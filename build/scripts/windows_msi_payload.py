@@ -12,6 +12,7 @@ REQUIRED_MARKER = {
     "architecture": "x64",
     "bridgeVersion": "1",
 }
+APPROVED_MAIN_CLASS = "com.shale.desktop.ShaleLauncher"
 
 def tag(name):
     return f"{{{NS}}}{name}"
@@ -78,6 +79,46 @@ def required_file(root, filename, expected_directory, label):
         raise ValueError(f"missing extracted {label} payload: {source or '<missing Source>'}")
     return Path(source)
 
+def required_source_file(root, filename, expected_directory, label):
+    matches = []
+    for node in root.iter(tag("File")):
+        source = node.get("Source", "")
+        basename = source.replace("/", "\\").rsplit("\\", 1)[-1]
+        if basename.casefold() == filename.casefold():
+            matches.append(node)
+    if not matches:
+        raise ValueError(f"missing generated {label} File entry: {filename}")
+    if len(matches) != 1:
+        raise ValueError(f"duplicate generated {label} File entries: {filename} ({len(matches)})")
+    node = matches[0]
+    if installed_directory(root, node) != expected_directory:
+        raise ValueError(f"generated {label} is in the wrong installed directory")
+    source = Path(node.get("Source"))
+    if not source.is_file():
+        raise ValueError(f"missing generated {label} payload: {source}")
+    return source
+
+def validate_launcher_config(path):
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError as error:
+        raise ValueError(f"launcher configuration is unreadable: {error.__class__.__name__}") from None
+    section = ""
+    values = []
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith(("#", ";")):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1]
+            continue
+        if section == "Application" and line.startswith("app.mainclass="):
+            values.append(line.partition("=")[2].strip())
+    if len(values) != 1:
+        raise ValueError(f"launcher configuration must contain exactly one app.mainclass; found {len(values)}")
+    if values[0] != APPROVED_MAIN_CLASS:
+        raise ValueError(f"launcher configuration app.mainclass is not approved: {values[0] or '<empty>'}")
+
 def marker_properties(path):
     required = {key: [] for key in REQUIRED_MARKER}
     try:
@@ -105,23 +146,31 @@ def marker_properties(path):
         if values[0] != expected:
             raise ValueError(f"invalid installed marker contents: conflicting value for {key}")
 
-def validate(wxs):
+def validate_compiled(wxs):
     root = ET.parse(wxs).getroot()
     marker = required_file(root, "shale-windows-toast.properties", ("app",), "installed marker")
     required_file(root, "shale_windows_toast.dll", ("app", "native"), "native DLL")
     required_file(root, "Shale.exe", (), "launcher")
+    launcher_config = required_file(root, "Shale.cfg", ("app",), "launcher configuration")
     marker_properties(marker)
+    validate_launcher_config(launcher_config)
+
+def validate_source(wxs):
+    root = ET.parse(wxs).getroot()
+    launcher_config = required_source_file(root, "Shale.cfg", ("app",), "launcher configuration")
+    validate_launcher_config(launcher_config)
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("wxs", type=Path)
+    parser.add_argument("mode", choices=["config", "source", "compiled"])
+    parser.add_argument("path", type=Path)
     args = parser.parse_args()
     try:
-        validate(args.wxs)
+        {"config": validate_launcher_config, "source": validate_source, "compiled": validate_compiled}[args.mode](args.path)
     except (OSError, ET.ParseError, ValueError) as error:
         print(f"Windows MSI payload validation failed: {error}", file=sys.stderr)
         return 1
-    print(f"Windows MSI payload validation passed: {args.wxs.name}")
+    print(f"Windows launcher/payload {args.mode} validation passed: {args.path.name}")
     return 0
 
 if __name__ == "__main__":

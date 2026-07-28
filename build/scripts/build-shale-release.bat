@@ -42,10 +42,12 @@ jpackage ^
   --input "%DESKTOP_TARGET%" ^
   --dest "%DIST_APP%" ^
   --main-jar "shale-desktop-%VERSION%.jar" ^
-  --main-class "com.shale.desktop.MainApp" ^
+  --main-class "com.shale.desktop.ShaleLauncher" ^
   --module-path "%JMODS_DIR%" ^
   --add-modules javafx.controls,javafx.fxml,java.sql,java.naming,java.net.http,jdk.crypto.ec ^
   --icon "%ASSETS_DIR%\Shale.ico" || goto :fail
+
+python "%ROOT%\build\scripts\windows_msi_payload.py" config "%DIST_APP%\Shale\app\Shale.cfg" || goto :fail
 
 powershell -NoProfile -Command "Compress-Archive -Path '%DIST_APP%\Shale\*' -DestinationPath '%DIST%\ShaleApp-%VERSION%.zip' -Force" || goto :fail
 

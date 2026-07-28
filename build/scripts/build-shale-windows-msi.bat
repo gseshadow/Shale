@@ -54,13 +54,14 @@ copy /y "%ROOT%\build\packaging\windows\shale-windows-toast.properties" "%APPINP
 
 echo Starting jpackage and WiX MSI construction...
 jpackage --type msi --name Shale --input "%APPINPUT%" --dest "%PRELIM%" --temp "%JPACKAGE_TEMP%" --verbose ^
- --main-jar "shale-desktop-%VERSION%.jar" --main-class com.shale.desktop.MainApp ^
+ --main-jar "shale-desktop-%VERSION%.jar" --main-class com.shale.desktop.ShaleLauncher ^
  --icon "%ROOT%\build\assets\Shale.ico" --app-version "%VERSION%" --vendor "Get Downing" ^
  --description "Shale Desktop" --win-menu --win-shortcut --win-dir-chooser --win-per-user-install --install-dir Shale || exit /b 18
 echo Preliminary jpackage MSI completed.
 if not exist "%PRELIMINARY_MSI%" goto :missing_preliminary_msi
 if not exist "%BUNDLE_SOURCE%" goto :missing_bundle
 echo Generated bundle.wxf location verified: "%BUNDLE_SOURCE%"
+python "%ROOT%\build\scripts\windows_msi_payload.py" source "%BUNDLE_SOURCE%" || exit /b 20
 python "%ROOT%\build\scripts\windows_msi_identity.py" inspect "%BUNDLE_SOURCE%" || exit /b 20
 echo Generated WiX identity validation passed.
 python "%ROOT%\build\scripts\windows_msi_identity.py" mutate "%BUNDLE_SOURCE%" || exit /b 20
@@ -108,7 +109,7 @@ dark.exe -x "%STAGE%\dark\payload" -o "%STAGE%\dark\final.wxs" "%FINAL_MSI%"
 if errorlevel 1 goto :dark_failed
 echo dark.exe inspection completed.
 python "%ROOT%\build\scripts\windows_msi_identity.py" validate "%STAGE%\dark\final.wxs" || exit /b 26
-python "%ROOT%\build\scripts\windows_msi_payload.py" "%STAGE%\dark\final.wxs" || exit /b 27
+python "%ROOT%\build\scripts\windows_msi_payload.py" compiled "%STAGE%\dark\final.wxs" || exit /b 27
 echo Final identity and payload validation passed.
 copy /y "%FINAL_MSI%" "%ROOT%\dist\Shale-%VERSION%.msi.new" >nul || exit /b 29
 move /y "%ROOT%\dist\Shale-%VERSION%.msi.new" "%ROOT%\dist\Shale-%VERSION%.msi" >nul || exit /b 30
