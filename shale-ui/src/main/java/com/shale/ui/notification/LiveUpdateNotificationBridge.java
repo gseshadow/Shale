@@ -26,6 +26,7 @@ public final class LiveUpdateNotificationBridge {
 	private final NotificationCenterService notificationCenterService;
 	private final NotificationPreferencesService notificationPreferencesService;
 	private final Clock clock;
+	private final Consumer<AppNotification> newlyVisibleNotificationConsumer;
 	private final Map<String, Instant> recentEventKeys = new LinkedHashMap<>();
 	private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> eventHandler = this::handleEntityUpdated;
 
@@ -39,17 +40,39 @@ public final class LiveUpdateNotificationBridge {
 		this(runtimeBridge, appState, notificationCenterService, notificationPreferencesService, Clock.systemUTC());
 	}
 
+	public LiveUpdateNotificationBridge(
+			UiRuntimeBridge runtimeBridge,
+			AppState appState,
+			NotificationCenterService notificationCenterService,
+			NotificationPreferencesService notificationPreferencesService,
+			Consumer<AppNotification> newlyVisibleNotificationConsumer) {
+		this(runtimeBridge, appState, notificationCenterService, notificationPreferencesService, Clock.systemUTC(),
+				newlyVisibleNotificationConsumer);
+	}
+
 	LiveUpdateNotificationBridge(
 			UiRuntimeBridge runtimeBridge,
 			AppState appState,
 			NotificationCenterService notificationCenterService,
 			NotificationPreferencesService notificationPreferencesService,
 			Clock clock) {
+		this(runtimeBridge, appState, notificationCenterService, notificationPreferencesService, clock, ignored -> { });
+	}
+
+	LiveUpdateNotificationBridge(
+			UiRuntimeBridge runtimeBridge,
+			AppState appState,
+			NotificationCenterService notificationCenterService,
+			NotificationPreferencesService notificationPreferencesService,
+			Clock clock,
+			Consumer<AppNotification> newlyVisibleNotificationConsumer) {
 		this.runtimeBridge = Objects.requireNonNull(runtimeBridge, "runtimeBridge");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.notificationCenterService = Objects.requireNonNull(notificationCenterService, "notificationCenterService");
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.clock = Objects.requireNonNull(clock, "clock");
+		this.newlyVisibleNotificationConsumer = Objects.requireNonNull(newlyVisibleNotificationConsumer,
+				"newlyVisibleNotificationConsumer");
 	}
 
 	public void start() {
@@ -123,7 +146,7 @@ public final class LiveUpdateNotificationBridge {
 		String caseResponsibleAttorney = stringValue(event.patch().get("caseResponsibleAttorney"));
 		String caseResponsibleAttorneyColor = stringValue(event.patch().get("caseResponsibleAttorneyColor"));
 		Boolean caseNonEngagementLetterSent = booleanValue(event.patch().get("caseNonEngagementLetterSent"));
-		notificationCenterService.pushNotification(new AppNotification(
+		AppNotification notification = new AppNotification(
 				event.eventId() == null || event.eventId().isBlank()
 						? "task-" + event.entityId() + "-" + createdAt.toEpochMilli()
 						: event.eventId(),
@@ -146,7 +169,8 @@ public final class LiveUpdateNotificationBridge {
 					caseName,
 					caseResponsibleAttorney,
 					caseResponsibleAttorneyColor,
-					caseNonEngagementLetterSent));
+					caseNonEngagementLetterSent);
+		pushAndOffer(notification);
 		long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
 		PerfLog.debug(log, "PERF notifications.live.handle type=TASK eventId={} entityId={} durableId={} elapsedMs={}",
 				event.eventId(), entityId, durableNotificationId, elapsedMs);
@@ -165,7 +189,7 @@ public final class LiveUpdateNotificationBridge {
 		Object eventKeyValue = event.patch().get("eventKey");
 		String eventKey = eventKeyValue == null ? null : String.valueOf(eventKeyValue);
 		Instant createdAt = parseTimestamp(event.timestamp());
-		notificationCenterService.pushNotification(new AppNotification(
+		AppNotification notification = new AppNotification(
 				event.eventId() == null || event.eventId().isBlank() ? "calendar-" + event.entityId() + "-" + createdAt.toEpochMilli() : event.eventId(),
 				NotificationCategory.CALENDAR,
 				NotificationSeverity.INFO,
@@ -180,9 +204,15 @@ public final class LiveUpdateNotificationBridge {
 				"CalendarEvent",
 				event.entityId() > 0 ? event.entityId() : null,
 				null,
-				"CALENDAR_EVENT_ASSIGNED"));
+				"CALENDAR_EVENT_ASSIGNED");
+		pushAndOffer(notification);
 		PerfLog.debug(log, "PERF notifications.live.handle type=CALENDAR_EVENT_ASSIGNED eventId={} targetUserId={} currentUserId={} deliveredLive=true",
 				event.eventId(), targetUserId, currentUserId);
+	}
+
+	private void pushAndOffer(AppNotification notification) {
+		notificationCenterService.pushNotification(notification);
+		newlyVisibleNotificationConsumer.accept(notification);
 	}
 
 	private void logLiveSkipped(UiRuntimeBridge.EntityUpdatedEvent event, String reason, long startNanos) {

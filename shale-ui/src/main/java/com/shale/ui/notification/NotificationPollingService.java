@@ -33,7 +33,9 @@ public final class NotificationPollingService implements AutoCloseable {
 	private final DoubleSupplier jitter;
 	private final Config config;
 	private final boolean ownsScheduler;
-	private final Set<Long> presentedOrAttempted = new HashSet<>();
+	private final Set<Long> presented = new HashSet<>();
+	private final Set<Long> terminallySuppressed = new HashSet<>();
+	private final Set<Long> inFlight = new HashSet<>();
 	private long generation;
 	private Session session;
 	private ScheduledFuture<?> scheduled;
@@ -74,8 +76,24 @@ public final class NotificationPollingService implements AutoCloseable {
 		stopInternal();
 		long token = ++generation;
 		session = new Session(shaleClientId, userId, token, null, false, 0);
-		presentedOrAttempted.clear();
+		presented.clear();
+		terminallySuppressed.clear();
+		inFlight.clear();
 		schedule(token, Duration.ZERO);
+	}
+
+	/**
+	 * Offers the exact notification just made visible in-app for native presentation in the
+	 * same refresh cycle. Presentation remains serialized on the polling worker.
+	 */
+	public void offerNewlyVisible(AppNotification notification) {
+		Objects.requireNonNull(notification, "notification");
+		long token;
+		synchronized (this) {
+			if (closed || session == null) return;
+			token = generation;
+		}
+		scheduler.schedule(() -> present(token, notification), 0, TimeUnit.MILLISECONDS);
 	}
 
 	public synchronized void stop() {
@@ -87,7 +105,9 @@ public final class NotificationPollingService implements AutoCloseable {
 		if (scheduled != null) scheduled.cancel(true);
 		scheduled = null;
 		session = null;
-		presentedOrAttempted.clear();
+		presented.clear();
+		terminallySuppressed.clear();
+		inFlight.clear();
 		presenter.invalidate();
 	}
 
@@ -144,13 +164,39 @@ public final class NotificationPollingService implements AutoCloseable {
 			AppNotification appNotification = mapper.map(row);
 			if (appNotification != null) uiExecutor.accept(() -> { if (active(token)) merger.accept(appNotification); });
 			if (appNotification == null) continue;
-			synchronized (this) { if (!active(token) || !presentedOrAttempted.add(row.id())) continue; }
-			try {
-				presenter.present(projector.project(row, appNotification));
-			} catch (RuntimeException ignored) {
-				log.warn("Notification presenter failed notificationId={} category={} code=presenter_failed",
-						row.id(), NotificationPrivacyProjector.allowlistedCategory(row.category()));
+			present(token, appNotification);
+		}
+	}
+
+	private void present(long token, AppNotification notification) {
+		Long notificationId = notification.getDurableNotificationId();
+		if (notificationId == null || notificationId <= 0) {
+			log.debug("Native notification skipped notificationId={} code=missing_durable_id", notificationId);
+			return;
+		}
+		synchronized (this) {
+			if (!active(token) || presented.contains(notificationId)
+					|| terminallySuppressed.contains(notificationId) || !inFlight.add(notificationId)) return;
+		}
+		PresentationResult result = PresentationResult.FAILED;
+		try {
+			result = presenter.present(projector.project(notification));
+		} catch (RuntimeException ignored) {
+			log.warn("Notification presenter failed notificationId={} category={} code=presenter_failed",
+					notificationId, NotificationPrivacyProjector.allowlistedCategory(notification.getCategory().name()));
+		} finally {
+			synchronized (this) {
+				inFlight.remove(notificationId);
+				if (result == PresentationResult.PRESENTED) presented.add(notificationId);
+				else if (result == PresentationResult.SUPPRESSED || result == PresentationResult.UNSUPPORTED) {
+					terminallySuppressed.add(notificationId);
+				}
 			}
+		}
+		if (result == PresentationResult.FAILED && active(token)) {
+			log.warn("Notification presentation retry notificationId={} delayMs={} code=presentation_failed",
+					notificationId, config.initialRetryDelay().toMillis());
+			scheduler.schedule(() -> present(token, notification), config.initialRetryDelay().toMillis(), TimeUnit.MILLISECONDS);
 		}
 	}
 

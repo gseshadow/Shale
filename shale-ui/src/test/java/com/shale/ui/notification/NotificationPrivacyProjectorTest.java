@@ -43,6 +43,15 @@ class NotificationPrivacyProjectorTest {
 		assertEquals(42L, display.getDurableNotificationId());
 	}
 
+	@Test void newlyVisibleProjectionUsesTheSameInAppObjectWithoutDurableRediscovery() {
+		AppNotification display = app("Task updated", "A task assigned to you was updated.", "TASK_TITLE_CHANGED");
+		NativeNotificationPresentation nativeDisplay = projector.project(display);
+		assertEquals(42L, nativeDisplay.notificationId());
+		assertEquals(display.getTitle(), nativeDisplay.heading());
+		assertEquals(display.getMessage(), nativeDisplay.message());
+		assertEquals("TASK", nativeDisplay.categoryCode());
+	}
+
 	@Test void presentationAndPresenterContractsExposeOnlyRestrictedType() {
 		Set<String> fields = Arrays.stream(NativeNotificationPresentation.class.getRecordComponents())
 				.map(RecordComponent::getName).collect(Collectors.toSet());

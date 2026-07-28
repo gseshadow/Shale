@@ -28,6 +28,26 @@ public final class NotificationPrivacyProjector {
 		return new NativeNotificationPresentation(source.id(), FALLBACK_HEADING, fallbackMessage(category), category);
 	}
 
+	/** Projects a newly visible in-app notification without waiting for durable polling to rediscover it. */
+	public NativeNotificationPresentation project(AppNotification display) {
+		Objects.requireNonNull(display, "display");
+		Long notificationId = display.getDurableNotificationId();
+		if (notificationId == null || notificationId <= 0) {
+			throw new IllegalArgumentException("A positive durable notification id is required");
+		}
+		String category = allowlistedCategory(display.getCategory().name());
+		if ("TASK".equals(category) && recognizedTaskAction(display.getActionType())
+				&& usable(display.getTitle()) && usable(display.getMessage())) {
+			return new NativeNotificationPresentation(notificationId, display.getTitle().trim(),
+					display.getMessage().trim(), category);
+		}
+		String reason = "TASK".equals(category)
+				? (recognizedTaskAction(display.getActionType()) ? "missing_display_content" : "unrecognized_type")
+				: "category_not_display_allowlisted";
+		log.debug("Native notification fallback notificationId={} type={} reason={}", notificationId, category, reason);
+		return new NativeNotificationPresentation(notificationId, FALLBACK_HEADING, fallbackMessage(category), category);
+	}
+
 	private static boolean usable(String value) { return value != null && !value.isBlank(); }
 
 	private static boolean recognizedTaskAction(String value) {

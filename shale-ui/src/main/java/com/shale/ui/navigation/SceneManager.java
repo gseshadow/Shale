@@ -172,7 +172,9 @@ public final class SceneManager {
 		});
 		this.notificationCenterService.setReadListener(durableNotificationService::markRead);
 		this.notificationCenterService.setDismissListener(durableNotificationService::dismiss);
-		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState, notificationCenterService, notificationPreferencesService);
+		this.liveUpdateNotificationBridge = new LiveUpdateNotificationBridge(runtimeBridge, appState,
+				notificationCenterService, notificationPreferencesService,
+				notificationPollingService::offerNewlyVisible);
 		this.connectivityNotificationProducer = new ConnectivityNotificationProducer(runtimeBridge, notificationCenterService, notificationPreferencesService);
 		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
 		this.updatePollingService = new UpdatePollingService(updateLauncher, this::onUpdateCheckCompleted);
@@ -229,7 +231,6 @@ public final class SceneManager {
 		Platform.runLater(() -> System.out.println("[StartupTiming] main shell visible"));
 		startNotificationBadgeCountAsync();
 		notificationPreferencesService.refreshActivePreferences();
-		liveUpdateNotificationBridge.start();
 		connectivityNotificationProducer.start();
 		taskDueDateNotificationGenerator.start();
 		Integer pollingTenantId = appState.getShaleClientId();
@@ -237,6 +238,7 @@ public final class SceneManager {
 		if (pollingTenantId != null && pollingTenantId > 0 && pollingUserId != null && pollingUserId > 0) {
 			notificationPollingService.start(pollingTenantId, pollingUserId);
 		}
+		liveUpdateNotificationBridge.start();
 		updatePollingService.start();
 		startNotificationBootstrapAsync();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");

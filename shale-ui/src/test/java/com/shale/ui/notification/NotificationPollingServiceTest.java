@@ -85,11 +85,50 @@ class NotificationPollingServiceTest {
  @Test void presenterFailureDoesNotStopMergeOrLaterPolling() {
   ManualScheduler scheduler=new ManualScheduler();FakeSource source=new FakeSource(1);
   source.pages.add(page(List.of(summary(2,"ASSIGNED",Instant.EPOCH)),2,false));source.pages.add(page(List.of(summary(3,"ASSIGNED",Instant.EPOCH)),3,false));
-  List<AppNotification> merged=new ArrayList<>();var service=service(source,scheduler,merged,p->{throw new RuntimeException("CLIENT SECRET");},()->.5,config());
+  List<AppNotification> merged=new ArrayList<>();AtomicInteger attempts=new AtomicInteger();
+  var service=service(source,scheduler,merged,p->{if(attempts.incrementAndGet()==1)throw new RuntimeException("CLIENT SECRET");return PresentationResult.PRESENTED;},()->.5,config());
   PrintStream original=System.err;ByteArrayOutputStream captured=new ByteArrayOutputStream();System.setErr(new PrintStream(captured));
-  try{service.start(7,9);scheduler.runNext();scheduler.runNext();assertEquals(2,merged.size());}finally{System.setErr(original);}
+  try{service.start(7,9);scheduler.runNext();scheduler.runNext();scheduler.runNext();assertEquals(2,merged.size());}finally{System.setErr(original);}
   String logs=captured.toString(StandardCharsets.UTF_8);
   assertFalse(logs.contains("CLIENT SECRET"));assertFalse(logs.contains("PRIVATE TITLE"));assertFalse(logs.contains("PRIVATE MESSAGE"));
+ }
+
+ @Test void newlyVisibleNotificationIsOfferedInSameRefreshCycleWithoutWaitingForPeriodicPoll() {
+  ManualScheduler scheduler=new ManualScheduler();FakeSource source=new FakeSource(10);
+  source.pages.add(page(List.of(),10,false));List<Long> presented=new ArrayList<>();
+  var service=service(source,scheduler,new ArrayList<>(),p->{presented.add(p.notificationId());return PresentationResult.PRESENTED;},()->.5,config());
+  service.start(7,9);scheduler.runNext();
+  service.offerNewlyVisible(map(summary(11,"ASSIGNED",Instant.EPOCH)));
+  assertTrue(presented.isEmpty(),"offer must not block its caller with native presentation");
+  assertEquals(0,scheduler.nextDelay(),"live delivery must precede the periodic database poll");
+  scheduler.runNext();assertEquals(List.of(11L),presented);
+ }
+
+ @Test void overlappingLiveAndPollingResultsPresentOnlyOnce() {
+  ManualScheduler scheduler=new ManualScheduler();FakeSource source=new FakeSource(10);
+  source.pages.add(page(List.of(),10,false));source.pages.add(page(List.of(summary(11,"ASSIGNED",Instant.EPOCH)),11,false));
+  AtomicInteger attempts=new AtomicInteger();var service=service(source,scheduler,new ArrayList<>(),p->{attempts.incrementAndGet();return PresentationResult.PRESENTED;},()->.5,config());
+  service.start(7,9);scheduler.runNext();service.offerNewlyVisible(map(summary(11,"ASSIGNED",Instant.EPOCH)));
+  scheduler.runNext();scheduler.runNext();assertEquals(1,attempts.get());
+ }
+
+ @Test void failedNativePresentationRemainsRetryableAndIsMarkedOnlyAfterSuccess() {
+  ManualScheduler scheduler=new ManualScheduler();FakeSource source=new FakeSource(10);
+  source.pages.add(page(List.of(),10,false));AtomicInteger attempts=new AtomicInteger();
+  var service=service(source,scheduler,new ArrayList<>(),p->attempts.incrementAndGet()==1?PresentationResult.FAILED:PresentationResult.PRESENTED,()->.5,config());
+  service.start(7,9);scheduler.runNext();service.offerNewlyVisible(map(summary(11,"ASSIGNED",Instant.EPOCH)));
+  scheduler.runNext();assertEquals(1,attempts.get());assertEquals(100,scheduler.nextDelay());
+  scheduler.runNext();assertEquals(2,attempts.get());
+  service.offerNewlyVisible(map(summary(11,"ASSIGNED",Instant.EPOCH)));scheduler.runNext();assertEquals(2,attempts.get());
+ }
+
+ @Test void unsupportedDesktopPresentationDoesNotSuppressInAppMergeOrRetryContinuously() {
+  ManualScheduler scheduler=new ManualScheduler();FakeSource source=new FakeSource(10);
+  source.pages.add(page(List.of(summary(11,"ASSIGNED",Instant.EPOCH)),11,false));List<AppNotification> merged=new ArrayList<>();AtomicInteger attempts=new AtomicInteger();
+  var service=service(source,scheduler,merged,p->{attempts.incrementAndGet();return PresentationResult.UNSUPPORTED;},()->.5,config());
+  service.start(7,9);scheduler.runNext();assertEquals(1,merged.size());assertEquals(1,attempts.get());
+  service.offerNewlyVisible(map(summary(11,"ASSIGNED",Instant.EPOCH)));scheduler.runNext();
+  assertEquals(1,attempts.get());assertEquals(1,merged.size());
  }
 
  @Test void logoutRejectsUiResultsAlreadyQueuedByOldGeneration() {
@@ -104,7 +143,7 @@ class NotificationPollingServiceTest {
   return new NotificationPollingService(source,NotificationPollingServiceTest::map,merged::add,new NotificationPrivacyProjector(),presenter,scheduler,Runnable::run,jitter,cfg,true);
  }
  private static NotificationPollingService.Config config(){return new NotificationPollingService.Config(Duration.ofMillis(1000),Duration.ofMillis(100),Duration.ofMillis(800),0,10);}
- private static AppNotification map(NotificationSummary s){return new AppNotification("db-"+s.id(),NotificationCategory.TASK,NotificationSeverity.INFO,"safe","safe",s.createdAt(),!s.read(),false,NotificationTargetScope.USER_SCOPED,s.id(),s.eventKey());}
+ private static AppNotification map(NotificationSummary s){return new AppNotification("db-"+s.id(),NotificationCategory.TASK,NotificationSeverity.INFO,"safe","safe",s.createdAt(),!s.read(),false,NotificationTargetScope.USER_SCOPED,s.id(),s.eventKey(),"Task",99L,"safe",s.actionType());}
  private static NotificationSummary summary(long id,String action,Instant time){return new NotificationSummary(id,7,9,"TASK","INFO","PRIVATE TITLE","PRIVATE MESSAGE","TASK",99L,action,"event-"+id,null,"PRIVATE ENTITY",1L,"PRIVATE CASE",null,null,null,null,null,null,time,false);}
  private static NotificationPage page(List<NotificationSummary> items,long next,boolean more){return new NotificationPage(items,NotificationCursor.after(next),more);}
 
