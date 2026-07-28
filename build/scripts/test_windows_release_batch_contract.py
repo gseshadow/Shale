@@ -143,10 +143,11 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         light = source.index("Final light.exe reconstruction started.")
         dark = source.index("dark.exe -x", light)
         identity = source.index('windows_msi_identity.py" validate', dark)
-        marker = source.index("shale-windows-toast.properties", identity)
-        dll = source.index("shale_windows_toast.dll", marker)
-        publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', dll)
-        self.assertEqual([light, dark, identity, marker, dll, publish], sorted([light, dark, identity, marker, dll, publish]))
+        payload = source.index('windows_msi_payload.py" "%STAGE%\\dark\\final.wxs"', identity)
+        publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', payload)
+        self.assertEqual([light, dark, identity, payload, publish], sorted([light, dark, identity, payload, publish]))
+        self.assertIn('windows_msi_payload.py" "%STAGE%\\dark\\final.wxs" || exit /b 27', source)
+        self.assertNotIn('dir /s /b "%STAGE%\\dark\\payload', source)
         self.assertNotIn('copy /y "%PRELIMINARY_MSI%"', source)
 
 if __name__ == "__main__":

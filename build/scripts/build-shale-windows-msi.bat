@@ -108,10 +108,7 @@ dark.exe -x "%STAGE%\dark\payload" -o "%STAGE%\dark\final.wxs" "%FINAL_MSI%"
 if errorlevel 1 goto :dark_failed
 echo dark.exe inspection completed.
 python "%ROOT%\build\scripts\windows_msi_identity.py" validate "%STAGE%\dark\final.wxs" || exit /b 26
-dir /s /b "%STAGE%\dark\payload\shale-windows-toast.properties" >nul 2>nul
-if errorlevel 1 goto :missing_marker
-dir /s /b "%STAGE%\dark\payload\shale_windows_toast.dll" >nul 2>nul
-if errorlevel 1 goto :missing_dll
+python "%ROOT%\build\scripts\windows_msi_payload.py" "%STAGE%\dark\final.wxs" || exit /b 27
 echo Final identity and payload validation passed.
 copy /y "%FINAL_MSI%" "%ROOT%\dist\Shale-%VERSION%.msi.new" >nul || exit /b 29
 move /y "%ROOT%\dist\Shale-%VERSION%.msi.new" "%ROOT%\dist\Shale-%VERSION%.msi" >nul || exit /b 30
@@ -193,14 +190,6 @@ exit /b 40
 :dark_failed
 echo dark.exe compiled-MSI inspection failed for: "%FINAL_MSI%"
 exit /b 25
-
-:missing_marker
-echo Installed marker missing.
-exit /b 27
-
-:missing_dll
-echo JNI DLL missing.
-exit /b 28
 
 :require_tool
 where "%~1" >nul 2>nul
