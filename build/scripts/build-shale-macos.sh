@@ -234,7 +234,7 @@ build_package() {
     --dest "$DIST_DIR" \
     --icon "$ROOT/build/assets/Shale.icns" \
     --main-jar "shale-desktop-$VERSION.jar" \
-    --main-class com.shale.desktop.MainApp \
+    --main-class com.shale.desktop.ShaleLauncher \
     --runtime-image "$RUNTIME_IMAGE" \
     --app-version "$VERSION" \
     --vendor "Get Downing" \

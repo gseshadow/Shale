@@ -12,6 +12,7 @@ import javafx.application.Platform;
 import javafx.stage.Stage;
 
 import com.shale.desktop.update.DesktopUiUpdateLauncher;
+import com.shale.desktop.notification.DesktopNotificationPresenterFactory;
 
 import java.util.Objects;
 
@@ -57,7 +58,8 @@ public final class SceneRouter {
 				uiAuthService,
 				runtimeBridge,
 				dbProvider,
-				updateLauncher
+				updateLauncher,
+				DesktopNotificationPresenterFactory.create()
 		);
 	}
 
@@ -75,5 +77,9 @@ public final class SceneRouter {
 
 	public void close() {
 		stage.close();
+	}
+
+	public void shutdown() {
+		sceneManager.shutdown();
 	}
 }

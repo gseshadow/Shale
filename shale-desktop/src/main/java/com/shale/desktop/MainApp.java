@@ -37,6 +37,9 @@ public final class MainApp extends Application {
 
 	@Override
 	public void stop() {
+		if (router != null) {
+			router.shutdown();
+		}
 		SessionContext sessionContext = new SessionContext();
 		// If runtimeBridge needs shutdown, call it here
 		sessionContext.clear();
