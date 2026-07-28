@@ -60,10 +60,15 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn('set "VALIDATOR=%~dp0validate_windows_msi_toolchain.py"', source)
         self.assertIn('python "%VALIDATOR%"', source)
         self.assertIn('if errorlevel 1 goto :wix_toolchain_failed', source)
+        self.assertIn('if not defined JAVA_HOME for %%J in ("!JAVA_PATH!") do set "JAVA_BIN=%%~dpJ"', source)
+        self.assertIn('if not defined JAVA_HOME for %%H in ("!JAVA_BIN!..") do set "JAVA_HOME=%%~fH"', source)
+        self.assertIn('if not exist "!JAVA_HOME!\\include\\jni.h" goto :missing_jni_headers', source)
+        self.assertIn('Toolchain check tool=JNI resolved="!JAVA_HOME!\\include\\jni.h" check=header-exists', source)
         self.assertIn('echo Toolchain validator: "%VALIDATOR%"', source)
         self.assertIn('classification=WiX-toolchain exit=%WIX_VALIDATION_EXIT%', source)
         self.assertNotIn("call :require_tool", source)
-        self.assertIn('call "%ROOT%\\build\\native\\windows-toast\\build-native.bat"', source)
+        self.assertIn('set "NATIVE_BUILD_SCRIPT=%ROOT%\\build\\native\\windows-toast\\build-native.bat"', source)
+        self.assertIn('call "%NATIVE_BUILD_SCRIPT%"', source)
         self.assertIn('--main-class com.shale.desktop.ShaleLauncher', source)
         self.assertNotIn('--main-class com.shale.desktop.MainApp', source)
         self.assertIn("candle.exe -nologo", source)
@@ -103,7 +108,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
     def test_native_dependency_report_parent_exists_before_redirection(self):
         source = (ROOT / "build/native/windows-toast/build-native.bat").read_text(encoding="utf-8")
         mkdir = source.index('if not exist "%DEPENDENCY_DIR%" mkdir "%DEPENDENCY_DIR%"')
-        redirect = source.index('dumpbin.exe /nologo /dependents "%DLL_PATH%" >"%DEPENDENCIES%"')
+        redirect = source.index('"!DUMPBIN_PATH!" /nologo /dependents "%DLL_PATH%" >"%DEPENDENCIES%"')
         self.assertLess(mkdir, redirect)
         self.assertIn("set DEPENDENCY_DIR=%ROOT%\\build\\staging\\windows-toast-dependencies", source)
         self.assertNotIn("set DEPENDENCIES=%TEMP%", source)
@@ -205,7 +210,8 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         payload = source.index('windows_msi_payload.py" compiled "%STAGE%\\dark\\final.wxs"', identity)
         publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', payload)
         self.assertEqual([light, dark, identity, payload, publish], sorted([light, dark, identity, payload, publish]))
-        self.assertIn('windows_msi_payload.py" compiled "%STAGE%\\dark\\final.wxs" || exit /b 27', source)
+        self.assertIn('windows_msi_payload.py" compiled "%STAGE%\\dark\\final.wxs"', source)
+        self.assertIn('if errorlevel 1 goto :compiled_payload_failed', source)
         self.assertNotIn('dir /s /b "%STAGE%\\dark\\payload', source)
         self.assertNotIn('copy /y "%PRELIMINARY_MSI%"', source)
 
@@ -229,6 +235,35 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         publish = msi.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"')
         self.assertLess(source_validation, final_validation)
         self.assertLess(final_validation, publish)
+
+    def test_successful_toolchain_reaches_named_native_stage_without_stale_errorlevel(self):
+        source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
+        success = source.index("Windows MSI stage completed: toolchain-validation")
+        staging = source.index("Windows MSI stage started: staging", success)
+        native = source.index("Windows MSI stage started: native-DLL", staging)
+        call = source.index('call "%NATIVE_BUILD_SCRIPT%"', native)
+        capture = source.index('set "NATIVE_BUILD_EXIT=!ERRORLEVEL!"', call)
+        check = source.index('if not "!NATIVE_BUILD_EXIT!"=="0" goto :native_build_failed', capture)
+        self.assertEqual([success, staging, native, call, capture, check], sorted([success, staging, native, call, capture, check]))
+        self.assertNotIn('build-native.bat" "%APPINPUT%\\native" || exit /b', source)
+
+    def test_every_post_toolchain_operation_has_fail_closed_stage_diagnostics(self):
+        source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
+        stages = (
+            "staging", "native-DLL", "marker-staging", "preliminary-jpackage",
+            "generated-payload-validation", "generated-identity-validation",
+            "generated-identity-mutation", "candle-recompile", "light-reconstruction",
+            "dark-extraction", "compiled-identity-validation", "compiled-payload-validation",
+            "artifact-finalization",
+        )
+        toolchain = source.index("Windows MSI stage completed: toolchain-validation")
+        publish = source.index("Final MSI publication completed:", toolchain)
+        for stage in stages:
+            self.assertIn(f"stage={stage}", source)
+            self.assertLess(toolchain, source.index(f"stage={stage}"))
+        self.assertIn('echo Windows MSI stage failed:', source)
+        self.assertIn('exit=!NATIVE_BUILD_EXIT!', source)
+        self.assertGreater(publish, source.index("Windows MSI stage started: compiled-payload-validation"))
 
 if __name__ == "__main__":
     unittest.main()
