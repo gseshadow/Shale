@@ -20,47 +20,72 @@ def tag(name):
 def parent_map(root):
     return {child: parent for parent in root.iter() for child in parent}
 
-def directory_parents(root):
+def directory_graph(root):
     parents = {}
-    for directory in root.iter(tag("Directory")):
-        for child in directory.findall(tag("Directory")):
+    names = {}
+    for owner in root.iter():
+        if owner.tag not in (tag("Directory"), tag("DirectoryRef")):
+            continue
+        owner_id = owner.get("Id")
+        for child in owner.findall(tag("Directory")):
             child_id = child.get("Id")
+            if child_id and owner_id:
+                parents.setdefault(child_id, set()).add(owner_id)
             if child_id:
-                parents.setdefault(child_id, set()).add(directory.get("Id"))
-    return parents
+                names.setdefault(child_id, set()).add(child.get("Name"))
+        if owner.tag == tag("Directory") and owner_id:
+            names.setdefault(owner_id, set()).add(owner.get("Name"))
+    return parents, names
+
+def file_description(file_node, component, directory_id):
+    return (f"File Id={file_node.get('Id')!r} Name={file_node.get('Name')!r} "
+            f"Source={file_node.get('Source')!r} Component={component.get('Id')!r} "
+            f"Directory={directory_id!r}")
+
+def canonical_directory_paths(directory_id, parents, names, trail=()):
+    if directory_id == "INSTALLDIR":
+        return {()}
+    if directory_id in trail:
+        raise ValueError(f"cyclic installed directory graph: {' -> '.join(trail + (directory_id,))}")
+    parent_ids = parents.get(directory_id, set())
+    if not parent_ids:
+        return set()
+    declared_names = names.get(directory_id, {None})
+    paths = set()
+    for parent_id in parent_ids:
+        for parent_path in canonical_directory_paths(parent_id, parents, names, trail + (directory_id,)):
+            for name in declared_names:
+                paths.add(parent_path + (() if name in (None, ".") else (name,)))
+    return paths
 
 def installed_directory(root, file_node):
     parents = parent_map(root)
     component = parents.get(file_node)
     if component is None or component.tag != tag("Component"):
         raise ValueError(f"payload File {file_node.get('Name')!r} is not owned by a Component")
-    owner = parents.get(component)
-    while owner is not None and owner.tag not in (tag("Directory"), tag("DirectoryRef")):
-        owner = parents.get(owner)
-    if owner is None or not owner.get("Id"):
-        raise ValueError(f"payload File {file_node.get('Name')!r} has no installed directory")
+    directory_id = component.get("Directory")
+    if not directory_id:
+        owner = parents.get(component)
+        while owner is not None and owner.tag not in (tag("Directory"), tag("DirectoryRef")):
+            owner = parents.get(owner)
+        directory_id = None if owner is None else owner.get("Id")
+    description = file_description(file_node, component, directory_id)
+    if not file_node.get("Id"):
+        raise ValueError(f"payload File is missing required Id: {description}")
+    if not directory_id:
+        raise ValueError(f"payload File has no installed directory: {description}")
 
-    by_id = {node.get("Id"): node for node in root.iter(tag("Directory")) if node.get("Id")}
-    graph = directory_parents(root)
-    current = owner.get("Id")
-    names = []
-    visited = set()
-    while current != "INSTALLDIR":
-        if current in visited:
-            raise ValueError(f"payload File {file_node.get('Name')!r} has a cyclic installed directory graph")
-        visited.add(current)
-        declaration = by_id.get(current)
-        if declaration is None:
-            raise ValueError(f"payload File {file_node.get('Name')!r} directory is not beneath INSTALLDIR: {current}")
-        name = declaration.get("Name")
-        if not name:
-            raise ValueError(f"payload File {file_node.get('Name')!r} has an unnamed installed directory: {current}")
-        names.append(name)
-        parent_ids = graph.get(current, set())
-        if len(parent_ids) != 1:
-            raise ValueError(f"payload File {file_node.get('Name')!r} directory parent is ambiguous: {current}")
-        current = next(iter(parent_ids))
-    return tuple(reversed(names))
+    graph, names = directory_graph(root)
+    try:
+        paths = canonical_directory_paths(directory_id, graph, names)
+    except ValueError as error:
+        raise ValueError(f"{error}; {description}") from None
+    if not paths:
+        raise ValueError(f"payload directory is not beneath INSTALLDIR; {description}")
+    if len(paths) != 1:
+        candidates = ", ".join("INSTALLDIR" + "".join(f"/{item}" for item in path) for path in sorted(paths))
+        raise ValueError(f"payload directory has conflicting canonical paths [{candidates}]; {description}")
+    return next(iter(paths))
 
 def required_file(root, filename, expected_directory, label):
     matches = [node for node in root.iter(tag("File")) if node.get("Name", "").casefold() == filename.casefold()]

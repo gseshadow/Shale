@@ -2,6 +2,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
 spec = importlib.util.spec_from_file_location("payload", Path(__file__).with_name("windows_msi_payload.py"))
 m = importlib.util.module_from_spec(spec)
@@ -117,6 +118,35 @@ class CompiledPayloadTest(unittest.TestCase):
         config.write_text("[Application]\napp.mainclass=com.shale.desktop.MainApp\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "app.mainclass is not approved"):
             m.validate_source(wxs)
+
+    def test_repeated_directory_references_with_one_canonical_path_are_accepted(self):
+        xml = f'''<Wix xmlns="{m.NS}"><Fragment>
+          <DirectoryRef Id="INSTALLDIR"><Directory Id="alias-a"><Directory Id="shared-app" Name="app"/></Directory></DirectoryRef>
+          <DirectoryRef Id="INSTALLDIR"><Directory Id="alias-b"><Directory Id="shared-app" Name="app"/></Directory></DirectoryRef>
+          <DirectoryRef Id="shared-app"><Component Id="config-component"><File Id="config-file" Source="opaque-Shale.cfg"/></Component></DirectoryRef>
+        </Fragment></Wix>'''
+        root = ET.fromstring(xml)
+        file_node = next(root.iter(m.tag("File")))
+        self.assertEqual(("app",), m.installed_directory(root, file_node))
+
+    def test_genuinely_conflicting_canonical_paths_report_element_context(self):
+        xml = f'''<Wix xmlns="{m.NS}"><Fragment>
+          <DirectoryRef Id="INSTALLDIR"><Directory Id="app-parent" Name="app"><Directory Id="shared" Name="native"/></Directory></DirectoryRef>
+          <DirectoryRef Id="INSTALLDIR"><Directory Id="wrong-parent" Name="wrong"><Directory Id="shared" Name="native"/></Directory></DirectoryRef>
+          <Component Id="native-component" Directory="shared"><File Id="native-file" Name="shale_windows_toast.dll" Source="opaque-payload"/></Component>
+        </Fragment></Wix>'''
+        root = ET.fromstring(xml)
+        file_node = next(root.iter(m.tag("File")))
+        with self.assertRaisesRegex(ValueError, r"conflicting canonical paths.*INSTALLDIR/app/native.*INSTALLDIR/wrong/native.*Id='native-file'.*Component='native-component'.*Directory='shared'"):
+            m.installed_directory(root, file_node)
+
+    def test_missing_file_id_fails_with_component_and_source_context(self):
+        xml = f'''<Wix xmlns="{m.NS}"><Fragment><DirectoryRef Id="INSTALLDIR">
+          <Component Id="broken-component"><File Name="Shale.cfg" Source="opaque-source"/></Component>
+        </DirectoryRef></Fragment></Wix>'''
+        root = ET.fromstring(xml)
+        with self.assertRaisesRegex(ValueError, r"missing required Id.*Name='Shale.cfg'.*Source='opaque-source'.*Component='broken-component'"):
+            m.installed_directory(root, next(root.iter(m.tag("File"))))
 
 if __name__ == "__main__":
     unittest.main()
