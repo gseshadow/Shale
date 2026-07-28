@@ -682,6 +682,15 @@ public final class ApiReadController {
         return notificationServicePort.listNotifications(shaleClientId, userId, parsedCursor, limit);
     }
 
+    @Operation(summary = "Get notification high-water mark", description = "Returns an opaque cursor positioned at the current authenticated tenant/user maximum notification id.")
+    @GetMapping("/api/notifications/high-water")
+    public java.util.Map<String, String> notificationHighWaterMark() {
+        int shaleClientId = runtimeSessionState.requireShaleClientId();
+        int userId = runtimeSessionState.requireUserId();
+        long highWater = notificationServicePort.notificationHighWaterMark(shaleClientId, userId);
+        return java.util.Map.of("cursor", NotificationCursor.after(highWater).value());
+    }
+
     @Operation(summary = "Count unread notifications", description = "Returns the unread count for the current authenticated user and tenant.")
     @GetMapping("/api/notifications/unread-count")
     public java.util.Map<String, Integer> unreadNotificationCount() {
