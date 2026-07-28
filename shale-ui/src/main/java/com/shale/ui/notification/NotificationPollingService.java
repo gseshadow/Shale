@@ -146,7 +146,7 @@ public final class NotificationPollingService implements AutoCloseable {
 			if (appNotification == null) continue;
 			synchronized (this) { if (!active(token) || !presentedOrAttempted.add(row.id())) continue; }
 			try {
-				presenter.present(projector.project(row));
+				presenter.present(projector.project(row, appNotification));
 			} catch (RuntimeException ignored) {
 				log.warn("Notification presenter failed notificationId={} category={} code=presenter_failed",
 						row.id(), NotificationPrivacyProjector.allowlistedCategory(row.category()));
