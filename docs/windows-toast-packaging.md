@@ -8,9 +8,11 @@ The stable AppUserModelID is `com.shale.desktop.Shale`. The installed runtime is
 
 - JDK 21 and the Windows JavaFX jmods used by the release build.
 - WiX Toolset 3 (`candle.exe`, `light.exe`, and `dark.exe` on `PATH`).
-- Visual Studio 2022 Build Tools, **Desktop development with C++**, x64 MSVC tools, and a Windows 10/11 SDK containing C++/WinRT.
+- Visual Studio 2022 Build Tools, **Desktop development with C++**, x64 MSVC tools, and a Windows 10/11 SDK containing C++/WinRT. These, JDK 21, and WiX 3 are build-machine requirements only.
 
-Run `build\scripts\build-shale-release.bat`. The native DLL is compiled from `build/native/windows-toast/shale_windows_toast.cpp`; no binary is stored in source control. The final MSI is written atomically to `dist\Shale-<version>.msi`. The unmodified preliminary MSI stays under `build\staging\windows-msi\preliminary` and is never published.
+Run `build\scripts\build-shale-release.bat`. The native DLL is compiled from `build/native/windows-toast/shale_windows_toast.cpp` with the static multithreaded MSVC runtime (`/MT`); no binary is stored in source control. `dumpbin /dependents` is validated before packaging, and the release fails if the DLL imports the dynamic Visual C++ runtime or any unknown non-system DLL. The final MSI is written atomically to `dist\Shale-<version>.msi`. The unmodified preliminary MSI stays under `build\staging\windows-msi\preliminary` and is never published.
+
+End users require only `Shale-<version>.msi`; Visual Studio, the Windows SDK, JDK, WiX, and a separately installed Visual C++ Redistributable are not end-user prerequisites.
 
 ## Installed smoke test
 
