@@ -13,11 +13,11 @@ ET.register_namespace("", NS)
 def tag(name):
     return f"{{{NS}}}{name}"
 
-def program_menu_directory_ids(root):
+def directory_subtree_ids(root, root_id):
     ids = set()
-    roots = [node for node in root.iter(tag("Directory")) if node.get("Id") == "ProgramMenuFolder"]
+    roots = [node for node in root.iter() if node.tag in (tag("Directory"), tag("DirectoryRef")) and node.get("Id") == root_id]
     if not roots:
-        raise ValueError("ProgramMenuFolder directory declaration is missing")
+        raise ValueError(f"directory declaration is missing: {root_id}")
     def collect(node):
         directory_id = node.get("Id")
         if directory_id:
@@ -35,24 +35,29 @@ def component_condition(component):
     child = component.find(tag("Condition"))
     return "" if child is None or child.text is None else child.text.strip()
 
-def resolve_target_file(root, shortcut):
+def resolve_target_file(root, shortcut, representation):
     match = re.fullmatch(r"\[#([^\]]+)\]", shortcut.get("Target", ""))
     if not match:
-        raise ValueError("Start Menu shortcut target is not a WiX file reference")
+        raise ValueError(f"{representation}: Start Menu shortcut target is not a WiX file reference")
     file_id = match.group(1)
     files = [node for node in root.iter(tag("File")) if node.get("Id") == file_id]
     if len(files) != 1:
-        raise ValueError(f"Start Menu shortcut target file {file_id!r} resolved {len(files)} times")
+        raise ValueError(f"{representation}: Start Menu shortcut target file {file_id!r} resolved {len(files)} times")
+    name = files[0].get("Name")
     source = files[0].get("Source", "")
     basename = source.replace("/", "\\").rsplit("\\", 1)[-1]
-    if basename.casefold() != "shale.exe":
-        raise ValueError(f"Start Menu shortcut target is not Shale.exe: {basename or '<missing>'}")
+    if representation == "generated-source":
+        if basename.casefold() != "shale.exe":
+            raise ValueError(f"generated-source: Start Menu shortcut Source is not Shale.exe: {basename or '<missing>'}")
+        if name is not None and name.casefold() != "shale.exe":
+            raise ValueError(f"generated-source: Start Menu shortcut File Name is inconsistent: {name}")
+    else:
+        if name is None or name.casefold() != "shale.exe":
+            raise ValueError(f"compiled/decompiled: Start Menu shortcut File Name is not Shale.exe: {name or '<missing>'}")
     return files[0]
 
-def shortcut(root):
+def owned_shortcuts(root, directory_ids, condition):
     parents = {child: parent for parent in root.iter() for child in parent}
-    menu_ids = program_menu_directory_ids(root)
-    found = []
     for node in root.iter(tag("Shortcut")):
         component = parents.get(node)
         if component is None or component.tag != tag("Component"):
@@ -60,42 +65,60 @@ def shortcut(root):
         owner = parents.get(component)
         while owner is not None and owner.tag not in (tag("DirectoryRef"), tag("Directory")):
             owner = parents.get(owner)
-        if owner is None or owner.get("Id") not in menu_ids:
+        if owner is None or owner.get("Id") not in directory_ids:
             continue
-        if component_condition(component) != "JP_INSTALL_STARTMENU_SHORTCUT":
+        if component_condition(component) != condition:
             continue
-        if node.get("Name") != "Shale" or node.get("WorkingDirectory") != "INSTALLDIR" or node.get("Advertise") != "no":
+        yield node
+
+def ensure_desktop_identity_absent(root, representation):
+    desktop_ids = directory_subtree_ids(root, "DesktopFolder")
+    for node in owned_shortcuts(root, desktop_ids, "JP_INSTALL_DESKTOP_SHORTCUT"):
+        if any(item.get("Key") == "System.AppUserModel.ID" for item in node.findall(tag("ShortcutProperty"))):
+            raise ValueError(f"{representation}: Desktop shortcut must not contain System.AppUserModel.ID")
+
+def shortcut(root, representation):
+    menu_ids = directory_subtree_ids(root, "ProgramMenuFolder")
+    found = []
+    for node in owned_shortcuts(root, menu_ids, "JP_INSTALL_STARTMENU_SHORTCUT"):
+        if node.get("Name") != "Shale" or node.get("WorkingDirectory") != "INSTALLDIR":
             continue
-        resolve_target_file(root, node)
+        advertise = node.get("Advertise")
+        if representation == "generated-source" and advertise != "no":
+            raise ValueError(f"generated-source: invalid Start Menu shortcut Advertise value: {advertise or '<missing>'}")
+        if representation == "compiled/decompiled" and advertise not in (None, "no"):
+            raise ValueError(f"compiled/decompiled: invalid Start Menu shortcut Advertise value: {advertise}")
+        resolve_target_file(root, node, representation)
         found.append(node)
     if len(found) != 1:
-        raise ValueError(f"expected one Shale Start Menu shortcut; found {len(found)}")
+        raise ValueError(f"{representation}: expected one Shale Start Menu shortcut; found {len(found)}")
+    ensure_desktop_identity_absent(root, representation)
     return found[0]
 
-def identity_property(node):
+def identity_property(node, representation):
     props = [item for item in node.findall(tag("ShortcutProperty")) if item.get("Key") == "System.AppUserModel.ID"]
     if props and any(item.get("Value") != APP_ID for item in props):
-        raise ValueError("conflicting AppUserModelID")
+        raise ValueError(f"{representation}: conflicting AppUserModelID")
     if len(props) > 1:
-        raise ValueError("duplicate AppUserModelID")
+        raise ValueError(f"{representation}: duplicate AppUserModelID")
     return props
 
 def inspect(path):
     tree = ET.parse(path)
-    identity_property(shortcut(tree.getroot()))
+    identity_property(shortcut(tree.getroot(), "generated-source"), "generated-source")
 
 def mutate(path):
     tree = ET.parse(path)
-    node = shortcut(tree.getroot())
-    if not identity_property(node):
+    node = shortcut(tree.getroot(), "generated-source")
+    if not identity_property(node, "generated-source"):
         ET.SubElement(node, tag("ShortcutProperty"), {"Key": "System.AppUserModel.ID", "Value": APP_ID})
     tree.write(path, encoding="utf-8", xml_declaration=True)
 
 def validate(path):
     tree = ET.parse(path)
-    props = identity_property(shortcut(tree.getroot()))
+    props = identity_property(shortcut(tree.getroot(), "compiled/decompiled"), "compiled/decompiled")
     if len(props) != 1:
-        raise ValueError("compiled shortcut identity missing or ambiguous")
+        raise ValueError("compiled/decompiled: shortcut identity missing or ambiguous")
 
 def main():
     parser = argparse.ArgumentParser()
