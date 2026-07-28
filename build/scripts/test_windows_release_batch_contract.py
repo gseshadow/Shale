@@ -41,5 +41,31 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn('--input "%UPDATER_INPUT%"', source)
         self.assertNotIn('--input "%UPDATER_TARGET%"', source)
 
+    def test_native_dependency_report_parent_exists_before_redirection(self):
+        source = (ROOT / "build/native/windows-toast/build-native.bat").read_text(encoding="utf-8")
+        mkdir = source.index('if not exist "%DEPENDENCY_DIR%" mkdir "%DEPENDENCY_DIR%"')
+        redirect = source.index('dumpbin.exe /nologo /dependents "%DLL_PATH%" >"%DEPENDENCIES%"')
+        self.assertLess(mkdir, redirect)
+        self.assertIn("set DEPENDENCY_DIR=%ROOT%\\build\\staging\\windows-toast-dependencies", source)
+        self.assertNotIn("set DEPENDENCIES=%TEMP%", source)
+        self.assertIn('if not exist "%DLL_PATH%" goto :missing_dll', source)
+        self.assertIn('echo Compiled native DLL was not found: "%DLL_PATH%"', source)
+
+    def test_native_outputs_and_required_stages_have_explicit_order(self):
+        native = (ROOT / "build/native/windows-toast/build-native.bat").read_text(encoding="utf-8")
+        stages = [
+            "Native DLL compilation completed.",
+            "Native DLL location verified:",
+            "Starting dumpbin dependency inspection...",
+            "Dependency validation passed.",
+        ]
+        positions = [native.index(stage) for stage in stages]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn('/Fo"%BUILD_DIR%\\shale_windows_toast.obj"', native)
+        self.assertIn('/IMPLIB:"%BUILD_DIR%\\shale_windows_toast.lib"', native)
+        self.assertIn('/PDB:"%BUILD_DIR%\\shale_windows_toast.pdb"', native)
+        msi = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
+        self.assertLess(msi.index("build-native.bat"), msi.index("Starting jpackage and WiX MSI construction..."))
+
 if __name__ == "__main__":
     unittest.main()

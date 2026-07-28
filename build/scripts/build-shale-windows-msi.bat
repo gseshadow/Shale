@@ -39,6 +39,7 @@ mkdir "%PRELIM%" "%FINAL%" || exit /b 15
 call "%ROOT%\build\native\windows-toast\build-native.bat" "%APPINPUT%\native" || exit /b 16
 copy /y "%ROOT%\build\packaging\windows\shale-windows-toast.properties" "%APPINPUT%\shale-windows-toast.properties" >nul || exit /b 17
 
+echo Starting jpackage and WiX MSI construction...
 jpackage --type msi --name Shale --input "%APPINPUT%" --dest "%PRELIM%" --temp "%TEMP%" --verbose ^
  --main-jar "shale-desktop-%VERSION%.jar" --main-class com.shale.desktop.MainApp ^
  --icon "%ROOT%\build\assets\Shale.ico" --app-version "%VERSION%" --vendor "Get Downing" ^
