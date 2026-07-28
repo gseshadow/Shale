@@ -48,13 +48,13 @@ echo ====================================
 echo Version: %VERSION%
 echo.
 echo Published URLs:
-echo %BASE_URL%/Shale-%VERSION%.exe
+echo %BASE_URL%/Shale-%VERSION%.msi
 echo %BASE_URL%/ShaleApp-%VERSION%.zip
 if exist "%MAC_ZIP%" echo %BASE_URL%/ShaleApp-%VERSION%-mac.zip
 echo %BASE_URL%/shale-stable.json
 echo.
 echo Local dist files:
-echo %DIST%\Shale-%VERSION%.exe
+echo %DIST%\Shale-%VERSION%.msi
 echo %DIST%\ShaleApp-%VERSION%.zip
 if exist "%MAC_ZIP%" echo %DIST%\ShaleApp-%VERSION%-mac.zip
 echo %DIST%\shale-stable.json
