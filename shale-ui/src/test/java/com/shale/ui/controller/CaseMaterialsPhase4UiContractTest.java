@@ -92,7 +92,10 @@ final class CaseMaterialsPhase4UiContractTest {
     assertTrue(placeholder.contains("ColorCodedComboBox<MaterialTypeDto> materialType"));
     assertFalse(placeholder.contains("new ComboBox<MaterialTypeDto>"));
     assertTrue(placeholder.contains("ChoiceBox<String> followUpInterval"));
-    assertTrue(placeholder.contains("add(fields,7,\"Follow-up Interval:\",followUpInterval)"));
+    assertTrue(placeholder.contains("\"Request Date:\",requestDate"));
+    assertTrue(placeholder.contains("\"Due Date:\",dueDate"));
+    assertTrue(placeholder.contains("\"Requested Date Start:\",requestedRangeStart"));
+    assertTrue(placeholder.contains("\"Requested Date End:\",requestedRangeEnd"));
     assertFalse(placeholder.contains("Requested At:"));
     assertFalse(placeholder.contains("Due At:"));
     assertFalse(placeholder.contains("Next Follow-up At:"));

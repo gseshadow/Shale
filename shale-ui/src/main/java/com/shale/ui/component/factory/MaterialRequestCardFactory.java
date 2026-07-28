@@ -96,9 +96,11 @@ public final class MaterialRequestCardFactory {
         addEntityFact(facts, "Requested From", requestedFromNode(request));
         addEntityFact(facts, "Requested By", userNode(request.requestedByUserId(), request.requestedByDisplayName(), request.requestedByUserColor()));
         addEntityFact(facts, "Assigned To", userNode(request.assignedToUserId(), request.assignedToDisplayName(), request.assignedToUserColor()));
-        addTextFact(facts, "Requested", fmt(request.requestedAt()));
+        addTextFact(facts, "Created By", nvl(request.createdByDisplayName(), "Unknown"));
+        addTextFact(facts, "Request Date", fmt(request.requestedAt()));
         addTextFact(facts, "Due", fmt(request.expectedResponseDate()));
         addTextFact(facts, "Next Follow-up", fmt(request.nextFollowUpAt()));
+        addTextFact(facts, "Requested Date Range", fmtRange(request.requestedRangeStartDate(), request.requestedRangeEndDate()));
 
         Label timing = dueIndicator(request);
         body.getChildren().add(header);
@@ -266,6 +268,12 @@ public final class MaterialRequestCardFactory {
     private static Region spacer() { Region r = new Region(); HBox.setHgrow(r, Priority.ALWAYS); return r; }
     private static boolean terminal(String s) { String v = s == null ? "" : s.trim().toUpperCase(); return v.equals("CLOSED") || v.equals("CANCELLED"); }
     private static String fmt(LocalDateTime t) { return t == null ? null : (t.toLocalTime().equals(java.time.LocalTime.MIDNIGHT) ? DATE_FORMAT.format(t) : DATE_TIME_FORMAT.format(t)); }
+    private static String fmtRange(LocalDate start, LocalDate end) {
+        if (start == null && end == null) return null;
+        if (start == null) return "Through " + DATE_FORMAT.format(end);
+        if (end == null) return "From " + DATE_FORMAT.format(start);
+        return DATE_FORMAT.format(start) + " – " + DATE_FORMAT.format(end);
+    }
     private static boolean has(String s) { return s != null && !s.isBlank(); }
     private static String nvl(String s, String fallback) { return s == null || s.isBlank() ? fallback : s.trim(); }
 }

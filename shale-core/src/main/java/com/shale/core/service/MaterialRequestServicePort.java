@@ -43,14 +43,19 @@ public interface MaterialRequestServicePort {
                                         Integer requestedFromOrganizationId, String requestedFromText,
                                         String requestMethod, String status, int requestedByUserId,
                                         Integer assignedToUserId, LocalDateTime requestedAt,
-                                        LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays) {}
+                                        LocalDate requestedRangeStartDate, LocalDate requestedRangeEndDate,
+                                        LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays) {
+        public CreateMaterialRequestCommand(int shaleClientId,int actorUserId,long caseId,int materialTypeId,String title,String description,Integer requestedFromContactId,Integer requestedFromOrganizationId,String requestedFromText,String requestMethod,String status,int requestedByUserId,Integer assignedToUserId,LocalDateTime requestedAt,LocalDate expectedResponseDate,LocalDateTime nextFollowUpAt,Integer followUpIntervalDays) {
+            this(shaleClientId,actorUserId,caseId,materialTypeId,title,description,requestedFromContactId,requestedFromOrganizationId,requestedFromText,requestMethod,status,requestedByUserId,assignedToUserId,requestedAt,null,null,expectedResponseDate,nextFollowUpAt,followUpIntervalDays);
+        }
+    }
 
     record UpdateMaterialRequestCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, int materialTypeId,
                                         String title, String description, Integer requestedFromContactId,
                                         Integer requestedFromOrganizationId, String requestedFromText,
                                         String requestMethod, String status, int requestedByUserId,
-                                        Integer assignedToUserId, LocalDateTime requestedAt, LocalDate relevantStartDate,
-                                        LocalDate relevantEndDate, LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays,
+                                        Integer assignedToUserId, LocalDateTime requestedAt, LocalDate requestedRangeStartDate,
+                                        LocalDate requestedRangeEndDate, LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays,
                                         LocalDateTime firstReceivedAt, LocalDateTime fullyReceivedAt, LocalDateTime closedAt,
                                         Integer closedByUserId, String closureReason, String notes, byte[] rowVer) {}
     record DeleteMaterialRequestCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, byte[] rowVer) {}
