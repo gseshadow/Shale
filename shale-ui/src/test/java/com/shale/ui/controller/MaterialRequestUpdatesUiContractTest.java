@@ -14,6 +14,8 @@ final class MaterialRequestUpdatesUiContractTest {
         assertTrue(s.contains("Your text has been kept."));
         assertTrue(s.contains("submitting.compareAndSet(false,true)"));
         assertTrue(s.contains("editor.clear()"));
+        assertTrue(s.contains("detailRef.set(refreshed)"), "Adding a note must refresh the editor RowVer");
+        assertTrue(s.contains("svc.getMaterialRequest(caseId,requestId,tenant,actor)"));
         assertTrue(s.contains("renderRequestUpdates"));
         assertTrue(s.contains("row.actorDisplayName()"));
         assertTrue(s.contains("row.createdAt()"));
