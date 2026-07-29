@@ -22,16 +22,46 @@ BEGIN
          SYSUTCDATETIME(), SYSUTCDATETIME());
 END;
 
-IF EXISTS (
-    SELECT 1
-    FROM sys.check_constraints
-    WHERE parent_object_id = OBJECT_ID(N'dbo.MaterialRequests')
-      AND name = N'CK_MaterialRequests_Status'
-)
+-- Do not rely on constraint names here. Restores and older deployments can
+-- retain a generated/renamed constraint name, so recognize only the two
+-- obsolete checks by their definitions. In particular, leave unrelated
+-- MaterialRequests checks (method, source, dates, and so on) alone.
+DECLARE @LegacyConstraintName sysname;
+DECLARE legacy_material_request_checks CURSOR LOCAL FAST_FORWARD FOR
+SELECT cc.name
+FROM sys.check_constraints cc
+WHERE cc.parent_object_id = OBJECT_ID(N'dbo.MaterialRequests', N'U')
+  AND (
+      -- Original fixed status allowlist.
+      (cc.definition LIKE N'%[[]Status[]]%'
+       AND cc.definition LIKE N'%DRAFT%'
+       AND cc.definition LIKE N'%REQUESTED%'
+       AND cc.definition LIKE N'%FOLLOW_UP_DUE%'
+       AND cc.definition LIKE N'%PARTIALLY_RECEIVED%'
+       AND cc.definition LIKE N'%FULLY_RECEIVED%'
+       AND cc.definition LIKE N'%CLOSED%'
+       AND cc.definition LIKE N'%CANCELLED%')
+      OR
+      -- Original status-dependent closure check.
+      (cc.definition LIKE N'%[[]Status[]]%'
+       AND cc.definition LIKE N'%[[]ClosedAt[]]%'
+       AND cc.definition LIKE N'%[[]ClosedByUserId[]]%'
+       AND cc.definition LIKE N'%[[]ClosureReason[]]%'
+       AND cc.definition LIKE N'%CLOSED%'
+       AND cc.definition LIKE N'%CANCELLED%')
+  );
+
+OPEN legacy_material_request_checks;
+FETCH NEXT FROM legacy_material_request_checks INTO @LegacyConstraintName;
+WHILE @@FETCH_STATUS = 0
 BEGIN
-    ALTER TABLE dbo.MaterialRequests
-    DROP CONSTRAINT CK_MaterialRequests_Status;
+    EXEC sys.sp_executesql
+        N'ALTER TABLE dbo.MaterialRequests DROP CONSTRAINT '
+        + QUOTENAME(@LegacyConstraintName) + N';';
+    FETCH NEXT FROM legacy_material_request_checks INTO @LegacyConstraintName;
 END;
+CLOSE legacy_material_request_checks;
+DEALLOCATE legacy_material_request_checks;
 
 -- JavaFX Color.toString() historically produced 0xRRGGBBAA. Configurable
 -- lookup colors use CSS #RRGGBB and do not preserve alpha.
@@ -43,16 +73,7 @@ WHERE LEN(Color) = 10
   AND SUBSTRING(Color, 3, 8) NOT LIKE '%[^0-9A-Fa-f]%';
 
 -- Closure semantics are resolved from RequestStatuses.SystemKey in application
--- code. This legacy name/value check would misclassify a custom display name.
-IF EXISTS (
-    SELECT 1
-    FROM sys.check_constraints
-    WHERE parent_object_id = OBJECT_ID(N'dbo.MaterialRequests')
-      AND name = N'CK_MaterialRequests_Closure'
-)
-BEGIN
-    ALTER TABLE dbo.MaterialRequests
-    DROP CONSTRAINT CK_MaterialRequests_Closure;
-END;
+-- code. The legacy name/value check was removed above because it would
+-- misclassify a custom display name.
 
 COMMIT TRANSACTION;
