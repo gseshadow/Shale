@@ -27,6 +27,8 @@ public interface MaterialRequestServicePort {
     List<MaterialRequestSummaryDto> listMaterialRequests(long caseId, int shaleClientId);
     default List<MaterialRequestSummaryDto> listMaterialRequests(long caseId, int shaleClientId, boolean includeDeleted) { return listMaterialRequests(caseId, shaleClientId); }
     Optional<MaterialRequestDetailDto> getMaterialRequest(long caseId, long materialRequestId, int shaleClientId, int actorUserId);
+    default List<MaterialRequestUpdateDto> listUpdates(long caseId, long materialRequestId, int shaleClientId, int actorUserId) { return List.of(); }
+    default MaterialRequestUpdateDto addNote(AddMaterialRequestNoteCommand command) { throw new UnsupportedOperationException("addNote"); }
     List<MaterialRequestFollowUpDto> listFollowUps(long caseId, long materialRequestId, int shaleClientId, int actorUserId);
     MaterialRequestDetailDto createMaterialRequest(CreateMaterialRequestCommand command);
     MaterialRequestDetailDto updateMaterialRequest(UpdateMaterialRequestCommand command);
@@ -58,5 +60,6 @@ public interface MaterialRequestServicePort {
                                         LocalDate requestedRangeEndDate, LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays,
                                         LocalDateTime firstReceivedAt, LocalDateTime fullyReceivedAt, LocalDateTime closedAt,
                                         Integer closedByUserId, String closureReason, String notes, byte[] rowVer) {}
+    record AddMaterialRequestNoteCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, String body) {}
     record DeleteMaterialRequestCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, byte[] rowVer) {}
 }
