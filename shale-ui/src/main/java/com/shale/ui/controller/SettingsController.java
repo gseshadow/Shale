@@ -929,11 +929,10 @@ public final class SettingsController {
 
 	static String fxColorToDb(Color color) {
 		Color safeColor = color == null ? DEFAULT_STATUS_COLOR : color;
-		return String.format("0x%02X%02X%02X%02X",
+		return String.format("#%02X%02X%02X",
 				toColorByte(safeColor.getRed()),
 				toColorByte(safeColor.getGreen()),
-				toColorByte(safeColor.getBlue()),
-				toColorByte(safeColor.getOpacity()));
+				toColorByte(safeColor.getBlue()));
 	}
 
 	private static int toColorByte(double value) {
