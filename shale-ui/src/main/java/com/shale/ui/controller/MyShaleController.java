@@ -288,6 +288,9 @@ public final class MyShaleController {
 	private FlowPane myTasksGrid;
 	private boolean notificationWidgetRefreshListenerAttached;
 	private boolean overviewWidgetRenderQueued;
+	private boolean taskPrioritiesHydrated;
+	private boolean taskStatusesHydrated;
+	private boolean taskAssignedUsersHydrated;
 	private Integer pendingMyCaseSummaryStatusFilterId;
 
 	private enum MyTasksViewMode {
@@ -329,6 +332,12 @@ public final class MyShaleController {
 	private final ExecutorService tasksDbExec = Executors.newSingleThreadExecutor(r ->
 	{
 		Thread t = new Thread(r, "my-shale-tasks-loader");
+		t.setDaemon(true);
+		return t;
+	});
+	private final ExecutorService taskMetadataDbExec = Executors.newFixedThreadPool(3, r ->
+	{
+		Thread t = new Thread(r, "my-shale-task-metadata-loader");
 		t.setDaemon(true);
 		return t;
 	});
@@ -376,8 +385,11 @@ public final class MyShaleController {
 
 	@FXML
 	private void initialize() {
+		long layoutStart = PerfLog.start();
+		PerfLog.log("STARTUP", "start", "page=my_shale phase=layout_initialization");
 		setupSections();
 		configureSectionSizing();
+		PerfLog.logDone("STARTUP", "page=my_shale phase=layout_placeholders_visible", layoutStart);
 
 		if (myCasesSortChoice != null) {
 			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE, SORT_UPDATED_OLDEST, SORT_UPDATED_NEWEST);
@@ -1122,109 +1134,70 @@ public final class MyShaleController {
 	}
 
 	private void refreshMyTasks(boolean force) {
-		if (caseTaskService == null || appState == null) {
-			return;
-		}
-		if (loadingMyTasks) {
-			if (!force) {
-				return;
-			}
-			PerfLog.log("CTRL", "supersede", "panel=my_tasks page=my_shale generation=" + (taskLoadGeneration + 1));
-		}
+		if (caseTaskService == null || appState == null) return;
+		if (loadingMyTasks && !force) return;
 		loadingOverview = true;
 		loadingMyTasks = true;
 		renderActiveTaskViews();
-		Integer shaleClientId = appState.getShaleClientId();
-		Integer userId = appState.getUserId();
-			if (shaleClientId == null || shaleClientId <= 0 || userId == null || userId <= 0) {
-				myTasks = List.of();
-				myTaskAssignedUsers = java.util.Map.of();
-				myTaskPrioritiesById = java.util.Map.of();
-				cachedTasksUserId = userId;
-				cachedTasksTenantId = shaleClientId;
-				myTasksLoadedOnce = true;
-				myTasksDirty = false;
-			loadingOverview = false;
-			loadingMyTasks = false;
+		Integer tenant = appState.getShaleClientId();
+		Integer user = appState.getUserId();
+		if (tenant == null || tenant <= 0 || user == null || user <= 0) {
+			myTasks = List.of();
+			loadingOverview = loadingMyTasks = false;
+			myTasksLoadedOnce = true;
+			myTasksDirty = false;
 			renderActiveTaskViews();
 			return;
 		}
 
-		CaseTaskService.MyTasksSortOption sortOption = selectedMyTaskSort();
+		final int tenantAtSubmit = tenant;
+		final int userAtSubmit = user;
+		final int generation = ++taskLoadGeneration;
+		final long initializationNanos = PerfLog.start();
+		final CaseTaskService.MyTasksSortOption sort = selectedMyTaskSort();
 		final boolean includeCompleted = showCompletedMyTasks;
-		final MyTasksSource sourceAtSubmit = myTasksSource;
-		final int shaleClientIdValue = shaleClientId;
-		final int userIdValue = userId;
-		final int generationAtSubmit = ++taskLoadGeneration;
+		final MyTasksSource source = myTasksSource;
+		taskPrioritiesHydrated = taskStatusesHydrated = taskAssignedUsersHydrated = false;
+		PerfLog.log("STARTUP", "start", "page=my_shale phase=initialization generation=" + generation);
+
+		// Lookup metadata has no dependency on the task query. Submit it immediately on a
+		// multi-thread executor; every DAO call obtains its own tenant-scoped connection.
+		submitTaskMetadataLoad("priorities", generation, tenantAtSubmit, userAtSubmit, () -> {
+			Map<Integer, String> result = loadMyShalePriorityNames(tenantAtSubmit);
+			runOnFx(() -> applyPriorities(generation, tenantAtSubmit, userAtSubmit, result));
+		});
+		submitTaskMetadataLoad("statuses", generation, tenantAtSubmit, userAtSubmit, () -> {
+			List<TaskStatusOptionDto> result = caseTaskService.loadActiveTaskStatuses(tenantAtSubmit);
+			runOnFx(() -> applyStatuses(generation, tenantAtSubmit, userAtSubmit, result));
+		});
+
+		long submitted = System.nanoTime();
+		PerfLog.log("STARTUP", "submitted", "page=my_shale load=tasks generation=" + generation);
 		tasksDbExec.submit(() -> {
+			long started = System.nanoTime();
+			PerfLog.log("EXECUTOR", "start", "page=my_shale load=tasks queueMs=" + nanosToMillis(started - submitted));
 			try {
-				long loadStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=loadMyTasks page=my_shale userId=" + userIdValue);
-				List<CaseTaskListItemDto> tasks = sourceAtSubmit == MyTasksSource.CREATED_BY_ME
-						? caseTaskService.loadTasksCreatedByUser(
-								shaleClientIdValue,
-								userIdValue,
-								sortOption,
-								includeCompleted)
-						: caseTaskService.loadMyTasks(
-								shaleClientIdValue,
-								userIdValue,
-								sortOption,
-								includeCompleted);
-				Set<Long> pinnedLaneCaseIds = loadPinnedTaskLaneCaseIds(shaleClientIdValue, userIdValue);
-				Set<Long> collapsedLaneCaseIds = loadCollapsedTaskLaneCaseIds(shaleClientIdValue, userIdValue);
-				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
-						.map(CaseTaskListItemDto::id)
-						.toList();
-				PerfLog.logDone("DAO", "method=loadMyTasks page=my_shale userId=" + userIdValue + " rows=" + (tasks == null ? 0 : tasks.size()), loadStartNanos);
-				long usersLoadStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue + " taskCount=" + taskIds.size());
-					java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedByTask = taskIds.isEmpty()
-							? java.util.Map.of()
-							: caseTaskService.loadAssignedUsersForTasks(taskIds, shaleClientIdValue)
-						.stream()
-						.collect(java.util.stream.Collectors.groupingBy(
-								CaseTaskService.TaskAssignedUsersByTask::taskId,
-								java.util.stream.Collectors.mapping(
-										row -> new TaskCardFactory.AssignedUserModel(
-												row.userId(),
-												row.displayName(),
-												row.color()),
-											java.util.stream.Collectors.toList())));
-					java.util.Map<Integer, String> prioritiesById = loadMyShalePriorityNames(shaleClientIdValue);
-					List<TaskStatusOptionDto> statusOptions = caseTaskService.loadActiveTaskStatuses(shaleClientIdValue);
-					PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=my_shale userId=" + userIdValue + " rows=" + assignedByTask.size(), usersLoadStartNanos);
-					runOnFx(() -> {
-						if (generationAtSubmit != taskLoadGeneration) {
-							PerfLog.log("CTRL", "stale", "panel=my_tasks page=my_shale generation=" + generationAtSubmit);
-							return;
-						}
-						loadingOverview = false;
-						loadingMyTasks = false;
-						myTasks = tasks == null ? List.of() : tasks;
-						pinnedTaskLaneCaseIds.clear();
-						pinnedTaskLaneCaseIds.addAll(pinnedLaneCaseIds);
-						collapsedTaskLaneCaseIds.clear();
-						collapsedTaskLaneCaseIds.addAll(collapsedLaneCaseIds);
-							myTaskAssignedUsers = assignedByTask;
-							myTaskPrioritiesById = prioritiesById;
-							myTaskStatusOptions = statusOptions == null ? List.of() : statusOptions;
-							cachedTasksUserId = userIdValue;
-							cachedTasksTenantId = shaleClientIdValue;
-							myTasksLoadedOnce = true;
-							myTasksDirty = false;
-						syncMyTaskPriorityFilterOptions();
-						syncMyTaskStatusFilterOptions();
-						syncMyTaskCaseFilterOptions();
-						renderActiveTaskViews();
-						refreshRecentCaseActivity();
-					});
+				List<CaseTaskListItemDto> result = source == MyTasksSource.CREATED_BY_ME
+						? caseTaskService.loadTasksCreatedByUser(tenantAtSubmit, userAtSubmit, sort, includeCompleted)
+						: caseTaskService.loadMyTasks(tenantAtSubmit, userAtSubmit, sort, includeCompleted);
+				List<CaseTaskListItemDto> tasks = result == null ? List.of() : List.copyOf(result);
+				runOnFx(() -> applyTasks(generation, tenantAtSubmit, userAtSubmit, tasks, initializationNanos));
+
+				// Assignees depend only on task ids, not on priorities/statuses or FX rendering.
+				List<Long> ids = tasks.stream().map(CaseTaskListItemDto::id).toList();
+				submitTaskMetadataLoad("assigned_users", generation, tenantAtSubmit, userAtSubmit, () -> {
+					Map<Long, List<TaskCardFactory.AssignedUserModel>> assigned = ids.isEmpty() ? Map.of()
+							: caseTaskService.loadAssignedUsersForTasks(ids, tenantAtSubmit).stream().collect(
+									java.util.stream.Collectors.groupingBy(CaseTaskService.TaskAssignedUsersByTask::taskId,
+											java.util.stream.Collectors.mapping(row -> new TaskCardFactory.AssignedUserModel(
+													row.userId(), row.displayName(), row.color()), java.util.stream.Collectors.toList())));
+					runOnFx(() -> applyAssignedUsers(generation, tenantAtSubmit, userAtSubmit, assigned));
+				});
 			} catch (Exception ex) {
 				log.warn("My tasks load failed: {}", ex.getMessage());
-				ex.printStackTrace();
 				runOnFx(() -> {
-					loadingOverview = false;
-					loadingMyTasks = false;
+					if (!isCurrentTaskLoad(generation, tenantAtSubmit, userAtSubmit)) return;
+					loadingOverview = loadingMyTasks = false;
 					myTasksDirty = true;
 					renderActiveTaskViews();
 					showTaskActionError("Failed to load your tasks.");
@@ -1232,6 +1205,76 @@ public final class MyShaleController {
 			}
 		});
 	}
+
+	private void submitTaskMetadataLoad(String load, int generation, int tenant, int user, Runnable operation) {
+		long submitted = System.nanoTime();
+		PerfLog.log("STARTUP", "submitted", "page=my_shale load=" + load + " generation=" + generation);
+		taskMetadataDbExec.submit(() -> {
+			long started = System.nanoTime();
+			PerfLog.log("EXECUTOR", "start", "page=my_shale load=" + load + " queueMs=" + nanosToMillis(started - submitted));
+			try {
+				operation.run();
+				PerfLog.log("STARTUP", "completed", "page=my_shale load=" + load + " generation=" + generation);
+			} catch (Exception ex) {
+				log.warn("My Shale {} load failed: {}", load, ex.getMessage());
+				// A metadata failure is deliberately section-local; task/case content remains visible.
+			}
+		});
+	}
+
+	private void applyTasks(int generation, int tenant, int user, List<CaseTaskListItemDto> tasks, long initializationNanos) {
+		if (!isCurrentTaskLoad(generation, tenant, user)) return;
+		myTasks = tasks;
+		cachedTasksUserId = user;
+		cachedTasksTenantId = tenant;
+		myTasksLoadedOnce = true;
+		myTasksDirty = false;
+		loadingOverview = loadingMyTasks = false;
+		syncMyTaskCaseFilterOptions();
+		renderActiveTaskViews();
+		PerfLog.logDone("STARTUP", "page=my_shale phase=first_meaningful_content generation=" + generation, initializationNanos);
+		refreshRecentCaseActivity();
+	}
+
+	private void applyPriorities(int generation, int tenant, int user, Map<Integer, String> priorities) {
+		if (!isCurrentTaskLoad(generation, tenant, user)) return;
+		myTaskPrioritiesById = priorities == null ? Map.of() : Map.copyOf(priorities);
+		taskPrioritiesHydrated = true;
+		syncMyTaskPriorityFilterOptions();
+		logHydrationIfComplete(generation);
+	}
+
+	private void applyStatuses(int generation, int tenant, int user, List<TaskStatusOptionDto> statuses) {
+		if (!isCurrentTaskLoad(generation, tenant, user)) return;
+		myTaskStatusOptions = statuses == null ? List.of() : List.copyOf(statuses);
+		taskStatusesHydrated = true;
+		syncMyTaskStatusFilterOptions();
+		logHydrationIfComplete(generation);
+	}
+
+	private void applyAssignedUsers(int generation, int tenant, int user, Map<Long, List<TaskCardFactory.AssignedUserModel>> users) {
+		if (!isCurrentTaskLoad(generation, tenant, user)) return;
+		myTaskAssignedUsers = users == null ? Map.of() : Map.copyOf(users);
+		taskAssignedUsersHydrated = true;
+		// Only card decoration changes; never reset task/case data or loading state.
+		renderActiveTaskViews();
+		logHydrationIfComplete(generation);
+	}
+
+	private boolean isCurrentTaskLoad(int generation, int tenant, int user) {
+		boolean current = generation == taskLoadGeneration && appState != null
+				&& Objects.equals(appState.getShaleClientId(), tenant) && Objects.equals(appState.getUserId(), user);
+		if (!current) PerfLog.log("CTRL", "stale", "panel=my_tasks page=my_shale generation=" + generation);
+		return current;
+	}
+
+	private void logHydrationIfComplete(int generation) {
+		if (myTasksLoadedOnce && taskPrioritiesHydrated && taskStatusesHydrated && taskAssignedUsersHydrated) {
+			PerfLog.log("STARTUP", "completed", "page=my_shale phase=fully_hydrated generation=" + generation);
+		}
+	}
+
+	private static long nanosToMillis(long nanos) { return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(nanos); }
 
 	private void refreshMyCasesBoard() {
 		refreshMyCasesBoard(true);
