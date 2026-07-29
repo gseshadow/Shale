@@ -30,7 +30,11 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
 import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.paint.Color;
 import javafx.stage.Window;
 import javafx.scene.control.cell.PropertyValueFactory;
@@ -41,6 +45,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.GridPane;
 import javafx.scene.shape.Circle;
+import javafx.css.PseudoClass;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.component.factory.StatusIndicatorFactory;
 import com.shale.ui.component.factory.PracticeAreaIndicatorFactory;
@@ -160,6 +165,8 @@ public final class SettingsController {
 	private boolean materialTypeMutationRunning;
 	private boolean requestMethodMutationRunning;
 	private boolean requestStatusMutationRunning;
+	private int requestLookupLoadGeneration;
+	private static final PseudoClass SELECTED_CARD = PseudoClass.getPseudoClass("selected");
 	private int caseStatusLoadGeneration;
 	private int practiceAreaLoadGeneration;
 	private int linkTypeLoadGeneration;
@@ -282,26 +289,37 @@ public final class SettingsController {
 
 	private void loadRequestLookupsAsync() {
 		if (materialRequestService == null) return;
+		final int generation = ++requestLookupLoadGeneration;
 		final int tenantId;
 		final int actorUserId;
 		try { tenantId = requireTenantId(); actorUserId = requireActorUserId(); } catch (RuntimeException ex) { setMaterialTypeMessage(rootMessage(ex)); return; }
-		if (materialTypeCardsContainer != null) materialTypeCardsContainer.getChildren().setAll(loadingLabel("Loading material types…"));
-		if (requestMethodCardsContainer != null) requestMethodCardsContainer.getChildren().setAll(loadingLabel("Loading request methods…"));
-		if (requestStatusCardsContainer != null) requestStatusCardsContainer.getChildren().setAll(loadingLabel("Loading request statuses…"));
+		showRequestLookupLoadingIfEmpty(materialTypeCardsContainer, "Loading material types…");
+		showRequestLookupLoadingIfEmpty(requestMethodCardsContainer, "Loading request methods…");
+		showRequestLookupLoadingIfEmpty(requestStatusCardsContainer, "Loading request statuses…");
 		settingsLoadExecutor.submit(() -> {
 			try {
 				List<MaterialTypeDto> materialTypes = buildMaterialTypeRows(materialRequestService.listMaterialTypesForAdministration(tenantId, actorUserId), tenantId);
 				List<RequestMethodDto> methods = buildRequestMethodRows(materialRequestService.listRequestMethodsForAdministration(tenantId, actorUserId), tenantId);
 				List<RequestStatusDto> statuses = buildRequestStatusRows(materialRequestService.listRequestStatusesForAdministration(tenantId, actorUserId), tenantId);
-				Platform.runLater(() -> { renderMaterialTypeCards(materialTypes); renderRequestMethodCards(methods); renderRequestStatusCards(statuses); });
+				Platform.runLater(() -> {
+					if (generation != requestLookupLoadGeneration) return;
+					renderMaterialTypeCards(materialTypes);
+					renderRequestMethodCards(methods);
+					renderRequestStatusCards(statuses);
+				});
 			} catch (RuntimeException ex) {
 				Platform.runLater(() -> {
+					if (generation != requestLookupLoadGeneration) return;
 					if (materialTypeCardsContainer != null) materialTypeCardsContainer.getChildren().setAll(loadingLabel("Failed to load material types. " + rootMessage(ex)));
 					if (requestMethodCardsContainer != null) requestMethodCardsContainer.getChildren().setAll(loadingLabel("Failed to load request methods. " + rootMessage(ex)));
 					if (requestStatusCardsContainer != null) requestStatusCardsContainer.getChildren().setAll(loadingLabel("Failed to load request statuses. " + rootMessage(ex)));
 				});
 			}
 		});
+	}
+
+	private void showRequestLookupLoadingIfEmpty(VBox container, String message) {
+		if (container != null && container.getChildren().isEmpty()) container.getChildren().setAll(loadingLabel(message));
 	}
 
 	private void setCaseStatusLoadingState(String message) {
@@ -379,7 +397,23 @@ public final class SettingsController {
 	private void renderMaterialTypeCards(List<MaterialTypeDto> rows) { if (materialTypeCardsContainer == null) return; List<MaterialTypeDto> effective = rows == null ? List.of() : rows; materialTypeCardsContainer.getChildren().setAll(effective.isEmpty() ? List.of(loadingLabel("No material types are configured for this tenant.")) : effective.stream().map(r -> buildRequestLookupCard(RequestLookupKind.MATERIAL_TYPE, RequestLookupSelection.material(r))).toList()); setMaterialTypeMessage(""); }
 	private void renderRequestMethodCards(List<RequestMethodDto> rows) { if (requestMethodCardsContainer == null) return; List<RequestMethodDto> effective = rows == null ? List.of() : rows; requestMethodCardsContainer.getChildren().setAll(effective.isEmpty() ? List.of(loadingLabel("No request methods are configured for this tenant.")) : effective.stream().map(r -> buildRequestLookupCard(RequestLookupKind.REQUEST_METHOD, RequestLookupSelection.method(r))).toList()); setRequestMethodMessage(""); }
 	private void renderRequestStatusCards(List<RequestStatusDto> rows) { if (requestStatusCardsContainer == null) return; List<RequestStatusDto> effective = rows == null ? List.of() : rows; requestStatusCardsContainer.getChildren().setAll(effective.isEmpty() ? List.of(loadingLabel("No request statuses are configured for this tenant.")) : effective.stream().map(r -> buildRequestLookupCard(RequestLookupKind.REQUEST_STATUS, RequestLookupSelection.status(r))).toList()); setRequestStatusMessage(""); }
-	private VBox buildRequestLookupCard(RequestLookupKind kind, RequestLookupSelection row) { VBox card = new VBox(8); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact"); if (selectedRequestLookup(kind) != null && selectedRequestLookup(kind).id() == row.id()) card.getStyleClass().add("link-type-card-selected"); card.setOnMouseClicked(e -> selectRequestLookup(kind, row)); HBox header = new HBox(10); header.setAlignment(Pos.CENTER_LEFT); Circle dot = new Circle(6); String css = safe(ColorUtil.toCssBackgroundColorOrNull(row.color())); if (!css.isBlank()) dot.setStyle("-fx-background-color: " + css + "; -fx-fill: " + css + ";"); Label name = new Label(row.name()); name.getStyleClass().add("app-dialog-field-label"); Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); header.getChildren().addAll(dot, name, spacer, LinkTypeIndicatorFactory.createLinkTypePill(row.name(), row.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); HBox metadata = new HBox(6); metadata.setAlignment(Pos.CENTER_LEFT); metadata.getChildren().addAll(metadataPill(row.active() ? "Active" : "Inactive"), metadataPill(row.scopeLabel())); if (!row.systemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.systemKey())); if (!row.color().isBlank()) metadata.getChildren().add(metadataPill(row.color())); HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", "app-toolbar-button-neutral"); edit.setOnAction(e -> { selectRequestLookup(kind,row); editRequestLookup(kind); e.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", "app-toolbar-button-neutral"); toggle.setOnAction(e -> { selectRequestLookup(kind,row); toggleRequestLookup(kind); e.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", row.custom() ? "app-toolbar-button-danger" : "app-toolbar-button-neutral"); reset.setDisable(row.global()); reset.setOnAction(e -> { selectRequestLookup(kind,row); resetRequestLookup(kind); e.consume(); }); Label help = new Label(row.description().isBlank() ? row.lifecycleText() : row.description()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit,toggle,reset,help); card.getChildren().addAll(header,metadata,actions); return card; }
+	private VBox buildRequestLookupCard(RequestLookupKind kind, RequestLookupSelection row) {
+		VBox card = new VBox(8);
+		card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact");
+		card.setUserData(row);
+		card.setFocusTraversable(true);
+		card.pseudoClassStateChanged(SELECTED_CARD, isSelectedRequestLookup(kind, row));
+		card.setOnMouseClicked(event -> {
+			if (event.getButton() == MouseButton.PRIMARY && !isActionControl(event.getTarget())) selectRequestLookup(kind, row);
+		});
+		card.setOnKeyPressed(event -> {
+			if (event.getCode() == KeyCode.SPACE || event.getCode() == KeyCode.ENTER) {
+				selectRequestLookup(kind, row);
+				event.consume();
+			}
+		});
+		HBox header = new HBox(10); header.setAlignment(Pos.CENTER_LEFT); Circle dot = new Circle(6); String css = safe(ColorUtil.toCssBackgroundColorOrNull(row.color())); if (!css.isBlank()) dot.setStyle("-fx-background-color: " + css + "; -fx-fill: " + css + ";"); Label name = new Label(row.name()); name.getStyleClass().add("app-dialog-field-label"); Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); header.getChildren().addAll(dot, name, spacer, LinkTypeIndicatorFactory.createLinkTypePill(row.name(), row.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); HBox metadata = new HBox(6); metadata.setAlignment(Pos.CENTER_LEFT); metadata.getChildren().addAll(metadataPill(row.active() ? "Active" : "Inactive"), metadataPill(row.scopeLabel())); if (!row.systemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.systemKey())); if (!row.color().isBlank()) metadata.getChildren().add(metadataPill(row.color())); HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", "app-toolbar-button-neutral"); edit.setOnAction(e -> { selectRequestLookup(kind,row); editRequestLookup(kind); e.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", "app-toolbar-button-neutral"); toggle.setOnAction(e -> { selectRequestLookup(kind,row); toggleRequestLookup(kind); e.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", row.custom() ? "app-toolbar-button-danger" : "app-toolbar-button-neutral"); reset.setDisable(row.global()); reset.setOnAction(e -> { selectRequestLookup(kind,row); resetRequestLookup(kind); e.consume(); }); Label help = new Label(row.description().isBlank() ? row.lifecycleText() : row.description()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit,toggle,reset,help); card.getChildren().addAll(header,metadata,actions); return card;
+	}
 
 
 
@@ -1212,9 +1246,30 @@ public final class SettingsController {
 	public enum RequestLookupKind { MATERIAL_TYPE, REQUEST_METHOD, REQUEST_STATUS }
 
 	private RequestLookupSelection selectedRequestLookup(RequestLookupKind kind) { return switch (kind) { case MATERIAL_TYPE -> selectedMaterialTypeRow; case REQUEST_METHOD -> selectedRequestMethodRow; case REQUEST_STATUS -> selectedRequestStatusRow; }; }
-	private void selectRequestLookup(RequestLookupKind kind, RequestLookupSelection row) { switch (kind) { case MATERIAL_TYPE -> selectedMaterialTypeRow = row; case REQUEST_METHOD -> selectedRequestMethodRow = row; case REQUEST_STATUS -> selectedRequestStatusRow = row; } renderRequestLookupCards(kind); }
-
-	private void renderRequestLookupCards(RequestLookupKind kind) { loadRequestLookupsAsync(); }
+	private void selectRequestLookup(RequestLookupKind kind, RequestLookupSelection row) {
+		switch (kind) { case MATERIAL_TYPE -> selectedMaterialTypeRow = row; case REQUEST_METHOD -> selectedRequestMethodRow = row; case REQUEST_STATUS -> selectedRequestStatusRow = row; }
+		updateRequestLookupSelectionStyles(kind);
+	}
+	private boolean isSelectedRequestLookup(RequestLookupKind kind, RequestLookupSelection row) {
+		RequestLookupSelection selected = selectedRequestLookup(kind);
+		return selected != null && selected.id() == row.id();
+	}
+	private void updateRequestLookupSelectionStyles(RequestLookupKind kind) {
+		VBox container = switch (kind) { case MATERIAL_TYPE -> materialTypeCardsContainer; case REQUEST_METHOD -> requestMethodCardsContainer; case REQUEST_STATUS -> requestStatusCardsContainer; };
+		if (container == null) return;
+		for (Node node : container.getChildren()) {
+			if (node.getUserData() instanceof RequestLookupSelection row) node.pseudoClassStateChanged(SELECTED_CARD, isSelectedRequestLookup(kind, row));
+		}
+	}
+	private static boolean isActionControl(Object target) {
+		Node node = target instanceof Node n ? n : null;
+		while (node != null) {
+			if (node instanceof ButtonBase) return true;
+			Parent parent = node.getParent();
+			node = parent;
+		}
+		return false;
+	}
 	private void onAddMaterialType(){ addRequestLookup(RequestLookupKind.MATERIAL_TYPE); } private void onEditMaterialType(){ editRequestLookup(RequestLookupKind.MATERIAL_TYPE); } private void onToggleMaterialTypeActive(){ toggleRequestLookup(RequestLookupKind.MATERIAL_TYPE); } private void onResetOrRemoveMaterialType(){ resetRequestLookup(RequestLookupKind.MATERIAL_TYPE); }
 	private void onAddRequestMethod(){ addRequestLookup(RequestLookupKind.REQUEST_METHOD); } private void onEditRequestMethod(){ editRequestLookup(RequestLookupKind.REQUEST_METHOD); } private void onToggleRequestMethodActive(){ toggleRequestLookup(RequestLookupKind.REQUEST_METHOD); } private void onResetOrRemoveRequestMethod(){ resetRequestLookup(RequestLookupKind.REQUEST_METHOD); }
 	private void onAddRequestStatus(){ addRequestLookup(RequestLookupKind.REQUEST_STATUS); } private void onEditRequestStatus(){ editRequestLookup(RequestLookupKind.REQUEST_STATUS); } private void onToggleRequestStatusActive(){ toggleRequestLookup(RequestLookupKind.REQUEST_STATUS); } private void onResetOrRemoveRequestStatus(){ resetRequestLookup(RequestLookupKind.REQUEST_STATUS); }
