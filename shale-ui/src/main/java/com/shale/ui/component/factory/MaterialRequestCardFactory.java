@@ -1,12 +1,15 @@
 package com.shale.ui.component.factory;
 
 import com.shale.core.dto.MaterialRequestSummaryDto;
+import com.shale.core.dto.RequestStatusDto;
+import com.shale.ui.component.StatusTimeline;
 import com.shale.ui.util.ColorUtil;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -20,6 +23,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -65,6 +71,11 @@ public final class MaterialRequestCardFactory {
     }
 
     public Node create(MaterialRequestSummaryDto request, Variant variant, String statusDisplayName, String configuredStatusColor) {
+        return create(request, variant, statusDisplayName, configuredStatusColor, List.of());
+    }
+
+    public Node create(MaterialRequestSummaryDto request, Variant variant, String statusDisplayName, String configuredStatusColor,
+                       List<RequestStatusDto> effectiveStatuses) {
         Objects.requireNonNull(request, "request");
         if (variant != Variant.LIST) throw new IllegalArgumentException("Unsupported material request card variant: " + variant);
 
@@ -103,6 +114,7 @@ public final class MaterialRequestCardFactory {
         addTextFact(facts, "Requested Date Range", fmtRange(request.requestedRangeStartDate(), request.requestedRangeEndDate()));
 
         Label timing = dueIndicator(request);
+        body.getChildren().add(requestStatusTimeline(request.status(), statusDisplayName, effectiveStatuses));
         body.getChildren().add(header);
         if (!facts.getChildren().isEmpty()) body.getChildren().add(facts);
         if (timing != null) body.getChildren().add(timing);
@@ -128,6 +140,43 @@ public final class MaterialRequestCardFactory {
             });
         }
         return card;
+    }
+
+    static ScrollPane requestStatusTimeline(String storedStatus, String displaySafeStatus, List<RequestStatusDto> effectiveStatuses) {
+        return StatusTimeline.create(requestStatusItems(storedStatus, displaySafeStatus, effectiveStatuses), StatusTimeline.Variant.COMPACT_CARD);
+    }
+
+    static List<StatusTimeline.Item> requestStatusItems(String storedStatus, String displaySafeStatus, List<RequestStatusDto> effectiveStatuses) {
+        List<RequestStatusDto> ordered = effectiveStatuses == null ? List.of() : effectiveStatuses.stream()
+                .filter(Objects::nonNull).filter(s -> s.active() && !s.deleted())
+                .sorted(Comparator.comparingInt(RequestStatusDto::sortOrder).thenComparingInt(RequestStatusDto::id)).toList();
+        int current = -1;
+        for (int i = 0; i < ordered.size(); i++) {
+            RequestStatusDto status = ordered.get(i);
+            if (lookupValueMatches(status, storedStatus)) { current = i; break; }
+        }
+        List<StatusTimeline.Item> items = new ArrayList<>();
+        for (int i = 0; i < ordered.size(); i++) {
+            RequestStatusDto status = ordered.get(i);
+            StatusTimeline.State state = i == current ? StatusTimeline.State.CURRENT
+                    : current >= 0 && i < current ? StatusTimeline.State.COMPLETED : StatusTimeline.State.FUTURE;
+            String name = status.name() == null || status.name().isBlank() ? "Status #" + status.id() : status.name().trim();
+            String identity = status.systemKey() == null || status.systemKey().isBlank() ? Integer.toString(status.id()) : status.systemKey();
+            items.add(new StatusTimeline.Item(identity, name, status.color(), state,
+                    name + (state == StatusTimeline.State.CURRENT ? " (Current)" : state == StatusTimeline.State.COMPLETED ? " (Prior workflow step)" : " (Future workflow step)")));
+        }
+        if (current < 0) {
+            String unknown = displaySafeStatus == null || displaySafeStatus.isBlank() ? "Unknown" : displaySafeStatus.trim();
+            items.add(new StatusTimeline.Item("unknown", unknown, NEUTRAL_STATUS_COLOR, StatusTimeline.State.CURRENT,
+                    unknown + " (Current status is not in the effective Request Status list)"));
+        }
+        return List.copyOf(items);
+    }
+
+    private static boolean lookupValueMatches(RequestStatusDto status, String value) {
+        if (value == null || value.isBlank()) return false;
+        return (status.systemKey() != null && status.systemKey().trim().equalsIgnoreCase(value.trim()))
+                || (status.name() != null && status.name().trim().equalsIgnoreCase(value.trim()));
     }
 
     private static void applyCardStyle(HBox card, String statusColor, boolean hovered) {
