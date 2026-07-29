@@ -43,4 +43,31 @@ final class MaterialRequestUpdatesContractTest {
         int due=s.indexOf("listDueNotificationCandidates"), updates=s.indexOf("public List<MaterialRequestUpdateDto> listUpdates");
         assertFalse(s.substring(due,updates).contains("appendUpdate("));
     }
+
+    @Test void nullableTrackedChangesAreComparedAndRenderedSafely() throws Exception {
+        String s=dao();
+        assertTrue(s.contains("Objects.equals(p.requestedByUserId(),c.requestedByUserId())"));
+        assertTrue(s.contains("Objects.equals(p.assignedToUserId(),c.assignedToUserId())"));
+        assertTrue(s.contains("Objects.equals(requestedFromKey(p),requestedFromKey(c))"));
+        assertTrue(s.contains("if(v==null)return \"None\""));
+        assertTrue(s.contains("if(id==null)return null"), "Null lookup IDs must never be queried");
+        assertFalse(s.contains("Set.of(\"closed\",\"cancelled\").contains(oldKey)"));
+        assertFalse(s.contains("Set.of(\"closed\",\"cancelled\").contains(newKey)"));
+    }
+
+    @Test void updateHistoryAndAuditsShareTheOptimisticTransaction() throws Exception {
+        String s=dao();
+        int start=s.indexOf("public MaterialRequestDetailDto update(UpdateMaterialRequestCommand c)");
+        int end=s.indexOf("public void softDelete",start);
+        String update=s.substring(start,end);
+        assertTrue(update.contains("con.setAutoCommit(false)"));
+        assertTrue(update.indexOf("findForUpdate(con,c)") < update.indexOf("updateRow(con,c"));
+        assertTrue(update.contains("if(rows==0)throw new IllegalStateException(\"Material request has changed. Please reload and try again.\")"));
+        assertTrue(update.indexOf("appendChangeUpdates(") > update.indexOf("if(rows==0)"), "A stale write must not append history");
+        assertTrue(update.indexOf("touchCase(") > update.indexOf("appendChangeUpdates("));
+        assertTrue(update.indexOf("audit(") > update.indexOf("touchCase("));
+        assertTrue(update.indexOf("con.commit()") > update.indexOf("audit("));
+        assertTrue(update.contains("catch(Exception ex){rollback(con);throw ex;}"), "History failures must roll back the edit");
+        assertTrue(update.contains("return findMaterialRequest("), "The save must return a refreshed RowVer");
+    }
 }

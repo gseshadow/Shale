@@ -59,7 +59,14 @@ public interface MaterialRequestServicePort {
                                         Integer assignedToUserId, LocalDateTime requestedAt, LocalDate requestedRangeStartDate,
                                         LocalDate requestedRangeEndDate, LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays,
                                         LocalDateTime firstReceivedAt, LocalDateTime fullyReceivedAt, LocalDateTime closedAt,
-                                        Integer closedByUserId, String closureReason, String notes, byte[] rowVer) {}
+                                        Integer closedByUserId, String closureReason, String notes, byte[] rowVer) {
+        public UpdateMaterialRequestCommand { rowVer = copyRowVer(rowVer); }
+        @Override public byte[] rowVer() { return copyRowVer(rowVer); }
+    }
     record AddMaterialRequestNoteCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, String body) {}
     record DeleteMaterialRequestCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, byte[] rowVer) {}
+
+    private static byte[] copyRowVer(byte[] rowVer) {
+        return rowVer == null ? null : java.util.Arrays.copyOf(rowVer, rowVer.length);
+    }
 }
