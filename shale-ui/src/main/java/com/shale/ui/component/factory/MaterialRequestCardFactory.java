@@ -155,20 +155,20 @@ public final class MaterialRequestCardFactory {
             RequestStatusDto status = ordered.get(i);
             if (lookupValueMatches(status, storedStatus)) { current = i; break; }
         }
+        if (current < 0) {
+            String unknown = displaySafeStatus == null || displaySafeStatus.isBlank() ? "Unknown" : displaySafeStatus.trim();
+            return List.of(new StatusTimeline.Item("unknown", unknown, NEUTRAL_STATUS_COLOR, StatusTimeline.State.CURRENT,
+                    unknown + " (Current status is not in the effective Request Status list)"));
+        }
         List<StatusTimeline.Item> items = new ArrayList<>();
-        for (int i = 0; i < ordered.size(); i++) {
+        for (int i = 0; i <= current; i++) {
             RequestStatusDto status = ordered.get(i);
             StatusTimeline.State state = i == current ? StatusTimeline.State.CURRENT
-                    : current >= 0 && i < current ? StatusTimeline.State.COMPLETED : StatusTimeline.State.FUTURE;
+                    : StatusTimeline.State.COMPLETED;
             String name = status.name() == null || status.name().isBlank() ? "Status #" + status.id() : status.name().trim();
             String identity = status.systemKey() == null || status.systemKey().isBlank() ? Integer.toString(status.id()) : status.systemKey();
             items.add(new StatusTimeline.Item(identity, name, status.color(), state,
                     name + (state == StatusTimeline.State.CURRENT ? " (Current)" : state == StatusTimeline.State.COMPLETED ? " (Prior workflow step)" : " (Future workflow step)")));
-        }
-        if (current < 0) {
-            String unknown = displaySafeStatus == null || displaySafeStatus.isBlank() ? "Unknown" : displaySafeStatus.trim();
-            items.add(new StatusTimeline.Item("unknown", unknown, NEUTRAL_STATUS_COLOR, StatusTimeline.State.CURRENT,
-                    unknown + " (Current status is not in the effective Request Status list)"));
         }
         return List.copyOf(items);
     }
