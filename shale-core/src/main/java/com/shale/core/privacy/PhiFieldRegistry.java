@@ -23,6 +23,7 @@ public final class PhiFieldRegistry {
             field("Tasks", "Description"),
             field("TaskTimelineEvents", "Body"),
             field("TaskUpdates", "Body"),
+            field("MaterialRequestUpdates", "Body"),
             field("MaterialTypes", "Description"),
             field("MaterialRequests", "Title"),
             field("MaterialRequests", "Description"),

@@ -335,8 +335,8 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(editBody.contains("\"Unknown\""));
         assertFalse(editBody.contains("createdBy=newUserSelectionField"));
         assertFalse(editBody.contains("selectUser(createdBy"));
-        assertTrue(editBody.contains("ScrollPane formScroll"));
-        assertTrue(editBody.contains("VBox body=new VBox(12,formScroll,footer)"));
+        assertTrue(editBody.contains("ScrollPane fieldsScroll"));
+        assertTrue(editBody.contains("VBox body=new VBox(12,detailBody,footer)"));
     }
 
     private static String methodBody(String source, String signatureStart) {
