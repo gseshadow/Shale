@@ -118,19 +118,20 @@ public final class TaskDueDateNotificationGenerator {
 				}
 			}
 			for (MaterialRequestDueNotificationCandidate candidate : materialRequestDao.listDueNotificationCandidates(shaleClientId, today)) {
-				Integer recipient = candidate.recipientUserId();
-				if (recipient == null || recipient <= 0) continue;
+				for (Integer recipient : candidate.recipientUserIds()) {
 				String eventKey = "material-request:" + candidate.requestId() + ":due:" + candidate.dueAt() + ":" + recipient;
-				notificationDao.createMaterialRequestDueNotification(candidate.shaleClientId(), recipient,
-						"Material request due", "A material request is due: " + candidate.title(), candidate.requestId(), eventKey);
-			}
+					notificationDao.createMaterialRequestDueNotification(candidate.shaleClientId(), recipient,
+							"Material request due", "A material request is due: " + candidate.title(), candidate.requestId(), eventKey);
+				}
+				}
 			LocalDateTime now=LocalDateTime.now(clock.withZone(zoneId));
 			for(MaterialRequestFollowUpNotificationCandidate candidate:materialRequestDao.listFollowUpNotificationCandidates(shaleClientId,now)){
-				Integer recipient=candidate.recipientUserId();if(recipient==null||recipient<=0)continue;
+				for(Integer recipient:candidate.recipientUserIds()){
 				String eventKey="material-request:"+candidate.requestId()+":follow-up:"+candidate.nextFollowUpAt()+":"+recipient;
-				notificationDao.createMaterialRequestFollowUpNotification(candidate.shaleClientId(),recipient,"Material request follow-up",
-						"Follow up on "+candidate.title()+" in its case.",candidate.requestId(),eventKey);
-			}
+					notificationDao.createMaterialRequestFollowUpNotification(candidate.shaleClientId(),recipient,"Material request follow-up",
+							"Follow up on "+candidate.title()+" in its case.",candidate.requestId(),eventKey);
+				}
+				}
 		} catch (Exception ex) {
 			System.err.println("Task due-date generator failed: " + ex.getMessage());
 		}
