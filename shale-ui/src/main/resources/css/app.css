@@ -2563,4 +2563,31 @@
 
 .request-update-body {
     -fx-wrap-text: true;
+    -fx-font-size: 12px;
+    -fx-text-fill: rgba(17,37,66,0.86);
+}
+
+/* Mirrors Task History's note-card/activity-row hierarchy. */
+.request-update-note-card {
+    -fx-background-color: rgba(52, 110, 201, 0.22);
+    -fx-background-radius: 8;
+}
+
+.request-update-note-card .request-update-body {
+    -fx-font-size: 13px;
+}
+
+.request-update-meta {
+    -fx-font-size: 10px;
+    -fx-text-fill: rgba(17,37,66,0.56);
+    -fx-wrap-text: true;
+}
+
+.request-update-note-card .request-update-meta {
+    -fx-font-size: 11px;
+    -fx-text-fill: rgba(17,37,66,0.70);
+}
+
+.request-update-system-row .request-update-body {
+    -fx-text-fill: rgba(17,37,66,0.72);
 }
