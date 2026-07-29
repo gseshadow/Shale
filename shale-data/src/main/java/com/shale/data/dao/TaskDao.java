@@ -12,6 +12,9 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
@@ -23,6 +26,7 @@ import com.shale.core.semantics.RoleSemantics;
  * DAO for task reads used by case task sections.
  */
 public final class TaskDao {
+    private static final Logger LOG = LoggerFactory.getLogger(TaskDao.class);
     private static final int ROLE_RESPONSIBLE_ATTORNEY = RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY;
     private static final String PRIORITIES_TABLE = "dbo.Priorities";
     private static final String TASK_STATUSES_TABLE = "dbo.TaskStatuses";
@@ -1118,14 +1122,23 @@ public final class TaskDao {
                   u.Id ASC;
                 """.formatted(placeholders);
 
-        try (Connection con = db.requireConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
-            int i = 1;
-            ps.setInt(i++, shaleClientId);
-            for (Long taskId : validTaskIds) {
-                ps.setLong(i++, taskId);
-            }
+        long connectionStart = System.nanoTime();
+        try (Connection con = db.requireConnection()) {
+            long connectionDone = System.nanoTime();
+            LOG.info("PERF DAO phase method=listAssignedUsersForTasks phase=connection_and_session_context elapsedMs={}",
+                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(connectionDone - connectionStart));
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                int i = 1;
+                ps.setInt(i++, shaleClientId);
+                for (Long taskId : validTaskIds) {
+                    ps.setLong(i++, taskId);
+                }
+                long executeStart = System.nanoTime();
             try (ResultSet rs = ps.executeQuery()) {
+                long executeDone = System.nanoTime();
+                LOG.info("PERF DAO phase method=listAssignedUsersForTasks phase=sql_execution elapsedMs={}",
+                        java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(executeDone - executeStart));
+                long mappingStart = System.nanoTime();
                 List<TaskAssignedTaskUserRow> out = new ArrayList<>();
                 while (rs.next()) {
                     out.add(new TaskAssignedTaskUserRow(
@@ -1134,8 +1147,12 @@ public final class TaskDao {
                             rs.getString("DisplayName"),
                             rs.getString("Color")));
                 }
+                long mappingDone = System.nanoTime();
+                LOG.info("PERF DAO phase method=listAssignedUsersForTasks phase=result_mapping rows={} elapsedMs={}", out.size(),
+                        java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(mappingDone - mappingStart));
                 return out;
             }
+        }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to list assigned users for task collection", e);
         }
