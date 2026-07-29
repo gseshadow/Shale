@@ -2591,3 +2591,16 @@
 .request-update-system-row .request-update-body {
     -fx-text-fill: rgba(17,37,66,0.72);
 }
+.status-timeline {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-padding: 0;
+}
+.status-timeline > .viewport,
+.status-timeline > .viewport > .content { -fx-background-color: transparent; }
+.status-timeline--compact .scroll-bar:horizontal {
+    -fx-pref-height: 5px;
+    -fx-background-color: transparent;
+}
+.status-timeline--compact .scroll-bar:horizontal .track { -fx-background-color: rgba(91,103,124,0.10); }
+.status-timeline--compact .scroll-bar:horizontal .thumb { -fx-background-color: rgba(91,103,124,0.38); }

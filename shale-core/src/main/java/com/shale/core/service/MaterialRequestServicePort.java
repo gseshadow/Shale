@@ -28,6 +28,7 @@ public interface MaterialRequestServicePort {
     default List<MaterialRequestSummaryDto> listMaterialRequests(long caseId, int shaleClientId, boolean includeDeleted) { return listMaterialRequests(caseId, shaleClientId); }
     Optional<MaterialRequestDetailDto> getMaterialRequest(long caseId, long materialRequestId, int shaleClientId, int actorUserId);
     default List<MaterialRequestUpdateDto> listUpdates(long caseId, long materialRequestId, int shaleClientId, int actorUserId) { return List.of(); }
+    default List<MaterialRequestStatusHistoryDto> listStatusHistory(long caseId, List<Long> materialRequestIds, int shaleClientId) { return List.of(); }
     default MaterialRequestUpdateDto addNote(AddMaterialRequestNoteCommand command) { throw new UnsupportedOperationException("addNote"); }
     List<MaterialRequestFollowUpDto> listFollowUps(long caseId, long materialRequestId, int shaleClientId, int actorUserId);
     MaterialRequestDetailDto createMaterialRequest(CreateMaterialRequestCommand command);
