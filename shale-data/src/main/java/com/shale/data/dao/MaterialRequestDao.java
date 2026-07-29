@@ -153,23 +153,27 @@ public final class MaterialRequestDao {
         try(Connection con=db.requireConnection(); PreparedStatement ps=con.prepareStatement(sql)){ verifyTenant(con,tenant); ps.setInt(1,tenant); ps.setLong(2,caseId); ps.setLong(3,id); try(ResultSet rs=ps.executeQuery()){return rs.next()?mapDetail(rs):null;}} catch(SQLException e){throw sqlFailure(e);} }
 
     public MaterialRequestDetailDto create(CreateMaterialRequestCommand c){
-        validateCreate(c); LocalDateTime mutationTime=LocalDateTime.now();
-        LocalDateTime next=normalizeCreateSchedule(c.nextFollowUpAt(),c.followUpIntervalDays(),mutationTime);
+        validateCreate(c);
         try(Connection con=db.requireConnection()){verifyTenant(con,c.shaleClientId());con.setAutoCommit(false);try{
+            LocalDateTime mutationTime=databaseNow(con);
+            LocalDateTime next=normalizeCreateSchedule(c.nextFollowUpAt(),c.followUpIntervalDays(),mutationTime);
             validateRefs(con,c);validateUser(con,c.shaleClientId(),c.actorUserId());StatusSemantic status=resolveStatusSemantic(con,c.shaleClientId(),c.status());
             ClosureValues closure=normalizeClosure(status.systemKey(),null,null,null,null,null,null,c.actorUserId(),mutationTime);
+            if(isTerminal(status.systemKey()))next=null;
             long id=insert(con,c,status.persistedStatus(),closure,next);appendUpdate(con,c.shaleClientId(),c.caseId(),id,"SYSTEM_EVENT","CREATED","Material request created.",c.actorUserId(),mutationTime);createRecipientNotifications(con,id,c.shaleClientId(),c.caseId(),c.title(),c.actorUserId(),null,null,c.requestedByUserId(),c.assignedToUserId(),"created");
             touchCase(con,c.caseId(),c.shaleClientId());auditPhiCreate(con,c.actorUserId(),id,c);audit(con,c.shaleClientId(),c.actorUserId(),EntityActionAuditEvent.Action.CREATED,id,c.caseId(),meta(c));con.commit();return findMaterialRequest(c.caseId(),id,c.shaleClientId());
         }catch(Exception ex){rollback(con);throw ex;}}catch(SQLException e){throw sqlFailure(e);}}
 
     public MaterialRequestDetailDto update(UpdateMaterialRequestCommand c){
-        validateUpdate(c); LocalDateTime mutationTime=LocalDateTime.now();
+        validateUpdate(c);
         try(Connection con=db.requireConnection()){verifyTenant(con,c.shaleClientId());con.setAutoCommit(false);try{
-            validateUpdateRefs(con,c);validateUser(con,c.shaleClientId(),c.actorUserId());MaterialRequestDetailDto prior=findForUpdate(con,c);StatusSemantic status=resolveStatusSemantic(con,c.shaleClientId(),c.status());RecipientSnapshot previous=findRecipientSnapshot(con,c);ClosureValues existing=findClosureValues(con,c);ScheduleSnapshot schedule=findScheduleSnapshot(con,c);
+            LocalDateTime mutationTime=databaseNow(con);validateUpdateRefs(con,c);validateUser(con,c.shaleClientId(),c.actorUserId());MaterialRequestDetailDto prior=findForUpdate(con,c);if(!Arrays.equals(prior.rowVer(),c.rowVer()))throw new IllegalStateException("Material request has changed. Please reload and try again.");StatusSemantic status=resolveStatusSemantic(con,c.shaleClientId(),c.status());RecipientSnapshot previous=findRecipientSnapshot(con,c);ClosureValues existing=findClosureValues(con,c);ScheduleSnapshot schedule=findScheduleSnapshot(con,c);
             ClosureValues closure=normalizeClosure(status.systemKey(),c.closedAt(),c.closedByUserId(),c.closureReason(),existing.closedAt(),existing.closedByUserId(),existing.closureReason(),c.actorUserId(),mutationTime);
-            LocalDateTime next=normalizeUpdateSchedule(c.nextFollowUpAt(),c.followUpIntervalDays(),schedule,status.systemKey(),mutationTime);
+            boolean meaningful=hasMeaningfulChange(prior,c,status.persistedStatus(),closure);boolean explicitScheduleChange=!Objects.equals(c.nextFollowUpAt(),schedule.nextFollowUpAt());
+            if(!meaningful&&!explicitScheduleChange){con.rollback();return prior;}
+            LocalDateTime next=normalizeUpdateSchedule(c.nextFollowUpAt(),c.followUpIntervalDays(),schedule,status.systemKey(),mutationTime,meaningful,explicitScheduleChange);
             int rows=updateRow(con,c,status.persistedStatus(),closure,next);if(rows==0)throw new IllegalStateException("Material request has changed. Please reload and try again.");
-            appendChangeUpdates(con,prior,c,status,closure,next,mutationTime);
+            appendChangeUpdates(con,prior,c,status,closure,next,mutationTime,!explicitScheduleChange&&meaningful&&c.followUpIntervalDays()!=null&&!isTerminal(status.systemKey()));
             createRecipientNotifications(con,c.materialRequestId(),c.shaleClientId(),c.caseId(),c.title(),c.actorUserId(),previous.requestedByUserId(),previous.assignedToUserId(),c.requestedByUserId(),c.assignedToUserId(),"update-"+HexFormat.of().formatHex(c.rowVer()));touchCase(con,c.caseId(),c.shaleClientId());audit(con,c.shaleClientId(),c.actorUserId(),EntityActionAuditEvent.Action.UPDATED,c.materialRequestId(),c.caseId(),meta(c));con.commit();return findMaterialRequest(c.caseId(),c.materialRequestId(),c.shaleClientId());
         }catch(Exception ex){rollback(con);throw ex;}}catch(SQLException e){throw sqlFailure(e);}}
 
@@ -177,7 +181,7 @@ public final class MaterialRequestDao {
         requireRowVer(c.rowVer());
         try(Connection con=db.requireConnection()){verifyTenant(con,c.shaleClientId());con.setAutoCommit(false);try{
             MaterialRequestDetailDto old=findForDelete(con,c);
-            try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.MaterialRequests SET IsDeleted=1,DeletedAt=SYSUTCDATETIME(),DeletedByUserId=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE ShaleClientId=? AND CaseId=? AND Id=? AND IsDeleted=0 AND RowVer=?")){ps.setInt(1,c.actorUserId());ps.setInt(2,c.actorUserId());ps.setInt(3,c.shaleClientId());ps.setLong(4,c.caseId());ps.setLong(5,c.materialRequestId());ps.setBytes(6,c.rowVer());if(ps.executeUpdate()!=1)throw new IllegalStateException("Material request has changed. Please reload and try again.");}
+            try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.MaterialRequests SET IsDeleted=1,NextFollowUpAt=NULL,DeletedAt=SYSUTCDATETIME(),DeletedByUserId=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE ShaleClientId=? AND CaseId=? AND Id=? AND IsDeleted=0 AND RowVer=?")){ps.setInt(1,c.actorUserId());ps.setInt(2,c.actorUserId());ps.setInt(3,c.shaleClientId());ps.setLong(4,c.caseId());ps.setLong(5,c.materialRequestId());ps.setBytes(6,c.rowVer());if(ps.executeUpdate()!=1)throw new IllegalStateException("Material request has changed. Please reload and try again.");}
             phi.auditDelete(con,c.actorUserId(),"MaterialRequests","Title",c.materialRequestId(),old.title());phi.auditDelete(con,c.actorUserId(),"MaterialRequests","Description",c.materialRequestId(),old.description());phi.auditDelete(con,c.actorUserId(),"MaterialRequests","RequestedFromText",c.materialRequestId(),old.requestedFromText());
             touchCase(con,c.caseId(),c.shaleClientId());audit(con,c.shaleClientId(),c.actorUserId(),EntityActionAuditEvent.Action.DELETED,c.materialRequestId(),c.caseId(),null);con.commit();
         }catch(Exception ex){rollback(con);throw ex;}}catch(SQLException e){throw sqlFailure(e);}}
@@ -186,7 +190,7 @@ public final class MaterialRequestDao {
     public List<MaterialRequestDueNotificationCandidate> listDueNotificationCandidates(int tenant, LocalDate today){
         if(today==null)return List.of();
         String sql="""
-            SELECT mr.Id,mr.ShaleClientId,mr.CaseId,mr.Title,mr.AssignedToUserId,mr.RequestedByUserId,mr.ExpectedResponseDate,
+            SELECT mr.Id,mr.ShaleClientId,mr.CaseId,mr.Title,CASE WHEN EXISTS (SELECT 1 FROM dbo.Users u WHERE u.Id=mr.AssignedToUserId AND u.ShaleClientId=mr.ShaleClientId AND ISNULL(u.is_deleted,0)=0) THEN mr.AssignedToUserId END,CASE WHEN EXISTS (SELECT 1 FROM dbo.Users u WHERE u.Id=mr.RequestedByUserId AND u.ShaleClientId=mr.ShaleClientId AND ISNULL(u.is_deleted,0)=0) THEN mr.RequestedByUserId END,mr.ExpectedResponseDate,
                    LOWER(LTRIM(RTRIM(COALESCE(rs.SystemKey,mr.Status)))) AS StatusSystemKey
             FROM dbo.MaterialRequests mr
             OUTER APPLY (SELECT TOP (1) r.SystemKey FROM dbo.RequestStatuses r
@@ -203,19 +207,19 @@ public final class MaterialRequestDao {
     public List<MaterialRequestFollowUpNotificationCandidate> listFollowUpNotificationCandidates(int tenant,LocalDateTime now){
         if(now==null)return List.of();
         String sql="""
-            SELECT mr.Id,mr.ShaleClientId,mr.CaseId,mr.Title,mr.AssignedToUserId,mr.RequestedByUserId,mr.NextFollowUpAt,mr.FollowUpIntervalDays
+            SELECT mr.Id,mr.ShaleClientId,mr.CaseId,mr.Title,CASE WHEN EXISTS (SELECT 1 FROM dbo.Users u WHERE u.Id=mr.AssignedToUserId AND u.ShaleClientId=mr.ShaleClientId AND ISNULL(u.is_deleted,0)=0) THEN mr.AssignedToUserId END,CASE WHEN EXISTS (SELECT 1 FROM dbo.Users u WHERE u.Id=mr.RequestedByUserId AND u.ShaleClientId=mr.ShaleClientId AND ISNULL(u.is_deleted,0)=0) THEN mr.RequestedByUserId END,mr.NextFollowUpAt,mr.FollowUpIntervalDays
             FROM dbo.MaterialRequests mr
             OUTER APPLY (SELECT TOP (1) r.SystemKey FROM dbo.RequestStatuses r WHERE (r.ShaleClientId=mr.ShaleClientId OR r.ShaleClientId IS NULL) AND r.IsDeleted=0 AND r.SystemKey IS NOT NULL AND (LOWER(LTRIM(RTRIM(r.SystemKey)))=LOWER(LTRIM(RTRIM(mr.Status))) OR LOWER(LTRIM(RTRIM(r.Name)))=LOWER(LTRIM(RTRIM(mr.Status)))) ORDER BY CASE WHEN r.ShaleClientId=mr.ShaleClientId THEN 0 ELSE 1 END,r.Id) rs
-            WHERE mr.ShaleClientId=? AND mr.IsDeleted=0 AND mr.FollowUpIntervalDays IS NOT NULL AND mr.NextFollowUpAt<=?
+            WHERE mr.ShaleClientId=? AND mr.IsDeleted=0 AND mr.NextFollowUpAt IS NOT NULL AND mr.NextFollowUpAt<=?
               AND LOWER(LTRIM(RTRIM(COALESCE(rs.SystemKey,mr.Status)))) NOT IN ('closed','cancelled')
             ORDER BY mr.NextFollowUpAt,mr.Id
             """;
-        try(Connection con=db.requireConnection();PreparedStatement ps=con.prepareStatement(sql)){verifyTenant(con,tenant);ps.setInt(1,tenant);setTs(ps,2,now);try(ResultSet rs=ps.executeQuery()){List<MaterialRequestFollowUpNotificationCandidate> out=new ArrayList<>();while(rs.next())out.add(new MaterialRequestFollowUpNotificationCandidate(rs.getLong(1),rs.getInt(2),rs.getLong(3),rs.getString(4),(Integer)rs.getObject(5),(Integer)rs.getObject(6),ldt(rs,"NextFollowUpAt"),rs.getInt(8)));return out;}}catch(SQLException e){throw sqlFailure(e);}
+        try(Connection con=db.requireConnection();PreparedStatement ps=con.prepareStatement(sql)){verifyTenant(con,tenant);ps.setInt(1,tenant);setTs(ps,2,now);try(ResultSet rs=ps.executeQuery()){List<MaterialRequestFollowUpNotificationCandidate> out=new ArrayList<>();while(rs.next())out.add(new MaterialRequestFollowUpNotificationCandidate(rs.getLong(1),rs.getInt(2),rs.getLong(3),rs.getString(4),(Integer)rs.getObject(5),(Integer)rs.getObject(6),ldt(rs,"NextFollowUpAt"),(Integer)rs.getObject(8)));return out;}}catch(SQLException e){throw sqlFailure(e);}
     }
-    public record MaterialRequestFollowUpNotificationCandidate(long requestId,int shaleClientId,long caseId,String title,Integer assignedToUserId,Integer requestedByUserId,LocalDateTime nextFollowUpAt,int followUpIntervalDays){public Integer recipientUserId(){return assignedToUserId!=null?assignedToUserId:requestedByUserId;}}
+    public record MaterialRequestFollowUpNotificationCandidate(long requestId,int shaleClientId,long caseId,String title,Integer assignedToUserId,Integer requestedByUserId,LocalDateTime nextFollowUpAt,Integer followUpIntervalDays){public Set<Integer> recipientUserIds(){return responsibleUsers(requestedByUserId,assignedToUserId);}}
 
     public record MaterialRequestDueNotificationCandidate(long requestId,int shaleClientId,long caseId,String title,Integer assignedToUserId,Integer requestedByUserId,LocalDate dueAt,String statusSystemKey){
-        public Integer recipientUserId(){return assignedToUserId!=null?assignedToUserId:requestedByUserId!=null&&requestedByUserId>0?requestedByUserId:null;}
+        public Set<Integer> recipientUserIds(){return responsibleUsers(requestedByUserId,assignedToUserId);}
     }
 
     public List<MaterialRequestUpdateDto> listUpdates(long caseId,long requestId,int tenant){
@@ -225,7 +229,7 @@ public final class MaterialRequestDao {
 
     public MaterialRequestUpdateDto addNote(AddMaterialRequestNoteCommand c){
         String body=blank(c.body());if(body==null)throw new IllegalArgumentException("Note is required.");if(body.length()>4000)throw new IllegalArgumentException("Note is too long.");
-        try(Connection con=db.requireConnection()){verifyTenant(con,c.shaleClientId());con.setAutoCommit(false);try{validateUser(con,c.shaleClientId(),c.actorUserId());requireExists(con,"dbo.MaterialRequests","Id=? AND ShaleClientId=? AND CaseId="+c.caseId()+" AND IsDeleted=0",c.materialRequestId(),c.shaleClientId());LocalDateTime now=LocalDateTime.now();long id=appendUpdate(con,c.shaleClientId(),c.caseId(),c.materialRequestId(),"USER_NOTE","NOTE",body,c.actorUserId(),now);try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.MaterialRequests SET UpdatedAt=?,UpdatedByUserId=? WHERE Id=? AND CaseId=? AND ShaleClientId=? AND IsDeleted=0")){setTs(ps,1,now);ps.setInt(2,c.actorUserId());ps.setLong(3,c.materialRequestId());ps.setLong(4,c.caseId());ps.setInt(5,c.shaleClientId());if(ps.executeUpdate()!=1)throw new IllegalArgumentException("Material request not found.");}touchCase(con,c.caseId(),c.shaleClientId());phi.auditCreate(con,c.actorUserId(),"MaterialRequestUpdates","Body",id,body);con.commit();return findUpdate(con,id,c.shaleClientId());}catch(Exception ex){rollback(con);throw ex;}}catch(SQLException e){throw sqlFailure(e);}
+        try(Connection con=db.requireConnection()){verifyTenant(con,c.shaleClientId());con.setAutoCommit(false);try{validateUser(con,c.shaleClientId(),c.actorUserId());LocalDateTime now=databaseNow(con);long id=appendUpdate(con,c.shaleClientId(),c.caseId(),c.materialRequestId(),"USER_NOTE","NOTE",body,c.actorUserId(),now);try(PreparedStatement ps=con.prepareStatement("UPDATE mr SET NextFollowUpAt=CASE WHEN mr.FollowUpIntervalDays IS NOT NULL AND LOWER(LTRIM(RTRIM(COALESCE(rs.SystemKey,mr.Status)))) NOT IN ('closed','cancelled') THEN DATEADD(day,mr.FollowUpIntervalDays,?) ELSE mr.NextFollowUpAt END,UpdatedAt=?,UpdatedByUserId=? FROM dbo.MaterialRequests mr OUTER APPLY (SELECT TOP (1) r.SystemKey FROM dbo.RequestStatuses r WHERE (r.ShaleClientId=mr.ShaleClientId OR r.ShaleClientId IS NULL) AND r.IsDeleted=0 AND r.SystemKey IS NOT NULL AND (LOWER(LTRIM(RTRIM(r.SystemKey)))=LOWER(LTRIM(RTRIM(mr.Status))) OR LOWER(LTRIM(RTRIM(r.Name)))=LOWER(LTRIM(RTRIM(mr.Status)))) ORDER BY CASE WHEN r.ShaleClientId=mr.ShaleClientId THEN 0 ELSE 1 END,r.Id) rs WHERE mr.Id=? AND mr.CaseId=? AND mr.ShaleClientId=? AND mr.IsDeleted=0")){setTs(ps,1,now);setTs(ps,2,now);ps.setInt(3,c.actorUserId());ps.setLong(4,c.materialRequestId());ps.setLong(5,c.caseId());ps.setInt(6,c.shaleClientId());if(ps.executeUpdate()!=1)throw new IllegalArgumentException("Material request not found.");}touchCase(con,c.caseId(),c.shaleClientId());phi.auditCreate(con,c.actorUserId(),"MaterialRequestUpdates","Body",id,body);con.commit();return findUpdate(con,id,c.shaleClientId());}catch(Exception ex){rollback(con);throw ex;}}catch(SQLException e){throw sqlFailure(e);}
     }
 
     public List<MaterialRequestFollowUpDto> listFollowUps(long caseId,long requestId,int tenant){ String sql=""" 
@@ -270,12 +274,15 @@ public final class MaterialRequestDao {
         try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,c.shaleClientId());ps.setLong(2,c.caseId());ps.setLong(3,c.materialRequestId());try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalArgumentException("Material request not found.");return new ScheduleSnapshot((Integer)rs.getObject(1),ldt(rs,"NextFollowUpAt"),rs.getString(3));}}
     }
     static LocalDateTime normalizeCreateSchedule(LocalDateTime supplied,Integer interval,LocalDateTime now){validateInterval(interval);return interval==null?supplied:Objects.requireNonNull(now).plusDays(interval);}
-    static LocalDateTime normalizeUpdateSchedule(LocalDateTime supplied,Integer interval,ScheduleSnapshot existing,String newStatus,LocalDateTime now){
+    static LocalDateTime normalizeUpdateSchedule(LocalDateTime supplied,Integer interval,ScheduleSnapshot existing,String newStatus,LocalDateTime now,boolean meaningful,boolean explicitScheduleChange){
         validateInterval(interval);boolean wasTerminal=isTerminal(existing.statusSystemKey()),terminal=isTerminal(newStatus);
+        if(terminal)return null;
         if(interval==null)return existing.intervalDays()!=null?null:supplied;
-        if(!Objects.equals(interval,existing.intervalDays())||(wasTerminal&&!terminal))return Objects.requireNonNull(now).plusDays(interval);
+        if(explicitScheduleChange)return supplied;
+        if(meaningful||!Objects.equals(interval,existing.intervalDays())||(wasTerminal&&!terminal))return Objects.requireNonNull(now).plusDays(interval);
         return supplied;
     }
+    static LocalDateTime normalizeUpdateSchedule(LocalDateTime supplied,Integer interval,ScheduleSnapshot existing,String newStatus,LocalDateTime now){return normalizeUpdateSchedule(supplied,interval,existing,newStatus,now,false,false);}
     private static boolean isTerminal(String key){return key!=null&&Set.of("closed","cancelled").contains(key.trim().toLowerCase(Locale.ROOT));}
     static void validateInterval(Integer days){if(days!=null&&(days<1||days>365))throw new IllegalArgumentException("Follow-up interval must be between 1 and 365 days.");}
 
@@ -321,7 +328,7 @@ public final class MaterialRequestDao {
     private MaterialRequestDetailDto findForUpdate(Connection con,UpdateMaterialRequestCommand c)throws SQLException{String sql=baseSelect(true)+" WHERE mr.ShaleClientId=? AND mr.CaseId=? AND mr.Id=? AND mr.IsDeleted=0 AND ISNULL(c.IsDeleted,0)=0";try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,c.shaleClientId());ps.setLong(2,c.caseId());ps.setLong(3,c.materialRequestId());try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalArgumentException("Material request not found.");return mapDetail(rs);}}}
     private long appendUpdate(Connection con,int tenant,long caseId,long requestId,String type,String key,String body,int actor,LocalDateTime at)throws SQLException{try(PreparedStatement ps=con.prepareStatement("INSERT dbo.MaterialRequestUpdates(ShaleClientId,CaseId,MaterialRequestId,UpdateType,FieldKey,Body,ActorUserId,CreatedAt) OUTPUT INSERTED.Id VALUES(?,?,?,?,?,?,?,?)")){ps.setInt(1,tenant);ps.setLong(2,caseId);ps.setLong(3,requestId);ps.setString(4,type);ps.setString(5,key);ps.setString(6,body);ps.setInt(7,actor);setTs(ps,8,at);try(ResultSet rs=ps.executeQuery()){rs.next();return rs.getLong(1);}}}
     private MaterialRequestUpdateDto findUpdate(Connection con,long id,int tenant)throws SQLException{String sql="SELECT mu.Id,mu.ShaleClientId,mu.CaseId,mu.MaterialRequestId,mu.UpdateType,mu.FieldKey,mu.Body,mu.ActorUserId,"+userDisplayName("u")+" AS ActorDisplayName,mu.CreatedAt FROM dbo.MaterialRequestUpdates mu JOIN dbo.Users u ON u.Id=mu.ActorUserId AND u.ShaleClientId=mu.ShaleClientId WHERE mu.Id=? AND mu.ShaleClientId=?";try(PreparedStatement ps=con.prepareStatement(sql)){ps.setLong(1,id);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new SQLException("Inserted request update could not be read.");return mapUpdate(rs);}}}
-    private void appendChangeUpdates(Connection con,MaterialRequestDetailDto p,UpdateMaterialRequestCommand c,StatusSemantic status,ClosureValues closure,LocalDateTime next,LocalDateTime at)throws SQLException{
+    private void appendChangeUpdates(Connection con,MaterialRequestDetailDto p,UpdateMaterialRequestCommand c,StatusSemantic status,ClosureValues closure,LocalDateTime next,LocalDateTime at,boolean derivedSchedule)throws SQLException{
         List<Change> changes=new ArrayList<>();
         change(changes,"TITLE",p.title(),blank(c.title()),"Title");
         if(p.materialTypeId()!=c.materialTypeId())changes.add(new Change("MATERIAL_TYPE","Material Type changed from "+p.materialTypeName()+" to "+lookupName(con,"dbo.MaterialTypes",c.materialTypeId(),c.shaleClientId())+"."));
@@ -332,7 +339,7 @@ public final class MaterialRequestDao {
         change(changes,"REQUEST_METHOD",displayLookup(con,"dbo.RequestMethods",c.shaleClientId(),p.requestMethod()),displayLookup(con,"dbo.RequestMethods",c.shaleClientId(),c.requestMethod()),"Request Method");
         String oldStatus=displayLookup(con,"dbo.RequestStatuses",c.shaleClientId(),p.status()),newStatus=displayLookup(con,"dbo.RequestStatuses",c.shaleClientId(),status.persistedStatus());
         if(!Objects.equals(norm(p.status()),norm(status.persistedStatus())))changes.add(new Change("STATUS","Status changed from "+oldStatus+" to "+newStatus+"."));
-        change(changes,"REQUESTED_DATE",p.requestedAt(),c.requestedAt(),"Requested date");change(changes,"REQUESTED_RANGE_START",p.requestedRangeStartDate(),c.requestedRangeStartDate(),"Requested date start");change(changes,"REQUESTED_RANGE_END",p.requestedRangeEndDate(),c.requestedRangeEndDate(),"Requested date end");change(changes,"EXPECTED_RESPONSE_DATE",p.expectedResponseDate(),c.expectedResponseDate(),"Expected response date");change(changes,"NEXT_FOLLOW_UP_AT",p.nextFollowUpAt(),next,"Next follow-up date");
+        change(changes,"REQUESTED_DATE",p.requestedAt(),c.requestedAt(),"Requested date");change(changes,"REQUESTED_RANGE_START",p.requestedRangeStartDate(),c.requestedRangeStartDate(),"Requested date start");change(changes,"REQUESTED_RANGE_END",p.requestedRangeEndDate(),c.requestedRangeEndDate(),"Requested date end");change(changes,"EXPECTED_RESPONSE_DATE",p.expectedResponseDate(),c.expectedResponseDate(),"Expected response date");if(!derivedSchedule)change(changes,"NEXT_FOLLOW_UP_AT",p.nextFollowUpAt(),next,"Next follow-up date");
         if(!Objects.equals(p.followUpIntervalDays(),c.followUpIntervalDays()))changes.add(new Change("FOLLOW_UP_INTERVAL","Follow-up interval changed from "+interval(p.followUpIntervalDays())+" to "+interval(c.followUpIntervalDays())+"."));
         if(!Objects.equals(blank(p.description()),blank(c.description())))changes.add(new Change("DESCRIPTION","Description updated."));
         if(!Objects.equals(blank(p.notes()),blank(c.notes())))changes.add(new Change("NOTES","Request notes updated."));
@@ -340,6 +347,10 @@ public final class MaterialRequestDao {
         if(!Objects.equals(blank(p.closureReason()),blank(closure.closureReason())))changes.add(new Change("CLOSURE_REASON",closure.closureReason()==null?"Closure reason was cleared.":"Closure reason updated."));
         for(Change x:changes)appendUpdate(con,c.shaleClientId(),c.caseId(),c.materialRequestId(),"SYSTEM_CHANGE",x.key(),x.body(),c.actorUserId(),at);
     }
+    private static boolean hasMeaningfulChange(MaterialRequestDetailDto p,UpdateMaterialRequestCommand c,String status,ClosureValues closure){
+        return p.materialTypeId()!=c.materialTypeId()||!Objects.equals(blank(p.title()),blank(c.title()))||!Objects.equals(blank(p.description()),blank(c.description()))||!Objects.equals(p.requestedFromContactId(),c.requestedFromContactId())||!Objects.equals(p.requestedFromOrganizationId(),c.requestedFromOrganizationId())||!Objects.equals(blank(p.requestedFromText()),blank(c.requestedFromText()))||!Objects.equals(norm(p.requestMethod()),norm(c.requestMethod()))||!Objects.equals(norm(p.status()),norm(status))||!Objects.equals(p.requestedByUserId(),c.requestedByUserId())||!Objects.equals(p.assignedToUserId(),c.assignedToUserId())||!Objects.equals(p.requestedAt(),c.requestedAt())||!Objects.equals(p.requestedRangeStartDate(),c.requestedRangeStartDate())||!Objects.equals(p.requestedRangeEndDate(),c.requestedRangeEndDate())||!Objects.equals(p.expectedResponseDate(),c.expectedResponseDate())||!Objects.equals(p.followUpIntervalDays(),c.followUpIntervalDays())||!Objects.equals(p.firstReceivedAt(),c.firstReceivedAt())||!Objects.equals(p.fullyReceivedAt(),c.fullyReceivedAt())||!Objects.equals(blank(p.notes()),blank(c.notes()))||!Objects.equals(p.closedAt(),closure.closedAt())||!Objects.equals(p.closedByUserId(),closure.closedByUserId())||!Objects.equals(blank(p.closureReason()),blank(closure.closureReason()));
+    }
+    private static Set<Integer> responsibleUsers(Integer requestedBy,Integer assignedTo){LinkedHashSet<Integer> users=new LinkedHashSet<>();if(requestedBy!=null&&requestedBy>0)users.add(requestedBy);if(assignedTo!=null&&assignedTo>0)users.add(assignedTo);return Collections.unmodifiableSet(users);}
     record Change(String key,String body){}
     private static void change(List<Change> out,String key,Object old,Object value,String label){if(Objects.equals(old,value))return;String a=friendly(old),b=friendly(value);out.add(new Change(key,value==null?label+" was cleared.":old==null?label+" set to "+b+".":label+" changed from "+a+" to "+b+"."));}
     private static String friendly(Object v){if(v==null)return "None";if(v instanceof LocalDate d)return d.format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy",Locale.US));if(v instanceof LocalDateTime d)return d.format(java.time.format.DateTimeFormatter.ofPattern("MMMM d, yyyy 'at' h:mm a",Locale.US));return String.valueOf(v);}
@@ -366,6 +377,7 @@ public final class MaterialRequestDao {
     private static Map<EntityActionAuditEvent.MetadataKey,Object> meta(CreateMaterialRequestCommand c){var m=new EnumMap<EntityActionAuditEvent.MetadataKey,Object>(EntityActionAuditEvent.MetadataKey.class);m.put(EntityActionAuditEvent.MetadataKey.MATERIAL_TYPE_ID,c.materialTypeId());m.put(EntityActionAuditEvent.MetadataKey.REQUEST_STATUS,norm(c.status()));if(c.assignedToUserId()!=null)m.put(EntityActionAuditEvent.MetadataKey.ASSIGNED_TO_USER_ID,c.assignedToUserId());if(c.requestedFromContactId()!=null)m.put(EntityActionAuditEvent.MetadataKey.CONTACT_ID,c.requestedFromContactId());if(c.requestedFromOrganizationId()!=null)m.put(EntityActionAuditEvent.MetadataKey.ORGANIZATION_ID,c.requestedFromOrganizationId());return m;}
     private static void requireExists(Connection con,String table,String where,Object a,Object b)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM "+table+" WHERE "+where)){ps.setObject(1,a);ps.setObject(2,b);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalArgumentException("Referenced record not found.");}}}
     private static void touchCase(Connection con,long caseId,int t)throws SQLException{try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.Cases SET UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=?")){ps.setLong(1,caseId);ps.setInt(2,t);ps.executeUpdate();}}
+    private static LocalDateTime databaseNow(Connection con)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT SYSUTCDATETIME()");ResultSet rs=ps.executeQuery()){if(!rs.next())throw new SQLException("Database clock unavailable.");return rs.getTimestamp(1).toLocalDateTime();}}
     private static void verifyTenant(Connection con,int t)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT)" );ResultSet rs=ps.executeQuery()){if(!rs.next()||rs.getInt(1)!=t)throw new IllegalStateException("ShaleClientId session context mismatch.");}}
     private static RuntimeException sqlFailure(SQLException e){return new IllegalStateException("Database operation failed.",e);}
     private static void rollback(Connection c){try{c.rollback();}catch(Exception ignored){}}

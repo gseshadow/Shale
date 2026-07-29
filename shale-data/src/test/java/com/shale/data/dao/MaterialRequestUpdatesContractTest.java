@@ -29,7 +29,7 @@ final class MaterialRequestUpdatesContractTest {
         assertTrue(s.contains("body.length()>4000"));
         assertTrue(s.contains("phi.auditCreate(con,c.actorUserId(),\"MaterialRequestUpdates\",\"Body\""));
         assertTrue(s.contains("touchCase(con,c.caseId(),c.shaleClientId())"));
-        assertTrue(s.contains("appendChangeUpdates(con,prior,c,status,closure,next,mutationTime)"));
+        assertTrue(s.contains("appendChangeUpdates(con,prior,c,status,closure,next,mutationTime,!explicitScheduleChange"));
         assertTrue(s.contains("Material request created."));
         assertTrue(s.contains("Description updated."));
         assertTrue(s.contains("Request reopened."));
