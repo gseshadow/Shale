@@ -177,7 +177,8 @@ class MaterialRequestCardFactoryTest {
     @Test
     void requestListLoadsEffectiveStatusesOnceAndResolvesSavedKeysCaseInsensitively() throws Exception {
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java"));
-        assertTrue(controller.contains("new RequestListData(svc.listMaterialRequests(cid,tid,include),svc.listEffectiveRequestStatuses(tid),svc.listEffectiveRequestMethods(tid))"));
+        assertTrue(controller.contains("List<MaterialRequestSummaryDto> requests=svc.listMaterialRequests(cid,tid,include)"));
+        assertTrue(controller.contains("svc.listStatusHistory(cid,ids,tid)"), "All visible request histories should be loaded in one bulk call.");
         assertTrue(controller.contains("lookupValueMatches(s.systemKey(),s.name(),savedStatus)"));
         assertTrue(controller.contains("new RequestStatusPresentation(resolved.name()==null||resolved.name().isBlank()?readableStatusLabel(savedStatus):resolved.name().trim(),resolved.color())"));
     }

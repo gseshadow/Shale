@@ -1,77 +1,54 @@
 package com.shale.ui.component.factory;
 
+import com.shale.core.dto.MaterialRequestStatusHistoryDto;
 import com.shale.core.dto.RequestStatusDto;
 import com.shale.ui.component.StatusTimeline;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 final class MaterialRequestStatusTimelineTest {
     @Test
-    void effectiveStatusesAreFilteredOrderedAndResolvedByEstablishedLookupIdentity() {
-        var items = MaterialRequestCardFactory.requestStatusItems("REVIEW", "Review", List.of(
-                status(3, "DONE", "Tenant Complete", "#334455", 30, true, false),
-                status(2, "REVIEW", "Tenant Review", "#223344", 20, true, false),
-                status(9, null, "Deleted custom", "#999999", 5, true, true),
-                status(8, null, "Inactive custom", "#888888", 4, false, false),
-                status(1, "START", "Tenant Start", "#112233", 10, true, false)));
+    void repeatedHistoryIsChronologicalAndNeverReorderedByLookupSortOrder() {
+        var items = MaterialRequestCardFactory.requestStatusItems(List.of(
+                occurrence(30, "A", "A", 3), occurrence(10, "A", "A", 1), occurrence(20, "B", "B", 2)),
+                List.of(status(2, "B", "Status B", "#222222", 1, true, false),
+                        status(1, "A", "Status A", "#111111", 999, true, false),
+                        status(3, "NEVER", "Never held", "#333333", 0, true, false)));
 
-        assertEquals(List.of("Tenant Start", "Tenant Review"), items.stream().map(StatusTimeline.Item::name).toList());
-        assertEquals(List.of("#112233", "#223344"), items.stream().map(StatusTimeline.Item::color).toList());
-        assertEquals(List.of(StatusTimeline.State.COMPLETED, StatusTimeline.State.CURRENT),
-                items.stream().map(StatusTimeline.Item::state).toList());
-        assertEquals("REVIEW", items.get(1).identity());
-        assertEquals(StatusTimeline.State.CURRENT, items.getLast().state(), "Current status must be the final visible node.");
-        assertFalse(items.stream().anyMatch(i -> i.state() == StatusTimeline.State.FUTURE));
+        assertEquals(List.of("Status A", "Status B", "Status A"), items.stream().map(StatusTimeline.Item::name).toList());
+        assertEquals(List.of(StatusTimeline.State.COMPLETED, StatusTimeline.State.COMPLETED, StatusTimeline.State.CURRENT), items.stream().map(StatusTimeline.Item::state).toList());
+        assertFalse(items.stream().anyMatch(i -> "Never held".equals(i.name()) || i.state() == StatusTimeline.State.FUTURE));
+        assertEquals("Status A", items.getLast().name());
     }
 
     @Test
-    void unresolvedStoredStatusRemainsVisibleAndIsNotAssignedToAWorkflowStep() {
-        var items = MaterialRequestCardFactory.requestStatusItems("LEGACY_HOLD", "Legacy Hold",
-                List.of(status(1, "START", "Start", null, 10, true, false)));
+    void inactiveDeletedAndUnknownOccurrencesRemainVisibleFromStoredFallback() {
+        var items = MaterialRequestCardFactory.requestStatusItems(List.of(
+                occurrence(1, "INACTIVE", "Saved inactive", 1), occurrence(2, "LEGACY", "Legacy hold", 2)),
+                List.of(status(1, "INACTIVE", "Inactive decorated", "#123456", 10, false, true)));
 
+        assertEquals(List.of("Inactive decorated", "Legacy hold"), items.stream().map(StatusTimeline.Item::name).toList());
+        assertEquals("#123456", items.getFirst().color());
+        assertEquals(MaterialRequestCardFactory.NEUTRAL_STATUS_COLOR, items.getLast().color());
+    }
+
+    @Test
+    void oneInitialOccurrenceIsOnlyCurrentNodeAndTooltipUsesPersistedMetadata() {
+        var items = MaterialRequestCardFactory.requestStatusItems(List.of(occurrence(1, "A", "A", 1)), List.of());
         assertEquals(1, items.size());
-        assertEquals("Legacy Hold", items.getFirst().name());
         assertEquals(StatusTimeline.State.CURRENT, items.getFirst().state());
-        assertTrue(items.getFirst().tooltip().contains("not in the effective"));
+        assertTrue(items.getFirst().tooltip().contains("Changed: Jan 1, 2026 9:00 AM"));
+        assertTrue(items.getFirst().tooltip().contains("By: Actor"));
     }
 
-    @Test
-    void equalSortOrderUsesStableLookupIdRatherThanAlphabeticalName() {
-        var items = MaterialRequestCardFactory.requestStatusItems("Z", "Z", List.of(
-                status(20, "Z", "Alpha", null, 10, true, false),
-                status(10, "A", "Zulu", null, 10, true, false)));
-        assertEquals(List.of("Zulu", "Alpha"), items.stream().map(StatusTimeline.Item::name).toList());
+    private static MaterialRequestStatusHistoryDto occurrence(long id,String key,String stored,int day){
+        return new MaterialRequestStatusHistoryDto(id,7,6502,44,key,stored,9,"Actor", LocalDateTime.of(2026,1,day,9,0));
     }
-
-    @Test
-    void firstWorkflowStatusRendersAsTheOnlyCurrentNode() {
-        var items = MaterialRequestCardFactory.requestStatusItems("START", "Start", List.of(
-                status(1, "START", "Start", "#112233", 10, true, false),
-                status(2, "REVIEW", "Review", "#223344", 20, true, false)));
-
-        assertEquals(1, items.size());
-        assertEquals("Start", items.getFirst().name());
-        assertEquals(StatusTimeline.State.CURRENT, items.getFirst().state());
-    }
-
-    @Test
-    void middleWorkflowStatusHasNoFutureNodeOrTrailingTimelineContent() {
-        var items = MaterialRequestCardFactory.requestStatusItems("REVIEW", "Review", List.of(
-                status(1, "START", "Start", null, 10, true, false),
-                status(2, "REVIEW", "Review", null, 20, true, false),
-                status(3, "DONE", "Done", null, 30, true, false)));
-
-        assertEquals(List.of("Start", "Review"), items.stream().map(StatusTimeline.Item::name).toList());
-        assertEquals(StatusTimeline.State.CURRENT, items.getLast().state());
-        assertFalse(items.stream().anyMatch(i -> "Done".equals(i.name()) || i.state() == StatusTimeline.State.FUTURE));
-        assertFalse(items.stream().anyMatch(i -> i.name().contains("…") || i.name().contains("...")),
-                "Omitted future statuses must not be represented by an ellipsis node.");
-    }
-
-    private static RequestStatusDto status(int id, String key, String name, String color, int order, boolean active, boolean deleted) {
-        return new RequestStatusDto(id, 7, key, name, color, order, active, deleted, new byte[]{1});
+    private static RequestStatusDto status(int id,String key,String name,String color,int order,boolean active,boolean deleted){
+        return new RequestStatusDto(id,7,key,name,color,order,active,deleted,new byte[]{1});
     }
 }
