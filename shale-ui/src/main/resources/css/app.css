@@ -2540,3 +2540,27 @@
     -fx-font-size: 12px;
     -fx-text-fill: rgba(17,37,66,0.70);
 }
+
+/* Material Request detail: stable fields/history desktop split. */
+.material-request-detail-columns {
+    -fx-background-color: transparent;
+}
+
+.material-request-updates {
+    -fx-border-color: transparent transparent transparent -shale-color-strong-panel-border;
+    -fx-border-width: 0 0 0 1;
+}
+
+.material-request-updates-history {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.material-request-updates-history > .viewport {
+    -fx-background-color: transparent;
+}
+
+.request-update-body {
+    -fx-wrap-text: true;
+}
