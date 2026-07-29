@@ -55,6 +55,13 @@
     -fx-border-color: -shale-color-card-hover-border;
 }
 
+/* Selection is visual state only; card contents and backing lookup rows stay intact. */
+.shale-entity-card-selectable:selected {
+    -fx-background-color: -shale-color-card-hover-surface;
+    -fx-border-color: -shale-color-primary-accent;
+    -fx-border-width: 2;
+}
+
 /* Entity Card clickable variant: same card, pointer affordance only. */
 .shale-entity-card-clickable {
     -fx-cursor: hand;
