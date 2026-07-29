@@ -106,7 +106,7 @@ public final class MaterialRequestDao {
     }); }
     public void resetRequestMethodOverride(ResetLookupOverrideCommand c) { mutateVoid(c.shaleClientId(), c.actorUserId(), con -> softDeleteOverride(con, "dbo.RequestMethods", c.id(), c.shaleClientId(), c.actorUserId(), findRequestMethod(con, c.id()) == null ? null : findRequestMethod(con, c.id()).systemKey())); }
 
-    public RequestStatusDto createRequestStatus(RequestStatusCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> insertRequestStatus(con, c)); }
+    public RequestStatusDto createRequestStatus(RequestStatusCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> { if(sk(c.systemKey())!=null)throw new IllegalArgumentException("Custom request statuses cannot define a built-in System Key."); return insertRequestStatus(con, c); }); }
     public RequestStatusDto updateRequestStatus(RequestStatusCommand c) { return mutate(c.shaleClientId(), c.actorUserId(), con -> {
         requireRowVer(c.expectedRowVer()); RequestStatusDto e = findRequestStatus(con, c.id()); requireAvailable(e, c.shaleClientId(), "Request status");
         if (e.shaleClientId() == null) { assertRowVer(con, "dbo.RequestStatuses", e.id(), c.expectedRowVer(), "request status changed."); return upsertRequestStatusOverride(con, c, e); }
@@ -122,6 +122,7 @@ public final class MaterialRequestDao {
 
     private static String effectiveRequestMethodSql() { return effectiveRequestLookupSql("dbo.RequestMethods").replace("Name,  SortOrder", "Name, Color, SortOrder"); }
     private static int nextRequestMethodSortOrder(Connection con,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT COALESCE(MAX(SortOrder),0)+10 FROM dbo.RequestMethods WHERE ShaleClientId=?")){ps.setInt(1,tenant);try(ResultSet rs=ps.executeQuery()){rs.next();return rs.getInt(1);}}}
+    private static int nextRequestStatusSortOrder(Connection con,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT COALESCE(MAX(SortOrder),0)+10 FROM dbo.RequestStatuses WHERE ShaleClientId=? AND IsDeleted=0")){ps.setInt(1,tenant);try(ResultSet rs=ps.executeQuery()){rs.next();return rs.getInt(1);}}}
 
     private static String effectiveRequestLookupSql(String tableName) {
         return """
@@ -269,8 +270,27 @@ public final class MaterialRequestDao {
     record ClosureValues(LocalDateTime closedAt,Integer closedByUserId,String closureReason) {}
     private StatusSemantic resolveStatusSemantic(Connection con,int tenant,String suppliedStatus)throws SQLException{
         String value=blank(suppliedStatus);
-        String sql="SELECT TOP (1) SystemKey FROM dbo.RequestStatuses WHERE (ShaleClientId=? OR ShaleClientId IS NULL) AND IsActive=1 AND IsDeleted=0 AND SystemKey IS NOT NULL AND (LOWER(LTRIM(RTRIM(SystemKey)))=LOWER(?) OR LOWER(LTRIM(RTRIM(Name)))=LOWER(?)) ORDER BY CASE WHEN ShaleClientId=? THEN 0 ELSE 1 END,Id";
-        try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setString(2,value);ps.setString(3,value);ps.setInt(4,tenant);try(ResultSet rs=ps.executeQuery()){String key=rs.next()?blank(rs.getString(1)):value;return new StatusSemantic(key==null?null:key.toLowerCase(Locale.ROOT),norm(key));}}
+        String sql="""
+            WITH effective AS (
+              SELECT Id,ShaleClientId,SystemKey,Name,IsActive,IsDeleted,
+                     ROW_NUMBER() OVER (PARTITION BY SystemKey ORDER BY CASE WHEN ShaleClientId=? THEN 0 ELSE 1 END,Id) rn
+              FROM dbo.RequestStatuses
+              WHERE (ShaleClientId=? OR ShaleClientId IS NULL) AND SystemKey IS NOT NULL
+            ), choices AS (
+              SELECT Id,ShaleClientId,SystemKey,Name FROM effective WHERE rn=1 AND IsActive=1 AND IsDeleted=0
+              UNION ALL
+              SELECT Id,ShaleClientId,SystemKey,Name FROM dbo.RequestStatuses
+              WHERE ShaleClientId=? AND SystemKey IS NULL AND IsActive=1 AND IsDeleted=0
+            )
+            SELECT TOP (1) SystemKey,Name FROM choices
+            WHERE LOWER(LTRIM(RTRIM(Name)))=LOWER(?) OR (SystemKey IS NOT NULL AND LOWER(LTRIM(RTRIM(SystemKey)))=LOWER(?))
+            ORDER BY CASE WHEN ShaleClientId=? THEN 0 ELSE 1 END,Id
+            """;
+        try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setInt(2,tenant);ps.setInt(3,tenant);ps.setString(4,value);ps.setString(5,value);ps.setInt(6,tenant);try(ResultSet rs=ps.executeQuery()){
+            if(!rs.next())throw new IllegalArgumentException("Request status is not active for this tenant.");
+            String key=blank(rs.getString(1));String name=blank(rs.getString(2));
+            return new StatusSemantic(key==null?null:key.toLowerCase(Locale.ROOT),key==null?norm(name):norm(key));
+        }}
     }
     private ClosureValues findClosureValues(Connection con,UpdateMaterialRequestCommand c)throws SQLException{
         try(PreparedStatement ps=con.prepareStatement("SELECT ClosedAt,ClosedByUserId,ClosureReason FROM dbo.MaterialRequests WHERE ShaleClientId=? AND CaseId=? AND Id=? AND IsDeleted=0")){ps.setInt(1,c.shaleClientId());ps.setLong(2,c.caseId());ps.setLong(3,c.materialRequestId());try(ResultSet rs=ps.executeQuery()){return rs.next()?new ClosureValues(ldt(rs,"ClosedAt"),(Integer)rs.getObject("ClosedByUserId"),rs.getString("ClosureReason")):new ClosureValues(null,null,null);}}
@@ -324,7 +344,7 @@ public final class MaterialRequestDao {
     private Integer findTenantOverrideId(Connection con,String table,int t,String key)throws SQLException{if(key==null)return null;try(PreparedStatement ps=con.prepareStatement("SELECT Id FROM "+table+" WHERE ShaleClientId=? AND SystemKey=?")){ps.setInt(1,t);ps.setString(2,key);try(ResultSet rs=ps.executeQuery()){return rs.next()?rs.getInt(1):null;}}}
     private MaterialTypeDto insertMaterialType(Connection con,MaterialTypeCommand c)throws SQLException{try(PreparedStatement ps=con.prepareStatement("INSERT dbo.MaterialTypes(ShaleClientId,SystemKey,Name,Description,Color,SortOrder,IsActive,IsDeleted,CreatedByUserId,UpdatedByUserId,CreatedAt,UpdatedAt) VALUES(?,?,?,?,?,?,?,0,?,?,SYSUTCDATETIME(),SYSUTCDATETIME())",Statement.RETURN_GENERATED_KEYS)){ps.setInt(1,c.shaleClientId());ps.setString(2,sk(c.systemKey()));ps.setString(3,nreq(c.name(),120));ps.setString(4,nopt(c.description(),4000));ps.setString(5,nopt(c.color(),32));ps.setInt(6,so(c.sortOrder()));ps.setBoolean(7,c.active());ps.setInt(8,c.actorUserId());ps.setInt(9,c.actorUserId());ps.executeUpdate();try(ResultSet rs=ps.getGeneratedKeys()){rs.next();return findMaterialType(con,rs.getInt(1));}}}
     private RequestMethodDto insertRequestMethod(Connection con,RequestMethodCommand c)throws SQLException{try(PreparedStatement ps=con.prepareStatement("INSERT dbo.RequestMethods(ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,CreatedAt,UpdatedAt) VALUES(?,?,?,?,?,?,0,SYSUTCDATETIME(),SYSUTCDATETIME())",Statement.RETURN_GENERATED_KEYS)){ps.setInt(1,c.shaleClientId());ps.setString(2,sk(c.systemKey()));ps.setString(3,nreq(c.name(),120));ps.setString(4,nopt(c.color(),20));ps.setInt(5,c.sortOrder()==null?nextRequestMethodSortOrder(con,c.shaleClientId()):c.sortOrder());ps.setBoolean(6,c.active());ps.executeUpdate();try(ResultSet rs=ps.getGeneratedKeys()){rs.next();return findRequestMethod(con,rs.getInt(1));}}}
-    private RequestStatusDto insertRequestStatus(Connection con,RequestStatusCommand c)throws SQLException{try(PreparedStatement ps=con.prepareStatement("INSERT dbo.RequestStatuses(ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,CreatedAt,UpdatedAt) VALUES(?,?,?,?,?,?,0,SYSUTCDATETIME(),SYSUTCDATETIME())",Statement.RETURN_GENERATED_KEYS)){ps.setInt(1,c.shaleClientId());ps.setString(2,sk(c.systemKey()));ps.setString(3,nreq(c.name(),120));ps.setString(4,nopt(c.color(),32));ps.setInt(5,so(c.sortOrder()));ps.setBoolean(6,c.active());ps.executeUpdate();try(ResultSet rs=ps.getGeneratedKeys()){rs.next();return findRequestStatus(con,rs.getInt(1));}}}
+    private RequestStatusDto insertRequestStatus(Connection con,RequestStatusCommand c)throws SQLException{try(PreparedStatement ps=con.prepareStatement("INSERT dbo.RequestStatuses(ShaleClientId,SystemKey,Name,Color,SortOrder,IsActive,IsDeleted,CreatedAt,UpdatedAt) VALUES(?,?,?,?,?,?,0,SYSUTCDATETIME(),SYSUTCDATETIME())",Statement.RETURN_GENERATED_KEYS)){ps.setInt(1,c.shaleClientId());ps.setString(2,sk(c.systemKey()));ps.setString(3,nreq(c.name(),120));ps.setString(4,nopt(c.color(),32));ps.setInt(5,c.sortOrder()==null||c.sortOrder()<=0?nextRequestStatusSortOrder(con,c.shaleClientId()):c.sortOrder());ps.setBoolean(6,c.active());ps.executeUpdate();try(ResultSet rs=ps.getGeneratedKeys()){rs.next();return findRequestStatus(con,rs.getInt(1));}}}
     private MaterialTypeDto upsertMaterialTypeOverride(Connection con,MaterialTypeCommand c,MaterialTypeDto g)throws SQLException{Integer id=findTenantOverrideId(con,"dbo.MaterialTypes",c.shaleClientId(),g.systemKey());return id==null?insertMaterialType(con,new MaterialTypeCommand(null,c.shaleClientId(),c.actorUserId(),c.name(),c.description(),c.color(),c.active(),g.systemKey(),c.sortOrder(),null)):updateMaterialTypeRow(con,new MaterialTypeCommand(id,c.shaleClientId(),c.actorUserId(),c.name(),c.description(),c.color(),c.active(),g.systemKey(),c.sortOrder(),findMaterialType(con,id).rowVer()),id,findMaterialType(con,id).rowVer());}
     private RequestMethodDto upsertRequestMethodOverride(Connection con,RequestMethodCommand c,RequestMethodDto g)throws SQLException{Integer id=findTenantOverrideId(con,"dbo.RequestMethods",c.shaleClientId(),g.systemKey());return id==null?insertRequestMethod(con,new RequestMethodCommand(null,c.shaleClientId(),c.actorUserId(),c.name(),c.color(),c.active(),g.systemKey(),g.sortOrder(),null)):updateRequestMethodRow(con,new RequestMethodCommand(id,c.shaleClientId(),c.actorUserId(),c.name(),c.color(),c.active(),g.systemKey(),g.sortOrder(),findRequestMethod(con,id).rowVer()),id,findRequestMethod(con,id).rowVer());}
     private RequestStatusDto upsertRequestStatusOverride(Connection con,RequestStatusCommand c,RequestStatusDto g)throws SQLException{Integer id=findTenantOverrideId(con,"dbo.RequestStatuses",c.shaleClientId(),g.systemKey());return id==null?insertRequestStatus(con,new RequestStatusCommand(null,c.shaleClientId(),c.actorUserId(),c.name(),c.color(),c.active(),g.systemKey(),c.sortOrder(),null)):updateRequestStatusRow(con,new RequestStatusCommand(id,c.shaleClientId(),c.actorUserId(),c.name(),c.color(),c.active(),g.systemKey(),c.sortOrder(),findRequestStatus(con,id).rowVer()),id,findRequestStatus(con,id).rowVer());}

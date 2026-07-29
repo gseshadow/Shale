@@ -95,6 +95,22 @@ final class MaterialRequestLookupContractTest {
         assertFalse(DAO.contains("DELETE FROM dbo.RequestStatuses"));
     }
 
+    @Test void materialRequestMutationsValidateAgainstEffectiveActiveStatusesAndPreserveSemanticKeys() {
+        assertTrue(DAO.contains("Request status is not active for this tenant."));
+        assertTrue(DAO.contains("SELECT Id,ShaleClientId,SystemKey,Name FROM effective WHERE rn=1 AND IsActive=1 AND IsDeleted=0"));
+        assertTrue(DAO.contains("ShaleClientId=? AND SystemKey IS NULL AND IsActive=1 AND IsDeleted=0"));
+        assertTrue(DAO.contains("key==null?norm(name):norm(key)"), "custom names persist through the legacy text contract while built-ins persist stable keys");
+        assertTrue(DAO.contains("normalizeClosure(status.systemKey()"));
+        assertTrue(DAO.contains("normalizeUpdateSchedule(c.nextFollowUpAt(),c.followUpIntervalDays(),schedule,status.systemKey()"));
+        assertTrue(DAO.contains("Custom request statuses cannot define a built-in System Key."));
+    }
+
+    @Test void customRequestStatusesReceiveTenantLocalOrdering() {
+        assertTrue(DAO.contains("nextRequestStatusSortOrder"));
+        assertTrue(DAO.contains("FROM dbo.RequestStatuses WHERE ShaleClientId=? AND IsDeleted=0"));
+        assertTrue(DAO.contains("c.sortOrder()==null||c.sortOrder()<=0?nextRequestStatusSortOrder"));
+    }
+
     private static void assertHasRecordComponent(Class<?> type, String name) {
         assertTrue(java.util.Arrays.stream(type.getRecordComponents()).anyMatch(c -> c.getName().equals(name)), name);
     }
