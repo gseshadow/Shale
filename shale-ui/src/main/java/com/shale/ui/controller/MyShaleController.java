@@ -100,6 +100,7 @@ public final class MyShaleController {
 	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 225;
 	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 260;
 	private static final double TASKS_CASE_COLUMN_MAX_WIDTH = 300;
+	private static final double TASKS_SINGLE_LANE_MAX_WIDTH = 430;
 	private static final double MY_CASES_STATUS_COLUMN_MIN_WIDTH = 336;
 	private static final double MY_CASES_STATUS_COLUMN_PREF_WIDTH = 376;
 	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 416;
@@ -1695,7 +1696,9 @@ public final class MyShaleController {
 		}
 		boolean fullVariant = SECTION_TASKS.equals(activeSection);
 		Map<TaskLaneKey, List<CaseTaskListItemDto>> tasksByLane = groupTasksByLane(filteredTasks);
-		for (Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>> entry : orderTaskLanes(tasksByLane)) {
+		List<Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>>> orderedLanes = orderTaskLanes(tasksByLane);
+		boolean hasSingleExpandedLane = orderedLanes.size() == 1 && !isCollapsedLane(orderedLanes.getFirst().getKey());
+		for (Map.Entry<TaskLaneKey, List<CaseTaskListItemDto>> entry : orderedLanes) {
 			Node laneHeader = buildTaskLaneHeader(entry.getKey(), entry.getValue());
 			Node laneBody = buildTaskLaneBody(entry.getValue(), fullVariant);
 			VBox lane = LaneBoardLayout.createLane(
@@ -1705,6 +1708,12 @@ public final class MyShaleController {
 							TASKS_CASE_COLUMN_MIN_WIDTH,
 							TASKS_CASE_COLUMN_PREF_WIDTH,
 							TASKS_CASE_COLUMN_MAX_WIDTH));
+			if (hasSingleExpandedLane) {
+				lane.setMaxWidth(TASKS_SINGLE_LANE_MAX_WIDTH);
+				lane.prefWidthProperty().bind(Bindings.createDoubleBinding(
+						() -> responsiveSingleTaskLaneWidth(myTasksScroll.getViewportBounds().getWidth()),
+						myTasksScroll.viewportBoundsProperty()));
+			}
 			if (isCollapsedLane(entry.getKey())) {
 				if (lane.getChildren().size() > 1) {
 					Node laneBodyScroll = lane.getChildren().get(1);
@@ -1715,6 +1724,14 @@ public final class MyShaleController {
 			}
 			myTasksList.getChildren().add(lane);
 		}
+	}
+
+	static double responsiveSingleTaskLaneWidth(double viewportWidth) {
+		if (!Double.isFinite(viewportWidth) || viewportWidth <= 0) {
+			return TASKS_CASE_COLUMN_PREF_WIDTH;
+		}
+		return Math.max(TASKS_CASE_COLUMN_MIN_WIDTH,
+				Math.min(TASKS_SINGLE_LANE_MAX_WIDTH, viewportWidth));
 	}
 
 	private void renderMyTasksGrid(List<CaseTaskListItemDto> filteredTasks) {

@@ -30,6 +30,7 @@ import com.shale.ui.services.UserDetailService;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
+import com.shale.ui.util.ControlStyles;
 
 import javafx.application.Platform;
 import javafx.animation.PauseTransition;
@@ -1208,6 +1209,9 @@ public final class UserController {
 	}
 
 	private void initializeAssignedTaskControls() {
+		ControlStyles.formControl(assignedTasksSearchField);
+		ControlStyles.formControl(assignedTasksSortChoice);
+		ControlStyles.apply(assignedTasksCompletedToggleButton, ControlStyles.Purpose.SECONDARY);
 		assignedTasksFilterDebounce = new PauseTransition(Duration.millis(180));
 		assignedTasksFilterDebounce.setOnFinished(e -> renderAssignedTasks());
 		if (assignedTasksSortChoice != null) {
