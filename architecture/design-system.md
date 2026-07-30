@@ -480,3 +480,53 @@ Case Link URL handling is intentionally limited to normalization and browser lau
 The Audit Log viewer uses the existing light table-in-glass-panel administration visual language and adds a compact mode filter at the top of the existing screen rather than a second administration page. The selector offers All, PHI Audit, and Entity Activity, with All as the default.
 
 PHI Audit rows keep the established field-audit columns and meaning. Entity Activity rows use the same dense audit table treatment but present a subtle category label, friendly action/entity wording, stable entity ids, safe parent context, actor, and local occurrence time. Entity Activity presentation must not add URL previews, Contact-name hydration, raw JSON details, or other rich content that would break the compact audit-row pattern or expose sensitive Case Link content.
+
+---
+
+## Unified JavaFX controls (phase 1)
+
+The JavaFX control system is an **opt-in** foundation. Migrated areas use ordinary JavaFX controls plus `ControlStyles`; broad `.button`, ComboBox-internal, and DatePicker-calendar migrations are intentionally out of scope.
+
+### Semantic button purposes
+
+* **Primary** is the single dominant affirmative action in a local action area (for example, Save or Create).
+* **Secondary** is an ordinary supporting action, including dialog Cancel where it should remain visibly available.
+* **Ghost** is a low-emphasis, reversible action on a card or within compact content.
+* **Danger** is reserved for confirmed destructive or irreversible behavior, not an action merely named Remove, Clear, or Unlink.
+* **Navigation** is movement to another place or entity and remains distinct from Ghost.
+
+Standard buttons are 40px high; Small buttons are 32px high. Ordinary dialog buttons use a 10px radius, 16px horizontal padding, and an 8px icon/text gap. Icon-only buttons use the Small square treatment, must have accessible text or an accessible label, and are not a substitute for navigation. Form controls retain the initial 36px height. Deliberately pill-shaped toolbar, filter, and lookup-content treatments remain pills.
+
+The shared tokens in `foundation/buttons.css` cover primary, secondary, ghost, danger, and navigation normal/hover/pressed colors; focus border/ring; disabled opacity; 40px and 32px heights; radius; padding; and icon gap. `foundation/forms.css` owns control surface, foreground, border, hover/pressed/focus, prompt, and invalid border/ring tokens. Feature and data colors identify stored status/type data inside indicators and lookup pills; control colors identify actions. Never flood an action button or an entire selector shell with a feature/status color.
+
+### Java API and validation
+
+Use the centralized helper rather than repeating class strings:
+
+```java
+ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
+ControlStyles.apply(removeChipButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+ControlStyles.formControl(titleField);
+ControlStyles.setInvalid(titleField, titleIsInvalid);
+```
+
+Applying a purpose or size is idempotent, removes conflicting semantic classes, and preserves unrelated feature classes. The JavaFX `:invalid` pseudo-class changes only paint (including a distinguishable invalid-focus ring), so validation does not change dimensions. Continue to use each workflow's established validation rules and timing.
+
+### Migration and legacy compatibility
+
+Migration is explicit, screen by screen. `ActionButtonFactory.semantic(...)` is the opt-in bridge. Existing `primary`, `neutral`, `danger`, `compact`, and `cardAction` methods retain their legacy toolbar classes so unmigrated callers do not change unexpectedly. `neutral` is a temporary compatibility alias only; new migrated code uses **Secondary** and must not expand neutral terminology. Legacy CSS and specialized selector rendering remain until their callers are intentionally migrated.
+
+Newly migrated areas must not introduce:
+
+* default-styled ordinary action buttons;
+* screen-specific Save-button colors;
+* feature or status colors on action buttons;
+* inline hard-coded control colors;
+* arbitrary per-screen control heights, radii, or padding;
+* multiple competing Primary actions in one local action area without documented justification;
+* broad global selectors that accidentally migrate unrelated screens;
+* custom Button subclasses, Success button variants, or a parallel styling vocabulary.
+
+### Case Links semantic-control adoption
+
+Case Links is the second opt-in desktop area. Its tab action and dialog affirmative actions use Primary/Standard; dialog cancellation uses Secondary/Standard; card Edit and staged share-management actions use Small Ghost or Secondary controls; Set Primary is Secondary/Small; and confirmed Case Link deletion is Danger/Small. Link cards themselves remain the established keyboard- and mouse-activatable navigation surface rather than adding a competing Open button solely to demonstrate the Navigation button variant. Link Type colors remain data presentation in pills, rails, and card washes and never determine action colors. The create/edit and share-detail fields use the shared form shell and show `:invalid` only after the existing validation workflow rejects a save, clearing the state as values are corrected.

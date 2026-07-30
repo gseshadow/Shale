@@ -104,6 +104,7 @@ import com.shale.ui.controller.support.MedicalRecordsRequestedCaseUpdateSafeguar
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.AppSectionTabs;
 import com.shale.ui.util.ColorUtil;
+import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.ExternalBrowserHelper;
 import com.shale.core.util.CaseLinkUrlNormalizer;
 import com.shale.ui.util.PerfLog;
@@ -978,8 +979,11 @@ public class CaseController {
 		}
 		if (addTaskButton != null)
 			addTaskButton.setOnAction(e -> onAddTask());
-		if (addCaseLinkButton != null)
+		if (addCaseLinkButton != null) {
+			addCaseLinkButton.getStyleClass().removeAll(ActionButtonFactory.BASE_STYLE_CLASS, ActionButtonFactory.PRIMARY_STYLE_CLASS);
+			ControlStyles.apply(addCaseLinkButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 			addCaseLinkButton.setOnAction(e -> onAddCaseLink());
+		}
 		configureCaseCalendarControls();
 		if (generateSummaryHtmlMenuItem != null)
 			generateSummaryHtmlMenuItem.setOnAction(e -> onGenerateSummaryHtml());
@@ -2217,10 +2221,30 @@ public class CaseController {
 		});
 	}
 
+	private static void styleCaseLinkDialogButtons(Dialog<?> dialog, ButtonType affirmative, String affirmativeText) {
+		Node affirmativeNode = dialog.getDialogPane().lookupButton(affirmative);
+		if (affirmativeNode instanceof Button button) {
+			button.setText(affirmativeText);
+			ControlStyles.apply(button, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+		}
+		Node cancelNode = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+		if (cancelNode instanceof Button button) ControlStyles.apply(button, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+	}
+
+	private static Button caseLinkAction(String text, ControlStyles.Purpose purpose, ControlStyles.Size size, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {
+		return ActionButtonFactory.semantic(text, handler, purpose, size);
+	}
+
+	private static boolean invalidCaseLinkUrl(String text) {
+		if (blank(text) || text.trim().length() > 2048) return true;
+		try { CaseLinkUrlNormalizer.normalize(text); return false; }
+		catch (RuntimeException invalid) { return true; }
+	}
+
 	private Optional<CaseLinkInput> showCaseLinkDialog(CaseLinkDto existing, List<LinkTypeDto> linkTypes) {
-		Dialog<CaseLinkInput> dialog = new Dialog<>(); String title = existing == null ? "Add Link" : "Edit Link"; dialog.setTitle(title); if (caseLinksOwner() != null) dialog.initOwner(caseLinksOwner()); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		Dialog<CaseLinkInput> dialog = new Dialog<>(); String title = existing == null ? "Add Link" : "Edit Link"; dialog.setTitle(title); if (caseLinksOwner() != null) dialog.initOwner(caseLinksOwner()); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL); styleCaseLinkDialogButtons(dialog, ButtonType.OK, existing == null ? "Create" : "Save");
 		ColorCodedComboBox<LinkTypeDto> type = new ColorCodedComboBox<>(LinkTypeDto::name, LinkTypeDto::color); type.getItems().setAll(linkTypes);
-		TextField name = new TextField(existing == null ? "" : safeText(existing.displayName())); TextField url = new TextField(existing == null ? "" : safeText(existing.url())); TextArea description = new TextArea(existing == null ? "" : safeText(existing.description())); description.setPrefRowCount(3); TextArea notes = new TextArea(existing == null ? "" : safeText(existing.notes())); notes.setPrefRowCount(3); CheckBox primary = new CheckBox("Make primary"); primary.setSelected(existing != null && existing.primary());
+		TextField name = new TextField(existing == null ? "" : safeText(existing.displayName())); TextField url = new TextField(existing == null ? "" : safeText(existing.url())); TextArea description = new TextArea(existing == null ? "" : safeText(existing.description())); description.setPrefRowCount(3); TextArea notes = new TextArea(existing == null ? "" : safeText(existing.notes())); notes.setPrefRowCount(3); ControlStyles.formControl(type); ControlStyles.formControl(name); ControlStyles.formControl(url); ControlStyles.formControl(description); ControlStyles.formControl(notes); CheckBox primary = new CheckBox("Make primary"); primary.setSelected(existing != null && existing.primary());
 		SharedWithEditor sharedWithEditor = new SharedWithEditor(existing);
 		VBox sharedWithBox = sharedWithEditor.root();
 		if (existing != null) type.getSelectionModel().select(linkTypes.stream().filter(t -> t.id() == existing.linkTypeId()).findFirst().orElse(null)); else if (!linkTypes.isEmpty()) type.getSelectionModel().selectFirst();
@@ -2231,11 +2255,21 @@ public class CaseController {
 		grid.getChildren().stream().filter(n -> n instanceof Label).forEach(n -> n.getStyleClass().add("case-link-dialog-label"));
 		sharedWithBox.getStyleClass().addAll("case-link-dialog-section", "shale-embedded-card-surface");
 		ScrollPane formScroll = screenSafeDialogScrollPane(grid); formScroll.getStyleClass().add("case-link-dialog-scroll"); formScroll.setPrefViewportWidth(720); dialog.getDialogPane().setContent(formScroll); dialog.setResizable(true); Runnable resizeCaseLinkDialog = () -> applyContentSizedDialogBounds(dialog, caseLinksOwner(), formScroll, grid, 780, 560, 420); sharedWithEditor.setOnSummaryChanged(resizeCaseLinkDialog); applyContentSizedDialogBounds(dialog, caseLinksOwner(), formScroll, grid, 780, 560, 420);
+		AtomicBoolean validationVisible = new AtomicBoolean(false);
+		Runnable updateInvalid = () -> {
+			boolean show = validationVisible.get();
+			ControlStyles.setInvalid(type, show && (type.getValue() == null || !type.getValue().active()));
+			ControlStyles.setInvalid(name, show && (blank(name.getText()) || name.getText().trim().length() > 255));
+			ControlStyles.setInvalid(url, show && invalidCaseLinkUrl(url.getText()));
+			ControlStyles.setInvalid(description, show && description.getText() != null && description.getText().trim().length() > 2048);
+			ControlStyles.setInvalid(notes, show && notes.getText() != null && notes.getText().trim().length() > 2000);
+		};
+		type.valueProperty().addListener((o,a,b) -> updateInvalid.run()); name.textProperty().addListener((o,a,b) -> updateInvalid.run()); url.textProperty().addListener((o,a,b) -> updateInvalid.run()); description.textProperty().addListener((o,a,b) -> updateInvalid.run()); notes.textProperty().addListener((o,a,b) -> updateInvalid.run());
 		final CaseLinkInput[] validated = new CaseLinkInput[1];
 		Node ok = dialog.getDialogPane().lookupButton(ButtonType.OK);
 		ok.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-			try { validated[0] = validateCaseLinkDialogInput(type.getValue(), name.getText(), url.getText(), description.getText(), primary.isSelected(), notes.getText(), sharedWithEditor.shareAdds(), sharedWithEditor.shareUpdates(), sharedWithEditor.shareRemovals()); url.setText(validated[0].url()); error.setText(""); error.setVisible(false); error.setManaged(false); }
-			catch (RuntimeException ex) { validated[0] = null; error.setText(rootMessage(ex)); error.setVisible(true); error.setManaged(true); LOG.info("Case Link dialog validation blocked save tenantId={} actorId={} caseId={} reason={}", safeTenantId(), safeActorUserId(), caseId, rootMessage(ex)); focusFirstInvalidCaseLinkField(type, name, url, description, notes); scrollFocusedNodeIntoView(formScroll); event.consume(); }
+			try { validated[0] = validateCaseLinkDialogInput(type.getValue(), name.getText(), url.getText(), description.getText(), primary.isSelected(), notes.getText(), sharedWithEditor.shareAdds(), sharedWithEditor.shareUpdates(), sharedWithEditor.shareRemovals()); url.setText(validated[0].url()); validationVisible.set(false); updateInvalid.run(); error.setText(""); error.setVisible(false); error.setManaged(false); }
+			catch (RuntimeException ex) { validated[0] = null; validationVisible.set(true); updateInvalid.run(); error.setText(rootMessage(ex)); error.setVisible(true); error.setManaged(true); LOG.info("Case Link dialog validation blocked save tenantId={} actorId={} caseId={} reason={}", safeTenantId(), safeActorUserId(), caseId, rootMessage(ex)); focusFirstInvalidCaseLinkField(type, name, url, description, notes); scrollFocusedNodeIntoView(formScroll); event.consume(); }
 		});
 		dialog.setResultConverter(button -> button == ButtonType.OK ? validated[0] : null);
 		return dialog.showAndWait();
@@ -2318,7 +2352,7 @@ public class CaseController {
 			root.getChildren().clear();
 			List<StagedShare> active = activeShares();
 			if (active.isEmpty()) {
-				Button share = ActionButtonFactory.cardAction("Share Link", e -> openShareModal());
+				Button share = caseLinkAction("Share Link", ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL, e -> openShareModal());
 				share.setAccessibleText("Share Link");
 				root.getChildren().add(share);
 				root.requestLayout();
@@ -2335,7 +2369,7 @@ public class CaseController {
 			ScrollPane cardsScroll = adaptiveContactScrollPane(cards, 176);
 			cardsScroll.getStyleClass().add("case-link-shared-with-summary");
 			cardsScroll.setAccessibleText("Shared With Contact Cards");
-			Button edit = ActionButtonFactory.cardAction("Edit Shared With", e -> openShareModal());
+			Button edit = caseLinkAction("Edit Shared With", ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL, e -> openShareModal());
 			edit.setAccessibleText("Edit Shared With");
 			root.getChildren().addAll(heading, cardsScroll, edit);
 			root.requestLayout();
@@ -2356,13 +2390,13 @@ public class CaseController {
 		}
 		private void openShareModal() { showShareSelectionDialog(activeShares()).ifPresent(applied -> { staged.clear(); staged.addAll(applied.stream().map(StagedShare::copy).toList()); renderSummary(); }); }
 		private Optional<List<StagedShare>> showShareSelectionDialog(List<StagedShare> parentShares) {
-			Dialog<List<StagedShare>> dialog = new Dialog<>(); String title = parentShares == null || parentShares.isEmpty() ? "Share Link" : "Edit Shared With"; dialog.setTitle(title); Window modalOwner = root.getScene() == null ? caseLinksOwner() : root.getScene().getWindow(); if (modalOwner != null) dialog.initOwner(modalOwner); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.APPLY, ButtonType.CANCEL); dialog.setResizable(true);
+			Dialog<List<StagedShare>> dialog = new Dialog<>(); String title = parentShares == null || parentShares.isEmpty() ? "Share Link" : "Edit Shared With"; dialog.setTitle(title); Window modalOwner = root.getScene() == null ? caseLinksOwner() : root.getScene().getWindow(); if (modalOwner != null) dialog.initOwner(modalOwner); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.APPLY, ButtonType.CANCEL); styleCaseLinkDialogButtons(dialog, ButtonType.APPLY, "Apply"); dialog.setResizable(true);
 			Map<Integer, StagedShare> working = new LinkedHashMap<>(); for (StagedShare s : parentShares == null ? List.<StagedShare>of() : parentShares) working.put(s.contactId, StagedShare.copy(s));
 			VBox selectedBox = new VBox(6); Label selectedHeading = new Label(); selectedHeading.getStyleClass().add("section-heading"); FlowPane caseRows = new FlowPane(8, 8); caseRows.getStyleClass().add("case-link-share-selection-flow"); caseRows.setPrefWrapLength(700); Label caseState = new Label("Loading Case Contacts..."); caseState.getStyleClass().add("search-summary-text"); caseRows.getChildren().add(caseState); AtomicReference<List<CaseLinkContactOptionDto>> caseOptions = new AtomicReference<>(List.of());
 			ScrollPane selectedScroll = boundedVerticalScrollPane(selectedBox, 96, 176); ScrollPane caseContactsScroll = boundedVerticalScrollPane(caseRows, 84, 150); caseContactsScroll.getStyleClass().add("case-link-case-contacts-scroll");
-			TextField search = new TextField(); search.setPromptText("Search all Contacts..."); Button clear = ActionButtonFactory.cardAction("Clear", e -> search.clear()); HBox searchRow = new HBox(6, search, clear); HBox.setHgrow(search, Priority.ALWAYS);
+			TextField search = ControlStyles.formControl(new TextField()); search.setPromptText("Search all Contacts..."); Button clear = caseLinkAction("Clear", ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL, e -> search.clear()); HBox searchRow = new HBox(6, search, clear); HBox.setHgrow(search, Priority.ALWAYS);
 			javafx.collections.ObservableList<CaseLinkContactOptionDto> allOptions = javafx.collections.FXCollections.observableArrayList(); javafx.collections.transformation.FilteredList<CaseLinkContactOptionDto> filtered = new javafx.collections.transformation.FilteredList<>(allOptions, o -> true); javafx.scene.control.ListView<CaseLinkContactOptionDto> allList = new javafx.scene.control.ListView<>(filtered); allList.setPrefHeight(240); allList.setPlaceholder(new Label("Loading Contacts..."));
-			final Runnable[] refresh = new Runnable[1]; refresh[0] = () -> { selectedBox.getChildren().clear(); List<StagedShare> active = working.values().stream().filter(s -> !s.removed).sorted(Comparator.comparing((StagedShare s) -> safeText(s.displayName), String.CASE_INSENSITIVE_ORDER).thenComparingInt(s -> s.contactId)).toList(); selectedHeading.setText("Selected Contacts (" + active.size() + ")"); if (active.isEmpty()) { Label empty = new Label("No Contacts selected."); empty.getStyleClass().add("search-summary-text"); selectedBox.getChildren().add(empty); } else for (StagedShare share : active) { Button details = ActionButtonFactory.cardAction("Details", e -> showShareDetailsDialog(share.displayName, share.sharedAt, share.notes).ifPresent(d -> { share.sharedAt = d.sharedAt(); share.notes = d.notes(); share.dirty = true; refresh[0].run(); })); Button remove = ActionButtonFactory.danger(share.shareId > 0 ? "Unshare" : "Remove", e -> { if (share.shareId > 0) { boolean ok = AppDialogs.showConfirmation(dialog.getDialogPane().getScene().getWindow(), "Unshare Contact", "Unshare this contact from the link?", "The Contact record is not deleted. The unshare is staged until the parent Link dialog is saved.", "Unshare", DialogActionKind.DANGER); if (!ok) return; share.removed = true; } else working.remove(share.contactId); refresh[0].run(); }); FlowPane actions = new FlowPane(6, 6, details, remove); actions.setPrefWrapLength(170); HBox row = new HBox(8, createShareContactCard(share), actions); row.getStyleClass().add("case-link-selected-contact-row"); row.setAlignment(Pos.CENTER_LEFT); row.setMaxWidth(Double.MAX_VALUE); HBox.setHgrow(row.getChildren().get(0), Priority.ALWAYS); selectedBox.getChildren().add(row); } renderCaseContactOptions(caseRows, caseOptions.get(), working, refresh[0]); allList.refresh(); };
+			final Runnable[] refresh = new Runnable[1]; refresh[0] = () -> { selectedBox.getChildren().clear(); List<StagedShare> active = working.values().stream().filter(s -> !s.removed).sorted(Comparator.comparing((StagedShare s) -> safeText(s.displayName), String.CASE_INSENSITIVE_ORDER).thenComparingInt(s -> s.contactId)).toList(); selectedHeading.setText("Selected Contacts (" + active.size() + ")"); if (active.isEmpty()) { Label empty = new Label("No Contacts selected."); empty.getStyleClass().add("search-summary-text"); selectedBox.getChildren().add(empty); } else for (StagedShare share : active) { Button details = caseLinkAction("Details", ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL, e -> showShareDetailsDialog(share.displayName, share.sharedAt, share.notes).ifPresent(d -> { share.sharedAt = d.sharedAt(); share.notes = d.notes(); share.dirty = true; refresh[0].run(); })); Button remove = caseLinkAction(share.shareId > 0 ? "Unshare" : "Remove", ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL, e -> { if (share.shareId > 0) { boolean ok = AppDialogs.showConfirmation(dialog.getDialogPane().getScene().getWindow(), "Unshare Contact", "Unshare this contact from the link?", "The Contact record is not deleted. The unshare is staged until the parent Link dialog is saved.", "Unshare", DialogActionKind.DANGER); if (!ok) return; share.removed = true; } else working.remove(share.contactId); refresh[0].run(); }); FlowPane actions = new FlowPane(6, 6, details, remove); actions.setPrefWrapLength(170); HBox row = new HBox(8, createShareContactCard(share), actions); row.getStyleClass().add("case-link-selected-contact-row"); row.setAlignment(Pos.CENTER_LEFT); row.setMaxWidth(Double.MAX_VALUE); HBox.setHgrow(row.getChildren().get(0), Priority.ALWAYS); selectedBox.getChildren().add(row); } renderCaseContactOptions(caseRows, caseOptions.get(), working, refresh[0]); allList.refresh(); };
 			allList.setCellFactory(lv -> new javafx.scene.control.ListCell<>() { @Override protected void updateItem(CaseLinkContactOptionDto item, boolean empty) { super.updateItem(item, empty); getStyleClass().removeAll("case-link-contact-cell-selected"); setText(null); setGraphic(null); setAccessibleText(null); if (empty || item == null) return; boolean selected = working.containsKey(item.contactId()) && !working.get(item.contactId()).removed; setGraphic(createSelectableContactCard(item, selected, () -> { toggleWorking(working, item); refresh[0].run(); }, true)); if (selected) getStyleClass().add("case-link-contact-cell-selected"); setAccessibleText((selected ? "Selected " : "Not selected ") + item.displayName()); } });
 			allList.setOnMouseClicked(e -> { CaseLinkContactOptionDto o = allList.getSelectionModel().getSelectedItem(); if (o != null) { toggleWorking(working, o); refresh[0].run(); } }); allList.setOnKeyPressed(e -> { if (e.getCode() == javafx.scene.input.KeyCode.SPACE || e.getCode() == javafx.scene.input.KeyCode.ENTER) { CaseLinkContactOptionDto o = allList.getSelectionModel().getSelectedItem(); if (o != null) { toggleWorking(working, o); refresh[0].run(); e.consume(); } } }); search.textProperty().addListener((obs, oldV, newV) -> { String q = safeText(newV).toLowerCase(Locale.ROOT); filtered.setPredicate(o -> q.isBlank() || safeText(o.displayName()).toLowerCase(Locale.ROOT).contains(q)); allList.setPlaceholder(new Label(q.isBlank() ? "No available Contacts." : "No Contacts match this search.")); });
 			Label allContactsHeading = new Label("All Contacts"); allContactsHeading.getStyleClass().add("section-heading"); VBox allContactsSection = new VBox(8, allContactsHeading, searchRow, allList); allContactsSection.getStyleClass().addAll("case-link-dialog-section", "shale-embedded-card-surface"); VBox.setVgrow(allList, Priority.ALWAYS); Label caseContactsHeading = new Label("Case Contacts"); caseContactsHeading.getStyleClass().add("section-heading"); VBox selectedSection = new VBox(8, selectedHeading, selectedScroll); selectedSection.getStyleClass().addAll("case-link-dialog-section", "shale-embedded-card-surface"); VBox caseContactsSection = new VBox(8, caseContactsHeading, caseContactsScroll); caseContactsSection.getStyleClass().addAll("case-link-dialog-section", "shale-embedded-card-surface"); VBox content = new VBox(12, selectedSection, caseContactsSection, allContactsSection); content.getStyleClass().add("case-link-share-modal-form"); content.setPadding(new Insets(16)); content.setPrefWidth(760); content.setPrefHeight(620); VBox.setVgrow(allContactsSection, Priority.ALWAYS); dialog.getDialogPane().setContent(content); applyScreenSafeDialogBounds(dialog, modalOwner, 820, 700, 600, 460); refresh[0].run();
@@ -2415,17 +2449,27 @@ public class CaseController {
 	private record ShareDetails(LocalDateTime sharedAt, String notes) {}
 
 	private Optional<ShareDetails> showShareDetailsDialog(String contactName, LocalDateTime initialSharedAt, String initialNotes) {
-		Dialog<ShareDetails> dialog = new Dialog<>(); dialog.setTitle("Share Details"); AppDialogs.applySecondaryDialogShell(dialog, "Share Details"); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		Dialog<ShareDetails> dialog = new Dialog<>(); dialog.setTitle("Share Details"); AppDialogs.applySecondaryDialogShell(dialog, "Share Details"); dialog.getDialogPane().getStyleClass().add("case-link-dialog-shell"); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL); styleCaseLinkDialogButtons(dialog, ButtonType.OK, "Save");
 		Label contact = new Label("Contact: " + blankTo(contactName, "Selected contact"));
 		DatePicker date = new DatePicker((initialSharedAt == null ? LocalDateTime.now() : initialSharedAt).toLocalDate());
 		TextField time = new TextField((initialSharedAt == null ? LocalDateTime.now() : initialSharedAt).toLocalTime().truncatedTo(ChronoUnit.MINUTES).toString());
-		TextArea notes = new TextArea(safeText(initialNotes)); notes.setPrefRowCount(3); notes.setPromptText("Share Notes (not Link Notes)");
+		TextArea notes = new TextArea(safeText(initialNotes)); notes.setPrefRowCount(3); notes.setPromptText("Share Notes (not Link Notes)"); ControlStyles.formControl(date); ControlStyles.formControl(time); ControlStyles.formControl(notes);
 		Label error = new Label(); error.setTextFill(Color.web("#b42318")); error.setVisible(false); error.setManaged(false);
 		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(contact, 0, 0, 2, 1); grid.addRow(1, new Label("Shared Date"), date); grid.addRow(2, new Label("Shared Time"), time); grid.addRow(3, new Label("Share Notes"), notes); grid.add(error, 0, 4, 2, 1); dialog.getDialogPane().setContent(grid);
+		AtomicBoolean validationVisible = new AtomicBoolean(false);
+		Runnable updateInvalid = () -> {
+			boolean show = validationVisible.get();
+			ControlStyles.setInvalid(date, show && date.getValue() == null);
+			boolean invalidTime;
+			try { java.time.LocalTime.parse(safeText(time.getText()).trim()); invalidTime = false; } catch (RuntimeException invalid) { invalidTime = true; }
+			ControlStyles.setInvalid(time, show && invalidTime);
+			ControlStyles.setInvalid(notes, show && notes.getText() != null && notes.getText().trim().length() > 500);
+		};
+		date.valueProperty().addListener((o,a,b) -> updateInvalid.run()); time.textProperty().addListener((o,a,b) -> updateInvalid.run()); notes.textProperty().addListener((o,a,b) -> updateInvalid.run());
 		final ShareDetails[] result = new ShareDetails[1];
 		dialog.getDialogPane().lookupButton(ButtonType.OK).addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-			try { LocalDate d = date.getValue(); if (d == null) throw new IllegalArgumentException("Shared date is required."); java.time.LocalTime t = java.time.LocalTime.parse(time.getText().trim()); String n = trimLimit(notes.getText(), "Share Notes", 500, false); result[0] = new ShareDetails(LocalDateTime.of(d, t), n); error.setVisible(false); error.setManaged(false); }
-			catch (RuntimeException ex) { result[0] = null; error.setText(rootMessage(ex)); error.setVisible(true); error.setManaged(true); event.consume(); }
+			try { LocalDate d = date.getValue(); if (d == null) throw new IllegalArgumentException("Shared date is required."); java.time.LocalTime t = java.time.LocalTime.parse(time.getText().trim()); String n = trimLimit(notes.getText(), "Share Notes", 500, false); result[0] = new ShareDetails(LocalDateTime.of(d, t), n); validationVisible.set(false); updateInvalid.run(); error.setVisible(false); error.setManaged(false); }
+			catch (RuntimeException ex) { result[0] = null; validationVisible.set(true); updateInvalid.run(); error.setText(rootMessage(ex)); error.setVisible(true); error.setManaged(true); event.consume(); }
 		});
 		dialog.setResultConverter(button -> button == ButtonType.OK ? result[0] : null);
 		return dialog.showAndWait();

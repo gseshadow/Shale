@@ -37,7 +37,7 @@ final class CaseLinksPhase544CompactCardTest {
         assertTrue(compact.contains("link.primary()") && compact.contains("primaryBadge()"));
         assertTrue(compact.contains("new HBox(8)"));
         assertTrue(compact.contains("descriptionLabel(link, true)"));
-        assertTrue(compact.contains("ActionButtonFactory.cardAction(\"Edit\""));
+        assertTrue(compact.contains("semantic(\"Edit\", ControlStyles.Purpose.GHOST"));
         assertTrue(compact.contains("case-link-card-compact-edit"));
         assertFalse(compact.contains("compactFooter"));
         assertFalse(compact.contains("case-link-card-footer"));

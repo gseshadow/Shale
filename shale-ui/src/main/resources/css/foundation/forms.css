@@ -14,7 +14,31 @@
     -shale-control-border-hover: rgba(74, 104, 138, 0.34);
     -shale-control-focus-border: rgba(75, 127, 206, 0.72);
     -shale-control-prompt-text: rgba(17, 37, 66, 0.56);
+    -shale-control-invalid-border: #c62828;
+    -shale-control-invalid-focus-border: #a31515;
+    -shale-control-invalid-ring: rgba(198, 40, 40, 0.24);
 }
+
+.shale-form-control {
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
+    -fx-background-color: -shale-control-surface;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-border-color: -shale-control-border;
+    -fx-border-width: 1px;
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-prompt-text-fill: -shale-control-prompt-text;
+}
+.shale-form-control:hover { -fx-background-color: -shale-control-surface-hover; -fx-border-color: -shale-control-border-hover; }
+.shale-form-control:focused, .shale-form-control:showing { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 10, 0.2, 0, 0); }
+.shale-form-control:invalid { -fx-border-color: -shale-control-invalid-border; }
+.shale-form-control:invalid:focused { -fx-border-color: -shale-control-invalid-focus-border; -fx-effect: dropshadow(gaussian, -shale-control-invalid-ring, 10, 0.2, 0, 0); }
+.text-area.shale-form-control { -fx-pref-height: 88px; }
+.text-area.shale-form-control > .scroll-pane,
+.text-area.shale-form-control > .scroll-pane > .viewport,
+.text-area.shale-form-control > .scroll-pane > .content { -fx-background-color: transparent; }
+.date-picker.shale-form-control > .text-field { -fx-background-color: transparent; -fx-border-color: transparent; }
 
 .shale-search-field,
 .text-field.shale-search-field {
