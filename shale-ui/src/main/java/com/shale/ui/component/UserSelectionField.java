@@ -9,6 +9,7 @@ import java.util.function.Function;
 
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
+import com.shale.ui.util.ControlStyles;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
@@ -74,6 +75,17 @@ public class UserSelectionField<T> extends HBox {
     public boolean isLoading() { return loading.get(); }
 
     public void setLoading(boolean loading) { this.loading.set(loading); }
+
+    /** Opts this field's actions into the unified controls without changing legacy callers. */
+    public UserSelectionField<T> useUnifiedControlStyles() {
+        addButton.getStyleClass().removeAll("app-dialog-button", "app-dialog-button-secondary");
+        changeButton.getStyleClass().removeAll("app-dialog-button", "app-dialog-button-secondary");
+        removeButton.getStyleClass().removeAll("app-dialog-button", "app-dialog-button-secondary", "app-dialog-small-action");
+        ControlStyles.apply(addButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+        ControlStyles.apply(changeButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+        ControlStyles.apply(removeButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        return this;
+    }
 
     private void buildUi() {
         getStyleClass().add("user-selection-field");

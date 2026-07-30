@@ -60,6 +60,7 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> requestedBy=newUserSelectionField(stage,true)"));
         assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> assignedTo=newUserSelectionField(stage,true)"));
         assertTrue(userFactory.contains("new UserSelectionField<>(CaseTaskService.AssignableUserOption::id,CaseTaskService.AssignableUserOption::displayName,CaseTaskService.AssignableUserOption::color"));
+        assertTrue(userFactory.contains(".useUnifiedControlStyles()"), "Material Request user actions must opt into semantic controls.");
         assertTrue(userFactory.contains("AssignedUserPickerDialog.show(pickerOwner,candidates,CaseMaterialRequestsTabController.class)"));
         assertFalse(method.contains("new ComboBox<CaseTaskService.AssignableUserOption>"));
         assertFalse(method.contains("newUserSelector("));
@@ -130,7 +131,7 @@ class CaseMaterialsNewRequestWindowTest {
         String source = Files.readString(SOURCE);
         String method = methodBody(source, "VBox newRequestBody");
         String confirmMethod = methodBody(source, "boolean confirmDiscardNewRequest");
-        assertTrue(source.contains("Button save=ActionButtonFactory.primary(\"Save\",null)"));
+        assertTrue(source.contains("Button save=semanticButton(ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD, \"Save\",null)"));
         assertTrue(method.contains("if(confirmDiscardNewRequest(stage))stage.close()"));
         assertTrue(confirmMethod.contains("AppDialogs.showChoice"));
         assertTrue(confirmMethod.contains("\"Discard New Request?\""));
