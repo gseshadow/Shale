@@ -13,6 +13,7 @@ import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.WindowSizingUtil;
 
 import javafx.geometry.Insets;
@@ -55,24 +56,29 @@ public final class NewTaskDialog {
 
         Label titleLabel = new Label("Title");
         TextField titleField = new TextField();
+        ControlStyles.formControl(titleField);
         titleField.setPromptText("Task title");
 
         Label descriptionLabel = new Label("Description");
         TextArea descriptionArea = new TextArea();
+        ControlStyles.formControl(descriptionArea);
         descriptionArea.setPromptText("Optional");
         descriptionArea.setPrefRowCount(4);
         descriptionArea.setWrapText(true);
 
         Label dueLabel = new Label("Due date/time");
         DatePicker dueDatePicker = new DatePicker();
+        ControlStyles.formControl(dueDatePicker);
         dueDatePicker.setPromptText("Optional");
         TextField dueTimeField = new TextField();
+        ControlStyles.formControl(dueTimeField);
         dueTimeField.setPromptText("HH:mm (optional)");
         dueTimeField.setPrefColumnCount(8);
         HBox dueRow = new HBox(8, dueDatePicker, dueTimeField);
 
         Label priorityLabel = new Label("Priority");
         ComboBox<TaskPriorityOptionDto> priorityComboBox = new ComboBox<>();
+        ControlStyles.formControl(priorityComboBox);
         priorityComboBox.setMaxWidth(Double.MAX_VALUE);
         priorityComboBox.setPromptText("Select priority");
         List<TaskPriorityOptionDto> safePriorities = availablePriorities == null ? List.of() : availablePriorities;
@@ -86,7 +92,7 @@ public final class NewTaskDialog {
         Label assignedLabel = new Label("Assigned");
         assignedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
         Button addAssignedButton = new Button("Add");
-        addAssignedButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(addAssignedButton, ControlStyles.Purpose.SECONDARY);
         Region assignedSpacer = new Region();
         HBox.setHgrow(assignedSpacer, Priority.ALWAYS);
         HBox assignedHeader = new HBox(8, assignedLabel, assignedSpacer, addAssignedButton);
@@ -151,16 +157,17 @@ public final class NewTaskDialog {
         VBox.setVgrow(contentScrollPane, Priority.ALWAYS);
 
         Button cancelButton = new Button("Cancel");
-        cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> stage.close());
 
         Button createButton = new Button("Create Task");
-        createButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+        ControlStyles.apply(createButton, ControlStyles.Purpose.PRIMARY);
         createButton.setDefaultButton(true);
         createButton.setOnAction(e -> {
             String title = titleField.getText() == null ? "" : titleField.getText().trim();
             if (title.isBlank()) {
+                ControlStyles.setInvalid(titleField, true);
                 showError(errorLabel, "Title is required.");
                 return;
             }
@@ -169,6 +176,7 @@ public final class NewTaskDialog {
             try {
                 dueAt = parseDueAt(dueDatePicker.getValue(), dueTimeField.getText());
             } catch (DateTimeParseException ex) {
+                ControlStyles.setInvalid(dueTimeField, true);
                 showError(errorLabel, "Invalid time. Use HH:mm (example: 14:30).");
                 return;
             }
@@ -184,6 +192,12 @@ public final class NewTaskDialog {
                     selectedAssignedUsers.values().stream().map(CaseTaskService.AssignableUserOption::id).toList());
             stage.close();
         });
+        titleField.textProperty().addListener((obs, oldText, newText) ->
+                ControlStyles.setInvalid(titleField, newText == null || newText.trim().isBlank()));
+        dueTimeField.textProperty().addListener((obs, oldText, newText) ->
+                ControlStyles.setInvalid(dueTimeField, !isValidDueTime(dueDatePicker.getValue(), newText)));
+        dueDatePicker.valueProperty().addListener((obs, oldDate, newDate) ->
+                ControlStyles.setInvalid(dueTimeField, !isValidDueTime(newDate, dueTimeField.getText())));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -227,6 +241,15 @@ public final class NewTaskDialog {
             return dueDate.atStartOfDay();
         }
         return LocalDateTime.of(dueDate, LocalTime.parse(trimmedTime));
+    }
+
+    private static boolean isValidDueTime(LocalDate dueDate, String dueTimeRaw) {
+        try {
+            parseDueAt(dueDate, dueTimeRaw);
+            return true;
+        } catch (DateTimeParseException ex) {
+            return false;
+        }
     }
 
     private static void showError(Label errorLabel, String message) {
@@ -288,7 +311,7 @@ public final class NewTaskDialog {
                     UserCardFactory.Variant.MINI);
             card.setMouseTransparent(true);
             Button removeButton = new Button("Remove");
-            removeButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            ControlStyles.apply(removeButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
             int userId = user.id();
             removeButton.setOnAction(e -> onRemove.accept(userId));
             HBox row = new HBox(8, card, removeButton);
