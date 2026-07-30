@@ -6,12 +6,14 @@ import com.shale.core.dto.MaterialRequestStatusHistoryDto;
 import com.shale.ui.component.StatusTimeline;
 import com.shale.ui.util.ColorUtil;
 import javafx.geometry.Insets;
+import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -34,6 +36,7 @@ import java.util.function.Consumer;
  * Controllers supply fully hydrated summary DTOs and own all service calls.
  */
 public final class MaterialRequestCardFactory {
+    static final String MATERIAL_REQUEST_ID_KEY = "shale.materialRequestId";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
     private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
     static final String NEUTRAL_STATUS_COLOR = "#E2E8F0";
@@ -95,6 +98,7 @@ public final class MaterialRequestCardFactory {
         HBox.setHgrow(body, Priority.ALWAYS);
 
         Label title = new Label(nvl(request.title(), nvl(request.materialTypeName(), "Material Request #" + request.id())));
+        title.getStyleClass().add("material-request-card__title");
         title.setWrapText(true);
         title.setMaxWidth(Double.MAX_VALUE);
         title.setStyle("-fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: #112542;");
@@ -130,7 +134,9 @@ public final class MaterialRequestCardFactory {
         rail.setMinWidth(7); rail.setPrefWidth(7); rail.setMaxWidth(7);
         rail.setStyle("-fx-background-color: " + materialTypeRailColor + "; -fx-background-radius: " + CARD_RADIUS + " 0 0 " + CARD_RADIUS + ";");
 
+        final long requestId = request.id();
         HBox card = new HBox(0, rail, body);
+        card.getProperties().put(MATERIAL_REQUEST_ID_KEY, requestId);
         card.getStyleClass().addAll("material-request-card", "material-request-list-card");
         card.setMinWidth(0);
         card.setMaxWidth(Double.MAX_VALUE);
@@ -141,11 +147,31 @@ public final class MaterialRequestCardFactory {
         card.setOnMouseExited(e -> applyCardStyle(card, statusColor, false));
         if (onOpenRequest != null) {
             card.setCursor(Cursor.HAND);
+            card.setFocusTraversable(true);
+            card.setAccessibleText("Open material request " + nvl(request.title(), "#" + requestId));
             card.setOnMouseClicked(e -> {
-                if (e.getButton() == MouseButton.PRIMARY) onOpenRequest.accept(request.id());
+                if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
+                    activateRequest(card, requestId);
+                    e.consume();
+                }
+            });
+            card.setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
+                    activateRequest(card, requestId);
+                    e.consume();
+                }
             });
         }
         return card;
+    }
+
+    private void activateRequest(Node card, long requestId) {
+        // Keep one queue boundary so the accepted input dispatch completes before window
+        // creation, and reject the activation if an intervening list rebuild detached it.
+        Platform.runLater(() -> {
+            if (card.getParent() == null || card.getScene() == null) return;
+            onOpenRequest.accept(requestId);
+        });
     }
 
     static ScrollPane requestStatusTimeline(List<MaterialRequestStatusHistoryDto> history, List<RequestStatusDto> effectiveStatuses) {
