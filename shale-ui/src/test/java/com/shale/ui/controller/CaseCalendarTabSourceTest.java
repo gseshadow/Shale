@@ -50,12 +50,8 @@ final class CaseCalendarTabSourceTest {
                 "Timeline must keep its own route after the Calendar tab.");
 
         String showCalendarTab = methodBody(controller, "private void showCalendarTab");
-        assertTrue(matches(showCalendarTab, "setPaneVisible\\(tasksTabPane,\\s*false\\)"),
-                "Calendar tab activation must hide the Tasks pane.");
-        assertTrue(matches(showCalendarTab, "setPaneVisible\\(caseCalendarTabPane,\\s*true\\)"),
-                "Calendar tab activation must show the Calendar pane.");
-        assertTrue(matches(showCalendarTab, "setPaneVisible\\(genericPane,\\s*false\\)"),
-                "Calendar tab activation must not fall through to the generic Timeline pane.");
+        assertTrue(showCalendarTab.contains("activateCaseSectionRoot(caseCalendarTabPane)"),
+                "Calendar must use the exclusive Case View section lifecycle.");
         assertTrue(showCalendarTab.contains("loadCaseCalendarAsync()"),
                 "Calendar tab activation must load the case calendar flow when stale.");
         assertTrue(showCalendarTab.contains("loadCaseUpdatesAsync()"),

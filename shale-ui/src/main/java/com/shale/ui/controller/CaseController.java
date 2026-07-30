@@ -1648,12 +1648,7 @@ public class CaseController {
 
 	private void showCalendarTab() {
 		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
-		setPaneVisible(overviewScrollPane, false);
-		setPaneVisible(detailsSectionPane, false);
-		setPaneVisible(tasksTabPane, false);
-		setPaneVisible(caseCalendarTabPane, true);
-		setPaneVisible(caseLinksTabPane, false);
-		setPaneVisible(genericPane, false);
+		activateCaseSectionRoot(caseCalendarTabPane);
 		setPaneVisible(tasksPanel, false);
 		if (!caseCalendarLoadedOnce || caseCalendarStale) {
 			loadCaseCalendarAsync();
@@ -1933,13 +1928,7 @@ public class CaseController {
 
 	private void showRequestsSurface() {
 		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
-		setPaneVisible(overviewScrollPane, false);
-		setPaneVisible(detailsSectionPane, false);
-		setPaneVisible(tasksTabPane, false);
-		setPaneVisible(caseCalendarTabPane, false);
-		setPaneVisible(caseRequestsTabPane, true);
-		setPaneVisible(caseLinksTabPane, false);
-		setPaneVisible(genericPane, false);
+		activateCaseSectionRoot(caseRequestsTabPane);
 		setPaneVisible(tasksPanel, false);
 	}
 
@@ -6683,6 +6672,17 @@ public class CaseController {
 			return;
 		pane.setVisible(visible);
 		pane.setManaged(visible);
+		pane.setMouseTransparent(!visible);
+	}
+
+	private void activateCaseSectionRoot(Node activeRoot) {
+		if (!Platform.isFxApplicationThread())
+			throw new IllegalStateException("Case sections must be activated on the JavaFX application thread.");
+		for (Node root : new Node[] {overviewScrollPane, detailsSectionPane, tasksTabPane, caseCalendarTabPane,
+				caseRequestsTabPane, caseLinksTabPane, genericPane}) {
+			if (root != null) setPaneVisible(root, root == activeRoot);
+		}
+		if (activeRoot != caseRequestsTabPane) caseMaterialRequestsTabController.deactivate();
 	}
 
 	private static void setVisibleManaged(javafx.scene.Node node, boolean visible) {
