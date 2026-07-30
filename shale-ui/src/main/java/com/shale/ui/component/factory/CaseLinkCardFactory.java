@@ -8,6 +8,7 @@ import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.ui.component.ContactCard;
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ColorUtil;
+import com.shale.ui.util.ControlStyles;
 
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -122,7 +123,7 @@ public final class CaseLinkCardFactory {
         HBox.setHgrow(description, Priority.ALWAYS);
         summaryRow.getChildren().add(description);
         if (showManagementActions) {
-            Button edit = isolated(ActionButtonFactory.cardAction("Edit", e -> safeActions.edit().run()));
+            Button edit = isolated(semantic("Edit", ControlStyles.Purpose.GHOST, e -> safeActions.edit().run()));
             edit.getStyleClass().add("case-link-card-compact-edit");
             summaryRow.getChildren().add(edit);
         }
@@ -204,11 +205,15 @@ public final class CaseLinkCardFactory {
 
     private static HBox fullFooter(CaseLinkDto link, Actions actions) {
         HBox footer = new HBox(6); footer.getStyleClass().add("case-link-card-footer"); footer.setAlignment(Pos.CENTER_LEFT);
-        if (!link.primary()) footer.getChildren().add(isolated(ActionButtonFactory.cardAction("Set Primary", e -> actions.setPrimary().run())));
-        footer.getChildren().add(isolated(ActionButtonFactory.danger("Delete", e -> actions.delete().run())));
+        if (!link.primary()) footer.getChildren().add(isolated(semantic("Set Primary", ControlStyles.Purpose.SECONDARY, e -> actions.setPrimary().run())));
+        footer.getChildren().add(isolated(semantic("Delete", ControlStyles.Purpose.DANGER, e -> actions.delete().run())));
         Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS);
-        footer.getChildren().addAll(spacer, isolated(ActionButtonFactory.cardAction("Edit", e -> actions.edit().run())));
+        footer.getChildren().addAll(spacer, isolated(semantic("Edit", ControlStyles.Purpose.GHOST, e -> actions.edit().run())));
         return footer;
+    }
+
+    private static Button semantic(String text, ControlStyles.Purpose purpose, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {
+        return ActionButtonFactory.semantic(text, handler, purpose, ControlStyles.Size.SMALL);
     }
 
     private static Button isolated(Button button) {

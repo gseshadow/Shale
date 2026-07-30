@@ -40,7 +40,7 @@ final class SemanticControlCssRuntimeTest {
             Platform.runLater(() -> {
                 try {
                     Button standard = ControlStyles.apply(new Button("A deliberately long action label"), ControlStyles.Purpose.PRIMARY);
-                    Button small = ControlStyles.apply(new Button("Remove"), ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+                    Button small = ControlStyles.apply(new Button("Set Primary"), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
                     VBox root = new VBox(standard, small);
                     Scene scene = new Scene(root, 500, 160);
                     scene.getStylesheets().add(requireStylesheet());

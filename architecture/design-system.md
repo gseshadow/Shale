@@ -526,3 +526,7 @@ Newly migrated areas must not introduce:
 * multiple competing Primary actions in one local action area without documented justification;
 * broad global selectors that accidentally migrate unrelated screens;
 * custom Button subclasses, Success button variants, or a parallel styling vocabulary.
+
+### Case Links semantic-control adoption
+
+Case Links is the second opt-in desktop area. Its tab action and dialog affirmative actions use Primary/Standard; dialog cancellation uses Secondary/Standard; card Edit and staged share-management actions use Small Ghost or Secondary controls; Set Primary is Secondary/Small; and confirmed Case Link deletion is Danger/Small. Link cards themselves remain the established keyboard- and mouse-activatable navigation surface rather than adding a competing Open button solely to demonstrate the Navigation button variant. Link Type colors remain data presentation in pills, rails, and card washes and never determine action colors. The create/edit and share-detail fields use the shared form shell and show `:invalid` only after the existing validation workflow rejects a save, clearing the state as values are corrected.
