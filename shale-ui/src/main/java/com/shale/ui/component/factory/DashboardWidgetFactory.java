@@ -9,6 +9,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import com.shale.ui.util.ControlStyles;
 
 /**
  * Builds reusable dashboard widgets with a consistent Shale card shell.
@@ -52,7 +53,8 @@ public final class DashboardWidgetFactory {
 		header.getChildren().add(spacer);
 		if (viewAllAction != null) {
 			Button viewAll = new Button("View All");
-			viewAll.getStyleClass().addAll("dashboard-widget-view-all", "app-toolbar-button", "app-toolbar-button-neutral");
+			viewAll.getStyleClass().add("dashboard-widget-view-all");
+			ControlStyles.apply(viewAll, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
 			viewAll.setOnAction(event -> viewAllAction.run());
 			header.getChildren().add(viewAll);
 		}

@@ -1,7 +1,7 @@
 package com.shale.ui.util;
 
 import javafx.css.PseudoClass;
-import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
 import javafx.scene.control.Control;
 
 import java.util.List;
@@ -37,11 +37,11 @@ public final class ControlStyles {
 
     private ControlStyles() { }
 
-    public static <T extends Button> T apply(T button, Purpose purpose) {
+    public static <T extends ButtonBase> T apply(T button, Purpose purpose) {
         return apply(button, purpose, Size.STANDARD);
     }
 
-    public static <T extends Button> T apply(T button, Purpose purpose, Size size) {
+    public static <T extends ButtonBase> T apply(T button, Purpose purpose, Size size) {
         Objects.requireNonNull(button, "button");
         Objects.requireNonNull(purpose, "purpose");
         Objects.requireNonNull(size, "size");
@@ -51,21 +51,21 @@ public final class ControlStyles {
         return button;
     }
 
-    public static <T extends Button> T small(T button) {
+    public static <T extends ButtonBase> T small(T button) {
         Objects.requireNonNull(button, "button");
         replace(button, SIZE_CLASSES, Size.SMALL.styleClass);
         addOnce(button, BUTTON_BASE);
         return button;
     }
 
-    public static <T extends Button> T standard(T button) {
+    public static <T extends ButtonBase> T standard(T button) {
         Objects.requireNonNull(button, "button");
         replace(button, SIZE_CLASSES, Size.STANDARD.styleClass);
         addOnce(button, BUTTON_BASE);
         return button;
     }
 
-    public static <T extends Button> T iconOnly(T button) {
+    public static <T extends ButtonBase> T iconOnly(T button) {
         Objects.requireNonNull(button, "button");
         addOnce(button, BUTTON_BASE);
         addOnce(button, ICON_ONLY);
