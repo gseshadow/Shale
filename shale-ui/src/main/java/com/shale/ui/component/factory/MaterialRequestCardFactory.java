@@ -6,12 +6,14 @@ import com.shale.core.dto.MaterialRequestStatusHistoryDto;
 import com.shale.ui.component.StatusTimeline;
 import com.shale.ui.util.ColorUtil;
 import javafx.geometry.Insets;
+import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -141,8 +143,20 @@ public final class MaterialRequestCardFactory {
         card.setOnMouseExited(e -> applyCardStyle(card, statusColor, false));
         if (onOpenRequest != null) {
             card.setCursor(Cursor.HAND);
+            card.setFocusTraversable(true);
+            card.setAccessibleText("Open material request " + nvl(request.title(), "#" + request.id()));
+            Runnable activate = () -> Platform.runLater(() -> onOpenRequest.accept(request.id()));
             card.setOnMouseClicked(e -> {
-                if (e.getButton() == MouseButton.PRIMARY) onOpenRequest.accept(request.id());
+                if (e.getButton() == MouseButton.PRIMARY) {
+                    activate.run();
+                    e.consume();
+                }
+            });
+            card.setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
+                    activate.run();
+                    e.consume();
+                }
             });
         }
         return card;
