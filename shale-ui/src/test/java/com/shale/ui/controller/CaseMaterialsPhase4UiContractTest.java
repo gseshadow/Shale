@@ -49,7 +49,7 @@ final class CaseMaterialsPhase4UiContractTest {
 
   @Test void requestTabSupportsEditableRequestsWhileCaseMaterialsStillUseItemForms() {
     String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
-    assertTrue(requestController.contains("primary(\"New Request\")"));
+    assertTrue(requestController.contains("semanticButton(ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD, \"New Request\",null)"));
     assertFalse(requestController.contains("ButtonType(\"Edit\")"));
     assertFalse(requestController.contains("openEditor"));
     assertTrue(requestController.contains("createMaterialRequest"));
@@ -71,7 +71,7 @@ final class CaseMaterialsPhase4UiContractTest {
   @Test void requestTabNewRequestActionIsHeaderStyledAndCreatesThroughService() {
     String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
     String materialsUi = MAT.substring(MAT.indexOf("final class MaterialsUi"));
-    int headerAction = requestController.indexOf("Button add=primary(\"New Request\")");
+    int headerAction = requestController.indexOf("Button add=semanticButton(ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD, \"New Request\",null)");
     int rootSection = requestController.indexOf("section(title,add,status,list)");
     int listCreation = requestController.indexOf("list=new VBox(10)");
     assertTrue(headerAction >= 0);
@@ -101,7 +101,7 @@ final class CaseMaterialsPhase4UiContractTest {
     assertFalse(placeholder.contains("Next Follow-up At:"));
     assertFalse(placeholder.contains("ButtonType.OK"));
     assertTrue(requestController.contains("CreateMaterialRequestCommand"));
-    assertTrue(requestController.contains("ActionButtonFactory.primary(\"Save\",null)"));
+    assertTrue(requestController.contains("semanticButton(ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD, \"Save\",null)"));
     assertTrue(requestController.contains("createMaterialRequest"));
     assertTrue(requestController.contains("updateMaterialRequest"));
     assertFalse(MAT.contains("final class MaterialRequestForm"));
@@ -111,9 +111,9 @@ final class CaseMaterialsPhase4UiContractTest {
     String dialog = read("src/main/java/com/shale/ui/controller/support/RequestedFromWorkflowDialog.java");
     String body = requestController.substring(requestController.indexOf("VBox newRequestBody"), requestController.indexOf("private void loadNewRequestLookups"));
     assertTrue(body.contains("add(fields,1,\"Requested From *:\",requestedFromBox)"));
-    assertTrue(body.contains("ActionButtonFactory.primary(\"Add\",null)"));
+    assertTrue(body.contains("semanticButton(ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD, \"Add\",null)"));
     assertTrue(body.contains("requestedFromAction.setText(v==null?\"Add\":\"Change\")"));
-    assertTrue(body.contains("ActionButtonFactory.neutral(\"Remove\",null)"));
+    assertTrue(body.contains("semanticButton(ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL, \"Remove\",null)"));
     assertTrue(body.contains("AtomicReference<RequestedFromSelection>"));
     assertTrue(requestController.contains("record RequestedFromSelection(String entityType, Long entityId, String label, ContactCardFactory.ContactCardModel contactModel, OrganizationCardFactory.OrganizationCardModel organizationModel)"));
     assertTrue(body.contains("contactCards.create(v.contactModel(),ContactCardFactory.Variant.MINI)"));
