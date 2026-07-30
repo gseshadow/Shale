@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.time.LocalDateTime;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,8 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 
 final class MaterialRequestCardFactoryRenderingTest {
@@ -85,10 +89,13 @@ final class MaterialRequestCardFactoryRenderingTest {
             assertNotNull(organization);
             assertNotNull(user);
 
-            organization.fireEvent(click(MouseButton.PRIMARY));
-            user.fireEvent(click(MouseButton.PRIMARY));
-            organization.fireEvent(click(MouseButton.SECONDARY));
-            rendered.card().fireEvent(click(MouseButton.PRIMARY));
+            runFxAndWait(() -> {
+                organization.fireEvent(click(MouseButton.PRIMARY));
+                user.fireEvent(click(MouseButton.PRIMARY));
+                organization.fireEvent(click(MouseButton.SECONDARY));
+                rendered.card().fireEvent(click(MouseButton.PRIMARY));
+            });
+            runFxAndWait(() -> { });
 
             assertEquals(1, organizationOpens.get(), "Organization MINI primary click should navigate once.");
             assertEquals(1, userOpens.get(), "User MINI primary click should navigate once.");
@@ -96,6 +103,67 @@ final class MaterialRequestCardFactoryRenderingTest {
         } finally {
             runFxAndWait(rendered.stage()::close);
         }
+    }
+
+    @Test
+    void distinctCardsCaptureTheirOwnIdsAcrossTheFxQueueInOrder() throws Exception {
+        List<Long> opened = new ArrayList<>();
+        AtomicInteger mutableSelection = new AtomicInteger();
+        AtomicReference<HBox> a = new AtomicReference<>(), b = new AtomicReference<>();
+        AtomicReference<Stage> stage = new AtomicReference<>();
+        runFxAndWait(() -> {
+            MaterialRequestCardFactory factory = new MaterialRequestCardFactory(opened::add);
+            a.set((HBox) factory.create(summary(101L), MaterialRequestCardFactory.Variant.LIST));
+            b.set((HBox) factory.create(summary(202L), MaterialRequestCardFactory.Variant.LIST));
+            VBox list = new VBox(a.get(), b.get());
+            stage.set(new Stage());
+            stage.get().setScene(new Scene(list));
+            stage.get().show();
+            a.get().fireEvent(click(MouseButton.PRIMARY));
+            mutableSelection.set(202); // must not affect A's already accepted activation
+            b.get().fireEvent(click(MouseButton.PRIMARY));
+        });
+        runFxAndWait(() -> { }); // deterministically drain both queued activations
+        try {
+            assertEquals(List.of(101L, 202L), opened);
+            assertEquals(101L, a.get().getProperties().get(MaterialRequestCardFactory.MATERIAL_REQUEST_ID_KEY));
+            assertEquals(202L, b.get().getProperties().get(MaterialRequestCardFactory.MATERIAL_REQUEST_ID_KEY));
+        } finally {
+            runFxAndWait(stage.get()::close);
+        }
+    }
+
+    @Test
+    void mouseEnterAndSpaceUseTheSameExplicitCardIdentity() throws Exception {
+        List<Long> opened = new ArrayList<>();
+        AtomicReference<HBox> card = new AtomicReference<>();
+        AtomicReference<Stage> stage = new AtomicReference<>();
+        runFxAndWait(() -> {
+            card.set((HBox) new MaterialRequestCardFactory(opened::add).create(summary(303L), MaterialRequestCardFactory.Variant.LIST));
+            stage.set(new Stage()); stage.get().setScene(new Scene(new StackPane(card.get()))); stage.get().show();
+            card.get().fireEvent(click(MouseButton.PRIMARY));
+            card.get().fireEvent(key(KeyCode.ENTER));
+            card.get().fireEvent(key(KeyCode.SPACE));
+        });
+        runFxAndWait(() -> { });
+        try { assertEquals(List.of(303L, 303L, 303L), opened); }
+        finally { runFxAndWait(stage.get()::close); }
+    }
+
+    @Test
+    void cardDetachedBeforeQueuedActivationDrainsCannotOpen() throws Exception {
+        List<Long> opened = new ArrayList<>();
+        AtomicReference<Stage> stage = new AtomicReference<>();
+        runFxAndWait(() -> {
+            HBox stale = (HBox) new MaterialRequestCardFactory(opened::add).create(summary(404L), MaterialRequestCardFactory.Variant.LIST);
+            VBox list = new VBox(stale);
+            stage.set(new Stage()); stage.get().setScene(new Scene(list)); stage.get().show();
+            stale.fireEvent(click(MouseButton.PRIMARY));
+            list.getChildren().clear(); // asynchronous rebuild detaches the stale card before callback
+        });
+        runFxAndWait(() -> { });
+        try { assertTrue(opened.isEmpty()); }
+        finally { runFxAndWait(stage.get()::close); }
     }
 
     @Test
@@ -108,8 +176,11 @@ final class MaterialRequestCardFactoryRenderingTest {
         try {
             Node contact = findFirst(rendered.card(), com.shale.ui.component.ContactCard.class);
             assertNotNull(contact);
-            contact.fireEvent(click(MouseButton.PRIMARY));
-            contact.fireEvent(click(MouseButton.SECONDARY));
+            runFxAndWait(() -> {
+                contact.fireEvent(click(MouseButton.PRIMARY));
+                contact.fireEvent(click(MouseButton.SECONDARY));
+            });
+            runFxAndWait(() -> { });
             assertEquals(1, contactOpens.get(), "Contact MINI primary click should navigate once.");
             assertEquals(0, requestOpens.get(), "Handled embedded MINI click must not bubble to request navigation.");
         } finally {
@@ -278,6 +349,19 @@ final class MaterialRequestCardFactoryRenderingTest {
     private static MouseEvent click(MouseButton button) {
         return new MouseEvent(MouseEvent.MOUSE_CLICKED, 4, 4, 4, 4, button, 1,
                 false, false, false, false, button == MouseButton.PRIMARY, button == MouseButton.MIDDLE, button == MouseButton.SECONDARY, false, false, false, null);
+    }
+
+    private static KeyEvent key(KeyCode code) {
+        return new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
+    }
+
+    private static MaterialRequestSummaryDto summary(long id) {
+        return new MaterialRequestSummaryDto(
+                id, 10, 6502L, 3, "Medical records", null, "#2F80ED", "Request " + id,
+                11, "Requestor", "#7C3AED", 12, "Assignee", "#059669",
+                null, null, 22, "Organization", null, "Portal", LocalDateTime.of(2026, 7, 23, 9, 0),
+                "REQUESTED", null, null, null, LocalDateTime.of(2026, 7, 23, 9, 0),
+                new byte[]{1});
     }
 
     private static MaterialRequestSummaryDto contactSummary() {

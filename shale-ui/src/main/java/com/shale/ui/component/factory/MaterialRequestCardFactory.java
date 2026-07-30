@@ -36,6 +36,7 @@ import java.util.function.Consumer;
  * Controllers supply fully hydrated summary DTOs and own all service calls.
  */
 public final class MaterialRequestCardFactory {
+    static final String MATERIAL_REQUEST_ID_KEY = "shale.materialRequestId";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
     private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
     static final String NEUTRAL_STATUS_COLOR = "#E2E8F0";
@@ -132,7 +133,9 @@ public final class MaterialRequestCardFactory {
         rail.setMinWidth(7); rail.setPrefWidth(7); rail.setMaxWidth(7);
         rail.setStyle("-fx-background-color: " + materialTypeRailColor + "; -fx-background-radius: " + CARD_RADIUS + " 0 0 " + CARD_RADIUS + ";");
 
+        final long requestId = request.id();
         HBox card = new HBox(0, rail, body);
+        card.getProperties().put(MATERIAL_REQUEST_ID_KEY, requestId);
         card.getStyleClass().addAll("material-request-card", "material-request-list-card");
         card.setMinWidth(0);
         card.setMaxWidth(Double.MAX_VALUE);
@@ -144,22 +147,30 @@ public final class MaterialRequestCardFactory {
         if (onOpenRequest != null) {
             card.setCursor(Cursor.HAND);
             card.setFocusTraversable(true);
-            card.setAccessibleText("Open material request " + nvl(request.title(), "#" + request.id()));
-            Runnable activate = () -> Platform.runLater(() -> onOpenRequest.accept(request.id()));
+            card.setAccessibleText("Open material request " + nvl(request.title(), "#" + requestId));
             card.setOnMouseClicked(e -> {
                 if (e.getButton() == MouseButton.PRIMARY) {
-                    activate.run();
+                    activateRequest(card, requestId);
                     e.consume();
                 }
             });
             card.setOnKeyPressed(e -> {
                 if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
-                    activate.run();
+                    activateRequest(card, requestId);
                     e.consume();
                 }
             });
         }
         return card;
+    }
+
+    private void activateRequest(Node card, long requestId) {
+        // Keep one queue boundary so the accepted input dispatch completes before window
+        // creation, and reject the activation if an intervening list rebuild detached it.
+        Platform.runLater(() -> {
+            if (card.getParent() == null || card.getScene() == null) return;
+            onOpenRequest.accept(requestId);
+        });
     }
 
     static ScrollPane requestStatusTimeline(List<MaterialRequestStatusHistoryDto> history, List<RequestStatusDto> effectiveStatuses) {
