@@ -203,7 +203,7 @@ public final class NewTaskDialog {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox actions = new HBox(10, spacer, cancelButton, createButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
-        actions.getStyleClass().add("app-dialog-action-bar");
+        actions.getStyleClass().addAll("app-dialog-action-bar", "new-task-dialog-action-bar");
         actions.setMaxWidth(Double.MAX_VALUE);
 
         VBox headerContent = new VBox(8, heading, message);

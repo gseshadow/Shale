@@ -11,6 +11,7 @@ final class TaskDialogSemanticControlMigrationTest {
     private static final Path CREATE = Path.of("src/main/java/com/shale/ui/component/dialog/NewTaskDialog.java");
     private static final Path DETAIL = Path.of("src/main/java/com/shale/ui/component/dialog/TaskDetailDialog.java");
     private static final Path PICKER = Path.of("src/main/java/com/shale/ui/component/dialog/AssignedUserPickerDialog.java");
+    private static final Path APP_CSS = Path.of("src/main/resources/css/app.css");
 
     @Test void classifiesEveryTaskDialogActionByBehavior() throws Exception {
         String create = Files.readString(CREATE);
@@ -82,6 +83,19 @@ final class TaskDialogSemanticControlMigrationTest {
             assertFalse(text.matches("(?s).*\\b(?:create|save|cancel|delete|completionToggle|addNote|addAssigned|remove|edit|close)Button"
                     + "\\.setStyle\\(.*"), source.toString());
         }
+    }
+
+    @Test void newTaskBackgroundOwningFooterHasShellMatchingBottomRadii() throws Exception {
+        String create = Files.readString(CREATE);
+        String css = Files.readString(APP_CSS);
+
+        assertTrue(create.contains("actions.getStyleClass().addAll(\"app-dialog-action-bar\", \"new-task-dialog-action-bar\")"));
+        assertTrue(css.contains(".new-task-dialog-action-bar {"));
+        int selector = css.indexOf(".new-task-dialog-action-bar {");
+        int close = css.indexOf('}', selector);
+        String rule = css.substring(selector, close);
+        assertTrue(rule.contains("-fx-background-radius: 0 0 16 16;"));
+        assertTrue(rule.contains("-fx-border-radius: 0 0 16 16;"));
     }
 
     private static void assertSemantic(String source, String variable, String purpose) {
