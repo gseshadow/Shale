@@ -7,7 +7,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -47,8 +46,8 @@ public final class StatusTimeline {
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.setPannable(true);
-        // A timeline is read-only. Consume its gestures so a containing card does not activate.
-        scroll.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
+        // The timeline is read-only. Leave ordinary clicks unconsumed so an enclosing
+        // selectable card receives them; ScrollPane still owns genuine pan gestures.
         return scroll;
     }
 

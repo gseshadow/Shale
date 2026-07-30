@@ -98,6 +98,7 @@ public final class MaterialRequestCardFactory {
         HBox.setHgrow(body, Priority.ALWAYS);
 
         Label title = new Label(nvl(request.title(), nvl(request.materialTypeName(), "Material Request #" + request.id())));
+        title.getStyleClass().add("material-request-card__title");
         title.setWrapText(true);
         title.setMaxWidth(Double.MAX_VALUE);
         title.setStyle("-fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: #112542;");
@@ -149,7 +150,7 @@ public final class MaterialRequestCardFactory {
             card.setFocusTraversable(true);
             card.setAccessibleText("Open material request " + nvl(request.title(), "#" + requestId));
             card.setOnMouseClicked(e -> {
-                if (e.getButton() == MouseButton.PRIMARY) {
+                if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
                     activateRequest(card, requestId);
                     e.consume();
                 }
