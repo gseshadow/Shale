@@ -60,6 +60,7 @@ class CaseMaterialsNewRequestWindowTest {
         assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> requestedBy=newUserSelectionField(stage,true)"));
         assertTrue(method.contains("UserSelectionField<CaseTaskService.AssignableUserOption> assignedTo=newUserSelectionField(stage,true)"));
         assertTrue(userFactory.contains("new UserSelectionField<>(CaseTaskService.AssignableUserOption::id,CaseTaskService.AssignableUserOption::displayName,CaseTaskService.AssignableUserOption::color"));
+        assertTrue(userFactory.contains(".useUnifiedControlStyles()"), "Material Request user actions must opt into semantic controls.");
         assertTrue(userFactory.contains("AssignedUserPickerDialog.show(pickerOwner,candidates,CaseMaterialRequestsTabController.class)"));
         assertFalse(method.contains("new ComboBox<CaseTaskService.AssignableUserOption>"));
         assertFalse(method.contains("newUserSelector("));

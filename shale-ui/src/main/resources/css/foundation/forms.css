@@ -20,13 +20,13 @@
 }
 
 .shale-form-control {
-    -fx-min-height: 36;
-    -fx-pref-height: 36;
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
     -fx-background-color: -shale-control-surface;
-    -fx-background-radius: 8;
-    -fx-border-radius: 8;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
     -fx-border-color: -shale-control-border;
-    -fx-border-width: 1;
+    -fx-border-width: 1px;
     -fx-text-fill: -shale-color-text-primary;
     -fx-prompt-text-fill: -shale-control-prompt-text;
 }
@@ -34,7 +34,7 @@
 .shale-form-control:focused, .shale-form-control:showing { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 10, 0.2, 0, 0); }
 .shale-form-control:invalid { -fx-border-color: -shale-control-invalid-border; }
 .shale-form-control:invalid:focused { -fx-border-color: -shale-control-invalid-focus-border; -fx-effect: dropshadow(gaussian, -shale-control-invalid-ring, 10, 0.2, 0, 0); }
-.text-area.shale-form-control { -fx-pref-height: 88; }
+.text-area.shale-form-control { -fx-pref-height: 88px; }
 .text-area.shale-form-control > .scroll-pane,
 .text-area.shale-form-control > .scroll-pane > .viewport,
 .text-area.shale-form-control > .scroll-pane > .content { -fx-background-color: transparent; }
