@@ -18,8 +18,9 @@ final class MyShaleControllerBoardLayoutTest {
     void singleTaskLaneUsesViewportWithoutExceedingReadableMaximum() {
         assertEquals(260.0, MyShaleController.responsiveSingleTaskLaneWidth(0), 0.01);
         assertEquals(225.0, MyShaleController.responsiveSingleTaskLaneWidth(180), 0.01);
-        assertEquals(560.0, MyShaleController.responsiveSingleTaskLaneWidth(560), 0.01);
-        assertEquals(720.0, MyShaleController.responsiveSingleTaskLaneWidth(1400), 0.01);
+        assertEquals(400.0, MyShaleController.responsiveSingleTaskLaneWidth(400), 0.01);
+        assertEquals(430.0, MyShaleController.responsiveSingleTaskLaneWidth(560), 0.01);
+        assertEquals(430.0, MyShaleController.responsiveSingleTaskLaneWidth(1400), 0.01);
     }
 
     @Test
@@ -30,7 +31,7 @@ final class MyShaleControllerBoardLayoutTest {
                 "Collapsed and multi-lane boards must retain their established compact widths.");
         assertTrue(source.contains("myTasksScroll.viewportBoundsProperty()"),
                 "The sole expanded lane must update when its viewport is resized.");
-        assertTrue(source.contains("TASKS_SINGLE_LANE_MAX_WIDTH = 720"));
+        assertTrue(source.contains("TASKS_SINGLE_LANE_MAX_WIDTH = 430"));
         assertTrue(source.contains("new LaneBoardLayout.LaneWidth(")
                         && source.contains("TASKS_CASE_COLUMN_MIN_WIDTH")
                         && source.contains("TASKS_CASE_COLUMN_PREF_WIDTH")

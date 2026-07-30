@@ -100,7 +100,7 @@ public final class MyShaleController {
 	private static final double TASKS_CASE_COLUMN_MIN_WIDTH = 225;
 	private static final double TASKS_CASE_COLUMN_PREF_WIDTH = 260;
 	private static final double TASKS_CASE_COLUMN_MAX_WIDTH = 300;
-	private static final double TASKS_SINGLE_LANE_MAX_WIDTH = 720;
+	private static final double TASKS_SINGLE_LANE_MAX_WIDTH = 430;
 	private static final double MY_CASES_STATUS_COLUMN_MIN_WIDTH = 336;
 	private static final double MY_CASES_STATUS_COLUMN_PREF_WIDTH = 376;
 	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 416;
