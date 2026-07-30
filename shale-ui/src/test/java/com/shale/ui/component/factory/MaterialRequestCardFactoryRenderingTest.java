@@ -364,6 +364,19 @@ final class MaterialRequestCardFactoryRenderingTest {
                 new byte[]{1});
     }
 
+    private static KeyEvent key(KeyCode code) {
+        return new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
+    }
+
+    private static MaterialRequestSummaryDto summary(long id) {
+        return new MaterialRequestSummaryDto(
+                id, 10, 6502L, 3, "Medical records", null, "#2F80ED", "Request " + id,
+                11, "Requestor", "#7C3AED", 12, "Assignee", "#059669",
+                null, null, 22, "Organization", null, "Portal", LocalDateTime.of(2026, 7, 23, 9, 0),
+                "REQUESTED", null, null, null, LocalDateTime.of(2026, 7, 23, 9, 0),
+                new byte[]{1});
+    }
+
     private static MaterialRequestSummaryDto contactSummary() {
         return new MaterialRequestSummaryDto(
                 2L, 10, 6502L, 3, "Medical records", null, "#2F80ED", "Contact Request",
