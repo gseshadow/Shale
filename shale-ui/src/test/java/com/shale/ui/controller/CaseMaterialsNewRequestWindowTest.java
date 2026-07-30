@@ -130,7 +130,7 @@ class CaseMaterialsNewRequestWindowTest {
         String source = Files.readString(SOURCE);
         String method = methodBody(source, "VBox newRequestBody");
         String confirmMethod = methodBody(source, "boolean confirmDiscardNewRequest");
-        assertTrue(source.contains("Button save=ActionButtonFactory.primary(\"Save\",null)"));
+        assertTrue(source.contains("Button save=semanticButton(ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD, \"Save\",null)"));
         assertTrue(method.contains("if(confirmDiscardNewRequest(stage))stage.close()"));
         assertTrue(confirmMethod.contains("AppDialogs.showChoice"));
         assertTrue(confirmMethod.contains("\"Discard New Request?\""));

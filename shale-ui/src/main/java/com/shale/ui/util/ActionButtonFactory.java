@@ -42,6 +42,14 @@ public final class ActionButtonFactory {
 		return create(text, handler, NEUTRAL_STYLE_CLASS, CARD_ACTION_STYLE_CLASS);
 	}
 
+	/** Explicit opt-in path; legacy factory methods retain their existing classes and appearance. */
+	public static Button semantic(String text, EventHandler<ActionEvent> handler,
+			ControlStyles.Purpose purpose, ControlStyles.Size size) {
+		Button button = new Button(normalize(text));
+		if (handler != null) button.setOnAction(handler);
+		return ControlStyles.apply(button, purpose, size);
+	}
+
 	private static Button create(String text, EventHandler<ActionEvent> handler, String... styleClasses) {
 		Button button = new Button(normalize(text));
 		addStyleClass(button, BASE_STYLE_CLASS);

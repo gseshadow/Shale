@@ -53,9 +53,9 @@ final class MaterialRequestUpdatesUiContractTest {
         assertTrue(source.contains("REQUEST_DETAIL_MIN_WIDTH=900"));
         assertEquals(1,count(source,"requestUpdatesSection(stage,requestId"));
         assertEquals(1,count(source,"setPromptText(\"Add a note about this request…\")"));
-        assertTrue(source.contains("Button cancel=ActionButtonFactory.neutral"));
-        assertTrue(source.contains("Button delete=ActionButtonFactory.danger"));
-        assertTrue(source.contains("Button save=ActionButtonFactory.primary"));
+        assertTrue(source.contains("Button cancel=semanticButton(ControlStyles.Purpose.SECONDARY"));
+        assertTrue(source.contains("Button delete=semanticButton(ControlStyles.Purpose.DANGER"));
+        assertTrue(source.contains("Button save=semanticButton(ControlStyles.Purpose.PRIMARY"));
         String css=Files.readString(Path.of("src/main/resources/css/app.css"));
         assertTrue(css.contains(".material-request-updates-history"));
         assertTrue(css.contains(".material-request-updates"));
