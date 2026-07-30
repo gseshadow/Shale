@@ -979,8 +979,11 @@ public class CaseController {
 			deleteCaseButton.setOnAction(e -> onDeleteCase());
 			setVisibleManaged(deleteCaseButton, false);
 		}
-		if (addTaskButton != null)
+		if (addTaskButton != null) {
+			addTaskButton.getStyleClass().removeAll(ActionButtonFactory.BASE_STYLE_CLASS, ActionButtonFactory.PRIMARY_STYLE_CLASS);
+			ControlStyles.apply(addTaskButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 			addTaskButton.setOnAction(e -> onAddTask());
+		}
 		if (addCaseLinkButton != null) {
 			addCaseLinkButton.getStyleClass().removeAll(ActionButtonFactory.BASE_STYLE_CLASS, ActionButtonFactory.PRIMARY_STYLE_CLASS);
 			ControlStyles.apply(addCaseLinkButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
@@ -994,6 +997,7 @@ public class CaseController {
 		if (generateSummaryMenuButton != null && generateSummaryHtmlMenuItem == null && generateSummaryPdfMenuItem == null)
 			generateSummaryMenuButton.setOnAction(e -> onGenerateSummaryHtml());
 		if (caseTasksSortChoice != null) {
+			ControlStyles.formControl(caseTasksSortChoice);
 			caseTasksSortChoice.getItems().setAll(
 					CASE_TASKS_SORT_DUE_ASC,
 					CASE_TASKS_SORT_DUE_DESC,
@@ -1004,6 +1008,8 @@ public class CaseController {
 					.addListener((obs, oldV, newV) -> refreshCaseTasks());
 		}
 		if (caseTasksShowCompletedButton != null) {
+			caseTasksShowCompletedButton.getStyleClass().removeAll(ActionButtonFactory.BASE_STYLE_CLASS, ActionButtonFactory.NEUTRAL_STYLE_CLASS);
+			ControlStyles.apply(caseTasksShowCompletedButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 			caseTasksShowCompletedButton.setOnAction(e ->
 			{
 				showCompletedCaseTasks = !showCompletedCaseTasks;

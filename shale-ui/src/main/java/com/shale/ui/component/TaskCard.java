@@ -14,6 +14,7 @@ import com.shale.ui.component.factory.TaskCardFactory.AssignedUserModel;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.DueProximityStyles;
 import com.shale.ui.util.ColorUtil;
+import com.shale.ui.util.ControlStyles;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 
 import javafx.geometry.Insets;
@@ -394,11 +395,12 @@ public final class TaskCard extends VBox {
 		dueAccentBar.setMaxWidth(7);
 		HBox.setMargin(dueAccentBar, new Insets(8, 0, 8, 8));
 		bodyPane.setPadding(new Insets(8, 10, 8, 10));
-		toggleCompleteButton.getStyleClass().addAll(
-				"app-toolbar-button",
-				"app-toolbar-button-success",
-				"app-taskcard-action-button");
-		expandDetailsButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-neutral");
+		ControlStyles.apply(toggleCompleteButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		toggleCompleteButton.getStyleClass().add("app-taskcard-action-button");
+		ControlStyles.apply(expandDetailsButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+		ControlStyles.iconOnly(expandDetailsButton);
+		expandDetailsButton.setTooltip(new Tooltip("Expand task card details"));
+		expandDetailsButton.setAccessibleText("Expand task card details");
 		expandDetailsButton.setFocusTraversable(false);
 		expandDetailsButton.setMinSize(20, 20);
 		expandDetailsButton.setPrefSize(20, 20);
@@ -474,6 +476,9 @@ public final class TaskCard extends VBox {
 			fullExpandedContent.setManaged(expanded);
 			fullExpandedContent.setVisible(expanded);
 			expandDetailsButton.setText(expanded ? "−" : "+");
+			String accessibleAction = expanded ? "Collapse task card details" : "Expand task card details";
+			expandDetailsButton.setAccessibleText(accessibleAction);
+			expandDetailsButton.getTooltip().setText(accessibleAction);
 		}
 	}
 
