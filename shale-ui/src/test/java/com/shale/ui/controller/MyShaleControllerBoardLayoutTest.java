@@ -15,6 +15,32 @@ import org.junit.jupiter.api.Test;
 final class MyShaleControllerBoardLayoutTest {
 
     @Test
+    void singleTaskLaneUsesViewportWithoutExceedingReadableMaximum() {
+        assertEquals(260.0, MyShaleController.responsiveSingleTaskLaneWidth(0), 0.01);
+        assertEquals(225.0, MyShaleController.responsiveSingleTaskLaneWidth(180), 0.01);
+        assertEquals(560.0, MyShaleController.responsiveSingleTaskLaneWidth(560), 0.01);
+        assertEquals(720.0, MyShaleController.responsiveSingleTaskLaneWidth(1400), 0.01);
+    }
+
+    @Test
+    void taskLaneResponsivenessOnlyAppliesToOneExpandedBoardLane() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+
+        assertTrue(source.contains("orderedLanes.size() == 1 && !isCollapsedLane"),
+                "Collapsed and multi-lane boards must retain their established compact widths.");
+        assertTrue(source.contains("myTasksScroll.viewportBoundsProperty()"),
+                "The sole expanded lane must update when its viewport is resized.");
+        assertTrue(source.contains("TASKS_SINGLE_LANE_MAX_WIDTH = 720"));
+        assertTrue(source.contains("new LaneBoardLayout.LaneWidth(")
+                        && source.contains("TASKS_CASE_COLUMN_MIN_WIDTH")
+                        && source.contains("TASKS_CASE_COLUMN_PREF_WIDTH")
+                        && source.contains("TASKS_CASE_COLUMN_MAX_WIDTH"),
+                "All lanes should still originate with the established multi-lane width constraints.");
+        assertTrue(source.contains("renderMyTasksGrid") && source.contains("setMyTasksViewMode"),
+                "Board/Grid switching should continue rebuilding through the existing render path.");
+    }
+
+    @Test
     void caseRadarReplacesPlaceholderAndKeepsUrgentRowsFirst() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 

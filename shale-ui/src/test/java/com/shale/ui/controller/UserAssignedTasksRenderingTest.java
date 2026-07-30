@@ -59,4 +59,17 @@ final class UserAssignedTasksRenderingTest {
                         && fxml.contains("minWidth=\"190\""),
                 "Assigned task toolbar should wrap and keep the search field wide enough to show its prompt.");
     }
+
+    @Test
+    void assignedTaskControlsUseSemanticActionsAndSharedFormShell() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/UserController.java"));
+        String fxml = Files.readString(Path.of("src/main/resources/fxml/user.fxml"));
+
+        assertTrue(source.contains("ControlStyles.formControl(assignedTasksSearchField)"));
+        assertTrue(source.contains("ControlStyles.formControl(assignedTasksSortChoice)"));
+        assertTrue(source.contains("ControlStyles.apply(assignedTasksCompletedToggleButton, ControlStyles.Purpose.SECONDARY)"));
+        assertFalse(source.contains("ControlStyles.apply(assignedTasksCompletedToggleButton, ControlStyles.Purpose.DANGER)"));
+        assertTrue(fxml.contains("fx:id=\"assignedTasksSearchField\"") && fxml.contains("shale-form-control"),
+                "Assigned-task filters should retain semantic styling when loaded directly from FXML.");
+    }
 }
