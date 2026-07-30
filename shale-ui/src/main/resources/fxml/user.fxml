@@ -164,11 +164,12 @@
                                 <Region HBox.hgrow="ALWAYS" />
                             </HBox>
                             <FlowPane hgap="8" vgap="8" prefWrapLength="356" alignment="CENTER_LEFT">
-                                <TextField fx:id="assignedTasksSearchField" promptText="Search assigned tasks" prefWidth="220" minWidth="190" />
+                                <TextField fx:id="assignedTasksSearchField" promptText="Search assigned tasks" prefWidth="220" minWidth="190" styleClass="text-field shale-form-control" />
                                 <ChoiceBox fx:id="assignedTasksSortChoice" prefWidth="180" minWidth="140" maxWidth="180">
                                     <styleClass>
                                         <String fx:value="choice-box" />
                                         <String fx:value="app-toolbar-select" />
+                                        <String fx:value="shale-form-control" />
                                     </styleClass>
                                 </ChoiceBox>
                                 <Button fx:id="assignedTasksCompletedToggleButton" text="Show Completed" minWidth="118" maxWidth="138">
@@ -177,6 +178,9 @@
                                         <String fx:value="app-toolbar-button" />
                                         <String fx:value="app-toolbar-button-neutral" />
                                         <String fx:value="app-toolbar-button-compact" />
+                                        <String fx:value="shale-control-button" />
+                                        <String fx:value="shale-control-secondary" />
+                                        <String fx:value="shale-control-standard" />
                                     </styleClass>
                                 </Button>
                             </FlowPane>
