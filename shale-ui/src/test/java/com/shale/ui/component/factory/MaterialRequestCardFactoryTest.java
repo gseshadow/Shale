@@ -144,7 +144,7 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("if (e.getButton() == MouseButton.PRIMARY)"));
         assertTrue(source.contains("onOpenEntity.accept(entityId);"));
         assertTrue(source.contains("e.consume();"));
-        assertTrue(source.contains("if (e.getButton() == MouseButton.PRIMARY) onOpenRequest.accept(request.id())"));
+        assertTrue(source.contains("Runnable activate = () -> Platform.runLater(() -> onOpenRequest.accept(request.id()))"));
     }
 
 
