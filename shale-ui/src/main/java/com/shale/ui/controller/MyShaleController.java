@@ -46,6 +46,7 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.AppSectionTabs;
+import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.PerfLog;
 
 import org.slf4j.Logger;
@@ -390,6 +391,7 @@ public final class MyShaleController {
 		setupSections();
 		configureSectionSizing();
 		PerfLog.logDone("STARTUP", "page=my_shale phase=layout_placeholders_visible", layoutStart);
+		applyMyTasksSemanticControls();
 
 		if (myCasesSortChoice != null) {
 			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE, SORT_UPDATED_OLDEST, SORT_UPDATED_NEWEST);
@@ -543,6 +545,20 @@ public final class MyShaleController {
 		}
 
 		subscribeLiveCaseUpdates();
+	}
+
+	private void applyMyTasksSemanticControls() {
+		if (myTasksSortChoice != null) ControlStyles.formControl(myTasksSortChoice);
+		if (myTasksSourceChoice != null) ControlStyles.formControl(myTasksSourceChoice);
+		if (myTasksCaseFilterChoice != null) ControlStyles.formControl(myTasksCaseFilterChoice);
+		if (myTasksPriorityFilterChoice != null) ControlStyles.formControl(myTasksPriorityFilterChoice);
+		if (myTasksStatusFilterChoice != null) ControlStyles.formControl(myTasksStatusFilterChoice);
+		if (myTasksColumnOrderChoice != null) ControlStyles.formControl(myTasksColumnOrderChoice);
+		if (myTasksSearchField != null) ControlStyles.formControl(myTasksSearchField);
+		if (myTasksShowCompletedButton != null) ControlStyles.apply(myTasksShowCompletedButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		if (myTasksClearAllFiltersButton != null) ControlStyles.apply(myTasksClearAllFiltersButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+		if (myTasksBoardViewButton != null) ControlStyles.apply(myTasksBoardViewButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+		if (myTasksGridViewButton != null) ControlStyles.apply(myTasksGridViewButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 	}
 
 	private void configureSectionSizing() {
@@ -3329,6 +3345,8 @@ public final class MyShaleController {
 		headerTopRow.getChildren().add(spacer);
 		if (key != null && key.caseId() != null && key.caseId() > 0) {
 			Button collapseButton = new Button(laneCollapsed ? "▸" : "▾");
+			ControlStyles.apply(collapseButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+			ControlStyles.iconOnly(collapseButton);
 			collapseButton.setFocusTraversable(false);
 			collapseButton.getStyleClass().add("lane-collapse-button");
 			collapseButton.setTooltip(new Tooltip(laneCollapsed ? "Expand lane" : "Collapse lane"));
@@ -3341,6 +3359,8 @@ public final class MyShaleController {
 
 			boolean pinned = isPinnedLane(key);
 			Button pinButton = new Button("📌");
+			ControlStyles.apply(pinButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+			ControlStyles.iconOnly(pinButton);
 			pinButton.setFocusTraversable(false);
 			pinButton.getStyleClass().addAll(
 					"lane-pin-button",
