@@ -640,6 +640,7 @@ public final class CaseDao {
 
 	private long insertCase(Connection con, NewIntakeCreateRequest request, Timestamp now) throws SQLException {
 		validatePracticeAreaForTenant(con, request.shaleClientId(), request.practiceAreaId());
+		validateIntakeUserForTenant(con, request.shaleClientId(), request.createdByUserId());
 		String sql = """
 				INSERT INTO dbo.Cases (
 				  Name,
@@ -668,10 +669,11 @@ public final class CaseDao {
 				  IsDeleted,
 				  CreatedAt,
 				  UpdatedAt,
-				  ShaleClientId
+				  ShaleClientId,
+				  IntakeTakenByUserId
 				)
 				OUTPUT INSERTED.Id
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?);
+				  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?, ?);
 				""";
 
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -691,6 +693,11 @@ public final class CaseDao {
 			ps.setTimestamp(i++, now);
 			ps.setTimestamp(i++, now);
 			ps.setInt(i++, request.shaleClientId());
+			if (request.createdByUserId() == null) {
+				ps.setNull(i++, java.sql.Types.INTEGER);
+			} else {
+				ps.setInt(i++, request.createdByUserId());
+			}
 
 			try (ResultSet rs = ps.executeQuery()) {
 				if (!rs.next())
@@ -698,6 +705,21 @@ public final class CaseDao {
 				return rs.getLong(1);
 			}
 		}
+	}
+
+	private void validateIntakeUserForTenant(Connection con, int shaleClientId, Integer userId) throws SQLException {
+		if (userId == null) {
+			return;
+		}
+		try (PreparedStatement ps = con.prepareStatement(
+				"SELECT 1 FROM dbo.Users WHERE Id = ? AND ShaleClientId = ?")) {
+			ps.setInt(1, userId);
+			ps.setInt(2, shaleClientId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (rs.next()) return;
+			}
+		}
+		throw new IllegalArgumentException("Intake user is invalid for this tenant.");
 	}
 
 	private void validatePracticeAreaForTenant(Connection con, int shaleClientId, int practiceAreaId) throws SQLException {
@@ -2553,7 +2575,9 @@ public final class CaseDao {
 				    CASE WHEN COALESCE(ra_user.name_first, '') = '' OR COALESCE(ra_user.name_last, '') = '' THEN '' ELSE ' ' END +
 				    COALESCE(ra_user.name_last, '')
 				  )) AS ResponsibleAttorneyName,
-				  responsible_attorney.UserId AS ResponsibleAttorneyId
+				  responsible_attorney.UserId AS ResponsibleAttorneyId,
+				  c.IntakeTakenByUserId,
+				  LTRIM(RTRIM(CONCAT(intake_user.name_first, ' ', intake_user.name_last))) AS IntakeTakenByDisplayName
 				FROM %s c
 				OUTER APPLY (
 				    SELECT TOP (1) s.Name AS CurrentStatusName
@@ -2580,9 +2604,12 @@ public final class CaseDao {
 				  ON ra_user.id = responsible_attorney.UserId
 				 AND ra_user.ShaleClientId = c.ShaleClientId
 				 AND COALESCE(ra_user.is_deleted, 0) = 0
+				LEFT JOIN %s intake_user
+				  ON intake_user.id = c.IntakeTakenByUserId
+				 AND intake_user.ShaleClientId = c.ShaleClientId
 				WHERE c.Id = ?
 				  AND %s;
-				""".formatted(schema.rowVersionSelectExpression("c"), CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"));
+				""".formatted(schema.rowVersionSelectExpression("c"), CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"));
 
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
@@ -2640,7 +2667,9 @@ public final class CaseDao {
 				toLocalDateTime(rs.getTimestamp("UpdatedAt")),
 				rs.getBytes("RowVer"),
 				relatedContacts,
-				statusHistory
+				statusHistory,
+				getNullableInt(rs, "IntakeTakenByUserId"),
+				rs.getString("IntakeTakenByDisplayName")
 		);
 	}
 

@@ -46,6 +46,31 @@ final class CaseDaoCaseDetailQueryTest {
     }
 
     @Test
+    void caseDetailHydratesIntakeUserInTenantSafeJoinWithoutExcludingHistoricalUsers() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String method = method(source, "private com.shale.core.dto.CaseDetailDto selectCaseDetail", "private static com.shale.core.dto.CaseDetailDto mapCaseDetail");
+        String mapper = method(source, "private static com.shale.core.dto.CaseDetailDto mapCaseDetail", "public com.shale.core.dto.CaseDetailDto updateCase");
+
+        assertTrue(method.contains("intake_user.id = c.IntakeTakenByUserId"));
+        assertTrue(method.contains("intake_user.ShaleClientId = c.ShaleClientId"));
+        assertTrue(method.contains("CONCAT(intake_user.name_first, ' ', intake_user.name_last)"));
+        assertTrue(!method.contains("intake_user.is_deleted"));
+        assertTrue(mapper.contains("getNullableInt(rs, \"IntakeTakenByUserId\")"));
+        assertTrue(mapper.contains("rs.getString(\"IntakeTakenByDisplayName\")"));
+    }
+
+    @Test
+    void intakeCreationCapturesActorOnceAndValidatesItsTenant() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String insert = method(source, "private long insertCase", "private void validateIntakeUserForTenant");
+        String validation = method(source, "private void validateIntakeUserForTenant", "private void validatePracticeAreaForTenant");
+
+        assertTrue(insert.contains("validateIntakeUserForTenant(con, request.shaleClientId(), request.createdByUserId())"));
+        assertTrue(insert.contains("IntakeTakenByUserId"));
+        assertTrue(validation.contains("Id = ? AND ShaleClientId = ?"));
+    }
+
+    @Test
     void caseDetailSelectAliasesMissingRowVersionToPreserveMapperAndJsonShape() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
         String schema = method(source, "private record CaseSchema", "public record NewIntakeCreateRequest");

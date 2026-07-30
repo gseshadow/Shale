@@ -193,6 +193,8 @@ public class CaseController {
 	@FXML
 	private Label caseMetadataLabel;
 	@FXML
+	private Label intakeTakenByLabel;
+	@FXML
 	private Label statusLabel;
 	@FXML
 	private StackPane statusHost;
@@ -1409,6 +1411,7 @@ public class CaseController {
 
 		caseTitleLabel.setText("Case #" + caseId + " (Placeholder)");
 		refreshCaseMetadata(null);
+		refreshIntakeTakenBy(null);
 		renderPrimaryStatusMini(null, "—", null);
 		renderResponsibleAttorneyMini(null, "—", null);
 		renderPracticeAreaMini(null, "—", null);
@@ -1424,6 +1427,12 @@ public class CaseController {
 		String safeNumber = safeText(caseNumberRaw).trim();
 		String idText = caseId == null ? "Case #—" : "Case #" + caseId;
 		caseMetadataLabel.setText(safeNumber.isBlank() ? idText : idText + " • " + safeNumber);
+	}
+
+	private void refreshIntakeTakenBy(String displayName) {
+		if (intakeTakenByLabel == null) return;
+		String name = safeText(displayName).trim();
+		intakeTakenByLabel.setText("Intake by: " + (name.isBlank() ? "—" : name));
 	}
 
 	private void refreshOverviewPlaceholders() {
@@ -7073,6 +7082,7 @@ public class CaseController {
 			else if (caseId != null)
 				caseTitleLabel.setText("Case #" + caseId);
 			refreshCaseMetadata(num);
+			refreshIntakeTakenBy(detail.getIntakeTakenByDisplayName());
 		}
 
 		private void renderLastUpdated(LocalDateTime updatedAt) {

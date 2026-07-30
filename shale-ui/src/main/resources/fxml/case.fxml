@@ -17,25 +17,28 @@
 				<Insets top="8" right="12" bottom="6" left="12" />
 			</padding>
 
-			<!-- Main header row: case title + status -->
+			<!-- Main header row: case title -->
 			<HBox spacing="8.0" alignment="CENTER_LEFT">
 				<Label fx:id="caseTitleLabel" text="Case (Placeholder)"
 					style="-fx-font-size: 18px; -fx-font-weight: bold;" />
-				<StackPane fx:id="statusHost" />
-
 				<Region HBox.hgrow="ALWAYS" />
 			</HBox>
 
 			<!-- Secondary row: compact metadata -->
-			<HBox spacing="8.0" alignment="CENTER_LEFT">
+			<FlowPane hgap="8.0" vgap="4.0" alignment="CENTER_LEFT" prefWrapLength="620">
 				<Label fx:id="caseMetadataLabel" text="Case #—"
 					style="-fx-opacity: 0.8;" />
+				<Label text="•" style="-fx-opacity: 0.55;" />
+				<Label fx:id="intakeTakenByLabel" text="Intake by: —"
+					style="-fx-opacity: 0.8;" />
+				<Label text="•" style="-fx-opacity: 0.55;" />
+				<StackPane fx:id="statusHost" />
 				<Label text="•" style="-fx-opacity: 0.55;" />
 				<StackPane fx:id="assignedUserHost" />
 				<Label text="•" style="-fx-opacity: 0.55;" />
 				<Label fx:id="lastUpdatedLabel" text="Last updated: —"
 					style="-fx-opacity: 0.7;" />
-			</HBox>
+			</FlowPane>
 
 			<StackPane fx:id="statusTimelineHost" maxWidth="1.7976931348623157E308" minHeight="48" />
 		</VBox>
