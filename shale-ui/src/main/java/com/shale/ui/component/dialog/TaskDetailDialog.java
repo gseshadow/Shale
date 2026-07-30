@@ -25,6 +25,7 @@ import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.util.UtcDateTimeDisplayFormatter;
+import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.WindowSizingUtil;
 
@@ -99,17 +100,22 @@ public final class TaskDetailDialog {
         createdByLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.75);");
 
         TextField titleField = new TextField(safe(model.title()));
+        ControlStyles.formControl(titleField);
         TextArea descriptionArea = new TextArea(safe(model.description()));
+        ControlStyles.formControl(descriptionArea);
         descriptionArea.setPrefRowCount(4);
         descriptionArea.setWrapText(true);
 
         DatePicker dueDatePicker = new DatePicker(model.dueAt() == null ? null : model.dueAt().toLocalDate());
+        ControlStyles.formControl(dueDatePicker);
         TextField dueTimeField = new TextField(displayDueTime(model.dueAt()));
+        ControlStyles.formControl(dueTimeField);
         dueTimeField.setPromptText("HH:mm (optional)");
         dueTimeField.setPrefColumnCount(8);
         HBox dueRow = new HBox(8, dueDatePicker, dueTimeField);
 
         ComboBox<TaskStatusOptionDto> statusCombo = new ComboBox<>();
+        ControlStyles.formControl(statusCombo);
         statusCombo.setMaxWidth(Double.MAX_VALUE);
         statusCombo.getStyleClass().add("app-toolbar-select");
         List<TaskStatusOptionDto> safeStatuses = statuses == null ? List.of() : statuses;
@@ -134,6 +140,7 @@ public final class TaskDetailDialog {
         });
 
         ComboBox<TaskPriorityOptionDto> priorityCombo = new ComboBox<>();
+        ControlStyles.formControl(priorityCombo);
         priorityCombo.setMaxWidth(Double.MAX_VALUE);
         priorityCombo.getStyleClass().add("app-toolbar-select");
         List<TaskPriorityOptionDto> safePriorities = priorities == null ? List.of() : priorities;
@@ -182,7 +189,7 @@ public final class TaskDetailDialog {
         Label assignedTeamLabel = new Label("Assigned");
         assignedTeamLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
         Button addAssignedUserButton = new Button("Add Assignee");
-        addAssignedUserButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(addAssignedUserButton, ControlStyles.Purpose.SECONDARY);
         addAssignedUserButton.setFocusTraversable(false);
         Region assignedHeaderSpacer = new Region();
         HBox.setHgrow(assignedHeaderSpacer, Priority.ALWAYS);
@@ -261,11 +268,12 @@ public final class TaskDetailDialog {
         Label historyLabel = new Label("History");
         historyLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
         TextArea noteComposer = new TextArea();
+        ControlStyles.formControl(noteComposer);
         noteComposer.setPromptText("Add note...");
         noteComposer.setPrefRowCount(3);
         noteComposer.setWrapText(true);
         Button addNoteButton = new Button("Add Note");
-        addNoteButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(addNoteButton, ControlStyles.Purpose.PRIMARY);
         Label uncommittedNoteWarningLabel = new Label("You have an unadded note. Click Add Note or clear the text to continue.");
         uncommittedNoteWarningLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #b42318;");
         uncommittedNoteWarningLabel.setWrapText(true);
@@ -308,6 +316,7 @@ public final class TaskDetailDialog {
             }
             String body = safe(noteComposer.getText()).trim();
             if (body.isBlank()) {
+                ControlStyles.setInvalid(noteComposer, true);
                 showError(notesErrorLabel, "Note text is required.");
                 return;
             }
@@ -326,10 +335,15 @@ public final class TaskDetailDialog {
                                 busyMutationState,
                                 busyMutationUi);
                         noteComposer.clear();
+                        ControlStyles.setInvalid(noteComposer, false);
                         notesErrorLabel.setManaged(false);
                         notesErrorLabel.setVisible(false);
                     },
                     ex -> showError(notesErrorLabel, "Failed to add note. " + rootCauseMessage(ex)));
+        });
+        noteComposer.textProperty().addListener((obs, oldText, newText) -> {
+            if (!noteComposer.getPseudoClassStates().contains(javafx.css.PseudoClass.getPseudoClass("invalid"))) return;
+            ControlStyles.setInvalid(noteComposer, safe(newText).trim().isBlank());
         });
         historyPanel.getChildren().setAll(
                 historyLabel,
@@ -365,7 +379,7 @@ public final class TaskDetailDialog {
         VBox.setVgrow(contentScrollPane, Priority.ALWAYS);
 
         Button deleteButton = new Button("Delete");
-        deleteButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(deleteButton, ControlStyles.Purpose.DANGER);
         deleteButton.setOnAction(e -> {
             boolean confirmed = AppDialogs.showConfirmation(
                     stage,
@@ -382,7 +396,7 @@ public final class TaskDetailDialog {
         });
 
         Button cancelButton = new Button("Cancel");
-        cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> {
             if (hasUncommittedNoteText(noteComposer)) {
@@ -401,7 +415,7 @@ public final class TaskDetailDialog {
         });
 
         Button completionToggleButton = new Button(completionToggleLabel(completedState[0]));
-        completionToggleButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(completionToggleButton, ControlStyles.Purpose.SECONDARY);
         completionToggleButton.setMinWidth(132);
         completionToggleButton.setOnAction(e -> {
             if (!completedState[0]) {
@@ -423,8 +437,21 @@ public final class TaskDetailDialog {
         });
 
         Button saveButton = new Button("Save");
-        saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+        ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
         saveButton.setDefaultButton(true);
+        final boolean[] validationVisible = new boolean[] { false };
+        Runnable updateInvalid = () -> {
+            if (!validationVisible[0]) return;
+            ControlStyles.setInvalid(titleField, safe(titleField.getText()).trim().isBlank());
+            ControlStyles.setInvalid(dueTimeField, !isValidDueTime(dueDatePicker.getValue(), dueTimeField.getText()));
+            ControlStyles.setInvalid(priorityCombo, priorityCombo.getValue() == null);
+            ControlStyles.setInvalid(statusCombo, statusCombo.getValue() == null);
+        };
+        titleField.textProperty().addListener((obs, oldValue, newValue) -> updateInvalid.run());
+        dueTimeField.textProperty().addListener((obs, oldValue, newValue) -> updateInvalid.run());
+        dueDatePicker.valueProperty().addListener((obs, oldValue, newValue) -> updateInvalid.run());
+        priorityCombo.valueProperty().addListener((obs, oldValue, newValue) -> updateInvalid.run());
+        statusCombo.valueProperty().addListener((obs, oldValue, newValue) -> updateInvalid.run());
         final boolean[] saveBlockedByCoreState = new boolean[] { safeStatuses.isEmpty() || safePriorities.isEmpty() };
         updateSaveCancelAvailability(
                 saveButton,
@@ -439,6 +466,8 @@ public final class TaskDetailDialog {
                 uncommittedNoteWarningLabel,
                 saveBlockedByCoreState[0]));
         saveButton.setOnAction(e -> {
+            validationVisible[0] = true;
+            updateInvalid.run();
             if (hasUncommittedNoteText(noteComposer)) {
                 boolean discardUncommitted = AppDialogs.showConfirmation(
                         stage,
@@ -875,6 +904,15 @@ public final class TaskDetailDialog {
         return LocalDateTime.of(dueDate, LocalTime.parse(trimmedTime));
     }
 
+    private static boolean isValidDueTime(LocalDate dueDate, String dueTimeRaw) {
+        try {
+            parseDueAt(dueDate, dueTimeRaw);
+            return true;
+        } catch (DateTimeParseException ex) {
+            return false;
+        }
+    }
+
     private static String displayDueTime(LocalDateTime dueAt) {
         if (dueAt == null) return "";
         LocalTime time = dueAt.toLocalTime();
@@ -998,7 +1036,7 @@ public final class TaskDetailDialog {
                     new UserCardModel(member.userId(), safe(member.displayName()), member.colorCss(), null),
                     UserCardFactory.Variant.MINI);
             Button removeButton = new Button("Remove");
-            removeButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            ControlStyles.apply(removeButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
             removeButton.setFocusTraversable(false);
             removeButton.setOnAction(e -> onRemove.accept(member.userId()));
             HBox row = new HBox(8, card, removeButton);
@@ -1107,16 +1145,16 @@ public final class TaskDetailDialog {
         VBox cardContent = new VBox(6, authorLabel, bodyLabel);
         if (entry.editable()) {
             Button editButton = new Button("Edit");
-            editButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
-            editButton.getStyleClass().add("app-dialog-button-compact");
+            ControlStyles.apply(editButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
             editButton.setOnAction(e -> {
                 TextArea editArea = new TextArea(safe(entry.body()));
+                ControlStyles.formControl(editArea);
                 editArea.setWrapText(true);
                 editArea.setPrefRowCount(3);
                 Button saveButton = new Button("Save");
-                saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+                ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.SMALL);
                 Button cancelButton = new Button("Cancel");
-                cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+                ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
                 HBox actions = new HBox(6, saveButton, cancelButton);
                 VBox editContent = new VBox(6, authorLabel, editArea, actions);
                 VBox card = (VBox) ((Button) e.getSource()).getParent().getParent();
@@ -1127,6 +1165,7 @@ public final class TaskDetailDialog {
                     }
                     String updatedText = safe(editArea.getText()).trim();
                     if (updatedText.isBlank()) {
+                        ControlStyles.setInvalid(editArea, true);
                         showError(notesErrorLabel, "Note text is required.");
                         return;
                     }
@@ -1148,6 +1187,8 @@ public final class TaskDetailDialog {
                             },
                             ex -> showError(notesErrorLabel, "Failed to update note. " + rootCauseMessage(ex)));
                 });
+                editArea.textProperty().addListener((obs, oldText, newText) ->
+                        ControlStyles.setInvalid(editArea, safe(newText).trim().isBlank()));
                 cancelButton.setOnAction(cancelEvent -> rerender.run());
             });
             HBox actionRow = new HBox(6, editButton);

@@ -2496,7 +2496,8 @@
     -fx-text-overrun: ellipsis;
 }
 
-.task-detail-dialog-action-bar {
+.task-detail-dialog-action-bar,
+.new-task-dialog-action-bar {
     -fx-background-radius: 0 0 16 16;
     -fx-border-radius: 0 0 16 16;
 }

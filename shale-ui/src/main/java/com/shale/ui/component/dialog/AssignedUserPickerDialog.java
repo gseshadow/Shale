@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import com.shale.ui.component.UserSelector;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.util.ControlStyles;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -46,6 +47,7 @@ public final class AssignedUserPickerDialog {
         selector.setPromptText("Search users...");
         selector.setEmptyText("No additional users available");
         selector.setCandidates(candidates == null ? List.of() : candidates);
+        selector.useSemanticFormControl();
         ResultHolderAssignable holder = new ResultHolderAssignable();
         selector.selectedUserProperty().addListener((obs, oldValue, selectedUser) -> {
             if (selectedUser != null) {
@@ -55,7 +57,8 @@ public final class AssignedUserPickerDialog {
         });
 
         Button closeButton = new Button("Close");
-        closeButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(closeButton, ControlStyles.Purpose.SECONDARY);
+        closeButton.setCancelButton(true);
         closeButton.setOnAction(e -> stage.close());
         Region closeSpacer = new Region();
         HBox.setHgrow(closeSpacer, Priority.ALWAYS);
