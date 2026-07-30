@@ -71,7 +71,9 @@
 }
 
 /* Unified controls are deliberately opt-in; legacy .button rules remain untouched. */
-.button.shale-control-button {
+.button.shale-control-button,
+.toggle-button.shale-control-button,
+.menu-button.shale-control-button {
     -fx-min-height: -shale-control-height-standard;
     -fx-pref-height: -shale-control-height-standard;
     /* JavaFX compound Size converters reject scalar looked-up values; keep these literals aligned with the tokens above. */
@@ -83,25 +85,36 @@
     -fx-font-weight: 700;
     -fx-cursor: hand;
 }
-.button.shale-control-button.shale-control-small { -fx-min-height: -shale-control-height-small; -fx-pref-height: -shale-control-height-small; }
-.button.shale-control-button.shale-control-standard { -fx-min-height: -shale-control-height-standard; -fx-pref-height: -shale-control-height-standard; }
+.button.shale-control-button.shale-control-small,
+.toggle-button.shale-control-button.shale-control-small,
+.menu-button.shale-control-button.shale-control-small { -fx-min-height: -shale-control-height-small; -fx-pref-height: -shale-control-height-small; }
+.button.shale-control-button.shale-control-standard,
+.toggle-button.shale-control-button.shale-control-standard,
+.menu-button.shale-control-button.shale-control-standard { -fx-min-height: -shale-control-height-standard; -fx-pref-height: -shale-control-height-standard; }
 .button.shale-control-button.shale-control-icon-only {
     -fx-min-width: -shale-control-height-small; -fx-pref-width: -shale-control-height-small; -fx-max-width: -shale-control-height-small;
     -fx-padding: 0px; -fx-alignment: center;
 }
-.button.shale-control-button:focused {
+.button.shale-control-button:focused,
+.toggle-button.shale-control-button:focused,
+.menu-button.shale-control-button:focused {
     -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 10, 0.2, 0, 0);
     -fx-border-color: -shale-button-focus-border;
 }
-.button.shale-control-button:disabled { -fx-opacity: -shale-control-disabled-opacity; -fx-cursor: default; }
+.button.shale-control-button:disabled,
+.toggle-button.shale-control-button:disabled,
+.menu-button.shale-control-button:disabled { -fx-opacity: -shale-control-disabled-opacity; -fx-cursor: default; }
 
 .button.shale-control-primary { -fx-background-color: -shale-button-primary-background; -fx-border-color: -shale-button-primary-border; -fx-text-fill: -shale-button-primary-text; }
 .button.shale-control-primary:hover { -fx-background-color: -shale-button-primary-hover-background; -fx-border-color: -shale-button-primary-hover-border; }
 .button.shale-control-primary:pressed { -fx-background-color: -shale-button-primary-pressed-background; -fx-border-color: -shale-button-primary-pressed-border; }
-.button.shale-control-secondary { -fx-background-color: -shale-button-dialog-secondary-background; -fx-border-color: -shale-button-dialog-secondary-border; -fx-text-fill: -shale-button-dialog-secondary-text; }
+.button.shale-control-secondary,
+.toggle-button.shale-control-secondary,
+.menu-button.shale-control-secondary { -fx-background-color: -shale-button-dialog-secondary-background; -fx-border-color: -shale-button-dialog-secondary-border; -fx-text-fill: -shale-button-dialog-secondary-text; }
 .button.shale-control-secondary:hover { -fx-background-color: -shale-button-dialog-secondary-hover-background; -fx-border-color: -shale-control-border-hover; }
 .button.shale-control-secondary:pressed { -fx-background-color: -shale-control-surface-pressed; -fx-border-color: -shale-control-focus-border; }
-.button.shale-control-ghost { -fx-background-color: -shale-button-ghost-background; -fx-border-color: -shale-button-ghost-border; -fx-text-fill: -shale-button-ghost-text; }
+.button.shale-control-ghost,
+.toggle-button.shale-control-ghost { -fx-background-color: -shale-button-ghost-background; -fx-border-color: -shale-button-ghost-border; -fx-text-fill: -shale-button-ghost-text; }
 .button.shale-control-ghost:hover { -fx-background-color: -shale-button-ghost-hover-background; }
 .button.shale-control-ghost:pressed { -fx-background-color: -shale-button-ghost-pressed-background; }
 .button.shale-control-danger { -fx-background-color: -shale-button-destructive-background; -fx-border-color: -shale-button-destructive-border; -fx-text-fill: -shale-button-destructive-text; }

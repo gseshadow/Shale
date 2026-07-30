@@ -393,6 +393,7 @@ public final class MyShaleController {
 		configureSectionSizing();
 		PerfLog.logDone("STARTUP", "page=my_shale phase=layout_placeholders_visible", layoutStart);
 		applyMyTasksSemanticControls();
+		applyRemainingSemanticControls();
 
 		if (myCasesSortChoice != null) {
 			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE, SORT_UPDATED_OLDEST, SORT_UPDATED_NEWEST);
@@ -560,6 +561,17 @@ public final class MyShaleController {
 		if (myTasksClearAllFiltersButton != null) ControlStyles.apply(myTasksClearAllFiltersButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 		if (myTasksBoardViewButton != null) ControlStyles.apply(myTasksBoardViewButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 		if (myTasksGridViewButton != null) ControlStyles.apply(myTasksGridViewButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+	}
+
+	private void applyRemainingSemanticControls() {
+		sectionTabs.values().forEach(button ->
+				ControlStyles.apply(button, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL));
+		if (myCasesBoardSearchField != null) ControlStyles.formControl(myCasesBoardSearchField);
+		if (myCasesBoardStatusFilterChoice != null) ControlStyles.formControl(myCasesBoardStatusFilterChoice);
+		if (myCasesBoardSortChoice != null) ControlStyles.formControl(myCasesBoardSortChoice);
+		if (myCasesClearAllFiltersButton != null) {
+			ControlStyles.apply(myCasesClearAllFiltersButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+		}
 	}
 
 	private void configureSectionSizing() {
@@ -2914,6 +2926,7 @@ public final class MyShaleController {
 		controls.setPadding(new javafx.geometry.Insets(8, 10, 8, 10));
 
 		overviewSearchFieldControl = new TextField(safe(overviewSearchText));
+		ControlStyles.formControl(overviewSearchFieldControl);
 		overviewSearchFieldControl.setPromptText("Search title, case, or creator…");
 		HBox.setHgrow(overviewSearchFieldControl, Priority.ALWAYS);
 		overviewSearchFieldControl.textProperty().addListener((obs, oldV, newV) -> {
@@ -2925,6 +2938,7 @@ public final class MyShaleController {
 		});
 
 		overviewPriorityChoiceControl = new ChoiceBox<>();
+		ControlStyles.formControl(overviewPriorityChoiceControl);
 		overviewPriorityChoiceControl.getStyleClass().add("app-toolbar-select");
 		overviewPriorityChoiceControl.setPrefWidth(190);
 		overviewPriorityChoiceControl.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
@@ -2936,6 +2950,7 @@ public final class MyShaleController {
 		});
 
 		overviewCaseChoiceControl = new ChoiceBox<>();
+		ControlStyles.formControl(overviewCaseChoiceControl);
 		overviewCaseChoiceControl.getStyleClass().add("app-toolbar-select");
 		overviewCaseChoiceControl.setPrefWidth(200);
 		overviewCaseChoiceControl.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
@@ -2957,6 +2972,7 @@ public final class MyShaleController {
 		});
 
 		overviewSortChoiceControl = new ChoiceBox<>();
+		ControlStyles.formControl(overviewSortChoiceControl);
 		overviewSortChoiceControl.getStyleClass().add("app-toolbar-select");
 		overviewSortChoiceControl.setPrefWidth(210);
 		overviewSortChoiceControl.getItems().setAll(

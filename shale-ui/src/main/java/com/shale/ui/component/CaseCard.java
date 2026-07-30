@@ -12,6 +12,8 @@ import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 
 /**
  * CaseCard - reusable VBox "card" for rendering a case summary.
@@ -352,6 +354,7 @@ public class CaseCard extends VBox {
 
 		// Nice UX: looks clickable
 		setCursor(Cursor.HAND);
+		setFocusTraversable(true);
 		applyCompact();
 	}
 
@@ -372,8 +375,16 @@ public class CaseCard extends VBox {
 		});
 		setOnMouseClicked(e ->
 		{
-			if (onOpen != null && caseId != null) {
+			if (e.getButton() == MouseButton.PRIMARY && onOpen != null && caseId != null) {
 				onOpen.accept(caseId);
+				e.consume();
+			}
+		});
+		setOnKeyPressed(e -> {
+			if ((e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE)
+					&& onOpen != null && caseId != null) {
+				onOpen.accept(caseId);
+				e.consume();
 			}
 		});
 	}
