@@ -1070,37 +1070,14 @@ public final class CalendarController {
     private List<NewCalendarEventDialog.CaseOption> caseOptionsForPicker(Integer selectedCaseId) {
         if (Platform.isFxApplicationThread()) throw new IllegalStateException("Calendar case options must load off the JavaFX Application Thread");
         long started = PerfLog.start();
-        int pageLoads = 0;
-        boolean selectedLookup = false;
-        Map<Integer, CaseDao.CaseRow> casesById = new LinkedHashMap<>();
-        if (caseDao != null) {
-            int page = 1;
-            int pageSize = 250;
-            while (true) {
-                CaseDao.PagedResult<CaseDao.CaseRow> result = caseDao.findPage(page, pageSize, CaseDao.CaseSort.INTAKE_NEWEST, false);
-                pageLoads++;
-                if (result == null || result.items() == null || result.items().isEmpty()) break;
-                result.items().forEach(c -> casesById.putIfAbsent(Math.toIntExact(c.id()), c));
-                if (result.items().size() < pageSize) break;
-                page++;
-            }
-            if (selectedCaseId != null && selectedCaseId > 0 && !casesById.containsKey(selectedCaseId)) {
-                selectedLookup = true;
-                var row = caseDao.getCaseRow(selectedCaseId.longValue());
-                if (row != null) casesById.put(selectedCaseId, row);
-            }
-        }
-        List<NewCalendarEventDialog.CaseOption> options = casesById.values().stream()
-                .map(row -> new NewCalendarEventDialog.CaseOption(
-                        Math.toIntExact(row.id()),
-                        safe(row.name()),
-                        row.responsibleAttorneyName(),
-                        row.responsibleAttorneyColor(),
-                        row.nonEngagementLetterSent()))
-                .sorted(Comparator.comparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT)))
+        int tenantId = appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId();
+        List<NewCalendarEventDialog.CaseOption> options = (caseDao == null ? List.<com.shale.core.dto.CaseSelectionOptionDto>of()
+                : caseDao.listCaseSelectionOptions(tenantId)).stream()
+                .map(row -> new NewCalendarEventDialog.CaseOption(Math.toIntExact(row.caseId()), safe(row.displayName()),
+                        row.responsibleAttorneyName(), row.responsibleAttorneyColor(), row.nonEngagementLetterSent()))
                 .toList();
-        PerfLog.logDone("DAO", "calendar case-picker options pages=" + pageLoads
-                + " selectedLookup=" + selectedLookup + " rows=" + options.size(), started);
+        PerfLog.logDone("DAO", "calendar case-picker options rows=" + options.size()
+                + " dbRoundTrips=" + (caseDao == null ? 0 : 1) + " fxThread=false", started);
         return options;
     }
     private List<NewCalendarEventDialog.AssignedUserOption> assignedUserOptionsForPicker(int tenantId, Integer selectedUserId) {
