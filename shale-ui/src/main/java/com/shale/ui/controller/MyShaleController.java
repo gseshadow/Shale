@@ -390,6 +390,7 @@ public final class MyShaleController {
 		long layoutStart = PerfLog.start();
 		PerfLog.log("STARTUP", "start", "page=my_shale phase=layout_initialization");
 		setupSections();
+		applySectionSelectionState(activeSection);
 		configureSectionSizing();
 		PerfLog.logDone("STARTUP", "page=my_shale phase=layout_placeholders_visible", layoutStart);
 		applyMyTasksSemanticControls();
@@ -645,15 +646,10 @@ public final class MyShaleController {
 			return;
 		}
 		long switchStartNanos = PerfLog.start();
-		activeSection = section;
-		Button activeButton = sectionTabs.get(section);
-		AppSectionTabs.setActive(activeButton, sectionTabs.values());
-		boolean showOverview = SECTION_OVERVIEW.equals(section);
-		boolean showTasks = SECTION_TASKS.equals(section);
-		boolean showMyCases = SECTION_MY_CASES.equals(section);
-		setVisibleManaged(overviewSectionPane, showOverview);
-		setVisibleManaged(tasksSectionPane, showTasks);
-		setVisibleManaged(myCasesSectionPane, showMyCases);
+		String selectedSection = applySectionSelectionState(section);
+		boolean showOverview = SECTION_OVERVIEW.equals(selectedSection);
+		boolean showTasks = SECTION_TASKS.equals(selectedSection);
+		boolean showMyCases = SECTION_MY_CASES.equals(selectedSection);
 		if (showOverview) {
 			primeTasksLoadingStateForFirstLoad();
 			if (myTasksLoadedOnce && !myTasksDirty && !loadingMyTasks) {
@@ -677,7 +673,21 @@ public final class MyShaleController {
 			}
 			ensureMyCasesFresh(false);
 		}
-		PerfLog.logDone("RENDER", "panel=my_shale_sections section=" + section, switchStartNanos);
+		PerfLog.logDone("RENDER", "panel=my_shale_sections section=" + selectedSection, switchStartNanos);
+	}
+
+	private String applySectionSelectionState(String requestedSection) {
+		String selectedSection = sectionTabs.containsKey(requestedSection) ? requestedSection : SECTION_OVERVIEW;
+		activeSection = selectedSection;
+		Button activeButton = sectionTabs.get(selectedSection);
+		AppSectionTabs.setActive(activeButton, sectionTabs.values());
+		boolean showOverview = SECTION_OVERVIEW.equals(selectedSection);
+		boolean showTasks = SECTION_TASKS.equals(selectedSection);
+		boolean showMyCases = SECTION_MY_CASES.equals(selectedSection);
+		setVisibleManaged(overviewSectionPane, showOverview);
+		setVisibleManaged(tasksSectionPane, showTasks);
+		setVisibleManaged(myCasesSectionPane, showMyCases);
+		return selectedSection;
 	}
 
 	private void primeTasksLoadingStateForFirstLoad() {
