@@ -18,6 +18,7 @@ import com.shale.ui.services.CalendarService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ColorUtil;
+import com.shale.ui.util.ControlStyles;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -62,7 +63,14 @@ public final class CalendarController {
     private static final CalendarCaseFilterOptions.CaseOption ALL_CASES_OPTION = CalendarCaseFilterOptions.ALL_CASES;
     private static final EventTypeFilterOption ALL_TYPES_OPTION = new EventTypeFilterOption("", "All types");
 
-    @FXML private ChoiceBox<String> viewModeChoice;
+    @FXML private ToggleButton weekViewButton;
+    @FXML private ToggleButton fiveDayViewButton;
+    @FXML private ToggleButton dayViewButton;
+    @FXML private ToggleButton monthViewButton;
+    @FXML private Button todayButton;
+    @FXML private Button prevWeekButton;
+    @FXML private Button nextWeekButton;
+    @FXML private Button newEventButton;
     @FXML private Label weekRangeLabel;
     @FXML private Label calendarLoadingLabel;
     @FXML private Label calendarErrorLabel;
@@ -124,15 +132,58 @@ public final class CalendarController {
     }
 
     @FXML private void initialize() {
-        viewModeChoice.getItems().setAll(VIEW_WEEK, VIEW_FIVE_DAY, VIEW_DAY, VIEW_MONTH);
-        viewModeChoice.setValue(VIEW_WEEK);
+        configureSemanticControls();
+        configureViewModeSelector();
         selectedDate = LocalDate.now();
-        viewModeChoice.valueProperty().addListener((obs, o, n) -> { if (!Objects.equals(o, n)) loadCurrentRange(false); });
         configureFilters();
         configureSourceLayerFilters();
         configureCalendarOverlayControls();
         renderCurrentShell();
         Platform.runLater(() -> loadCurrentRange(false));
+    }
+
+    private void configureSemanticControls() {
+        ControlStyles.apply(todayButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+        ControlStyles.apply(prevWeekButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
+        ControlStyles.iconOnly(prevWeekButton);
+        prevWeekButton.setAccessibleText("Previous calendar period");
+        Tooltip.install(prevWeekButton, new Tooltip("Previous period"));
+        ControlStyles.apply(nextWeekButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
+        ControlStyles.iconOnly(nextWeekButton);
+        nextWeekButton.setAccessibleText("Next calendar period");
+        Tooltip.install(nextWeekButton, new Tooltip("Next period"));
+        ControlStyles.apply(newEventButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+        ControlStyles.apply(selectAllCalendarsButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.apply(clearAllCalendarsButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.apply(resetCalendarsButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.apply(clearFiltersButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.formControl(searchTextField);
+        ControlStyles.formControl(caseFilterCombo);
+        ControlStyles.formControl(eventTypeFilterCombo);
+    }
+
+    private void configureViewModeSelector() {
+        ToggleGroup group = new ToggleGroup();
+        List.of(weekViewButton, fiveDayViewButton, dayViewButton, monthViewButton).forEach(button -> button.setToggleGroup(group));
+        weekViewButton.setUserData(VIEW_WEEK);
+        fiveDayViewButton.setUserData(VIEW_FIVE_DAY);
+        dayViewButton.setUserData(VIEW_DAY);
+        monthViewButton.setUserData(VIEW_MONTH);
+        weekViewButton.setSelected(true);
+        group.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+            if (newToggle == null) {
+                if (oldToggle != null) oldToggle.setSelected(true);
+                return;
+            }
+            if (oldToggle != null && oldToggle != newToggle) loadCurrentRange(false);
+        });
+    }
+
+    private String selectedViewMode() {
+        for (ToggleButton button : List.of(weekViewButton, fiveDayViewButton, dayViewButton, monthViewButton)) {
+            if (button != null && button.isSelected()) return String.valueOf(button.getUserData());
+        }
+        return VIEW_WEEK;
     }
     private void configureFilters() {
         caseFilterCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(CalendarCaseFilterOptions.CaseOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "All cases" : item.displayName()); }});
@@ -443,7 +494,7 @@ public final class CalendarController {
             renderEmptyCalendarState("No calendar layers selected.");
             return;
         }
-        switch (safe(viewModeChoice.getValue())) {
+        switch (selectedViewMode()) {
             case VIEW_DAY -> renderDay(items);
             case VIEW_MONTH -> renderMonth(items);
             case VIEW_FIVE_DAY -> renderWeekLike(items, true);
@@ -561,11 +612,9 @@ public final class CalendarController {
     void openDayView(LocalDate date) {
         if (date == null) return;
         selectedDate = date;
-        boolean alreadyDay = viewModeChoice != null && VIEW_DAY.equals(viewModeChoice.getValue());
-        if (viewModeChoice != null) {
-            viewModeChoice.setValue(VIEW_DAY);
-        }
-        if (alreadyDay || viewModeChoice == null) {
+        boolean alreadyDay = VIEW_DAY.equals(selectedViewMode());
+        if (dayViewButton != null) dayViewButton.setSelected(true);
+        if (alreadyDay || dayViewButton == null) {
             loadCurrentRange(false);
         }
     }
@@ -583,6 +632,7 @@ public final class CalendarController {
 
     private Button createMonthDayButton(LocalDate day) {
         Button dayButton = new Button(String.valueOf(day.getDayOfMonth()));
+        ControlStyles.apply(dayButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
         dayButton.getStyleClass().add("calendar-month-day-link");
         dayButton.setMaxWidth(Region.USE_PREF_SIZE);
         dayButton.setCursor(Cursor.HAND);
@@ -600,6 +650,7 @@ public final class CalendarController {
 
     private Button createMonthMoreButton(LocalDate day, int hiddenCount) {
         Button moreButton = new Button("+" + hiddenCount + " more");
+        ControlStyles.apply(moreButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
         moreButton.getStyleClass().add("calendar-month-more-link");
         moreButton.setMaxWidth(Region.USE_PREF_SIZE);
         moreButton.setCursor(Cursor.HAND);
@@ -625,6 +676,9 @@ public final class CalendarController {
         Label label = new Label("All day");
         label.getStyleClass().add("calendar-all-day-label");
         Button toggle = new Button(allDayCollapsed ? "▾" : "▸");
+        ControlStyles.apply(toggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.iconOnly(toggle);
+        toggle.setAccessibleText(allDayCollapsed ? "Expand all-day events" : "Collapse all-day events");
         toggle.getStyleClass().add("calendar-disclosure-toggle");
         toggle.setOnAction(evt -> {
             allDayCollapsed = !allDayCollapsed;
@@ -1058,10 +1112,10 @@ public final class CalendarController {
     private String deleteEvent(Integer calendarEventId, int tenantId) { try { calendarService.deleteCalendarEvent(calendarEventId, tenantId); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not delete event. Please try again."; } }
     private static LocalDate weekStartFor(LocalDate date) { return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY)); }
     private static LocalDate workWeekStartFor(LocalDate date) { return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)); }
-    private LocalDate currentRangeStart() { return switch (safe(viewModeChoice.getValue())) { case VIEW_FIVE_DAY -> workWeekStartFor(selectedDate); case VIEW_DAY -> selectedDate; case VIEW_MONTH -> selectedDate.withDayOfMonth(1); default -> weekStartFor(selectedDate); }; }
-    private LocalDate currentRangeEndInclusive() { LocalDate start = currentRangeStart(); return switch (safe(viewModeChoice.getValue())) { case VIEW_FIVE_DAY -> start.plusDays(4); case VIEW_DAY -> start; case VIEW_MONTH -> YearMonth.from(selectedDate).atEndOfMonth(); default -> start.plusDays(6); }; }
-    private LocalDate shiftSelectedDate(int direction) { return switch (safe(viewModeChoice.getValue())) { case VIEW_FIVE_DAY -> workWeekStartFor(selectedDate).plusWeeks(direction); case VIEW_DAY -> selectedDate.plusDays(direction); case VIEW_MONTH -> selectedDate.plusMonths(direction); default -> weekStartFor(selectedDate).plusWeeks(direction); }; }
-    private String currentRangeLabel() { return switch (safe(viewModeChoice.getValue())) { case VIEW_MONTH -> MONTH_RANGE_FORMAT.format(selectedDate); case VIEW_DAY -> WEEK_RANGE_FORMAT.format(selectedDate); default -> WEEK_RANGE_FORMAT.format(currentRangeStart()) + " - " + WEEK_RANGE_FORMAT.format(currentRangeEndInclusive()); }; }
+    private LocalDate currentRangeStart() { return switch (selectedViewMode()) { case VIEW_FIVE_DAY -> workWeekStartFor(selectedDate); case VIEW_DAY -> selectedDate; case VIEW_MONTH -> selectedDate.withDayOfMonth(1); default -> weekStartFor(selectedDate); }; }
+    private LocalDate currentRangeEndInclusive() { LocalDate start = currentRangeStart(); return switch (selectedViewMode()) { case VIEW_FIVE_DAY -> start.plusDays(4); case VIEW_DAY -> start; case VIEW_MONTH -> YearMonth.from(selectedDate).atEndOfMonth(); default -> start.plusDays(6); }; }
+    private LocalDate shiftSelectedDate(int direction) { return switch (selectedViewMode()) { case VIEW_FIVE_DAY -> workWeekStartFor(selectedDate).plusWeeks(direction); case VIEW_DAY -> selectedDate.plusDays(direction); case VIEW_MONTH -> selectedDate.plusMonths(direction); default -> weekStartFor(selectedDate).plusWeeks(direction); }; }
+    private String currentRangeLabel() { return switch (selectedViewMode()) { case VIEW_MONTH -> MONTH_RANGE_FORMAT.format(selectedDate); case VIEW_DAY -> WEEK_RANGE_FORMAT.format(selectedDate); default -> WEEK_RANGE_FORMAT.format(currentRangeStart()) + " - " + WEEK_RANGE_FORMAT.format(currentRangeEndInclusive()); }; }
     private static String safe(String value) { return value == null ? "" : value; }
     private static String formatHourLabel(int hour24) { int hour12 = hour24 % 12; if (hour12 == 0) hour12 = 12; return hour12 + (hour24 < 12 ? " AM" : " PM"); }
     private void setLoading(boolean loading) { calendarLoadingLabel.setVisible(loading); calendarLoadingLabel.setManaged(loading); }

@@ -2244,7 +2244,7 @@
 }
 
 .calendar-main-content {
-    -fx-min-width: 720;
+    -fx-min-width: 480;
 }
 
 .calendar-overlay-actions {
@@ -2384,8 +2384,8 @@
     -fx-padding: 5 0 5 0;
 }
 
-.calendar-toolbar-view-select {
-    -fx-pref-width: 92;
+.calendar-toolbar-view-selector {
+    -fx-max-width: Infinity;
 }
 
 .calendar-toolbar-search {

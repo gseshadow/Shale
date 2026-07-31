@@ -16,9 +16,9 @@ final class CalendarMonthDrillDownSourceTest {
                 "CalendarController should expose one shared drill-down path.");
         assertTrue(source.contains("selectedDate = date;"),
                 "The clicked LocalDate must become the selected date.");
-        assertTrue(source.contains("viewModeChoice.setValue(VIEW_DAY)"),
+        assertTrue(source.contains("dayViewButton.setSelected(true)"),
                 "Drill-down should switch through the existing view mode control.");
-        assertTrue(source.contains("if (alreadyDay || viewModeChoice == null)"),
+        assertTrue(source.contains("if (alreadyDay || dayViewButton == null)"),
                 "The shared path should explicitly reload if Day view was already selected.");
         assertTrue(source.contains("configureMonthDayCellDrillDown(cell, day)"),
                 "Month day-cell background clicks should use the shared drill-down path.");

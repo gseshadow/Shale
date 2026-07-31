@@ -61,7 +61,11 @@ class CalendarVisualPolishSourceTest {
         assertTrue(fxml.contains("fx:id=\"prevWeekButton\""));
         assertTrue(fxml.contains("fx:id=\"nextWeekButton\""));
         assertTrue(fxml.contains("fx:id=\"newEventButton\""));
-        assertTrue(fxml.contains("fx:id=\"viewModeChoice\""));
+        assertTrue(fxml.contains("fx:id=\"viewModeSelector\""));
+        assertTrue(fxml.contains("fx:id=\"weekViewButton\""));
+        assertTrue(fxml.contains("fx:id=\"fiveDayViewButton\""));
+        assertTrue(fxml.contains("fx:id=\"dayViewButton\""));
+        assertTrue(fxml.contains("fx:id=\"monthViewButton\""));
         assertTrue(fxml.contains("fx:id=\"searchTextField\""));
         assertTrue(fxml.contains("fx:id=\"caseFilterCombo\""));
         assertTrue(fxml.contains("fx:id=\"eventTypeFilterCombo\""));
@@ -73,7 +77,7 @@ class CalendarVisualPolishSourceTest {
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
         int noCalendars = controller.indexOf("No calendars selected.");
         int noLayers = controller.indexOf("No calendar layers selected.");
-        int switchView = controller.indexOf("switch (safe(viewModeChoice.getValue()))");
+        int switchView = controller.indexOf("switch (selectedViewMode())");
 
         assertTrue(noCalendars >= 0 && noLayers > noCalendars && switchView > noLayers);
         assertTrue(controller.contains("applyFiltersAndRender()"));
