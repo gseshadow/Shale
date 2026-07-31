@@ -23,7 +23,10 @@
 					<Insets top="10" right="12" bottom="12" left="12" />
 				</padding>
 
-				<HBox fx:id="sectionTabsBar" spacing="8" alignment="CENTER_LEFT" />
+				<ScrollPane fitToHeight="true" fitToWidth="false" hbarPolicy="AS_NEEDED"
+					vbarPolicy="NEVER" pannable="true" styleClass="app-section-tabs-scroll">
+					<HBox fx:id="sectionTabsBar" spacing="8" alignment="CENTER_LEFT" />
+				</ScrollPane>
 
 			<StackPane fx:id="sectionContentStack" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308" VBox.vgrow="ALWAYS">
 
