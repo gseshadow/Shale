@@ -31,7 +31,31 @@ final class MyShaleAndCasesSemanticControlMigrationTest {
         assertTrue(casesFxml.contains("selected=\"true\""));
         assertFalse(cases.contains("ControlStyles.Purpose.PRIMARY"), "Filters and view/export controls are not primary actions.");
         assertFalse(cases.contains("ControlStyles.Purpose.DANGER"), "My Cases has no destructive button.");
+
+		String statusFilter = fxmlElement("MenuButton", "statusFilterMenuButton");
+		String intakeDateSort = fxmlElement("ChoiceBox", "casesSortChoice");
+		assertFalse(statusFilter.contains("app-toolbar-button"),
+				"The status filter must not retain the legacy capsule action shell.");
+		assertFalse(intakeDateSort.contains("app-toolbar-select"),
+				"The Intake Date sort selector must not retain the legacy capsule selector shell.");
+		for (String action : java.util.List.of("columnMenuButton", "exportMenuButton")) {
+			assertFalse(fxmlElement("MenuButton", action).contains("app-toolbar-button"),
+					action + " must rely on its semantic action classification without a legacy override.");
+		}
     }
+
+	@Test
+	void casesToolbarKeepsResponsiveAndDataPresentationContracts() throws Exception {
+		assertTrue(casesFxml.contains("<FlowPane hgap=\"10\" vgap=\"8\""));
+		assertTrue(casesFxml.contains("prefWrapLength=\"1040\""));
+		assertTrue(casesFxml.contains("promptText=\"Search cases…\" prefWidth=\"280\""));
+		assertTrue(casesFxml.contains("styleClass=\"shale-segmented-control\""));
+		String indicators = read("src/main/resources/css/foundation/indicators.css");
+		assertTrue(indicators.contains(".shale-indicator-status-pill"));
+		assertTrue(indicators.contains(".shale-status-pill"));
+		assertFalse(fxmlElement("MenuButton", "statusFilterMenuButton").contains("status-pill"),
+				"Status color is data presentation inside content, not action styling on the filter shell.");
+	}
 
     @Test
     void myShaleNonTaskControlsAreExplicitlyMigrated() {
@@ -71,4 +95,12 @@ final class MyShaleAndCasesSemanticControlMigrationTest {
     private static String read(String path) throws Exception {
         return Files.readString(Path.of(path));
     }
+
+	private String fxmlElement(String element, String id) {
+		int start = casesFxml.indexOf("<" + element + " fx:id=\"" + id + "\"");
+		assertTrue(start >= 0, id);
+		int end = casesFxml.indexOf("</" + element + ">", start);
+		assertTrue(end >= 0, id);
+		return casesFxml.substring(start, end);
+	}
 }
