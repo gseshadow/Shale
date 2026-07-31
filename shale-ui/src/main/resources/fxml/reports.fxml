@@ -10,17 +10,22 @@
         <VBox spacing="10" styleClass="strong-panel">
             <padding><Insets top="10" right="10" bottom="10" left="10" /></padding>
             <Label text="Case Status Report" styleClass="page-heading" />
-            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="shale-filter-panel">
-                <Label text="Start date" />
-                <DatePicker fx:id="startDatePicker" styleClass="shale-date-picker" />
-                <Label text="End date" />
-                <DatePicker fx:id="endDatePicker" styleClass="shale-date-picker" />
-                <MenuButton fx:id="statusFilterMenuButton" text="Statuses (0/0)" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
-                <Button fx:id="refreshButton" text="Apply" onAction="#onRefresh" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact" />
-                <Button fx:id="showAllResultsButton" text="Show all results" onAction="#onShowAllResults" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
-                <Button fx:id="exportButton" text="Export" onAction="#onExport" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+            <FlowPane fx:id="reportFilterToolbar" hgap="10" vgap="8" alignment="CENTER_LEFT"
+                      prefWrapLength="1040" styleClass="shale-filter-panel">
+                <HBox spacing="6" alignment="CENTER_LEFT">
+                    <Label text="Start date" />
+                    <DatePicker fx:id="startDatePicker" />
+                </HBox>
+                <HBox spacing="6" alignment="CENTER_LEFT">
+                    <Label text="End date" />
+                    <DatePicker fx:id="endDatePicker" />
+                </HBox>
+                <MenuButton fx:id="statusFilterMenuButton" text="Statuses (0/0)" />
+                <Button fx:id="refreshButton" text="Apply" onAction="#onRefresh" />
+                <Button fx:id="showAllResultsButton" text="Show all results" onAction="#onShowAllResults" />
+                <Button fx:id="exportButton" text="Export" onAction="#onExport" />
                 <Label fx:id="statusLabel" styleClass="search-summary-text" />
-            </HBox>
+            </FlowPane>
             <HBox fx:id="summaryMetricsBox" spacing="10" alignment="CENTER_LEFT">
                 <StatisticCard fx:id="totalCasesCard" HBox.hgrow="ALWAYS" />
                 <StatisticCard fx:id="visibleStatusesCard" HBox.hgrow="ALWAYS" />
