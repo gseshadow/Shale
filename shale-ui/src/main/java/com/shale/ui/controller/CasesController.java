@@ -30,6 +30,7 @@ import com.shale.ui.export.CaseXlsxExporter;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.ControlStyles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -180,6 +181,8 @@ public final class CasesController {
 	private void initialize() {
 		System.out.println("CasesController.initialize()");
 
+		applySemanticControls();
+
 		// sort choices
 		if (casesSortChoice != null) {
 			casesSortChoice.getItems().setAll(
@@ -240,6 +243,16 @@ public final class CasesController {
 		}
 
 		subscribeLiveCaseUpdates();
+	}
+
+	private void applySemanticControls() {
+		if (casesSearchField != null) ControlStyles.formControl(casesSearchField);
+		if (casesSortChoice != null) ControlStyles.formControl(casesSortChoice);
+		if (statusFilterMenuButton != null) ControlStyles.formControl(statusFilterMenuButton);
+		if (cardsViewToggle != null) ControlStyles.apply(cardsViewToggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+		if (gridViewToggle != null) ControlStyles.apply(gridViewToggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+		if (columnMenuButton != null) ControlStyles.apply(columnMenuButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		if (exportMenuButton != null) ControlStyles.apply(exportMenuButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 	}
 
 	private void initializeExportMenu() {

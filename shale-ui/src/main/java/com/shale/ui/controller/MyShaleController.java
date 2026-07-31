@@ -390,9 +390,11 @@ public final class MyShaleController {
 		long layoutStart = PerfLog.start();
 		PerfLog.log("STARTUP", "start", "page=my_shale phase=layout_initialization");
 		setupSections();
+		applySectionSelectionState(activeSection);
 		configureSectionSizing();
 		PerfLog.logDone("STARTUP", "page=my_shale phase=layout_placeholders_visible", layoutStart);
 		applyMyTasksSemanticControls();
+		applyRemainingSemanticControls();
 
 		if (myCasesSortChoice != null) {
 			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE, SORT_UPDATED_OLDEST, SORT_UPDATED_NEWEST);
@@ -562,6 +564,17 @@ public final class MyShaleController {
 		if (myTasksGridViewButton != null) ControlStyles.apply(myTasksGridViewButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 	}
 
+	private void applyRemainingSemanticControls() {
+		sectionTabs.values().forEach(button ->
+				ControlStyles.apply(button, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL));
+		if (myCasesBoardSearchField != null) ControlStyles.formControl(myCasesBoardSearchField);
+		if (myCasesBoardStatusFilterChoice != null) ControlStyles.formControl(myCasesBoardStatusFilterChoice);
+		if (myCasesBoardSortChoice != null) ControlStyles.formControl(myCasesBoardSortChoice);
+		if (myCasesClearAllFiltersButton != null) {
+			ControlStyles.apply(myCasesClearAllFiltersButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+		}
+	}
+
 	private void configureSectionSizing() {
 		if (sectionContentStack != null) {
 			sectionContentStack.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -633,15 +646,10 @@ public final class MyShaleController {
 			return;
 		}
 		long switchStartNanos = PerfLog.start();
-		activeSection = section;
-		Button activeButton = sectionTabs.get(section);
-		AppSectionTabs.setActive(activeButton, sectionTabs.values());
-		boolean showOverview = SECTION_OVERVIEW.equals(section);
-		boolean showTasks = SECTION_TASKS.equals(section);
-		boolean showMyCases = SECTION_MY_CASES.equals(section);
-		setVisibleManaged(overviewSectionPane, showOverview);
-		setVisibleManaged(tasksSectionPane, showTasks);
-		setVisibleManaged(myCasesSectionPane, showMyCases);
+		String selectedSection = applySectionSelectionState(section);
+		boolean showOverview = SECTION_OVERVIEW.equals(selectedSection);
+		boolean showTasks = SECTION_TASKS.equals(selectedSection);
+		boolean showMyCases = SECTION_MY_CASES.equals(selectedSection);
 		if (showOverview) {
 			primeTasksLoadingStateForFirstLoad();
 			if (myTasksLoadedOnce && !myTasksDirty && !loadingMyTasks) {
@@ -665,7 +673,21 @@ public final class MyShaleController {
 			}
 			ensureMyCasesFresh(false);
 		}
-		PerfLog.logDone("RENDER", "panel=my_shale_sections section=" + section, switchStartNanos);
+		PerfLog.logDone("RENDER", "panel=my_shale_sections section=" + selectedSection, switchStartNanos);
+	}
+
+	private String applySectionSelectionState(String requestedSection) {
+		String selectedSection = sectionTabs.containsKey(requestedSection) ? requestedSection : SECTION_OVERVIEW;
+		activeSection = selectedSection;
+		Button activeButton = sectionTabs.get(selectedSection);
+		AppSectionTabs.setActive(activeButton, sectionTabs.values());
+		boolean showOverview = SECTION_OVERVIEW.equals(selectedSection);
+		boolean showTasks = SECTION_TASKS.equals(selectedSection);
+		boolean showMyCases = SECTION_MY_CASES.equals(selectedSection);
+		setVisibleManaged(overviewSectionPane, showOverview);
+		setVisibleManaged(tasksSectionPane, showTasks);
+		setVisibleManaged(myCasesSectionPane, showMyCases);
+		return selectedSection;
 	}
 
 	private void primeTasksLoadingStateForFirstLoad() {
@@ -2914,6 +2936,7 @@ public final class MyShaleController {
 		controls.setPadding(new javafx.geometry.Insets(8, 10, 8, 10));
 
 		overviewSearchFieldControl = new TextField(safe(overviewSearchText));
+		ControlStyles.formControl(overviewSearchFieldControl);
 		overviewSearchFieldControl.setPromptText("Search title, case, or creator…");
 		HBox.setHgrow(overviewSearchFieldControl, Priority.ALWAYS);
 		overviewSearchFieldControl.textProperty().addListener((obs, oldV, newV) -> {
@@ -2925,6 +2948,7 @@ public final class MyShaleController {
 		});
 
 		overviewPriorityChoiceControl = new ChoiceBox<>();
+		ControlStyles.formControl(overviewPriorityChoiceControl);
 		overviewPriorityChoiceControl.getStyleClass().add("app-toolbar-select");
 		overviewPriorityChoiceControl.setPrefWidth(190);
 		overviewPriorityChoiceControl.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
@@ -2936,6 +2960,7 @@ public final class MyShaleController {
 		});
 
 		overviewCaseChoiceControl = new ChoiceBox<>();
+		ControlStyles.formControl(overviewCaseChoiceControl);
 		overviewCaseChoiceControl.getStyleClass().add("app-toolbar-select");
 		overviewCaseChoiceControl.setPrefWidth(200);
 		overviewCaseChoiceControl.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
@@ -2957,6 +2982,7 @@ public final class MyShaleController {
 		});
 
 		overviewSortChoiceControl = new ChoiceBox<>();
+		ControlStyles.formControl(overviewSortChoiceControl);
 		overviewSortChoiceControl.getStyleClass().add("app-toolbar-select");
 		overviewSortChoiceControl.setPrefWidth(210);
 		overviewSortChoiceControl.getItems().setAll(
