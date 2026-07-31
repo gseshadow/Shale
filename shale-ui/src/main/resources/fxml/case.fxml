@@ -807,8 +807,8 @@
 							<CheckBox fx:id="caseCalendarTasksLayerCheckBox" text="Tasks" />
 							<CheckBox fx:id="caseCalendarDeadlinesLayerCheckBox" text="Deadlines" />
 							<CheckBox fx:id="caseCalendarCaseDatesLayerCheckBox" text="Case Dates" />
-							<Button fx:id="caseCalendarNewEventButton" text="New Event" styleClass="app-toolbar-button" />
-							<Button fx:id="caseCalendarNewTaskButton" text="New Task" styleClass="app-toolbar-button" />
+							<Button fx:id="caseCalendarNewEventButton" text="New Event" />
+							<Button fx:id="caseCalendarNewTaskButton" text="New Task" />
 						</HBox>
 						<Label fx:id="caseCalendarStatusLabel" text="Loading calendar…" visible="false" managed="false" style="-fx-opacity: 0.75;" />
 						<ScrollPane fx:id="caseCalendarScrollPane" fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">

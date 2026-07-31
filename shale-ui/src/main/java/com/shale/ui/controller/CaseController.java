@@ -1630,9 +1630,11 @@ public class CaseController {
 			});
 		}
 		if (caseCalendarNewEventButton != null) {
+			ControlStyles.apply(caseCalendarNewEventButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 			caseCalendarNewEventButton.setOnAction(e -> onCaseCalendarNewEvent());
 		}
 		if (caseCalendarNewTaskButton != null) {
+			ControlStyles.apply(caseCalendarNewTaskButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 			caseCalendarNewTaskButton.setOnAction(e -> onAddTask());
 		}
 	}
