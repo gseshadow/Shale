@@ -49,6 +49,7 @@ import com.shale.core.service.CaseServicePort.CaseLinkShareRemoval;
 public final class CaseDao {
 
 	private static final Logger LOG = Logger.getLogger(CaseDao.class.getName());
+	private static final org.slf4j.Logger PERF_LOG = org.slf4j.LoggerFactory.getLogger(CaseDao.class);
 	private static final String CASES_TABLE = "Cases";
 	private static final String CASE_USERS_TABLE = "CaseUsers";
 	private static final String USERS_TABLE = "Users";
@@ -983,8 +984,13 @@ public final class CaseDao {
 		if (shaleClientId <= 0) throw new IllegalArgumentException("shaleClientId must be > 0");
 		long started = System.nanoTime();
 		long connectionStarted = System.nanoTime();
+		long connectionMs = -1;
+		long sqlStarted = -1;
+		long sqlMs = -1;
+		long mappingMs = -1;
+		int dbRoundTrips = 0;
 		try (Connection con = db.requireConnection()) {
-			long connectionMs = (System.nanoTime() - connectionStarted) / 1_000_000;
+			connectionMs = (System.nanoTime() - connectionStarted) / 1_000_000;
 			String sql = """
 					SELECT
 					  c.Id AS CaseId,
@@ -1011,13 +1017,13 @@ public final class CaseDao {
 					  AND ISNULL(c.IsDeleted, 0) = 0
 					ORDER BY LOWER(COALESCE(c.Name, '')), c.Id;
 					""";
-			long sqlStarted = System.nanoTime();
+			sqlStarted = System.nanoTime();
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(2, shaleClientId);
 				List<CaseSelectionOptionDto> out = new ArrayList<>();
-				long sqlMs;
 				long mappingStarted;
+				dbRoundTrips = 1;
 				try (ResultSet rs = ps.executeQuery()) {
 					sqlMs = (System.nanoTime() - sqlStarted) / 1_000_000;
 					mappingStarted = System.nanoTime();
@@ -1027,15 +1033,22 @@ public final class CaseDao {
 								getNullableBoolean(rs, "NonEngagementLetterSent")));
 					}
 				}
-				long mappingMs = (System.nanoTime() - mappingStarted) / 1_000_000;
+				mappingMs = (System.nanoTime() - mappingStarted) / 1_000_000;
 				long totalMs = (System.nanoTime() - started) / 1_000_000;
-				System.out.println("[PERF] operation=calendar-case-selector rows=" + out.size()
-						+ " dbRoundTrips=1 connectionMs=" + connectionMs
-						+ " sqlMs=" + sqlMs + " mappingMs=" + mappingMs
-						+ " totalMs=" + totalMs);
+				PERF_LOG.info("PERF DAO done operation=calendar-case-selector outcome=success rows={} dbRoundTrips=1 connectionMs={} sqlMs={} mappingMs={} elapsedMs={}",
+						out.size(), connectionMs, sqlMs, mappingMs, totalMs);
 				return List.copyOf(out);
 			}
 		} catch (SQLException e) {
+			long elapsedMs = (System.nanoTime() - started) / 1_000_000;
+			long failedSqlMs = sqlStarted < 0 ? -1 : (System.nanoTime() - sqlStarted) / 1_000_000;
+			PERF_LOG.error("PERF DAO failed operation=calendar-case-selector outcome=failure elapsedMs={} dbRoundTrips={} connectionMs={} sqlMs={} mappingMs={} exceptionClass={} sqlState={} vendorCode={}",
+					elapsedMs, dbRoundTrips, connectionMs, failedSqlMs, mappingMs, e.getClass().getName(), e.getSQLState(), e.getErrorCode(), e);
+			int chainIndex = 0;
+			for (SQLException next = e.getNextException(); next != null; next = next.getNextException()) {
+				PERF_LOG.error("Selector SQL chained exception operation=calendar-case-selector chainIndex={} sqlState={} vendorCode={} exceptionClass={}",
+						++chainIndex, next.getSQLState(), next.getErrorCode(), next.getClass().getName(), next);
+			}
 			throw new RuntimeException("Failed to load calendar case selector options", e);
 		}
 	}

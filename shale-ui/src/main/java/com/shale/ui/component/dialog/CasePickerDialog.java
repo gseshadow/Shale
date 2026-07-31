@@ -19,12 +19,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.Executor;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 final class CasePickerDialog {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(CasePickerDialog.class);
     private CasePickerDialog() {}
 
     static Handle showAsync(Window owner,
@@ -118,6 +121,7 @@ final class CasePickerDialog {
             list.setVisible(false);
             list.setManaged(false);
             select.setDisable(true);
+            long attemptStarted = System.nanoTime();
             executor.execute(() -> {
                 try {
                     List<NewCalendarEventDialog.CaseOption> result = loader.get();
@@ -139,6 +143,8 @@ final class CasePickerDialog {
                         Platform.runLater(search::requestFocus);
                     });
                 } catch (RuntimeException failure) {
+                    long elapsedMs = (System.nanoTime() - attemptStarted) / 1_000_000;
+                    logLoadFailure(requestedGeneration, elapsedMs, failure);
                     Platform.runLater(() -> {
                         loading.set(false);
                         if (disposed.get() || requestedGeneration != generation.get() || !stage.isShowing()) return;
@@ -159,6 +165,33 @@ final class CasePickerDialog {
         Platform.runLater(search::requestFocus);
         load[0].run();
         return new Handle(stage, search, list, state, select, cancel, retry, generation, disposed);
+    }
+
+    static Throwable unwrapAsyncFailure(Throwable failure) {
+        Throwable current = failure;
+        while ((current instanceof CompletionException || current instanceof ExecutionException)
+                && current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        return current;
+    }
+
+    static void logLoadFailure(int generation, long elapsedMs, Throwable failure) {
+        Throwable cause = unwrapAsyncFailure(failure);
+        LOG.error("PERF DAO failed operation=calendar-case-selector outcome=failure generation={} attempt={} elapsedMs={} dbRoundTrips=unknown connectionMs=unknown sqlMs=unknown mappingMs=unknown exceptionClass={}",
+                generation, generation, elapsedMs, cause.getClass().getName(), failure);
+        logChainedSqlExceptions(cause, generation);
+    }
+
+    private static void logChainedSqlExceptions(Throwable failure, int generation) {
+        Throwable current = failure;
+        while (current != null && !(current instanceof java.sql.SQLException)) current = current.getCause();
+        if (!(current instanceof java.sql.SQLException sql)) return;
+        int chainIndex = 0;
+        for (java.sql.SQLException next = sql.getNextException(); next != null; next = next.getNextException()) {
+            LOG.error("Selector SQL chained exception operation=calendar-case-selector generation={} chainIndex={} sqlState={} vendorCode={} exceptionClass={}",
+                    generation, ++chainIndex, next.getSQLState(), next.getErrorCode(), next.getClass().getName(), next);
+        }
     }
 
     record Handle(Stage stage, TextField search, ListView<NewCalendarEventDialog.CaseOption> list,

@@ -35,6 +35,22 @@ final class CalendarCasePickerFlowSourceTest {
         assertFalse(method.contains(".sorted("), "SQL owns deterministic ordering");
     }
 
+    @Test
+    void pickerLogsFailureBeforeAnyDetachedOrStaleUiGuard() throws Exception {
+        String picker = Files.readString(Path.of("src/main/java/com/shale/ui/component/dialog/CasePickerDialog.java"));
+        int catchBlock = picker.indexOf("catch (RuntimeException failure)");
+        int log = picker.indexOf("logLoadFailure(requestedGeneration", catchBlock);
+        int publish = picker.indexOf("Platform.runLater(() ->", catchBlock);
+        int guard = picker.indexOf("if (disposed.get() || requestedGeneration != generation.get()", publish);
+        assertTrue(catchBlock >= 0 && log > catchBlock && publish > log && guard > publish,
+                "initial and Retry use the same load runnable, and logging precedes stale/closed UI rejection");
+        assertTrue(picker.contains("retry.setOnAction(event -> load[0].run())"));
+        assertTrue(picker.contains("Cases could not be loaded. Please try again."));
+        assertFalse(picker.contains("printStackTrace"));
+        assertFalse(picker.contains("System.err"));
+        assertFalse(picker.contains("System.out"));
+    }
+
     private static int occurrences(String text, String needle) {
         int count = 0;
         for (int at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + needle.length())) count++;

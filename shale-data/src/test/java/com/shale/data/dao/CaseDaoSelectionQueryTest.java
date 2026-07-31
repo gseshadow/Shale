@@ -29,6 +29,13 @@ final class CaseDaoSelectionQueryTest {
         assertFalse(method.contains("Description"));
         assertFalse(method.contains("StatuteOfLimitations"));
         assertFalse(method.contains("Task"));
+        assertTrue(method.contains("PERF DAO done operation=calendar-case-selector outcome=success"));
+        assertTrue(method.contains("PERF DAO failed operation=calendar-case-selector outcome=failure"));
+        assertTrue(method.contains("getNextException()"));
+        assertTrue(method.contains("sqlState={}"));
+        assertTrue(method.contains("vendorCode={}"));
+        assertFalse(method.contains("System.out"));
+        assertFalse(method.contains("System.err"));
     }
 
     @Test
