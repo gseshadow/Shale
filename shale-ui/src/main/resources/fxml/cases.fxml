@@ -26,28 +26,21 @@
 					<MenuButton fx:id="statusFilterMenuButton" text="Status (8/8)">
 						<styleClass>
 							<String fx:value="menu-button" />
-							<String fx:value="app-toolbar-button" />
-							<String fx:value="app-toolbar-button-neutral" />
 						</styleClass>
 					</MenuButton>
 					<ChoiceBox fx:id="casesSortChoice" prefWidth="220">
 						<styleClass>
 							<String fx:value="choice-box" />
-							<String fx:value="app-toolbar-select" />
 						</styleClass>
 					</ChoiceBox>
 					<MenuButton fx:id="columnMenuButton" text="Customize Columns">
 						<styleClass>
 							<String fx:value="menu-button" />
-							<String fx:value="app-toolbar-button" />
-							<String fx:value="app-toolbar-button-neutral" />
 						</styleClass>
 					</MenuButton>
 					<MenuButton fx:id="exportMenuButton" text="Export...">
 						<styleClass>
 							<String fx:value="menu-button" />
-							<String fx:value="app-toolbar-button" />
-							<String fx:value="app-toolbar-button-neutral" />
 						</styleClass>
 					</MenuButton>
 				</FlowPane>
