@@ -888,9 +888,7 @@ public class CaseController {
 
 	public void setInitialSection(String sectionKey) {
 		String resolved = fromSectionKey(sectionKey);
-		if (resolved != null) {
-			this.initialSectionName = resolved;
-		}
+		this.initialSectionName = resolveAvailableSection(resolved);
 	}
 
 	/** Optional - if you don’t set this, card click will Sys.out for now */
@@ -1487,12 +1485,11 @@ public class CaseController {
 	// ----------------------------
 
 	private void onSectionSelected(String sectionName, boolean userInitiated) {
-		if (sectionName == null)
-			return;
+		String selectedSection = resolveAvailableSection(sectionName);
 
-		activeSectionName = sectionName;
-		setActiveSectionButton(sectionName);
-		switch (sectionName) {
+		activeSectionName = selectedSection;
+		setActiveSectionButton(selectedSection);
+		switch (selectedSection) {
 		case "Overview" -> showOverview();
 		case "Parties" -> showParties();
 		case "Tasks" -> showTasksTab();
@@ -1501,12 +1498,16 @@ public class CaseController {
 		case "Links" -> showLinksTab();
 		case "Timeline" -> showTimeline();
 		case "Details" -> showDetails();
-		default -> showGeneric(sectionName);
+		default -> showOverview();
 		}
 
 		if (userInitiated && onSectionNavigation != null) {
-			onSectionNavigation.accept(toSectionKey(sectionName));
+			onSectionNavigation.accept(toSectionKey(selectedSection));
 		}
+	}
+
+	private static String resolveAvailableSection(String requestedSection) {
+		return requestedSection != null && SECTIONS.contains(requestedSection) ? requestedSection : "Overview";
 	}
 
 	private static String toSectionKey(String sectionName) {
@@ -1538,6 +1539,7 @@ public class CaseController {
 		case "TIMELINE" -> "Timeline";
 		case "DETAILS" -> "Details";
 		case "PARTIES" -> "Parties";
+		case "REQUESTS" -> "Requests";
 		default -> null;
 		};
 	}
