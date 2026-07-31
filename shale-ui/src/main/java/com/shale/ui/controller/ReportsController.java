@@ -10,6 +10,7 @@ import com.shale.ui.services.CaseExportService;
 import com.shale.ui.export.CaseXlsxExporter;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.util.ColorUtil;
+import com.shale.ui.util.ControlStyles;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyLongWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
@@ -91,6 +92,12 @@ public final class ReportsController {
 
     @FXML
     private void initialize() {
+        ControlStyles.formControl(startDatePicker);
+        ControlStyles.formControl(endDatePicker);
+        ControlStyles.formControl(statusFilterMenuButton);
+        ControlStyles.apply(refreshButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+        ControlStyles.apply(showAllResultsButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+        ControlStyles.apply(exportButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
         if (caseStatusColumn != null) {
             caseStatusColumn.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().caseStatus()));
         }
@@ -308,6 +315,8 @@ public final class ReportsController {
         DialogPane pane = dialog.getDialogPane();
         pane.setPrefSize(1200, 650);
         pane.setMinSize(800, 420);
+        pane.getStylesheets().add(Objects.requireNonNull(
+                ReportsController.class.getResource("/css/app.css")).toExternalForm());
         dialog.setResizable(true);
 
         TableView<ReportCaseDetailRowDto> table = new TableView<>();
@@ -330,7 +339,9 @@ public final class ReportsController {
         content.setPrefSize(1180, 600);
         pane.setContent(content);
         Button drillExport = (Button) pane.lookupButton(exportType);
-        drillExport.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-primary");
+        ControlStyles.apply(drillExport, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+        Button closeButton = (Button) pane.lookupButton(ButtonType.CLOSE);
+        ControlStyles.apply(closeButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
         drillExport.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
             event.consume();
             exportReport(criteria, statusName, statusName + " Cases", drillExport);
