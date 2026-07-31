@@ -25,6 +25,7 @@ import java.util.logging.Logger;
 
 import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
+import com.shale.core.dto.CaseSelectionOptionDto;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
@@ -972,6 +973,71 @@ public final class CaseDao {
 	/** page is 0-based */
 	public PagedResult<CaseRow> findPage(int page, int pageSize, CaseSort sort, boolean includeClosedDenied) {
 		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, null, null, null);
+	}
+
+	/**
+	 * Loads the complete calendar selector projection with one bounded SQL query.
+	 * RLS and the explicit tenant predicate both apply on the runtime connection.
+	 */
+	public List<CaseSelectionOptionDto> listCaseSelectionOptions(int shaleClientId) {
+		if (shaleClientId <= 0) throw new IllegalArgumentException("shaleClientId must be > 0");
+		long started = System.nanoTime();
+		long connectionStarted = System.nanoTime();
+		try (Connection con = db.requireConnection()) {
+			long connectionMs = (System.nanoTime() - connectionStarted) / 1_000_000;
+			String sql = """
+					SELECT
+					  c.Id AS CaseId,
+					  c.Name AS DisplayName,
+					  LTRIM(RTRIM(
+					    COALESCE(u.name_first, '') +
+					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
+					    COALESCE(u.name_last, '')
+					  )) AS ResponsibleAttorneyName,
+					  u.color AS ResponsibleAttorneyColor,
+					  c.NonEngagementLetterSent
+					FROM dbo.Cases c
+					OUTER APPLY (
+					  SELECT TOP (1) cu.UserId
+					  FROM dbo.CaseUsers cu
+					  WHERE cu.CaseId = c.Id
+					    AND cu.RoleId = ?
+					    AND cu.IsPrimary = 1
+					    AND ISNULL(cu.IsDeleted, 0) = 0
+					  ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+					) ra
+					LEFT JOIN dbo.Users u ON u.id = ra.UserId
+					WHERE c.ShaleClientId = ?
+					  AND ISNULL(c.IsDeleted, 0) = 0
+					ORDER BY LOWER(COALESCE(c.Name, '')), c.Id;
+					""";
+			long sqlStarted = System.nanoTime();
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(2, shaleClientId);
+				List<CaseSelectionOptionDto> out = new ArrayList<>();
+				long sqlMs;
+				long mappingStarted;
+				try (ResultSet rs = ps.executeQuery()) {
+					sqlMs = (System.nanoTime() - sqlStarted) / 1_000_000;
+					mappingStarted = System.nanoTime();
+					while (rs.next()) {
+						out.add(new CaseSelectionOptionDto(rs.getLong("CaseId"), rs.getString("DisplayName"),
+								rs.getString("ResponsibleAttorneyName"), rs.getString("ResponsibleAttorneyColor"),
+								getNullableBoolean(rs, "NonEngagementLetterSent")));
+					}
+				}
+				long mappingMs = (System.nanoTime() - mappingStarted) / 1_000_000;
+				long totalMs = (System.nanoTime() - started) / 1_000_000;
+				System.out.println("[PERF] operation=calendar-case-selector rows=" + out.size()
+						+ " dbRoundTrips=1 connectionMs=" + connectionMs
+						+ " sqlMs=" + sqlMs + " mappingMs=" + mappingMs
+						+ " totalMs=" + totalMs);
+				return List.copyOf(out);
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load calendar case selector options", e);
+		}
 	}
 
 	/** page is 0-based; query/status filters are pushed into SQL for the Cases view. */

@@ -22,16 +22,17 @@ final class CalendarCasePickerFlowSourceTest {
     }
 
     @Test
-    void caseOptionsKeepPagedQuerySemanticsWithoutPerRowLookups() throws Exception {
+    void caseOptionsUseOneDedicatedProjectionWithoutPaginationOrPerRowLookups() throws Exception {
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
         int start = controller.indexOf("private List<NewCalendarEventDialog.CaseOption> caseOptionsForPicker");
         int end = controller.indexOf("private List<NewCalendarEventDialog.AssignedUserOption>", start);
         String method = controller.substring(start, end);
-        assertTrue(method.contains("caseDao.findPage(page, pageSize, CaseDao.CaseSort.INTAKE_NEWEST, false)"));
-        assertTrue(method.contains("pageLoads++"));
-        assertTrue(method.contains("caseDao.getCaseRow(selectedCaseId.longValue())"));
-        assertEquals(1, occurrences(method, "caseDao.getCaseRow("), "only the missing selected case receives one fallback lookup");
+        assertEquals(1, occurrences(method, "caseDao.listCaseSelectionOptions("));
+        assertFalse(method.contains("caseDao.findPage("), "selector must not walk the Cases screen API");
+        assertFalse(method.contains("countAll("), "selector does not need a total-count query");
+        assertFalse(method.contains("caseDao.getCaseRow("), "every expected case id comes from the complete projection");
         assertFalse(method.contains("forEach(c -> caseDao."), "no per-row/N+1 DAO call");
+        assertFalse(method.contains(".sorted("), "SQL owns deterministic ordering");
     }
 
     private static int occurrences(String text, String needle) {
