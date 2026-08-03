@@ -52,8 +52,9 @@ final class SettingsNotificationAuditSemanticControlTest {
     }
 
     @Test
-    void userManagementLegacyControlsRemainIntentionallyUntouched() {
-        assertTrue(FXML.contains("text=\"Add User\" onAction=\"#onAddUser\" styleClass=\"app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact\""));
+    void userManagementUsesUnifiedSemanticControls() {
+        assertTrue(FXML.contains("text=\"Add User\" onAction=\"#onAddUser\" styleClass=\"shale-control-button shale-control-primary shale-control-standard\""));
+        assertTrue(FXML.contains("fx:id=\"editUserButton\" text=\"Edit User\""));
         assertTrue(FXML.contains("fx:id=\"deactivateUserButton\" text=\"Deactivate User\""));
         assertTrue(FXML.contains("fx:id=\"reactivateUserButton\" text=\"Reactivate User\""));
         assertTrue(FXML.contains("fx:id=\"resetPasswordButton\" text=\"Reset Password\""));
