@@ -5252,12 +5252,14 @@ public class CaseController {
 
 	private void onEditResponsibleAttorneyField() {
 		if (!ensureTenantAndCaseForFieldDialog("responsible attorney")) return;
-		List<CaseDao.UserRow> options = caseDao.listAttorneysForTenant(appState.getShaleClientId());
-		CaseDao.UserRow currentValue = currentOverview == null ? null : options.stream()
+		// Responsible Attorney is the one Case Overview user editor whose candidates
+		// must come from the authoritative Users.is_attorney eligibility query.
+		List<CaseDao.UserRow> eligibleAttorneys = caseDao.listAttorneysForTenant(appState.getShaleClientId());
+		CaseDao.UserRow currentValue = currentOverview == null ? null : eligibleAttorneys.stream()
 				.filter(v -> Objects.equals(v.id(), currentOverview.getResponsibleAttorneyUserId())).findFirst()
 				.orElse(new CaseDao.UserRow(currentOverview.getResponsibleAttorneyUserId(), currentOverview.getResponsibleAttorney(),
 						currentOverview.getResponsibleAttorneyColor()));
-		showUserCardChoice("Edit Responsible Attorney", "Responsible Attorney", currentValue, options, false,
+		showUserCardChoice("Edit Responsible Attorney", "Responsible Attorney", currentValue, eligibleAttorneys, false,
 				null, changeResponsibleAttorneyButton).ifPresent(v -> saveResponsibleAttorneyField(v.id()));
 	}
 
