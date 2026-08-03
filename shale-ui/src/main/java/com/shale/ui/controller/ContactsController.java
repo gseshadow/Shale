@@ -8,6 +8,7 @@ import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.UiStateLabels;
+import com.shale.ui.util.ControlStyles;
 
 import javafx.application.Platform;
 import javafx.animation.PauseTransition;
@@ -76,6 +77,7 @@ public final class ContactsController {
     @FXML
     private void initialize() {
         if (contactsSearchField != null) {
+            ControlStyles.formControl(contactsSearchField);
             searchDebounce = new PauseTransition(SEARCH_DEBOUNCE);
             searchDebounce.setOnFinished(e -> {
                 latestRequestedQuery = normalizedQuery();

@@ -19,6 +19,7 @@ import com.shale.data.dao.ContactDao.ContactDetailRow;
 import com.shale.data.dao.ContactDao.ContactProfileUpdateRequest;
 import com.shale.data.dao.ContactDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.util.ControlStyles;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
@@ -45,7 +46,6 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
-import javafx.scene.paint.Color;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -187,22 +187,30 @@ public final class ContactViewController {
     @FXML
     private void initialize() {
         if (editButton != null) {
+            ControlStyles.apply(editButton, ControlStyles.Purpose.SECONDARY);
             editButton.setOnAction(e -> onEdit());
             setVisibleManaged(editButton, false);
         }
         initializeInlineEditButtons();
         if (saveButton != null) {
+            ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
             saveButton.setOnAction(e -> onSave());
         }
         if (cancelButton != null) {
+            ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
             cancelButton.setOnAction(e -> onCancel());
         }
         if (deleteContactButton != null) {
+            ControlStyles.apply(deleteContactButton, ControlStyles.Purpose.DANGER);
             deleteContactButton.setOnAction(e -> onDeleteContact());
             setVisibleManaged(deleteContactButton, false);
         }
 
         initialized = true;
+        for (javafx.scene.control.Control editor : List.of(nameEditor, firstNameEditor, lastNameEditor,
+                emailEditor, phoneEditor, addressHomeEditor, dateOfBirthEditor, conditionEditor, deceasedEditor)) {
+            ControlStyles.formControl(editor);
+        }
         setEditMode(false);
         renderRelatedCases();
         resetSharedLinksState();
@@ -246,6 +254,9 @@ public final class ContactViewController {
         if (button == null) {
             return;
         }
+        ControlStyles.apply(button, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.iconOnly(button);
+        button.setAccessibleText("Edit " + fieldLabel);
         button.setTooltip(new Tooltip("Edit " + fieldLabel));
         button.setOnAction(e -> {
             if (!canEditContact()) {
@@ -349,13 +360,16 @@ public final class ContactViewController {
         dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
 
         TextField field = new TextField(safe(currentValue));
+        ControlStyles.formControl(field);
         Label error = new Label();
-        error.setTextFill(Color.web("#b42318"));
+        error.getStyleClass().add("dialog-error-text");
         error.setVisible(false);
         error.setManaged(false);
         dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + displayCurrentValue(currentValue)), field, error));
 
         Node save = dialog.getDialogPane().lookupButton(saveType);
+        ControlStyles.apply((javafx.scene.control.ButtonBase) save, ControlStyles.Purpose.PRIMARY);
+        ControlStyles.apply((javafx.scene.control.ButtonBase) dialog.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
         save.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
             if (required && safe(field.getText()).trim().isBlank()) {
                 error.setText(label + " is required.");
@@ -377,9 +391,12 @@ public final class ContactViewController {
         dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
 
         TextArea area = new TextArea(safe(currentValue));
+        ControlStyles.formControl(area);
         area.setPrefRowCount(8);
         area.setWrapText(true);
         dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current value shown below."), area));
+        ControlStyles.apply((javafx.scene.control.ButtonBase) dialog.getDialogPane().lookupButton(saveType), ControlStyles.Purpose.PRIMARY);
+        ControlStyles.apply((javafx.scene.control.ButtonBase) dialog.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
         installUnsavedContactDialogConfirmation(dialog, () -> !Objects.equals(safeText(currentValue), safeText(area.getText())));
         dialog.setResultConverter(button -> button == saveType ? area.getText() : null);
         dialog.showAndWait().ifPresent(onSave);
@@ -393,7 +410,10 @@ public final class ContactViewController {
         dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
 
         DatePicker picker = new DatePicker(currentValue);
+        ControlStyles.formControl(picker);
         dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + formatDate(currentValue)), picker));
+        ControlStyles.apply((javafx.scene.control.ButtonBase) dialog.getDialogPane().lookupButton(saveType), ControlStyles.Purpose.PRIMARY);
+        ControlStyles.apply((javafx.scene.control.ButtonBase) dialog.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
         installUnsavedContactDialogConfirmation(dialog, () -> !Objects.equals(currentValue, picker.getValue()));
         dialog.setResultConverter(button -> button == saveType ? picker.getValue() : null);
         dialog.showAndWait().ifPresent(onSave);
@@ -407,8 +427,11 @@ public final class ContactViewController {
         dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
 
         CheckBox box = new CheckBox(label);
+        ControlStyles.formControl(box);
         box.setSelected(currentValue);
         dialog.getDialogPane().setContent(new VBox(8, new Label("Current: " + booleanLabel(currentValue)), box));
+        ControlStyles.apply((javafx.scene.control.ButtonBase) dialog.getDialogPane().lookupButton(saveType), ControlStyles.Purpose.PRIMARY);
+        ControlStyles.apply((javafx.scene.control.ButtonBase) dialog.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
         installUnsavedContactDialogConfirmation(dialog, () -> currentValue != box.isSelected());
         dialog.setResultConverter(button -> button == saveType ? box.isSelected() : null);
         dialog.showAndWait().ifPresent(onSave);
@@ -810,7 +833,7 @@ public final class ContactViewController {
             title.getStyleClass().add("case-overview-row-value");
             Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS);
             Button openCase = new Button("Open Case");
-            openCase.getStyleClass().add("secondary-button");
+            ControlStyles.apply(openCase, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
             openCase.setOnAction(e -> { if (onOpenCase != null) onOpenCase.accept((int) first.caseId()); });
             heading.getChildren().addAll(title, spacer, openCase);
             group.getChildren().add(heading);

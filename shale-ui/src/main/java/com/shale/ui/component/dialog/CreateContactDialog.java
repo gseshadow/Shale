@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.shale.data.dao.ContactDao;
+import com.shale.ui.util.ControlStyles;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -46,6 +47,11 @@ public final class CreateContactDialog {
         lastNameField.setPromptText("Last name");
         emailField.setPromptText("Email");
         phoneField.setPromptText("Phone");
+        ControlStyles.formControl(firstNameField);
+        ControlStyles.formControl(lastNameField);
+        ControlStyles.formControl(emailField);
+        ControlStyles.formControl(phoneField);
+        ControlStyles.formControl(clientCheckBox);
 
         GridPane form = new GridPane();
         form.setHgap(12);
@@ -65,12 +71,12 @@ public final class CreateContactDialog {
         GridPane.setHgrow(phoneField, Priority.ALWAYS);
 
         errorLabel.setWrapText(true);
-        errorLabel.setStyle("-fx-text-fill: #b42318;");
+        errorLabel.getStyleClass().add("dialog-error-text");
         errorLabel.setManaged(false);
         errorLabel.setVisible(false);
 
         Button cancelButton = new Button("Cancel");
-        cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> {
             result = null;
@@ -78,7 +84,7 @@ public final class CreateContactDialog {
         });
 
         Button createButton = new Button("Create Contact");
-        createButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+        ControlStyles.apply(createButton, ControlStyles.Purpose.PRIMARY);
         createButton.setDefaultButton(true);
         createButton.setOnAction(e -> onCreate());
 

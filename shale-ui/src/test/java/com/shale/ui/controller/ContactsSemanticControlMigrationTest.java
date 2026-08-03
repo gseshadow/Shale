@@ -1,0 +1,110 @@
+package com.shale.ui.controller;
+
+import javafx.application.Platform;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Control;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import org.junit.jupiter.api.Test;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+final class ContactsSemanticControlMigrationTest {
+    @Test
+    void contactsSurfacesUseExplicitSemanticActionsAndSharedForms() throws Exception {
+        String list = read("src/main/java/com/shale/ui/controller/ContactsController.java");
+        String detail = read("src/main/java/com/shale/ui/controller/ContactViewController.java");
+        String create = read("src/main/java/com/shale/ui/component/dialog/CreateContactDialog.java");
+        String fxml = read("src/main/resources/fxml/contact.fxml");
+
+        assertTrue(list.contains("ControlStyles.formControl(contactsSearchField)"));
+        assertTrue(detail.contains("ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY)"));
+        assertTrue(detail.contains("ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY)"));
+        assertTrue(detail.contains("ControlStyles.apply(deleteContactButton, ControlStyles.Purpose.DANGER)"));
+        assertTrue(detail.contains("ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL"));
+        assertTrue(detail.contains("ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL"));
+        assertTrue(create.contains("ControlStyles.apply(createButton, ControlStyles.Purpose.PRIMARY)"));
+        assertTrue(create.contains("ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY)"));
+        for (String control : List.of("firstNameField", "lastNameField", "emailField", "phoneField", "clientCheckBox")) {
+            assertTrue(create.contains("ControlStyles.formControl(" + control + ")"), control);
+        }
+        assertFalse(fxml.contains("app-toolbar-button"));
+        assertFalse(fxml.contains("case-overview-edit-button"));
+        assertFalse(create.contains("setStyle("), "contact creation must not retain inline action/form paint");
+    }
+
+    @Test
+    void productionFxmlAndCssRenderWithoutSemanticCssWarnings() throws Exception {
+        Process process = new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "-cp", System.getProperty("java.class.path"), Probe.class.getName())
+                .redirectErrorStream(true).start();
+        assertTrue(process.waitFor(25, TimeUnit.SECONDS), "Contacts rendering probe timed out");
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, process.exitValue(), output);
+        assertFalse(output.contains("CSS Error"), output);
+        assertFalse(output.contains("CssStyleHelper"), output);
+        assertFalse(output.contains("ClassCastException"), output);
+        assertFalse(output.contains("cannot be cast to javafx.css.Size"), output);
+    }
+
+    private static String read(String path) throws Exception { return Files.readString(Path.of(path)); }
+
+    public static final class Probe {
+        public static void main(String[] args) throws Exception {
+            CountDownLatch started = new CountDownLatch(1);
+            CountDownLatch finished = new CountDownLatch(1);
+            AtomicReference<Throwable> failure = new AtomicReference<>();
+            Platform.startup(started::countDown);
+            require(started.await(10, TimeUnit.SECONDS), "JavaFX did not start");
+            Platform.runLater(() -> {
+                try {
+                    inspect("/fxml/contacts.fxml", 1280, 800);
+                    inspect("/fxml/contacts.fxml", 560, 700);
+                    Parent detail = inspect("/fxml/contact.fxml", 1280, 800);
+                    require(((Button) detail.lookup("#saveButton")).getStyleClass().contains("shale-control-primary"), "Save primary");
+                    require(((Button) detail.lookup("#cancelButton")).getStyleClass().contains("shale-control-secondary"), "Cancel secondary");
+                    require(((Button) detail.lookup("#deleteContactButton")).getStyleClass().contains("shale-control-danger"), "Delete danger");
+                    require(((Button) detail.lookup("#editEmailButton")).getStyleClass().contains("shale-control-small"), "inline Edit small");
+                    require(((TextArea) detail.lookup("#conditionEditor")).getPrefRowCount() == 4, "multiline geometry retained");
+                } catch (Throwable thrown) { failure.set(thrown); }
+                finally { finished.countDown(); }
+            });
+            require(finished.await(20, TimeUnit.SECONDS), "JavaFX rendering did not finish");
+            Platform.exit();
+            if (failure.get() != null) throw new AssertionError("Contacts rendering failed", failure.get());
+        }
+
+        private static Parent inspect(String resource, double width, double height) throws Exception {
+            Parent root = FXMLLoader.load(requireResource(resource));
+            Scene scene = new Scene(root, width, height);
+            scene.getStylesheets().add(requireResource("/css/app.css").toExternalForm());
+            root.applyCss(); root.layout();
+            if (resource.endsWith("contacts.fxml")) {
+                Control search = (TextField) root.lookup("#contactsSearchField");
+                require(search.getStyleClass().contains("shale-form-control"), "search shared form shell");
+            }
+            return root;
+        }
+
+        private static java.net.URL requireResource(String path) {
+            java.net.URL resource = Probe.class.getResource(path);
+            if (resource == null) throw new AssertionError("Missing " + path);
+            return resource;
+        }
+        private static void require(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
+    }
+}
