@@ -22,6 +22,7 @@ import javafx.scene.control.Button;
 import javafx.scene.Node;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 
 /**
  * Compact selected-user field that composes the shared {@link UserSelector} in a caller-supplied picker shell.
@@ -140,7 +141,12 @@ public class UserSelectionField<T> extends HBox {
         Node card = cardRenderer == null
                 ? cardFactory.create(new UserCardModel(userId(selected), safe(displayName(selected)), color(selected), null), UserCardFactory.Variant.MINI)
                 : Objects.requireNonNull(cardRenderer.apply(selected), "cardRenderer result");
-        card.setMaxWidth(Double.MAX_VALUE);
+        // Renderers intentionally accept any Node. Shale's MINI cards are Regions,
+        // but callers may supply another valid JavaFX node; only Regions expose
+        // resizable width constraints.
+        if (card instanceof Region region) {
+            region.setMaxWidth(Double.MAX_VALUE);
+        }
         HBox.setHgrow(card, Priority.ALWAYS);
         getChildren().addAll(card, changeButton);
         if (clearable) getChildren().add(removeButton);
