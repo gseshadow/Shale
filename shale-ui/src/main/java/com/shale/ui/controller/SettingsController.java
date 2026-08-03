@@ -142,7 +142,10 @@ public final class SettingsController {
 	@FXML
 	private CheckBox showInactiveUsersCheck;
 	@FXML private TextField userSearchField;
+	@FXML private Button addUserButton;
 	@FXML private Button editUserButton;
+	@FXML private Button refreshUsersButton;
+	@FXML private Button removeUserButton;
 	@FXML
 	private Button deactivateUserButton;
 	@FXML
@@ -192,6 +195,7 @@ public final class SettingsController {
 	private void initialize() {
 		fxmlReady = true;
 		configureSettingsSemanticButtons();
+		configureUserManagementSemanticButtons();
 		configureLookupActionRows();
 		configureUserManagementTable();
 		updateAdminControlsVisibility();
@@ -205,6 +209,16 @@ public final class SettingsController {
 		ControlStyles.apply(applyNotificationPreferencesButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 		ControlStyles.apply(resetNotificationPreferencesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		ControlStyles.apply(viewAuditLogButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+	}
+
+	private void configureUserManagementSemanticButtons() {
+		ControlStyles.apply(addUserButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(editUserButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(deactivateUserButton, ControlStyles.Purpose.DANGER, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(reactivateUserButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(resetPasswordButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(refreshUsersButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(removeUserButton, ControlStyles.Purpose.DANGER, ControlStyles.Size.STANDARD);
 	}
 
 	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
@@ -1134,6 +1148,13 @@ public final class SettingsController {
 		if(filtered.isEmpty())setUserManagementMessage(managedUserRows.isEmpty()?"No users exist for this tenant.":"No users match the current search.");
 	}
 	@FXML private void onRefreshUsers(){loadManagedUsersAsync(null);}
+	@FXML private void onRemoveUserFromTenant(){
+		UserManagementViewRow selected=selectedManagedUser();if(selected==null||userMutationRunning)return;
+		String warning="They will no longer be able to sign in and will disappear from User Management and assignment lists. Historical records will be preserved.";
+		if(!AppDialogs.showConfirmation(null,"Remove from Tenant","Remove "+selected.name()+" from this tenant?",warning,"Remove from Tenant",AppDialogs.DialogActionKind.DANGER))return;
+		userMutationRunning=true;updateUserActionButtons(selected);setUserManagementMessage("Removing user from tenant…");int removedId=selected.id();int generation=++userManagementLoadGeneration;
+		settingsLoadExecutor.submit(()->{try{userDao.removeUserFromTenant(removedId,selected.rowVer());Platform.runLater(()->{if(generation!=userManagementLoadGeneration)return;userMutationRunning=false;managedUserRows.removeIf(r->r.id()==removedId);applyUserFilter();userManagementTable.getSelectionModel().clearSelection();updateUserActionButtons(null);setUserManagementMessage("User removed from tenant.");loadManagedUsersAsync("User removed from tenant.");});}catch(RuntimeException ex){Platform.runLater(()->{if(generation!=userManagementLoadGeneration)return;userMutationRunning=false;updateUserActionButtons(selected);AppDialogs.showError(null,"Remove from Tenant",rootMessage(ex));setUserManagementMessage(rootMessage(ex));});}});
+	}
 	@FXML private void onEditUser(){
 		UserManagementViewRow selected=selectedManagedUser();if(selected==null||userMutationRunning)return;
 		showEditUserDialog(selected).ifPresent(request->{userMutationRunning=true;updateUserActionButtons(selected);setUserManagementMessage("Saving changes…");settingsLoadExecutor.submit(()->{try{var result=userDao.updateManagedUser(request);Platform.runLater(()->{userMutationRunning=false;loadManagedUsersAsync(result.changed()?"User updated.":"No changes to save.");});}catch(RuntimeException ex){Platform.runLater(()->{userMutationRunning=false;updateUserActionButtons(selected);AppDialogs.showError(null,"Edit User",rootMessage(ex));setUserManagementMessage(rootMessage(ex));});}});});
@@ -1279,11 +1300,15 @@ public final class SettingsController {
 	}
 
 	private void updateUserActionButtons(UserManagementViewRow selected) {
-		boolean has = selected != null && !userMutationRunning;
+		boolean has = selected != null && !selected.removed() && !userMutationRunning;
+		boolean self = has && appState != null && appState.getUserId() != null && selected.id() == appState.getUserId();
 		if(editUserButton!=null)editUserButton.setDisable(!has);
-		if (deactivateUserButton != null) deactivateUserButton.setDisable(!has || selected.deleted());
+		if (deactivateUserButton != null) deactivateUserButton.setDisable(!has || selected.deleted() || self);
 		if (reactivateUserButton != null) reactivateUserButton.setDisable(!has || !selected.deleted());
 		if (resetPasswordButton != null) resetPasswordButton.setDisable(!has || selected.deleted());
+		if (removeUserButton != null) removeUserButton.setDisable(!has || self);
+		if (addUserButton != null) addUserButton.setDisable(userMutationRunning);
+		if (refreshUsersButton != null) refreshUsersButton.setDisable(userMutationRunning);
 	}
 
 	private void setUserManagementMessage(String message) { if (userManagementStatusLabel != null) userManagementStatusLabel.setText(message == null ? "" : message); }
@@ -1386,7 +1411,7 @@ public final class SettingsController {
 		private final UserDao.UserManagementRow row; UserManagementViewRow(UserDao.UserManagementRow row){this.row=row;}
 		public int getId(){return row.id();} public int id(){return row.id();} public String getName(){return safe(row.name())+"  (#"+row.id()+")";} public String name(){return safe(row.name());}
 		public String getEmail(){return safe(row.email());} public String email(){return getEmail();} public String firstName(){return safe(row.firstName());} public String lastName(){return safe(row.lastName());} public String phone(){return safe(row.phone());} public String initials(){return safe(row.initials());} public String color(){return safe(row.color());}
-		public String getInitials(){return initials();} public String getRoles(){return (row.admin()?"Administrator":"")+(row.admin()&&row.attorney()?", ":"")+(row.attorney()?"Attorney":"");} public String getStatus(){return row.deleted()?"Inactive":"Active";} public boolean deleted(){return row.deleted();} public boolean admin(){return row.admin();} public boolean attorney(){return row.attorney();} public byte[] rowVer(){return row.rowVer()==null?null:row.rowVer().clone();}
+		public String getInitials(){return initials();} public String getRoles(){return (row.admin()?"Administrator":"")+(row.admin()&&row.attorney()?", ":"")+(row.attorney()?"Attorney":"");} public String getStatus(){return row.deleted()?"Inactive":"Active";} public boolean deleted(){return row.deleted();} public boolean removed(){return row.removed();} public boolean admin(){return row.admin();} public boolean attorney(){return row.attorney();} public byte[] rowVer(){return row.rowVer()==null?null:row.rowVer().clone();}
 		String searchText(){return (name()+" "+email()+" "+initials()+" "+getRoles()+" "+id()).toLowerCase(java.util.Locale.ROOT);}
 	}
 

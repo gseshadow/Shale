@@ -58,6 +58,7 @@ final class SettingsNotificationAuditSemanticControlTest {
         assertTrue(FXML.contains("fx:id=\"deactivateUserButton\" text=\"Deactivate User\""));
         assertTrue(FXML.contains("fx:id=\"reactivateUserButton\" text=\"Reactivate User\""));
         assertTrue(FXML.contains("fx:id=\"resetPasswordButton\" text=\"Reset Password\""));
+        assertTrue(FXML.contains("fx:id=\"removeUserButton\" text=\"Remove from Tenant\""));
     }
 
     private static String element(String fxId) {
