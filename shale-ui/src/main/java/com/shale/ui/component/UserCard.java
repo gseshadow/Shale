@@ -8,7 +8,6 @@ import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.css.PseudoClass;
 import javafx.scene.paint.Color;
-import javafx.scene.text.TextAlignment;
 import com.shale.ui.util.ColorUtil;
 import javafx.scene.layout.*;
 import javafx.scene.shape.Circle;
@@ -61,40 +60,6 @@ public class UserCard extends HBox {
     public void setInactive(boolean inactive) {
         pseudoClassStateChanged(INACTIVE, inactive);
         setAccessibleText((inactive ? "Inactive user: " : "User: ") + nameLabel.getText() + (secondaryLabel.getText().isBlank() ? "" : ", " + secondaryLabel.getText()));
-    }
-
-    /** Table-compatible MINI presentation: passive, dense, and selection-surface neutral. */
-    public void applyTableMini() {
-        getChildren().clear();
-        getStyleClass().remove("shale-entity-card-clickable");
-        for (String styleClass : java.util.List.of("shale-entity-card", "shale-embedded-card-surface", "shale-entity-card-inline", "user-card-mini", "user-card-table-mini")) {
-            if (!getStyleClass().contains(styleClass)) getStyleClass().add(styleClass);
-        }
-        setStyle(null);
-        setPadding(new Insets(5, 8, 5, 8));
-        setSpacing(8);
-        setCursor(Cursor.DEFAULT);
-        setMouseTransparent(true);
-        setFocusTraversable(false);
-        setOnMouseEntered(null); setOnMouseExited(null); setOnMouseClicked(null);
-
-        Circle circle = new Circle(15, ColorUtil.toFxColor(backgroundCss));
-        circle.getStyleClass().add("user-card-avatar-circle");
-        initialsLabel.setText(initials.isBlank() ? initialsFromName(nameLabel.getText()) : initials);
-        initialsLabel.getStyleClass().setAll("label", "user-card-avatar-initials");
-        initialsLabel.setTextAlignment(TextAlignment.CENTER);
-        avatarHolder.getChildren().setAll(circle, initialsLabel);
-        avatarHolder.setMouseTransparent(true);
-
-        nameLabel.setStyle(null);
-        nameLabel.getStyleClass().setAll("label", "user-card-table-name");
-        nameLabel.setMaxWidth(Double.MAX_VALUE);
-        nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
-        secondaryLabel.getStyleClass().setAll("label", "user-card-table-metadata");
-        VBox identity = new VBox(1, nameLabel, secondaryLabel);
-        identity.setMouseTransparent(true);
-        HBox.setHgrow(identity, Priority.ALWAYS);
-        getChildren().addAll(avatarHolder, identity);
     }
 
     private static String normalizeInitials(String value) {
