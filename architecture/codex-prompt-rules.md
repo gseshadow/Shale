@@ -155,6 +155,22 @@ Required:
 
 Do not create duplicate implementations when an existing component already solves the problem.
 
+#### Required JavaFX semantic controls
+
+Before adding or changing an ordinary JavaFX action, read the **Unified JavaFX controls** section of
+`architecture/design-system.md`. Construct programmatic buttons with
+`ActionButtonFactory.semantic(text, handler, ControlStyles.Purpose, ControlStyles.Size)` or call
+`ControlStyles.apply(...)` on an FXML-injected `Button`/`ToggleButton` in `initialize()`, after injection.
+The supported purposes are `PRIMARY`, `SECONDARY`, `GHOST`, `DANGER`, and `NAVIGATION`; the supported
+sizes are `STANDARD` and `SMALL`. Do not spell their CSS classes in controllers.
+
+For selectors, the general-purpose API is the ordinary DTO-typed JavaFX `ComboBox<T>` or `ChoiceBox<T>`
+opted into the shared shell with `ControlStyles.formControl(...)`. Use `ColorCodedComboBox<T>` for
+database lookup DTOs with authoritative colors, and `UserSelector<T>` (or `UserSelectionField<T>` when
+the compact picker shell is required) for user DTOs. Do not replace DTOs with rendered strings, copy
+cell factories, or add local/broad `.combo-box` styling. Extend a shared component with a narrowly
+scoped reusable capability when these APIs cannot express the interaction.
+
 ---
 
 ### Live Updates / Notifications
