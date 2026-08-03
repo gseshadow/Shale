@@ -26,6 +26,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.shale.core.dto.CasePartyDto;
@@ -60,6 +61,7 @@ import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.ContactCard;
 import com.shale.ui.component.OrganizationCard;
 import com.shale.ui.component.StatusTimeline;
+import com.shale.ui.component.UserSelectionField;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.document.CaseDocumentExportService;
 import com.shale.ui.document.CaseDocumentFormat;
@@ -5223,163 +5225,126 @@ public class CaseController {
 	}
 
 	private void onEditStatusField() {
-		if (!ensureTenantAndCaseForFieldDialog("status"))
-			return;
-		int tenantId = appState.getShaleClientId();
-		List<CaseDao.StatusRow> statuses = statusesForTenantCached(tenantId);
-		Map<String, CaseDao.StatusRow> options = new LinkedHashMap<>();
-		for (CaseDao.StatusRow row : statuses) {
-			options.put(safeText(row.name()).isBlank() ? "Status #" + row.id() : row.name(), row);
-		}
-		showChoiceFieldDialog(
-				"Edit Case Status",
-				"Case Status",
-				currentOverview == null ? "—" : safeText(currentOverview.getCaseStatus()),
-				currentOverview == null ? null : currentOverview.getCaseStatus(),
-				options.keySet(),
-				changeStatusButton).map(options::get).ifPresent(row -> saveStatusField(row.id()));
+		if (!ensureTenantAndCaseForFieldDialog("status")) return;
+		List<CaseDao.StatusRow> options = statusesForTenantCached(appState.getShaleClientId());
+		CaseDao.StatusRow currentValue = currentOverview == null ? null : options.stream()
+				.filter(v -> Objects.equals(v.id(), currentOverview.getPrimaryStatusId())).findFirst()
+				.orElse(new CaseDao.StatusRow(currentOverview.getPrimaryStatusId(), currentOverview.getCaseStatus(), 0,
+						currentOverview.getPrimaryStatusColor(), null, null));
+		StatusCardFactory cards = new StatusCardFactory(id -> { });
+		showCardChoiceFieldDialog("Edit Case Status", "Case Status", currentValue, options,
+				CaseDao.StatusRow::id, v -> cards.create(new StatusCardModel(v.id(), v.name(), v.sortOrder(), v.color()), StatusCardFactory.Variant.MINI),
+				false, null, changeStatusButton).ifPresent(v -> saveStatusField(v.id()));
 	}
 
 	private void onEditPracticeAreaField() {
-		if (!ensureTenantAndCaseForFieldDialog("practice area"))
-			return;
-		int tenantId = appState.getShaleClientId();
-		List<CaseDao.PracticeAreaRow> areas = practiceAreasForTenantCached(tenantId);
-		Map<String, CaseDao.PracticeAreaRow> options = new LinkedHashMap<>();
-		for (CaseDao.PracticeAreaRow row : areas) {
-			options.put(safeText(row.name()).isBlank() ? "Practice Area #" + row.id() : row.name(), row);
-		}
-		showChoiceFieldDialog(
-				"Edit Practice Area",
-				"Practice Area",
-				currentOverview == null ? "—" : safeText(currentOverview.getPracticeArea()),
-				currentOverview == null ? null : currentOverview.getPracticeArea(),
-				options.keySet(),
-				changePracticeAreaButton).map(options::get).ifPresent(row -> savePracticeAreaField(row.id()));
+		if (!ensureTenantAndCaseForFieldDialog("practice area")) return;
+		List<CaseDao.PracticeAreaRow> options = practiceAreasForTenantCached(appState.getShaleClientId());
+		CaseDao.PracticeAreaRow currentValue = currentOverview == null ? null : options.stream()
+				.filter(v -> Objects.equals(v.id(), currentOverview.getPracticeAreaId())).findFirst()
+				.orElse(new CaseDao.PracticeAreaRow(currentOverview.getPracticeAreaId(), currentOverview.getPracticeArea(),
+						currentOverview.getPracticeAreaColor(), null));
+		PracticeAreaCardFactory cards = new PracticeAreaCardFactory(id -> { });
+		showCardChoiceFieldDialog("Edit Practice Area", "Practice Area", currentValue, options,
+				CaseDao.PracticeAreaRow::id, v -> cards.create(new PracticeAreaCardModel(v.id(), v.name(), v.color()), PracticeAreaCardFactory.Variant.MINI),
+				false, null, changePracticeAreaButton).ifPresent(v -> savePracticeAreaField(v.id()));
 	}
 
 	private void onEditResponsibleAttorneyField() {
-		if (!ensureTenantAndCaseForFieldDialog("responsible attorney"))
-			return;
-		int tenantId = appState.getShaleClientId();
-		List<CaseDao.UserRow> users = caseDao.listUsersForTenant(tenantId);
-		Map<String, CaseDao.UserRow> options = new LinkedHashMap<>();
-		for (CaseDao.UserRow row : users) {
-			options.put(safeText(row.displayName()).isBlank() ? "User #" + row.id() : row.displayName(), row);
-		}
-		showChoiceFieldDialog(
-				"Edit Responsible Attorney",
-				"Responsible Attorney",
-				currentOverview == null ? "—" : safeText(currentOverview.getResponsibleAttorney()),
-				currentOverview == null ? null : currentOverview.getResponsibleAttorney(),
-				options.keySet(),
-				changeResponsibleAttorneyButton).map(options::get).ifPresent(row -> saveResponsibleAttorneyField(row.id()));
+		if (!ensureTenantAndCaseForFieldDialog("responsible attorney")) return;
+		List<CaseDao.UserRow> options = caseDao.listAttorneysForTenant(appState.getShaleClientId());
+		CaseDao.UserRow currentValue = currentOverview == null ? null : options.stream()
+				.filter(v -> Objects.equals(v.id(), currentOverview.getResponsibleAttorneyUserId())).findFirst()
+				.orElse(new CaseDao.UserRow(currentOverview.getResponsibleAttorneyUserId(), currentOverview.getResponsibleAttorney(),
+						currentOverview.getResponsibleAttorneyColor()));
+		showUserCardChoice("Edit Responsible Attorney", "Responsible Attorney", currentValue, options, false,
+				null, changeResponsibleAttorneyButton).ifPresent(v -> saveResponsibleAttorneyField(v.id()));
 	}
 
 	private void onEditPrimaryLegalAssistantField() {
-		if (!ensureTenantAndCaseForFieldDialog("primary legal assistant"))
-			return;
-		int tenantId = appState.getShaleClientId();
-		List<CaseDao.UserRow> users = caseDao.listUsersForTenant(tenantId);
-		Map<String, CaseDao.UserRow> options = new LinkedHashMap<>();
-		for (CaseDao.UserRow row : users) {
-			options.put(safeText(row.displayName()).isBlank() ? "User #" + row.id() : row.displayName(), row);
-		}
-		showPrimaryLegalAssistantDialog(
-				currentOverview == null ? "—" : safeText(currentOverview.getPrimaryLegalAssistant()),
-				currentOverview == null ? null : currentOverview.getPrimaryLegalAssistant(),
-				options.keySet(),
-				currentOverview != null && currentOverview.getPrimaryLegalAssistantUserId() != null,
-				changePrimaryLegalAssistantButton).ifPresent(action -> {
-			if (action.remove()) {
-				removePrimaryLegalAssistantField();
-			} else {
-				CaseDao.UserRow row = options.get(action.selectedValue());
-				if (row != null)
-					savePrimaryLegalAssistantField(row.id());
-			}
-		});
+		if (!ensureTenantAndCaseForFieldDialog("primary legal assistant")) return;
+		List<CaseDao.UserRow> options = caseDao.listUsersForTenant(appState.getShaleClientId());
+		CaseDao.UserRow currentValue = currentOverview == null || currentOverview.getPrimaryLegalAssistantUserId() == null ? null : options.stream()
+				.filter(v -> Objects.equals(v.id(), currentOverview.getPrimaryLegalAssistantUserId())).findFirst()
+				.orElse(new CaseDao.UserRow(currentOverview.getPrimaryLegalAssistantUserId(), currentOverview.getPrimaryLegalAssistant(),
+						currentOverview.getPrimaryLegalAssistantColor()));
+		Optional<CaseDao.UserRow> selected = showUserCardChoice("Edit Primary Legal Assistant", "Primary Legal Assistant",
+				currentValue, options, true, this::removePrimaryLegalAssistantField, changePrimaryLegalAssistantButton);
+		if (selected.isPresent()) savePrimaryLegalAssistantField(selected.get().id());
 	}
 
-	private record PrimaryLegalAssistantDialogAction(String selectedValue, boolean remove) {
+	private Optional<CaseDao.UserRow> showUserCardChoice(String title, String label, CaseDao.UserRow currentValue,
+			List<CaseDao.UserRow> options, boolean clearable, Runnable removeAction, Button ownerButton) {
+		UserCardFactory cards = new UserCardFactory(id -> { });
+		return showCardChoiceFieldDialog(title, label, currentValue, options, CaseDao.UserRow::id,
+				v -> cards.create(new UserCardModel(v.id(), v.displayName(), v.color(), null), Variant.MINI), clearable, removeAction, ownerButton);
 	}
 
-	private Optional<PrimaryLegalAssistantDialogAction> showPrimaryLegalAssistantDialog(String currentValue, String selectedValue,
-			java.util.Collection<String> options, boolean hasPrimaryLegalAssistant, Button ownerButton) {
-		Dialog<PrimaryLegalAssistantDialogAction> dialog = new Dialog<>();
-		AppDialogs.applySecondaryDialogShell(dialog, "Edit primary legal assistant");
-		dialog.initOwner(dialogOwner(ownerButton));
-		ButtonType removeType = new ButtonType("Remove primary legal assistant", ButtonData.LEFT);
-		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
-		if (hasPrimaryLegalAssistant) {
-			dialog.getDialogPane().getButtonTypes().add(removeType);
-		}
-		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, saveType);
-		ChoiceBox<String> choice = new ChoiceBox<>();
-		choice.getItems().addAll(options == null ? List.of() : options);
-		if (selectedValue != null && choice.getItems().contains(selectedValue)) {
-			choice.getSelectionModel().select(selectedValue);
-		} else if (!choice.getItems().isEmpty()) {
-			choice.getSelectionModel().select(0);
-		}
-		choice.setMaxWidth(Double.MAX_VALUE);
-		Label currentLabel = new Label(safeText(currentValue).isBlank() ? "—" : currentValue);
-		currentLabel.getStyleClass().add("field-edit-current-value");
-		VBox content = new VBox(10,
-				new Label("Current Primary legal assistant"),
-				currentLabel,
-				new Label("New Primary legal assistant"),
-				choice);
-		content.getStyleClass().add("field-edit-dialog-body");
-		dialog.getDialogPane().setContent(content);
-		Node saveButtonNode = dialog.getDialogPane().lookupButton(saveType);
-		if (saveButtonNode != null) {
-			saveButtonNode.disableProperty().bind(choice.valueProperty().isNull());
-		}
-		Node removeButtonNode = dialog.getDialogPane().lookupButton(removeType);
-		if (removeButtonNode != null) {
-			removeButtonNode.getStyleClass().add("app-dialog-button-danger");
-		}
-		dialog.setResultConverter(button -> {
-			if (button == saveType)
-				return new PrimaryLegalAssistantDialogAction(choice.getValue(), false);
-			if (button == removeType)
-				return new PrimaryLegalAssistantDialogAction(null, true);
-			return null;
-		});
-		return dialog.showAndWait();
-	}
-
-	private Optional<String> showChoiceFieldDialog(String title, String fieldLabel, String currentValue, String selectedValue, java.util.Collection<String> options,
-			Button ownerButton) {
-		Dialog<String> dialog = new Dialog<>();
+	/** Shared Case Overview editor shell; persistence deliberately remains in each caller. */
+	private <T> Optional<T> showCardChoiceFieldDialog(String title, String fieldLabel, T currentValue, List<T> options,
+			Function<T, Integer> identity, Function<T, Node> miniCardRenderer, boolean clearable, Runnable removeAction, Button ownerButton) {
+		Dialog<T> dialog = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(dialog, title);
 		dialog.initOwner(dialogOwner(ownerButton));
+		ButtonType removeType = new ButtonType("Remove", ButtonData.LEFT);
 		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
+		if (clearable && currentValue != null) dialog.getDialogPane().getButtonTypes().add(removeType);
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, saveType);
-		ChoiceBox<String> choice = new ChoiceBox<>();
-		choice.getItems().addAll(options == null ? List.of() : options);
-		if (selectedValue != null && choice.getItems().contains(selectedValue)) {
-			choice.getSelectionModel().select(selectedValue);
-		} else if (!choice.getItems().isEmpty()) {
-			choice.getSelectionModel().select(0);
-		}
-		choice.setMaxWidth(Double.MAX_VALUE);
-		Label currentLabel = new Label(safeText(currentValue).isBlank() ? "—" : currentValue);
-		currentLabel.getStyleClass().add("field-edit-current-value");
-		VBox content = new VBox(10,
-				new Label("Current " + fieldLabel),
-				currentLabel,
-				new Label("New " + fieldLabel),
-				choice);
+		UserSelectionField<T> selector = new UserSelectionField<>(identity, Object::toString, ignored -> null,
+				(field, candidates) -> showMiniCardPicker(dialog.getDialogPane().getScene().getWindow(), fieldLabel, candidates,
+						identity, miniCardRenderer), clearable, miniCardRenderer).useUnifiedControlStyles();
+		selector.setCandidates(options);
+		selector.setSelectedUser(currentValue);
+		selector.setMaxWidth(Double.MAX_VALUE);
+		Node currentCard = currentValue == null ? emptyCurrentValue("No " + fieldLabel.toLowerCase(Locale.ROOT) + " assigned")
+				: miniCardRenderer.apply(currentValue);
+		VBox content = new VBox(10, new Label("Current " + fieldLabel), currentCard,
+				new Label("New " + fieldLabel), selector);
 		content.getStyleClass().add("field-edit-dialog-body");
+		content.setMinWidth(420);
 		dialog.getDialogPane().setContent(content);
-		Node saveButtonNode = dialog.getDialogPane().lookupButton(saveType);
-		if (saveButtonNode != null) {
-			saveButtonNode.disableProperty().bind(choice.valueProperty().isNull());
-		}
-		dialog.setResultConverter(button -> button == saveType ? choice.getValue() : null);
+		Node save = dialog.getDialogPane().lookupButton(saveType);
+		if (save instanceof Button button) ControlStyles.apply(button, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+		if (save != null) save.disableProperty().bind(selector.selectedUserProperty().isNull());
+		Node cancel = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+		if (cancel instanceof Button button) ControlStyles.apply(button, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		Node remove = dialog.getDialogPane().lookupButton(removeType);
+		if (remove instanceof Button button) ControlStyles.apply(button, ControlStyles.Purpose.GHOST, ControlStyles.Size.STANDARD);
+		dialog.setResultConverter(button -> {
+			if (button == removeType && removeAction != null) removeAction.run();
+			return button == saveType ? selector.getSelectedUser() : null;
+		});
 		return dialog.showAndWait();
+	}
+
+	private static Node emptyCurrentValue(String text) {
+		Label empty = new Label(text);
+		empty.getStyleClass().add("field-edit-current-value");
+		return empty;
+	}
+
+	private static <T> Optional<T> showMiniCardPicker(Window owner, String label, List<T> options,
+			Function<T, Integer> identity, Function<T, Node> renderer) {
+		Dialog<T> picker = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(picker, "Select " + label);
+		picker.initOwner(owner);
+		picker.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+		VBox list = new VBox(8);
+		for (T option : options) {
+			Button row = new Button();
+			ControlStyles.apply(row, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+			row.getStyleClass().add("user-selector-card-button");
+			row.setMaxWidth(Double.MAX_VALUE);
+			row.setGraphic(renderer.apply(option));
+			row.setAccessibleText("Select " + label + " " + identity.apply(option));
+			row.setOnAction(event -> { picker.setResult(option); picker.close(); });
+			list.getChildren().add(row);
+		}
+		ScrollPane scroll = new ScrollPane(list);
+		scroll.setFitToWidth(true); scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		scroll.setPrefViewportHeight(Math.min(360, Math.max(120, options.size() * 58)));
+		picker.getDialogPane().setContent(scroll);
+		return picker.showAndWait();
 	}
 
 	private boolean ensureTenantAndCaseForFieldDialog(String fieldLabel) {
