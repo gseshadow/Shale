@@ -86,6 +86,12 @@ public final class SettingsController {
 	@FXML
 	private Label notificationSettingsStatusLabel;
 	@FXML
+	private Button applyNotificationPreferencesButton;
+	@FXML
+	private Button resetNotificationPreferencesButton;
+	@FXML
+	private Button viewAuditLogButton;
+	@FXML
 	private VBox auditSection;
 	@FXML
 	private VBox caseStatusAdministrationSection;
@@ -183,6 +189,7 @@ public final class SettingsController {
 	@FXML
 	private void initialize() {
 		fxmlReady = true;
+		configureSettingsSemanticButtons();
 		configureLookupActionRows();
 		configureUserManagementTable();
 		updateAdminControlsVisibility();
@@ -190,6 +197,12 @@ public final class SettingsController {
 			loadFromPreferences();
 		}
 		loadAdminSectionsAsync();
+	}
+
+	private void configureSettingsSemanticButtons() {
+		ControlStyles.apply(applyNotificationPreferencesButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(resetNotificationPreferencesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(viewAuditLogButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 	}
 
 	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
