@@ -46,18 +46,18 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
         assertTrue(source.contains("setVisibleManaged(changePrimaryLegalAssistantButton, true)"));
         assertTrue(source.contains("changePrimaryLegalAssistantButton.setDisable(busy)"));
 
-        String editor = method(source, "private void onEditPrimaryLegalAssistantField", "private Optional<String> showChoiceFieldDialog");
-        assertTrue(editor.contains("caseDao.listUsersForTenant(tenantId)"));
-        assertTrue(editor.contains("\"Edit primary legal assistant\""));
-        assertTrue(editor.contains("currentOverview.getPrimaryLegalAssistant()"), "Dialog should preselect the current assistant display value");
-        assertTrue(editor.contains("showPrimaryLegalAssistantDialog("));
-        assertTrue(editor.contains("savePrimaryLegalAssistantField(row.id())"));
+        String editor = method(source, "private void onEditPrimaryLegalAssistantField", "private Optional<CaseDao.UserRow> showUserCardChoice");
+        assertTrue(editor.contains("caseDao.listUsersForTenant(appState.getShaleClientId())"));
+        assertTrue(editor.contains("\"Edit Primary Legal Assistant\""));
+        assertTrue(editor.contains("currentOverview.getPrimaryLegalAssistant()"));
+        assertTrue(editor.contains("showUserCardChoice("));
+        assertTrue(editor.contains("savePrimaryLegalAssistantField(selected.get().id())"));
 
         String saver = method(source, "private void savePrimaryLegalAssistantField", "private void onChangeResponsibleAttorney");
         assertTrue(saver.contains("caseDao.setPrimaryLegalAssistant(activeCaseId, appState.getShaleClientId(), userId)"));
         assertTrue(saver.contains("catch (Exception ex)"));
         assertTrue(saver.contains("publishCaseFieldUpdated(activeCaseId, \"primaryLegalAssistantUserId\", userId)"));
-        assertTrue(saver.contains("reloadCurrentCaseForViewMode()"), "Overview should refresh after save without navigating away");
+        assertTrue(saver.contains("reloadCurrentCaseForViewMode()"));
     }
 
     @Test
@@ -73,19 +73,18 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
     @Test
     void primaryLegalAssistantEditorOffersRemoveOnlyWhenCurrentAssistantExistsAndPublishesSafeClear() throws Exception {
         String source = caseControllerSource();
-        String editor = method(source, "private Optional<PrimaryLegalAssistantDialogAction> showPrimaryLegalAssistantDialog", "private Optional<String> showChoiceFieldDialog");
-        assertTrue(editor.contains("boolean hasPrimaryLegalAssistant"));
-        assertTrue(editor.contains("ButtonType removeType = new ButtonType(\"Remove primary legal assistant\""));
-        assertTrue(editor.contains("if (hasPrimaryLegalAssistant)"));
+        String editor = method(source, "private <T> Optional<T> showCardChoiceFieldDialog", "private static Node emptyCurrentValue");
+        assertTrue(editor.contains("if (clearable && currentValue != null)"));
         assertTrue(editor.contains("dialog.getDialogPane().getButtonTypes().add(removeType)"));
-        assertTrue(editor.contains("app-dialog-button-danger"), "Remove should follow destructive-secondary styling convention");
-        assertTrue(editor.contains("ButtonType.CANCEL, saveType"), "Save and Cancel should remain available for changing users");
+        assertTrue(editor.contains("ControlStyles.Purpose.GHOST"));
+        assertTrue(editor.contains("ButtonType.CANCEL, saveType"));
+        assertTrue(source.contains("this::removePrimaryLegalAssistantField"));
 
         String remover = method(source, "private void removePrimaryLegalAssistantField", "private void savePrimaryLegalAssistantField");
         assertTrue(remover.contains("caseDao.removePrimaryLegalAssistant(activeCaseId, appState.getShaleClientId())"));
         assertTrue(remover.contains("publishCaseFieldUpdated(activeCaseId, \"primaryLegalAssistantUserId\", null)"));
         assertTrue(remover.contains("reloadCurrentCaseForViewMode()"));
-        assertFalse(remover.contains("Map.of"), "Clearing publish path must not use Map.of with a null value");
+        assertFalse(remover.contains("Map.of"));
     }
 
     @Test
