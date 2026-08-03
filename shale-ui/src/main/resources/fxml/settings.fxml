@@ -160,7 +160,7 @@
                     <CheckBox fx:id="showInactiveUsersCheck" text="Show inactive users" onAction="#onToggleInactiveUsers" styleClass="shale-form-control"/>
                     <Button fx:id="addUserButton" text="Add User" onAction="#onAddUser" styleClass="shale-control-button shale-control-primary shale-control-standard"/>
                 </HBox>
-                <TableView fx:id="userManagementTable" prefHeight="340" minHeight="240" fixedCellSize="50" styleClass="shale-table" VBox.vgrow="ALWAYS">
+                <TableView fx:id="userManagementTable" prefHeight="340" minHeight="240" fixedCellSize="36" styleClass="shale-table" VBox.vgrow="ALWAYS">
                     <columns>
                         <TableColumn fx:id="userNameColumn" text="Name" prefWidth="230" minWidth="190" maxWidth="300"/>
                         <TableColumn fx:id="userEmailColumn" text="Email / login" prefWidth="230"/>

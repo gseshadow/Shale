@@ -1260,9 +1260,10 @@ public final class SettingsController {
 				super.updateItem(row, empty);
 				setText(null); setGraphic(null); pseudoClassStateChanged(PseudoClass.getPseudoClass("inactive"), false);
 				if (empty || row == null) return;
-				UserCard card = userManagementCardFactory.createTableMini(
+				UserCard card = userManagementCardFactory.create(
 						new UserCardModel(row.id(), row.name(), row.color(), row.initials()),
-						"User ID #" + row.id(), row.deleted());
+						UserCardFactory.Variant.MINI);
+				card.setInactive(row.deleted());
 				card.setMaxWidth(Double.MAX_VALUE);
 				setGraphic(card);
 			}

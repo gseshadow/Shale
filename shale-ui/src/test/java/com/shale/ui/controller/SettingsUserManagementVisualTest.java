@@ -7,6 +7,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.SnapshotParameters;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TableCell;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.Pane;
@@ -47,8 +48,12 @@ final class SettingsUserManagementVisualTest {
             snapshot(section,output.resolve("user-management-mini-cards-minimum.png"));
             table.scrollTo(rows.size()-1);table.getSelectionModel().select(rows.size()-1);visualRoot.applyCss();visualRoot.layout();section.applyCss();section.layout();
             snapshot(section,output.resolve("user-management-mini-cards-after-scroll-reuse.png"));
-            assertFalse(section.lookupAll(".user-card-mini").isEmpty(),"render must contain shared mini card shells");
-            assertTrue(section.lookupAll(".user-card-table-name").size()>1);
+            assertTrue(table.lookupAll(".table-cell").stream().filter(TableCell.class::isInstance)
+                    .map(TableCell.class::cast).anyMatch(cell -> cell.getGraphic() instanceof com.shale.ui.component.UserCard),
+                    "the Name column must render the shared UserCard type");
+            assertTrue(table.lookupAll(".user-card-table-mini").isEmpty(),"removed table-specific card shell must be absent");
+            assertTrue(table.lookupAll(".user-card-table-metadata").isEmpty(),"User ID metadata must not be rendered");
+            assertEquals(36,table.getFixedCellSize());
             stage.close();
         } catch(Exception e){throw new AssertionError(e);} });
     }

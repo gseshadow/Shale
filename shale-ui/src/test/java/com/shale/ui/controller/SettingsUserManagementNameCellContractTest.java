@@ -9,17 +9,25 @@ final class SettingsUserManagementNameCellContractTest {
     private static final String SOURCE;
     static { try { SOURCE=Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java")); } catch(Exception e){throw new ExceptionInInitializerError(e);} }
 
-    @Test void nameColumnUsesSharedPassiveTableMiniAndCleansReusedCells(){
+    @Test void nameColumnUsesTheEstablishedSharedMiniVariantAndCleansReusedCells(){
         String method=method("configureUserManagementTable");
-        assertTrue(method.contains("userManagementCardFactory.createTableMini"));
+        assertTrue(method.contains("userManagementCardFactory.create("));
         assertTrue(method.contains("new UserCardModel(row.id(), row.name(), row.color(), row.initials())"));
-        assertTrue(method.contains("\"User ID #\" + row.id()"));
-        assertTrue(method.contains("row.deleted()"));
+        assertTrue(method.contains("UserCardFactory.Variant.MINI"));
+        assertTrue(method.contains("card.setInactive(row.deleted())"));
         assertTrue(method.contains("setText(null); setGraphic(null)"));
         assertTrue(method.contains("if (empty || row == null) return"));
-        assertTrue(method.contains("createTableMini"), "embedded identity must use the shared passive renderer");
+        assertFalse(method.contains("createTableMini"), "the removed table-specific large card must not return");
+        assertFalse(method.contains("User ID #"), "authoritative IDs must not be rendered as secondary metadata");
         assertFalse(method.contains("new Circle"), "Settings must not imitate the shared mini card");
         assertFalse(method.contains("new Label"), "Settings must not imitate the shared mini card");
+    }
+
+    @Test void userManagementRowsUseTheFoundationHeightRatherThanTheRemovedLargeCardHeight() throws Exception {
+        String fxml=Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
+        String table=fxml.substring(fxml.indexOf("<TableView fx:id=\"userManagementTable\""), fxml.indexOf("</TableView>", fxml.indexOf("<TableView fx:id=\"userManagementTable\"")));
+        assertTrue(table.contains("fixedCellSize=\"36\""));
+        assertFalse(table.contains("fixedCellSize=\"50\""));
     }
 
     @Test void rowSelectionAndActivationRemainOnImmutableDtoBackedTableRow(){
