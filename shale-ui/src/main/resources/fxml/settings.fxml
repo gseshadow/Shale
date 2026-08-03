@@ -55,8 +55,8 @@
             <Separator/>
 
             <HBox spacing="10">
-                <Button text="Apply" onAction="#onApplyNotificationPreferences" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact"/>
-                <Button text="Reset" onAction="#onResetNotificationPreferences" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact"/>
+                <Button fx:id="applyNotificationPreferencesButton" text="Apply" onAction="#onApplyNotificationPreferences"/>
+                <Button fx:id="resetNotificationPreferencesButton" text="Reset" onAction="#onResetNotificationPreferences"/>
                 <Label fx:id="notificationSettingsStatusLabel" styleClass="search-summary-text" wrapText="true">
                     <HBox.margin>
                         <Insets left="8"/>
@@ -182,7 +182,6 @@
                 <Label text="Audit" styleClass="app-dialog-field-label"/>
                 <Button fx:id="viewAuditLogButton"
                         text="View Audit Log"
-                        styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact"
                         onAction="#onViewAuditLog"/>
             </VBox>
         </VBox>
