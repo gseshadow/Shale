@@ -66,10 +66,12 @@ public class UserCard extends HBox {
     /** Table-compatible MINI presentation: passive, dense, and selection-surface neutral. */
     public void applyTableMini() {
         getChildren().clear();
-        getStyleClass().removeAll("shale-entity-card", "shale-card-surface", "shale-entity-card-clickable");
-        if (!getStyleClass().contains("user-card-table-mini")) getStyleClass().add("user-card-table-mini");
+        getStyleClass().remove("shale-entity-card-clickable");
+        for (String styleClass : java.util.List.of("shale-entity-card", "shale-embedded-card-surface", "shale-entity-card-inline", "user-card-mini", "user-card-table-mini")) {
+            if (!getStyleClass().contains(styleClass)) getStyleClass().add(styleClass);
+        }
         setStyle(null);
-        setPadding(Insets.EMPTY);
+        setPadding(new Insets(5, 8, 5, 8));
         setSpacing(8);
         setCursor(Cursor.DEFAULT);
         setMouseTransparent(true);

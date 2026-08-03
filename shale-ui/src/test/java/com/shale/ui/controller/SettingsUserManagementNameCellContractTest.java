@@ -18,6 +18,8 @@ final class SettingsUserManagementNameCellContractTest {
         assertTrue(method.contains("setText(null); setGraphic(null)"));
         assertTrue(method.contains("if (empty || row == null) return"));
         assertTrue(method.contains("createTableMini"), "embedded identity must use the shared passive renderer");
+        assertFalse(method.contains("new Circle"), "Settings must not imitate the shared mini card");
+        assertFalse(method.contains("new Label"), "Settings must not imitate the shared mini card");
     }
 
     @Test void rowSelectionAndActivationRemainOnImmutableDtoBackedTableRow(){

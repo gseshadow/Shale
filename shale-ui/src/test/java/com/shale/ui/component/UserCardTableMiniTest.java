@@ -18,6 +18,8 @@ final class UserCardTableMiniTest {
             UserCardFactory factory = new UserCardFactory(null);
             UserCard inactive = factory.createTableMini(new UserCardModel(41, "Alex Morgan", "#336699", "AM"), "User ID #41", true);
             assertTrue(inactive.isMouseTransparent());
+            assertTrue(inactive.getStyleClass().containsAll(java.util.List.of("shale-entity-card", "shale-embedded-card-surface", "shale-entity-card-inline", "user-card-mini", "user-card-table-mini")));
+            assertTrue(inactive.getStyle().isEmpty(), "table MINI must use the shared CSS card shell rather than inline styling");
             assertTrue(inactive.getPseudoClassStates().contains(PseudoClass.getPseudoClass("inactive")));
             assertEquals("Alex Morgan", ((Label) inactive.lookup(".user-card-table-name")).getText());
             assertEquals("User ID #41", ((Label) inactive.lookup(".user-card-table-metadata")).getText());
