@@ -246,3 +246,26 @@
 .case-link-contact-cell-selected {
     -fx-background-color: -shale-color-card-hover-surface;
 }
+
+/* Passive MINI user identity for dense table/list cells; the parent row owns selection. */
+.user-card-table-mini {
+    -fx-alignment: center-left;
+    -fx-min-height: 34px;
+    -fx-pref-height: 34px;
+    -fx-max-height: 34px;
+}
+.user-card-table-mini:inactive { -fx-opacity: 0.62; }
+.user-card-table-name {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -shale-color-text-primary;
+}
+.user-card-table-metadata {
+    -fx-font-size: 10px;
+    -fx-text-fill: -shale-color-text-muted;
+}
+.user-card-avatar-initials {
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+    -fx-text-fill: -shale-color-text-primary;
+}

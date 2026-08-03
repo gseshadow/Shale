@@ -74,4 +74,13 @@ final class EntityActionAuditEventTest {
 		assertThrows(IllegalArgumentException.class, () -> EntityActionAuditEvent.now(7, 9, EntityActionAuditEvent.EntityType.MATERIAL_ITEM, 88, EntityActionAuditEvent.Action.PRIMARY_SET, null, null, Map.of()));
 	}
 
+	@Test
+	void userAdministrationAuditUsesOnlySafeIdentifiersAndRoleState() {
+		EntityActionAuditEvent updated=EntityActionAuditEvent.now(7,9,EntityActionAuditEvent.EntityType.USER,11,EntityActionAuditEvent.Action.UPDATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.TARGET_USER_ID,11,EntityActionAuditEvent.MetadataKey.ADMIN_ROLE,false,EntityActionAuditEvent.MetadataKey.ATTORNEY_ROLE,true));
+		assertEquals(Map.of(EntityActionAuditEvent.MetadataKey.TARGET_USER_ID,"11",EntityActionAuditEvent.MetadataKey.ADMIN_ROLE,"false",EntityActionAuditEvent.MetadataKey.ATTORNEY_ROLE,"true"),updated.metadata());
+		EntityActionAuditEvent removed=EntityActionAuditEvent.now(7,9,EntityActionAuditEvent.EntityType.USER,11,EntityActionAuditEvent.Action.REMOVED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.TARGET_USER_ID,11,EntityActionAuditEvent.MetadataKey.ACTIVE,false));
+		String json=EntityActionAuditDao.metadataJson(removed.metadata());
+		assertFalse(json.toLowerCase().matches(".*(email|phone|password|credential|rowver).*"));
+	}
+
 }

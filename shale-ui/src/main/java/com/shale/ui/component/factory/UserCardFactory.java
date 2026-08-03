@@ -26,6 +26,20 @@ public class UserCardFactory {
 		this.onOpenUser = onOpenUser;
 	}
 
+	/** Creates a passive MINI user identity suitable for table cells. */
+	public UserCard createTableMini(UserCardModel model, String secondaryMetadata, boolean inactive) {
+		Objects.requireNonNull(model, "model");
+		UserCard card = new UserCard();
+		card.setUserId(model.userId());
+		card.setName(model.displayName());
+		card.setInitials(model.avatarRef());
+		card.setSecondaryMetadata(secondaryMetadata);
+		card.setBackgroundCssColor(ColorUtil.toCssBackgroundColorOrNull(model.colorCss()));
+		card.applyTableMini();
+		card.setInactive(inactive);
+		return card;
+	}
+
 	public UserCard create(UserCardModel model, Variant variant) {
 		Objects.requireNonNull(model, "model");
 
