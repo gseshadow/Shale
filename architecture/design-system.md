@@ -483,9 +483,15 @@ PHI Audit rows keep the established field-audit columns and meaning. Entity Acti
 
 ---
 
-## Unified JavaFX controls (phase 1)
+## Unified JavaFX controls
 
-The JavaFX control system is an **opt-in** foundation. Migrated areas use ordinary JavaFX controls plus `ControlStyles`; broad `.button`, ComboBox-internal, and DatePicker-calendar migrations are intentionally out of scope.
+The authoritative JavaFX semantic API is `com.shale.ui.util.ControlStyles`. Ordinary actions are
+classified with `ControlStyles.apply(ButtonBase, Purpose, Size)`; programmatically constructed actions
+use `ActionButtonFactory.semantic(String, EventHandler<ActionEvent>, Purpose, Size)`. The runtime class
+contract is `shale-control-button` plus exactly one of `shale-control-primary`,
+`shale-control-secondary`, `shale-control-ghost`, `shale-control-danger`, or
+`shale-control-navigation`, and exactly one of `shale-control-small` or `shale-control-standard`.
+`foundation/buttons.css`, imported by the production `app.css`, is the sole owner of these selectors.
 
 ### Semantic button purposes
 
@@ -512,9 +518,58 @@ ControlStyles.setInvalid(titleField, titleIsInvalid);
 
 Applying a purpose or size is idempotent, removes conflicting semantic classes, and preserves unrelated feature classes. The JavaFX `:invalid` pseudo-class changes only paint (including a distinguishable invalid-focus ring), so validation does not change dimensions. Continue to use each workflow's established validation rules and timing.
 
-### Migration and legacy compatibility
+FXML-injected actions must be classified in the controller's `initialize()` method (or a method called
+from it), after injection and before user interaction. Later initialization may change disabled,
+default-button, text, graphic, or handler state, but must not clear the semantic classes. Disabled
+buttons retain their purpose and size identity; CSS supplies only disabled opacity. Hover, pressed,
+focused, and default-button presentation remains owned by `foundation/buttons.css`. Each local action
+group or surface normally has one `PRIMARY`; supporting actions are `SECONDARY`, low-emphasis utilities
+are `GHOST`, destructive actions are `DANGER`, and location changes are `NAVIGATION`. Use `STANDARD`
+for forms/dialog action bars and `SMALL` for dense toolbars, cards, tables, and compact filters.
 
-Migration is explicit, screen by screen. `ActionButtonFactory.semantic(...)` is the opt-in bridge. Existing `primary`, `neutral`, `danger`, `compact`, and `cardAction` methods retain their legacy toolbar classes so unmigrated callers do not change unexpectedly. `neutral` is a temporary compatibility alias only; new migrated code uses **Secondary** and must not expand neutral terminology. Legacy CSS and specialized selector rendering remain until their callers are intentionally migrated.
+New inline action colors, local semantic CSS, duplicate button factories, manually assembled semantic
+class names, and broad `.button` overrides are prohibited. A genuinely specialized control (segmented
+view, section-tab pill, switch, status pill, icon-only affordance, calendar cell, card activation
+surface, or real hyperlink) must have a narrowly scoped feature class and be documented in its feature
+contract; it must not work only because of generic button CSS. Architectural tests must inspect the
+final runtime style-class list, including disabled controls, rather than merely finding helper names in
+source.
+
+### Dropdown-selector API
+
+The general selector is a DTO-typed JavaFX `ComboBox<T>` (or `ChoiceBox<T>` where its intentionally
+smaller native interaction is required) classified with `ControlStyles.formControl(control)`. For FXML,
+declare the typed field and call `formControl` in `initialize()` after injection. Programmatic selectors
+call it immediately after construction. `shale-form-control` and `foundation/forms.css` own the shared
+surface, arrow, prompt, hover, focus, disabled, and `:invalid` presentation; validation is applied with
+`ControlStyles.setInvalid(control, boolean)`. Native keyboard navigation and the caller's established
+prompt/null-selection behavior must remain intact.
+
+Use `com.shale.ui.component.ColorCodedComboBox<T>` for database-backed status, priority, type, method,
+role, or other lookup DTOs whose authoritative color belongs in popup and selected-value rendering.
+Its extractor functions render the label, stored color, and optional secondary description without
+changing the selected DTO. `ColoredLookupComboBoxCellFactory.configure(...)` is the FXML bridge when an
+existing injected `ComboBox<T>` needs that renderer. Use `UserSelector<T>` for searchable rich user-card
+selection and call `useSemanticFormControl()` for its search shell; use `UserSelectionField<T>` for the
+compact selected-user field/picker composition. Calendar time/duration selectors, segmented controls,
+and feature-specific searchable or rich selectors are intentional exceptions when their distinct
+interaction is documented and still opt into the shared form shell where applicable.
+
+DTO instances and immutable IDs—not labels or table positions—remain authoritative for filtering and
+mutation. Preserve null/None values, prompts, disabled/read-only state, validation, type-ahead/search,
+keyboard operation, async generation guards, tenant-aware hydration, RowVer boundaries, colors, and
+button/popup cell parity. Local one-off ComboBox CSS, inline selector colors, duplicated cell/button-cell
+factories, and broad `.combo-box` overrides are prohibited. If a shared selector lacks a capability,
+add a narrowly scoped reusable enhancement and focused behavior tests rather than creating a local
+parallel selector.
+
+### Legacy compatibility and intentional exceptions
+
+Existing `ActionButtonFactory.primary`, `neutral`, `danger`, `compact`, and `cardAction` methods are
+compatibility methods only and retain their legacy toolbar classes until each caller is deliberately
+migrated. New code must use `semantic`; `neutral` must not become a parallel name for Secondary.
+Documented specialized controls may retain their feature selectors, but ordinary actions and selectors
+must use the APIs above. Legacy styling may be removed only after its final caller is migrated.
 
 Newly migrated areas must not introduce:
 
