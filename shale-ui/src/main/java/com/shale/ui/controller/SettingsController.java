@@ -17,6 +17,7 @@ import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ActionButtonFactory;
+import com.shale.ui.util.ControlStyles;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -24,6 +25,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ColorPicker;
+import javafx.scene.control.Control;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -368,30 +370,42 @@ public final class SettingsController {
 	private void configureLookupActionRows() {
 		if (caseStatusActionRow != null) {
 			caseStatusActionRow.getChildren().setAll(
-					ActionButtonFactory.primary("Add Status", event -> onAddCaseStatus()),
-					ActionButtonFactory.neutral("Edit Status", event -> onEditCaseStatus()),
-					ActionButtonFactory.neutral("Move Up", event -> onMoveCaseStatusUp()),
-					ActionButtonFactory.neutral("Move Down", event -> onMoveCaseStatusDown()),
+					semanticButton("Add Status", ControlStyles.Purpose.PRIMARY, event -> onAddCaseStatus()),
+					semanticButton("Edit Status", ControlStyles.Purpose.SECONDARY, event -> onEditCaseStatus()),
+					semanticButton("Move Up", ControlStyles.Purpose.GHOST, event -> onMoveCaseStatusUp()),
+					semanticButton("Move Down", ControlStyles.Purpose.GHOST, event -> onMoveCaseStatusDown()),
 					caseStatusSettingsStatusLabel);
 		}
 		if (linkTypeActionRow != null) {
 			linkTypeActionRow.getChildren().setAll(
-					ActionButtonFactory.primary("Add Link Type", event -> onAddLinkType()),
-					ActionButtonFactory.neutral("Edit/Customize", event -> onEditLinkType()),
-					ActionButtonFactory.neutral("Activate/Deactivate", event -> onToggleLinkTypeActive()),
-					ActionButtonFactory.neutral("Reset/Remove", event -> onResetOrRemoveLinkType()),
+					semanticButton("Add Link Type", ControlStyles.Purpose.PRIMARY, event -> onAddLinkType()),
+					semanticButton("Edit/Customize", ControlStyles.Purpose.SECONDARY, event -> onEditLinkType()),
+					semanticButton("Activate/Deactivate", ControlStyles.Purpose.GHOST, event -> onToggleLinkTypeActive()),
+					semanticButton("Reset/Remove", ControlStyles.Purpose.SECONDARY, event -> onResetOrRemoveLinkType()),
 					linkTypeSettingsStatusLabel);
 		}
 		if (practiceAreaActionRow != null) {
 			practiceAreaActionRow.getChildren().setAll(
-					ActionButtonFactory.primary("Add Practice Area", event -> onAddPracticeArea()),
-					ActionButtonFactory.neutral("Edit Practice Area", event -> onEditPracticeArea()),
-					ActionButtonFactory.neutral("Remove Practice Area", event -> onRemovePracticeArea()),
+					semanticButton("Add Practice Area", ControlStyles.Purpose.PRIMARY, event -> onAddPracticeArea()),
+					semanticButton("Edit Practice Area", ControlStyles.Purpose.SECONDARY, event -> onEditPracticeArea()),
+					semanticButton("Deactivate Practice Area", ControlStyles.Purpose.GHOST, event -> onRemovePracticeArea()),
 					practiceAreaSettingsStatusLabel);
 		}
-		if (materialTypeActionRow != null) materialTypeActionRow.getChildren().setAll(ActionButtonFactory.primary("Add Material Type", e -> onAddMaterialType()), ActionButtonFactory.neutral("Edit/Customize", e -> onEditMaterialType()), ActionButtonFactory.neutral("Activate/Deactivate", e -> onToggleMaterialTypeActive()), ActionButtonFactory.neutral("Reset/Remove", e -> onResetOrRemoveMaterialType()), materialTypeSettingsStatusLabel);
-		if (requestMethodActionRow != null) requestMethodActionRow.getChildren().setAll(ActionButtonFactory.primary("Add Request Method", e -> onAddRequestMethod()), ActionButtonFactory.neutral("Edit/Customize", e -> onEditRequestMethod()), ActionButtonFactory.neutral("Activate/Deactivate", e -> onToggleRequestMethodActive()), ActionButtonFactory.neutral("Reset/Remove", e -> onResetOrRemoveRequestMethod()), requestMethodSettingsStatusLabel);
-		if (requestStatusActionRow != null) requestStatusActionRow.getChildren().setAll(ActionButtonFactory.primary("Add Request Status", e -> onAddRequestStatus()), ActionButtonFactory.neutral("Edit/Customize", e -> onEditRequestStatus()), ActionButtonFactory.neutral("Activate/Deactivate", e -> onToggleRequestStatusActive()), ActionButtonFactory.neutral("Reset/Remove", e -> onResetOrRemoveRequestStatus()), requestStatusSettingsStatusLabel);
+		if (materialTypeActionRow != null) configureRequestActionRow(materialTypeActionRow, "Material Type", materialTypeSettingsStatusLabel, this::onAddMaterialType, this::onEditMaterialType, this::onToggleMaterialTypeActive, this::onResetOrRemoveMaterialType);
+		if (requestMethodActionRow != null) configureRequestActionRow(requestMethodActionRow, "Request Method", requestMethodSettingsStatusLabel, this::onAddRequestMethod, this::onEditRequestMethod, this::onToggleRequestMethodActive, this::onResetOrRemoveRequestMethod);
+		if (requestStatusActionRow != null) configureRequestActionRow(requestStatusActionRow, "Request Status", requestStatusSettingsStatusLabel, this::onAddRequestStatus, this::onEditRequestStatus, this::onToggleRequestStatusActive, this::onResetOrRemoveRequestStatus);
+	}
+
+	private Button semanticButton(String text, ControlStyles.Purpose purpose, javafx.event.EventHandler<ActionEvent> handler) {
+		return ActionButtonFactory.semantic(text, handler, purpose, ControlStyles.Size.STANDARD);
+	}
+
+	private void configureRequestActionRow(HBox row, String label, Label status, Runnable add, Runnable edit, Runnable toggle, Runnable reset) {
+		row.getChildren().setAll(
+				semanticButton("Add " + label, ControlStyles.Purpose.PRIMARY, e -> add.run()),
+				semanticButton("Edit/Customize", ControlStyles.Purpose.SECONDARY, e -> edit.run()),
+				semanticButton("Activate/Deactivate", ControlStyles.Purpose.GHOST, e -> toggle.run()),
+				semanticButton("Reset/Remove", ControlStyles.Purpose.SECONDARY, e -> reset.run()), status);
 	}
 
 	private void renderMaterialTypeCards(List<MaterialTypeDto> rows) { if (materialTypeCardsContainer == null) return; List<MaterialTypeDto> effective = rows == null ? List.of() : rows; materialTypeCardsContainer.getChildren().setAll(effective.isEmpty() ? List.of(loadingLabel("No material types are configured for this tenant.")) : effective.stream().map(r -> buildRequestLookupCard(RequestLookupKind.MATERIAL_TYPE, RequestLookupSelection.material(r))).toList()); setMaterialTypeMessage(""); }
@@ -412,7 +426,7 @@ public final class SettingsController {
 				event.consume();
 			}
 		});
-		HBox header = new HBox(10); header.setAlignment(Pos.CENTER_LEFT); Circle dot = new Circle(6); String css = safe(ColorUtil.toCssBackgroundColorOrNull(row.color())); if (!css.isBlank()) dot.setStyle("-fx-background-color: " + css + "; -fx-fill: " + css + ";"); Label name = new Label(row.name()); name.getStyleClass().add("app-dialog-field-label"); Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); header.getChildren().addAll(dot, name, spacer, LinkTypeIndicatorFactory.createLinkTypePill(row.name(), row.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); HBox metadata = new HBox(6); metadata.setAlignment(Pos.CENTER_LEFT); metadata.getChildren().addAll(metadataPill(row.active() ? "Active" : "Inactive"), metadataPill(row.scopeLabel())); if (!row.systemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.systemKey())); if (!row.color().isBlank()) metadata.getChildren().add(metadataPill(row.color())); HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", "app-toolbar-button-neutral"); edit.setOnAction(e -> { selectRequestLookup(kind,row); editRequestLookup(kind); e.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", "app-toolbar-button-neutral"); toggle.setOnAction(e -> { selectRequestLookup(kind,row); toggleRequestLookup(kind); e.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", row.custom() ? "app-toolbar-button-danger" : "app-toolbar-button-neutral"); reset.setDisable(row.global()); reset.setOnAction(e -> { selectRequestLookup(kind,row); resetRequestLookup(kind); e.consume(); }); Label help = new Label(row.description().isBlank() ? row.lifecycleText() : row.description()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit,toggle,reset,help); card.getChildren().addAll(header,metadata,actions); return card;
+		HBox header = new HBox(10); header.setAlignment(Pos.CENTER_LEFT); Circle dot = new Circle(6); String css = safe(ColorUtil.toCssBackgroundColorOrNull(row.color())); if (!css.isBlank()) dot.setStyle("-fx-background-color: " + css + "; -fx-fill: " + css + ";"); Label name = new Label(row.name()); name.getStyleClass().add("app-dialog-field-label"); Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); header.getChildren().addAll(dot, name, spacer, LinkTypeIndicatorFactory.createLinkTypePill(row.name(), row.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); HBox metadata = new HBox(6); metadata.setAlignment(Pos.CENTER_LEFT); metadata.getChildren().addAll(metadataPill(row.active() ? "Active" : "Inactive"), metadataPill(row.scopeLabel())); if (!row.systemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.systemKey())); if (!row.color().isBlank()) metadata.getChildren().add(metadataPill(row.color())); HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", ControlStyles.Purpose.GHOST); edit.setOnAction(e -> { selectRequestLookup(kind,row); editRequestLookup(kind); e.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", ControlStyles.Purpose.GHOST); toggle.setOnAction(e -> { selectRequestLookup(kind,row); toggleRequestLookup(kind); e.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", ControlStyles.Purpose.SECONDARY); reset.setDisable(row.global()); reset.setOnAction(e -> { selectRequestLookup(kind,row); resetRequestLookup(kind); e.consume(); }); Label help = new Label(row.description().isBlank() ? row.lifecycleText() : row.description()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit,toggle,reset,help); card.getChildren().addAll(header,metadata,actions); return card;
 	}
 
 
@@ -519,17 +533,20 @@ public final class SettingsController {
 	private void applyLinkTypeRows(int generation, List<LinkTypeViewRow> rows, String successMessage) { if (generation != linkTypeLoadGeneration) return; Integer selectedId = selectedLinkTypeRow == null ? null : selectedLinkTypeRow.id(); linkTypeRows.clear(); linkTypeRows.addAll(rows); selectedLinkTypeRow = rows.stream().filter(row -> selectedId != null && row.id() == selectedId).findFirst().orElse(null); renderLinkTypeCards(); setLinkTypeMessage(successMessage != null && !successMessage.isBlank() ? successMessage : rows.isEmpty() ? "No link types are configured for this tenant." : ""); }
 	private void renderLinkTypeCards() { if (linkTypeCardsContainer == null) return; linkTypeCardsContainer.getChildren().clear(); for (LinkTypeViewRow row : linkTypeRows) linkTypeCardsContainer.getChildren().add(buildLinkTypeCard(row)); }
 	private VBox buildLinkTypeCard(LinkTypeViewRow row) {
-		VBox card = new VBox(8); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact"); if (selectedLinkTypeRow != null && selectedLinkTypeRow.id() == row.id()) card.getStyleClass().add("link-type-card-selected"); card.setOnMouseClicked(event -> selectLinkTypeRow(row));
+		VBox card = new VBox(8); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact"); card.setUserData(row); card.setFocusTraversable(true); card.pseudoClassStateChanged(SELECTED_CARD, selectedLinkTypeRow != null && selectedLinkTypeRow.id() == row.id());
+		card.setOnMouseClicked(event -> { if (event.getButton() == MouseButton.PRIMARY && !isActionControl(event.getTarget())) selectLinkTypeRow(row); });
+		card.setOnKeyPressed(event -> { if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) { selectLinkTypeRow(row); event.consume(); } });
 		HBox header = new HBox(10); header.setAlignment(Pos.CENTER_LEFT); Circle dot = new Circle(6); String colorCss = safe(ColorUtil.toCssBackgroundColorOrNull(row.getColor())); if (!colorCss.isBlank()) dot.setStyle("-fx-background-color: " + colorCss + "; -fx-fill: " + colorCss + ";"); Label name = new Label(row.getName()); name.getStyleClass().add("app-dialog-field-label"); Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); header.getChildren().addAll(dot, name, spacer, LinkTypeIndicatorFactory.createLinkTypePill(row.getName(), row.getColor(), LinkTypeIndicatorFactory.PillSize.COMPACT));
 		HBox metadata = new HBox(6); metadata.setAlignment(Pos.CENTER_LEFT); metadata.getChildren().addAll(metadataPill(row.getActiveState()), metadataPill(row.scopeLabel())); if (!row.getSystemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.getSystemKey())); if (!row.getColor().isBlank()) metadata.getChildren().add(metadataPill(row.getColor()));
-		HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", "app-toolbar-button-neutral"); edit.setOnAction(event -> { selectLinkTypeRow(row); onEditLinkType(); event.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", "app-toolbar-button-neutral"); toggle.setOnAction(event -> { selectLinkTypeRow(row); onToggleLinkTypeActive(); event.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", row.custom() ? "app-toolbar-button-danger" : "app-toolbar-button-neutral"); reset.setDisable(row.global()); reset.setOnAction(event -> { selectLinkTypeRow(row); onResetOrRemoveLinkType(); event.consume(); }); Label help = new Label(row.lifecycleText()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit, toggle, reset, help);
+		HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", ControlStyles.Purpose.GHOST); edit.setOnAction(event -> { selectLinkTypeRow(row); onEditLinkType(); event.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", ControlStyles.Purpose.GHOST); toggle.setOnAction(event -> { selectLinkTypeRow(row); onToggleLinkTypeActive(); event.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", ControlStyles.Purpose.SECONDARY); reset.setDisable(row.global()); reset.setOnAction(event -> { selectLinkTypeRow(row); onResetOrRemoveLinkType(); event.consume(); }); Label help = new Label(row.lifecycleText()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit, toggle, reset, help);
 		card.getChildren().addAll(header, metadata, actions); return card;
 	}
-	private void selectLinkTypeRow(LinkTypeViewRow row) { selectedLinkTypeRow = row; renderLinkTypeCards(); }
+	private void selectLinkTypeRow(LinkTypeViewRow row) { selectedLinkTypeRow = row; updateSelectionStyles(linkTypeCardsContainer, row.id()); }
 	private LinkTypeViewRow selectedLinkTypeRow() { if (selectedLinkTypeRow == null) setLinkTypeMessage("Select a link type first."); return selectedLinkTypeRow; }
 	private Optional<LinkTypeInput> showLinkTypeDialog(LinkTypeDto existing) {
 		Dialog<LinkTypeInput> dialog = new Dialog<>(); String dialogTitle = existing == null ? "Add Link Type" : (existing.shaleClientId() == null ? "Customize Link Type" : "Edit Link Type"); dialog.setTitle(dialogTitle); AppDialogs.applySecondaryDialogShell(dialog, dialogTitle); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		TextField name = new TextField(existing == null ? "" : existing.name()); name.setPromptText("100 characters max"); CheckBox active = new CheckBox("Active"); active.setSelected(existing == null || existing.active()); ColorPicker colorPicker = new ColorPicker(dbColorToFx(existing == null ? null : existing.color())); GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(new Label("Name"),0,0); grid.add(name,1,0); grid.add(new Label("Color"),0,1); grid.add(colorPicker,1,1); grid.add(active,1,2); if (existing != null && !safe(existing.systemKey()).isBlank()) { grid.add(new Label("System Key"),0,3); grid.add(new Label(existing.systemKey()),1,3); } dialog.getDialogPane().setContent(grid);
+		styleLookupDialog(dialog, name, colorPicker, active);
 		dialog.setResultConverter(button -> { if (button != ButtonType.OK) return null; String trimmedName = trim(name.getText()); if (trimmedName.isBlank()) throw new IllegalArgumentException("Name is required."); if (trimmedName.length() > 100) throw new IllegalArgumentException("Name must be 100 characters or fewer."); String systemKey = linkTypeSystemKeyForSave(existing); if (systemKey != null && systemKey.length() > 64) throw new IllegalArgumentException("SystemKey must be 64 characters or fewer."); String color = fxColorToDb(colorPicker.getValue()); if (color.length() > 20) throw new IllegalArgumentException("Color must be 20 characters or fewer."); return new LinkTypeInput(trimmedName, color, active.isSelected(), systemKey); });
 		try { return dialog.showAndWait(); } catch (RuntimeException ex) { AppDialogs.showError(dialog.getOwner(), "Link Types", rootMessage(ex)); return Optional.empty(); }
 	}
@@ -622,10 +639,10 @@ public final class SettingsController {
 	private VBox buildPracticeAreaCard(PracticeAreaViewRow row) {
 		VBox card = new VBox(8);
 		card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact");
-		if (selectedPracticeAreaRow != null && selectedPracticeAreaRow.id() == row.id()) {
-			card.getStyleClass().add("practice-area-card-selected");
-		}
-		card.setOnMouseClicked(event -> selectPracticeAreaRow(row));
+		card.setUserData(row); card.setFocusTraversable(true);
+		card.pseudoClassStateChanged(SELECTED_CARD, selectedPracticeAreaRow != null && selectedPracticeAreaRow.id() == row.id());
+		card.setOnMouseClicked(event -> { if (event.getButton() == MouseButton.PRIMARY && !isActionControl(event.getTarget())) selectPracticeAreaRow(row); });
+		card.setOnKeyPressed(event -> { if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) { selectPracticeAreaRow(row); event.consume(); } });
 
 		HBox header = new HBox(10);
 		header.setAlignment(Pos.CENTER_LEFT);
@@ -649,9 +666,9 @@ public final class SettingsController {
 
 		HBox actions = new HBox(8);
 		actions.setAlignment(Pos.CENTER_LEFT);
-		Button edit = cardButton("Edit", "app-toolbar-button-neutral");
+		Button edit = cardButton("Edit", ControlStyles.Purpose.GHOST);
 		edit.setOnAction(event -> { selectPracticeAreaRow(row); onEditPracticeArea(); event.consume(); });
-		Button remove = cardButton("Remove", "app-toolbar-button-danger");
+		Button remove = cardButton("Deactivate", ControlStyles.Purpose.GHOST);
 		remove.setOnAction(event -> { selectPracticeAreaRow(row); onRemovePracticeArea(); event.consume(); });
 		Label restriction = new Label(row.global() ? "Global/default practice area: editing creates or updates a tenant-scoped override when supported." : "Tenant-specific/custom practice area.");
 		restriction.getStyleClass().add("search-summary-text");
@@ -663,7 +680,7 @@ public final class SettingsController {
 
 	private void selectPracticeAreaRow(PracticeAreaViewRow row) {
 		selectedPracticeAreaRow = row;
-		renderPracticeAreaCards();
+		updateSelectionStyles(practiceAreaCardsContainer, row.id());
 	}
 
 	private Optional<PracticeAreaInput> showPracticeAreaDialog(PracticeAreaDto existing) {
@@ -685,6 +702,7 @@ public final class SettingsController {
 			grid.add(new Label(existing.systemKey()), 1, 3);
 		}
 		dialog.getDialogPane().setContent(grid);
+		styleLookupDialog(dialog, name, colorPicker, active);
 		dialog.setResultConverter(button -> {
 			if (button != ButtonType.OK) return null;
 			String trimmedName = name.getText() == null ? "" : name.getText().trim();
@@ -793,10 +811,10 @@ public final class SettingsController {
 	private VBox buildCaseStatusCard(CaseStatusViewRow row, int index) {
 		VBox card = new VBox(8);
 		card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact");
-		if (selectedCaseStatusRow != null && selectedCaseStatusRow.id() == row.id()) {
-			card.getStyleClass().add("case-status-card-selected");
-		}
-		card.setOnMouseClicked(event -> selectCaseStatusRow(row));
+		card.setUserData(row); card.setFocusTraversable(true);
+		card.pseudoClassStateChanged(SELECTED_CARD, selectedCaseStatusRow != null && selectedCaseStatusRow.id() == row.id());
+		card.setOnMouseClicked(event -> { if (event.getButton() == MouseButton.PRIMARY && !isActionControl(event.getTarget())) selectCaseStatusRow(row); });
+		card.setOnKeyPressed(event -> { if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) { selectCaseStatusRow(row); event.consume(); } });
 
 		HBox header = new HBox(10);
 		header.setAlignment(Pos.CENTER_LEFT);
@@ -818,12 +836,12 @@ public final class SettingsController {
 
 		HBox actions = new HBox(8);
 		actions.setAlignment(Pos.CENTER_LEFT);
-		Button edit = cardButton("Edit", "app-toolbar-button-neutral");
+		Button edit = cardButton("Edit", ControlStyles.Purpose.GHOST);
 		edit.setOnAction(event -> { selectCaseStatusRow(row); onEditCaseStatus(); event.consume(); });
-		Button up = cardButton("Move Up", "app-toolbar-button-neutral");
+		Button up = cardButton("Move Up", ControlStyles.Purpose.GHOST);
 		up.setDisable(index == 0);
 		up.setOnAction(event -> { selectCaseStatusRow(row); moveSelectedStatus(-1); event.consume(); });
-		Button down = cardButton("Move Down", "app-toolbar-button-neutral");
+		Button down = cardButton("Move Down", ControlStyles.Purpose.GHOST);
 		down.setDisable(index >= caseStatusRows.size() - 1);
 		down.setOnAction(event -> { selectCaseStatusRow(row); moveSelectedStatus(1); event.consume(); });
 		Label restriction = new Label(row.global() ? "Global/default status: editing creates a tenant override; reordering requires tenant-specific status." : "Tenant-specific/custom status.");
@@ -834,21 +852,38 @@ public final class SettingsController {
 		return card;
 	}
 
+	private void updateSelectionStyles(VBox container, int selectedId) {
+		if (container == null) return;
+		for (Node node : container.getChildren()) {
+			Object value = node.getUserData();
+			int id = value instanceof LinkTypeViewRow row ? row.id()
+					: value instanceof PracticeAreaViewRow row ? row.id()
+					: value instanceof CaseStatusViewRow row ? row.id() : Integer.MIN_VALUE;
+			node.pseudoClassStateChanged(SELECTED_CARD, id == selectedId);
+		}
+	}
+
 	private Label metadataPill(String text) {
 		Label label = new Label(text == null || text.isBlank() ? "—" : text);
 		label.getStyleClass().addAll("shale-indicator-chip");
 		return label;
 	}
 
-	private Button cardButton(String text, String roleClass) {
-		Button button = new Button(text);
-		button.getStyleClass().addAll("app-toolbar-button", roleClass, "app-toolbar-button-compact");
-		return button;
+	private Button cardButton(String text, ControlStyles.Purpose purpose) {
+		return ActionButtonFactory.semantic(text, null, purpose, ControlStyles.Size.SMALL);
+	}
+
+	private void styleLookupDialog(Dialog<?> dialog, Control... controls) {
+		for (Control control : controls) ControlStyles.formControl(control);
+		Node ok = dialog.getDialogPane().lookupButton(ButtonType.OK);
+		Node cancel = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+		if (ok instanceof ButtonBase button) ControlStyles.apply(button, ControlStyles.Purpose.PRIMARY);
+		if (cancel instanceof ButtonBase button) ControlStyles.apply(button, ControlStyles.Purpose.SECONDARY);
 	}
 
 	private void selectCaseStatusRow(CaseStatusViewRow row) {
 		selectedCaseStatusRow = row;
-		renderCaseStatusCards();
+		updateSelectionStyles(caseStatusCardsContainer, row.id());
 	}
 
 	private void moveSelectedStatus(int delta) {
@@ -891,6 +926,7 @@ public final class SettingsController {
 			grid.add(new Label(existing.systemKey()), 1, 4);
 		}
 		dialog.getDialogPane().setContent(grid);
+		styleLookupDialog(dialog, name, colorPicker, closed);
 		dialog.setResultConverter(button -> {
 			if (button != ButtonType.OK) return null;
 			String trimmedName = name.getText() == null ? "" : name.getText().trim();
@@ -1277,7 +1313,7 @@ public final class SettingsController {
 	private void editRequestLookup(RequestLookupKind kind){ RequestLookupSelection row=selectedRequestLookup(kind); if(row==null){message(kind,"Select a "+label(kind).toLowerCase(java.util.Locale.ROOT)+" first.");return;} if(mutationRunning(kind))return; showRequestLookupDialog(kind,row).ifPresent(input -> mutateRequestLookup(kind, () -> { switch(kind){ case MATERIAL_TYPE -> materialRequestService.updateMaterialType(new MaterialRequestServicePort.MaterialTypeCommand(row.id(),requireTenantId(),requireActorUserId(),input.name(),input.description(),input.color(),input.active(),row.systemKey().isBlank()?input.systemKey():row.systemKey(),input.sortOrder(),row.rowVer())); case REQUEST_METHOD -> materialRequestService.updateRequestMethod(new MaterialRequestServicePort.RequestMethodCommand(row.id(),requireTenantId(),requireActorUserId(),input.name(),input.color(),input.active(),row.systemKey().isBlank()?input.systemKey():row.systemKey(),row.sortOrder(),row.rowVer())); case REQUEST_STATUS -> materialRequestService.updateRequestStatus(new MaterialRequestServicePort.RequestStatusCommand(row.id(),requireTenantId(),requireActorUserId(),input.name(),input.color(),input.active(),row.systemKey().isBlank()?input.systemKey():row.systemKey(),input.sortOrder(),row.rowVer())); } }, row.global()?"Tenant override saved.":label(kind)+" updated.")); }
 	private void toggleRequestLookup(RequestLookupKind kind){ RequestLookupSelection row=selectedRequestLookup(kind); if(row==null){message(kind,"Select a "+label(kind).toLowerCase(java.util.Locale.ROOT)+" first.");return;} mutateRequestLookup(kind, () -> { var c=new MaterialRequestServicePort.SetLookupActiveCommand(requireTenantId(),requireActorUserId(),row.id(),!row.active(),row.rowVer()); switch(kind){ case MATERIAL_TYPE -> materialRequestService.setMaterialTypeActive(c); case REQUEST_METHOD -> materialRequestService.setRequestMethodActive(c); case REQUEST_STATUS -> materialRequestService.setRequestStatusActive(c); } }, row.active()?label(kind)+" deactivated for future selections.":label(kind)+" activated."); }
 	private void resetRequestLookup(RequestLookupKind kind){ RequestLookupSelection row=selectedRequestLookup(kind); if(row==null){message(kind,"Select a "+label(kind).toLowerCase(java.util.Locale.ROOT)+" first.");return;} String action=row.custom()?"Remove":"Reset to Default"; if(row.global()){message(kind,"Global defaults do not need reset.");return;} if(!AppDialogs.showConfirmation(null,label(kind),action+" "+row.name()+"?","Existing records retain their stored lookup relationship.",action,row.custom()?AppDialogs.DialogActionKind.DANGER:AppDialogs.DialogActionKind.PRIMARY))return; mutateRequestLookup(kind, () -> { var c=new MaterialRequestServicePort.ResetLookupOverrideCommand(requireTenantId(),requireActorUserId(),row.id()); switch(kind){ case MATERIAL_TYPE -> materialRequestService.resetMaterialTypeOverride(c); case REQUEST_METHOD -> materialRequestService.resetRequestMethodOverride(c); case REQUEST_STATUS -> materialRequestService.resetRequestStatusOverride(c); } }, row.custom()?label(kind)+" removed from future selections.":"Tenant override reset to global default."); }
-	private Optional<RequestLookupInput> showRequestLookupDialog(RequestLookupKind kind, RequestLookupSelection existing){ Dialog<RequestLookupInput> d=new Dialog<>(); String title=(existing==null?"Add ":existing.global()?"Customize ":"Edit ")+label(kind); d.setTitle(title); AppDialogs.applySecondaryDialogShell(d,title); d.getDialogPane().getButtonTypes().setAll(ButtonType.OK,ButtonType.CANCEL); TextField name=new TextField(existing==null?"":existing.name()); TextField description=new TextField(existing==null?"":existing.description()); TextField sort=new TextField(existing==null?"0":String.valueOf(existing.sortOrder())); CheckBox active=new CheckBox("Active"); active.setSelected(existing==null||existing.active()); ColorPicker colorPicker=new ColorPicker(dbColorToFx(existing==null?null:existing.color())); colorPicker.setMaxWidth(Double.MAX_VALUE); GridPane grid=new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(new Label("Name"),0,0);grid.add(name,1,0); int r=1; if(kind==RequestLookupKind.MATERIAL_TYPE){grid.add(new Label("Description"),0,r);grid.add(description,1,r++);} grid.add(new Label("Color"),0,r);grid.add(colorPicker,1,r++); if(kind!=RequestLookupKind.REQUEST_METHOD){grid.add(new Label("Sort Order"),0,r);grid.add(sort,1,r++);} grid.add(active,1,r++); if(existing!=null&&!existing.systemKey().isBlank()){grid.add(new Label("System Key"),0,r);grid.add(new Label(existing.systemKey()),1,r);} d.getDialogPane().setContent(grid); d.setResultConverter(b->{if(b!=ButtonType.OK)return null; String nm=trim(name.getText()); if(nm.isBlank())throw new IllegalArgumentException("Name is required."); int sortOrder=existing==null?0:existing.sortOrder(); if(kind!=RequestLookupKind.REQUEST_METHOD){try{sortOrder=Integer.parseInt(trim(sort.getText()).isBlank()?"0":trim(sort.getText()));}catch(NumberFormatException ex){throw new IllegalArgumentException("Sort Order must be a number.");}} return new RequestLookupInput(nm, kind==RequestLookupKind.MATERIAL_TYPE?trim(description.getText()):null, fxColorToDb(colorPicker.getValue()), active.isSelected(), existing==null?null:existing.systemKey(), sortOrder);}); try{return d.showAndWait();}catch(RuntimeException ex){AppDialogs.showError(null,label(kind),rootMessage(ex));return Optional.empty();}}
+	private Optional<RequestLookupInput> showRequestLookupDialog(RequestLookupKind kind, RequestLookupSelection existing){ Dialog<RequestLookupInput> d=new Dialog<>(); String title=(existing==null?"Add ":existing.global()?"Customize ":"Edit ")+label(kind); d.setTitle(title); AppDialogs.applySecondaryDialogShell(d,title); d.getDialogPane().getButtonTypes().setAll(ButtonType.OK,ButtonType.CANCEL); TextField name=new TextField(existing==null?"":existing.name()); TextField description=new TextField(existing==null?"":existing.description()); TextField sort=new TextField(existing==null?"0":String.valueOf(existing.sortOrder())); CheckBox active=new CheckBox("Active"); active.setSelected(existing==null||existing.active()); ColorPicker colorPicker=new ColorPicker(dbColorToFx(existing==null?null:existing.color())); colorPicker.setMaxWidth(Double.MAX_VALUE); GridPane grid=new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(new Label("Name"),0,0);grid.add(name,1,0); int r=1; if(kind==RequestLookupKind.MATERIAL_TYPE){grid.add(new Label("Description"),0,r);grid.add(description,1,r++);} grid.add(new Label("Color"),0,r);grid.add(colorPicker,1,r++); if(kind!=RequestLookupKind.REQUEST_METHOD){grid.add(new Label("Sort Order"),0,r);grid.add(sort,1,r++);} grid.add(active,1,r++); if(existing!=null&&!existing.systemKey().isBlank()){grid.add(new Label("System Key"),0,r);grid.add(new Label(existing.systemKey()),1,r);} d.getDialogPane().setContent(grid); styleLookupDialog(d,name,description,sort,colorPicker,active); d.setResultConverter(b->{if(b!=ButtonType.OK)return null; String nm=trim(name.getText()); if(nm.isBlank())throw new IllegalArgumentException("Name is required."); int sortOrder=existing==null?0:existing.sortOrder(); if(kind!=RequestLookupKind.REQUEST_METHOD){try{sortOrder=Integer.parseInt(trim(sort.getText()).isBlank()?"0":trim(sort.getText()));}catch(NumberFormatException ex){throw new IllegalArgumentException("Sort Order must be a number.");}} return new RequestLookupInput(nm, kind==RequestLookupKind.MATERIAL_TYPE?trim(description.getText()):null, fxColorToDb(colorPicker.getValue()), active.isSelected(), existing==null?null:existing.systemKey(), sortOrder);}); try{return d.showAndWait();}catch(RuntimeException ex){AppDialogs.showError(null,label(kind),rootMessage(ex));return Optional.empty();}}
 	private void mutateRequestLookup(RequestLookupKind kind,Runnable work,String success){ if(mutationRunning(kind))return; setMutationRunning(kind,true); message(kind,"Saving…"); settingsLoadExecutor.submit(()->{try{work.run(); Platform.runLater(()->{setMutationRunning(kind,false);message(kind,success);loadRequestLookupsAsync();});}catch(RuntimeException ex){Platform.runLater(()->{setMutationRunning(kind,false);AppDialogs.showError(null,label(kind),rootMessage(ex));message(kind,rootMessage(ex));});}});}
 	private boolean mutationRunning(RequestLookupKind kind){return switch(kind){case MATERIAL_TYPE->materialTypeMutationRunning;case REQUEST_METHOD->requestMethodMutationRunning;case REQUEST_STATUS->requestStatusMutationRunning;};}
 	private void setMutationRunning(RequestLookupKind kind,boolean v){switch(kind){case MATERIAL_TYPE->materialTypeMutationRunning=v;case REQUEST_METHOD->requestMethodMutationRunning=v;case REQUEST_STATUS->requestStatusMutationRunning=v;}}
