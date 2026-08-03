@@ -29,6 +29,8 @@ class CaseOverviewCardEditorsTest {
         assertTrue(editors.contains("ControlStyles.Purpose.SECONDARY"));
         assertTrue(editors.contains("ControlStyles.Purpose.GHOST"));
         assertTrue(editors.contains("this::removePrimaryLegalAssistantField"));
+        assertTrue(editors.contains("picker.setResultConverter(buttonType -> null)"),
+                "picker shell dismissal must never leak ButtonType as a typed selection");
     }
 
     @Test

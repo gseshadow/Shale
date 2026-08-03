@@ -45,6 +45,27 @@ class UserSelectionFieldTest {
         });
     }
 
+    @Test
+    void pickerCancellationPreservesSelectionRenderedCardAndChangeControl() {
+        JavaFxTestSupport.runAndWait(() -> {
+            Item original = new Item(7, "Original");
+            Region rendered = new Region();
+            java.util.concurrent.atomic.AtomicInteger opens = new java.util.concurrent.atomic.AtomicInteger();
+            UserSelectionField<Item> field = new UserSelectionField<>(Item::id, Item::name, ignored -> null,
+                    (owner, candidates) -> { opens.incrementAndGet(); return Optional.empty(); }, false,
+                    item -> rendered);
+            field.setSelectedUser(original);
+            Node change = field.getChildren().get(1);
+
+            for (int cycle = 0; cycle < 3; cycle++) ((javafx.scene.control.Button) change).fire();
+
+            assertSame(original, field.getSelectedUser());
+            assertSame(rendered, field.getChildren().getFirst());
+            assertSame(change, field.getChildren().get(1));
+            assertEquals(3, opens.get());
+        });
+    }
+
     private static UserSelectionField<Item> field(java.util.function.Function<Item, Node> renderer) {
         return new UserSelectionField<>(Item::id, Item::name, ignored -> null,
                 (owner, candidates) -> Optional.empty(), false, renderer);

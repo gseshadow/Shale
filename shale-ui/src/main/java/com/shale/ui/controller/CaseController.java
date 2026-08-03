@@ -5323,12 +5323,17 @@ public class CaseController {
 		return empty;
 	}
 
-	private static <T> Optional<T> showMiniCardPicker(Window owner, String label, List<T> options,
+	static <T> Optional<T> showMiniCardPicker(Window owner, String label, List<T> options,
 			Function<T, Integer> identity, Function<T, Node> renderer) {
 		Dialog<T> picker = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(picker, "Select " + label);
 		picker.initOwner(owner);
 		picker.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+		// Dialog's default converter returns the pressed ButtonType. With Dialog<T>
+		// that value survives erasure and contaminates the typed Optional. All shell
+		// dismissal paths are cancellation; card activation sets the typed result
+		// explicitly below before closing.
+		picker.setResultConverter(buttonType -> null);
 		VBox list = new VBox(8);
 		for (T option : options) {
 			Button row = new Button();
