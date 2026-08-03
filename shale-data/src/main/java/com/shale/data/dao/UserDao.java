@@ -12,11 +12,15 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.EnumMap;
 import java.util.Objects;
 
 import org.mindrot.jbcrypt.BCrypt;
 
 public final class UserDao {
+	private final EntityActionAuditDao entityActionAuditDao = new EntityActionAuditDao();
 	public record DirectoryUserRow(
 			int id,
 			String firstName,
@@ -40,7 +44,8 @@ public final class UserDao {
 			String initials,
 			boolean admin,
 			boolean attorney,
-			boolean deleted) {
+			boolean deleted,
+			byte[] rowVer) {
 	}
 
 	public record UserProfileUpdateRequest(
@@ -69,13 +74,8 @@ public final class UserDao {
 	}
 
 	public record UserManagementRow(
-			int id,
-			String name,
-			String email,
-			String initials,
-			boolean attorney,
-			boolean admin,
-			boolean deleted) {
+			int id, String firstName, String lastName, String name, String email, String phone, String color, String initials,
+			boolean attorney, boolean admin, boolean deleted, byte[] rowVer) {
 	}
 
 	public record ExistingEmailRow(int id, boolean deleted) {
@@ -290,7 +290,8 @@ public final class UserDao {
 					  COALESCE(u.Initials, '') AS Initials,
 					  COALESCE(u.%s, 0) AS IsAdmin,
 					  COALESCE(u.%s, 0) AS IsAttorney,
-					  COALESCE(u.is_deleted, 0) AS IsDeleted
+					  COALESCE(u.is_deleted, 0) AS IsDeleted,
+					  u.RowVer
 					FROM dbo.Users u
 					WHERE u.Id = ?
 					  AND u.ShaleClientId = ?
@@ -317,7 +318,8 @@ public final class UserDao {
 							rs.getString("Initials"),
 							rs.getBoolean("IsAdmin"),
 							rs.getBoolean("IsAttorney"),
-							rs.getBoolean("IsDeleted"));
+							rs.getBoolean("IsDeleted"),
+							rs.getBytes("RowVer"));
 				}
 			}
 		} catch (SQLException e) {
@@ -450,44 +452,53 @@ public final class UserDao {
 
 	public List<UserManagementRow> listUsersForManagement(boolean includeInactive) {
 		try (Connection con = db.requireConnection()) {
-			int shaleClientId = requireCurrentShaleClientId(con);
-			requireCurrentAdmin(con, shaleClientId);
-			StringBuilder sql = new StringBuilder("""
-					SELECT Id,
-					       LTRIM(RTRIM(COALESCE(name_first, '') + CASE WHEN COALESCE(name_first, '') = '' OR COALESCE(name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(name_last, ''))) AS DisplayName,
-					       COALESCE(email, '') AS Email,
-					       COALESCE(Initials, '') AS Initials,
-					       COALESCE(is_attorney, 0) AS IsAttorney,
-					       COALESCE(is_admin, 0) AS IsAdmin,
-					       COALESCE(is_deleted, 0) AS IsDeleted
-					FROM dbo.Users
-					WHERE ShaleClientId = ?
-					""");
-			if (!includeInactive) {
-				sql.append("  AND COALESCE(is_deleted, 0) = 0\n");
-			}
-			sql.append("ORDER BY IsDeleted ASC, DisplayName ASC, Id ASC");
-			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
-				ps.setInt(1, shaleClientId);
-				try (ResultSet rs = ps.executeQuery()) {
-					List<UserManagementRow> out = new ArrayList<>();
-					while (rs.next()) {
-						out.add(new UserManagementRow(
-								rs.getInt("Id"),
-								rs.getString("DisplayName"),
-								rs.getString("Email"),
-								rs.getString("Initials"),
-								rs.getBoolean("IsAttorney"),
-								rs.getBoolean("IsAdmin"),
-								rs.getBoolean("IsDeleted")));
-					}
-					return out;
-				}
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to list users for management", e);
-		}
+			int tenant = requireCurrentShaleClientId(con); requireCurrentAdmin(con, tenant);
+			String phone = existingPhoneColumn(con);
+			String sql = "SELECT Id,COALESCE(name_first,'') FirstName,COALESCE(name_last,'') LastName," +
+				"LTRIM(RTRIM(COALESCE(name_first,'')+CASE WHEN COALESCE(name_first,'')='' OR COALESCE(name_last,'')='' THEN '' ELSE ' ' END+COALESCE(name_last,''))) DisplayName," +
+				"COALESCE(email,'') Email," + phoneSelectExpression(phone, null) + ",COALESCE(Color,'') Color,COALESCE(Initials,'') Initials," +
+				"COALESCE(is_attorney,0) IsAttorney,COALESCE(is_admin,0) IsAdmin,COALESCE(is_deleted,0) IsDeleted,RowVer FROM dbo.Users WHERE ShaleClientId=?" +
+				(includeInactive ? "" : " AND COALESCE(is_deleted,0)=0") + " ORDER BY IsDeleted,DisplayName,Id";
+			try (PreparedStatement ps=con.prepareStatement(sql)) { ps.setInt(1,tenant); try(ResultSet rs=ps.executeQuery()) {
+				List<UserManagementRow> out=new ArrayList<>(); while(rs.next()) out.add(managementRow(rs)); return out;
+			}}
+		} catch(SQLException e){ throw new RuntimeException("Failed to list users for management",e); }
 	}
+
+	public record UserUpdateRequest(int userId, byte[] expectedRowVer, String firstName, String lastName,
+			String email, String phone, String initials, String color, Set<Integer> roleIds) {
+		public UserUpdateRequest { expectedRowVer=expectedRowVer==null?null:expectedRowVer.clone(); roleIds=roleIds==null?Set.of():Set.copyOf(roleIds); }
+		@Override public byte[] expectedRowVer(){ return expectedRowVer==null?null:expectedRowVer.clone(); }
+	}
+	public record UserUpdateResult(UserManagementRow user, boolean changed) {}
+
+	/** Atomic administrative profile/role update. Lifecycle and credentials are deliberately excluded. */
+	public UserUpdateResult updateManagedUser(UserUpdateRequest request) {
+		Objects.requireNonNull(request,"request");
+		String first=trimRequired(request.firstName(),"First name"), last=trimRequired(request.lastName(),"Last name");
+		String email=normalizeEmail(request.email()); if(!email.contains("@")) throw new IllegalArgumentException("A valid email is required.");
+		if(request.expectedRowVer()==null||request.expectedRowVer().length==0) throw new IllegalArgumentException("User version is required.");
+		if(!Set.of(RoleSemantics.ROLE_ADMIN,RoleSemantics.ROLE_ATTORNEY).containsAll(request.roleIds())) throw new IllegalArgumentException("An unsupported user role was supplied.");
+		try(Connection con=db.requireConnection()) { int tenant=requireCurrentShaleClientId(con), actor=requireCurrentAdmin(con,tenant); con.setAutoCommit(false);
+			try {
+				UserManagementRow old=findManagementUser(con,tenant,request.userId()); if(old==null) throw new IllegalArgumentException("User was not found for this tenant.");
+				if(!Arrays.equals(old.rowVer(),request.expectedRowVer())) throw new IllegalStateException("This user was changed by someone else. Reload and try again.");
+				ExistingEmailRow duplicate=findExistingEmail(con,tenant,email); if(duplicate!=null&&duplicate.id()!=request.userId()) throw new IllegalArgumentException(duplicateEmailMessage(duplicate.deleted()));
+				boolean admin=request.roleIds().contains(RoleSemantics.ROLE_ADMIN), attorney=request.roleIds().contains(RoleSemantics.ROLE_ATTORNEY);
+				if(old.admin()&&!admin&&(!old.deleted()&&countActiveAdmins(con,tenant)<=1)) throw new IllegalArgumentException("Cannot remove the last active admin in this tenant.");
+				String phoneColumn=existingPhoneColumn(con); String phoneValue=blankToNull(request.phone()), initials=blankToNull(request.initials()), color=blankToNull(request.color());
+				boolean changed=!old.firstName().equals(first)||!old.lastName().equals(last)||!normalizeEmail(old.email()).equals(email)||!Objects.equals(blankToNull(old.phone()),phoneValue)||!Objects.equals(blankToNull(old.initials()),initials)||!Objects.equals(blankToNull(old.color()),color)||old.admin()!=admin||old.attorney()!=attorney;
+				if(!changed){ con.rollback(); return new UserUpdateResult(old,false); }
+				String sql="UPDATE dbo.Users SET name_first=?,name_last=?,email=?,Initials=?,Color=?,is_admin=?,is_attorney=?,UpdatedAt=SYSUTCDATETIME()"+(phoneColumn==null?"":","+phoneColumn+"=?")+" WHERE Id=? AND ShaleClientId=? AND RowVer=?";
+				try(PreparedStatement ps=con.prepareStatement(sql)){int i=1;ps.setString(i++,first);ps.setString(i++,last);ps.setString(i++,email);setNullableString(ps,i++,initials);setNullableString(ps,i++,color);ps.setBoolean(i++,admin);ps.setBoolean(i++,attorney);if(phoneColumn!=null)setNullableString(ps,i++,phoneValue);ps.setInt(i++,request.userId());ps.setInt(i++,tenant);ps.setBytes(i++,request.expectedRowVer());if(ps.executeUpdate()!=1)throw new IllegalStateException("This user was changed by someone else. Reload and try again.");}
+				var md=new EnumMap<EntityActionAuditEvent.MetadataKey,Object>(EntityActionAuditEvent.MetadataKey.class);md.put(EntityActionAuditEvent.MetadataKey.TARGET_USER_ID,request.userId());md.put(EntityActionAuditEvent.MetadataKey.ADMIN_ROLE,admin);md.put(EntityActionAuditEvent.MetadataKey.ATTORNEY_ROLE,attorney);
+				entityActionAuditDao.append(con,EntityActionAuditEvent.now(tenant,actor,EntityActionAuditEvent.EntityType.USER,request.userId(),EntityActionAuditEvent.Action.UPDATED,null,null,md)); con.commit();
+				return new UserUpdateResult(findManagementUser(con,tenant,request.userId()),true);
+			}catch(Exception ex){try{con.rollback();}catch(SQLException ignored){} if(ex instanceof RuntimeException re)throw re; throw new IllegalStateException("Failed to update user.",ex);}
+		}catch(SQLException e){throw new RuntimeException("Failed to update user.",e);}
+	}
+	private static String trimRequired(String v,String label){String n=v==null?"":v.trim();if(n.isEmpty())throw new IllegalArgumentException(label+" is required.");return n;}
+	private static String blankToNull(String v){if(v==null)return null;String n=v.trim();return n.isEmpty()?null:n;}
 
 	public ExistingEmailRow findExistingEmailForCurrentTenant(String email) {
 		String normalizedEmail = normalizeEmail(email);
@@ -765,27 +776,11 @@ public final class UserDao {
 		}
 	}
 
-	private static UserManagementRow findManagementUser(Connection con, int shaleClientId, int userId) throws SQLException {
-		String sql = """
-				SELECT Id,
-				       LTRIM(RTRIM(COALESCE(name_first, '') + CASE WHEN COALESCE(name_first, '') = '' OR COALESCE(name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(name_last, ''))) AS DisplayName,
-				       COALESCE(email, '') AS Email,
-				       COALESCE(Initials, '') AS Initials,
-				       COALESCE(is_attorney, 0) AS IsAttorney,
-				       COALESCE(is_admin, 0) AS IsAdmin,
-				       COALESCE(is_deleted, 0) AS IsDeleted
-				FROM dbo.Users
-				WHERE Id = ? AND ShaleClientId = ?
-				""";
-		try (PreparedStatement ps = con.prepareStatement(sql)) {
-			ps.setInt(1, userId);
-			ps.setInt(2, shaleClientId);
-			try (ResultSet rs = ps.executeQuery()) {
-				if (!rs.next()) return null;
-				return new UserManagementRow(rs.getInt("Id"), rs.getString("DisplayName"), rs.getString("Email"), rs.getString("Initials"), rs.getBoolean("IsAttorney"), rs.getBoolean("IsAdmin"), rs.getBoolean("IsDeleted"));
-			}
-		}
+	private static UserManagementRow findManagementUser(Connection con,int tenant,int userId)throws SQLException{
+		String phone=existingPhoneColumn(con);String sql="SELECT Id,COALESCE(name_first,'') FirstName,COALESCE(name_last,'') LastName,LTRIM(RTRIM(COALESCE(name_first,'')+' '+COALESCE(name_last,''))) DisplayName,COALESCE(email,'') Email,"+phoneSelectExpression(phone,null)+",COALESCE(Color,'') Color,COALESCE(Initials,'') Initials,COALESCE(is_attorney,0) IsAttorney,COALESCE(is_admin,0) IsAdmin,COALESCE(is_deleted,0) IsDeleted,RowVer FROM dbo.Users WHERE Id=? AND ShaleClientId=?";
+		try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,userId);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){return rs.next()?managementRow(rs):null;}}
 	}
+	private static UserManagementRow managementRow(ResultSet rs)throws SQLException{return new UserManagementRow(rs.getInt("Id"),rs.getString("FirstName"),rs.getString("LastName"),rs.getString("DisplayName"),rs.getString("Email"),rs.getString("Phone"),rs.getString("Color"),rs.getString("Initials"),rs.getBoolean("IsAttorney"),rs.getBoolean("IsAdmin"),rs.getBoolean("IsDeleted"),rs.getBytes("RowVer"));}
 
 	private static int countActiveAdmins(Connection con, int shaleClientId) throws SQLException {
 		try (PreparedStatement ps = con.prepareStatement("SELECT COUNT(*) FROM dbo.Users WHERE ShaleClientId = ? AND COALESCE(is_deleted, 0) = 0 AND COALESCE(is_admin, 0) = 1")) {
