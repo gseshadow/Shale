@@ -19,8 +19,10 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.Node;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 
 /**
  * Compact selected-user field that composes the shared {@link UserSelector} in a caller-supplied picker shell.
@@ -41,6 +43,7 @@ public class UserSelectionField<T> extends HBox {
     private final Button changeButton = secondary("Change");
     private final Button removeButton = secondary("Remove");
     private final UserCardFactory cardFactory = new UserCardFactory(id -> { });
+    private final Function<T, Node> cardRenderer;
 
     public UserSelectionField(
             Function<T, Integer> userIdExtractor,
@@ -48,11 +51,27 @@ public class UserSelectionField<T> extends HBox {
             Function<T, String> colorExtractor,
             BiFunction<UserSelectionField<T>, List<T>, Optional<T>> picker,
             boolean clearable) {
+        this(userIdExtractor, displayNameExtractor, colorExtractor, picker, clearable, null);
+    }
+
+    /**
+     * Compatibility-safe generic rendering hook for typed selections which use the
+     * same established picker/selection-field interaction but have their own MINI
+     * entity card. Identity and selection remain caller-owned and ID based.
+     */
+    public UserSelectionField(
+            Function<T, Integer> userIdExtractor,
+            Function<T, String> displayNameExtractor,
+            Function<T, String> colorExtractor,
+            BiFunction<UserSelectionField<T>, List<T>, Optional<T>> picker,
+            boolean clearable,
+            Function<T, Node> cardRenderer) {
         this.userIdExtractor = Objects.requireNonNull(userIdExtractor, "userIdExtractor");
         this.displayNameExtractor = Objects.requireNonNull(displayNameExtractor, "displayNameExtractor");
         this.colorExtractor = Objects.requireNonNull(colorExtractor, "colorExtractor");
         this.picker = Objects.requireNonNull(picker, "picker");
         this.clearable = clearable;
+        this.cardRenderer = cardRenderer;
         buildUi();
         wireState();
         render();
@@ -119,8 +138,15 @@ public class UserSelectionField<T> extends HBox {
             getChildren().setAll(addButton);
             return;
         }
-        var card = cardFactory.create(new UserCardModel(userId(selected), safe(displayName(selected)), color(selected), null), UserCardFactory.Variant.MINI);
-        card.setMaxWidth(Double.MAX_VALUE);
+        Node card = cardRenderer == null
+                ? cardFactory.create(new UserCardModel(userId(selected), safe(displayName(selected)), color(selected), null), UserCardFactory.Variant.MINI)
+                : Objects.requireNonNull(cardRenderer.apply(selected), "cardRenderer result");
+        // Renderers intentionally accept any Node. Shale's MINI cards are Regions,
+        // but callers may supply another valid JavaFX node; only Regions expose
+        // resizable width constraints.
+        if (card instanceof Region region) {
+            region.setMaxWidth(Double.MAX_VALUE);
+        }
         HBox.setHgrow(card, Priority.ALWAYS);
         getChildren().addAll(card, changeButton);
         if (clearable) getChildren().add(removeButton);
