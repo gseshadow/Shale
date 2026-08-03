@@ -162,7 +162,7 @@
                 </HBox>
                 <TableView fx:id="userManagementTable" prefHeight="300" minHeight="220" styleClass="shale-table" VBox.vgrow="ALWAYS">
                     <columns>
-                        <TableColumn fx:id="userNameColumn" text="Name" prefWidth="190"/>
+                        <TableColumn fx:id="userNameColumn" text="Name" prefWidth="230" minWidth="190" maxWidth="300"/>
                         <TableColumn fx:id="userEmailColumn" text="Email / login" prefWidth="230"/>
                         <TableColumn fx:id="userInitialsColumn" text="Initials" prefWidth="70"/>
                         <TableColumn fx:id="userRolesColumn" text="Roles" prefWidth="150"/>

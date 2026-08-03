@@ -10,6 +10,9 @@ import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.MaterialRequestServicePort;
 import com.shale.data.dao.UserDao;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.UserCard;
+import com.shale.ui.component.factory.UserCardFactory;
+import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.notification.NotificationPreferenceKey;
 import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
@@ -29,6 +32,8 @@ import javafx.scene.control.Control;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TableCell;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.scene.control.TextField;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.Button;
@@ -130,7 +135,7 @@ public final class SettingsController {
 	@FXML
 	private TableView<UserManagementViewRow> userManagementTable;
 	@FXML
-	private TableColumn<UserManagementViewRow, String> userNameColumn;
+	private TableColumn<UserManagementViewRow, UserManagementViewRow> userNameColumn;
 	@FXML
 	private TableColumn<UserManagementViewRow, String> userEmailColumn;
 	@FXML
@@ -183,6 +188,7 @@ public final class SettingsController {
 	private int linkTypeLoadGeneration;
 	private int userManagementLoadGeneration;
 	private final List<UserManagementViewRow> managedUserRows = new ArrayList<>();
+	private final UserCardFactory userManagementCardFactory = new UserCardFactory(null);
 	private boolean userMutationRunning;
 
 	private final ExecutorService settingsLoadExecutor = Executors.newFixedThreadPool(4, runnable -> {
@@ -1248,7 +1254,19 @@ public final class SettingsController {
 
 	private void configureUserManagementTable() {
 		if (userManagementTable == null) return;
-		userNameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
+		userNameColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue()));
+		userNameColumn.setCellFactory(column -> new TableCell<>() {
+			@Override protected void updateItem(UserManagementViewRow row, boolean empty) {
+				super.updateItem(row, empty);
+				setText(null); setGraphic(null); pseudoClassStateChanged(PseudoClass.getPseudoClass("inactive"), false);
+				if (empty || row == null) return;
+				UserCard card = userManagementCardFactory.createTableMini(
+						new UserCardModel(row.id(), row.name(), row.color(), row.initials()),
+						"User ID #" + row.id(), row.deleted());
+				card.setMaxWidth(Double.MAX_VALUE);
+				setGraphic(card);
+			}
+		});
 		userEmailColumn.setCellValueFactory(new PropertyValueFactory<>("email"));
 		userInitialsColumn.setCellValueFactory(new PropertyValueFactory<>("initials"));
 		userRolesColumn.setCellValueFactory(new PropertyValueFactory<>("roles"));
