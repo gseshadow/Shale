@@ -29,8 +29,10 @@
 				<Label fx:id="caseMetadataLabel" text="Case #—"
 					style="-fx-opacity: 0.8;" />
 				<Label text="•" style="-fx-opacity: 0.55;" />
-				<Label fx:id="intakeTakenByLabel" text="Intake by: —"
-					style="-fx-opacity: 0.8;" />
+				<HBox spacing="4.0" alignment="CENTER_LEFT">
+					<Label text="Intake by:" style="-fx-opacity: 0.8;" />
+					<StackPane fx:id="intakeTakenByUserHost" />
+				</HBox>
 				<Label text="•" style="-fx-opacity: 0.55;" />
 				<StackPane fx:id="statusHost" />
 				<Label text="•" style="-fx-opacity: 0.55;" />

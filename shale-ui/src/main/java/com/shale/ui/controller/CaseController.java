@@ -195,7 +195,7 @@ public class CaseController {
 	@FXML
 	private Label caseMetadataLabel;
 	@FXML
-	private Label intakeTakenByLabel;
+	private StackPane intakeTakenByUserHost;
 	@FXML
 	private Label statusLabel;
 	@FXML
@@ -1417,7 +1417,7 @@ public class CaseController {
 
 		caseTitleLabel.setText("Case #" + caseId + " (Placeholder)");
 		refreshCaseMetadata(null);
-		refreshIntakeTakenBy(null);
+		refreshIntakeTakenBy(null, null);
 		renderPrimaryStatusMini(null, "—", null);
 		renderResponsibleAttorneyMini(null, "—", null);
 		renderPracticeAreaMini(null, "—", null);
@@ -1435,10 +1435,10 @@ public class CaseController {
 		caseMetadataLabel.setText(safeNumber.isBlank() ? idText : idText + " • " + safeNumber);
 	}
 
-	private void refreshIntakeTakenBy(String displayName) {
-		if (intakeTakenByLabel == null) return;
-		String name = safeText(displayName).trim();
-		intakeTakenByLabel.setText("Intake by: " + (name.isBlank() ? "—" : name));
+	private void refreshIntakeTakenBy(Integer userId, String displayName) {
+		if (intakeTakenByUserHost == null)
+			return;
+		intakeTakenByUserHost.getChildren().setAll(createHeaderUserMini(userId, displayName, null));
 	}
 
 	private void refreshOverviewPlaceholders() {
@@ -6358,12 +6358,6 @@ public class CaseController {
 	// ----------------------------
 
 	private void renderResponsibleAttorneyMini(Integer userId, String displayName, String userColorCss) {
-		if (userCardFactory == null) {
-			userCardFactory = new UserCardFactory(onOpenUser == null ? id ->
-			{
-			} : onOpenUser);
-		}
-
 		UserCardModel model = new UserCardModel(
 				userId,
 				(displayName == null || displayName.isBlank()) ? "—" : displayName,
@@ -6371,12 +6365,32 @@ public class CaseController {
 				null
 		);
 
-		var headerCard = userCardFactory.create(model, Variant.MINI);
+		var headerCard = createHeaderUserMini(userId, displayName, userColorCss);
 
 		if (assignedUserHost != null)
 			assignedUserHost.getChildren().setAll(headerCard);
-		if (ovResponsibleAttorneyHost != null)
+		if (ovResponsibleAttorneyHost != null) {
+			ensureUserCardFactory();
 			ovResponsibleAttorneyHost.getChildren().setAll(userCardFactory.create(model, Variant.COMPACT));
+		}
+	}
+
+	private Node createHeaderUserMini(Integer userId, String displayName, String userColorCss) {
+		ensureUserCardFactory();
+		UserCardModel model = new UserCardModel(
+				userId,
+				(displayName == null || displayName.isBlank()) ? "—" : displayName,
+				userColorCss,
+				null
+		);
+		return userCardFactory.create(model, Variant.MINI);
+	}
+
+	private void ensureUserCardFactory() {
+		if (userCardFactory == null) {
+			userCardFactory = new UserCardFactory(onOpenUser == null ? id -> {
+			} : onOpenUser);
+		}
 	}
 
 	private void renderPrimaryLegalAssistantMini(Integer userId, String displayName, String userColorCss) {
@@ -7064,7 +7078,7 @@ public class CaseController {
 			else if (caseId != null)
 				caseTitleLabel.setText("Case #" + caseId);
 			refreshCaseMetadata(num);
-			refreshIntakeTakenBy(detail.getIntakeTakenByDisplayName());
+			refreshIntakeTakenBy(detail.getIntakeTakenByUserId(), detail.getIntakeTakenByDisplayName());
 		}
 
 		private void renderLastUpdated(LocalDateTime updatedAt) {
