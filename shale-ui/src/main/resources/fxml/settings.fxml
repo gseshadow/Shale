@@ -7,6 +7,7 @@
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
@@ -154,23 +155,28 @@
                 <Label text="User Management" styleClass="search-section-title"/>
                 <Label text="Manage users for the current tenant. Tenant id is applied from your signed-in session."
                        styleClass="search-summary-text" wrapText="true"/>
-                <CheckBox fx:id="showInactiveUsersCheck" text="Show inactive users" onAction="#onToggleInactiveUsers"/>
-                <TableView fx:id="userManagementTable" prefHeight="260" styleClass="shale-table">
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <TextField fx:id="userSearchField" promptText="Search name, email, initials, or role" styleClass="shale-form-control" HBox.hgrow="ALWAYS"/>
+                    <CheckBox fx:id="showInactiveUsersCheck" text="Show inactive users" onAction="#onToggleInactiveUsers" styleClass="shale-form-control"/>
+                    <Button fx:id="addUserButton" text="Add User" onAction="#onAddUser" styleClass="shale-control-button shale-control-primary shale-control-standard"/>
+                </HBox>
+                <TableView fx:id="userManagementTable" prefHeight="300" minHeight="220" styleClass="shale-table" VBox.vgrow="ALWAYS">
                     <columns>
-                        <TableColumn fx:id="userNameColumn" text="Name" prefWidth="180"/>
-                        <TableColumn fx:id="userEmailColumn" text="Email" prefWidth="220"/>
-                        <TableColumn fx:id="userInitialsColumn" text="Initials" prefWidth="80"/>
-                        <TableColumn fx:id="userAttorneyColumn" text="Attorney" prefWidth="90"/>
-                        <TableColumn fx:id="userAdminColumn" text="Admin" prefWidth="80"/>
-                        <TableColumn fx:id="userStatusColumn" text="Status" prefWidth="100"/>
+                        <TableColumn fx:id="userNameColumn" text="Name" prefWidth="190"/>
+                        <TableColumn fx:id="userEmailColumn" text="Email / login" prefWidth="230"/>
+                        <TableColumn fx:id="userInitialsColumn" text="Initials" prefWidth="70"/>
+                        <TableColumn fx:id="userRolesColumn" text="Roles" prefWidth="150"/>
+                        <TableColumn fx:id="userStatusColumn" text="Status" prefWidth="90"/>
                     </columns>
                 </TableView>
-                <HBox spacing="8">
-                    <Button text="Add User" onAction="#onAddUser" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact"/>
-                    <Button fx:id="deactivateUserButton" text="Deactivate User" onAction="#onDeactivateUser" styleClass="app-toolbar-button app-toolbar-button-danger app-toolbar-button-compact" disable="true"/>
-                    <Button fx:id="reactivateUserButton" text="Reactivate User" onAction="#onReactivateUser" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" disable="true"/>
-                    <Button fx:id="resetPasswordButton" text="Reset Password" onAction="#onResetUserPassword" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" disable="true"/>
-                    <Label fx:id="userManagementStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <Button fx:id="editUserButton" text="Edit User" onAction="#onEditUser" styleClass="shale-control-button shale-control-secondary shale-control-standard" disable="true"/>
+                    <Button fx:id="deactivateUserButton" text="Deactivate User" onAction="#onDeactivateUser" styleClass="shale-control-button shale-control-danger shale-control-standard" disable="true"/>
+                    <Button fx:id="reactivateUserButton" text="Reactivate User" onAction="#onReactivateUser" styleClass="shale-control-button shale-control-secondary shale-control-standard" disable="true"/>
+                    <Button fx:id="resetPasswordButton" text="Reset Password" onAction="#onResetUserPassword" styleClass="shale-control-button shale-control-secondary shale-control-standard" disable="true"/>
+                    <Button fx:id="refreshUsersButton" text="Refresh" onAction="#onRefreshUsers" styleClass="shale-control-button shale-control-ghost shale-control-standard"/>
+                    <Button fx:id="removeUserButton" text="Remove from Tenant" onAction="#onRemoveUserFromTenant" styleClass="shale-control-button shale-control-danger shale-control-standard" disable="true"/>
+                    <Label fx:id="userManagementStatusLabel" styleClass="search-summary-text" wrapText="true" HBox.hgrow="ALWAYS"/>
                 </HBox>
             </VBox>
 
