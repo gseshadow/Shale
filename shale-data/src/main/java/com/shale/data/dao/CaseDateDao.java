@@ -46,7 +46,16 @@ public final class CaseDateDao {
         String sql = occurrenceSql("cd.CaseId = ? AND cd.ShaleClientId = ? AND cd.IsDeleted = 0 ORDER BY cd.StartsAt, cd.EndsAt, COALESCE(eff.SortOrder, st.SortOrder), COALESCE(eff.Name, st.Name), cd.Id");
         try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
             verifyTenant(con, tenant); validateActor(con, tenant, actor); validateCase(con, tenant, caseId);
-            ps.setInt(1, tenant); ps.setLong(2, caseId); ps.setInt(3, tenant);
+            ps.setInt(1, tenant); ps.setInt(2, tenant); ps.setLong(3, caseId); ps.setInt(4, tenant);
+            try (ResultSet rs = ps.executeQuery()) { List<CaseDateDto> out = new ArrayList<>(); while (rs.next()) out.add(mapDate(rs)); return List.copyOf(out); }
+        } catch (SQLException e) { throw fail(e); }
+    }
+
+    public List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int tenant, int actor) {
+        String sql = occurrenceSql("cd.CaseId = ? AND cd.ShaleClientId = ? AND cd.IsDeleted = 1 ORDER BY cd.StartsAt, cd.EndsAt, COALESCE(eff.SortOrder, st.SortOrder), COALESCE(eff.Name, st.Name), cd.Id");
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            verifyTenant(con, tenant); validateActor(con, tenant, actor); validateCase(con, tenant, caseId);
+            ps.setInt(1, tenant); ps.setInt(2, tenant); ps.setLong(3, caseId); ps.setInt(4, tenant);
             try (ResultSet rs = ps.executeQuery()) { List<CaseDateDto> out = new ArrayList<>(); while (rs.next()) out.add(mapDate(rs)); return List.copyOf(out); }
         } catch (SQLException e) { throw fail(e); }
     }
@@ -55,7 +64,7 @@ public final class CaseDateDao {
         String sql = occurrenceSql("cd.Id = ? AND cd.ShaleClientId = ? AND cd.IsDeleted = 0");
         try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
             verifyTenant(con, tenant); validateActor(con, tenant, actor);
-            ps.setInt(1, tenant); ps.setLong(2, id); ps.setInt(3, tenant);
+            ps.setInt(1, tenant); ps.setInt(2, tenant); ps.setLong(3, id); ps.setInt(4, tenant);
             try (ResultSet rs = ps.executeQuery()) { return rs.next() ? Optional.of(mapDate(rs)) : Optional.empty(); }
         } catch (SQLException e) { throw fail(e); }
     }
@@ -130,7 +139,7 @@ public final class CaseDateDao {
             WHERE """ + where; }
 
 
-    private CaseDateDto requireDate(Connection con,long id,int tenant)throws SQLException{String sql=occurrenceSql("cd.Id = ? AND cd.ShaleClientId = ?");try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setLong(2,id);ps.setInt(3,tenant);try(ResultSet rs=ps.executeQuery()){if(rs.next())return mapDate(rs);throw new IllegalStateException("Case date is not available.");}}}
+    private CaseDateDto requireDate(Connection con,long id,int tenant)throws SQLException{String sql=occurrenceSql("cd.Id = ? AND cd.ShaleClientId = ?");try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setInt(2,tenant);ps.setLong(3,id);ps.setInt(4,tenant);try(ResultSet rs=ps.executeQuery()){if(rs.next())return mapDate(rs);throw new IllegalStateException("Case date is not available.");}}}
     private record TypeRow(int id, boolean supportsTime){}
     private record MutationRow(long id,int typeId,LocalDateTime startsAt,LocalDateTime endsAt,boolean allDay,String notes,byte[] rowVer){}
     private static void requireRowVerMatch(byte[] actual, byte[] expected){ if(expected==null||expected.length==0) throw new IllegalArgumentException("expectedRowVer is required"); if(!Arrays.equals(actual, expected)) throw new IllegalStateException("Case date changed."); }
