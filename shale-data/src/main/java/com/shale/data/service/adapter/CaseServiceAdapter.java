@@ -243,6 +243,14 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) {
+		validatePositive(caseId, "CaseId");
+		validatePositive(shaleClientId, "ShaleClientId");
+		validatePositive(actorUserId, "ActorUserId");
+		return caseGateway.listDeletedCaseDatesForCase(caseId, shaleClientId, actorUserId);
+	}
+
+	@Override
 	public Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) {
 		validatePositive(caseDateId, "CaseDateId");
 		validatePositive(shaleClientId, "ShaleClientId");
@@ -697,6 +705,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
 		default List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("listEffectiveCaseDateTypes"); }
 		default List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("listCaseDatesForCase"); }
+		default List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("listDeletedCaseDatesForCase"); }
 		default Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("getCaseDate"); }
 		default CaseDateDto createCaseDate(CreateCaseDateCommand command) { throw unsupportedCaseLinkGatewayOperation("createCaseDate"); }
 		default CaseDateDto updateCaseDate(UpdateCaseDateCommand command) { throw unsupportedCaseLinkGatewayOperation("updateCaseDate"); }
@@ -867,6 +876,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		@Override public List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) { return caseDateDao.listEffectiveCaseDateTypes(shaleClientId, actorUserId); }
 		@Override public List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) { return caseDateDao.listCaseDatesForCase(caseId, shaleClientId, actorUserId); }
+		@Override public List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) { return caseDateDao.listDeletedCaseDatesForCase(caseId, shaleClientId, actorUserId); }
 		@Override public Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) { return caseDateDao.getCaseDate(caseDateId, shaleClientId, actorUserId); }
 		@Override public CaseDateDto createCaseDate(CreateCaseDateCommand command) { return caseDateDao.createCaseDate(command); }
 		@Override public CaseDateDto updateCaseDate(UpdateCaseDateCommand command) { return caseDateDao.updateCaseDate(command); }

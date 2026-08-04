@@ -32,11 +32,17 @@ import java.util.stream.Collectors;
 import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkContactOptionDto;
 import com.shale.core.dto.CaseLinkShareDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.service.CaseServicePort;
+import com.shale.core.service.CaseServicePort.CreateCaseDateCommand;
+import com.shale.core.service.CaseServicePort.DeleteCaseDateCommand;
+import com.shale.core.service.CaseServicePort.RestoreCaseDateCommand;
+import com.shale.core.service.CaseServicePort.UpdateCaseDateCommand;
 import com.shale.core.service.MaterialRequestServicePort;
 import com.shale.core.dto.CaseTimelineEventDto;
 import com.shale.core.dto.CaseUpdateDto;
@@ -86,6 +92,7 @@ import com.shale.ui.component.dialog.AppDialogs.DialogActionKind;
 import com.shale.ui.component.dialog.ClientAssignmentDialog;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.dialog.CreateContactDialog;
+import com.shale.ui.component.dialog.CaseDateOccurrenceDialog;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
 import com.shale.ui.component.dialog.NewTaskDialog;
 import com.shale.ui.component.factory.UserCardFactory;
@@ -237,6 +244,22 @@ public class CaseController {
 	private VBox caseRequestsTabPane;
 	@FXML
 	private StackPane caseRequestsContentHost;
+	@FXML
+	private VBox caseDatesTabPane;
+	@FXML
+	private VBox caseDatesCardsBox;
+	@FXML
+	private VBox removedCaseDatesCardsBox;
+	@FXML
+	private Label caseDatesStatusLabel;
+	@FXML
+	private Label removedCaseDatesStatusLabel;
+	@FXML
+	private Button addCaseDateButton;
+	@FXML
+	private Button refreshCaseDatesButton;
+	@FXML
+	private Button showRemovedCaseDatesButton;
 	@FXML
 	private VBox caseLinksTabPane;
 	@FXML
@@ -605,6 +628,7 @@ public class CaseController {
 			"Parties",
 			"Tasks",
 			"Calendar",
+			"Dates",
 			"Requests",
 			"Links",
 			"Timeline"
@@ -641,6 +665,19 @@ public class CaseController {
 	private MaterialRequestServicePort materialRequestService;
 	private final CaseMaterialRequestsTabController caseMaterialRequestsTabController = new CaseMaterialRequestsTabController();
 	private final CaseLinkCardFactory caseLinkCardFactory = new CaseLinkCardFactory();
+	private final ExecutorService caseDateExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
+		private final java.util.concurrent.atomic.AtomicInteger sequence = new java.util.concurrent.atomic.AtomicInteger();
+		@Override public Thread newThread(Runnable runnable) { Thread thread = new Thread(runnable, "case-dates-worker-" + sequence.incrementAndGet()); thread.setDaemon(true); return thread; }
+	});
+	private final AtomicBoolean caseDateMutationInFlight = new AtomicBoolean(false);
+	private List<CaseDateDto> caseDates = List.of();
+	private List<CaseDateDto> removedCaseDates = List.of();
+	private List<EffectiveCaseDateTypeDto> effectiveCaseDateTypes = List.of();
+	private boolean caseDatesLoadedOnce;
+	private boolean caseDatesStale = true;
+	private boolean showRemovedCaseDates;
+	private int caseDatesLoadGeneration;
+
 	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
 		private final java.util.concurrent.atomic.AtomicInteger sequence = new java.util.concurrent.atomic.AtomicInteger();
 		@Override public Thread newThread(Runnable runnable) {
@@ -809,6 +846,7 @@ public class CaseController {
 		this.caseTasksLoadedOnce = false;
 		this.caseTasksStale = true;
 		resetCaseCalendarState();
+		resetCaseDatesState();
 		resetCaseLinksState();
 		resetMaterialRequestsState();
 		resetOverviewPrimaryLinkState();
@@ -828,6 +866,7 @@ public class CaseController {
 		this.caseTasksLoadedOnce = false;
 		this.caseTasksStale = true;
 		resetCaseCalendarState();
+		resetCaseDatesState();
 		resetCaseLinksState();
 		resetMaterialRequestsState();
 		resetOverviewPrimaryLinkState();
@@ -1496,6 +1535,7 @@ public class CaseController {
 		case "Parties" -> showParties();
 		case "Tasks" -> showTasksTab();
 		case "Calendar" -> showCalendarTab();
+		case "Dates" -> showCaseDatesTab();
 		case "Requests" -> showRequestsTab();
 		case "Links" -> showLinksTab();
 		case "Timeline" -> showTimeline();
@@ -1520,6 +1560,7 @@ public class CaseController {
 		case "Overview" -> "OVERVIEW";
 		case "Tasks" -> "TASKS";
 		case "Calendar" -> "CALENDAR";
+		case "Dates" -> "DATES";
 		case "Links" -> "LINKS";
 		case "Timeline" -> "TIMELINE";
 		case "Details" -> "DETAILS";
@@ -1537,6 +1578,7 @@ public class CaseController {
 		case "OVERVIEW" -> "Overview";
 		case "TASKS" -> "Tasks";
 		case "CALENDAR" -> "Calendar";
+		case "DATES" -> "Dates";
 		case "LINKS" -> "Links";
 		case "TIMELINE" -> "Timeline";
 		case "DETAILS" -> "Details";
@@ -1639,6 +1681,7 @@ public class CaseController {
 			ControlStyles.apply(caseCalendarNewTaskButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 			caseCalendarNewTaskButton.setOnAction(e -> onAddTask());
 		}
+		configureCaseDatesControls();
 	}
 
 	private void resetCaseCalendarState() {
@@ -1832,6 +1875,91 @@ public class CaseController {
 	}
 
 
+
+	private void configureCaseDatesControls() {
+		if (addCaseDateButton != null) { ControlStyles.apply(addCaseDateButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD); addCaseDateButton.setAccessibleText("Add case date"); addCaseDateButton.setOnAction(e -> openCaseDateDialog(null)); }
+		if (refreshCaseDatesButton != null) { ControlStyles.apply(refreshCaseDatesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD); refreshCaseDatesButton.setAccessibleText("Refresh case dates"); refreshCaseDatesButton.setOnAction(e -> loadCaseDatesAsync()); }
+		if (showRemovedCaseDatesButton != null) { ControlStyles.apply(showRemovedCaseDatesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL); showRemovedCaseDatesButton.setAccessibleText("Show removed case dates"); showRemovedCaseDatesButton.setOnAction(e -> { showRemovedCaseDates = !showRemovedCaseDates; updateRemovedCaseDatesVisibility(); if (showRemovedCaseDates) loadCaseDatesAsync(); }); }
+	}
+
+	private void resetCaseDatesState() {
+		caseDatesLoadedOnce = false; caseDatesStale = true; caseDates = List.of(); removedCaseDates = List.of(); effectiveCaseDateTypes = List.of(); caseDatesLoadGeneration++;
+		if (caseDatesCardsBox != null) caseDatesCardsBox.getChildren().clear();
+		if (removedCaseDatesCardsBox != null) removedCaseDatesCardsBox.getChildren().clear();
+		showRemovedCaseDates = false; updateRemovedCaseDatesVisibility();
+	}
+
+	private void showCaseDatesTab() {
+		attachCaseUpdatesPane(CaseUpdatesPlacement.RIGHT);
+		activateCaseSectionRoot(caseDatesTabPane);
+		setPaneVisible(tasksPanel, false);
+		if (!caseDatesLoadedOnce || caseDatesStale) loadCaseDatesAsync(); else renderCaseDates(null);
+		loadCaseUpdatesAsync();
+	}
+
+	private void loadCaseDatesAsync() {
+		if (caseService == null || appState == null || caseId == null) { showCaseDatesMessage("Case dates are unavailable."); return; }
+		Integer tenantId = appState.getShaleClientId(); Integer actorId = appState.getUserId();
+		if (tenantId == null || tenantId <= 0 || actorId == null || actorId <= 0) { showCaseDatesMessage("Case dates are unavailable because no active user is selected."); return; }
+		final int activeCaseId = caseId; final int generation = ++caseDatesLoadGeneration;
+		showCaseDatesMessage("Loading case dates…");
+		caseDateExecutor.submit(() -> {
+			try {
+				List<EffectiveCaseDateTypeDto> types = caseService.listEffectiveCaseDateTypes(tenantId, actorId);
+				List<CaseDateDto> active = caseService.listCaseDatesForCase(activeCaseId, tenantId, actorId);
+				List<CaseDateDto> removed = showRemovedCaseDates ? caseService.listDeletedCaseDatesForCase(activeCaseId, tenantId, actorId) : List.of();
+				Platform.runLater(() -> {
+					if (!isCaseDatesCurrent(activeCaseId, generation)) return;
+					effectiveCaseDateTypes = types == null ? List.of() : List.copyOf(types);
+					caseDates = sortCaseDates(active); removedCaseDates = sortCaseDates(removed); caseDatesLoadedOnce = true; caseDatesStale = false; renderCaseDates(null);
+				});
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> { if (isCaseDatesCurrent(activeCaseId, generation)) renderCaseDatesFailure(); });
+			}
+		});
+	}
+
+	private boolean isCaseDatesCurrent(int activeCaseId, int generation) { return caseId != null && caseId == activeCaseId && generation == caseDatesLoadGeneration && caseDatesTabPane != null && caseDatesTabPane.getScene() != null; }
+
+	private List<CaseDateDto> sortCaseDates(List<CaseDateDto> dates) {
+		return (dates == null ? List.<CaseDateDto>of() : dates).stream().sorted(Comparator.comparing(CaseDateDto::startsAt, Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(CaseDateDto::endsAt, Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(d -> safeText(d.typeName())).thenComparingLong(CaseDateDto::id)).toList();
+	}
+
+	private void renderCaseDates(String message) {
+		if (caseDatesCardsBox == null) return; caseDatesCardsBox.getChildren().clear();
+		if (message != null && !message.isBlank()) showCaseDatesMessage(message); else setVisibleManaged(caseDatesStatusLabel, false);
+		if (caseDates.isEmpty()) showCaseDatesMessage("No case dates have been added yet."); else for (CaseDateDto date : caseDates) caseDatesCardsBox.getChildren().add(createCaseDateCard(date, false));
+		updateRemovedCaseDatesVisibility();
+		if (showRemovedCaseDates && removedCaseDatesCardsBox != null) { removedCaseDatesCardsBox.getChildren().clear(); if (removedCaseDates.isEmpty()) showRemovedCaseDatesMessage("No removed case dates."); else { setVisibleManaged(removedCaseDatesStatusLabel, false); for (CaseDateDto date : removedCaseDates) removedCaseDatesCardsBox.getChildren().add(createCaseDateCard(date, true)); } }
+	}
+
+	private Node createCaseDateCard(CaseDateDto date, boolean removed) {
+		Label title = new Label(safe(date.typeName())); title.setStyle("-fx-font-weight: 700; -fx-font-size: 13px;");
+		Label when = new Label(formatCaseDateOccurrence(date)); when.setStyle("-fx-opacity: 0.78;");
+		VBox text = new VBox(3, title, when);
+		if (isHistoricalCaseDateType(date)) { Label h = new Label("Historical/inactive type"); h.setStyle("-fx-opacity: 0.65; -fx-font-size: 11px;"); text.getChildren().add(h); }
+		if (!removed && !safeText(date.notes()).isBlank()) { Label n = new Label(date.notes()); n.setWrapText(true); n.setStyle("-fx-opacity: 0.75;"); text.getChildren().add(n); }
+		Button edit = ActionButtonFactory.semantic("Edit", e -> openCaseDateDialog(date), ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL); edit.setAccessibleText("Edit case date");
+		Button remove = ActionButtonFactory.semantic("Remove", e -> onRemoveCaseDate(date), ControlStyles.Purpose.DANGER, ControlStyles.Size.SMALL); remove.setAccessibleText("Remove case date");
+		Button restore = ActionButtonFactory.semantic("Restore", e -> onRestoreCaseDate(date), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL); restore.setAccessibleText("Restore case date");
+		HBox actions = removed ? new HBox(6, restore) : new HBox(6, edit, remove); actions.setAlignment(Pos.CENTER_RIGHT);
+		Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); HBox row = new HBox(12, text, spacer, actions); row.setAlignment(Pos.CENTER_LEFT); row.setPadding(new Insets(10)); row.setStyle("-fx-background-color: rgba(248,250,252,0.96); -fx-background-radius: 12; -fx-border-color: rgba(74,104,138,0.24); -fx-border-radius: 12;" + (removed ? " -fx-opacity: 0.72;" : "")); return row;
+	}
+
+	private String formatCaseDateOccurrence(CaseDateDto d) { if (d == null || d.startsAt() == null) return "—"; DateTimeFormatter df = DateTimeFormatter.ofPattern("MMM d, yyyy"); DateTimeFormatter dtf = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a"); if (d.allDay()) { String s = d.startsAt().toLocalDate().format(df); return d.endsAt() == null ? s : s + " – " + d.endsAt().toLocalDate().format(df); } String s = d.startsAt().format(dtf); return d.endsAt() == null ? s : s + " – " + d.endsAt().format(dtf); }
+	private boolean isHistoricalCaseDateType(CaseDateDto d) { return d != null && effectiveCaseDateTypes.stream().noneMatch(t -> t.id() == d.caseDateTypeId()); }
+	private void showCaseDatesMessage(String message) { if (caseDatesStatusLabel != null) { caseDatesStatusLabel.setText(message); setVisibleManaged(caseDatesStatusLabel, true); } }
+	private void showRemovedCaseDatesMessage(String message) { if (removedCaseDatesStatusLabel != null) { removedCaseDatesStatusLabel.setText(message); setVisibleManaged(removedCaseDatesStatusLabel, true); } }
+	private void renderCaseDatesFailure() { if (caseDatesCardsBox != null) caseDatesCardsBox.getChildren().clear(); Button retry = ActionButtonFactory.semantic("Retry", e -> loadCaseDatesAsync(), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD); retry.setAccessibleText("Retry loading case dates"); VBox box = new VBox(8, new Label("Failed to load case dates."), retry); caseDatesCardsBox.getChildren().setAll(box); setVisibleManaged(caseDatesStatusLabel, false); }
+	private void updateRemovedCaseDatesVisibility() { if (showRemovedCaseDatesButton != null) { showRemovedCaseDatesButton.setText(showRemovedCaseDates ? "Hide Removed" : "Show Removed"); showRemovedCaseDatesButton.setAccessibleText(showRemovedCaseDates ? "Hide removed case dates" : "Show removed case dates"); } setVisibleManaged(removedCaseDatesCardsBox, showRemovedCaseDates); setVisibleManaged(removedCaseDatesStatusLabel, showRemovedCaseDates && removedCaseDates.isEmpty()); }
+	private void refreshCaseDatesAfterMutation(String message) { caseDatesStale = true; if ("Dates".equals(activeSectionName)) loadCaseDatesAsync(); }
+	private void openCaseDateDialog(CaseDateDto existing) { if (caseService == null || appState == null || caseId == null) return; if (effectiveCaseDateTypes.isEmpty()) loadCaseDatesAsync(); CaseDateOccurrenceDialog.show(caseDatesOwner(), existing == null ? "Add Date" : "Edit Date", effectiveCaseDateTypes, existing, input -> saveCaseDate(existing, input), this::loadCaseDatesAsync); }
+	private String saveCaseDate(CaseDateDto existing, CaseDateOccurrenceDialog.Input input) { Integer tenantId=appState.getShaleClientId(), actorId=appState.getUserId(); if(tenantId==null||actorId==null) return "Save is unavailable."; if(caseDateMutationInFlight.getAndSet(true)) return "Save is already in progress."; try { if(existing==null) caseService.createCaseDate(new CreateCaseDateCommand(tenantId, actorId, caseId, input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes())); else caseService.updateCaseDate(new UpdateCaseDateCommand(tenantId, actorId, caseId, existing.id(), input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes(), existing.rowVer())); caseDateMutationInFlight.set(false); refreshCaseDatesAfterMutation(null); return null; } catch(RuntimeException ex) { caseDateMutationInFlight.set(false); return rootMessage(ex); } }
+	private void onRemoveCaseDate(CaseDateDto d) { if (d==null||caseService==null||appState==null||caseId==null) return; if(!AppDialogs.showConfirmation(caseDatesOwner(), "Remove Date", "Remove this case date?", "The date will be removed from active case dates and can be restored later.", "Remove", DialogActionKind.DANGER)) return; Integer tenantId=appState.getShaleClientId(), actorId=appState.getUserId(); if(tenantId==null||actorId==null||caseDateMutationInFlight.getAndSet(true)) return; caseDateExecutor.submit(() -> { try { caseService.deleteCaseDate(new DeleteCaseDateCommand(tenantId, actorId, caseId, d.id(), d.rowVer())); caseDateMutationInFlight.set(false); Platform.runLater(() -> refreshCaseDatesAfterMutation(null)); } catch(RuntimeException ex) { caseDateMutationInFlight.set(false); Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Remove Date", rootMessage(ex))); } }); }
+	private void onRestoreCaseDate(CaseDateDto d) { if (d==null||caseService==null||appState==null||caseId==null) return; Integer tenantId=appState.getShaleClientId(), actorId=appState.getUserId(); if(tenantId==null||actorId==null||caseDateMutationInFlight.getAndSet(true)) return; caseDateExecutor.submit(() -> { try { caseService.restoreCaseDate(new RestoreCaseDateCommand(tenantId, actorId, caseId, d.id(), d.rowVer())); caseDateMutationInFlight.set(false); Platform.runLater(() -> refreshCaseDatesAfterMutation(null)); } catch(RuntimeException ex) { caseDateMutationInFlight.set(false); Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Restore Date", rootMessage(ex))); } }); }
+	private Window caseDatesOwner() { return caseDatesTabPane != null && caseDatesTabPane.getScene() != null ? caseDatesTabPane.getScene().getWindow() : taskDialogOwner(); }
+
+
 	private void resetCaseLinksState() {
 		caseLinksLoadedOnce = false;
 		caseLinksStale = true;
@@ -1961,6 +2089,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseDatesTabPane, false);
 		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, true);
 		setPaneVisible(genericPane, false);
@@ -2667,6 +2796,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseDatesTabPane, false);
 		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
@@ -2685,6 +2815,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, true);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseDatesTabPane, false);
 		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
@@ -2706,6 +2837,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, true);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseDatesTabPane, false);
 		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, false);
@@ -2723,6 +2855,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseDatesTabPane, false);
 		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
@@ -2751,6 +2884,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseDatesTabPane, false);
 		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
@@ -2778,6 +2912,7 @@ public class CaseController {
 		setPaneVisible(detailsSectionPane, false);
 		setPaneVisible(tasksTabPane, false);
 		setPaneVisible(caseCalendarTabPane, false);
+		setPaneVisible(caseDatesTabPane, false);
 		setPaneVisible(caseRequestsTabPane, false);
 		setPaneVisible(caseLinksTabPane, false);
 		setPaneVisible(genericPane, true);
@@ -6684,7 +6819,7 @@ public class CaseController {
 		if (!Platform.isFxApplicationThread())
 			throw new IllegalStateException("Case sections must be activated on the JavaFX application thread.");
 		for (Node root : new Node[] {overviewScrollPane, detailsSectionPane, tasksTabPane, caseCalendarTabPane,
-				caseRequestsTabPane, caseLinksTabPane, genericPane}) {
+				caseDatesTabPane, caseRequestsTabPane, caseLinksTabPane, genericPane}) {
 			if (root != null) setPaneVisible(root, root == activeRoot);
 		}
 		if (activeRoot != caseRequestsTabPane) caseMaterialRequestsTabController.deactivate();

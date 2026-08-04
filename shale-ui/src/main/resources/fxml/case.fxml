@@ -821,6 +821,34 @@
 				</HBox>
 			</VBox>
 
+			<!-- DATES TAB PANE (center) -->
+			<VBox fx:id="caseDatesTabPane" spacing="8" maxWidth="1.7976931348623157E308"
+				maxHeight="1.7976931348623157E308" visible="false" managed="false">
+				<padding><Insets top="8" right="8" bottom="8" left="8" /></padding>
+				<VBox spacing="8" VBox.vgrow="ALWAYS" maxHeight="1.7976931348623157E308" styleClass="case-main-surface">
+					<padding><Insets top="10" right="10" bottom="10" left="10" /></padding>
+					<HBox spacing="8" alignment="CENTER_LEFT">
+						<Label text="Dates" style="-fx-font-size: 16px; -fx-font-weight: bold;" />
+						<Region HBox.hgrow="ALWAYS" />
+						<Button fx:id="refreshCaseDatesButton" text="Refresh" />
+						<Button fx:id="showRemovedCaseDatesButton" text="Show Removed" />
+						<Button fx:id="addCaseDateButton" text="Add Date" />
+					</HBox>
+					<Label fx:id="caseDatesStatusLabel" text="Loading case dates…" visible="false" managed="false" style="-fx-opacity: 0.75;" />
+					<ScrollPane fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS" styleClass="transparent-scroll">
+						<content>
+							<VBox spacing="12">
+								<VBox fx:id="caseDatesCardsBox" spacing="10"><padding><Insets top="4" right="4" bottom="4" left="4" /></padding></VBox>
+								<VBox fx:id="removedCaseDatesCardsBox" spacing="10" visible="false" managed="false">
+									<Label text="Removed Dates" style="-fx-font-size: 14px; -fx-font-weight: bold;" />
+									<Label fx:id="removedCaseDatesStatusLabel" text="No removed case dates." visible="false" managed="false" style="-fx-opacity: 0.75;" />
+								</VBox>
+							</VBox>
+						</content>
+					</ScrollPane>
+				</VBox>
+			</VBox>
+
 			<!-- REQUESTS TAB PANE (center) -->
 			<VBox fx:id="caseRequestsTabPane" spacing="8" maxWidth="1.7976931348623157E308"
 				maxHeight="1.7976931348623157E308" visible="false" managed="false">

@@ -55,6 +55,8 @@ public interface CaseServicePort {
 
 	List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId);
 
+	List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int shaleClientId, int actorUserId);
+
 	Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId);
 
 	CaseDateDto createCaseDate(CreateCaseDateCommand command);
