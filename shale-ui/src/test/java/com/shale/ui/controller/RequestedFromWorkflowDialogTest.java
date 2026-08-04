@@ -68,7 +68,7 @@ final class RequestedFromWorkflowDialogTest {
         assertFalse(s.contains("addCaseParty"));
         assertFalse(c.contains("caseDao.addCaseParty"));
         assertTrue(c.contains("createMaterialRequest"));
-        assertTrue(c.contains("Button save=ActionButtonFactory.primary(\"Save\",null)"));
+        assertTrue(c.contains("Button save=semanticButton(ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD, \"Save\",null)"));
     }
 
 

@@ -56,8 +56,8 @@ final class TaskSemanticControlMigrationTest {
         assertTrue(taskCard.contains("setTaskStatus"));
         assertTrue(taskCard.contains("DueProximityStyles.accentColor"));
         assertTrue(taskCard.contains("CaseCardFactory.Variant.EMBEDDED"));
-        assertTrue(taskCard.contains("caseCard.setOnMouseClicked(e -> {\n\t\t\te.consume();"));
-        assertTrue(taskCard.contains("toggleCompleteButton.setOnAction(e ->\n\t\t{\n\t\t\te.consume();"));
+        assertTrue(taskCard.matches("(?s).*caseCard\\.setOnMouseClicked\\(e -> \\{\\s+e\\.consume\\(\\);.*"));
+        assertTrue(taskCard.matches("(?s).*toggleCompleteButton\\.setOnAction\\(e ->\\s+\\{\\s+e\\.consume\\(\\);.*"));
         assertFalse(taskCard.contains("toggleCompleteButton.setStyle("), "Action buttons must not receive inline feature colors.");
     }
 

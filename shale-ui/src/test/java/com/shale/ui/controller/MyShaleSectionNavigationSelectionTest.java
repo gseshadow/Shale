@@ -22,8 +22,8 @@ final class MyShaleSectionNavigationSelectionTest {
     @Test
     void initialOverviewPresentationAndSelectionAgreeWithoutStartingASecondLoad() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
-        assertTrue(source.contains("setupSections();\n\t\tapplySectionSelectionState(activeSection);"));
-        assertFalse(source.contains("setupSections();\n\t\tonSectionSelected(SECTION_OVERVIEW);"),
+        assertTrue(source.matches("(?s).*setupSections\\(\\);\\s+applySectionSelectionState\\(activeSection\\);.*"));
+        assertFalse(source.matches("(?s).*setupSections\\(\\);\\s+onSectionSelected\\(SECTION_OVERVIEW\\);.*"),
                 "Initialization must establish presentation state without invoking navigation/loading.");
 
         JavaFxTestSupport.runAndWait(() -> {
@@ -50,6 +50,11 @@ final class MyShaleSectionNavigationSelectionTest {
 
     private static LoadedMyShale load() throws Exception {
         FXMLLoader loader = new FXMLLoader(MyShaleSectionNavigationSelectionTest.class.getResource("/fxml/my-shale.fxml"));
+        // FXMLLoader otherwise falls back to the current thread's context loader. The
+        // shared JavaFX application thread may legitimately have no context loader
+        // after other tests have used the toolkit, so do not depend on that global
+        // thread state when resolving the controller and imported FXML types.
+        loader.setClassLoader(MyShaleSectionNavigationSelectionTest.class.getClassLoader());
         Parent root = loader.load();
         MyShaleController controller = loader.getController();
         @SuppressWarnings("unchecked")
