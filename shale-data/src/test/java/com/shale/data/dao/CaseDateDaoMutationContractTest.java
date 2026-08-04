@@ -56,17 +56,17 @@ class CaseDateDaoMutationContractTest {
         assertTrue(source.contains("EntityType.CASE_DATE"));
         assertFalse(source.contains("DELETE FROM dbo.CaseDates"));
         assertFalse(source.contains("CalendarEvents"));
-        assertFalse(source.contains("UPDATE dbo.CaseDateTypes"));
-        assertFalse(source.contains("INSERT dbo.CaseDateTypes"));
+        assertTrue(source.contains("INSERT dbo.CaseDateTypes"), "Phase 2A owns CaseDateTypes administration separately from occurrence mutations.");
+        assertTrue(source.contains("UPDATE dbo.CaseDateTypes"), "Phase 2A owns CaseDateTypes administration separately from occurrence mutations.");
     }
 
-    @Test void serviceBoundaryExposesOnlyOccurrenceMutations() throws Exception {
+    @Test void serviceBoundaryExposesOccurrenceAndPhase2ATypeAdministrationMutations() throws Exception {
         String port = Files.readString(Path.of(PORT));
         assertTrue(port.contains("CaseDateDto createCaseDate(CreateCaseDateCommand command)"));
         assertTrue(port.contains("CaseDateDto updateCaseDate(UpdateCaseDateCommand command)"));
         assertTrue(port.contains("void deleteCaseDate(DeleteCaseDateCommand command)"));
         assertTrue(port.contains("CaseDateDto restoreCaseDate(RestoreCaseDateCommand command)"));
-        assertFalse(port.contains("createCaseDateType"));
-        assertFalse(port.contains("updateCaseDateType"));
+        assertTrue(port.contains("createCaseDateType"));
+        assertTrue(port.contains("updateCaseDateType"));
     }
 }

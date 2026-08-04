@@ -7,6 +7,9 @@ import com.shale.core.service.CaseServicePort.CreateCaseDateCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseDateCommand;
 import com.shale.core.service.CaseServicePort.DeleteCaseDateCommand;
 import com.shale.core.service.CaseServicePort.RestoreCaseDateCommand;
+import com.shale.core.service.CaseServicePort.CaseDateTypeCommand;
+import com.shale.core.service.CaseServicePort.SetCaseDateTypeActiveCommand;
+import com.shale.core.service.CaseServicePort.ResetCaseDateTypeOverrideCommand;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -69,6 +72,37 @@ public final class CaseDateDao {
         } catch (SQLException e) { throw fail(e); }
     }
 
+
+
+    public List<EffectiveCaseDateTypeDto> listCaseDateTypesForAdministration(int tenant, int actor) {
+        String sql = """
+                SELECT t.Id, t.ShaleClientId, t.SystemKey, t.Name, t.Description, t.CalendarCategory, t.Color, t.SupportsTime, t.SortOrder, t.IsActive, t.IsDeleted,
+                       CASE WHEN t.ShaleClientId IS NOT NULL AND g.Id IS NOT NULL THEN 'TENANT_OVERRIDE' WHEN t.ShaleClientId IS NOT NULL THEN 'TENANT_CREATED' ELSE 'GLOBAL' END AS Origin,
+                       t.RowVer
+                FROM dbo.CaseDateTypes t
+                LEFT JOIN dbo.CaseDateTypes g ON g.ShaleClientId IS NULL AND g.SystemKey = t.SystemKey
+                WHERE t.ShaleClientId IS NULL OR t.ShaleClientId = ?
+                ORDER BY t.SortOrder, t.Name, t.Id
+                """;
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+            verifyTenant(con, tenant); validateAdminActor(con, tenant, actor); ps.setInt(1, tenant);
+            try (ResultSet rs = ps.executeQuery()) { List<EffectiveCaseDateTypeDto> out = new ArrayList<>(); while (rs.next()) out.add(mapType(rs)); return List.copyOf(out); }
+        } catch (SQLException e) { throw fail(e); }
+    }
+
+    public EffectiveCaseDateTypeDto createCaseDateType(CaseDateTypeCommand c) { return mutateType(c.shaleClientId(), c.actorUserId(), con -> insertType(con, c, normalizeSystemKey(c.systemKey()))); }
+    public EffectiveCaseDateTypeDto updateCaseDateType(CaseDateTypeCommand c) { return mutateType(c.shaleClientId(), c.actorUserId(), con -> {
+        requireExpected(c.expectedRowVer()); EffectiveCaseDateTypeDto e=findType(con,c.id()); requireTypeForTenant(e,c.shaleClientId());
+        if(e.shaleClientId()==null){ requireRowVerMatch(e.rowVer(),c.expectedRowVer()); return upsertOverride(con,c,e); }
+        return updateTypeRow(con,c,e.id(),c.expectedRowVer(), e.systemKey());
+    }); }
+    public EffectiveCaseDateTypeDto setCaseDateTypeActive(SetCaseDateTypeActiveCommand c) { return mutateType(c.shaleClientId(), c.actorUserId(), con -> {
+        requireExpected(c.expectedRowVer()); EffectiveCaseDateTypeDto e=findType(con,c.id()); requireTypeForTenant(e,c.shaleClientId());
+        CaseDateTypeCommand cmd=new CaseDateTypeCommand(e.shaleClientId()==null?null:e.id(),c.shaleClientId(),c.actorUserId(),e.systemKey(),e.name(),e.description(),e.calendarCategory(),e.color(),e.supportsTime(),e.sortOrder(),c.active(),e.shaleClientId()==null?c.expectedRowVer():e.rowVer());
+        if(e.shaleClientId()==null){ requireRowVerMatch(e.rowVer(),c.expectedRowVer()); return upsertOverride(con,cmd,e); }
+        return updateTypeRow(con,cmd,e.id(),c.expectedRowVer(), e.systemKey());
+    }); }
+    public void resetCaseDateTypeOverride(ResetCaseDateTypeOverrideCommand c) { mutateType(c.shaleClientId(), c.actorUserId(), con -> { EffectiveCaseDateTypeDto e=findType(con,c.id()); requireTypeForTenant(e,c.shaleClientId()); String key=e.systemKey(); if(key==null||key.isBlank()) key=null; EffectiveCaseDateTypeDto tenant=e.shaleClientId()==null?findTenantTypeByKey(con,c.shaleClientId(),key):e; if(tenant==null||tenant.shaleClientId()==null) throw new IllegalArgumentException("Tenant case date type override is not available."); softDeleteType(con,c.shaleClientId(),c.actorUserId(),tenant.id()); return tenant; }); }
 
 
     public CaseDateDto createCaseDate(CreateCaseDateCommand c) {
@@ -139,6 +173,23 @@ public final class CaseDateDao {
             WHERE """ + where; }
 
 
+
+    private interface SqlTypeMutation<T>{T run(Connection con)throws Exception;}
+    private <T> T mutateType(int tenant,int actor,SqlTypeMutation<T> op){try(Connection con=db.requireConnection()){verifyTenant(con,tenant);validateAdminActor(con,tenant,actor);con.setAutoCommit(false);try{T r=op.run(con);con.commit();return r;}catch(Exception e){con.rollback(); if(e instanceof RuntimeException re) throw re; throw new IllegalStateException("Case date type mutation failed.", e);}finally{con.setAutoCommit(true);}}catch(SQLException e){throw fail(e);}}
+    private EffectiveCaseDateTypeDto insertType(Connection con,CaseDateTypeCommand c,String key)throws SQLException{validateTypeValues(c.name(),c.calendarCategory(),c.color(),key,c.sortOrder());try(PreparedStatement ps=con.prepareStatement("INSERT dbo.CaseDateTypes (ShaleClientId,SystemKey,Name,Description,CalendarCategory,Color,SupportsTime,SortOrder,IsActive,CreatedByUserId) OUTPUT INSERTED.Id VALUES (?,?,?,?,?,?,?,?,?,?)")){int i=1;ps.setInt(i++,c.shaleClientId());ps.setString(i++,key);ps.setString(i++,trimReq(c.name(),"Name"));ps.setString(i++,norm(c.description()));ps.setString(i++,category(c.calendarCategory()));ps.setString(i++,norm(c.color()));ps.setBoolean(i++,c.supportsTime());ps.setInt(i++,c.sortOrder()==null?nextSort(con,c.shaleClientId()):c.sortOrder());ps.setBoolean(i++,c.active());ps.setInt(i,c.actorUserId());try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalStateException("Case date type was not created.");return findType(con,rs.getInt(1));}}}
+    private EffectiveCaseDateTypeDto upsertOverride(Connection con,CaseDateTypeCommand c,EffectiveCaseDateTypeDto global)throws SQLException{if(global.systemKey()==null||global.systemKey().isBlank())throw new IllegalArgumentException("Global case date type cannot be customized without a SystemKey.");EffectiveCaseDateTypeDto existing=findTenantTypeByKey(con,c.shaleClientId(),global.systemKey());CaseDateTypeCommand cmd=new CaseDateTypeCommand(existing==null?null:existing.id(),c.shaleClientId(),c.actorUserId(),global.systemKey(),c.name(),c.description(),c.calendarCategory(),c.color(),c.supportsTime(),c.sortOrder(),c.active(),existing==null?null:existing.rowVer());return existing==null?insertType(con,cmd,global.systemKey()):updateTypeRow(con,cmd,existing.id(),existing.rowVer(),global.systemKey());}
+    private EffectiveCaseDateTypeDto updateTypeRow(Connection con,CaseDateTypeCommand c,int id,byte[] expected,String stableKey)throws SQLException{validateTypeValues(c.name(),c.calendarCategory(),c.color(),stableKey,c.sortOrder());try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.CaseDateTypes SET Name=?,Description=?,CalendarCategory=?,Color=?,SupportsTime=?,SortOrder=?,IsActive=?,IsDeleted=0,DeletedAt=NULL,DeletedByUserId=NULL,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND RowVer=?")){int i=1;ps.setString(i++,trimReq(c.name(),"Name"));ps.setString(i++,norm(c.description()));ps.setString(i++,category(c.calendarCategory()));ps.setString(i++,norm(c.color()));ps.setBoolean(i++,c.supportsTime());ps.setInt(i++,c.sortOrder()==null?nextSort(con,c.shaleClientId()):c.sortOrder());ps.setBoolean(i++,c.active());ps.setInt(i++,c.actorUserId());ps.setInt(i++,id);ps.setInt(i++,c.shaleClientId());ps.setBytes(i,expected);if(ps.executeUpdate()!=1)throw new IllegalStateException("Case date type changed.");return findType(con,id);}}
+    private void softDeleteType(Connection con,int tenant,int actor,int id)throws SQLException{try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.CaseDateTypes SET IsDeleted=1,IsActive=0,DeletedAt=SYSUTCDATETIME(),DeletedByUserId=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=?")){ps.setInt(1,actor);ps.setInt(2,actor);ps.setInt(3,id);ps.setInt(4,tenant);if(ps.executeUpdate()!=1)throw new IllegalArgumentException("Tenant case date type is not available.");}}
+    private EffectiveCaseDateTypeDto findType(Connection con,Integer id)throws SQLException{if(id==null)return null;try(PreparedStatement ps=con.prepareStatement("SELECT t.Id,t.ShaleClientId,t.SystemKey,t.Name,t.Description,t.CalendarCategory,t.Color,t.SupportsTime,t.SortOrder,t.IsActive,t.IsDeleted,CASE WHEN t.ShaleClientId IS NOT NULL AND g.Id IS NOT NULL THEN 'TENANT_OVERRIDE' WHEN t.ShaleClientId IS NOT NULL THEN 'TENANT_CREATED' ELSE 'GLOBAL' END AS Origin,t.RowVer FROM dbo.CaseDateTypes t LEFT JOIN dbo.CaseDateTypes g ON g.ShaleClientId IS NULL AND g.SystemKey=t.SystemKey WHERE t.Id=?")){ps.setInt(1,id);try(ResultSet rs=ps.executeQuery()){return rs.next()?mapType(rs):null;}}}
+    private EffectiveCaseDateTypeDto findTenantTypeByKey(Connection con,int tenant,String key)throws SQLException{if(key==null)return null;try(PreparedStatement ps=con.prepareStatement("SELECT t.Id,t.ShaleClientId,t.SystemKey,t.Name,t.Description,t.CalendarCategory,t.Color,t.SupportsTime,t.SortOrder,t.IsActive,t.IsDeleted,'TENANT_OVERRIDE' AS Origin,t.RowVer FROM dbo.CaseDateTypes t WHERE t.ShaleClientId=? AND t.SystemKey=?")){ps.setInt(1,tenant);ps.setString(2,key);try(ResultSet rs=ps.executeQuery()){return rs.next()?mapType(rs):null;}}}
+    private static void requireTypeForTenant(EffectiveCaseDateTypeDto e,int tenant){if(e==null)throw new IllegalArgumentException("Case date type is not available.");if(e.shaleClientId()!=null&&e.shaleClientId()!=tenant)throw new IllegalArgumentException("Case date type is not available for this tenant.");}
+    private static void requireExpected(byte[] rv){if(rv==null||rv.length==0)throw new IllegalArgumentException("expectedRowVer is required");}
+    private static void validateTypeValues(String name,String cat,String color,String key,Integer sort){trimReq(name,"Name");category(cat);String c=norm(color);if(c!=null&&!c.matches("#[0-9A-Fa-f]{6}"))throw new IllegalArgumentException("Color must be #RRGGBB.");if(key!=null&&!key.matches("[a-z0-9_\\-]{1,64}"))throw new IllegalArgumentException("SystemKey is invalid.");if(sort!=null&&(sort<-100000||sort>100000))throw new IllegalArgumentException("Sort order is out of range.");}
+    private static String trimReq(String s,String n){String v=norm(s);if(v==null)throw new IllegalArgumentException(n+" is required.");if(v.length()>100)throw new IllegalArgumentException(n+" must be 100 characters or fewer.");return v;}
+    private static String category(String c){String v=norm(c);if(v==null)v="OTHER";v=v.toUpperCase(Locale.ROOT);if(!Set.of("DEADLINE","TRIAL","HEARING","MEDIATION","DEPOSITION","NOTICE","APPOINTMENT","MILESTONE","OTHER").contains(v))throw new IllegalArgumentException("Calendar category is invalid.");return v;}
+    private static String normalizeSystemKey(String s){String v=norm(s);return v==null?null:v.toLowerCase(Locale.ROOT);}
+    private static int nextSort(Connection con,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT COALESCE(MAX(SortOrder),0)+10 FROM dbo.CaseDateTypes WHERE ShaleClientId=? AND IsDeleted=0")){ps.setInt(1,tenant);try(ResultSet rs=ps.executeQuery()){rs.next();return rs.getInt(1);}}}
+
     private CaseDateDto requireDate(Connection con,long id,int tenant)throws SQLException{String sql=occurrenceSql("cd.Id = ? AND cd.ShaleClientId = ?");try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setInt(2,tenant);ps.setLong(3,id);ps.setInt(4,tenant);try(ResultSet rs=ps.executeQuery()){if(rs.next())return mapDate(rs);throw new IllegalStateException("Case date is not available.");}}}
     private record TypeRow(int id, boolean supportsTime){}
     private record MutationRow(long id,int typeId,LocalDateTime startsAt,LocalDateTime endsAt,boolean allDay,String notes,byte[] rowVer){}
@@ -159,6 +210,7 @@ public final class CaseDateDao {
     private static CaseDateDto mapDate(ResultSet rs) throws SQLException { return new CaseDateDto(rs.getLong("Id"),rs.getInt("ShaleClientId"),rs.getLong("CaseId"),rs.getInt("CaseDateTypeId"),rs.getString("TypeSystemKey"),rs.getString("TypeName"),rs.getString("TypeDescription"),rs.getString("CalendarCategory"),rs.getString("Color"),rs.getBoolean("SupportsTime"),ldt(rs,"StartsAt"),ldt(rs,"EndsAt"),rs.getBoolean("AllDay"),rs.getString("Notes"),ldt(rs,"CreatedAt"),rs.getInt("CreatedByUserId"),rs.getString("CreatedByDisplayName"),ldt(rs,"UpdatedAt"),(Integer)rs.getObject("UpdatedByUserId"),rs.getString("UpdatedByDisplayName"),rs.getBytes("RowVer")); }
     private static LocalDateTime ldt(ResultSet rs, String c) throws SQLException { Timestamp ts = rs.getTimestamp(c); return ts == null ? null : ts.toLocalDateTime(); }
     private static void verifyTenant(Connection con,int t)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT)");ResultSet rs=ps.executeQuery()){if(!rs.next()||rs.getInt(1)!=t)throw new IllegalStateException("ShaleClientId session context mismatch.");}}
+    private static void validateAdminActor(Connection con,int t,int u)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0 AND ISNULL(is_admin,0)=1")){ps.setInt(1,u);ps.setInt(2,t);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalArgumentException("Administrator user is not available for this tenant.");}}}
     private static void validateActor(Connection con,int t,int u)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0")){ps.setInt(1,u);ps.setInt(2,t);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalArgumentException("Actor user is not available for this tenant.");}}}
     private static void validateCase(Connection con,int t,long c)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.Cases WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){ps.setLong(1,c);ps.setInt(2,t);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalArgumentException("Case is not available for this tenant.");}}}
     private static RuntimeException fail(SQLException e){return new IllegalStateException("Database operation failed.", e);}
