@@ -127,6 +127,7 @@ public final class ScheduleAgendaPane {
                 case CALENDAR_EVENT -> { if (handlers.onEvent() != null) handlers.onEvent().accept(Math.toIntExact(target.id())); }
                 case TASK -> { if (handlers.onTask() != null) handlers.onTask().accept(target.id()); }
                 case CASE -> { if (handlers.onCase() != null) handlers.onCase().accept(Math.toIntExact(target.id())); }
+                case CASE_DATES -> { if (handlers.onCase() != null) handlers.onCase().accept(Math.toIntExact(target.id())); }
                 case NONE -> { }
             }
         });

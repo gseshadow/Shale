@@ -1826,6 +1826,7 @@ public class CaseController {
 				case CALENDAR_EVENT -> openCaseCalendarEventEditor(Math.toIntExact(target.id()));
 				case TASK -> openTask(target.id());
 				case CASE -> AppDialogs.showInfo(caseCalendarOwner(), "Case Date", "This is a projected case date from the current case. Edit it from Overview or Details.");
+				case CASE_DATES -> showCaseDatesTab();
 				case NONE -> { }
 			}
 		});
