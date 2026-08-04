@@ -154,6 +154,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		return List.copyOf(effective);
 	}
 
+	private static void validateCaseDateRange(LocalDateTime startsAt, LocalDateTime endsAt) {
+		if (startsAt == null) throw new IllegalArgumentException("StartsAt is required.");
+		if (endsAt != null && endsAt.isBefore(startsAt)) throw new IllegalArgumentException("EndsAt must be greater than or equal to StartsAt.");
+	}
+
 	private static String normalizeSystemKey(String systemKey) {
 		String normalized = systemKey == null ? "" : systemKey.trim().toLowerCase(Locale.ROOT);
 		return normalized.isBlank() ? null : normalized;
@@ -243,6 +248,52 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		validatePositive(shaleClientId, "ShaleClientId");
 		validatePositive(actorUserId, "ActorUserId");
 		return caseGateway.getCaseDate(caseDateId, shaleClientId, actorUserId);
+	}
+
+	@Override
+	public CaseDateDto createCaseDate(CreateCaseDateCommand command) {
+		Objects.requireNonNull(command, "command");
+		validatePositive(command.shaleClientId(), "ShaleClientId");
+		validatePositive(command.actorUserId(), "ActorUserId");
+		validatePositive(command.caseId(), "CaseId");
+		validatePositive(command.caseDateTypeId(), "CaseDateTypeId");
+		validateCaseDateRange(command.startsAt(), command.endsAt());
+		return caseGateway.createCaseDate(command);
+	}
+
+	@Override
+	public CaseDateDto updateCaseDate(UpdateCaseDateCommand command) {
+		Objects.requireNonNull(command, "command");
+		validatePositive(command.shaleClientId(), "ShaleClientId");
+		validatePositive(command.actorUserId(), "ActorUserId");
+		validatePositive(command.caseId(), "CaseId");
+		validatePositive(command.caseDateId(), "CaseDateId");
+		validatePositive(command.caseDateTypeId(), "CaseDateTypeId");
+		validateRequiredRowVer(command.expectedRowVer(), "expectedRowVer");
+		validateCaseDateRange(command.startsAt(), command.endsAt());
+		return caseGateway.updateCaseDate(command);
+	}
+
+	@Override
+	public void deleteCaseDate(DeleteCaseDateCommand command) {
+		Objects.requireNonNull(command, "command");
+		validatePositive(command.shaleClientId(), "ShaleClientId");
+		validatePositive(command.actorUserId(), "ActorUserId");
+		validatePositive(command.caseId(), "CaseId");
+		validatePositive(command.caseDateId(), "CaseDateId");
+		validateRequiredRowVer(command.expectedRowVer(), "expectedRowVer");
+		caseGateway.deleteCaseDate(command);
+	}
+
+	@Override
+	public CaseDateDto restoreCaseDate(RestoreCaseDateCommand command) {
+		Objects.requireNonNull(command, "command");
+		validatePositive(command.shaleClientId(), "ShaleClientId");
+		validatePositive(command.actorUserId(), "ActorUserId");
+		validatePositive(command.caseId(), "CaseId");
+		validatePositive(command.caseDateId(), "CaseDateId");
+		validateRequiredRowVer(command.expectedRowVer(), "expectedRowVer");
+		return caseGateway.restoreCaseDate(command);
 	}
 
 	@Override
@@ -647,6 +698,10 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		default List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("listEffectiveCaseDateTypes"); }
 		default List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("listCaseDatesForCase"); }
 		default Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("getCaseDate"); }
+		default CaseDateDto createCaseDate(CreateCaseDateCommand command) { throw unsupportedCaseLinkGatewayOperation("createCaseDate"); }
+		default CaseDateDto updateCaseDate(UpdateCaseDateCommand command) { throw unsupportedCaseLinkGatewayOperation("updateCaseDate"); }
+		default void deleteCaseDate(DeleteCaseDateCommand command) { throw unsupportedCaseLinkGatewayOperation("deleteCaseDate"); }
+		default CaseDateDto restoreCaseDate(RestoreCaseDateCommand command) { throw unsupportedCaseLinkGatewayOperation("restoreCaseDate"); }
 		List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId);
 		LinkTypeDto createLinkType(int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey);
 		LinkTypeDto updateLinkType(int shaleClientId, int actorUserId, int linkTypeId, String name, String color, boolean active, String systemKey, byte[] expectedRowVer);
@@ -813,6 +868,10 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override public List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) { return caseDateDao.listEffectiveCaseDateTypes(shaleClientId, actorUserId); }
 		@Override public List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) { return caseDateDao.listCaseDatesForCase(caseId, shaleClientId, actorUserId); }
 		@Override public Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) { return caseDateDao.getCaseDate(caseDateId, shaleClientId, actorUserId); }
+		@Override public CaseDateDto createCaseDate(CreateCaseDateCommand command) { return caseDateDao.createCaseDate(command); }
+		@Override public CaseDateDto updateCaseDate(UpdateCaseDateCommand command) { return caseDateDao.updateCaseDate(command); }
+		@Override public void deleteCaseDate(DeleteCaseDateCommand command) { caseDateDao.deleteCaseDate(command); }
+		@Override public CaseDateDto restoreCaseDate(RestoreCaseDateCommand command) { return caseDateDao.restoreCaseDate(command); }
 		@Override public List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive) { return caseDao.listLinkTypes(shaleClientId, includeInactive); }
 		@Override public List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId) { return caseDao.listLinkTypesForAdministration(shaleClientId, actorUserId); }
 		@Override public LinkTypeDto createLinkType(int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey) { return caseDao.createLinkType(shaleClientId, actorUserId, name, color, active, systemKey); }

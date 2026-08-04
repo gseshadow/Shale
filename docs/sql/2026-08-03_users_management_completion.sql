@@ -33,7 +33,7 @@ BEGIN TRY
 
     DECLARE @Allowed table(Value nvarchar(100) NOT NULL PRIMARY KEY);
     INSERT @Allowed(Value) VALUES
-      (N'LINK_TYPE'),(N'CASE_LINK'),(N'CASE_LINK_SHARE'),(N'MATERIAL_TYPE'),(N'MATERIAL_REQUEST'),(N'MATERIAL_REQUEST_FOLLOW_UP'),(N'MATERIAL_ITEM'),(N'USER');
+      (N'LINK_TYPE'),(N'CASE_LINK'),(N'CASE_LINK_SHARE'),(N'MATERIAL_TYPE'),(N'MATERIAL_REQUEST'),(N'MATERIAL_REQUEST_FOLLOW_UP'),(N'MATERIAL_ITEM'),(N'USER'),(N'CASE_DATE');
     -- Preserve any older quoted values present in the deployed definition.
     DECLARE @work nvarchar(max)=@OldDefinition,@start int=CHARINDEX(N'''',@OldDefinition),@finish int;
     WHILE @start>0 BEGIN
