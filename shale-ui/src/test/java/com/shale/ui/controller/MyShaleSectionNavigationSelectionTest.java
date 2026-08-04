@@ -22,8 +22,8 @@ final class MyShaleSectionNavigationSelectionTest {
     @Test
     void initialOverviewPresentationAndSelectionAgreeWithoutStartingASecondLoad() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
-        assertTrue(source.contains("setupSections();\n\t\tapplySectionSelectionState(activeSection);"));
-        assertFalse(source.contains("setupSections();\n\t\tonSectionSelected(SECTION_OVERVIEW);"),
+        assertTrue(source.matches("(?s).*setupSections\\(\\);\\s+applySectionSelectionState\\(activeSection\\);.*"));
+        assertFalse(source.matches("(?s).*setupSections\\(\\);\\s+onSectionSelected\\(SECTION_OVERVIEW\\);.*"),
                 "Initialization must establish presentation state without invoking navigation/loading.");
 
         JavaFxTestSupport.runAndWait(() -> {
