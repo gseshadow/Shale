@@ -27,6 +27,16 @@ class CaseDateDaoReadContractTest {
         assertTrue(sql.contains("t.IsDeleted = 0 AND t.IsActive = 1"));
         assertTrue(sql.contains("COALESCE(eff.Name, st.Name) AS TypeName"));
         assertTrue(sql.contains("LEFT JOIN dbo.Users cu ON cu.Id = cd.CreatedByUserId AND cu.ShaleClientId = cd.ShaleClientId"));
+        assertTrue(sql.contains("cu.name_first"));
+        assertTrue(sql.contains("cu.name_last"));
+        assertTrue(sql.contains("uu.name_first"));
+        assertTrue(sql.contains("uu.name_last"));
+        assertFalse(sql.contains("cu.DisplayName"));
+        assertFalse(sql.contains("cu.first_name"));
+        assertFalse(sql.contains("cu.last_name"));
+        assertFalse(sql.contains("uu.DisplayName"));
+        assertFalse(sql.contains("uu.first_name"));
+        assertFalse(sql.contains("uu.last_name"));
         assertFalse(sql.contains("CalendarEvents"));
         assertFalse(sql.contains("UPDATE dbo.Cases"));
         assertFalse(sql.contains("StatuteOfLimitations"));

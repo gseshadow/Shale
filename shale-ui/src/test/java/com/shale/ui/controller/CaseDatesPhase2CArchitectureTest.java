@@ -31,6 +31,11 @@ class CaseDatesPhase2CArchitectureTest {
         assertTrue(controller.contains("caseDatesTabPane.getScene() != null"));
         assertTrue(controller.contains("caseService.listCaseDatesForCase"));
         assertTrue(controller.contains("caseService.listDeletedCaseDatesForCase"));
+        assertTrue(controller.contains("logCaseDatesLoadFailure(operation"));
+        assertTrue(controller.contains("LOG.error(\"Case dates load failed operation={} tenantId={} actorId={} caseId={} generation={} elapsedMs={}\""));
+        assertTrue(controller.contains(", ex);"), "load failures must log the throwable object for a full stack trace");
+        assertTrue(controller.contains("renderCaseDatesFailure()"));
+        assertTrue(controller.contains("ActionButtonFactory.semantic(\"Retry\", e -> loadCaseDatesAsync()"));
         assertFalse(controller.contains("new CaseDateDao"));
     }
 
@@ -44,6 +49,7 @@ class CaseDatesPhase2CArchitectureTest {
         assertFalse(controller.contains("DELETE FROM dbo.CaseDates"));
         String datesBlock = controller.substring(controller.indexOf("private void configureCaseDatesControls"), controller.indexOf("private void resetCaseLinksState"));
         assertFalse(datesBlock.contains("CalendarEvents"));
+        assertFalse(datesBlock.contains("d.notes()"), "calendar/date-section diagnostics must not write occurrence notes to logs");
     }
 
     @Test void dialogUsesSharedControlsAndPreservesLocalDateTimeSemantics() throws Exception {

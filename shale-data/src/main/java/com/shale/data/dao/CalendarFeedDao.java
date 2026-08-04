@@ -130,6 +130,7 @@ public final class CalendarFeedDao {
             ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive)); if (userScheduleUserId != null) ps.setInt(i++, userScheduleUserId); if (caseId != null) ps.setInt(i++, caseId);
             LocalDate startDate = startInclusive.toLocalDate();
             LocalDate endDate = endExclusive.toLocalDate();
+            ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive)); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); if (userScheduleUserId != null) ps.setInt(i++, userScheduleUserId); if (caseId != null) ps.setInt(i++, caseId);
             for (int branch = 0; branch < CASE_DATE_PROJECTIONS.size(); branch++) {
                 ps.setInt(i++, shaleClientId); ps.setDate(i++, Date.valueOf(startDate)); ps.setDate(i++, Date.valueOf(endDate)); if (userScheduleUserId != null) ps.setInt(i++, userScheduleUserId); if (caseId != null) ps.setInt(i++, caseId);
             }
@@ -249,6 +250,7 @@ public final class CalendarFeedDao {
                       )
 """ : "") + (caseFiltered ? "AND t.CaseId = ?\n" : "") + """
                 """);
+        sql.append("\n                    UNION ALL\n\n").append(authoritativeCaseDatesBranch(caseFiltered, userScheduleScoped));
         for (CaseDateProjection projection : CASE_DATE_PROJECTIONS) {
             sql.append("\n                    UNION ALL\n\n").append(caseDateBranch(projection, caseFiltered, userScheduleScoped));
         }
@@ -257,6 +259,67 @@ public final class CalendarFeedDao {
                 ORDER BY StartsAt ASC, AllDay DESC, KeyValue ASC;
                 """);
         return sql.toString();
+    }
+
+    private static String authoritativeCaseDatesBranch(boolean caseFiltered, boolean userScheduleScoped) {
+        return """
+                    SELECT CONCAT('CASE_DATE:', CAST(cd.Id AS varchar(20))),
+                           CONCAT(typePresentation.Name, N' — ', c.Name),
+                           NULL AS Details,
+                           cd.StartsAt,
+                           cd.EndsAt,
+                           cd.AllDay,
+                           'CASE_DATE',
+                           typePresentation.CalendarCategory,
+                           c.Id,
+                           c.Name AS CaseName,
+                           NULL,
+                           c.Name,
+                           CONCAT('CASE_DATE_', typePresentation.CalendarCategory),
+                           typePresentation.Name,
+                           typePresentation.Color,
+                           NULL AS AssignedUserColor,
+                           NULL AS AssignedToUserId,
+                           NULL AS AssignedUserDisplayName
+                    FROM dbo.CaseDates cd
+                    INNER JOIN dbo.Cases c ON c.Id = cd.CaseId AND c.ShaleClientId = cd.ShaleClientId AND ISNULL(c.IsDeleted, 0) = 0
+                    INNER JOIN dbo.CaseDateTypes storedType ON storedType.Id = cd.CaseDateTypeId AND (storedType.ShaleClientId = cd.ShaleClientId OR storedType.ShaleClientId IS NULL)
+                    OUTER APPLY (
+                      SELECT TOP (1) effectiveType.Name, effectiveType.CalendarCategory, effectiveType.Color
+                      FROM dbo.CaseDateTypes effectiveType
+                      WHERE storedType.SystemKey IS NOT NULL
+                        AND effectiveType.SystemKey = storedType.SystemKey
+                        AND (effectiveType.ShaleClientId = cd.ShaleClientId OR effectiveType.ShaleClientId IS NULL)
+                        AND ISNULL(effectiveType.IsDeleted, 0) = 0
+                        AND effectiveType.IsActive = 1
+                      ORDER BY CASE WHEN effectiveType.ShaleClientId = cd.ShaleClientId THEN 0 ELSE 1 END,
+                               effectiveType.SortOrder ASC, effectiveType.Name ASC, effectiveType.Id ASC
+                    ) effectiveType
+                    CROSS APPLY (
+                      SELECT COALESCE(effectiveType.Name, storedType.Name) AS Name,
+                             COALESCE(effectiveType.CalendarCategory, storedType.CalendarCategory) AS CalendarCategory,
+                             COALESCE(effectiveType.Color, storedType.Color) AS Color
+                    ) typePresentation
+                    WHERE cd.ShaleClientId = ?
+                      AND ISNULL(cd.IsDeleted, 0) = 0
+                      AND typePresentation.CalendarCategory IN ('DEADLINE','TRIAL','HEARING','MEDIATION','DEPOSITION','NOTICE','APPOINTMENT','MILESTONE','OTHER')
+                      AND cd.StartsAt < ?
+                      AND COALESCE(cd.EndsAt, cd.StartsAt) >= ?
+                      """ + (userScheduleScoped ? """
+                      AND EXISTS (
+                        SELECT 1
+                        FROM dbo.CaseUsers responsibleAttorney
+                        INNER JOIN dbo.Users responsibleAttorneyUser
+                          ON responsibleAttorneyUser.id = responsibleAttorney.UserId
+                         AND responsibleAttorneyUser.ShaleClientId = c.ShaleClientId
+                         AND ISNULL(responsibleAttorneyUser.is_deleted, 0) = 0
+                        WHERE responsibleAttorney.CaseId = c.Id
+                          AND responsibleAttorney.RoleId = 4
+                          AND responsibleAttorney.IsPrimary = 1
+                          AND responsibleAttorney.UserId = ?
+                      )
+""" : "") + (caseFiltered ? "AND c.Id = ?\n" : "") + """
+                """;
     }
 
     private static String caseDateBranch(CaseDateProjection projection, boolean caseFiltered, boolean userScheduleScoped) {

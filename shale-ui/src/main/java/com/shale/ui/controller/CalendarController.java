@@ -1008,6 +1008,7 @@ public final class CalendarController {
                 case CALENDAR_EVENT -> openEditEventDialog(Math.toIntExact(target.id()));
                 case TASK -> onOpenTask.accept(target.id());
                 case CASE -> onOpenCase.accept(Math.toIntExact(target.id()));
+                case CASE_DATES -> onOpenCase.accept(Math.toIntExact(target.id()));
                 case NONE -> { }
             }
             evt.consume();

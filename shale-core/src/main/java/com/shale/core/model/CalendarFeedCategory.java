@@ -20,6 +20,10 @@ public enum CalendarFeedCategory {
         if (key.startsWith("TASK:") || item.taskId() != null || "DueAt".equalsIgnoreCase(sourceField)) {
             return TASKS;
         }
+        if (key.startsWith("CASE_DATE:") || "CASE_DATE".equalsIgnoreCase(safe(item.sourceType()))) {
+            String category = sourceField.trim().toUpperCase(Locale.ROOT);
+            return "DEADLINE".equals(category) ? CASE_DEADLINES : OTHER_CASE_DATES;
+        }
         return switch (sourceField) {
             case "StatuteOfLimitations", "TortNoticeDeadline", "DiscoveryDeadline" -> CASE_DEADLINES;
             case "CallerDate", "AcceptedDate", "DeniedDate", "ClosedDate", "DateOfInjury",

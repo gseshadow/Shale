@@ -67,12 +67,46 @@ class CalendarFeedDaoTest {
     }
 
     @Test
+    void feedSqlProjectsAuthoritativeCaseDatesReadOnlyWithIntersectionAndHistoricalPresentation() {
+        String sql = CalendarFeedDao.buildCalendarFeedSql();
+
+        assertTrue(sql.contains("FROM dbo.CaseDates cd"));
+        assertTrue(sql.contains("CONCAT('CASE_DATE:', CAST(cd.Id AS varchar(20)))"));
+        assertTrue(sql.contains("cd.ShaleClientId = ?"));
+        assertTrue(sql.contains("INNER JOIN dbo.Cases c ON c.Id = cd.CaseId AND c.ShaleClientId = cd.ShaleClientId AND ISNULL(c.IsDeleted, 0) = 0"));
+        assertTrue(sql.contains("INNER JOIN dbo.CaseDateTypes storedType ON storedType.Id = cd.CaseDateTypeId AND (storedType.ShaleClientId = cd.ShaleClientId OR storedType.ShaleClientId IS NULL)"));
+        assertTrue(sql.contains("COALESCE(effectiveType.Name, storedType.Name) AS Name"));
+        assertTrue(sql.contains("COALESCE(effectiveType.CalendarCategory, storedType.CalendarCategory) AS CalendarCategory"));
+        assertTrue(sql.contains("typePresentation.CalendarCategory IN ('DEADLINE','TRIAL','HEARING','MEDIATION','DEPOSITION','NOTICE','APPOINTMENT','MILESTONE','OTHER')"));
+        assertTrue(sql.contains("AND ISNULL(cd.IsDeleted, 0) = 0"));
+        assertTrue(sql.contains("AND cd.StartsAt < ?"));
+        assertTrue(sql.contains("AND COALESCE(cd.EndsAt, cd.StartsAt) >= ?"));
+        assertFalse(sql.contains("INSERT dbo.CalendarEvents"));
+        assertFalse(sql.contains("UPDATE dbo.CalendarEvents"));
+        assertFalse(sql.contains("DELETE FROM dbo.CalendarEvents"));
+    }
+
+    @Test
+    void authoritativeCaseDatesPreserveStoredLocalDateTimeAndDoNotShiftAllDayRanges() {
+        String sql = CalendarFeedDao.buildCalendarFeedSql();
+
+        assertTrue(sql.contains("cd.StartsAt,"));
+        assertTrue(sql.contains("cd.EndsAt,"));
+        assertTrue(sql.contains("cd.AllDay,"));
+        assertFalse(sql.contains("DATEADD(day"));
+        assertFalse(sql.contains("23:59:59"));
+        assertFalse(sql.contains("AT TIME ZONE"));
+        assertFalse(sql.contains("SWITCHOFFSET"));
+        assertFalse(sql.contains("CONVERT(time(0), cd.StartsAt)"));
+    }
+
+    @Test
     void caseFilteredFeedSqlPushesCaseIdIntoEveryUnifiedFeedBranch() {
         String sql = CalendarFeedDao.buildCalendarFeedSql(true);
 
         assertTrue(sql.contains("AND e.CaseId = ?"));
         assertTrue(sql.contains("AND t.CaseId = ?"));
-        assertEquals(CalendarFeedDao.CASE_DATE_PROJECTIONS.size(), count(sql, "AND c.Id = ?"));
+        assertEquals(CalendarFeedDao.CASE_DATE_PROJECTIONS.size() + 1, count(sql, "AND c.Id = ?"));
         assertTrue(sql.contains("AND ISNULL(e.IsCancelled, 0) = 0"));
         assertTrue(sql.contains("AND t.CompletedAt IS NULL"));
         assertTrue(sql.contains("AND ISNULL(t.IsDeleted, 0) = 0"));
