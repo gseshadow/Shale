@@ -57,6 +57,14 @@ public interface CaseServicePort {
 
 	Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId);
 
+	CaseDateDto createCaseDate(CreateCaseDateCommand command);
+
+	CaseDateDto updateCaseDate(UpdateCaseDateCommand command);
+
+	void deleteCaseDate(DeleteCaseDateCommand command);
+
+	CaseDateDto restoreCaseDate(RestoreCaseDateCommand command);
+
 	List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId);
 
 	LinkTypeDto createLinkType(LinkTypeCommand command);
@@ -129,6 +137,24 @@ public interface CaseServicePort {
 	CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command);
 
 	CaseDetailDto updateCaseAssignment(UpdateCaseAssignmentCommand command);
+
+	record CreateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, int caseDateTypeId, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes) {
+	}
+
+	record UpdateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId, int caseDateTypeId, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes, byte[] expectedRowVer) {
+		public UpdateCaseDateCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record DeleteCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId, byte[] expectedRowVer) {
+		public DeleteCaseDateCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record RestoreCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId, byte[] expectedRowVer) {
+		public RestoreCaseDateCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
 
 	record AddCaseNoteCommand(
 			long caseId,
