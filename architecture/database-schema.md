@@ -953,3 +953,17 @@ If a combined All-mode load partially fails, the viewer must not present incompl
 | `RowVer` | `rowversion` | Not null; database generated |
 
 `Color` uses the standard optional `nvarchar(20)` presentation contract documented for customizable lookups and already established by the authoritative `MaterialTypes` schema. The Phase 1 migration stores built-in defaults but **the application does not read or mutate `RequestMethods.Color` yet**. `RequestStatuses` retains its independent color implementation. Global rows seed the approved request methods (`email`, `phone`, `fax`, `mail`, `portal`, `in_person`, `other`) and lifecycle statuses including the creation default `requested`. The legacy `dbo.MaterialRequests.RequestMethod` and `dbo.MaterialRequests.Status` text columns remain in place; no Request Method foreign key is introduced.
+
+---
+
+## Case Dates
+
+### dbo.CaseDateTypes
+
+Customizable overlay lookup for authoritative case-date meanings. Uses nullable `ShaleClientId` for global built-ins, stable lowercase `SystemKey`, display `Name`, `Description`, constrained `CalendarCategory`, `Color`, `SupportsTime`, active/deleted lifecycle fields, actor metadata, timestamps, and `RowVer`.
+
+### dbo.CaseDates
+
+Strict tenant-owned case occurrence table with `ShaleClientId`, `CaseId`, `CaseDateTypeId`, `StartsAt`, optional `EndsAt`, `AllDay`, notes, actor metadata, soft-deletion metadata, timestamps, and `RowVer`. Multiple occurrences of the same type may exist on one case.
+
+Ownership: `CaseDates` owns legal/factual case dates. `CalendarEvents` owns manually created calendar events only. The unified calendar should project from authoritative sources instead of becoming the owner or duplicating domain dates. Existing fixed legal/factual `Cases` columns remain authoritative until a later verified migration; workflow/lifecycle dates remain separate unless deliberately reclassified.
