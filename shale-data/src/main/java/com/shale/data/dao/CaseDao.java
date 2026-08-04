@@ -190,6 +190,10 @@ public final class CaseDao {
 		this.phiAuditService = new PhiAuditService(new AuditLogDao(this.db));
 	}
 
+	public DbSessionProvider dbSessionProvider() {
+		return db;
+	}
+
 	/** DAO read-model for lists/cards. */
 	public record CaseRow(
 			long id,

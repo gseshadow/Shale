@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
@@ -25,6 +27,7 @@ import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.util.CaseLinkUrlNormalizer;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseDateDao;
 
 /**
  * Thin CaseServicePort adapter over existing CaseDao read operations.
@@ -34,7 +37,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	private final CaseGateway caseGateway;
 
 	public CaseServiceAdapter(CaseDao caseDao) {
-		this(new DaoCaseGateway(caseDao));
+		this(new DaoCaseGateway(caseDao, new CaseDateDao(caseDao.dbSessionProvider())));
+	}
+
+	public CaseServiceAdapter(CaseDao caseDao, CaseDateDao caseDateDao) {
+		this(new DaoCaseGateway(caseDao, caseDateDao));
 	}
 
 	CaseServiceAdapter(CaseGateway caseGateway) {
@@ -212,6 +219,30 @@ public final class CaseServiceAdapter implements CaseServicePort {
 				.comparing((LinkTypeDto type) -> type.name() == null ? "" : type.name(), String.CASE_INSENSITIVE_ORDER)
 				.thenComparingInt(LinkTypeDto::id));
 		return List.copyOf(effective);
+	}
+
+
+	@Override
+	public List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) {
+		validatePositive(shaleClientId, "ShaleClientId");
+		validatePositive(actorUserId, "ActorUserId");
+		return caseGateway.listEffectiveCaseDateTypes(shaleClientId, actorUserId);
+	}
+
+	@Override
+	public List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) {
+		validatePositive(caseId, "CaseId");
+		validatePositive(shaleClientId, "ShaleClientId");
+		validatePositive(actorUserId, "ActorUserId");
+		return caseGateway.listCaseDatesForCase(caseId, shaleClientId, actorUserId);
+	}
+
+	@Override
+	public Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) {
+		validatePositive(caseDateId, "CaseDateId");
+		validatePositive(shaleClientId, "ShaleClientId");
+		validatePositive(actorUserId, "ActorUserId");
+		return caseGateway.getCaseDate(caseDateId, shaleClientId, actorUserId);
 	}
 
 	@Override
@@ -613,6 +644,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		List<PracticeAreaDto> listTenantPracticeAreas(int shaleClientId, boolean includeInactive);
 
 		List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
+		default List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("listEffectiveCaseDateTypes"); }
+		default List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("listCaseDatesForCase"); }
+		default Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("getCaseDate"); }
 		List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId);
 		LinkTypeDto createLinkType(int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey);
 		LinkTypeDto updateLinkType(int shaleClientId, int actorUserId, int linkTypeId, String name, String color, boolean active, String systemKey, byte[] expectedRowVer);
@@ -669,9 +703,10 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		long createBasicCase(CreateCaseCommand command, int statusId);
 	}
 
-	private record DaoCaseGateway(CaseDao caseDao) implements CaseGateway {
+	private record DaoCaseGateway(CaseDao caseDao, CaseDateDao caseDateDao) implements CaseGateway {
 		private DaoCaseGateway {
 			Objects.requireNonNull(caseDao, "caseDao");
+			Objects.requireNonNull(caseDateDao, "caseDateDao");
 		}
 
 		@Override
@@ -775,6 +810,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
 			caseDao.updateCaseAssignment(caseId, shaleClientId, practiceAreaId, responsibleAttorneyUserId);
 		}
 
+		@Override public List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) { return caseDateDao.listEffectiveCaseDateTypes(shaleClientId, actorUserId); }
+		@Override public List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) { return caseDateDao.listCaseDatesForCase(caseId, shaleClientId, actorUserId); }
+		@Override public Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) { return caseDateDao.getCaseDate(caseDateId, shaleClientId, actorUserId); }
 		@Override public List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive) { return caseDao.listLinkTypes(shaleClientId, includeInactive); }
 		@Override public List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId) { return caseDao.listLinkTypesForAdministration(shaleClientId, actorUserId); }
 		@Override public LinkTypeDto createLinkType(int shaleClientId, int actorUserId, String name, String color, boolean active, String systemKey) { return caseDao.createLinkType(shaleClientId, actorUserId, name, color, active, systemKey); }
