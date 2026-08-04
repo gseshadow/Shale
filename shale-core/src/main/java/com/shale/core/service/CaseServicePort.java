@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
+import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseOverviewDto;
@@ -49,6 +51,11 @@ public interface CaseServicePort {
 
 	List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
 
+	List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId);
+
+	List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId);
+
+	Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId);
 
 	List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId);
 
