@@ -42,6 +42,44 @@ class CaseDateDaoReadContractTest {
         assertFalse(sql.contains("StatuteOfLimitations"));
     }
 
+
+    @Test void assembledActiveAndRemovedOccurrenceSqlKeepClauseBoundariesSeparated() throws Exception {
+        Method m = CaseDateDao.class.getDeclaredMethod("occurrenceSql", String.class);
+        m.setAccessible(true);
+        String active = (String) m.invoke(null, "cd.CaseId = ? AND cd.ShaleClientId = ? AND cd.IsDeleted = 0 ORDER BY cd.StartsAt, cd.EndsAt, COALESCE(eff.SortOrder, st.SortOrder), COALESCE(eff.Name, st.Name), cd.Id");
+        String removed = (String) m.invoke(null, "cd.CaseId = ? AND cd.ShaleClientId = ? AND cd.IsDeleted = 1 ORDER BY cd.StartsAt, cd.EndsAt, COALESCE(eff.SortOrder, st.SortOrder), COALESCE(eff.Name, st.Name), cd.Id");
+
+        assertAssembledOccurrenceSql(active, "cd.IsDeleted = 0");
+        assertAssembledOccurrenceSql(removed, "cd.IsDeleted = 1");
+    }
+
+    private static void assertAssembledOccurrenceSql(String sql, String deletedPredicate) {
+        assertTrue(sql.contains("WHERE\n") || sql.contains("WHERE\r\n"), "WHERE must be separated from the supplied predicate");
+        assertTrue(sql.contains("WHERE\n" + deletedPredicate) || sql.contains("WHERE\r\n" + deletedPredicate) || sql.contains("WHERE\ncd.CaseId") || sql.contains("WHERE\r\ncd.CaseId"));
+        assertTrue(sql.contains(deletedPredicate), deletedPredicate);
+        assertFalse(sql.contains("WHEREcd"));
+        assertFalse(sql.contains("JOINdbo"));
+        assertFalse(sql.contains("ONcd"));
+        assertFalse(sql.contains("ANDcd"));
+        assertFalse(sql.contains("ORDERBY"));
+        assertFalse(sql.contains("BYcd"));
+        assertTrue(sql.contains("JOIN dbo.Cases"));
+        assertTrue(sql.contains("JOIN dbo.CaseDateTypes"));
+        assertTrue(sql.contains("LEFT JOIN dbo.Users cu"));
+        assertTrue(sql.contains("LEFT JOIN dbo.Users uu"));
+        assertTrue(sql.contains("ORDER BY cd.StartsAt"));
+        assertTrue(sql.contains("cu.name_first"));
+        assertTrue(sql.contains("cu.name_last"));
+        assertTrue(sql.contains("uu.name_first"));
+        assertTrue(sql.contains("uu.name_last"));
+        assertFalse(sql.contains("cu.DisplayName"));
+        assertFalse(sql.contains("uu.DisplayName"));
+        assertFalse(sql.contains("cu.first_name"));
+        assertFalse(sql.contains("cu.last_name"));
+        assertFalse(sql.contains("uu.first_name"));
+        assertFalse(sql.contains("uu.last_name"));
+    }
+
     @Test void dtoRowVersionsAreDefensiveCopies() {
         byte[] typeRv = {1, 2, 3};
         EffectiveCaseDateTypeDto type = new EffectiveCaseDateTypeDto(1, null, "trial", "Trial", null, "TRIAL", "#B91C1C", true, 1, true, false, EffectiveCaseDateTypeDto.Origin.GLOBAL, typeRv);

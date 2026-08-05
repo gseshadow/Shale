@@ -170,7 +170,8 @@ public final class CaseDateDao {
             ) eff
             LEFT JOIN dbo.Users cu ON cu.Id = cd.CreatedByUserId AND cu.ShaleClientId = cd.ShaleClientId
             LEFT JOIN dbo.Users uu ON uu.Id = cd.UpdatedByUserId AND uu.ShaleClientId = cd.ShaleClientId
-            WHERE """ + where; }
+            WHERE
+            """ + where; }
 
 
 
