@@ -34,7 +34,7 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
             assertTrue(validation.contains(field), "validation missing " + field);
         }
         assertTrue(preflight.contains("Orphan CallerTime"));
-        assertTrue(validation.contains("unresolved/orphan/conflict counts"));
+        assertTrue(validation.contains("FINAL_VALIDATION_SUMMARY"));
     }
 
     @Test void seedAndBackfillUseApprovedSystemKeysWithoutDuplicatingTypes() throws Exception {
@@ -52,11 +52,12 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
     @Test void backfillIsTenantAwareDuplicateGuardedAndHandlesIntakeTime() throws Exception {
         String sql = Files.readString(BACKFILL);
         assertTrue(sql.contains("ShaleClientId"));
-        assertTrue(sql.contains("cd.ShaleClientId=r.ShaleClientId"));
-        assertTrue(sql.contains("DATEADD(NANOSECOND,DATEDIFF_BIG(NANOSECOND"));
+        assertTrue(sql.contains("cd.ShaleClientId=l.ShaleClientId"));
+        assertFalse(sql.contains("DATEADD(NANOSECOND"));
         assertTrue(sql.contains("CallerTime IS NOT NULL AND CallerDate IS NULL"));
-        assertTrue(sql.contains("ExistingExact=0"));
-        assertTrue(sql.contains("ExistingExact>1"));
+        assertTrue(sql.contains("ActiveExactMatches=0"));
+        assertTrue(sql.contains("ActiveExactMatches>1"));
+        assertTrue(sql.contains("DATETIME2FROMPARTS"));
     }
 
     @Test void mutationScriptsHaveTransactionAndErrorHandlingProtections() throws Exception {
@@ -68,6 +69,46 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
             assertTrue(sql.contains("ROLLBACK TRANSACTION"), path + " missing rollback");
             assertTrue(sql.contains("THROW"), path + " missing clear failure path");
         }
+    }
+
+    @Test void packageMaterializesResolvedRowsAndDoesNotReuseCteAcrossStatements() throws Exception {
+        String sql = Files.readString(BACKFILL);
+        assertTrue(sql.contains("INTO #ResolvedBackfill"));
+        assertTrue(sql.contains("CREATE UNIQUE CLUSTERED INDEX IX_ResolvedBackfill_Row"));
+        assertFalse(sql.contains("WITH L AS"), "backfill should use materialized source tables instead of chained single-use CTEs");
+        assertFalse(sql.contains("FROM C WHERE"), "backfill must not reuse a CTE named C across statements");
+    }
+
+    @Test void packageUsesActualRemovalColumnAndRejectsIsRemoved() throws Exception {
+        String combined = Files.readString(PREFLIGHT) + Files.readString(BACKFILL) + Files.readString(VALIDATION);
+        assertTrue(combined.contains("COL_LENGTH(N'dbo.CaseDates', N'IsDeleted')"));
+        assertTrue(combined.contains("ISNULL(cd.IsDeleted,0)"));
+        assertFalse(combined.contains("cd.IsRemoved"));
+    }
+
+    @Test void intakeExpressionIsConsistentAcrossSqlFilesAndAvoidsDateaddOverflow() throws Exception {
+        String expression = "DATETIME2FROMPARTS(DATEPART(year, c.CallerDate)";
+        assertTrue(Files.readString(PREFLIGHT).contains(expression));
+        assertTrue(Files.readString(BACKFILL).contains(expression));
+        assertTrue(Files.readString(VALIDATION).contains(expression));
+        assertFalse(Files.readString(BACKFILL).contains("DATEADD(NANOSECOND"));
+    }
+
+    @Test void actorAndTypeResolutionAreTenantAware() throws Exception {
+        String sql = Files.readString(BACKFILL);
+        assertTrue(sql.contains("DECLARE @MigrationActors TABLE"));
+        assertTrue(sql.contains("u.ShaleClientId=r.ShaleClientId"));
+        assertFalse(sql.contains("SELECT TOP(1) @MigrationActorUserId"));
+        assertTrue(sql.contains("#EffectiveCaseDateTypes"));
+        assertTrue(sql.contains("t.ShaleClientId = tenantScope.ShaleClientId OR t.ShaleClientId IS NULL"));
+        assertFalse(sql.contains("t.ShaleClientId IS NULL AND t.SystemKey=l.SystemKey"));
+    }
+
+    @Test void validationHasMachineReadableSummaryAndThrowsOnBlockers() throws Exception {
+        String sql = Files.readString(VALIDATION);
+        assertTrue(sql.contains("FINAL_VALIDATION_SUMMARY"));
+        assertTrue(sql.contains("@BlockerCount"));
+        assertTrue(sql.contains("IF @BlockerCount <> 0 THROW"));
     }
 
     @Test void packageDoesNotClearDropCalendarWriteOrChangeRuntimeStatusHistory() throws Exception {
