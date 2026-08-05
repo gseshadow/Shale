@@ -156,9 +156,9 @@ public final class CaseDateDao {
                    COALESCE(eff.Color, st.Color) AS Color,
                    COALESCE(eff.SupportsTime, st.SupportsTime) AS SupportsTime,
                    cd.StartsAt, cd.EndsAt, cd.AllDay, cd.Notes, cd.CreatedAt, cd.CreatedByUserId,
-                   COALESCE(cu.DisplayName, cu.Name, CONCAT(cu.first_name, ' ', cu.last_name), CONCAT('User #', cd.CreatedByUserId)) AS CreatedByDisplayName,
+                   COALESCE(NULLIF(LTRIM(RTRIM(COALESCE(cu.name_first, '') + CASE WHEN COALESCE(cu.name_first, '') = '' OR COALESCE(cu.name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(cu.name_last, ''))), ''), CONCAT('User #', cd.CreatedByUserId)) AS CreatedByDisplayName,
                    cd.UpdatedAt, cd.UpdatedByUserId,
-                   CASE WHEN cd.UpdatedByUserId IS NULL THEN NULL ELSE COALESCE(uu.DisplayName, uu.Name, CONCAT(uu.first_name, ' ', uu.last_name), CONCAT('User #', cd.UpdatedByUserId)) END AS UpdatedByDisplayName,
+                   CASE WHEN cd.UpdatedByUserId IS NULL THEN NULL ELSE COALESCE(NULLIF(LTRIM(RTRIM(COALESCE(uu.name_first, '') + CASE WHEN COALESCE(uu.name_first, '') = '' OR COALESCE(uu.name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(uu.name_last, ''))), ''), CONCAT('User #', cd.UpdatedByUserId)) END AS UpdatedByDisplayName,
                    cd.RowVer
             FROM dbo.CaseDates cd
             JOIN dbo.Cases c ON c.Id = cd.CaseId AND c.ShaleClientId = cd.ShaleClientId AND c.IsDeleted = 0
@@ -170,7 +170,8 @@ public final class CaseDateDao {
             ) eff
             LEFT JOIN dbo.Users cu ON cu.Id = cd.CreatedByUserId AND cu.ShaleClientId = cd.ShaleClientId
             LEFT JOIN dbo.Users uu ON uu.Id = cd.UpdatedByUserId AND uu.ShaleClientId = cd.ShaleClientId
-            WHERE """ + where; }
+            WHERE
+            """ + where; }
 
 
 

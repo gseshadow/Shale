@@ -1826,6 +1826,7 @@ public class CaseController {
 				case CALENDAR_EVENT -> openCaseCalendarEventEditor(Math.toIntExact(target.id()));
 				case TASK -> openTask(target.id());
 				case CASE -> AppDialogs.showInfo(caseCalendarOwner(), "Case Date", "This is a projected case date from the current case. Edit it from Overview or Details.");
+				case CASE_DATES -> showCaseDatesTab();
 				case NONE -> { }
 			}
 		});
@@ -1904,22 +1905,31 @@ public class CaseController {
 		final int activeCaseId = caseId; final int generation = ++caseDatesLoadGeneration;
 		showCaseDatesMessage("Loading case dates…");
 		caseDateExecutor.submit(() -> {
+			long started = System.nanoTime();
+			String operation = showRemovedCaseDates ? "caseDates.loadActiveAndRemoved" : "caseDates.loadActive";
 			try {
 				List<EffectiveCaseDateTypeDto> types = caseService.listEffectiveCaseDateTypes(tenantId, actorId);
 				List<CaseDateDto> active = caseService.listCaseDatesForCase(activeCaseId, tenantId, actorId);
 				List<CaseDateDto> removed = showRemovedCaseDates ? caseService.listDeletedCaseDatesForCase(activeCaseId, tenantId, actorId) : List.of();
 				Platform.runLater(() -> {
-					if (!isCaseDatesCurrent(activeCaseId, generation)) return;
-					effectiveCaseDateTypes = types == null ? List.of() : List.copyOf(types);
-					caseDates = sortCaseDates(active); removedCaseDates = sortCaseDates(removed); caseDatesLoadedOnce = true; caseDatesStale = false; renderCaseDates(null);
+					try {
+						if (!isCaseDatesCurrent(activeCaseId, generation)) return;
+						effectiveCaseDateTypes = types == null ? List.of() : List.copyOf(types);
+						caseDates = sortCaseDates(active); removedCaseDates = sortCaseDates(removed); caseDatesLoadedOnce = true; caseDatesStale = false; renderCaseDates(null);
+					} catch (RuntimeException uiEx) {
+						logCaseDatesLoadFailure(operation + ".render", tenantId, actorId, activeCaseId, generation, started, uiEx);
+						if (isCaseDatesCurrent(activeCaseId, generation)) renderCaseDatesFailure();
+					}
 				});
-			} catch (RuntimeException ex) {
+			} catch (Throwable ex) {
+				logCaseDatesLoadFailure(operation, tenantId, actorId, activeCaseId, generation, started, ex);
 				Platform.runLater(() -> { if (isCaseDatesCurrent(activeCaseId, generation)) renderCaseDatesFailure(); });
 			}
 		});
 	}
 
 	private boolean isCaseDatesCurrent(int activeCaseId, int generation) { return caseId != null && caseId == activeCaseId && generation == caseDatesLoadGeneration && caseDatesTabPane != null && caseDatesTabPane.getScene() != null; }
+	private void logCaseDatesLoadFailure(String operation, int tenantId, int actorId, int activeCaseId, int generation, long startedNanos, Throwable ex) { long elapsedMs = Math.max(0, (System.nanoTime() - startedNanos) / 1_000_000L); LOG.error("Case dates load failed operation={} tenantId={} actorId={} caseId={} generation={} elapsedMs={}", operation, tenantId, actorId, activeCaseId, generation, elapsedMs, ex); }
 
 	private List<CaseDateDto> sortCaseDates(List<CaseDateDto> dates) {
 		return (dates == null ? List.<CaseDateDto>of() : dates).stream().sorted(Comparator.comparing(CaseDateDto::startsAt, Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(CaseDateDto::endsAt, Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(d -> safeText(d.typeName())).thenComparingLong(CaseDateDto::id)).toList();

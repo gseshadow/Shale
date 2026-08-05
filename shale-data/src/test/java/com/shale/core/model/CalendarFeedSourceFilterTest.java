@@ -26,6 +26,8 @@ class CalendarFeedSourceFilterTest {
         assertCaseDate("DateNonEngagementLetterSent");
         assertCaseDate("DateOfMedicalNegligence");
         assertCaseDate("DateMedicalNegligenceWasDiscovered");
+        assertEquals(CalendarFeedCategory.CASE_DEADLINES, CalendarFeedCategory.classify(item("CASE_DATE:900", "DEADLINE", null, 1, "CASE_DATE", "SOL", 1, "CASE_DATE_DEADLINE")));
+        assertEquals(CalendarFeedCategory.OTHER_CASE_DATES, CalendarFeedCategory.classify(item("CASE_DATE:901", "HEARING", null, 1, "CASE_DATE", "Hearing", 1, "CASE_DATE_HEARING")));
     }
 
     @Test
@@ -145,6 +147,10 @@ class CalendarFeedSourceFilterTest {
         CalendarFeedClickTarget caseDate = CalendarFeedClickTarget.resolve(itemWithCaseName("CASE_SOL:7", "SOL", "StatuteOfLimitations", null, 7, "PROJECTED", "Case Seven", "STATUTE_OF_LIMITATIONS"));
         assertEquals(CalendarFeedClickTarget.Kind.CASE, caseDate.kind());
         assertEquals(7L, caseDate.id());
+
+        CalendarFeedClickTarget authoritativeCaseDate = CalendarFeedClickTarget.resolve(itemWithCaseName("CASE_DATE:555", "SOL", "DEADLINE", null, 7, "CASE_DATE", "Case Seven", "CASE_DATE_DEADLINE"));
+        assertEquals(CalendarFeedClickTarget.Kind.CASE_DATES, authoritativeCaseDate.kind());
+        assertEquals(7L, authoritativeCaseDate.id());
 
         assertFalse(CalendarFeedClickTarget.resolve(itemWithCaseName("BROKEN", "Other", null, null, null, "PROJECTED", null, "OTHER")).actionable());
     }
