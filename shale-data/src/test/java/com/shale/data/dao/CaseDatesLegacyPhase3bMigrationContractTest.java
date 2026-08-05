@@ -73,14 +73,14 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
 
     @Test void preflightIsReadOnlyAndHasMachineReadableSummary() throws Exception {
         String sql = Files.readString(PREFLIGHT);
-        assertFalse(sql.matches("(?is).*\bINSERT\b.*"));
-        assertFalse(sql.matches("(?is).*\bUPDATE\b.*"));
-        assertFalse(sql.matches("(?is).*\bDELETE\b.*"));
-        assertFalse(sql.matches("(?is).*\bMERGE\b.*"));
-        assertFalse(sql.matches("(?is).*\bALTER\b.*"));
-        assertFalse(sql.matches("(?is).*\bDROP\b.*"));
-        assertFalse(sql.matches("(?is).*\bTRUNCATE\b.*"));
-        assertFalse(sql.matches("(?is).*\bEXEC(UTE)?\b.*"));
+        assertFalse(sql.matches("(?is).*\\bINSERT\\b.*"));
+        assertFalse(sql.matches("(?is).*\\bUPDATE\\b.*"));
+        assertFalse(sql.matches("(?is).*\\bDELETE\\b.*"));
+        assertFalse(sql.matches("(?is).*\\bMERGE\\b.*"));
+        assertFalse(sql.matches("(?is).*\\bALTER\\b.*"));
+        assertFalse(sql.matches("(?is).*\\bDROP\\b.*"));
+        assertFalse(sql.matches("(?is).*\\bTRUNCATE\\b.*"));
+        assertFalse(sql.matches("(?is).*\\bEXEC(UTE)?\\b.*"));
         assertTrue(sql.contains("PREFLIGHT_VALIDATION_SUMMARY"));
         assertTrue(sql.contains("READY_FOR_SEED_REVIEW"));
         assertTrue(sql.contains("BLOCKED_FOR_BACKFILL"));
@@ -96,13 +96,13 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
 
     @Test void packageUsesActualRemovalColumnAndRejectsIsRemoved() throws Exception {
         String combined = Files.readString(PREFLIGHT) + Files.readString(BACKFILL) + Files.readString(VALIDATION);
-        assertTrue(combined.contains("COL_LENGTH(N'dbo.CaseDates', N'IsDeleted')"));
+        assertTrue(combined.contains("COL_LENGTH(N'dbo.CaseDates',N'IsDeleted')"));
         assertTrue(combined.contains("ISNULL(cd.IsDeleted,0)"));
         assertFalse(combined.contains("cd.IsRemoved"));
     }
 
     @Test void intakeExpressionIsConsistentAcrossSqlFilesAndAvoidsDateaddOverflow() throws Exception {
-        String expression = "DATETIME2FROMPARTS(DATEPART(year, c.CallerDate)";
+        String expression = "DATETIME2FROMPARTS(DATEPART(year,c.CallerDate)";
         assertTrue(Files.readString(PREFLIGHT).contains(expression));
         assertTrue(Files.readString(BACKFILL).contains(expression));
         assertTrue(Files.readString(VALIDATION).contains(expression));
@@ -115,7 +115,8 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
         assertTrue(sql.contains("u.ShaleClientId=r.ShaleClientId"));
         assertFalse(sql.contains("SELECT TOP(1) @MigrationActorUserId"));
         assertTrue(sql.contains("#EffectiveCaseDateTypes"));
-        assertTrue(sql.contains("t.ShaleClientId = tenantScope.ShaleClientId OR t.ShaleClientId IS NULL"));
+        assertTrue(sql.contains("tw.ShaleClientId,gw.ShaleClientId"));
+        assertTrue(sql.contains("ShaleClientId=pt.ShaleClientId AND SystemKey=e.SystemKey"));
         assertFalse(sql.contains("t.ShaleClientId IS NULL AND t.SystemKey=l.SystemKey"));
     }
 
@@ -123,7 +124,60 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
         String sql = Files.readString(VALIDATION);
         assertTrue(sql.contains("FINAL_VALIDATION_SUMMARY"));
         assertTrue(sql.contains("@BlockerCount"));
-        assertTrue(sql.contains("IF @BlockerCount <> 0 THROW"));
+        assertTrue(sql.contains("IF @BlockerCount<>0 THROW"));
+    }
+
+    @Test void missingTypesCannotDisappearThroughAnInnerJoin() throws Exception {
+        String backfill = Files.readString(BACKFILL);
+        String validation = Files.readString(VALIDATION);
+        assertTrue(backfill.contains("@SourceRowCount<>@ResolvedRowCount"));
+        assertTrue(backfill.contains("Source rows were not resolved exactly once"));
+        assertTrue(backfill.contains("@InsertedOrExactExistingCount<>@SourceRowCount"));
+        assertTrue(validation.contains("LEFT JOIN #EffectiveCaseDateTypes"));
+        assertTrue(validation.contains("UnresolvedTypeSourceCount"));
+        assertTrue(validation.contains("@UnresolvedTypeCount+@DestinationMismatchCount"));
+    }
+
+    @Test void semanticOccurrenceChecksIncludeGlobalAndTenantTypeVariants() throws Exception {
+        for (Path path : new Path[] {PREFLIGHT, BACKFILL, VALIDATION}) {
+            String sql = Files.readString(path);
+            assertTrue(sql.contains("variants.SystemKey=l.SystemKey"), path.toString());
+            assertTrue(sql.contains("variants.ShaleClientId=l.ShaleClientId OR variants.ShaleClientId IS NULL"), path.toString());
+            assertTrue(sql.contains("ActiveSameKeyDifferentValue"), path.toString());
+            assertTrue(sql.contains("RemovedExactMatches"), path.toString());
+        }
+    }
+
+    @Test void overlayResolutionCoversOverrideResetDuplicatesAndMissingGlobal() throws Exception {
+        for (Path path : new Path[] {PREFLIGHT, BACKFILL, VALIDATION}) {
+            String sql = Files.readString(path);
+            assertTrue(sql.contains("NonDeletedTenantCount"), path.toString());
+            assertTrue(sql.contains("DeletedTenantCount"), path.toString());
+            assertTrue(sql.contains("GlobalCount"), path.toString());
+            assertTrue(sql.contains("GLOBAL_OR_RESET_FALLBACK"), path.toString());
+            assertTrue(sql.contains("ISNULL(IsDeleted,0)=0 ORDER BY Id"), path.toString());
+            assertTrue(sql.contains("NonDeletedTenantCount,0)>1"), path.toString());
+            assertTrue(sql.contains("GlobalCount<>1"), path.toString());
+            assertTrue(sql.contains("IsActive,0)<>1"), path.toString());
+        }
+    }
+
+    @Test void preflightReadinessMirrorsEverySeedRejection() throws Exception {
+        String sql = Files.readString(PREFLIGHT);
+        assertTrue(sql.contains("01_GLOBAL_SEED_COMPATIBILITY"));
+        assertTrue(sql.contains("ExactNameConflictCount"));
+        assertTrue(sql.contains("CategoryConflictCount"));
+        assertTrue(sql.contains("SupportsTimeConflictCount"));
+        assertTrue(sql.contains("InactiveCount"));
+        assertTrue(sql.contains("DeletedCount"));
+        assertTrue(sql.contains("GlobalDefinitionCount>1"));
+        assertTrue(sql.contains("@SeedBlockers=0"));
+    }
+
+    @Test void statusBlockerUsesTenantOrGlobalStatusDefinition() throws Exception {
+        String sql = Files.readString(STATUS_BLOCKER);
+        assertTrue(sql.contains("s.ShaleClientId=c.ShaleClientId OR s.ShaleClientId IS NULL"));
+        assertTrue(sql.contains("cs.CaseId=c.Id"));
     }
 
     @Test void packageDoesNotClearDropCalendarWriteOrChangeRuntimeStatusHistory() throws Exception {

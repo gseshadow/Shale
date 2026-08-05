@@ -1,68 +1,52 @@
-/* Post-backfill validation/reconciliation for legacy dbo.Cases date migration to dbo.CaseDates. */
+/* Independent all-tenant post-backfill validation. Requires administrative/RLS visibility; no @TenantId partial-success mode.
+   Covered legacy fields: CallerDate, CallerTime, DateOfMedicalNegligence, DateMedicalNegligenceWasDiscovered,
+   DateOfInjury, StatuteOfLimitations, TortNoticeDeadline, DiscoveryDeadline, DateFeeAgreementSigned,
+   DateNonEngagementLetterSent. AcceptedDate, DeniedDate, and ClosedDate remain status-history blockers, not CaseDates. */
 SET NOCOUNT ON;
-DECLARE @TenantId int = NULL;
-IF OBJECT_ID(N'dbo.Cases', N'U') IS NULL THROW 56000, 'Missing dbo.Cases.', 1;
-IF OBJECT_ID(N'dbo.CaseDates', N'U') IS NULL THROW 56001, 'Missing dbo.CaseDates.', 1;
-IF OBJECT_ID(N'dbo.CaseDateTypes', N'U') IS NULL THROW 56002, 'Missing dbo.CaseDateTypes.', 1;
-IF COL_LENGTH(N'dbo.CaseDates', N'IsDeleted') IS NULL THROW 56003, 'Expected dbo.CaseDates.IsDeleted removal column is missing.', 1;
-IF COL_LENGTH(N'dbo.CaseDates', N'IsRemoved') IS NOT NULL PRINT 'WARNING: dbo.CaseDates.IsRemoved also exists; repository Phase 1A/runtime contract uses IsDeleted.';
-
-DECLARE @Legacy TABLE(FieldName sysname, SystemKey nvarchar(64), Destination nvarchar(64));
-INSERT @Legacy VALUES ('CallerDate','intake','CaseDates'),('CallerTime','intake','CaseDates companion'),('DateOfMedicalNegligence','date_of_medical_negligence','CaseDates'),('DateMedicalNegligenceWasDiscovered','medical_negligence_discovered','CaseDates'),('DateOfInjury','date_of_injury','CaseDates'),('StatuteOfLimitations','statute_of_limitations','CaseDates'),('TortNoticeDeadline','tort_notice_deadline','CaseDates'),('DiscoveryDeadline','discovery_deadline','CaseDates'),('DateFeeAgreementSigned','fee_agreement_signed','CaseDates'),('DateNonEngagementLetterSent','non_engagement_letter_sent','CaseDates'),('AcceptedDate',NULL,'StatusHistoryBlocker'),('DeniedDate',NULL,'StatusHistoryBlocker'),('ClosedDate',NULL,'StatusHistoryBlocker');
-SELECT 'Legacy field coverage' SectionName,* FROM @Legacy ORDER BY FieldName;
-DECLARE @ExpectedTypes TABLE(SystemKey nvarchar(64) NOT NULL PRIMARY KEY, CalendarCategory varchar(32) NOT NULL, SupportsTime bit NOT NULL);
+IF OBJECT_ID(N'dbo.Cases',N'U') IS NULL THROW 56402,'Missing dbo.Cases.',1;
+IF OBJECT_ID(N'dbo.CaseDates',N'U') IS NULL THROW 56403,'Missing dbo.CaseDates.',1;
+IF OBJECT_ID(N'dbo.CaseDateTypes',N'U') IS NULL THROW 56404,'Missing dbo.CaseDateTypes.',1;
+IF COL_LENGTH(N'dbo.CaseDates',N'IsDeleted') IS NULL THROW 56401,'Expected dbo.CaseDates.IsDeleted.',1;
+DECLARE @ExpectedTypes TABLE(SystemKey nvarchar(64) NOT NULL PRIMARY KEY, Name nvarchar(100) NOT NULL, CalendarCategory varchar(32) NOT NULL, SupportsTime bit NOT NULL);
 INSERT @ExpectedTypes VALUES
-(N'intake','OTHER',1),(N'date_of_injury','OTHER',0),(N'date_of_medical_negligence','OTHER',0),(N'medical_negligence_discovered','OTHER',0),
-(N'statute_of_limitations','DEADLINE',0),(N'tort_notice_deadline','DEADLINE',0),(N'discovery_deadline','DEADLINE',0),
-(N'fee_agreement_signed','MILESTONE',0),(N'non_engagement_letter_sent','MILESTONE',0);
-
-WITH TypeCandidates AS (
-    SELECT t.Id, t.ShaleClientId, t.SystemKey, t.Name, t.CalendarCategory, t.Color, t.SupportsTime, t.IsActive, t.IsDeleted,
-           tenantScope.ShaleClientId AS EffectiveTenantId,
-           ROW_NUMBER() OVER (PARTITION BY tenantScope.ShaleClientId, t.SystemKey ORDER BY CASE WHEN t.ShaleClientId = tenantScope.ShaleClientId THEN 0 ELSE 1 END, t.Id) AS rn,
-           COUNT(*) OVER (PARTITION BY tenantScope.ShaleClientId, t.SystemKey, CASE WHEN t.ShaleClientId = tenantScope.ShaleClientId THEN 0 ELSE 1 END) AS SamePrecedenceCount
-    FROM (SELECT DISTINCT ShaleClientId FROM dbo.Cases WHERE ShaleClientId IS NOT NULL) tenantScope
-    JOIN dbo.CaseDateTypes t ON (t.ShaleClientId = tenantScope.ShaleClientId OR t.ShaleClientId IS NULL)
-    JOIN @ExpectedTypes e ON e.SystemKey = t.SystemKey
-)
-SELECT * INTO #EffectiveCaseDateTypes FROM TypeCandidates WHERE rn = 1;
-CREATE UNIQUE CLUSTERED INDEX IX_EffectiveCaseDateTypes_TenantKey ON #EffectiveCaseDateTypes(EffectiveTenantId, SystemKey);
-
-
-SELECT c.ShaleClientId, c.Id AS CaseId, v.FieldName, v.SystemKey,
-       CASE WHEN v.FieldName = 'CallerDate' AND c.CallerTime IS NOT NULL THEN
-            DATETIME2FROMPARTS(DATEPART(year, c.CallerDate), DATEPART(month, c.CallerDate), DATEPART(day, c.CallerDate),
-                               DATEPART(hour, CAST(c.CallerTime AS time)), DATEPART(minute, CAST(c.CallerTime AS time)), DATEPART(second, CAST(c.CallerTime AS time)), DATEPART(nanosecond, CAST(c.CallerTime AS time)) / 100, 7)
-            ELSE CAST(v.LegacyDate AS datetime2(7)) END AS ExpectedStartsAt,
-       CAST(CASE WHEN v.FieldName = 'CallerDate' AND c.CallerTime IS NOT NULL THEN 0 ELSE 1 END AS bit) AS ExpectedAllDay
-INTO #LegacyCaseDateSources
-FROM dbo.Cases c
-CROSS APPLY (VALUES
-    ('CallerDate','intake',c.CallerDate),
-    ('DateOfMedicalNegligence','date_of_medical_negligence',c.DateOfMedicalNegligence),
-    ('DateMedicalNegligenceWasDiscovered','medical_negligence_discovered',c.DateMedicalNegligenceWasDiscovered),
-    ('DateOfInjury','date_of_injury',c.DateOfInjury),
-    ('StatuteOfLimitations','statute_of_limitations',c.StatuteOfLimitations),
-    ('TortNoticeDeadline','tort_notice_deadline',c.TortNoticeDeadline),
-    ('DiscoveryDeadline','discovery_deadline',c.DiscoveryDeadline),
-    ('DateFeeAgreementSigned','fee_agreement_signed',c.DateFeeAgreementSigned),
-    ('DateNonEngagementLetterSent','non_engagement_letter_sent',c.DateNonEngagementLetterSent)
-) v(FieldName,SystemKey,LegacyDate)
-WHERE v.LegacyDate IS NOT NULL AND ISNULL(c.IsDeleted,0)=0;
-CREATE CLUSTERED INDEX IX_LegacyCaseDateSources_TenantCaseKey ON #LegacyCaseDateSources(ShaleClientId, CaseId, SystemKey);
-
-SELECT 'Effective destination type issues' SectionName, e.SystemKey, t.EffectiveTenantId AS ShaleClientId, t.Id, t.ShaleClientId AS TypeOwnerTenantId, t.Name, t.CalendarCategory, t.SupportsTime, t.IsActive, t.IsDeleted, t.SamePrecedenceCount
-FROM @ExpectedTypes e LEFT JOIN #EffectiveCaseDateTypes t ON t.SystemKey=e.SystemKey
-WHERE t.Id IS NULL OR t.CalendarCategory<>e.CalendarCategory OR t.SupportsTime<>e.SupportsTime OR ISNULL(t.IsActive,0)<>1 OR ISNULL(t.IsDeleted,0)<>0 OR t.SamePrecedenceCount>1;
-SELECT 'Legacy value profile' SectionName, FieldName, ShaleClientId, COUNT_BIG(*) NonNullCount, MIN(ExpectedStartsAt) MinStartsAt, MAX(ExpectedStartsAt) MaxStartsAt, SUM(CASE WHEN ExpectedAllDay=0 THEN 1 ELSE 0 END) TimedCount, SUM(CASE WHEN ExpectedAllDay=1 THEN 1 ELSE 0 END) AllDayCount FROM #LegacyCaseDateSources WHERE (@TenantId IS NULL OR ShaleClientId=@TenantId) GROUP BY FieldName,ShaleClientId;
-SELECT 'Orphan CallerTime' SectionName, ShaleClientId, COUNT_BIG(*) BlockerCount FROM dbo.Cases WHERE (@TenantId IS NULL OR ShaleClientId=@TenantId) AND CallerTime IS NOT NULL AND CallerDate IS NULL GROUP BY ShaleClientId;
-SELECT 'Workflow flag/date mismatch' SectionName, ShaleClientId, SUM(CASE WHEN ISNULL(FeeAgreementSigned,0)=1 AND DateFeeAgreementSigned IS NULL THEN 1 ELSE 0 END) FeeFlagWithoutDate, SUM(CASE WHEN ISNULL(FeeAgreementSigned,0)=0 AND DateFeeAgreementSigned IS NOT NULL THEN 1 ELSE 0 END) FeeDateWithoutFlag, SUM(CASE WHEN ISNULL(NonEngagementLetterSent,0)=1 AND DateNonEngagementLetterSent IS NULL THEN 1 ELSE 0 END) NonEngagementFlagWithoutDate, SUM(CASE WHEN ISNULL(NonEngagementLetterSent,0)=0 AND DateNonEngagementLetterSent IS NOT NULL THEN 1 ELSE 0 END) NonEngagementDateWithoutFlag FROM dbo.Cases WHERE (@TenantId IS NULL OR ShaleClientId=@TenantId) GROUP BY ShaleClientId;
-SELECT 'Existing occurrence conflicts' SectionName, l.ShaleClientId,l.CaseId,l.FieldName,l.SystemKey, SUM(CASE WHEN cd.Id IS NOT NULL AND cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay AND ISNULL(cd.IsDeleted,0)=0 THEN 1 ELSE 0 END) ActiveExactMatches, SUM(CASE WHEN cd.Id IS NOT NULL AND NOT (cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay) AND ISNULL(cd.IsDeleted,0)=0 THEN 1 ELSE 0 END) ActiveSameTypeDifferentValue, SUM(CASE WHEN cd.Id IS NOT NULL AND cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay AND ISNULL(cd.IsDeleted,0)=1 THEN 1 ELSE 0 END) RemovedExactMatches FROM #LegacyCaseDateSources l JOIN #EffectiveCaseDateTypes et ON et.EffectiveTenantId=l.ShaleClientId AND et.SystemKey=l.SystemKey LEFT JOIN dbo.CaseDates cd ON cd.ShaleClientId=l.ShaleClientId AND cd.CaseId=l.CaseId AND cd.CaseDateTypeId=et.Id WHERE (@TenantId IS NULL OR l.ShaleClientId=@TenantId) GROUP BY l.ShaleClientId,l.CaseId,l.FieldName,l.SystemKey HAVING SUM(CASE WHEN cd.Id IS NOT NULL AND cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay AND ISNULL(cd.IsDeleted,0)=0 THEN 1 ELSE 0 END)<>1 OR SUM(CASE WHEN cd.Id IS NOT NULL AND NOT (cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay) AND ISNULL(cd.IsDeleted,0)=0 THEN 1 ELSE 0 END)>0 OR SUM(CASE WHEN cd.Id IS NOT NULL AND cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay AND ISNULL(cd.IsDeleted,0)=1 THEN 1 ELSE 0 END)>0;
-IF OBJECT_ID(N'dbo.CaseStatuses', N'U') IS NOT NULL BEGIN SELECT 'Status date/history evidence' SectionName, v.FieldName, c.ShaleClientId, COUNT_BIG(*) LegacyValues, SUM(CASE WHEN h.MatchCount=0 THEN 1 ELSE 0 END) WithoutMatchingStatusHistoryEvidence, SUM(CASE WHEN h.MatchCount>1 THEN 1 ELSE 0 END) RepeatedRelevantStatusTransitions FROM dbo.Cases c CROSS APPLY (VALUES ('AcceptedDate','accepted',c.AcceptedDate),('DeniedDate','denied',c.DeniedDate),('ClosedDate','closed',c.ClosedDate)) v(FieldName,LifecycleKey,LegacyDate) CROSS APPLY (SELECT COUNT_BIG(*) MatchCount FROM dbo.CaseStatuses cs JOIN dbo.Statuses s ON s.Id=cs.StatusId AND (s.ShaleClientId=c.ShaleClientId OR s.ShaleClientId IS NULL) WHERE cs.CaseId=c.Id AND CAST(cs.EffectiveDate AS date)=v.LegacyDate AND (s.LifecycleKey=v.LifecycleKey OR s.SystemKey=v.LifecycleKey)) h WHERE v.LegacyDate IS NOT NULL AND (@TenantId IS NULL OR c.ShaleClientId=@TenantId) GROUP BY v.FieldName,c.ShaleClientId; END;
-
-DECLARE @BlockerCount bigint = 0;
-SELECT @BlockerCount = @BlockerCount + COUNT_BIG(*) FROM dbo.Cases WHERE CallerTime IS NOT NULL AND CallerDate IS NULL;
-SELECT @BlockerCount = @BlockerCount + COUNT_BIG(*) FROM #EffectiveCaseDateTypes et JOIN @ExpectedTypes e ON e.SystemKey=et.SystemKey WHERE et.CalendarCategory<>e.CalendarCategory OR et.SupportsTime<>e.SupportsTime OR ISNULL(et.IsActive,0)<>1 OR ISNULL(et.IsDeleted,0)<>0 OR et.SamePrecedenceCount>1;
-SELECT @BlockerCount = @BlockerCount + COUNT_BIG(*) FROM #LegacyCaseDateSources l JOIN #EffectiveCaseDateTypes et ON et.EffectiveTenantId=l.ShaleClientId AND et.SystemKey=l.SystemKey OUTER APPLY (SELECT SUM(CASE WHEN cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay AND ISNULL(cd.IsDeleted,0)=0 THEN 1 ELSE 0 END) ActiveExact, SUM(CASE WHEN NOT (cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay) AND ISNULL(cd.IsDeleted,0)=0 THEN 1 ELSE 0 END) ActiveConflict, SUM(CASE WHEN cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay AND ISNULL(cd.IsDeleted,0)=1 THEN 1 ELSE 0 END) RemovedExact FROM dbo.CaseDates cd WHERE cd.ShaleClientId=l.ShaleClientId AND cd.CaseId=l.CaseId AND cd.CaseDateTypeId=et.Id) x WHERE ISNULL(x.ActiveExact,0)<>1 OR ISNULL(x.ActiveConflict,0)>0 OR ISNULL(x.RemovedExact,0)>0;
-SELECT 'FINAL_VALIDATION_SUMMARY' AS SectionName, @BlockerCount AS BlockerCount, CASE WHEN @BlockerCount = 0 THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS IsSuccessful;
-IF @BlockerCount <> 0 THROW 56400, 'Post-backfill validation failed; see FINAL_VALIDATION_SUMMARY and blocker result sets.', 1;
+(N'intake',N'Intake','OTHER',1),(N'date_of_injury',N'Date of Injury','OTHER',0),(N'date_of_medical_negligence',N'Date of Medical Negligence','OTHER',0),(N'medical_negligence_discovered',N'Medical Negligence Discovered','OTHER',0),
+(N'statute_of_limitations',N'Statute of Limitations','DEADLINE',0),(N'tort_notice_deadline',N'Tort Notice Deadline','DEADLINE',0),(N'discovery_deadline',N'Discovery Deadline','DEADLINE',0),
+(N'fee_agreement_signed',N'Fee Agreement Signed','MILESTONE',0),(N'non_engagement_letter_sent',N'Non-Engagement Letter Sent','MILESTONE',0);
+SELECT c.ShaleClientId,c.Id CaseId,v.FieldName,v.SystemKey,
+ CASE WHEN v.FieldName='CallerDate' AND c.CallerTime IS NOT NULL THEN DATETIME2FROMPARTS(DATEPART(year,c.CallerDate),DATEPART(month,c.CallerDate),DATEPART(day,c.CallerDate),DATEPART(hour,CAST(c.CallerTime AS time)),DATEPART(minute,CAST(c.CallerTime AS time)),DATEPART(second,CAST(c.CallerTime AS time)),DATEPART(nanosecond,CAST(c.CallerTime AS time))/100,7) ELSE CAST(v.LegacyDate AS datetime2(7)) END ExpectedStartsAt,
+ CAST(CASE WHEN v.FieldName='CallerDate' AND c.CallerTime IS NOT NULL THEN 0 ELSE 1 END AS bit) ExpectedAllDay
+INTO #LegacyCaseDateSources FROM dbo.Cases c CROSS APPLY(VALUES
+ ('CallerDate','intake',c.CallerDate),('DateOfMedicalNegligence','date_of_medical_negligence',c.DateOfMedicalNegligence),('DateMedicalNegligenceWasDiscovered','medical_negligence_discovered',c.DateMedicalNegligenceWasDiscovered),('DateOfInjury','date_of_injury',c.DateOfInjury),('StatuteOfLimitations','statute_of_limitations',c.StatuteOfLimitations),('TortNoticeDeadline','tort_notice_deadline',c.TortNoticeDeadline),('DiscoveryDeadline','discovery_deadline',c.DiscoveryDeadline),('DateFeeAgreementSigned','fee_agreement_signed',c.DateFeeAgreementSigned),('DateNonEngagementLetterSent','non_engagement_letter_sent',c.DateNonEngagementLetterSent)
+) v(FieldName,SystemKey,LegacyDate) WHERE v.LegacyDate IS NOT NULL AND ISNULL(c.IsDeleted,0)=0;
+CREATE UNIQUE CLUSTERED INDEX IX_LegacySources ON #LegacyCaseDateSources(ShaleClientId,CaseId,SystemKey);
+SELECT DISTINCT ShaleClientId INTO #ParticipatingTenants FROM #LegacyCaseDateSources;
+SELECT pt.ShaleClientId EffectiveTenantId,e.SystemKey,e.Name ExpectedName,e.CalendarCategory ExpectedCategory,e.SupportsTime ExpectedSupportsTime,
+ tc.NonDeletedTenantCount,tc.DeletedTenantCount,gc.GlobalCount,
+ COALESCE(tw.Id,gw.Id) EffectiveCaseDateTypeId,COALESCE(tw.ShaleClientId,gw.ShaleClientId) TypeOwnerTenantId,COALESCE(tw.Name,gw.Name) ActualName,COALESCE(tw.CalendarCategory,gw.CalendarCategory) ActualCategory,COALESCE(tw.SupportsTime,gw.SupportsTime) ActualSupportsTime,COALESCE(tw.IsActive,gw.IsActive) IsActive,COALESCE(tw.IsDeleted,gw.IsDeleted) IsDeleted,
+ CASE WHEN tw.Id IS NOT NULL THEN 'TENANT_OVERRIDE' WHEN gw.Id IS NOT NULL THEN 'GLOBAL_OR_RESET_FALLBACK' ELSE 'MISSING' END ResolutionSource
+INTO #EffectiveCaseDateTypes FROM #ParticipatingTenants pt CROSS JOIN @ExpectedTypes e
+OUTER APPLY(SELECT SUM(CASE WHEN ISNULL(IsDeleted,0)=0 THEN 1 ELSE 0 END) NonDeletedTenantCount,SUM(CASE WHEN ISNULL(IsDeleted,0)=1 THEN 1 ELSE 0 END) DeletedTenantCount FROM dbo.CaseDateTypes WHERE ShaleClientId=pt.ShaleClientId AND SystemKey=e.SystemKey) tc
+OUTER APPLY(SELECT COUNT_BIG(*) GlobalCount FROM dbo.CaseDateTypes WHERE ShaleClientId IS NULL AND SystemKey=e.SystemKey) gc
+OUTER APPLY(SELECT TOP(1) * FROM dbo.CaseDateTypes WHERE ShaleClientId=pt.ShaleClientId AND SystemKey=e.SystemKey AND ISNULL(IsDeleted,0)=0 ORDER BY Id) tw
+OUTER APPLY(SELECT TOP(1) * FROM dbo.CaseDateTypes WHERE ShaleClientId IS NULL AND SystemKey=e.SystemKey ORDER BY Id) gw;
+CREATE UNIQUE CLUSTERED INDEX IX_EffectiveTypes ON #EffectiveCaseDateTypes(EffectiveTenantId,SystemKey);
+SELECT l.*,et.EffectiveCaseDateTypeId,et.ResolutionSource,
+ SUM(CASE WHEN cd.Id IS NOT NULL AND cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay AND ISNULL(cd.IsDeleted,0)=0 THEN 1 ELSE 0 END) ActiveExactMatches,
+ SUM(CASE WHEN cd.Id IS NOT NULL AND NOT(cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay) AND ISNULL(cd.IsDeleted,0)=0 THEN 1 ELSE 0 END) ActiveSameKeyDifferentValue,
+ SUM(CASE WHEN cd.Id IS NOT NULL AND cd.StartsAt=l.ExpectedStartsAt AND cd.EndsAt IS NULL AND cd.AllDay=l.ExpectedAllDay AND ISNULL(cd.IsDeleted,0)=1 THEN 1 ELSE 0 END) RemovedExactMatches
+INTO #OccurrenceEvidence FROM #LegacyCaseDateSources l
+LEFT JOIN #EffectiveCaseDateTypes et ON et.EffectiveTenantId=l.ShaleClientId AND et.SystemKey=l.SystemKey
+LEFT JOIN dbo.CaseDateTypes variants ON variants.SystemKey=l.SystemKey AND (variants.ShaleClientId=l.ShaleClientId OR variants.ShaleClientId IS NULL)
+LEFT JOIN dbo.CaseDates cd ON cd.ShaleClientId=l.ShaleClientId AND cd.CaseId=l.CaseId AND cd.CaseDateTypeId=variants.Id
+GROUP BY l.ShaleClientId,l.CaseId,l.FieldName,l.SystemKey,l.ExpectedStartsAt,l.ExpectedAllDay,et.EffectiveCaseDateTypeId,et.ResolutionSource;
+SELECT 'UNRESOLVED_SOURCE_SAFE_IDS' SectionName,l.ShaleClientId,l.CaseId,l.FieldName,l.SystemKey FROM #LegacyCaseDateSources l LEFT JOIN #EffectiveCaseDateTypes et ON et.EffectiveTenantId=l.ShaleClientId AND et.SystemKey=l.SystemKey WHERE et.EffectiveCaseDateTypeId IS NULL OR ISNULL(et.NonDeletedTenantCount,0)>1 OR et.GlobalCount<>1 OR ISNULL(et.IsActive,0)<>1 OR ISNULL(et.IsDeleted,0)<>0 OR et.ActualCategory<>et.ExpectedCategory OR et.ActualSupportsTime<>et.ExpectedSupportsTime;
+SELECT 'DESTINATION_RECONCILIATION_SAFE_IDS' SectionName,ShaleClientId,CaseId,FieldName,SystemKey,ActiveExactMatches,ActiveSameKeyDifferentValue,RemovedExactMatches FROM #OccurrenceEvidence WHERE EffectiveCaseDateTypeId IS NULL OR ActiveExactMatches<>1 OR ActiveSameKeyDifferentValue>0 OR RemovedExactMatches>0;
+DECLARE @UnresolvedTypeCount bigint=(SELECT COUNT_BIG(*) FROM #LegacyCaseDateSources l LEFT JOIN #EffectiveCaseDateTypes et ON et.EffectiveTenantId=l.ShaleClientId AND et.SystemKey=l.SystemKey WHERE et.EffectiveCaseDateTypeId IS NULL OR ISNULL(et.NonDeletedTenantCount,0)>1 OR et.GlobalCount<>1 OR ISNULL(et.IsActive,0)<>1 OR ISNULL(et.IsDeleted,0)<>0 OR et.ActualCategory<>et.ExpectedCategory OR et.ActualSupportsTime<>et.ExpectedSupportsTime);
+DECLARE @DestinationMismatchCount bigint=(SELECT COUNT_BIG(*) FROM #OccurrenceEvidence WHERE ActiveExactMatches<>1 OR ActiveSameKeyDifferentValue>0 OR RemovedExactMatches>0);
+DECLARE @OrphanCallerTimeCount bigint=(SELECT COUNT_BIG(*) FROM dbo.Cases WHERE CallerTime IS NOT NULL AND CallerDate IS NULL);
+DECLARE @WorkflowMismatchCount bigint=(SELECT COUNT_BIG(*) FROM dbo.Cases WHERE (ISNULL(FeeAgreementSigned,0)=1 AND DateFeeAgreementSigned IS NULL) OR (ISNULL(FeeAgreementSigned,0)=0 AND DateFeeAgreementSigned IS NOT NULL) OR (ISNULL(NonEngagementLetterSent,0)=1 AND DateNonEngagementLetterSent IS NULL) OR (ISNULL(NonEngagementLetterSent,0)=0 AND DateNonEngagementLetterSent IS NOT NULL));
+DECLARE @CrossTenantCount bigint=(SELECT COUNT_BIG(*) FROM dbo.CaseDates cd LEFT JOIN dbo.Cases c ON c.Id=cd.CaseId LEFT JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId WHERE c.Id IS NULL OR c.ShaleClientId<>cd.ShaleClientId OR (t.ShaleClientId IS NOT NULL AND t.ShaleClientId<>cd.ShaleClientId));
+DECLARE @ActorMismatchCount bigint=(SELECT COUNT_BIG(*) FROM dbo.CaseDates cd LEFT JOIN dbo.Users u ON u.Id=cd.CreatedByUserId AND u.ShaleClientId=cd.ShaleClientId WHERE u.Id IS NULL);
+DECLARE @BlockerCount bigint=@UnresolvedTypeCount+@DestinationMismatchCount+@OrphanCallerTimeCount+@WorkflowMismatchCount+@CrossTenantCount+@ActorMismatchCount;
+SELECT 'FINAL_VALIDATION_SUMMARY' SectionName,(SELECT COUNT_BIG(*) FROM #LegacyCaseDateSources) SourceRowCount,@UnresolvedTypeCount UnresolvedTypeSourceCount,@DestinationMismatchCount DestinationMismatchCount,@OrphanCallerTimeCount OrphanCallerTimeCount,@WorkflowMismatchCount WorkflowMismatchCount,@CrossTenantCount CrossTenantRelationshipCount,@ActorMismatchCount CreatedByTenantMismatchCount,@BlockerCount BlockerCount,CASE WHEN @BlockerCount=0 THEN 'SUCCESS' ELSE 'BLOCKED' END ValidationResult;
+IF @BlockerCount<>0 THROW 56400,'Post-backfill validation blocked; review safe-id result sets and FINAL_VALIDATION_SUMMARY.',1;
