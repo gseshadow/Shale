@@ -264,3 +264,58 @@ Phase 3B cannot responsibly include backfill, cutover, dual-read/write, or workf
 * Decide whether accepted/denied/closed dates remain status lifecycle timestamps even when manually repairable in Case Details.
 * Decide whether and when web/API editors must move migrated fields to the Dates section or become read-only.
 * Define duplicate-display policy during any backfill validation window; the repository currently has no warning or prevention for semantically duplicate Case Dates.
+
+## Phase 3B SQL preparation package (2026-08-05)
+
+Phase 3B prepares reviewable SQL only. The package does not execute SQL, does not change runtime readers or writers, does not dual-write, does not touch `CalendarEvents`, and does not clear or drop any legacy `dbo.Cases` columns. Until explicit writer cutover is implemented, legacy `dbo.Cases` fields remain authoritative.
+
+### Verified status-history and Timeline behavior
+
+Repository code uses `dbo.CaseStatuses` as the case status history table. A history row contains `CaseId`, `StatusId`, `EffectiveDate`, `EndDate`, `Notes`, `CreatedAt`, `UpdatedAt`, and `IsPrimary`; runtime reads join to current `dbo.Statuses` rows for name, color, `IsClosed`, `LifecycleKey`, and `SystemKey`. The row does not store previous status, actor id, historical status key, or historical display label. Case status changes end open status rows and insert a new primary row with `SYSDATETIME()`, then touch `dbo.Cases.UpdatedAt`. Lifecycle date population is separate: `AcceptedDate`, `DeniedDate`, and `ClosedDate` are set to `CAST(SYSDATETIME() AS date)` only when the target lifecycle key is reached and the corresponding legacy field is null. The desktop Timeline loads `caseDao.listCaseStatusHistory(activeCaseId)` and renders `dbo.CaseStatuses` rows joined to current `dbo.Statuses`; it does not derive those status timeline entries from fixed `dbo.Cases.AcceptedDate`, `DeniedDate`, or `ClosedDate`.
+
+Because `dbo.CaseStatuses` lacks actor, previous status, historical label/key, tenant-scoped identity, and migration provenance, the preparation package intentionally does not generate status-history inserts for legacy `AcceptedDate`, `DeniedDate`, or `ClosedDate`. Direct SQL would have to invent missing transition context and could not prove first-versus-latest semantics for repaired or manually edited legacy dates. The smallest prerequisite phase is a status-history data-model upgrade that records tenant id, previous and new status ids, historical lifecycle/system keys and display labels, nullable/explicit actor or system actor convention, source/provenance, and immutable occurred-at timestamps. After that prerequisite, a new read-only discrepancy run can decide whether legacy date-only milestones can be represented without fabricating transitions.
+
+### Approved CaseDateType destinations
+
+| Legacy source | Destination `CaseDateTypes.SystemKey` | Category | Time semantics | Future writer owner |
+| --- | --- | --- | --- | --- |
+| `CallerDate` + `CallerTime` | `intake` | `OTHER` | Timed when `CallerTime` exists; all-day when only `CallerDate` exists | Intake workflow |
+| `DateOfInjury` | `date_of_injury` | `OTHER` | All-day | Case Dates/details workflow after cutover |
+| `DateOfMedicalNegligence` | `date_of_medical_negligence` | `OTHER` | All-day | Case Dates/details workflow after cutover |
+| `DateMedicalNegligenceWasDiscovered` | `medical_negligence_discovered` | `OTHER` | All-day | Case Dates/details workflow after cutover |
+| `StatuteOfLimitations` | `statute_of_limitations` | `DEADLINE` | All-day | Deadline/Case Dates workflow after cutover |
+| `TortNoticeDeadline` | `tort_notice_deadline` | `DEADLINE` | All-day | Deadline/Case Dates workflow after cutover |
+| `DiscoveryDeadline` | `discovery_deadline` | `DEADLINE` | All-day | Deadline/Case Dates workflow after cutover |
+| `DateFeeAgreementSigned` | `fee_agreement_signed` | `MILESTONE` | All-day | Fee-agreement workflow |
+| `DateNonEngagementLetterSent` | `non_engagement_letter_sent` | `MILESTONE` | All-day | Non-engagement workflow |
+| `AcceptedDate` | status-transition history | n/a | Legacy date-only milestone until prerequisite history upgrade | Status transition workflow |
+| `DeniedDate` | status-transition history | n/a | Legacy date-only milestone until prerequisite history upgrade | Status transition workflow |
+| `ClosedDate` | status-transition history | n/a | Legacy date-only milestone until prerequisite history upgrade | Status transition workflow |
+
+The Phase 1A global seeds already include `statute_of_limitations`, `tort_notice_deadline`, `discovery_deadline`, `date_of_injury`, and `date_of_medical_negligence`. Phase 3B seed verification reuses those keys and adds only missing approved globals. It treats conflicting category, support-time, active, deleted, or duplicate definitions as blockers instead of silently changing deployed meaning. The existing Phase 1A key `date_medical_negligence_discovered` differs from the approved destination key `medical_negligence_discovered`; the seed script therefore verifies/creates the approved key and preflight exposes both effective mappings for review before execution.
+
+### SQL package and execution order
+
+1. Review and run `docs/sql/2026-08-05_case_dates_legacy_phase3b_preflight.sql` in a read-only session to collect aggregate counts, exact matches, conflicts, orphan `CallerTime`, workflow flag/date mismatches, existing type definitions, status-date evidence, reopened/repeated transitions, and unresolved deterministic blockers.
+2. Resolve every preflight blocker outside the migration script. Do not execute backfill while orphan `CallerTime`, duplicate type definitions, conflicting exact `CaseDates`, status-history uncertainty, or workflow flag/date mismatches remain unresolved.
+3. Run `docs/sql/2026-08-05_case_dates_legacy_phase3b_seed_types.sql` to verify and idempotently seed approved global destination types.
+4. Run `docs/sql/2026-08-05_case_dates_legacy_phase3b_backfill_case_dates.sql` only after seed verification and preflight success. The script inserts only missing exact destination rows, preserves all-day versus timed intake semantics, leaves `EndsAt` null, leaves legacy columns intact, and does not update `dbo.Cases.UpdatedAt`.
+5. Run `docs/sql/2026-08-05_case_dates_legacy_phase3b_post_validation.sql`. The migration is not successful while unresolved/orphan/conflict counts remain non-zero or an eligible legacy value lacks exactly one active destination representation.
+6. Keep `docs/sql/2026-08-05_case_dates_legacy_phase3b_status_history_blocker.sql` as the read-only discrepancy query and blocker report for status dates; do not insert speculative status history in this phase.
+
+Rollback boundary: the CaseDateTypes and CaseDates scripts are idempotent, but the current schema has no reversible migration-owned source key/ledger on `dbo.CaseDates`. Exact matching can avoid duplicate inserts, but it cannot distinguish preexisting user-created exact matches from migration-created rows after commit. Treat database backup/transaction rollback before commit as the reliable rollback boundary unless a future provenance schema is added.
+
+### Future phased cutover roadmap
+
+1. Destination type verification.
+2. Preflight and conflict resolution.
+3. Controlled backfill.
+4. Post-backfill validation.
+5. Runtime writer cutover: Intake writes the `intake` CaseDate; fee-agreement workflow writes `fee_agreement_signed`; non-engagement workflow writes `non_engagement_letter_sent`; status transition workflow writes upgraded status-history rows for accepted/denied/closed.
+6. Runtime reader cutover from legacy case columns to authoritative `CaseDates` and upgraded status history.
+7. Case Timeline cutover to the upgraded status-history model where needed for historical presentation.
+8. Unified Calendar legacy-projection removal after readers no longer need fixed `dbo.Cases` date projections.
+9. Export/report/web/API cutover.
+10. Release soak period with reconciliation comparing legacy fields to destinations.
+11. Final dependency scan across database SQL and Java/web/UI references.
+12. Legacy column removal only when no dependencies remain and the final verification phase passes.
