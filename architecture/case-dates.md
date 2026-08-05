@@ -307,6 +307,11 @@ Existing-occurrence conflict policy: the current `CaseDates` model allows multip
 
 Rollback boundary: the CaseDateTypes and CaseDates scripts are idempotent, but the current schema has no reversible migration-owned source key/ledger on `dbo.CaseDates`. Exact matching can avoid duplicate inserts, but it cannot distinguish preexisting user-created exact matches from migration-created rows after commit. Treat database backup/transaction rollback before commit as the reliable rollback boundary unless a future provenance schema is added.
 
+
+### Mixed-version compatibility rule
+
+No new reader may depend exclusively on `CaseDates` while any supported deployed client can still write exclusively to the legacy `dbo.Cases` columns. Phase 3B and Phase 3C do not change runtime authority: legacy `dbo.Cases` fields remain authoritative, and the existing desktop and web applications must continue working unchanged. Backfill alone does not authorize reader or writer cutover. A later compatibility release must cover desktop, server/API, and web together, and that release will require a deliberately designed synchronization strategy for mixed versions rather than an accidental dual-write or fallback-read behavior. Legacy columns remain physically present throughout migration preparation, compatibility deployment, upgrade completion, reconciliation, and soak. Physical removal is a separate final contract phase after all supported desktop clients are upgraded and all desktop, web, API, report, export, and calendar dependencies are gone.
+
 ### Future phased cutover roadmap
 
 1. Destination type verification.

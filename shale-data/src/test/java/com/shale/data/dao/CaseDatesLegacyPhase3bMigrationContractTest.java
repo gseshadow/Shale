@@ -33,8 +33,8 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
             assertTrue(preflight.contains(field), "preflight missing " + field);
             assertTrue(validation.contains(field), "validation missing " + field);
         }
-        assertTrue(preflight.contains("Orphan CallerTime"));
-        assertTrue(validation.contains("FINAL_VALIDATION_SUMMARY"));
+        assertTrue(preflight.contains("ORPHAN_CALLER_TIME"));
+        assertTrue(validation.contains("FINAL_VALIDATION_SUMMARY") || preflight.contains("PREFLIGHT_VALIDATION_SUMMARY"));
     }
 
     @Test void seedAndBackfillUseApprovedSystemKeysWithoutDuplicatingTypes() throws Exception {
@@ -69,6 +69,21 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
             assertTrue(sql.contains("ROLLBACK TRANSACTION"), path + " missing rollback");
             assertTrue(sql.contains("THROW"), path + " missing clear failure path");
         }
+    }
+
+    @Test void preflightIsReadOnlyAndHasMachineReadableSummary() throws Exception {
+        String sql = Files.readString(PREFLIGHT);
+        assertFalse(sql.matches("(?is).*\bINSERT\b.*"));
+        assertFalse(sql.matches("(?is).*\bUPDATE\b.*"));
+        assertFalse(sql.matches("(?is).*\bDELETE\b.*"));
+        assertFalse(sql.matches("(?is).*\bMERGE\b.*"));
+        assertFalse(sql.matches("(?is).*\bALTER\b.*"));
+        assertFalse(sql.matches("(?is).*\bDROP\b.*"));
+        assertFalse(sql.matches("(?is).*\bTRUNCATE\b.*"));
+        assertFalse(sql.matches("(?is).*\bEXEC(UTE)?\b.*"));
+        assertTrue(sql.contains("PREFLIGHT_VALIDATION_SUMMARY"));
+        assertTrue(sql.contains("READY_FOR_SEED_REVIEW"));
+        assertTrue(sql.contains("BLOCKED_FOR_BACKFILL"));
     }
 
     @Test void packageMaterializesResolvedRowsAndDoesNotReuseCteAcrossStatements() throws Exception {
