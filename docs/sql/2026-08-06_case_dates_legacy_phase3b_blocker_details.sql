@@ -9,7 +9,7 @@ DECLARE @OperatorVerifiedAllTenantVisibility bit = 0;
 DECLARE @ExpectedSeedBlockerCount bigint = 3;
 DECLARE @ExpectedMissingSeedableCount bigint = 4;
 DECLARE @ExpectedUnresolvedSourceCount bigint = 1717;
-DECLARE @ExpectedWorkflowMismatchCount bigint = 610;
+DECLARE @ExpectedWorkflowMismatchCaseCount bigint = 610;
 IF OBJECT_ID(N'dbo.Cases', N'U') IS NULL THROW 56400, 'Missing dbo.Cases.', 1;
 IF OBJECT_ID(N'dbo.CaseDateTypes', N'U') IS NULL THROW 56401, 'Missing dbo.CaseDateTypes.', 1;
 
@@ -68,12 +68,12 @@ OUTER APPLY(SELECT TOP(1) Id,IsActive,IsDeleted,CalendarCategory,SupportsTime FR
 SELECT c.ShaleClientId,v.FieldName,v.SystemKey,v.MismatchReason INTO #WorkflowMismatches FROM dbo.Cases c CROSS APPLY(VALUES
  (N'DateFeeAgreementSigned',N'fee_agreement_signed',CASE WHEN ISNULL(c.FeeAgreementSigned,0)=1 AND c.DateFeeAgreementSigned IS NULL THEN N'FLAG_SET_DATE_MISSING' WHEN ISNULL(c.FeeAgreementSigned,0)=0 AND c.DateFeeAgreementSigned IS NOT NULL THEN N'DATE_PRESENT_FLAG_NOT_SET' END),
  (N'DateNonEngagementLetterSent',N'non_engagement_letter_sent',CASE WHEN ISNULL(c.NonEngagementLetterSent,0)=1 AND c.DateNonEngagementLetterSent IS NULL THEN N'FLAG_SET_DATE_MISSING' WHEN ISNULL(c.NonEngagementLetterSent,0)=0 AND c.DateNonEngagementLetterSent IS NOT NULL THEN N'DATE_PRESENT_FLAG_NOT_SET' END)
-)v(FieldName,SystemKey,MismatchReason) WHERE v.MismatchReason IS NOT NULL AND ISNULL(c.IsDeleted,0)=0;
+)v(FieldName,SystemKey,MismatchReason) WHERE v.MismatchReason IS NOT NULL;
 
 SELECT N'01_SEED_BLOCKERS' SectionName,SystemKey,BlockerReason,SUM(AffectedDefinitions) AffectedDefinitionCount FROM #SeedBlockerReasons GROUP BY SystemKey,BlockerReason ORDER BY SystemKey,BlockerReason;
 SELECT N'02_EXPECTED_MISSING_GLOBAL_TYPES' SectionName,SystemKey,N'EXPECTED_MISSING_SEED_MAY_CREATE' Classification FROM #GlobalSeedProfile WHERE GlobalDefinitionCount=0 ORDER BY SystemKey;
 SELECT N'03_UNRESOLVED_LEGACY_SOURCES' SectionName,s.ShaleClientId,s.FieldName,s.SystemKey,COUNT_BIG(*) UnresolvedSourceCount FROM #LegacySources s LEFT JOIN #EffectiveTypes e ON e.ShaleClientId=s.ShaleClientId AND e.SystemKey=s.SystemKey WHERE e.SelectedCaseDateTypeId IS NULL OR e.BlockerReason<>N'NONE' GROUP BY s.ShaleClientId,s.FieldName,s.SystemKey ORDER BY s.ShaleClientId,s.FieldName,s.SystemKey;
-SELECT N'04_WORKFLOW_MISMATCHES' SectionName,ShaleClientId,FieldName,SystemKey,MismatchReason,COUNT_BIG(*) WorkflowMismatchCount FROM #WorkflowMismatches GROUP BY ShaleClientId,FieldName,SystemKey,MismatchReason ORDER BY ShaleClientId,FieldName,SystemKey,MismatchReason;
+SELECT N'04_WORKFLOW_MISMATCHES' SectionName,ShaleClientId,FieldName,SystemKey,MismatchReason,COUNT_BIG(*) WorkflowMismatchInstanceCount FROM #WorkflowMismatches GROUP BY ShaleClientId,FieldName,SystemKey,MismatchReason ORDER BY ShaleClientId,FieldName,SystemKey,MismatchReason;
 SELECT N'05_EFFECTIVE_TYPE_RESOLUTION' SectionName,ShaleClientId,SystemKey,SelectedCaseDateTypeId,ResolutionSource,SelectedIsActive IsActive,SelectedIsDeleted IsDeleted,
  CASE WHEN SelectedCaseDateTypeId IS NULL THEN N'MISSING' WHEN ISNULL(SelectedIsDeleted,0)=1 THEN N'DELETED' WHEN ISNULL(SelectedIsActive,0)=0 THEN N'INACTIVE' ELSE N'ACTIVE' END LifecycleState,
  CASE WHEN BlockerReason=N'NONE' THEN N'COMPATIBLE' ELSE N'BLOCKED' END CompatibilityStatus,BlockerReason FROM #EffectiveTypes ORDER BY ShaleClientId,SystemKey;
@@ -81,10 +81,13 @@ SELECT N'05_EFFECTIVE_TYPE_RESOLUTION' SectionName,ShaleClientId,SystemKey,Selec
 DECLARE @SeedBlockerCount bigint=(SELECT COUNT_BIG(*) FROM #GlobalSeedProfile WHERE GlobalDefinitionCount>1 OR ExactNameConflictCount>0 OR CategoryConflictCount>0 OR SupportsTimeConflictCount>0 OR InactiveCount>0 OR DeletedCount>0);
 DECLARE @MissingSeedableCount bigint=(SELECT COUNT_BIG(*) FROM #GlobalSeedProfile WHERE GlobalDefinitionCount=0);
 DECLARE @UnresolvedSourceCount bigint=(SELECT COUNT_BIG(*) FROM #LegacySources s LEFT JOIN #EffectiveTypes e ON e.ShaleClientId=s.ShaleClientId AND e.SystemKey=s.SystemKey WHERE e.SelectedCaseDateTypeId IS NULL OR e.BlockerReason<>N'NONE');
-DECLARE @WorkflowMismatchCount bigint=(SELECT COUNT_BIG(*) FROM #WorkflowMismatches);
+/* Match PREFLIGHT_VALIDATION_SUMMARY exactly: one count per case satisfying either workflow mismatch. */
+DECLARE @WorkflowMismatchCaseCount bigint=(SELECT COUNT_BIG(*) FROM dbo.Cases WHERE (ISNULL(FeeAgreementSigned,0)=1 AND DateFeeAgreementSigned IS NULL) OR (ISNULL(FeeAgreementSigned,0)=0 AND DateFeeAgreementSigned IS NOT NULL) OR (ISNULL(NonEngagementLetterSent,0)=1 AND DateNonEngagementLetterSent IS NULL) OR (ISNULL(NonEngagementLetterSent,0)=0 AND DateNonEngagementLetterSent IS NOT NULL));
+DECLARE @WorkflowMismatchInstanceCount bigint=(SELECT COUNT_BIG(*) FROM #WorkflowMismatches);
 SELECT N'06_BLOCKER_RECONCILIATION_SUMMARY' SectionName,@SeedBlockerCount SeedBlockerCount,@ExpectedSeedBlockerCount ExpectedSeedBlockerCount,
  @MissingSeedableCount ExpectedMissingTypesSeedMayCreate,@ExpectedMissingSeedableCount ReviewedExpectedMissingTypesSeedMayCreate,
  @UnresolvedSourceCount UnresolvedSourceCount,@ExpectedUnresolvedSourceCount ExpectedUnresolvedSourceCount,
- @WorkflowMismatchCount WorkflowMismatchCount,@ExpectedWorkflowMismatchCount ExpectedWorkflowMismatchCount,
- CASE WHEN @SeedBlockerCount=@ExpectedSeedBlockerCount AND @MissingSeedableCount=@ExpectedMissingSeedableCount AND @UnresolvedSourceCount=@ExpectedUnresolvedSourceCount AND @WorkflowMismatchCount=@ExpectedWorkflowMismatchCount THEN N'MATCHES_REVIEW_INVENTORY' ELSE N'DOES_NOT_MATCH_REVIEW_INVENTORY' END ReconciliationStatus,
+ @WorkflowMismatchCaseCount WorkflowMismatchCaseCount,@ExpectedWorkflowMismatchCaseCount ExpectedWorkflowMismatchCaseCount,
+ @WorkflowMismatchInstanceCount WorkflowMismatchInstanceCount,
+ CASE WHEN @SeedBlockerCount=@ExpectedSeedBlockerCount AND @MissingSeedableCount=@ExpectedMissingSeedableCount AND @UnresolvedSourceCount=@ExpectedUnresolvedSourceCount AND @WorkflowMismatchCaseCount=@ExpectedWorkflowMismatchCaseCount THEN N'MATCHES_REVIEW_INVENTORY' ELSE N'DOES_NOT_MATCH_REVIEW_INVENTORY' END ReconciliationStatus,
  @OperatorVerifiedAllTenantVisibility OperatorVerifiedAllTenantVisibility,N'DIAGNOSTIC_NON_AUTHORIZING' AuthorizationStatus;

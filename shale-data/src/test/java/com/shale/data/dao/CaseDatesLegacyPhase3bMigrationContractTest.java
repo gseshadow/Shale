@@ -307,7 +307,7 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
         assertTrue(sql.contains("@ExpectedSeedBlockerCount bigint = 3"));
         assertTrue(sql.contains("@ExpectedMissingSeedableCount bigint = 4"));
         assertTrue(sql.contains("@ExpectedUnresolvedSourceCount bigint = 1717"));
-        assertTrue(sql.contains("@ExpectedWorkflowMismatchCount bigint = 610"));
+        assertTrue(sql.contains("@ExpectedWorkflowMismatchCaseCount bigint = 610"));
         assertTrue(sql.contains("01_SEED_BLOCKERS"));
         assertTrue(sql.contains("02_EXPECTED_MISSING_GLOBAL_TYPES"));
         assertTrue(sql.contains("03_UNRESOLVED_LEGACY_SOURCES"));
@@ -315,6 +315,32 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
         assertTrue(sql.contains("05_EFFECTIVE_TYPE_RESOLUTION"));
         assertTrue(sql.contains("06_BLOCKER_RECONCILIATION_SUMMARY"));
         assertTrue(sql.contains("MATCHES_REVIEW_INVENTORY"));
+    }
+
+    @Test void blockerDetailsSeparatesWorkflowCasesFromMismatchInstances() throws Exception {
+        String sql = Files.readString(BLOCKER_DETAILS);
+        String instances = sql.substring(sql.indexOf("SELECT c.ShaleClientId,v.FieldName,v.SystemKey,v.MismatchReason"),
+                sql.indexOf("SELECT N'01_SEED_BLOCKERS'"));
+        assertTrue(instances.contains("DateFeeAgreementSigned"));
+        assertTrue(instances.contains("DateNonEngagementLetterSent"));
+        assertTrue(instances.contains("WHERE v.MismatchReason IS NOT NULL;"));
+        assertFalse(instances.contains("IsDeleted"), "deleted cases must remain in workflow mismatch diagnostics");
+        assertTrue(sql.contains("COUNT_BIG(*) WorkflowMismatchInstanceCount FROM #WorkflowMismatches"));
+        assertTrue(sql.contains("@WorkflowMismatchCaseCount WorkflowMismatchCaseCount"));
+        assertTrue(sql.contains("@WorkflowMismatchInstanceCount WorkflowMismatchInstanceCount"));
+    }
+
+    @Test void blockerWorkflowCaseCountUsesTheExactPreflightPredicate() throws Exception {
+        String preflight = Files.readString(PREFLIGHT).replaceAll("\\s+", "");
+        String details = Files.readString(BLOCKER_DETAILS).replaceAll("\\s+", "");
+        String predicate = "WHERE(ISNULL(FeeAgreementSigned,0)=1ANDDateFeeAgreementSignedISNULL)"
+                + "OR(ISNULL(FeeAgreementSigned,0)=0ANDDateFeeAgreementSignedISNOTNULL)"
+                + "OR(ISNULL(NonEngagementLetterSent,0)=1ANDDateNonEngagementLetterSentISNULL)"
+                + "OR(ISNULL(NonEngagementLetterSent,0)=0ANDDateNonEngagementLetterSentISNOTNULL)";
+        assertTrue(preflight.contains(predicate), "reviewed preflight workflow predicate changed");
+        assertTrue(details.contains(predicate), "diagnostic must use the exact case-level preflight predicate");
+        assertTrue(details.contains("COUNT_BIG(*)FROMdbo.Cases" + predicate));
+        assertTrue(details.contains("@WorkflowMismatchCaseCount=@ExpectedWorkflowMismatchCaseCount"));
     }
 
     @Test void packageDoesNotClearDropCalendarWriteOrChangeRuntimeStatusHistory() throws Exception {
