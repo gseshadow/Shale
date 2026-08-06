@@ -24,7 +24,7 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
     };
 
     private static final String[] SYSTEM_KEYS = {
-            "intake", "date_of_injury", "date_of_medical_negligence", "medical_negligence_discovered",
+            "intake", "date_of_injury", "date_of_medical_negligence", "date_medical_negligence_discovered",
             "statute_of_limitations", "tort_notice_deadline", "discovery_deadline",
             "fee_agreement_signed", "non_engagement_letter_sent"
     };
@@ -180,7 +180,7 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
     @Test void casesSafeIdProjectionsUseAuthoritativeIdColumn() throws Exception {
         String sql = Files.readString(PREFLIGHT);
         assertTrue(sql.contains("'06_ORPHAN_CALLER_TIME' SectionName,ShaleClientId,Id AS CaseId FROM dbo.Cases"));
-        assertTrue(sql.contains("'12_WORKFLOW_FLAG_DATE_MISMATCH' SectionName,ShaleClientId,Id CaseId FROM dbo.Cases"));
+        assertTrue(sql.contains("'12_WORKFLOW_FLAG_DATE_ANOMALIES' SectionName,v.AnomalyClass,COUNT_BIG(*)"));
         assertFalse(sql.matches("(?is).*SELECT\\s+'06_ORPHAN_CALLER_TIME'.*?ShaleClientId\\s*,\\s*CaseId\\s+FROM\\s+dbo\\.Cases.*"));
     }
 
@@ -203,7 +203,8 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
     @Test void backfillIndependentlyRejectsEveryMutableDataBlocker() throws Exception {
         String sql = Files.readString(BACKFILL);
         assertTrue(sql.contains("CallerTime IS NOT NULL AND CallerDate IS NULL"));
-        assertTrue(sql.contains("Workflow flag/date mismatches block backfill"));
+        assertFalse(sql.contains("Workflow flag/date mismatches block backfill"));
+        assertTrue(sql.contains("never invent dates or change flags"));
         assertTrue(sql.contains("Broken or cross-tenant CaseDate case/type relationships block backfill"));
         assertTrue(sql.contains("Missing or cross-tenant CaseDate creator relationships block backfill"));
         assertTrue(sql.contains("c.Id IS NULL OR t.Id IS NULL"));
@@ -304,14 +305,14 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
 
     @Test void blockerDetailsReconcilesTheReviewedInventoryCounts() throws Exception {
         String sql = Files.readString(BLOCKER_DETAILS);
-        assertTrue(sql.contains("@ExpectedSeedBlockerCount bigint = 3"));
-        assertTrue(sql.contains("@ExpectedMissingSeedableCount bigint = 4"));
-        assertTrue(sql.contains("@ExpectedUnresolvedSourceCount bigint = 1717"));
-        assertTrue(sql.contains("@ExpectedWorkflowMismatchCaseCount bigint = 610"));
+        assertTrue(sql.contains("@ExpectedSeedBlockerCount bigint = 0"));
+        assertTrue(sql.contains("@ExpectedMissingSeedableCount bigint = 3"));
+        assertTrue(sql.contains("@ExpectedUnresolvedSourceCount bigint = NULL"));
+        assertTrue(sql.contains("@ExpectedFlagSetDateMissingCount bigint = 610"));
         assertTrue(sql.contains("01_SEED_BLOCKERS"));
         assertTrue(sql.contains("02_EXPECTED_MISSING_GLOBAL_TYPES"));
         assertTrue(sql.contains("03_UNRESOLVED_LEGACY_SOURCES"));
-        assertTrue(sql.contains("04_WORKFLOW_MISMATCHES"));
+        assertTrue(sql.contains("04_WORKFLOW_FLAG_DATE_ANOMALIES"));
         assertTrue(sql.contains("05_EFFECTIVE_TYPE_RESOLUTION"));
         assertTrue(sql.contains("06_BLOCKER_RECONCILIATION_SUMMARY"));
         assertTrue(sql.contains("MATCHES_REVIEW_INVENTORY"));
@@ -325,22 +326,77 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
         assertTrue(instances.contains("DateNonEngagementLetterSent"));
         assertTrue(instances.contains("WHERE v.MismatchReason IS NOT NULL;"));
         assertFalse(instances.contains("IsDeleted"), "deleted cases must remain in workflow mismatch diagnostics");
-        assertTrue(sql.contains("COUNT_BIG(*) WorkflowMismatchInstanceCount FROM #WorkflowMismatches"));
-        assertTrue(sql.contains("@WorkflowMismatchCaseCount WorkflowMismatchCaseCount"));
-        assertTrue(sql.contains("@WorkflowMismatchInstanceCount WorkflowMismatchInstanceCount"));
+        assertTrue(sql.contains("COUNT_BIG(*) WorkflowAnomalyInstanceCount FROM #WorkflowMismatches"));
+        assertTrue(sql.contains("@FlagSetDateMissingCount FlagSetDateMissingCount"));
+        assertTrue(sql.contains("@DatePresentFlagNotSetCount DatePresentFlagNotSetCount"));
     }
 
-    @Test void blockerWorkflowCaseCountUsesTheExactPreflightPredicate() throws Exception {
-        String preflight = Files.readString(PREFLIGHT).replaceAll("\\s+", "");
-        String details = Files.readString(BLOCKER_DETAILS).replaceAll("\\s+", "");
-        String predicate = "WHERE(ISNULL(FeeAgreementSigned,0)=1ANDDateFeeAgreementSignedISNULL)"
-                + "OR(ISNULL(FeeAgreementSigned,0)=0ANDDateFeeAgreementSignedISNOTNULL)"
-                + "OR(ISNULL(NonEngagementLetterSent,0)=1ANDDateNonEngagementLetterSentISNULL)"
-                + "OR(ISNULL(NonEngagementLetterSent,0)=0ANDDateNonEngagementLetterSentISNOTNULL)";
-        assertTrue(preflight.contains(predicate), "reviewed preflight workflow predicate changed");
-        assertTrue(details.contains(predicate), "diagnostic must use the exact case-level preflight predicate");
-        assertTrue(details.contains("COUNT_BIG(*)FROMdbo.Cases" + predicate));
-        assertTrue(details.contains("@WorkflowMismatchCaseCount=@ExpectedWorkflowMismatchCaseCount"));
+    @Test void workflowAnomaliesAreReportedSeparatelyAndDoNotBlockValidDates() throws Exception {
+        String preflight = Files.readString(PREFLIGHT);
+        String backfill = Files.readString(BACKFILL);
+        String validation = Files.readString(VALIDATION);
+        String details = Files.readString(BLOCKER_DETAILS);
+        for (String sql : new String[] {preflight, details}) {
+            assertTrue(sql.contains("FLAG_SET_DATE_MISSING"));
+            assertTrue(sql.contains("DATE_PRESENT_FLAG_NOT_SET"));
+        }
+        assertTrue(preflight.contains("FlagSetDateMissingCount"));
+        assertTrue(preflight.contains("DatePresentFlagNotSetCount"));
+        assertFalse(preflight.contains("+@ActorMismatch+@Workflow"));
+        assertFalse(backfill.contains("Workflow flag/date mismatches block backfill"));
+        assertTrue(details.contains("@ExpectedFlagSetDateMissingCount bigint = 610"));
+    }
+
+    @Test void phase1aContractAndCanonicalDiscoveryKeyAreReused() throws Exception {
+        String combined = Files.readString(PREFLIGHT) + Files.readString(SEED_TYPES)
+                + Files.readString(BACKFILL) + Files.readString(VALIDATION) + Files.readString(BLOCKER_DETAILS);
+        assertTrue(combined.contains("date_of_injury',N'Date of Injury','MILESTONE"));
+        assertTrue(combined.contains("date_of_medical_negligence',N'Date of Medical Negligence','MILESTONE"));
+        assertTrue(combined.contains("tort_notice_deadline',N'Tort Notice Deadline','NOTICE"));
+        assertTrue(combined.contains("date_medical_negligence_discovered"));
+        assertFalse(combined.contains("N'medical_negligence_discovered',N'Medical Negligence Discovered'"));
+    }
+
+    @Test void discardedDraftAliasDefinitionsAndOccurrencesBlockEveryMigrationStage() throws Exception {
+        String preflight = Files.readString(PREFLIGHT);
+        String seed = Files.readString(SEED_TYPES);
+        String backfill = Files.readString(BACKFILL);
+        String validation = Files.readString(VALIDATION);
+        for (String sql : new String[] {preflight, seed, backfill, validation}) {
+            assertTrue(sql.contains("SystemKey=N'medical_negligence_discovered'"));
+            assertTrue(sql.contains("JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId"));
+        }
+        assertTrue(preflight.contains("SET @SeedBlockers=@SeedBlockers+@DraftAliasDefinitionCount+@DraftAliasOccurrenceCount"));
+        assertTrue(preflight.contains("DraftAliasDefinitionCount,@DraftAliasOccurrenceCount DraftAliasOccurrenceCount"));
+        assertTrue(seed.contains("THROW 56106"));
+        assertTrue(backfill.contains("THROW 56217"));
+        assertTrue(validation.contains("@DraftAliasDefinitionCount+@DraftAliasOccurrenceCount"));
+        assertTrue(validation.contains("IF @BlockerCount<>0 THROW"));
+    }
+
+    @Test void discardedAliasScanCoversEveryOwnerAndLifecycleState() throws Exception {
+        for (Path path : new Path[] {PREFLIGHT, SEED_TYPES, BACKFILL, VALIDATION, BLOCKER_DETAILS}) {
+            String sql = Files.readString(path);
+            int aliasScan = sql.indexOf("FROM dbo.CaseDateTypes WHERE SystemKey=N'medical_negligence_discovered'");
+            assertTrue(aliasScan >= 0, path + " must scan global and tenant definitions");
+            String definitionPredicate = sql.substring(aliasScan,
+                    Math.min(sql.length(), aliasScan + 100));
+            assertFalse(definitionPredicate.contains("ShaleClientId"), path + " must not exclude global or tenant definitions");
+            assertFalse(definitionPredicate.contains("IsActive"), path + " must include active and inactive definitions");
+            assertFalse(definitionPredicate.contains("IsDeleted"), path + " must include deleted definitions");
+        }
+    }
+
+    @Test void bothDiagnosticsReportNonPhiDraftAliasAggregates() throws Exception {
+        Path combinedResults = resolve("docs/sql/2026-08-06_case_dates_legacy_phase3b_blocker_details_combined_results.sql");
+        for (Path path : new Path[] {BLOCKER_DETAILS, combinedResults}) {
+            String sql = Files.readString(path);
+            assertTrue(sql.contains("00_DRAFT_SYSTEMKEY_COLLISION"));
+            assertTrue(sql.contains("DraftAliasDefinitionCount"));
+            assertTrue(sql.contains("DraftAliasOccurrenceCount"));
+            assertFalse(sql.contains("SELECT cd.*"));
+            assertFalse(sql.contains("SELECT t.Name"));
+        }
     }
 
     @Test void packageDoesNotClearDropCalendarWriteOrChangeRuntimeStatusHistory() throws Exception {
