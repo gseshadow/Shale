@@ -54,7 +54,7 @@ class CaseDatesFoundationMigrationTest {
         assertTrue(verification.contains("Cross-tenant") || verification.contains("c.ShaleClientId <> cd.ShaleClientId"));
         assertTrue(architecture.contains("The unified calendar is a projection hub, not the owner of dates."));
         assertTrue(architecture.contains("Other domains must not copy their dates into `CalendarEvents`"));
-        assertTrue(architecture.contains("Existing fixed legal/factual `Cases` columns remain authoritative temporarily"));
+        assertTrue(architecture.contains("`CaseDates` is authoritative for migrated data; legacy columns are retained temporarily for rollback/history and explicitly deferred compatibility callers"));
         assertTrue(architecture.contains("Workflow/lifecycle dates"));
     }
 
