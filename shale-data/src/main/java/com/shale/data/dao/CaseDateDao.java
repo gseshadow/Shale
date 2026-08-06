@@ -16,12 +16,29 @@ import java.util.*;
 import com.shale.core.model.MigratedCaseDateKey;
 import com.shale.core.model.CompatibilityCaseDateMutation;
 import com.shale.core.model.CompatibilityCaseDateState;
+import com.shale.core.model.CaseDateAggregateCommand;
+import com.shale.core.model.CaseDateAggregateResult;
 
 public final class CaseDateDao {
     private final DbSessionProvider db;
     private final PhiAuditService phiAuditService;
     private final EntityActionAuditDao entityActionAuditDao = new EntityActionAuditDao();
     public CaseDateDao(DbSessionProvider db) { this.db = Objects.requireNonNull(db, "db"); this.phiAuditService = new PhiAuditService(new AuditLogDao(db)); }
+
+    /** Public aggregate boundary used by the converted desktop editor. */
+    public CaseDateAggregateResult mutateMigratedCompatibilityDates(CaseDateAggregateCommand command) {
+        new CaseAggregateTransaction(db).execute(con -> { mutateMigratedCompatibilityDates(con, command); return null; });
+        Map<MigratedCaseDateKey, CompatibilityCaseDateState> refreshed = listMigratedCompatibilityStateForCase(
+                command.caseId(), command.shaleClientId(), command.actorUserId());
+        byte[] rowVer = readCaseRowVer(command.caseId(), command.shaleClientId(), command.actorUserId());
+        return new CaseDateAggregateResult(rowVer, refreshed);
+    }
+
+    private byte[] readCaseRowVer(long caseId,int tenant,int actor){try(Connection con=db.requireConnection()){
+        verifyTenant(con,tenant);validateActor(con,tenant,actor);
+        try(PreparedStatement ps=con.prepareStatement("SELECT RowVer FROM dbo.Cases WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){ps.setLong(1,caseId);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){if(rs.next())return rs.getBytes(1);}}
+        throw new IllegalArgumentException("Case is not available for this tenant.");
+    }catch(SQLException e){throw fail(e);}}
 
     public List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int tenant, int actor) {
         String sql = """
@@ -114,6 +131,116 @@ public final class CaseDateDao {
                             date.id(), date.rowVer(), null));
         }
         return Collections.unmodifiableMap(result);
+    }
+
+    /**
+     * Connection-accepting aggregate participant. It deliberately performs no
+     * transaction or connection lifecycle operation and touches the case once,
+     * after all occurrence writes, only when at least one intent changed data.
+     */
+    public void mutateMigratedCompatibilityDates(Connection con, CaseDateAggregateCommand command) throws SQLException {
+        Objects.requireNonNull(con, "connection"); Objects.requireNonNull(command, "command");
+        verifyTenant(con, command.shaleClientId());
+        validateActor(con, command.shaleClientId(), command.actorUserId());
+        byte[] lockedCaseRowVer = lockCaseRow(con, command.shaleClientId(), command.caseId());
+        if (!Arrays.equals(lockedCaseRowVer, command.expectedCaseRowVer()))
+            throw new IllegalStateException("Case changed; reload before saving.");
+
+        boolean changed = false;
+        for (MigratedCaseDateKey key : MigratedCaseDateKey.values()) {
+            CompatibilityCaseDateMutation mutation = command.dates().get(key);
+            if (mutation instanceof CompatibilityCaseDateMutation.Unchanged) continue;
+            List<SingletonMutationRow> active = lockSingleton(con, command.shaleClientId(), command.caseId(), key.systemKey());
+            if (active.size() > 1) throw new IllegalStateException("Duplicate active Case Date singleton: " + key.systemKey());
+            if (mutation instanceof CompatibilityCaseDateMutation.Create create) {
+                if (!Arrays.equals(lockedCaseRowVer, create.expectedAbsent().observedCaseRowVer()))
+                    throw new IllegalStateException("Case changed since absence was observed; reload before saving.");
+                if (!active.isEmpty()) throw new IllegalStateException("Case Date appeared since it was loaded; reload before saving.");
+                long id = insertMappedOccurrence(con, command, key, create.value());
+                auditOccurrenceCreate(con, command, id, create.value());
+            } else {
+                if (active.isEmpty()) throw new IllegalStateException("Case Date is missing or deleted; reload before saving.");
+                SingletonMutationRow row = active.get(0);
+                long occurrenceId = mutation instanceof CompatibilityCaseDateMutation.Update u ? u.occurrenceId()
+                        : ((CompatibilityCaseDateMutation.Clear) mutation).occurrenceId();
+                byte[] expected = mutation instanceof CompatibilityCaseDateMutation.Update u ? u.expectedRowVer()
+                        : ((CompatibilityCaseDateMutation.Clear) mutation).expectedRowVer();
+                if (row.id() != occurrenceId || !Arrays.equals(row.rowVer(), expected))
+                    throw new IllegalStateException("Case Date changed; reload before saving.");
+                if (mutation instanceof CompatibilityCaseDateMutation.Update update)
+                    updateMappedOccurrence(con, command, row, update.value());
+                else clearMappedOccurrence(con, command, row);
+            }
+            changed = true;
+        }
+        if (changed) touchCase(con, command.caseId(), command.shaleClientId());
+    }
+
+    private static byte[] lockCaseRow(Connection con, int tenant, long caseId) throws SQLException {
+        try (PreparedStatement ps = con.prepareStatement("SELECT RowVer FROM dbo.Cases WITH (UPDLOCK,HOLDLOCK) WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")) {
+            ps.setLong(1, caseId); ps.setInt(2, tenant);
+            try (ResultSet rs = ps.executeQuery()) { if (rs.next()) return rs.getBytes(1); }
+        }
+        throw new IllegalArgumentException("Case is not available for this tenant.");
+    }
+
+    private record SingletonMutationRow(long id, int typeId, LocalDateTime startsAt, LocalDateTime endsAt,
+            boolean allDay, String notes, byte[] rowVer) {}
+
+    private static List<SingletonMutationRow> lockSingleton(Connection con, int tenant, long caseId, String systemKey) throws SQLException {
+        if (MigratedCaseDateKey.DISCARDED_ALIAS.equals(systemKey)) throw new IllegalArgumentException("Discarded alias is not supported.");
+        String sql = """
+                SELECT cd.Id,cd.CaseDateTypeId,cd.StartsAt,cd.EndsAt,cd.AllDay,cd.Notes,cd.RowVer
+                FROM dbo.CaseDates cd WITH (UPDLOCK,HOLDLOCK)
+                JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
+                WHERE cd.ShaleClientId=? AND cd.CaseId=? AND cd.IsDeleted=0 AND t.SystemKey=?
+                  AND (t.ShaleClientId=? OR t.ShaleClientId IS NULL)
+                """;
+        try (PreparedStatement ps=con.prepareStatement(sql)) {
+            ps.setInt(1,tenant); ps.setLong(2,caseId); ps.setString(3,systemKey); ps.setInt(4,tenant);
+            try(ResultSet rs=ps.executeQuery()) { List<SingletonMutationRow> rows=new ArrayList<>(); while(rs.next())
+                rows.add(new SingletonMutationRow(rs.getLong(1),rs.getInt(2),ldt(rs,"StartsAt"),ldt(rs,"EndsAt"),rs.getBoolean(5),rs.getString(6),rs.getBytes(7))); return rows; }
+        }
+    }
+
+    private static int requireEffectiveMappedType(Connection con, int tenant, MigratedCaseDateKey key) throws SQLException {
+        String sql="""
+                SELECT TOP (1) Id FROM dbo.CaseDateTypes WHERE SystemKey=? AND IsDeleted=0 AND IsActive=1
+                AND (ShaleClientId=? OR ShaleClientId IS NULL) ORDER BY CASE WHEN ShaleClientId=? THEN 0 ELSE 1 END,Id
+                """;
+        try(PreparedStatement ps=con.prepareStatement(sql)){ps.setString(1,key.systemKey());ps.setInt(2,tenant);ps.setInt(3,tenant);
+            try(ResultSet rs=ps.executeQuery()){if(rs.next())return rs.getInt(1);}}
+        throw new IllegalStateException("No effective Case Date type for " + key.systemKey());
+    }
+
+    private static long insertMappedOccurrence(Connection con, CaseDateAggregateCommand c, MigratedCaseDateKey key, CompatibilityCaseDateMutation.Value v)throws SQLException{
+        int typeId=requireEffectiveMappedType(con,c.shaleClientId(),key);
+        try(PreparedStatement ps=con.prepareStatement("INSERT dbo.CaseDates (ShaleClientId,CaseId,CaseDateTypeId,StartsAt,EndsAt,AllDay,CreatedAt,CreatedByUserId) OUTPUT INSERTED.Id VALUES (?,?,?,?,?,?,SYSUTCDATETIME(),?)")){
+            ps.setInt(1,c.shaleClientId());ps.setLong(2,c.caseId());ps.setInt(3,typeId);setLdt(ps,4,v.startsAt());setLdt(ps,5,v.endsAt());ps.setBoolean(6,v.allDay());ps.setInt(7,c.actorUserId());
+            try(ResultSet rs=ps.executeQuery()){if(rs.next())return rs.getLong(1);}}
+        throw new IllegalStateException("Case Date was not created.");
+    }
+
+    private void auditOccurrenceCreate(Connection con,CaseDateAggregateCommand c,long id,CompatibilityCaseDateMutation.Value v)throws SQLException{
+        audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),id,EntityActionAuditEvent.Action.CREATED);
+        phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","StartsAt",id,v.startsAt());
+        phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","EndsAt",id,v.endsAt());
+    }
+
+    private void updateMappedOccurrence(Connection con,CaseDateAggregateCommand c,SingletonMutationRow row,CompatibilityCaseDateMutation.Value v)throws SQLException{
+        try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.CaseDates SET StartsAt=?,EndsAt=?,AllDay=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=0 AND RowVer=?")){
+            setLdt(ps,1,v.startsAt());setLdt(ps,2,v.endsAt());ps.setBoolean(3,v.allDay());ps.setInt(4,c.actorUserId());ps.setLong(5,row.id());ps.setInt(6,c.shaleClientId());ps.setLong(7,c.caseId());ps.setBytes(8,row.rowVer());if(ps.executeUpdate()!=1)throw new IllegalStateException("Case Date changed; reload before saving.");}
+        audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),row.id(),EntityActionAuditEvent.Action.UPDATED);
+        phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","StartsAt",row.id(),row.startsAt(),v.startsAt());
+        phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","EndsAt",row.id(),row.endsAt(),v.endsAt());
+    }
+
+    private void clearMappedOccurrence(Connection con,CaseDateAggregateCommand c,SingletonMutationRow row)throws SQLException{
+        try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.CaseDates SET IsDeleted=1,DeletedAt=SYSUTCDATETIME(),DeletedByUserId=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=0 AND RowVer=?")){
+            ps.setInt(1,c.actorUserId());ps.setInt(2,c.actorUserId());ps.setLong(3,row.id());ps.setInt(4,c.shaleClientId());ps.setLong(5,c.caseId());ps.setBytes(6,row.rowVer());if(ps.executeUpdate()!=1)throw new IllegalStateException("Case Date changed; reload before saving.");}
+        audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),row.id(),EntityActionAuditEvent.Action.DELETED);
+        phiAuditService.auditDelete(con,c.actorUserId(),"CaseDates","StartsAt",row.id(),row.startsAt());
+        phiAuditService.auditDelete(con,c.actorUserId(),"CaseDates","EndsAt",row.id(),row.endsAt());
     }
 
     public List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int tenant, int actor) {

@@ -19,6 +19,11 @@ import com.shale.core.dto.CaseLinkContactOptionDto;
 import com.shale.core.dto.CasePartyEntityOptionDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.PracticeAreaDto;
+import com.shale.core.model.CaseDateAggregateCommand;
+import com.shale.core.model.CaseDateAggregateResult;
+import com.shale.core.model.CompatibilityCaseDateState;
+import com.shale.core.model.MigratedCaseDateKey;
+import java.util.Map;
 
 /**
  * Shared case application boundary for future desktop/server adapters.
@@ -60,6 +65,15 @@ public interface CaseServicePort {
 	List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int shaleClientId, int actorUserId);
 
 	Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId);
+
+	/** Authoritative snapshot used by the existing-case desktop compatibility-date editors. */
+	default Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(
+			long caseId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkOperation("listMigratedCompatibilityStateForCase"); }
+
+	/** Atomic nine-slot mutation; this boundary never writes legacy dbo.Cases date columns. */
+	default CaseDateAggregateResult mutateMigratedCompatibilityDates(CaseDateAggregateCommand command) {
+		throw unsupportedCaseLinkOperation("mutateMigratedCompatibilityDates");
+	}
 
 	CaseDateDto createCaseDate(CreateCaseDateCommand command);
 
