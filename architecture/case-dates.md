@@ -1,8 +1,8 @@
 # Case Dates Architecture
 
-*Last updated: 2026-08-04*
+*Last updated: 2026-08-06*
 
-Case dates are authoritative legal and factual dates attached to cases. Phases 1A through 1C are the foundation: `CaseDateTypes` and `CaseDates` schema/RLS/constraints/seeds, effective selector and historical read models, and actor-aware occurrence mutations. Phases 2A and 2B complete date-type administration before Phase 2C Case View occurrence management is treated as complete. Phase 3A is complete; no later Phase 3 migration or cutover phase has begun.
+Case dates are authoritative legal and factual dates attached to cases. Phases 1A through 1C are the foundation: `CaseDateTypes` and `CaseDates` schema/RLS/constraints/seeds, effective selector and historical read models, and actor-aware occurrence mutations. Phases 2A and 2B complete date-type administration before Phase 2C Case View occurrence management is treated as complete. Phase 3A projection, Phase 3B backfill, and Phase 3C post-validation are complete. Phase 3D post-migration runtime cutover has begun with an inventory and plan; no runtime implementation change is authorized by that inventory.
 
 ## Ownership model
 
@@ -11,8 +11,8 @@ Case dates are authoritative legal and factual dates attached to cases. Phases 1
 * `CalendarEvents` remains the store for manually created user/calendar events.
 * The unified calendar is a projection hub, not the owner of dates.
 * Other domains must not copy their dates into `CalendarEvents`; Tasks own task due dates, Material Requests own request/follow-up dates, workflow fields on Cases own lifecycle dates, and CalendarEvents owns manual events.
-* Existing fixed legal/factual `Cases` columns remain authoritative temporarily until a later explicitly verified migration moves them into `CaseDates`.
-* Workflow/lifecycle dates such as accepted, denied, closed, fee-agreement signed, and non-engagement letter sent remain separate unless deliberately reclassified in a later phase.
+* For the nine migrated meanings, `CaseDates` is the target authoritative runtime source. The fixed `Cases` columns are retained temporarily for rollback/history only and must not be changed or removed during runtime cutover. Runtime conversion is gated by the Phase 3D inventory and regression plan.
+* Accepted, denied, and closed lifecycle dates remain separate. Fee-agreement and non-engagement flags also remain workflow-owned, while their migrated paired date occurrences are represented by `CaseDates`; a flag never fabricates a missing date.
 
 ## Tenant, overlay, and calendar security
 
@@ -233,7 +233,9 @@ Because the legacy columns are SQL `date` fields, the projected values are effec
 
 ### Migration strategy analysis and smallest safe future sequence
 
-Repository evidence supports treating only the legal/factual fields as immediate migration candidates: `StatuteOfLimitations`, `TortNoticeDeadline`, `DiscoveryDeadline`, `DateOfInjury`, `DateOfMedicalNegligence`, and `DateMedicalNegligenceWasDiscovered`. The safest next phase should not backfill or cut over workflow-owned timestamps. It should first resolve product decisions and collect production aggregates.
+> **Historical pre-Phase 3B record:** the audit, alternatives, and proposed sequence below explain how the migration package was selected. Phase 3B and Phase 3C have since completed successfully and supersede its future-tense status. The current Phase 3D scope and gates are recorded in `case-dates-runtime-cutover-inventory.md`.
+
+Repository evidence supported treating only the legal/factual fields as immediate migration candidates before the final approved nine-field mapping expanded the scope. The safest next phase at that time did not backfill or cut over workflow-owned timestamps and first required product decisions and production aggregates.
 
 Strategy comparison:
 
@@ -323,6 +325,8 @@ Rollback boundary: the CaseDateTypes and CaseDates scripts are idempotent, but t
 
 
 ### Mixed-version compatibility rule
+
+The rule below was written before the completed backfill and remains a Phase 3D release gate: authority cannot cut over while a supported legacy-only client can still perform normal writes. The Phase 3D plan does not authorize a compatibility dual-write; supported-client upgrade/enforcement must be decided explicitly before implementation deployment.
 
 No new reader may depend exclusively on `CaseDates` while any supported deployed client can still write exclusively to the legacy `dbo.Cases` columns. Phase 3B and Phase 3C do not change runtime authority: legacy `dbo.Cases` fields remain authoritative, and the existing desktop and web applications must continue working unchanged. Backfill alone does not authorize reader or writer cutover. A later compatibility release must cover desktop, server/API, and web together, and that release will require a deliberately designed synchronization strategy for mixed versions rather than an accidental dual-write or fallback-read behavior. Legacy columns remain physically present throughout migration preparation, compatibility deployment, upgrade completion, reconciliation, and soak. Physical removal is a separate final contract phase after all supported desktop clients are upgraded and all desktop, web, API, report, export, and calendar dependencies are gone.
 
