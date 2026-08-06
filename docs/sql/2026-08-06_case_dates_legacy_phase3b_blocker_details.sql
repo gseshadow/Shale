@@ -12,6 +12,9 @@ DECLARE @ExpectedUnresolvedSourceCount bigint = NULL; -- informational count dep
 DECLARE @ExpectedFlagSetDateMissingCount bigint = 610;
 IF OBJECT_ID(N'dbo.Cases', N'U') IS NULL THROW 56400, 'Missing dbo.Cases.', 1;
 IF OBJECT_ID(N'dbo.CaseDateTypes', N'U') IS NULL THROW 56401, 'Missing dbo.CaseDateTypes.', 1;
+IF OBJECT_ID(N'dbo.CaseDates', N'U') IS NULL THROW 56402, 'Missing dbo.CaseDates.', 1;
+DECLARE @DraftAliasDefinitionCount bigint=(SELECT COUNT_BIG(*) FROM dbo.CaseDateTypes WHERE SystemKey=N'medical_negligence_discovered');
+DECLARE @DraftAliasOccurrenceCount bigint=(SELECT COUNT_BIG(*) FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId WHERE t.SystemKey=N'medical_negligence_discovered');
 
 SELECT v.SystemKey, v.ExpectedName, v.ExpectedCategory, v.ExpectedSupportsTime INTO #ExpectedTypes
 FROM (VALUES
@@ -71,6 +74,7 @@ SELECT c.ShaleClientId,v.FieldName,v.SystemKey,v.MismatchReason INTO #WorkflowMi
  (N'DateNonEngagementLetterSent',N'non_engagement_letter_sent',CASE WHEN ISNULL(c.NonEngagementLetterSent,0)=1 AND c.DateNonEngagementLetterSent IS NULL THEN N'FLAG_SET_DATE_MISSING' WHEN ISNULL(c.NonEngagementLetterSent,0)=0 AND c.DateNonEngagementLetterSent IS NOT NULL THEN N'DATE_PRESENT_FLAG_NOT_SET' END)
 )v(FieldName,SystemKey,MismatchReason) WHERE v.MismatchReason IS NOT NULL;
 
+SELECT N'00_DRAFT_SYSTEMKEY_COLLISION' SectionName,@DraftAliasDefinitionCount DraftAliasDefinitionCount,@DraftAliasOccurrenceCount DraftAliasOccurrenceCount;
 SELECT N'01_SEED_BLOCKERS' SectionName,SystemKey,BlockerReason,SUM(AffectedDefinitions) AffectedDefinitionCount FROM #SeedBlockerReasons GROUP BY SystemKey,BlockerReason ORDER BY SystemKey,BlockerReason;
 SELECT N'02_EXPECTED_MISSING_GLOBAL_TYPES' SectionName,SystemKey,N'EXPECTED_MISSING_SEED_MAY_CREATE' Classification FROM #GlobalSeedProfile WHERE GlobalDefinitionCount=0 ORDER BY SystemKey;
 SELECT N'03_UNRESOLVED_LEGACY_SOURCES' SectionName,s.ShaleClientId,s.FieldName,s.SystemKey,COUNT_BIG(*) UnresolvedSourceCount FROM #LegacySources s LEFT JOIN #EffectiveTypes e ON e.ShaleClientId=s.ShaleClientId AND e.SystemKey=s.SystemKey WHERE e.SelectedCaseDateTypeId IS NULL OR ISNULL(e.NonDeletedTenantCount,0)>1 OR e.GlobalCount<>1 OR ISNULL(e.SelectedIsActive,0)<>1 OR ISNULL(e.SelectedIsDeleted,0)<>0 OR e.BlockerReason IN (N'CATEGORY_CONFLICT',N'SUPPORTS_TIME_CONFLICT') GROUP BY s.ShaleClientId,s.FieldName,s.SystemKey ORDER BY s.ShaleClientId,s.FieldName,s.SystemKey;
@@ -80,6 +84,7 @@ SELECT N'05_EFFECTIVE_TYPE_RESOLUTION' SectionName,ShaleClientId,SystemKey,Selec
  CASE WHEN BlockerReason=N'NONE' THEN N'COMPATIBLE' ELSE N'BLOCKED' END CompatibilityStatus,BlockerReason FROM #EffectiveTypes ORDER BY ShaleClientId,SystemKey;
 
 DECLARE @SeedBlockerCount bigint=(SELECT COUNT_BIG(*) FROM #GlobalSeedProfile WHERE GlobalDefinitionCount>1 OR ExactNameConflictCount>0 OR CategoryConflictCount>0 OR SupportsTimeConflictCount>0 OR InactiveCount>0 OR DeletedCount>0);
+SET @SeedBlockerCount=@SeedBlockerCount+@DraftAliasDefinitionCount+@DraftAliasOccurrenceCount;
 DECLARE @MissingSeedableCount bigint=(SELECT COUNT_BIG(*) FROM #GlobalSeedProfile WHERE GlobalDefinitionCount=0);
 DECLARE @UnresolvedSourceCount bigint=(SELECT COUNT_BIG(*) FROM #LegacySources s LEFT JOIN #EffectiveTypes e ON e.ShaleClientId=s.ShaleClientId AND e.SystemKey=s.SystemKey WHERE e.SelectedCaseDateTypeId IS NULL OR ISNULL(e.NonDeletedTenantCount,0)>1 OR e.GlobalCount<>1 OR ISNULL(e.SelectedIsActive,0)<>1 OR ISNULL(e.SelectedIsDeleted,0)<>0 OR e.BlockerReason IN (N'CATEGORY_CONFLICT',N'SUPPORTS_TIME_CONFLICT'));
 /* Match PREFLIGHT_VALIDATION_SUMMARY exactly: one count per case satisfying either workflow mismatch. */
@@ -87,7 +92,7 @@ DECLARE @FlagSetDateMissingCount bigint=(SELECT COUNT_BIG(*) FROM #WorkflowMisma
 DECLARE @DatePresentFlagNotSetCount bigint=(SELECT COUNT_BIG(*) FROM #WorkflowMismatches WHERE MismatchReason=N'DATE_PRESENT_FLAG_NOT_SET');
 DECLARE @WorkflowAnomalyInstanceCount bigint=(SELECT COUNT_BIG(*) FROM #WorkflowMismatches);
 SELECT N'06_BLOCKER_RECONCILIATION_SUMMARY' SectionName,@SeedBlockerCount SeedBlockerCount,@ExpectedSeedBlockerCount ExpectedSeedBlockerCount,
- @MissingSeedableCount ExpectedMissingTypesSeedMayCreate,@ExpectedMissingSeedableCount ReviewedExpectedMissingTypesSeedMayCreate,
+ @DraftAliasDefinitionCount DraftAliasDefinitionCount,@DraftAliasOccurrenceCount DraftAliasOccurrenceCount,@MissingSeedableCount ExpectedMissingTypesSeedMayCreate,@ExpectedMissingSeedableCount ReviewedExpectedMissingTypesSeedMayCreate,
  @UnresolvedSourceCount UnresolvedSourceCount,@ExpectedUnresolvedSourceCount ExpectedUnresolvedSourceCount,
  @FlagSetDateMissingCount FlagSetDateMissingCount,@ExpectedFlagSetDateMissingCount ExpectedFlagSetDateMissingCount,@DatePresentFlagNotSetCount DatePresentFlagNotSetCount,
  @WorkflowAnomalyInstanceCount WorkflowAnomalyInstanceCount,

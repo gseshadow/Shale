@@ -8,6 +8,7 @@ IF OBJECT_ID(N'dbo.CaseDateTypes',N'U') IS NULL THROW 56202,'Missing dbo.CaseDat
 IF COL_LENGTH(N'dbo.CaseDates',N'IsDeleted') IS NULL THROW 56203,'Expected dbo.CaseDates.IsDeleted.',1;
 IF SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL OR (ISNULL(IS_SRVROLEMEMBER(N'sysadmin'),0)<>1 AND ISNULL(IS_MEMBER(N'db_owner'),0)<>1) THROW 56211,'All-tenant administrative visibility is required; ShaleClientId session context must be NULL.',1;
 IF @OperatorVerifiedAllTenantVisibility<>1 THROW 56216,'Operator-verified all-tenant visibility is required before backfill.',1;
+IF EXISTS(SELECT 1 FROM dbo.CaseDateTypes WHERE SystemKey=N'medical_negligence_discovered') OR EXISTS(SELECT 1 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId WHERE t.SystemKey=N'medical_negligence_discovered') THROW 56217,'Discarded medical-negligence discovery SystemKey requires separately reviewed reconciliation.',1;
 DECLARE @MigrationActors TABLE(ShaleClientId int NOT NULL PRIMARY KEY,CreatedByUserId int NOT NULL);
 -- REQUIRED: explicitly populate one same-tenant actor for every participating tenant.
 DECLARE @ExpectedTypes TABLE(SystemKey nvarchar(64) NOT NULL PRIMARY KEY, Name nvarchar(100) NOT NULL, CalendarCategory varchar(32) NOT NULL, SupportsTime bit NOT NULL);

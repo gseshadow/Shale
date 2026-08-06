@@ -354,7 +354,49 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
         assertTrue(combined.contains("date_of_medical_negligence',N'Date of Medical Negligence','MILESTONE"));
         assertTrue(combined.contains("tort_notice_deadline',N'Tort Notice Deadline','NOTICE"));
         assertTrue(combined.contains("date_medical_negligence_discovered"));
-        assertFalse(combined.contains("N'medical_negligence_discovered'"));
+        assertFalse(combined.contains("N'medical_negligence_discovered',N'Medical Negligence Discovered'"));
+    }
+
+    @Test void discardedDraftAliasDefinitionsAndOccurrencesBlockEveryMigrationStage() throws Exception {
+        String preflight = Files.readString(PREFLIGHT);
+        String seed = Files.readString(SEED_TYPES);
+        String backfill = Files.readString(BACKFILL);
+        String validation = Files.readString(VALIDATION);
+        for (String sql : new String[] {preflight, seed, backfill, validation}) {
+            assertTrue(sql.contains("SystemKey=N'medical_negligence_discovered'"));
+            assertTrue(sql.contains("JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId"));
+        }
+        assertTrue(preflight.contains("SET @SeedBlockers=@SeedBlockers+@DraftAliasDefinitionCount+@DraftAliasOccurrenceCount"));
+        assertTrue(preflight.contains("DraftAliasDefinitionCount,@DraftAliasOccurrenceCount DraftAliasOccurrenceCount"));
+        assertTrue(seed.contains("THROW 56106"));
+        assertTrue(backfill.contains("THROW 56217"));
+        assertTrue(validation.contains("@DraftAliasDefinitionCount+@DraftAliasOccurrenceCount"));
+        assertTrue(validation.contains("IF @BlockerCount<>0 THROW"));
+    }
+
+    @Test void discardedAliasScanCoversEveryOwnerAndLifecycleState() throws Exception {
+        for (Path path : new Path[] {PREFLIGHT, SEED_TYPES, BACKFILL, VALIDATION, BLOCKER_DETAILS}) {
+            String sql = Files.readString(path);
+            int aliasScan = sql.indexOf("FROM dbo.CaseDateTypes WHERE SystemKey=N'medical_negligence_discovered'");
+            assertTrue(aliasScan >= 0, path + " must scan global and tenant definitions");
+            String definitionPredicate = sql.substring(aliasScan,
+                    Math.min(sql.length(), aliasScan + 100));
+            assertFalse(definitionPredicate.contains("ShaleClientId"), path + " must not exclude global or tenant definitions");
+            assertFalse(definitionPredicate.contains("IsActive"), path + " must include active and inactive definitions");
+            assertFalse(definitionPredicate.contains("IsDeleted"), path + " must include deleted definitions");
+        }
+    }
+
+    @Test void bothDiagnosticsReportNonPhiDraftAliasAggregates() throws Exception {
+        Path combinedResults = resolve("docs/sql/2026-08-06_case_dates_legacy_phase3b_blocker_details_combined_results.sql");
+        for (Path path : new Path[] {BLOCKER_DETAILS, combinedResults}) {
+            String sql = Files.readString(path);
+            assertTrue(sql.contains("00_DRAFT_SYSTEMKEY_COLLISION"));
+            assertTrue(sql.contains("DraftAliasDefinitionCount"));
+            assertTrue(sql.contains("DraftAliasOccurrenceCount"));
+            assertFalse(sql.contains("SELECT cd.*"));
+            assertFalse(sql.contains("SELECT t.Name"));
+        }
     }
 
     @Test void packageDoesNotClearDropCalendarWriteOrChangeRuntimeStatusHistory() throws Exception {

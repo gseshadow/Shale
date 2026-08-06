@@ -12,6 +12,9 @@ DECLARE @ExpectedUnresolvedSourceCount bigint = NULL; -- informational count dep
 DECLARE @ExpectedFlagSetDateMissingCount bigint = 610;
 IF OBJECT_ID(N'dbo.Cases', N'U') IS NULL THROW 56400, 'Missing dbo.Cases.', 1;
 IF OBJECT_ID(N'dbo.CaseDateTypes', N'U') IS NULL THROW 56401, 'Missing dbo.CaseDateTypes.', 1;
+IF OBJECT_ID(N'dbo.CaseDates', N'U') IS NULL THROW 56402, 'Missing dbo.CaseDates.', 1;
+DECLARE @DraftAliasDefinitionCount bigint=(SELECT COUNT_BIG(*) FROM dbo.CaseDateTypes WHERE SystemKey=N'medical_negligence_discovered');
+DECLARE @DraftAliasOccurrenceCount bigint=(SELECT COUNT_BIG(*) FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId WHERE t.SystemKey=N'medical_negligence_discovered');
 
 SELECT v.SystemKey, v.ExpectedName, v.ExpectedCategory, v.ExpectedSupportsTime INTO #ExpectedTypes
 FROM (VALUES
@@ -96,6 +99,10 @@ CREATE TABLE #DiagnosticResults (
     AuthorizationStatus nvarchar(80) NULL
 );
 
+INSERT #DiagnosticResults (SectionName,MetricName,NumericValue) VALUES
+ (N'00_DRAFT_SYSTEMKEY_COLLISION',N'DraftAliasDefinitionCount',@DraftAliasDefinitionCount),
+ (N'00_DRAFT_SYSTEMKEY_COLLISION',N'DraftAliasOccurrenceCount',@DraftAliasOccurrenceCount);
+
 INSERT #DiagnosticResults
     (SectionName,MetricName,SystemKey,DetailReason,NumericValue)
 SELECT N'01_SEED_BLOCKERS',N'AffectedDefinitionCount',SystemKey,BlockerReason,
@@ -147,6 +154,7 @@ SELECT N'05_EFFECTIVE_TYPE_RESOLUTION',N'EffectiveTypeResolution',ShaleClientId,
 FROM #EffectiveTypes;
 
 DECLARE @SeedBlockerCount bigint=(SELECT COUNT_BIG(*) FROM #GlobalSeedProfile WHERE GlobalDefinitionCount>1 OR ExactNameConflictCount>0 OR CategoryConflictCount>0 OR SupportsTimeConflictCount>0 OR InactiveCount>0 OR DeletedCount>0);
+SET @SeedBlockerCount=@SeedBlockerCount+@DraftAliasDefinitionCount+@DraftAliasOccurrenceCount;
 DECLARE @MissingSeedableCount bigint=(SELECT COUNT_BIG(*) FROM #GlobalSeedProfile WHERE GlobalDefinitionCount=0);
 DECLARE @UnresolvedSourceCount bigint=(SELECT COUNT_BIG(*) FROM #LegacySources s LEFT JOIN #EffectiveTypes e ON e.ShaleClientId=s.ShaleClientId AND e.SystemKey=s.SystemKey WHERE e.SelectedCaseDateTypeId IS NULL OR ISNULL(e.NonDeletedTenantCount,0)>1 OR e.GlobalCount<>1 OR ISNULL(e.SelectedIsActive,0)<>1 OR ISNULL(e.SelectedIsDeleted,0)<>0 OR e.BlockerReason IN (N'CATEGORY_CONFLICT',N'SUPPORTS_TIME_CONFLICT'));
 /* Match PREFLIGHT_VALIDATION_SUMMARY exactly: one count per case satisfying either workflow mismatch. */
