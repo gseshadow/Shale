@@ -235,6 +235,20 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
         assertFalse(conflictResult.matches("(?is).*(CallerDate|LegacyDate|StartsAt|EndsAt|CallerTime).*"));
     }
 
+    @Test void everyOutwardPreflightProjectionOmitsLegacyDateTimes() throws Exception {
+        String sql = Files.readString(PREFLIGHT);
+        assertTrue(sql.contains("'03_ELIGIBLE_COUNTS_BY_FIELD' SectionName,ShaleClientId,FieldName,COUNT_BIG(*) EligibleRows FROM"));
+        int[] outwardSelects = {0};
+        sql.lines().map(String::trim).filter(line -> line.startsWith("SELECT '")).forEach(line -> {
+            outwardSelects[0]++;
+            int from = line.indexOf(" FROM ");
+            String projection = from < 0 ? line : line.substring(0, from);
+            assertFalse(projection.matches("(?is).*\\b(ExpectedStartsAt|LegacyDate|CallerDate|CallerTime|StartsAt|EndsAt|EffectiveDate|AcceptedDate|DeniedDate|ClosedDate)\\b.*"),
+                    "outward preflight projection discloses a date/time: " + projection);
+        });
+        assertTrue(outwardSelects[0] >= 16, "expected every named preflight result and summary to be scanned");
+    }
+
     @Test void globalSeedRequiresAdministrativeNullTenantContext() throws Exception {
         String sql = Files.readString(SEED_TYPES);
         int guard = sql.indexOf("SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL");
@@ -243,6 +257,14 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
         assertTrue(sql.contains("IS_SRVROLEMEMBER(N'sysadmin')"));
         assertTrue(sql.contains("IS_MEMBER(N'db_owner')"));
         assertTrue(sql.contains("THROW 56104"));
+    }
+
+    @Test void standaloneStatusReportIsExplicitlySessionScoped() throws Exception {
+        String sql = Files.readString(STATUS_BLOCKER);
+        assertTrue(sql.contains("SESSION-SCOPED, NON-AUTHORITATIVE BLOCKER REPORT"));
+        assertTrue(sql.contains("@TenantId = NULL does not prove all-tenant visibility"));
+        assertTrue(sql.contains("SESSION_SCOPED_NON_AUTHORITATIVE"));
+        assertTrue(sql.contains("SESSION_CONTEXT(N'ShaleClientId')"));
     }
 
     @Test void statusBlockerUsesTenantOrGlobalStatusDefinition() throws Exception {

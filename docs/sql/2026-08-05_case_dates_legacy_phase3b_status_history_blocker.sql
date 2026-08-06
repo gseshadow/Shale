@@ -1,5 +1,9 @@
 /*
-  BLOCKER REPORT: no AcceptedDate/DeniedDate/ClosedDate status-history insert is generated.
+  SESSION-SCOPED, NON-AUTHORITATIVE BLOCKER REPORT: no
+  AcceptedDate/DeniedDate/ClosedDate status-history insert is generated.
+  @TenantId = NULL does not prove all-tenant visibility; RLS and the connection's
+  SESSION_CONTEXT still determine visible rows. Do not use this standalone report
+  as evidence of authoritative all-tenant completion.
   dbo.CaseStatuses records current/past status rows with CaseId, StatusId, EffectiveDate,
   EndDate, Notes, CreatedAt, UpdatedAt, and IsPrimary. It does not store previous status,
   actor, historical SystemKey/display label, tenant id, or explicit migration provenance.
@@ -10,7 +14,7 @@
 SET NOCOUNT ON;
 DECLARE @TenantId int = NULL;
 IF OBJECT_ID(N'dbo.CaseStatuses', N'U') IS NULL THROW 56300, 'Missing dbo.CaseStatuses.', 1;
-SELECT v.FieldName,c.ShaleClientId,COUNT_BIG(*) LegacyRows,SUM(CASE WHEN h.MatchCount=0 THEN 1 ELSE 0 END) MissingSameDateEvidence,SUM(CASE WHEN h.MatchCount>1 THEN 1 ELSE 0 END) MultipleSameDateEvidence
+SELECT N'SESSION_SCOPED_NON_AUTHORITATIVE' VisibilityScope,CONVERT(nvarchar(128),SESSION_CONTEXT(N'ShaleClientId')) SessionContextShaleClientId,v.FieldName,c.ShaleClientId,COUNT_BIG(*) LegacyRows,SUM(CASE WHEN h.MatchCount=0 THEN 1 ELSE 0 END) MissingSameDateEvidence,SUM(CASE WHEN h.MatchCount>1 THEN 1 ELSE 0 END) MultipleSameDateEvidence
 FROM dbo.Cases c CROSS APPLY (VALUES ('AcceptedDate','accepted',c.AcceptedDate),('DeniedDate','denied',c.DeniedDate),('ClosedDate','closed',c.ClosedDate)) v(FieldName,LifecycleKey,LegacyDate)
 CROSS APPLY (SELECT COUNT_BIG(*) MatchCount
              FROM dbo.CaseStatuses cs
