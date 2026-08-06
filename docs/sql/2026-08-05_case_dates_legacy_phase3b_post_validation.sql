@@ -3,6 +3,8 @@
    DateOfInjury, StatuteOfLimitations, TortNoticeDeadline, DiscoveryDeadline, DateFeeAgreementSigned,
    DateNonEngagementLetterSent. AcceptedDate, DeniedDate, and ClosedDate remain status-history blockers, not CaseDates. */
 SET NOCOUNT ON;
+DECLARE @SessionTenantId sql_variant=SESSION_CONTEXT(N'ShaleClientId');
+DECLARE @IsAdministrativePrincipal bit=CONVERT(bit,CASE WHEN ISNULL(IS_SRVROLEMEMBER(N'sysadmin'),0)=1 OR ISNULL(IS_MEMBER(N'db_owner'),0)=1 THEN 1 ELSE 0 END);
 IF OBJECT_ID(N'dbo.Cases',N'U') IS NULL THROW 56402,'Missing dbo.Cases.',1;
 IF OBJECT_ID(N'dbo.CaseDates',N'U') IS NULL THROW 56403,'Missing dbo.CaseDates.',1;
 IF OBJECT_ID(N'dbo.CaseDateTypes',N'U') IS NULL THROW 56404,'Missing dbo.CaseDateTypes.',1;
@@ -45,8 +47,10 @@ DECLARE @UnresolvedTypeCount bigint=(SELECT COUNT_BIG(*) FROM #LegacyCaseDateSou
 DECLARE @DestinationMismatchCount bigint=(SELECT COUNT_BIG(*) FROM #OccurrenceEvidence WHERE ActiveExactMatches<>1 OR ActiveSameKeyDifferentValue>0 OR RemovedExactMatches>0);
 DECLARE @OrphanCallerTimeCount bigint=(SELECT COUNT_BIG(*) FROM dbo.Cases WHERE CallerTime IS NOT NULL AND CallerDate IS NULL);
 DECLARE @WorkflowMismatchCount bigint=(SELECT COUNT_BIG(*) FROM dbo.Cases WHERE (ISNULL(FeeAgreementSigned,0)=1 AND DateFeeAgreementSigned IS NULL) OR (ISNULL(FeeAgreementSigned,0)=0 AND DateFeeAgreementSigned IS NOT NULL) OR (ISNULL(NonEngagementLetterSent,0)=1 AND DateNonEngagementLetterSent IS NULL) OR (ISNULL(NonEngagementLetterSent,0)=0 AND DateNonEngagementLetterSent IS NOT NULL));
-DECLARE @CrossTenantCount bigint=(SELECT COUNT_BIG(*) FROM dbo.CaseDates cd LEFT JOIN dbo.Cases c ON c.Id=cd.CaseId LEFT JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId WHERE c.Id IS NULL OR c.ShaleClientId<>cd.ShaleClientId OR (t.ShaleClientId IS NOT NULL AND t.ShaleClientId<>cd.ShaleClientId));
+DECLARE @CrossTenantCount bigint=(SELECT COUNT_BIG(*) FROM dbo.CaseDates cd LEFT JOIN dbo.Cases c ON c.Id=cd.CaseId LEFT JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId WHERE c.Id IS NULL OR t.Id IS NULL OR c.ShaleClientId<>cd.ShaleClientId OR (t.ShaleClientId IS NOT NULL AND t.ShaleClientId<>cd.ShaleClientId));
 DECLARE @ActorMismatchCount bigint=(SELECT COUNT_BIG(*) FROM dbo.CaseDates cd LEFT JOIN dbo.Users u ON u.Id=cd.CreatedByUserId AND u.ShaleClientId=cd.ShaleClientId WHERE u.Id IS NULL);
-DECLARE @BlockerCount bigint=@UnresolvedTypeCount+@DestinationMismatchCount+@OrphanCallerTimeCount+@WorkflowMismatchCount+@CrossTenantCount+@ActorMismatchCount;
-SELECT 'FINAL_VALIDATION_SUMMARY' SectionName,(SELECT COUNT_BIG(*) FROM #LegacyCaseDateSources) SourceRowCount,@UnresolvedTypeCount UnresolvedTypeSourceCount,@DestinationMismatchCount DestinationMismatchCount,@OrphanCallerTimeCount OrphanCallerTimeCount,@WorkflowMismatchCount WorkflowMismatchCount,@CrossTenantCount CrossTenantRelationshipCount,@ActorMismatchCount CreatedByTenantMismatchCount,@BlockerCount BlockerCount,CASE WHEN @BlockerCount=0 THEN 'SUCCESS' ELSE 'BLOCKED' END ValidationResult;
+DECLARE @ParticipatingTenantCount bigint=(SELECT COUNT_BIG(*) FROM #ParticipatingTenants),@EligibleSourceRowCount bigint=(SELECT COUNT_BIG(*) FROM #LegacyCaseDateSources);
+DECLARE @VisibilityConfirmed bit=CONVERT(bit,CASE WHEN @SessionTenantId IS NULL AND @IsAdministrativePrincipal=1 AND @ParticipatingTenantCount>0 AND @EligibleSourceRowCount>0 THEN 1 ELSE 0 END);
+DECLARE @BlockerCount bigint=(CASE WHEN @VisibilityConfirmed=1 THEN 0 ELSE 1 END)+@UnresolvedTypeCount+@DestinationMismatchCount+@OrphanCallerTimeCount+@WorkflowMismatchCount+@CrossTenantCount+@ActorMismatchCount;
+SELECT 'FINAL_VALIDATION_SUMMARY' SectionName,CONVERT(nvarchar(128),@SessionTenantId) SessionContextShaleClientId,@ParticipatingTenantCount ParticipatingTenantCount,@EligibleSourceRowCount EligibleSourceRowCount,CASE WHEN @VisibilityConfirmed=1 THEN 'ALL_TENANT_VISIBILITY_CONFIRMED' ELSE 'VISIBILITY_NOT_CONFIRMED' END VisibilityReadiness,@UnresolvedTypeCount UnresolvedTypeSourceCount,@DestinationMismatchCount DestinationMismatchCount,@OrphanCallerTimeCount OrphanCallerTimeCount,@WorkflowMismatchCount WorkflowMismatchCount,@CrossTenantCount CrossTenantOrBrokenRelationshipCount,@ActorMismatchCount CreatedByTenantMismatchCount,@BlockerCount BlockerCount,CASE WHEN @BlockerCount=0 THEN 'SUCCESS' ELSE 'BLOCKED' END ValidationResult;
 IF @BlockerCount<>0 THROW 56400,'Post-backfill validation blocked; review safe-id result sets and FINAL_VALIDATION_SUMMARY.',1;

@@ -174,6 +174,54 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
         assertTrue(sql.contains("@SeedBlockers=0"));
     }
 
+    @Test void casesSafeIdProjectionsUseAuthoritativeIdColumn() throws Exception {
+        String sql = Files.readString(PREFLIGHT);
+        assertTrue(sql.contains("'06_ORPHAN_CALLER_TIME' SectionName,ShaleClientId,Id AS CaseId FROM dbo.Cases"));
+        assertTrue(sql.contains("'12_WORKFLOW_FLAG_DATE_MISMATCH' SectionName,ShaleClientId,Id CaseId FROM dbo.Cases"));
+        assertFalse(sql.matches("(?is).*SELECT\\s+'06_ORPHAN_CALLER_TIME'.*?ShaleClientId\\s*,\\s*CaseId\\s+FROM\\s+dbo\\.Cases.*"));
+    }
+
+    @Test void zeroOrTenantScopedVisibilityCanNeverReportReady() throws Exception {
+        for (Path path : new Path[] {PREFLIGHT, VALIDATION}) {
+            String sql = Files.readString(path);
+            assertTrue(sql.contains("SESSION_CONTEXT(N'ShaleClientId')"), path.toString());
+            assertTrue(sql.contains("@SessionTenantId IS NULL"), path.toString());
+            assertTrue(sql.contains("@IsAdministrativePrincipal=1"), path.toString());
+            assertTrue(sql.contains("@ParticipatingTenantCount>0"), path.toString());
+            assertTrue(sql.contains("@EligibleSourceRowCount>0"), path.toString());
+            assertTrue(sql.contains("VISIBILITY_NOT_CONFIRMED"), path.toString());
+        }
+        String preflight = Files.readString(PREFLIGHT);
+        assertTrue(preflight.contains("@VisibilityConfirmed=1 AND @SeedBlockers=0"));
+        assertTrue(preflight.contains("CASE WHEN @BackfillBlockerCount=0 THEN 'READY_FOR_BACKFILL_REVIEW'"));
+    }
+
+    @Test void backfillIndependentlyRejectsEveryMutableDataBlocker() throws Exception {
+        String sql = Files.readString(BACKFILL);
+        assertTrue(sql.contains("CallerTime IS NOT NULL AND CallerDate IS NULL"));
+        assertTrue(sql.contains("Workflow flag/date mismatches block backfill"));
+        assertTrue(sql.contains("Broken or cross-tenant CaseDate case/type relationships block backfill"));
+        assertTrue(sql.contains("Missing or cross-tenant CaseDate creator relationships block backfill"));
+        assertTrue(sql.contains("c.Id IS NULL OR t.Id IS NULL"));
+        assertTrue(sql.contains("u.Id=cd.CreatedByUserId AND u.ShaleClientId=cd.ShaleClientId"));
+        assertTrue(sql.contains("Same-SystemKey CaseDates conflict"));
+        assertTrue(sql.contains("Every source key must resolve to one valid effective type"));
+    }
+
+    @Test void summariesExposeVisibilityAndConsistentBlockerTotals() throws Exception {
+        String preflight = Files.readString(PREFLIGHT);
+        for (String column : new String[] {"ParticipatingTenantCount", "EligibleSourceRowCount",
+                "VisibilityReadiness", "BackfillBlockerCount"}) {
+            assertTrue(preflight.contains(column), "preflight summary missing " + column);
+        }
+        assertTrue(preflight.contains("(CASE WHEN @VisibilityConfirmed=1 THEN 0 ELSE 1 END)+"));
+        assertTrue(preflight.contains("@BackfillBlockerCount BackfillBlockerCount"));
+        String validation = Files.readString(VALIDATION);
+        assertTrue(validation.contains("c.Id IS NULL OR t.Id IS NULL"));
+        assertTrue(validation.contains("@VisibilityConfirmed=1 THEN 0 ELSE 1"));
+        assertTrue(validation.contains("CrossTenantOrBrokenRelationshipCount"));
+    }
+
     @Test void statusBlockerUsesTenantOrGlobalStatusDefinition() throws Exception {
         String sql = Files.readString(STATUS_BLOCKER);
         assertTrue(sql.contains("s.ShaleClientId=c.ShaleClientId OR s.ShaleClientId IS NULL"));

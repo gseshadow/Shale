@@ -5,6 +5,7 @@ IF OBJECT_ID(N'dbo.Cases',N'U') IS NULL THROW 56200,'Missing dbo.Cases.',1;
 IF OBJECT_ID(N'dbo.CaseDates',N'U') IS NULL THROW 56201,'Missing dbo.CaseDates.',1;
 IF OBJECT_ID(N'dbo.CaseDateTypes',N'U') IS NULL THROW 56202,'Missing dbo.CaseDateTypes.',1;
 IF COL_LENGTH(N'dbo.CaseDates',N'IsDeleted') IS NULL THROW 56203,'Expected dbo.CaseDates.IsDeleted.',1;
+IF SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL OR (ISNULL(IS_SRVROLEMEMBER(N'sysadmin'),0)<>1 AND ISNULL(IS_MEMBER(N'db_owner'),0)<>1) THROW 56211,'All-tenant administrative visibility is required; ShaleClientId session context must be NULL.',1;
 DECLARE @MigrationActors TABLE(ShaleClientId int NOT NULL PRIMARY KEY,CreatedByUserId int NOT NULL);
 -- REQUIRED: explicitly populate one same-tenant actor for every participating tenant.
 DECLARE @ExpectedTypes TABLE(SystemKey nvarchar(64) NOT NULL PRIMARY KEY, Name nvarchar(100) NOT NULL, CalendarCategory varchar(32) NOT NULL, SupportsTime bit NOT NULL);
@@ -19,7 +20,11 @@ INTO #LegacyCaseDateSources FROM dbo.Cases c CROSS APPLY(VALUES
  ('CallerDate','intake',c.CallerDate),('DateOfMedicalNegligence','date_of_medical_negligence',c.DateOfMedicalNegligence),('DateMedicalNegligenceWasDiscovered','medical_negligence_discovered',c.DateMedicalNegligenceWasDiscovered),('DateOfInjury','date_of_injury',c.DateOfInjury),('StatuteOfLimitations','statute_of_limitations',c.StatuteOfLimitations),('TortNoticeDeadline','tort_notice_deadline',c.TortNoticeDeadline),('DiscoveryDeadline','discovery_deadline',c.DiscoveryDeadline),('DateFeeAgreementSigned','fee_agreement_signed',c.DateFeeAgreementSigned),('DateNonEngagementLetterSent','non_engagement_letter_sent',c.DateNonEngagementLetterSent)
 ) v(FieldName,SystemKey,LegacyDate) WHERE v.LegacyDate IS NOT NULL AND ISNULL(c.IsDeleted,0)=0;
 CREATE UNIQUE CLUSTERED INDEX IX_LegacySources ON #LegacyCaseDateSources(ShaleClientId,CaseId,SystemKey);
+IF NOT EXISTS(SELECT 1 FROM #LegacyCaseDateSources) THROW 56212,'Visibility not confirmed: no eligible source rows are visible.',1;
 IF EXISTS(SELECT 1 FROM dbo.Cases WHERE CallerTime IS NOT NULL AND CallerDate IS NULL) THROW 56205,'Orphan CallerTime blocks backfill.',1;
+IF EXISTS(SELECT 1 FROM dbo.Cases WHERE (ISNULL(FeeAgreementSigned,0)=1 AND DateFeeAgreementSigned IS NULL) OR (ISNULL(FeeAgreementSigned,0)=0 AND DateFeeAgreementSigned IS NOT NULL) OR (ISNULL(NonEngagementLetterSent,0)=1 AND DateNonEngagementLetterSent IS NULL) OR (ISNULL(NonEngagementLetterSent,0)=0 AND DateNonEngagementLetterSent IS NOT NULL)) THROW 56213,'Workflow flag/date mismatches block backfill.',1;
+IF EXISTS(SELECT 1 FROM dbo.CaseDates cd LEFT JOIN dbo.Cases c ON c.Id=cd.CaseId LEFT JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId WHERE c.Id IS NULL OR t.Id IS NULL OR c.ShaleClientId<>cd.ShaleClientId OR (t.ShaleClientId IS NOT NULL AND t.ShaleClientId<>cd.ShaleClientId)) THROW 56214,'Broken or cross-tenant CaseDate case/type relationships block backfill.',1;
+IF EXISTS(SELECT 1 FROM dbo.CaseDates cd LEFT JOIN dbo.Users u ON u.Id=cd.CreatedByUserId AND u.ShaleClientId=cd.ShaleClientId WHERE u.Id IS NULL) THROW 56215,'Missing or cross-tenant CaseDate creator relationships block backfill.',1;
 SELECT DISTINCT ShaleClientId INTO #ParticipatingTenants FROM #LegacyCaseDateSources;
 SELECT pt.ShaleClientId EffectiveTenantId,e.SystemKey,e.Name ExpectedName,e.CalendarCategory ExpectedCategory,e.SupportsTime ExpectedSupportsTime,
  tc.NonDeletedTenantCount,tc.DeletedTenantCount,gc.GlobalCount,
