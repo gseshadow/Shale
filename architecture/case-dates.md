@@ -2,7 +2,7 @@
 
 *Last updated: 2026-08-06*
 
-Case dates are authoritative legal and factual dates attached to cases. Phases 1A through 1C are the foundation: `CaseDateTypes` and `CaseDates` schema/RLS/constraints/seeds, effective selector and historical read models, and actor-aware occurrence mutations. Phases 2A and 2B complete date-type administration before Phase 2C Case View occurrence management is treated as complete. Phase 3A projection, Phase 3B backfill, and Phase 3C post-validation are complete. Phase 3D post-migration runtime cutover has begun with an inventory and plan; no runtime implementation change is authorized by that inventory.
+Case dates are authoritative legal and factual dates attached to cases. Phases 1A through 1C are the foundation: `CaseDateTypes` and `CaseDates` schema/RLS/constraints/seeds, effective selector and historical read models, and actor-aware occurrence mutations. Phases 2A and 2B complete date-type administration before Phase 2C Case View occurrence management is treated as complete. Phase 3A projection, Phase 3B backfill, and Phase 3C post-validation are complete. Phase 3D post-migration runtime cutover has begun: its first slice freezes the nine-key contract and adds tenant-safe, conflict-detecting authoritative lookup. Compatibility hydration and mutation remain gated on an occurrence-row-version aggregate contract and atomic case transaction ownership, as recorded in the runtime cutover inventory.
 
 ## Ownership model
 
