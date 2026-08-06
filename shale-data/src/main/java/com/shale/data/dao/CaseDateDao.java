@@ -14,6 +14,8 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.*;
 import com.shale.core.model.MigratedCaseDateKey;
+import com.shale.core.model.CompatibilityCaseDateMutation;
+import com.shale.core.model.CompatibilityCaseDateState;
 
 public final class CaseDateDao {
     private final DbSessionProvider db;
@@ -81,6 +83,35 @@ public final class CaseDateDao {
             if (conflict != null) {
                 throw new IllegalStateException("Multiple active Case Date occurrences for singleton SystemKey: " + mapped.systemKey());
             }
+        }
+        return Collections.unmodifiableMap(result);
+    }
+
+    /**
+     * Complete nine-slot edit snapshot. An absent slot carries the case RowVer
+     * witnessed by this read; aggregate creation must compare that token while
+     * holding the case row and singleton key range in its transaction.
+     */
+    public Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId, int tenant, int actor) {
+        Map<MigratedCaseDateKey, CaseDateDto> present = listMigratedSingletonsForCase(caseId, tenant, actor);
+        byte[] caseRowVer;
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(
+                "SELECT RowVer FROM dbo.Cases WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")) {
+            verifyTenant(con, tenant); validateActor(con, tenant, actor);
+            ps.setLong(1, caseId); ps.setInt(2, tenant);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) throw new IllegalArgumentException("Case is not available for this tenant.");
+                caseRowVer = rs.getBytes(1);
+            }
+        } catch (SQLException e) { throw fail(e); }
+        EnumMap<MigratedCaseDateKey, CompatibilityCaseDateState> result = new EnumMap<>(MigratedCaseDateKey.class);
+        for (MigratedCaseDateKey key : MigratedCaseDateKey.values()) {
+            CaseDateDto date = present.get(key);
+            result.put(key, date == null
+                    ? new CompatibilityCaseDateState(key, key.systemKey(), null, null, true, null, null,
+                            new CompatibilityCaseDateMutation.ExpectedAbsent(caseRowVer))
+                    : new CompatibilityCaseDateState(key, key.systemKey(), date.startsAt(), date.endsAt(), date.allDay(),
+                            date.id(), date.rowVer(), null));
         }
         return Collections.unmodifiableMap(result);
     }
