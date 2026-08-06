@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class CaseDatesLegacyPhase3bMigrationContractTest {
@@ -13,6 +15,7 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
     private static final Path BACKFILL = resolve("docs/sql/2026-08-05_case_dates_legacy_phase3b_backfill_case_dates.sql");
     private static final Path STATUS_BLOCKER = resolve("docs/sql/2026-08-05_case_dates_legacy_phase3b_status_history_blocker.sql");
     private static final Path VALIDATION = resolve("docs/sql/2026-08-05_case_dates_legacy_phase3b_post_validation.sql");
+    private static final Path BLOCKER_DETAILS = resolve("docs/sql/2026-08-06_case_dates_legacy_phase3b_blocker_details.sql");
 
     private static final String[] LEGACY_FIELDS = {
             "CallerDate", "CallerTime", "DateOfMedicalNegligence", "DateMedicalNegligenceWasDiscovered",
@@ -271,6 +274,47 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
         String sql = Files.readString(STATUS_BLOCKER);
         assertTrue(sql.contains("s.ShaleClientId=c.ShaleClientId OR s.ShaleClientId IS NULL"));
         assertTrue(sql.contains("cs.CaseId=c.Id"));
+    }
+
+    @Test void blockerDetailsIsReadOnlyAndNonAuthorizing() throws Exception {
+        String sql = Files.readString(BLOCKER_DETAILS);
+        assertFalse(sql.matches("(?is).*(?:^|[;\\r\\n])\\s*(INSERT|UPDATE|DELETE|MERGE|ALTER|DROP|TRUNCATE|CREATE|EXEC(?:UTE)?)\\b.*"));
+        assertFalse(sql.matches("(?is).*\\b(sp_executesql|EXECUTE\\s*\\().*"));
+        assertTrue(sql.contains("DECLARE @OperatorVerifiedAllTenantVisibility bit = 0"));
+        assertTrue(sql.contains("DIAGNOSTIC_NON_AUTHORIZING"));
+        assertFalse(sql.contains("READY_FOR_SEED"));
+        assertFalse(sql.contains("READY_FOR_BACKFILL"));
+    }
+
+    @Test void blockerDetailsEmitsOnlyAggregateOrTypeMetadata() throws Exception {
+        String sql = Files.readString(BLOCKER_DETAILS);
+        Matcher outputs = Pattern.compile("(?is)SELECT\\s+N'0[1-6]_[^;]+?\\sFROM\\s").matcher(sql);
+        int outputCount = 0;
+        while (outputs.find()) {
+            outputCount++;
+            String projection = outputs.group();
+            assertFalse(projection.matches("(?is).*\\b(CaseId|LegacyValue|CallerDate|CallerTime|StartsAt|EndsAt|AcceptedDate|DeniedDate|ClosedDate|Name|Description|Notes)\\b.*"),
+                    "blocker detail output discloses a source value or PHI-bearing field: " + projection);
+        }
+        assertTrue(outputCount >= 5, "expected all detail outputs with FROM clauses to be inspected");
+        assertFalse(sql.matches("(?is).*SELECT\\s+N'0[1-6]_[^;]*\\bCaseId\\b.*"));
+        assertTrue(sql.contains("GROUP BY s.ShaleClientId,s.FieldName,s.SystemKey"));
+        assertTrue(sql.contains("GROUP BY ShaleClientId,FieldName,SystemKey,MismatchReason"));
+    }
+
+    @Test void blockerDetailsReconcilesTheReviewedInventoryCounts() throws Exception {
+        String sql = Files.readString(BLOCKER_DETAILS);
+        assertTrue(sql.contains("@ExpectedSeedBlockerCount bigint = 3"));
+        assertTrue(sql.contains("@ExpectedMissingSeedableCount bigint = 4"));
+        assertTrue(sql.contains("@ExpectedUnresolvedSourceCount bigint = 1717"));
+        assertTrue(sql.contains("@ExpectedWorkflowMismatchCount bigint = 610"));
+        assertTrue(sql.contains("01_SEED_BLOCKERS"));
+        assertTrue(sql.contains("02_EXPECTED_MISSING_GLOBAL_TYPES"));
+        assertTrue(sql.contains("03_UNRESOLVED_LEGACY_SOURCES"));
+        assertTrue(sql.contains("04_WORKFLOW_MISMATCHES"));
+        assertTrue(sql.contains("05_EFFECTIVE_TYPE_RESOLUTION"));
+        assertTrue(sql.contains("06_BLOCKER_RECONCILIATION_SUMMARY"));
+        assertTrue(sql.contains("MATCHES_REVIEW_INVENTORY"));
     }
 
     @Test void packageDoesNotClearDropCalendarWriteOrChangeRuntimeStatusHistory() throws Exception {
