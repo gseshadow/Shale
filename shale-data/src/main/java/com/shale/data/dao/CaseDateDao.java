@@ -13,6 +13,7 @@ import com.shale.core.service.CaseServicePort.ResetCaseDateTypeOverrideCommand;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.*;
+import com.shale.core.model.MigratedCaseDateKey;
 
 public final class CaseDateDao {
     private final DbSessionProvider db;
@@ -52,6 +53,36 @@ public final class CaseDateDao {
             ps.setInt(1, tenant); ps.setInt(2, tenant); ps.setLong(3, caseId); ps.setInt(4, tenant);
             try (ResultSet rs = ps.executeQuery()) { List<CaseDateDto> out = new ArrayList<>(); while (rs.next()) out.add(mapDate(rs)); return List.copyOf(out); }
         } catch (SQLException e) { throw fail(e); }
+    }
+
+    /**
+     * Loads the authoritative active occurrence for every migrated compatibility
+     * meaning. The occurrence query retains its stored type (including inactive or
+     * soft-deleted historical types) while applying the tenant/global presentation
+     * overlay. Ambiguity is an error: compatibility fields must never pick an
+     * arbitrary occurrence.
+     */
+    public Map<MigratedCaseDateKey, CaseDateDto> listMigratedSingletonsForCase(long caseId, int tenant, int actor) {
+        List<CaseDateDto> occurrences = listCaseDatesForCase(caseId, tenant, actor);
+        EnumMap<MigratedCaseDateKey, CaseDateDto> result = new EnumMap<>(MigratedCaseDateKey.class);
+        for (CaseDateDto occurrence : occurrences) {
+            String systemKey = occurrence.typeSystemKey();
+            if (systemKey == null) continue;
+            if (MigratedCaseDateKey.DISCARDED_ALIAS.equalsIgnoreCase(systemKey.trim())) {
+                throw new IllegalStateException("Discarded Case Date SystemKey alias occurrence detected.");
+            }
+            final MigratedCaseDateKey mapped;
+            try {
+                mapped = MigratedCaseDateKey.require(systemKey);
+            } catch (IllegalArgumentException notMapped) {
+                continue;
+            }
+            CaseDateDto conflict = result.putIfAbsent(mapped, occurrence);
+            if (conflict != null) {
+                throw new IllegalStateException("Multiple active Case Date occurrences for singleton SystemKey: " + mapped.systemKey());
+            }
+        }
+        return Collections.unmodifiableMap(result);
     }
 
     public List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int tenant, int actor) {
@@ -188,7 +219,7 @@ public final class CaseDateDao {
     private static void validateTypeValues(String name,String cat,String color,String key,Integer sort){trimReq(name,"Name");category(cat);String c=norm(color);if(c!=null&&!c.matches("#[0-9A-Fa-f]{6}"))throw new IllegalArgumentException("Color must be #RRGGBB.");if(key!=null&&!key.matches("[a-z0-9_\\-]{1,64}"))throw new IllegalArgumentException("SystemKey is invalid.");if(sort!=null&&(sort<-100000||sort>100000))throw new IllegalArgumentException("Sort order is out of range.");}
     private static String trimReq(String s,String n){String v=norm(s);if(v==null)throw new IllegalArgumentException(n+" is required.");if(v.length()>100)throw new IllegalArgumentException(n+" must be 100 characters or fewer.");return v;}
     private static String category(String c){String v=norm(c);if(v==null)v="OTHER";v=v.toUpperCase(Locale.ROOT);if(!Set.of("DEADLINE","TRIAL","HEARING","MEDIATION","DEPOSITION","NOTICE","APPOINTMENT","MILESTONE","OTHER").contains(v))throw new IllegalArgumentException("Calendar category is invalid.");return v;}
-    private static String normalizeSystemKey(String s){String v=norm(s);return v==null?null:v.toLowerCase(Locale.ROOT);}
+    private static String normalizeSystemKey(String s){String v=norm(s);if(v==null)return null;v=v.toLowerCase(Locale.ROOT);if(MigratedCaseDateKey.DISCARDED_ALIAS.equals(v))throw new IllegalArgumentException("Discarded Case Date SystemKey alias is not supported.");return v;}
     private static int nextSort(Connection con,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT COALESCE(MAX(SortOrder),0)+10 FROM dbo.CaseDateTypes WHERE ShaleClientId=? AND IsDeleted=0")){ps.setInt(1,tenant);try(ResultSet rs=ps.executeQuery()){rs.next();return rs.getInt(1);}}}
 
     private CaseDateDto requireDate(Connection con,long id,int tenant)throws SQLException{String sql=occurrenceSql("cd.Id = ? AND cd.ShaleClientId = ?");try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setInt(2,tenant);ps.setLong(3,id);ps.setInt(4,tenant);try(ResultSet rs=ps.executeQuery()){if(rs.next())return mapDate(rs);throw new IllegalStateException("Case date is not available.");}}}

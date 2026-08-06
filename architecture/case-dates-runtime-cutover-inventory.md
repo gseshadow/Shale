@@ -2,7 +2,13 @@
 
 ## Decision record status
 
-This is the Phase 3D inventory and proposed cutover plan. It records repository evidence only; it makes **no runtime or SQL change**. Phase 3B backfill and Phase 3C post-validation are complete: 2,233 eligible source rows reconcile exactly, `BlockerCount = 0`, and 610 flag-set/date-missing rows are intentional historical anomalies. The inventory assumes those deployed results and must not rerun, repair, or reinterpret them.
+This is the Phase 3D inventory and cutover plan. Phase 3B backfill and Phase 3C post-validation are complete: 2,233 eligible source rows reconcile exactly, `BlockerCount = 0`, and 610 flag-set/date-missing rows are intentional historical anomalies. The inventory assumes those deployed results and must not rerun, repair, or reinterpret them.
+
+### First runtime-cutover slice (2026-08-06)
+
+The fixed contract and read-foundation gate are implemented: `MigratedCaseDateKey` is the single immutable mapping, rejects the discarded alias, and records that only `intake` supports time. `CaseDateDao.listMigratedSingletonsForCase` uses the existing tenant-scoped occurrence query and effective tenant/global presentation overlay, retains stored historical type fallback, ignores soft-deleted occurrences, and fails explicitly for duplicate active singleton occurrences or a discarded-alias occurrence.
+
+No compatibility reader or writer has been switched in this slice. The exact blocker is the inventory's unresolved concurrency shape: existing case editors submit only `Cases.RowVer` and cannot supply per-occurrence identity/`CaseDates.RowVer` or an explicit expected-absence token. In addition, case creation owns its transaction inside `CaseDao`; adding occurrences afterward would be non-atomic. Per the intake atomicity gate, this slice stops rather than introducing last-write-wins or a partially created case. Consequently all production dependencies classified **CONVERT** below remain, the legacy calendar projection remains until its readers are authoritative, and there is no dual-write. The next gate is an aggregate command/DTO contract carrying the nine occurrence identities and row versions and transaction ownership spanning case creation/update plus occurrence mutations; only after that contract is approved may compatibility hydration and writes cut over together.
 
 `dbo.CaseDates` will become the runtime authority for the nine migrated meanings below. The corresponding `dbo.Cases` columns remain unchanged for rollback/history and must receive no normal application writes after cutover. `FeeAgreementSigned` and `NonEngagementLetterSent` remain workflow authorities as flags; their missing paired dates must never cause an occurrence to be fabricated.
 
