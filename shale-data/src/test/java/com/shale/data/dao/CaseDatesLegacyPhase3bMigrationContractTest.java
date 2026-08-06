@@ -189,7 +189,8 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
             assertTrue(sql.contains("@IsAdministrativePrincipal=1"), path.toString());
             assertTrue(sql.contains("@ParticipatingTenantCount>0"), path.toString());
             assertTrue(sql.contains("@EligibleSourceRowCount>0"), path.toString());
-            assertTrue(sql.contains("VISIBILITY_NOT_CONFIRMED"), path.toString());
+            assertTrue(sql.contains("OPERATOR_VERIFICATION_REQUIRED"), path.toString());
+            assertTrue(sql.contains("@OperatorVerifiedAllTenantVisibility=1"), path.toString());
         }
         String preflight = Files.readString(PREFLIGHT);
         assertTrue(preflight.contains("@VisibilityConfirmed=1 AND @SeedBlockers=0"));
@@ -220,6 +221,28 @@ class CaseDatesLegacyPhase3bMigrationContractTest {
         assertTrue(validation.contains("c.Id IS NULL OR t.Id IS NULL"));
         assertTrue(validation.contains("@VisibilityConfirmed=1 THEN 0 ELSE 1"));
         assertTrue(validation.contains("CrossTenantOrBrokenRelationshipCount"));
+    }
+
+    @Test void preflightDoesNotEmitDatesWithRowLevelSafeIds() throws Exception {
+        String sql = Files.readString(PREFLIGHT);
+        assertFalse(sql.contains("'08_SAME_SYSTEMKEY_OCCURRENCE_EVIDENCE' SectionName,*"));
+        assertTrue(sql.contains("'08_SAME_SYSTEMKEY_OCCURRENCE_EVIDENCE' SectionName,ShaleClientId,SystemKey,COUNT_BIG(*)"));
+        String conflictResult = sql.substring(sql.indexOf("SELECT '09_OCCURRENCE_CONFLICT_SAFE_IDS'"),
+                sql.indexOf("SELECT '10_CROSS_TENANT_CASE_TYPE'"));
+        assertTrue(conflictResult.contains("ShaleClientId,CaseId,FieldName,SystemKey"));
+        assertFalse(conflictResult.contains("ExpectedStartsAt"));
+        assertFalse(conflictResult.contains("ExpectedAllDay"));
+        assertFalse(conflictResult.matches("(?is).*(CallerDate|LegacyDate|StartsAt|EndsAt|CallerTime).*"));
+    }
+
+    @Test void globalSeedRequiresAdministrativeNullTenantContext() throws Exception {
+        String sql = Files.readString(SEED_TYPES);
+        int guard = sql.indexOf("SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL");
+        int globalInsert = sql.indexOf("INSERT dbo.CaseDateTypes");
+        assertTrue(guard >= 0 && guard < globalInsert, "visibility guard must precede global mutation");
+        assertTrue(sql.contains("IS_SRVROLEMEMBER(N'sysadmin')"));
+        assertTrue(sql.contains("IS_MEMBER(N'db_owner')"));
+        assertTrue(sql.contains("THROW 56104"));
     }
 
     @Test void statusBlockerUsesTenantOrGlobalStatusDefinition() throws Exception {
