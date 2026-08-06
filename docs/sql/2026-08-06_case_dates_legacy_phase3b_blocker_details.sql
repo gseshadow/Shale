@@ -54,6 +54,7 @@ SELECT pt.ShaleClientId,e.SystemKey,COALESCE(tw.Id,gw.Id) SelectedCaseDateTypeId
  COALESCE(tw.IsActive,gw.IsActive) SelectedIsActive,COALESCE(tw.IsDeleted,gw.IsDeleted) SelectedIsDeleted,
  ISNULL(tc.NonDeletedTenantCount,0) NonDeletedTenantCount,ISNULL(tc.DeletedTenantCount,0) DeletedTenantCount,gc.GlobalCount,
  CASE WHEN ISNULL(tc.NonDeletedTenantCount,0)>1 THEN N'DUPLICATE_ACTIVE_TENANT_DEFINITIONS'
+      WHEN gc.GlobalCount=0 THEN N'MISSING_GLOBAL_DEFINITION'
       WHEN gc.GlobalCount>1 THEN N'DUPLICATE_GLOBAL_DEFINITIONS' WHEN COALESCE(tw.Id,gw.Id) IS NULL THEN N'MISSING_EFFECTIVE_DEFINITION'
       WHEN ISNULL(COALESCE(tw.IsDeleted,gw.IsDeleted),0)<>0 THEN N'SELECTED_DEFINITION_DELETED'
       WHEN ISNULL(COALESCE(tw.IsActive,gw.IsActive),0)<>1 THEN N'SELECTED_DEFINITION_INACTIVE'
@@ -72,7 +73,7 @@ SELECT c.ShaleClientId,v.FieldName,v.SystemKey,v.MismatchReason INTO #WorkflowMi
 
 SELECT N'01_SEED_BLOCKERS' SectionName,SystemKey,BlockerReason,SUM(AffectedDefinitions) AffectedDefinitionCount FROM #SeedBlockerReasons GROUP BY SystemKey,BlockerReason ORDER BY SystemKey,BlockerReason;
 SELECT N'02_EXPECTED_MISSING_GLOBAL_TYPES' SectionName,SystemKey,N'EXPECTED_MISSING_SEED_MAY_CREATE' Classification FROM #GlobalSeedProfile WHERE GlobalDefinitionCount=0 ORDER BY SystemKey;
-SELECT N'03_UNRESOLVED_LEGACY_SOURCES' SectionName,s.ShaleClientId,s.FieldName,s.SystemKey,COUNT_BIG(*) UnresolvedSourceCount FROM #LegacySources s LEFT JOIN #EffectiveTypes e ON e.ShaleClientId=s.ShaleClientId AND e.SystemKey=s.SystemKey WHERE e.SelectedCaseDateTypeId IS NULL OR e.BlockerReason<>N'NONE' GROUP BY s.ShaleClientId,s.FieldName,s.SystemKey ORDER BY s.ShaleClientId,s.FieldName,s.SystemKey;
+SELECT N'03_UNRESOLVED_LEGACY_SOURCES' SectionName,s.ShaleClientId,s.FieldName,s.SystemKey,COUNT_BIG(*) UnresolvedSourceCount FROM #LegacySources s LEFT JOIN #EffectiveTypes e ON e.ShaleClientId=s.ShaleClientId AND e.SystemKey=s.SystemKey WHERE e.SelectedCaseDateTypeId IS NULL OR ISNULL(e.NonDeletedTenantCount,0)>1 OR e.GlobalCount<>1 OR ISNULL(e.SelectedIsActive,0)<>1 OR ISNULL(e.SelectedIsDeleted,0)<>0 OR e.BlockerReason IN (N'CATEGORY_CONFLICT',N'SUPPORTS_TIME_CONFLICT') GROUP BY s.ShaleClientId,s.FieldName,s.SystemKey ORDER BY s.ShaleClientId,s.FieldName,s.SystemKey;
 SELECT N'04_WORKFLOW_MISMATCHES' SectionName,ShaleClientId,FieldName,SystemKey,MismatchReason,COUNT_BIG(*) WorkflowMismatchInstanceCount FROM #WorkflowMismatches GROUP BY ShaleClientId,FieldName,SystemKey,MismatchReason ORDER BY ShaleClientId,FieldName,SystemKey,MismatchReason;
 SELECT N'05_EFFECTIVE_TYPE_RESOLUTION' SectionName,ShaleClientId,SystemKey,SelectedCaseDateTypeId,ResolutionSource,SelectedIsActive IsActive,SelectedIsDeleted IsDeleted,
  CASE WHEN SelectedCaseDateTypeId IS NULL THEN N'MISSING' WHEN ISNULL(SelectedIsDeleted,0)=1 THEN N'DELETED' WHEN ISNULL(SelectedIsActive,0)=0 THEN N'INACTIVE' ELSE N'ACTIVE' END LifecycleState,
@@ -80,7 +81,7 @@ SELECT N'05_EFFECTIVE_TYPE_RESOLUTION' SectionName,ShaleClientId,SystemKey,Selec
 
 DECLARE @SeedBlockerCount bigint=(SELECT COUNT_BIG(*) FROM #GlobalSeedProfile WHERE GlobalDefinitionCount>1 OR ExactNameConflictCount>0 OR CategoryConflictCount>0 OR SupportsTimeConflictCount>0 OR InactiveCount>0 OR DeletedCount>0);
 DECLARE @MissingSeedableCount bigint=(SELECT COUNT_BIG(*) FROM #GlobalSeedProfile WHERE GlobalDefinitionCount=0);
-DECLARE @UnresolvedSourceCount bigint=(SELECT COUNT_BIG(*) FROM #LegacySources s LEFT JOIN #EffectiveTypes e ON e.ShaleClientId=s.ShaleClientId AND e.SystemKey=s.SystemKey WHERE e.SelectedCaseDateTypeId IS NULL OR e.BlockerReason<>N'NONE');
+DECLARE @UnresolvedSourceCount bigint=(SELECT COUNT_BIG(*) FROM #LegacySources s LEFT JOIN #EffectiveTypes e ON e.ShaleClientId=s.ShaleClientId AND e.SystemKey=s.SystemKey WHERE e.SelectedCaseDateTypeId IS NULL OR ISNULL(e.NonDeletedTenantCount,0)>1 OR e.GlobalCount<>1 OR ISNULL(e.SelectedIsActive,0)<>1 OR ISNULL(e.SelectedIsDeleted,0)<>0 OR e.BlockerReason IN (N'CATEGORY_CONFLICT',N'SUPPORTS_TIME_CONFLICT'));
 /* Match PREFLIGHT_VALIDATION_SUMMARY exactly: one count per case satisfying either workflow mismatch. */
 DECLARE @WorkflowMismatchCaseCount bigint=(SELECT COUNT_BIG(*) FROM dbo.Cases WHERE (ISNULL(FeeAgreementSigned,0)=1 AND DateFeeAgreementSigned IS NULL) OR (ISNULL(FeeAgreementSigned,0)=0 AND DateFeeAgreementSigned IS NOT NULL) OR (ISNULL(NonEngagementLetterSent,0)=1 AND DateNonEngagementLetterSent IS NULL) OR (ISNULL(NonEngagementLetterSent,0)=0 AND DateNonEngagementLetterSent IS NOT NULL));
 DECLARE @WorkflowMismatchInstanceCount bigint=(SELECT COUNT_BIG(*) FROM #WorkflowMismatches);
