@@ -312,6 +312,9 @@ public final class NewIntakeController {
 		for (ConfiguredDate field : fields) {
 			Label label = new Label(field.type().name() + (field.required() ? " *" : ""));
 			DatePicker picker = ControlStyles.formControl(new DatePicker());
+			picker.valueProperty().addListener((observable, oldValue, newValue) -> {
+				if (newValue != null) ControlStyles.setInvalid(picker, false);
+			});
 			HBox row = new HBox(16, label, picker); row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 			HBox.setHgrow(picker, Priority.ALWAYS); picker.setMaxWidth(Double.MAX_VALUE);
 			configuredDatesBox.getChildren().add(row);
@@ -345,15 +348,25 @@ public final class NewIntakeController {
 		for (int i = 0; i < stagedDateSelections.size(); i++) {
 			int index = i; Selection selection = stagedDateSelections.get(i);
 			Label name = new Label(selection.type().name()); HBox.setHgrow(name, Priority.ALWAYS); name.setMaxWidth(Double.MAX_VALUE);
+			CheckBox required = ControlStyles.formControl(new CheckBox("Required"));
+			required.setSelected(selection.required());
+			required.setAccessibleHelp("Choose whether " + selection.type().name() + " must be completed on New Intake.");
+			required.selectedProperty().addListener((observable, oldValue, newValue) ->
+					stagedDateSelections.set(index, NewIntakeDatesConfiguration.withRequired(selection, newValue)));
 			Button up = ActionButtonFactory.semantic("Up", e -> moveDateSelection(index, -1), ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 			Button down = ActionButtonFactory.semantic("Down", e -> moveDateSelection(index, 1), ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 			Button remove = ActionButtonFactory.semantic("Remove", e -> { stagedDateSelections.remove(index); renderDatesCustomization(); }, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 			up.setDisable(i == 0); down.setDisable(i == stagedDateSelections.size() - 1);
-			datesCustomizationBox.getChildren().add(new HBox(8, name, up, down, remove));
+			datesCustomizationBox.getChildren().add(new HBox(8, name, required, up, down, remove));
 		}
 		Button save = ActionButtonFactory.semantic("Save", e -> saveDatesCustomization(), ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
-		Button cancel = ActionButtonFactory.semantic("Cancel", e -> renderDatesNormalMode(), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		Button cancel = ActionButtonFactory.semantic("Cancel", e -> cancelDatesCustomization(), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		datesCustomizationBox.getChildren().add(new HBox(8, save, cancel));
+	}
+
+	private void cancelDatesCustomization() {
+		stagedDateSelections.clear();
+		renderDatesNormalMode();
 	}
 
 	private void moveDateSelection(int index, int delta) {
@@ -777,6 +790,7 @@ public final class NewIntakeController {
 		List<String> errors = validateRequiredFields();
 		if (!errors.isEmpty()) {
 			showValidation(errors.stream().collect(Collectors.joining("\n")));
+			focusFirstMissingConfiguredDate();
 			return;
 		}
 
@@ -1343,8 +1357,18 @@ public final class NewIntakeController {
 				callerRequiredWhenNotClient(callerPhoneField.getText(), "Caller Phone Number is required when Caller is Client is unchecked.")
 		).filter(s -> s != null && !s.isBlank()).toList());
 		configuredDateInputs.values().stream().filter(input -> input.required() && input.value() == null)
-				.forEach(input -> errors.add("A required configured date is missing."));
+				.forEach(input -> {
+					ControlStyles.setInvalid(input.input(), true);
+					errors.add("A required configured date is missing.");
+				});
 		return List.copyOf(errors);
+	}
+
+	private void focusFirstMissingConfiguredDate() {
+		configuredDateInputs.values().stream()
+				.filter(input -> input.required() && input.value() == null)
+				.findFirst()
+				.ifPresent(input -> input.input().requestFocus());
 	}
 
 	private List<String> validatePracticeAreaSelection(PracticeAreaValidationResult practiceAreaState) {
