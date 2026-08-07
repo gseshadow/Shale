@@ -1395,11 +1395,12 @@ public class CaseController {
 			showDetailsTextAreaDialog("Edit Description", "Description", base.description, ownerButton,
 					value -> saveSingleDetailsField(d -> d.description = value));
 		} else if (editor == detCallerDateEditor) {
-			showDetailsDateDialog("Edit Caller Date", "Caller Date", base.callerDate, ownerButton,
+			showDetailsDateDialog("Edit Caller Date", "Caller Date", authoritativeDate(MigratedCaseDateKey.CALLER_DATE), ownerButton,
 					value -> saveAuthoritativeDate(MigratedCaseDateKey.CALLER_DATE, value));
 		} else if (editor == detCallerTimeEditor) {
-			showDetailsTextFieldDialog("Edit Caller Time", "Caller Time", base.callerTime, false, ownerButton,
-					value -> saveSingleDetailsField(d -> d.callerTime = value));
+			CompatibilityCaseDateState intake = compatibilityDates.isLoaded() ? compatibilityDates.states().get(MigratedCaseDateKey.CALLER_DATE) : null;
+			String time = intake == null || intake.startsAt() == null || intake.allDay() ? "" : intake.startsAt().toLocalTime().toString();
+			showDetailsTextFieldDialog("Edit Caller Time", "Caller Time", time, false, ownerButton, this::saveAuthoritativeIntakeTime);
 		} else if (editor == detAcceptedDateEditor) {
 			showDetailsDateDialog("Edit Accepted Date", "Accepted Date", base.acceptedDate, ownerButton,
 					value -> saveSingleDetailsField(d -> d.acceptedDate = value));
@@ -1410,23 +1411,29 @@ public class CaseController {
 			showDetailsDateDialog("Edit Denied Date", "Denied Date", base.deniedDate, ownerButton,
 					value -> saveSingleDetailsField(d -> d.deniedDate = value));
 		} else if (editor == detDateOfMedicalNegligenceEditor) {
-			showDetailsDateDialog("Edit Date of Medical Negligence", "Date of Medical Negligence", base.dateOfMedicalNegligence, ownerButton,
+			showDetailsDateDialog("Edit Date of Medical Negligence", "Date of Medical Negligence", authoritativeDate(MigratedCaseDateKey.DATE_OF_MEDICAL_NEGLIGENCE), ownerButton,
 					value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_MEDICAL_NEGLIGENCE, value));
 		} else if (editor == detDateMedicalNegligenceWasDiscoveredEditor) {
-			showDetailsDateDialog("Edit Date Medical Negligence Was Discovered", "Date Medical Negligence Was Discovered", base.dateMedicalNegligenceWasDiscovered, ownerButton,
+			showDetailsDateDialog("Edit Date Medical Negligence Was Discovered", "Date Medical Negligence Was Discovered", authoritativeDate(MigratedCaseDateKey.DATE_MEDICAL_NEGLIGENCE_DISCOVERED), ownerButton,
 					value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_MEDICAL_NEGLIGENCE_DISCOVERED, value));
 		} else if (editor == detDateOfInjuryEditor) {
-			showDetailsDateDialog("Edit Date of Injury", "Date of Injury", base.dateOfInjury, ownerButton,
+			showDetailsDateDialog("Edit Date of Injury", "Date of Injury", authoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY), ownerButton,
 					value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY, value));
 		} else if (editor == detStatuteOfLimitationsEditor) {
-			showDetailsNullableDateDialog("Edit Statute of Limitations", "Statute of Limitations", base.statuteOfLimitations, ownerButton,
+			showDetailsNullableDateDialog("Edit Statute of Limitations", "Statute of Limitations", authoritativeDate(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS), ownerButton,
 					value -> saveAuthoritativeDate(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS, value));
 		} else if (editor == detTortNoticeDeadlineEditor) {
-			showDetailsNullableDateDialog("Edit Tort Notice Deadline", "Tort Notice Deadline", base.tortNoticeDeadline, ownerButton,
+			showDetailsNullableDateDialog("Edit Tort Notice Deadline", "Tort Notice Deadline", authoritativeDate(MigratedCaseDateKey.TORT_NOTICE_DEADLINE), ownerButton,
 					value -> saveAuthoritativeDate(MigratedCaseDateKey.TORT_NOTICE_DEADLINE, value));
 		} else if (editor == detDiscoveryDeadlineEditor) {
-			showDetailsDateDialog("Edit Discovery Deadline", "Discovery Deadline", base.discoveryDeadline, ownerButton,
+			showDetailsDateDialog("Edit Discovery Deadline", "Discovery Deadline", authoritativeDate(MigratedCaseDateKey.DISCOVERY_DEADLINE), ownerButton,
 					value -> saveAuthoritativeDate(MigratedCaseDateKey.DISCOVERY_DEADLINE, value));
+		} else if (editor == detDateFeeAgreementSignedEditor) {
+			showDetailsDateDialog("Edit Date Fee Agreement Signed", "Date Fee Agreement Signed", authoritativeDate(MigratedCaseDateKey.DATE_FEE_AGREEMENT_SIGNED), ownerButton,
+					value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_FEE_AGREEMENT_SIGNED, value));
+		} else if (editor == detDateNonEngagementLetterSentEditor) {
+			showDetailsDateDialog("Edit Date Non-Engagement Letter Sent", "Date Non-Engagement Letter Sent", authoritativeDate(MigratedCaseDateKey.DATE_NON_ENGAGEMENT_LETTER_SENT), ownerButton,
+					value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_NON_ENGAGEMENT_LETTER_SENT, value));
 		} else if (editor instanceof CheckBox checkBox) {
 			showDetailsBooleanDialog("Edit " + fieldLabel, fieldLabel, checkBox.isSelected(), ownerButton,
 					value -> saveSingleDetailsBooleanField(editor, value));
@@ -1973,11 +1980,53 @@ public class CaseController {
 	private void showRemovedCaseDatesMessage(String message) { if (removedCaseDatesStatusLabel != null) { removedCaseDatesStatusLabel.setText(message); setVisibleManaged(removedCaseDatesStatusLabel, true); } }
 	private void renderCaseDatesFailure() { if (caseDatesCardsBox != null) caseDatesCardsBox.getChildren().clear(); Button retry = ActionButtonFactory.semantic("Retry", e -> loadCaseDatesAsync(), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD); retry.setAccessibleText("Retry loading case dates"); VBox box = new VBox(8, new Label("Failed to load case dates."), retry); caseDatesCardsBox.getChildren().setAll(box); setVisibleManaged(caseDatesStatusLabel, false); }
 	private void updateRemovedCaseDatesVisibility() { if (showRemovedCaseDatesButton != null) { showRemovedCaseDatesButton.setText(showRemovedCaseDates ? "Hide Removed" : "Show Removed"); showRemovedCaseDatesButton.setAccessibleText(showRemovedCaseDates ? "Hide removed case dates" : "Show removed case dates"); } setVisibleManaged(removedCaseDatesCardsBox, showRemovedCaseDates); setVisibleManaged(removedCaseDatesStatusLabel, showRemovedCaseDates && removedCaseDates.isEmpty()); }
-	private void refreshCaseDatesAfterMutation(String message) { caseDatesStale = true; if ("Dates".equals(activeSectionName)) loadCaseDatesAsync(); }
 	private void openCaseDateDialog(CaseDateDto existing) { if (caseService == null || appState == null || caseId == null) return; if (effectiveCaseDateTypes.isEmpty()) loadCaseDatesAsync(); CaseDateOccurrenceDialog.show(caseDatesOwner(), existing == null ? "Add Date" : "Edit Date", effectiveCaseDateTypes, existing, input -> saveCaseDate(existing, input), this::loadCaseDatesAsync); }
-	private String saveCaseDate(CaseDateDto existing, CaseDateOccurrenceDialog.Input input) { Integer tenantId=appState.getShaleClientId(), actorId=appState.getUserId(); if(tenantId==null||actorId==null) return "Save is unavailable."; if(caseDateMutationInFlight.getAndSet(true)) return "Save is already in progress."; try { if(existing==null) caseService.createCaseDate(new CreateCaseDateCommand(tenantId, actorId, caseId, input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes())); else caseService.updateCaseDate(new UpdateCaseDateCommand(tenantId, actorId, caseId, existing.id(), input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes(), existing.rowVer())); caseDateMutationInFlight.set(false); refreshCaseDatesAfterMutation(null); return null; } catch(RuntimeException ex) { caseDateMutationInFlight.set(false); return rootMessage(ex); } }
-	private void onRemoveCaseDate(CaseDateDto d) { if (d==null||caseService==null||appState==null||caseId==null) return; if(!AppDialogs.showConfirmation(caseDatesOwner(), "Remove Date", "Remove this case date?", "The date will be removed from active case dates and can be restored later.", "Remove", DialogActionKind.DANGER)) return; Integer tenantId=appState.getShaleClientId(), actorId=appState.getUserId(); if(tenantId==null||actorId==null||caseDateMutationInFlight.getAndSet(true)) return; caseDateExecutor.submit(() -> { try { caseService.deleteCaseDate(new DeleteCaseDateCommand(tenantId, actorId, caseId, d.id(), d.rowVer())); caseDateMutationInFlight.set(false); Platform.runLater(() -> refreshCaseDatesAfterMutation(null)); } catch(RuntimeException ex) { caseDateMutationInFlight.set(false); Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Remove Date", rootMessage(ex))); } }); }
-	private void onRestoreCaseDate(CaseDateDto d) { if (d==null||caseService==null||appState==null||caseId==null) return; Integer tenantId=appState.getShaleClientId(), actorId=appState.getUserId(); if(tenantId==null||actorId==null||caseDateMutationInFlight.getAndSet(true)) return; caseDateExecutor.submit(() -> { try { caseService.restoreCaseDate(new RestoreCaseDateCommand(tenantId, actorId, caseId, d.id(), d.rowVer())); caseDateMutationInFlight.set(false); Platform.runLater(() -> refreshCaseDatesAfterMutation(null)); } catch(RuntimeException ex) { caseDateMutationInFlight.set(false); Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Restore Date", rootMessage(ex))); } }); }
+	private java.util.concurrent.CompletionStage<String> saveCaseDate(CaseDateDto existing, CaseDateOccurrenceDialog.Input input) {
+		Integer tenantId = appState.getShaleClientId(), actorId = appState.getUserId();
+		if (tenantId == null || actorId == null || caseId == null)
+			return java.util.concurrent.CompletableFuture.completedFuture("Save is unavailable.");
+		if (caseDateMutationInFlight.getAndSet(true))
+			return java.util.concurrent.CompletableFuture.completedFuture("Save is already in progress.");
+		final long activeCaseId = caseId.longValue();
+		final boolean compatibilityAffected = isMigratedCaseDateType(input.caseDateTypeId())
+				|| (existing != null && isMigratedCaseDateSystemKey(existing.typeSystemKey()));
+		return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+			try {
+				if (existing == null) caseService.createCaseDate(new CreateCaseDateCommand(tenantId, actorId, activeCaseId,
+						input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes()));
+				else caseService.updateCaseDate(new UpdateCaseDateCommand(tenantId, actorId, activeCaseId, existing.id(),
+						input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes(), existing.rowVer()));
+				Platform.runLater(() -> synchronizeCaseDatesAfterLocalMutation(activeCaseId, compatibilityAffected));
+				return null;
+			} catch (RuntimeException ex) { return rootMessage(ex); }
+			finally { caseDateMutationInFlight.set(false); }
+		}, caseDateExecutor);
+	}
+
+	private void onRemoveCaseDate(CaseDateDto d) {
+		if (d == null || caseService == null || appState == null || caseId == null) return;
+		if (!AppDialogs.showConfirmation(caseDatesOwner(), "Remove Date", "Remove this case date?", "The date will be removed from active case dates and can be restored later.", "Remove", DialogActionKind.DANGER)) return;
+		Integer tenantId = appState.getShaleClientId(), actorId = appState.getUserId();
+		if (tenantId == null || actorId == null || caseDateMutationInFlight.getAndSet(true)) return;
+		final long activeCaseId = caseId.longValue();
+		caseDateExecutor.submit(() -> { try {
+			caseService.deleteCaseDate(new DeleteCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer()));
+			Platform.runLater(() -> synchronizeCaseDatesAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())));
+		} catch (RuntimeException ex) { Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Remove Date", rootMessage(ex))); }
+		finally { caseDateMutationInFlight.set(false); } });
+	}
+
+	private void onRestoreCaseDate(CaseDateDto d) {
+		if (d == null || caseService == null || appState == null || caseId == null) return;
+		Integer tenantId = appState.getShaleClientId(), actorId = appState.getUserId();
+		if (tenantId == null || actorId == null || caseDateMutationInFlight.getAndSet(true)) return;
+		final long activeCaseId = caseId.longValue();
+		caseDateExecutor.submit(() -> { try {
+			caseService.restoreCaseDate(new RestoreCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer()));
+			Platform.runLater(() -> synchronizeCaseDatesAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())));
+		} catch (RuntimeException ex) { Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Restore Date", rootMessage(ex))); }
+		finally { caseDateMutationInFlight.set(false); } });
+	}
 	private Window caseDatesOwner() { return caseDatesTabPane != null && caseDatesTabPane.getScene() != null ? caseDatesTabPane.getScene().getWindow() : taskDialogOwner(); }
 
 
@@ -4501,16 +4550,46 @@ public class CaseController {
 			try {
 				CaseDateAggregateResult loaded = caseService.loadMigratedCompatibilityDateSnapshot(activeCaseId, tenant, actor);
 				runOnFx(() -> {
-					if (caseId == null || caseId.longValue() != activeCaseId || generation != compatibilityDatesGeneration) return;
+					if (!isCompatibilityDatesCurrent(activeCaseId, generation)) return;
 					compatibilityDates.replace(loaded);
 					latestCaseRowVer = loaded.caseRowVer();
 					renderCompatibilityDates();
 				});
 			} catch (RuntimeException ex) {
-				runOnFx(() -> { if (caseId != null && caseId.longValue() == activeCaseId && generation == compatibilityDatesGeneration)
+				runOnFx(() -> { if (isCompatibilityDatesCurrent(activeCaseId, generation))
 					showError("Authoritative Case Dates could not be loaded. Reload before editing dates."); });
 			}
 		}, "case-compatibility-dates-load-" + activeCaseId).start();
+	}
+
+	private boolean isCompatibilityDatesCurrent(long activeCaseId, int generation) {
+		return caseId != null && caseId.longValue() == activeCaseId
+				&& generation == compatibilityDatesGeneration
+				&& overviewScrollPane != null && overviewScrollPane.getScene() != null;
+	}
+
+	/**
+	 * The only local invalidation path between the generic Dates list and the fixed
+	 * compatibility controls.  A generic mutation never synthesizes an editor state:
+	 * migrated types force a complete aggregate reload so all row versions and absence
+	 * witnesses move forward together.  Fixed aggregate saves already return that
+	 * coherent snapshot, so only the generic list is invalidated in that direction.
+	 */
+	private void synchronizeCaseDatesAfterLocalMutation(long activeCaseId, boolean compatibilityAffected) {
+		if (caseId == null || caseId.longValue() != activeCaseId) return;
+		caseDatesStale = true;
+		if ("Dates".equals(activeSectionName)) loadCaseDatesAsync();
+		if (compatibilityAffected) loadCompatibilityDatesAsync(activeCaseId);
+	}
+
+	private boolean isMigratedCaseDateType(int typeId) {
+		return effectiveCaseDateTypes.stream().filter(type -> type.id() == typeId).findFirst()
+				.map(EffectiveCaseDateTypeDto::systemKey).map(this::isMigratedCaseDateSystemKey).orElse(false);
+	}
+
+	private boolean isMigratedCaseDateSystemKey(String systemKey) {
+		try { MigratedCaseDateKey.require(systemKey); return true; }
+		catch (IllegalArgumentException ignored) { return false; }
 	}
 
 	private void renderCompatibilityDates() {
@@ -4555,23 +4634,47 @@ public class CaseController {
 			else start = date.atStartOfDay();
 		}
 		values.put(key, new CompatibilityCaseDateEditor.EditedValue(start, date == null ? null : old.endsAt(), key.supportsTime() ? old.allDay() : true));
+		saveAuthoritativeValues(values);
+	}
+
+	private void saveAuthoritativeIntakeTime(String value) {
+		if (!compatibilityDates.isLoaded()) { showError("Reload authoritative Case Dates before editing."); return; }
+		CompatibilityCaseDateState old = compatibilityDates.states().get(MigratedCaseDateKey.CALLER_DATE);
+		if (old == null || old.startsAt() == null) { showError("Set Caller Date before Caller Time."); return; }
+		final java.time.LocalTime time;
+		try { time = java.time.LocalTime.parse(safeText(value).trim()); }
+		catch (RuntimeException ex) { showError("Caller Time must be a valid time such as 9:30."); return; }
+		Map<MigratedCaseDateKey, CompatibilityCaseDateEditor.EditedValue> values =
+				new java.util.EnumMap<>(AuthoritativeCaseDateEditor.values(compatibilityDates.states()));
+		values.put(MigratedCaseDateKey.CALLER_DATE, new CompatibilityCaseDateEditor.EditedValue(
+				LocalDateTime.of(old.startsAt().toLocalDate(), time), old.endsAt(), false));
+		saveAuthoritativeValues(values);
+	}
+
+	private void saveAuthoritativeValues(Map<MigratedCaseDateKey, CompatibilityCaseDateEditor.EditedValue> values) {
+		if (caseId == null || appState == null || caseService == null || !compatibilityDates.isLoaded()) {
+			showError("Reload authoritative Case Dates before editing."); return;
+		}
 		CaseDateAggregateCommand command;
 		try { command = compatibilityDates.beginSave(appState.getShaleClientId(), appState.getUserId(), caseId, values); }
 		catch (RuntimeException ex) { showError(ex.getMessage()); return; }
 		if (command == null) { renderCompatibilityDates(); return; }
 		final long activeCaseId = caseId;
-		final int generation = compatibilityDatesGeneration;
+		// A save is itself a newer authoritative request. Invalidate any older load so
+		// an out-of-order response cannot overwrite the returned aggregate snapshot.
+		final int generation = ++compatibilityDatesGeneration;
 		setBusy(true);
 		new Thread(() -> {
 			try {
 				CaseDateAggregateResult result = caseService.mutateMigratedCompatibilityDates(command);
 				runOnFx(() -> {
-					if (caseId == null || caseId.longValue() != activeCaseId || generation != compatibilityDatesGeneration) return;
+					if (!isCompatibilityDatesCurrent(activeCaseId, generation)) return;
 					compatibilityDates.replace(result); latestCaseRowVer = result.caseRowVer(); renderCompatibilityDates(); setBusy(false);
+					synchronizeCaseDatesAfterLocalMutation(activeCaseId, false);
 				});
 			} catch (RuntimeException ex) {
 				runOnFx(() -> {
-					if (caseId == null || caseId.longValue() != activeCaseId || generation != compatibilityDatesGeneration) return;
+					if (!isCompatibilityDatesCurrent(activeCaseId, generation)) return;
 					compatibilityDates.failedSave(); setBusy(false);
 					showError("Case Dates changed elsewhere or are inconsistent. Reloaded authoritative dates; review your change before saving again.");
 					compatibilityDates.invalidate(); loadCompatibilityDatesAsync(activeCaseId);
@@ -5111,37 +5214,43 @@ public class CaseController {
 
 	private void onEditCaseNameField() {
 		showTextFieldDialog("Edit Case Name", "Case name", currentOverview == null ? "" : currentOverview.getCaseName(), true,
-				value -> saveCoreOverviewField("name", value, null, null, null));
+				value -> saveCoreOverviewField("name", value));
 	}
 
 	private void onEditCaseNumberField() {
 		showTextFieldDialog("Edit Case Number", "Case number", currentOverview == null ? "" : currentOverview.getCaseNumber(), false, value -> saveCoreOverviewField("caseNumber",
-				value, null, null, null));
+				value));
 	}
 
 	private void onEditDescriptionField() {
 		showTextAreaDialog("Edit Description", "Description / summary notes", currentOverview == null ? "" : currentOverview.getDescription(), value -> saveCoreOverviewField(
-				"description", value, null, null, null));
+				"description", value));
 	}
 
 	private void onEditIncidentDateField() {
-		showDateFieldDialog("Edit Incident Date", "Incident date", currentOverview == null ? null : currentOverview.getIncidentDate(), value -> saveCoreOverviewField(
-				"incidentDate", null, value, null, null));
+		showDateFieldDialog("Edit Incident Date", "Incident date", authoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY),
+				value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY, value));
 	}
 
 	private void onEditDateOfMedicalNegligenceField() {
-		showDateFieldDialog("Edit Date of Medical Negligence", "Date of medical negligence", current == null ? null : current.getDateOfMedicalNegligence(),
-				value -> saveDetailDateOverviewField("dateOfMedicalNegligence", value));
+		showDateFieldDialog("Edit Date of Medical Negligence", "Date of medical negligence", authoritativeDate(MigratedCaseDateKey.DATE_OF_MEDICAL_NEGLIGENCE),
+				value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_MEDICAL_NEGLIGENCE, value));
 	}
 
 	private void onEditSolDateField() {
-		showNullableDateFieldDialog("Edit SOL Date", "SOL date", currentOverview == null ? null : currentOverview.getSolDate(), editSolDateButton,
-				value -> saveCoreOverviewField("solDate", null, null, value, null));
+		showNullableDateFieldDialog("Edit SOL Date", "SOL date", authoritativeDate(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS), editSolDateButton,
+				value -> saveAuthoritativeDate(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS, value));
 	}
 
 	private void onEditTortNoticeDeadlineField() {
-		showNullableDateFieldDialog("Edit Tort Notice Deadline", "Tort notice deadline", current == null ? null : current.getTortNoticeDeadline(),
-				editTortNoticeDeadlineButton, value -> saveCoreOverviewField("tortNoticeDeadline", null, null, null, value));
+		showNullableDateFieldDialog("Edit Tort Notice Deadline", "Tort notice deadline", authoritativeDate(MigratedCaseDateKey.TORT_NOTICE_DEADLINE),
+				editTortNoticeDeadlineButton, value -> saveAuthoritativeDate(MigratedCaseDateKey.TORT_NOTICE_DEADLINE, value));
+	}
+
+	private LocalDate authoritativeDate(MigratedCaseDateKey key) {
+		if (!compatibilityDates.isLoaded()) return null;
+		CompatibilityCaseDateState state = compatibilityDates.states().get(key);
+		return state == null || state.startsAt() == null ? null : state.startsAt().toLocalDate();
 	}
 
 	private void showTextFieldDialog(String title, String label, String currentValue, boolean required, Consumer<String> onSave) {
@@ -5398,19 +5507,7 @@ public class CaseController {
 		});
 	}
 
-	private void saveDetailDateOverviewField(String field, LocalDate value) {
-		if (!"dateOfMedicalNegligence".equals(field))
-			return;
-		CaseDetailsDraft draft = CaseDetailsDraft.from(current, currentOverview);
-		draft.dateOfMedicalNegligence = value;
-		detailsDraft = draft;
-		detailsBaseline = CaseDetailsDraft.from(current, currentOverview);
-		detailsEditRowVer = cloneRowVer(latestCaseRowVer != null ? latestCaseRowVer : (current == null ? null : current.getRowVer()));
-		detailsEditor.renderEditors(draft);
-		detailsSaveCoordinator.save();
-	}
-
-	private void saveCoreOverviewField(String field, String textValue, LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline) {
+	private void saveCoreOverviewField(String field, String textValue) {
 		if (caseDao == null || caseId == null || current == null) {
 			showError("Case is still loading. Please try again.");
 			return;
@@ -5428,11 +5525,8 @@ public class CaseController {
 				String name = "name".equals(field) ? safeText(textValue).trim() : latest.getCaseName();
 				String number = "caseNumber".equals(field) ? safeText(textValue).trim() : latest.getCaseNumber();
 				String description = "description".equals(field) ? safeText(textValue) : latest.getDescription();
-				LocalDate injury = "incidentDate".equals(field) ? incidentDate : latest.getDateOfInjury();
-				LocalDate sol = "solDate".equals(field) ? solDate : latest.getStatuteOfLimitations();
-				LocalDate tortNotice = "tortNoticeDeadline".equals(field) ? tortNoticeDeadline : latest.getTortNoticeDeadline();
-				CaseDetailDto updated = caseDao.updateCase(activeCaseId, name, number, description, injury, sol,
-						tortNotice, latest.getSummary(), latest.getRowVer(), appState == null ? null
+				CaseDetailDto updated = caseDao.updateCaseNonDate(activeCaseId, name, number, description,
+						latest.getSummary(), latest.getRowVer(), appState == null ? null
 								: appState.getUserId());
 				if (updated == null) {
 					runOnFx(() ->
@@ -5447,14 +5541,12 @@ public class CaseController {
 				{
 					applyCurrentDetailSnapshot(updated);
 					applyDetail(updated);
+					compatibilityDates.invalidate();
 					setBusy(false);
 					publishCaseFieldUpdated(activeCaseId, field, switch (field) {
 					case "name" -> name;
 					case "caseNumber" -> number;
 					case "description" -> description;
-					case "incidentDate" -> injury == null ? null : injury.toString();
-					case "solDate" -> sol == null ? null : sol.toString();
-					case "tortNoticeDeadline" -> tortNotice == null ? null : tortNotice.toString();
 					default -> null;
 					});
 					reloadCurrentCaseForViewMode();
@@ -7187,10 +7279,6 @@ public class CaseController {
 				ovCaseNumberValue.setText(safeText(detail.getCaseNumber()));
 			if (!editMode && ovDescriptionValue != null)
 				ovDescriptionValue.setText(safeText(detail.getDescription()));
-			if (!editMode && ovDateOfMedicalNegligenceValue != null)
-				ovDateOfMedicalNegligenceValue.setText(formatDate(detail.getDateOfMedicalNegligence()));
-			if (!editMode && ovDateOfMedicalNegligenceEditor != null)
-				ovDateOfMedicalNegligenceEditor.setValue(detail.getDateOfMedicalNegligence());
 			if (statusLabel != null)
 				statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
 			renderLastUpdated(detail.getUpdatedAt());
@@ -7282,24 +7370,8 @@ public class CaseController {
 		}
 
 		private void renderOverviewDates(CaseOverviewDto dto, boolean editSafeOnly) {
-			if (ovIntakeDateValue != null)
-				ovIntakeDateValue.setText(formatDate(dto.getIntakeDate()));
-			if (ovIncidentDateValue != null)
-				ovIncidentDateValue.setText(formatDate(dto.getIncidentDate()));
-			if (ovDateOfMedicalNegligenceValue != null)
-				ovDateOfMedicalNegligenceValue.setText(formatDate(current == null ? null : current.getDateOfMedicalNegligence()));
-			if (ovSolDateValue != null)
-				ovSolDateValue.setText(formatDate(dto.getSolDate()));
-			if (ovTortNoticeDeadlineValue != null)
-				ovTortNoticeDeadlineValue.setText(formatDate(dto.getTortNoticeDeadline()));
-			if (!editSafeOnly) {
-				if (ovIncidentDateEditor != null && !editMode)
-					ovIncidentDateEditor.setValue(dto.getIncidentDate());
-				if (ovDateOfMedicalNegligenceEditor != null && !editMode)
-					ovDateOfMedicalNegligenceEditor.setValue(current == null ? null : current.getDateOfMedicalNegligence());
-				if (ovSolDateEditor != null && !editMode)
-					ovSolDateEditor.setValue(dto.getSolDate());
-			}
+			// The general overview/detail DTOs still carry deferred compatibility values,
+			// but existing-case fixed controls are rendered only by renderCompatibilityDates().
 		}
 
 		private void renderHeaderTitleFromOverview(CaseOverviewDto dto) {
@@ -7417,8 +7489,7 @@ public class CaseController {
 			draftPrimaryOpposingCounselName = null;
 			draftIncidentDate = null;
 			draftSolDate = null;
-			if (ovTortNoticeDeadlineEditor != null)
-				ovTortNoticeDeadlineEditor.setValue(current == null ? null : current.getTortNoticeDeadline());
+			if (compatibilityDates.isLoaded()) renderCompatibilityDates();
 			draftTeamAssignments = null;
 		}
 
@@ -7434,16 +7505,9 @@ public class CaseController {
 			draftPracticeAreaColor = (currentOverview == null ? null : currentOverview.getPracticeAreaColor());
 			draftPrimaryOpposingCounselContactId = (currentOverview == null ? null : currentOverview.getPrimaryOpposingCounselContactId());
 			draftPrimaryOpposingCounselName = (currentOverview == null ? null : currentOverview.getOpposingCounsel());
-			draftIncidentDate = (currentOverview == null ? null : currentOverview.getIncidentDate());
-			draftSolDate = (currentOverview == null ? null : currentOverview.getSolDate());
-			if (ovIncidentDateEditor != null)
-				ovIncidentDateEditor.setValue(draftIncidentDate);
-			if (ovDateOfMedicalNegligenceEditor != null)
-				ovDateOfMedicalNegligenceEditor.setValue(current == null ? null : current.getDateOfMedicalNegligence());
-			if (ovSolDateEditor != null)
-				ovSolDateEditor.setValue(draftSolDate);
-			if (ovTortNoticeDeadlineEditor != null)
-				ovTortNoticeDeadlineEditor.setValue(current == null ? null : current.getTortNoticeDeadline());
+			draftIncidentDate = authoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY);
+			draftSolDate = authoritativeDate(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS);
+			renderCompatibilityDates();
 		}
 
 		private boolean ensureCurrentDetailReady() {
@@ -7540,7 +7604,7 @@ public class CaseController {
 					safeText(current.getDescription()),
 					safeText(current.getCaseNumber()).trim(),
 					currentOverview,
-					current.getTortNoticeDeadline(),
+					authoritativeDate(MigratedCaseDateKey.TORT_NOTICE_DEADLINE),
 					current.getSummary(),
 					expectedRowVer
 			);
@@ -7569,7 +7633,7 @@ public class CaseController {
 					draftPrimaryOpposingCounselName,
 					(ovIncidentDateEditor == null ? null : ovIncidentDateEditor.getValue()),
 					(ovSolDateEditor == null ? null : nullableDatePickerValue(ovSolDateEditor)),
-					(ovTortNoticeDeadlineEditor == null ? current.getTortNoticeDeadline() : nullableDatePickerValue(ovTortNoticeDeadlineEditor)),
+					(ovTortNoticeDeadlineEditor == null ? authoritativeDate(MigratedCaseDateKey.TORT_NOTICE_DEADLINE) : nullableDatePickerValue(ovTortNoticeDeadlineEditor)),
 					(draftTeamAssignments == null) ? null : List.copyOf(draftTeamAssignments)
 			);
 		}
@@ -7790,14 +7854,11 @@ public class CaseController {
 		}
 
 		private CaseDetailDto persistBaseCaseFields(SaveRequest request) {
-			return caseDao.updateCase(
+			return caseDao.updateCaseNonDate(
 					request.saveCaseId(),
 					request.saveDraft().caseName(),
 					request.saveDraft().caseNumber(),
 					request.saveDraft().description(),
-					request.desired().desiredIncidentDate(),
-					request.desired().desiredSolDate(),
-					request.desired().desiredTortNoticeDeadline(),
 					request.baseline().summary(),
 					request.baseline().expectedRowVer(),
 					request.userId()
@@ -7877,6 +7938,7 @@ public class CaseController {
 			publishFieldUpdates(request, computation, teamChanged);
 
 			clearDraftState();
+			compatibilityDates.invalidate();
 			reloadCurrentCaseForViewMode();
 		}
 
@@ -8767,11 +8829,6 @@ public class CaseController {
 				}
 			}
 
-			if (incidentApplied && ovIncidentDateValue != null)
-				ovIncidentDateValue.setText(formatDate(nextIncidentDate));
-			if (solApplied && ovSolDateValue != null)
-				ovSolDateValue.setText(formatDate(nextSolDate));
-
 			if (incidentApplied || solApplied) {
 				CaseOverviewDto base = currentOverview;
 				if (base != null) {
@@ -8920,27 +8977,17 @@ public class CaseController {
 			d.practiceAreaColor = overview == null ? null : overview.getPracticeAreaColor();
 
 			d.description = detail == null ? "" : safeText(detail.getDescription());
-			d.callerDate = detail == null ? null : detail.getCallerDate();
-			d.callerTime = detail == null ? "" : normalizeCallerTimeDisplay(detail.getCallerTime());
 			d.acceptedDate = detail == null ? null : detail.getAcceptedDate();
 			d.closedDate = detail == null ? null : detail.getClosedDate();
 			d.deniedDate = detail == null ? null : detail.getDeniedDate();
 
-			d.dateOfMedicalNegligence = detail == null ? null : detail.getDateOfMedicalNegligence();
-			d.dateMedicalNegligenceWasDiscovered = detail == null ? null : detail.getDateMedicalNegligenceWasDiscovered();
-			d.dateOfInjury = detail == null ? null : detail.getDateOfInjury();
-			d.statuteOfLimitations = detail == null ? null : detail.getStatuteOfLimitations();
-			d.tortNoticeDeadline = detail == null ? null : detail.getTortNoticeDeadline();
-			d.discoveryDeadline = detail == null ? null : detail.getDiscoveryDeadline();
 
 			d.clientEstate = detail == null ? "0" : normalizeDetailsCheckboxStorage(detail.getClientEstate());
 			d.officePrinterCode = detail == null ? "" : safeText(detail.getOfficePrinterCode());
 			d.medicalRecordsRequested = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getMedicalRecordsRequested());
 			System.out.println("Case details load: feeAgreementSigned rawLoaded=" + (detail == null ? null : detail.getFeeAgreementSigned()));
 			d.feeAgreementSigned = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getFeeAgreementSigned());
-			d.dateFeeAgreementSigned = detail == null ? null : detail.getDateFeeAgreementSigned();
 			d.nonEngagementLetterSent = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getNonEngagementLetterSent());
-			d.dateNonEngagementLetterSent = detail == null ? null : detail.getDateNonEngagementLetterSent();
 
 			d.acceptedChronology = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getAcceptedChronology());
 			d.acceptedConsultantExpertSearch = detail == null ? Boolean.FALSE : normalizeDetailsCheckboxBoolean(detail.getAcceptedConsultantExpertSearch());
@@ -9041,30 +9088,20 @@ public class CaseController {
 
 		private void runSaveWorker(DetailsSaveRequest request) {
 			try {
-				CaseDetailDto updated = caseDao.updateCaseDetails(
+				CaseDetailDto updated = caseDao.updateCaseDetailsNonMigrated(
 						request.caseId(),
 						request.name(),
 						request.caseNumber(),
 						request.practiceAreaId(),
 						request.description(),
-						request.callerDate(),
-						request.callerTime(),
 						request.acceptedDate(),
 						request.closedDate(),
 						request.deniedDate(),
-						request.dateOfMedicalNegligence(),
-						request.dateMedicalNegligenceWasDiscovered(),
-						request.dateOfInjury(),
-						request.statuteOfLimitations(),
-						request.tortNoticeDeadline(),
-						request.discoveryDeadline(),
 						request.clientEstate(),
 						request.officePrinterCode(),
 						request.medicalRecordsRequested(),
 						request.feeAgreementSigned(),
-						request.dateFeeAgreementSigned(),
 						request.nonEngagementLetterSent(),
-						request.dateNonEngagementLetterSent(),
 						request.acceptedChronology(),
 						request.acceptedConsultantExpertSearch(),
 						request.acceptedTestifyingExpertSearch(),
@@ -9102,24 +9139,6 @@ public class CaseController {
 							request.caseId(),
 							(appState == null ? null : appState.getShaleClientId()),
 							(appState == null ? null : appState.getUserId()),
-							CaseDao.CaseTimelineEventTypes.INTAKE_DATE_CHANGED,
-							"Intake date changed",
-							request.baseline().getCallerDate(),
-							request.callerDate()
-					);
-					addTimeChangedTimelineEvent(
-							request.caseId(),
-							(appState == null ? null : appState.getShaleClientId()),
-							(appState == null ? null : appState.getUserId()),
-							CaseDao.CaseTimelineEventTypes.INTAKE_TIME_CHANGED,
-							"Intake time changed",
-							normalizeCallerTimeDisplay(request.baseline().getCallerTime()),
-							request.callerTime()
-					);
-					addDateChangedTimelineEvent(
-							request.caseId(),
-							(appState == null ? null : appState.getShaleClientId()),
-							(appState == null ? null : appState.getUserId()),
 							CaseDao.CaseTimelineEventTypes.ACCEPTED_DATE_CHANGED,
 							"Accepted date changed",
 							request.baseline().getAcceptedDate(),
@@ -9142,69 +9161,6 @@ public class CaseController {
 							"Denied date changed",
 							request.baseline().getDeniedDate(),
 							request.deniedDate()
-					);
-					addDateChangedTimelineEvent(
-							request.caseId(),
-							(appState == null ? null : appState.getShaleClientId()),
-							(appState == null ? null : appState.getUserId()),
-							CaseDao.CaseTimelineEventTypes.MEDICAL_MALPRACTICE_DATE_CHANGED,
-							"Date of medical negligence changed",
-							request.baseline().getDateOfMedicalNegligence(),
-							request.dateOfMedicalNegligence()
-					);
-					addDateChangedTimelineEvent(
-							request.caseId(),
-							(appState == null ? null : appState.getShaleClientId()),
-							(appState == null ? null : appState.getUserId()),
-							CaseDao.CaseTimelineEventTypes.MEDICAL_MALPRACTICE_DISCOVERY_DATE_CHANGED,
-							"Medical negligence discovery date changed",
-							request.baseline().getDateMedicalNegligenceWasDiscovered(),
-							request.dateMedicalNegligenceWasDiscovered()
-					);
-					addDateChangedTimelineEvent(
-							request.caseId(),
-							(appState == null ? null : appState.getShaleClientId()),
-							(appState == null ? null : appState.getUserId()),
-							CaseDao.CaseTimelineEventTypes.INJURY_DATE_CHANGED,
-							"Date of injury changed",
-							request.baseline().getDateOfInjury(),
-							request.dateOfInjury()
-					);
-					addDateChangedTimelineEvent(
-							request.caseId(),
-							(appState == null ? null : appState.getShaleClientId()),
-							(appState == null ? null : appState.getUserId()),
-							CaseDao.CaseTimelineEventTypes.STATUTE_OF_LIMITATIONS_CHANGED,
-							"Statute of limitations changed",
-							request.baseline().getStatuteOfLimitations(),
-							request.statuteOfLimitations()
-					);
-					addDateChangedTimelineEvent(
-							request.caseId(),
-							(appState == null ? null : appState.getShaleClientId()),
-							(appState == null ? null : appState.getUserId()),
-							CaseDao.CaseTimelineEventTypes.TORT_NOTICE_DEADLINE_CHANGED,
-							"Tort notice deadline changed",
-							request.baseline().getTortNoticeDeadline(),
-							request.tortNoticeDeadline()
-					);
-					addDateChangedTimelineEvent(
-							request.caseId(),
-							(appState == null ? null : appState.getShaleClientId()),
-							(appState == null ? null : appState.getUserId()),
-							CaseDao.CaseTimelineEventTypes.DISCOVERY_DEADLINE_CHANGED,
-							"Discovery deadline changed",
-							request.baseline().getDiscoveryDeadline(),
-							request.discoveryDeadline()
-					);
-					addDateChangedTimelineEvent(
-							request.caseId(),
-							(appState == null ? null : appState.getShaleClientId()),
-							(appState == null ? null : appState.getUserId()),
-							CaseDao.CaseTimelineEventTypes.FEE_AGREEMENT_DATE_CHANGED,
-							"Fee agreement date changed",
-							request.baseline().getDateFeeAgreementSigned(),
-							request.dateFeeAgreementSigned()
 					);
 					addBooleanChangedTimelineEvent(
 							request.caseId(),
@@ -9394,6 +9350,7 @@ public class CaseController {
 			clearError();
 			publishDetailsFieldUpdates(request);
 			setBusy(false);
+			compatibilityDates.invalidate();
 			reloadCurrentCaseForViewMode();
 		}
 
@@ -9404,29 +9361,14 @@ public class CaseController {
 			publishIfChanged(request.caseId(), "primaryStatusId", request.baselinePrimaryStatusId(), request.primaryStatusId());
 			publishIfChanged(request.caseId(), "practiceAreaId", baseline.getPracticeAreaId(), request.practiceAreaId());
 			publishIfChanged(request.caseId(), "description", normalizeNullableText(baseline.getDescription()), request.description());
-			publishIfChanged(request.caseId(), "callerDate", baseline.getCallerDate(), request.callerDate());
-			publishIfChanged(request.caseId(), "callerTime", normalizeCallerTimeInput(normalizeCallerTimeDisplay(baseline.getCallerTime())), request.callerTime());
 			publishIfChanged(request.caseId(), "acceptedDate", baseline.getAcceptedDate(), request.acceptedDate());
 			publishIfChanged(request.caseId(), "closedDate", baseline.getClosedDate(), request.closedDate());
 			publishIfChanged(request.caseId(), "deniedDate", baseline.getDeniedDate(), request.deniedDate());
-			publishIfChanged(request.caseId(), "dateOfMedicalNegligence", baseline.getDateOfMedicalNegligence(), request.dateOfMedicalNegligence());
-			publishIfChanged(request.caseId(), "dateMedicalNegligenceWasDiscovered", baseline.getDateMedicalNegligenceWasDiscovered(), request
-					.dateMedicalNegligenceWasDiscovered());
-			publishIfChanged(request.caseId(), "dateOfInjury", baseline.getDateOfInjury(), request.dateOfInjury());
-			publishIfChanged(request.caseId(), "statuteOfLimitations", baseline.getStatuteOfLimitations(), request.statuteOfLimitations());
-			publishIfChanged(request.caseId(), "tortNoticeDeadline", baseline.getTortNoticeDeadline(), request.tortNoticeDeadline());
-			publishIfChanged(request.caseId(), "discoveryDeadline", baseline.getDiscoveryDeadline(), request.discoveryDeadline());
 			publishIfChanged(request.caseId(), "clientEstate", normalizeNullableText(baseline.getClientEstate()), request.clientEstate());
 			publishIfChanged(request.caseId(), "officePrinterCode", normalizeNullableText(baseline.getOfficePrinterCode()), request.officePrinterCode());
 			publishIfChanged(request.caseId(), "medicalRecordsRequested", baseline.getMedicalRecordsRequested(), request.medicalRecordsRequested());
 			publishIfChanged(request.caseId(), "feeAgreementSigned", baseline.getFeeAgreementSigned(), request.feeAgreementSigned());
-			publishIfChanged(request.caseId(), "dateFeeAgreementSigned", baseline.getDateFeeAgreementSigned(), request.dateFeeAgreementSigned());
 			publishIfChanged(request.caseId(), "nonEngagementLetterSent", baseline.getNonEngagementLetterSent(), request.nonEngagementLetterSent());
-			publishIfChanged(
-					request.caseId(),
-					"dateNonEngagementLetterSent",
-					baseline.getDateNonEngagementLetterSent(),
-					request.dateNonEngagementLetterSent());
 			publishIfChanged(request.caseId(), "acceptedChronology", baseline.getAcceptedChronology(), request.acceptedChronology());
 			publishIfChanged(request.caseId(), "acceptedConsultantExpertSearch", baseline.getAcceptedConsultantExpertSearch(), request.acceptedConsultantExpertSearch());
 			publishIfChanged(request.caseId(), "acceptedTestifyingExpertSearch", baseline.getAcceptedTestifyingExpertSearch(), request.acceptedTestifyingExpertSearch());
@@ -9437,9 +9379,6 @@ public class CaseController {
 			publishIfChanged(request.caseId(), "summary", normalizeNullableText(baseline.getSummary()), request.summary());
 			publishIfChanged(request.caseId(), "receivedUpdates", normalizeNullableText(baseline.getReceivedUpdates()), request.receivedUpdates());
 
-			// Keep Overview inline listeners responsive for these two shared fields.
-			publishIfChanged(request.caseId(), "incidentDate", baseline.getDateOfInjury(), request.dateOfInjury());
-			publishIfChanged(request.caseId(), "solDate", baseline.getStatuteOfLimitations(), request.statuteOfLimitations());
 		}
 
 		private void publishIfChanged(long caseId, String field, Object before, Object after) {
@@ -9495,24 +9434,14 @@ public class CaseController {
 					!Objects.equals(caseNumber, normalizeNullableText(baseline.getCaseNumber())) ||
 					!Objects.equals(practiceAreaId, baseline.getPracticeAreaId()) ||
 					!Objects.equals(description, normalizeNullableText(baseline.getDescription())) ||
-					!Objects.equals(source.callerDate, baseline.getCallerDate()) ||
-					!Objects.equals(callerTime, normalizeCallerTimeInput(normalizeCallerTimeDisplay(baseline.getCallerTime()))) ||
 					!Objects.equals(lifecycleDates.acceptedDate(), baseline.getAcceptedDate()) ||
 					!Objects.equals(lifecycleDates.closedDate(), baseline.getClosedDate()) ||
 					!Objects.equals(lifecycleDates.deniedDate(), baseline.getDeniedDate()) ||
-					!Objects.equals(source.dateOfMedicalNegligence, baseline.getDateOfMedicalNegligence()) ||
-					!Objects.equals(source.dateMedicalNegligenceWasDiscovered, baseline.getDateMedicalNegligenceWasDiscovered()) ||
-					!Objects.equals(source.dateOfInjury, baseline.getDateOfInjury()) ||
-					!Objects.equals(source.statuteOfLimitations, baseline.getStatuteOfLimitations()) ||
-					!Objects.equals(source.tortNoticeDeadline, baseline.getTortNoticeDeadline()) ||
-					!Objects.equals(source.discoveryDeadline, baseline.getDiscoveryDeadline()) ||
 					!Objects.equals(clientEstate, normalizeDetailsCheckboxStorage(baseline.getClientEstate())) ||
 					!Objects.equals(officePrinterCode, normalizeNullableText(baseline.getOfficePrinterCode())) ||
 					!Objects.equals(medicalRecordsRequested, baselineMedicalRecordsRequested) ||
 					!Objects.equals(feeAgreementSigned, baselineFeeAgreementSigned) ||
-					!Objects.equals(dateFeeAgreementSigned, baseline.getDateFeeAgreementSigned()) ||
 					!Objects.equals(nonEngagementLetterSent, baselineNonEngagementLetterSent) ||
-					!Objects.equals(dateNonEngagementLetterSent, baseline.getDateNonEngagementLetterSent()) ||
 					!Objects.equals(acceptedChronology, baselineAcceptedChronology) ||
 					!Objects.equals(acceptedConsultantExpertSearch, baselineAcceptedConsultantExpertSearch) ||
 					!Objects.equals(acceptedTestifyingExpertSearch, baselineAcceptedTestifyingExpertSearch) ||
@@ -10101,9 +10030,6 @@ public class CaseController {
 	}
 
 	private final class CaseDetailsEditor {
-		private javafx.beans.value.ChangeListener<Boolean> feeAgreementSignedAutoDateListener;
-		private javafx.beans.value.ChangeListener<Boolean> nonEngagementLetterSentAutoDateListener;
-
 		void beginEdit() {
 			CaseDetailsDraft base = resolveDetailsViewModel();
 			detailsBaseline = base.copy();
@@ -10232,28 +10158,12 @@ public class CaseController {
 			renderDetailsPracticeAreaMini(d.practiceAreaId, d.practiceAreaName, d.practiceAreaColor);
 			if (detDescriptionValue != null)
 				detDescriptionValue.setText(safe(d.description));
-			if (detCallerDateValue != null)
-				detCallerDateValue.setText(formatDate(d.callerDate));
-			if (detCallerTimeValue != null)
-				detCallerTimeValue.setText(safe(d.callerTime));
 			if (detAcceptedDateValue != null)
 				detAcceptedDateValue.setText(formatDate(d.acceptedDate));
 			if (detClosedDateValue != null)
 				detClosedDateValue.setText(formatDate(d.closedDate));
 			if (detDeniedDateValue != null)
 				detDeniedDateValue.setText(formatDate(d.deniedDate));
-			if (detDateOfMedicalNegligenceValue != null)
-				detDateOfMedicalNegligenceValue.setText(formatDate(d.dateOfMedicalNegligence));
-			if (detDateMedicalNegligenceWasDiscoveredValue != null)
-				detDateMedicalNegligenceWasDiscoveredValue.setText(formatDate(d.dateMedicalNegligenceWasDiscovered));
-			if (detDateOfInjuryValue != null)
-				detDateOfInjuryValue.setText(formatDate(d.dateOfInjury));
-			if (detStatuteOfLimitationsValue != null)
-				detStatuteOfLimitationsValue.setText(formatDate(d.statuteOfLimitations));
-			if (detTortNoticeDeadlineValue != null)
-				detTortNoticeDeadlineValue.setText(formatDate(d.tortNoticeDeadline));
-			if (detDiscoveryDeadlineValue != null)
-				detDiscoveryDeadlineValue.setText(formatDate(d.discoveryDeadline));
 			if (detClientEstateValue != null)
 				detClientEstateValue.setText(boolLabel(parseNullableBooleanStorage(d.clientEstate)));
 			if (detOfficePrinterCodeValue != null)
@@ -10262,12 +10172,8 @@ public class CaseController {
 				detMedicalRecordsRequestedValue.setText(boolLabel(d.medicalRecordsRequested));
 			if (detFeeAgreementSignedValue != null)
 				detFeeAgreementSignedValue.setText(boolLabel(Boolean.TRUE.equals(d.feeAgreementSigned)));
-			if (detDateFeeAgreementSignedValue != null)
-				detDateFeeAgreementSignedValue.setText(formatDate(d.dateFeeAgreementSigned));
 			if (detNonEngagementLetterSentValue != null)
 				detNonEngagementLetterSentValue.setText(boolLabel(Boolean.TRUE.equals(d.nonEngagementLetterSent)));
-			if (detDateNonEngagementLetterSentValue != null)
-				detDateNonEngagementLetterSentValue.setText(formatDate(d.dateNonEngagementLetterSent));
 			if (detAcceptedChronologyValue != null)
 				detAcceptedChronologyValue.setText(boolLabel(d.acceptedChronology));
 			if (detAcceptedConsultantExpertSearchValue != null)
@@ -10302,28 +10208,12 @@ public class CaseController {
 			renderDetailsPracticeAreaMini(d.practiceAreaId, d.practiceAreaName, d.practiceAreaColor);
 			if (detDescriptionEditor != null)
 				detDescriptionEditor.setText(d.description);
-			if (detCallerDateEditor != null)
-				detCallerDateEditor.setValue(d.callerDate);
-			if (detCallerTimeEditor != null)
-				detCallerTimeEditor.setText(d.callerTime);
 			if (detAcceptedDateEditor != null)
 				detAcceptedDateEditor.setValue(d.acceptedDate);
 			if (detClosedDateEditor != null)
 				detClosedDateEditor.setValue(d.closedDate);
 			if (detDeniedDateEditor != null)
 				detDeniedDateEditor.setValue(d.deniedDate);
-			if (detDateOfMedicalNegligenceEditor != null)
-				detDateOfMedicalNegligenceEditor.setValue(d.dateOfMedicalNegligence);
-			if (detDateMedicalNegligenceWasDiscoveredEditor != null)
-				detDateMedicalNegligenceWasDiscoveredEditor.setValue(d.dateMedicalNegligenceWasDiscovered);
-			if (detDateOfInjuryEditor != null)
-				detDateOfInjuryEditor.setValue(d.dateOfInjury);
-			if (detStatuteOfLimitationsEditor != null)
-				detStatuteOfLimitationsEditor.setValue(d.statuteOfLimitations);
-			if (detTortNoticeDeadlineEditor != null)
-				detTortNoticeDeadlineEditor.setValue(d.tortNoticeDeadline);
-			if (detDiscoveryDeadlineEditor != null)
-				detDiscoveryDeadlineEditor.setValue(d.discoveryDeadline);
 			renderNullableBoolean(detClientEstateEditor, parseNullableBooleanStorage(d.clientEstate));
 			if (detOfficePrinterCodeEditor != null)
 				detOfficePrinterCodeEditor.setText(d.officePrinterCode);
@@ -10333,15 +10223,11 @@ public class CaseController {
 				detFeeAgreementSignedEditor.setIndeterminate(false);
 				detFeeAgreementSignedEditor.setSelected(Boolean.TRUE.equals(d.feeAgreementSigned));
 			}
-			if (detDateFeeAgreementSignedEditor != null)
-				detDateFeeAgreementSignedEditor.setValue(d.dateFeeAgreementSigned);
 			if (detNonEngagementLetterSentEditor != null) {
 				detNonEngagementLetterSentEditor.setAllowIndeterminate(false);
 				detNonEngagementLetterSentEditor.setIndeterminate(false);
 				detNonEngagementLetterSentEditor.setSelected(Boolean.TRUE.equals(d.nonEngagementLetterSent));
 			}
-			if (detDateNonEngagementLetterSentEditor != null)
-				detDateNonEngagementLetterSentEditor.setValue(d.dateNonEngagementLetterSent);
 			renderNullableBoolean(detAcceptedChronologyEditor, d.acceptedChronology);
 			renderNullableBoolean(detAcceptedConsultantExpertSearchEditor, d.acceptedConsultantExpertSearch);
 			renderNullableBoolean(detAcceptedTestifyingExpertSearchEditor, d.acceptedTestifyingExpertSearch);
@@ -10356,36 +10242,6 @@ public class CaseController {
 			renderNullableBoolean(detReceivedUpdatesEditor, d.receivedUpdates);
 		}
 
-		private void wireFeeAgreementSignedAutoDateListener() {
-			if (detFeeAgreementSignedEditor == null)
-				return;
-			if (feeAgreementSignedAutoDateListener != null)
-				detFeeAgreementSignedEditor.selectedProperty().removeListener(feeAgreementSignedAutoDateListener);
-			feeAgreementSignedAutoDateListener = (obs, wasSelected, isSelected) ->
-			{
-				if (!Boolean.TRUE.equals(isSelected) || detDateFeeAgreementSignedEditor == null)
-					return;
-				if (detDateFeeAgreementSignedEditor.getValue() == null)
-					detDateFeeAgreementSignedEditor.setValue(LocalDate.now());
-			};
-			detFeeAgreementSignedEditor.selectedProperty().addListener(feeAgreementSignedAutoDateListener);
-		}
-
-		private void wireNonEngagementLetterSentAutoDateListener() {
-			if (detNonEngagementLetterSentEditor == null)
-				return;
-			if (nonEngagementLetterSentAutoDateListener != null)
-				detNonEngagementLetterSentEditor.selectedProperty().removeListener(nonEngagementLetterSentAutoDateListener);
-			nonEngagementLetterSentAutoDateListener = (obs, wasSelected, isSelected) ->
-			{
-				if (!Boolean.TRUE.equals(isSelected) || detDateNonEngagementLetterSentEditor == null)
-					return;
-				if (detDateNonEngagementLetterSentEditor.getValue() == null)
-					detDateNonEngagementLetterSentEditor.setValue(LocalDate.now());
-			};
-			detNonEngagementLetterSentEditor.selectedProperty().addListener(nonEngagementLetterSentAutoDateListener);
-		}
-
 		void captureEditors(CaseDetailsDraft d) {
 			if (detNameEditor != null)
 				d.name = safeText(detNameEditor.getText());
@@ -10393,38 +10249,18 @@ public class CaseController {
 				d.caseNumber = safeText(detCaseNumberEditor.getText());
 			if (detDescriptionEditor != null)
 				d.description = safeText(detDescriptionEditor.getText());
-			if (detCallerDateEditor != null)
-				d.callerDate = detCallerDateEditor.getValue();
-			if (detCallerTimeEditor != null)
-				d.callerTime = safeText(detCallerTimeEditor.getText());
 			if (detAcceptedDateEditor != null)
 				d.acceptedDate = detAcceptedDateEditor.getValue();
 			if (detClosedDateEditor != null)
 				d.closedDate = detClosedDateEditor.getValue();
 			if (detDeniedDateEditor != null)
 				d.deniedDate = detDeniedDateEditor.getValue();
-			if (detDateOfMedicalNegligenceEditor != null)
-				d.dateOfMedicalNegligence = detDateOfMedicalNegligenceEditor.getValue();
-			if (detDateMedicalNegligenceWasDiscoveredEditor != null)
-				d.dateMedicalNegligenceWasDiscovered = detDateMedicalNegligenceWasDiscoveredEditor.getValue();
-			if (detDateOfInjuryEditor != null)
-				d.dateOfInjury = detDateOfInjuryEditor.getValue();
-			if (detStatuteOfLimitationsEditor != null)
-				d.statuteOfLimitations = nullableDatePickerValue(detStatuteOfLimitationsEditor);
-			if (detTortNoticeDeadlineEditor != null)
-				d.tortNoticeDeadline = nullableDatePickerValue(detTortNoticeDeadlineEditor);
-			if (detDiscoveryDeadlineEditor != null)
-				d.discoveryDeadline = detDiscoveryDeadlineEditor.getValue();
 			d.clientEstate = toNullableBooleanStorage(captureNullableBoolean(detClientEstateEditor));
 			if (detOfficePrinterCodeEditor != null)
 				d.officePrinterCode = safeText(detOfficePrinterCodeEditor.getText());
 			d.medicalRecordsRequested = captureNullableBoolean(detMedicalRecordsRequestedEditor);
 			d.feeAgreementSigned = detFeeAgreementSignedEditor != null && detFeeAgreementSignedEditor.isSelected();
-			if (detDateFeeAgreementSignedEditor != null)
-				d.dateFeeAgreementSigned = detDateFeeAgreementSignedEditor.getValue();
 			d.nonEngagementLetterSent = detNonEngagementLetterSentEditor != null && detNonEngagementLetterSentEditor.isSelected();
-			if (detDateNonEngagementLetterSentEditor != null)
-				d.dateNonEngagementLetterSent = detDateNonEngagementLetterSentEditor.getValue();
 			d.acceptedChronology = captureNullableBoolean(detAcceptedChronologyEditor);
 			d.acceptedConsultantExpertSearch = captureNullableBoolean(detAcceptedConsultantExpertSearchEditor);
 			d.acceptedTestifyingExpertSearch = captureNullableBoolean(detAcceptedTestifyingExpertSearchEditor);
