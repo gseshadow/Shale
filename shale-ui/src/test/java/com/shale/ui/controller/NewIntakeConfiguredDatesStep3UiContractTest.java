@@ -26,4 +26,22 @@ class NewIntakeConfiguredDatesStep3UiContractTest {
         assertTrue(s.contains("if (datesReloadRequired)"));
         assertTrue(s.contains("Reload the form before submitting again."));
     }
+
+    @Test void customizationUsesSharedRequiredControlAndCancelDiscardsDraft() throws Exception {
+        String s=source();
+        assertTrue(s.contains("ControlStyles.formControl(new CheckBox(\"Required\"))"));
+        assertTrue(s.contains("NewIntakeDatesConfiguration.withRequired(selection, newValue)"));
+        assertTrue(s.contains("new Selection(selector.getValue(), false)"));
+        assertTrue(s.contains("private void cancelDatesCustomization()"));
+        assertTrue(s.contains("stagedDateSelections.clear();"));
+    }
+
+    @Test void requiredDatesAreMarkedValidatedAndFocusedBeforeCreate() throws Exception {
+        String s=source();
+        assertTrue(s.contains("field.type().name() + (field.required() ? \" *\" : \"\")"));
+        assertTrue(s.contains("ControlStyles.setInvalid(input.input(), true)"));
+        assertTrue(s.contains("focusFirstMissingConfiguredDate();"));
+        assertTrue(s.contains("input.input().requestFocus()"));
+        assertTrue(s.indexOf("List<String> errors = validateRequiredFields();") < s.indexOf("setSaving(true);"));
+    }
 }

@@ -62,6 +62,12 @@ public final class NewIntakeDatesConfiguration {
         return new SectionDraft(SECTION_KEY, "Dates", 0, true, true, fields);
     }
 
+    /** Returns a new draft selection with only its required state changed. */
+    public static Selection withRequired(Selection selection, boolean required) {
+        if (selection == null) throw new IllegalArgumentException("Selection is required.");
+        return new Selection(selection.type(), required);
+    }
+
     private static Map<Integer, EffectiveCaseDateTypeDto> effectiveById(List<EffectiveCaseDateTypeDto> types) {
         Map<Integer, EffectiveCaseDateTypeDto> result = new LinkedHashMap<>();
         if (types != null) for (EffectiveCaseDateTypeDto type : types) {
