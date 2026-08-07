@@ -378,8 +378,21 @@ authoritative.
 Nonblank configured values create one all-day `CaseDates` occurrence apiece. The SQL
 `date`/Java `LocalDate` is stored as `StartsAt` at `00:00` on that same local calendar date,
 with `EndsAt = NULL` and `AllDay = 1`; no workstation or UTC timezone conversion is applied.
-Optional blanks create no occurrence. In configured mode the five legacy customizable
-intake date columns are left null rather than dual-written, while unrelated legacy fields
-are untouched. If no saved configuration exists (`id = 0`, null row version), the existing
+Optional blanks create no occurrence. In configured mode all migrated legacy date inputs
+accepted by the desktop intake command, including `CallerDate` and `CallerTime`, are left
+null rather than dual-written; only completed configured occurrences are authoritative,
+while unrelated legacy fields are untouched. If no saved configuration exists (`id = 0`, null row version), the existing
 legacy controls and fixed-column writes remain unchanged. No default configuration is
 seeded.
+
+`CaseDao.createIntake` owns the single JDBC transaction. It locks and validates the form
+configuration and effective types, verifies party-role prerequisites, inserts client/caller
+contacts, inserts the case, links default and pending parties, normalizes primaries, inserts
+the initial status, inserts every completed configured occurrence, and then commits. Any
+failure rolls the whole sequence back on that connection; there is no post-create CaseDates
+transaction. The returned result reports the committed occurrence count, and the desktop
+controller publishes one PHI-safe `CaseDates`/`CREATED` invalidation only after the DAO has
+returned from commit. Validation and rollback publish nothing. The payload follows the
+existing CaseDates contract and carries only case id and change, never dates, labels, notes,
+or concurrency tokens. Server/API/web compatibility creation remains deferred and unchanged.
+The next cutover gate is Calendar duplicate legacy-date projection cleanup.

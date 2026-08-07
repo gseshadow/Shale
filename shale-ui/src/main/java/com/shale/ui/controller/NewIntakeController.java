@@ -20,6 +20,7 @@ import com.shale.core.service.FormConfigurationServicePort;
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -927,6 +928,11 @@ public final class NewIntakeController {
 		captureInitialSnapshot();
 		deleteLocalDraftIfPresent();
 		System.out.println("[NewIntakeController] create succeeded tenant=" + tenantId + " caseId=" + result.caseId());
+		if (result.createdCaseDateCount() > 0 && runtimeBridge != null && appState != null
+				&& appState.getUserId() != null) {
+			runtimeBridge.publishCaseDatesChanged(result.caseId(), tenantId, appState.getUserId(),
+					LiveUpdateEvents.CHANGE_CREATED);
+		}
 		showSuccess("Intake created successfully.");
 		setSaving(false);
 		if (stage != null)
