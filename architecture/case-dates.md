@@ -352,3 +352,13 @@ An initial backfill is only a point-in-time copy. While any legacy-only client r
 10. Release soak period with reconciliation comparing legacy fields to destinations.
 11. Final dependency scan across database SQL and Java/web/UI references.
 12. Legacy column removal only when no dependencies remain and the final verification phase passes.
+
+## Desktop LiveBus synchronization gate (existing cases)
+
+Committed existing-case occurrence mutations now emit the PHI-safe `CaseDates`
+`EntityUpdated` invalidation documented in `live-update-architecture.md`. Subscribers
+authoritatively reload the generic list and the coherent nine-key snapshot rather than
+carrying dates or concurrency tokens in LiveBus. The fixed controls continue to use only
+CaseDates-backed `AuthoritativeCaseDateEditor` state: there is no legacy read, legacy
+write, or dual-write. Active edits are preserved and stale saves retain the explicit
+conflict/reload workflow. Atomic new-case intake remains the next gate.
