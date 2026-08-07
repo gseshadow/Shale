@@ -21,6 +21,46 @@ class CaseDateLocalSynchronizationArchitectureTest {
         assertFalse(source.contains("SystemKeys"));
     }
 
+    @Test void actualOverviewButtonsRouteToAggregateAndInitializeFromAuthoritativeSnapshot() throws Exception {
+        String source = Files.readString(CONTROLLER);
+        String handlers = source.substring(source.indexOf("private void onEditIncidentDateField"),
+                source.indexOf("private void showTextFieldDialog"));
+        assertTrue(handlers.contains("authoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY)"));
+        assertTrue(handlers.contains("saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY, value)"));
+        assertTrue(handlers.contains("saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_MEDICAL_NEGLIGENCE, value)"));
+        assertTrue(handlers.contains("saveAuthoritativeDate(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS, value)"));
+        assertTrue(handlers.contains("saveAuthoritativeDate(MigratedCaseDateKey.TORT_NOTICE_DEADLINE, value)"));
+        assertFalse(handlers.contains("saveCoreOverviewField"));
+        assertFalse(handlers.contains("saveDetailDateOverviewField"));
+        assertFalse(handlers.contains("currentOverview.getIncidentDate"));
+        assertFalse(handlers.contains("current.getDateOfMedicalNegligence"));
+    }
+
+    @Test void generalHydrationCannotOverwriteAnyFixedDateControl() throws Exception {
+        String source = Files.readString(CONTROLLER);
+        String renderer = source.substring(source.indexOf("private final class CaseOverviewRenderer"),
+                source.indexOf("private final class CaseOverviewSaveCoordinator"));
+        assertFalse(renderer.contains("getDateOfMedicalNegligence()"));
+        String details = source.substring(source.indexOf("private final class CaseDetailsEditor"));
+        for (String field : new String[] {"detCallerDateValue", "detDateOfMedicalNegligenceValue",
+                "detDateMedicalNegligenceWasDiscoveredValue", "detDateOfInjuryValue",
+                "detStatuteOfLimitationsValue", "detTortNoticeDeadlineValue", "detDiscoveryDeadlineValue",
+                "detDateFeeAgreementSignedValue", "detDateNonEngagementLetterSentValue"}) {
+            assertFalse(details.contains(field + ".setText"), field);
+        }
+        assertTrue(source.contains("renderCompatibilityDates()"));
+    }
+
+    @Test void unrelatedDesktopSavesUseNonMigratedDaoBoundaries() throws Exception {
+        String source = Files.readString(CONTROLLER);
+        assertTrue(source.contains("caseDao.updateCaseNonDate("));
+        assertTrue(source.contains("caseDao.updateCaseDetailsNonMigrated("));
+        assertFalse(source.contains("caseDao.updateCase("));
+        assertFalse(source.contains("caseDao.updateCaseDetails("));
+        String detailsEditor = source.substring(source.indexOf("private final class CaseDetailsEditor"));
+        assertFalse(detailsEditor.contains("LocalDate.now()"), "workflow flags must not fabricate fixed dates");
+    }
+
     @Test void fixedSuccessInvalidatesDatesWithoutIssuingAnotherMutation() throws Exception {
         String source = Files.readString(CONTROLLER);
         String save = source.substring(source.indexOf("private void saveAuthoritativeDate"),

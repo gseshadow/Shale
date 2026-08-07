@@ -2835,6 +2835,78 @@ public final class CaseDao {
 		}
 	}
 
+	/** Existing-case desktop update boundary which deliberately owns no migrated dates. */
+	public CaseDetailDto updateCaseNonDate(long caseId, String name, String caseNumber, String description,
+			String summary, byte[] expectedRowVer, Integer actorUserId) {
+		if (expectedRowVer == null || expectedRowVer.length == 0) throw new IllegalArgumentException("expectedRowVer is required");
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			String sql = """
+					UPDATE %s SET Name = ?, CaseNumber = ?, Description = ?, Summary = ?, UpdatedAt = SYSDATETIME()
+					WHERE Id = ? AND RowVer = ? AND %s;
+					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), null));
+			CaseDetailDto before = selectCaseDetail(con, caseId);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setString(1, name); ps.setString(2, caseNumber); ps.setString(3, description); ps.setString(4, summary);
+				ps.setLong(5, caseId); ps.setBytes(6, expectedRowVer);
+				int rows = ps.executeUpdate();
+				if (rows == 0) return null;
+				if (rows != 1) throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
+				CaseDetailDto updated = selectCaseDetail(con, caseId);
+				if (before != null && updated != null) {
+					phiAuditService.auditUpdate(actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
+					phiAuditService.auditUpdate(actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
+				}
+				return updated;
+			}
+		} catch (SQLException e) { throw new RuntimeException("Failed to update non-date case fields (caseId=" + caseId + ")", e); }
+	}
+
+	/** Broad Details boundary for unrelated existing-case fields only. */
+	public CaseDetailDto updateCaseDetailsNonMigrated(long caseId, String name, String caseNumber, Integer practiceAreaId,
+			String description, LocalDate acceptedDate, LocalDate closedDate, LocalDate deniedDate, String clientEstate,
+			String officePrinterCode, Boolean medicalRecordsRequested, Boolean feeAgreementSigned,
+			Boolean nonEngagementLetterSent, Boolean acceptedChronology, Boolean acceptedConsultantExpertSearch,
+			Boolean acceptedTestifyingExpertSearch, Boolean acceptedMedicalLiterature, String acceptedDetail,
+			Boolean deniedChronology, String deniedDetail, String summary, String receivedUpdates,
+			byte[] expectedRowVer, Integer actorUserId) {
+		if (expectedRowVer == null || expectedRowVer.length == 0) throw new IllegalArgumentException("expectedRowVer is required");
+		try (Connection con = db.requireConnection()) {
+			CaseSchema schema = resolveCaseSchema(con);
+			String sql = """
+					UPDATE %s SET Name=?, CaseNumber=?, PracticeAreaId=?, Description=?, AcceptedDate=?, ClosedDate=?, DeniedDate=?,
+					ClientEstate=?, OfficePrinterCode=?, MedicalRecordsRequested=?, FeeAgreementSigned=?, NonEngagementLetterSent=?,
+					AcceptedChronology=?, AcceptedConsultantExpertSearch=?, AcceptedTestifyingExpertSearch=?, AcceptedMedicalLiterature=?,
+					AcceptedDetail=?, DeniedChronology=?, DeniedDetail=?, Summary=?, ReceivedUpdates=?, UpdatedAt=SYSDATETIME()
+					WHERE Id=? AND RowVer=? AND %s;
+					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), null));
+			CaseDetailDto before = selectCaseDetail(con, caseId);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int i=1; ps.setString(i++,name); ps.setString(i++,caseNumber);
+				if(practiceAreaId==null)ps.setNull(i++,java.sql.Types.INTEGER);else ps.setInt(i++,practiceAreaId);
+				ps.setString(i++,description); setNullableDate(ps,i++,acceptedDate); setNullableDate(ps,i++,closedDate);
+				setNullableDate(ps,i++,deniedDate); setNullableString(ps,i++,clientEstate); setNullableString(ps,i++,officePrinterCode);
+				setNullableBoolean(ps,i++,medicalRecordsRequested); setNullableBoolean(ps,i++,feeAgreementSigned);
+				setNullableBoolean(ps,i++,nonEngagementLetterSent); setNullableBoolean(ps,i++,acceptedChronology);
+				setNullableBoolean(ps,i++,acceptedConsultantExpertSearch); setNullableBoolean(ps,i++,acceptedTestifyingExpertSearch);
+				setNullableBoolean(ps,i++,acceptedMedicalLiterature); setNullableString(ps,i++,acceptedDetail);
+				setNullableBoolean(ps,i++,deniedChronology); setNullableString(ps,i++,deniedDetail); setNullableString(ps,i++,summary);
+				setNullableString(ps,i++,receivedUpdates); ps.setLong(i++,caseId); ps.setBytes(i,expectedRowVer);
+				int rows=ps.executeUpdate(); if(rows==0)return null;
+				if(rows!=1)throw new RuntimeException("Unexpected update row count for caseId="+caseId+": "+rows);
+				CaseDetailDto updated=selectCaseDetail(con,caseId);
+				if(before!=null&&updated!=null){
+					phiAuditService.auditUpdate(actorUserId,"Cases","AcceptedDetail",caseId,before.getAcceptedDetail(),updated.getAcceptedDetail());
+					phiAuditService.auditUpdate(actorUserId,"Cases","DeniedDetail",caseId,before.getDeniedDetail(),updated.getDeniedDetail());
+					phiAuditService.auditUpdate(actorUserId,"Cases","ReceivedUpdates",caseId,before.getReceivedUpdates(),updated.getReceivedUpdates());
+					phiAuditService.auditUpdate(actorUserId,"Cases","Description",caseId,before.getDescription(),updated.getDescription());
+					phiAuditService.auditUpdate(actorUserId,"Cases","Summary",caseId,before.getSummary(),updated.getSummary());
+				}
+				return updated;
+			}
+		} catch(SQLException e){throw new RuntimeException("Failed to update non-migrated case details (caseId="+caseId+")",e);}
+	}
+
 	public com.shale.core.dto.CaseDetailDto updateCaseDetails(
 			long caseId,
 			String name,
