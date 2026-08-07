@@ -41,11 +41,11 @@ class CaseDatesPhase2CArchitectureTest {
 
     @Test void occurrenceMutationsCarryActorCaseAndRowVersion() throws Exception {
         String controller = Files.readString(CONTROLLER);
-        assertTrue(controller.contains("new CreateCaseDateCommand(tenantId, actorId, caseId"));
-        assertTrue(controller.contains("new UpdateCaseDateCommand(tenantId, actorId, caseId, existing.id()"));
+        assertTrue(controller.contains("new CreateCaseDateCommand(tenantId, actorId, activeCaseId"));
+        assertTrue(controller.contains("new UpdateCaseDateCommand(tenantId, actorId, activeCaseId, existing.id()"));
         assertTrue(controller.contains("existing.rowVer()"));
-        assertTrue(controller.contains("new DeleteCaseDateCommand(tenantId, actorId, caseId, d.id(), d.rowVer())"));
-        assertTrue(controller.contains("new RestoreCaseDateCommand(tenantId, actorId, caseId, d.id(), d.rowVer())"));
+        assertTrue(controller.contains("new DeleteCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer())"));
+        assertTrue(controller.contains("new RestoreCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer())"));
         assertFalse(controller.contains("DELETE FROM dbo.CaseDates"));
         String datesBlock = controller.substring(controller.indexOf("private void configureCaseDatesControls"), controller.indexOf("private void resetCaseLinksState"));
         assertFalse(datesBlock.contains("CalendarEvents"));
