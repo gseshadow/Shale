@@ -11,7 +11,7 @@ final class CaseMaterialsPhase4UiContractTest {
   private static final String MAT = read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
 
   @Test void requestsRemainInTabOrderWhileCaseMaterialsUiIsAbsent() {
-    assertEquals(java.util.List.of("Overview", "Details", "Parties", "Tasks", "Calendar", "Requests", "Links", "Timeline"),
+    assertEquals(java.util.List.of("Overview", "Details", "Parties", "Tasks", "Calendar", "Dates", "Requests", "Links", "Timeline"),
         CaseController.sectionOrderForTesting());
     assertTrue(CTRL.contains("case \"Requests\" -> showRequestsTab();"));
     assertFalse(CTRL.contains("case \"Case Materials\""));

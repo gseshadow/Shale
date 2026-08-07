@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class CaseSectionNavigationSelectionTest {
     private static final List<String> ORDER = List.of(
-            "Overview", "Details", "Parties", "Tasks", "Calendar", "Requests", "Links", "Timeline");
+            "Overview", "Details", "Parties", "Tasks", "Calendar", "Dates", "Requests", "Links", "Timeline");
 
     @Test
     void initialOverviewAndEveryNavigationSelectionStaySynchronized() {
@@ -126,6 +126,7 @@ final class CaseSectionNavigationSelectionTest {
             case "Details" -> "detailsSectionPane";
             case "Tasks" -> "tasksTabPane";
             case "Calendar" -> "caseCalendarTabPane";
+            case "Dates" -> "caseDatesTabPane";
             case "Requests" -> "caseRequestsTabPane";
             case "Links" -> "caseLinksTabPane";
             default -> "genericPane";
