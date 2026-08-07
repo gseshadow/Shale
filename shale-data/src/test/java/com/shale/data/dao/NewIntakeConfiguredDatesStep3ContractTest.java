@@ -35,9 +35,19 @@ class NewIntakeConfiguredDatesStep3ContractTest {
 
     @Test void configuredModeDoesNotDualWriteAndMissingConfigurationRetainsLegacyValues() throws Exception {
         String s=source();
-        assertTrue(s.contains("boolean configured = request.formConfigurationId() != 0"));
-        assertEquals(5, s.split("configured \\? null : request\\.", -1).length - 1);
+        assertTrue(s.contains("if (request.formConfigurationId() != 0)"));
+        String configured=s.substring(s.indexOf("private static long insertConfiguredIntakeCase"), s.indexOf("private void insertCaseParty"));
+        for (String legacy : new String[]{"CallerDate", "CallerTime", "DateOfMedicalNegligence", "DateMedicalNegligenceWasDiscovered", "DateOfInjury", "StatuteOfLimitations", "TortNoticeDeadline"})
+            assertFalse(configured.contains(legacy), legacy);
         assertTrue(s.contains("if (currentId == 0)"));
         assertTrue(s.contains("return List.of()"));
+    }
+
+    @Test void configuredIntakeHasNoPostCreateDateTransactionAndReportsCommittedDateCount() throws Exception {
+        String s=source();
+        String create=s.substring(s.indexOf("public NewIntakeCreateResult createIntake"), s.indexOf("public static final class IntakeConfigurationException"));
+        assertEquals(1, create.split("db.requireConnection\\(\\)", -1).length - 1);
+        assertEquals(1, create.split("con.commit\\(\\)", -1).length - 1);
+        assertTrue(create.contains("configuredDates.size()"));
     }
 }

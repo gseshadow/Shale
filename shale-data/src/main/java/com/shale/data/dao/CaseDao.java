@@ -382,7 +382,8 @@ public final class CaseDao {
 	) {
 	}
 
-	public record NewIntakeCreateResult(long caseId, int clientContactId, int callerContactId) {
+	public record NewIntakeCreateResult(long caseId, int clientContactId, int callerContactId,
+			int createdCaseDateCount) {
 	}
 
 	public NewIntakeCreateResult createIntake(NewIntakeCreateRequest request) {
@@ -482,7 +483,7 @@ public final class CaseDao {
 
 			con.commit();
 			System.out.println("[IntakeCreate] committed caseId=" + caseId + " shaleClientId=" + request.shaleClientId());
-			return new NewIntakeCreateResult(caseId, clientContactId, callerContactId);
+			return new NewIntakeCreateResult(caseId, clientContactId, callerContactId, configuredDates.size());
 		} catch (Exception e) {
 			System.err.println("[IntakeCreate] failed shaleClientId=" + request.shaleClientId() + " error=" + e.getMessage());
 			e.printStackTrace(System.err);
@@ -806,6 +807,8 @@ public final class CaseDao {
 	private long insertCase(Connection con, NewIntakeCreateRequest request, Timestamp now) throws SQLException {
 		validatePracticeAreaForTenant(con, request.shaleClientId(), request.practiceAreaId());
 		validateIntakeUserForTenant(con, request.shaleClientId(), request.createdByUserId());
+		if (request.formConfigurationId() != 0)
+			return insertConfiguredIntakeCase(con, request, now);
 		String sql = """
 				INSERT INTO dbo.Cases (
 				  Name,
@@ -850,12 +853,11 @@ public final class CaseDao {
 			ps.setBoolean(i++, request.estateCase());
 			setNullableString(ps, i++, request.description());
 			setNullableString(ps, i++, request.summary());
-			boolean configured = request.formConfigurationId() != 0;
-			setNullableDate(ps, i++, configured ? null : request.dateOfMedicalNegligence());
-			setNullableDate(ps, i++, configured ? null : request.dateMedicalNegligenceWasDiscovered());
-			setNullableDate(ps, i++, configured ? null : request.dateOfInjury());
-			setNullableDate(ps, i++, configured ? null : request.statuteOfLimitations());
-			setNullableDate(ps, i++, configured ? null : request.tortClaimsNotice());
+			setNullableDate(ps, i++, request.dateOfMedicalNegligence());
+			setNullableDate(ps, i++, request.dateMedicalNegligenceWasDiscovered());
+			setNullableDate(ps, i++, request.dateOfInjury());
+			setNullableDate(ps, i++, request.statuteOfLimitations());
+			setNullableDate(ps, i++, request.tortClaimsNotice());
 			ps.setTimestamp(i++, now);
 			ps.setTimestamp(i++, now);
 			ps.setInt(i++, request.shaleClientId());
@@ -868,6 +870,40 @@ public final class CaseDao {
 			try (ResultSet rs = ps.executeQuery()) {
 				if (!rs.next())
 					throw new RuntimeException("Failed to create case.");
+				return rs.getLong(1);
+			}
+		}
+	}
+
+	/** Configured intake deliberately omits every migrated legacy date column. */
+	private static long insertConfiguredIntakeCase(Connection con, NewIntakeCreateRequest request,
+			Timestamp now) throws SQLException {
+		String sql = """
+				INSERT INTO dbo.Cases (
+				  Name, PracticeAreaId, ClientEstate, Description, Summary,
+				  FollowUpMeetWithClient, FollowUpNurseReview, FollowUpExpertReview,
+				  FollowUpCaseTransferred, AcceptedChronology, AcceptedConsultantExpertSearch,
+				  AcceptedTestifyingExpertSearch, AcceptedMedicalLiterature, DeniedChronology,
+				  FeeAgreementSigned, MedicalRecordsRequested, IsDeleted,
+				  CreatedAt, UpdatedAt, ShaleClientId, IntakeTakenByUserId
+				)
+				OUTPUT INSERTED.Id
+				VALUES (?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?, ?);
+				""";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int i = 1;
+			setNullableString(ps, i++, request.caseName());
+			ps.setInt(i++, request.practiceAreaId());
+			ps.setBoolean(i++, request.estateCase());
+			setNullableString(ps, i++, request.description());
+			setNullableString(ps, i++, request.summary());
+			ps.setTimestamp(i++, now);
+			ps.setTimestamp(i++, now);
+			ps.setInt(i++, request.shaleClientId());
+			if (request.createdByUserId() == null) ps.setNull(i, java.sql.Types.INTEGER);
+			else ps.setInt(i, request.createdByUserId());
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) throw new RuntimeException("Failed to create case.");
 				return rs.getLong(1);
 			}
 		}
