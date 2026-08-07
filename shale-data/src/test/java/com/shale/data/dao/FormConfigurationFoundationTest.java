@@ -46,6 +46,27 @@ class FormConfigurationFoundationTest {
                 ()->assertTrue(source.contains("ShaleClientId=? AND (ShaleClientId=? OR ShaleClientId IS NULL)")));
     }
 
+    @Test void replacementAuditIsAuthoritativeSafeAndTransactional() throws Exception {
+        String source=Files.readString(ROOT.resolve("shale-data/src/main/java/com/shale/data/dao/FormConfigurationDao.java"));
+        int lock=source.indexOf("LockedForm form = lockAndTouchForm");
+        int audit=source.indexOf("appendAudit(con, command, formKey, form)");
+        int commit=source.indexOf("con.commit()", audit);
+        assertAll(
+                ()->assertTrue(source.indexOf("validateActor(con, command.shaleClientId(), command.actorUserId())") < lock),
+                ()->assertTrue(source.indexOf("validateAdmin(con, command.shaleClientId(), command.actorUserId())") < lock),
+                ()->assertTrue(audit > source.indexOf("insertSections(con, form.id(), command)")),
+                ()->assertTrue(commit > audit),
+                ()->assertTrue(source.contains("auditDao.append(con, EntityActionAuditEvent.now(command.shaleClientId(), command.actorUserId()")),
+                ()->assertTrue(source.contains("form.initialCreation() ? EntityActionAuditEvent.Action.CREATED : EntityActionAuditEvent.Action.UPDATED")),
+                ()->assertTrue(source.contains("FORM_CONFIGURATION_ID")),
+                ()->assertTrue(source.contains("FORM_KEY")),
+                ()->assertTrue(source.contains("SECTION_COUNT")),
+                ()->assertTrue(source.contains("CONFIGURED_FIELD_COUNT")),
+                ()->assertTrue(source.contains("INITIAL_CREATION")),
+                ()->assertTrue(source.contains("catch (Exception e)")),
+                ()->assertTrue(source.contains("con.rollback()")));
+    }
+
     private static ReplaceCommand command(int a,int b){return new ReplaceCommand(7,3,"NEW_INTAKE",List.of(new SectionDraft("dates","Dates",0,true,true,List.of(new FieldDraft("date.a","CASE_DATE",a,0,true,true,false),new FieldDraft("date.b","CASE_DATE",b,1,true,true,true)))),null);}
     private static String validate(ReplaceCommand command)throws Exception{Method m=FormConfigurationDao.class.getDeclaredMethod("validate",ReplaceCommand.class);m.setAccessible(true);return (String)m.invoke(null,command);}
     private static void assertInvalid(ReplaceCommand c){InvocationTargetException error=assertThrows(InvocationTargetException.class,()->validate(c));assertInstanceOf(IllegalArgumentException.class,error.getCause());}

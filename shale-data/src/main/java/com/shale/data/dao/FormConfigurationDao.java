@@ -14,8 +14,10 @@ public final class FormConfigurationDao {
     private static final Set<String> KINDS = Set.of("CASE_DATE");
     private static final Pattern KEY = Pattern.compile("[a-z][a-z0-9_.:-]{0,127}");
     private final DbSessionProvider db;
+    private final EntityActionAuditDao auditDao;
 
-    public FormConfigurationDao(DbSessionProvider db) { this.db = Objects.requireNonNull(db, "db"); }
+    public FormConfigurationDao(DbSessionProvider db) { this(db, new EntityActionAuditDao()); }
+    FormConfigurationDao(DbSessionProvider db, EntityActionAuditDao auditDao) { this.db = Objects.requireNonNull(db, "db"); this.auditDao = Objects.requireNonNull(auditDao, "auditDao"); }
 
     public FormConfigurationDto load(int tenant, int actor, String formKey) {
         formKey = validateFormKey(formKey);
@@ -35,14 +37,15 @@ public final class FormConfigurationDao {
                 validateActor(con, command.shaleClientId(), command.actorUserId());
                 validateAdmin(con, command.shaleClientId(), command.actorUserId());
                 validateReferences(con, command.shaleClientId(), command.sections());
-                long formId = lockAndTouchForm(con, command, formKey);
+                LockedForm form = lockAndTouchForm(con, command, formKey);
                 try (PreparedStatement ps = con.prepareStatement("DELETE FROM dbo.FormConfiguredFields WHERE FormConfigurationId=? AND ShaleClientId=?")) {
-                    ps.setLong(1, formId); ps.setInt(2, command.shaleClientId()); ps.executeUpdate();
+                    ps.setLong(1, form.id()); ps.setInt(2, command.shaleClientId()); ps.executeUpdate();
                 }
                 try (PreparedStatement ps = con.prepareStatement("DELETE FROM dbo.FormConfigurationSections WHERE FormConfigurationId=? AND ShaleClientId=?")) {
-                    ps.setLong(1, formId); ps.setInt(2, command.shaleClientId()); ps.executeUpdate();
+                    ps.setLong(1, form.id()); ps.setInt(2, command.shaleClientId()); ps.executeUpdate();
                 }
-                insertSections(con, formId, command);
+                insertSections(con, form.id(), command);
+                appendAudit(con, command, formKey, form);
                 con.commit();
                 return load(con, command.shaleClientId(), formKey);
             } catch (Exception e) {
@@ -96,7 +99,8 @@ public final class FormConfigurationDao {
         }
     }
 
-    private static long lockAndTouchForm(Connection con, ReplaceCommand c, String key) throws SQLException {
+    private record LockedForm(long id, boolean initialCreation) {}
+    private static LockedForm lockAndTouchForm(Connection con, ReplaceCommand c, String key) throws SQLException {
         Long id = null; byte[] current = null;
         try (PreparedStatement ps = con.prepareStatement("SELECT Id,RowVer FROM dbo.FormConfigurations WITH (UPDLOCK,HOLDLOCK) WHERE ShaleClientId=? AND FormKey=? AND IsDeleted=0")) {
             ps.setInt(1,c.shaleClientId()); ps.setString(2,key); try(ResultSet rs=ps.executeQuery()){if(rs.next()){id=rs.getLong(1);current=rs.getBytes(2);}}
@@ -105,14 +109,25 @@ public final class FormConfigurationDao {
             if (c.expectedRowVer() != null && c.expectedRowVer().length > 0) throw new IllegalStateException("Form configuration changed.");
             try (PreparedStatement ps=con.prepareStatement("INSERT dbo.FormConfigurations(ShaleClientId,FormKey,CreatedByUserId,UpdatedByUserId) VALUES(?,?,?,?)",Statement.RETURN_GENERATED_KEYS)) {
                 ps.setInt(1,c.shaleClientId());ps.setString(2,key);ps.setInt(3,c.actorUserId());ps.setInt(4,c.actorUserId());ps.executeUpdate();
-                try(ResultSet rs=ps.getGeneratedKeys()){if(!rs.next())throw new SQLException("No generated form configuration id.");return rs.getLong(1);}
+                try(ResultSet rs=ps.getGeneratedKeys()){if(!rs.next())throw new SQLException("No generated form configuration id.");return new LockedForm(rs.getLong(1),true);}
             }
         }
         if (c.expectedRowVer()==null || !Arrays.equals(current,c.expectedRowVer())) throw new IllegalStateException("Form configuration changed.");
         try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.FormConfigurations SET UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND RowVer=?")){
             ps.setInt(1,c.actorUserId());ps.setLong(2,id);ps.setInt(3,c.shaleClientId());ps.setBytes(4,c.expectedRowVer());if(ps.executeUpdate()!=1)throw new IllegalStateException("Form configuration changed.");
         }
-        return id;
+        return new LockedForm(id,false);
+    }
+
+    private void appendAudit(Connection con, ReplaceCommand command, String formKey, LockedForm form) throws SQLException {
+        int fieldCount = command.sections().stream().mapToInt(section -> section.fields().size()).sum();
+        var metadata = new EnumMap<EntityActionAuditEvent.MetadataKey, Object>(EntityActionAuditEvent.MetadataKey.class);
+        metadata.put(EntityActionAuditEvent.MetadataKey.FORM_CONFIGURATION_ID, form.id());
+        metadata.put(EntityActionAuditEvent.MetadataKey.FORM_KEY, formKey);
+        metadata.put(EntityActionAuditEvent.MetadataKey.SECTION_COUNT, command.sections().size());
+        metadata.put(EntityActionAuditEvent.MetadataKey.CONFIGURED_FIELD_COUNT, fieldCount);
+        metadata.put(EntityActionAuditEvent.MetadataKey.INITIAL_CREATION, form.initialCreation());
+        auditDao.append(con, EntityActionAuditEvent.now(command.shaleClientId(), command.actorUserId(), EntityActionAuditEvent.EntityType.FORM_CONFIGURATION, form.id(), form.initialCreation() ? EntityActionAuditEvent.Action.CREATED : EntityActionAuditEvent.Action.UPDATED, null, null, metadata));
     }
 
     private static void insertSections(Connection con,long formId,ReplaceCommand c)throws SQLException{

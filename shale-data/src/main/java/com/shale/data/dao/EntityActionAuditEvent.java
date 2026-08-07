@@ -19,7 +19,7 @@ public record EntityActionAuditEvent(
 		String source,
 		Map<MetadataKey, String> metadata) {
 
-	public enum EntityType { LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER }
+	public enum EntityType { LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER }
 
 	public enum Action {
 		CREATED,
@@ -70,7 +70,12 @@ public record EntityActionAuditEvent(
 		HAS_EXTERNAL_LINK,
 		TARGET_USER_ID,
 		ADMIN_ROLE,
-		ATTORNEY_ROLE
+		ATTORNEY_ROLE,
+		FORM_CONFIGURATION_ID,
+		FORM_KEY,
+		SECTION_COUNT,
+		CONFIGURED_FIELD_COUNT,
+		INITIAL_CREATION
 	}
 
 	private static final Set<String> PROHIBITED_KEY_FRAGMENTS = Set.of(
@@ -95,6 +100,7 @@ public record EntityActionAuditEvent(
 			case CASE_LINK -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.PRIMARY_SET || action == Action.REORDERED;
 			case CASE_LINK_SHARE -> action == Action.ADDED || action == Action.UPDATED || action == Action.REMOVED;
 			case CASE_DATE -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.ACTIVATED;
+			case FORM_CONFIGURATION -> action == Action.CREATED || action == Action.UPDATED;
 			case MATERIAL_REQUEST -> action == Action.CREATED || action == Action.UPDATED || action == Action.STATUS_CHANGED || action == Action.FOLLOW_UP_ADDED || action == Action.LINKED || action == Action.DELETED;
 			case MATERIAL_REQUEST_FOLLOW_UP -> action == Action.CREATED || action == Action.FOLLOW_UP_ADDED;
 			case USER -> action == Action.CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.REMOVED;
