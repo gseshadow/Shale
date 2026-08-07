@@ -918,6 +918,8 @@ Phase 6.1 adds a dedicated append-only entity-action audit table because existin
 
 Audit metadata may contain only stable IDs and non-sensitive state markers, including CaseId, CaseLinkId, CaseLinkShareId, ExternalLinkId, LinkTypeId, ContactId, previous/new Primary CaseLinkId, reordered link count, and activation state. It must not contain URLs, descriptions, link notes, share notes, Contact names/emails/phones, credentials, RowVer bytes, raw commands/DTOs, SQL, or exception text. Ordinary application paths insert only and must not update/delete audit history.
 
+Form-configuration replacement uses this same append-only audit contract at the DAO transaction boundary. It records entity type `FORM_CONFIGURATION`, the authoritative configuration id, action `CREATED` for the first saved configuration or `UPDATED` for a replacement, and only `FORM_CONFIGURATION_ID`, stable `FORM_KEY`, `SECTION_COUNT`, `CONFIGURED_FIELD_COUNT`, and `INITIAL_CREATION` metadata. The validated tenant administrator is the actor. The event is inserted on the replacement connection before commit, so audit failure rolls back the configuration, sections, and fields; rejected validation, authorization, tenant, and row-version checks do not emit a mutation event. Labels, configured or entered values, Case data, Contact data, dates, and row-version bytes are prohibited.
+
 ## Phase 6.2 unified Audit Log viewer
 
 The desktop Audit Log viewer now supports three read-only modes on one screen: **All**, **PHI Audit**, and **Entity Activity**. PHI Audit rows retain the `dbo.AuditLog` field/value semantics; Entity Activity rows retain the `dbo.EntityActionAuditLog` action/entity semantics and are not projected into fake `FieldName`, old-value, or new-value changes.

@@ -83,4 +83,21 @@ final class EntityActionAuditEventTest {
 		assertFalse(json.toLowerCase().matches(".*(email|phone|password|credential|rowver).*"));
 	}
 
+	@Test
+	void formConfigurationReplacementUsesSafeAuthoritativeVocabulary() {
+		var metadata = new java.util.EnumMap<EntityActionAuditEvent.MetadataKey, Object>(EntityActionAuditEvent.MetadataKey.class);
+		metadata.put(EntityActionAuditEvent.MetadataKey.FORM_CONFIGURATION_ID, 41L);
+		metadata.put(EntityActionAuditEvent.MetadataKey.FORM_KEY, "NEW_INTAKE");
+		metadata.put(EntityActionAuditEvent.MetadataKey.SECTION_COUNT, 2);
+		metadata.put(EntityActionAuditEvent.MetadataKey.CONFIGURED_FIELD_COUNT, 5);
+		metadata.put(EntityActionAuditEvent.MetadataKey.INITIAL_CREATION, false);
+		EntityActionAuditEvent event = EntityActionAuditEvent.now(7, 9, EntityActionAuditEvent.EntityType.FORM_CONFIGURATION, 41, EntityActionAuditEvent.Action.UPDATED, null, null, metadata);
+		assertEquals(7, event.shaleClientId());
+		assertEquals(9, event.actorUserId());
+		assertEquals(41, event.entityId());
+		assertEquals("NEW_INTAKE", event.metadata().get(EntityActionAuditEvent.MetadataKey.FORM_KEY));
+		assertEquals("5", event.metadata().get(EntityActionAuditEvent.MetadataKey.CONFIGURED_FIELD_COUNT));
+		assertThrows(IllegalArgumentException.class, () -> EntityActionAuditEvent.now(7, 9, EntityActionAuditEvent.EntityType.FORM_CONFIGURATION, 41, EntityActionAuditEvent.Action.DELETED, null, null, Map.of()));
+	}
+
 }
