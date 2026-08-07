@@ -104,6 +104,26 @@ public final class CaseDateDao {
         return Collections.unmodifiableMap(result);
     }
 
+    public CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(long caseId, int tenant, int actor) {
+        Map<MigratedCaseDateKey, CompatibilityCaseDateState> dates = listMigratedCompatibilityStateForCase(caseId, tenant, actor);
+        byte[] token = dates.values().stream().map(CompatibilityCaseDateState::expectedAbsent)
+                .filter(Objects::nonNull).map(CompatibilityCaseDateMutation.ExpectedAbsent::observedCaseRowVer)
+                .findFirst().orElseGet(() -> loadCaseRowVer(caseId, tenant, actor));
+        return new CaseDateAggregateResult(token, dates);
+    }
+
+    private byte[] loadCaseRowVer(long caseId, int tenant, int actor) {
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(
+                "SELECT RowVer FROM dbo.Cases WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")) {
+            verifyTenant(con, tenant); validateActor(con, tenant, actor);
+            ps.setLong(1, caseId); ps.setInt(2, tenant);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) throw new IllegalArgumentException("Case is not available for this tenant.");
+                return rs.getBytes(1);
+            }
+        } catch (SQLException e) { throw fail(e); }
+    }
+
     /**
      * Complete nine-slot edit snapshot. An absent slot carries the case RowVer
      * witnessed by this read; aggregate creation must compare that token while

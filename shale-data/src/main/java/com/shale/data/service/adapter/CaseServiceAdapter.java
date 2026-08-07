@@ -60,6 +60,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override public Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId,int tenant,int actor){
 		return caseGateway.listMigratedCompatibilityStateForCase(caseId,tenant,actor);
 	}
+	@Override public CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(long caseId,int tenant,int actor){return caseGateway.loadMigratedCompatibilityDateSnapshot(caseId,tenant,actor);}
 	@Override public CaseDateAggregateResult mutateMigratedCompatibilityDates(CaseDateAggregateCommand command){
 		return caseGateway.mutateMigratedCompatibilityDates(command);
 	}
@@ -730,6 +731,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		default List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("listDeletedCaseDatesForCase"); }
 		default Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("getCaseDate"); }
 		default Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId,int tenant,int actor){throw unsupportedCaseLinkGatewayOperation("listMigratedCompatibilityStateForCase");}
+		default CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(long caseId,int tenant,int actor){throw unsupportedCaseLinkGatewayOperation("loadMigratedCompatibilityDateSnapshot");}
 		default CaseDateAggregateResult mutateMigratedCompatibilityDates(CaseDateAggregateCommand command){throw unsupportedCaseLinkGatewayOperation("mutateMigratedCompatibilityDates");}
 		default CaseDateDto createCaseDate(CreateCaseDateCommand command) { throw unsupportedCaseLinkGatewayOperation("createCaseDate"); }
 		default CaseDateDto updateCaseDate(UpdateCaseDateCommand command) { throw unsupportedCaseLinkGatewayOperation("updateCaseDate"); }
@@ -908,6 +910,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override public List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) { return caseDateDao.listDeletedCaseDatesForCase(caseId, shaleClientId, actorUserId); }
 		@Override public Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) { return caseDateDao.getCaseDate(caseDateId, shaleClientId, actorUserId); }
 		@Override public Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId,int tenant,int actor){return caseDateDao.listMigratedCompatibilityStateForCase(caseId,tenant,actor);}
+		@Override public CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(long caseId,int tenant,int actor){return caseDateDao.loadMigratedCompatibilityDateSnapshot(caseId,tenant,actor);}
 		@Override public CaseDateAggregateResult mutateMigratedCompatibilityDates(CaseDateAggregateCommand command){return caseDateDao.mutateMigratedCompatibilityDates(command);}
 		@Override public CaseDateDto createCaseDate(CreateCaseDateCommand command) { return caseDateDao.createCaseDate(command); }
 		@Override public CaseDateDto updateCaseDate(UpdateCaseDateCommand command) { return caseDateDao.updateCaseDate(command); }

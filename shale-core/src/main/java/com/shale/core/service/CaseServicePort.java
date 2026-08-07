@@ -69,6 +69,8 @@ public interface CaseServicePort {
 	/** Authoritative snapshot used by the existing-case desktop compatibility-date editors. */
 	default Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(
 			long caseId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkOperation("listMigratedCompatibilityStateForCase"); }
+	default CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(
+			long caseId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkOperation("loadMigratedCompatibilityDateSnapshot"); }
 
 	/** Atomic nine-slot mutation; this boundary never writes legacy dbo.Cases date columns. */
 	default CaseDateAggregateResult mutateMigratedCompatibilityDates(CaseDateAggregateCommand command) {

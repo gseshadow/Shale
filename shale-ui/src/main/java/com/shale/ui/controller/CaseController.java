@@ -57,6 +57,11 @@ import com.shale.core.model.CalendarFeedCategory;
 import com.shale.core.model.CalendarFeedClickTarget;
 import com.shale.core.model.CalendarFeedItem;
 import com.shale.core.model.CalendarFeedSourceFilter;
+import com.shale.core.model.CaseDateAggregateResult;
+import com.shale.core.model.CaseDateAggregateCommand;
+import com.shale.core.model.CompatibilityCaseDateEditor;
+import com.shale.core.model.CompatibilityCaseDateState;
+import com.shale.core.model.MigratedCaseDateKey;
 import com.shale.core.semantics.RoleSemantics;
 import com.shale.data.dao.CalendarEventDao;
 import com.shale.data.dao.CalendarEventTypeDao;
@@ -731,6 +736,8 @@ public class CaseController {
 	private byte[] latestCaseRowVer;
 	private byte[] overviewEditRowVer;
 	private byte[] detailsEditRowVer;
+	private final AuthoritativeCaseDateEditor compatibilityDates = new AuthoritativeCaseDateEditor();
+	private int compatibilityDatesGeneration;
 	private Runnable onCaseDeleted;
 	private PhiReadAuditService phiReadAuditService;
 
@@ -841,6 +848,8 @@ public class CaseController {
 	}
 
 	public void init(Integer caseId) {
+		compatibilityDates.invalidate();
+		compatibilityDatesGeneration++;
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
 		this.caseTasksLoadedOnce = false;
@@ -861,6 +870,8 @@ public class CaseController {
 
 	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseServicePort caseService, OrganizationDao organizationDao, ContactDao contactDao,
 			AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted, PhiReadAuditService phiReadAuditService) {
+		compatibilityDates.invalidate();
+		compatibilityDatesGeneration++;
 		this.caseId = caseId;
 		this.partiesLoadedOnce = false;
 		this.caseTasksLoadedOnce = false;
@@ -1385,7 +1396,7 @@ public class CaseController {
 					value -> saveSingleDetailsField(d -> d.description = value));
 		} else if (editor == detCallerDateEditor) {
 			showDetailsDateDialog("Edit Caller Date", "Caller Date", base.callerDate, ownerButton,
-					value -> saveSingleDetailsField(d -> d.callerDate = value));
+					value -> saveAuthoritativeDate(MigratedCaseDateKey.CALLER_DATE, value));
 		} else if (editor == detCallerTimeEditor) {
 			showDetailsTextFieldDialog("Edit Caller Time", "Caller Time", base.callerTime, false, ownerButton,
 					value -> saveSingleDetailsField(d -> d.callerTime = value));
@@ -1400,22 +1411,22 @@ public class CaseController {
 					value -> saveSingleDetailsField(d -> d.deniedDate = value));
 		} else if (editor == detDateOfMedicalNegligenceEditor) {
 			showDetailsDateDialog("Edit Date of Medical Negligence", "Date of Medical Negligence", base.dateOfMedicalNegligence, ownerButton,
-					value -> saveSingleDetailsField(d -> d.dateOfMedicalNegligence = value));
+					value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_MEDICAL_NEGLIGENCE, value));
 		} else if (editor == detDateMedicalNegligenceWasDiscoveredEditor) {
 			showDetailsDateDialog("Edit Date Medical Negligence Was Discovered", "Date Medical Negligence Was Discovered", base.dateMedicalNegligenceWasDiscovered, ownerButton,
-					value -> saveSingleDetailsField(d -> d.dateMedicalNegligenceWasDiscovered = value));
+					value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_MEDICAL_NEGLIGENCE_DISCOVERED, value));
 		} else if (editor == detDateOfInjuryEditor) {
 			showDetailsDateDialog("Edit Date of Injury", "Date of Injury", base.dateOfInjury, ownerButton,
-					value -> saveSingleDetailsField(d -> d.dateOfInjury = value));
+					value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY, value));
 		} else if (editor == detStatuteOfLimitationsEditor) {
 			showDetailsNullableDateDialog("Edit Statute of Limitations", "Statute of Limitations", base.statuteOfLimitations, ownerButton,
-					value -> saveSingleDetailsField(d -> d.statuteOfLimitations = value));
+					value -> saveAuthoritativeDate(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS, value));
 		} else if (editor == detTortNoticeDeadlineEditor) {
 			showDetailsNullableDateDialog("Edit Tort Notice Deadline", "Tort Notice Deadline", base.tortNoticeDeadline, ownerButton,
-					value -> saveSingleDetailsField(d -> d.tortNoticeDeadline = value));
+					value -> saveAuthoritativeDate(MigratedCaseDateKey.TORT_NOTICE_DEADLINE, value));
 		} else if (editor == detDiscoveryDeadlineEditor) {
 			showDetailsDateDialog("Edit Discovery Deadline", "Discovery Deadline", base.discoveryDeadline, ownerButton,
-					value -> saveSingleDetailsField(d -> d.discoveryDeadline = value));
+					value -> saveAuthoritativeDate(MigratedCaseDateKey.DISCOVERY_DEADLINE, value));
 		} else if (editor instanceof CheckBox checkBox) {
 			showDetailsBooleanDialog("Edit " + fieldLabel, fieldLabel, checkBox.isSelected(), ownerButton,
 					value -> saveSingleDetailsBooleanField(editor, value));
@@ -4420,6 +4431,7 @@ public class CaseController {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
+		loadCompatibilityDatesAsync(activeCaseId);
 		caseUpdatesStale = true;
 		loadCaseUpdatesAsync();
 		loadCaseTasksAsync();
@@ -4478,6 +4490,94 @@ public class CaseController {
 				PerfLog.logDone("NAV", "ready page=case_view caseId=" + activeCaseId, pageLoadStartNanos);
 			});
 		}, "case-view-sync-" + activeCaseId).start();
+	}
+
+	private void loadCompatibilityDatesAsync(long activeCaseId) {
+		if (caseService == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null) return;
+		final int generation = ++compatibilityDatesGeneration;
+		final int tenant = appState.getShaleClientId();
+		final int actor = appState.getUserId();
+		new Thread(() -> {
+			try {
+				CaseDateAggregateResult loaded = caseService.loadMigratedCompatibilityDateSnapshot(activeCaseId, tenant, actor);
+				runOnFx(() -> {
+					if (caseId == null || caseId.longValue() != activeCaseId || generation != compatibilityDatesGeneration) return;
+					compatibilityDates.replace(loaded);
+					latestCaseRowVer = loaded.caseRowVer();
+					renderCompatibilityDates();
+				});
+			} catch (RuntimeException ex) {
+				runOnFx(() -> { if (caseId != null && caseId.longValue() == activeCaseId && generation == compatibilityDatesGeneration)
+					showError("Authoritative Case Dates could not be loaded. Reload before editing dates."); });
+			}
+		}, "case-compatibility-dates-load-" + activeCaseId).start();
+	}
+
+	private void renderCompatibilityDates() {
+		if (!compatibilityDates.isLoaded()) return;
+		Map<MigratedCaseDateKey, CompatibilityCaseDateState> s = compatibilityDates.states();
+		setCompatibilityDate(detCallerDateValue, detCallerDateEditor, s.get(MigratedCaseDateKey.CALLER_DATE));
+		CompatibilityCaseDateState intake = s.get(MigratedCaseDateKey.CALLER_DATE);
+		String intakeTime = intake.startsAt() == null || intake.allDay() ? "" : intake.startsAt().toLocalTime().toString();
+		if (detCallerTimeValue != null) detCallerTimeValue.setText(intakeTime.isBlank() ? "—" : intakeTime);
+		if (detCallerTimeEditor != null) detCallerTimeEditor.setText(intakeTime);
+		setCompatibilityDate(detDateOfInjuryValue, detDateOfInjuryEditor, s.get(MigratedCaseDateKey.DATE_OF_INJURY));
+		setCompatibilityDate(detDateOfMedicalNegligenceValue, detDateOfMedicalNegligenceEditor, s.get(MigratedCaseDateKey.DATE_OF_MEDICAL_NEGLIGENCE));
+		setCompatibilityDate(detDateMedicalNegligenceWasDiscoveredValue, detDateMedicalNegligenceWasDiscoveredEditor, s.get(MigratedCaseDateKey.DATE_MEDICAL_NEGLIGENCE_DISCOVERED));
+		setCompatibilityDate(detStatuteOfLimitationsValue, detStatuteOfLimitationsEditor, s.get(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS));
+		setCompatibilityDate(detTortNoticeDeadlineValue, detTortNoticeDeadlineEditor, s.get(MigratedCaseDateKey.TORT_NOTICE_DEADLINE));
+		setCompatibilityDate(detDiscoveryDeadlineValue, detDiscoveryDeadlineEditor, s.get(MigratedCaseDateKey.DISCOVERY_DEADLINE));
+		setCompatibilityDate(detDateFeeAgreementSignedValue, detDateFeeAgreementSignedEditor, s.get(MigratedCaseDateKey.DATE_FEE_AGREEMENT_SIGNED));
+		setCompatibilityDate(detDateNonEngagementLetterSentValue, detDateNonEngagementLetterSentEditor, s.get(MigratedCaseDateKey.DATE_NON_ENGAGEMENT_LETTER_SENT));
+		setCompatibilityDate(ovIncidentDateValue, ovIncidentDateEditor, s.get(MigratedCaseDateKey.DATE_OF_INJURY));
+		setCompatibilityDate(ovDateOfMedicalNegligenceValue, ovDateOfMedicalNegligenceEditor, s.get(MigratedCaseDateKey.DATE_OF_MEDICAL_NEGLIGENCE));
+		setCompatibilityDate(ovSolDateValue, ovSolDateEditor, s.get(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS));
+		setCompatibilityDate(ovTortNoticeDeadlineValue, ovTortNoticeDeadlineEditor, s.get(MigratedCaseDateKey.TORT_NOTICE_DEADLINE));
+		if (ovIntakeDateValue != null) ovIntakeDateValue.setText(formatDate(intake.startsAt() == null ? null : intake.startsAt().toLocalDate()));
+	}
+
+	private void setCompatibilityDate(Label label, DatePicker picker, CompatibilityCaseDateState state) {
+		LocalDate date = state == null || state.startsAt() == null ? null : state.startsAt().toLocalDate();
+		if (label != null) label.setText(formatDate(date));
+		if (picker != null) picker.setValue(date);
+	}
+
+	private void saveAuthoritativeDate(MigratedCaseDateKey key, LocalDate date) {
+		if (caseId == null || appState == null || caseService == null || !compatibilityDates.isLoaded()) {
+			showError("Reload authoritative Case Dates before editing."); return;
+		}
+		Map<MigratedCaseDateKey, CompatibilityCaseDateEditor.EditedValue> values =
+				new java.util.EnumMap<>(AuthoritativeCaseDateEditor.values(compatibilityDates.states()));
+		CompatibilityCaseDateState old = compatibilityDates.states().get(key);
+		LocalDateTime start = null;
+		if (date != null) {
+			if (key.supportsTime() && old.startsAt() != null && !old.allDay()) start = LocalDateTime.of(date, old.startsAt().toLocalTime());
+			else start = date.atStartOfDay();
+		}
+		values.put(key, new CompatibilityCaseDateEditor.EditedValue(start, date == null ? null : old.endsAt(), key.supportsTime() ? old.allDay() : true));
+		CaseDateAggregateCommand command;
+		try { command = compatibilityDates.beginSave(appState.getShaleClientId(), appState.getUserId(), caseId, values); }
+		catch (RuntimeException ex) { showError(ex.getMessage()); return; }
+		if (command == null) { renderCompatibilityDates(); return; }
+		final long activeCaseId = caseId;
+		final int generation = compatibilityDatesGeneration;
+		setBusy(true);
+		new Thread(() -> {
+			try {
+				CaseDateAggregateResult result = caseService.mutateMigratedCompatibilityDates(command);
+				runOnFx(() -> {
+					if (caseId == null || caseId.longValue() != activeCaseId || generation != compatibilityDatesGeneration) return;
+					compatibilityDates.replace(result); latestCaseRowVer = result.caseRowVer(); renderCompatibilityDates(); setBusy(false);
+				});
+			} catch (RuntimeException ex) {
+				runOnFx(() -> {
+					if (caseId == null || caseId.longValue() != activeCaseId || generation != compatibilityDatesGeneration) return;
+					compatibilityDates.failedSave(); setBusy(false);
+					showError("Case Dates changed elsewhere or are inconsistent. Reloaded authoritative dates; review your change before saving again.");
+					compatibilityDates.invalidate(); loadCompatibilityDatesAsync(activeCaseId);
+				});
+			}
+		}, "case-compatibility-dates-save-" + activeCaseId).start();
 	}
 
 	private void refreshOverviewAndDetailsAfterStructuralPatchAsync() {
@@ -9362,13 +9462,9 @@ public class CaseController {
 			Boolean feeAgreementSigned = normalizeDetailsCheckboxBoolean(source.feeAgreementSigned);
 			LocalDate rawDateFeeAgreementSigned = source.dateFeeAgreementSigned;
 			LocalDate dateFeeAgreementSigned = rawDateFeeAgreementSigned;
-			if (Boolean.TRUE.equals(feeAgreementSigned) && dateFeeAgreementSigned == null)
-				dateFeeAgreementSigned = LocalDate.now();
 			Boolean nonEngagementLetterSent = normalizeDetailsCheckboxBoolean(source.nonEngagementLetterSent);
 			LocalDate rawDateNonEngagementLetterSent = source.dateNonEngagementLetterSent;
 			LocalDate dateNonEngagementLetterSent = rawDateNonEngagementLetterSent;
-			if (Boolean.TRUE.equals(nonEngagementLetterSent) && dateNonEngagementLetterSent == null)
-				dateNonEngagementLetterSent = LocalDate.now();
 			Boolean acceptedChronology = normalizeDetailsCheckboxBoolean(source.acceptedChronology);
 			Boolean acceptedConsultantExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedConsultantExpertSearch);
 			Boolean acceptedTestifyingExpertSearch = normalizeDetailsCheckboxBoolean(source.acceptedTestifyingExpertSearch);
@@ -10246,8 +10342,6 @@ public class CaseController {
 			}
 			if (detDateNonEngagementLetterSentEditor != null)
 				detDateNonEngagementLetterSentEditor.setValue(d.dateNonEngagementLetterSent);
-			wireFeeAgreementSignedAutoDateListener();
-			wireNonEngagementLetterSentAutoDateListener();
 			renderNullableBoolean(detAcceptedChronologyEditor, d.acceptedChronology);
 			renderNullableBoolean(detAcceptedConsultantExpertSearchEditor, d.acceptedConsultantExpertSearch);
 			renderNullableBoolean(detAcceptedTestifyingExpertSearchEditor, d.acceptedTestifyingExpertSearch);
