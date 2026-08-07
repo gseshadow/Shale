@@ -349,9 +349,16 @@ public final class CaseDao {
 			String callerAddress,
 			String callerEmail,
 			List<NewIntakePendingParty> pendingParties,
-			Integer createdByUserId
+			Integer createdByUserId,
+			long formConfigurationId,
+			byte[] formConfigurationRowVer,
+			List<ConfiguredDateValue> configuredDates
 	) {
+		public NewIntakeCreateRequest { formConfigurationRowVer = formConfigurationRowVer == null ? null : formConfigurationRowVer.clone(); configuredDates = configuredDates == null ? List.of() : List.copyOf(configuredDates); }
+		@Override public byte[] formConfigurationRowVer() { return formConfigurationRowVer == null ? null : formConfigurationRowVer.clone(); }
 	}
+
+	public record ConfiguredDateValue(String fieldKey, int caseDateTypeId, boolean required, LocalDate value) {}
 
 	public record NewIntakePendingParty(
 			String entityType,
@@ -381,6 +388,7 @@ public final class CaseDao {
 		try {
 			con = db.requireConnection();
 			con.setAutoCommit(false);
+			List<ConfiguredDateValue> configuredDates = validateConfiguredIntakeDates(con, request);
 			System.out.println("[IntakeCreate] start shaleClientId=" + request.shaleClientId()
 					+ " caseName='" + safeLogValue(request.caseName()) + "'");
 			ensureRequiredPartyRolesForTenant(con, request.shaleClientId());
@@ -461,12 +469,13 @@ public final class CaseDao {
 			normalizeCasePartyRelationshipPrimaries(con, caseId, request.shaleClientId());
 			System.out.println("[IntakeCreate] party primary normalization completed caseId=" + caseId);
 			insertCaseStatus(con, caseId, request.statusId(), now);
+			for (ConfiguredDateValue date : configuredDates) insertConfiguredCaseDate(con, request, caseId, date);
 			System.out.println("[IntakeCreate] primary status linked caseId=" + caseId + " statusId=" + request.statusId());
 
 			con.commit();
 			System.out.println("[IntakeCreate] committed caseId=" + caseId + " shaleClientId=" + request.shaleClientId());
 			return new NewIntakeCreateResult(caseId, clientContactId, callerContactId);
-		} catch (SQLException e) {
+		} catch (Exception e) {
 			System.err.println("[IntakeCreate] failed shaleClientId=" + request.shaleClientId() + " error=" + e.getMessage());
 			e.printStackTrace(System.err);
 			if (con != null) {
@@ -475,6 +484,7 @@ public final class CaseDao {
 				} catch (SQLException ignored) {
 				}
 			}
+			if (e instanceof IntakeConfigurationException configured) throw configured;
 			throw new RuntimeException("Failed to create intake.", e);
 		} finally {
 			if (con != null) {
@@ -487,6 +497,64 @@ public final class CaseDao {
 				} catch (SQLException ignored) {
 				}
 			}
+		}
+	}
+
+	public static final class IntakeConfigurationException extends RuntimeException {
+		public IntakeConfigurationException(String message) { super(message); }
+	}
+
+	private List<ConfiguredDateValue> validateConfiguredIntakeDates(Connection con, NewIntakeCreateRequest request) throws SQLException {
+		long currentId = 0; byte[] currentRowVer = null;
+		try (PreparedStatement ps = con.prepareStatement("SELECT Id,RowVer FROM dbo.FormConfigurations WITH (UPDLOCK,HOLDLOCK) WHERE ShaleClientId=? AND FormKey='NEW_INTAKE' AND IsDeleted=0")) {
+			ps.setInt(1, request.shaleClientId()); try (ResultSet rs=ps.executeQuery()) { if (rs.next()) { currentId=rs.getLong(1); currentRowVer=rs.getBytes(2); } }
+		}
+		byte[] submittedRowVer=request.formConfigurationRowVer();
+		if (currentId != request.formConfigurationId() || !java.util.Arrays.equals(currentRowVer, submittedRowVer))
+			throw new IntakeConfigurationException("The intake form configuration changed. Reload the form before submitting again.");
+		if (currentId == 0) {
+			if (!request.configuredDates().isEmpty()) throw invalidConfiguredDates();
+			return List.of();
+		}
+		LinkedHashMap<String, ConfiguredDateValue> submitted=new LinkedHashMap<>();
+		for (ConfiguredDateValue value : request.configuredDates()) {
+			if (value == null || value.fieldKey() == null || submitted.putIfAbsent(value.fieldKey(), value) != null) throw invalidConfiguredDates();
+		}
+		LinkedHashMap<String, ConfiguredDateValue> authoritative=new LinkedHashMap<>();
+		String sql="""
+			SELECT f.FieldKey,f.CaseDateTypeId,f.IsRequired
+			FROM dbo.FormConfigurationSections s
+			JOIN dbo.FormConfiguredFields f ON f.FormConfigurationSectionId=s.Id AND f.ShaleClientId=s.ShaleClientId
+			WHERE s.FormConfigurationId=? AND s.ShaleClientId=? AND s.SectionKey='dates' AND s.IsEnabled=1 AND s.IsVisible=1
+			  AND f.FieldKind='CASE_DATE' AND f.IsEnabled=1 AND f.IsVisible=1
+			ORDER BY s.SortOrder,s.Id,f.SortOrder,f.Id
+			""";
+		try (PreparedStatement ps=con.prepareStatement(sql)) { ps.setLong(1,currentId);ps.setInt(2,request.shaleClientId());try(ResultSet rs=ps.executeQuery()){while(rs.next()){
+			String key=rs.getString(1);int type=rs.getInt(2);boolean required=rs.getBoolean(3);
+			if(authoritative.putIfAbsent(key,new ConfiguredDateValue(key,type,required,null))!=null)throw invalidConfiguredDates();
+		}}}
+		if (!submitted.keySet().equals(authoritative.keySet())) throw invalidConfiguredDates();
+		Set<Integer> typeIds=new HashSet<>(); List<ConfiguredDateValue> result=new ArrayList<>();
+		for (var entry:authoritative.entrySet()) {
+			ConfiguredDateValue expected=entry.getValue(), actual=submitted.get(entry.getKey());
+			if(actual.caseDateTypeId()!=expected.caseDateTypeId() || actual.required()!=expected.required() || !typeIds.add(actual.caseDateTypeId())) throw invalidConfiguredDates();
+			validateEffectiveConfiguredDateType(con,request.shaleClientId(),actual.caseDateTypeId());
+			if(expected.required() && actual.value()==null) throw new IntakeConfigurationException("Complete all required configured date fields.");
+			if(actual.value()!=null) result.add(actual);
+		}
+		return List.copyOf(result);
+	}
+
+	private static void validateEffectiveConfiguredDateType(Connection con,int tenant,int typeId)throws SQLException{
+		String sql="""WITH visible AS (SELECT t.Id,t.IsActive,t.IsDeleted,ROW_NUMBER() OVER(PARTITION BY t.SystemKey ORDER BY CASE WHEN t.ShaleClientId=? AND t.IsDeleted=0 THEN 0 ELSE 1 END,t.Id) rn FROM dbo.CaseDateTypes t WHERE (t.ShaleClientId=? OR t.ShaleClientId IS NULL) AND t.SystemKey IS NOT NULL), effective AS (SELECT Id FROM visible WHERE rn=1 AND IsActive=1 AND IsDeleted=0 UNION ALL SELECT Id FROM dbo.CaseDateTypes WHERE ShaleClientId=? AND SystemKey IS NULL AND IsActive=1 AND IsDeleted=0) SELECT 1 FROM effective WHERE Id=?""";
+		try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setInt(2,tenant);ps.setInt(3,tenant);ps.setInt(4,typeId);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw invalidConfiguredDates();}}
+	}
+
+	private static IntakeConfigurationException invalidConfiguredDates(){return new IntakeConfigurationException("The configured date fields are no longer valid. Reload the form before submitting again.");}
+
+	private static void insertConfiguredCaseDate(Connection con,NewIntakeCreateRequest request,long caseId,ConfiguredDateValue value)throws SQLException{
+		try(PreparedStatement ps=con.prepareStatement("INSERT dbo.CaseDates(ShaleClientId,CaseId,CaseDateTypeId,StartsAt,EndsAt,AllDay,CreatedAt,CreatedByUserId) VALUES(?,?,?, ?,NULL,1,SYSUTCDATETIME(),?)")){
+			ps.setInt(1,request.shaleClientId());ps.setLong(2,caseId);ps.setInt(3,value.caseDateTypeId());ps.setTimestamp(4,Timestamp.valueOf(value.value().atStartOfDay()));ps.setInt(5,request.createdByUserId());ps.executeUpdate();
 		}
 	}
 
@@ -691,11 +759,12 @@ public final class CaseDao {
 			ps.setBoolean(i++, request.estateCase());
 			setNullableString(ps, i++, request.description());
 			setNullableString(ps, i++, request.summary());
-			setNullableDate(ps, i++, request.dateOfMedicalNegligence());
-			setNullableDate(ps, i++, request.dateMedicalNegligenceWasDiscovered());
-			setNullableDate(ps, i++, request.dateOfInjury());
-			setNullableDate(ps, i++, request.statuteOfLimitations());
-			setNullableDate(ps, i++, request.tortClaimsNotice());
+			boolean configured = request.formConfigurationId() != 0;
+			setNullableDate(ps, i++, configured ? null : request.dateOfMedicalNegligence());
+			setNullableDate(ps, i++, configured ? null : request.dateMedicalNegligenceWasDiscovered());
+			setNullableDate(ps, i++, configured ? null : request.dateOfInjury());
+			setNullableDate(ps, i++, configured ? null : request.statuteOfLimitations());
+			setNullableDate(ps, i++, configured ? null : request.tortClaimsNotice());
 			ps.setTimestamp(i++, now);
 			ps.setTimestamp(i++, now);
 			ps.setInt(i++, request.shaleClientId());

@@ -132,7 +132,7 @@ public final class NewIntakeController {
 	private FormConfigurationServicePort formConfigurationService;
 	private FormConfigurationDto loadedDatesConfiguration;
 	private List<EffectiveCaseDateTypeDto> effectiveDateTypes = List.of();
-	private final Map<Integer, ConfiguredDateInput> configuredDateInputs = new LinkedHashMap<>();
+	private final Map<String, ConfiguredDateInput> configuredDateInputs = new LinkedHashMap<>();
 	private final List<Selection> stagedDateSelections = new ArrayList<>();
 	private long datesLoadGeneration;
 	private boolean datesViewClosed;
@@ -315,7 +315,7 @@ public final class NewIntakeController {
 			HBox row = new HBox(16, label, picker); row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 			HBox.setHgrow(picker, Priority.ALWAYS); picker.setMaxWidth(Double.MAX_VALUE);
 			configuredDatesBox.getChildren().add(row);
-			configuredDateInputs.put(field.type().id(), new ConfiguredDateInput(field.type().id(), field.fieldKey(), picker));
+			configuredDateInputs.put(field.fieldKey(), new ConfiguredDateInput(field.type().id(), field.fieldKey(), field.required(), picker));
 		}
 	}
 
@@ -408,7 +408,7 @@ public final class NewIntakeController {
 	}
 
 	private record DatesLoad(FormConfigurationDto configuration, List<EffectiveCaseDateTypeDto> types) {}
-	public record ConfiguredDateInput(int caseDateTypeId, String fieldKey, DatePicker input) {
+	public record ConfiguredDateInput(int caseDateTypeId, String fieldKey, boolean required, DatePicker input) {
 		public LocalDate value() { return input.getValue(); }
 	}
 
@@ -769,6 +769,10 @@ public final class NewIntakeController {
 	private void attemptCreateIntake(boolean invokedFromOfflineRetry) {
 		if (saving)
 			return;
+		if (datesReloadRequired) {
+			showValidation("The intake form configuration changed. Reload the form before submitting again.");
+			return;
+		}
 		System.out.println("[NewIntakeController] save clicked cachedOnlineState=" + knownOnlineState + " offlineRetry=" + invokedFromOfflineRetry);
 		List<String> errors = validateRequiredFields();
 		if (!errors.isEmpty()) {
@@ -853,6 +857,9 @@ public final class NewIntakeController {
 	}
 
 	private CaseDao.NewIntakeCreateRequest buildCreateRequest() {
+		FormConfigurationDto configuration = loadedDatesConfiguration;
+		long configurationId = configuration == null ? 0 : configuration.id();
+		byte[] configurationRowVer = configuration == null ? null : configuration.rowVer();
 		return new CaseDao.NewIntakeCreateRequest(
 				requireClientId(),
 				safeTrim(caseNameField.getText()),
@@ -894,7 +901,11 @@ public final class NewIntakeController {
 						party.contactLastName(),
 						party.organizationName(),
 						party.organizationTypeId())).toList(),
-				appState == null ? null : appState.getUserId()
+				appState == null ? null : appState.getUserId(),
+				configurationId,
+				configurationRowVer == null ? null : configurationRowVer.clone(),
+				configuredDateInputs.values().stream().map(input -> new CaseDao.ConfiguredDateValue(
+						input.fieldKey(), input.caseDateTypeId(), input.required(), input.value())).toList()
 		);
 	}
 
@@ -912,8 +923,11 @@ public final class NewIntakeController {
 
 	private void handleCreateFailure(RuntimeException ex) {
 		knownOnlineState = isConnectivityFailure(ex) ? Boolean.FALSE : knownOnlineState;
+		boolean configurationFailure = ex instanceof CaseDao.IntakeConfigurationException;
+		if (configurationFailure) datesReloadRequired = true;
 		String message = isConnectivityFailure(ex)
 				? "Shale could not connect to the database. Your intake was not saved. You can save a local backup and retry later."
+				: configurationFailure ? ex.getMessage()
 				: "Unable to save intake. Your information has not been discarded. Please try again.";
 		showValidation(message);
 		setSaving(false);
@@ -1316,7 +1330,7 @@ public final class NewIntakeController {
 	}
 
 	private List<String> validateRequiredFields() {
-		return java.util.stream.Stream.of(
+		List<String> errors = new ArrayList<>(java.util.stream.Stream.of(
 				required(caseNameField.getText(), "Case Name is required."),
 				requiredDate(dateOfIntakePicker.getValue(), "Date of Intake is required."),
 				validateIntakeTime(),
@@ -1327,7 +1341,10 @@ public final class NewIntakeController {
 				callerRequiredWhenNotClient(callerFirstNameField.getText(), "Caller First Name is required when Caller is Client is unchecked."),
 				callerRequiredWhenNotClient(callerLastNameField.getText(), "Caller Last Name is required when Caller is Client is unchecked."),
 				callerRequiredWhenNotClient(callerPhoneField.getText(), "Caller Phone Number is required when Caller is Client is unchecked.")
-		).filter(s -> s != null && !s.isBlank()).toList();
+		).filter(s -> s != null && !s.isBlank()).toList());
+		configuredDateInputs.values().stream().filter(input -> input.required() && input.value() == null)
+				.forEach(input -> errors.add("A required configured date is missing."));
+		return List.copyOf(errors);
 	}
 
 	private List<String> validatePracticeAreaSelection(PracticeAreaValidationResult practiceAreaState) {

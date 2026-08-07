@@ -361,4 +361,25 @@ authoritatively reload the generic list and the coherent nine-key snapshot rathe
 carrying dates or concurrency tokens in LiveBus. The fixed controls continue to use only
 CaseDates-backed `AuthoritativeCaseDateEditor` state: there is no legacy read, legacy
 write, or dual-write. Active edits are preserved and stale saves retain the explicit
-conflict/reload workflow. Atomic new-case intake remains the next gate.
+conflict/reload workflow.
+
+## Configurable New Intake writer cutover
+
+When a tenant has a saved `NEW_INTAKE` form configuration, its enabled and visible
+`CASE_DATE` fields are the authoritative intake date writer contract. Submission carries
+the configuration id and row version plus each rendered field's stable key, date-type id,
+required flag, and nullable value. The intake transaction locks and reloads the current
+tenant configuration, compares its identity and row version, requires an exact field set,
+and re-resolves every submitted type through tenant/global effective-winner rules before
+creating the case. A stale or invalid submission rolls back contacts, parties, case, status,
+and occurrences and requires a form reload; labels and client authorization are never
+authoritative.
+
+Nonblank configured values create one all-day `CaseDates` occurrence apiece. The SQL
+`date`/Java `LocalDate` is stored as `StartsAt` at `00:00` on that same local calendar date,
+with `EndsAt = NULL` and `AllDay = 1`; no workstation or UTC timezone conversion is applied.
+Optional blanks create no occurrence. In configured mode the five legacy customizable
+intake date columns are left null rather than dual-written, while unrelated legacy fields
+are untouched. If no saved configuration exists (`id = 0`, null row version), the existing
+legacy controls and fixed-column writes remain unchanged. No default configuration is
+seeded.
