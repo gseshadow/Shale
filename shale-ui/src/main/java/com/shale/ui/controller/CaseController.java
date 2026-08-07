@@ -675,6 +675,10 @@ public class CaseController {
 		@Override public Thread newThread(Runnable runnable) { Thread thread = new Thread(runnable, "case-dates-worker-" + sequence.incrementAndGet()); thread.setDaemon(true); return thread; }
 	});
 	private final AtomicBoolean caseDateMutationInFlight = new AtomicBoolean(false);
+	private final AtomicBoolean remoteCaseDatesRefreshQueued = new AtomicBoolean(false);
+	private final java.util.LinkedHashSet<String> receivedCaseDateEventIds = new java.util.LinkedHashSet<>();
+	private boolean caseDateEditorOpen;
+	private boolean remoteCaseDatesRefreshDeferred;
 	private List<CaseDateDto> caseDates = List.of();
 	private List<CaseDateDto> removedCaseDates = List.of();
 	private List<EffectiveCaseDateTypeDto> effectiveCaseDateTypes = List.of();
@@ -848,6 +852,8 @@ public class CaseController {
 	}
 
 	public void init(Integer caseId) {
+		synchronized (receivedCaseDateEventIds) { receivedCaseDateEventIds.clear(); }
+		remoteCaseDatesRefreshDeferred = false;
 		compatibilityDates.invalidate();
 		compatibilityDatesGeneration++;
 		this.caseId = caseId;
@@ -870,6 +876,8 @@ public class CaseController {
 
 	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseServicePort caseService, OrganizationDao organizationDao, ContactDao contactDao,
 			AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted, PhiReadAuditService phiReadAuditService) {
+		synchronized (receivedCaseDateEventIds) { receivedCaseDateEventIds.clear(); }
+		remoteCaseDatesRefreshDeferred = false;
 		compatibilityDates.invalidate();
 		compatibilityDatesGeneration++;
 		this.caseId = caseId;
@@ -1980,7 +1988,7 @@ public class CaseController {
 	private void showRemovedCaseDatesMessage(String message) { if (removedCaseDatesStatusLabel != null) { removedCaseDatesStatusLabel.setText(message); setVisibleManaged(removedCaseDatesStatusLabel, true); } }
 	private void renderCaseDatesFailure() { if (caseDatesCardsBox != null) caseDatesCardsBox.getChildren().clear(); Button retry = ActionButtonFactory.semantic("Retry", e -> loadCaseDatesAsync(), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD); retry.setAccessibleText("Retry loading case dates"); VBox box = new VBox(8, new Label("Failed to load case dates."), retry); caseDatesCardsBox.getChildren().setAll(box); setVisibleManaged(caseDatesStatusLabel, false); }
 	private void updateRemovedCaseDatesVisibility() { if (showRemovedCaseDatesButton != null) { showRemovedCaseDatesButton.setText(showRemovedCaseDates ? "Hide Removed" : "Show Removed"); showRemovedCaseDatesButton.setAccessibleText(showRemovedCaseDates ? "Hide removed case dates" : "Show removed case dates"); } setVisibleManaged(removedCaseDatesCardsBox, showRemovedCaseDates); setVisibleManaged(removedCaseDatesStatusLabel, showRemovedCaseDates && removedCaseDates.isEmpty()); }
-	private void openCaseDateDialog(CaseDateDto existing) { if (caseService == null || appState == null || caseId == null) return; if (effectiveCaseDateTypes.isEmpty()) loadCaseDatesAsync(); CaseDateOccurrenceDialog.show(caseDatesOwner(), existing == null ? "Add Date" : "Edit Date", effectiveCaseDateTypes, existing, input -> saveCaseDate(existing, input), this::loadCaseDatesAsync); }
+	private void openCaseDateDialog(CaseDateDto existing) { if (caseService == null || appState == null || caseId == null) return; if (effectiveCaseDateTypes.isEmpty()) loadCaseDatesAsync(); caseDateEditorOpen = true; try { CaseDateOccurrenceDialog.show(caseDatesOwner(), existing == null ? "Add Date" : "Edit Date", effectiveCaseDateTypes, existing, input -> saveCaseDate(existing, input), this::loadCaseDatesAsync); } finally { caseDateEditorOpen = false; applyDeferredCaseDatesRefresh(); } }
 	private java.util.concurrent.CompletionStage<String> saveCaseDate(CaseDateDto existing, CaseDateOccurrenceDialog.Input input) {
 		Integer tenantId = appState.getShaleClientId(), actorId = appState.getUserId();
 		if (tenantId == null || actorId == null || caseId == null)
@@ -1996,10 +2004,10 @@ public class CaseController {
 						input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes()));
 				else caseService.updateCaseDate(new UpdateCaseDateCommand(tenantId, actorId, activeCaseId, existing.id(),
 						input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes(), existing.rowVer()));
-				Platform.runLater(() -> synchronizeCaseDatesAfterLocalMutation(activeCaseId, compatibilityAffected));
+				Platform.runLater(() -> { synchronizeCaseDatesAfterLocalMutation(activeCaseId, compatibilityAffected); publishCaseDatesChanged(activeCaseId, existing == null ? LiveUpdateEvents.CHANGE_CREATED : LiveUpdateEvents.CHANGE_UPDATED); });
 				return null;
 			} catch (RuntimeException ex) { return rootMessage(ex); }
-			finally { caseDateMutationInFlight.set(false); }
+			finally { caseDateMutationInFlight.set(false); Platform.runLater(this::applyDeferredCaseDatesRefresh); }
 		}, caseDateExecutor);
 	}
 
@@ -2011,9 +2019,9 @@ public class CaseController {
 		final long activeCaseId = caseId.longValue();
 		caseDateExecutor.submit(() -> { try {
 			caseService.deleteCaseDate(new DeleteCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer()));
-			Platform.runLater(() -> synchronizeCaseDatesAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())));
+			Platform.runLater(() -> { synchronizeCaseDatesAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())); publishCaseDatesChanged(activeCaseId, LiveUpdateEvents.CHANGE_REMOVED); });
 		} catch (RuntimeException ex) { Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Remove Date", rootMessage(ex))); }
-		finally { caseDateMutationInFlight.set(false); } });
+		finally { caseDateMutationInFlight.set(false); Platform.runLater(this::applyDeferredCaseDatesRefresh); } });
 	}
 
 	private void onRestoreCaseDate(CaseDateDto d) {
@@ -2023,9 +2031,9 @@ public class CaseController {
 		final long activeCaseId = caseId.longValue();
 		caseDateExecutor.submit(() -> { try {
 			caseService.restoreCaseDate(new RestoreCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer()));
-			Platform.runLater(() -> synchronizeCaseDatesAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())));
+			Platform.runLater(() -> { synchronizeCaseDatesAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())); publishCaseDatesChanged(activeCaseId, LiveUpdateEvents.CHANGE_ADDED); });
 		} catch (RuntimeException ex) { Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Restore Date", rootMessage(ex))); }
-		finally { caseDateMutationInFlight.set(false); } });
+		finally { caseDateMutationInFlight.set(false); Platform.runLater(this::applyDeferredCaseDatesRefresh); } });
 	}
 	private Window caseDatesOwner() { return caseDatesTabPane != null && caseDatesTabPane.getScene() != null ? caseDatesTabPane.getScene().getWindow() : taskDialogOwner(); }
 
@@ -4582,6 +4590,43 @@ public class CaseController {
 		if (compatibilityAffected) loadCompatibilityDatesAsync(activeCaseId);
 	}
 
+	/** Publish only after the service/DAO transaction has returned successfully. */
+	private void publishCaseDatesChanged(long activeCaseId, String change) {
+		if (runtimeBridge == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null) return;
+		runtimeBridge.publishCaseDatesChanged(activeCaseId, appState.getShaleClientId(), appState.getUserId(), change);
+	}
+
+	private void applyDeferredCaseDatesRefresh() {
+		if (!remoteCaseDatesRefreshDeferred || caseDateEditorOpen || caseDateMutationInFlight.get() || compatibilityDates.isSaving()) return;
+		remoteCaseDatesRefreshDeferred = false;
+		queueRemoteCaseDatesRefresh();
+	}
+
+	private void queueRemoteCaseDatesRefresh() {
+		if (!remoteCaseDatesRefreshQueued.compareAndSet(false, true)) return;
+		runOnFx(() -> {
+			remoteCaseDatesRefreshQueued.set(false);
+			if (caseId == null) return;
+			if (caseDateEditorOpen || caseDateMutationInFlight.get() || compatibilityDates.isSaving()) {
+				remoteCaseDatesRefreshDeferred = true;
+				return;
+			}
+			long activeCaseId = caseId.longValue();
+			caseDatesStale = true;
+			loadCaseDatesAsync();
+			loadCompatibilityDatesAsync(activeCaseId);
+		});
+	}
+
+	private boolean rememberCaseDateEvent(String eventId) {
+		if (eventId == null || eventId.isBlank()) return true;
+		synchronized (receivedCaseDateEventIds) {
+			if (!receivedCaseDateEventIds.add(eventId)) return false;
+			while (receivedCaseDateEventIds.size() > 256) receivedCaseDateEventIds.remove(receivedCaseDateEventIds.iterator().next());
+			return true;
+		}
+	}
+
 	private boolean isMigratedCaseDateType(int typeId) {
 		return effectiveCaseDateTypes.stream().filter(type -> type.id() == typeId).findFirst()
 				.map(EffectiveCaseDateTypeDto::systemKey).map(this::isMigratedCaseDateSystemKey).orElse(false);
@@ -4671,6 +4716,8 @@ public class CaseController {
 					if (!isCompatibilityDatesCurrent(activeCaseId, generation)) return;
 					compatibilityDates.replace(result); latestCaseRowVer = result.caseRowVer(); renderCompatibilityDates(); setBusy(false);
 					synchronizeCaseDatesAfterLocalMutation(activeCaseId, false);
+					publishCaseDatesChanged(activeCaseId, LiveUpdateEvents.CHANGE_UPDATED);
+					applyDeferredCaseDatesRefresh();
 				});
 			} catch (RuntimeException ex) {
 				runOnFx(() -> {
@@ -4678,6 +4725,7 @@ public class CaseController {
 					compatibilityDates.failedSave(); setBusy(false);
 					showError("Case Dates changed elsewhere or are inconsistent. Reloaded authoritative dates; review your change before saving again.");
 					compatibilityDates.invalidate(); loadCompatibilityDatesAsync(activeCaseId);
+					applyDeferredCaseDatesRefresh();
 				});
 			}
 		}, "case-compatibility-dates-save-" + activeCaseId).start();
@@ -5315,7 +5363,9 @@ public class CaseController {
 		DatePicker picker = new DatePicker(currentValue);
 		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + formatDate(currentValue)), picker));
 		dialog.setResultConverter(button -> button == saveType ? Optional.ofNullable(nullableDatePickerValue(picker)) : null);
-		dialog.showAndWait().ifPresent(value -> onSave.accept(value.orElse(null)));
+		caseDateEditorOpen = true;
+		try { dialog.showAndWait().ifPresent(value -> onSave.accept(value.orElse(null))); }
+		finally { caseDateEditorOpen = false; applyDeferredCaseDatesRefresh(); }
 	}
 
 	private void showDetailsTextFieldDialog(String title, String label, String currentValue, boolean required, Button ownerButton, Consumer<String> onSave) {
@@ -5370,7 +5420,9 @@ public class CaseController {
 		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + formatDate(currentValue)), picker));
 		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> !Objects.equals(currentValue, picker.getValue()));
 		dialog.setResultConverter(button -> button == saveType ? picker.getValue() : null);
-		dialog.showAndWait().ifPresent(onSave);
+		caseDateEditorOpen = true;
+		try { dialog.showAndWait().ifPresent(onSave); }
+		finally { caseDateEditorOpen = false; applyDeferredCaseDatesRefresh(); }
 	}
 
 	private void showDetailsNullableDateDialog(String title, String label, LocalDate currentValue, Button ownerButton, Consumer<LocalDate> onSave) {
@@ -5383,7 +5435,9 @@ public class CaseController {
 		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + formatDate(currentValue)), picker));
 		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> !Objects.equals(currentValue, picker.getValue()));
 		dialog.setResultConverter(button -> button == saveType ? Optional.ofNullable(nullableDatePickerValue(picker)) : null);
-		dialog.showAndWait().ifPresent(value -> onSave.accept(value.orElse(null)));
+		caseDateEditorOpen = true;
+		try { dialog.showAndWait().ifPresent(value -> onSave.accept(value.orElse(null))); }
+		finally { caseDateEditorOpen = false; applyDeferredCaseDatesRefresh(); }
 	}
 
 	static LocalDate nullableDatePickerValue(DatePicker picker) {
@@ -8537,6 +8591,7 @@ public class CaseController {
 	private final class CaseOverviewLiveUpdateHandler {
 		private final Consumer<UiRuntimeBridge.CaseUpdatedEvent> eventHandler = this::handleEvent;
 		private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> entityEventHandler = this::handleEntityEvent;
+		private final Consumer<UiRuntimeBridge.ConnectivityEvent> connectivityEventHandler = this::handleConnectivityEvent;
 		private boolean subscribed;
 
 		void subscribe() {
@@ -8545,6 +8600,7 @@ public class CaseController {
 
 			runtimeBridge.subscribeCaseUpdated(eventHandler);
 			runtimeBridge.subscribeEntityUpdated(entityEventHandler);
+			runtimeBridge.subscribeConnectivity(connectivityEventHandler);
 			subscribed = true;
 		}
 
@@ -8554,7 +8610,12 @@ public class CaseController {
 			}
 			runtimeBridge.unsubscribeCaseUpdated(eventHandler);
 			runtimeBridge.unsubscribeEntityUpdated(entityEventHandler);
+			runtimeBridge.unsubscribeConnectivity(connectivityEventHandler);
 			subscribed = false;
+		}
+
+		private void handleConnectivityEvent(UiRuntimeBridge.ConnectivityEvent event) {
+			if (event != null && event.online() && caseId != null) queueRemoteCaseDatesRefresh();
 		}
 
 		private void handleEntityEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -8562,6 +8623,15 @@ public class CaseController {
 			Integer tenantId = appState.getShaleClientId();
 			if (tenantId == null || event.shaleClientId() != tenantId) return;
 			String entityType = event.entityType();
+			if (LiveUpdateEvents.ENTITY_CASE_DATES.equals(entityType)) {
+				if (event.entityId() != caseId.longValue() || !rememberCaseDateEvent(event.eventId())) return;
+				if (runtimeBridge != null) {
+					String mine = runtimeBridge.getClientInstanceId();
+					if (mine != null && !mine.isBlank() && mine.equals(event.clientInstanceId())) return;
+				}
+				queueRemoteCaseDatesRefresh();
+				return;
+			}
 			if (!LiveUpdateEvents.ENTITY_CASE_LINK.equals(entityType)
 					&& !LiveUpdateEvents.ENTITY_CASE_LINK_SHARE.equals(entityType)
 					&& !LiveUpdateEvents.ENTITY_LINK_TYPE.equals(entityType)) return;
