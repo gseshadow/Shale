@@ -62,3 +62,44 @@ Publication occurs only after successful mutation methods return. Validation, au
 Domain invalidations and `EntityAuditActivity` invalidations are separate safe events: audited Case Link, Case Link Share, and Link Type mutations publish the domain invalidation needed by business screens and an audit-activity invalidation needed by the unified Audit Log viewer. Sending live notifications does not create audit rows, and Audit Viewer reloads are read-only and must not recursively generate entity-action audit records.
 
 Controllers continue to use existing JavaFX rules: database reloads run on background executors, UI mutations happen via `Platform.runLater`, request generations reject stale results, open edit dialogs are not closed or overwritten by live events, and later manual/live refreshes can recover after a failed reload. Existing connection-loss behavior is preserved: the live client reports connectivity and reconnects by negotiating/joining the tenant group again; there is no durable replay, so currently visible affected views should use one authoritative bounded reload after reconnect rather than assuming missed event delivery.
+
+## Case Dates cross-instance invalidation
+
+Desktop existing-case Case Date mutations use the established tenant LiveBus envelope with
+`type=EntityUpdated`, `entityType=CaseDates`, `entityId=CaseId`, a UUID `eventId`,
+`shaleClientId`, `updatedByUserId`, `clientInstanceId`, and a patch containing only
+`caseId` and `change` (`CREATED`, `UPDATED`, `REMOVED`, or `ADDED`). The contract must
+not contain occurrence values, names, type labels, descriptions, notes, row versions, or
+other PHI. It is an invalidation, never a data patch.
+
+`CaseController` publishes through its single `publishCaseDatesChanged` boundary only
+after a generic create/update/remove/restore or the nine-slot aggregate service call has
+returned successfully. Those service calls return after their DAO transaction commits;
+validation, stale-row-version, rollback, and other failures never reach publication. An
+aggregate command whose nine intents are all `Unchanged` does not call the mutation or
+publisher. Publication failure cannot roll back or misreport the already committed save.
+
+The controller owns the subscription for the attached Case View and unsubscribes with its
+existing scene lifecycle. It rejects another tenant, another case, its own
+`clientInstanceId`, and duplicate/replayed `eventId` values. Bursts are coalesced on the FX
+queue. Receipt performs no mutation: background workers reload both the generic Dates
+collection and the complete `AuthoritativeCaseDateEditor` snapshot. Only the FX thread
+applies results, and existing case-id, request-generation, and attached-scene checks keep
+case switches and older responses from replacing newer state. The snapshot replaces the
+Cases row version plus all nine occurrence ids, CaseDates row versions, values, and
+expected-absence witnesses coherently; live payloads never carry or synthesize them.
+
+A remote invalidation arriving while a Case Date dialog or save is active is deferred. The
+open dialog input is not repainted, closed, retried, or converted to last-write-wins. After
+the edit/save completes, one authoritative reconciliation runs; if the submitted tokens
+were genuinely stale, the established conflict message and explicit authoritative reload
+remain in force. The initiating instance applies the mutation result/local synchronization
+and ignores its echoed instance id, preventing a refresh or mutation loop.
+
+All generic CaseDates changes invalidate the generic Dates section. Because the PHI-safe
+contract intentionally omits the affected SystemKey, every remote event also reloads the
+complete nine-slot snapshot; non-migrated occurrences therefore cannot populate a fixed
+field. Reconnect duplicates are deduplicated and remain read-only. This adds no polling,
+new socket, durable replay, legacy `dbo.Cases` date read/write, or dual-write. The next
+cutover gate remains atomic new-case intake; API/web/new-case paths are not partially
+converted here.
