@@ -33,6 +33,7 @@ public final class FormConfigurationDao {
             con.setAutoCommit(false);
             try {
                 validateActor(con, command.shaleClientId(), command.actorUserId());
+                validateAdmin(con, command.shaleClientId(), command.actorUserId());
                 validateReferences(con, command.shaleClientId(), command.sections());
                 long formId = lockAndTouchForm(con, command, formKey);
                 try (PreparedStatement ps = con.prepareStatement("DELETE FROM dbo.FormConfiguredFields WHERE FormConfigurationId=? AND ShaleClientId=?")) {
@@ -138,5 +139,6 @@ public final class FormConfigurationDao {
     private static Object object(ResultSet r,String n){try{return r.getObject(n);}catch(SQLException e){throw failure(e);}}private static String get(ResultSet r,String n){try{return r.getString(n);}catch(SQLException e){throw failure(e);}}private static int integer(ResultSet r,String n){try{return r.getInt(n);}catch(SQLException e){throw failure(e);}}private static boolean bool(ResultSet r,String n){try{return r.getBoolean(n);}catch(SQLException e){throw failure(e);}}private static LocalDateTime ldt(ResultSet r,String n)throws SQLException{Timestamp t=r.getTimestamp(n);return t==null?null:t.toLocalDateTime();}
     private static void verifyContext(Connection con,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT TRY_CONVERT(int,SESSION_CONTEXT(N'ShaleClientId'))");ResultSet rs=ps.executeQuery()){if(!rs.next()||rs.getObject(1)==null||rs.getInt(1)!=tenant)throw new IllegalStateException("Tenant session context is not initialized.");}}
     private static void validateActor(Connection con,int tenant,int actor)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE Id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0")){ps.setInt(1,actor);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalArgumentException("Actor is not available for this tenant.");}}}
+    private static void validateAdmin(Connection con,int tenant,int actor)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE Id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0 AND ISNULL(is_admin,0)=1")){ps.setInt(1,actor);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new SecurityException("Only administrators may customize forms.");}}}
     private static RuntimeException failure(SQLException e){return new IllegalStateException("Form configuration persistence failed.",e);}
 }

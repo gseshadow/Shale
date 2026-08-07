@@ -8,8 +8,10 @@ import com.shale.data.dao.CalendarEventDao;
 import com.shale.data.dao.CalendarEventTypeDao;
 import com.shale.data.dao.CalendarFeedDao;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.FormConfigurationDao;
 import com.shale.data.dao.MaterialRequestDao;
 import com.shale.data.service.adapter.CaseServiceAdapter;
+import com.shale.data.service.adapter.FormConfigurationServiceAdapter;
 import com.shale.data.service.adapter.MaterialRequestServiceAdapter;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
@@ -910,7 +912,9 @@ public final class SceneManager {
 			NewIntakeController controller = loader.getController();
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			controller.init(appState, caseDao, organizationDao, runtimeBridge, dialog, onCaseCreated);
+			controller.init(appState, caseDao, organizationDao, runtimeBridge, dialog, onCaseCreated,
+					new CaseServiceAdapter(caseDao),
+					new FormConfigurationServiceAdapter(new FormConfigurationDao(dbSessionProvider)));
 
 			VBox dialogRoot = new VBox(
 					AppDialogs.createSecondaryWindowHeader(dialog, "New Intake", dialog::close),

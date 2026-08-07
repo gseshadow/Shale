@@ -10,6 +10,15 @@ import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardMo
 import com.shale.ui.component.factory.StatusCardFactory;
 import com.shale.ui.component.factory.StatusCardFactory.StatusCardModel;
 import com.shale.ui.controller.support.PartyAddWorkflowDialog;
+import com.shale.ui.controller.support.NewIntakeDatesConfiguration;
+import com.shale.ui.controller.support.NewIntakeDatesConfiguration.ConfiguredDate;
+import com.shale.ui.controller.support.NewIntakeDatesConfiguration.Selection;
+import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import com.shale.core.dto.FormConfigurationDto;
+import com.shale.core.service.CaseServicePort;
+import com.shale.core.service.FormConfigurationServicePort;
+import com.shale.ui.util.ActionButtonFactory;
+import com.shale.ui.util.ControlStyles;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import javafx.application.Platform;
@@ -18,6 +27,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
@@ -110,8 +120,27 @@ public final class NewIntakeController {
 
 	@FXML private Button cancelButton;
 	@FXML private Button createIntakeButton;
+	@FXML private VBox datesSection;
+	@FXML private HBox datesAdminActions;
+	@FXML private Label datesStatusLabel;
+	@FXML private GridPane legacyDatesGrid;
+	@FXML private VBox configuredDatesBox;
+	@FXML private VBox datesCustomizationBox;
 
 	private AppState appState;
+	private CaseServicePort caseService;
+	private FormConfigurationServicePort formConfigurationService;
+	private FormConfigurationDto loadedDatesConfiguration;
+	private List<EffectiveCaseDateTypeDto> effectiveDateTypes = List.of();
+	private final Map<Integer, ConfiguredDateInput> configuredDateInputs = new LinkedHashMap<>();
+	private final List<Selection> stagedDateSelections = new ArrayList<>();
+	private long datesLoadGeneration;
+	private boolean datesViewClosed;
+	private boolean datesViewAttached;
+	private boolean datesReloadRequired;
+	private final ExecutorService datesExecutor = Executors.newSingleThreadExecutor(r -> {
+		Thread t = new Thread(r, "new-intake-dates"); t.setDaemon(true); return t;
+	});
 	private CaseDao caseDao;
 	private OrganizationDao organizationDao;
 	private UiRuntimeBridge runtimeBridge;
@@ -151,21 +180,32 @@ public final class NewIntakeController {
 			UiRuntimeBridge runtimeBridge,
 			Stage stage,
 			Consumer<Integer> onCaseCreated) {
+		init(appState, caseDao, organizationDao, runtimeBridge, stage, onCaseCreated, null, null);
+	}
+
+	public void init(AppState appState, CaseDao caseDao, OrganizationDao organizationDao,
+			UiRuntimeBridge runtimeBridge, Stage stage, Consumer<Integer> onCaseCreated,
+			CaseServicePort caseService, FormConfigurationServicePort formConfigurationService) {
 		this.appState = appState;
 		this.caseDao = caseDao;
 		this.organizationDao = organizationDao;
 		this.runtimeBridge = runtimeBridge;
 		this.stage = stage;
 		this.onCaseCreated = onCaseCreated;
+		this.caseService = caseService;
+		this.formConfigurationService = formConfigurationService;
 		if (this.runtimeBridge != null) {
 			this.runtimeBridge.subscribeConnectivity(connectivityHandler);
 		}
 		if (this.stage != null) {
 			this.stage.setOnHidden(event -> {
+				datesViewClosed = true;
+				datesLoadGeneration++;
 				if (this.runtimeBridge != null) {
 					this.runtimeBridge.unsubscribeConnectivity(connectivityHandler);
 				}
 				intakeSaveExecutor.shutdownNow();
+				datesExecutor.shutdownNow();
 			});
 			this.stage.setOnCloseRequest(event -> {
 				if (!confirmDiscardIfDirty()) {
@@ -176,10 +216,20 @@ public final class NewIntakeController {
 		Platform.runLater(this::preselectDefaultStatusIfAvailable);
 		Platform.runLater(this::initializePartyMetadata);
 		Platform.runLater(this::offerDraftRestoreIfPresent);
+		configureDatesAuthorization();
+		loadDatesConfiguration();
 	}
 
 	@FXML
 	private void initialize() {
+		datesSection.sceneProperty().addListener((observable, oldScene, newScene) -> {
+			if (newScene != null) datesViewAttached = true;
+		});
+		ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
+		ControlStyles.apply(createIntakeButton, ControlStyles.Purpose.PRIMARY);
+		ControlStyles.apply(selectPracticeAreaButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		ControlStyles.apply(selectStatusButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		if (addPartyButton != null) ControlStyles.apply(addPartyButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		dateOfIntakePicker.setValue(LocalDate.now());
 		timeOfIntakeField.setText(LocalTime.now().format(TIME_FORMAT));
 
@@ -212,6 +262,154 @@ public final class NewIntakeController {
 
 		Platform.runLater(this::autoGenerateCaseName);
 		Platform.runLater(this::captureInitialSnapshot);
+	}
+
+	private void configureDatesAuthorization() {
+		datesAdminActions.getChildren().clear();
+		if (!isAuthorizedDatesAdmin()) return; // non-admins never receive an action node or handler
+		Button customize = ActionButtonFactory.semantic("Customize Form", e -> enterDatesCustomization(),
+				ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		datesAdminActions.getChildren().add(customize);
+	}
+
+	private boolean isAuthorizedDatesAdmin() {
+		return appState != null && appState.isAdmin() && appState.getShaleClientId() != null
+				&& appState.getUserId() != null;
+	}
+
+	private void loadDatesConfiguration() {
+		if (caseService == null || formConfigurationService == null || appState == null
+				|| appState.getShaleClientId() == null || appState.getUserId() == null) return;
+		long generation = ++datesLoadGeneration;
+		int tenant = appState.getShaleClientId(), actor = appState.getUserId();
+		datesStatusLabel.setText("Loading saved date fields…");
+		CompletableFuture.supplyAsync(() -> new DatesLoad(
+				formConfigurationService.load(tenant, actor, NewIntakeDatesConfiguration.FORM_KEY),
+				caseService.listEffectiveCaseDateTypes(tenant, actor)), datesExecutor)
+				.whenComplete((result, failure) -> Platform.runLater(() -> {
+					if (isDatesResultStale(generation)) return;
+					if (failure != null) {
+						datesStatusLabel.setText("Standard intake dates remain available. Saved customization could not be loaded.");
+						return;
+					}
+					loadedDatesConfiguration = result.configuration();
+					effectiveDateTypes = result.types();
+					datesReloadRequired = false;
+					renderDatesNormalMode();
+				}));
+	}
+
+	private void renderDatesNormalMode() {
+		datesCustomizationBox.getChildren().clear();
+		datesCustomizationBox.setVisible(false); datesCustomizationBox.setManaged(false);
+		configuredDatesBox.getChildren().clear(); configuredDateInputs.clear();
+		List<ConfiguredDate> fields = NewIntakeDatesConfiguration.renderable(loadedDatesConfiguration, effectiveDateTypes);
+		boolean saved = loadedDatesConfiguration != null && loadedDatesConfiguration.id() != 0;
+		legacyDatesGrid.setVisible(!saved); legacyDatesGrid.setManaged(!saved);
+		configuredDatesBox.setVisible(saved); configuredDatesBox.setManaged(saved);
+		if (!saved) { datesStatusLabel.setText("Using standard intake dates."); return; }
+		datesStatusLabel.setText(fields.isEmpty() ? "No date fields are configured for this form." : "Date fields configured for this tenant.");
+		for (ConfiguredDate field : fields) {
+			Label label = new Label(field.type().name() + (field.required() ? " *" : ""));
+			DatePicker picker = ControlStyles.formControl(new DatePicker());
+			HBox row = new HBox(16, label, picker); row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+			HBox.setHgrow(picker, Priority.ALWAYS); picker.setMaxWidth(Double.MAX_VALUE);
+			configuredDatesBox.getChildren().add(row);
+			configuredDateInputs.put(field.type().id(), new ConfiguredDateInput(field.type().id(), field.fieldKey(), picker));
+		}
+	}
+
+	private void enterDatesCustomization() {
+		if (!isAuthorizedDatesAdmin()) return;
+		if (datesReloadRequired) { loadDatesConfiguration(); return; }
+		stagedDateSelections.clear();
+		stagedDateSelections.addAll(NewIntakeDatesConfiguration.selections(loadedDatesConfiguration, effectiveDateTypes));
+		renderDatesCustomization();
+	}
+
+	private void renderDatesCustomization() {
+		legacyDatesGrid.setVisible(false); legacyDatesGrid.setManaged(false);
+		configuredDatesBox.setVisible(false); configuredDatesBox.setManaged(false);
+		datesCustomizationBox.getChildren().clear();
+		datesCustomizationBox.setVisible(true); datesCustomizationBox.setManaged(true);
+		datesStatusLabel.setText("Choose and explicitly order the date fields shown on New Intake.");
+		ComboBox<EffectiveCaseDateTypeDto> selector = ControlStyles.formControl(new ComboBox<>());
+		selector.setPromptText("Select an active case-date type");
+		selector.getItems().setAll(effectiveDateTypes.stream().filter(t -> stagedDateSelections.stream().noneMatch(s -> s.type().id() == t.id())).toList());
+		selector.setConverter(new javafx.util.StringConverter<>() {
+			@Override public String toString(EffectiveCaseDateTypeDto value) { return value == null ? "" : value.name(); }
+			@Override public EffectiveCaseDateTypeDto fromString(String value) { return null; }
+		});
+		Button add = ActionButtonFactory.semantic("Add", e -> { if (selector.getValue() != null) { stagedDateSelections.add(new Selection(selector.getValue(), false)); renderDatesCustomization(); } }, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		datesCustomizationBox.getChildren().add(new HBox(8, selector, add));
+		for (int i = 0; i < stagedDateSelections.size(); i++) {
+			int index = i; Selection selection = stagedDateSelections.get(i);
+			Label name = new Label(selection.type().name()); HBox.setHgrow(name, Priority.ALWAYS); name.setMaxWidth(Double.MAX_VALUE);
+			Button up = ActionButtonFactory.semantic("Up", e -> moveDateSelection(index, -1), ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+			Button down = ActionButtonFactory.semantic("Down", e -> moveDateSelection(index, 1), ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+			Button remove = ActionButtonFactory.semantic("Remove", e -> { stagedDateSelections.remove(index); renderDatesCustomization(); }, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+			up.setDisable(i == 0); down.setDisable(i == stagedDateSelections.size() - 1);
+			datesCustomizationBox.getChildren().add(new HBox(8, name, up, down, remove));
+		}
+		Button save = ActionButtonFactory.semantic("Save", e -> saveDatesCustomization(), ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+		Button cancel = ActionButtonFactory.semantic("Cancel", e -> renderDatesNormalMode(), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		datesCustomizationBox.getChildren().add(new HBox(8, save, cancel));
+	}
+
+	private void moveDateSelection(int index, int delta) {
+		int target = index + delta; if (target < 0 || target >= stagedDateSelections.size()) return;
+		java.util.Collections.swap(stagedDateSelections, index, target); renderDatesCustomization();
+	}
+
+	private void saveDatesCustomization() {
+		if (!isAuthorizedDatesAdmin() || datesReloadRequired || formConfigurationService == null) return;
+		int tenant = appState.getShaleClientId(), actor = appState.getUserId();
+		byte[] rowVer = loadedDatesConfiguration == null ? null : loadedDatesConfiguration.rowVer();
+		var command = new FormConfigurationServicePort.ReplaceCommand(tenant, actor,
+				NewIntakeDatesConfiguration.FORM_KEY,
+				List.of(NewIntakeDatesConfiguration.draft(List.copyOf(stagedDateSelections))), rowVer);
+		datesCustomizationBox.setDisable(true);
+		long generation = ++datesLoadGeneration;
+		CompletableFuture.supplyAsync(() -> formConfigurationService.replace(command), datesExecutor)
+				.whenComplete((saved, failure) -> Platform.runLater(() -> {
+					if (isDatesResultStale(generation)) return;
+					datesCustomizationBox.setDisable(false);
+					if (failure != null) {
+						datesReloadRequired = isConfigurationConflict(failure);
+						String message = datesReloadRequired
+								? "The form configuration changed elsewhere. Reload it explicitly before editing again."
+								: "The form configuration could not be saved.";
+						datesStatusLabel.setText(message);
+						AppDialogs.showError(stage, "Customize New Intake", message);
+						if (datesReloadRequired) configureReloadAction();
+						return;
+					}
+					loadedDatesConfiguration = saved; renderDatesNormalMode();
+				}));
+	}
+
+	private void configureReloadAction() {
+		datesAdminActions.getChildren().clear();
+		if (!isAuthorizedDatesAdmin()) return;
+		datesAdminActions.getChildren().add(ActionButtonFactory.semantic("Reload Configuration", e -> {
+			configureDatesAuthorization(); loadDatesConfiguration();
+		}, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL));
+	}
+
+	static boolean isConfigurationConflict(Throwable failure) {
+		for (Throwable current = failure; current != null; current = current.getCause())
+			if (current instanceof IllegalStateException && "Form configuration changed.".equals(current.getMessage())) return true;
+		return false;
+	}
+
+	private boolean isDatesResultStale(long generation) {
+		return datesViewClosed || generation != datesLoadGeneration
+				|| (datesViewAttached && datesSection.getScene() == null);
+	}
+
+	private record DatesLoad(FormConfigurationDto configuration, List<EffectiveCaseDateTypeDto> types) {}
+	public record ConfiguredDateInput(int caseDateTypeId, String fieldKey, DatePicker input) {
+		public LocalDate value() { return input.getValue(); }
 	}
 
 	private void initializePartyMetadata() {
