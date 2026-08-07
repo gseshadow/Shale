@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -39,7 +41,7 @@ public final class CaseDateOccurrenceDialog {
     public record Input(int caseDateTypeId, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes) {}
 
     public static void show(Window owner, String title, List<EffectiveCaseDateTypeDto> selectableTypes, CaseDateDto existing,
-            Function<Input, String> onSave, Runnable onReload) {
+            Function<Input, ? extends CompletionStage<String>> onSave, Runnable onReload) {
         Stage stage = AppDialogs.createModalStage(owner, title);
         AtomicBoolean submitting = new AtomicBoolean(false);
         List<EffectiveCaseDateTypeDto> safeTypes = selectableTypes == null ? List.of() : List.copyOf(selectableTypes);
@@ -81,12 +83,16 @@ public final class CaseDateOccurrenceDialog {
             Optional<Input> input = read(typeBox.getValue(), startDate, startTime, endDate, endTime, allDay, notes, error);
             if (input.isEmpty() || submitting.getAndSet(true)) return;
             save.setDisable(true); cancel.setDisable(true); typeBox.setDisable(true);
-            String message;
-            try { message = onSave == null ? "Save is unavailable." : onSave.apply(input.get()); }
-            catch (RuntimeException ex) { message = "Unable to save this case date."; }
-            submitting.set(false); save.setDisable(false); cancel.setDisable(false); typeBox.setDisable(false);
-            if (message == null || message.isBlank()) stage.close();
-            else { showError(error, message); if (message.toLowerCase().contains("changed")) { reload.setVisible(true); reload.setManaged(true); } }
+            CompletionStage<String> result;
+            try { result = onSave == null ? CompletableFuture.completedFuture("Save is unavailable.") : onSave.apply(input.get()); }
+            catch (RuntimeException ex) { result = CompletableFuture.completedFuture("Unable to save this case date."); }
+            if (result == null) result = CompletableFuture.completedFuture("Save is unavailable.");
+            result.whenComplete((message, failure) -> javafx.application.Platform.runLater(() -> {
+                String displayed = failure == null ? message : "Unable to save this case date.";
+                submitting.set(false); save.setDisable(false); cancel.setDisable(false); typeBox.setDisable(false);
+                if (displayed == null || displayed.isBlank()) stage.close();
+                else { showError(error, displayed); if (displayed.toLowerCase().contains("changed")) { reload.setVisible(true); reload.setManaged(true); } }
+            }));
         });
         stage.getScene();
         GridPane grid = new GridPane(); grid.setHgap(10); grid.setVgap(8);

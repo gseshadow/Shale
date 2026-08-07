@@ -1427,6 +1427,12 @@ public class CaseController {
 		} else if (editor == detDiscoveryDeadlineEditor) {
 			showDetailsDateDialog("Edit Discovery Deadline", "Discovery Deadline", base.discoveryDeadline, ownerButton,
 					value -> saveAuthoritativeDate(MigratedCaseDateKey.DISCOVERY_DEADLINE, value));
+		} else if (editor == detDateFeeAgreementSignedEditor) {
+			showDetailsDateDialog("Edit Date Fee Agreement Signed", "Date Fee Agreement Signed", base.dateFeeAgreementSigned, ownerButton,
+					value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_FEE_AGREEMENT_SIGNED, value));
+		} else if (editor == detDateNonEngagementLetterSentEditor) {
+			showDetailsDateDialog("Edit Date Non-Engagement Letter Sent", "Date Non-Engagement Letter Sent", base.dateNonEngagementLetterSent, ownerButton,
+					value -> saveAuthoritativeDate(MigratedCaseDateKey.DATE_NON_ENGAGEMENT_LETTER_SENT, value));
 		} else if (editor instanceof CheckBox checkBox) {
 			showDetailsBooleanDialog("Edit " + fieldLabel, fieldLabel, checkBox.isSelected(), ownerButton,
 					value -> saveSingleDetailsBooleanField(editor, value));
@@ -1973,11 +1979,53 @@ public class CaseController {
 	private void showRemovedCaseDatesMessage(String message) { if (removedCaseDatesStatusLabel != null) { removedCaseDatesStatusLabel.setText(message); setVisibleManaged(removedCaseDatesStatusLabel, true); } }
 	private void renderCaseDatesFailure() { if (caseDatesCardsBox != null) caseDatesCardsBox.getChildren().clear(); Button retry = ActionButtonFactory.semantic("Retry", e -> loadCaseDatesAsync(), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD); retry.setAccessibleText("Retry loading case dates"); VBox box = new VBox(8, new Label("Failed to load case dates."), retry); caseDatesCardsBox.getChildren().setAll(box); setVisibleManaged(caseDatesStatusLabel, false); }
 	private void updateRemovedCaseDatesVisibility() { if (showRemovedCaseDatesButton != null) { showRemovedCaseDatesButton.setText(showRemovedCaseDates ? "Hide Removed" : "Show Removed"); showRemovedCaseDatesButton.setAccessibleText(showRemovedCaseDates ? "Hide removed case dates" : "Show removed case dates"); } setVisibleManaged(removedCaseDatesCardsBox, showRemovedCaseDates); setVisibleManaged(removedCaseDatesStatusLabel, showRemovedCaseDates && removedCaseDates.isEmpty()); }
-	private void refreshCaseDatesAfterMutation(String message) { caseDatesStale = true; if ("Dates".equals(activeSectionName)) loadCaseDatesAsync(); }
 	private void openCaseDateDialog(CaseDateDto existing) { if (caseService == null || appState == null || caseId == null) return; if (effectiveCaseDateTypes.isEmpty()) loadCaseDatesAsync(); CaseDateOccurrenceDialog.show(caseDatesOwner(), existing == null ? "Add Date" : "Edit Date", effectiveCaseDateTypes, existing, input -> saveCaseDate(existing, input), this::loadCaseDatesAsync); }
-	private String saveCaseDate(CaseDateDto existing, CaseDateOccurrenceDialog.Input input) { Integer tenantId=appState.getShaleClientId(), actorId=appState.getUserId(); if(tenantId==null||actorId==null) return "Save is unavailable."; if(caseDateMutationInFlight.getAndSet(true)) return "Save is already in progress."; try { if(existing==null) caseService.createCaseDate(new CreateCaseDateCommand(tenantId, actorId, caseId, input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes())); else caseService.updateCaseDate(new UpdateCaseDateCommand(tenantId, actorId, caseId, existing.id(), input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes(), existing.rowVer())); caseDateMutationInFlight.set(false); refreshCaseDatesAfterMutation(null); return null; } catch(RuntimeException ex) { caseDateMutationInFlight.set(false); return rootMessage(ex); } }
-	private void onRemoveCaseDate(CaseDateDto d) { if (d==null||caseService==null||appState==null||caseId==null) return; if(!AppDialogs.showConfirmation(caseDatesOwner(), "Remove Date", "Remove this case date?", "The date will be removed from active case dates and can be restored later.", "Remove", DialogActionKind.DANGER)) return; Integer tenantId=appState.getShaleClientId(), actorId=appState.getUserId(); if(tenantId==null||actorId==null||caseDateMutationInFlight.getAndSet(true)) return; caseDateExecutor.submit(() -> { try { caseService.deleteCaseDate(new DeleteCaseDateCommand(tenantId, actorId, caseId, d.id(), d.rowVer())); caseDateMutationInFlight.set(false); Platform.runLater(() -> refreshCaseDatesAfterMutation(null)); } catch(RuntimeException ex) { caseDateMutationInFlight.set(false); Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Remove Date", rootMessage(ex))); } }); }
-	private void onRestoreCaseDate(CaseDateDto d) { if (d==null||caseService==null||appState==null||caseId==null) return; Integer tenantId=appState.getShaleClientId(), actorId=appState.getUserId(); if(tenantId==null||actorId==null||caseDateMutationInFlight.getAndSet(true)) return; caseDateExecutor.submit(() -> { try { caseService.restoreCaseDate(new RestoreCaseDateCommand(tenantId, actorId, caseId, d.id(), d.rowVer())); caseDateMutationInFlight.set(false); Platform.runLater(() -> refreshCaseDatesAfterMutation(null)); } catch(RuntimeException ex) { caseDateMutationInFlight.set(false); Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Restore Date", rootMessage(ex))); } }); }
+	private java.util.concurrent.CompletionStage<String> saveCaseDate(CaseDateDto existing, CaseDateOccurrenceDialog.Input input) {
+		Integer tenantId = appState.getShaleClientId(), actorId = appState.getUserId();
+		if (tenantId == null || actorId == null || caseId == null)
+			return java.util.concurrent.CompletableFuture.completedFuture("Save is unavailable.");
+		if (caseDateMutationInFlight.getAndSet(true))
+			return java.util.concurrent.CompletableFuture.completedFuture("Save is already in progress.");
+		final long activeCaseId = caseId.longValue();
+		final boolean compatibilityAffected = isMigratedCaseDateType(input.caseDateTypeId())
+				|| (existing != null && isMigratedCaseDateSystemKey(existing.typeSystemKey()));
+		return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+			try {
+				if (existing == null) caseService.createCaseDate(new CreateCaseDateCommand(tenantId, actorId, activeCaseId,
+						input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes()));
+				else caseService.updateCaseDate(new UpdateCaseDateCommand(tenantId, actorId, activeCaseId, existing.id(),
+						input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes(), existing.rowVer()));
+				Platform.runLater(() -> synchronizeCaseDatesAfterLocalMutation(activeCaseId, compatibilityAffected));
+				return null;
+			} catch (RuntimeException ex) { return rootMessage(ex); }
+			finally { caseDateMutationInFlight.set(false); }
+		}, caseDateExecutor);
+	}
+
+	private void onRemoveCaseDate(CaseDateDto d) {
+		if (d == null || caseService == null || appState == null || caseId == null) return;
+		if (!AppDialogs.showConfirmation(caseDatesOwner(), "Remove Date", "Remove this case date?", "The date will be removed from active case dates and can be restored later.", "Remove", DialogActionKind.DANGER)) return;
+		Integer tenantId = appState.getShaleClientId(), actorId = appState.getUserId();
+		if (tenantId == null || actorId == null || caseDateMutationInFlight.getAndSet(true)) return;
+		final long activeCaseId = caseId.longValue();
+		caseDateExecutor.submit(() -> { try {
+			caseService.deleteCaseDate(new DeleteCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer()));
+			Platform.runLater(() -> synchronizeCaseDatesAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())));
+		} catch (RuntimeException ex) { Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Remove Date", rootMessage(ex))); }
+		finally { caseDateMutationInFlight.set(false); } });
+	}
+
+	private void onRestoreCaseDate(CaseDateDto d) {
+		if (d == null || caseService == null || appState == null || caseId == null) return;
+		Integer tenantId = appState.getShaleClientId(), actorId = appState.getUserId();
+		if (tenantId == null || actorId == null || caseDateMutationInFlight.getAndSet(true)) return;
+		final long activeCaseId = caseId.longValue();
+		caseDateExecutor.submit(() -> { try {
+			caseService.restoreCaseDate(new RestoreCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer()));
+			Platform.runLater(() -> synchronizeCaseDatesAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())));
+		} catch (RuntimeException ex) { Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Restore Date", rootMessage(ex))); }
+		finally { caseDateMutationInFlight.set(false); } });
+	}
 	private Window caseDatesOwner() { return caseDatesTabPane != null && caseDatesTabPane.getScene() != null ? caseDatesTabPane.getScene().getWindow() : taskDialogOwner(); }
 
 
@@ -4501,16 +4549,46 @@ public class CaseController {
 			try {
 				CaseDateAggregateResult loaded = caseService.loadMigratedCompatibilityDateSnapshot(activeCaseId, tenant, actor);
 				runOnFx(() -> {
-					if (caseId == null || caseId.longValue() != activeCaseId || generation != compatibilityDatesGeneration) return;
+					if (!isCompatibilityDatesCurrent(activeCaseId, generation)) return;
 					compatibilityDates.replace(loaded);
 					latestCaseRowVer = loaded.caseRowVer();
 					renderCompatibilityDates();
 				});
 			} catch (RuntimeException ex) {
-				runOnFx(() -> { if (caseId != null && caseId.longValue() == activeCaseId && generation == compatibilityDatesGeneration)
+				runOnFx(() -> { if (isCompatibilityDatesCurrent(activeCaseId, generation))
 					showError("Authoritative Case Dates could not be loaded. Reload before editing dates."); });
 			}
 		}, "case-compatibility-dates-load-" + activeCaseId).start();
+	}
+
+	private boolean isCompatibilityDatesCurrent(long activeCaseId, int generation) {
+		return caseId != null && caseId.longValue() == activeCaseId
+				&& generation == compatibilityDatesGeneration
+				&& overviewScrollPane != null && overviewScrollPane.getScene() != null;
+	}
+
+	/**
+	 * The only local invalidation path between the generic Dates list and the fixed
+	 * compatibility controls.  A generic mutation never synthesizes an editor state:
+	 * migrated types force a complete aggregate reload so all row versions and absence
+	 * witnesses move forward together.  Fixed aggregate saves already return that
+	 * coherent snapshot, so only the generic list is invalidated in that direction.
+	 */
+	private void synchronizeCaseDatesAfterLocalMutation(long activeCaseId, boolean compatibilityAffected) {
+		if (caseId == null || caseId.longValue() != activeCaseId) return;
+		caseDatesStale = true;
+		if ("Dates".equals(activeSectionName)) loadCaseDatesAsync();
+		if (compatibilityAffected) loadCompatibilityDatesAsync(activeCaseId);
+	}
+
+	private boolean isMigratedCaseDateType(int typeId) {
+		return effectiveCaseDateTypes.stream().filter(type -> type.id() == typeId).findFirst()
+				.map(EffectiveCaseDateTypeDto::systemKey).map(this::isMigratedCaseDateSystemKey).orElse(false);
+	}
+
+	private boolean isMigratedCaseDateSystemKey(String systemKey) {
+		try { MigratedCaseDateKey.require(systemKey); return true; }
+		catch (IllegalArgumentException ignored) { return false; }
 	}
 
 	private void renderCompatibilityDates() {
@@ -4560,18 +4638,21 @@ public class CaseController {
 		catch (RuntimeException ex) { showError(ex.getMessage()); return; }
 		if (command == null) { renderCompatibilityDates(); return; }
 		final long activeCaseId = caseId;
-		final int generation = compatibilityDatesGeneration;
+		// A save is itself a newer authoritative request. Invalidate any older load so
+		// an out-of-order response cannot overwrite the returned aggregate snapshot.
+		final int generation = ++compatibilityDatesGeneration;
 		setBusy(true);
 		new Thread(() -> {
 			try {
 				CaseDateAggregateResult result = caseService.mutateMigratedCompatibilityDates(command);
 				runOnFx(() -> {
-					if (caseId == null || caseId.longValue() != activeCaseId || generation != compatibilityDatesGeneration) return;
+					if (!isCompatibilityDatesCurrent(activeCaseId, generation)) return;
 					compatibilityDates.replace(result); latestCaseRowVer = result.caseRowVer(); renderCompatibilityDates(); setBusy(false);
+					synchronizeCaseDatesAfterLocalMutation(activeCaseId, false);
 				});
 			} catch (RuntimeException ex) {
 				runOnFx(() -> {
-					if (caseId == null || caseId.longValue() != activeCaseId || generation != compatibilityDatesGeneration) return;
+					if (!isCompatibilityDatesCurrent(activeCaseId, generation)) return;
 					compatibilityDates.failedSave(); setBusy(false);
 					showError("Case Dates changed elsewhere or are inconsistent. Reloaded authoritative dates; review your change before saving again.");
 					compatibilityDates.invalidate(); loadCompatibilityDatesAsync(activeCaseId);
