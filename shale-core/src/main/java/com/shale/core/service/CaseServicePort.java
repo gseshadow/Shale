@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.MigratedCaseDateProjectionDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseStatusDto;
@@ -24,6 +25,7 @@ import com.shale.core.model.CaseDateAggregateResult;
 import com.shale.core.model.CompatibilityCaseDateState;
 import com.shale.core.model.MigratedCaseDateKey;
 import java.util.Map;
+import java.util.Collection;
 
 /**
  * Shared case application boundary for future desktop/server adapters.
@@ -61,6 +63,12 @@ public interface CaseServicePort {
 	List<EffectiveCaseDateTypeDto> listCaseDateTypesForAdministration(int shaleClientId, int actorUserId);
 
 	List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId);
+
+	/** Batch read boundary for list-style consumers of the nine migrated authoritative meanings. */
+	default Map<Long, MigratedCaseDateProjectionDto> projectMigratedCaseDates(
+			Collection<Long> caseIds, int shaleClientId, int actorUserId) {
+		throw unsupportedCaseLinkOperation("projectMigratedCaseDates");
+	}
 
 	List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int shaleClientId, int actorUserId);
 
