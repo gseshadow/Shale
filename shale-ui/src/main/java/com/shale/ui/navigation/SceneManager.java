@@ -134,7 +134,7 @@ public final class SceneManager {
 			UiAuthService authService,
 			UiRuntimeBridge runtimeBridge,
 			DbSessionProvider dbSessionProvider,
-				UiUpdateLauncher updateLauncher) {
+			UiUpdateLauncher updateLauncher) {
 		this(stage, appState, authService, runtimeBridge, dbSessionProvider, updateLauncher,
 				new NoOpDesktopNotificationPresenter());
 	}
@@ -162,12 +162,14 @@ public final class SceneManager {
 				appState,
 				notificationPreferencesService,
 				new AssignedUserTaskDueNotificationRecipientResolver());
-		this.notificationBadgeCountExecutor = Executors.newSingleThreadExecutor(r -> {
+		this.notificationBadgeCountExecutor = Executors.newSingleThreadExecutor(r ->
+		{
 			Thread t = new Thread(r, "notification-badge-count-worker");
 			t.setDaemon(true);
 			return t;
 		});
-		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r -> {
+		this.notificationStartupExecutor = Executors.newSingleThreadExecutor(r ->
+		{
 			Thread t = new Thread(r, "notification-startup-worker");
 			t.setDaemon(true);
 			return t;
@@ -262,7 +264,8 @@ public final class SceneManager {
 		if (existingFuture != null) {
 			existingFuture.cancel(true);
 		}
-		notificationBadgeCountFuture = notificationBadgeCountExecutor.submit(() -> {
+		notificationBadgeCountFuture = notificationBadgeCountExecutor.submit(() ->
+		{
 			long startNanos = System.nanoTime();
 			PerfLog.debug(log, "PERF notifications.badge.count.start tenantId={} userId={} generation={}", shaleClientId, userId, generation);
 			try {
@@ -273,7 +276,8 @@ public final class SceneManager {
 							shaleClientId, userId, generation, unreadCount, queryElapsedMs);
 					return;
 				}
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					if (!isActiveBadgeSession(generation, shaleClientId, userId)) {
 						PerfLog.debug(log, "PERF notifications.badge.count.applySkipped tenantId={} userId={} generation={} unreadCount={}",
 								shaleClientId, userId, generation, unreadCount);
@@ -297,7 +301,8 @@ public final class SceneManager {
 			return;
 		}
 		long generation = notificationStartupGeneration.incrementAndGet();
-		notificationStartupFuture = notificationStartupExecutor.submit(() -> {
+		notificationStartupFuture = notificationStartupExecutor.submit(() ->
+		{
 			long bootstrapStartNanos = System.nanoTime();
 			PerfLog.debug(log, "PERF notifications.bootstrap.full.start tenantId={} userId={} generation={}", shaleClientId, userId, generation);
 			try {
@@ -318,7 +323,8 @@ public final class SceneManager {
 							shaleClientId, userId, generation);
 					return;
 				}
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					if (!isActiveSession(generation, shaleClientId, userId)) {
 						PerfLog.debug(log, "PERF notifications.bootstrap.full.applySkipped tenantId={} userId={} generation={} reason=session_changed",
 								shaleClientId, userId, generation);
@@ -356,7 +362,6 @@ public final class SceneManager {
 				&& currentShaleClientId == expectedShaleClientId
 				&& currentUserId == expectedUserId;
 	}
-
 
 	public void onUpdateCheckCompleted(UpdateCheckResult result) {
 		if (Platform.isFxApplicationThread()) {
@@ -602,7 +607,8 @@ public final class SceneManager {
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
-			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(dbSessionProvider), notificationDao, runtimeBridge);
+			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(
+					dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			c.init(appState, runtimeBridge, caseDao, new CaseServiceAdapter(caseDao), caseTaskService,
 					new CaseExportService(caseDao, new CaseServiceAdapter(caseDao), appState, phiReadAuditService), onOpenCase);
@@ -651,7 +657,8 @@ public final class SceneManager {
 	}
 
 	public Parent createCalendarView() {
-		return load("/fxml/calendar.fxml", controller -> {
+		return load("/fxml/calendar.fxml", controller ->
+		{
 			CalendarController c = (CalendarController) controller;
 			this.calendarController = c;
 			CalendarFeedDao calendarFeedDao = new CalendarFeedDao(dbSessionProvider);
@@ -666,7 +673,8 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, runtimeBridge, caseId -> openCaseProfile(caseId, "OVERVIEW"), taskId -> openTaskProfile(taskId, c::refreshCurrentRange));
+			c.init(appState, calendarService, calendarFeedDao, caseTaskService, caseDao, runtimeBridge, caseId -> openCaseProfile(caseId, "OVERVIEW"), taskId -> openTaskProfile(
+					taskId, c::refreshCurrentRange));
 			Integer pendingEventId = pendingCalendarNotificationEventId;
 			if (pendingEventId != null && pendingEventId > 0) {
 				pendingCalendarNotificationEventId = null;
@@ -680,7 +688,8 @@ public final class SceneManager {
 		return load("/fxml/settings.fxml", controller ->
 		{
 			SettingsController c = (SettingsController) controller;
-			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new MaterialRequestServiceAdapter(new MaterialRequestDao(dbSessionProvider)), new UserDao(dbSessionProvider), runtimeBridge);
+			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new MaterialRequestServiceAdapter(
+					new MaterialRequestDao(dbSessionProvider)), new UserDao(dbSessionProvider), runtimeBridge);
 			return c;
 		});
 	}
@@ -724,7 +733,8 @@ public final class SceneManager {
 					new TaskDao(dbSessionProvider),
 					new CalendarEventDao(dbSessionProvider));
 			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
-			c.init(appState, searchService, caseDetailService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser, this::openTaskProfile, this::openCalendarEventFromNotification);
+			c.init(appState, searchService, caseDetailService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser, this::openTaskProfile,
+					this::openCalendarEventFromNotification);
 			return c;
 		});
 	}
@@ -735,11 +745,11 @@ public final class SceneManager {
 		}
 		Integer entityId = route.entityId();
 		return switch (route.type()) {
-			case CASE_PROFILE -> entityId == null ? "" : " caseId=" + entityId;
-			case USER_PROFILE -> entityId == null ? "" : " userId=" + entityId;
-			case ORGANIZATION_PROFILE -> entityId == null ? "" : " organizationId=" + entityId;
-			case CONTACT_PROFILE -> entityId == null ? "" : " contactId=" + entityId;
-			default -> "";
+		case CASE_PROFILE -> entityId == null ? "" : " caseId=" + entityId;
+		case USER_PROFILE -> entityId == null ? "" : " userId=" + entityId;
+		case ORGANIZATION_PROFILE -> entityId == null ? "" : " organizationId=" + entityId;
+		case CONTACT_PROFILE -> entityId == null ? "" : " contactId=" + entityId;
+		default -> "";
 		};
 	}
 
@@ -753,16 +763,17 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
-			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(dbSessionProvider), notificationDao, runtimeBridge);
+			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(
+					dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			UserDetailService userDetailService = new UserDetailService(userDao, caseDao, taskDao);
-				c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
-				{
-					System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
-					openCaseProfile(relatedCaseId, "OVERVIEW");
-				}, this::openUserProfile, caseTaskService, phiReadAuditService, calendarService);
-				return c;
-			});
+			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
+			{
+				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
+				openCaseProfile(relatedCaseId, "OVERVIEW");
+			}, this::openUserProfile, caseTaskService, phiReadAuditService, calendarService);
+			return c;
+		});
 	}
 
 	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase, Runnable onContactDeleted) {
@@ -771,9 +782,10 @@ public final class SceneManager {
 			ContactViewController c = (ContactViewController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
 			ContactDetailService contactDetailService = new ContactDetailService(contactDao);
-				c.init(contactId, contactDetailService, appState, onOpenCase, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), onContactDeleted, phiReadAuditService, this::openContactProfile, runtimeBridge);
-				return c;
-			});
+			c.init(contactId, contactDetailService, appState, onOpenCase, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), onContactDeleted, phiReadAuditService,
+					this::openContactProfile, runtimeBridge);
+			return c;
+		});
 	}
 
 	public Parent createContactView(int contactId, Consumer<Integer> onOpenCase) {
@@ -804,9 +816,21 @@ public final class SceneManager {
 			UserBoardLanePreferencesDao userBoardLanePreferencesDao = new UserBoardLanePreferencesDao(dbSessionProvider);
 			UserPreferencesService userPreferencesService = new UserPreferencesService(new UserPreferencesDao(dbSessionProvider), appState);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
-			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(dbSessionProvider), notificationDao, runtimeBridge);
+			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(
+					dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, runtimeBridge, caseDao, new CaseServiceAdapter(caseDao), caseTaskService, userBoardLanePreferencesDao, userPreferencesService, notificationCenterService, this::openNotificationCenterFromDashboard, onOpenCase, onOpenUser, phiReadAuditService);
+			c.init(
+					appState,
+					runtimeBridge,
+					caseDao,
+					caseTaskService,
+					userBoardLanePreferencesDao,
+					userPreferencesService,
+					notificationCenterService,
+					this::openNotificationCenterFromDashboard,
+					onOpenCase,
+					onOpenUser,
+					phiReadAuditService);
 			return c;
 		});
 	}
@@ -831,8 +855,10 @@ public final class SceneManager {
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			CalendarFeedDao calendarFeedDao = new CalendarFeedDao(dbSessionProvider);
-			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), calendarFeedDao, notificationDao, runtimeBridge);
-			c.init(caseId, caseDao, caseDetailService, caseTaskService, calendarService, calendarFeedDao, new CaseServiceAdapter(caseDao), organizationDao, contactDao, appState, runtimeBridge, onCaseDeleted, phiReadAuditService);
+			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), calendarFeedDao,
+					notificationDao, runtimeBridge);
+			c.init(caseId, caseDao, caseDetailService, caseTaskService, calendarService, calendarFeedDao, new CaseServiceAdapter(caseDao), organizationDao, contactDao, appState,
+					runtimeBridge, onCaseDeleted, phiReadAuditService);
 			c.setMaterialRequestService(new MaterialRequestServiceAdapter(new MaterialRequestDao(dbSessionProvider)));
 			c.setInitialSection(sectionKey);
 			c.setOnOpenUser(this::openUserProfile);
@@ -937,7 +963,6 @@ public final class SceneManager {
 		System.out.println("Navigate to Status: " + statusId);
 	}
 
-
 	private void openCalendarTaskLocation(Long taskId) {
 		if (taskId == null || taskId <= 0) {
 			System.err.println("Ignoring calendar task navigation for invalid taskId: " + taskId);
@@ -953,7 +978,8 @@ public final class SceneManager {
 				new UserDao(dbSessionProvider),
 				runtimeBridge,
 				new NotificationDao(dbSessionProvider));
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 				if (detail == null) {
@@ -961,7 +987,8 @@ public final class SceneManager {
 					return;
 				}
 				long caseId = detail.caseId();
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					if (caseId > 0 && caseId <= Integer.MAX_VALUE) {
 						openCaseProfile((int) caseId, "TASKS");
 					} else {
@@ -998,7 +1025,8 @@ public final class SceneManager {
 				new UserDao(dbSessionProvider),
 				runtimeBridge,
 				new NotificationDao(dbSessionProvider));
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				TaskDetailDto initialDetail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 				if (initialDetail == null) {
@@ -1052,9 +1080,11 @@ public final class SceneManager {
 				model,
 				List.of(),
 				List.of(),
-				id -> {
+				id ->
+				{
 					TaskDetailDto detail = caseTaskService.loadTaskDetail(id, shaleClientId);
-					if (detail == null) throw new IllegalStateException("Task was not found or may have been deleted.");
+					if (detail == null)
+						throw new IllegalStateException("Task was not found or may have been deleted.");
 					List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
 					List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
 					return new TaskDetailDialog.CoreTaskHydration(detail, statuses, priorities);
@@ -1143,13 +1173,15 @@ public final class SceneManager {
 				caseId -> openCaseProfile(caseId, "OVERVIEW"));
 		if (result.isEmpty()) {
 			taskDetailDialogInFlight.set(false);
-			if (dialogMutatedAssignments.get()) runTaskChangedCallback(onTaskChanged);
+			if (dialogMutatedAssignments.get())
+				runTaskChangedCallback(onTaskChanged);
 			return;
 		}
 		taskDetailDialogInFlight.set(false);
 		TaskDetailDialog.TaskDetailResult action = result.get();
 		if (action.action() == TaskDetailDialog.TaskDetailAction.DELETE) {
-			new Thread(() -> {
+			new Thread(() ->
+			{
 				try {
 					caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
 					runTaskChangedCallback(onTaskChanged);
@@ -1173,7 +1205,8 @@ public final class SceneManager {
 				payload.priorityId(),
 				payload.completed(),
 				currentUserId);
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseTaskService.updateTask(request);
 				runTaskChangedCallback(onTaskChanged);
@@ -1183,9 +1216,9 @@ public final class SceneManager {
 		}, "scene-manager-save-task-" + taskId).start();
 	}
 
-
 	private static void runTaskChangedCallback(Runnable onTaskChanged) {
-		if (onTaskChanged == null) return;
+		if (onTaskChanged == null)
+			return;
 		Platform.runLater(onTaskChanged);
 	}
 
