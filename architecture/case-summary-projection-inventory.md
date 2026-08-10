@@ -29,4 +29,31 @@ The projection contains: Case ID, tenant ID, Case number/name; status ID, `Syste
 
 Status selection was not uniform: several card queries prefer `IsPrimary` and recency even when a row has ended, while report and newer queries require `EndDate IS NULL` and use `EffectiveDate`. Assignment queries consistently use IDs and role 4, but some require `IsPrimary = 1`, some admit any team membership for filtering, and older calendar SQL still contains role 1. Date authority also differs: the Cases grid/export use migrated `CaseDates`, while MyShale deliberately retains legacy `Cases` date compatibility. Rich `CaseRow` queries repeatedly join Practice Areas and independently apply status, assignment, party, update, contact, and organization enrichment. Those joins also caused each query to carry its own deletion and tenant details.
 
-No representative UI consumer is converted in this phase: the main grid's paging, full sorting matrix, migrated dates, and PHI-heavy card enrichments cannot be replaced surgically by the deliberately small projection. Keeping all existing entry points unchanged is the safer proof of the new boundary; a later phase can compose consumer-specific enrichment around this projection.
+## Main active Cases grid cutover
+
+The main JavaFX surface is `SceneManager.createCasesView` → `CasesController` →
+`CaseSummaryDao.findActiveGridPage`. Its controller retains 100-row SQL paging (cards request the
+next page on scroll; grid mode continues requesting pages), SQL-backed debounced case-name search,
+the status multi-filter, cached total counts, generation-based stale-load rejection, and the existing
+`CaseCardFactory`, table row, Enter-key, and double-click navigation paths. The supported orders are
+intake newest/oldest, statute soonest/latest, case name ascending/descending, responsible attorney
+ascending/descending, and current status ascending/descending. Each is a `GridOrder` allow-list value
+and every SQL expression ends in a Case ID direction-matched tie-breaker.
+
+The grid reuses every matching `CaseSummaryProjection` field: Case/tenant identity, number/name,
+authoritative current-status identity and display, Practice Area identity/name, responsible-attorney
+and legal-assistant identities/display, timestamps, and deletion state. A scoped `CaseGridRow` keeps
+the existing consumer-only Practice Area color, non-engagement flag, client/opponent labels, latest
+update, description, and four displayed dates out of the shared PHI-minimized record. Enrichment uses
+`OUTER APPLY`, aggregation, and a bounded page query, so missing optionals remain and malformed
+one-to-many data cannot multiply Cases. Intake, statute, and tort dates resolve through
+`CaseDateTypeSemanticRoleMappings`; injury continues through the authoritative stored
+`CaseDateTypes.SystemKey`. No deprecated `Cases` date convenience column is read and no per-row DAO
+hydration remains.
+
+The prior `CaseDao.findCasesViewPage` entry point is intentionally retained because export and other
+deferred compatibility paths still compile against the rich `CaseRow`. `listCasesViewForExport`, the
+board, Search, Deleted Cases, MyShale, user/contact/organization related Cases, reports, documents,
+API, and web paths are unchanged. In particular, this phase neither copies nor changes the older
+calendar role-1 SQL. This is a sensitive read-only cutover: it continues through the established
+Cases view/read boundaries and introduces no mutation requiring an entity-action audit transaction.
