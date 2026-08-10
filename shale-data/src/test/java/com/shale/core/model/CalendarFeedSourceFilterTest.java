@@ -14,18 +14,6 @@ class CalendarFeedSourceFilterTest {
     void classifierUsesStableFeedMetadata() {
         assertEquals(CalendarFeedCategory.CALENDAR_EVENTS, CalendarFeedCategory.classify(item("EVENT:42", null, null, null, "MANUAL", "Visit", 1, "MEETING")));
         assertEquals(CalendarFeedCategory.TASKS, CalendarFeedCategory.classify(item("TASK:7", "DueAt", 7, 10, "PROJECTED", "Draft", 1, "TASK_DUE")));
-        assertDeadline("StatuteOfLimitations");
-        assertDeadline("TortNoticeDeadline");
-        assertDeadline("DiscoveryDeadline");
-        assertCaseDate("CallerDate");
-        assertCaseDate("AcceptedDate");
-        assertCaseDate("DeniedDate");
-        assertCaseDate("ClosedDate");
-        assertCaseDate("DateOfInjury");
-        assertCaseDate("DateFeeAgreementSigned");
-        assertCaseDate("DateNonEngagementLetterSent");
-        assertCaseDate("DateOfMedicalNegligence");
-        assertCaseDate("DateMedicalNegligenceWasDiscovered");
         assertEquals(CalendarFeedCategory.CASE_DEADLINES, CalendarFeedCategory.classify(item("CASE_DATE:900", "DEADLINE", null, 1, "CASE_DATE", "SOL", 1, "CASE_DATE_DEADLINE")));
         assertEquals(CalendarFeedCategory.OTHER_CASE_DATES, CalendarFeedCategory.classify(item("CASE_DATE:901", "HEARING", null, 1, "CASE_DATE", "Hearing", 1, "CASE_DATE_HEARING")));
     }
@@ -39,8 +27,8 @@ class CalendarFeedSourceFilterTest {
         assertFalse(filter.isEnabled(CalendarFeedCategory.OTHER_CASE_DATES));
         assertTrue(filter.matches(item("EVENT:1", null, null, null, "MANUAL", "Event", 1, "MEETING")));
         assertTrue(filter.matches(item("TASK:1", "DueAt", 1, 1, "PROJECTED", "Task", 1, "TASK_DUE")));
-        assertTrue(filter.matches(item("CASE_SOL:1", "StatuteOfLimitations", null, 1, "PROJECTED", "SOL", 1, "STATUTE_OF_LIMITATIONS")));
-        assertFalse(filter.matches(item("CASE_CALLER:1", "CallerDate", null, 1, "PROJECTED", "Intake", 1, "CASE_DATE")));
+        assertTrue(filter.matches(item("CASE_DATE:101", "DEADLINE", null, 1, "CASE_DATE", "SOL", 1, "STATUTE_OF_LIMITATIONS")));
+        assertFalse(filter.matches(item("CASE_DATE:401", "OTHER", null, 1, "CASE_DATE", "Intake", 1, "CASE_DATE")));
     }
     @Test
     void caseCalendarDefaultFilterShowsEventsTasksDeadlinesAndCaseDates() {
@@ -49,7 +37,7 @@ class CalendarFeedSourceFilterTest {
         assertTrue(filter.isEnabled(CalendarFeedCategory.TASKS));
         assertTrue(filter.isEnabled(CalendarFeedCategory.CASE_DEADLINES));
         assertTrue(filter.isEnabled(CalendarFeedCategory.OTHER_CASE_DATES));
-        assertTrue(filter.matches(item("CASE_CALLER:1", "CallerDate", null, 1, "PROJECTED", "Intake", 1, "CASE_DATE")));
+        assertTrue(filter.matches(item("CASE_DATE:401", "OTHER", null, 1, "CASE_DATE", "Intake", 1, "CASE_DATE")));
     }
 
 
@@ -58,16 +46,16 @@ class CalendarFeedSourceFilterTest {
         List<CalendarFeedItem> items = List.of(
                 item("EVENT:1", null, null, null, "MANUAL", "Alpha", 1, "MEETING"),
                 item("TASK:1", "DueAt", 1, 1, "PROJECTED", "Beta", 1, "TASK_DUE"),
-                item("CASE_SOL:1", "StatuteOfLimitations", null, 1, "PROJECTED", "Gamma", 1, "STATUTE_OF_LIMITATIONS"),
-                item("CASE_TORT:1", "TortNoticeDeadline", null, 1, "PROJECTED", "Delta", 1, "TORT_NOTICE_DEADLINE"),
-                item("CASE_DISC:1", "DiscoveryDeadline", null, 1, "PROJECTED", "Epsilon", 1, "DISCOVERY_DEADLINE"),
-                item("CASE_CALLER:1", "CallerDate", null, 1, "PROJECTED", "Zeta", 1, "CASE_DATE"));
+                item("CASE_DATE:101", "DEADLINE", null, 1, "CASE_DATE", "Gamma", 1, "STATUTE_OF_LIMITATIONS"),
+                item("CASE_DATE:201", "DEADLINE", null, 1, "CASE_DATE", "Delta", 1, "TORT_NOTICE_DEADLINE"),
+                item("CASE_DATE:301", "DEADLINE", null, 1, "CASE_DATE", "Epsilon", 1, "DISCOVERY_DEADLINE"),
+                item("CASE_DATE:401", "OTHER", null, 1, "CASE_DATE", "Zeta", 1, "CASE_DATE"));
 
-        assertEquals(List.of("EVENT:1", "CASE_SOL:1", "CASE_TORT:1", "CASE_DISC:1", "CASE_CALLER:1"), keysMatching(items, new CalendarFeedSourceFilter(EnumSet.of(CalendarFeedCategory.CALENDAR_EVENTS, CalendarFeedCategory.CASE_DEADLINES, CalendarFeedCategory.OTHER_CASE_DATES))));
-        assertEquals(List.of("EVENT:1", "TASK:1", "CASE_CALLER:1"), keysMatching(items, new CalendarFeedSourceFilter(EnumSet.of(CalendarFeedCategory.CALENDAR_EVENTS, CalendarFeedCategory.TASKS, CalendarFeedCategory.OTHER_CASE_DATES))));
-        assertEquals(List.of("EVENT:1", "TASK:1", "CASE_SOL:1", "CASE_TORT:1", "CASE_DISC:1"), keysMatching(items, new CalendarFeedSourceFilter(EnumSet.of(CalendarFeedCategory.CALENDAR_EVENTS, CalendarFeedCategory.TASKS, CalendarFeedCategory.CASE_DEADLINES))));
-        assertEquals(List.of("TASK:1", "CASE_SOL:1", "CASE_TORT:1", "CASE_DISC:1", "CASE_CALLER:1"), keysMatching(items, new CalendarFeedSourceFilter(EnumSet.of(CalendarFeedCategory.TASKS, CalendarFeedCategory.CASE_DEADLINES, CalendarFeedCategory.OTHER_CASE_DATES))));
-        assertEquals(List.of("EVENT:1", "CASE_SOL:1", "CASE_TORT:1", "CASE_DISC:1"), keysMatching(items, new CalendarFeedSourceFilter(EnumSet.of(CalendarFeedCategory.CALENDAR_EVENTS, CalendarFeedCategory.CASE_DEADLINES))));
+        assertEquals(List.of("EVENT:1", "CASE_DATE:101", "CASE_DATE:201", "CASE_DATE:301", "CASE_DATE:401"), keysMatching(items, new CalendarFeedSourceFilter(EnumSet.of(CalendarFeedCategory.CALENDAR_EVENTS, CalendarFeedCategory.CASE_DEADLINES, CalendarFeedCategory.OTHER_CASE_DATES))));
+        assertEquals(List.of("EVENT:1", "TASK:1", "CASE_DATE:401"), keysMatching(items, new CalendarFeedSourceFilter(EnumSet.of(CalendarFeedCategory.CALENDAR_EVENTS, CalendarFeedCategory.TASKS, CalendarFeedCategory.OTHER_CASE_DATES))));
+        assertEquals(List.of("EVENT:1", "TASK:1", "CASE_DATE:101", "CASE_DATE:201", "CASE_DATE:301"), keysMatching(items, new CalendarFeedSourceFilter(EnumSet.of(CalendarFeedCategory.CALENDAR_EVENTS, CalendarFeedCategory.TASKS, CalendarFeedCategory.CASE_DEADLINES))));
+        assertEquals(List.of("TASK:1", "CASE_DATE:101", "CASE_DATE:201", "CASE_DATE:301", "CASE_DATE:401"), keysMatching(items, new CalendarFeedSourceFilter(EnumSet.of(CalendarFeedCategory.TASKS, CalendarFeedCategory.CASE_DEADLINES, CalendarFeedCategory.OTHER_CASE_DATES))));
+        assertEquals(List.of("EVENT:1", "CASE_DATE:101", "CASE_DATE:201", "CASE_DATE:301"), keysMatching(items, new CalendarFeedSourceFilter(EnumSet.of(CalendarFeedCategory.CALENDAR_EVENTS, CalendarFeedCategory.CASE_DEADLINES))));
     }
 
 
@@ -91,8 +79,8 @@ class CalendarFeedSourceFilterTest {
         List<CalendarFeedItem> items = List.of(
                 itemWithCaseName("TASK:1", "Call", "DueAt", 1, 42, "PROJECTED", "Smith v Jones", "TASK_DUE"),
                 itemWithCaseName("EVENT:2", "Event title", null, null, 43, "MANUAL", "Alpha Matter", "MEETING"),
-                itemWithCaseName("CASE_SOL:42", "SOL — Smith v Jones", "StatuteOfLimitations", null, 42, "PROJECTED", "Smith v Jones", "STATUTE_OF_LIMITATIONS"),
-                itemWithCaseName("CASE_CALLER:42", "Intake — Smith v Jones", "CallerDate", null, 42, "PROJECTED", "Smith v Jones", "CASE_DATE"),
+                itemWithCaseName("CASE_DATE:1042", "SOL — Smith v Jones", "DEADLINE", null, 42, "PROJECTED", "Smith v Jones", "STATUTE_OF_LIMITATIONS"),
+                itemWithCaseName("CASE_DATE:4042", "Intake — Smith v Jones", "OTHER", null, 42, "PROJECTED", "Smith v Jones", "CASE_DATE"),
                 itemWithCaseName("EVENT:3", "No case event", null, null, null, "MANUAL", null, "MEETING"));
 
         List<CalendarCaseFilterOptions.CaseOption> options = CalendarCaseFilterOptions.fromFeedItems(items);
@@ -111,8 +99,8 @@ class CalendarFeedSourceFilterTest {
         List<CalendarFeedItem> items = List.of(
                 itemWithCaseName("TASK:1", "Call", "DueAt", 1, 20, "PROJECTED", "Zephyr", "TASK_DUE"),
                 itemWithCaseName("EVENT:2", "Review", null, null, 10, "MANUAL", "Acme", "MEETING"),
-                itemWithCaseName("CASE_SOL:10", "SOL — Acme", "StatuteOfLimitations", null, 10, "PROJECTED", "Acme", "STATUTE_OF_LIMITATIONS"),
-                itemWithCaseName("CASE_CALLER:12", "Intake — Acme", "CallerDate", null, 12, "PROJECTED", "Acme", "CASE_DATE"),
+                itemWithCaseName("CASE_DATE:1010", "SOL — Acme", "DEADLINE", null, 10, "PROJECTED", "Acme", "STATUTE_OF_LIMITATIONS"),
+                itemWithCaseName("CASE_DATE:4012", "Intake — Acme", "OTHER", null, 12, "PROJECTED", "Acme", "CASE_DATE"),
                 itemWithCaseName("TASK:3", "Missing case name", "DueAt", 3, 30, "PROJECTED", null, "TASK_DUE"),
                 itemWithCaseName("EVENT:4", "No case", null, null, null, "MANUAL", null, "MEETING"));
 
@@ -127,8 +115,8 @@ class CalendarFeedSourceFilterTest {
         CalendarFeedSourceFilter allLayers = new CalendarFeedSourceFilter(EnumSet.allOf(CalendarFeedCategory.class));
         assertTrue(CalendarFeedFilters.matches(itemWithCaseName("EVENT:1", "Event", null, null, 7, "MANUAL", "Case Seven", "MEETING"), allLayers, "", 7, ""));
         assertTrue(CalendarFeedFilters.matches(itemWithCaseName("TASK:1", "Task", "DueAt", 1, 7, "PROJECTED", "Case Seven", "TASK_DUE"), allLayers, "", 7, ""));
-        assertTrue(CalendarFeedFilters.matches(itemWithCaseName("CASE_SOL:7", "SOL", "StatuteOfLimitations", null, 7, "PROJECTED", "Case Seven", "STATUTE_OF_LIMITATIONS"), allLayers, "", 7, ""));
-        assertTrue(CalendarFeedFilters.matches(itemWithCaseName("CASE_CALLER:7", "Intake", "CallerDate", null, 7, "PROJECTED", "Case Seven", "CASE_DATE"), allLayers, "", 7, ""));
+        assertTrue(CalendarFeedFilters.matches(itemWithCaseName("CASE_DATE:107", "SOL", "DEADLINE", null, 7, "PROJECTED", "Case Seven", "STATUTE_OF_LIMITATIONS"), allLayers, "", 7, ""));
+        assertTrue(CalendarFeedFilters.matches(itemWithCaseName("CASE_DATE:407", "Intake", "OTHER", null, 7, "PROJECTED", "Case Seven", "CASE_DATE"), allLayers, "", 7, ""));
         assertFalse(CalendarFeedFilters.matches(itemWithCaseName("EVENT:2", "Other", null, null, 8, "MANUAL", "Case Eight", "MEETING"), allLayers, "", 7, ""));
         assertFalse(CalendarFeedFilters.matches(itemWithCaseName("EVENT:3", "No case", null, null, null, "MANUAL", null, "MEETING"), allLayers, "", 7, ""));
     }
@@ -144,7 +132,7 @@ class CalendarFeedSourceFilterTest {
         assertEquals(CalendarFeedClickTarget.Kind.CALENDAR_EVENT, persistedEventWithTask.kind());
         assertEquals(123L, persistedEventWithTask.id());
 
-        CalendarFeedClickTarget caseDate = CalendarFeedClickTarget.resolve(itemWithCaseName("CASE_SOL:7", "SOL", "StatuteOfLimitations", null, 7, "PROJECTED", "Case Seven", "STATUTE_OF_LIMITATIONS"));
+        CalendarFeedClickTarget caseDate = CalendarFeedClickTarget.resolve(itemWithCaseName("CASE_DATE:107", "SOL", "DEADLINE", null, 7, "PROJECTED", "Case Seven", "STATUTE_OF_LIMITATIONS"));
         assertEquals(CalendarFeedClickTarget.Kind.CASE, caseDate.kind());
         assertEquals(7L, caseDate.id());
 
@@ -165,8 +153,6 @@ class CalendarFeedSourceFilterTest {
     private static List<String> keysMatching(List<CalendarFeedItem> items, CalendarFeedSourceFilter filter) {
         return items.stream().filter(filter::matches).map(CalendarFeedItem::key).toList();
     }
-    private static void assertDeadline(String sourceField) { assertEquals(CalendarFeedCategory.CASE_DEADLINES, CalendarFeedCategory.classify(item("CASE:" + sourceField, sourceField, null, 1, "PROJECTED", sourceField, 1, sourceField))); }
-    private static void assertCaseDate(String sourceField) { assertEquals(CalendarFeedCategory.OTHER_CASE_DATES, CalendarFeedCategory.classify(item("CASE:" + sourceField, sourceField, null, 1, "PROJECTED", sourceField, 1, "CASE_DATE"))); }
     private static CalendarFeedItem item(String key, String sourceField, Integer taskId, Integer caseId, String sourceType, String title, Integer relatedCaseId, String typeKey) {
         Integer effectiveCaseId = caseId == null ? relatedCaseId : caseId;
         return itemWithCaseName(key, title, sourceField, taskId, effectiveCaseId, sourceType, effectiveCaseId == null ? null : "Case " + effectiveCaseId, typeKey);

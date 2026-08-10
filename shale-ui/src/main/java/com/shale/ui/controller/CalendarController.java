@@ -16,6 +16,8 @@ import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.services.CalendarService;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.services.LiveUpdateEvents;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.ControlStyles;
@@ -41,6 +43,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import com.shale.ui.util.PerfLog;
 import org.slf4j.Logger;
@@ -95,6 +98,10 @@ public final class CalendarController {
     private Consumer<Long> onOpenTask;
     private CaseTaskService caseTaskService;
     private CaseDao caseDao;
+    private UiRuntimeBridge runtimeBridge;
+    private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
+    private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
+    private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> entityUpdatedHandler = this::handleEntityUpdated;
     private int loadGeneration;
     private LocalDate selectedDate;
     private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(300));
@@ -120,15 +127,39 @@ public final class CalendarController {
     private TaskCardFactory taskCardFactory = new TaskCardFactory(id -> {}, id -> {}, id -> {}, id -> {});
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "calendar-feed-loader"); t.setDaemon(true); return t; });
 
-    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseDao caseDao, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
+    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseDao caseDao, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
         this.appState = appState; this.calendarService = calendarService; this.calendarFeedDao = calendarFeedDao;
         this.caseTaskService = caseTaskService;
         this.caseDao = caseDao;
+        this.runtimeBridge = runtimeBridge;
         this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase; this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
         resetCalendarOverlayDefaults();
         configureCalendarOverlayControls();
         this.caseCardFactory = new CaseCardFactory(this.onOpenCase);
         this.taskCardFactory = new TaskCardFactory(this.onOpenTask, id -> {}, this.onOpenCase, id -> {});
+        if (runtimeBridge != null) runtimeBridge.subscribeEntityUpdated(entityUpdatedHandler);
+    }
+
+    private void handleEntityUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
+        if (event == null || !LiveUpdateEvents.ENTITY_CASE_DATES.equals(event.entityType()) || appState == null) return;
+        Integer tenantId = appState.getShaleClientId();
+        if (tenantId == null || tenantId <= 0 || event.shaleClientId() != tenantId || event.entityId() <= 0) return;
+        String localInstance = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+        if (localInstance != null && !localInstance.isBlank() && localInstance.equals(event.clientInstanceId())) return;
+        if (!rememberCaseDatesEvent(event.eventId()) || !caseDatesRefreshQueued.compareAndSet(false, true)) return;
+        Platform.runLater(() -> {
+            caseDatesRefreshQueued.set(false);
+            loadCurrentRange(false); // load generation discards any older in-flight response
+        });
+    }
+
+    private boolean rememberCaseDatesEvent(String eventId) {
+        if (eventId == null || eventId.isBlank()) return true;
+        synchronized (seenCaseDatesEventIds) {
+            if (!seenCaseDatesEventIds.add(eventId)) return false;
+            while (seenCaseDatesEventIds.size() > 256) seenCaseDatesEventIds.remove(seenCaseDatesEventIds.iterator().next());
+            return true;
+        }
     }
 
     @FXML private void initialize() {

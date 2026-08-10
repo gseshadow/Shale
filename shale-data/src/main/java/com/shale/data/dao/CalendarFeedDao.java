@@ -83,27 +83,13 @@ public final class CalendarFeedDao {
             }
         } catch (SQLException e) { throw new RuntimeException("Failed to load calendar task card rows", e); }
     }
-    record CaseDateProjection(String keyPrefix, String columnName, String titlePrefix, String systemKey, String displayTypeName) {
-        boolean deadline() {
-            return "STATUTE_OF_LIMITATIONS".equals(systemKey)
-                    || "TORT_NOTICE_DEADLINE".equals(systemKey)
-                    || "DISCOVERY_DEADLINE".equals(systemKey);
-        }
-    }
+    record LifecycleDateProjection(String keyPrefix, String columnName, String titlePrefix) {}
 
-    static final List<CaseDateProjection> CASE_DATE_PROJECTIONS = List.of(
-            new CaseDateProjection("CASE_SOL", "StatuteOfLimitations", "SOL", "STATUTE_OF_LIMITATIONS", "Statute of Limitations"),
-            new CaseDateProjection("CASE_TORT", "TortNoticeDeadline", "Tort Notice", "TORT_NOTICE_DEADLINE", "Tort Notice Deadline"),
-            new CaseDateProjection("CASE_DISC", "DiscoveryDeadline", "Discovery Deadline", "DISCOVERY_DEADLINE", "Discovery Deadline"),
-            new CaseDateProjection("CASE_CALLER", "CallerDate", "Intake", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_ACCEPTED", "AcceptedDate", "Accepted", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_DENIED", "DeniedDate", "Denied", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_CLOSED", "ClosedDate", "Closed", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_INJURY", "DateOfInjury", "Date of Injury", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_FEE_AGREEMENT", "DateFeeAgreementSigned", "Fee Agreement Signed", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_NON_ENGAGEMENT", "DateNonEngagementLetterSent", "Non-Engagement Letter Sent", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_MED_NEG", "DateOfMedicalNegligence", "Medical Negligence", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_MED_NEG_DISCOVERED", "DateMedicalNegligenceWasDiscovered", "Medical Negligence Discovered", "CASE_DATE", "Case Date"));
+    /** Status/lifecycle dates are not part of the Case Dates migration. */
+    static final List<LifecycleDateProjection> LIFECYCLE_DATE_PROJECTIONS = List.of(
+            new LifecycleDateProjection("CASE_ACCEPTED", "AcceptedDate", "Accepted"),
+            new LifecycleDateProjection("CASE_DENIED", "DeniedDate", "Denied"),
+            new LifecycleDateProjection("CASE_CLOSED", "ClosedDate", "Closed"));
 
     public List<CalendarFeedItem> listCalendarFeed(int shaleClientId, LocalDateTime startInclusive, LocalDateTime endExclusive) {
         return listCalendarFeed(shaleClientId, startInclusive, endExclusive, null, null);
@@ -131,7 +117,7 @@ public final class CalendarFeedDao {
             LocalDate startDate = startInclusive.toLocalDate();
             LocalDate endDate = endExclusive.toLocalDate();
             ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive)); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); if (userScheduleUserId != null) ps.setInt(i++, userScheduleUserId); if (caseId != null) ps.setInt(i++, caseId);
-            for (int branch = 0; branch < CASE_DATE_PROJECTIONS.size(); branch++) {
+            for (int branch = 0; branch < LIFECYCLE_DATE_PROJECTIONS.size(); branch++) {
                 ps.setInt(i++, shaleClientId); ps.setDate(i++, Date.valueOf(startDate)); ps.setDate(i++, Date.valueOf(endDate)); if (userScheduleUserId != null) ps.setInt(i++, userScheduleUserId); if (caseId != null) ps.setInt(i++, caseId);
             }
             try (ResultSet rs = ps.executeQuery()) {
@@ -251,8 +237,8 @@ public final class CalendarFeedDao {
 """ : "") + (caseFiltered ? "AND t.CaseId = ?\n" : "") + """
                 """);
         sql.append("\n                    UNION ALL\n\n").append(authoritativeCaseDatesBranch(caseFiltered, userScheduleScoped));
-        for (CaseDateProjection projection : CASE_DATE_PROJECTIONS) {
-            sql.append("\n                    UNION ALL\n\n").append(caseDateBranch(projection, caseFiltered, userScheduleScoped));
+        for (LifecycleDateProjection projection : LIFECYCLE_DATE_PROJECTIONS) {
+            sql.append("\n                    UNION ALL\n\n").append(lifecycleDateBranch(projection, caseFiltered, userScheduleScoped));
         }
         sql.append("""
                 ) feed
@@ -322,8 +308,7 @@ public final class CalendarFeedDao {
                 """;
     }
 
-    private static String caseDateBranch(CaseDateProjection projection, boolean caseFiltered, boolean userScheduleScoped) {
-        String fallbackSystemKey = projection.deadline() ? "DEADLINE" : "REMINDER";
+    private static String lifecycleDateBranch(LifecycleDateProjection projection, boolean caseFiltered, boolean userScheduleScoped) {
         return ("""
                     SELECT CONCAT('%s:', CAST(c.Id AS varchar(20))),
                            CONCAT('%s', N' — ', c.Name),
@@ -337,8 +322,8 @@ public final class CalendarFeedDao {
                            c.Name AS CaseName,
                            NULL,
                            c.Name,
-                           COALESCE(projectedType.SystemKey, fallbackType.SystemKey, '%s'),
-                           COALESCE(projectedType.Name, fallbackType.Name, '%s'),
+                           COALESCE(projectedType.SystemKey, fallbackType.SystemKey, 'CASE_DATE'),
+                           COALESCE(projectedType.Name, fallbackType.Name, 'Case Date'),
                            COALESCE(projectedType.ColorHex, fallbackType.ColorHex),
                            NULL AS AssignedUserColor,
                            NULL AS AssignedToUserId,
@@ -383,7 +368,7 @@ public final class CalendarFeedDao {
 """ : "") + (caseFiltered ? "AND c.Id = ?\n" : "") + """
                 """).formatted(
                 projection.keyPrefix(), projection.titlePrefix().replace("'", "''"), projection.columnName(), projection.columnName(),
-                projection.systemKey(), projection.displayTypeName().replace("'", "''"), projection.systemKey(), fallbackSystemKey,
+                "CASE_DATE", "REMINDER",
                 projection.columnName(), projection.columnName(), projection.columnName());
     }
 

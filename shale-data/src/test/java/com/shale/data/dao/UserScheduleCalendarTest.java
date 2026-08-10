@@ -22,7 +22,7 @@ class UserScheduleCalendarTest {
         assertTrue(sql.contains("responsibleAttorney.RoleId = 4"));
         assertTrue(sql.contains("responsibleAttorney.IsPrimary = 1"));
         assertTrue(sql.contains("responsibleAttorney.UserId = ?"));
-        assertEquals(CalendarFeedDao.CASE_DATE_PROJECTIONS.size() + 1, count(sql, "responsibleAttorney.UserId = ?"), "every projected case-date branch should require viewed user as responsible attorney");
+        assertEquals(CalendarFeedDao.LIFECYCLE_DATE_PROJECTIONS.size() + 1, count(sql, "responsibleAttorney.UserId = ?"), "every projected case-date branch should require viewed user as responsible attorney");
     }
 
     @Test
@@ -52,13 +52,13 @@ class UserScheduleCalendarTest {
         assertFalse(caseSql.contains("AssignedToUserId = ?"));
         assertTrue(caseSql.contains("AND e.CaseId = ?"));
         assertTrue(caseSql.contains("AND t.CaseId = ?"));
-        assertEquals(CalendarFeedDao.CASE_DATE_PROJECTIONS.size() + 1, count(caseSql, "AND c.Id = ?"));
+        assertEquals(CalendarFeedDao.LIFECYCLE_DATE_PROJECTIONS.size() + 1, count(caseSql, "AND c.Id = ?"));
     }
 
     @Test
     void everyInformationalAndDeadlineCaseDateUsesResponsibleAttorneyPredicate() {
         String sql = CalendarFeedDao.buildCalendarFeedSql(false, true);
-        for (CalendarFeedDao.CaseDateProjection projection : CalendarFeedDao.CASE_DATE_PROJECTIONS) {
+        for (CalendarFeedDao.LifecycleDateProjection projection : CalendarFeedDao.LIFECYCLE_DATE_PROJECTIONS) {
             int field = sql.indexOf("'" + projection.columnName() + "'");
             assertTrue(field >= 0, projection.columnName());
             int nextUnion = sql.indexOf("UNION ALL", field + 1);
