@@ -604,8 +604,8 @@ public final class SceneManager {
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, runtimeBridge, caseDao, caseTaskService,
-					new CaseExportService(caseDao, appState, phiReadAuditService), onOpenCase);
+			c.init(appState, runtimeBridge, caseDao, new CaseServiceAdapter(caseDao), caseTaskService,
+					new CaseExportService(caseDao, new CaseServiceAdapter(caseDao), appState, phiReadAuditService), onOpenCase);
 			return c;
 		});
 	}
@@ -645,7 +645,7 @@ public final class SceneManager {
 		{
 			ReportsController c = (ReportsController) controller;
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-			c.init(appState, caseDao, new CaseExportService(caseDao, appState, phiReadAuditService));
+			c.init(appState, caseDao, new CaseExportService(caseDao, new CaseServiceAdapter(caseDao), appState, phiReadAuditService));
 			return c;
 		});
 	}
@@ -806,7 +806,7 @@ public final class SceneManager {
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, runtimeBridge, caseDao, caseTaskService, userBoardLanePreferencesDao, userPreferencesService, notificationCenterService, this::openNotificationCenterFromDashboard, onOpenCase, onOpenUser, phiReadAuditService);
+			c.init(appState, runtimeBridge, caseDao, new CaseServiceAdapter(caseDao), caseTaskService, userBoardLanePreferencesDao, userPreferencesService, notificationCenterService, this::openNotificationCenterFromDashboard, onOpenCase, onOpenUser, phiReadAuditService);
 			return c;
 		});
 	}

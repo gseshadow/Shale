@@ -11,6 +11,10 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -18,6 +22,10 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.dto.MigratedCaseDateProjectionDto;
+import com.shale.core.model.MigratedCaseDateKey;
+import com.shale.core.service.CaseServicePort;
+import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseSort;
 import com.shale.ui.component.factory.CaseCardFactory;
@@ -118,6 +126,7 @@ public final class CasesController {
 	private FlowPane casesFlow;
 
 	private CaseDao caseDao;
+	private CaseServicePort caseService;
 	private CaseTaskService caseTaskService;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
@@ -144,6 +153,9 @@ public final class CasesController {
 	private Consumer<Integer> onOpenCase;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
 	private boolean liveSubscribed;
+	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> caseDatesUpdatedHandler;
+	private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
+	private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
 
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
@@ -163,11 +175,13 @@ public final class CasesController {
 	public void init(AppState appState,
 			UiRuntimeBridge runtimeBridge,
 			CaseDao caseDao,
+			CaseServicePort caseService,
 			CaseTaskService caseTaskService, CaseExportService caseExportService,
 			Consumer<Integer> onOpenCase) {
 		System.out.println("CasesController.init()");
 		PerfLog.log("CTRL", "start", "controller=CasesController page=cases_list");
 		this.caseDao = caseDao;
+		this.caseService = Objects.requireNonNull(caseService, "caseService");
 		this.caseTaskService = caseTaskService;
 		this.caseExportService = caseExportService;
 		this.onOpenCase = onOpenCase;
@@ -532,12 +546,28 @@ public final class CasesController {
 		feedback.run();
 	}
 
-	private CaseCardVm toViewModel(CaseDao.CaseRow row) {
-		return new CaseCardVm(row.id(), safe(row.name()), row.intakeDate(), row.statuteOfLimitationsDate(),
-				row.primaryStatusId(), safe(row.responsibleAttorneyName()), safe(row.responsibleAttorneyColor()),
-				row.nonEngagementLetterSent(), safe(row.primaryStatusName()), safe(row.primaryStatusColor()),
-				safe(row.practiceAreaColor()), safe(row.clientName()), safe(row.opposingPartiesName()),
-				safe(row.latestCaseUpdate()), safe(row.description()), row.dateOfIncident(), row.tortClaimsNoticeDeadline());
+	private CaseCardVm toViewModel(CaseDao.CaseRow row, MigratedCaseDateProjectionDto projection) {
+		MigratedCaseDateProjectionDto dates = projection == null ? MigratedCaseDateProjectionDto.empty(row.id()) : projection;
+		return new CaseCardVm(row.id(), safe(row.name()), projectedDate(dates, MigratedCaseDateKey.CALLER_DATE),
+				projectedDate(dates, MigratedCaseDateKey.STATUTE_OF_LIMITATIONS), row.primaryStatusId(),
+				safe(row.responsibleAttorneyName()), safe(row.responsibleAttorneyColor()), row.nonEngagementLetterSent(),
+				safe(row.primaryStatusName()), safe(row.primaryStatusColor()), safe(row.practiceAreaColor()), safe(row.clientName()),
+				safe(row.opposingPartiesName()), safe(row.latestCaseUpdate()), safe(row.description()),
+				projectedDate(dates, MigratedCaseDateKey.DATE_OF_INJURY), projectedDate(dates, MigratedCaseDateKey.TORT_NOTICE_DEADLINE));
+	}
+
+	private CaseCardVm toViewModel(CaseExportService.ExportCaseRow row) {
+		CaseDao.CaseRow base = row.base();
+		return new CaseCardVm(base.id(), safe(base.name()), row.intakeDate(), row.statuteOfLimitationsDate(),
+				base.primaryStatusId(), safe(base.responsibleAttorneyName()), safe(base.responsibleAttorneyColor()),
+				base.nonEngagementLetterSent(), safe(base.primaryStatusName()), safe(base.primaryStatusColor()),
+				safe(base.practiceAreaColor()), safe(base.clientName()), safe(base.opposingPartiesName()), safe(base.latestCaseUpdate()),
+				safe(base.description()), row.dateOfIncident(), row.tortClaimsNoticeDeadline());
+	}
+
+	private static LocalDate projectedDate(MigratedCaseDateProjectionDto dates, MigratedCaseDateKey key) {
+		var slot = dates.date(key);
+		return slot.present() ? slot.startsAt().toLocalDate() : null;
 	}
 
 	private void writeCsv(File file, List<CaseCardVm> rows) throws IOException {
@@ -672,7 +702,28 @@ public final class CasesController {
 			}
 		};
 		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		caseDatesUpdatedHandler = this::handleCaseDatesUpdated;
+		runtimeBridge.subscribeEntityUpdated(caseDatesUpdatedHandler);
 		liveSubscribed = true;
+	}
+
+	private void handleCaseDatesUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
+		if (event == null || !LiveUpdateEvents.ENTITY_CASE_DATES.equals(event.entityType()) || appState == null) return;
+		Integer tenant = appState.getShaleClientId();
+		if (tenant == null || tenant <= 0 || event.shaleClientId() != tenant || event.entityId() <= 0) return;
+		String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+		if (!mine.isBlank() && mine.equals(event.clientInstanceId())) return;
+		if (!rememberCaseDatesEvent(event.eventId()) || !caseDatesRefreshQueued.compareAndSet(false, true)) return;
+		Platform.runLater(() -> { caseDatesRefreshQueued.set(false); loadFirstPage(); });
+	}
+
+	private boolean rememberCaseDatesEvent(String eventId) {
+		if (eventId == null || eventId.isBlank()) return true;
+		synchronized (seenCaseDatesEventIds) {
+			if (!seenCaseDatesEventIds.add(eventId)) return false;
+			while (seenCaseDatesEventIds.size() > 256) seenCaseDatesEventIds.remove(seenCaseDatesEventIds.iterator().next());
+			return true;
+		}
 	}
 
 	private void unsubscribeLiveCaseUpdates() {
@@ -680,6 +731,7 @@ public final class CasesController {
 			return;
 		}
 		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		if (caseDatesUpdatedHandler != null) runtimeBridge.unsubscribeEntityUpdated(caseDatesUpdatedHandler);
 		liveSubscribed = false;
 	}
 
@@ -811,26 +863,9 @@ public final class CasesController {
 				// map DAO rows into UI VM
 				long mapStartNanos = PerfLog.start();
 				PerfLog.log("DAO_MAP", "start", "method=findPage page=cases_list rows=" + (page == null || page.items() == null ? 0 : page.items().size()));
+				Map<Long, MigratedCaseDateProjectionDto> projections = projectDates(page.items());
 				List<CaseCardVm> newItems = page.items().stream()
-						.map(r -> new CaseCardVm(
-								r.id(),
-								safe(r.name()),
-								r.intakeDate(),
-								r.statuteOfLimitationsDate(),
-								r.primaryStatusId(),
-								safe(r.responsibleAttorneyName()),
-								safe(r.responsibleAttorneyColor()),
-								r.nonEngagementLetterSent(),
-								safe(r.primaryStatusName()),
-								safe(r.primaryStatusColor()),
-								safe(r.practiceAreaColor()),
-								safe(r.clientName()),
-								safe(r.opposingPartiesName()),
-								safe(r.latestCaseUpdate()),
-								safe(r.description()),
-								r.dateOfIncident(),
-								r.tortClaimsNoticeDeadline()
-						))
+						.map(r -> toViewModel(r, projections.get(r.id())))
 						.toList();
 				PerfLog.logDone("DAO_MAP", "method=findPage page=cases_list rows=" + newItems.size(), mapStartNanos);
 
@@ -867,6 +902,14 @@ public final class CasesController {
 				});
 			}
 		});
+	}
+
+	private Map<Long, MigratedCaseDateProjectionDto> projectDates(List<CaseDao.CaseRow> rows) {
+		if (rows == null || rows.isEmpty()) return Map.of();
+		Integer tenant = appState == null ? null : appState.getShaleClientId();
+		Integer actor = appState == null ? null : appState.getUserId();
+		if (tenant == null || tenant <= 0 || actor == null || actor <= 0) throw new SecurityException("Cases dates are not authorized.");
+		return caseService.projectMigratedCaseDates(rows.stream().map(CaseDao.CaseRow::id).toList(), tenant, actor);
 	}
 
 	private boolean isGridViewActive() {
@@ -1257,96 +1300,9 @@ public final class CasesController {
 	}
 
 	private void refreshCaseRowFromDb(long caseId) {
-		if (caseDao == null)
-			return;
-
-		final int generationAtSubmit = loadGeneration;
-
-		dbExec.submit(() ->
-		{
-			try {
-				// simplest: fetch a 1-item "page" by filtering current page is awkward,
-				// so add a DAO method later. For now: just reload the *current page* row via DAO helper.
-				long daoStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=getCaseRow page=cases_list caseId=" + caseId);
-				CaseDao.CaseRow row = caseDao.getCaseRow(caseId);
-				PerfLog.logDone("DAO", "method=getCaseRow page=cases_list caseId=" + caseId + " rows=" + (row == null ? 0 : 1), daoStartNanos);
-
-				Platform.runLater(() ->
-				{
-					if (generationAtSubmit != loadGeneration)
-						return;
-
-					boolean changed = row == null ? removeLoadedCase(caseId) : applyCaseRowToList(row);
-					if (changed)
-						rerender();
-				});
-			} catch (Exception ex) {
-				Platform.runLater(ex::printStackTrace);
-			}
-		});
+		// A row-level legacy-shaped DAO read cannot preserve authoritative date ordering.
+		// Restart the bounded query so CaseDates sorting, paging, and projection hydration remain coherent.
+		runOnFx(this::loadFirstPage);
 	}
 
-	private boolean removeLoadedCase(long caseId) {
-		for (int i = 0; i < loaded.size(); i++) {
-			if (loaded.get(i).id == caseId) {
-				loaded.remove(i);
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private boolean applyCaseRowToList(CaseDao.CaseRow r) {
-		for (int i = 0; i < loaded.size(); i++) {
-			CaseCardVm vm = loaded.get(i);
-			if (vm.id == r.id()) {
-				String newName = safe(r.name());
-				String newAtty = safe(r.responsibleAttorneyName());
-				String newColor = safe(r.responsibleAttorneyColor());
-
-				boolean same = newName.equals(vm.name)
-						&& Objects.equals(r.intakeDate(), vm.intakeDate)
-						&& Objects.equals(r.statuteOfLimitationsDate(), vm.solDate)
-						&& Objects.equals(r.primaryStatusId(), vm.primaryStatusId)
-						&& newAtty.equals(vm.responsibleAttorney)
-						&& newColor.equals(vm.responsibleAttorneyColor)
-						&& Objects.equals(r.nonEngagementLetterSent(), vm.nonEngagementLetterSent)
-						&& safe(r.primaryStatusName()).equals(vm.primaryStatusName)
-						&& safe(r.primaryStatusColor()).equals(vm.primaryStatusColor)
-						&& safe(r.practiceAreaColor()).equals(vm.practiceAreaColor)
-						&& safe(r.clientName()).equals(vm.clientName)
-						&& safe(r.opposingPartiesName()).equals(vm.opposingPartiesName)
-						&& safe(r.latestCaseUpdate()).equals(vm.latestCaseUpdate)
-						&& safe(r.description()).equals(vm.description)
-						&& Objects.equals(r.dateOfIncident(), vm.dateOfIncident)
-						&& Objects.equals(r.tortClaimsNoticeDeadline(), vm.tortClaimsNoticeDeadline);
-
-				if (same)
-					return false;
-
-				loaded.set(i, new CaseCardVm(
-						r.id(),
-						newName,
-						r.intakeDate(),
-						r.statuteOfLimitationsDate(),
-						r.primaryStatusId(),
-						newAtty,
-						newColor,
-						r.nonEngagementLetterSent(),
-						safe(r.primaryStatusName()),
-						safe(r.primaryStatusColor()),
-						safe(r.practiceAreaColor()),
-						safe(r.clientName()),
-						safe(r.opposingPartiesName()),
-						safe(r.latestCaseUpdate()),
-						safe(r.description()),
-						r.dateOfIncident(),
-						r.tortClaimsNoticeDeadline()
-				));
-				return true;
-			}
-		}
-		return false;
-	}
 }
