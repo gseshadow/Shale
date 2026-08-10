@@ -44,6 +44,42 @@ references. Existing global mutation protection is unchanged. Starter templates,
 tenant ownership conversion, tenant mapping administration, and classification of
 firm-specific types are explicitly deferred to a later migration.
 
+### Settings classification and compatibility inventory (2026-08-10)
+
+Settings classifies only the three protected semantic roles—Intake, Statute of
+Limitations, and Tort Notice Deadline—as required built-ins. Protection comes from an
+active protected-role mapping, never from global ownership, historical seeding, or a
+`SystemKey`. A `SystemKey` may remain on a global row solely as compatibility identity
+for projections, form configuration, and historical presentation.
+
+Tenant-owned definitions are presented as custom cards and retain authoritative id and
+row-version lifecycle operations. A custom definition actively fulfilling a protected
+role is identified in plain language and cannot be deactivated or removed until its
+mapping is changed or reset. Global noncritical definitions are compatibility/template
+candidates: they are not built-in cards and are not converted, cloned, deleted, or
+remapped by this phase. Existing `CaseDates.CaseDateTypeId` and
+`FormConfiguredFields.CaseDateTypeId` references therefore remain unchanged, and
+historical reads continue to use the stored type with the established effective-display
+fallback.
+
+The repository cannot prove production tenant usage or all deployed foreign-key
+consumers. The read-only inventory at
+`docs/sql/verification/2026-08-10_case_date_type_ownership_inventory.sql` must be run
+before an ownership migration is designed. Its results must identify definitions,
+per-tenant occurrence usage (including removed occurrences), form references, every
+foreign key targeting `CaseDateTypes`, semantic mappings, and any cross-tenant blocker.
+Until those results are reviewed, starter-template installation and conversion of
+compatibility rows to tenant ownership are deliberately deferred. Noninstalled
+templates are not shown as built-ins, and no template-installation mutation or UX is
+introduced.
+
+The Settings presentation uses compact wrapping cards. Required built-ins use a
+restrained neutral card with `Built-in` and `Required` badges, plain inherited/override
+copy, override selection only when an eligible tenant type exists, and reset only for an
+active override. Custom types use the ordinary selectable card treatment with Custom,
+lifecycle, category, timing, and active-role indicators; technical ids, role keys,
+ownership labels, and system keys are not displayed.
+
 * `CaseDateTypes` defines customizable authoritative case-date meanings using Shale's global/tenant overlay lookup pattern.
 * `CaseDates` stores case-owned occurrences for those meanings and allows multiple occurrences of the same type on one case.
 * `CalendarEvents` remains the store for manually created user/calendar events.

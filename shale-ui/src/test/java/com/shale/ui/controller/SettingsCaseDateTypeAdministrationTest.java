@@ -26,7 +26,7 @@ final class SettingsCaseDateTypeAdministrationTest {
         assertTrue(SOURCE.contains("configureCaseDateTypeActionRow()"));
         assertTrue(SOURCE.contains("AppDialogs.showConfirmation"));
         assertFalse(SOURCE.contains("new CaseDateDao"));
-        assertTrue(SOURCE.contains("protectedType()?\"Protected system type\":\"Custom type\""));
+        assertFalse(SOURCE.contains("Protected system type"));
         assertTrue(SOURCE.contains("updateCaseDateTypeActionState(null)"));
         assertTrue(SOURCE.contains("editCaseDateTypeButton.setDisable(!editable)"));
         assertTrue(SOURCE.contains("toggleCaseDateTypeButton.setDisable(!toggle)"));
@@ -55,26 +55,33 @@ final class SettingsCaseDateTypeAdministrationTest {
         assertTrue(SOURCE.contains("findFirst().orElse(null)"));
         assertTrue(SOURCE.contains("applyCaseDateTypeRows(generation,rows,successMessage)"));
     }
-    @Test void overlayRowsBuildLikeOtherSettingsManagers(){
+    @Test void onlyTenantOwnedRowsBuildAsCustomCards(){
         var global = new EffectiveCaseDateTypeDto(1,null,"trial","Trial",null,"TRIAL","#111111",true,10,true,false,EffectiveCaseDateTypeDto.Origin.GLOBAL,new byte[]{1});
         var override = new EffectiveCaseDateTypeDto(2,7,"trial","Trial Tenant",null,"TRIAL","#222222",true,10,true,false,EffectiveCaseDateTypeDto.Origin.TENANT_OVERRIDE,new byte[]{2});
         var custom = new EffectiveCaseDateTypeDto(3,7,null,"Custom",null,"OTHER","#333333",false,20,true,false,EffectiveCaseDateTypeDto.Origin.TENANT_CREATED,new byte[]{3});
         var rows = SettingsController.buildCaseDateTypeRows(List.of(global, override, custom), 7);
         assertEquals(List.of("Custom", "Trial Tenant"), rows.stream().map(SettingsController.CaseDateTypeViewRow::name).sorted().toList());
-        assertTrue(rows.stream().anyMatch(r -> r.scopeLabel().equals("Tenant override")));
-        assertTrue(rows.stream().anyMatch(r -> r.scopeLabel().equals("Tenant custom")));
-        assertTrue(rows.stream().filter(r -> r.scopeLabel().equals("Tenant override")).allMatch(SettingsController.CaseDateTypeViewRow::protectedType));
-        assertTrue(rows.stream().filter(SettingsController.CaseDateTypeViewRow::custom).noneMatch(SettingsController.CaseDateTypeViewRow::protectedType));
+        assertTrue(rows.stream().allMatch(r -> r.scopeLabel().equals("Custom")));
+        assertTrue(rows.stream().allMatch(SettingsController.CaseDateTypeViewRow::custom));
+        assertTrue(rows.stream().noneMatch(SettingsController.CaseDateTypeViewRow::protectedType));
         assertEquals(3, SettingsController.preserveCaseDateTypeSelection(rows,3).id());
         assertNull(SettingsController.preserveCaseDateTypeSelection(rows,999));
         var sameName = new EffectiveCaseDateTypeDto(4,7,null,"Custom",null,"OTHER","#444444",false,30,true,false,EffectiveCaseDateTypeDto.Origin.TENANT_CREATED,new byte[]{4});
         var duplicateNames = SettingsController.buildCaseDateTypeRows(List.of(custom,sameName),7);
         assertEquals(4, SettingsController.preserveCaseDateTypeSelection(duplicateNames,4).id(), "selection must use authoritative id, not display name or index");
-        var protectedRow = rows.stream().filter(SettingsController.CaseDateTypeViewRow::protectedType).findFirst().orElseThrow();
         var customRow = rows.stream().filter(SettingsController.CaseDateTypeViewRow::custom).findFirst().orElseThrow();
-        assertFalse(protectedRow.canEdit()); assertFalse(protectedRow.canToggleActive()); assertFalse(protectedRow.canRemove()); assertFalse(protectedRow.canReset());
         assertTrue(customRow.canEdit()); assertTrue(customRow.canToggleActive()); assertTrue(customRow.canRemove()); assertFalse(customRow.canReset());
-        assertTrue(SOURCE.contains("explainProtectedCaseDateType();return"));
-        assertTrue(SOURCE.contains("Built into Shale. This Case Date Type cannot be customized"));
+        assertFalse(SOURCE.contains("Global/default") && method("private VBox buildCaseDateTypeCard").contains("Global/default"));
+        assertTrue(method("private VBox buildCaseDateTypeCard").contains("metadataPill(\"Custom\")"));
+    }
+
+    @Test void globalAndSystemKeyAloneNeverCreateBuiltInCards(){
+        var global = new EffectiveCaseDateTypeDto(1,null,"trial","Trial",null,"TRIAL",null,true,1,true,false,EffectiveCaseDateTypeDto.Origin.GLOBAL,new byte[]{1});
+        assertTrue(SettingsController.buildCaseDateTypeRows(List.of(global),7).isEmpty());
+        assertTrue(SOURCE.contains("case-date-built-in-card"));
+        assertTrue(SOURCE.contains("metadataPill(\"Built-in\")"));
+        assertTrue(SOURCE.contains("metadataPill(\"Required\")"));
+        assertTrue(CARDS_CSS.contains(".case-date-built-in-card"));
+        assertTrue(CARDS_CSS.contains(".case-date-custom-card"));
     }
 }

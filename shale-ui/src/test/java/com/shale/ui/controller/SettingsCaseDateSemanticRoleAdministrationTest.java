@@ -31,7 +31,7 @@ final class SettingsCaseDateSemanticRoleAdministrationTest {
         String render = method("private void renderCaseDateRoleMappings");
         String row = method("private VBox buildCaseDateRoleMappingRow");
         assertTrue(render.contains("if (eligible.isEmpty())"));
-        assertEquals(1, count(render, "Global defaults are in use because no custom Case Date Types are available."));
+        assertEquals(1, count(render, "No custom types are available for overrides."));
         assertTrue(row.contains("if (!eligible.isEmpty())"));
         assertTrue(row.indexOf("if (!eligible.isEmpty())") < row.indexOf("new ComboBox<>()"));
         assertTrue(row.indexOf("if (!eligible.isEmpty())") < row.indexOf("\"Save override\""));
@@ -50,8 +50,8 @@ final class SettingsCaseDateSemanticRoleAdministrationTest {
 
     @Test void presentationDistinguishesInheritanceAndOverrideAndConditionallyResets() {
         String row = method("private VBox buildCaseDateRoleMappingRow");
-        assertTrue(row.contains("Inherited global default"));
-        assertTrue(row.contains("Tenant override"));
+        assertTrue(row.contains("Using the built-in default."));
+        assertTrue(row.contains("is currently used for this required date."));
         assertTrue(row.contains("if (mapping.tenantOverride())"));
         assertTrue(row.contains("Reset to global default"));
     }
@@ -61,13 +61,16 @@ final class SettingsCaseDateSemanticRoleAdministrationTest {
         String row = method("private VBox buildCaseDateRoleMappingRow");
         assertTrue(FXML.contains("caseDateTypeAdministrationSection"));
         assertTrue(FXML.contains("caseDateRoleMappingsContainer"));
-        assertTrue(render.contains("VBox section = new VBox(8)"));
+        assertTrue(render.contains("FlowPane section = new FlowPane(10, 10)"));
         assertTrue(render.contains("for (CaseDateSemanticRoleMappingDto mapping : mappings)"));
         assertTrue(render.contains("caseDateRoleMappingsContainer.getChildren().setAll(section)"));
         assertFalse(render.contains("buildCaseDateRoleMappingCard"));
         assertTrue(row.contains("FlowPane actions"));
         assertTrue(row.contains("actions.setPrefWrapLength(520)"));
         assertTrue(row.contains("setWrapText(true)"));
+        assertTrue(row.contains("case-date-built-in-card"));
+        assertFalse(row.contains("Global/default"));
+        assertFalse(row.contains("Protected system type"));
     }
 
     private static int count(String value, String needle) {
