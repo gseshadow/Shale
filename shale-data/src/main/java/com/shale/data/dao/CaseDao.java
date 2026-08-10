@@ -46,6 +46,8 @@ import com.shale.core.service.CaseServicePort.CaseLinkShareUpdate;
 import com.shale.core.service.CaseServicePort.CaseLinkShareRemoval;
 
 public final class CaseDao {
+	private static final boolean AUTHORITATIVE_MIGRATED_DATES = true;
+	private static final boolean LEGACY_MIGRATED_DATE_COMPATIBILITY = false;
 
 	private static final Logger LOG = Logger.getLogger(CaseDao.class.getName());
 	private static final org.slf4j.Logger PERF_LOG = org.slf4j.LoggerFactory.getLogger(CaseDao.class);
@@ -1179,7 +1181,7 @@ public final class CaseDao {
 
 	/** page is 0-based */
 	public PagedResult<CaseRow> findPage(int page, int pageSize, CaseSort sort, boolean includeClosedDenied) {
-		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, null, null, null);
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, null, null, null, AUTHORITATIVE_MIGRATED_DATES);
 	}
 
 	/**
@@ -1281,7 +1283,7 @@ public final class CaseDao {
 			String query,
 			Set<Integer> selectedStatusIds,
 			Long knownTotal) {
-		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, query, selectedStatusIds, knownTotal);
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, query, selectedStatusIds, knownTotal, AUTHORITATIVE_MIGRATED_DATES);
 	}
 
 	/**
@@ -1294,7 +1296,7 @@ public final class CaseDao {
 		final int exportBatchSize = 500;
 		return collectAllExportPages(page -> findPageInternal(page, exportBatchSize, sort,
 				includeClosedDenied, null, query, selectedStatusIds,
-				null));
+				null, AUTHORITATIVE_MIGRATED_DATES));
 	}
 
 	static <T> List<T> collectAllExportPages(java.util.function.IntFunction<PagedResult<T>> loader) {
@@ -1321,7 +1323,7 @@ public final class CaseDao {
 				+ " pageSize=" + pageSize
 				+ " sort=" + sort
 				+ " includeClosedDenied=" + includeClosedDenied);
-		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId, null, null, null);
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId, null, null, null, LEGACY_MIGRATED_DATE_COMPATIBILITY);
 	}
 
 	public List<CaseRow> listActiveCasesForUserTeamMember(int userId, int limit) {
@@ -2155,7 +2157,8 @@ public final class CaseDao {
 			Integer restrictToUserId,
 			String query,
 			Set<Integer> selectedStatusIds,
-			Long knownTotal) {
+			Long knownTotal,
+			boolean authoritativeMigratedDates) {
 		if (page < 0)
 			throw new IllegalArgumentException("page must be >= 0");
 		if (pageSize <= 0)
@@ -2175,7 +2178,7 @@ public final class CaseDao {
 
 		int offset = page * pageSize;
 		CaseSort effectiveSort = sort == null ? CaseSort.INTAKE_NEWEST : sort;
-		String orderByClause = orderByClauseFor(effectiveSort);
+		String orderByClause = orderByClauseFor(effectiveSort, authoritativeMigratedDates);
 
 		List<CaseRow> out = new ArrayList<>(pageSize);
 
@@ -2192,14 +2195,15 @@ public final class CaseDao {
 				casesViewFilter.setLength(casesViewFilter.length() - 1);
 				casesViewFilter.append("))");
 			}
+			String migratedDateSelect = authoritativeMigratedDates
+					? "migrated.IntakeDate AS CallerDate, migrated.StatuteDate AS StatuteOfLimitations, migrated.IncidentDate AS DateOfIncident, migrated.TortDate AS TortNoticeDeadline,"
+					: "c.CallerDate, c.StatuteOfLimitations, c.DateOfInjury AS DateOfIncident, c.TortNoticeDeadline,";
+			String migratedDateApply = authoritativeMigratedDates ? authoritativeCasesDateApplySql() : "";
 			String sql = """
 					SELECT
 					  c.Id,
 					  c.Name,
-					  c.CallerDate,
-					  c.StatuteOfLimitations,
-					  c.DateOfInjury AS DateOfIncident,
-					  c.TortNoticeDeadline,
+					  %s
 					  latestUpdate.LatestCaseUpdate,
 					  c.Description AS Description,
 					  current_status.PrimaryStatusId,
@@ -2294,6 +2298,7 @@ public final class CaseDao {
 					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
 					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
 					) latestUpdate
+					%s
 					WHERE %s
 					  AND c.ShaleClientId = ?
 					  %s
@@ -2301,8 +2306,8 @@ public final class CaseDao {
 					  %s
 					OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
 					"""
-					.formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter
-							+ casesViewFilter,
+					.formatted(migratedDateSelect, CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE,
+							migratedDateApply, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter + casesViewFilter,
 							orderByClause);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -2384,12 +2389,29 @@ public final class CaseDao {
 		return "%" + normalizedQuery + "%";
 	}
 
-	private static String orderByClauseFor(CaseSort sort) {
+	private static String authoritativeCasesDateApplySql() {
+		return """
+			OUTER APPLY (
+			  SELECT
+			    MAX(CASE WHEN type_key.SystemKey = 'intake' THEN cd.StartsAt END) AS IntakeDate,
+			    MAX(CASE WHEN type_key.SystemKey = 'date_of_injury' THEN cd.StartsAt END) AS IncidentDate,
+			    MAX(CASE WHEN type_key.SystemKey = 'statute_of_limitations' THEN cd.StartsAt END) AS StatuteDate,
+			    MAX(CASE WHEN type_key.SystemKey = 'tort_notice_deadline' THEN cd.StartsAt END) AS TortDate
+			  FROM dbo.CaseDates cd
+			  INNER JOIN dbo.CaseDateTypes type_key ON type_key.Id = cd.CaseDateTypeId
+			    AND (type_key.ShaleClientId = c.ShaleClientId OR type_key.ShaleClientId IS NULL)
+			  WHERE cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId AND cd.IsDeleted = 0
+			    AND type_key.SystemKey IN ('intake','date_of_injury','statute_of_limitations','tort_notice_deadline')
+			) migrated
+			""";
+	}
+
+	private static String orderByClauseFor(CaseSort sort, boolean authoritativeMigratedDates) {
 		return switch (sort) {
-		case INTAKE_OLDEST -> "c.CallerDate ASC, c.Id ASC";
-		case STATUTE_SOONEST -> "c.StatuteOfLimitations ASC, c.Id ASC";
-		case STATUTE_LATEST -> "c.StatuteOfLimitations DESC, c.Id DESC";
-		case TORT_NOTICE_SOONEST -> "c.TortNoticeDeadline ASC, c.Id ASC";
+		case INTAKE_OLDEST -> (authoritativeMigratedDates ? "migrated.IntakeDate" : "c.CallerDate") + " ASC, c.Id ASC";
+		case STATUTE_SOONEST -> (authoritativeMigratedDates ? "migrated.StatuteDate" : "c.StatuteOfLimitations") + " ASC, c.Id ASC";
+		case STATUTE_LATEST -> (authoritativeMigratedDates ? "migrated.StatuteDate" : "c.StatuteOfLimitations") + " DESC, c.Id DESC";
+		case TORT_NOTICE_SOONEST -> (authoritativeMigratedDates ? "migrated.TortDate" : "c.TortNoticeDeadline") + " ASC, c.Id ASC";
 		case UPDATED_OLDEST -> "c.UpdatedAt ASC, c.Id ASC";
 		case UPDATED_NEWEST -> "c.UpdatedAt DESC, c.Id DESC";
 		case CASE_NAME_ASC -> "c.Name ASC, c.Id ASC";
@@ -2398,7 +2420,7 @@ public final class CaseDao {
 		case RESPONSIBLE_ATTORNEY_DESC -> "ResponsibleAttorneyName DESC, c.Id DESC";
 		case CASE_STATUS_ASC -> "CurrentStatusName ASC, c.Id ASC";
 		case CASE_STATUS_DESC -> "CurrentStatusName DESC, c.Id DESC";
-		case INTAKE_NEWEST -> "c.CallerDate DESC, c.Id DESC";
+		case INTAKE_NEWEST -> (authoritativeMigratedDates ? "migrated.IntakeDate" : "c.CallerDate") + " DESC, c.Id DESC";
 		};
 	}
 
