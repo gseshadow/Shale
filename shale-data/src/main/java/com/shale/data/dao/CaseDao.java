@@ -2187,7 +2187,7 @@ public final class CaseDao {
 		}
 
 		int offset = page * pageSize;
-		String orderByClause = orderByClauseFor(effectiveSort, authoritativeMigratedDates);
+		String boundaryOrderBy = boundaryOrderByClauseFor(effectiveSort, authoritativeMigratedDates);
 
 		List<CaseRow> out = new ArrayList<>(pageSize);
 
@@ -2202,16 +2202,34 @@ public final class CaseDao {
 				casesViewFilter.append("\n  AND LOWER(COALESCE(c.Name, '')) LIKE ?");
 			}
 			if (!effectiveStatusIds.isEmpty()) {
-				casesViewFilter.append("\n  AND (current_status.PrimaryStatusId IS NULL OR current_status.PrimaryStatusId IN (");
+				casesViewFilter.append("\n  AND (boundary_status.PrimaryStatusId IS NULL OR boundary_status.PrimaryStatusId IN (");
 				casesViewFilter.append("?,".repeat(effectiveStatusIds.size()));
 				casesViewFilter.setLength(casesViewFilter.length() - 1);
 				casesViewFilter.append("))");
 			}
+			boolean boundaryNeedsStatus = !effectiveStatusIds.isEmpty() || requiresStatusSort(effectiveSort);
+			boolean boundaryNeedsResponsibleAttorney = requiresResponsibleAttorneySort(effectiveSort);
+			boolean boundaryNeedsAuthoritativeDate = authoritativeMigratedDates && requiresAuthoritativeDateSort(effectiveSort);
+			String boundaryStatusApply = boundaryNeedsStatus ? boundaryStatusApplySql() : "";
+			String boundaryResponsibleAttorneyJoins = boundaryNeedsResponsibleAttorney ? boundaryResponsibleAttorneyJoinsSql() : "";
+			String boundaryDateApply = boundaryNeedsAuthoritativeDate ? authoritativeBoundaryDateApplySql() : "";
 			String migratedDateSelect = authoritativeMigratedDates
-					? "migrated.IntakeDate AS CallerDate, migrated.StatuteDate AS StatuteOfLimitations, migrated.IncidentDate AS DateOfIncident, migrated.TortDate AS TortNoticeDeadline,"
+					? "CAST(NULL AS date) AS CallerDate, CAST(NULL AS date) AS StatuteOfLimitations, CAST(NULL AS date) AS DateOfIncident, CAST(NULL AS date) AS TortNoticeDeadline,"
 					: "c.CallerDate, c.StatuteOfLimitations, c.DateOfInjury AS DateOfIncident, c.TortNoticeDeadline,";
-			String migratedDateApply = authoritativeMigratedDates ? authoritativeCasesDateApplySql() : "";
 			String sql = """
+					WITH OrderedPage AS (
+					  SELECT c.Id AS CaseId, c.ShaleClientId,
+					         ROW_NUMBER() OVER (ORDER BY %s) AS PageOrdinal
+					  FROM %s c
+					  %s
+					  %s
+					  %s
+					  WHERE %s
+					    AND c.ShaleClientId = ?
+					    %s
+					  ORDER BY %s
+					  OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+					)
 					SELECT
 					  c.Id,
 					  c.Name,
@@ -2226,107 +2244,70 @@ public final class CaseDao {
 					  oppContact.OpposingPartiesName,
 					  ra.UserId AS ResponsibleAttorneyId,
 					  u.color AS ResponsibleAttorneyColor,
-					 c.NonEngagementLetterSent AS NonEngagementLetterSent,
-					  LTRIM(RTRIM(
-					    COALESCE(u.name_first, '') +
+					  c.NonEngagementLetterSent AS NonEngagementLetterSent,
+					  LTRIM(RTRIM(COALESCE(u.name_first, '') +
 					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-					    COALESCE(u.name_last, '')
-					  )) AS ResponsibleAttorneyName
-					FROM %s c
+					    COALESCE(u.name_last, ''))) AS ResponsibleAttorneyName
+					FROM OrderedPage page
+					INNER JOIN %s c ON c.Id = page.CaseId AND c.ShaleClientId = page.ShaleClientId
 					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
 					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
-					    FROM %s cs
-					    INNER JOIN %s s ON s.Id = cs.StatusId
+					    FROM %s cs INNER JOIN %s s ON s.Id = cs.StatusId
 					    WHERE cs.CaseId = c.Id
-					    ORDER BY
-					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-					      cs.UpdatedAt DESC,
-					      cs.CreatedAt DESC,
-					      cs.Id DESC
+					    ORDER BY CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END, cs.UpdatedAt DESC, cs.CreatedAt DESC, cs.Id DESC
 					) current_status
 					OUTER APPLY (
-					    SELECT TOP (1) cu.UserId
-					    FROM %s cu
-					    WHERE cu.CaseId = c.Id
-					      AND cu.RoleId = ?
-					      AND cu.IsPrimary = 1
-					    ORDER BY
-					      cu.UpdatedAt DESC,
-					      cu.CreatedAt DESC,
-					      cu.Id DESC
+					    SELECT TOP (1) cu.UserId FROM %s cu
+					    WHERE cu.CaseId = c.Id AND cu.RoleId = ? AND cu.IsPrimary = 1
+					    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
 					) ra
-					LEFT JOIN %s u
-					  ON u.id = ra.UserId
+					LEFT JOIN %s u ON u.id = ra.UserId
 					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS ClientName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
+					    SELECT TOP (1) CASE
+					      WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					      THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
+					      ELSE COALESCE(ct.Name, '') END AS ClientName
+					    FROM dbo.CaseParties cp INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId INNER JOIN Contacts ct ON ct.Id = cp.ContactId
+					    WHERE cp.CaseId = c.Id AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
+					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented' AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
 					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
 					) clientContact
 					OUTER APPLY (
 					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
-					    FROM (
-					      SELECT
-					        LTRIM(RTRIM(
-					          CASE
-					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, o.Name, '')
-					          END
-					        )) AS DisplayName,
-					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
-					        cp.UpdatedAt,
-					        cp.CreatedAt,
-					        cp.Id
-					      FROM dbo.CaseParties cp
-					      LEFT JOIN Contacts ct ON ct.Id = cp.ContactId
-					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
-					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
+					    FROM (SELECT LTRIM(RTRIM(CASE
+					      WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
+					      THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
+					      ELSE COALESCE(ct.Name, o.Name, '') END)) AS DisplayName,
+					      CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary, cp.UpdatedAt, cp.CreatedAt, cp.Id
+					      FROM dbo.CaseParties cp LEFT JOIN Contacts ct ON ct.Id = cp.ContactId LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
+					      WHERE cp.CaseId = c.Id AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
 					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
-					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
-					    ) opp
+					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL) AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)) opp
 					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
 					) oppContact
 					OUTER APPLY (
 					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
-					    FROM dbo.CaseUpdates cu
-					    WHERE cu.CaseId = c.Id
-					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
-					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
-					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
+					    FROM dbo.CaseUpdates cu WHERE cu.CaseId = c.Id AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
+					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL ORDER BY cu.CreatedAt DESC, cu.Id DESC
 					) latestUpdate
-					%s
-					WHERE %s
-					  AND c.ShaleClientId = ?
-					  %s
-					ORDER BY
-					  %s
-					OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
-					"""
-					.formatted(migratedDateSelect, CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE,
-							migratedDateApply, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter + casesViewFilter,
-							orderByClause);
+					ORDER BY page.PageOrdinal;
+					""".formatted(boundaryOrderBy, CASES_TABLE, boundaryStatusApply,
+						boundaryResponsibleAttorneyJoins, boundaryDateApply,
+						activeFilter(schema.deletedColumn(), "c"), userMembershipFilter + casesViewFilter,
+						boundaryOrderBy, migratedDateSelect, CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE,
+						CASE_USERS_TABLE, USERS_TABLE);
 
 			long pageQueryStarted = System.nanoTime();
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int shaleClientId = requireCurrentShaleClientId(con);
 				int idx = 1;
-				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				if (boundaryNeedsResponsibleAttorney) {
+					ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				}
+				if (boundaryNeedsAuthoritativeDate) {
+					ps.setString(idx++, authoritativeSortSystemKey(effectiveSort));
+				}
 				ps.setInt(idx++, shaleClientId);
 				StringBuilder traceParams = new StringBuilder()
 						.append("raRoleId=").append(ROLE_RESPONSIBLE_ATTORNEY)
@@ -2346,6 +2327,7 @@ public final class CaseDao {
 				}
 				ps.setInt(idx++, offset);
 				ps.setInt(idx++, pageSize);
+				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 				traceParams.append(" offset=").append(offset)
 						.append(" pageSize=").append(pageSize);
 				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.findPageInternal] "
@@ -2407,40 +2389,81 @@ public final class CaseDao {
 		return "%" + normalizedQuery + "%";
 	}
 
-	private static String authoritativeCasesDateApplySql() {
+	private static String boundaryStatusApplySql() {
 		return """
 			OUTER APPLY (
-			  SELECT
-			    MAX(CASE WHEN type_key.SystemKey = 'intake' THEN cd.StartsAt END) AS IntakeDate,
-			    MAX(CASE WHEN type_key.SystemKey = 'date_of_injury' THEN cd.StartsAt END) AS IncidentDate,
-			    MAX(CASE WHEN type_key.SystemKey = 'statute_of_limitations' THEN cd.StartsAt END) AS StatuteDate,
-			    MAX(CASE WHEN type_key.SystemKey = 'tort_notice_deadline' THEN cd.StartsAt END) AS TortDate
-			  FROM dbo.CaseDates cd
-			  INNER JOIN dbo.CaseDateTypes type_key ON type_key.Id = cd.CaseDateTypeId
-			    AND (type_key.ShaleClientId = c.ShaleClientId OR type_key.ShaleClientId IS NULL)
-			  WHERE cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId AND cd.IsDeleted = 0
-			    AND type_key.SystemKey IN ('intake','date_of_injury','statute_of_limitations','tort_notice_deadline')
-			) migrated
+			  SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName
+			  FROM dbo.CaseStatuses cs INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
+			  WHERE cs.CaseId = c.Id
+			  ORDER BY CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END, cs.UpdatedAt DESC, cs.CreatedAt DESC, cs.Id DESC
+			) boundary_status
 			""";
 	}
 
-	private static String orderByClauseFor(CaseSort sort, boolean authoritativeMigratedDates) {
+	private static String boundaryResponsibleAttorneyJoinsSql() {
+		return """
+			OUTER APPLY (
+			  SELECT TOP (1) cu.UserId FROM dbo.CaseUsers cu
+			  WHERE cu.CaseId = c.Id AND cu.RoleId = ? AND cu.IsPrimary = 1
+			  ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+			) boundary_ra
+			LEFT JOIN dbo.Users boundary_user ON boundary_user.id = boundary_ra.UserId
+			""";
+	}
+
+	private static String authoritativeBoundaryDateApplySql() {
+		return """
+			OUTER APPLY (
+			  SELECT MAX(cd.StartsAt) AS SortDate
+			  FROM dbo.CaseDates cd
+			  INNER JOIN dbo.CaseDateTypes stored_type ON stored_type.Id = cd.CaseDateTypeId
+			    AND (stored_type.ShaleClientId = cd.ShaleClientId OR stored_type.ShaleClientId IS NULL)
+			  WHERE cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId
+			    AND cd.IsDeleted = 0 AND stored_type.SystemKey = ?
+			) boundary_date
+			""";
+	}
+
+	private static boolean requiresAuthoritativeDateSort(CaseSort sort) {
+		return sort == CaseSort.INTAKE_OLDEST || sort == CaseSort.INTAKE_NEWEST
+				|| sort == CaseSort.STATUTE_SOONEST || sort == CaseSort.STATUTE_LATEST
+				|| sort == CaseSort.TORT_NOTICE_SOONEST;
+	}
+
+	private static boolean requiresStatusSort(CaseSort sort) {
+		return sort == CaseSort.CASE_STATUS_ASC || sort == CaseSort.CASE_STATUS_DESC;
+	}
+
+	private static boolean requiresResponsibleAttorneySort(CaseSort sort) {
+		return sort == CaseSort.RESPONSIBLE_ATTORNEY_ASC || sort == CaseSort.RESPONSIBLE_ATTORNEY_DESC;
+	}
+
+	private static String authoritativeSortSystemKey(CaseSort sort) {
+		if (sort == CaseSort.INTAKE_OLDEST || sort == CaseSort.INTAKE_NEWEST) return "intake";
+		if (sort == CaseSort.STATUTE_SOONEST || sort == CaseSort.STATUTE_LATEST) return "statute_of_limitations";
+		if (sort == CaseSort.TORT_NOTICE_SOONEST) return "tort_notice_deadline";
+		throw new IllegalArgumentException("Sort does not require an authoritative Case Date");
+	}
+
+	private static String boundaryOrderByClauseFor(CaseSort sort, boolean authoritativeMigratedDates) {
+		String responsibleName = "LTRIM(RTRIM(COALESCE(boundary_user.name_first, '') + CASE WHEN COALESCE(boundary_user.name_first, '') = '' OR COALESCE(boundary_user.name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(boundary_user.name_last, '')))";
 		return switch (sort) {
-		case INTAKE_OLDEST -> (authoritativeMigratedDates ? "migrated.IntakeDate" : "c.CallerDate") + " ASC, c.Id ASC";
-		case STATUTE_SOONEST -> (authoritativeMigratedDates ? "migrated.StatuteDate" : "c.StatuteOfLimitations") + " ASC, c.Id ASC";
-		case STATUTE_LATEST -> (authoritativeMigratedDates ? "migrated.StatuteDate" : "c.StatuteOfLimitations") + " DESC, c.Id DESC";
-		case TORT_NOTICE_SOONEST -> (authoritativeMigratedDates ? "migrated.TortDate" : "c.TortNoticeDeadline") + " ASC, c.Id ASC";
+		case INTAKE_OLDEST -> (authoritativeMigratedDates ? "boundary_date.SortDate" : "c.CallerDate") + " ASC, c.Id ASC";
+		case STATUTE_SOONEST -> (authoritativeMigratedDates ? "boundary_date.SortDate" : "c.StatuteOfLimitations") + " ASC, c.Id ASC";
+		case STATUTE_LATEST -> (authoritativeMigratedDates ? "boundary_date.SortDate" : "c.StatuteOfLimitations") + " DESC, c.Id DESC";
+		case TORT_NOTICE_SOONEST -> (authoritativeMigratedDates ? "boundary_date.SortDate" : "c.TortNoticeDeadline") + " ASC, c.Id ASC";
 		case UPDATED_OLDEST -> "c.UpdatedAt ASC, c.Id ASC";
 		case UPDATED_NEWEST -> "c.UpdatedAt DESC, c.Id DESC";
 		case CASE_NAME_ASC -> "c.Name ASC, c.Id ASC";
 		case CASE_NAME_DESC -> "c.Name DESC, c.Id DESC";
-		case RESPONSIBLE_ATTORNEY_ASC -> "ResponsibleAttorneyName ASC, c.Id ASC";
-		case RESPONSIBLE_ATTORNEY_DESC -> "ResponsibleAttorneyName DESC, c.Id DESC";
-		case CASE_STATUS_ASC -> "CurrentStatusName ASC, c.Id ASC";
-		case CASE_STATUS_DESC -> "CurrentStatusName DESC, c.Id DESC";
-		case INTAKE_NEWEST -> (authoritativeMigratedDates ? "migrated.IntakeDate" : "c.CallerDate") + " DESC, c.Id DESC";
+		case RESPONSIBLE_ATTORNEY_ASC -> responsibleName + " ASC, c.Id ASC";
+		case RESPONSIBLE_ATTORNEY_DESC -> responsibleName + " DESC, c.Id DESC";
+		case CASE_STATUS_ASC -> "boundary_status.CurrentStatusName ASC, c.Id ASC";
+		case CASE_STATUS_DESC -> "boundary_status.CurrentStatusName DESC, c.Id DESC";
+		case INTAKE_NEWEST -> (authoritativeMigratedDates ? "boundary_date.SortDate" : "c.CallerDate") + " DESC, c.Id DESC";
 		};
 	}
+
 
 	public long countAll() {
 		return countAll(false);
