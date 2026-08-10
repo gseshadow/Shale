@@ -2,6 +2,7 @@ package com.shale.ui.export;
 
 import com.shale.data.dao.CaseDao.CaseRow;
 import com.shale.ui.services.CaseExportService.ReportExportRow;
+import com.shale.ui.services.CaseExportService.ExportCaseRow;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
@@ -26,12 +27,13 @@ public final class CaseXlsxExporter {
             "Closed Date", "Date of Injury", "Description", "Statute of Limitations", "Tort Notice Deadline",
             "Updated At", "Responsible Attorney"};
 
-    public void writeCases(Path path, List<CaseRow> rows) throws IOException {
+    public void writeCases(Path path, List<ExportCaseRow> rows) throws IOException {
         write(path, "Cases", CASE_HEADERS, rows, (row, value) -> {
-            value.accept(row.name()); value.accept(row.clientName()); value.accept(row.intakeDate());
-            value.accept(row.primaryStatusName()); value.accept(row.opposingPartiesName()); value.accept(row.latestCaseUpdate());
-            value.accept(row.description()); value.accept(row.dateOfIncident()); value.accept(row.statuteOfLimitationsDate());
-            value.accept(row.tortClaimsNoticeDeadline()); value.accept(row.responsibleAttorneyName());
+            CaseRow base = row.base();
+            value.accept(base.name()); value.accept(base.clientName()); value.accept(row.intakeDate());
+            value.accept(base.primaryStatusName()); value.accept(base.opposingPartiesName()); value.accept(base.latestCaseUpdate());
+            value.accept(base.description()); value.accept(row.dateOfIncident()); value.accept(row.statuteOfLimitationsDate());
+            value.accept(row.tortClaimsNoticeDeadline()); value.accept(base.responsibleAttorneyName());
         });
     }
 

@@ -1,6 +1,9 @@
 package com.shale.ui.services;
 
 import com.shale.core.dto.ReportCaseDetailRowDto;
+import com.shale.core.dto.MigratedCaseDateProjectionDto;
+import com.shale.core.model.MigratedCaseDateKey;
+import com.shale.core.service.CaseServicePort;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseRow;
 import com.shale.data.dao.CaseDao.CaseSort;
@@ -19,19 +22,25 @@ public final class CaseExportService {
     private final CaseDao caseDao;
     private final AppState appState;
     private final PhiReadAuditService phiReadAuditService;
+    private final CaseServicePort caseService;
 
-    public CaseExportService(CaseDao caseDao, AppState appState, PhiReadAuditService phiReadAuditService) {
+    public CaseExportService(CaseDao caseDao, CaseServicePort caseService, AppState appState, PhiReadAuditService phiReadAuditService) {
         this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
+        this.caseService = Objects.requireNonNull(caseService, "caseService");
         this.appState = Objects.requireNonNull(appState, "appState");
         this.phiReadAuditService = Objects.requireNonNull(phiReadAuditService, "phiReadAuditService");
     }
 
-    public List<CaseRow> exportCases(CasesCriteria criteria) {
+    public List<ExportCaseRow> exportCases(CasesCriteria criteria) {
         requireAuthorizedTenant(criteria.tenantId());
         List<CaseRow> rows = caseDao.listCasesViewForExport(criteria.sort(), criteria.includeClosedDenied(),
                 criteria.query(), criteria.statusIds());
+        Integer actor = appState.getUserId();
+        Map<Long, MigratedCaseDateProjectionDto> dates = caseService.projectMigratedCaseDates(
+                rows.stream().map(CaseRow::id).toList(), criteria.tenantId(), actor);
+        List<ExportCaseRow> result = rows.stream().map(row -> ExportCaseRow.from(row, dates.get(row.id()))).toList();
         phiReadAuditService.auditRead("Case.Export", "Cases.Export", "Case", null);
-        return rows;
+        return result;
     }
 
     public List<ReportExportRow> exportReport(ReportCriteria criteria, Map<Integer, String> statusNames) {
@@ -68,6 +77,21 @@ public final class CaseExportService {
     public record ReportCriteria(int tenantId, LocalDate startDate, LocalDate endDate, List<Integer> statusIds) {
         public ReportCriteria {
             statusIds = statusIds == null ? List.of() : List.copyOf(statusIds);
+        }
+    }
+
+
+    public record ExportCaseRow(CaseRow base, LocalDate intakeDate, LocalDate dateOfIncident,
+                                LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline) {
+        static ExportCaseRow from(CaseRow row, MigratedCaseDateProjectionDto projection) {
+            MigratedCaseDateProjectionDto p = projection == null ? MigratedCaseDateProjectionDto.empty(row.id()) : projection;
+            return new ExportCaseRow(row, date(p, MigratedCaseDateKey.CALLER_DATE),
+                    date(p, MigratedCaseDateKey.DATE_OF_INJURY), date(p, MigratedCaseDateKey.STATUTE_OF_LIMITATIONS),
+                    date(p, MigratedCaseDateKey.TORT_NOTICE_DEADLINE));
+        }
+        private static LocalDate date(MigratedCaseDateProjectionDto p, MigratedCaseDateKey key) {
+            var slot = p.date(key);
+            return slot.present() ? slot.startsAt().toLocalDate() : null;
         }
     }
 

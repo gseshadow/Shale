@@ -4,6 +4,7 @@ import com.shale.core.dto.ReportCaseDetailRowDto;
 import com.shale.data.dao.CaseDao.CaseRow;
 import com.shale.ui.export.CaseXlsxExporter;
 import com.shale.ui.services.CaseExportService.ReportExportRow;
+import com.shale.ui.services.CaseExportService.ExportCaseRow;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -90,14 +91,13 @@ final class CompleteExportContractTest {
     @Test void casesXlsxHandlesMoreThanOneThousandRowsNullsLongTextAndDates() throws Exception {
         Path file = Files.createTempFile("shale-cases-export", ".xlsx");
         try {
-            List<CaseRow> rows = new ArrayList<>();
+            List<ExportCaseRow> rows = new ArrayList<>();
             for (int i = 0; i < 1_127; i++) {
                 String description = i == 417 ? "x".repeat(40_000) : (i % 2 == 0 ? null : "Description");
-                rows.add(new CaseRow(i + 1L, "Case " + i,
-                        i % 3 == 0 ? null : LocalDate.of(2026, 1, 1).plusDays(i),
-                        LocalDate.of(2027, 12, 31), 1, null, null, null, null,
-                        "Open", null, null, null, null, null, description,
-                        i % 5 == 0 ? null : LocalDate.of(2025, 6, 15), null, null));
+                CaseRow base = new CaseRow(i + 1L, "Case " + i, null, null, 1, null, null, null, null,
+                        "Open", null, null, null, null, null, description, null, null, null);
+                rows.add(new ExportCaseRow(base, i % 3 == 0 ? null : LocalDate.of(2026, 1, 1).plusDays(i),
+                        i % 5 == 0 ? null : LocalDate.of(2025, 6, 15), LocalDate.of(2027, 12, 31), null));
             }
 
             new CaseXlsxExporter().writeCases(file, rows);

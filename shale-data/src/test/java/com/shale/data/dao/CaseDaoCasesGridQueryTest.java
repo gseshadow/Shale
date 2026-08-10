@@ -11,17 +11,20 @@ import org.junit.jupiter.api.Test;
 final class CaseDaoCasesGridQueryTest {
 
     @Test
-    void casesGridQueryUsesCurrentIncidentDateColumn() throws Exception {
+    void casesGridUsesAuthoritativeCaseDatesForDisplaySortingAndPaging() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-
-        assertFalse(source.contains("IncidentOccurred"),
-                "Cases grid queries must not reference IncidentOccurred unless schema detection guards it");
-        assertTrue(source.contains("c.DateOfInjury AS DateOfIncident"),
-                "Cases grid should hydrate Date of Incident from the existing DateOfInjury column");
-        assertTrue(source.contains("c.StatuteOfLimitations"),
-                "Cases grid should hydrate Statute of Limitations from the existing StatuteOfLimitations column");
-        assertTrue(source.contains("c.TortNoticeDeadline"),
-                "Cases grid should hydrate Tort Claims Notice Deadline from the existing TortNoticeDeadline column");
+        String method = source.substring(source.indexOf("private PagedResult<CaseRow> findPageInternal"),
+                source.indexOf("private static String normalizeSearchQuery"));
+        assertTrue(method.contains("authoritativeCasesDateApplySql()"));
+        assertTrue(method.contains("migrated.IntakeDate AS CallerDate"));
+        assertTrue(method.contains("migrated.StatuteDate AS StatuteOfLimitations"));
+        assertTrue(method.contains("migrated.IncidentDate AS DateOfIncident"));
+        assertTrue(method.contains("migrated.TortDate AS TortNoticeDeadline"));
+        assertTrue(source.contains("authoritativeMigratedDates ? \"migrated.IntakeDate\""));
+        assertTrue(source.contains("authoritativeMigratedDates ? \"migrated.StatuteDate\""));
+        assertTrue(source.contains("OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"));
+        assertTrue(source.contains("dbo.CaseDates cd"));
+        assertTrue(source.contains("type_key.SystemKey IN ('intake','date_of_injury','statute_of_limitations','tort_notice_deadline')"));
     }
 
     @Test
