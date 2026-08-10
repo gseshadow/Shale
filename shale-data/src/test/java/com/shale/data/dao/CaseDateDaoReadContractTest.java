@@ -15,6 +15,17 @@ class CaseDateDaoReadContractTest {
         assertTrue(source.contains("WHERE rn = 1 AND IsDeleted = 0 AND IsActive = 1"));
         assertTrue(source.contains("UNION ALL"), "tenant-created unkeyed rows remain selectable when active");
         assertTrue(source.contains("ORDER BY SortOrder, Name, Id"));
+        assertTrue(source.contains("pm.CaseDateTypeId=t.Id AND pm.ShaleClientId IS NULL"),
+                "global ownership alone must not make a nonprotected type selectable");
+    }
+
+    @Test void administrationAndMutationSelectionRestrictGlobalsToProtectedMappings() throws Exception {
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
+        assertTrue(source.contains("WHERE t.ShaleClientId = ? OR (t.ShaleClientId IS NULL AND EXISTS"));
+        assertTrue(source.contains("private static TypeRow requireSelectableType"));
+        assertTrue(source.substring(source.indexOf("private static TypeRow requireSelectableType"))
+                .contains("CaseDateTypeSemanticRoleMappings pm"));
+        assertTrue(source.contains("requireHistoricalType"), "stored authoritative ids retain a historical read path");
     }
 
     @Test void occurrenceSqlPreservesHistoricalPresentationAndTenantSafety() throws Exception {
