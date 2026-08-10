@@ -27,6 +27,8 @@ import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseSummaryDao;
+import com.shale.data.dao.CaseSummaryDao.CaseBoardRow;
 import com.shale.data.dao.CaseDao.CaseSort;
 import com.shale.data.dao.UserBoardLanePreferencesDao;
 import com.shale.ui.component.dialog.AppDialogs;
@@ -210,6 +212,7 @@ public final class MyShaleController {
 	private Button myCasesClearAllFiltersButton;
 
 	private CaseDao caseDao;
+	private CaseSummaryDao caseSummaryDao;
 	private CaseTaskService caseTaskService;
 	private UserBoardLanePreferencesDao userBoardLanePreferencesDao;
 	private AppState appState;
@@ -258,6 +261,7 @@ public final class MyShaleController {
 	private Integer cachedCasesUserId;
 	private Integer cachedCasesTenantId;
 	private boolean myCasesLoadFailed;
+	private boolean caseStatusOptionsInitialized;
 	private boolean loadingRecentCaseActivity;
 	private boolean recentCaseActivityLoadFailed;
 	private boolean showCompletedMyTasks;
@@ -354,6 +358,7 @@ public final class MyShaleController {
 			AppState appState,
 			UiRuntimeBridge runtimeBridge,
 			CaseDao caseDao,
+			CaseSummaryDao caseSummaryDao,
 			CaseTaskService caseTaskService,
 			UserBoardLanePreferencesDao userBoardLanePreferencesDao,
 			UserPreferencesService userPreferencesService,
@@ -363,6 +368,7 @@ public final class MyShaleController {
 			Consumer<Integer> onOpenUser,
 			PhiReadAuditService phiReadAuditService) {
 		this.caseDao = caseDao;
+		this.caseSummaryDao = caseSummaryDao;
 		this.caseTaskService = caseTaskService;
 		this.userBoardLanePreferencesDao = userBoardLanePreferencesDao;
 		this.userPreferencesService = userPreferencesService;
@@ -526,6 +532,8 @@ public final class MyShaleController {
 		}
 
 		reloadStatusFilterOptionsAndThen(() -> {
+			caseStatusOptionsInitialized = true;
+			ensureMyCasesFresh(false);
 			renderMyCasesBoard();
 		});
 
@@ -1320,6 +1328,10 @@ public final class MyShaleController {
 	}
 
 	private void ensureMyCasesFresh(boolean force) {
+		if (!caseStatusOptionsInitialized) {
+			PerfLog.log("CTRL", "gated", "panel=my_cases_board reason=status_options_initializing");
+			return;
+		}
 		invalidateMyCasesCacheIfContextChanged();
 		if (!force && myCasesLoadedOnce && !myCasesDirty && !loadingMyCases) {
 			PerfLog.log("CTRL", "cache_hit", "panel=my_cases_board page=my_shale");
@@ -1338,7 +1350,7 @@ public final class MyShaleController {
 	}
 
 	private void refreshMyCasesBoard(boolean force) {
-		if (caseDao == null || appState == null) {
+		if (caseSummaryDao == null || appState == null) {
 			return;
 		}
 		if (!force && loadingMyCases) {
@@ -1370,17 +1382,19 @@ public final class MyShaleController {
 		casesDbExec.submit(() -> {
 			try {
 				long daoStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=listAssignedCasesForBoard page=my_shale userId=" + userIdValue);
-				List<CaseDao.CaseRow> rows = caseDao.listAssignedCasesForBoard(userIdValue);
-				PerfLog.logDone("DAO", "method=listAssignedCasesForBoard page=my_shale userId=" + userIdValue + " rows=" + (rows == null ? 0 : rows.size()), daoStartNanos);
+				PerfLog.log("DAO", "start", "method=listActiveAssignedBoard page=my_shale userId=" + userIdValue);
+				List<CaseBoardRow> rows = caseSummaryDao.listActiveAssignedBoard(shaleClientId, userIdValue);
+				PerfLog.logDone("DAO", "method=listActiveAssignedBoard page=my_shale userId=" + userIdValue + " rows=" + (rows == null ? 0 : rows.size()), daoStartNanos);
 				int rowCount = rows == null ? 0 : rows.size();
 				log.debug("My Cases board DAO returned rowCount={} userId={}", rowCount, userIdValue);
-				List<CaseCardVm> cases = (rows == null ? List.<CaseDao.CaseRow>of() : rows).stream()
+				List<CaseCardVm> cases = (rows == null ? List.<CaseBoardRow>of() : rows).stream()
 						.filter(Objects::nonNull)
 						.map(this::toVm)
 						.toList();
 				runOnFx(() -> {
-					if (generationAtSubmit != myCasesBoardLoadGeneration) {
+					if (generationAtSubmit != myCasesBoardLoadGeneration || appState == null
+							|| !Objects.equals(appState.getUserId(), userIdValue)
+							|| !Objects.equals(appState.getShaleClientId(), shaleClientId)) {
 						PerfLog.log("CTRL", "stale", "panel=my_cases_board page=my_shale generation=" + generationAtSubmit);
 						return;
 					}
@@ -1401,6 +1415,9 @@ public final class MyShaleController {
 				log.warn("My cases board load failed userId={}: {}", userIdValue, ex.getMessage());
 				ex.printStackTrace();
 				runOnFx(() -> {
+					if (generationAtSubmit != myCasesBoardLoadGeneration
+							|| appState == null || !Objects.equals(appState.getUserId(), userIdValue)
+							|| !Objects.equals(appState.getShaleClientId(), shaleClientId)) return;
 					loadingMyCases = false;
 					myCasesLoadFailed = true;
 					myCasesDirty = true;
@@ -1410,6 +1427,15 @@ public final class MyShaleController {
 				});
 			}
 		});
+	}
+
+	private CaseCardVm toVm(CaseBoardRow row) {
+		var summary = row.summary();
+		return new CaseCardVm(summary.caseId(), safe(summary.caseName()), row.intakeDate(),
+				row.statuteOfLimitationsDate(), row.tortClaimsNoticeDeadline(), summary.primaryStatusId(),
+				safe(summary.responsibleAttorneyName()), safe(summary.responsibleAttorneyColor()),
+				row.nonEngagementLetterSent(), safe(summary.primaryStatusName()), safe(summary.primaryStatusColor()),
+				safe(row.practiceAreaColor()), summary.updatedAt());
 	}
 
 	private void renderMyCasesBoard() {
@@ -1471,10 +1497,12 @@ public final class MyShaleController {
 
 		int laneCount = 0;
 		int cardCount = 0;
+		Set<Integer> configuredStatusIds = new LinkedHashSet<>();
 		for (CaseListUiSupport.StatusFilterOption status : statusFilterOptions) {
 			if (status == null) {
 				continue;
 			}
+			configuredStatusIds.add(status.id());
 			String statusName = safe(status.label()).isBlank() ? ("Status #" + status.id()) : safe(status.label()).trim();
 			List<CaseCardVm> laneCases = byStatus.getOrDefault(status.id(), List.of()).stream()
 					.sorted(laneSort)
@@ -1485,6 +1513,15 @@ public final class MyShaleController {
 			myCasesBoardList.getChildren().add(createMyCasesStatusLane(statusName, laneCases));
 			laneCount++;
 			cardCount += laneCases.size();
+		}
+		for (Map.Entry<Integer,List<CaseCardVm>> entry : byStatus.entrySet()) {
+			if (configuredStatusIds.contains(entry.getKey()) || entry.getValue().isEmpty()) continue;
+			List<CaseCardVm> laneCases=entry.getValue().stream().sorted(laneSort).toList();
+			String label=laneCases.stream().map(vm -> safe(vm.primaryStatusName)).filter(name -> !name.isBlank())
+					.findFirst().orElse("Status #" + entry.getKey());
+			myCasesBoardList.getChildren().add(createMyCasesStatusLane(label, laneCases));
+			laneCount++;
+			cardCount+=laneCases.size();
 		}
 		if (!noStatus.isEmpty()) {
 			List<CaseCardVm> sortedNoStatus = noStatus.stream()
