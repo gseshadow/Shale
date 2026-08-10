@@ -16,6 +16,7 @@ public enum CaseDateSemanticRole {
     CaseDateSemanticRole(String persistedKey) { this.persistedKey = persistedKey; }
 
     public String persistedKey() { return persistedKey; }
+    public String displayName() { return switch(this) { case INTAKE -> "Intake"; case STATUTE_OF_LIMITATIONS -> "Statute of Limitations"; case TORT_NOTICE_DEADLINE -> "Tort Notice Deadline"; }; }
 
     public static CaseDateSemanticRole require(String value) {
         String normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);

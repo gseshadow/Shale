@@ -19,7 +19,7 @@ public record EntityActionAuditEvent(
 		String source,
 		Map<MetadataKey, String> metadata) {
 
-	public enum EntityType { CASE, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER }
+	public enum EntityType { CASE, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CASE_DATE_ROLE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER }
 
 	public enum Action {
 		CREATED,
@@ -76,7 +76,9 @@ public record EntityActionAuditEvent(
 		FORM_KEY,
 		SECTION_COUNT,
 		CONFIGURED_FIELD_COUNT,
-		INITIAL_CREATION
+		INITIAL_CREATION,
+		SEMANTIC_ROLE,
+		CASE_DATE_TYPE_ID
 	}
 
 	private static final Set<String> PROHIBITED_KEY_FRAGMENTS = Set.of(
@@ -102,6 +104,7 @@ public record EntityActionAuditEvent(
 			case CASE_LINK -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.PRIMARY_SET || action == Action.REORDERED;
 			case CASE_LINK_SHARE -> action == Action.ADDED || action == Action.UPDATED || action == Action.REMOVED;
 			case CASE_DATE -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.ACTIVATED;
+			case CASE_DATE_ROLE_MAPPING -> action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.OVERRIDE_RESET;
 			case FORM_CONFIGURATION -> action == Action.CREATED || action == Action.UPDATED;
 			case MATERIAL_REQUEST -> action == Action.CREATED || action == Action.UPDATED || action == Action.STATUS_CHANGED || action == Action.FOLLOW_UP_ADDED || action == Action.LINKED || action == Action.DELETED;
 			case MATERIAL_REQUEST_FOLLOW_UP -> action == Action.CREATED || action == Action.FOLLOW_UP_ADDED;
