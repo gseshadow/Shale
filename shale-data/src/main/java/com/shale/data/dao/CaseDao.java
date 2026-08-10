@@ -2167,11 +2167,15 @@ public final class CaseDao {
 		String normalizedQuery = normalizeSearchQuery(query);
 		Set<Integer> effectiveStatusIds = selectedStatusIds == null ? Set.of() : new HashSet<>(selectedStatusIds);
 		boolean casesViewFiltered = restrictToUserId == null && (!normalizedQuery.isBlank() || !effectiveStatusIds.isEmpty());
+		long countStarted = System.nanoTime();
 		long total = knownTotal != null && knownTotal >= 0
 				? knownTotal
 				: (casesViewFiltered
 						? countForCasesView(normalizedQuery, effectiveStatusIds)
 						: countAll(includeClosedDenied, restrictToUserId));
+		PERF_LOG.info("PERF DAO phase operation=cases-page phase=count pageIndex={} pageSize={} sort={} queryCount={} elapsedMs={}",
+				page, pageSize, sort == null ? CaseSort.INTAKE_NEWEST : sort,
+				knownTotal != null && knownTotal >= 0 ? 0 : 1, (System.nanoTime() - countStarted) / 1_000_000);
 		if (total == 0) {
 			return new PagedResult<>(List.of(), page, pageSize, 0);
 		}
@@ -2196,9 +2200,9 @@ public final class CaseDao {
 				casesViewFilter.append("))");
 			}
 			String migratedDateSelect = authoritativeMigratedDates
-					? "migrated.IntakeDate AS CallerDate, migrated.StatuteDate AS StatuteOfLimitations, migrated.IncidentDate AS DateOfIncident, migrated.TortDate AS TortNoticeDeadline,"
+					? "CAST(NULL AS date) AS CallerDate, CAST(NULL AS date) AS StatuteOfLimitations, CAST(NULL AS date) AS DateOfIncident, CAST(NULL AS date) AS TortNoticeDeadline,"
 					: "c.CallerDate, c.StatuteOfLimitations, c.DateOfInjury AS DateOfIncident, c.TortNoticeDeadline,";
-			String migratedDateApply = authoritativeMigratedDates ? authoritativeCasesDateApplySql() : "";
+			String migratedDateApply = authoritativeMigratedDates ? authoritativeSortJoinSql(effectiveSort) : "";
 			String sql = """
 					SELECT
 					  c.Id,
@@ -2310,10 +2314,14 @@ public final class CaseDao {
 							migratedDateApply, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter + casesViewFilter,
 							orderByClause);
 
+			long pageStarted = System.nanoTime();
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int shaleClientId = requireCurrentShaleClientId(con);
 				int idx = 1;
 				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
+				if (authoritativeMigratedDates && requiresAuthoritativeDateSort(effectiveSort)) {
+					ps.setString(idx++, authoritativeSortSystemKey(effectiveSort));
+				}
 				ps.setInt(idx++, shaleClientId);
 				StringBuilder traceParams = new StringBuilder()
 						.append("raRoleId=").append(ROLE_RESPONSIBLE_ATTORNEY)
@@ -2364,6 +2372,8 @@ public final class CaseDao {
 					}
 				}
 			}
+			PERF_LOG.info("PERF DAO phase operation=cases-page phase=page-query pageIndex={} pageSize={} sort={} resultCount={} queryCount=1 elapsedMs={}",
+					page, pageSize, effectiveSort, out.size(), (System.nanoTime() - pageStarted) / 1_000_000);
 			System.out.println("[TRACE ASSIGNED_CASES][CaseDao.findPageInternal] "
 					+ "restrictToUserId=" + restrictToUserId
 					+ " resultCount=" + out.size()
@@ -2389,29 +2399,39 @@ public final class CaseDao {
 		return "%" + normalizedQuery + "%";
 	}
 
-	private static String authoritativeCasesDateApplySql() {
+	private static String authoritativeSortJoinSql(CaseSort sort) {
+		if (!requiresAuthoritativeDateSort(sort)) return "";
 		return """
-			OUTER APPLY (
-			  SELECT
-			    MAX(CASE WHEN type_key.SystemKey = 'intake' THEN cd.StartsAt END) AS IntakeDate,
-			    MAX(CASE WHEN type_key.SystemKey = 'date_of_injury' THEN cd.StartsAt END) AS IncidentDate,
-			    MAX(CASE WHEN type_key.SystemKey = 'statute_of_limitations' THEN cd.StartsAt END) AS StatuteDate,
-			    MAX(CASE WHEN type_key.SystemKey = 'tort_notice_deadline' THEN cd.StartsAt END) AS TortDate
+			LEFT JOIN (
+			  SELECT cd.ShaleClientId, cd.CaseId, MAX(cd.StartsAt) AS SortDate
 			  FROM dbo.CaseDates cd
-			  INNER JOIN dbo.CaseDateTypes type_key ON type_key.Id = cd.CaseDateTypeId
-			    AND (type_key.ShaleClientId = c.ShaleClientId OR type_key.ShaleClientId IS NULL)
-			  WHERE cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId AND cd.IsDeleted = 0
-			    AND type_key.SystemKey IN ('intake','date_of_injury','statute_of_limitations','tort_notice_deadline')
-			) migrated
+			  INNER JOIN dbo.CaseDateTypes stored_type ON stored_type.Id = cd.CaseDateTypeId
+			    AND (stored_type.ShaleClientId = cd.ShaleClientId OR stored_type.ShaleClientId IS NULL)
+			  WHERE cd.IsDeleted = 0 AND stored_type.SystemKey = ?
+			  GROUP BY cd.ShaleClientId, cd.CaseId
+			) migrated_sort ON migrated_sort.CaseId = c.Id AND migrated_sort.ShaleClientId = c.ShaleClientId
 			""";
+	}
+
+	private static boolean requiresAuthoritativeDateSort(CaseSort sort) {
+		return sort == CaseSort.INTAKE_OLDEST || sort == CaseSort.INTAKE_NEWEST
+				|| sort == CaseSort.STATUTE_SOONEST || sort == CaseSort.STATUTE_LATEST
+				|| sort == CaseSort.TORT_NOTICE_SOONEST;
+	}
+
+	private static String authoritativeSortSystemKey(CaseSort sort) {
+		if (sort == CaseSort.INTAKE_OLDEST || sort == CaseSort.INTAKE_NEWEST) return "intake";
+		if (sort == CaseSort.STATUTE_SOONEST || sort == CaseSort.STATUTE_LATEST) return "statute_of_limitations";
+		if (sort == CaseSort.TORT_NOTICE_SOONEST) return "tort_notice_deadline";
+		throw new IllegalArgumentException("Sort does not require an authoritative Case Date");
 	}
 
 	private static String orderByClauseFor(CaseSort sort, boolean authoritativeMigratedDates) {
 		return switch (sort) {
-		case INTAKE_OLDEST -> (authoritativeMigratedDates ? "migrated.IntakeDate" : "c.CallerDate") + " ASC, c.Id ASC";
-		case STATUTE_SOONEST -> (authoritativeMigratedDates ? "migrated.StatuteDate" : "c.StatuteOfLimitations") + " ASC, c.Id ASC";
-		case STATUTE_LATEST -> (authoritativeMigratedDates ? "migrated.StatuteDate" : "c.StatuteOfLimitations") + " DESC, c.Id DESC";
-		case TORT_NOTICE_SOONEST -> (authoritativeMigratedDates ? "migrated.TortDate" : "c.TortNoticeDeadline") + " ASC, c.Id ASC";
+		case INTAKE_OLDEST -> (authoritativeMigratedDates ? "migrated_sort.SortDate" : "c.CallerDate") + " ASC, c.Id ASC";
+		case STATUTE_SOONEST -> (authoritativeMigratedDates ? "migrated_sort.SortDate" : "c.StatuteOfLimitations") + " ASC, c.Id ASC";
+		case STATUTE_LATEST -> (authoritativeMigratedDates ? "migrated_sort.SortDate" : "c.StatuteOfLimitations") + " DESC, c.Id DESC";
+		case TORT_NOTICE_SOONEST -> (authoritativeMigratedDates ? "migrated_sort.SortDate" : "c.TortNoticeDeadline") + " ASC, c.Id ASC";
 		case UPDATED_OLDEST -> "c.UpdatedAt ASC, c.Id ASC";
 		case UPDATED_NEWEST -> "c.UpdatedAt DESC, c.Id DESC";
 		case CASE_NAME_ASC -> "c.Name ASC, c.Id ASC";
@@ -2420,7 +2440,7 @@ public final class CaseDao {
 		case RESPONSIBLE_ATTORNEY_DESC -> "ResponsibleAttorneyName DESC, c.Id DESC";
 		case CASE_STATUS_ASC -> "CurrentStatusName ASC, c.Id ASC";
 		case CASE_STATUS_DESC -> "CurrentStatusName DESC, c.Id DESC";
-		case INTAKE_NEWEST -> (authoritativeMigratedDates ? "migrated.IntakeDate" : "c.CallerDate") + " DESC, c.Id DESC";
+		case INTAKE_NEWEST -> (authoritativeMigratedDates ? "migrated_sort.SortDate" : "c.CallerDate") + " DESC, c.Id DESC";
 		};
 	}
 
@@ -2448,7 +2468,6 @@ public final class CaseDao {
 			StringBuilder sql = new StringBuilder("""
 					SELECT COUNT(1)
 					FROM %s c
-					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
 					OUTER APPLY (
 					    SELECT TOP (1) s.Id AS PrimaryStatusId
 					    FROM %s cs
@@ -2506,22 +2525,10 @@ public final class CaseDao {
 			String sql = """
 					SELECT COUNT(1)
 					FROM %s c
-					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
-					OUTER APPLY (
-					    SELECT TOP (1) s.Name AS CurrentStatusName
-					    FROM %s cs
-					    INNER JOIN %s s ON s.Id = cs.StatusId
-					    WHERE cs.CaseId = c.Id
-					    ORDER BY
-					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-					      cs.UpdatedAt DESC,
-					      cs.CreatedAt DESC,
-					      cs.Id DESC
-					) current_status
 					WHERE %s
 					  AND c.ShaleClientId = ?
 					  %s;
-					""".formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter);
+					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter);
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int shaleClientId = requireCurrentShaleClientId(con);

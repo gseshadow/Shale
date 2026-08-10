@@ -20,6 +20,9 @@ final class CasesMigratedDateCutoverContractTest {
         assertTrue(source.contains("toViewModel(CaseDao.CaseRow row, MigratedCaseDateProjectionDto projection)"));
         assertTrue(source.contains("slot.present() ? slot.startsAt().toLocalDate() : null"));
         assertTrue(source.contains("caseCardFactory.create(new CaseCardModel"));
+        assertTrue(source.contains("if (!statusFilterWillLoad) loadFirstPage()"),
+                "Status hydration and fallback startup must not both load page zero");
+        assertTrue(source.contains("reloadStatusFilterOptionsAndThen(this::loadFirstPage)"));
     }
 
     @Test void caseDatesInvalidationIsTenantSafeDeduplicatedAndCoalesced() throws Exception {
