@@ -117,6 +117,8 @@ public final class CaseDao {
 		public static final String MEDICAL_LITERATURE_CHANGED = "MEDICAL_LITERATURE_CHANGED";
 		public static final String DENIED_CHRONOLOGY_CHANGED = "DENIED_CHRONOLOGY_CHANGED";
 		public static final String RECEIVED_UPDATES_CHANGED = "RECEIVED_UPDATES_CHANGED";
+		public static final String CASE_DELETED = "CASE_DELETED";
+		public static final String CASE_RESTORED = "CASE_RESTORED";
 
 		private static final Set<String> ALLOWED = Set.of(
 				CASE_CREATED,
@@ -157,7 +159,9 @@ public final class CaseDao {
 				TESTIFYING_EXPERT_SEARCH_CHANGED,
 				MEDICAL_LITERATURE_CHANGED,
 				DENIED_CHRONOLOGY_CHANGED,
-				RECEIVED_UPDATES_CHANGED
+				RECEIVED_UPDATES_CHANGED,
+				CASE_DELETED,
+				CASE_RESTORED
 		);
 
 		private CaseTimelineEventTypes() {
@@ -3313,10 +3317,13 @@ public final class CaseDao {
 		}
 
 		try (Connection con = db.requireConnection()) {
+			con.setAutoCommit(false);
+			try {
 			int currentShaleClientId = requireCurrentShaleClientId(con);
 			if (shaleClientId.intValue() != currentShaleClientId) {
 				throw new IllegalArgumentException("shaleClientId does not match current session");
 			}
+			int actorUserId = requireCurrentPrincipalUserId(con, currentShaleClientId);
 
 			CaseSchema schema = resolveCaseSchema(con);
 			if (schema.deletedColumn() == null || schema.deletedColumn().isBlank()) {
@@ -3333,18 +3340,50 @@ public final class CaseDao {
 					    UpdatedAt = SYSUTCDATETIME()
 					WHERE Id = ?
 					  AND ShaleClientId = ?
-					  AND %s;
+					  AND %s
+					  AND RowVer = ?;
 					""".formatted(CASES_TABLE, schema.deletedColumn(), desiredStateFilter);
+			byte[] expectedRowVer = selectCaseRowVer(con, caseId, currentShaleClientId, desiredStateFilter);
+			if (expectedRowVer == null) { con.rollback(); return false; }
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				ps.setInt(1, deleted ? 1 : 0);
 				ps.setLong(2, caseId);
 				ps.setInt(3, shaleClientId);
-				return ps.executeUpdate() > 0;
+				ps.setBytes(4, expectedRowVer);
+				if (ps.executeUpdate() != 1) { con.rollback(); return false; }
 			}
+			java.time.Instant occurredAt = java.time.Instant.now();
+			EntityActionAuditEvent.Action action = deleted ? EntityActionAuditEvent.Action.DELETED : EntityActionAuditEvent.Action.RESTORED;
+			entityActionAuditDao.append(con, new EntityActionAuditEvent(0, currentShaleClientId, actorUserId,
+					EntityActionAuditEvent.EntityType.CASE, caseId, action, occurredAt, null, null, null,
+					"SHALE_DESKTOP", Map.of(EntityActionAuditEvent.MetadataKey.CASE_ID, Long.toString(caseId))));
+			insertLifecycleTimelineEvent(con, caseId, currentShaleClientId, actorUserId, deleted, occurredAt);
+			con.commit();
+			return true;
+			} catch (RuntimeException | SQLException e) { con.rollback(); throw e; }
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to " + (deleted ? "soft delete" : "restore") + " case (id=" + caseId + ")", e);
 		}
+	}
+
+	private static byte[] selectCaseRowVer(Connection con, long caseId, int tenant, String stateFilter) throws SQLException {
+		String sql = "SELECT RowVer FROM dbo.Cases WHERE Id=? AND ShaleClientId=? AND " + stateFilter;
+		try (PreparedStatement ps = con.prepareStatement(sql)) { ps.setLong(1, caseId); ps.setInt(2, tenant);
+			try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getBytes(1) : null; } }
+	}
+
+	private static int requireCurrentPrincipalUserId(Connection con, int tenant) throws SQLException {
+		String sql = "SELECT u.Id FROM dbo.Users u WHERE u.Id=CAST(SESSION_CONTEXT(N'PrincipalUserId') AS INT) AND u.ShaleClientId=? AND ISNULL(u.is_deleted,0)=0";
+		try (PreparedStatement ps = con.prepareStatement(sql)) { ps.setInt(1, tenant);
+			try (ResultSet rs = ps.executeQuery()) { if (!rs.next()) throw new SecurityException("Authenticated user is unavailable for this tenant."); return rs.getInt(1); } }
+	}
+
+	private static void insertLifecycleTimelineEvent(Connection con, long caseId, int tenant, int actor, boolean deleted, java.time.Instant at) throws SQLException {
+		String sql = "INSERT INTO dbo.CaseTimelineEvents (CaseId,ShaleClientId,EventType,OccurredAt,ActorUserId,Title,Body) VALUES (?,?,?,?,?,?,NULL)";
+		try (PreparedStatement ps = con.prepareStatement(sql)) { ps.setLong(1,caseId); ps.setInt(2,tenant);
+			ps.setString(3, deleted ? CaseTimelineEventTypes.CASE_DELETED : CaseTimelineEventTypes.CASE_RESTORED);
+			ps.setTimestamp(4, Timestamp.from(at)); ps.setInt(5,actor); ps.setString(6, deleted ? "Case deleted" : "Case restored"); ps.executeUpdate(); }
 	}
 
 	public List<RecentCaseUpdateActivityDto> listRecentCaseUpdatesForAssignedCases(int assignedUserId, int shaleClientId, int limit) {

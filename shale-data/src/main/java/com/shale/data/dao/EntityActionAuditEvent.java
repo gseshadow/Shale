@@ -19,7 +19,7 @@ public record EntityActionAuditEvent(
 		String source,
 		Map<MetadataKey, String> metadata) {
 
-	public enum EntityType { LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER }
+	public enum EntityType { CASE, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER }
 
 	public enum Action {
 		CREATED,
@@ -38,7 +38,8 @@ public record EntityActionAuditEvent(
 		LINKED,
 		UNLINKED,
 		LOCATION_UPDATED,
-		RELEASED
+		RELEASED,
+		RESTORED
 	}
 
 	public enum MetadataKey {
@@ -96,6 +97,7 @@ public record EntityActionAuditEvent(
 
 	private static boolean isAllowedCombination(EntityType entityType, Action action) {
 		return switch (entityType) {
+			case CASE -> action == Action.DELETED || action == Action.RESTORED;
 			case LINK_TYPE, MATERIAL_TYPE -> action == Action.CREATED || action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.OVERRIDE_RESET || action == Action.DELETED || action == Action.REMOVED;
 			case CASE_LINK -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.PRIMARY_SET || action == Action.REORDERED;
 			case CASE_LINK_SHARE -> action == Action.ADDED || action == Action.UPDATED || action == Action.REMOVED;
