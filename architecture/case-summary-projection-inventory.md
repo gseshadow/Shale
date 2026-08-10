@@ -1,0 +1,32 @@
+# Authoritative Case summary projection and compatibility inventory
+
+This note records the discovery performed before introducing `CaseSummaryProjection`. The first phase adds the shared read boundary without removing or rerouting legacy consumers.
+
+## Authoritative boundary
+
+`CaseSummaryDao.list(tenant, deletedState, order)` is a single-statement, PHI-minimized read. It first compares the requested tenant with `SESSION_CONTEXT(N'ShaleClientId')`, then also predicates `Cases.ShaleClientId`. A missing or conflicting context fails. Deleted state and ordering are required enums, never implicit defaults.
+
+Each optional one-to-many relationship is selected by `OUTER APPLY TOP (1)`, so a Case remains present and malformed legacy primaries cannot multiply rows. Current status candidates must have `CaseStatuses.EndDate IS NULL`; selection is primary first, then effective date, update/create timestamps, and row ID descending. Status definitions must be global or owned by the Case tenant. Responsible attorney (role 4) and primary legal assistant (role 11) are selected by `CaseUsers.RoleId`, preferring `IsPrimary`, then update/create timestamps and row ID descending; this preserves an assignment when malformed legacy data has no primary flag. User display hydration additionally requires the Case tenant, while the selected authoritative user ID is retained even if display hydration is unavailable.
+
+The projection contains: Case ID, tenant ID, Case number/name; status ID, `SystemKey`, `LifecycleKey`, name/color; Practice Area ID/name; responsible-attorney ID/name/color; primary-legal-assistant ID/name/color; created/updated timestamps; and deleted state. It intentionally excludes descriptions, summaries, updates, notes, parties/contact details, medical data, deadlines, and `RowVer`. Intake and other Case Dates remain outside this projection until the shared query can consume the authoritative `CaseDates` semantic-role boundary rather than legacy `Cases` convenience dates.
+
+## Existing consumer inventory
+
+| Consumer | Existing method/query | Consumed fields | Filters/order | Projection fit / intentionally separate data |
+|---|---|---|---|---|
+| Cases list/grid | `CaseDao.findCasesViewPage` / `findPageInternal` | Case name; current status; Practice Area color; responsible attorney; migrated Case Dates; client/opponents; latest update; description; non-engagement flag | active by default; optional closed/denied, text and status filters; all `CaseSort` orders; paging | Identity/status/assignment fit. Migrated dates, party names, update, description, non-engagement and paging/filter policy stay consumer-specific. Deferred to avoid behavior change. |
+| Case board | `CaseDao.listAssignedCasesForBoard` | `CaseRow` card data including status, attorney, dates, parties, update and description | active only; assigned-user membership; status/date order | Core fields fit; membership, card enrichment and lane behavior remain separate. Deferred. |
+| Cases export | `CaseDao.listCasesViewForExport`, then `CaseExportService` batch Case Date projection | grid fields plus authoritative migrated dates | same grid criteria/order; 500-row pages | Core fields fit; export shape and dates remain separate. Deferred. |
+| Search | `CaseDao.searchCasesByName` | rich `CaseRow` card data | active; name `LIKE`; updated descending, limited | Core fields fit; ranking/search filter and rich card enrichment remain separate. Deferred. |
+| Deleted Cases | `CaseDao.searchDeletedCasesByName` | rich `CaseRow` card data | deleted only; name `LIKE`; updated descending, limited | Explicit `DELETED` mode fits lifecycle; restore UI/card enrichment remains separate. Deferred. |
+| MyShale paging | `CaseDao.findMyCasesPage` | `CaseRow` | active by default; any `CaseUsers` membership; legacy date compatibility; caller-selected sort | Core fields fit; membership and compatibility date behavior remain separate. Deferred. |
+| MyShale/user detail assigned cases | `CaseDao.listActiveCasesForUserTeamMember`, `UserDetailService.loadAssignedCases` | rich card data | active; any `CaseUsers` membership; intake/id descending; limit | Core fields fit; membership, limits and card enrichment remain separate. Deferred. |
+| Contact related Cases | `ContactDao.findRelatedCases` | local `RelatedCaseRow`: ID/name, party role/side, status, responsible attorney | contact and tenant; active contact/case relationships; name order | Case core fits; relationship role/side remains in Contact query. Deferred. |
+| Organization related Cases | `OrganizationDao.findRelatedCases` | local `RelatedCaseRow`: ID/name, party role/side, status, responsible attorney | organization; active relationships; name order | Case core fits; organization relationship metadata remains outside. Deferred. |
+| Reports | `CaseDao.listCaseStatusReport`, `listCaseStatusReportCases` | status identity/display/counts and report detail rows | active; current effective status; status/date filters; status sort order | Status core fits; aggregation, report dates and detailed report columns remain separate. Deferred. |
+
+## Conflicts found
+
+Status selection was not uniform: several card queries prefer `IsPrimary` and recency even when a row has ended, while report and newer queries require `EndDate IS NULL` and use `EffectiveDate`. Assignment queries consistently use IDs and role 4, but some require `IsPrimary = 1`, some admit any team membership for filtering, and older calendar SQL still contains role 1. Date authority also differs: the Cases grid/export use migrated `CaseDates`, while MyShale deliberately retains legacy `Cases` date compatibility. Rich `CaseRow` queries repeatedly join Practice Areas and independently apply status, assignment, party, update, contact, and organization enrichment. Those joins also caused each query to carry its own deletion and tenant details.
+
+No representative UI consumer is converted in this phase: the main grid's paging, full sorting matrix, migrated dates, and PHI-heavy card enrichments cannot be replaced surgically by the deliberately small projection. Keeping all existing entry points unchanged is the safer proof of the new boundary; a later phase can compose consumer-specific enrichment around this projection.

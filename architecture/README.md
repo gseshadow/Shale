@@ -10,3 +10,4 @@ Supporting documents:
 - tenancy-and-rls.md
 - system-overview.md
 - live-update-architecture.md
+- case-summary-projection-inventory.md
