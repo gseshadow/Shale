@@ -56,7 +56,7 @@ final class CasesMigratedDateCutoverContractTest {
     @Test void loadTimingWrapsExistingBoundariesWithoutSchedulingWork() throws Exception {
         String source = read("src/main/java/com/shale/ui/controller/CasesController.java");
         assertTrue(source.contains("boundary=defaults-finalized"));
-        assertTrue(source.contains("boundary=initial-load-scheduled"));
+        assertTrue(source.contains("boundary=status-filter-load-pending"));
         assertTrue(source.contains("boundary=background-dao-start"));
         assertTrue(source.contains("boundary=dao-complete"));
         assertTrue(source.contains("phase=projection-hydration"));
@@ -66,4 +66,15 @@ final class CasesMigratedDateCutoverContractTest {
                 < source.indexOf("loaded.addAll(newItems)"), "stale loads must still be rejected before apply");
         assertFalse(source.contains("PerfLog.log(\"CTRL\", \"start\", \"search="));
     }
+
+	@Test void initialLoadWaitsForStatusOptionsAndThenRunsExactlyFromCompletionBoundary() throws Exception {
+		String source = read("src/main/java/com/shale/ui/controller/CasesController.java");
+		String startup = source.substring(source.indexOf("Platform.runLater(() ->"),
+				source.indexOf("if (casesFlow != null)", source.indexOf("Platform.runLater(() ->")));
+		assertFalse(startup.contains("loadFirstPage()"), "startup must not query before status modes are known");
+		String reload = source.substring(source.indexOf("private void reloadStatusFilterOptionsAndThen"),
+				source.indexOf("private boolean matchesSelectedStatus"));
+		assertEquals(2, reload.split("onLoaded\\.run\\(\\);", -1).length - 1,
+				"both unavailable and successfully loaded status-option paths must release the initial load");
+	}
 }

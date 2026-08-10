@@ -246,9 +246,7 @@ public final class CasesController {
 				return;
 			}
 			wireInfiniteScroll();
-			PerfLog.logDone("CTRL", "operation=cases-load boundary=initial-load-scheduled loadGeneration="
-					+ (loadGeneration + 1) + " pageIndex=0", controllerCreatedNanos);
-			loadFirstPage();
+			PerfLog.logDone("CTRL", "operation=cases-load boundary=status-filter-load-pending", controllerCreatedNanos);
 		});
 		if (casesFlow != null) {
 			casesFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -1096,6 +1094,7 @@ public final class CasesController {
 			statusFilterOptions = List.of();
 			selectedStatusIds.clear();
 			CaseListUiSupport.initializeStatusFilterMenu(statusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+			onLoaded.run();
 			return;
 		}
 
@@ -1124,6 +1123,7 @@ public final class CasesController {
 				}
 				statusFilterOptions = options;
 				CaseListUiSupport.initializeStatusFilterMenu(statusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+				onLoaded.run();
 			});
 		});
 	}

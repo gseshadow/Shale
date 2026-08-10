@@ -67,3 +67,11 @@ retaining Cases without a current status), and clearing every status means **no 
 the same predicate builder and bind status IDs only in `SELECTED` mode. This corrects the initial
 cutover regression where the default 11-of-11 selection was incorrectly emitted as a restrictive
 `IN` predicate, allowing a successful count of zero to be rendered as a legitimate empty table.
+
+The follow-up lifecycle correction makes status-option initialization the sole release point for the
+first page load. Previously, the FXML startup `runLater` queried while the asynchronous status options
+were still empty, which translated to `NO_STATUS`. The options callback later selected 11-of-11 and
+the independent results-count refresh correctly reported the unrestricted 1,172 total, but it never
+invoked the supplied `loadFirstPage` callback; consequently the table retained the earlier successful
+zero-row page. Both status-option completion paths now invoke that callback, and the unconditional
+pre-option page request has been removed.
