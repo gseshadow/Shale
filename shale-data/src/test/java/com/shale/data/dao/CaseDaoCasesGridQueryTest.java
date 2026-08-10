@@ -56,11 +56,11 @@ final class CaseDaoCasesGridQueryTest {
         String boundaryDate = source.substring(source.indexOf("private static String authoritativeBoundaryDateApplySql"),
                 source.indexOf("private static boolean requiresAuthoritativeDateSort"));
         assertTrue(boundaryDate.contains("MAX(cd.StartsAt) AS SortDate"));
-        assertTrue(boundaryDate.contains("stored_type.SystemKey = ?"));
+        assertTrue(boundaryDate.contains("role_mapping.SemanticRoleKey=?"));
         assertTrue(boundaryDate.contains("cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId"));
         assertFalse(boundaryDate.contains("c.CallerDate"));
         assertFalse(boundaryDate.contains("c.StatuteOfLimitations"));
-        assertTrue(source.contains("authoritativeSortSystemKey(effectiveSort)"));
+        assertTrue(source.contains("authoritativeSortSemanticRole(effectiveSort)"));
         assertTrue(source.contains("boundary_date.SortDate\" : \"c.CallerDate"));
         assertTrue(source.contains("boundary_date.SortDate\" : \"c.StatuteOfLimitations"));
     }

@@ -12,6 +12,38 @@ The existing-case JavaFX fixed-date inline path now owns a coherent, hidden nine
 
 ## Ownership model
 
+### Protected semantic roles (Phase 1)
+
+A **Case Date Type** is the persisted display/selection definition (label, color,
+category, ordering and time support). A **semantic role** is a small protected
+application meaning. They are deliberately separate: application behavior resolves
+`INTAKE`, `STATUTE_OF_LIMITATIONS`, or `TORT_NOTICE_DEADLINE`, then obtains display
+metadata from the resolved `CaseDateTypes` row. It never infers behavior from a name,
+card position, sort order, or Java enum ordinal.
+
+`CaseDateSemanticRoles` is the stable role vocabulary and
+`CaseDateTypeSemanticRoleMappings` is the tenant-or-global association. The mapping
+table is safer than a nullable role column on `CaseDateTypes`: mapping lifecycle and
+tenant ownership are independent from mutable type presentation, compatibility rows
+can remain global anchors, and a future tenant type can assume a role without making
+all of its presentation globally immutable. A bare `SystemKey` remains a technical
+overlay identity; it does not make a type a universal built-in or protected template.
+
+Resolution is tenant-scoped and rejects zero or multiple eligible mappings. One valid,
+active, non-deleted tenant mapping wins; otherwise the valid global compatibility
+mapping is used. Its type must also be active, non-deleted, and global or owned by the
+authenticated tenant. Cross-tenant mappings never qualify. Historical occurrence
+reads remain based on their stored `CaseDateTypeId` and retain the existing historical
+presentation fallback even if that type later becomes ineligible for new selection.
+
+The initial global compatibility mappings are `intake` → `INTAKE`,
+`statute_of_limitations` → `STATUTE_OF_LIMITATIONS`, and
+`tort_notice_deadline` → `TORT_NOTICE_DEADLINE`. The migration validates and maps the
+existing rows without changing their ids, keys, metadata, occurrences, or form-field
+references. Existing global mutation protection is unchanged. Starter templates,
+tenant ownership conversion, tenant mapping administration, and classification of
+firm-specific types are explicitly deferred to a later migration.
+
 * `CaseDateTypes` defines customizable authoritative case-date meanings using Shale's global/tenant overlay lookup pattern.
 * `CaseDates` stores case-owned occurrences for those meanings and allows multiple occurrences of the same type on one case.
 * `CalendarEvents` remains the store for manually created user/calendar events.
