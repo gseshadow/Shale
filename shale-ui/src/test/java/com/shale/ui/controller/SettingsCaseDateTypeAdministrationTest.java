@@ -24,6 +24,11 @@ final class SettingsCaseDateTypeAdministrationTest {
         assertTrue(SOURCE.contains("configureRequestActionRow(caseDateTypeActionRow"));
         assertTrue(SOURCE.contains("AppDialogs.showConfirmation"));
         assertFalse(SOURCE.contains("new CaseDateDao"));
+        assertTrue(SOURCE.contains("protectedType()?\"Protected system type\":\"Custom type\""));
+        assertTrue(SOURCE.contains("edit.setDisable(row.protectedType())"));
+        assertTrue(SOURCE.contains("toggle.setDisable(row.protectedType())"));
+        assertTrue(SOURCE.contains("selected.id(),selected.rowVer()"));
+        assertTrue(SOURCE.contains("publishCaseDateTypeChanged"));
     }
     @Test void overlayRowsBuildLikeOtherSettingsManagers(){
         var global = new EffectiveCaseDateTypeDto(1,null,"trial","Trial",null,"TRIAL","#111111",true,10,true,false,EffectiveCaseDateTypeDto.Origin.GLOBAL,new byte[]{1});
@@ -33,5 +38,7 @@ final class SettingsCaseDateTypeAdministrationTest {
         assertEquals(List.of("Custom", "Trial Tenant"), rows.stream().map(SettingsController.CaseDateTypeViewRow::name).sorted().toList());
         assertTrue(rows.stream().anyMatch(r -> r.scopeLabel().equals("Tenant override")));
         assertTrue(rows.stream().anyMatch(r -> r.scopeLabel().equals("Tenant custom")));
+        assertTrue(rows.stream().filter(r -> r.scopeLabel().equals("Tenant override")).allMatch(SettingsController.CaseDateTypeViewRow::protectedType));
+        assertTrue(rows.stream().filter(SettingsController.CaseDateTypeViewRow::custom).noneMatch(SettingsController.CaseDateTypeViewRow::protectedType));
     }
 }
