@@ -29,34 +29,69 @@ final class CaseDaoCasesGridQueryTest {
     }
 
     @Test
-    void casesGridUsesAuthoritativeCaseDatesForDisplaySortingAndPaging() throws Exception {
+    void casesGridEstablishesTheGlobalBoundaryBeforeDisplayEnrichment() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
         String method = source.substring(source.indexOf("private PagedResult<CaseRow> findPageInternal"),
                 source.indexOf("private static String normalizeSearchQuery"));
-        assertTrue(method.contains("authoritativeCasesDateApplySql()"));
-        assertTrue(method.contains("migrated.IntakeDate AS CallerDate"));
-        assertTrue(method.contains("migrated.StatuteDate AS StatuteOfLimitations"));
-        assertTrue(method.contains("migrated.IncidentDate AS DateOfIncident"));
-        assertTrue(method.contains("migrated.TortDate AS TortNoticeDeadline"));
-        assertTrue(source.contains("authoritativeMigratedDates ? \"migrated.IntakeDate\""));
-        assertTrue(source.contains("authoritativeMigratedDates ? \"migrated.StatuteDate\""));
-        assertTrue(source.contains("OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"));
-        assertTrue(source.contains("dbo.CaseDates cd"));
-        assertTrue(source.contains("type_key.SystemKey IN ('intake','date_of_injury','statute_of_limitations','tort_notice_deadline')"));
+
+        int boundary = method.indexOf("WITH OrderedPage AS");
+        int offset = method.indexOf("OFFSET ? ROWS FETCH NEXT ? ROWS ONLY");
+        int hydration = method.indexOf("FROM OrderedPage page");
+        assertTrue(boundary >= 0 && boundary < offset && offset < hydration);
+        assertTrue(method.contains("ROW_NUMBER() OVER (ORDER BY %s) AS PageOrdinal"));
+        assertTrue(method.contains("ORDER BY page.PageOrdinal"), "The hydration join must explicitly retain global order");
+        assertTrue(method.contains("INNER JOIN %s c ON c.Id = page.CaseId AND c.ShaleClientId = page.ShaleClientId"));
+
+        String orderedStage = method.substring(boundary, hydration);
+        assertFalse(orderedStage.contains("dbo.CaseParties"));
+        assertFalse(orderedStage.contains("dbo.CaseUpdates"));
+        assertFalse(orderedStage.contains("PracticeAreas"));
+        assertTrue(method.indexOf("FROM dbo.CaseUpdates cu") > hydration);
+        assertTrue(method.indexOf("FROM dbo.CaseParties cp") > hydration);
     }
 
     @Test
-    void phaseTimingLeavesTheRestoredAuthoritativeSqlBoundaryIntact() throws Exception {
+    void authoritativeDateSortIsGlobalParameterizedAndHasNoLegacyFallback() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String boundaryDate = source.substring(source.indexOf("private static String authoritativeBoundaryDateApplySql"),
+                source.indexOf("private static boolean requiresAuthoritativeDateSort"));
+        assertTrue(boundaryDate.contains("MAX(cd.StartsAt) AS SortDate"));
+        assertTrue(boundaryDate.contains("stored_type.SystemKey = ?"));
+        assertTrue(boundaryDate.contains("cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId"));
+        assertFalse(boundaryDate.contains("c.CallerDate"));
+        assertFalse(boundaryDate.contains("c.StatuteOfLimitations"));
+        assertTrue(source.contains("authoritativeSortSystemKey(effectiveSort)"));
+        assertTrue(source.contains("boundary_date.SortDate\" : \"c.CallerDate"));
+        assertTrue(source.contains("boundary_date.SortDate\" : \"c.StatuteOfLimitations"));
+    }
+
+    @Test
+    void allSortFamiliesUseTheSameBoundedQueryContract() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String ordering = source.substring(source.indexOf("private static String boundaryOrderByClauseFor"),
+                source.indexOf("public long countAll()"));
+        for (String sort : new String[] { "INTAKE_OLDEST", "INTAKE_NEWEST", "STATUTE_SOONEST",
+                "STATUTE_LATEST", "TORT_NOTICE_SOONEST", "UPDATED_OLDEST", "UPDATED_NEWEST",
+                "CASE_NAME_ASC", "CASE_NAME_DESC", "RESPONSIBLE_ATTORNEY_ASC",
+                "RESPONSIBLE_ATTORNEY_DESC", "CASE_STATUS_ASC", "CASE_STATUS_DESC" }) {
+            assertTrue(ordering.contains("case " + sort), sort + " must retain an explicit global order");
+        }
+        assertTrue(ordering.contains("c.Id ASC"));
+        assertTrue(ordering.contains("c.Id DESC"));
+        assertTrue(source.contains("if (boundaryNeedsAuthoritativeDate)"));
+        assertFalse(source.contains("type_key.SystemKey IN ('intake','date_of_injury','statute_of_limitations','tort_notice_deadline')"));
+    }
+
+    @Test
+    void timingAndQueryCountRemainPhiSafeAndSingleStatement() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
         String method = source.substring(source.indexOf("private PagedResult<CaseRow> findPageInternal"),
                 source.indexOf("private static String normalizeSearchQuery"));
         assertTrue(method.contains("phase=total-count"));
         assertTrue(method.contains("phase=session-setup"));
         assertTrue(method.contains("phase=page-row-query"));
-        assertTrue(method.contains("authoritativeCasesDateApplySql()"));
-        assertTrue(method.contains("orderByClauseFor(effectiveSort, authoritativeMigratedDates)"));
-        assertTrue(method.contains("OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"));
-        assertFalse(method.contains("authoritativeSortJoinSql"), "reverted grouped sorting must stay absent");
+        assertEquals(1, method.lines().filter(line -> line.contains("ps.executeQuery()")).count());
+        assertTrue(method.contains("1 + (totalCached ? 0 : 1)"));
     }
 
     @Test
