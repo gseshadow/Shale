@@ -139,6 +139,51 @@ Case Dates invalidations remain PHI-free. The main Calendar feed now observes sa
 
 Remaining production legacy readers outside Calendar are deliberately deferred: `CaseDao` list/grid/search/report/export compatibility queries and legacy-shaped detail boundaries; `OrganizationDao` and `ContactDao` related-case summaries; shared `CaseDetailDto`/`CaseOverviewDto` compatibility properties; case cards; server API responses; and web models/views. Remaining normal migrated-field writers outside Calendar are the deferred legacy-shaped case update/API/web compatibility paths identified above; configurable Intake and configured New Intake are already cut over and do not write them. Migration/validation SQL and historical PHI registry names remain compatibility evidence rather than runtime Calendar dependencies. The next gate is one shared authoritative date projection for lists, boards, search, MyShale, reports, and exports, followed by conversion of their complete concurrency-aware write round trips.
 
+## Shared list projection foundation (2026-08-10)
+
+The approved boundary for later list-style conversions is
+`CaseServicePort.projectMigratedCaseDates(Collection<Long>, tenant, actor)`. Its immutable core DTO is
+`MigratedCaseDateProjectionDto`, the data adapter delegates through `CaseServiceAdapter`, and the sole
+persistence implementation is `CaseDateDao.projectMigratedCaseDates`. Consumers therefore need no DAO,
+JDBC, JavaFX, report, export, spreadsheet, API, or web-serialization dependency. This extends the existing
+Case Dates service/adapter/DAO structure and reuses `MigratedCaseDateKey`; it is not a competing date domain
+or a replacement for the generic occurrence APIs used by Dates, Calendar, and configurable Intake.
+
+The projection always contains nine slots for each returned authoritative `CaseId`: `intake`,
+`date_of_injury`, `date_of_medical_negligence`, `date_medical_negligence_discovered`,
+`statute_of_limitations`, `tort_notice_deadline`, `discovery_deadline`, `fee_agreement_signed`, and
+`non_engagement_letter_sent`. Identity is the stable stored/effective `SystemKey`, never a display label.
+Each slot explicitly distinguishes presence from absence. A present intake retains its complete
+`LocalDateTime` and stored `AllDay` value; the other eight accept only their established all-day shape.
+Flags do not manufacture occurrences. No slot is read from or falls back to a migrated `dbo.Cases` column.
+
+The DTO intentionally excludes occurrence ids, type ids, row versions, and expected-absence witnesses:
+list consumers cannot edit, and those values would unnecessarily duplicate the established
+`CompatibilityCaseDateState`/aggregate optimistic-concurrency contract used by Case View. The existing edit
+snapshot continues to carry occurrence identity and `CaseDates.RowVer` for present slots and the observed
+case row version for expected absence. The shared projection performs no write to `CaseDates`, `Cases`, or
+`CalendarEvents` and introduces no write path.
+
+The DAO de-duplicates positive requested ids while preserving first-request order, safely ignores null and
+non-positive ids, and returns only cases visible through the authenticated SQL session tenant. An unavailable,
+unknown, or cross-tenant id is omitted, so absence/presence cannot reveal another tenant's case. Existing
+cases with no active occurrences receive a coherent nine-slot empty projection. Input is partitioned into
+500-id chunks, leaving ample room below SQL Server's 2,100-parameter limit; each chunk uses one set-oriented
+Case/CaseDates/type query, with one tenant-session validation and one actor validation per boundary call,
+never one query per case or hidden type lookup. Duplicate active occurrences for a migrated singleton are an
+explicit conflict rather than being collapsed by label or date.
+
+Stored type identity is retained even when that type is inactive or soft-deleted. Active effective
+tenant/global overlays supply the canonical `SystemKey` when available, using tenant-first resolution; the
+stored historical type key is the fallback when no active overlay exists. Tenant joins cover cases,
+occurrences, and stored types, while SQL `SESSION_CONTEXT` remains authoritative and must match the supplied
+tenant argument. This matches the completed Case View and Calendar historical/effective-type behavior.
+
+No broad consumer conversion occurred in this slice. `CaseDao` grid/board/search/deleted/MyShale/report/export
+queries, related-case queries in `ContactDao` and `OrganizationDao`, case cards, server/API/web models, and
+legacy-shaped shared DTO fields are intentionally not converted or classified as converted. The next gate is
+Cases grid, board, and export conversion using this boundary; later screens should follow independently.
+
 1. **Freeze the contract.** Add one shared, immutable mapping of the nine canonical SystemKeys. Reject `medical_negligence_discovered` at every stable-key boundary. Do not modify Phase 1A seed/category data.
 2. **Build tenant-safe read projection.** In `CaseDateDao`, load mapped occurrences set-wise by `(ShaleClientId, CaseId)` and resolve presentation by stable SystemKey using the established tenant override/global fallback rules. Active occurrences remain the runtime value; historical type fallback remains available for display. Treat multiple active occurrences for a mapped singleton key as an explicit conflict, never “first row wins.”
 3. **Define concurrency-aware aggregate DTOs.** Return occurrence id/type id/SystemKey/value/`AllDay`/`RowVer`. Decide and document how a create or case edit submits expected absence versus expected row version. This decision blocks implementation of legacy-shaped editors.

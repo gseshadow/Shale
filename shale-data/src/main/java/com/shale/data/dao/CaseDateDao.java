@@ -2,6 +2,7 @@ package com.shale.data.dao;
 
 import com.shale.core.dto.CaseDateDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import com.shale.core.dto.MigratedCaseDateProjectionDto;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.service.CaseServicePort.CreateCaseDateCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseDateCommand;
@@ -20,6 +21,7 @@ import com.shale.core.model.CaseDateAggregateCommand;
 import com.shale.core.model.CaseDateAggregateResult;
 
 public final class CaseDateDao {
+    static final int PROJECTION_BATCH_SIZE = 500;
     private final DbSessionProvider db;
     private final PhiAuditService phiAuditService;
     private final EntityActionAuditDao entityActionAuditDao = new EntityActionAuditDao();
@@ -72,6 +74,88 @@ public final class CaseDateDao {
             ps.setInt(1, tenant); ps.setInt(2, tenant); ps.setLong(3, caseId); ps.setInt(4, tenant);
             try (ResultSet rs = ps.executeQuery()) { List<CaseDateDto> out = new ArrayList<>(); while (rs.next()) out.add(mapDate(rs)); return List.copyOf(out); }
         } catch (SQLException e) { throw fail(e); }
+    }
+
+    /**
+     * Set-oriented authoritative projection for list-style consumers. Input order is
+     * retained in the returned map, duplicates are coalesced, invalid ids are ignored,
+     * and unavailable/cross-tenant cases are indistinguishable from unknown ids.
+     */
+    public Map<Long, MigratedCaseDateProjectionDto> projectMigratedCaseDates(
+            Collection<Long> caseIds, int tenant, int actor) {
+        LinkedHashSet<Long> requested = new LinkedHashSet<>();
+        if (caseIds != null) for (Long id : caseIds) if (id != null && id > 0) requested.add(id);
+        if (requested.isEmpty()) return Map.of();
+        LinkedHashMap<Long, MigratedCaseDateProjectionDto> found = new LinkedHashMap<>();
+        try (Connection con = db.requireConnection()) {
+            verifyTenant(con, tenant);
+            validateActor(con, tenant, actor);
+            List<Long> ids = new ArrayList<>(requested);
+            for (int offset = 0; offset < ids.size(); offset += PROJECTION_BATCH_SIZE) {
+                readMigratedProjectionBatch(con, ids.subList(offset, Math.min(ids.size(), offset + PROJECTION_BATCH_SIZE)), tenant, found);
+            }
+        } catch (SQLException e) { throw fail(e); }
+        LinkedHashMap<Long, MigratedCaseDateProjectionDto> ordered = new LinkedHashMap<>();
+        requested.forEach(id -> { if (found.containsKey(id)) ordered.put(id, found.get(id)); });
+        return Collections.unmodifiableMap(ordered);
+    }
+
+    private static void readMigratedProjectionBatch(Connection con, List<Long> ids, int tenant,
+            Map<Long, MigratedCaseDateProjectionDto> output) throws SQLException {
+        String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
+        String sql = migratedProjectionSql(placeholders);
+        LinkedHashMap<Long, EnumMap<MigratedCaseDateKey, MigratedCaseDateProjectionDto.Slot>> slots = new LinkedHashMap<>();
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            int p = 1;
+            ps.setInt(p++, tenant); ps.setInt(p++, tenant); ps.setInt(p++, tenant);
+            for (long id : ids) ps.setLong(p++, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    long caseId = rs.getLong("CaseId");
+                    EnumMap<MigratedCaseDateKey, MigratedCaseDateProjectionDto.Slot> caseSlots = slots.computeIfAbsent(caseId, ignored -> emptyProjectionSlots());
+                    String systemKey = rs.getString("TypeSystemKey");
+                    if (systemKey == null) continue;
+                    if (MigratedCaseDateKey.DISCARDED_ALIAS.equalsIgnoreCase(systemKey.trim())) {
+                        throw new IllegalStateException("Discarded Case Date SystemKey alias occurrence detected.");
+                    }
+                    MigratedCaseDateKey key;
+                    try { key = MigratedCaseDateKey.require(systemKey); }
+                    catch (IllegalArgumentException notMigrated) { continue; }
+                    MigratedCaseDateProjectionDto.Slot value = MigratedCaseDateProjectionDto.Slot.present(
+                            key, ldt(rs, "StartsAt"), ldt(rs, "EndsAt"), rs.getBoolean("AllDay"));
+                    if (caseSlots.put(key, value).present()) {
+                        throw new IllegalStateException("Multiple active Case Date occurrences for singleton SystemKey: " + key.systemKey());
+                    }
+                }
+            }
+        }
+        slots.forEach((caseId, values) -> output.put(caseId, new MigratedCaseDateProjectionDto(caseId, values)));
+    }
+
+    private static EnumMap<MigratedCaseDateKey, MigratedCaseDateProjectionDto.Slot> emptyProjectionSlots() {
+        EnumMap<MigratedCaseDateKey, MigratedCaseDateProjectionDto.Slot> result = new EnumMap<>(MigratedCaseDateKey.class);
+        for (MigratedCaseDateKey key : MigratedCaseDateKey.values()) result.put(key, MigratedCaseDateProjectionDto.Slot.absent(key));
+        return result;
+    }
+
+    static String migratedProjectionSql(String placeholders) {
+        return """
+                SELECT c.Id AS CaseId, cd.Id AS OccurrenceId,
+                       COALESCE(eff.SystemKey, st.SystemKey) AS TypeSystemKey,
+                       cd.StartsAt, cd.EndsAt, cd.AllDay
+                FROM dbo.Cases c
+                LEFT JOIN dbo.CaseDates cd ON cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId AND cd.IsDeleted = 0
+                LEFT JOIN dbo.CaseDateTypes st ON st.Id = cd.CaseDateTypeId
+                     AND (st.ShaleClientId = cd.ShaleClientId OR st.ShaleClientId IS NULL)
+                OUTER APPLY (
+                  SELECT TOP (1) t.SystemKey
+                  FROM dbo.CaseDateTypes t
+                  WHERE st.SystemKey IS NOT NULL AND t.SystemKey = st.SystemKey
+                    AND (t.ShaleClientId = ? OR t.ShaleClientId IS NULL)
+                    AND t.IsDeleted = 0 AND t.IsActive = 1
+                  ORDER BY CASE WHEN t.ShaleClientId = ? THEN 0 ELSE 1 END, t.Id
+                ) eff
+                WHERE c.ShaleClientId = ? AND c.Id IN (""" + placeholders + ") ORDER BY c.Id, cd.Id";
     }
 
     /**
