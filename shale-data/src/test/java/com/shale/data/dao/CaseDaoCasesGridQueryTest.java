@@ -46,6 +46,20 @@ final class CaseDaoCasesGridQueryTest {
     }
 
     @Test
+    void phaseTimingLeavesTheRestoredAuthoritativeSqlBoundaryIntact() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String method = source.substring(source.indexOf("private PagedResult<CaseRow> findPageInternal"),
+                source.indexOf("private static String normalizeSearchQuery"));
+        assertTrue(method.contains("phase=total-count"));
+        assertTrue(method.contains("phase=session-setup"));
+        assertTrue(method.contains("phase=page-row-query"));
+        assertTrue(method.contains("authoritativeCasesDateApplySql()"));
+        assertTrue(method.contains("orderByClauseFor(effectiveSort, authoritativeMigratedDates)"));
+        assertTrue(method.contains("OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"));
+        assertFalse(method.contains("authoritativeSortJoinSql"), "reverted grouped sorting must stay absent");
+    }
+
+    @Test
     void caseOverviewQueryHydratesTortNoticeDeadline() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
         String method = source.substring(source.indexOf("public com.shale.core.dto.CaseOverviewDto getOverview"), source.indexOf("private List<com.shale.core.dto.CaseOverviewDto.ContactSummary>"));

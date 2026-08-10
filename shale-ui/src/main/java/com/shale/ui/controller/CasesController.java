@@ -156,6 +156,7 @@ public final class CasesController {
 	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> caseDatesUpdatedHandler;
 	private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
 	private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
+	private final long controllerCreatedNanos = PerfLog.start();
 
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
@@ -194,6 +195,7 @@ public final class CasesController {
 	@FXML
 	private void initialize() {
 		System.out.println("CasesController.initialize()");
+		long initializeStartedNanos = PerfLog.start();
 
 		applySemanticControls();
 
@@ -236,6 +238,7 @@ public final class CasesController {
 		initializeGridRowActions();
 		initializeStatusFilter();
 		initializeExportMenu();
+		PerfLog.logDone("CTRL", "operation=cases-load boundary=defaults-finalized", initializeStartedNanos);
 
 		Platform.runLater(() ->
 		{
@@ -244,6 +247,8 @@ public final class CasesController {
 				return;
 			}
 			wireInfiniteScroll();
+			PerfLog.logDone("CTRL", "operation=cases-load boundary=initial-load-scheduled loadGeneration="
+					+ (loadGeneration + 1) + " pageIndex=0", controllerCreatedNanos);
 			loadFirstPage();
 		});
 		if (casesFlow != null) {
@@ -855,19 +860,34 @@ public final class CasesController {
 		dbExec.submit(() ->
 		{
 			try {
+				long loadStartedNanos = PerfLog.start();
+				PerfLog.log("CTRL", "start", "operation=cases-load boundary=background-dao-start loadGeneration="
+						+ generationAtSubmit + " pageIndex=" + pageToLoad);
 				long daoStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=findCasesViewPage page=cases_list pageIndex=" + pageToLoad + " grid=" + gridAtSubmit);
 				var page = caseDao.findCasesViewPage(pageToLoad, pageSize, sortAtSubmit, includeClosedDeniedAtSubmit, queryAtSubmit, statusesAtSubmit, knownTotalAtSubmit);
 				PerfLog.logDone("DAO", "method=findCasesViewPage page=cases_list pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0 : page.items().size()), daoStartNanos);
+				PerfLog.logDone("CTRL", "operation=cases-load boundary=dao-complete loadGeneration="
+						+ generationAtSubmit + " pageIndex=" + pageToLoad, daoStartNanos);
 
 				// map DAO rows into UI VM
-				long mapStartNanos = PerfLog.start();
+				long projectionStartNanos = PerfLog.start();
 				PerfLog.log("DAO_MAP", "start", "method=findPage page=cases_list rows=" + (page == null || page.items() == null ? 0 : page.items().size()));
 				Map<Long, MigratedCaseDateProjectionDto> projections = projectDates(page.items());
+				int projectionChunks = projectionChunkCount(page.items().size());
+				PerfLog.logDone("DAO", "operation=cases-load phase=projection-hydration pageIndex=" + pageToLoad
+						+ " pageSize=" + pageSize + " resultCount=" + page.items().size() + " queryCount="
+						+ projectionChunks + " projectionChunkCount=" + projectionChunks, projectionStartNanos);
+				long mapStartNanos = PerfLog.start();
 				List<CaseCardVm> newItems = page.items().stream()
 						.map(r -> toViewModel(r, projections.get(r.id())))
 						.toList();
-				PerfLog.logDone("DAO_MAP", "method=findPage page=cases_list rows=" + newItems.size(), mapStartNanos);
+				PerfLog.logDone("DAO_MAP", "operation=cases-load phase=projection-merge-dto-map pageIndex="
+						+ pageToLoad + " resultCount=" + newItems.size(), mapStartNanos);
+				PerfLog.logDone("CTRL", "operation=cases-load boundary=complete-background loadGeneration="
+						+ generationAtSubmit + " pageIndex=" + pageToLoad + " resultCount=" + newItems.size()
+						+ " queryCount=" + (1 + (knownTotalAtSubmit == null ? 1 : 0) + projectionChunks)
+						+ " totalCached=" + (knownTotalAtSubmit != null), loadStartedNanos);
 
 				Platform.runLater(() ->
 				{
@@ -886,6 +906,8 @@ public final class CasesController {
 
 					// Render according to current search/sort
 					rerender();
+					PerfLog.logDone("CTRL", "operation=cases-load boundary=page-applied-rendered loadGeneration="
+							+ generationAtSubmit + " pageIndex=" + pageToLoad + " resultCount=" + newItems.size(), loadStartedNanos);
 
 					System.out.println("Loaded cases page " + pageToLoad + ": " + newItems.size()
 							+ " (loaded=" + loaded.size() + " / total=" + page.total() + ")");
@@ -902,6 +924,10 @@ public final class CasesController {
 				});
 			}
 		});
+	}
+
+	private static int projectionChunkCount(int rowCount) {
+		return rowCount <= 0 ? 0 : (rowCount + 499) / 500;
 	}
 
 	private Map<Long, MigratedCaseDateProjectionDto> projectDates(List<CaseDao.CaseRow> rows) {
