@@ -52,6 +52,7 @@ import javafx.stage.Window;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.geometry.Pos;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
@@ -505,8 +506,79 @@ public final class SettingsController {
 	static List<CaseDateTypeViewRow> buildCaseDateTypeRows(List<EffectiveCaseDateTypeDto> rows,int tenantId){Map<String,EffectiveCaseDateTypeDto> globals=new java.util.LinkedHashMap<>(),tenantKeyed=new java.util.LinkedHashMap<>();List<CaseDateTypeViewRow> out=new ArrayList<>();for(EffectiveCaseDateTypeDto r:rows==null?List.<EffectiveCaseDateTypeDto>of():rows){if(r==null||(r.shaleClientId()!=null&&r.shaleClientId()!=tenantId))continue;String key=safe(r.systemKey()).trim().toLowerCase(java.util.Locale.ROOT);if(r.shaleClientId()==null&&!key.isBlank())globals.put(key,r);else if(!key.isBlank())tenantKeyed.put(key,r);else if(!r.deleted())out.add(new CaseDateTypeViewRow(r,LinkTypeScope.TENANT_CUSTOM));}for(var e:globals.entrySet()){EffectiveCaseDateTypeDto t=tenantKeyed.get(e.getKey());out.add(t==null||t.deleted()?new CaseDateTypeViewRow(e.getValue(),LinkTypeScope.GLOBAL_DEFAULT):new CaseDateTypeViewRow(t,LinkTypeScope.TENANT_OVERRIDE));}for(var e:tenantKeyed.entrySet())if(!globals.containsKey(e.getKey())&&!e.getValue().deleted())out.add(new CaseDateTypeViewRow(e.getValue(),LinkTypeScope.TENANT_CUSTOM));out.sort(java.util.Comparator.comparing(CaseDateTypeViewRow::name,String.CASE_INSENSITIVE_ORDER).thenComparingInt(CaseDateTypeViewRow::id));return List.copyOf(out);}
 	private void applyCaseDateTypeRows(int generation,List<CaseDateTypeViewRow> rows,String successMessage){if(generation!=caseDateTypeLoadGeneration)return;Integer selectedId=selectedCaseDateTypeRow==null?null:selectedCaseDateTypeRow.id();selectedCaseDateTypeRow=preserveCaseDateTypeSelection(rows,selectedId);renderCaseDateTypeCards(rows);updateCaseDateTypeActionState(selectedCaseDateTypeRow);setCaseDateTypeMessage(successMessage==null?"":successMessage);}
 	static CaseDateTypeViewRow preserveCaseDateTypeSelection(List<CaseDateTypeViewRow> rows,Integer selectedId){return rows.stream().filter(row->selectedId!=null&&row.id()==selectedId).findFirst().orElse(null);}
-	private void renderCaseDateRoleMappings(List<CaseDateSemanticRoleMappingDto> mappings,List<EffectiveCaseDateTypeDto> types){if(caseDateRoleMappingsContainer==null)return;List<EffectiveCaseDateTypeDto> eligible=types.stream().filter(t->t.shaleClientId()!=null&&t.active()&&!t.deleted()).toList();caseDateRoleMappingsContainer.getChildren().setAll(mappings.stream().map(m->buildCaseDateRoleMappingCard(m,eligible)).toList());}
-	private VBox buildCaseDateRoleMappingCard(CaseDateSemanticRoleMappingDto mapping,List<EffectiveCaseDateTypeDto> eligible){VBox card=new VBox(7);card.getStyleClass().addAll("shale-entity-card","shale-entity-card-compact");Label title=new Label(mapping.roleName());title.getStyleClass().add("app-dialog-field-label");Label effective=new Label("Currently effective: "+mapping.effectiveTypeName()+" · "+(mapping.tenantOverride()?"Tenant override":"Inherited global default"));effective.getStyleClass().add("search-summary-text");ComboBox<EffectiveCaseDateTypeDto> selector=ControlStyles.formControl(new ComboBox<>());selector.getItems().setAll(eligible);selector.setConverter(new javafx.util.StringConverter<>(){public String toString(EffectiveCaseDateTypeDto v){return v==null?"":v.name();}public EffectiveCaseDateTypeDto fromString(String v){return null;}});eligible.stream().filter(t->t.id()==mapping.effectiveTypeId()).findFirst().ifPresent(selector::setValue);Button save=semanticButton(mapping.tenantOverride()?"Change":"Save override",ControlStyles.Purpose.PRIMARY,e->{EffectiveCaseDateTypeDto selected=selector.getValue();if(selected==null){setCaseDateTypeMessage("Select an eligible tenant Case Date Type.");return;}try{caseService.saveCaseDateSemanticRoleMapping(new CaseServicePort.SaveCaseDateSemanticRoleMappingCommand(requireTenantId(),requireActorUserId(),mapping.roleKey(),selected.id(),mapping.tenantMappingId(),mapping.tenantMappingRowVer()));publishCaseDateTypeChanged(selected.id());loadCaseDateTypesAsync("Protected role mapping saved.");}catch(RuntimeException ex){showCaseDateTypeError(ex);}});HBox actions=new HBox(8,selector,save);if(mapping.tenantOverride()){Button reset=semanticButton("Reset to global default",ControlStyles.Purpose.SECONDARY,e->{try{caseService.resetCaseDateSemanticRoleMapping(new CaseServicePort.ResetCaseDateSemanticRoleMappingCommand(requireTenantId(),requireActorUserId(),mapping.roleKey(),mapping.tenantMappingId(),mapping.tenantMappingRowVer()));publishCaseDateTypeChanged(mapping.effectiveTypeId());loadCaseDateTypesAsync("Protected role mapping reset to the global default.");}catch(RuntimeException ex){showCaseDateTypeError(ex);}});actions.getChildren().add(reset);}card.getChildren().addAll(title,effective,actions);return card;}
+	private void renderCaseDateRoleMappings(List<CaseDateSemanticRoleMappingDto> mappings, List<EffectiveCaseDateTypeDto> types) {
+		if (caseDateRoleMappingsContainer == null) return;
+		List<EffectiveCaseDateTypeDto> eligible = types.stream()
+				.filter(type -> type.shaleClientId() != null && type.active() && !type.deleted())
+				.toList();
+		VBox section = new VBox(8);
+		section.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-density-compact");
+		if (eligible.isEmpty()) {
+			Label empty = new Label("Global defaults are in use because no custom Case Date Types are available.");
+			empty.getStyleClass().add("search-summary-text");
+			empty.setWrapText(true);
+			section.getChildren().add(empty);
+		}
+		for (CaseDateSemanticRoleMappingDto mapping : mappings) {
+			section.getChildren().add(buildCaseDateRoleMappingRow(mapping, eligible));
+		}
+		caseDateRoleMappingsContainer.getChildren().setAll(section);
+	}
+
+	private VBox buildCaseDateRoleMappingRow(CaseDateSemanticRoleMappingDto mapping,
+			List<EffectiveCaseDateTypeDto> eligible) {
+		VBox row = new VBox(5);
+		row.setMaxWidth(Double.MAX_VALUE);
+		Label role = new Label(mapping.roleName());
+		role.getStyleClass().add("app-dialog-field-label");
+		role.setWrapText(true);
+		Label effective = new Label("Effective type: " + mapping.effectiveTypeName() + " · "
+				+ (mapping.tenantOverride() ? "Tenant override" : "Inherited global default"));
+		effective.getStyleClass().add("search-summary-text");
+		effective.setWrapText(true);
+		row.getChildren().addAll(role, effective);
+
+		FlowPane actions = new FlowPane(8, 6);
+		actions.setPrefWrapLength(520);
+		if (!eligible.isEmpty()) {
+			ComboBox<EffectiveCaseDateTypeDto> selector = ControlStyles.formControl(new ComboBox<>());
+			selector.setPromptText("Select a custom Case Date Type");
+			selector.setMaxWidth(360);
+			selector.getItems().setAll(eligible);
+			selector.setConverter(new javafx.util.StringConverter<>() {
+				@Override public String toString(EffectiveCaseDateTypeDto value) { return value == null ? "" : value.name(); }
+				@Override public EffectiveCaseDateTypeDto fromString(String value) { return null; }
+			});
+			eligible.stream().filter(type -> type.id() == mapping.effectiveTypeId()).findFirst().ifPresent(selector::setValue);
+			Button save = ActionButtonFactory.semantic(mapping.tenantOverride() ? "Change" : "Save override", event -> {
+				EffectiveCaseDateTypeDto selected = selector.getValue();
+				if (selected == null) { setCaseDateTypeMessage("Select an eligible tenant Case Date Type."); return; }
+				try {
+					caseService.saveCaseDateSemanticRoleMapping(new CaseServicePort.SaveCaseDateSemanticRoleMappingCommand(
+							requireTenantId(), requireActorUserId(), mapping.roleKey(), selected.id(),
+							mapping.tenantMappingId(), mapping.tenantMappingRowVer()));
+					publishCaseDateTypeChanged(selected.id());
+					loadCaseDateTypesAsync("Protected role mapping saved.");
+				} catch (RuntimeException ex) { showCaseDateTypeError(ex); }
+			}, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.SMALL);
+			actions.getChildren().addAll(selector, save);
+		}
+		if (mapping.tenantOverride()) {
+			Button reset = ActionButtonFactory.semantic("Reset to global default", event -> {
+				try {
+					caseService.resetCaseDateSemanticRoleMapping(new CaseServicePort.ResetCaseDateSemanticRoleMappingCommand(
+							requireTenantId(), requireActorUserId(), mapping.roleKey(), mapping.tenantMappingId(),
+							mapping.tenantMappingRowVer()));
+					publishCaseDateTypeChanged(mapping.effectiveTypeId());
+					loadCaseDateTypesAsync("Protected role mapping reset to the global default.");
+				} catch (RuntimeException ex) { showCaseDateTypeError(ex); }
+			}, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+			actions.getChildren().add(reset);
+		}
+		if (!actions.getChildren().isEmpty()) row.getChildren().add(actions);
+		return row;
+	}
+
 	private void renderCaseDateTypeCards(List<CaseDateTypeViewRow> rows){caseDateTypeCardsContainer.getChildren().setAll(rows.isEmpty()?List.of(loadingLabel("No case date types are configured for this tenant.")):rows.stream().map(this::buildCaseDateTypeCard).toList());}
 	private VBox buildCaseDateTypeCard(CaseDateTypeViewRow row){VBox card=new VBox(8);card.getStyleClass().addAll("shale-entity-card","shale-entity-card-compact","shale-entity-card-selectable","shale-density-compact");card.setUserData(row);card.setFocusTraversable(true);card.pseudoClassStateChanged(SELECTED_CARD,selectedCaseDateTypeRow!=null&&selectedCaseDateTypeRow.id()==row.id());card.setOnMouseClicked(e->{if(e.getButton()==MouseButton.PRIMARY&&!isActionControl(e.getTarget()))selectCaseDateTypeRow(row);});card.setOnKeyPressed(e->{if(e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE){selectCaseDateTypeRow(row);e.consume();}});HBox h=new HBox(10);h.setAlignment(Pos.CENTER_LEFT);Circle dot=new Circle(6);String css=safe(ColorUtil.toCssBackgroundColorOrNull(row.color()));if(!css.isBlank())dot.setStyle("-fx-background-color: "+css+"; -fx-fill: "+css+";");Label name=new Label(row.name());name.getStyleClass().add("app-dialog-field-label");h.getChildren().addAll(dot,name,metadataPill(row.category()),metadataPill(row.supportsTime()?"Timed or all-day":"All-day only"));HBox meta=new HBox(6);meta.getChildren().addAll(metadataPill(row.active()?"Active":"Inactive"),metadataPill(row.scopeLabel()),metadataPill(row.protectedType()?"Protected system type":"Custom type"));Label help=new Label(row.protectedType()?PROTECTED_CASE_DATE_TYPE_MESSAGE:"Select this type to manage it with the actions below.");help.getStyleClass().add("search-summary-text");help.setWrapText(true);card.getChildren().addAll(h,meta,help);return card;}
 	private void selectCaseDateTypeRow(CaseDateTypeViewRow row){selectedCaseDateTypeRow=row;updateSelectionStyles(caseDateTypeCardsContainer,row.id());updateCaseDateTypeActionState(row);setCaseDateTypeMessage(row.protectedType()?PROTECTED_CASE_DATE_TYPE_MESSAGE:"");}
