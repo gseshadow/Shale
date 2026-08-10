@@ -113,6 +113,8 @@
                 <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
                 <Label text="Case Date Types" styleClass="search-section-title"/>
                 <Label text="Manage tenant-created Case Date types. Types built into Shale are shown for reference and are protected; existing occurrences retain historical presentation." styleClass="search-summary-text" wrapText="true"/>
+                <Label text="Protected role mappings" styleClass="search-section-title"/>
+                <VBox fx:id="caseDateRoleMappingsContainer" spacing="8" styleClass="shale-density-card-compact"/>
                 <VBox fx:id="caseDateTypeCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
                 <HBox fx:id="caseDateTypeActionRow" spacing="8">
                     <Label fx:id="caseDateTypeSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>

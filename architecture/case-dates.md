@@ -430,3 +430,13 @@ returned from commit. Validation and rollback publish nothing. The payload follo
 existing CaseDates contract and carries only case id and change, never dates, labels, notes,
 or concurrency tokens. Server/API/web compatibility creation remains deferred and unchanged.
 The next cutover gate is Calendar duplicate legacy-date projection cleanup.
+
+## Protected semantic-role tenant administration (Phase 2)
+
+Tenant administrators manage the three protected mappings in **Settings > Case Date Types**. Each role displays its effective type and whether that value is inherited from the global compatibility mapping or supplied by an active tenant override. Override selectors contain only active, non-deleted types owned by the authenticated tenant and persist authoritative type ids; labels are presentation only. A valid active tenant mapping wins, otherwise the unchanged global compatibility mapping applies. The filtered singleton indexes continue to enforce at most one active mapping per tenant/role and one global fallback per role.
+
+Creating or replacing an override and resetting it are authoritative, administrator-only transactions. Replacement retires the prior mapping using its `RowVer` before inserting the successor. Reset soft-deletes the tenant mapping, restoring the fallback. Candidate ownership/lifecycle, session tenant, actor membership/admin status, ambiguity, and optimistic concurrency are validated in the transaction. Each successful mutation writes exactly one `CASE_DATE_ROLE_MAPPING` entity-action audit row on the same connection; its only metadata is `SEMANTIC_ROLE` and `CASE_DATE_TYPE_ID`. Failures roll back both writes. These administrative actions expose no occurrence value, case information, type label, description, note, or other PHI.
+
+An active tenant type referenced by a protected-role mapping cannot be deactivated or removed until the administrator changes or resets that mapping. Existing global compatibility protection is unchanged. Mapping lifecycle never rewrites `CaseDates.CaseDateTypeId` or form configuration references, so historical occurrences remain readable through their stored type identity. LiveBus uses the existing Case Date Type change event once after a successful mutation to invalidate Settings, Cases/card projections, sorting, and open effective-role consumers; failures publish nothing and no second projection path exists.
+
+The separate classification/ownership phase remains deferred. It will correct noncritical global dates that Settings currently describes as built-in; this phase does not convert ownership, change built-in classification, or broaden protected semantic roles.
