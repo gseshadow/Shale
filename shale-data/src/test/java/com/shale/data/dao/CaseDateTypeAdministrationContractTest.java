@@ -18,17 +18,26 @@ final class CaseDateTypeAdministrationContractTest {
     @Test void mutationsUseTenantOwnedOverlayRowsAndRowVersion(){
         assertTrue(DAO.contains("validateAdminActor"));
         assertTrue(DAO.contains("e.shaleClientId()==null"));
-        assertTrue(DAO.contains("upsertOverride"));
+        assertFalse(DAO.contains("upsertOverride"));
         assertTrue(DAO.contains("ShaleClientId=? AND RowVer=?"));
         assertTrue(DAO.contains("UPDATE dbo.CaseDateTypes SET IsDeleted=1,IsActive=0"));
         assertFalse(DAO.contains("DELETE FROM dbo.CaseDateTypes"));
         assertFalse(DAO.contains("UPDATE dbo.CalendarEvents"));
         assertFalse(DAO.contains("INSERT dbo.CalendarEvents"));
+        assertTrue(DAO.contains("requireCustomType(e)"));
+        assertTrue(DAO.contains("ensureStableKeyUnchanged"));
+        assertTrue(DAO.contains("System-defined Case Date Types are protected"));
+        assertTrue(DAO.contains("softDeleteType(con,c.shaleClientId(),c.actorUserId(),e.id(),c.expectedRowVer())"));
     }
     @Test void validationCoversSchemaFields(){
         assertTrue(DAO.contains("DEADLINE"));
         assertTrue(DAO.contains("#[0-9A-Fa-f]{6}"));
         assertTrue(DAO.contains("supportsTime"));
         assertTrue(DAO.contains("SystemKey is invalid"));
+    }
+    @Test void customNamesAreNormalizedAndDuplicateChecked(){
+        assertTrue(DAO.contains("LOWER(LTRIM(RTRIM(Name)))=LOWER(LTRIM(RTRIM(?)))"));
+        assertTrue(DAO.contains("A Case Date Type with that name already exists."));
+        assertTrue(DAO.contains("System keys are reserved for protected system-defined Case Date Types."));
     }
 }
