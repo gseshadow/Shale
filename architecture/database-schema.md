@@ -969,3 +969,14 @@ Customizable overlay lookup for authoritative case-date meanings. Uses nullable 
 Strict tenant-owned case occurrence table with `ShaleClientId`, `CaseId`, `CaseDateTypeId`, `StartsAt`, optional `EndsAt`, `AllDay`, notes, actor metadata, soft-deletion metadata, timestamps, and `RowVer`. Multiple occurrences of the same type may exist on one case.
 
 Ownership: `CaseDates` owns legal/factual case dates. Following the completed Phase 3B backfill and Phase 3C validation, it is the target authoritative runtime representation for the nine migrated fixed-date meanings; their `Cases` columns are retained temporarily for rollback/history only. `CalendarEvents` owns manually created calendar events only. The unified calendar projects from authoritative sources instead of becoming the owner or duplicating domain dates. Unmigrated workflow/lifecycle dates remain separate unless deliberately reclassified. Runtime cutover and later column removal are distinct, independently gated phases.
+
+### dbo.CaseDateSemanticRoles / dbo.CaseDateTypeSemanticRoleMappings
+
+`CaseDateSemanticRoles` contains the explicit protected application meanings
+`INTAKE`, `STATUTE_OF_LIMITATIONS`, and `TORT_NOTICE_DEADLINE`.
+`CaseDateTypeSemanticRoleMappings` associates one active global compatibility type,
+or at most one active tenant-specific type, with each role. The association has its
+own tenant/global scope, active and soft-deleted lifecycle, actor/timestamp provenance,
+`RowVer`, foreign keys, filtered singleton indexes, and tenant-or-global RLS. Type
+presentation and occurrence identity remain in `CaseDateTypes` and `CaseDates`;
+neither existing id is rewritten by the semantic-role foundation.

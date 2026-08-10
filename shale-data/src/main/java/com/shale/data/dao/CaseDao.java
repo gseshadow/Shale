@@ -40,6 +40,7 @@ import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.RecentCaseUpdateActivityDto;
 import com.shale.core.dto.ReportCaseDetailRowDto;
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.model.CaseDateSemanticRole;
 import com.shale.core.semantics.RoleSemantics;
 import com.shale.core.service.CaseServicePort.CaseLinkShareDraft;
 import com.shale.core.service.CaseServicePort.CaseLinkShareUpdate;
@@ -2306,7 +2307,7 @@ public final class CaseDao {
 					ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 				}
 				if (boundaryNeedsAuthoritativeDate) {
-					ps.setString(idx++, authoritativeSortSystemKey(effectiveSort));
+					ps.setString(idx++, authoritativeSortSemanticRole(effectiveSort));
 				}
 				ps.setInt(idx++, shaleClientId);
 				StringBuilder traceParams = new StringBuilder()
@@ -2419,7 +2420,20 @@ public final class CaseDao {
 			  INNER JOIN dbo.CaseDateTypes stored_type ON stored_type.Id = cd.CaseDateTypeId
 			    AND (stored_type.ShaleClientId = cd.ShaleClientId OR stored_type.ShaleClientId IS NULL)
 			  WHERE cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId
-			    AND cd.IsDeleted = 0 AND stored_type.SystemKey = ?
+			    AND cd.IsDeleted = 0 AND EXISTS (
+			      SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings role_mapping
+			      WHERE role_mapping.CaseDateTypeId=stored_type.Id AND role_mapping.SemanticRoleKey=?
+			        AND role_mapping.IsActive=1 AND role_mapping.IsDeleted=0
+			        AND (role_mapping.ShaleClientId=c.ShaleClientId OR role_mapping.ShaleClientId IS NULL)
+			        AND NOT (role_mapping.ShaleClientId IS NULL AND EXISTS (
+			          SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings tenant_mapping
+			          JOIN dbo.CaseDateTypes tenant_type ON tenant_type.Id=tenant_mapping.CaseDateTypeId
+			          WHERE tenant_mapping.ShaleClientId=c.ShaleClientId
+			            AND tenant_mapping.SemanticRoleKey=role_mapping.SemanticRoleKey
+			            AND tenant_mapping.IsActive=1 AND tenant_mapping.IsDeleted=0
+			            AND tenant_type.ShaleClientId=c.ShaleClientId
+			            AND tenant_type.IsActive=1 AND tenant_type.IsDeleted=0))
+			    )
 			) boundary_date
 			""";
 	}
@@ -2438,10 +2452,10 @@ public final class CaseDao {
 		return sort == CaseSort.RESPONSIBLE_ATTORNEY_ASC || sort == CaseSort.RESPONSIBLE_ATTORNEY_DESC;
 	}
 
-	private static String authoritativeSortSystemKey(CaseSort sort) {
-		if (sort == CaseSort.INTAKE_OLDEST || sort == CaseSort.INTAKE_NEWEST) return "intake";
-		if (sort == CaseSort.STATUTE_SOONEST || sort == CaseSort.STATUTE_LATEST) return "statute_of_limitations";
-		if (sort == CaseSort.TORT_NOTICE_SOONEST) return "tort_notice_deadline";
+	private static String authoritativeSortSemanticRole(CaseSort sort) {
+		if (sort == CaseSort.INTAKE_OLDEST || sort == CaseSort.INTAKE_NEWEST) return CaseDateSemanticRole.INTAKE.persistedKey();
+		if (sort == CaseSort.STATUTE_SOONEST || sort == CaseSort.STATUTE_LATEST) return CaseDateSemanticRole.STATUTE_OF_LIMITATIONS.persistedKey();
+		if (sort == CaseSort.TORT_NOTICE_SOONEST) return CaseDateSemanticRole.TORT_NOTICE_DEADLINE.persistedKey();
 		throw new IllegalArgumentException("Sort does not require an authoritative Case Date");
 	}
 

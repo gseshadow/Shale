@@ -15,6 +15,7 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.*;
 import com.shale.core.model.MigratedCaseDateKey;
+import com.shale.core.model.CaseDateSemanticRole;
 import com.shale.core.model.CompatibilityCaseDateMutation;
 import com.shale.core.model.CompatibilityCaseDateState;
 import com.shale.core.model.CaseDateAggregateCommand;
@@ -131,6 +132,15 @@ public final class CaseDateDao {
                     long caseId = rs.getLong("CaseId");
                     EnumMap<MigratedCaseDateKey, MigratedCaseDateProjectionDto.Slot> caseSlots = slots.computeIfAbsent(caseId, ignored -> emptyProjectionSlots());
                     String systemKey = rs.getString("TypeSystemKey");
+                    String roleKey = rs.getString("SemanticRoleKey");
+                    if (roleKey != null) {
+                        MigratedCaseDateKey semanticKey = migratedKey(CaseDateSemanticRole.require(roleKey));
+                        MigratedCaseDateProjectionDto.Slot value = MigratedCaseDateProjectionDto.Slot.present(
+                                semanticKey, ldt(rs, "StartsAt"), ldt(rs, "EndsAt"), rs.getBoolean("AllDay"));
+                        if (caseSlots.put(semanticKey, value).present())
+                            throw new IllegalStateException("Multiple active Case Date occurrences for semantic role " + roleKey + ".");
+                        continue;
+                    }
                     if (systemKey == null) continue;
                     if (MigratedCaseDateKey.DISCARDED_ALIAS.equalsIgnoreCase(systemKey.trim())) {
                         throw new IllegalStateException("Discarded Case Date SystemKey alias occurrence detected.");
@@ -158,7 +168,7 @@ public final class CaseDateDao {
     static String migratedProjectionSql(String placeholders) {
         return """
                 SELECT c.Id AS CaseId, cd.Id AS OccurrenceId,
-                       COALESCE(eff.SystemKey, st.SystemKey) AS TypeSystemKey,
+                       COALESCE(eff.SystemKey, st.SystemKey) AS TypeSystemKey, role_mapping.SemanticRoleKey,
                        cd.StartsAt, cd.EndsAt, cd.AllDay
                 FROM dbo.Cases c
                 LEFT JOIN dbo.CaseDates cd ON cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId AND cd.IsDeleted = 0
@@ -172,6 +182,11 @@ public final class CaseDateDao {
                     AND t.IsDeleted = 0 AND t.IsActive = 1
                   ORDER BY CASE WHEN t.ShaleClientId = ? THEN 0 ELSE 1 END, t.Id
                 ) eff
+                OUTER APPLY (
+                  SELECT m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
+                  WHERE m.CaseDateTypeId=st.Id AND m.IsActive=1 AND m.IsDeleted=0
+                    AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL)
+                ) role_mapping
                 WHERE c.ShaleClientId = ? AND c.Id IN (""" + placeholders + ") ORDER BY c.Id, cd.Id";
     }
 
@@ -271,7 +286,7 @@ public final class CaseDateDao {
         for (MigratedCaseDateKey key : MigratedCaseDateKey.values()) {
             CompatibilityCaseDateMutation mutation = command.dates().get(key);
             if (mutation instanceof CompatibilityCaseDateMutation.Unchanged) continue;
-            List<SingletonMutationRow> active = lockSingleton(con, command.shaleClientId(), command.caseId(), key.systemKey());
+            List<SingletonMutationRow> active = lockSingleton(con, command.shaleClientId(), command.caseId(), key);
             if (active.size() > 1) throw new IllegalStateException("Duplicate active Case Date singleton: " + key.systemKey());
             if (mutation instanceof CompatibilityCaseDateMutation.Create create) {
                 if (!Arrays.equals(lockedCaseRowVer, create.expectedAbsent().observedCaseRowVer()))
@@ -308,8 +323,23 @@ public final class CaseDateDao {
     private record SingletonMutationRow(long id, int typeId, LocalDateTime startsAt, LocalDateTime endsAt,
             boolean allDay, String notes, byte[] rowVer) {}
 
-    private static List<SingletonMutationRow> lockSingleton(Connection con, int tenant, long caseId, String systemKey) throws SQLException {
+    private static List<SingletonMutationRow> lockSingleton(Connection con, int tenant, long caseId, MigratedCaseDateKey key) throws SQLException {
+        String systemKey=key.systemKey();
         if (MigratedCaseDateKey.DISCARDED_ALIAS.equals(systemKey)) throw new IllegalArgumentException("Discarded alias is not supported.");
+        CaseDateSemanticRole role=semanticRole(key);
+        if (role!=null) {
+            int typeId=CaseDateSemanticRoleResolver.requireEffectiveTypeId(con,tenant,role);
+            String roleSql="""
+                    SELECT cd.Id,cd.CaseDateTypeId,cd.StartsAt,cd.EndsAt,cd.AllDay,cd.Notes,cd.RowVer
+                    FROM dbo.CaseDates cd WITH (UPDLOCK,HOLDLOCK)
+                    WHERE cd.ShaleClientId=? AND cd.CaseId=? AND cd.IsDeleted=0 AND cd.CaseDateTypeId=?
+                    """;
+            try(PreparedStatement ps=con.prepareStatement(roleSql)) {
+                ps.setInt(1,tenant); ps.setLong(2,caseId); ps.setInt(3,typeId);
+                try(ResultSet rs=ps.executeQuery()) { List<SingletonMutationRow> rows=new ArrayList<>(); while(rs.next())
+                    rows.add(new SingletonMutationRow(rs.getLong(1),rs.getInt(2),ldt(rs,"StartsAt"),ldt(rs,"EndsAt"),rs.getBoolean(5),rs.getString(6),rs.getBytes(7))); return rows; }
+            }
+        }
         String sql = """
                 SELECT cd.Id,cd.CaseDateTypeId,cd.StartsAt,cd.EndsAt,cd.AllDay,cd.Notes,cd.RowVer
                 FROM dbo.CaseDates cd WITH (UPDLOCK,HOLDLOCK)
@@ -325,6 +355,8 @@ public final class CaseDateDao {
     }
 
     private static int requireEffectiveMappedType(Connection con, int tenant, MigratedCaseDateKey key) throws SQLException {
+        CaseDateSemanticRole semanticRole = semanticRole(key);
+        if (semanticRole != null) return CaseDateSemanticRoleResolver.requireEffectiveTypeId(con, tenant, semanticRole);
         String sql="""
                 SELECT TOP (1) Id FROM dbo.CaseDateTypes WHERE SystemKey=? AND IsDeleted=0 AND IsActive=1
                 AND (ShaleClientId=? OR ShaleClientId IS NULL) ORDER BY CASE WHEN ShaleClientId=? THEN 0 ELSE 1 END,Id
@@ -332,6 +364,23 @@ public final class CaseDateDao {
         try(PreparedStatement ps=con.prepareStatement(sql)){ps.setString(1,key.systemKey());ps.setInt(2,tenant);ps.setInt(3,tenant);
             try(ResultSet rs=ps.executeQuery()){if(rs.next())return rs.getInt(1);}}
         throw new IllegalStateException("No effective Case Date type for " + key.systemKey());
+    }
+
+    private static CaseDateSemanticRole semanticRole(MigratedCaseDateKey key) {
+        return switch (key) {
+            case CALLER_DATE -> CaseDateSemanticRole.INTAKE;
+            case STATUTE_OF_LIMITATIONS -> CaseDateSemanticRole.STATUTE_OF_LIMITATIONS;
+            case TORT_NOTICE_DEADLINE -> CaseDateSemanticRole.TORT_NOTICE_DEADLINE;
+            default -> null;
+        };
+    }
+
+    private static MigratedCaseDateKey migratedKey(CaseDateSemanticRole role) {
+        return switch (role) {
+            case INTAKE -> MigratedCaseDateKey.CALLER_DATE;
+            case STATUTE_OF_LIMITATIONS -> MigratedCaseDateKey.STATUTE_OF_LIMITATIONS;
+            case TORT_NOTICE_DEADLINE -> MigratedCaseDateKey.TORT_NOTICE_DEADLINE;
+        };
     }
 
     private static long insertMappedOccurrence(Connection con, CaseDateAggregateCommand c, MigratedCaseDateKey key, CompatibilityCaseDateMutation.Value v)throws SQLException{
