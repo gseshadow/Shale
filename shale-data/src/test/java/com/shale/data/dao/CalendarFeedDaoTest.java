@@ -3,36 +3,17 @@ package com.shale.data.dao;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class CalendarFeedDaoTest {
 
     @Test
-    void caseDateProjectionsCoverVerifiedCaseFieldsWithStableKeys() {
-        Map<String, CalendarFeedDao.CaseDateProjection> byField = CalendarFeedDao.CASE_DATE_PROJECTIONS.stream()
-                .collect(Collectors.toMap(CalendarFeedDao.CaseDateProjection::columnName, projection -> projection));
-
-        assertProjection(byField, "StatuteOfLimitations", "CASE_SOL", "STATUTE_OF_LIMITATIONS", true);
-        assertProjection(byField, "TortNoticeDeadline", "CASE_TORT", "TORT_NOTICE_DEADLINE", true);
-        assertProjection(byField, "DiscoveryDeadline", "CASE_DISC", "DISCOVERY_DEADLINE", true);
-        assertProjection(byField, "CallerDate", "CASE_CALLER", "CASE_DATE", false);
-        assertProjection(byField, "AcceptedDate", "CASE_ACCEPTED", "CASE_DATE", false);
-        assertProjection(byField, "DeniedDate", "CASE_DENIED", "CASE_DATE", false);
-        assertProjection(byField, "ClosedDate", "CASE_CLOSED", "CASE_DATE", false);
-        assertProjection(byField, "DateOfInjury", "CASE_INJURY", "CASE_DATE", false);
-        assertProjection(byField, "DateFeeAgreementSigned", "CASE_FEE_AGREEMENT", "CASE_DATE", false);
-        assertProjection(byField, "DateNonEngagementLetterSent", "CASE_NON_ENGAGEMENT", "CASE_DATE", false);
-        assertProjection(byField, "DateOfMedicalNegligence", "CASE_MED_NEG", "CASE_DATE", false);
-        assertProjection(byField, "DateMedicalNegligenceWasDiscovered", "CASE_MED_NEG_DISCOVERED", "CASE_DATE", false);
-
-        assertFalse(byField.containsKey("CreatedAt"));
-        assertFalse(byField.containsKey("UpdatedAt"));
-        assertFalse(byField.containsKey("CallerTime"));
-        assertEquals(CalendarFeedDao.CASE_DATE_PROJECTIONS.size(), new HashSet<>(byField.keySet()).size());
+    void fixedCaseProjectionsAreLimitedToNonMigratedLifecycleDates() {
+        assertEquals(Set.of("AcceptedDate", "DeniedDate", "ClosedDate"),
+                CalendarFeedDao.LIFECYCLE_DATE_PROJECTIONS.stream()
+                        .map(CalendarFeedDao.LifecycleDateProjection::columnName).collect(java.util.stream.Collectors.toSet()));
     }
 
     @Test
@@ -53,16 +34,31 @@ class CalendarFeedDaoTest {
     }
 
     @Test
-    void feedSqlProjectsEveryCaseDateAsAllDayWithStableSourceFieldAndRangeFilter() {
+    void feedSqlProjectsEveryLifecycleDateAsAllDayWithStableSourceFieldAndRangeFilter() {
         String sql = CalendarFeedDao.buildCalendarFeedSql();
         Set<String> keys = new HashSet<>();
-        for (CalendarFeedDao.CaseDateProjection projection : CalendarFeedDao.CASE_DATE_PROJECTIONS) {
+        for (CalendarFeedDao.LifecycleDateProjection projection : CalendarFeedDao.LIFECYCLE_DATE_PROJECTIONS) {
             assertTrue(keys.add(projection.keyPrefix()), "duplicate key prefix " + projection.keyPrefix());
             assertTrue(sql.contains(projection.keyPrefix()), projection.keyPrefix());
             assertTrue(sql.contains("'" + projection.columnName() + "'"));
             assertTrue(sql.contains("AND c." + projection.columnName() + " IS NOT NULL"));
             assertTrue(sql.contains("AND c." + projection.columnName() + " >= CAST(? AS date)"));
             assertTrue(sql.contains("AND c." + projection.columnName() + " < CAST(? AS date)"));
+        }
+    }
+
+    @Test
+    void feedSqlHasNoMigratedLegacyDateFallbackOrAlias() {
+        String sql = CalendarFeedDao.buildCalendarFeedSql();
+        for (String legacy : new String[] {"CallerDate", "CallerTime", "DateOfInjury",
+                "DateOfMedicalNegligence", "DateMedicalNegligenceWasDiscovered", "StatuteOfLimitations",
+                "TortNoticeDeadline", "DiscoveryDeadline", "DateFeeAgreementSigned",
+                "DateNonEngagementLetterSent"}) {
+            assertFalse(sql.contains(legacy), "Calendar feed must not read migrated dbo.Cases column " + legacy);
+        }
+        for (String retiredKey : new String[] {"CASE_SOL", "CASE_TORT", "CASE_DISC", "CASE_CALLER",
+                "CASE_INJURY", "CASE_FEE_AGREEMENT", "CASE_NON_ENGAGEMENT", "CASE_MED_NEG"}) {
+            assertFalse(sql.contains(retiredKey), "retired duplicate identity " + retiredKey);
         }
     }
 
@@ -106,7 +102,7 @@ class CalendarFeedDaoTest {
 
         assertTrue(sql.contains("AND e.CaseId = ?"));
         assertTrue(sql.contains("AND t.CaseId = ?"));
-        assertEquals(CalendarFeedDao.CASE_DATE_PROJECTIONS.size() + 1, count(sql, "AND c.Id = ?"));
+        assertEquals(CalendarFeedDao.LIFECYCLE_DATE_PROJECTIONS.size() + 1, count(sql, "AND c.Id = ?"));
         assertTrue(sql.contains("AND ISNULL(e.IsCancelled, 0) = 0"));
         assertTrue(sql.contains("AND t.CompletedAt IS NULL"));
         assertTrue(sql.contains("AND ISNULL(t.IsDeleted, 0) = 0"));
@@ -123,16 +119,4 @@ class CalendarFeedDaoTest {
         return count;
     }
 
-    private static void assertProjection(
-            Map<String, CalendarFeedDao.CaseDateProjection> byField,
-            String field,
-            String keyPrefix,
-            String systemKey,
-            boolean deadline) {
-        CalendarFeedDao.CaseDateProjection projection = byField.get(field);
-        assertNotNull(projection, field);
-        assertEquals(keyPrefix, projection.keyPrefix());
-        assertEquals(systemKey, projection.systemKey());
-        assertEquals(deadline, projection.deadline());
-    }
 }
