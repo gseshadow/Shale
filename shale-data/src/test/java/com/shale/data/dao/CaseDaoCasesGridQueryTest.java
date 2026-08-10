@@ -1,5 +1,6 @@
 package com.shale.data.dao;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -9,6 +10,23 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 final class CaseDaoCasesGridQueryTest {
+
+    @Test
+    void everyPagingEntryPointChoosesAnExplicitDateAuthorityMode() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        assertTrue(source.contains("AUTHORITATIVE_MIGRATED_DATES = true"));
+        assertTrue(source.contains("LEGACY_MIGRATED_DATE_COMPATIBILITY = false"));
+        assertTrue(source.contains("null, null, null, null, AUTHORITATIVE_MIGRATED_DATES)"),
+                "The general public Cases paging entry point must use authoritative migrated dates");
+        assertTrue(source.contains("selectedStatusIds, knownTotal, AUTHORITATIVE_MIGRATED_DATES)"),
+                "The converted Cases grid path must be authoritative");
+        assertTrue(source.contains("null, AUTHORITATIVE_MIGRATED_DATES))"),
+                "The converted Cases export path must be authoritative");
+        assertTrue(source.contains("userId, null, null, null, LEGACY_MIGRATED_DATE_COMPATIBILITY)"),
+                "Deferred MyShale paging must remain explicitly compatible");
+        long internalCalls = source.lines().filter(line -> line.contains("findPageInternal(")).count();
+        assertEquals(5, internalCalls, "Four callers plus the private declaration must be reviewed together");
+    }
 
     @Test
     void casesGridUsesAuthoritativeCaseDatesForDisplaySortingAndPaging() throws Exception {

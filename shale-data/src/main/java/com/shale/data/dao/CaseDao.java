@@ -46,6 +46,8 @@ import com.shale.core.service.CaseServicePort.CaseLinkShareUpdate;
 import com.shale.core.service.CaseServicePort.CaseLinkShareRemoval;
 
 public final class CaseDao {
+	private static final boolean AUTHORITATIVE_MIGRATED_DATES = true;
+	private static final boolean LEGACY_MIGRATED_DATE_COMPATIBILITY = false;
 
 	private static final Logger LOG = Logger.getLogger(CaseDao.class.getName());
 	private static final org.slf4j.Logger PERF_LOG = org.slf4j.LoggerFactory.getLogger(CaseDao.class);
@@ -1179,7 +1181,7 @@ public final class CaseDao {
 
 	/** page is 0-based */
 	public PagedResult<CaseRow> findPage(int page, int pageSize, CaseSort sort, boolean includeClosedDenied) {
-		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, null, null, null);
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, null, null, null, AUTHORITATIVE_MIGRATED_DATES);
 	}
 
 	/**
@@ -1281,7 +1283,7 @@ public final class CaseDao {
 			String query,
 			Set<Integer> selectedStatusIds,
 			Long knownTotal) {
-		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, query, selectedStatusIds, knownTotal, true);
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, query, selectedStatusIds, knownTotal, AUTHORITATIVE_MIGRATED_DATES);
 	}
 
 	/**
@@ -1294,7 +1296,7 @@ public final class CaseDao {
 		final int exportBatchSize = 500;
 		return collectAllExportPages(page -> findPageInternal(page, exportBatchSize, sort,
 				includeClosedDenied, null, query, selectedStatusIds,
-				null, true));
+				null, AUTHORITATIVE_MIGRATED_DATES));
 	}
 
 	static <T> List<T> collectAllExportPages(java.util.function.IntFunction<PagedResult<T>> loader) {
@@ -1321,7 +1323,7 @@ public final class CaseDao {
 				+ " pageSize=" + pageSize
 				+ " sort=" + sort
 				+ " includeClosedDenied=" + includeClosedDenied);
-		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId, null, null, null, false);
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId, null, null, null, LEGACY_MIGRATED_DATE_COMPATIBILITY);
 	}
 
 	public List<CaseRow> listActiveCasesForUserTeamMember(int userId, int limit) {
