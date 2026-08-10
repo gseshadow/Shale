@@ -12,6 +12,7 @@ public final class LiveUpdateEvents {
     public static final String ENTITY_AUDIT_ACTIVITY = "EntityAuditActivity";
     /** PHI-free invalidation for any committed dbo.CaseDates occurrence mutation. */
     public static final String ENTITY_CASE_DATES = "CaseDates";
+    public static final String ENTITY_CASE_DATE_TYPES = "CaseDateTypes";
 
     public static final String CHANGE_CREATED = "CREATED";
     public static final String CHANGE_UPDATED = "UPDATED";

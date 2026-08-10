@@ -168,7 +168,7 @@ public interface CaseServicePort {
 
 	record CaseDateTypeCommand(Integer id, int shaleClientId, int actorUserId, String systemKey, String name, String description, String calendarCategory, String color, boolean supportsTime, Integer sortOrder, boolean active, byte[] expectedRowVer) { public CaseDateTypeCommand { expectedRowVer = copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); } }
 	record SetCaseDateTypeActiveCommand(int shaleClientId, int actorUserId, int id, boolean active, byte[] expectedRowVer) { public SetCaseDateTypeActiveCommand { expectedRowVer = copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); } }
-	record ResetCaseDateTypeOverrideCommand(int shaleClientId, int actorUserId, int id) {}
+	record ResetCaseDateTypeOverrideCommand(int shaleClientId, int actorUserId, int id, byte[] expectedRowVer) { public ResetCaseDateTypeOverrideCommand { expectedRowVer = copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); } }
 
 	EffectiveCaseDateTypeDto createCaseDateType(CaseDateTypeCommand command);
 	EffectiveCaseDateTypeDto updateCaseDateType(CaseDateTypeCommand command);

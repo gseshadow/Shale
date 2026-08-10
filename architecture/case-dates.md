@@ -52,11 +52,13 @@ Phase 2A adds actor-aware Settings administration APIs for `CaseDateTypes` on th
 
 * `listCaseDateTypesForAdministration(int shaleClientId, int actorUserId)` returns global and current-tenant rows with origin, active/deleted state, editable metadata, and `RowVer` for Settings overlay presentation.
 * `createCaseDateType(CaseDateTypeCommand)` creates tenant-owned custom rows.
-* `updateCaseDateType(CaseDateTypeCommand)` edits tenant-owned rows or creates/updates a tenant override for an eligible global row.
-* `setCaseDateTypeActive(SetCaseDateTypeActiveCommand)` activates/deactivates tenant-owned rows or creates/updates a tenant override for an eligible global row.
-* `resetCaseDateTypeOverride(ResetCaseDateTypeOverrideCommand)` soft-deletes the tenant override/custom row according to the established reset/remove semantics.
+* `updateCaseDateType(CaseDateTypeCommand)` edits tenant-created custom rows while preserving authoritative identity and stable keys.
+* `setCaseDateTypeActive(SetCaseDateTypeActiveCommand)` activates/deactivates tenant-created custom rows.
+* `resetCaseDateTypeOverride(ResetCaseDateTypeOverrideCommand)` retains its compatibility name and soft-deletes tenant-created custom rows with `RowVer`; protected override rows are rejected.
 
-Editable metadata follows the Phase 1A schema: display name, optional stable `SystemKey` for tenant-custom creation, description, `CalendarCategory`, color, `SupportsTime`, sort order, active state, soft deletion, and row-version concurrency. Validation enforces required names, allowed categories, `#RRGGBB` colors, stable-key format, row-version presence for edits/toggles, tenant ownership, admin actor context, and cross-tenant exclusion. Successful mutations return or reload authoritative state. Existing occurrences are not rewritten when a type is deactivated, removed, reset, or shadowed.
+Administrator-created types have no `SystemKey`; keys are reserved for system-defined contracts. For tenant-created custom types, the editable properties are display name, description, `CalendarCategory`, color, `SupportsTime`, active state, and the existing sort order. These are presentation/selection capabilities already represented by the Phase 1A schema and do not change occurrence identity. A custom type's existing key, if present from older data, is immutable. Global definitions and tenant overrides sharing a global key are protected from edit, activation changes, removal, rename, or re-keying. Validation enforces required normalized names, tenant-visible duplicate names, allowed categories, `#RRGGBB` colors, row-version presence for every existing-row mutation, tenant ownership, admin actor context, and cross-tenant exclusion. Successful mutations return or reload authoritative state. Existing occurrences are not rewritten when a custom type is deactivated or removed.
+
+Case Date Type mutations are not currently written to `EntityActionAuditLog`: the deployed/repository check constraint enumerates supported entity types and does not include `CASE_DATE_TYPE`. Adding such audit rows would fail the transaction, while using `CASE_DATE` would misclassify an administrative definition change. This phase therefore defers entity-action audit until a separately approved schema expansion can add the entity type; no sensitive values are logged as a substitute.
 
 Effective active selector reads remain separate from administration reads. New-occurrence selectors use only `listEffectiveCaseDateTypes`; inactive, deleted, reset-marker, and shadowed rows must not leak into ordinary selectors.
 
@@ -64,7 +66,7 @@ Effective active selector reads remain separate from administration reads. New-o
 
 Phase 2B adds **Settings > Case Date Types** in the established Settings manager surface. It uses the Phase 2A `CaseServicePort` administration APIs and does not call DAOs directly or calculate persistence semantics outside the service.
 
-The Settings manager supports loading/error/empty states, Add, Edit/Customize, Activate/Deactivate, Reset to Default, Remove, and refresh-after-mutation. Cards distinguish Global/default, Tenant override, Tenant custom, Active/Inactive, category, color, and `SupportsTime` in the same unobtrusive metadata style as other Settings managers.
+The Settings manager supports loading/error/empty states, Add, Edit, Activate/Deactivate, soft Remove, and refresh-after-mutation for tenant-created custom types. Cards distinguish protected Global/default and Tenant override rows from editable Tenant custom rows, along with Active/Inactive, category, color, and `SupportsTime`, in the same unobtrusive metadata style as other Settings managers.
 
 The UI uses shared Settings cards, shared semantic buttons (`ActionButtonFactory.semantic`/`ControlStyles`), Shale dialog shell/form styling, inline validation through the existing dialog flow, shared color conversion/rendering, and existing confirmation dialogs. Category values are persisted through the backend contract and color values use the same `ColorPicker`/DB color conversion used by comparable Settings lookup managers. Mutations preserve the submitted authoritative id and expected row version; concurrency failures are surfaced to the user and require reload rather than silent retry.
 
