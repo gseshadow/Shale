@@ -21,6 +21,11 @@ final class CaseDateTypeOwnershipInventoryContractTest {
         assertFalse(sql.matches("(?is).*\\bUPDATE\\s+dbo\\..*"));
         assertFalse(sql.matches("(?is).*\\bDELETE\\s+FROM\\s+dbo\\..*"));
         assertFalse(sql.matches("(?is).*\\bALTER\\s+(TABLE|SECURITY)\\b.*"));
+        assertTrue(sql.contains("COUNT_BIG(cd.Id) OccurrenceCount"));
+        assertTrue(sql.contains("COUNT_BIG(f.Id) ConfiguredFieldCount"));
+        assertFalse(sql.contains("cd.ShaleClientId,COUNT_BIG(*) OccurrenceCount"));
+        assertFalse(sql.contains("f.ShaleClientId,COUNT_BIG(*) ConfiguredFieldCount"));
+        assertTrue(sql.contains("f.ShaleClientId IS NULL OR t.ShaleClientId<>f.ShaleClientId"));
     }
 
     @Test void inventoryNamesEveryNoncriticalCompatibilityKey() throws Exception {
@@ -53,8 +58,11 @@ final class CaseDateTypeOwnershipInventoryContractTest {
                 "(3,N'discovery_deadline',N'Discovery Deadline')","(4,N'date_of_injury',N'Date of Injury')",
                 "(5,N'date_of_medical_negligence',N'Date of Medical Negligence')",
                 "(6,N'date_medical_negligence_discovered',N'Date Medical Negligence Was Discovered')",
-                "(12,N'fee_agreement_signed',N'Fee Agreement Signed')",
+                "(11,N'fee_agreement_signed',N'Fee Agreement Signed')",
                 "(13,N'non_engagement_letter_sent',N'Non-Engagement Letter Sent')"}) assertTrue(sql.contains(identity), identity);
+        assertFalse(sql.contains("(12,N'fee_agreement_signed'"));
+        assertTrue(sql.contains("f.ShaleClientId IS NULL OR f.ShaleClientId<>7"));
+        assertTrue(sql.contains("t.ShaleClientId IS NULL OR t.ShaleClientId<>7"));
         for (String blocker : new String[]{"missing or ambiguous","identity or lifecycle","conflicting ownership",
                 "identity conflicts","semantic-role participation","Cross-tenant Case Date","Cross-tenant form",
                 "unreviewed Case Date Type foreign-key consumer","personal test tenant"}) assertTrue(sql.contains(blocker), blocker);

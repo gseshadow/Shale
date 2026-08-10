@@ -20,7 +20,7 @@ BEGIN TRY
  (3,N'discovery_deadline',N'Discovery Deadline'),(4,N'date_of_injury',N'Date of Injury'),
  (5,N'date_of_medical_negligence',N'Date of Medical Negligence'),
  (6,N'date_medical_negligence_discovered',N'Date Medical Negligence Was Discovered'),
- (12,N'fee_agreement_signed',N'Fee Agreement Signed'),(13,N'non_engagement_letter_sent',N'Non-Engagement Letter Sent');
+ (11,N'fee_agreement_signed',N'Fee Agreement Signed'),(13,N'non_engagement_letter_sent',N'Non-Engagement Letter Sent');
 
  /* UPDLOCK/HOLDLOCK makes validation and correction one serializable operation. */
  SELECT t.Id INTO #LockedTargets
@@ -41,9 +41,10 @@ BEGIN TRY
   THROW 56927,'Protected semantic-role participation blocks the ownership correction.',1;
  IF EXISTS(SELECT 1 FROM dbo.CaseDates cd JOIN @Expected e ON e.Id=cd.CaseDateTypeId
            LEFT JOIN dbo.Cases c ON c.Id=cd.CaseId
-           WHERE cd.ShaleClientId<>7 OR c.Id IS NULL OR c.ShaleClientId<>7)
+           WHERE cd.ShaleClientId IS NULL OR cd.ShaleClientId<>7 OR c.Id IS NULL OR c.ShaleClientId IS NULL OR c.ShaleClientId<>7)
   THROW 56928,'Cross-tenant Case Date references block the ownership correction.',1;
- IF EXISTS(SELECT 1 FROM dbo.FormConfiguredFields f JOIN @Expected e ON e.Id=f.CaseDateTypeId WHERE f.ShaleClientId<>7)
+ IF EXISTS(SELECT 1 FROM dbo.FormConfiguredFields f JOIN @Expected e ON e.Id=f.CaseDateTypeId
+           WHERE f.ShaleClientId IS NULL OR f.ShaleClientId<>7)
   THROW 56929,'Cross-tenant form references block the ownership correction.',1;
  IF EXISTS(SELECT 1 FROM sys.foreign_keys fk JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id=fk.object_id
            WHERE fk.referenced_object_id=OBJECT_ID(N'dbo.CaseDateTypes')
@@ -59,7 +60,7 @@ BEGIN TRY
  FROM dbo.CaseDateTypes t JOIN @Expected e ON e.Id=t.Id
  WHERE t.ShaleClientId IS NULL;
 
- IF @@ROWCOUNT NOT IN(0,10) OR EXISTS(SELECT 1 FROM @Expected e JOIN dbo.CaseDateTypes t ON t.Id=e.Id WHERE t.ShaleClientId<>7)
+ IF @@ROWCOUNT NOT IN(0,10) OR EXISTS(SELECT 1 FROM @Expected e JOIN dbo.CaseDateTypes t ON t.Id=e.Id WHERE t.ShaleClientId IS NULL OR t.ShaleClientId<>7)
   THROW 56932,'Case Date Type ownership correction was incomplete.',1;
  IF @OccurrenceCount<>(SELECT COUNT_BIG(*) FROM dbo.CaseDates cd JOIN @Expected e ON e.Id=cd.CaseDateTypeId) OR
     @FormCount<>(SELECT COUNT_BIG(*) FROM dbo.FormConfiguredFields f JOIN @Expected e ON e.Id=f.CaseDateTypeId)
