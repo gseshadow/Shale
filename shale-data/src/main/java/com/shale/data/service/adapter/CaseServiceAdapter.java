@@ -15,6 +15,7 @@ import com.shale.core.dto.CaseDateDto;
 import com.shale.core.dto.MigratedCaseDateProjectionDto;
 import java.util.Collection;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import com.shale.core.dto.CaseDateSemanticRoleMappingDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
@@ -252,6 +253,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override public List<EffectiveCaseDateTypeDto> listCaseDateTypesForAdministration(int shaleClientId, int actorUserId) { validatePositive(shaleClientId,"ShaleClientId"); validatePositive(actorUserId,"ActorUserId"); return caseGateway.listCaseDateTypesForAdministration(shaleClientId, actorUserId); }
+	@Override public List<CaseDateSemanticRoleMappingDto> listCaseDateSemanticRoleMappings(int t,int a){validatePositive(t,"ShaleClientId");validatePositive(a,"ActorUserId");return caseGateway.listCaseDateSemanticRoleMappings(t,a);}
+	@Override public CaseDateSemanticRoleMappingDto saveCaseDateSemanticRoleMapping(SaveCaseDateSemanticRoleMappingCommand c){return caseGateway.saveCaseDateSemanticRoleMapping(c);}
+	@Override public void resetCaseDateSemanticRoleMapping(ResetCaseDateSemanticRoleMappingCommand c){caseGateway.resetCaseDateSemanticRoleMapping(c);}
 	@Override public EffectiveCaseDateTypeDto createCaseDateType(CaseDateTypeCommand command) { Objects.requireNonNull(command,"command"); validatePositive(command.shaleClientId(),"ShaleClientId"); validatePositive(command.actorUserId(),"ActorUserId"); return caseGateway.createCaseDateType(command); }
 	@Override public EffectiveCaseDateTypeDto updateCaseDateType(CaseDateTypeCommand command) { Objects.requireNonNull(command,"command"); validatePositive(command.shaleClientId(),"ShaleClientId"); validatePositive(command.actorUserId(),"ActorUserId"); validatePositive(command.id()==null?0:command.id(),"CaseDateTypeId"); validateRequiredRowVer(command.expectedRowVer(),"expectedRowVer"); return caseGateway.updateCaseDateType(command); }
 	@Override public EffectiveCaseDateTypeDto setCaseDateTypeActive(SetCaseDateTypeActiveCommand command) { Objects.requireNonNull(command,"command"); validatePositive(command.shaleClientId(),"ShaleClientId"); validatePositive(command.actorUserId(),"ActorUserId"); validatePositive(command.id(),"CaseDateTypeId"); validateRequiredRowVer(command.expectedRowVer(),"expectedRowVer"); return caseGateway.setCaseDateTypeActive(command); }
@@ -728,6 +732,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
 		default List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("listEffectiveCaseDateTypes"); }
 		default List<EffectiveCaseDateTypeDto> listCaseDateTypesForAdministration(int shaleClientId, int actorUserId) { throw unsupportedCaseLinkGatewayOperation("listCaseDateTypesForAdministration"); }
+		default List<CaseDateSemanticRoleMappingDto> listCaseDateSemanticRoleMappings(int t,int a){throw unsupportedCaseLinkGatewayOperation("listCaseDateSemanticRoleMappings");}
+		default CaseDateSemanticRoleMappingDto saveCaseDateSemanticRoleMapping(SaveCaseDateSemanticRoleMappingCommand c){throw unsupportedCaseLinkGatewayOperation("saveCaseDateSemanticRoleMapping");}
+		default void resetCaseDateSemanticRoleMapping(ResetCaseDateSemanticRoleMappingCommand c){throw unsupportedCaseLinkGatewayOperation("resetCaseDateSemanticRoleMapping");}
 		default EffectiveCaseDateTypeDto createCaseDateType(CaseDateTypeCommand command) { throw unsupportedCaseLinkGatewayOperation("createCaseDateType"); }
 		default EffectiveCaseDateTypeDto updateCaseDateType(CaseDateTypeCommand command) { throw unsupportedCaseLinkGatewayOperation("updateCaseDateType"); }
 		default EffectiveCaseDateTypeDto setCaseDateTypeActive(SetCaseDateTypeActiveCommand command) { throw unsupportedCaseLinkGatewayOperation("setCaseDateTypeActive"); }
@@ -908,6 +915,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		@Override public List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) { return caseDateDao.listEffectiveCaseDateTypes(shaleClientId, actorUserId); }
 		@Override public List<EffectiveCaseDateTypeDto> listCaseDateTypesForAdministration(int shaleClientId, int actorUserId) { return caseDateDao.listCaseDateTypesForAdministration(shaleClientId, actorUserId); }
+		@Override public List<CaseDateSemanticRoleMappingDto> listCaseDateSemanticRoleMappings(int t,int a){return caseDateDao.listCaseDateSemanticRoleMappings(t,a);}
+		@Override public CaseDateSemanticRoleMappingDto saveCaseDateSemanticRoleMapping(SaveCaseDateSemanticRoleMappingCommand c){return caseDateDao.saveCaseDateSemanticRoleMapping(c);}
+		@Override public void resetCaseDateSemanticRoleMapping(ResetCaseDateSemanticRoleMappingCommand c){caseDateDao.resetCaseDateSemanticRoleMapping(c);}
 		@Override public EffectiveCaseDateTypeDto createCaseDateType(CaseDateTypeCommand command) { return caseDateDao.createCaseDateType(command); }
 		@Override public EffectiveCaseDateTypeDto updateCaseDateType(CaseDateTypeCommand command) { return caseDateDao.updateCaseDateType(command); }
 		@Override public EffectiveCaseDateTypeDto setCaseDateTypeActive(SetCaseDateTypeActiveCommand command) { return caseDateDao.setCaseDateTypeActive(command); }

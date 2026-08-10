@@ -3,6 +3,7 @@ package com.shale.data.dao;
 import com.shale.core.dto.CaseDateDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.MigratedCaseDateProjectionDto;
+import com.shale.core.dto.CaseDateSemanticRoleMappingDto;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.service.CaseServicePort.CreateCaseDateCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseDateCommand;
@@ -11,6 +12,8 @@ import com.shale.core.service.CaseServicePort.RestoreCaseDateCommand;
 import com.shale.core.service.CaseServicePort.CaseDateTypeCommand;
 import com.shale.core.service.CaseServicePort.SetCaseDateTypeActiveCommand;
 import com.shale.core.service.CaseServicePort.ResetCaseDateTypeOverrideCommand;
+import com.shale.core.service.CaseServicePort.SaveCaseDateSemanticRoleMappingCommand;
+import com.shale.core.service.CaseServicePort.ResetCaseDateSemanticRoleMappingCommand;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -449,20 +452,41 @@ public final class CaseDateDao {
         } catch (SQLException e) { throw fail(e); }
     }
 
+    public List<CaseDateSemanticRoleMappingDto> listCaseDateSemanticRoleMappings(int tenant,int actor){try(Connection con=db.requireConnection()){verifyTenant(con,tenant);validateAdminActor(con,tenant,actor);return listRoleMappings(con,tenant);}catch(SQLException e){throw fail(e);}}
+    private List<CaseDateSemanticRoleMappingDto> listRoleMappings(Connection con,int tenant)throws SQLException{String sql="""
+        SELECT r.RoleKey,CASE r.RoleKey WHEN 'INTAKE' THEN 'Intake' WHEN 'STATUTE_OF_LIMITATIONS' THEN 'Statute of Limitations' ELSE 'Tort Notice Deadline' END,
+          COALESCE(tm.CaseDateTypeId,gm.CaseDateTypeId),COALESCE(tt.Name,gt.Name),tm.Id,tm.RowVer,tt.Id
+        FROM dbo.CaseDateSemanticRoles r
+        JOIN dbo.CaseDateTypeSemanticRoleMappings gm ON gm.ShaleClientId IS NULL AND gm.SemanticRoleKey=r.RoleKey AND gm.IsActive=1 AND gm.IsDeleted=0
+        JOIN dbo.CaseDateTypes gt ON gt.Id=gm.CaseDateTypeId AND gt.ShaleClientId IS NULL AND gt.IsActive=1 AND gt.IsDeleted=0
+        LEFT JOIN dbo.CaseDateTypeSemanticRoleMappings tm ON tm.ShaleClientId=? AND tm.SemanticRoleKey=r.RoleKey AND tm.IsActive=1 AND tm.IsDeleted=0
+        LEFT JOIN dbo.CaseDateTypes tt ON tt.Id=tm.CaseDateTypeId AND tt.ShaleClientId=? AND tt.IsActive=1 AND tt.IsDeleted=0
+        ORDER BY CASE r.RoleKey WHEN 'INTAKE' THEN 1 WHEN 'STATUTE_OF_LIMITATIONS' THEN 2 ELSE 3 END""";try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){List<CaseDateSemanticRoleMappingDto> out=new ArrayList<>();while(rs.next()){Long id=(Long)rs.getObject(5);if(id!=null&&rs.getObject(7)==null)throw new IllegalStateException("The tenant Case Date role mapping references an ineligible type.");out.add(new CaseDateSemanticRoleMappingDto(rs.getString(1),rs.getString(2),rs.getInt(3),rs.getString(4),id!=null,id,rs.getBytes(6)));}return List.copyOf(out);}}}
+    public CaseDateSemanticRoleMappingDto saveCaseDateSemanticRoleMapping(SaveCaseDateSemanticRoleMappingCommand c){return mutateType(c.shaleClientId(),c.actorUserId(),con->{CaseDateSemanticRole role=CaseDateSemanticRole.require(c.roleKey());requireEligibleTenantRoleType(con,c.shaleClientId(),c.caseDateTypeId());MappingRow old=findActiveMapping(con,c.shaleClientId(),role.persistedKey());if(old==null&&c.expectedMappingId()!=null)throw new IllegalStateException("Case Date role mapping changed.");if(old!=null){if(!Objects.equals(c.expectedMappingId(),old.id)||!Arrays.equals(c.expectedRowVer(),old.rowVer))throw new IllegalStateException("Case Date role mapping changed.");retireMapping(con,c.shaleClientId(),c.actorUserId(),old.id,c.expectedRowVer());}
+        long id;try(PreparedStatement ps=con.prepareStatement("INSERT dbo.CaseDateTypeSemanticRoleMappings(ShaleClientId,SemanticRoleKey,CaseDateTypeId,CreatedByUserId) OUTPUT INSERTED.Id VALUES(?,?,?,?)")){ps.setInt(1,c.shaleClientId());ps.setString(2,role.persistedKey());ps.setInt(3,c.caseDateTypeId());ps.setInt(4,c.actorUserId());try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalStateException("Case Date role mapping was not saved.");id=rs.getLong(1);}}
+        auditRoleMapping(con,c.shaleClientId(),c.actorUserId(),id,old==null?EntityActionAuditEvent.Action.OVERRIDE_CREATED:EntityActionAuditEvent.Action.UPDATED,role.persistedKey(),c.caseDateTypeId());return listRoleMappings(con,c.shaleClientId()).stream().filter(x->x.roleKey().equals(role.persistedKey())).findFirst().orElseThrow();});}
+    public void resetCaseDateSemanticRoleMapping(ResetCaseDateSemanticRoleMappingCommand c){mutateType(c.shaleClientId(),c.actorUserId(),con->{CaseDateSemanticRole role=CaseDateSemanticRole.require(c.roleKey());requireExpected(c.expectedRowVer());MappingRow old=findActiveMapping(con,c.shaleClientId(),role.persistedKey());if(old==null||old.id!=c.mappingId()||!Arrays.equals(old.rowVer,c.expectedRowVer()))throw new IllegalStateException("Case Date role mapping changed.");retireMapping(con,c.shaleClientId(),c.actorUserId(),old.id,c.expectedRowVer());auditRoleMapping(con,c.shaleClientId(),c.actorUserId(),old.id,EntityActionAuditEvent.Action.OVERRIDE_RESET,role.persistedKey(),old.typeId);return null;});}
+    private void retireMapping(Connection con,int tenant,int actor,long id,byte[] rv)throws SQLException{try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.CaseDateTypeSemanticRoleMappings SET IsActive=0,IsDeleted=1,DeletedAt=SYSUTCDATETIME(),DeletedByUserId=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND RowVer=?")){ps.setInt(1,actor);ps.setInt(2,actor);ps.setLong(3,id);ps.setInt(4,tenant);ps.setBytes(5,rv);if(ps.executeUpdate()!=1)throw new IllegalStateException("Case Date role mapping changed.");}}
+    private MappingRow findActiveMapping(Connection con,int tenant,String role)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT Id,CaseDateTypeId,RowVer FROM dbo.CaseDateTypeSemanticRoleMappings WHERE ShaleClientId=? AND SemanticRoleKey=? AND IsActive=1 AND IsDeleted=0")){ps.setInt(1,tenant);ps.setString(2,role);try(ResultSet rs=ps.executeQuery()){if(!rs.next())return null;MappingRow row=new MappingRow(rs.getLong(1),rs.getInt(2),rs.getBytes(3));if(rs.next())throw new IllegalStateException("Ambiguous tenant Case Date role mappings.");return row;}}}
+    private void requireEligibleTenantRoleType(Connection con,int tenant,int type)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT COUNT(*) FROM dbo.CaseDateTypes WHERE Id=? AND ShaleClientId=? AND IsActive=1 AND IsDeleted=0")){ps.setInt(1,type);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){rs.next();if(rs.getInt(1)!=1)throw new IllegalArgumentException("Select an active tenant Case Date Type.");}}}
+    private void requireNotActivelyMapped(Connection con,int tenant,int type)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings WHERE ShaleClientId=? AND CaseDateTypeId=? AND IsActive=1 AND IsDeleted=0")){ps.setInt(1,tenant);ps.setInt(2,type);try(ResultSet rs=ps.executeQuery()){if(rs.next())throw new IllegalStateException("Change or reset the "+CaseDateSemanticRole.require(rs.getString(1)).displayName()+" mapping before deactivating or removing this Case Date Type.");}}}
+    private void auditRoleMapping(Connection con,int tenant,int actor,long id,EntityActionAuditEvent.Action action,String role,int type)throws SQLException{entityActionAuditDao.append(con,EntityActionAuditEvent.now(tenant,actor,EntityActionAuditEvent.EntityType.CASE_DATE_ROLE_MAPPING,id,action,null,null,Map.of(EntityActionAuditEvent.MetadataKey.SEMANTIC_ROLE,role,EntityActionAuditEvent.MetadataKey.CASE_DATE_TYPE_ID,type)));}
+    private record MappingRow(long id,int typeId,byte[] rowVer){}
+
     public EffectiveCaseDateTypeDto createCaseDateType(CaseDateTypeCommand c) { return mutateType(c.shaleClientId(), c.actorUserId(), con -> {
         if (normalizeSystemKey(c.systemKey()) != null) throw new IllegalArgumentException("System keys are reserved for protected system-defined Case Date Types.");
         EffectiveCaseDateTypeDto created=insertType(con,c,null); return created;
     }); }
     public EffectiveCaseDateTypeDto updateCaseDateType(CaseDateTypeCommand c) { return mutateType(c.shaleClientId(), c.actorUserId(), con -> {
         requireExpected(c.expectedRowVer()); EffectiveCaseDateTypeDto e=findType(con,c.id()); requireTypeForTenant(e,c.shaleClientId());
-        requireCustomType(e); ensureStableKeyUnchanged(e,c.systemKey()); EffectiveCaseDateTypeDto updated=updateTypeRow(con,c,e.id(),c.expectedRowVer(),e.systemKey()); return updated;
+        requireCustomType(e); if(!c.active()) requireNotActivelyMapped(con,c.shaleClientId(),e.id()); ensureStableKeyUnchanged(e,c.systemKey()); EffectiveCaseDateTypeDto updated=updateTypeRow(con,c,e.id(),c.expectedRowVer(),e.systemKey()); return updated;
     }); }
     public EffectiveCaseDateTypeDto setCaseDateTypeActive(SetCaseDateTypeActiveCommand c) { return mutateType(c.shaleClientId(), c.actorUserId(), con -> {
         requireExpected(c.expectedRowVer()); EffectiveCaseDateTypeDto e=findType(con,c.id()); requireTypeForTenant(e,c.shaleClientId());
-        requireCustomType(e); CaseDateTypeCommand cmd=new CaseDateTypeCommand(e.id(),c.shaleClientId(),c.actorUserId(),e.systemKey(),e.name(),e.description(),e.calendarCategory(),e.color(),e.supportsTime(),e.sortOrder(),c.active(),e.rowVer());
+        requireCustomType(e); if(!c.active()) requireNotActivelyMapped(con,c.shaleClientId(),e.id()); CaseDateTypeCommand cmd=new CaseDateTypeCommand(e.id(),c.shaleClientId(),c.actorUserId(),e.systemKey(),e.name(),e.description(),e.calendarCategory(),e.color(),e.supportsTime(),e.sortOrder(),c.active(),e.rowVer());
         EffectiveCaseDateTypeDto updated=updateTypeRow(con,cmd,e.id(),c.expectedRowVer(),e.systemKey()); return updated;
     }); }
-    public void resetCaseDateTypeOverride(ResetCaseDateTypeOverrideCommand c) { mutateType(c.shaleClientId(), c.actorUserId(), con -> { requireExpected(c.expectedRowVer()); EffectiveCaseDateTypeDto e=findType(con,c.id()); requireTypeForTenant(e,c.shaleClientId()); requireCustomType(e); softDeleteType(con,c.shaleClientId(),c.actorUserId(),e.id(),c.expectedRowVer()); return e; }); }
+    public void resetCaseDateTypeOverride(ResetCaseDateTypeOverrideCommand c) { mutateType(c.shaleClientId(), c.actorUserId(), con -> { requireExpected(c.expectedRowVer()); EffectiveCaseDateTypeDto e=findType(con,c.id()); requireTypeForTenant(e,c.shaleClientId()); requireCustomType(e); requireNotActivelyMapped(con,c.shaleClientId(),e.id()); softDeleteType(con,c.shaleClientId(),c.actorUserId(),e.id(),c.expectedRowVer()); return e; }); }
 
 
     public CaseDateDto createCaseDate(CreateCaseDateCommand c) {
