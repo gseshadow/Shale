@@ -6,6 +6,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -13,11 +16,29 @@ import java.util.Objects;
 import com.shale.core.dto.CaseSummaryProjection;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The authoritative SQL boundary for shared, tenant-scoped Case summaries. */
 public final class CaseSummaryDao {
+	private static final Logger LOG = LoggerFactory.getLogger(CaseSummaryDao.class);
 	public enum DeletedState { ACTIVE, DELETED, ALL }
 	public enum Order { NAME_ASC, UPDATED_DESC }
+	/** Closed allow-list shared by the Cases UI and this SQL boundary. */
+	public enum GridOrder {
+		INTAKE_NEWEST, INTAKE_OLDEST, STATUTE_SOONEST, STATUTE_LATEST,
+		CASE_NAME_ASC, CASE_NAME_DESC, RESPONSIBLE_ATTORNEY_ASC,
+		RESPONSIBLE_ATTORNEY_DESC, CASE_STATUS_ASC, CASE_STATUS_DESC
+	}
+	public enum GridStatusMode { UNRESTRICTED, SELECTED, NO_STATUS }
+
+	/** Consumer-specific, PHI-bearing shape. It is deliberately not part of CaseSummaryProjection. */
+	public record CaseGridRow(CaseSummaryProjection summary, LocalDate intakeDate,
+			LocalDate statuteOfLimitationsDate, LocalDate dateOfIncident, LocalDate tortClaimsNoticeDeadline,
+			String practiceAreaColor, Boolean nonEngagementLetterSent, String clientName,
+			String opposingPartiesName, String latestCaseUpdate, String description) { }
+
+	public record GridPage(List<CaseGridRow> items, int page, int pageSize, long total) { }
 
 	private final DbSessionProvider db;
 
@@ -106,13 +127,201 @@ public final class CaseSummaryDao {
 		}
 	}
 
-	private static void verifyTenant(Connection con, int requestedTenantId) throws SQLException {
+	/** Main active Cases grid. Filtering, ordering, enrichment and paging stay set based. */
+	public GridPage findActiveGridPage(int requestedTenantId, int page, int pageSize, GridOrder order,
+			String query, GridStatusMode statusMode, Set<Integer> selectedStatusIds, Long knownTotal) {
+		if (requestedTenantId <= 0) throw new IllegalArgumentException("requestedTenantId must be > 0");
+		if (page < 0 || pageSize <= 0) throw new IllegalArgumentException("Invalid grid page");
+		Objects.requireNonNull(order, "order");
+		Objects.requireNonNull(statusMode, "statusMode");
+		String normalized = query == null ? "" : query.strip().toLowerCase(java.util.Locale.ROOT);
+		Set<Integer> statuses = selectedStatusIds == null ? Set.of() : new LinkedHashSet<>(selectedStatusIds);
+		validateStatusMode(statusMode, statuses);
+		Set<Integer> boundStatuses = statusMode == GridStatusMode.SELECTED ? statuses : Set.of();
+		String statusPredicate = statusPredicate(statusMode, statuses.size());
+		String searchPredicate = normalized.isBlank() ? "" : "AND LOWER(COALESCE(c.Name, '')) LIKE ?";
+		String orderBy = gridOrderSql(order);
+		try (Connection con = db.requireConnection()) {
+			int sessionTenantId = verifyTenant(con, requestedTenantId);
+			long total = knownTotal != null && knownTotal >= 0 ? knownTotal
+					: countActiveGrid(con, requestedTenantId, normalized, boundStatuses, searchPredicate, statusPredicate);
+			LOG.debug("Cases grid query tenant={} sessionTenant={} deletedMode=ACTIVE searchEnabled={} statusMode={} statusCount={} statusIds={} page={} pageSize={} sort={} count={}",
+					requestedTenantId, sessionTenantId, !normalized.isBlank(), statusMode, statuses.size(), statuses, page, pageSize, order, total);
+			if (total == 0) return new GridPage(List.of(), page, pageSize, 0);
+			String sql = gridSql(searchPredicate, statusPredicate, orderBy);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int index = bindGridCriteria(ps, requestedTenantId, normalized, boundStatuses, 1);
+				ps.setInt(index++, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(index++, RoleSemantics.ROLE_LEGAL_ASSISTANT);
+				ps.setInt(index++, page * pageSize);
+				ps.setInt(index, pageSize);
+				List<CaseGridRow> rows = new ArrayList<>(pageSize);
+				try (ResultSet rs = ps.executeQuery()) { while (rs.next()) rows.add(mapGrid(rs)); }
+				LOG.debug("Cases grid page tenant={} page={} pageSize={} sort={} returnedRows={}", requestedTenantId, page, pageSize, order, rows.size());
+				return new GridPage(List.copyOf(rows), page, pageSize, total);
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load authoritative Cases grid page", e);
+		}
+	}
+
+	public long countActiveGrid(int requestedTenantId, String query, GridStatusMode statusMode, Set<Integer> selectedStatusIds) {
+		Objects.requireNonNull(statusMode, "statusMode");
+		String normalized = query == null ? "" : query.strip().toLowerCase(java.util.Locale.ROOT);
+		Set<Integer> statuses = selectedStatusIds == null ? Set.of() : new LinkedHashSet<>(selectedStatusIds);
+		validateStatusMode(statusMode, statuses);
+		Set<Integer> boundStatuses = statusMode == GridStatusMode.SELECTED ? statuses : Set.of();
+		String search = normalized.isBlank() ? "" : "AND LOWER(COALESCE(c.Name, '')) LIKE ?";
+		String status = statusPredicate(statusMode, statuses.size());
+		try (Connection con = db.requireConnection()) {
+			verifyTenant(con, requestedTenantId);
+			return countActiveGrid(con, requestedTenantId, normalized, boundStatuses, search, status);
+		} catch (SQLException e) { throw new RuntimeException("Failed to count authoritative Cases grid", e); }
+	}
+
+	static String statusPredicate(GridStatusMode mode, int selectedCount) {
+		return switch (mode) {
+			case UNRESTRICTED -> "";
+			case NO_STATUS -> "AND status_row.StatusId IS NULL";
+			case SELECTED -> "AND (status_row.StatusId IS NULL OR status_row.StatusId IN ("
+					+ String.join(",", java.util.Collections.nCopies(selectedCount, "?")) + "))";
+		};
+	}
+
+	private static void validateStatusMode(GridStatusMode mode, Set<Integer> statuses) {
+		if (mode == GridStatusMode.SELECTED && statuses.isEmpty())
+			throw new IllegalArgumentException("SELECTED status mode requires at least one status ID");
+	}
+
+	private long countActiveGrid(Connection con, int tenant, String query, Set<Integer> statuses,
+			String searchPredicate, String statusPredicate) throws SQLException {
+		String sql = "SELECT COUNT_BIG(1) FROM dbo.Cases c " + statusApplySql() +
+				" WHERE c.ShaleClientId = ? AND ISNULL(c.IsDeleted,0)=0 " + searchPredicate + " " + statusPredicate;
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			bindGridCriteria(ps, tenant, query, statuses, 1);
+			try (ResultSet rs = ps.executeQuery()) { rs.next(); return rs.getLong(1); }
+		}
+	}
+
+	private static int bindGridCriteria(PreparedStatement ps, int tenant, String query, Set<Integer> statuses, int index) throws SQLException {
+		ps.setInt(index++, tenant);
+		if (!query.isBlank()) ps.setString(index++, "%" + query.replace("[", "[[]").replace("%", "[%]").replace("_", "[_]") + "%");
+		for (Integer status : statuses) ps.setInt(index++, status);
+		return index;
+	}
+
+	private static String gridOrderSql(GridOrder order) {
+		return switch (order) {
+			case INTAKE_NEWEST -> "dates.IntakeDate DESC, c.Id DESC";
+			case INTAKE_OLDEST -> "dates.IntakeDate ASC, c.Id ASC";
+			case STATUTE_SOONEST -> "dates.StatuteDate ASC, c.Id ASC";
+			case STATUTE_LATEST -> "dates.StatuteDate DESC, c.Id DESC";
+			case CASE_NAME_ASC -> "c.Name ASC, c.Id ASC";
+			case CASE_NAME_DESC -> "c.Name DESC, c.Id DESC";
+			case RESPONSIBLE_ATTORNEY_ASC -> "attorney_user.DisplayName ASC, c.Id ASC";
+			case RESPONSIBLE_ATTORNEY_DESC -> "attorney_user.DisplayName DESC, c.Id DESC";
+			case CASE_STATUS_ASC -> "c.StatusName ASC, c.Id ASC";
+			case CASE_STATUS_DESC -> "c.StatusName DESC, c.Id DESC";
+		};
+	}
+
+	private static String statusApplySql() {
+		return """
+			OUTER APPLY (
+			 SELECT TOP (1) s.Id StatusId, s.SystemKey, s.LifecycleKey, s.Name StatusName, s.Color StatusColor
+			 FROM dbo.CaseStatuses cs JOIN dbo.Statuses s ON s.Id=cs.StatusId
+			  AND (s.ShaleClientId=c.ShaleClientId OR s.ShaleClientId IS NULL)
+			 WHERE cs.CaseId=c.Id AND cs.EndDate IS NULL
+			 ORDER BY cs.IsPrimary DESC, cs.EffectiveDate DESC, cs.UpdatedAt DESC, cs.CreatedAt DESC, cs.Id DESC
+			) status_row
+			""";
+	}
+
+	private static String gridSql(String search, String status, String orderBy) {
+		return """
+			WITH Filtered AS (
+			 SELECT c.*, status_row.StatusId, status_row.SystemKey StatusSystemKey,
+			        status_row.LifecycleKey StatusLifecycleKey, status_row.StatusName, status_row.StatusColor
+			 FROM dbo.Cases c
+			 %s
+			 WHERE c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0 %s %s
+			), Ordered AS (
+			 SELECT c.*, dates.IntakeDate, dates.StatuteDate, dates.InjuryDate, dates.TortDate,
+			        attorney.UserId ResponsibleAttorneyId, attorney_user.DisplayName ResponsibleAttorneyName,
+			        attorney_user.Color ResponsibleAttorneyColor,
+			        assistant.UserId PrimaryLegalAssistantId, assistant_user.DisplayName PrimaryLegalAssistantName,
+			        assistant_user.Color PrimaryLegalAssistantColor,
+			        ROW_NUMBER() OVER (ORDER BY %s) PageOrdinal
+			 FROM Filtered c
+			 OUTER APPLY (
+			  SELECT
+			   MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
+			   MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+			   MAX(CASE WHEN t.SystemKey='date_of_injury' THEN CAST(cd.StartsAt AS date) END) InjuryDate,
+			   MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+			  FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
+			   AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
+			  OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
+			    WHERE m.CaseDateTypeId=t.Id AND m.IsActive=1 AND m.IsDeleted=0
+			      AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL)
+			    ORDER BY CASE WHEN m.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END, m.Id DESC) effective
+			  WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0
+			 ) dates
+			 OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=?
+			   ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) attorney
+			 OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color
+			   FROM dbo.Users u WHERE u.id=attorney.UserId AND u.ShaleClientId=c.ShaleClientId) attorney_user
+			 OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=?
+			   ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) assistant
+			 OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color
+			   FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
+			 ORDER BY %s OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+			)
+			SELECT c.*, pa.Name PracticeAreaName, pa.Color PracticeAreaColor,
+			 client.ClientName, opposing.OpposingPartiesName, latest.LatestCaseUpdate
+			FROM Ordered c
+			LEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId AND (pa.ShaleClientId=c.ShaleClientId OR pa.ShaleClientId IS NULL)
+			OUTER APPLY (SELECT TOP(1) CASE WHEN NULLIF(LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))),'') IS NULL THEN ct.Name ELSE LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))) END ClientName
+			 FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId JOIN dbo.Contacts ct ON ct.Id=cp.ContactId
+			 WHERE cp.CaseId=c.Id AND LOWER(LTRIM(RTRIM(pr.SystemKey)))='party' AND LOWER(LTRIM(RTRIM(cp.Side)))='represented'
+			  AND ISNULL(ct.IsDeleted,0)=0 ORDER BY cp.IsPrimary DESC,cp.UpdatedAt DESC,cp.CreatedAt DESC,cp.Id DESC) client
+			OUTER APPLY (SELECT STRING_AGG(x.DisplayName,', ') WITHIN GROUP(ORDER BY x.Id) OpposingPartiesName FROM
+			 (SELECT cp.Id,COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))),''),ct.Name,o.Name) DisplayName
+			  FROM dbo.CaseParties cp LEFT JOIN dbo.Contacts ct ON ct.Id=cp.ContactId LEFT JOIN dbo.Organizations o ON o.Id=cp.OrganizationId
+			  WHERE cp.CaseId=c.Id AND LOWER(LTRIM(RTRIM(cp.Side)))='opposing' AND ISNULL(ct.IsDeleted,0)=0 AND ISNULL(o.IsDeleted,0)=0) x
+			 WHERE NULLIF(x.DisplayName,'') IS NOT NULL) opposing
+			OUTER APPLY (SELECT TOP(1) NULLIF(LTRIM(RTRIM(cu.NoteText)),'') LatestCaseUpdate FROM dbo.CaseUpdates cu
+			 WHERE cu.CaseId=c.Id AND ISNULL(cu.IsDeleted,0)=0 AND NULLIF(LTRIM(RTRIM(cu.NoteText)),'') IS NOT NULL
+			 ORDER BY cu.CreatedAt DESC,cu.Id DESC) latest
+			ORDER BY c.PageOrdinal
+			""".formatted(statusApplySql(), search, status, orderBy, orderBy);
+	}
+
+	private static CaseGridRow mapGrid(ResultSet rs) throws SQLException {
+		CaseSummaryProjection summary = new CaseSummaryProjection(rs.getLong("Id"), rs.getInt("ShaleClientId"),
+				rs.getString("CaseNumber"), rs.getString("Name"), nullableInt(rs,"StatusId"), rs.getString("StatusSystemKey"),
+				rs.getString("StatusLifecycleKey"), rs.getString("StatusName"), rs.getString("StatusColor"),
+				nullableInt(rs,"PracticeAreaId"), rs.getString("PracticeAreaName"), nullableInt(rs,"ResponsibleAttorneyId"),
+				rs.getString("ResponsibleAttorneyName"), rs.getString("ResponsibleAttorneyColor"), nullableInt(rs,"PrimaryLegalAssistantId"),
+				rs.getString("PrimaryLegalAssistantName"), rs.getString("PrimaryLegalAssistantColor"),
+				localDateTime(rs.getTimestamp("CreatedAt")), localDateTime(rs.getTimestamp("UpdatedAt")), rs.getBoolean("IsDeleted"));
+		return new CaseGridRow(summary, localDate(rs,"IntakeDate"), localDate(rs,"StatuteDate"), localDate(rs,"InjuryDate"),
+				localDate(rs,"TortDate"), rs.getString("PracticeAreaColor"), (Boolean)rs.getObject("NonEngagementLetterSent"),
+				rs.getString("ClientName"), rs.getString("OpposingPartiesName"), rs.getString("LatestCaseUpdate"), rs.getString("Description"));
+	}
+
+	private static LocalDate localDate(ResultSet rs, String column) throws SQLException {
+		java.sql.Date value=rs.getDate(column); return value==null?null:value.toLocalDate();
+	}
+
+	private static int verifyTenant(Connection con, int requestedTenantId) throws SQLException {
 		try (PreparedStatement ps = con.prepareStatement("SELECT TRY_CONVERT(int, SESSION_CONTEXT(N'ShaleClientId'))");
 				ResultSet rs = ps.executeQuery()) {
 			if (!rs.next() || rs.getObject(1) == null)
 				throw new IllegalStateException("ShaleClientId session context is missing.");
 			if (rs.getInt(1) != requestedTenantId)
 				throw new IllegalStateException("Requested tenant conflicts with ShaleClientId session context.");
+			return rs.getInt(1);
 		}
 	}
 

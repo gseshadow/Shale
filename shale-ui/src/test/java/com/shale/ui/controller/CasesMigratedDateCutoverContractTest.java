@@ -3,22 +3,30 @@ package com.shale.ui.controller;
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
+import com.shale.ui.controller.support.CaseListUiSupport.StatusFilterOption;
+import com.shale.data.dao.CaseSummaryDao.GridStatusMode;
 import org.junit.jupiter.api.Test;
 
 final class CasesMigratedDateCutoverContractTest {
     private static String read(String path) throws Exception { return Files.readString(Path.of(path)); }
 
+    @Test void statusSelectionIsTranslatedToAnExplicitDaoMode() {
+        List<StatusFilterOption> options = List.of(new StatusFilterOption(10, "Open", false),
+                new StatusFilterOption(20, "Closed", true));
+        assertEquals(GridStatusMode.UNRESTRICTED, CasesController.statusMode(Set.of(10, 20), options));
+        assertEquals(GridStatusMode.SELECTED, CasesController.statusMode(Set.of(10), options));
+        assertEquals(GridStatusMode.NO_STATUS, CasesController.statusMode(Set.of(), options));
+    }
+
     @Test void gridBoardAndCsvMapOnlyTheSharedProjection() throws Exception {
         String source = read("src/main/java/com/shale/ui/controller/CasesController.java");
-        assertTrue(source.contains("caseService.projectMigratedCaseDates"));
-        assertTrue(source.contains("projectDates(page.items())"));
-        assertTrue(source.contains("MigratedCaseDateProjectionDto.empty(row.id())"));
-        assertTrue(source.contains("MigratedCaseDateKey.CALLER_DATE"));
-        assertTrue(source.contains("MigratedCaseDateKey.DATE_OF_INJURY"));
-        assertTrue(source.contains("MigratedCaseDateKey.STATUTE_OF_LIMITATIONS"));
-        assertTrue(source.contains("MigratedCaseDateKey.TORT_NOTICE_DEADLINE"));
-        assertTrue(source.contains("toViewModel(CaseDao.CaseRow row, MigratedCaseDateProjectionDto projection)"));
-        assertTrue(source.contains("slot.present() ? slot.startsAt().toLocalDate() : null"));
+        assertTrue(source.contains("caseSummaryDao.findActiveGridPage"));
+        assertTrue(source.contains("toViewModel(CaseGridRow row)"));
+        assertTrue(source.contains("var summary = row.summary()"));
+        assertFalse(source.contains("projectMigratedCaseDates"));
+        assertFalse(source.contains("MigratedCaseDateKey"));
         assertTrue(source.contains("caseCardFactory.create(new CaseCardModel"));
     }
 
