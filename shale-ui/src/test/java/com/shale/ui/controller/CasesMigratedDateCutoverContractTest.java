@@ -44,4 +44,18 @@ final class CasesMigratedDateCutoverContractTest {
         assertTrue(exporter.contains("Character.isHighSurrogate"));
         assertTrue(exporter.contains("Cases XLSX export failed at stage"));
     }
+
+    @Test void loadTimingWrapsExistingBoundariesWithoutSchedulingWork() throws Exception {
+        String source = read("src/main/java/com/shale/ui/controller/CasesController.java");
+        assertTrue(source.contains("boundary=defaults-finalized"));
+        assertTrue(source.contains("boundary=initial-load-scheduled"));
+        assertTrue(source.contains("boundary=background-dao-start"));
+        assertTrue(source.contains("boundary=dao-complete"));
+        assertTrue(source.contains("phase=projection-hydration"));
+        assertTrue(source.contains("phase=projection-merge-dto-map"));
+        assertTrue(source.contains("boundary=page-applied-rendered"));
+        assertTrue(source.indexOf("generationAtSubmit != loadGeneration")
+                < source.indexOf("loaded.addAll(newItems)"), "stale loads must still be rejected before apply");
+        assertFalse(source.contains("PerfLog.log(\"CTRL\", \"start\", \"search="));
+    }
 }

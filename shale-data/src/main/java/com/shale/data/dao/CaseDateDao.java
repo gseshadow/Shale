@@ -22,6 +22,7 @@ import com.shale.core.model.CaseDateAggregateResult;
 
 public final class CaseDateDao {
     static final int PROJECTION_BATCH_SIZE = 500;
+    private static final org.slf4j.Logger PERF_LOG = org.slf4j.LoggerFactory.getLogger(CaseDateDao.class);
     private final DbSessionProvider db;
     private final PhiAuditService phiAuditService;
     private final EntityActionAuditDao entityActionAuditDao = new EntityActionAuditDao();
@@ -83,20 +84,36 @@ public final class CaseDateDao {
      */
     public Map<Long, MigratedCaseDateProjectionDto> projectMigratedCaseDates(
             Collection<Long> caseIds, int tenant, int actor) {
+        long requestStarted = System.nanoTime();
         LinkedHashSet<Long> requested = new LinkedHashSet<>();
         if (caseIds != null) for (Long id : caseIds) if (id != null && id > 0) requested.add(id);
         if (requested.isEmpty()) return Map.of();
         LinkedHashMap<Long, MigratedCaseDateProjectionDto> found = new LinkedHashMap<>();
         try (Connection con = db.requireConnection()) {
+            long setupStarted = System.nanoTime();
             verifyTenant(con, tenant);
             validateActor(con, tenant, actor);
+            PERF_LOG.info("PERF DAO phase operation=cases-date-projection phase=session-auth-setup resultCount={} queryCount=2 elapsedMs={}",
+                    requested.size(), (System.nanoTime() - setupStarted) / 1_000_000);
             List<Long> ids = new ArrayList<>(requested);
+            long hydrationStarted = System.nanoTime();
+            int chunks = 0;
             for (int offset = 0; offset < ids.size(); offset += PROJECTION_BATCH_SIZE) {
                 readMigratedProjectionBatch(con, ids.subList(offset, Math.min(ids.size(), offset + PROJECTION_BATCH_SIZE)), tenant, found);
+                chunks++;
             }
+            PERF_LOG.info("PERF DAO phase operation=cases-date-projection phase=projection-hydration resultCount={} queryCount={} projectionChunkCount={} elapsedMs={}",
+                    found.size(), chunks, chunks, (System.nanoTime() - hydrationStarted) / 1_000_000);
         } catch (SQLException e) { throw fail(e); }
+        long mergeStarted = System.nanoTime();
         LinkedHashMap<Long, MigratedCaseDateProjectionDto> ordered = new LinkedHashMap<>();
         requested.forEach(id -> { if (found.containsKey(id)) ordered.put(id, found.get(id)); });
+        PERF_LOG.info("PERF DAO phase operation=cases-date-projection phase=projection-merge resultCount={} elapsedMs={}",
+                ordered.size(), (System.nanoTime() - mergeStarted) / 1_000_000);
+        PERF_LOG.info("PERF DAO done operation=cases-date-projection resultCount={} queryCount={} projectionChunkCount={} elapsedMs={}",
+                ordered.size(), 2 + ((requested.size() + PROJECTION_BATCH_SIZE - 1) / PROJECTION_BATCH_SIZE),
+                (requested.size() + PROJECTION_BATCH_SIZE - 1) / PROJECTION_BATCH_SIZE,
+                (System.nanoTime() - requestStarted) / 1_000_000);
         return Collections.unmodifiableMap(ordered);
     }
 

@@ -2163,28 +2163,40 @@ public final class CaseDao {
 			throw new IllegalArgumentException("page must be >= 0");
 		if (pageSize <= 0)
 			throw new IllegalArgumentException("pageSize must be > 0");
+		long requestStarted = System.nanoTime();
+		CaseSort effectiveSort = sort == null ? CaseSort.INTAKE_NEWEST : sort;
+		boolean totalCached = knownTotal != null && knownTotal >= 0;
 
 		String normalizedQuery = normalizeSearchQuery(query);
 		Set<Integer> effectiveStatusIds = selectedStatusIds == null ? Set.of() : new HashSet<>(selectedStatusIds);
 		boolean casesViewFiltered = restrictToUserId == null && (!normalizedQuery.isBlank() || !effectiveStatusIds.isEmpty());
-		long total = knownTotal != null && knownTotal >= 0
+		long countStarted = System.nanoTime();
+		long total = totalCached
 				? knownTotal
 				: (casesViewFiltered
 						? countForCasesView(normalizedQuery, effectiveStatusIds)
 						: countAll(includeClosedDenied, restrictToUserId));
+		PERF_LOG.info("PERF DAO phase operation=cases-page phase=total-count pageIndex={} pageSize={} sort={} totalCount={} queryCount={} totalCached={} elapsedMs={}",
+				page, pageSize, effectiveSort, total, totalCached ? 0 : 1, totalCached,
+				(System.nanoTime() - countStarted) / 1_000_000);
 		if (total == 0) {
+			PERF_LOG.info("PERF DAO done operation=cases-page pageIndex={} pageSize={} sort={} resultCount=0 totalCount=0 queryCount={} totalCached={} elapsedMs={}",
+					page, pageSize, effectiveSort, totalCached ? 0 : 1, totalCached,
+					(System.nanoTime() - requestStarted) / 1_000_000);
 			return new PagedResult<>(List.of(), page, pageSize, 0);
 		}
 
 		int offset = page * pageSize;
-		CaseSort effectiveSort = sort == null ? CaseSort.INTAKE_NEWEST : sort;
 		String orderByClause = orderByClauseFor(effectiveSort, authoritativeMigratedDates);
 
 		List<CaseRow> out = new ArrayList<>(pageSize);
 
+		long sessionStarted = System.nanoTime();
 		try (Connection con = db.requireConnection()) {
 			CaseSchema schema = resolveCaseSchema(con);
 			String userMembershipFilter = membershipExistsFilter(restrictToUserId, resolveCaseUsersDeletedColumn(con));
+			PERF_LOG.info("PERF DAO phase operation=cases-page phase=session-setup pageIndex={} pageSize={} sort={} queryCount=0 elapsedMs={}",
+					page, pageSize, effectiveSort, (System.nanoTime() - sessionStarted) / 1_000_000);
 			StringBuilder casesViewFilter = new StringBuilder();
 			if (!normalizedQuery.isBlank()) {
 				casesViewFilter.append("\n  AND LOWER(COALESCE(c.Name, '')) LIKE ?");
@@ -2310,6 +2322,7 @@ public final class CaseDao {
 							migratedDateApply, activeFilter(schema.deletedColumn(), "c"), userMembershipFilter + casesViewFilter,
 							orderByClause);
 
+			long pageQueryStarted = System.nanoTime();
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int shaleClientId = requireCurrentShaleClientId(con);
 				int idx = 1;
@@ -2364,11 +2377,16 @@ public final class CaseDao {
 					}
 				}
 			}
+			PERF_LOG.info("PERF DAO phase operation=cases-page phase=page-row-query pageIndex={} pageSize={} sort={} resultCount={} queryCount=1 elapsedMs={}",
+					page, pageSize, effectiveSort, out.size(), (System.nanoTime() - pageQueryStarted) / 1_000_000);
 			System.out.println("[TRACE ASSIGNED_CASES][CaseDao.findPageInternal] "
 					+ "restrictToUserId=" + restrictToUserId
 					+ " resultCount=" + out.size()
 					+ " total=" + total);
 
+			PERF_LOG.info("PERF DAO done operation=cases-page pageIndex={} pageSize={} sort={} resultCount={} totalCount={} queryCount={} totalCached={} elapsedMs={}",
+					page, pageSize, effectiveSort, out.size(), total, 1 + (totalCached ? 0 : 1), totalCached,
+					(System.nanoTime() - requestStarted) / 1_000_000);
 			return new PagedResult<>(out, page, pageSize, total);
 		} catch (SQLException e) {
 			throw new RuntimeException(
