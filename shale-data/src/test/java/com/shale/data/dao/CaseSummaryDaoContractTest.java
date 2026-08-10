@@ -85,4 +85,13 @@ final class CaseSummaryDaoContractTest {
 		assertFalse(source.contains("c.CallerDate"));
 		assertFalse(source.contains("c.StatuteOfLimitations"));
 	}
+
+	@Test void gridStatusModesPreserveAllSelectedSubsetAndNoStatusSemantics() {
+		assertTrue(CaseSummaryDao.statusPredicate(CaseSummaryDao.GridStatusMode.UNRESTRICTED, 11).isEmpty());
+		assertTrue(CaseSummaryDao.statusPredicate(CaseSummaryDao.GridStatusMode.NO_STATUS, 0)
+				.contains("status_row.StatusId IS NULL"));
+		String selected = CaseSummaryDao.statusPredicate(CaseSummaryDao.GridStatusMode.SELECTED, 2);
+		assertTrue(selected.contains("StatusId IS NULL"));
+		assertTrue(selected.contains("IN (?,?)"));
+	}
 }

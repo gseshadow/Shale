@@ -57,3 +57,13 @@ board, Search, Deleted Cases, MyShale, user/contact/organization related Cases, 
 API, and web paths are unchanged. In particular, this phase neither copies nor changes the older
 calendar role-1 SQL. This is a sensitive read-only cutover: it continues through the established
 Cases view/read boundaries and introduces no mutation requiring an entity-action audit transaction.
+
+### Active-grid status-mode correction
+
+The UI status menu is a selection model, not directly a SQL `IN` contract. Selecting every available
+status means **unrestricted**, selecting a subset means the established selected-ID filter (while
+retaining Cases without a current status), and clearing every status means **no current status**.
+`CasesController` now translates those three states to `GridStatusMode`; count and page queries share
+the same predicate builder and bind status IDs only in `SELECTED` mode. This corrects the initial
+cutover regression where the default 11-of-11 selection was incorrectly emitted as a restrictive
+`IN` predicate, allowing a successful count of zero to be rendered as a legitimate empty table.

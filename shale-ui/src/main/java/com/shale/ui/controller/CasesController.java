@@ -846,6 +846,7 @@ public final class CasesController {
 		final int generationAtSubmit = loadGeneration;
 		final String queryAtSubmit = normalizedSearchQuery();
 		final Set<Integer> statusesAtSubmit = new LinkedHashSet<>(selectedStatusIds);
+		final CaseSummaryDao.GridStatusMode statusModeAtSubmit = statusMode(statusesAtSubmit, statusFilterOptions);
 		final Long knownTotalAtSubmit = knownResultsTotal(queryAtSubmit, statusesAtSubmit);
 		final boolean gridAtSubmit = isGridViewActive();
 		final CaseSort sortAtSubmit = selectedSort();
@@ -860,7 +861,8 @@ public final class CasesController {
 				long daoStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=findCasesViewPage page=cases_list pageIndex=" + pageToLoad + " grid=" + gridAtSubmit);
 				int tenantId = requireTenantId();
-				var page = caseSummaryDao.findActiveGridPage(tenantId, pageToLoad, pageSize, gridOrder(sortAtSubmit), queryAtSubmit, statusesAtSubmit, knownTotalAtSubmit);
+				var page = caseSummaryDao.findActiveGridPage(tenantId, pageToLoad, pageSize, gridOrder(sortAtSubmit), queryAtSubmit,
+						statusModeAtSubmit, statusesAtSubmit, knownTotalAtSubmit);
 				PerfLog.logDone("DAO", "method=findCasesViewPage page=cases_list pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0 : page.items().size()), daoStartNanos);
 				PerfLog.logDone("CTRL", "operation=cases-load boundary=dao-complete loadGeneration="
 						+ generationAtSubmit + " pageIndex=" + pageToLoad, daoStartNanos);
@@ -908,6 +910,9 @@ public final class CasesController {
 				});
 
 			} catch (Exception ex) {
+				LOG.error("Cases grid load failed tenantId={} page={} pageSize={} sort={} searchEnabled={} statusMode={} statusCount={}",
+						appState == null ? null : appState.getShaleClientId(), pageToLoad, pageSize, sortAtSubmit,
+						!queryAtSubmit.isBlank(), statusModeAtSubmit, statusesAtSubmit.size(), ex);
 				Platform.runLater(() ->
 				{
 					if (generationAtSubmit != loadGeneration) {
@@ -997,7 +1002,8 @@ public final class CasesController {
 			try {
 				long daoStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=countForCasesView page=cases_list");
-				long total = caseSummaryDao.countActiveGrid(requireTenantId(), query, statusesSnapshot);
+				long total = caseSummaryDao.countActiveGrid(requireTenantId(), query,
+						statusMode(statusesSnapshot, statusFilterOptions), statusesSnapshot);
 				PerfLog.logDone("DAO", "method=countForCasesView page=cases_list rows=1", daoStartNanos);
 				Platform.runLater(() ->
 				{
@@ -1067,6 +1073,17 @@ public final class CasesController {
 			case CASE_STATUS_DESC -> CaseSummaryDao.GridOrder.CASE_STATUS_DESC;
 			default -> throw new IllegalArgumentException("Unsupported Cases grid sort: " + sort);
 		};
+	}
+
+	static CaseSummaryDao.GridStatusMode statusMode(Set<Integer> selected,
+			List<CaseListUiSupport.StatusFilterOption> available) {
+		Set<Integer> chosen = selected == null ? Set.of() : selected;
+		if (chosen.isEmpty()) return CaseSummaryDao.GridStatusMode.NO_STATUS;
+		Set<Integer> all = available == null ? Set.of() : available.stream().filter(Objects::nonNull)
+				.map(CaseListUiSupport.StatusFilterOption::id).collect(java.util.stream.Collectors.toSet());
+		if (!all.isEmpty() && chosen.size() == all.size() && chosen.containsAll(all))
+			return CaseSummaryDao.GridStatusMode.UNRESTRICTED;
+		return CaseSummaryDao.GridStatusMode.SELECTED;
 	}
 
 	private void initializeStatusFilter() {

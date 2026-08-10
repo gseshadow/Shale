@@ -3,10 +3,22 @@ package com.shale.ui.controller;
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Set;
+import com.shale.ui.controller.support.CaseListUiSupport.StatusFilterOption;
+import com.shale.data.dao.CaseSummaryDao.GridStatusMode;
 import org.junit.jupiter.api.Test;
 
 final class CasesMigratedDateCutoverContractTest {
     private static String read(String path) throws Exception { return Files.readString(Path.of(path)); }
+
+    @Test void statusSelectionIsTranslatedToAnExplicitDaoMode() {
+        List<StatusFilterOption> options = List.of(new StatusFilterOption(10, "Open", false),
+                new StatusFilterOption(20, "Closed", true));
+        assertEquals(GridStatusMode.UNRESTRICTED, CasesController.statusMode(Set.of(10, 20), options));
+        assertEquals(GridStatusMode.SELECTED, CasesController.statusMode(Set.of(10), options));
+        assertEquals(GridStatusMode.NO_STATUS, CasesController.statusMode(Set.of(), options));
+    }
 
     @Test void gridBoardAndCsvMapOnlyTheSharedProjection() throws Exception {
         String source = read("src/main/java/com/shale/ui/controller/CasesController.java");

@@ -16,9 +16,12 @@ import java.util.Objects;
 import com.shale.core.dto.CaseSummaryProjection;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The authoritative SQL boundary for shared, tenant-scoped Case summaries. */
 public final class CaseSummaryDao {
+	private static final Logger LOG = LoggerFactory.getLogger(CaseSummaryDao.class);
 	public enum DeletedState { ACTIVE, DELETED, ALL }
 	public enum Order { NAME_ASC, UPDATED_DESC }
 	/** Closed allow-list shared by the Cases UI and this SQL boundary. */
@@ -27,6 +30,7 @@ public final class CaseSummaryDao {
 		CASE_NAME_ASC, CASE_NAME_DESC, RESPONSIBLE_ATTORNEY_ASC,
 		RESPONSIBLE_ATTORNEY_DESC, CASE_STATUS_ASC, CASE_STATUS_DESC
 	}
+	public enum GridStatusMode { UNRESTRICTED, SELECTED, NO_STATUS }
 
 	/** Consumer-specific, PHI-bearing shape. It is deliberately not part of CaseSummaryProjection. */
 	public record CaseGridRow(CaseSummaryProjection summary, LocalDate intakeDate,
@@ -125,31 +129,35 @@ public final class CaseSummaryDao {
 
 	/** Main active Cases grid. Filtering, ordering, enrichment and paging stay set based. */
 	public GridPage findActiveGridPage(int requestedTenantId, int page, int pageSize, GridOrder order,
-			String query, Set<Integer> selectedStatusIds, Long knownTotal) {
+			String query, GridStatusMode statusMode, Set<Integer> selectedStatusIds, Long knownTotal) {
 		if (requestedTenantId <= 0) throw new IllegalArgumentException("requestedTenantId must be > 0");
 		if (page < 0 || pageSize <= 0) throw new IllegalArgumentException("Invalid grid page");
 		Objects.requireNonNull(order, "order");
+		Objects.requireNonNull(statusMode, "statusMode");
 		String normalized = query == null ? "" : query.strip().toLowerCase(java.util.Locale.ROOT);
 		Set<Integer> statuses = selectedStatusIds == null ? Set.of() : new LinkedHashSet<>(selectedStatusIds);
-		StringBuilder statusPredicate = new StringBuilder("AND (status_row.StatusId IS NULL");
-		if (!statuses.isEmpty()) statusPredicate.append(" OR status_row.StatusId IN (").append("?,".repeat(statuses.size()), 0, statuses.size() * 2 - 1).append(')');
-		statusPredicate.append(')');
+		validateStatusMode(statusMode, statuses);
+		Set<Integer> boundStatuses = statusMode == GridStatusMode.SELECTED ? statuses : Set.of();
+		String statusPredicate = statusPredicate(statusMode, statuses.size());
 		String searchPredicate = normalized.isBlank() ? "" : "AND LOWER(COALESCE(c.Name, '')) LIKE ?";
 		String orderBy = gridOrderSql(order);
 		try (Connection con = db.requireConnection()) {
-			verifyTenant(con, requestedTenantId);
+			int sessionTenantId = verifyTenant(con, requestedTenantId);
 			long total = knownTotal != null && knownTotal >= 0 ? knownTotal
-					: countActiveGrid(con, requestedTenantId, normalized, statuses, searchPredicate, statusPredicate.toString());
+					: countActiveGrid(con, requestedTenantId, normalized, boundStatuses, searchPredicate, statusPredicate);
+			LOG.debug("Cases grid query tenant={} sessionTenant={} deletedMode=ACTIVE searchEnabled={} statusMode={} statusCount={} statusIds={} page={} pageSize={} sort={} count={}",
+					requestedTenantId, sessionTenantId, !normalized.isBlank(), statusMode, statuses.size(), statuses, page, pageSize, order, total);
 			if (total == 0) return new GridPage(List.of(), page, pageSize, 0);
-			String sql = gridSql(searchPredicate, statusPredicate.toString(), orderBy);
+			String sql = gridSql(searchPredicate, statusPredicate, orderBy);
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				int index = bindGridCriteria(ps, requestedTenantId, normalized, statuses, 1);
+				int index = bindGridCriteria(ps, requestedTenantId, normalized, boundStatuses, 1);
 				ps.setInt(index++, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(index++, RoleSemantics.ROLE_LEGAL_ASSISTANT);
 				ps.setInt(index++, page * pageSize);
 				ps.setInt(index, pageSize);
 				List<CaseGridRow> rows = new ArrayList<>(pageSize);
 				try (ResultSet rs = ps.executeQuery()) { while (rs.next()) rows.add(mapGrid(rs)); }
+				LOG.debug("Cases grid page tenant={} page={} pageSize={} sort={} returnedRows={}", requestedTenantId, page, pageSize, order, rows.size());
 				return new GridPage(List.copyOf(rows), page, pageSize, total);
 			}
 		} catch (SQLException e) {
@@ -157,16 +165,32 @@ public final class CaseSummaryDao {
 		}
 	}
 
-	public long countActiveGrid(int requestedTenantId, String query, Set<Integer> selectedStatusIds) {
+	public long countActiveGrid(int requestedTenantId, String query, GridStatusMode statusMode, Set<Integer> selectedStatusIds) {
+		Objects.requireNonNull(statusMode, "statusMode");
 		String normalized = query == null ? "" : query.strip().toLowerCase(java.util.Locale.ROOT);
 		Set<Integer> statuses = selectedStatusIds == null ? Set.of() : new LinkedHashSet<>(selectedStatusIds);
+		validateStatusMode(statusMode, statuses);
+		Set<Integer> boundStatuses = statusMode == GridStatusMode.SELECTED ? statuses : Set.of();
 		String search = normalized.isBlank() ? "" : "AND LOWER(COALESCE(c.Name, '')) LIKE ?";
-		String status = statuses.isEmpty() ? "AND status_row.StatusId IS NULL"
-				: "AND (status_row.StatusId IS NULL OR status_row.StatusId IN (" + String.join(",", java.util.Collections.nCopies(statuses.size(), "?")) + "))";
+		String status = statusPredicate(statusMode, statuses.size());
 		try (Connection con = db.requireConnection()) {
 			verifyTenant(con, requestedTenantId);
-			return countActiveGrid(con, requestedTenantId, normalized, statuses, search, status);
+			return countActiveGrid(con, requestedTenantId, normalized, boundStatuses, search, status);
 		} catch (SQLException e) { throw new RuntimeException("Failed to count authoritative Cases grid", e); }
+	}
+
+	static String statusPredicate(GridStatusMode mode, int selectedCount) {
+		return switch (mode) {
+			case UNRESTRICTED -> "";
+			case NO_STATUS -> "AND status_row.StatusId IS NULL";
+			case SELECTED -> "AND (status_row.StatusId IS NULL OR status_row.StatusId IN ("
+					+ String.join(",", java.util.Collections.nCopies(selectedCount, "?")) + "))";
+		};
+	}
+
+	private static void validateStatusMode(GridStatusMode mode, Set<Integer> statuses) {
+		if (mode == GridStatusMode.SELECTED && statuses.isEmpty())
+			throw new IllegalArgumentException("SELECTED status mode requires at least one status ID");
 	}
 
 	private long countActiveGrid(Connection con, int tenant, String query, Set<Integer> statuses,
@@ -290,13 +314,14 @@ public final class CaseSummaryDao {
 		java.sql.Date value=rs.getDate(column); return value==null?null:value.toLocalDate();
 	}
 
-	private static void verifyTenant(Connection con, int requestedTenantId) throws SQLException {
+	private static int verifyTenant(Connection con, int requestedTenantId) throws SQLException {
 		try (PreparedStatement ps = con.prepareStatement("SELECT TRY_CONVERT(int, SESSION_CONTEXT(N'ShaleClientId'))");
 				ResultSet rs = ps.executeQuery()) {
 			if (!rs.next() || rs.getObject(1) == null)
 				throw new IllegalStateException("ShaleClientId session context is missing.");
 			if (rs.getInt(1) != requestedTenantId)
 				throw new IllegalStateException("Requested tenant conflicts with ShaleClientId session context.");
+			return rs.getInt(1);
 		}
 	}
 
