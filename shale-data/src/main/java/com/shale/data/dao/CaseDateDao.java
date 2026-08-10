@@ -54,7 +54,10 @@ public final class CaseDateDao {
                          ROW_NUMBER() OVER (PARTITION BY t.SystemKey ORDER BY CASE WHEN t.ShaleClientId = ? AND t.IsDeleted = 0 THEN 0 ELSE 1 END, t.Id) AS rn
                   FROM dbo.CaseDateTypes t
                   LEFT JOIN dbo.CaseDateTypes g ON g.ShaleClientId IS NULL AND g.SystemKey = t.SystemKey
-                  WHERE (t.ShaleClientId = ? OR t.ShaleClientId IS NULL) AND t.SystemKey IS NOT NULL
+                  WHERE (t.ShaleClientId = ? OR (t.ShaleClientId IS NULL AND EXISTS (
+                    SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings pm
+                    WHERE pm.CaseDateTypeId=t.Id AND pm.ShaleClientId IS NULL AND pm.IsActive=1 AND pm.IsDeleted=0
+                  ))) AND t.SystemKey IS NOT NULL
                 )
                 SELECT Id, ShaleClientId, SystemKey, Name, Description, CalendarCategory, Color, SupportsTime, SortOrder, IsActive, IsDeleted, Origin, RowVer
                 FROM visible
@@ -443,7 +446,10 @@ public final class CaseDateDao {
                        t.RowVer
                 FROM dbo.CaseDateTypes t
                 LEFT JOIN dbo.CaseDateTypes g ON g.ShaleClientId IS NULL AND g.SystemKey = t.SystemKey
-                WHERE t.ShaleClientId IS NULL OR t.ShaleClientId = ?
+                WHERE t.ShaleClientId = ? OR (t.ShaleClientId IS NULL AND EXISTS (
+                  SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings pm
+                  WHERE pm.CaseDateTypeId=t.Id AND pm.ShaleClientId IS NULL AND pm.IsActive=1 AND pm.IsDeleted=0
+                ))
                 ORDER BY t.SortOrder, t.Name, t.Id
                 """;
         try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
@@ -584,7 +590,7 @@ public final class CaseDateDao {
     private static String norm(String s){ if(s==null)return null; String t=s.trim(); return t.isEmpty()?null:t; }
     private static void setLdt(PreparedStatement ps,int i,LocalDateTime v)throws SQLException{ if(v==null)ps.setNull(i,Types.TIMESTAMP); else ps.setTimestamp(i,Timestamp.valueOf(v)); }
     private static TypeRow requireSelectableType(Connection con,int tenant,int id)throws SQLException{ try(PreparedStatement ps=con.prepareStatement("""
-            WITH visible AS (SELECT t.Id,t.SupportsTime,t.IsActive,t.IsDeleted,ROW_NUMBER() OVER (PARTITION BY t.SystemKey ORDER BY CASE WHEN t.ShaleClientId=? AND t.IsDeleted=0 THEN 0 ELSE 1 END,t.Id) rn FROM dbo.CaseDateTypes t WHERE (t.ShaleClientId=? OR t.ShaleClientId IS NULL) AND t.SystemKey IS NOT NULL UNION ALL SELECT t.Id,t.SupportsTime,t.IsActive,t.IsDeleted,1 FROM dbo.CaseDateTypes t WHERE t.ShaleClientId=? AND t.SystemKey IS NULL)
+            WITH visible AS (SELECT t.Id,t.SupportsTime,t.IsActive,t.IsDeleted,ROW_NUMBER() OVER (PARTITION BY t.SystemKey ORDER BY CASE WHEN t.ShaleClientId=? AND t.IsDeleted=0 THEN 0 ELSE 1 END,t.Id) rn FROM dbo.CaseDateTypes t WHERE (t.ShaleClientId=? OR (t.ShaleClientId IS NULL AND EXISTS (SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings pm WHERE pm.CaseDateTypeId=t.Id AND pm.ShaleClientId IS NULL AND pm.IsActive=1 AND pm.IsDeleted=0))) AND t.SystemKey IS NOT NULL UNION ALL SELECT t.Id,t.SupportsTime,t.IsActive,t.IsDeleted,1 FROM dbo.CaseDateTypes t WHERE t.ShaleClientId=? AND t.SystemKey IS NULL)
             SELECT Id, SupportsTime FROM visible WHERE Id=? AND rn=1 AND IsActive=1 AND IsDeleted=0
             """)){ps.setInt(1,tenant);ps.setInt(2,tenant);ps.setInt(3,tenant);ps.setInt(4,id);try(ResultSet rs=ps.executeQuery()){if(rs.next())return new TypeRow(rs.getInt(1),rs.getBoolean(2));throw new IllegalArgumentException("Case date type is not selectable for this tenant.");}}}
     private static TypeRow requireHistoricalType(Connection con,int tenant,int id)throws SQLException{ try(PreparedStatement ps=con.prepareStatement("SELECT Id, SupportsTime FROM dbo.CaseDateTypes WHERE Id=? AND (ShaleClientId=? OR ShaleClientId IS NULL)")){ps.setInt(1,id);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){if(rs.next())return new TypeRow(rs.getInt(1),rs.getBoolean(2));throw new IllegalArgumentException("Case date type is not available for this tenant.");}}}

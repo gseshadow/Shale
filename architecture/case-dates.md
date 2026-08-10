@@ -4,7 +4,7 @@
 
 Workflow/lifecycle dates remain owned by their established workflow domains and are not inferred from compatibility occurrences.
 
-*Last updated: 2026-08-06*
+*Last updated: 2026-08-10*
 
 Case dates are authoritative legal and factual dates attached to cases. Phases 1A through 1C are the foundation: `CaseDateTypes` and `CaseDates` schema/RLS/constraints/seeds, effective selector and historical read models, and actor-aware occurrence mutations. Phases 2A and 2B complete date-type administration before Phase 2C Case View occurrence management is treated as complete. Phase 3A projection, Phase 3B backfill, and Phase 3C post-validation are complete. Phase 3D post-migration runtime cutover has begun: its first slice freezes the nine-key contract and adds tenant-safe, conflict-detecting authoritative lookup. Compatibility hydration and mutation remain gated on an occurrence-row-version aggregate contract and atomic case transaction ownership, as recorded in the runtime cutover inventory.
 
@@ -44,34 +44,31 @@ references. Existing global mutation protection is unchanged. Starter templates,
 tenant ownership conversion, tenant mapping administration, and classification of
 firm-specific types are explicitly deferred to a later migration.
 
-### Settings classification and compatibility inventory (2026-08-10)
+### Production ownership correction (2026-08-10)
 
-Settings classifies only the three protected semantic roles—Intake, Statute of
-Limitations, and Tort Notice Deadline—as required built-ins. Protection comes from an
-active protected-role mapping, never from global ownership, historical seeding, or a
-`SystemKey`. A `SystemKey` may remain on a global row solely as compatibility identity
-for projections, form configuration, and historical presentation.
+Settings classifies only Intake, Statute of Limitations, and Tort Notice Deadline as
+global required built-ins. Protection comes from an active protected-role mapping,
+never from global ownership, a display name, or a `SystemKey` alone. The existing
+Trial, Hearing, Mediation, Deposition, Discovery Deadline, Date of Injury, Date of
+Medical Negligence, Date Medical Negligence Was Discovered, Fee Agreement Signed, and
+Non-Engagement Letter Sent definitions are owned by tenant 7. Tenant 8 starts with
+only the three built-ins and receives no copies of tenant 7's definitions.
 
-Tenant-owned definitions are presented as custom cards and retain authoritative id and
-row-version lifecycle operations. A custom definition actively fulfilling a protected
-role is identified in plain language and cannot be deactivated or removed until its
-mapping is changed or reset. Global noncritical definitions are compatibility/template
-candidates: they are not built-in cards and are not converted, cloned, deleted, or
-remapped by this phase. Existing `CaseDates.CaseDateTypeId` and
-`FormConfiguredFields.CaseDateTypeId` references therefore remain unchanged, and
-historical reads continue to use the stored type with the established effective-display
-fallback.
+Tenant-owned definitions are custom cards and retain their authoritative id and
+row-version lifecycle operations. The correction changes only
+`CaseDateTypes.ShaleClientId` on the ten deployed rows. It does not rewrite
+`CaseDates.CaseDateTypeId`, `FormConfiguredFields.CaseDateTypeId`, semantic mappings,
+date values, or definition presentation/lifecycle metadata. Preserving stored identity
+keeps tenant 7's intake, case, calendar, reporting, export, form, and historical
+projections resolvable without a clone-and-repoint operation.
 
-The repository cannot prove production tenant usage or all deployed foreign-key
-consumers. The read-only inventory at
-`docs/sql/verification/2026-08-10_case_date_type_ownership_inventory.sql` must be run
-before an ownership migration is designed. Its results must identify definitions,
-per-tenant occurrence usage (including removed occurrences), form references, every
-foreign key targeting `CaseDateTypes`, semantic mappings, and any cross-tenant blocker.
-Until those results are reviewed, starter-template installation and conversion of
-compatibility rows to tenant ownership are deliberately deferred. Noninstalled
-templates are not shown as built-ins, and no template-installation mutation or UX is
-introduced.
+The transactional, idempotent production script validates frozen ids, authoritative
+keys and names, lifecycle, current global-or-already-7 ownership, absence of identity
+conflicts and protected mappings, tenant-7-only occurrence/form use, and the complete
+deployed foreign-key consumer set before changing ownership. Any blocker produces a
+sanitized error and full rollback. The companion inventory reports protected globals,
+post-deployment ownership, reference counts, tenant-8 custom rows, and cross-tenant
+references. Optional templates and template-installation UI remain outside this phase.
 
 The Settings presentation uses compact wrapping cards. Required built-ins use a
 restrained neutral card with `Built-in` and `Required` badges, plain inherited/override
@@ -90,7 +87,7 @@ ownership labels, and system keys are not displayed.
 
 ## Tenant, overlay, and calendar security
 
-`CaseDateTypes` uses tenant-or-global RLS so a tenant can see global definitions and its own overrides/custom rows. `CaseDates` uses strict tenant RLS. The database enforces that each `CaseDates` row references a case with the same tenant through a composite case foreign key.
+`CaseDateTypes` uses tenant-or-global RLS, while application selectors admit only the current tenant definitions plus globals participating in an active protected semantic mapping. Global ownership alone does not grant selector or Settings visibility. `CaseDates` uses strict tenant RLS. The database enforces that each `CaseDates` row references a case with the same tenant through a composite case foreign key.
 
 Because a case-date type can be global or tenant-owned, SQL Server cannot fully express the allowed type relationship as a simple composite foreign key. Backend services transactionally validate that a referenced type is either global or belongs to the same tenant as the case date. They also validate actor tenant membership and `SupportsTime`/`AllDay` consistency.
 

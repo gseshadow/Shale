@@ -962,7 +962,7 @@ If a combined All-mode load partially fails, the viewer must not present incompl
 
 ### dbo.CaseDateTypes
 
-Customizable overlay lookup for authoritative case-date meanings. Uses nullable `ShaleClientId` for global built-ins, stable lowercase `SystemKey`, display `Name`, `Description`, constrained `CalendarCategory`, `Color`, `SupportsTime`, active/deleted lifecycle fields, actor metadata, timestamps, and `RowVer`.
+Customizable lookup for authoritative case-date meanings. Intake, Statute of Limitations, and Tort Notice Deadline are the only global required built-ins. The ten deployed noncritical definitions (Trial, Hearing, Mediation, Deposition, Discovery Deadline, Date of Injury, Date of Medical Negligence, Date Medical Negligence Was Discovered, Fee Agreement Signed, and Non-Engagement Letter Sent) are owned by tenant 7; tenant 8 begins built-in-only. Existing ids and references were preserved by changing ownership in place. Optional templates are outside this phase. Rows retain stable lowercase `SystemKey`, display `Name`, `Description`, constrained `CalendarCategory`, `Color`, `SupportsTime`, active/deleted lifecycle fields, actor metadata, timestamps, and `RowVer`.
 
 ### dbo.CaseDates
 
