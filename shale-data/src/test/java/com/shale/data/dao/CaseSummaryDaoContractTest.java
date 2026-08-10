@@ -94,4 +94,23 @@ final class CaseSummaryDaoContractTest {
 		assertTrue(selected.contains("StatusId IS NULL"));
 		assertTrue(selected.contains("IN (?,?)"));
 	}
+
+	@Test void assignedBoardIsOneSetBasedAuthoritativeSnapshot() throws Exception {
+		String source = source();
+		String board = source.substring(source.indexOf("public List<CaseBoardRow> listActiveAssignedBoard"),
+				source.indexOf("static String statusPredicate"));
+		assertTrue(board.contains("verifyTenant(con, requestedTenantId)"));
+		assertTrue(board.contains("c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0"));
+		assertTrue(board.contains("EXISTS (SELECT 1 FROM dbo.CaseUsers scope"));
+		assertTrue(board.contains("scope.UserId=?"));
+		assertTrue(board.contains("CaseDateTypeSemanticRoleMappings"));
+		assertTrue(board.contains("RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY"));
+		assertTrue(board.contains("RoleSemantics.ROLE_LEGAL_ASSISTANT"));
+		assertTrue(board.contains("ORDER BY status_row.StatusId ASC, dates.IntakeDate DESC, c.Id DESC"));
+		assertFalse(board.contains("c.CallerDate"));
+		assertFalse(board.contains("c.StatuteOfLimitations"));
+		assertFalse(board.contains("c.TortNoticeDeadline"));
+		assertTrue(board.lines().filter(line -> line.contains("executeQuery()")).count() == 1,
+				"Board hydration must remain a single query after tenant verification");
+	}
 }

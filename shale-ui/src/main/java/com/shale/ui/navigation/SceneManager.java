@@ -813,6 +813,7 @@ public final class SceneManager {
 		{
 			MyShaleController c = (MyShaleController) controller;
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
+			CaseSummaryDao caseSummaryDao = new CaseSummaryDao(dbSessionProvider);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
 			UserBoardLanePreferencesDao userBoardLanePreferencesDao = new UserBoardLanePreferencesDao(dbSessionProvider);
@@ -825,6 +826,7 @@ public final class SceneManager {
 					appState,
 					runtimeBridge,
 					caseDao,
+					caseSummaryDao,
 					caseTaskService,
 					userBoardLanePreferencesDao,
 					userPreferencesService,

@@ -75,3 +75,36 @@ the independent results-count refresh correctly reported the unrestricted 1,172 
 invoked the supplied `loadFirstPage` callback; consequently the table retained the earlier successful
 zero-row page. Both status-option completion paths now invoke that callback, and the unconditional
 pre-option page request has been removed.
+
+## Assigned Case board cutover
+
+The Case board remains the existing My Shale **My Cases** surface and card factory. Its old entry point
+was `MyShaleController` → `CaseDao.listAssignedCasesForBoard`; the new entry point is
+`MyShaleController` → `CaseSummaryDao.listActiveAssignedBoard`. Other My Shale queries and every
+deferred consumer remain on their compatibility paths. The board reuses projection Case/tenant
+identity, number/name, current-status ID/stable keys/display, Practice Area identity/name,
+responsible-attorney and legal-assistant authoritative IDs/display, timestamps, and deletion state.
+Its scoped enrichment contains only the three displayed semantic Case Dates, Practice Area color,
+and non-engagement display flag. It does not add parties, contacts, updates, narrative, or description
+to the shared projection.
+
+The single set query explicitly requires active, nondeleted Cases owned by the trusted session tenant
+and membership for the signed-in user. Status and both assignment roles use the shared deterministic
+projection rules; scalar `OUTER APPLY` and date aggregation preserve missing optionals and one row per
+Case. Lane identity and filtering use status ID, never the label. Configured statuses retain their DAO
+order; an assigned Case whose status is not in the current options receives its own ID-keyed lane,
+and a missing status uses the deterministic **No Status** lane. Duplicate/renamed labels therefore do
+not merge lanes. The established UI omits empty lanes and has no Case-board lane visibility/order
+preference (the preference DAO applies only to My Tasks lanes), so that behavior is retained.
+
+The established board contract requires all Cases assigned to the current user simultaneously for
+lane counts and the Overview widgets. This is user-membership bounded rather than an unbounded
+tenant-wide load. Search/status filtering and lane sorting remain in-memory over one accepted board
+snapshot; all sort modes end with Case ID. Refresh replaces the full snapshot, so cards cannot be
+duplicated or dropped by incremental pagination. Initialization now gates that query until status
+options finish, and both success and failure callbacks verify load generation plus user/tenant before
+changing loading state, cards, counts, or error state. Existing JavaFX executor/FX-thread application,
+LiveBus refresh, loading/empty/error states, selection/navigation, scroll surface, headers/counts, and
+`CaseCardFactory` rendering are unchanged. The legacy board DAO remains temporarily because the
+service adapter compatibility contract still exposes it; export, Search, Deleted Cases, other My
+Shale data paths, related views, reports, documents, API, web, and calendar are unchanged.

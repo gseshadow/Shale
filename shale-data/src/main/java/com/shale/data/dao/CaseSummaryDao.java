@@ -40,6 +40,11 @@ public final class CaseSummaryDao {
 
 	public record GridPage(List<CaseGridRow> items, int page, int pageSize, long total) { }
 
+	/** Assigned-Case board enrichment; sensitive card fields remain outside the shared projection. */
+	public record CaseBoardRow(CaseSummaryProjection summary, LocalDate intakeDate,
+			LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline,
+			String practiceAreaColor, Boolean nonEngagementLetterSent) { }
+
 	private final DbSessionProvider db;
 
 	public CaseSummaryDao(DbSessionProvider db) {
@@ -179,6 +184,72 @@ public final class CaseSummaryDao {
 		} catch (SQLException e) { throw new RuntimeException("Failed to count authoritative Cases grid", e); }
 	}
 
+	/**
+	 * Loads the complete assigned-user board snapshot in one statement. Membership bounds this
+	 * established board to one user's active Cases; every apply is scalar/aggregate, preserving
+	 * exactly one row per Case even when legacy current rows are malformed.
+	 */
+	public List<CaseBoardRow> listActiveAssignedBoard(int requestedTenantId, int assignedUserId) {
+		if (requestedTenantId <= 0 || assignedUserId <= 0)
+			throw new IllegalArgumentException("tenant and assignedUserId must be > 0");
+		try (Connection con = db.requireConnection()) {
+			verifyTenant(con, requestedTenantId);
+			String sql = """
+				SELECT c.Id, c.ShaleClientId, c.CaseNumber, c.Name,
+				 status_row.StatusId, status_row.SystemKey StatusSystemKey,
+				 status_row.LifecycleKey StatusLifecycleKey, status_row.StatusName, status_row.StatusColor,
+				 c.PracticeAreaId, pa.Name PracticeAreaName, pa.Color PracticeAreaColor,
+				 attorney.UserId ResponsibleAttorneyId, attorney_user.DisplayName ResponsibleAttorneyName,
+				 attorney_user.Color ResponsibleAttorneyColor,
+				 assistant.UserId PrimaryLegalAssistantId, assistant_user.DisplayName PrimaryLegalAssistantName,
+				 assistant_user.Color PrimaryLegalAssistantColor,
+				 c.CreatedAt, c.UpdatedAt, ISNULL(c.IsDeleted,0) IsDeleted,
+				 dates.IntakeDate, dates.StatuteDate, dates.TortDate, c.NonEngagementLetterSent
+				FROM dbo.Cases c
+				%s
+				LEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId
+				 AND (pa.ShaleClientId=c.ShaleClientId OR pa.ShaleClientId IS NULL)
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu
+				 WHERE cu.CaseId=c.Id AND cu.RoleId=?
+				 ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) attorney
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color
+				 FROM dbo.Users u WHERE u.id=attorney.UserId AND u.ShaleClientId=c.ShaleClientId) attorney_user
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu
+				 WHERE cu.CaseId=c.Id AND cu.RoleId=?
+				 ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) assistant
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color
+				 FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
+				OUTER APPLY (SELECT
+				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
+				  AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
+				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
+				  WHERE m.CaseDateTypeId=t.Id AND m.IsActive=1 AND m.IsDeleted=0
+				   AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL)
+				  ORDER BY CASE WHEN m.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,m.Id DESC) effective
+				 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0) dates
+				WHERE c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0
+				 AND EXISTS (SELECT 1 FROM dbo.CaseUsers scope
+				  WHERE scope.CaseId=c.Id AND scope.UserId=?)
+				ORDER BY status_row.StatusId ASC, dates.IntakeDate DESC, c.Id DESC
+				""".formatted(statusApplySql());
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(2, RoleSemantics.ROLE_LEGAL_ASSISTANT);
+				ps.setInt(3, requestedTenantId);
+				ps.setInt(4, assignedUserId);
+				List<CaseBoardRow> rows = new ArrayList<>();
+				try (ResultSet rs=ps.executeQuery()) { while(rs.next()) rows.add(new CaseBoardRow(
+						mapGridSummary(rs), localDate(rs,"IntakeDate"), localDate(rs,"StatuteDate"),
+						localDate(rs,"TortDate"), rs.getString("PracticeAreaColor"),
+						(Boolean)rs.getObject("NonEngagementLetterSent"))); }
+				return List.copyOf(rows);
+			}
+		} catch (SQLException e) { throw new RuntimeException("Failed to load assigned Case board", e); }
+	}
+
 	static String statusPredicate(GridStatusMode mode, int selectedCount) {
 		return switch (mode) {
 			case UNRESTRICTED -> "";
@@ -298,16 +369,20 @@ public final class CaseSummaryDao {
 	}
 
 	private static CaseGridRow mapGrid(ResultSet rs) throws SQLException {
-		CaseSummaryProjection summary = new CaseSummaryProjection(rs.getLong("Id"), rs.getInt("ShaleClientId"),
+		CaseSummaryProjection summary = mapGridSummary(rs);
+		return new CaseGridRow(summary, localDate(rs,"IntakeDate"), localDate(rs,"StatuteDate"), localDate(rs,"InjuryDate"),
+				localDate(rs,"TortDate"), rs.getString("PracticeAreaColor"), (Boolean)rs.getObject("NonEngagementLetterSent"),
+				rs.getString("ClientName"), rs.getString("OpposingPartiesName"), rs.getString("LatestCaseUpdate"), rs.getString("Description"));
+	}
+
+	private static CaseSummaryProjection mapGridSummary(ResultSet rs) throws SQLException {
+		return new CaseSummaryProjection(rs.getLong("Id"), rs.getInt("ShaleClientId"),
 				rs.getString("CaseNumber"), rs.getString("Name"), nullableInt(rs,"StatusId"), rs.getString("StatusSystemKey"),
 				rs.getString("StatusLifecycleKey"), rs.getString("StatusName"), rs.getString("StatusColor"),
 				nullableInt(rs,"PracticeAreaId"), rs.getString("PracticeAreaName"), nullableInt(rs,"ResponsibleAttorneyId"),
 				rs.getString("ResponsibleAttorneyName"), rs.getString("ResponsibleAttorneyColor"), nullableInt(rs,"PrimaryLegalAssistantId"),
 				rs.getString("PrimaryLegalAssistantName"), rs.getString("PrimaryLegalAssistantColor"),
 				localDateTime(rs.getTimestamp("CreatedAt")), localDateTime(rs.getTimestamp("UpdatedAt")), rs.getBoolean("IsDeleted"));
-		return new CaseGridRow(summary, localDate(rs,"IntakeDate"), localDate(rs,"StatuteDate"), localDate(rs,"InjuryDate"),
-				localDate(rs,"TortDate"), rs.getString("PracticeAreaColor"), (Boolean)rs.getObject("NonEngagementLetterSent"),
-				rs.getString("ClientName"), rs.getString("OpposingPartiesName"), rs.getString("LatestCaseUpdate"), rs.getString("Description"));
 	}
 
 	private static LocalDate localDate(ResultSet rs, String column) throws SQLException {
