@@ -234,7 +234,7 @@ public final class CasesController {
 		initializeViewToggle();
 		initializeGridColumns();
 		initializeGridRowActions();
-		boolean statusFilterWillLoad = initializeStatusFilter();
+		initializeStatusFilter();
 		initializeExportMenu();
 
 		Platform.runLater(() ->
@@ -244,7 +244,7 @@ public final class CasesController {
 				return;
 			}
 			wireInfiniteScroll();
-			if (!statusFilterWillLoad) loadFirstPage();
+			loadFirstPage();
 		});
 		if (casesFlow != null) {
 			casesFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -851,7 +851,6 @@ public final class CasesController {
 		final boolean gridAtSubmit = isGridViewActive();
 		final CaseSort sortAtSubmit = selectedSort();
 		final boolean includeClosedDeniedAtSubmit = includeClosedDeniedInQuery();
-		final long requestStartedNanos = PerfLog.start();
 
 		dbExec.submit(() ->
 		{
@@ -862,19 +861,13 @@ public final class CasesController {
 				PerfLog.logDone("DAO", "method=findCasesViewPage page=cases_list pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0 : page.items().size()), daoStartNanos);
 
 				// map DAO rows into UI VM
-				long projectionStartNanos = PerfLog.start();
+				long mapStartNanos = PerfLog.start();
 				PerfLog.log("DAO_MAP", "start", "method=findPage page=cases_list rows=" + (page == null || page.items() == null ? 0 : page.items().size()));
 				Map<Long, MigratedCaseDateProjectionDto> projections = projectDates(page.items());
-				PerfLog.logDone("DAO", "method=projectMigratedCaseDates page=cases_list pageIndex=" + pageToLoad
-						+ " rows=" + page.items().size() + " queryCount=" + projectionQueryCount(page.items().size()), projectionStartNanos);
-				long mapStartNanos = PerfLog.start();
 				List<CaseCardVm> newItems = page.items().stream()
 						.map(r -> toViewModel(r, projections.get(r.id())))
 						.toList();
-				PerfLog.logDone("DAO_MAP", "method=mergeProjectedCaseDates page=cases_list rows=" + newItems.size(), mapStartNanos);
-				PerfLog.logDone("DAO", "method=findCasesViewPageComplete page=cases_list pageIndex=" + pageToLoad
-						+ " rows=" + newItems.size() + " sort=" + sortAtSubmit + " queryCount="
-						+ (1 + (knownTotalAtSubmit == null ? 1 : 0) + projectionQueryCount(newItems.size())), requestStartedNanos);
+				PerfLog.logDone("DAO_MAP", "method=findPage page=cases_list rows=" + newItems.size(), mapStartNanos);
 
 				Platform.runLater(() ->
 				{
@@ -917,10 +910,6 @@ public final class CasesController {
 		Integer actor = appState == null ? null : appState.getUserId();
 		if (tenant == null || tenant <= 0 || actor == null || actor <= 0) throw new SecurityException("Cases dates are not authorized.");
 		return caseService.projectMigratedCaseDates(rows.stream().map(CaseDao.CaseRow::id).toList(), tenant, actor);
-	}
-
-	private static int projectionQueryCount(int rowCount) {
-		return rowCount <= 0 ? 0 : (rowCount + 499) / 500;
 	}
 
 	private boolean isGridViewActive() {
@@ -1050,11 +1039,8 @@ public final class CasesController {
 		return false;
 	}
 
-	private boolean initializeStatusFilter() {
-		boolean willLoad = appState != null && appState.getShaleClientId() != null
-				&& appState.getShaleClientId() > 0 && caseDao != null;
+	private void initializeStatusFilter() {
 		reloadStatusFilterOptionsAndThen(this::loadFirstPage);
-		return willLoad;
 	}
 
 	private void reloadStatusFilterOptionsAndThen(Runnable onLoaded) {

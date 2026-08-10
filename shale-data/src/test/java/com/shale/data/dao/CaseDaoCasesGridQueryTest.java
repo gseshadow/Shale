@@ -29,34 +29,20 @@ final class CaseDaoCasesGridQueryTest {
     }
 
     @Test
-    void casesGridUsesOnlyTheSelectedAuthoritativeDateForSortingBeforePaging() throws Exception {
+    void casesGridUsesAuthoritativeCaseDatesForDisplaySortingAndPaging() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
         String method = source.substring(source.indexOf("private PagedResult<CaseRow> findPageInternal"),
                 source.indexOf("private static String normalizeSearchQuery"));
-        assertTrue(method.contains("authoritativeSortJoinSql(effectiveSort)"));
-        assertTrue(method.contains("CAST(NULL AS date) AS CallerDate"),
-                "Display dates must be supplied by the bounded shared projection, not the base page query");
-        assertTrue(source.contains("stored_type.SystemKey = ?"));
-        assertTrue(source.contains("GROUP BY cd.ShaleClientId, cd.CaseId"),
-                "The selected semantic date must be resolved once at a set-oriented boundary");
-        assertTrue(source.contains("migrated_sort.SortDate\" : \"c.CallerDate"));
-        assertTrue(source.contains("migrated_sort.SortDate\" : \"c.StatuteOfLimitations"));
+        assertTrue(method.contains("authoritativeCasesDateApplySql()"));
+        assertTrue(method.contains("migrated.IntakeDate AS CallerDate"));
+        assertTrue(method.contains("migrated.StatuteDate AS StatuteOfLimitations"));
+        assertTrue(method.contains("migrated.IncidentDate AS DateOfIncident"));
+        assertTrue(method.contains("migrated.TortDate AS TortNoticeDeadline"));
+        assertTrue(source.contains("authoritativeMigratedDates ? \"migrated.IntakeDate\""));
+        assertTrue(source.contains("authoritativeMigratedDates ? \"migrated.StatuteDate\""));
         assertTrue(source.contains("OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"));
         assertTrue(source.contains("dbo.CaseDates cd"));
-        assertFalse(source.contains("type_key.SystemKey IN ('intake','date_of_injury','statute_of_limitations','tort_notice_deadline')"));
-    }
-
-    @Test
-    void ordinarySortsAndCountAvoidAuthoritativeDateWork() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        String sortJoin = source.substring(source.indexOf("private static String authoritativeSortJoinSql"),
-                source.indexOf("private static boolean requiresAuthoritativeDateSort"));
-        assertTrue(sortJoin.contains("if (!requiresAuthoritativeDateSort(sort)) return \"\""));
-        String count = source.substring(source.indexOf("public long countForCasesView"),
-                source.indexOf("public com.shale.core.dto.CaseOverviewDto getOverview"));
-        assertFalse(count.contains("dbo.CaseDates"));
-        assertFalse(count.contains("migrated_sort"));
-        assertFalse(count.contains("ORDER BY\n\t\t\t\t\t  migrated"));
+        assertTrue(source.contains("type_key.SystemKey IN ('intake','date_of_injury','statute_of_limitations','tort_notice_deadline')"));
     }
 
     @Test
