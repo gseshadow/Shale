@@ -806,7 +806,7 @@ public final class SceneManager {
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, runtimeBridge, caseDao, caseTaskService, userBoardLanePreferencesDao, userPreferencesService, notificationCenterService, this::openNotificationCenterFromDashboard, onOpenCase, onOpenUser, phiReadAuditService);
+			c.init(appState, runtimeBridge, caseDao, new CaseServiceAdapter(caseDao), caseTaskService, userBoardLanePreferencesDao, userPreferencesService, notificationCenterService, this::openNotificationCenterFromDashboard, onOpenCase, onOpenUser, phiReadAuditService);
 			return c;
 		});
 	}
