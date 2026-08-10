@@ -8,6 +8,7 @@ import com.shale.data.dao.CalendarEventDao;
 import com.shale.data.dao.CalendarEventTypeDao;
 import com.shale.data.dao.CalendarFeedDao;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.FormConfigurationDao;
 import com.shale.data.dao.MaterialRequestDao;
 import com.shale.data.service.adapter.CaseServiceAdapter;
@@ -604,13 +605,14 @@ public final class SceneManager {
 			CasesController c = (CasesController) controller;
 
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
+			CaseSummaryDao caseSummaryDao = new CaseSummaryDao(dbSessionProvider);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(
 					dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, runtimeBridge, caseDao, new CaseServiceAdapter(caseDao), caseTaskService,
+			c.init(appState, runtimeBridge, caseDao, caseSummaryDao, caseTaskService,
 					new CaseExportService(caseDao, new CaseServiceAdapter(caseDao), appState, phiReadAuditService), onOpenCase);
 			return c;
 		});

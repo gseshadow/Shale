@@ -51,22 +51,47 @@ final class CaseSummaryDaoContractTest {
 
 	@Test void optionalRelationshipsCannotRemoveOrMultiplyCasesAndQueryIsNotNPlusOne() throws Exception {
 		String source = source();
+		String projectionList = source.substring(source.indexOf("public List<CaseSummaryProjection> list"),
+				source.indexOf("public GridPage findActiveGridPage"));
 		assertTrue(source.contains("OUTER APPLY ("));
 		assertTrue(source.contains("SELECT TOP (1)"));
 		assertTrue(source.contains("LEFT JOIN dbo.PracticeAreas"));
 		assertTrue(source.contains("while (rs.next()) rows.add(map(rs))"));
 		assertTrue(source.contains("return List.copyOf(rows)"));
-		assertTrue(source.lines().filter(line -> line.contains("executeQuery()")).count() == 2,
+		assertTrue(projectionList.lines().filter(line -> line.contains("executeQuery()")).count() == 2,
 				"Exactly one context check and one set query are allowed");
 	}
 
 	@Test void projectionDoesNotExpandPhiOrRemoveLegacyQueries() throws Exception {
 		String source = source();
+		String projectionList = source.substring(source.indexOf("public List<CaseSummaryProjection> list"),
+				source.indexOf("public GridPage findActiveGridPage"));
 		for (String forbidden : new String[] { "c.Description", "c.Summary", "CaseUpdates", "Contacts", "Organizations", "Medical" })
-			assertFalse(source.contains(forbidden), forbidden);
+			assertFalse(projectionList.contains(forbidden), forbidden);
 		String legacy = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
 		for (String method : new String[] { "findCasesViewPage", "listCasesViewForExport", "listAssignedCasesForBoard",
 				"searchCasesByName", "searchDeletedCasesByName", "findMyCasesPage" })
 			assertTrue(legacy.contains(method), method + " must remain for deferred consumers");
+	}
+
+	@Test void activeGridComposesProjectionRulesWithBoundedEnrichment() throws Exception {
+		String source = source();
+		assertTrue(source.contains("record CaseGridRow(CaseSummaryProjection summary"));
+		assertTrue(source.contains("OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"));
+		assertTrue(source.contains("enum GridOrder"));
+		assertTrue(source.contains("CaseDateTypeSemanticRoleMappings"));
+		assertTrue(source.contains("RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY"));
+		assertTrue(source.contains("RoleSemantics.ROLE_LEGAL_ASSISTANT"));
+		assertFalse(source.contains("c.CallerDate"));
+		assertFalse(source.contains("c.StatuteOfLimitations"));
+	}
+
+	@Test void gridStatusModesPreserveAllSelectedSubsetAndNoStatusSemantics() {
+		assertTrue(CaseSummaryDao.statusPredicate(CaseSummaryDao.GridStatusMode.UNRESTRICTED, 11).isEmpty());
+		assertTrue(CaseSummaryDao.statusPredicate(CaseSummaryDao.GridStatusMode.NO_STATUS, 0)
+				.contains("status_row.StatusId IS NULL"));
+		String selected = CaseSummaryDao.statusPredicate(CaseSummaryDao.GridStatusMode.SELECTED, 2);
+		assertTrue(selected.contains("StatusId IS NULL"));
+		assertTrue(selected.contains("IN (?,?)"));
 	}
 }
