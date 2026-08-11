@@ -122,6 +122,18 @@
             </VBox>
 
 
+            <VBox fx:id="calendarCaseDateMappingAdministrationSection" spacing="8" styleClass="strong-panel">
+                <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+                <Label text="Calendar / Case Date Mappings" styleClass="search-section-title"/>
+                <Label text="Map active Calendar Event Types to active Case Date Types and choose one or both synchronization directions. Each active type can belong to only one active mapping."
+                       styleClass="search-summary-text" wrapText="true"/>
+                <VBox fx:id="calendarCaseDateMappingCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
+                <HBox fx:id="calendarCaseDateMappingActionRow" spacing="8">
+                    <Label fx:id="calendarCaseDateMappingStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+                </HBox>
+            </VBox>
+
+
             <VBox fx:id="requestAdministrationSection" spacing="8" styleClass="strong-panel">
                 <padding>
                     <Insets top="12" right="12" bottom="12" left="12"/>
