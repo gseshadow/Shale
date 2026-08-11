@@ -299,12 +299,12 @@ public final class SearchController {
 				&& java.util.Objects.equals(userId, appState.getUserId());
 	}
 
-	private static CaseCardModel toCaseCardModel(CaseSummaryDao.SearchCaseRow row) {
+	static CaseCardModel toCaseCardModel(CaseSummaryDao.SearchCaseRow row) {
 		var summary = row.summary();
 		return new CaseCardModel(summary.caseId(), summary.caseName(), row.intakeDate(),
 				row.statuteOfLimitationsDate(), row.tortClaimsNoticeDeadline(),
 				summary.responsibleAttorneyName(), summary.responsibleAttorneyColor(),
-				row.nonEngagementLetterSent(), summary.statusName(), summary.statusColor(),
+				row.nonEngagementLetterSent(), summary.primaryStatusName(), summary.primaryStatusColor(),
 				row.practiceAreaColor());
 	}
 
