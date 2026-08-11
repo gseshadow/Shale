@@ -60,6 +60,21 @@ final class CaseCalendarFoundationMigrationTest {
    ()->assertTrue(sql.contains("N'sec.fn_filterbytenantshaleclientid'")));
  }
 
+ @Test void catalogMetadataComparisonsUseDatabaseCollationForScriptAndTableVariables(){
+  assertAll(
+   ()->assertTrue(sql.contains("c.name COLLATE DATABASE_DEFAULT=r.ColumnName")),
+   ()->assertTrue(sql.contains("t.name COLLATE DATABASE_DEFAULT<>r.TypeName")),
+   ()->assertTrue(sql.contains("c.name COLLATE DATABASE_DEFAULT=v.ColumnName")),
+   ()->assertTrue(sql.contains("REPLACE(d.definition,N' ',N'') COLLATE DATABASE_DEFAULT<>v.Definition")),
+   ()->assertTrue(sql.contains("name COLLATE DATABASE_DEFAULT=@IndexName")),
+   ()->assertTrue(sql.contains("STRING_AGG(c.name,N',') WITHIN GROUP(ORDER BY ic.key_ordinal) FROM sys.index_columns ic JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id WHERE ic.object_id=i.object_id AND ic.index_id=i.index_id AND ic.key_ordinal>0) COLLATE DATABASE_DEFAULT=@ExpectedKeys")),
+   ()->assertTrue(sql.contains("OBJECT_NAME(fk.referenced_object_id) COLLATE DATABASE_DEFAULT=@ReferencedTable")),
+   ()->assertTrue(sql.contains("pc.name COLLATE DATABASE_DEFAULT=@ParentColumn")),
+   ()->assertTrue(sql.contains("rc.name COLLATE DATABASE_DEFAULT=@ReferencedColumn")),
+   ()->assertTrue(sql.contains("p.predicate_type_desc COLLATE DATABASE_DEFAULT=@PredicateType")),
+   ()->assertTrue(sql.contains("p.operation_desc COLLATE DATABASE_DEFAULT=@Operation")));
+ }
+
  @Test void transactionMakesFirstInstallAtomicAndLateFailureRollsBackEarlierDdl(){
   assertAll(
    ()->assertTrue(sql.contains("SET XACT_ABORT ON")),
