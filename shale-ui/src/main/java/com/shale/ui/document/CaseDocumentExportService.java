@@ -28,18 +28,16 @@ public final class CaseDocumentExportService {
     }
 
     public GeneratedDocument exportCaseSummary(
-            int caseId,
-            int shaleClientId,
-            CaseDocumentType type,
-            CaseDocumentFormat format) throws IOException {
-        CaseDocumentModel model = caseDocumentService.buildCaseDocumentModel(caseId, shaleClientId, type);
-        String html = htmlRenderer.render(model, type, LocalDateTime.now());
+            CaseDocumentGenerationRequest request) throws IOException {
+        Objects.requireNonNull(request, "request");
+        CaseDocumentModel model = caseDocumentService.buildCaseDocumentModel(request.caseId(), request.tenantId(), request.type());
+        String html = htmlRenderer.render(model, request.type(), LocalDateTime.now());
         System.out.println("[Document][Export] renderedHtmlLength=" + (html == null ? 0 : html.length())
-                + " format=" + format + " caseId=" + caseId + " shaleClientId=" + shaleClientId);
+                + " format=" + request.format() + " caseId=" + request.caseId() + " shaleClientId=" + request.tenantId());
         String safeName = sanitizeFileName(model.caseName());
         String prefix = "Case Summary - " + safeName + "-";
 
-        if (format == CaseDocumentFormat.HTML) {
+        if (request.format() == CaseDocumentFormat.HTML) {
             Path htmlPath = Files.createTempFile(prefix, ".html");
             Files.writeString(htmlPath, html, StandardCharsets.UTF_8);
             htmlPath.toFile().deleteOnExit();

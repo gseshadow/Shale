@@ -77,14 +77,7 @@ public final class CaseDocumentPdfExporter {
     }
 
     private static void logExportDebug(Path outputPdfPath, String xhtml, Path debugXhtmlPath) {
-        String snippet = xhtml.length() <= 200 ? xhtml : xhtml.substring(0, 200);
-        String flattenedSnippet = snippet
-                .replace("\r", "\\r")
-                .replace("\n", "\\n");
         System.out.println("[Document][PDF] using input mode=string-content");
-        System.out.println("[Document][PDF] outputPath=" + outputPdfPath);
         System.out.println("[Document][PDF] xhtmlLength=" + xhtml.length());
-        System.out.println("[Document][PDF] xhtmlHead(200)=" + flattenedSnippet);
-        System.out.println("[Document][PDF] xhtmlDebugPath=" + debugXhtmlPath);
     }
 }

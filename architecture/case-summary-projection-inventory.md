@@ -300,3 +300,39 @@ failures, and loading-state callbacks are discarded, and empty status selection 
 generation. Controller database and workbook work remain on the existing daemon executor, JavaFX changes
 remain dispatched with `Platform.runLater`, and export continues to use immutable `ReportCriteria` and
 status-name snapshots with the existing success/failure cleanup.
+
+## Desktop Documents consumer cutover
+
+The desktop Documents surface is the Case-profile summary export rooted at
+`CaseController.generateAndOpenSummary`. It has no Case search, list, selector, filter, paging, recent-Case,
+or display-name identity path: navigation supplies the authoritative Case ID, and both supported formats
+(HTML and PDF) generate the same `CASE_SUMMARY` document. The old composition called
+`CaseDao.getOverview`, `CaseDao.getDetail`, up to two tenant-scoped `ContactDao.findById` lookups, and
+`CaseDao.listCaseUpdates`; the overview redundantly supplied Case name, current status, and Practice Area.
+
+This cutover classifies that workflow as a document-specific composition (one immutable document model per
+active Case), wrapping the true one-Case summary consumer `CaseSummaryDao.findActiveForDocuments`. The new
+lookup requires the requested tenant to match SQL Server session context, binds the tenant-scoped Case ID,
+requires an active/nondeleted Case, and returns zero or one row. It reuses the shared projection SQL and its
+authoritative current-status, Practice Area, responsible-attorney, and primary-legal-assistant resolution;
+scalar applies and the left Practice Area join preserve missing optional values without multiplying Cases.
+The document consumes only `caseName`, `primaryStatusName`, and `practiceAreaName`. Status color and both
+assignment identities remain correctly mapped in the projection but are not document template fields.
+
+The full-detail generation queries remain specialized and unchanged: overview still supplies primary caller
+and client identity plus incident/statute semantic dates and description; detail supplies workflow accepted,
+denied, and closed dates plus narrative summary and retains its existing related-contact grain; contact
+lookups supply the established phone/address/email values; updates retain their deterministic created-time/ID
+ordering. Templates, placeholders, normalization, filenames, formats, temporary storage, rendering, opening,
+and PHI audit timing are unchanged. Legacy PDF debug logging no longer emits generated XHTML snippets or
+temporary paths, and controller failures no longer echo exception/path details that can contain Case names.
+Calendar, server/API/web, template management, persistence/mutations,
+and every previously converted desktop consumer are deferred and unchanged.
+
+Before dispatch, `CaseController` now captures tenant ID, authenticated user ID, Case ID, type, and format in
+an immutable `CaseDocumentGenerationRequest`. Incomplete context cannot generate. The background task uses
+only that snapshot, while a monotonic generation plus tenant/user/Case comparison rejects stale successes and
+failures after a selection or controller-context change. Database reads and rendering remain on the existing
+daemon worker and accepted UI callbacks remain on the JavaFX thread. The authoritative validation adds one
+bounded query per generation; the existing document-only overview/detail/contact/update hydration is retained
+because it supplies genuine generation content rather than Case-summary data.

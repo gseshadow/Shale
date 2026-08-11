@@ -272,7 +272,41 @@ public final class CaseSummaryDao {
 				case NAME_ASC -> "LOWER(COALESCE(c.Name, '')) ASC, c.Id ASC";
 				case UPDATED_DESC -> "c.UpdatedAt DESC, c.Id DESC";
 			};
-			String sql = """
+			String sql = summarySelectSql(deletedPredicate, orderBy);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(2, RoleSemantics.ROLE_LEGAL_ASSISTANT);
+				ps.setInt(3, requestedTenantId);
+				try (ResultSet rs = ps.executeQuery()) {
+					List<CaseSummaryProjection> rows = new ArrayList<>();
+					while (rs.next()) rows.add(map(rs));
+					return List.copyOf(rows);
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load authoritative Case summaries", e);
+		}
+	}
+
+
+	/** Authoritative active one-Case lookup for desktop Documents generation. */
+	public CaseSummaryProjection findActiveForDocuments(int requestedTenantId, long caseId) {
+		if (requestedTenantId <= 0 || caseId <= 0) throw new IllegalArgumentException("requestedTenantId and caseId must be > 0");
+		try (Connection con = db.requireConnection()) {
+			verifyTenant(con, requestedTenantId);
+			try (PreparedStatement ps = con.prepareStatement(summarySelectSql(
+					"AND ISNULL(c.IsDeleted, 0) = 0 AND c.Id = ?", "c.Id ASC"))) {
+				ps.setInt(1, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(2, RoleSemantics.ROLE_LEGAL_ASSISTANT);
+				ps.setInt(3, requestedTenantId);
+				ps.setLong(4, caseId);
+				try (ResultSet rs = ps.executeQuery()) { return rs.next() ? map(rs) : null; }
+			}
+		} catch (SQLException e) { throw new RuntimeException("Failed to validate Documents Case summary", e); }
+	}
+
+	private static String summarySelectSql(String extraPredicate, String orderBy) {
+		return """
 					SELECT c.Id AS CaseId, c.ShaleClientId, c.CaseNumber, c.Name AS CaseName,
 					       status_row.StatusId, status_row.SystemKey AS StatusSystemKey,
 					       status_row.LifecycleKey AS StatusLifecycleKey, status_row.StatusName,
@@ -318,20 +352,7 @@ public final class CaseSummaryDao {
 					WHERE c.ShaleClientId = ?
 					%s
 					ORDER BY %s;
-					""".formatted(deletedPredicate, orderBy);
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				ps.setInt(1, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
-				ps.setInt(2, RoleSemantics.ROLE_LEGAL_ASSISTANT);
-				ps.setInt(3, requestedTenantId);
-				try (ResultSet rs = ps.executeQuery()) {
-					List<CaseSummaryProjection> rows = new ArrayList<>();
-					while (rs.next()) rows.add(map(rs));
-					return List.copyOf(rows);
-				}
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to load authoritative Case summaries", e);
-		}
+					""".formatted(extraPredicate, orderBy);
 	}
 
 	/**
