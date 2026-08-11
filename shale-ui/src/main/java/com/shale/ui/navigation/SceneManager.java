@@ -653,7 +653,9 @@ public final class SceneManager {
 		{
 			ReportsController c = (ReportsController) controller;
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-			c.init(appState, caseDao, new CaseExportService(caseDao, new CaseServiceAdapter(caseDao), appState, phiReadAuditService));
+			CaseSummaryDao caseSummaryDao = new CaseSummaryDao(dbSessionProvider);
+			c.init(appState, caseDao, caseSummaryDao, new CaseExportService(caseDao, caseSummaryDao,
+					new CaseServiceAdapter(caseDao), appState, phiReadAuditService));
 			return c;
 		});
 	}

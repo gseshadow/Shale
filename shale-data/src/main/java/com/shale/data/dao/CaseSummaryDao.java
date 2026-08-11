@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Objects;
 
 import com.shale.core.dto.CaseSummaryProjection;
+import com.shale.core.dto.CaseStatusReportRowDto;
+import com.shale.core.dto.ReportCaseDetailRowDto;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
 import org.slf4j.Logger;
@@ -71,10 +73,110 @@ public final class CaseSummaryDao {
 		@Override public byte[] rowVer() { return rowVer.clone(); }
 	}
 
+	/** PHI-bearing detail used only by the desktop Case-status report. */
+	public record ReportCaseRow(CaseSummaryProjection summary, LocalDate intakeDate,
+			LocalDate deniedDate, LocalDate closedDate, LocalDate dateOfInjury, String description,
+			LocalDate statuteOfLimitations, LocalDate tortNoticeDeadline) {
+		public ReportCaseRow { Objects.requireNonNull(summary, "summary"); }
+
+		public ReportCaseDetailRowDto toDetailRow() {
+			return new ReportCaseDetailRowDto(Math.toIntExact(summary.caseId()), summary.caseName(), summary.createdAt(),
+					intakeDate, deniedDate, closedDate, dateOfInjury, description, statuteOfLimitations,
+					tortNoticeDeadline, summary.updatedAt(), summary.responsibleAttorneyName());
+		}
+	}
+
 	private final DbSessionProvider db;
 
 	public CaseSummaryDao(DbSessionProvider db) {
 		this.db = Objects.requireNonNull(db, "db");
+	}
+
+	/** Status-grain aggregate for the desktop report; eligibility is shared with its detail query. */
+	public List<CaseStatusReportRowDto> listActiveStatusReport(int requestedTenantId, LocalDate startDate,
+			LocalDate endDate, List<Integer> selectedStatusIds) {
+		Set<Integer> statuses = normalizedPositiveIds(selectedStatusIds);
+		if (requestedTenantId <= 0) throw new IllegalArgumentException("requestedTenantId must be > 0");
+		if (statuses.isEmpty()) return List.of();
+		try (Connection con = db.requireConnection()) {
+			verifyTenant(con, requestedTenantId);
+			verifyStatuses(con, requestedTenantId, statuses);
+			String placeholders = String.join(",", java.util.Collections.nCopies(statuses.size(), "?"));
+			String sql = """
+				SELECT s.Id,s.Name,s.SystemKey,s.LifecycleKey,s.Color,s.SortOrder,ISNULL(totals.CaseCount,0) CaseCount
+				FROM dbo.Statuses s
+				OUTER APPLY (SELECT COUNT_BIG(1) CaseCount FROM dbo.Cases c
+				%s
+				OUTER APPLY (SELECT MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate
+				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
+				  AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
+				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
+				  WHERE m.CaseDateTypeId=t.Id AND m.IsActive=1 AND m.IsDeleted=0
+				   AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL)
+				  ORDER BY CASE WHEN m.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,m.Id DESC) effective
+				 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0) dates
+				 WHERE c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0 AND status_row.StatusId=s.Id
+				 AND (? IS NULL OR dates.IntakeDate>=?) AND (? IS NULL OR dates.IntakeDate<DATEADD(day,1,?))) totals
+				WHERE s.Id IN (%s) AND (s.ShaleClientId=? OR s.ShaleClientId IS NULL)
+				ORDER BY s.SortOrder ASC,s.Name ASC,s.Id ASC
+				""".formatted(statusApplySql(), placeholders);
+			try (PreparedStatement ps=con.prepareStatement(sql)) {
+				int i=1; ps.setInt(i++,requestedTenantId); i=bindNullableDateTwice(ps,i,startDate);
+				i=bindNullableDateTwice(ps,i,endDate); for (Integer id:statuses) ps.setInt(i++,id);
+				ps.setInt(i,requestedTenantId);
+				List<CaseStatusReportRowDto> rows=new ArrayList<>();
+				try(ResultSet rs=ps.executeQuery()){while(rs.next()) rows.add(new CaseStatusReportRowDto(rs.getInt("Id"),
+					rs.getString("Name"),rs.getString("SystemKey"),rs.getString("LifecycleKey"),rs.getString("Color"),
+					rs.getInt("SortOrder"),rs.getLong("CaseCount")));} return List.copyOf(rows);
+			}
+		} catch(SQLException e){throw new RuntimeException("Failed to load authoritative Case status report",e);}
+	}
+
+	/** One authoritative Case-summary row per report result; no child join can multiply rows. */
+	public List<ReportCaseRow> listActiveStatusReportCases(int requestedTenantId, int statusId,
+			LocalDate startDate, LocalDate endDate) {
+		if(requestedTenantId<=0||statusId<=0) throw new IllegalArgumentException("tenant and statusId must be > 0");
+		try(Connection con=db.requireConnection()){
+			verifyTenant(con,requestedTenantId); verifyStatuses(con,requestedTenantId,Set.of(statusId));
+			String sql="""
+				SELECT c.Id,c.ShaleClientId,c.CaseNumber,c.Name,status_row.StatusId,status_row.SystemKey StatusSystemKey,
+				 status_row.LifecycleKey StatusLifecycleKey,status_row.StatusName,status_row.StatusColor,
+				 c.PracticeAreaId,pa.Name PracticeAreaName,attorney.UserId ResponsibleAttorneyId,
+				 attorney_user.DisplayName ResponsibleAttorneyName,attorney_user.Color ResponsibleAttorneyColor,
+				 assistant.UserId PrimaryLegalAssistantId,assistant_user.DisplayName PrimaryLegalAssistantName,
+				 assistant_user.Color PrimaryLegalAssistantColor,c.CreatedAt,c.UpdatedAt,CAST(0 AS bit) IsDeleted,
+				 dates.IntakeDate,c.DeniedDate,c.ClosedDate,dates.InjuryDate,c.Description,dates.StatuteDate,dates.TortDate
+				FROM dbo.Cases c %s
+				LEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId AND (pa.ShaleClientId=c.ShaleClientId OR pa.ShaleClientId IS NULL)
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=?
+				 ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) attorney
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color FROM dbo.Users u
+				 WHERE u.id=attorney.UserId AND u.ShaleClientId=c.ShaleClientId) attorney_user
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=?
+				 ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) assistant
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color FROM dbo.Users u
+				 WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
+				OUTER APPLY (SELECT
+				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
+				 MAX(CASE WHEN t.SystemKey='date_of_injury' THEN CAST(cd.StartsAt AS date) END) InjuryDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
+				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m WHERE m.CaseDateTypeId=t.Id
+				  AND m.IsActive=1 AND m.IsDeleted=0 AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL)
+				  ORDER BY CASE WHEN m.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,m.Id DESC) effective
+				 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0) dates
+				WHERE c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0 AND status_row.StatusId=?
+				 AND (? IS NULL OR dates.IntakeDate>=?) AND (? IS NULL OR dates.IntakeDate<DATEADD(day,1,?))
+				ORDER BY dates.IntakeDate DESC,c.Id DESC
+				""".formatted(statusApplySql());
+			try(PreparedStatement ps=con.prepareStatement(sql)){int i=1;ps.setInt(i++,RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(i++,RoleSemantics.ROLE_LEGAL_ASSISTANT);ps.setInt(i++,requestedTenantId);ps.setInt(i++,statusId);
+				i=bindNullableDateTwice(ps,i,startDate);bindNullableDateTwice(ps,i,endDate);List<ReportCaseRow> rows=new ArrayList<>();
+				try(ResultSet rs=ps.executeQuery()){while(rs.next())rows.add(new ReportCaseRow(mapGridSummary(rs),localDate(rs,"IntakeDate"),
+					localDate(rs,"DeniedDate"),localDate(rs,"ClosedDate"),localDate(rs,"InjuryDate"),rs.getString("Description"),
+					localDate(rs,"StatuteDate"),localDate(rs,"TortDate")));}return List.copyOf(rows);}
+		}catch(SQLException e){throw new RuntimeException("Failed to load authoritative Case status report details",e);}
 	}
 
 	/** Active Cases related to a tenant Contact through one authoritative CaseParties row. */
@@ -638,6 +740,29 @@ public final class CaseSummaryDao {
 
 	private static LocalDate localDate(ResultSet rs, String column) throws SQLException {
 		java.sql.Date value=rs.getDate(column); return value==null?null:value.toLocalDate();
+	}
+
+	private static Set<Integer> normalizedPositiveIds(List<Integer> ids) {
+		if (ids == null) return Set.of();
+		Set<Integer> result = new LinkedHashSet<>();
+		for (Integer id : ids) if (id != null && id > 0) result.add(id);
+		return Set.copyOf(result);
+	}
+
+	private static int bindNullableDateTwice(PreparedStatement ps, int index, LocalDate value) throws SQLException {
+		java.sql.Date date = value == null ? null : java.sql.Date.valueOf(value);
+		ps.setDate(index++, date); ps.setDate(index++, date); return index;
+	}
+
+	private static void verifyStatuses(Connection con, int tenantId, Set<Integer> statusIds) throws SQLException {
+		String placeholders = String.join(",", java.util.Collections.nCopies(statusIds.size(), "?"));
+		String sql = "SELECT COUNT(DISTINCT s.Id) FROM dbo.Statuses s WHERE s.Id IN (" + placeholders
+				+ ") AND (s.ShaleClientId=? OR s.ShaleClientId IS NULL)";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int i=1; for (Integer id:statusIds) ps.setInt(i++,id); ps.setInt(i,tenantId);
+			try(ResultSet rs=ps.executeQuery()) { rs.next(); if(rs.getInt(1)!=statusIds.size())
+				throw new IllegalArgumentException("status IDs must belong to the trusted tenant"); }
+		}
 	}
 
 	private static void verifyEligibleAssignedUser(Connection con, int requestedTenantId, int assignedUserId) throws SQLException {

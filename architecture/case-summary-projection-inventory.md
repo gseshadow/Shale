@@ -266,3 +266,37 @@ The unreachable paging fields/methods and their `CaseRow` mapping were removed f
 desktop consumers still reference those DAO boundaries. The verified global Cases grid, global Case
 board behavior, export, Search, Deleted Cases, Contact/Organization related views, Reports, Documents,
 Calendar, server/API, and web paths are unchanged.
+
+## Desktop Reports Case-query cutover
+
+The desktop **Case Status Report** has two distinct grains. Its chart/table query is a status-grain
+aggregate (one configured selected status row, including zero-count statuses); its drill-down and XLSX
+export are true Case-summary consumers (one row per eligible active Case). Both now enter through
+`CaseSummaryDao`: `listActiveStatusReport` and `listActiveStatusReportCases`. The old
+`CaseDao.listCaseStatusReport` and `CaseDao.listCaseStatusReportCases` remain intact for compatibility;
+no deferred server, API, web, Documents, Calendar, mutation, or saved-report path was changed.
+
+Both new methods require the requested tenant to match SQL Server `SESSION_CONTEXT`, reject status IDs
+outside the tenant/global status overlay, bind IDs and inclusive date limits, reuse the shared current
+status apply, and explicitly require active Cases. Status identity is by ID; null-status Cases remain
+excluded because the existing report contains only selected configured statuses. Detail ordering remains
+intake descending and Case ID descending. The selected statuses, blank date defaults, inclusive start/end,
+zero-count rows, table/chart fields, drill-down columns, filenames, XLSX ordering, typed cells, and audit
+boundary are unchanged.
+
+The report's Intake, Date of Injury, Statute of Limitations, and Tort Notice values now come set-wise from
+`CaseDates`/`CaseDateTypes` and the effective semantic-role mapping (Date of Injury retains its deployed
+stable system key). Denied and Closed remain their workflow-owned `Cases` timestamps as classified in
+`case-dates.md`; they are not silently reinterpreted as user-managed semantic dates. Responsible attorney
+and primary legal assistant use `CaseUsers.RoleId` with `RoleSemantics`, primary/recent deterministic
+selection, and tenant-owned Users. Optional status, Practice Area, and assignments use scalar applies or
+left joins, so they cannot multiply a Case. Report-only description and dates stay in `ReportCaseRow`
+rather than expanding `CaseSummaryProjection`.
+
+The aggregate is one statement and each selected-status export currently remains one statement, matching
+the prior export query count while removing legacy SQL and per-row hydration from the desktop Reports
+consumer. Report/status loads capture a monotonically increasing generation and tenant; stale successes,
+failures, and loading-state callbacks are discarded, and empty status selection also advances the
+generation. Controller database and workbook work remain on the existing daemon executor, JavaFX changes
+remain dispatched with `Platform.runLater`, and export continues to use immutable `ReportCriteria` and
+status-name snapshots with the existing success/failure cleanup.
