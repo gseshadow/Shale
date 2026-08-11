@@ -106,7 +106,7 @@ public final class EntityActionAuditDao {
 	private static boolean isAllowedMetadataKey(String key) {
 		String lower = key.toLowerCase(Locale.ROOT);
 		for (String bad : java.util.Set.of("url","description","note","email","phone","name","credential","password","token","rowver","sql","exception","command","dto")) if (lower.contains(bad)) return false;
-		return java.util.Set.of("CASE_ID","CASE_LINK_ID","CASE_LINK_SHARE_ID","CASE_DATE_ID","CALENDAR_EVENT_ID","CALENDAR_EVENT_TYPE_ID","EXTERNAL_LINK_ID","LINK_TYPE_ID","CONTACT_ID","PREVIOUS_PRIMARY_CASE_LINK_ID","NEW_PRIMARY_CASE_LINK_ID","REORDERED_LINK_COUNT","ACTIVE","FORM_CONFIGURATION_ID","FORM_KEY","SECTION_COUNT","CONFIGURED_FIELD_COUNT","INITIAL_CREATION","SEMANTIC_ROLE","CASE_DATE_TYPE_ID","CASE_DATE_TO_CALENDAR","CALENDAR_TO_CASE_DATE").contains(key);
+		return java.util.Set.of("CASE_ID","CASE_LINK_ID","CASE_LINK_SHARE_ID","CASE_DATE_ID","CALENDAR_EVENT_ID","CALENDAR_EVENT_TYPE_ID","EXTERNAL_LINK_ID","LINK_TYPE_ID","CONTACT_ID","PREVIOUS_PRIMARY_CASE_LINK_ID","NEW_PRIMARY_CASE_LINK_ID","REORDERED_LINK_COUNT","ACTIVE","FORM_CONFIGURATION_ID","FORM_KEY","SECTION_COUNT","CONFIGURED_FIELD_COUNT","INITIAL_CREATION","SEMANTIC_ROLE","CASE_DATE_TYPE_ID","CASE_DATE_TO_CALENDAR","CALENDAR_TO_CASE_DATE","SYNCHRONIZATION_DIRECTION").contains(key);
 	}
 
 	static String metadataJson(Map<EntityActionAuditEvent.MetadataKey, String> metadata) {
