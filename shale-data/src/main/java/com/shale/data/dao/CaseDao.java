@@ -3385,7 +3385,17 @@ public final class CaseDao {
 		return updateDeletedState(caseId, shaleClientId, false);
 	}
 
+	public boolean restoreCase(long caseId, Integer shaleClientId, byte[] expectedRowVer) {
+		if (expectedRowVer == null || expectedRowVer.length == 0)
+			throw new IllegalArgumentException("expectedRowVer is required");
+		return updateDeletedState(caseId, shaleClientId, false, expectedRowVer.clone());
+	}
+
 	private boolean updateDeletedState(long caseId, Integer shaleClientId, boolean deleted) {
+		return updateDeletedState(caseId, shaleClientId, deleted, null);
+	}
+
+	private boolean updateDeletedState(long caseId, Integer shaleClientId, boolean deleted, byte[] suppliedRowVer) {
 		if (caseId <= 0) {
 			throw new IllegalArgumentException("caseId must be > 0");
 		}
@@ -3420,7 +3430,9 @@ public final class CaseDao {
 					  AND %s
 					  AND RowVer = ?;
 					""".formatted(CASES_TABLE, schema.deletedColumn(), desiredStateFilter);
-			byte[] expectedRowVer = selectCaseRowVer(con, caseId, currentShaleClientId, desiredStateFilter);
+			byte[] expectedRowVer = suppliedRowVer == null
+					? selectCaseRowVer(con, caseId, currentShaleClientId, desiredStateFilter)
+					: suppliedRowVer.clone();
 			if (expectedRowVer == null) { con.rollback(); return false; }
 
 			try (PreparedStatement ps = con.prepareStatement(sql)) {

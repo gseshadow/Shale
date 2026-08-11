@@ -2,7 +2,6 @@ package com.shale.ui.controller;
 
 import com.shale.core.model.Organization;
 import com.shale.core.model.CalendarFeedItem;
-import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.UserDao;
@@ -18,6 +17,8 @@ import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.util.ActionButtonFactory;
+import com.shale.ui.util.ControlStyles;
 import com.shale.ui.services.CaseDetailService;
 import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UiRuntimeBridge;
@@ -245,7 +246,7 @@ public final class SearchController {
 		}
 	}
 
-	private void renderDeletedCases(List<CaseDao.CaseRow> deletedCases) {
+	private void renderDeletedCases(List<CaseSummaryDao.DeletedCaseRow> deletedCases) {
 		boolean authorized = canViewDeletedCasesInSearch();
 		if (deletedCasesSection != null) {
 			deletedCasesSection.setVisible(authorized);
@@ -255,15 +256,14 @@ public final class SearchController {
 			return;
 		}
 		List<Node> cards = new ArrayList<>(deletedCases.size());
-		for (CaseDao.CaseRow row : deletedCases) {
+		for (CaseSummaryDao.DeletedCaseRow row : deletedCases) {
 			Node card = caseCardFactory.create(toCaseCardModel(row), CaseCardFactory.Variant.COMPACT);
 			if (card instanceof Region region) {
 				region.setPrefWidth(CASE_CARD_WIDTH);
 				region.setMaxWidth(CASE_CARD_WIDTH);
 			}
-			var restoreButton = new javafx.scene.control.Button("Restore Case");
-			restoreButton.getStyleClass().add("button-secondary");
-			restoreButton.setOnAction(e -> onRestoreCase(row));
+			var restoreButton = ActionButtonFactory.semantic("Restore Case", e -> onRestoreCase(row),
+					ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 			Region spacer = new Region();
 			HBox.setHgrow(spacer, Priority.ALWAYS);
 			HBox actions = new HBox(8, spacer, restoreButton);
@@ -308,18 +308,19 @@ public final class SearchController {
 				row.practiceAreaColor());
 	}
 
-	private static CaseCardModel toCaseCardModel(CaseDao.CaseRow row) {
+	private static CaseCardModel toCaseCardModel(CaseSummaryDao.DeletedCaseRow row) {
+		var summary = row.summary();
 		return new CaseCardModel(
-				row.id(),
-				row.name(),
+				summary.caseId(),
+				summary.caseName(),
 				row.intakeDate(),
 				row.statuteOfLimitationsDate(),
 				row.tortClaimsNoticeDeadline(),
-				row.responsibleAttorneyName(),
-				row.responsibleAttorneyColor(),
+				summary.responsibleAttorneyName(),
+				summary.responsibleAttorneyColor(),
 				row.nonEngagementLetterSent(),
-				row.primaryStatusName(),
-				row.primaryStatusColor(),
+				summary.primaryStatusName(),
+				summary.primaryStatusColor(),
 				row.practiceAreaColor());
 	}
 
@@ -452,7 +453,7 @@ public final class SearchController {
 		return text.isBlank() ? "—" : text;
 	}
 
-	private void onRestoreCase(CaseDao.CaseRow row) {
+	private void onRestoreCase(CaseSummaryDao.DeletedCaseRow row) {
 		if (row == null || caseDetailService == null) {
 			return;
 		}
@@ -465,7 +466,8 @@ public final class SearchController {
 			AppDialogs.showError(dialogOwner(), "Restore Case", "Restore is unavailable because no tenant is selected.");
 			return;
 		}
-		String caseName = row.name() == null || row.name().isBlank() ? "This case" : "\"" + row.name() + "\"";
+		String caseName = row.summary().caseName() == null || row.summary().caseName().isBlank()
+				? "This case" : "\"" + row.summary().caseName() + "\"";
 		boolean confirmed = AppDialogs.showConfirmation(
 				dialogOwner(),
 				"Restore Case",
@@ -476,19 +478,28 @@ public final class SearchController {
 		if (!confirmed) {
 			return;
 		}
+		loadGeneration++;
+		final int restoreGeneration = loadGeneration;
+		final Integer userId = appState == null ? null : appState.getUserId();
 		dbExec.submit(() -> {
 			try {
-				boolean restored = caseDetailService.restoreCase(row.id(), tenantId);
+				boolean restored = caseDetailService.restoreCase(row.summary().caseId(), tenantId, row.rowVer());
 				Platform.runLater(() -> {
+					if (!isCurrent(restoreGeneration, tenantId, userId)) return;
 					if (!restored) {
 						AppDialogs.showError(dialogOwner(), "Restore Case", "Case could not be restored.");
+						loadResults();
 						return;
 					}
-					publishDeletedStateUpdate(row.id(), 0);
+					publishDeletedStateUpdate(row.summary().caseId(), 0);
 					loadResults();
 				});
 			} catch (RuntimeException ex) {
-				Platform.runLater(() -> AppDialogs.showError(dialogOwner(), "Restore Case", "Failed to restore case."));
+				Platform.runLater(() -> {
+					if (!isCurrent(restoreGeneration, tenantId, userId)) return;
+					AppDialogs.showError(dialogOwner(), "Restore Case", "Failed to restore case.");
+					loadResults();
+				});
 			}
 		});
 	}

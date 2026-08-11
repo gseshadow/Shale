@@ -51,6 +51,18 @@ public final class CaseSummaryDao {
 			LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline,
 			String practiceAreaColor, Boolean nonEngagementLetterSent) { }
 
+	/** Deleted-search card data plus the concurrency token consumed by the lifecycle restore command. */
+	public record DeletedCaseRow(CaseSummaryProjection summary, LocalDate intakeDate,
+			LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline,
+			String practiceAreaColor, Boolean nonEngagementLetterSent, byte[] rowVer) {
+		public DeletedCaseRow {
+			Objects.requireNonNull(summary, "summary");
+			if (rowVer == null || rowVer.length == 0) throw new IllegalArgumentException("rowVer is required");
+			rowVer = rowVer.clone();
+		}
+		@Override public byte[] rowVer() { return rowVer.clone(); }
+	}
+
 	private final DbSessionProvider db;
 
 	public CaseSummaryDao(DbSessionProvider db) {
@@ -195,6 +207,65 @@ public final class CaseSummaryDao {
 				return List.copyOf(rows);
 			}
 		} catch (SQLException e) { throw new RuntimeException("Failed to search authoritative Case summaries", e); }
+	}
+
+	/**
+	 * Admin Deleted Cases search. This preserves the established unpaged, nonblank,
+	 * case-name-only literal substring contract while selecting deletion explicitly.
+	 */
+	public List<DeletedCaseRow> searchDeletedByName(int requestedTenantId, String query) {
+		if (requestedTenantId <= 0) throw new IllegalArgumentException("requestedTenantId must be > 0");
+		String normalized = query == null ? "" : query.strip().toLowerCase(java.util.Locale.ROOT);
+		if (normalized.isBlank()) return List.of();
+		try (Connection con = db.requireConnection()) {
+			verifyTenant(con, requestedTenantId);
+			String sql = """
+				SELECT c.Id,c.ShaleClientId,c.CaseNumber,c.Name,
+				 status_row.StatusId,status_row.SystemKey StatusSystemKey,status_row.LifecycleKey StatusLifecycleKey,
+				 status_row.StatusName,status_row.StatusColor,c.PracticeAreaId,pa.Name PracticeAreaName,
+				 attorney.UserId ResponsibleAttorneyId,attorney_user.DisplayName ResponsibleAttorneyName,
+				 attorney_user.Color ResponsibleAttorneyColor,assistant.UserId PrimaryLegalAssistantId,
+				 assistant_user.DisplayName PrimaryLegalAssistantName,assistant_user.Color PrimaryLegalAssistantColor,
+				 c.CreatedAt,c.UpdatedAt,CAST(1 AS bit) IsDeleted,pa.Color PracticeAreaColor,
+				 dates.IntakeDate,dates.StatuteDate,dates.TortDate,c.NonEngagementLetterSent,c.RowVer
+				FROM dbo.Cases c
+				%s
+				LEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId AND (pa.ShaleClientId=c.ShaleClientId OR pa.ShaleClientId IS NULL)
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=?
+				 ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) attorney
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color
+				 FROM dbo.Users u WHERE u.id=attorney.UserId AND u.ShaleClientId=c.ShaleClientId) attorney_user
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=?
+				 ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) assistant
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color
+				 FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
+				OUTER APPLY (SELECT
+				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
+				  AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
+				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
+				  WHERE m.CaseDateTypeId=t.Id AND m.IsActive=1 AND m.IsDeleted=0
+				   AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL)
+				  ORDER BY CASE WHEN m.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,m.Id DESC) effective
+				 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0) dates
+				WHERE c.ShaleClientId=? AND c.IsDeleted = 1 AND LOWER(COALESCE(c.Name,'')) LIKE ?
+				ORDER BY c.Name ASC,c.Id ASC
+				""".formatted(statusApplySql());
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(2, RoleSemantics.ROLE_LEGAL_ASSISTANT);
+				ps.setInt(3, requestedTenantId);
+				ps.setString(4, "%" + escapeLike(normalized) + "%");
+				List<DeletedCaseRow> rows = new ArrayList<>();
+				try (ResultSet rs=ps.executeQuery()) { while (rs.next()) rows.add(new DeletedCaseRow(
+						mapGridSummary(rs), localDate(rs,"IntakeDate"), localDate(rs,"StatuteDate"),
+						localDate(rs,"TortDate"), rs.getString("PracticeAreaColor"),
+						(Boolean)rs.getObject("NonEngagementLetterSent"), rs.getBytes("RowVer"))); }
+				return List.copyOf(rows);
+			}
+		} catch (SQLException e) { throw new RuntimeException("Failed to search authoritative deleted Case summaries", e); }
 	}
 
 	static String escapeLike(String value) {

@@ -9,10 +9,11 @@ import com.shale.data.dao.CaseSummaryDao;
 import org.junit.jupiter.api.Test;
 
 final class SearchCaseCutoverContractTest {
-	@Test void activeCasesUseSummaryDaoWhileDeletedAndOtherGroupsRemainLegacy() throws Exception {
+	@Test void activeAndDeletedCasesUseSummaryDaoWhileOtherGroupsRemainUnchanged() throws Exception {
 		String service = Files.readString(Path.of("src/main/java/com/shale/ui/services/SearchService.java"));
 		assertTrue(service.contains("caseSummaryDao.searchActiveByName(shaleClientId"));
-		assertTrue(service.contains("caseDao.searchDeletedCasesByName"));
+		assertTrue(service.contains("caseSummaryDao.searchDeletedByName(shaleClientId"));
+		assertFalse(service.contains("caseDao.searchDeletedCasesByName"));
 		assertTrue(service.contains("contactDao.searchContacts"));
 		assertTrue(service.contains("organizationDao.searchOrganizations"));
 		assertTrue(service.contains("userDao.searchUsers"));
@@ -27,6 +28,8 @@ final class SearchCaseCutoverContractTest {
 		assertTrue(controller.contains("Objects.equals(tenantId, appState.getShaleClientId())"));
 		assertTrue(controller.contains("Objects.equals(userId, appState.getUserId())"));
 		assertTrue(controller.contains("caseCardFactory.create(toCaseCardModel(row), CaseCardFactory.Variant.COMPACT)"));
+		assertTrue(controller.contains("restoreCase(row.summary().caseId(), tenantId, row.rowVer())"));
+		assertTrue(controller.contains("if (!isCurrent(restoreGeneration, tenantId, userId)) return;"));
 	}
 
 	@Test void mapsTheRealProjectionStatusApiAndPreservesNoStatus() {
