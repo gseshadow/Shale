@@ -47,6 +47,7 @@ public record EntityActionAuditEvent(
 		CASE_LINK_ID,
 		CASE_LINK_SHARE_ID,
 		CASE_DATE_ID,
+		CALENDAR_EVENT_ID,
 		EXTERNAL_LINK_ID,
 		LINK_TYPE_ID,
 		CONTACT_ID,
@@ -103,7 +104,7 @@ public record EntityActionAuditEvent(
 			case LINK_TYPE, MATERIAL_TYPE -> action == Action.CREATED || action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.OVERRIDE_RESET || action == Action.DELETED || action == Action.REMOVED;
 			case CASE_LINK -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.PRIMARY_SET || action == Action.REORDERED;
 			case CASE_LINK_SHARE -> action == Action.ADDED || action == Action.UPDATED || action == Action.REMOVED;
-			case CASE_DATE -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.ACTIVATED;
+			case CASE_DATE -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.ACTIVATED || action == Action.LINKED || action == Action.UNLINKED;
 			case CASE_DATE_ROLE_MAPPING -> action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.OVERRIDE_RESET;
 			case FORM_CONFIGURATION -> action == Action.CREATED || action == Action.UPDATED;
 			case MATERIAL_REQUEST -> action == Action.CREATED || action == Action.UPDATED || action == Action.STATUS_CHANGED || action == Action.FOLLOW_UP_ADDED || action == Action.LINKED || action == Action.DELETED;
