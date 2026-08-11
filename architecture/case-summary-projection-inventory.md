@@ -17,7 +17,7 @@ The projection contains: Case ID, tenant ID, Case number/name; status ID, `Syste
 | Cases list/grid | `CaseDao.findCasesViewPage` / `findPageInternal` | Case name; current status; Practice Area color; responsible attorney; migrated Case Dates; client/opponents; latest update; description; non-engagement flag | active by default; optional closed/denied, text and status filters; all `CaseSort` orders; paging | Identity/status/assignment fit. Migrated dates, party names, update, description, non-engagement and paging/filter policy stay consumer-specific. Deferred to avoid behavior change. |
 | Case board | `CaseDao.listAssignedCasesForBoard` | `CaseRow` card data including status, attorney, dates, parties, update and description | active only; assigned-user membership; status/date order | Core fields fit; membership, card enrichment and lane behavior remain separate. Deferred. |
 | Cases export | `CasesController.exportCases` → `CaseExportService.exportCases` → `CaseSummaryDao.listActiveGridForExport` | shared summary plus export-scoped dates, party/client, latest-update, and description enrichment | immutable current grid search/status/sort snapshot; 500-row SQL pages | Converted; Reports and every deferred consumer retain their legacy boundaries. |
-| Search | `CaseDao.searchCasesByName` | rich `CaseRow` card data | active; name `LIKE`; updated descending, limited | Core fields fit; ranking/search filter and rich card enrichment remain separate. Deferred. |
+| Search | `SearchService.searchAll` → `CaseSummaryDao.searchActiveByName` | shared summary plus compact-card dates/color/flag | active; literal case-insensitive name substring; score/name/ID order; unpaged | Converted for active desktop Search only; Deleted Cases and API/web search retain legacy paths. |
 | Deleted Cases | `CaseDao.searchDeletedCasesByName` | rich `CaseRow` card data | deleted only; name `LIKE`; updated descending, limited | Explicit `DELETED` mode fits lifecycle; restore UI/card enrichment remains separate. Deferred. |
 | MyShale paging | `CaseDao.findMyCasesPage` | `CaseRow` | active by default; any `CaseUsers` membership; legacy date compatibility; caller-selected sort | Core fields fit; membership and compatibility date behavior remain separate. Deferred. |
 | MyShale/user detail assigned cases | `CaseDao.listActiveCasesForUserTeamMember`, `UserDetailService.loadAssignedCases` | rich card data | active; any `CaseUsers` membership; intake/id descending; limit | Core fields fit; membership, limits and card enrichment remain separate. Deferred. |
@@ -108,3 +108,38 @@ LiveBus refresh, loading/empty/error states, selection/navigation, scroll surfac
 `CaseCardFactory` rendering are unchanged. The legacy board DAO remains temporarily because the
 service adapter compatibility contract still exposes it; export, Search, Deleted Cases, other My
 Shale data paths, related views, reports, documents, API, web, and calendar are unchanged.
+
+## Desktop Search Case-results cutover
+
+The old active-Case path was `SearchController` → `SearchService.searchAll` →
+`CaseDao.searchCasesByName` → rich legacy `CaseRow`. The active-Case group now uses
+`CaseSummaryDao.searchActiveByName` and its search-scoped `SearchCaseRow`; the admin-only Deleted
+Cases group deliberately continues through `CaseDao.searchDeletedCasesByName`. Contacts,
+organizations, users, tasks, and calendar events retain their existing providers and cards.
+
+The preserved Case contract trims surrounding whitespace, treats blank as idle without querying,
+and performs a case-insensitive literal substring match against `Cases.Name` only. Percent,
+underscore, and opening-bracket characters are escaped as literals. There is no minimum length
+beyond nonblank, no tokenization or Case-number normalization, and no Case number, description,
+update, party, contact, client, date, status, Practice Area, or assignee matching. Only active
+(`ISNULL(IsDeleted,0)=0`) Cases in the trusted session tenant are returned. The established search
+has no limit or paging boundary. In-memory precedence remains exact, prefix, word-boundary prefix,
+then substring, followed by case-insensitive name and authoritative Case ID; the DAO also ends its
+deterministic base order with Case ID.
+
+The compact card reuses projection Case/tenant identity, Case name/number, authoritative status,
+Practice Area, responsible-attorney and legal-assistant IDs/display, timestamps, and deletion state.
+Search-only enrichment is limited to the fields already displayed by that card: authoritative
+semantic intake/statute/tort dates, Practice Area color, and the non-engagement flag. Scalar applies
+and date aggregation retain matching Cases with missing optionals and prevent multiplication; there
+is one statement and no result hydration. No narrative, update, contact, party, or client value is
+selected or searched, and no deprecated `Cases` convenience date is read.
+
+Each controller load captures immutable query, generation, tenant, and user values. Clearing,
+replacement, or live refresh increments the generation; both success and failure callbacks validate
+generation and current identity context before any FX-thread render, count/summary, selection, empty,
+loading, or error mutation. Provider failures retain the established explicit partial-results model
+and full exception logging without logging returned PHI. Existing `CaseCardFactory` compact rendering
+and Case-ID navigation are unchanged. The legacy active search method remains because the server/API
+service adapter still calls it; Deleted Cases, related views, My Shale, Reports, Documents, Calendar,
+server/API/web, active grid, board, and export are intentionally unchanged.
