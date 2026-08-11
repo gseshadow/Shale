@@ -10,9 +10,18 @@ import com.shale.core.dto.RequestMethodDto;
 import com.shale.core.dto.RequestStatusDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.MaterialRequestServicePort;
+import com.shale.core.service.CalendarCaseDateTypeMappingServicePort;
+import com.shale.core.model.CalendarCaseDateTypeMapping;
+import com.shale.core.model.CalendarEventType;
+import com.shale.core.model.CreateCalendarCaseDateTypeMappingCommand;
+import com.shale.core.model.UpdateCalendarCaseDateTypeMappingCommand;
+import com.shale.core.model.SetCalendarCaseDateTypeMappingActiveCommand;
+import com.shale.core.model.DeleteCalendarCaseDateTypeMappingCommand;
+import com.shale.data.dao.CalendarEventTypeDao;
 import com.shale.data.dao.UserDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.UserCard;
+import com.shale.ui.component.ColorCodedComboBox;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.notification.NotificationPreferenceKey;
@@ -133,6 +142,10 @@ public final class SettingsController {
 	@FXML private VBox caseDateRoleMappingsContainer;
 	@FXML private HBox caseDateTypeActionRow;
 	@FXML private Label caseDateTypeSettingsStatusLabel;
+	@FXML private VBox calendarCaseDateMappingAdministrationSection;
+	@FXML private VBox calendarCaseDateMappingCardsContainer;
+	@FXML private HBox calendarCaseDateMappingActionRow;
+	@FXML private Label calendarCaseDateMappingStatusLabel;
 	@FXML private VBox requestAdministrationSection;
 	@FXML private VBox materialTypeCardsContainer;
 	@FXML private HBox materialTypeActionRow;
@@ -175,6 +188,8 @@ public final class SettingsController {
 	private AppState appState;
 	private CaseServicePort caseService;
 	private MaterialRequestServicePort materialRequestService;
+	private CalendarCaseDateTypeMappingServicePort calendarCaseDateMappingService;
+	private CalendarEventTypeDao calendarEventTypeDao;
 	private UserDao userDao;
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
@@ -202,6 +217,17 @@ public final class SettingsController {
 	private int practiceAreaLoadGeneration;
 	private int linkTypeLoadGeneration;
 	private int caseDateTypeLoadGeneration;
+	private int calendarCaseDateMappingLoadGeneration;
+	private boolean calendarCaseDateMappingMutationRunning;
+	private List<CalendarCaseDateTypeMapping> calendarCaseDateMappings = List.of();
+	private List<CalendarEventType> eligibleCalendarEventTypes = List.of();
+	private List<EffectiveCaseDateTypeDto> eligibleMappingCaseDateTypes = List.of();
+	private List<CalendarEventType> visibleCalendarEventTypes = List.of();
+	private List<EffectiveCaseDateTypeDto> visibleMappingCaseDateTypes = List.of();
+	private CalendarCaseDateTypeMapping selectedCalendarCaseDateMapping;
+	private Button editCalendarCaseDateMappingButton;
+	private Button toggleCalendarCaseDateMappingButton;
+	private Button deleteCalendarCaseDateMappingButton;
 	private int userManagementLoadGeneration;
 	private final List<UserManagementViewRow> managedUserRows = new ArrayList<>();
 	private final UserCardFactory userManagementCardFactory = new UserCardFactory(null);
@@ -243,7 +269,7 @@ public final class SettingsController {
 		ControlStyles.apply(removeUserButton, ControlStyles.Purpose.DANGER, ControlStyles.Size.STANDARD);
 	}
 
-	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService, UserDao userDao, UiRuntimeBridge runtimeBridge, CalendarCaseDateTypeMappingServicePort mappingService, CalendarEventTypeDao calendarEventTypeDao) {
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.onOpenAuditLog = Objects.requireNonNull(onOpenAuditLog, "onOpenAuditLog");
@@ -252,11 +278,17 @@ public final class SettingsController {
 		this.caseService = Objects.requireNonNull(caseService, "caseService");
 		this.materialRequestService = Objects.requireNonNull(materialRequestService, "materialRequestService");
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
+		this.calendarCaseDateMappingService = Objects.requireNonNull(mappingService, "mappingService");
+		this.calendarEventTypeDao = Objects.requireNonNull(calendarEventTypeDao, "calendarEventTypeDao");
 		if (fxmlReady) {
 			loadFromPreferences();
 			updateAdminControlsVisibility();
 			loadAdminSectionsAsync();
 		}
+	}
+
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
+		throw new IllegalStateException("Calendar/case-date mapping services are required by Settings.");
 	}
 
 	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
@@ -342,6 +374,7 @@ public final class SettingsController {
 		loadPracticeAreasAsync(null);
 		loadLinkTypesAsync(null);
 		loadCaseDateTypesAsync(null);
+		loadCalendarCaseDateMappingsAsync(null, null);
 		loadRequestLookupsAsync();
 		loadManagedUsersAsync(null);
 	}
@@ -449,9 +482,20 @@ public final class SettingsController {
 					practiceAreaSettingsStatusLabel);
 		}
 		if (caseDateTypeActionRow != null) configureCaseDateTypeActionRow();
+		if (calendarCaseDateMappingActionRow != null) configureCalendarCaseDateMappingActionRow();
 		if (materialTypeActionRow != null) configureRequestActionRow(materialTypeActionRow, "Material Type", materialTypeSettingsStatusLabel, this::onAddMaterialType, this::onEditMaterialType, this::onToggleMaterialTypeActive, this::onResetOrRemoveMaterialType);
 		if (requestMethodActionRow != null) configureRequestActionRow(requestMethodActionRow, "Request Method", requestMethodSettingsStatusLabel, this::onAddRequestMethod, this::onEditRequestMethod, this::onToggleRequestMethodActive, this::onResetOrRemoveRequestMethod);
 		if (requestStatusActionRow != null) configureRequestActionRow(requestStatusActionRow, "Request Status", requestStatusSettingsStatusLabel, this::onAddRequestStatus, this::onEditRequestStatus, this::onToggleRequestStatusActive, this::onResetOrRemoveRequestStatus);
+	}
+
+	private void configureCalendarCaseDateMappingActionRow() {
+		Button add = semanticButton("Add Mapping", ControlStyles.Purpose.PRIMARY, e -> addCalendarCaseDateMapping());
+		editCalendarCaseDateMappingButton = semanticButton("Edit", ControlStyles.Purpose.SECONDARY, e -> editCalendarCaseDateMapping());
+		toggleCalendarCaseDateMappingButton = semanticButton("Activate/Deactivate", ControlStyles.Purpose.GHOST, e -> toggleCalendarCaseDateMapping());
+		deleteCalendarCaseDateMappingButton = semanticButton("Delete", ControlStyles.Purpose.DANGER, e -> deleteCalendarCaseDateMapping());
+		calendarCaseDateMappingActionRow.getChildren().setAll(add, editCalendarCaseDateMappingButton,
+				toggleCalendarCaseDateMappingButton, deleteCalendarCaseDateMappingButton, calendarCaseDateMappingStatusLabel);
+		updateCalendarCaseDateMappingActions();
 	}
 
 	private Button semanticButton(String text, ControlStyles.Purpose purpose, javafx.event.EventHandler<ActionEvent> handler) {
@@ -594,6 +638,143 @@ public final class SettingsController {
 	private void setCaseDateTypeMessage(String msg){if(caseDateTypeSettingsStatusLabel!=null)caseDateTypeSettingsStatusLabel.setText(msg==null?"":msg);} private void showCaseDateTypeError(RuntimeException ex){AppDialogs.showError(caseDateTypeCardsContainer==null||caseDateTypeCardsContainer.getScene()==null?null:caseDateTypeCardsContainer.getScene().getWindow(),"Case Date Types",rootMessage(ex));}
 	public record CaseDateTypeViewRow(EffectiveCaseDateTypeDto type, String mappedRoleName){int id(){return type.id();}String name(){return safe(type.name());}String color(){return safe(type.color());}String category(){return safe(type.calendarCategory());}boolean supportsTime(){return type.supportsTime();}boolean active(){return type.active();}boolean global(){return false;}boolean custom(){return true;}boolean protectedType(){return false;}boolean canEdit(){return true;}boolean canToggleActive(){return mappedRoleName==null;}boolean canRemove(){return mappedRoleName==null;}boolean canReset(){return false;}String scopeLabel(){return "Custom";}byte[] rowVer(){return type.rowVer();}String systemKeyForSave(){return safe(type.systemKey()).isBlank()?null:type.systemKey();}}
 	private record CaseDateTypeInput(String name,String description,String category,String color,boolean supportsTime,String systemKey,Integer sortOrder,boolean active){}
+
+	private void loadCalendarCaseDateMappingsAsync(String successMessage, Long selectId) {
+		if (calendarCaseDateMappingService == null || calendarEventTypeDao == null || calendarCaseDateMappingCardsContainer == null) return;
+		if (!requireAdminLookupManagement("Calendar / Case Date Mappings")) return;
+		final int generation = ++calendarCaseDateMappingLoadGeneration;
+		final int tenantId;
+		final int actorId;
+		try { tenantId = requireTenantId(); actorId = requireActorUserId(); }
+		catch (RuntimeException ex) { setCalendarCaseDateMappingMessage(mappingErrorMessage(ex)); return; }
+		if (calendarCaseDateMappings.isEmpty()) calendarCaseDateMappingCardsContainer.getChildren().setAll(loadingLabel("Loading mappings…"));
+		else setCalendarCaseDateMappingMessage("Refreshing mappings…");
+		settingsLoadExecutor.submit(() -> {
+			try {
+				List<CalendarCaseDateTypeMapping> mappings = List.copyOf(calendarCaseDateMappingService.listMappings());
+				List<CalendarEventType> visibleEvents = List.copyOf(calendarEventTypeDao.listEffectiveEventTypes(tenantId));
+				List<EffectiveCaseDateTypeDto> visibleDates = List.copyOf(caseService.listEffectiveCaseDateTypes(tenantId, actorId));
+				List<CalendarEventType> events = eligibleCalendarEventTypes(visibleEvents, tenantId);
+				List<EffectiveCaseDateTypeDto> dates = eligibleCaseDateTypes(visibleDates, tenantId);
+				Platform.runLater(() -> applyCalendarCaseDateMappingLoad(generation, mappings, events, dates, visibleEvents, visibleDates, successMessage, selectId));
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> { if (generation == calendarCaseDateMappingLoadGeneration) setCalendarCaseDateMappingMessage("Unable to refresh mappings. " + mappingErrorMessage(ex)); });
+			}
+		});
+	}
+
+	void applyCalendarCaseDateMappingLoad(int generation, List<CalendarCaseDateTypeMapping> mappings,
+			List<CalendarEventType> events, List<EffectiveCaseDateTypeDto> dates, List<CalendarEventType> visibleEvents,
+			List<EffectiveCaseDateTypeDto> visibleDates, String successMessage, Long selectId) {
+		if (generation != calendarCaseDateMappingLoadGeneration) return;
+		Long preserved = selectId != null ? selectId : selectedCalendarCaseDateMapping == null ? null : selectedCalendarCaseDateMapping.id();
+		calendarCaseDateMappings = List.copyOf(mappings);
+		eligibleCalendarEventTypes = List.copyOf(events);
+		eligibleMappingCaseDateTypes = List.copyOf(dates);
+		visibleCalendarEventTypes = List.copyOf(visibleEvents);
+		visibleMappingCaseDateTypes = List.copyOf(visibleDates);
+		selectedCalendarCaseDateMapping = mappings.stream().filter(row -> preserved != null && row.id() == preserved).findFirst().orElse(null);
+		renderCalendarCaseDateMappingCards();
+		updateCalendarCaseDateMappingActions();
+		setCalendarCaseDateMappingMessage(successMessage == null ? "" : successMessage);
+	}
+
+	static List<CalendarEventType> eligibleCalendarEventTypes(List<CalendarEventType> rows, int tenantId) {
+		return (rows == null ? List.<CalendarEventType>of() : rows).stream().filter(Objects::nonNull)
+				.filter(row -> row.active() && (row.shaleClientId() == null || row.shaleClientId() == tenantId)).toList();
+	}
+
+	static List<EffectiveCaseDateTypeDto> eligibleCaseDateTypes(List<EffectiveCaseDateTypeDto> rows, int tenantId) {
+		return (rows == null ? List.<EffectiveCaseDateTypeDto>of() : rows).stream().filter(Objects::nonNull)
+				.filter(row -> row.active() && !row.deleted() && (row.shaleClientId() == null || row.shaleClientId() == tenantId)).toList();
+	}
+
+	static String activeMappingConflict(List<CalendarCaseDateTypeMapping> rows, Long excludedId, int eventTypeId, int dateTypeId, boolean active) {
+		if (!active) return null;
+		for (CalendarCaseDateTypeMapping row : rows == null ? List.<CalendarCaseDateTypeMapping>of() : rows) {
+			if (row.active() && (excludedId == null || row.id() != excludedId) &&
+					(row.calendarEventTypeId() == eventTypeId || row.caseDateTypeId() == dateTypeId))
+				return "An active mapping already uses the selected Calendar Event Type or Case Date Type.";
+		}
+		return null;
+	}
+
+	private void renderCalendarCaseDateMappingCards() {
+		if (calendarCaseDateMappings.isEmpty()) { calendarCaseDateMappingCardsContainer.getChildren().setAll(loadingLabel("No mappings are configured.")); return; }
+		FlowPane grid = new FlowPane(10, 10); grid.setPrefWrapLength(760);
+		grid.getChildren().setAll(calendarCaseDateMappings.stream().map(this::buildCalendarCaseDateMappingCard).toList());
+		calendarCaseDateMappingCardsContainer.getChildren().setAll(grid);
+	}
+
+	private VBox buildCalendarCaseDateMappingCard(CalendarCaseDateTypeMapping row) {
+		VBox card = new VBox(8); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact");
+		card.setMinWidth(280); card.setPrefWidth(360); card.setMaxWidth(410); card.setFocusTraversable(true); card.setUserData(row);
+		card.pseudoClassStateChanged(SELECTED_CARD, selectedCalendarCaseDateMapping != null && selectedCalendarCaseDateMapping.id() == row.id());
+		Runnable select = () -> { selectedCalendarCaseDateMapping = row; renderCalendarCaseDateMappingCards(); updateCalendarCaseDateMappingActions(); };
+		card.setOnMouseClicked(e -> { if (e.getButton() == MouseButton.PRIMARY && !isActionControl(e.getTarget())) select.run(); });
+		card.setOnKeyPressed(e -> { if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) { select.run(); e.consume(); } });
+		Label event = new Label("Calendar Event Type: " + eventTypeName(row.calendarEventTypeId())); event.getStyleClass().add("app-dialog-field-label");
+		Label date = new Label("Case Date Type: " + caseDateTypeName(row.caseDateTypeId())); date.getStyleClass().add("app-dialog-field-label");
+		FlowPane meta = new FlowPane(6, 6); meta.getChildren().addAll(metadataPill(row.active() ? "Active" : "Inactive"),
+				metadataPill("Case Date → Calendar: " + yesNo(row.caseDateToCalendar())), metadataPill("Calendar → Case Date: " + yesNo(row.calendarToCaseDate())));
+		card.getChildren().addAll(event, date, meta); return card;
+	}
+
+	private String eventTypeName(int id) { return visibleCalendarEventTypes.stream().filter(x -> x.calendarEventTypeId() == id).map(CalendarEventType::name).findFirst().orElse("Unavailable type (ID " + id + ")"); }
+	private String caseDateTypeName(int id) { return visibleMappingCaseDateTypes.stream().filter(x -> x.id() == id).map(EffectiveCaseDateTypeDto::name).findFirst().orElse("Unavailable type (ID " + id + ")"); }
+	private static String yesNo(boolean value) { return value ? "Enabled" : "Disabled"; }
+
+	private void addCalendarCaseDateMapping() { if (canMutateCalendarCaseDateMapping()) showCalendarCaseDateMappingDialog(null).ifPresent(this::createCalendarCaseDateMapping); }
+	private void editCalendarCaseDateMapping() { if (!canMutateCalendarCaseDateMapping()) return; if (selectedCalendarCaseDateMapping == null) { setCalendarCaseDateMappingMessage("Select a mapping first."); return; } showCalendarCaseDateMappingDialog(selectedCalendarCaseDateMapping).ifPresent(input -> updateCalendarCaseDateMapping(selectedCalendarCaseDateMapping, input)); }
+	private boolean canMutateCalendarCaseDateMapping() { return requireAdminLookupManagement("Calendar / Case Date Mappings") && !calendarCaseDateMappingMutationRunning; }
+
+	private Optional<MappingInput> showCalendarCaseDateMappingDialog(CalendarCaseDateTypeMapping existing) {
+		Dialog<MappingInput> dialog = new Dialog<>(); String title = existing == null ? "Add Mapping" : "Edit Mapping";
+		dialog.setTitle(title); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		ColorCodedComboBox<CalendarEventType> event = ControlStyles.formControl(new ColorCodedComboBox<>(CalendarEventType::name, CalendarEventType::colorHex));
+		ColorCodedComboBox<EffectiveCaseDateTypeDto> date = ControlStyles.formControl(new ColorCodedComboBox<>(EffectiveCaseDateTypeDto::name, EffectiveCaseDateTypeDto::color));
+		event.getItems().setAll(eligibleCalendarEventTypes); date.getItems().setAll(eligibleMappingCaseDateTypes);
+		if (existing != null) { eligibleCalendarEventTypes.stream().filter(x -> x.calendarEventTypeId() == existing.calendarEventTypeId()).findFirst().ifPresent(event::setValue); eligibleMappingCaseDateTypes.stream().filter(x -> x.id() == existing.caseDateTypeId()).findFirst().ifPresent(date::setValue); }
+		CheckBox dateToCalendar = new CheckBox("Case Date → Calendar"); CheckBox calendarToDate = new CheckBox("Calendar → Case Date"); CheckBox active = new CheckBox("Active");
+		dateToCalendar.setSelected(existing == null || existing.caseDateToCalendar()); calendarToDate.setSelected(existing != null && existing.calendarToCaseDate()); active.setSelected(existing == null || existing.active());
+		if (existing != null) { active.setDisable(true); active.setTooltip(new Tooltip("Use Activate/Deactivate to change lifecycle state.")); }
+		Label validation = new Label(); validation.getStyleClass().add("search-summary-text"); validation.setWrapText(true);
+		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(new Label("Calendar Event Type"),0,0); grid.add(event,1,0); grid.add(new Label("Case Date Type"),0,1); grid.add(date,1,1); grid.add(dateToCalendar,1,2); grid.add(calendarToDate,1,3); grid.add(active,1,4); grid.add(validation,1,5); dialog.getDialogPane().setContent(grid);
+		Node save = dialog.getDialogPane().lookupButton(ButtonType.OK); ControlStyles.apply((ButtonBase) save, ControlStyles.Purpose.PRIMARY); ControlStyles.apply((ButtonBase) dialog.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
+		save.addEventFilter(ActionEvent.ACTION, e -> { String message = validateMappingInput(event.getValue(), date.getValue(), dateToCalendar.isSelected(), calendarToDate.isSelected(), active.isSelected(), existing == null ? null : existing.id()); if (message != null) { validation.setText(message); ControlStyles.setInvalid(event, event.getValue() == null); ControlStyles.setInvalid(date, date.getValue() == null); e.consume(); } });
+		dialog.setResultConverter(button -> button == ButtonType.OK ? new MappingInput(event.getValue().calendarEventTypeId(), date.getValue().id(), dateToCalendar.isSelected(), calendarToDate.isSelected(), active.isSelected()) : null);
+		return dialog.showAndWait();
+	}
+
+	private String validateMappingInput(CalendarEventType event, EffectiveCaseDateTypeDto date, boolean a, boolean b, boolean active, Long excludedId) {
+		if (event == null || date == null) return "Select both a Calendar Event Type and a Case Date Type.";
+		if (!a && !b) return "Select at least one synchronization direction.";
+		return activeMappingConflict(calendarCaseDateMappings, excludedId, event.calendarEventTypeId(), date.id(), active);
+	}
+
+	private void createCalendarCaseDateMapping(MappingInput input) { mutateCalendarCaseDateMapping(() -> calendarCaseDateMappingService.createMapping(new CreateCalendarCaseDateTypeMappingCommand(input.eventTypeId(), input.dateTypeId(), input.dateToCalendar(), input.calendarToDate(), input.active())), "Mapping created."); }
+	private void updateCalendarCaseDateMapping(CalendarCaseDateTypeMapping row, MappingInput input) { mutateCalendarCaseDateMapping(() -> calendarCaseDateMappingService.updateMapping(new UpdateCalendarCaseDateTypeMappingCommand(row.id(), input.eventTypeId(), input.dateTypeId(), input.dateToCalendar(), input.calendarToDate(), row.rowVer())), "Mapping updated."); }
+	private void toggleCalendarCaseDateMapping() {
+		if (!canMutateCalendarCaseDateMapping()) return; CalendarCaseDateTypeMapping row = selectedCalendarCaseDateMapping; if (row == null) { setCalendarCaseDateMappingMessage("Select a mapping first."); return; }
+		if (!row.active()) { String conflict = activeMappingConflict(calendarCaseDateMappings, row.id(), row.calendarEventTypeId(), row.caseDateTypeId(), true); if (conflict != null) { setCalendarCaseDateMappingMessage(conflict); return; } }
+		mutateCalendarCaseDateMapping(() -> calendarCaseDateMappingService.setMappingActive(new SetCalendarCaseDateTypeMappingActiveCommand(row.id(), !row.active(), row.rowVer())), row.active() ? "Mapping deactivated." : "Mapping activated.");
+	}
+	private void deleteCalendarCaseDateMapping() {
+		if (!canMutateCalendarCaseDateMapping()) return; CalendarCaseDateTypeMapping row = selectedCalendarCaseDateMapping; if (row == null) { setCalendarCaseDateMappingMessage("Select a mapping first."); return; }
+		if (!AppDialogs.showConfirmation(calendarCaseDateMappingCardsContainer.getScene() == null ? null : calendarCaseDateMappingCardsContainer.getScene().getWindow(), "Delete Mapping", "Delete this mapping?", "This removes the configuration permanently.", "Delete", AppDialogs.DialogActionKind.DANGER)) return;
+		mutateCalendarCaseDateMapping(() -> { calendarCaseDateMappingService.deleteMapping(new DeleteCalendarCaseDateTypeMappingCommand(row.id(), row.rowVer())); return null; }, "Mapping deleted.");
+	}
+
+	private void mutateCalendarCaseDateMapping(java.util.concurrent.Callable<CalendarCaseDateTypeMapping> mutation, String success) {
+		if (calendarCaseDateMappingMutationRunning) return; calendarCaseDateMappingMutationRunning = true; updateCalendarCaseDateMappingActions(); setCalendarCaseDateMappingMessage("Saving…");
+		settingsLoadExecutor.submit(() -> { try { CalendarCaseDateTypeMapping saved = mutation.call(); Platform.runLater(() -> { calendarCaseDateMappingMutationRunning = false; loadCalendarCaseDateMappingsAsync(success, saved == null ? null : saved.id()); updateCalendarCaseDateMappingActions(); }); }
+			catch (Exception ex) { Platform.runLater(() -> { calendarCaseDateMappingMutationRunning = false; setCalendarCaseDateMappingMessage(mappingErrorMessage(ex)); updateCalendarCaseDateMappingActions(); }); } });
+	}
+
+	private void updateCalendarCaseDateMappingActions() { boolean enabled = selectedCalendarCaseDateMapping != null && !calendarCaseDateMappingMutationRunning; if (editCalendarCaseDateMappingButton != null) editCalendarCaseDateMappingButton.setDisable(!enabled); if (toggleCalendarCaseDateMappingButton != null) { toggleCalendarCaseDateMappingButton.setDisable(!enabled); toggleCalendarCaseDateMappingButton.setText(selectedCalendarCaseDateMapping != null && selectedCalendarCaseDateMapping.active() ? "Deactivate" : "Activate"); } if (deleteCalendarCaseDateMappingButton != null) deleteCalendarCaseDateMappingButton.setDisable(!enabled); }
+	private void setCalendarCaseDateMappingMessage(String text) { if (calendarCaseDateMappingStatusLabel != null) calendarCaseDateMappingStatusLabel.setText(text == null ? "" : text); }
+	static String mappingErrorMessage(Throwable ex) { String message = rootMessage(ex); String lower = message.toLowerCase(); if (lower.contains("changed by another") || lower.contains("rowver") || lower.contains("stale")) return "This mapping changed elsewhere. Refresh and try again."; if (lower.contains("already uses") || lower.contains("duplicate") || lower.contains("unique")) return "An active mapping already uses the selected Calendar Event Type or Case Date Type."; if (lower.contains("active calendar") || lower.contains("active case date") || lower.contains("reference")) return "The selected type is no longer active or available to this tenant."; if (lower.contains("admin") || lower.contains("authoriz") || lower.contains("permission")) return "Only administrators can manage calendar/case-date mappings."; if (lower.contains("not found") || lower.contains("inaccessible")) return "This mapping is no longer available. Refresh and try again."; return "Unable to save the mapping. " + message; }
+	private record MappingInput(int eventTypeId, int dateTypeId, boolean dateToCalendar, boolean calendarToDate, boolean active) {}
 
 
 
@@ -1130,6 +1311,8 @@ public final class SettingsController {
 			setLinkTypeMessage(message);
 		} else if ("Case Date Types".equals(sectionName)) {
 			setCaseDateTypeMessage(message);
+		} else if ("Calendar / Case Date Mappings".equals(sectionName)) {
+			setCalendarCaseDateMappingMessage(message);
 		}
 		return false;
 	}
@@ -1671,6 +1854,10 @@ public final class SettingsController {
 		if (requestAdministrationSection != null) {
 			requestAdministrationSection.setVisible(visible);
 			requestAdministrationSection.setManaged(visible);
+		}
+		if (calendarCaseDateMappingAdministrationSection != null) {
+			calendarCaseDateMappingAdministrationSection.setVisible(visible);
+			calendarCaseDateMappingAdministrationSection.setManaged(visible);
 		}
 		if (userAdministrationSection != null) {
 			userAdministrationSection.setVisible(visible);

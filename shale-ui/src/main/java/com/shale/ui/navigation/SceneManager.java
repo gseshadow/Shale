@@ -14,6 +14,8 @@ import com.shale.data.dao.MaterialRequestDao;
 import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.FormConfigurationServiceAdapter;
 import com.shale.data.service.adapter.MaterialRequestServiceAdapter;
+import com.shale.data.service.adapter.CalendarCaseDateTypeMappingServiceAdapter;
+import com.shale.data.dao.CalendarCaseDateTypeMappingDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
@@ -692,7 +694,9 @@ public final class SceneManager {
 		{
 			SettingsController c = (SettingsController) controller;
 			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new MaterialRequestServiceAdapter(
-					new MaterialRequestDao(dbSessionProvider)), new UserDao(dbSessionProvider), runtimeBridge);
+					new MaterialRequestDao(dbSessionProvider)), new UserDao(dbSessionProvider), runtimeBridge,
+					new CalendarCaseDateTypeMappingServiceAdapter(new CalendarCaseDateTypeMappingDao(dbSessionProvider)),
+					new CalendarEventTypeDao(dbSessionProvider));
 			return c;
 		});
 	}
