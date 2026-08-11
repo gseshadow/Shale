@@ -8,7 +8,7 @@ import com.shale.core.model.CalendarFeedItem;
 import com.shale.core.model.CalendarFeedSourceFilter;
 import com.shale.core.model.CalendarOverlaySelection;
 import com.shale.data.dao.CalendarFeedDao;
-import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseSummaryDao;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
@@ -97,7 +97,7 @@ public final class CalendarController {
     private Consumer<Integer> onOpenCase;
     private Consumer<Long> onOpenTask;
     private CaseTaskService caseTaskService;
-    private CaseDao caseDao;
+    private CaseSummaryDao caseSummaryDao;
     private UiRuntimeBridge runtimeBridge;
     private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
     private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
@@ -127,10 +127,10 @@ public final class CalendarController {
     private TaskCardFactory taskCardFactory = new TaskCardFactory(id -> {}, id -> {}, id -> {}, id -> {});
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "calendar-feed-loader"); t.setDaemon(true); return t; });
 
-    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseDao caseDao, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
+    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseSummaryDao caseSummaryDao, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
         this.appState = appState; this.calendarService = calendarService; this.calendarFeedDao = calendarFeedDao;
         this.caseTaskService = caseTaskService;
-        this.caseDao = caseDao;
+        this.caseSummaryDao = caseSummaryDao;
         this.runtimeBridge = runtimeBridge;
         this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase; this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
         resetCalendarOverlayDefaults();
@@ -1068,7 +1068,7 @@ public final class CalendarController {
                     return;
                 }
                 var initial = new NewCalendarEventDialog.CreateCalendarEventInput(event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(), event.allDay() ? null : event.startsAt().toLocalTime(), resolveDurationMinutes(event), event.description(), event.caseId(), event.assignedToUserId());
-                CalendarFeedDao.CalendarCaseCardRow caseRow = loadCaseRowForEvent(event, tenantId);
+                CaseSummaryDao.CalendarCaseRow caseRow = loadCaseRowForEvent(event, tenantId);
                 CalendarFeedDao.CalendarTaskCardRow taskRow = loadTaskRowForEvent(event, tenantId);
                 var eventTypes = calendarService.listEffectiveEventTypes(tenantId);
                 PerfLog.logDone("DAO", "calendar edit-event hydrate eventId=" + eventId, loadStart);
@@ -1076,7 +1076,8 @@ public final class CalendarController {
                     if (!dialog.isShowing()) return;
                     Node rc = caseRow == null ? null : createRelatedCaseNode(caseRow);
                     Node rt = taskRow == null ? null : createRelatedTaskNode(taskRow);
-                    dialog.populate(eventTypes, initial, input -> saveEditedEvent(event, input), () -> deleteEvent(event.calendarEventId(), tenantId), rc, rt, () -> caseOptionsForPicker(event.caseId()), () -> assignedUserOptionsForPicker(tenantId, event.assignedToUserId()), onOpenCase, caseRow == null ? null : new NewCalendarEventDialog.CaseOption(caseRow.caseId(), caseRow.caseName(), caseRow.responsibleAttorney(), caseRow.responsibleAttorneyColor(), caseRow.nonEngagementLetterSent()), dbExec);
+                    var summary = caseRow == null ? null : caseRow.summary();
+                    dialog.populate(eventTypes, initial, input -> saveEditedEvent(event, input), () -> deleteEvent(event.calendarEventId(), tenantId), rc, rt, () -> caseOptionsForPicker(event.caseId()), () -> assignedUserOptionsForPicker(tenantId, event.assignedToUserId()), onOpenCase, summary == null ? null : new NewCalendarEventDialog.CaseOption(Math.toIntExact(summary.caseId()), summary.caseName(), summary.responsibleAttorneyName(), summary.responsibleAttorneyColor(), caseRow.nonEngagementLetterSent()), dbExec);
                     openingEditDialogEventIds.remove(eventId);
                 });
             } catch (RuntimeException ex) {
@@ -1094,22 +1095,22 @@ public final class CalendarController {
         }
         openEditEventDialog((int) eventId);
     }
-    private CalendarFeedDao.CalendarCaseCardRow loadCaseRowForEvent(com.shale.core.model.CalendarEvent event, int tenantId) { if (event == null || event.caseId() == null) return null; List<CalendarFeedDao.CalendarCaseCardRow> rows = calendarFeedDao.listCaseCardRows(tenantId, List.of(event.caseId())); return rows.isEmpty() ? null : rows.getFirst(); }
+    private CaseSummaryDao.CalendarCaseRow loadCaseRowForEvent(com.shale.core.model.CalendarEvent event, int tenantId) { return event == null || event.caseId() == null || caseSummaryDao == null ? null : caseSummaryDao.findActiveForCalendar(tenantId, event.caseId()); }
     private CalendarFeedDao.CalendarTaskCardRow loadTaskRowForEvent(com.shale.core.model.CalendarEvent event, int tenantId) { if (event == null || event.taskId() == null) return null; List<CalendarFeedDao.CalendarTaskCardRow> rows = calendarFeedDao.listTaskCardRows(tenantId, List.of(event.taskId())); return rows.isEmpty() ? null : rows.getFirst(); }
-    private Node createRelatedCaseNode(CalendarFeedDao.CalendarCaseCardRow row) { if (row == null) return null; return caseCardFactory.create(new CaseCardFactory.CaseCardModel(row.caseId(), row.caseName(), null, null, row.responsibleAttorney(), row.responsibleAttorneyColor(), row.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI); }
+    private Node createRelatedCaseNode(CaseSummaryDao.CalendarCaseRow row) { if (row == null) return null; var summary = row.summary(); return caseCardFactory.create(new CaseCardFactory.CaseCardModel(Math.toIntExact(summary.caseId()), summary.caseName(), null, null, summary.responsibleAttorneyName(), summary.responsibleAttorneyColor(), row.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI); }
     private Node createRelatedTaskNode(CalendarFeedDao.CalendarTaskCardRow row) { if (row == null) return null; return taskCardFactory.create(new TaskCardFactory.TaskCardModel(row.taskId(), row.caseId() == null ? null : row.caseId().longValue(), row.caseName(), null, null, null, row.caseResponsibleAttorney(), row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(), row.title(), row.description(), row.createdByDisplayName(), null, null, row.priorityColorHex(), row.dueAt(), row.completedAt(), List.of()), TaskCardFactory.Variant.MINI); }
     private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) { LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime()); LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes()); try { calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), input.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), input.assignedToUserId(), existing.completed(), existing.cancelled(), appState == null ? null : appState.getUserId(), existing.createdAt(), existing.updatedAt())); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; } }
     private List<NewCalendarEventDialog.CaseOption> caseOptionsForPicker(Integer selectedCaseId) {
         if (Platform.isFxApplicationThread()) throw new IllegalStateException("Calendar case options must load off the JavaFX Application Thread");
         long started = PerfLog.start();
         int tenantId = appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId();
-        List<NewCalendarEventDialog.CaseOption> options = (caseDao == null ? List.<com.shale.core.dto.CaseSelectionOptionDto>of()
-                : caseDao.listCaseSelectionOptions(tenantId)).stream()
-                .map(row -> new NewCalendarEventDialog.CaseOption(Math.toIntExact(row.caseId()), safe(row.displayName()),
-                        row.responsibleAttorneyName(), row.responsibleAttorneyColor(), row.nonEngagementLetterSent()))
+        List<NewCalendarEventDialog.CaseOption> options = (caseSummaryDao == null ? List.<CaseSummaryDao.CalendarCaseRow>of()
+                : caseSummaryDao.listActiveForCalendar(tenantId)).stream()
+                .map(row -> new NewCalendarEventDialog.CaseOption(Math.toIntExact(row.summary().caseId()), safe(row.summary().caseName()),
+                        row.summary().responsibleAttorneyName(), row.summary().responsibleAttorneyColor(), row.nonEngagementLetterSent()))
                 .toList();
         PerfLog.logDone("DAO", "calendar case-picker options rows=" + options.size()
-                + " dbRoundTrips=" + (caseDao == null ? 0 : 1) + " fxThread=false", started);
+                + " dbRoundTrips=" + (caseSummaryDao == null ? 0 : 1) + " fxThread=false", started);
         return options;
     }
     private List<NewCalendarEventDialog.AssignedUserOption> assignedUserOptionsForPicker(int tenantId, Integer selectedUserId) {
