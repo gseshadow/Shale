@@ -27,8 +27,58 @@ final class CaseCalendarFoundationMigrationTest {
    ()->assertTrue(trigger.contains("uu.id=i.UpdatedByUserId")),
    ()->assertTrue(trigger.contains("cu.ShaleClientId<>i.ShaleClientId")),
    ()->assertTrue(trigger.contains("uu.ShaleClientId<>i.ShaleClientId")),
+   ()->assertTrue(trigger.contains("cu.ShaleClientId IS NULL")),
+   ()->assertTrue(trigger.contains("uu.ShaleClientId IS NULL")),
    ()->assertFalse(trigger.contains("is_deleted")),
    ()->assertFalse(trigger.contains("name=")));
+ }
+
+ @Test void acceptsTheVerifiedRealPreMigrationUsersTenantShape(){
+  assertAll(
+   ()->assertTrue(sql.contains("(N'Users',N'id',N'int',4,0)")),
+   ()->assertTrue(sql.contains("(N'Users',N'ShaleClientId',N'int',4,1)")),
+   ()->assertFalse(sql.contains("(N'Users',N'ShaleClientId',N'int',4,0)")));
+ }
+
+ @Test void rejectsNullTenantAndCrossTenantAuditUsersDuringPreflightAndWrites(){
+  String preflight=sql.substring(sql.indexOf("IF EXISTS(SELECT 1 FROM dbo.CalendarCaseDateTypeMappings"),sql.indexOf("DECLARE @FkName"));
+  String trigger=sql.substring(sql.indexOf("CREATE TRIGGER dbo.TR_CalendarCaseDateTypeMappings_Tenant"),sql.indexOf("/* Reject competing"));
+  assertAll(
+   ()->assertTrue(preflight.contains("cu.ShaleClientId IS NULL OR cu.ShaleClientId<>i.ShaleClientId")),
+   ()->assertTrue(preflight.contains("uu.ShaleClientId IS NULL OR uu.ShaleClientId<>i.ShaleClientId")),
+   ()->assertTrue(trigger.contains("cu.ShaleClientId IS NULL OR cu.ShaleClientId<>i.ShaleClientId")),
+   ()->assertTrue(trigger.contains("uu.ShaleClientId IS NULL OR uu.ShaleClientId<>i.ShaleClientId")));
+ }
+
+ @Test void normalizesFormattingWhenValidatingStoredPredicateAndTriggerDefinitions(){
+  assertAll(
+   ()->assertTrue(sql.contains("p.predicate_definition,N'[',N''")),
+   ()->assertTrue(sql.contains("N']',N''")),
+   ()->assertTrue(sql.contains("N'(',N''")),
+   ()->assertTrue(sql.contains("N')',N''")),
+   ()->assertTrue(sql.contains("SET @TriggerDefinition=REPLACE(@TriggerDefinition,N' ',N'')")),
+   ()->assertTrue(sql.contains("N'sec.fn_filterbytenantshaleclientid'")));
+ }
+
+ @Test void transactionMakesFirstInstallAtomicAndLateFailureRollsBackEarlierDdl(){
+  assertAll(
+   ()->assertTrue(sql.contains("SET XACT_ABORT ON")),
+   ()->assertTrue(sql.contains("BEGIN TRY\nBEGIN TRANSACTION;")),
+   ()->assertTrue(sql.contains("COMMIT;")),
+   ()->assertTrue(sql.contains("BEGIN CATCH IF @@TRANCOUNT>0 ROLLBACK; THROW; END CATCH")),
+   ()->assertTrue(sql.indexOf("ALTER TABLE dbo.CalendarEvents ADD CaseDateId")<sql.indexOf("ALTER SECURITY POLICY")));
+ }
+
+ @Test void firstRunAndRerunPathsCoverExpectedFoundationObjects(){
+  assertAll(
+   ()->assertTrue(sql.contains("ALTER TABLE dbo.CalendarEvents ADD CaseDateId bigint NULL")),
+   ()->assertTrue(sql.contains("ALTER TABLE dbo.CalendarEvents ADD RowVer rowversion NOT NULL")),
+   ()->assertTrue(sql.contains("CREATE UNIQUE INDEX UX_CaseDates_ShaleClientId_Id")),
+   ()->assertTrue(sql.contains("CREATE UNIQUE INDEX UX_CalendarEvents_ActiveCaseDateLink")),
+   ()->assertTrue(sql.contains("FK_CalendarEvents_CaseDate_Tenant")),
+   ()->assertTrue(sql.contains("CREATE TABLE dbo.CalendarCaseDateTypeMappings")),
+   ()->assertTrue(sql.contains("CREATE TRIGGER dbo.TR_CalendarCaseDateTypeMappings_Tenant")),
+   ()->assertTrue(sql.contains("IF NOT EXISTS(SELECT 1 FROM sys.security_predicates")));
  }
 
  @Test void rerunRetainsCorrectObjectsAndRejectsSameNamedIncompatibleObjects(){

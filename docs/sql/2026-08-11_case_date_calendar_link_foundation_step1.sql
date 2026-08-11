@@ -28,7 +28,7 @@ INSERT @PrerequisiteColumns VALUES
 (N'CaseDates',N'ShaleClientId',N'int',4,0),(N'CaseDates',N'Id',N'bigint',8,0),
 (N'CalendarEventTypes',N'CalendarEventTypeId',N'int',4,0),(N'CalendarEventTypes',N'ShaleClientId',N'int',4,1),
 (N'CaseDateTypes',N'Id',N'int',4,0),(N'CaseDateTypes',N'ShaleClientId',N'int',4,1),
-(N'Users',N'id',N'int',4,0),(N'Users',N'ShaleClientId',N'int',4,0);
+(N'Users',N'id',N'int',4,0),(N'Users',N'ShaleClientId',N'int',4,1);
 IF EXISTS(SELECT 1 FROM @PrerequisiteColumns r LEFT JOIN sys.columns c ON c.object_id=OBJECT_ID(N'dbo.'+r.TableName) AND c.name=r.ColumnName LEFT JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.column_id IS NULL OR t.name<>r.TypeName OR c.max_length<>r.MaxLength OR c.is_nullable<>r.Nullable)
  THROW 55211,'A prerequisite ID/tenant column is missing or incompatible; inspect CalendarEvents, CaseDates, type tables, and Users column types/nullability.',1;
 
@@ -112,7 +112,7 @@ END CLOSE mapping_indexes; DEALLOCATE mapping_indexes;
 
 /* Single-column relationship FKs; trigger below supplies overlay-aware tenant ownership. */
 IF EXISTS(SELECT 1 FROM dbo.CalendarCaseDateTypeMappings i LEFT JOIN dbo.ShaleClients sc ON sc.Id=i.ShaleClientId LEFT JOIN dbo.CalendarEventTypes et ON et.CalendarEventTypeId=i.CalendarEventTypeId LEFT JOIN dbo.CaseDateTypes dt ON dt.Id=i.CaseDateTypeId LEFT JOIN dbo.Users cu ON cu.id=i.CreatedByUserId LEFT JOIN dbo.Users uu ON uu.id=i.UpdatedByUserId
- WHERE sc.Id IS NULL OR et.CalendarEventTypeId IS NULL OR dt.Id IS NULL OR cu.id IS NULL OR (et.ShaleClientId IS NOT NULL AND et.ShaleClientId<>i.ShaleClientId) OR (dt.ShaleClientId IS NOT NULL AND dt.ShaleClientId<>i.ShaleClientId) OR cu.ShaleClientId<>i.ShaleClientId OR (i.UpdatedByUserId IS NOT NULL AND (uu.id IS NULL OR uu.ShaleClientId<>i.ShaleClientId)))
+ WHERE sc.Id IS NULL OR et.CalendarEventTypeId IS NULL OR dt.Id IS NULL OR cu.id IS NULL OR (et.ShaleClientId IS NOT NULL AND et.ShaleClientId<>i.ShaleClientId) OR (dt.ShaleClientId IS NOT NULL AND dt.ShaleClientId<>i.ShaleClientId) OR cu.ShaleClientId IS NULL OR cu.ShaleClientId<>i.ShaleClientId OR (i.UpdatedByUserId IS NOT NULL AND (uu.id IS NULL OR uu.ShaleClientId IS NULL OR uu.ShaleClientId<>i.ShaleClientId)))
  THROW 55229,'Existing mapping rows contain cross-tenant or missing type/audit-user references; no relationship constraint was added and no data was changed.',1;
 DECLARE @FkName sysname,@ParentColumn sysname,@ReferencedTable sysname,@ReferencedColumn sysname;
 DECLARE mapping_fks CURSOR LOCAL FAST_FORWARD FOR SELECT * FROM (VALUES
@@ -134,18 +134,19 @@ END CLOSE mapping_fks; DEALLOCATE mapping_fks;
 /* Tenant ownership for overlay lookup IDs and both audit-user IDs. Users are not lifecycle-filtered: audit columns preserve historical actors. */
 IF OBJECT_ID(N'dbo.TR_CalendarCaseDateTypeMappings_Tenant',N'TR') IS NOT NULL
 BEGIN
- DECLARE @TriggerDefinition nvarchar(max)=(SELECT LOWER(REPLACE(REPLACE(REPLACE(REPLACE(definition,CHAR(13),N''),CHAR(10),N''),CHAR(9),N''),N' ',N'')) FROM sys.sql_modules WHERE object_id=OBJECT_ID(N'dbo.TR_CalendarCaseDateTypeMappings_Tenant'));
- IF EXISTS(SELECT 1 FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_CalendarCaseDateTypeMappings_Tenant') AND (is_disabled=1 OR parent_id<>OBJECT_ID(N'dbo.CalendarCaseDateTypeMappings'))) OR @TriggerDefinition NOT LIKE N'%createdbyuserid%' OR @TriggerDefinition NOT LIKE N'%updatedbyuserid%' OR @TriggerDefinition NOT LIKE N'%u.shaleclientid<>i.shaleclientid%' OR @TriggerDefinition NOT LIKE N'%et.shaleclientid<>i.shaleclientid%' OR @TriggerDefinition NOT LIKE N'%dt.shaleclientid<>i.shaleclientid%'
+ DECLARE @TriggerDefinition nvarchar(max)=(SELECT LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(definition,N'[',N''),N']',N''),N'(',N''),N')',N''),CHAR(13),N''),CHAR(10),N''),CHAR(9),N'')) FROM sys.sql_modules WHERE object_id=OBJECT_ID(N'dbo.TR_CalendarCaseDateTypeMappings_Tenant'));
+ SET @TriggerDefinition=REPLACE(@TriggerDefinition,N' ',N'');
+ IF EXISTS(SELECT 1 FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_CalendarCaseDateTypeMappings_Tenant') AND (is_disabled=1 OR parent_id<>OBJECT_ID(N'dbo.CalendarCaseDateTypeMappings'))) OR @TriggerDefinition NOT LIKE N'%createdbyuserid%' OR @TriggerDefinition NOT LIKE N'%updatedbyuserid%' OR @TriggerDefinition NOT LIKE N'%cu.shaleclientidisnullorcu.shaleclientid<>i.shaleclientid%' OR @TriggerDefinition NOT LIKE N'%uu.shaleclientidisnulloruu.shaleclientid<>i.shaleclientid%' OR @TriggerDefinition NOT LIKE N'%et.shaleclientid<>i.shaleclientid%' OR @TriggerDefinition NOT LIKE N'%dt.shaleclientid<>i.shaleclientid%'
   THROW 55225,'TR_CalendarCaseDateTypeMappings_Tenant exists with an incompatible tenant-validation definition.',1;
 END ELSE EXEC(N'CREATE TRIGGER dbo.TR_CalendarCaseDateTypeMappings_Tenant ON dbo.CalendarCaseDateTypeMappings AFTER INSERT,UPDATE AS
 BEGIN SET NOCOUNT ON;
  IF EXISTS(SELECT 1 FROM inserted i LEFT JOIN dbo.CalendarEventTypes et ON et.CalendarEventTypeId=i.CalendarEventTypeId LEFT JOIN dbo.CaseDateTypes dt ON dt.Id=i.CaseDateTypeId LEFT JOIN dbo.Users cu ON cu.id=i.CreatedByUserId LEFT JOIN dbo.Users uu ON uu.id=i.UpdatedByUserId
- WHERE et.CalendarEventTypeId IS NULL OR dt.Id IS NULL OR cu.id IS NULL OR (et.ShaleClientId IS NOT NULL AND et.ShaleClientId<>i.ShaleClientId) OR (dt.ShaleClientId IS NOT NULL AND dt.ShaleClientId<>i.ShaleClientId) OR cu.ShaleClientId<>i.ShaleClientId OR (i.UpdatedByUserId IS NOT NULL AND (uu.id IS NULL OR uu.ShaleClientId<>i.ShaleClientId)))
+ WHERE et.CalendarEventTypeId IS NULL OR dt.Id IS NULL OR cu.id IS NULL OR (et.ShaleClientId IS NOT NULL AND et.ShaleClientId<>i.ShaleClientId) OR (dt.ShaleClientId IS NOT NULL AND dt.ShaleClientId<>i.ShaleClientId) OR cu.ShaleClientId IS NULL OR cu.ShaleClientId<>i.ShaleClientId OR (i.UpdatedByUserId IS NOT NULL AND (uu.id IS NULL OR uu.ShaleClientId IS NULL OR uu.ShaleClientId<>i.ShaleClientId)))
  THROW 55226,''Mapped types must be global/current-tenant and audit users must belong to the mapping tenant.'',1;
 END');
 
 /* Reject competing or incompatible predicates, then add the complete strict-write RLS set. */
-IF EXISTS(SELECT 1 FROM sys.security_predicates p WHERE p.target_object_id=OBJECT_ID(N'dbo.CalendarCaseDateTypeMappings') AND (p.object_id<>@PolicyObjectId OR LOWER(REPLACE(REPLACE(REPLACE(p.predicate_definition,N'[',N''),N']',N''),N' ',N''))<>N'sec.fn_filterbytenant(shaleclientid)'))
+IF EXISTS(SELECT 1 FROM sys.security_predicates p WHERE p.target_object_id=OBJECT_ID(N'dbo.CalendarCaseDateTypeMappings') AND (p.object_id<>@PolicyObjectId OR LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(p.predicate_definition,N'[',N''),N']',N''),N' ',N''),N'(',N''),N')',N''))<>N'sec.fn_filterbytenantshaleclientid'))
  THROW 55227,'CalendarCaseDateTypeMappings has a competing or incompatible security predicate.',1;
 DECLARE @Rls TABLE(PredicateType nvarchar(60),Operation nvarchar(60),Clause nvarchar(60));
 INSERT @Rls VALUES(N'FILTER',NULL,N'FILTER'),(N'BLOCK',N'AFTER INSERT',N'BLOCK_AFTER_INSERT'),(N'BLOCK',N'BEFORE UPDATE',N'BLOCK_BEFORE_UPDATE'),(N'BLOCK',N'AFTER UPDATE',N'BLOCK_AFTER_UPDATE');
