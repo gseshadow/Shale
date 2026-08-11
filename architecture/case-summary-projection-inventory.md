@@ -18,7 +18,7 @@ The projection contains: Case ID, tenant ID, Case number/name; status ID, `Syste
 | Case board | `CaseDao.listAssignedCasesForBoard` | `CaseRow` card data including status, attorney, dates, parties, update and description | active only; assigned-user membership; status/date order | Core fields fit; membership, card enrichment and lane behavior remain separate. Deferred. |
 | Cases export | `CasesController.exportCases` → `CaseExportService.exportCases` → `CaseSummaryDao.listActiveGridForExport` | shared summary plus export-scoped dates, party/client, latest-update, and description enrichment | immutable current grid search/status/sort snapshot; 500-row SQL pages | Converted; Reports and every deferred consumer retain their legacy boundaries. |
 | Search | `SearchService.searchAll` → `CaseSummaryDao.searchActiveByName` | shared summary plus compact-card dates/color/flag | active; literal case-insensitive name substring; score/name/ID order; unpaged | Converted for active desktop Search only; Deleted Cases and API/web search retain legacy paths. |
-| Deleted Cases | `CaseDao.searchDeletedCasesByName` | rich `CaseRow` card data | deleted only; name `LIKE`; updated descending, limited | Explicit `DELETED` mode fits lifecycle; restore UI/card enrichment remains separate. Deferred. |
+| Deleted Cases | `SearchService.searchAll` → `CaseSummaryDao.searchDeletedByName` | shared summary, compact-card dates/color/flag, and restore `RowVer` | deleted only; literal case-insensitive name substring; score/name/ID order; unpaged | Converted for the admin-only desktop Deleted Cases group. Legacy DAO retained for compatibility. |
 | MyShale paging | `CaseDao.findMyCasesPage` | `CaseRow` | active by default; any `CaseUsers` membership; legacy date compatibility; caller-selected sort | Core fields fit; membership and compatibility date behavior remain separate. Deferred. |
 | MyShale/user detail assigned cases | `CaseDao.listActiveCasesForUserTeamMember`, `UserDetailService.loadAssignedCases` | rich card data | active; any `CaseUsers` membership; intake/id descending; limit | Core fields fit; membership, limits and card enrichment remain separate. Deferred. |
 | Contact related Cases | `ContactDao.findRelatedCases` | local `RelatedCaseRow`: ID/name, party role/side, status, responsible attorney | contact and tenant; active contact/case relationships; name order | Case core fits; relationship role/side remains in Contact query. Deferred. |
@@ -143,3 +143,42 @@ and full exception logging without logging returned PHI. Existing `CaseCardFacto
 and Case-ID navigation are unchanged. The legacy active search method remains because the server/API
 service adapter still calls it; Deleted Cases, related views, My Shale, Reports, Documents, Calendar,
 server/API/web, active grid, board, and export are intentionally unchanged.
+
+## Desktop Deleted Cases cutover
+
+The Deleted Cases consumer is the admin-only group within desktop global Search. Its old read path
+was `SearchController` → `SearchService.searchAll` → `CaseDao.searchDeletedCasesByName` → rich legacy
+`CaseRow`; its new read path ends at `CaseSummaryDao.searchDeletedByName` and the scoped
+`DeletedCaseRow`. Search initialization, its single background executor, query generation, tenant/user
+identity guard, FX-thread application, provider-level partial-error state, LiveBus reload subscription,
+empty/loading presentation, compact `CaseCardFactory`, confirmation dialog, and navigation remain the
+existing Search lifecycle. A restore now invalidates the current generation before work begins, and
+both restore success and failure callbacks verify that generation and identity. Success publishes the
+existing PHI-free deleted-state event and reloads; conflict/failure keeps the card and reloads to obtain
+authoritative state. Thus a pre-restore load cannot reintroduce a restored Case.
+
+The exact population is every `Cases.IsDeleted = 1` Case in the trusted session tenant whose Case name
+contains the nonblank trimmed query, case-insensitively and with SQL LIKE metacharacters treated
+literally. Blank search remains idle and issues no Deleted Cases query. There are no status or Practice
+Area filters, paging, or result limit. SQL orders by Case name then Case ID; established in-memory
+ranking remains exact, prefix, word-boundary prefix, substring, case-insensitive name, then Case ID.
+Current status is resolved by the shared open-status deterministic rule even if its definition is
+inactive; absent status/assignments remain absent, and selected assignment IDs survive unavailable
+display hydration. No deletion timestamp or actor is displayed.
+
+The row reuses summary Case/tenant identity and number/name, authoritative current-status identity and
+display, Practice Area identity/name, responsible-attorney and legal-assistant IDs/display,
+created/updated timestamps, and deleted state. Deleted-only composition adds only the compact card's
+authoritative semantic Intake, Statute, and Tort dates, Practice Area color, non-engagement flag, and
+the `Cases.RowVer` restore token. Scalar applies and date aggregation keep one row per Case and retain
+missing optional relationships without per-row hydration. It adds no parties, contacts, updates,
+narratives, or description and reads no deprecated `Cases` date column.
+
+Restore continues through `SearchController` → `CaseDetailService` → the established transactional
+`CaseDao` lifecycle operation. The accepted row's authoritative Case ID and defensively copied
+`RowVer` are now supplied to the existing tenant/session/actor-verified update; audit vocabulary,
+timeline insertion, rollback, and optimistic-concurrency semantics are otherwise unchanged. The
+legacy two-argument restore method and `CaseDao.searchDeletedCasesByName` are retained because deleting
+and other deferred compatibility paths must not be migrated in this slice. Active grid, board, export,
+active Search, remaining My Shale, related views, Reports, Documents, Calendar, server, API, and web
+are unchanged.

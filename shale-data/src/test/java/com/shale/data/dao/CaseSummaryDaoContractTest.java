@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import com.shale.core.dto.CaseSummaryProjection;
 
 import org.junit.jupiter.api.Test;
 
@@ -52,7 +54,7 @@ final class CaseSummaryDaoContractTest {
 	@Test void optionalRelationshipsCannotRemoveOrMultiplyCasesAndQueryIsNotNPlusOne() throws Exception {
 		String source = source();
 		String projectionList = source.substring(source.indexOf("public List<CaseSummaryProjection> list"),
-				source.indexOf("public GridPage findActiveGridPage"));
+				source.indexOf("public List<SearchCaseRow> searchActiveByName"));
 		assertTrue(source.contains("OUTER APPLY ("));
 		assertTrue(source.contains("SELECT TOP (1)"));
 		assertTrue(source.contains("LEFT JOIN dbo.PracticeAreas"));
@@ -65,7 +67,7 @@ final class CaseSummaryDaoContractTest {
 	@Test void projectionDoesNotExpandPhiOrRemoveLegacyQueries() throws Exception {
 		String source = source();
 		String projectionList = source.substring(source.indexOf("public List<CaseSummaryProjection> list"),
-				source.indexOf("public GridPage findActiveGridPage"));
+				source.indexOf("public List<SearchCaseRow> searchActiveByName"));
 		for (String forbidden : new String[] { "c.Description", "c.Summary", "CaseUpdates", "Contacts", "Organizations", "Medical" })
 			assertFalse(projectionList.contains(forbidden), forbidden);
 		String legacy = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
@@ -126,5 +128,36 @@ final class CaseSummaryDaoContractTest {
 		assertFalse(board.contains("c.TortNoticeDeadline"));
 		assertTrue(board.lines().filter(line -> line.contains("executeQuery()")).count() == 1,
 				"Board hydration must remain a single query after tenant verification");
+	}
+
+	@Test void deletedSearchIsExplicitSetBasedTenantScopedAndDeterministic() throws Exception {
+		String source = source();
+		String deleted = source.substring(source.indexOf("public List<DeletedCaseRow> searchDeletedByName"),
+				source.indexOf("static String escapeLike"));
+		assertTrue(deleted.contains("verifyTenant(con, requestedTenantId)"));
+		assertTrue(deleted.contains("c.ShaleClientId=? AND c.IsDeleted = 1"));
+		assertTrue(deleted.contains("LOWER(COALESCE(c.Name,'')) LIKE ?"));
+		assertTrue(deleted.contains("ORDER BY c.Name ASC,c.Id ASC"));
+		assertTrue(deleted.contains("RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY"));
+		assertTrue(deleted.contains("RoleSemantics.ROLE_LEGAL_ASSISTANT"));
+		assertTrue(deleted.contains("CaseDateTypeSemanticRoleMappings"));
+		assertTrue(deleted.contains("OUTER APPLY"));
+		assertFalse(deleted.contains("c.CallerDate"));
+		assertFalse(deleted.contains("c.StatuteOfLimitations"));
+		assertFalse(deleted.contains("c.TortNoticeDeadline"));
+		assertTrue(deleted.lines().filter(line -> line.contains("executeQuery()" )).count() == 1,
+				"Deleted Cases must use one set query after tenant verification");
+	}
+
+	@Test void deletedRowDefensivelyCopiesTheAuthoritativeRestoreToken() {
+		byte[] token = { 1, 2, 3 };
+		var summary = new CaseSummaryProjection(42, 7, "C-42", "Deleted", null, null, null, null, null,
+				null, null, null, null, null, null, null, null, LocalDateTime.MIN, LocalDateTime.MIN, true);
+		var row = new CaseSummaryDao.DeletedCaseRow(summary, null, null, null, null, null, token);
+		token[0] = 9;
+		assertTrue(row.rowVer()[0] == 1);
+		byte[] returned = row.rowVer();
+		returned[1] = 9;
+		assertTrue(row.rowVer()[1] == 2);
 	}
 }

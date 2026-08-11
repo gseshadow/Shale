@@ -26,6 +26,8 @@ class CaseLifecycleAuditContractTest {
         assertTrue(s.contains("AND RowVer = ?"));
         assertTrue(s.contains("shaleClientId does not match current session"));
         assertTrue(s.contains("if (ps.executeUpdate() != 1) { con.rollback(); return false; }"));
+		assertTrue(s.contains("restoreCase(long caseId, Integer shaleClientId, byte[] expectedRowVer)"));
+		assertTrue(s.contains("updateDeletedState(caseId, shaleClientId, false, expectedRowVer.clone())"));
     }
 
     @Test void metadataContainsOnlyAuthoritativeCaseIdAndTimelineReadPreservesDeletedHistory() throws Exception {
