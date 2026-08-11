@@ -12,6 +12,8 @@ import java.util.Objects;
 public final class CalendarEventDao {
     public record GlobalSearchCalendarEventRow(Integer calendarEventId, int shaleClientId, Integer caseId, String caseName, String title, String description, String location, LocalDateTime startsAt, LocalDateTime endsAt) { }
     private final DbSessionProvider db;
+    private final CaseCalendarSynchronizer caseCalendarSynchronizer = new CaseCalendarSynchronizer();
+    private final EntityActionAuditDao audit = new EntityActionAuditDao();
 
     public CalendarEventDao(DbSessionProvider db) {
         this.db = Objects.requireNonNull(db, "db");
@@ -26,17 +28,21 @@ public final class CalendarEventDao {
                     AssignedToUserId, IsCompleted, IsCancelled, CreatedByUserId
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """;
-        try (Connection con = db.requireConnection();
-             PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection con = db.requireConnection()) {
+            SessionIdentity identity=requireIdentity(con); requireTenant(event.shaleClientId(),identity.tenant()); con.setAutoCommit(false);
+            try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             bindUpsert(ps, event);
             ps.executeUpdate();
-            touchCaseUpdatedAt(con, event.caseId(), event.shaleClientId());
+            Integer id;
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
-                    return rs.getInt(1);
-                }
+                    id=rs.getInt(1);
+                } else { throw new IllegalStateException("Calendar event was not created."); }
             }
-            return null;
+            caseCalendarSynchronizer.fromCalendar(con,identity.tenant(),identity.actor(),id,"CREATE");
+            auditCalendar(con,identity,id,EntityActionAuditEvent.Action.CREATED,event.caseId());
+            touchCaseUpdatedAt(con, event.caseId(), identity.tenant()); con.commit(); return id;
+            } catch(SQLException | RuntimeException e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create calendar event", e);
         }
@@ -67,8 +73,9 @@ public final class CalendarEventDao {
                 WHERE CalendarEventId = ?
                   AND ShaleClientId = ?;
                 """;
-        try (Connection con = db.requireConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
+        try (Connection con = db.requireConnection()) {
+            SessionIdentity identity=requireIdentity(con); requireTenant(event.shaleClientId(),identity.tenant()); con.setAutoCommit(false);
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
             Integer previousCaseId = findCalendarEventCaseId(con, event.calendarEventId(), event.shaleClientId());
             ps.setInt(1, event.calendarEventTypeId());
             ps.setObject(2, event.caseId());
@@ -86,10 +93,14 @@ public final class CalendarEventDao {
             ps.setBoolean(14, event.cancelled());
             ps.setInt(15, event.calendarEventId());
             ps.setInt(16, event.shaleClientId());
-            if (ps.executeUpdate() > 0) {
+            if (ps.executeUpdate() == 1) {
+                caseCalendarSynchronizer.fromCalendar(con,identity.tenant(),identity.actor(),event.calendarEventId(),"UPDATE");
+                auditCalendar(con,identity,event.calendarEventId(),EntityActionAuditEvent.Action.UPDATED,event.caseId());
                 touchCaseUpdatedAt(con, previousCaseId, event.shaleClientId());
                 touchCaseUpdatedAt(con, event.caseId(), event.shaleClientId());
-            }
+            } else throw new IllegalArgumentException("Record is not available.");
+            con.commit();
+            } catch(SQLException | RuntimeException e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update calendar event", e);
         }
@@ -198,18 +209,28 @@ public final class CalendarEventDao {
                 WHERE CalendarEventId = ?
                   AND ShaleClientId = ?;
                 """;
-        try (Connection con = db.requireConnection();
-             PreparedStatement ps = con.prepareStatement(sql)) {
+        try (Connection con = db.requireConnection()) {
+            SessionIdentity identity=requireIdentity(con); requireTenant(shaleClientId,identity.tenant()); con.setAutoCommit(false);
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
             Integer previousCaseId = findCalendarEventCaseId(con, calendarEventId, shaleClientId);
+            caseCalendarSynchronizer.fromCalendar(con,identity.tenant(),identity.actor(),calendarEventId,"DELETE");
             ps.setInt(1, calendarEventId);
             ps.setInt(2, shaleClientId);
             if (ps.executeUpdate() > 0) {
+                auditCalendar(con,identity,calendarEventId,EntityActionAuditEvent.Action.DELETED,previousCaseId);
                 touchCaseUpdatedAt(con, previousCaseId, shaleClientId);
-            }
+            } else throw new IllegalArgumentException("Record is not available.");
+            con.commit();
+            } catch(SQLException | RuntimeException e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to delete calendar event", e);
         }
     }
+
+    private record SessionIdentity(int tenant,int actor){}
+    private static SessionIdentity requireIdentity(Connection con)throws SQLException{try(Statement s=con.createStatement();ResultSet r=s.executeQuery("SELECT TRY_CONVERT(int,SESSION_CONTEXT(N'ShaleClientId')),TRY_CONVERT(int,SESSION_CONTEXT(N'PrincipalUserId'))")){if(!r.next())throw new IllegalStateException("Authenticated SQL session context is required.");int t=r.getInt(1),a=r.getInt(2);if(t<=0||a<=0)throw new IllegalStateException("Authenticated SQL session context is required.");try(PreparedStatement p=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE id=? AND ShaleClientId=? AND COALESCE(is_deleted,0)=0 AND COALESCE(IsRemoved,0)=0")){p.setInt(1,a);p.setInt(2,t);try(ResultSet u=p.executeQuery()){if(!u.next())throw new IllegalStateException("Authenticated SQL session context is required.");}}return new SessionIdentity(t,a);}}
+    private static void requireTenant(int supplied,int authoritative){if(supplied!=authoritative)throw new IllegalArgumentException("Record is not available.");}
+    private void auditCalendar(Connection con,SessionIdentity i,int id,EntityActionAuditEvent.Action action,Integer caseId)throws SQLException{audit.append(con,EntityActionAuditEvent.now(i.tenant(),i.actor(),EntityActionAuditEvent.EntityType.CALENDAR_EVENT,id,action,caseId==null?null:EntityActionAuditEvent.EntityType.CASE,caseId==null?null:caseId.longValue(),caseId==null?java.util.Map.of():java.util.Map.of(EntityActionAuditEvent.MetadataKey.CASE_ID,caseId)));}
 
     private static void touchCaseUpdatedAt(Connection con, Integer caseId, int shaleClientId) throws SQLException {
         if (caseId == null || caseId <= 0) {
