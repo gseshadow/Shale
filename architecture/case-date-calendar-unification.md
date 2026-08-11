@@ -99,3 +99,52 @@ types and Case Date Types currently require later tenant administrative mapping.
 2. Deferred: Case Date creates/updates Calendar event.
 3. Deferred: Calendar event creates/updates Case Date.
 4. Deferred: conservative administrative reconciliation of existing records.
+
+## Step 4 — transactional synchronization (complete)
+
+### Mutation-path inventory and entry points
+
+Before Step 4, authoritative Case Date occurrence writes were `CaseDateDao.createCaseDate`,
+`updateCaseDate`, `deleteCaseDate`, and `restoreCaseDate`; they already owned tenant/actor checks,
+RowVer validation, the SQL transaction, Case touch, PHI audit, entity-action audit, authoritative
+reload, and controller publication of the established case-date live-update. They do not create
+timeline or assignment-notification rows. Calendar writes were `CalendarEventDao.create`, `update`,
+and `deleteCalendarEvent`, reached through `CalendarService`; they touched the Case, while assignment
+notification and live publication were existing post-return service/controller effects. Calendar
+has hard delete and `IsCancelled`, but no restore endpoint or durable timeline contract.
+
+Step 4 integrates the connection-bound `CaseCalendarSynchronizer` directly into those DAO mutation
+transactions. It is deliberately not public, owns no connection, never commits, and is not called
+recursively for counterpart writes. Calendar DAO now obtains both tenant and actor from authenticated
+SQL session context, validates active membership, and treats submitted tenant identity only as an
+equality assertion. No worker, startup reconciliation, seed, backfill, polling route, or matching
+heuristic is introduced.
+
+### Field ownership and projection
+
+Identity is exclusively `CalendarEvents.CaseDateId`; an unlinked record is never paired. Case Date
+owns Case identity and `CaseDateTypeId`; Calendar owns event title, description, Task/source details,
+assignment, and completion. Only `StartsAt`, `EndsAt`, and `AllDay` are shared projections. An active
+mapping projects the destination type ID. Case-Date-created events receive the mapped event type's
+presentation name only at creation and a fixed `CASE_DATE` source marker; later synchronization does
+not overwrite title, description, Task/source fields, assignment, or completion. Calendar-created
+Case Dates leave Notes null. SQL local date-times are copied without timezone conversion.
+
+### Lifecycle, safety, and effects
+
+Eligible creates insert exactly one counterpart and establish `CaseDateId` in the same transaction.
+Eligible linked updates update that row using its locked RowVer. A type change re-reads the active,
+direction-specific mapping: a valid replacement changes the counterpart type and shared projection;
+a missing/inactive direction unlinks but does not modify the former counterpart. Case Date soft-delete
+cancels its linked event and restore reactivates it; Calendar cancellation soft-deletes its linked
+Case Date and cancellation reversal restores it. Calendar hard-delete soft-deletes its counterpart,
+then unlinks before deleting the event, preserving Case Date history.
+
+All source and counterpart rows and mapping key ranges are locked in the tenant transaction; updates
+include RowVer predicates and stable domain messages replace stale/missing/duplicate outcomes. The
+composite FK and filtered unique link remain final race defenses. Counterpart writes append one
+durable entity-action audit on the same connection with IDs and `SYNCHRONIZATION_DIRECTION` only.
+They intentionally do not manufacture timeline, notification, or live-update effects: the single
+authoritative source path continues to publish through the existing infrastructure, avoiding
+recursive and duplicate effects. Audit integration uses the existing entity-action schema and
+requires no migration.
