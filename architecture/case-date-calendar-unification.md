@@ -135,9 +135,12 @@ Case Dates leave Notes null. SQL local date-times are copied without timezone co
 Eligible creates insert exactly one counterpart and establish `CaseDateId` in the same transaction.
 Eligible linked updates update that row using its locked RowVer. A type change re-reads the active,
 direction-specific mapping: a valid replacement changes the counterpart type and shared projection;
-a missing/inactive direction unlinks but does not modify the former counterpart. Case Date soft-delete
-cancels its linked event and restore reactivates it; Calendar cancellation soft-deletes its linked
-Case Date and cancellation reversal restores it. Calendar hard-delete soft-deletes its counterpart,
+a missing/inactive direction unlinks but does not modify the former counterpart. Ordinary later edits
+of an unlinked row do not create a counterpart; only creation or an explicit source-type transition
+may create one. Case Date soft-delete cancels its linked event only when it was not already cancelled,
+and restore reactivates only a cancellation whose latest entity audit proves it was caused by Case
+Date synchronization. Calendar cancellation soft-deletes its linked Case Date and cancellation reversal
+restores only a deletion whose latest entity audit proves Calendar synchronization ownership. Calendar hard-delete soft-deletes its counterpart,
 then unlinks before deleting the event, preserving Case Date history.
 
 All source and counterpart rows and mapping key ranges are locked in the tenant transaction; updates

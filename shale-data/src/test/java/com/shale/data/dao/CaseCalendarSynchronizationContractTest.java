@@ -43,4 +43,24 @@ class CaseCalendarSynchronizationContractTest {
                 () -> assertTrue(events.contains("caseCalendarSynchronizer.fromCalendar(con")),
                 () -> assertTrue(events.contains("con.rollback()")), () -> assertTrue(events.contains("con.commit()")));
     }
+
+    @Test void correctionPassProtectsIndependentLifecycleAndHistoricalUnlinkedRows() throws Exception {
+        String s=source("CaseCalendarSynchronizer.java");
+        assertAll(() -> assertTrue(s.contains("lastSynchronizationAction")),
+                () -> assertTrue(s.contains("CASE_DATE_TO_CALENDAR")),
+                () -> assertTrue(s.contains("CALENDAR_TO_CASE_DATE")),
+                () -> assertTrue(s.contains("linked == null && allowCreate")),
+                () -> assertTrue(s.contains("restore ? false : linked.cancelled")),
+                () -> assertTrue(s.contains("linked.deleted && !restore")));
+    }
+
+    @Test void correctionPassUsesAuthoritativeActorAndSourceRowVersions() throws Exception {
+        String s=source("CaseCalendarSynchronizer.java"), events=source("CalendarEventDao.java");
+        assertAll(() -> assertTrue(s.contains("SESSION_CONTEXT(N'PrincipalUserId')")),
+                () -> assertFalse(s.contains("callerActor")),
+                () -> assertTrue(events.contains("WITH(UPDLOCK,HOLDLOCK)")),
+                () -> assertTrue(events.contains("AND RowVer = ?")),
+                () -> assertTrue(events.contains("ps.setBytes(17, before.rowVer())")),
+                () -> assertTrue(events.contains("ps.setBytes(3,deleteRowVer)")));
+    }
 }
