@@ -729,6 +729,7 @@ public final class SceneManager {
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			SearchService searchService = new SearchService(
 					caseDao,
+					new CaseSummaryDao(dbSessionProvider),
 					new ContactDao(dbSessionProvider),
 					new OrganizationDao(dbSessionProvider),
 					new UserDao(dbSessionProvider),
