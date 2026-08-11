@@ -2,6 +2,7 @@ package com.shale.data.dao;
 
 import com.shale.core.model.CalendarFeedItem;
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.semantics.RoleSemantics;
 
 import java.sql.*;
 import java.time.LocalDate;
@@ -18,37 +19,7 @@ public final class CalendarFeedDao {
     }
 
 
-    public record CalendarCaseCardRow(int caseId, String caseName, String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {}
     public record CalendarTaskCardRow(long taskId, Integer caseId, String caseName, String caseResponsibleAttorney, String caseResponsibleAttorneyColor, Boolean caseNonEngagementLetterSent, String title, String description, LocalDateTime dueAt, LocalDateTime completedAt, String createdByDisplayName, String priorityColorHex) {}
-
-    public List<CalendarCaseCardRow> listCaseCardRows(int shaleClientId, List<Integer> caseIds) {
-        if (shaleClientId <= 0 || caseIds == null || caseIds.isEmpty()) return List.of();
-        String placeholders = String.join(",", java.util.Collections.nCopies(caseIds.size(), "?"));
-        String sql = """
-                SELECT c.Id,
-                       c.Name,
-                       LTRIM(RTRIM(
-                         COALESCE(ra.name_first, '') +
-                         CASE WHEN COALESCE(ra.name_first, '') = '' OR COALESCE(ra.name_last, '') = '' THEN '' ELSE ' ' END +
-                         COALESCE(ra.name_last, '')
-                       )) AS ResponsibleAttorney,
-                       ra.color AS ResponsibleAttorneyColor,
-                       c.NonEngagementLetterSent
-                FROM dbo.Cases c
-                LEFT JOIN dbo.CaseUsers cu ON cu.CaseId = c.Id AND cu.RoleId = 1
-                LEFT JOIN dbo.Users ra ON ra.Id = cu.UserId
-                WHERE c.ShaleClientId = ? AND c.Id IN (""" + placeholders + ") AND ISNULL(c.IsDeleted,0)=0";
-        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-            int i = 1;
-            ps.setInt(i++, shaleClientId);
-            for (Integer id : caseIds) ps.setInt(i++, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                List<CalendarCaseCardRow> rows = new ArrayList<>();
-                while (rs.next()) rows.add(new CalendarCaseCardRow(rs.getInt("Id"), rs.getString("Name"), rs.getString("ResponsibleAttorney"), rs.getString("ResponsibleAttorneyColor"), (Boolean) rs.getObject("NonEngagementLetterSent")));
-                return rows;
-            }
-        } catch (SQLException e) { throw new RuntimeException("Failed to load calendar case card rows", e); }
-    }
 
     public List<CalendarTaskCardRow> listTaskCardRows(int shaleClientId, List<Integer> taskIds) {
         if (shaleClientId <= 0 || taskIds == null || taskIds.isEmpty()) return List.of();
@@ -67,13 +38,19 @@ public final class CalendarFeedDao {
                        LTRIM(RTRIM(COALESCE(u.name_first,'') + CASE WHEN COALESCE(u.name_first,'')='' OR COALESCE(u.name_last,'')='' THEN '' ELSE ' ' END + COALESCE(u.name_last,''))) AS CreatedByDisplayName
                 FROM dbo.Tasks t
                 LEFT JOIN dbo.Cases c ON c.Id = t.CaseId
-                LEFT JOIN dbo.CaseUsers cu ON cu.CaseId = c.Id AND cu.RoleId = 1
-                LEFT JOIN dbo.Users ra ON ra.Id = cu.UserId
+                OUTER APPLY (
+                  SELECT TOP (1) cu.UserId
+                  FROM dbo.CaseUsers cu
+                  WHERE cu.CaseId = c.Id AND cu.RoleId = ?
+                  ORDER BY cu.IsPrimary DESC, cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+                ) responsibleAttorney
+                LEFT JOIN dbo.Users ra ON ra.Id = responsibleAttorney.UserId AND ra.ShaleClientId = t.ShaleClientId
                 LEFT JOIN dbo.Users u ON u.Id = t.CreatedByUserId
                 LEFT JOIN dbo.Priorities p ON p.Id = t.PriorityId
                 WHERE t.ShaleClientId = ? AND t.Id IN (""" + placeholders + ") AND ISNULL(t.IsDeleted,0)=0";
         try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
             int i = 1;
+            ps.setInt(i++, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
             ps.setInt(i++, shaleClientId);
             for (Integer id : taskIds) ps.setInt(i++, id);
             try (ResultSet rs = ps.executeQuery()) {

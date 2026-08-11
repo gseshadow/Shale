@@ -27,8 +27,8 @@ final class CalendarCasePickerFlowSourceTest {
         int start = controller.indexOf("private List<NewCalendarEventDialog.CaseOption> caseOptionsForPicker");
         int end = controller.indexOf("private List<NewCalendarEventDialog.AssignedUserOption>", start);
         String method = controller.substring(start, end);
-        assertEquals(1, occurrences(method, "caseDao.listCaseSelectionOptions("));
-        assertFalse(method.contains("caseDao.findPage("), "selector must not walk the Cases screen API");
+        assertEquals(1, occurrences(method, "caseSummaryDao.listActiveForCalendar("));
+        assertFalse(method.contains("caseDao"), "selector must not use the legacy Case DAO");
         assertFalse(method.contains("countAll("), "selector does not need a total-count query");
         assertFalse(method.contains("caseDao.getCaseRow("), "every expected case id comes from the complete projection");
         assertFalse(method.contains("forEach(c -> caseDao."), "no per-row/N+1 DAO call");

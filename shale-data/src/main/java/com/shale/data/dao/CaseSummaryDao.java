@@ -53,6 +53,11 @@ public final class CaseSummaryDao {
 			LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline,
 			String practiceAreaColor, Boolean nonEngagementLetterSent) { }
 
+	/** Calendar selector/card data; Calendar event identity and scheduling stay outside this row. */
+	public record CalendarCaseRow(CaseSummaryProjection summary, Boolean nonEngagementLetterSent) {
+		public CalendarCaseRow { Objects.requireNonNull(summary, "summary"); }
+	}
+
 	/** Case-party relationship metadata composed with the authoritative Case summary. */
 	public record RelatedCaseRow(long relationshipId, int partyRoleId, CaseSummaryProjection summary,
 			LocalDate intakeDate, LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline,
@@ -305,6 +310,39 @@ public final class CaseSummaryDao {
 		} catch (SQLException e) { throw new RuntimeException("Failed to validate Documents Case summary", e); }
 	}
 
+	/** Complete active Case selector snapshot for desktop Calendar, ordered by label then authoritative ID. */
+	public List<CalendarCaseRow> listActiveForCalendar(int requestedTenantId) {
+		return calendarCases(requestedTenantId, null);
+	}
+
+	/** Revalidates an event's tenant-scoped Case ID before rendering its related-Case card. */
+	public CalendarCaseRow findActiveForCalendar(int requestedTenantId, long caseId) {
+		if (caseId <= 0) throw new IllegalArgumentException("caseId must be > 0");
+		List<CalendarCaseRow> rows = calendarCases(requestedTenantId, caseId);
+		return rows.isEmpty() ? null : rows.getFirst();
+	}
+
+	private List<CalendarCaseRow> calendarCases(int requestedTenantId, Long caseId) {
+		if (requestedTenantId <= 0) throw new IllegalArgumentException("requestedTenantId must be > 0");
+		try (Connection con = db.requireConnection()) {
+			verifyTenant(con, requestedTenantId);
+			String predicate = "AND ISNULL(c.IsDeleted, 0) = 0" + (caseId == null ? "" : " AND c.Id = ?");
+			try (PreparedStatement ps = con.prepareStatement(summarySelectSql(predicate,
+					"LOWER(COALESCE(c.Name, '')) ASC, c.Id ASC"))) {
+				ps.setInt(1, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(2, RoleSemantics.ROLE_LEGAL_ASSISTANT);
+				ps.setInt(3, requestedTenantId);
+				if (caseId != null) ps.setLong(4, caseId);
+				List<CalendarCaseRow> rows = new ArrayList<>();
+				try (ResultSet rs = ps.executeQuery()) {
+					while (rs.next()) rows.add(new CalendarCaseRow(map(rs),
+							(Boolean) rs.getObject("NonEngagementLetterSent")));
+				}
+				return List.copyOf(rows);
+			}
+		} catch (SQLException e) { throw new RuntimeException("Failed to load authoritative Calendar Case summaries", e); }
+	}
+
 	private static String summarySelectSql(String extraPredicate, String orderBy) {
 		return """
 					SELECT c.Id AS CaseId, c.ShaleClientId, c.CaseNumber, c.Name AS CaseName,
@@ -317,7 +355,8 @@ public final class CaseSummaryDao {
 					       assistant.UserId AS PrimaryLegalAssistantId,
 					       assistant_user.DisplayName AS PrimaryLegalAssistantName,
 					       assistant_user.Color AS PrimaryLegalAssistantColor,
-					       c.CreatedAt, c.UpdatedAt, ISNULL(c.IsDeleted, 0) AS IsDeleted
+					       c.CreatedAt, c.UpdatedAt, ISNULL(c.IsDeleted, 0) AS IsDeleted,
+					       c.NonEngagementLetterSent
 					FROM dbo.Cases c
 					OUTER APPLY (
 					  SELECT TOP (1) s.Id AS StatusId, s.SystemKey, s.LifecycleKey,

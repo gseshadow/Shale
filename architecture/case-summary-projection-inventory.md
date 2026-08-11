@@ -336,3 +336,47 @@ failures after a selection or controller-context change. Database reads and rend
 daemon worker and accepted UI callbacks remain on the JavaFX thread. The authoritative validation adds one
 bounded query per generation; the existing document-only overview/detail/contact/update hydration is retained
 because it supplies genuine generation content rather than Case-summary data.
+
+## Desktop Calendar Case-query cutover
+
+The desktop Calendar inventory has four distinct grains. `CalendarFeedDao.listCalendarFeed`,
+`listCalendarFeedForCase`, and `listCalendarFeedForUserSchedule` remain one feed item per persisted
+event, task due projection, authoritative Case Date occurrence, or lifecycle-date projection. Event
+ID/occurrence key remains authoritative; the optional Case ID and name are presentation/navigation
+composition only. `CalendarEventDao.getById` and global-search rows remain persisted-event grain.
+`CalendarFeedDao.listTaskCardRows` remains task grain. Event types, user overlays, task assignments,
+Calendar mutations, notifications, reminders, external synchronization, and Case-detail Calendar are
+specialized or deferred paths and are unchanged.
+
+The eligible one-Case paths were the event editor's related-Case card and the create/edit Case
+selector. Their old paths were `CalendarController` -> `CalendarFeedDao.listCaseCardRows` and
+`CalendarController` -> `CaseDao.listCaseSelectionOptions`. Both independently resolved a purported
+responsible attorney, including a hard-coded role `1`; the card join could multiply a Case. Their new
+paths are `CalendarController` -> `CaseSummaryDao.findActiveForCalendar` and
+`listActiveForCalendar`, returning `CalendarCaseRow` around the authoritative
+`CaseSummaryProjection`. Both verify the requested tenant against SQL Server session context, require
+active Cases, bind Case identity, use shared current-status and semantic assignment resolution, retain
+missing optional relationships, and order the selector by case name then Case ID. The selected and
+opened identity is always Case ID; duplicate or renamed labels do not participate in resolution.
+Deleted or cross-tenant IDs do not resolve, preserving the prior related-card/selector eligibility.
+Events with null Case IDs remain unchanged.
+
+Calendar reuses Case/tenant ID, number/name, current-status identity/stable keys/name/color, Practice
+Area identity/name, responsible-attorney and primary-legal-assistant IDs/names/colors, timestamps, and
+deleted state. `NonEngagementLetterSent` remains narrowly scoped card presentation outside the shared
+projection. Event IDs/types, title/description, start/end, all-day, recurrence/source identity,
+assigned users, attendees, reminders, task/feed data, colors, and Calendar display calculations remain
+Calendar-owned. Feed population, visibility, in-memory Case/event-type/source/user filters, search,
+day/week/month rendering, range `[startInclusive,endExclusive)`, Case Date intersection behavior,
+local timestamps, all-day handling, recurrence behavior, limits, and `StartsAt, AllDay, KeyValue`
+deterministic ordering are unchanged.
+
+The selector remains one off-FX-thread set query with no paging or per-Case hydration. Opening an event
+continues its existing bounded background hydration and now performs one authoritative Case-summary
+lookup instead of the legacy Calendar Case join. Existing load generations continue rejecting stale
+feed successes/failures after date/view/filter refresh; JavaFX application remains on the FX thread.
+No mutation transaction, audit timing, RowVer behavior, reminder/notification write, recurrence,
+feed, or synchronization boundary changed. The legacy `CaseDao.listCaseSelectionOptions` remains for
+unverified compatibility consumers; the Calendar-exclusive `CalendarFeedDao.listCaseCardRows` and its
+DTO were removed. Previously verified grid, board, export, Search, Deleted Cases, related views,
+MyShale, Reports, and Documents consumers, plus server/API/web, are unchanged.
