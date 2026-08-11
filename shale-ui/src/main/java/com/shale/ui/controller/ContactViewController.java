@@ -17,7 +17,7 @@ import com.shale.core.service.CaseServicePort;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.ContactDao.ContactDetailRow;
 import com.shale.data.dao.ContactDao.ContactProfileUpdateRequest;
-import com.shale.data.dao.ContactDao.RelatedCaseRow;
+import com.shale.data.dao.CaseSummaryDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.component.factory.CaseCardFactory;
@@ -318,6 +318,9 @@ public final class ContactViewController {
                 });
             } catch (RuntimeException ex) {
                 Platform.runLater(() -> {
+                    if (generation != detailLoadGeneration || contactId != requestedContactId) {
+                        return;
+                    }
                     setBusy(false);
                     currentContact = null;
                     relatedCases = List.of();
@@ -870,7 +873,7 @@ public final class ContactViewController {
 
         List<Node> cards = relatedCases.stream()
                 .sorted(Comparator.comparing(
-                        (RelatedCaseRow row) -> caseNameSortKey(row == null ? null : row.name()),
+                        (RelatedCaseRow row) -> caseNameSortKey(row == null ? null : row.summary().caseName()),
                         Comparator.nullsLast(String::compareToIgnoreCase)))
                 .map(this::createRelatedCaseCard)
                 .toList();
@@ -890,16 +893,16 @@ public final class ContactViewController {
 
     private Node createRelatedCaseCard(RelatedCaseRow row) {
         Node card = caseCardFactory.create(new CaseCardModel(
-                row.id(),
-                row.name(),
+                row.summary().caseId(),
+                row.summary().caseName(),
                 row.intakeDate(),
                 row.statuteOfLimitationsDate(),
                 row.tortClaimsNoticeDeadline(),
-                row.responsibleAttorneyName(),
-                row.responsibleAttorneyColor(),
+                row.summary().responsibleAttorneyName(),
+                row.summary().responsibleAttorneyColor(),
                 row.nonEngagementLetterSent(),
-                row.primaryStatusName(),
-                row.primaryStatusColor(),
+                row.summary().statusName(),
+                row.summary().statusColor(),
                 row.practiceAreaColor()), CaseCardFactory.Variant.FULL);
         if (card instanceof Region region) {
             region.setMaxWidth(Double.MAX_VALUE);

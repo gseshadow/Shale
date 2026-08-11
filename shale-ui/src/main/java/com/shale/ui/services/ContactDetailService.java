@@ -8,9 +8,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.shale.ui.util.PerfLog;
 
 import com.shale.data.dao.ContactDao;
+import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.ContactDao.ContactDetailRow;
 import com.shale.data.dao.ContactDao.ContactProfileUpdateRequest;
-import com.shale.data.dao.ContactDao.RelatedCaseRow;
+import com.shale.data.dao.CaseSummaryDao.RelatedCaseRow;
 
 public final class ContactDetailService {
 
@@ -23,10 +24,12 @@ public final class ContactDetailService {
     private record CacheKey(int contactId, int shaleClientId) {}
 
     private final ContactDao contactDao;
+    private final CaseSummaryDao caseSummaryDao;
     private final Map<CacheKey, ContactDetailSnapshot> sessionCache = new ConcurrentHashMap<>();
 
-    public ContactDetailService(ContactDao contactDao) {
+    public ContactDetailService(ContactDao contactDao, CaseSummaryDao caseSummaryDao) {
         this.contactDao = Objects.requireNonNull(contactDao, "contactDao");
+        this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
     }
 
     public ContactDetailRow loadContact(int contactId, int shaleClientId) {
@@ -38,7 +41,7 @@ public final class ContactDetailService {
 
     public List<RelatedCaseRow> loadRelatedCases(int contactId, int shaleClientId) {
         long started = PerfLog.start();
-        List<RelatedCaseRow> rows = contactDao.findRelatedCases(contactId, shaleClientId);
+        List<RelatedCaseRow> rows = caseSummaryDao.listActiveRelatedToContact(shaleClientId, contactId);
         PerfLog.logDone("contacts.relatedCases.dao", "operation=loadRelatedCases contactId=" + contactId + " tenantId=" + shaleClientId + " rows=" + (rows == null ? 0 : rows.size()), started);
         return rows;
     }

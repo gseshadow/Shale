@@ -51,6 +51,14 @@ public final class CaseSummaryDao {
 			LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline,
 			String practiceAreaColor, Boolean nonEngagementLetterSent) { }
 
+	/** Case-party relationship metadata composed with the authoritative Case summary. */
+	public record RelatedCaseRow(long relationshipId, int partyRoleId, CaseSummaryProjection summary,
+			LocalDate intakeDate, LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline,
+			String practiceAreaColor, Boolean nonEngagementLetterSent, String partyRoleName,
+			String side, boolean primary, String notes) {
+		public RelatedCaseRow { Objects.requireNonNull(summary, "summary"); }
+	}
+
 	/** Deleted-search card data plus the concurrency token consumed by the lifecycle restore command. */
 	public record DeletedCaseRow(CaseSummaryProjection summary, LocalDate intakeDate,
 			LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline,
@@ -67,6 +75,80 @@ public final class CaseSummaryDao {
 
 	public CaseSummaryDao(DbSessionProvider db) {
 		this.db = Objects.requireNonNull(db, "db");
+	}
+
+	/** Active Cases related to a tenant Contact through one authoritative CaseParties row. */
+	public List<RelatedCaseRow> listActiveRelatedToContact(int requestedTenantId, int contactId) {
+		return listActiveRelated(requestedTenantId, contactId, true);
+	}
+
+	/** Active Cases related to a tenant Organization through one authoritative CaseParties row. */
+	public List<RelatedCaseRow> listActiveRelatedToOrganization(int requestedTenantId, int organizationId) {
+		return listActiveRelated(requestedTenantId, organizationId, false);
+	}
+
+	private List<RelatedCaseRow> listActiveRelated(int tenantId, int entityId, boolean contact) {
+		if (tenantId <= 0) throw new IllegalArgumentException("requestedTenantId must be > 0");
+		if (entityId <= 0) throw new IllegalArgumentException((contact ? "contactId" : "organizationId") + " must be > 0");
+		String entityTable = contact ? "dbo.Contacts" : "dbo.Organizations";
+		String entityColumn = contact ? "ContactId" : "OrganizationId";
+		try (Connection con = db.requireConnection()) {
+			verifyTenant(con, tenantId);
+			String sql = """
+				SELECT cp.Id RelationshipId,cp.PartyRoleId,c.Id,c.ShaleClientId,c.CaseNumber,c.Name,
+				 status_row.StatusId,status_row.SystemKey StatusSystemKey,status_row.LifecycleKey StatusLifecycleKey,
+				 status_row.StatusName,status_row.StatusColor,c.PracticeAreaId,pa.Name PracticeAreaName,
+				 attorney.UserId ResponsibleAttorneyId,attorney_user.DisplayName ResponsibleAttorneyName,
+				 attorney_user.Color ResponsibleAttorneyColor,assistant.UserId PrimaryLegalAssistantId,
+				 assistant_user.DisplayName PrimaryLegalAssistantName,assistant_user.Color PrimaryLegalAssistantColor,
+				 c.CreatedAt,c.UpdatedAt,CAST(0 AS bit) IsDeleted,pa.Color PracticeAreaColor,
+				 dates.IntakeDate,dates.StatuteDate,dates.TortDate,c.NonEngagementLetterSent,
+				 pr.Name PartyRoleName,cp.Side,ISNULL(cp.IsPrimary,0) IsPrimary,cp.Notes
+				FROM dbo.CaseParties cp
+				JOIN dbo.Cases c ON c.Id=cp.CaseId AND c.ShaleClientId=?
+				JOIN %s entity ON entity.Id=cp.%s AND entity.ShaleClientId=c.ShaleClientId AND ISNULL(entity.IsDeleted,0)=0
+				LEFT JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId
+				 AND (pr.ShaleClientId=c.ShaleClientId OR pr.ShaleClientId IS NULL)
+				%s
+				LEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId
+				 AND (pa.ShaleClientId=c.ShaleClientId OR pa.ShaleClientId IS NULL)
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=?
+				 ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) attorney
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color
+				 FROM dbo.Users u WHERE u.id=attorney.UserId AND u.ShaleClientId=c.ShaleClientId) attorney_user
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=?
+				 ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) assistant
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color
+				 FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
+				OUTER APPLY (SELECT
+				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
+				  AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
+				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
+				  WHERE m.CaseDateTypeId=t.Id AND m.IsActive=1 AND m.IsDeleted=0
+				   AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL)
+				  ORDER BY CASE WHEN m.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,m.Id DESC) effective
+				 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0) dates
+				WHERE cp.%s=? AND c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0
+				ORDER BY CASE WHEN ISNULL(cp.IsPrimary,0)=1 THEN 0 ELSE 1 END,c.Name ASC,c.Id ASC,cp.Id ASC
+				""".formatted(entityTable, entityColumn, statusApplySql(), entityColumn);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, tenantId);
+				ps.setInt(2, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(3, RoleSemantics.ROLE_LEGAL_ASSISTANT);
+				ps.setInt(4, entityId);
+				ps.setInt(5, tenantId);
+				List<RelatedCaseRow> rows = new ArrayList<>();
+				try (ResultSet rs = ps.executeQuery()) { while (rs.next()) rows.add(new RelatedCaseRow(
+						rs.getLong("RelationshipId"),rs.getInt("PartyRoleId"),mapGridSummary(rs),
+						localDate(rs,"IntakeDate"),localDate(rs,"StatuteDate"),localDate(rs,"TortDate"),
+						rs.getString("PracticeAreaColor"),(Boolean)rs.getObject("NonEngagementLetterSent"),
+						rs.getString("PartyRoleName"),rs.getString("Side"),rs.getBoolean("IsPrimary"),rs.getString("Notes"))); }
+				return List.copyOf(rows);
+			}
+		} catch (SQLException e) { throw new RuntimeException("Failed to load authoritative related Cases", e); }
 	}
 
 	/**

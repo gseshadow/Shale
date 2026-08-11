@@ -784,7 +784,7 @@ public final class SceneManager {
 		{
 			ContactViewController c = (ContactViewController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
-			ContactDetailService contactDetailService = new ContactDetailService(contactDao);
+			ContactDetailService contactDetailService = new ContactDetailService(contactDao, new CaseSummaryDao(dbSessionProvider));
 			c.init(contactId, contactDetailService, appState, onOpenCase, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), onContactDeleted, phiReadAuditService,
 					this::openContactProfile, runtimeBridge);
 			return c;
@@ -804,7 +804,7 @@ public final class SceneManager {
 		{
 			OrganizationController c = (OrganizationController) controller;
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			c.init(organizationId, organizationDao, appState, runtimeBridge, onOpenCase, onOrganizationDeleted);
+			c.init(organizationId, organizationDao, new CaseSummaryDao(dbSessionProvider), appState, runtimeBridge, onOpenCase, onOrganizationDeleted);
 			return c;
 		});
 	}

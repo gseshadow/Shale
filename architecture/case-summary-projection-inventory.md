@@ -182,3 +182,39 @@ legacy two-argument restore method and `CaseDao.searchDeletedCasesByName` are re
 and other deferred compatibility paths must not be migrated in this slice. Active grid, board, export,
 active Search, remaining My Shale, related views, Reports, Documents, Calendar, server, API, and web
 are unchanged.
+
+## Desktop Contact/Organization Related Cases cutover
+
+The desktop Related Cases consumers are the read-only Contact and Organization detail sections, not
+a Case-to-Case link table. Their authoritative relationship is one directional `CaseParties` row
+from a Case (`CaseId`) to either a Contact (`ContactId`) or Organization (`OrganizationId`), carrying
+the relationship ID, `PartyRoleId`, side text, primary flag, and notes. One card is retained per
+`CaseParties.Id`; multiple roles between the same entities therefore remain distinct. The old paths
+were `ContactViewController` → `ContactDetailService` → `ContactDao.findRelatedCases` and
+`OrganizationController` → `OrganizationDao.findRelatedCases`. Both desktop paths now compose
+`CaseSummaryDao.RelatedCaseRow` around `CaseSummaryProjection`. The legacy DAO methods and DTOs remain
+for the server adapter and deferred compatibility consumers.
+
+Both queries require trusted session tenant equality, constrain the related Contact/Organization and
+Case to that tenant, and retain only active entities and active Cases. There is no paging or result
+limit. SQL orders primary relationships first, then Case name, Case ID, and relationship ID. Contact
+View retains its Case-name ordering; Organization View retains its in-memory Case-name/intake/statute
+sorting and Case-name/responsible-attorney filtering. Neither section has an add selector or direct
+relationship mutation control: creation, editing, and removal remain in the established Case Parties
+transactional boundary, so no mutation, audit, concurrency, confirmation, or selector behavior was
+changed.
+
+Cards continue through `CaseCardFactory.FULL` and navigate by the projection's authoritative Case ID.
+They reuse Case identity/name/number, authoritative current status identity/display, Practice Area
+identity/name, both authoritative assignment identities/display, timestamps, and deleted state.
+Related-only composition contains `CaseParties`/Party Role identity and display metadata plus the
+already-rendered Practice Area color, non-engagement flag, and authoritative semantic Intake,
+Statute, and Tort dates. A single set query uses scalar applies and aggregation; missing optional
+status, Practice Area, or assignments cannot remove or multiply a relationship.
+
+Contact loading retains its generation and Case-independent snapshot lifecycle, with stale failures
+now rejected as well as stale successes. Organization related loads now capture relationship-load
+generation, Organization ID, and tenant ID; both success and failure callbacks validate all captured
+context on the JavaFX thread before changing cards or empty state. Navigation or refresh therefore
+cannot accept an older related-Case result. Active grid, board, export, Search, Deleted Cases,
+remaining My Shale, Reports, Documents, Calendar, server/API, and web paths are unchanged.

@@ -14,6 +14,8 @@ import java.util.function.Consumer;
 
 import com.shale.core.model.Organization;
 import com.shale.data.dao.OrganizationDao;
+import com.shale.data.dao.CaseSummaryDao;
+import com.shale.data.dao.CaseSummaryDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
@@ -105,6 +107,7 @@ public final class OrganizationController {
 
 	private Integer organizationId;
 	private OrganizationDao organizationDao;
+	private CaseSummaryDao caseSummaryDao;
 	private Organization currentOrganization;
 	private boolean editMode;
 	private AppState appState;
@@ -112,7 +115,8 @@ public final class OrganizationController {
 	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> liveOrganizationUpdatedHandler;
 	private boolean liveSubscribed;
 	private boolean pendingRemoteUpdate;
-	private List<OrganizationDao.RelatedCaseRow> relatedCases = List.of();
+	private int relatedCasesLoadGeneration;
+	private List<RelatedCaseRow> relatedCases = List.of();
 	private List<OrganizationDao.OrganizationTypeRow> organizationTypeOptions = List.of();
 	private CaseCardFactory caseCardFactory;
 	private Consumer<Integer> onOpenCase;
@@ -127,12 +131,14 @@ public final class OrganizationController {
 	public void init(
 			int organizationId,
 			OrganizationDao organizationDao,
+			CaseSummaryDao caseSummaryDao,
 			AppState appState,
 			UiRuntimeBridge runtimeBridge,
 			Consumer<Integer> onOpenCase,
 			Runnable onOrganizationDeleted) {
 		this.organizationId = organizationId;
 		this.organizationDao = organizationDao;
+		this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.onOpenCase = onOpenCase;
@@ -321,6 +327,9 @@ public final class OrganizationController {
 
 	private void loadRelatedCasesSafe() {
 		long relatedStarted = PerfLog.start();
+		final int generation = ++relatedCasesLoadGeneration;
+		final Integer requestedOrganizationId = organizationId;
+		final Integer requestedTenantId = currentTenantId();
 		if (organizationDao == null || organizationId == null) {
 			relatedCases = List.of();
 			renderRelatedCases();
@@ -330,16 +339,20 @@ public final class OrganizationController {
 		dbExec.submit(() -> {
 			try {
 				PerfLog.log("organizations.relatedCases.dao", "start", "organizationId=" + organizationId);
-				List<OrganizationDao.RelatedCaseRow> loadedRelatedCases = organizationDao.findRelatedCases(organizationId);
+				List<RelatedCaseRow> loadedRelatedCases = caseSummaryDao.listActiveRelatedToOrganization(
+						requestedTenantId == null ? 0 : requestedTenantId, requestedOrganizationId);
 				int rowCount = loadedRelatedCases == null ? 0 : loadedRelatedCases.size();
 				Platform.runLater(() -> {
+					if (generation != relatedCasesLoadGeneration || !Objects.equals(organizationId, requestedOrganizationId)
+							|| !Objects.equals(currentTenantId(), requestedTenantId)) return;
 					relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
 					renderRelatedCases();
 					PerfLog.logDone("organizations.relatedCases.load", "organizationId=" + organizationId + " rows=" + rowCount, relatedStarted);
 				});
 			} catch (Exception ex) {
-				System.out.println("Failed to load related cases for organization id=" + organizationId + ": " + ex.getMessage());
 				Platform.runLater(() -> {
+					if (generation != relatedCasesLoadGeneration || !Objects.equals(organizationId, requestedOrganizationId)
+							|| !Objects.equals(currentTenantId(), requestedTenantId)) return;
 					relatedCases = List.of();
 					renderRelatedCases();
 				});
@@ -845,14 +858,14 @@ public final class OrganizationController {
 			caseCardFactory = new CaseCardFactory(onOpenCase);
 		}
 		String query = CaseListFilterSortSupport.normalizedQuery(relatedCasesSearchField);
-		Comparator<OrganizationDao.RelatedCaseRow> comparator = CaseListFilterSortSupport.comparator(
+		Comparator<RelatedCaseRow> comparator = CaseListFilterSortSupport.comparator(
 				relatedCasesSortChoice,
-				OrganizationDao.RelatedCaseRow::name,
-				OrganizationDao.RelatedCaseRow::intakeDate,
-				OrganizationDao.RelatedCaseRow::statuteOfLimitationsDate);
+				row -> row.summary().caseName(),
+				RelatedCaseRow::intakeDate,
+				RelatedCaseRow::statuteOfLimitationsDate);
 
 		List<Node> cards = relatedCases.stream()
-				.filter(row -> CaseListFilterSortSupport.matchesQuery(query, row.name(), row.responsibleAttorneyName()))
+				.filter(row -> CaseListFilterSortSupport.matchesQuery(query, row.summary().caseName(), row.summary().responsibleAttorneyName()))
 				.sorted(comparator)
 				.map(this::createRelatedCaseCardContainer)
 				.toList();
@@ -876,18 +889,18 @@ public final class OrganizationController {
 		}
 	}
 
-	private Node createRelatedCaseCardContainer(OrganizationDao.RelatedCaseRow row) {
+	private Node createRelatedCaseCardContainer(RelatedCaseRow row) {
 		Node card = caseCardFactory.create(new CaseCardModel(
-				row.id(),
-				row.name(),
+				row.summary().caseId(),
+				row.summary().caseName(),
 				row.intakeDate(),
 				row.statuteOfLimitationsDate(),
 				row.tortClaimsNoticeDeadline(),
-				row.responsibleAttorneyName(),
-				row.responsibleAttorneyColor(),
+				row.summary().responsibleAttorneyName(),
+				row.summary().responsibleAttorneyColor(),
 				row.nonEngagementLetterSent(),
-				row.primaryStatusName(),
-				row.primaryStatusColor(),
+				row.summary().statusName(),
+				row.summary().statusColor(),
 				row.practiceAreaColor()
 		), CaseCardFactory.Variant.FULL);
 		if (card instanceof Region region) {
