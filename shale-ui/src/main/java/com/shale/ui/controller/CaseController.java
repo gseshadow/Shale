@@ -67,6 +67,7 @@ import com.shale.data.dao.CalendarEventDao;
 import com.shale.data.dao.CalendarEventTypeDao;
 import com.shale.data.dao.CalendarFeedDao;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.ContactCard;
@@ -877,7 +878,8 @@ public class CaseController {
 		refreshOverviewPlaceholders();
 	}
 
-	public void init(Integer caseId, CaseDao caseDao, CaseSummaryDao caseSummaryDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseServicePort caseService, OrganizationDao organizationDao, ContactDao contactDao,
+	public void init(Integer caseId, CaseDao caseDao,
+			CaseSummaryDao caseSummaryDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseServicePort caseService, OrganizationDao organizationDao, ContactDao contactDao,
 			AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted, PhiReadAuditService phiReadAuditService) {
 		documentGeneration++;
 		synchronized (receivedCaseDateEventIds) { receivedCaseDateEventIds.clear(); }
