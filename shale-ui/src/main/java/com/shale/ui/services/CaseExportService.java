@@ -47,12 +47,13 @@ public final class CaseExportService {
 
     public List<ReportExportRow> exportReport(ReportCriteria criteria, Map<Integer, String> statusNames) {
         requireAuthorizedTenant(criteria.tenantId());
+		if (caseSummaryDao == null) throw new IllegalStateException("Authoritative Reports export is unavailable.");
         List<ReportExportRow> rows = new ArrayList<>();
         for (Integer statusId : criteria.statusIds()) {
             String statusName = statusNames.getOrDefault(statusId, "Unknown");
-            for (ReportCaseDetailRowDto detail : caseDao.listCaseStatusReportCases(
+            for (CaseSummaryDao.ReportCaseRow reportRow : caseSummaryDao.listActiveStatusReportCases(
                     criteria.tenantId(), statusId, criteria.startDate(), criteria.endDate())) {
-                rows.add(new ReportExportRow(statusName, detail));
+                rows.add(new ReportExportRow(statusName, reportRow.toDetailRow()));
             }
         }
         phiReadAuditService.auditRead("Case.Report.Export", "Reports.Export", "Case", null);

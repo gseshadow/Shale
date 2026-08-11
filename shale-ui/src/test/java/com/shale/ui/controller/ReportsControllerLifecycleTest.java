@@ -19,6 +19,8 @@ final class ReportsControllerLifecycleTest {
                 "Reports should load tenant statuses and report data when initialized by SceneManager.");
         assertTrue(source.contains("caseDao.listCaseStatuses(shaleClientId, true)"),
                 "Reports status filter should use the same merged tenant/global case status source as Settings.");
+        assertTrue(source.contains("caseSummaryDao.listActiveStatusReport("),
+                "Case report rows must load through the authoritative Case summary boundary.");
         assertFalse(source.contains("minusMonths(12)"),
                 "Initial Reports load should not default to the last 12 months.");
         assertTrue(fxml.contains("fx:id=\"statusFilterMenuButton\""));
@@ -58,5 +60,15 @@ final class ReportsControllerLifecycleTest {
                 "Colors should be looked up from the status slice name so reordered statuses keep their own colors.");
         assertFalse(source.contains("data" + 0));
         assertFalse(source.contains("CHART_COLOR"));
+    }
+
+    @Test
+    void staleReportCallbacksCannotReplaceNewTenantOrFilterResults() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/ReportsController.java"));
+        assertTrue(source.contains("loadGeneration.incrementAndGet()"));
+        assertTrue(source.contains("generation == loadGeneration.get()"));
+        assertTrue(source.contains("Objects.equals(appState.getShaleClientId(), tenantId)"));
+        assertTrue(source.contains("if (isCurrentLoad(generation, shaleClientId)) applyRows(rows)"));
+        assertTrue(source.contains("if (!isCurrentLoad(generation, shaleClientId)) return;"));
     }
 }

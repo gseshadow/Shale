@@ -4,6 +4,7 @@ import com.shale.core.dto.CaseStatusReportRowDto;
 import com.shale.core.dto.ReportCaseDetailRowDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseSummaryDao;
 import com.shale.ui.component.StatisticCard;
 import com.shale.ui.state.AppState;
 import com.shale.ui.services.CaseExportService;
@@ -47,6 +48,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import javafx.stage.FileChooser;
 import java.io.File;
 
@@ -79,13 +81,16 @@ public final class ReportsController {
     private final Map<String, CaseStatusReportRowDto> reportRowsBySliceName = new LinkedHashMap<>();
     private AppState appState;
     private CaseDao caseDao;
+    private CaseSummaryDao caseSummaryDao;
     private CaseExportService caseExportService;
     private final CaseXlsxExporter xlsxExporter = new CaseXlsxExporter();
     private boolean exportInProgress;
+    private final AtomicLong loadGeneration = new AtomicLong();
 
-    public void init(AppState appState, CaseDao caseDao, CaseExportService caseExportService) {
+    public void init(AppState appState, CaseDao caseDao, CaseSummaryDao caseSummaryDao, CaseExportService caseExportService) {
         this.appState = Objects.requireNonNull(appState, "appState");
         this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
+        this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
         this.caseExportService = Objects.requireNonNull(caseExportService, "caseExportService");
         loadStatusesAndReport();
     }
@@ -129,15 +134,18 @@ public final class ReportsController {
             return;
         }
         setLoading(true);
+        long generation = loadGeneration.incrementAndGet();
         executor.submit(() -> {
             try {
                 List<CaseStatusDto> statuses = caseDao.listCaseStatuses(shaleClientId, true);
                 Platform.runLater(() -> {
+                    if (!isCurrentLoad(generation, shaleClientId)) return;
                     applyAvailableStatuses(statuses);
                     refreshReport();
                 });
             } catch (RuntimeException ex) {
                 Platform.runLater(() -> {
+                    if (!isCurrentLoad(generation, shaleClientId)) return;
                     clearReport();
                     setStatus("Unable to load case statuses. Please try again.");
                     setLoading(false);
@@ -154,6 +162,7 @@ public final class ReportsController {
         LocalDate startDate = startDatePicker == null ? null : startDatePicker.getValue();
         LocalDate endDate = endDatePicker == null ? null : endDatePicker.getValue();
         List<Integer> selectedStatusIds = selectedStatusIds();
+        long generation = loadGeneration.incrementAndGet();
         if (shaleClientId == null || shaleClientId <= 0) {
             setStatus("No tenant is selected.");
             return;
@@ -168,17 +177,23 @@ public final class ReportsController {
         setLoading(true);
         executor.submit(() -> {
             try {
-                List<CaseStatusReportRowDto> rows = caseDao.listCaseStatusReport(shaleClientId, startDate, endDate, selectedStatusIds);
-                Platform.runLater(() -> applyRows(rows));
+                List<CaseStatusReportRowDto> rows = caseSummaryDao.listActiveStatusReport(shaleClientId, startDate, endDate, selectedStatusIds);
+                Platform.runLater(() -> { if (isCurrentLoad(generation, shaleClientId)) applyRows(rows); });
             } catch (RuntimeException ex) {
                 Platform.runLater(() -> {
+                    if (!isCurrentLoad(generation, shaleClientId)) return;
                     clearReport();
                     setStatus("Unable to load report. Please try again.");
                 });
             } finally {
-                Platform.runLater(() -> setLoading(false));
+                Platform.runLater(() -> { if (isCurrentLoad(generation, shaleClientId)) setLoading(false); });
             }
         });
+    }
+
+    private boolean isCurrentLoad(long generation, int tenantId) {
+        return generation == loadGeneration.get() && appState != null
+                && Objects.equals(appState.getShaleClientId(), tenantId);
     }
 
     private void applyAvailableStatuses(List<CaseStatusDto> statuses) {
@@ -293,15 +308,20 @@ public final class ReportsController {
         LocalDate startDate = startDatePicker == null ? null : startDatePicker.getValue();
         LocalDate endDate = endDatePicker == null ? null : endDatePicker.getValue();
         CaseExportService.ReportCriteria criteria = new CaseExportService.ReportCriteria(shaleClientId, startDate, endDate, List.of(row.statusId()));
+        long generation = loadGeneration.get();
         setLoading(true);
         executor.submit(() -> {
             try {
-                List<ReportCaseDetailRowDto> rows = caseDao.listCaseStatusReportCases(shaleClientId, row.statusId(), startDate, endDate);
-                Platform.runLater(() -> showCaseDetailsDialog(row.caseStatus(), startDate, endDate, rows, criteria));
+                List<ReportCaseDetailRowDto> rows = caseSummaryDao.listActiveStatusReportCases(
+                        shaleClientId, row.statusId(), startDate, endDate).stream()
+                        .map(CaseSummaryDao.ReportCaseRow::toDetailRow).toList();
+                Platform.runLater(() -> { if (isCurrentLoad(generation, shaleClientId))
+                    showCaseDetailsDialog(row.caseStatus(), startDate, endDate, rows, criteria); });
             } catch (RuntimeException ex) {
-                Platform.runLater(() -> setStatus("Unable to load cases for " + row.caseStatus() + ". Please try again."));
+                Platform.runLater(() -> { if (isCurrentLoad(generation, shaleClientId))
+                    setStatus("Unable to load cases for " + row.caseStatus() + ". Please try again."); });
             } finally {
-                Platform.runLater(() -> setLoading(false));
+                Platform.runLater(() -> { if (isCurrentLoad(generation, shaleClientId)) setLoading(false); });
             }
         });
     }
