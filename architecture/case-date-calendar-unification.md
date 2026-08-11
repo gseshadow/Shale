@@ -49,6 +49,23 @@ No mappings are seeded: the existing stable keys prove type identity but do not 
 want bidirectional synchronization. SOL, TCN, meetings, calls, reminders, and every other type
 therefore remain unchanged until explicit administration is added.
 
+The migration extends the single established enabled `TenantFilter` policy only after rejecting a
+missing, disabled, or ambiguously named policy. The mapping table has the strict tenant predicate as
+one `FILTER` plus `BLOCK AFTER INSERT`, `BLOCK BEFORE UPDATE`, and `BLOCK AFTER UPDATE` predicates.
+Consequently a foreign-tenant write is rejected rather than inserted and then hidden, and neither
+the old nor new tenant key of an update can evade the trusted session tenant. The overlay-aware
+mapping trigger additionally requires both audit user IDs to resolve to `Users.id` in the mapping
+tenant. It intentionally does not reject deleted historical actors because the established audit
+column contract preserves authoritative actor IDs independent of current user lifecycle.
+
+Reruns validate definitions rather than names alone: prerequisite column types/nullability,
+composite-key and filtered-index key order/filters, FK endpoints and no-action behavior, mapping
+columns/defaults/check/primary key, active uniqueness, trigger validation, and every RLS operation.
+A compatible partial table receives only safely missing defaults, constraints, indexes, FKs,
+trigger, and predicates. Incompatible partial shapes or same-named incompatible objects abort the
+transaction with an actionable error; the migration never drops the table or repairs it by
+discarding/reinterpreting rows.
+
 ### Shared transaction and ownership contract
 
 `CaseCalendarMutationService` is the UI-neutral orchestration seam. It derives tenant from the
