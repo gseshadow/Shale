@@ -29,7 +29,6 @@ import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.CaseSummaryDao.CaseBoardRow;
-import com.shale.data.dao.CaseDao.CaseSort;
 import com.shale.data.dao.UserBoardLanePreferencesDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.dialog.TaskDetailDialog;
@@ -64,7 +63,6 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
-import javafx.scene.control.MenuButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
@@ -132,16 +130,6 @@ public final class MyShaleController {
 	private static final int RECENTLY_UPDATED_CASE_DAYS = 7;
 	private static final DateTimeFormatter IMPORTANT_DATE_LABEL_FORMATTER = DateTimeFormatter.ofPattern("MMM d");
 
-	@FXML
-	private TextField myCasesSearchField;
-	@FXML
-	private ChoiceBox<String> myCasesSortChoice;
-	@FXML
-	private MenuButton myCasesStatusFilterMenuButton;
-	@FXML
-	private ScrollPane myCasesScroll;
-	@FXML
-	private FlowPane myCasesFlow;
 	@FXML
 	private ChoiceBox<String> myTasksSortChoice;
 	@FXML
@@ -229,16 +217,10 @@ public final class MyShaleController {
 	private boolean liveSubscribed;
 	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 
-	private int currentPage = 0;
-	private final int pageSize = 100;
-	private boolean loading = false;
-	private boolean hasMore = true;
-	private int loadGeneration = 0;
 	private int taskLoadGeneration = 0;
 	private int myCasesBoardLoadGeneration = 0;
 	private int recentCaseActivityLoadGeneration = 0;
 
-	private final List<CaseCardVm> loaded = new ArrayList<>();
 	private List<CaseTaskListItemDto> myTasks = List.of();
 	private List<TaskStatusOptionDto> myTaskStatusOptions = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> myTaskAssignedUsers = java.util.Map.of();
@@ -265,7 +247,6 @@ public final class MyShaleController {
 	private boolean loadingRecentCaseActivity;
 	private boolean recentCaseActivityLoadFailed;
 	private boolean showCompletedMyTasks;
-	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private final Set<Long> pinnedTaskLaneCaseIds = new LinkedHashSet<>();
 	private final Set<Long> collapsedTaskLaneCaseIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
@@ -402,15 +383,6 @@ public final class MyShaleController {
 		applyMyTasksSemanticControls();
 		applyRemainingSemanticControls();
 
-		if (myCasesSortChoice != null) {
-			myCasesSortChoice.getItems().setAll(SORT_NAME, SORT_INTAKE, SORT_SOL, SORT_TORT_NOTICE, SORT_UPDATED_OLDEST, SORT_UPDATED_NEWEST);
-			myCasesSortChoice.getSelectionModel().select(SORT_NAME);
-			myCasesSortChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> loadFirstPage());
-		}
-
-		if (myCasesSearchField != null) {
-			myCasesSearchField.textProperty().addListener((obs, oldV, newV) -> rerender());
-		}
 		if (myTasksSortChoice != null) {
 			myTasksSortChoice.getItems().setAll(MY_TASKS_SORT_DUE_ASC, MY_TASKS_SORT_DUE_DESC);
 			myTasksSortChoice.getSelectionModel().select(restoreMyTasksSortPreference());
@@ -540,21 +512,15 @@ public final class MyShaleController {
 		Platform.runLater(() ->
 		{
 			onSectionSelected(SECTION_OVERVIEW);
-			wireInfiniteScroll();
 		});
 
-		if (myCasesFlow != null) {
-			myCasesFlow.sceneProperty().addListener((obs, oldScene, newScene) ->
-			{
+		if (myCasesSectionPane != null) {
+			myCasesSectionPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
 				log.debug("My Cases live scene changed oldPresent={} newPresent={}", oldScene != null, newScene != null);
-				if (newScene == null) {
-					unsubscribeLiveCaseUpdates();
-				} else {
-					subscribeLiveCaseUpdates();
-				}
+				if (newScene == null) unsubscribeLiveCaseUpdates();
+				else subscribeLiveCaseUpdates();
 			});
 		}
-
 		subscribeLiveCaseUpdates();
 	}
 
@@ -770,8 +736,9 @@ public final class MyShaleController {
 			return;
 		}
 
-		log.debug("My Cases live event accepted; scheduling targeted refresh");
-		refreshCaseIncremental(event.caseId());
+		log.debug("My Cases live event accepted; invalidating assigned-case snapshot");
+		myCasesDirty = true;
+		refreshMyCasesBoard(true);
 		refreshRecentCaseActivity();
 	}
 
@@ -779,8 +746,7 @@ public final class MyShaleController {
 		Integer tenantId = appState == null ? null : appState.getShaleClientId();
 		if (tenantId == null || tenantId <= 0 || caseDao == null) {
 			statusFilterOptions = List.of();
-			selectedStatusIds.clear();
-			CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+			onLoaded.run();
 			return;
 		}
 
@@ -802,307 +768,13 @@ public final class MyShaleController {
 
 			Platform.runLater(() ->
 			{
-				Set<Integer> statusIds = options.stream()
-						.map(CaseListUiSupport.StatusFilterOption::id)
-						.collect(java.util.stream.Collectors.toSet());
-				selectedStatusIds.removeIf(id -> !statusIds.contains(id));
-				if (selectedStatusIds.isEmpty()) {
-					selectedStatusIds.addAll(CaseListUiSupport.defaultSelectedStatuses(options));
-				}
 				statusFilterOptions = options;
-				CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+				onLoaded.run();
 				syncMyCasesBoardStatusFilterOptions();
 				applyPendingMyCaseSummaryStatusFilter();
 				renderOverviewWidgets();
 			});
 		});
-	}
-
-	private void refreshCaseIncremental(long caseId) {
-		if (caseDao == null || appState == null || appState.getUserId() == null || appState.getUserId() <= 0) {
-			log.debug("My Cases targeted refresh skipped: missing dependencies");
-			return;
-		}
-
-		final int userId = appState.getUserId();
-		final int generationAtSubmit = loadGeneration;
-		casesDbExec.submit(() ->
-		{
-			try {
-				long daoStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=getMyCaseRow page=my_shale caseId=" + caseId + " userId=" + userId);
-				CaseDao.CaseRow row = caseDao.getMyCaseRow(userId, caseId);
-				PerfLog.logDone("DAO", "method=getMyCaseRow page=my_shale caseId=" + caseId + " userId=" + userId + " rows=" + (row == null ? 0 : 1), daoStartNanos);
-				Platform.runLater(() ->
-				{
-					if (generationAtSubmit != loadGeneration) {
-						log.debug("My Cases targeted refresh ignored due to generation mismatch");
-						return;
-					}
-
-					boolean changed;
-					if (row == null) {
-						changed = removeLoadedCase(caseId);
-						log.debug("My Cases targeted refresh row missing: removed={} caseId={}", changed, caseId);
-					} else {
-						changed = upsertLoadedCase(toVm(row));
-						log.debug("My Cases targeted refresh upsert changed={} caseId={}", changed, caseId);
-					}
-
-					if (changed) {
-						myCasesDirty = false;
-						myCasesLoadedOnce = true;
-						rerender();
-						renderMyCasesBoard();
-						renderOverviewWidgets();
-					}
-				});
-				} catch (Exception ex) {
-					log.warn("My Cases targeted refresh failed caseId={}: {}", caseId, ex.getMessage());
-					runOnFx(() -> {
-						myCasesDirty = true;
-						refreshMyCasesBoard(true);
-					});
-				}
-		});
-	}
-
-	private boolean removeLoadedCase(long caseId) {
-		for (int i = 0; i < loaded.size(); i++) {
-			if (loaded.get(i).id == caseId) {
-				loaded.remove(i);
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private boolean upsertLoadedCase(CaseCardVm vm) {
-		for (int i = 0; i < loaded.size(); i++) {
-			CaseCardVm existing = loaded.get(i);
-			if (existing.id == vm.id) {
-				if (existing.sameContent(vm)) {
-					return false;
-				}
-				loaded.set(i, vm);
-				return true;
-			}
-		}
-		loaded.add(vm);
-		return true;
-	}
-
-	private CaseCardVm toVm(CaseDao.CaseRow r) {
-		return new CaseCardVm(
-				r.id(),
-				safe(r.name()),
-				r.intakeDate(),
-				r.statuteOfLimitationsDate(),
-				r.tortClaimsNoticeDeadline(),
-				r.primaryStatusId(),
-				safe(r.responsibleAttorneyName()),
-				safe(r.responsibleAttorneyColor()),
-				r.nonEngagementLetterSent(),
-				safe(r.primaryStatusName()),
-				safe(r.primaryStatusColor()),
-				safe(r.practiceAreaColor()),
-				r.updatedAt()
-		);
-	}
-
-	private void wireInfiniteScroll() {
-		if (myCasesScroll == null)
-			return;
-		myCasesScroll.vvalueProperty().addListener((obs, oldV, newV) ->
-		{
-			if (newV != null && newV.doubleValue() >= 0.95 && !isSearchActive()) {
-				loadNextPage();
-			}
-		});
-	}
-
-	private void loadFirstPage() {
-		PerfLog.log("PAGE", "start", "page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
-		loadGeneration++;
-		log.debug("My Cases loadFirstPage generation={} sort={} queryPresent={} selectedStatusCount={}",
-				loadGeneration, myCasesSortChoice == null ? "<null>" : myCasesSortChoice.getValue(),
-				!normalizedSearchQuery().isBlank(), selectedStatusIds.size());
-		currentPage = 0;
-		loading = false;
-		hasMore = true;
-		loaded.clear();
-		if (myCasesFlow != null) {
-			myCasesFlow.getChildren().clear();
-		}
-		loadNextPage();
-	}
-
-	private void loadNextPage() {
-		if (loading || !hasMore || caseDao == null || appState == null || appState.getUserId() == null || appState.getUserId() <= 0) {
-			return;
-		}
-
-		loading = true;
-		final int pageToLoad = currentPage;
-		final int generationAtSubmit = loadGeneration;
-		final int userId = appState.getUserId();
-
-		casesDbExec.submit(() ->
-		{
-			try {
-				long daoStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=findMyCasesPage page=my_shale userId=" + userId + " pageIndex=" + pageToLoad);
-				var page = caseDao.findMyCasesPage(userId, pageToLoad, pageSize, selectedSort(), false);
-				PerfLog.logDone("DAO", "method=findMyCasesPage page=my_shale userId=" + userId + " pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0
-						: page.items().size()), daoStartNanos);
-				List<CaseCardVm> newItems = page.items().stream()
-						.map(this::toVm)
-						.toList();
-
-				Platform.runLater(() ->
-				{
-					if (generationAtSubmit != loadGeneration) {
-						loading = false;
-						return;
-					}
-					for (CaseCardVm vm : newItems) {
-						upsertLoadedCase(vm);
-					}
-					log.debug("My Cases page loaded page={} items={} total={} loadedUnique={}", pageToLoad, newItems.size(), page.total(), loaded.size());
-					currentPage++;
-					hasMore = loaded.size() < page.total();
-					loading = false;
-					rerender();
-				});
-			} catch (Exception ex) {
-				Platform.runLater(() ->
-				{
-					if (generationAtSubmit == loadGeneration) {
-						loading = false;
-						log.warn("My Cases load failed generation={}: {}", generationAtSubmit, ex.getMessage());
-						ex.printStackTrace();
-					}
-				});
-			}
-		});
-	}
-
-	private void rerender() {
-		if (myCasesFlow == null) {
-			return;
-		}
-		long renderStartNanos = PerfLog.start();
-		PerfLog.log("RENDER", "start", "panel=my_cases page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
-
-		String q = normalizedSearchQuery();
-		Comparator<CaseCardVm> comp = comparatorFor(myCasesSortChoice == null ? SORT_NAME : myCasesSortChoice.getValue());
-
-		List<CaseCardVm> filtered = loaded.stream()
-				.filter(vm -> matchesQuery(vm, q) && matchesSelectedStatus(vm))
-				.sorted(comp)
-				.toList();
-
-		if (!q.isEmpty() && filtered.size() < pageSize && hasMore && !loading) {
-			loadNextPage();
-		}
-
-		List<CaseCardVm> view = q.isEmpty() ? filtered : filtered.stream().limit(pageSize).toList();
-		myCasesFlow.getChildren().setAll(view.stream().map(this::buildCaseCard).toList());
-		PerfLog.logDone("RENDER", "panel=my_cases page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=" + myCasesFlow.getChildren().size(),
-				renderStartNanos);
-	}
-
-	private CaseSort selectedSort() {
-		String value = myCasesSortChoice == null ? SORT_NAME : myCasesSortChoice.getValue();
-		if (SORT_NAME.equals(value)) {
-			return CaseSort.CASE_NAME_ASC;
-		}
-		if (SORT_SOL.equals(value)) {
-			return CaseSort.STATUTE_SOONEST;
-		}
-		if (SORT_TORT_NOTICE.equals(value)) {
-			return CaseSort.TORT_NOTICE_SOONEST;
-		}
-		if (SORT_UPDATED_OLDEST.equals(value)) {
-			return CaseSort.UPDATED_OLDEST;
-		}
-		if (SORT_UPDATED_NEWEST.equals(value)) {
-			return CaseSort.UPDATED_NEWEST;
-		}
-		return CaseSort.INTAKE_NEWEST;
-	}
-
-	private Comparator<CaseCardVm> comparatorFor(String sortOption) {
-		if (SORT_NAME.equals(sortOption)) {
-			return Comparator.comparing((CaseCardVm v) -> v.name, this::nullsLastString);
-		}
-		if (SORT_SOL.equals(sortOption)) {
-			return Comparator.comparing((CaseCardVm v) -> v.solDate, this::nullsLastDate);
-		}
-		if (SORT_TORT_NOTICE.equals(sortOption)) {
-			return Comparator.comparing((CaseCardVm v) -> v.tortNoticeDate, this::nullsLastDate);
-		}
-		if (SORT_INTAKE.equals(sortOption)) {
-			return Comparator.comparing((CaseCardVm v) -> v.intakeDate, this::nullsLastDate).reversed();
-		}
-		if (SORT_UPDATED_OLDEST.equals(sortOption)) {
-			return Comparator.comparing((CaseCardVm v) -> v.updatedAt, this::nullsLastDateTime);
-		}
-		if (SORT_UPDATED_NEWEST.equals(sortOption)) {
-			return Comparator.comparing((CaseCardVm v) -> v.updatedAt, this::nullsLastDateTime).reversed();
-		}
-		return Comparator.comparing((CaseCardVm v) -> v.name, this::nullsLastString);
-	}
-
-	private boolean matchesSelectedStatus(CaseCardVm vm) {
-		return vm.primaryStatusId == null || selectedStatusIds.contains(vm.primaryStatusId);
-	}
-
-	private boolean isSearchActive() {
-		return !normalizedSearchQuery().isEmpty();
-	}
-
-	private String normalizedSearchQuery() {
-		if (myCasesSearchField == null)
-			return "";
-		return safe(myCasesSearchField.getText()).trim().toLowerCase(Locale.ROOT);
-	}
-
-	private static boolean matchesQuery(CaseCardVm vm, String query) {
-		if (query.isEmpty())
-			return true;
-		return vm.name.toLowerCase(Locale.ROOT).contains(query)
-				|| vm.responsibleAttorney.toLowerCase(Locale.ROOT).contains(query);
-	}
-
-	private int nullsLastDate(LocalDate a, LocalDate b) {
-		if (a == null && b == null)
-			return 0;
-		if (a == null)
-			return 1;
-		if (b == null)
-			return -1;
-		return a.compareTo(b);
-	}
-
-	private int nullsLastDateTime(LocalDateTime a, LocalDateTime b) {
-		if (a == null && b == null)
-			return 0;
-		if (a == null)
-			return 1;
-		if (b == null)
-			return -1;
-		return a.compareTo(b);
-	}
-
-	private int nullsLastString(String a, String b) {
-		if (a == null && b == null)
-			return 0;
-		if (a == null)
-			return 1;
-		if (b == null)
-			return -1;
-		return a.compareToIgnoreCase(b);
 	}
 
 	private Node buildCaseCard(CaseCardVm vm) {
@@ -2577,51 +2249,30 @@ public final class MyShaleController {
 			if (myCasesBoardSearchField != null) {
 				myCasesBoardSearchField.clear();
 			}
-			if (myCasesSearchField != null) {
-				myCasesSearchField.clear();
-			}
 			if (myCasesBoardStatusFilterChoice != null) {
 				myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
 			}
-			selectAllMyCasesStatuses();
-			CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, this::loadFirstPage);
 		} finally {
 			suppressMyCasesFilterEvents = false;
 		}
 		renderMyCasesBoard();
-		rerender();
 		ensureMyCasesFresh(false);
 	}
 
 	private boolean hasActiveMyCasesFilters() {
 		return !normalizeSearchQuery(myCasesBoardSearchField == null ? null : myCasesBoardSearchField.getText()).isEmpty()
-				|| !normalizedSearchQuery().isEmpty()
-				|| selectedMyCasesBoardStatusId() != null
-				|| !selectedStatusIds.equals(CaseListUiSupport.defaultSelectedStatuses(statusFilterOptions));
-	}
-
-	private void selectAllMyCasesStatuses() {
-		selectedStatusIds.clear();
-		selectedStatusIds.addAll(CaseListUiSupport.defaultSelectedStatuses(statusFilterOptions));
+				|| selectedMyCasesBoardStatusId() != null;
 	}
 
 	private void showDeadlineCasesInMyCases(String sortOption, CaseDeadlineWindow deadlineWindow) {
 		if (myCasesBoardSearchField != null) {
 			myCasesBoardSearchField.clear();
 		}
-		if (myCasesSearchField != null) {
-			myCasesSearchField.clear();
-		}
 		if (myCasesBoardStatusFilterChoice != null) {
 			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
 		}
-		selectAllMyCasesStatuses();
-		CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, this::loadFirstPage);
 		if (myCasesBoardSortChoice != null) {
 			myCasesBoardSortChoice.getSelectionModel().select(sortOption);
-		}
-		if (myCasesSortChoice != null) {
-			myCasesSortChoice.getSelectionModel().select(sortOption);
 		}
 		onSectionSelected(SECTION_MY_CASES);
 		// TODO: Apply an existing My Cases deadline/window filter for deadlineWindow when the assigned-case board exposes one.
@@ -2633,19 +2284,11 @@ public final class MyShaleController {
 		if (myCasesBoardSearchField != null) {
 			myCasesBoardSearchField.clear();
 		}
-		if (myCasesSearchField != null) {
-			myCasesSearchField.clear();
-		}
 		if (myCasesBoardStatusFilterChoice != null) {
 			myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION);
 		}
-		selectAllMyCasesStatuses();
-		CaseListUiSupport.initializeStatusFilterMenu(myCasesStatusFilterMenuButton, selectedStatusIds, statusFilterOptions, this::loadFirstPage);
 		if (myCasesBoardSortChoice != null) {
 			myCasesBoardSortChoice.getSelectionModel().select(sortOption);
-		}
-		if (myCasesSortChoice != null) {
-			myCasesSortChoice.getSelectionModel().select(sortOption);
 		}
 		onSectionSelected(SECTION_MY_CASES);
 		renderMyCasesBoard();

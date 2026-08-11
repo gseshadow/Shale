@@ -162,20 +162,16 @@ final class MyShaleControllerBoardLayoutTest {
     @Test
     void updatedAtIsCarriedThroughAssignedCaseModelAndSorts() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
-        String dao = Files.readString(Path.of("../shale-data/src/main/java/com/shale/data/dao/CaseDao.java"));
+        String dao = Files.readString(Path.of("../shale-data/src/main/java/com/shale/data/dao/CaseSummaryDao.java"));
 
-        assertTrue(dao.contains("c.UpdatedAt"),
-                "Assigned-case board query should select Cases.UpdatedAt");
-        assertTrue(dao.contains("LocalDateTime updatedAt"),
-                "CaseRow should expose UpdatedAt to the UI model");
-        assertTrue(source.contains("r.updatedAt()"),
-                "MyShaleController should carry CaseRow UpdatedAt into CaseCardVm");
+        assertTrue(dao.contains("c.CreatedAt, c.UpdatedAt"),
+                "Authoritative assigned-case query should select Cases.UpdatedAt");
+        assertTrue(source.contains("summary.updatedAt()"),
+                "MyShaleController should carry projection UpdatedAt into CaseCardVm");
         assertTrue(source.contains("final LocalDateTime updatedAt"),
                 "Assigned-case VM should retain UpdatedAt for radar and sorting");
         assertTrue(source.contains("SORT_UPDATED_OLDEST") && source.contains("SORT_UPDATED_NEWEST"),
                 "My Cases should expose narrow UpdatedAt sort options for radar click-through");
-        assertTrue(source.contains("CaseSort.UPDATED_OLDEST") && source.contains("CaseSort.UPDATED_NEWEST"),
-                "Paged My Cases loading should use DAO UpdatedAt sorting when selected");
         assertTrue(source.contains("caseVm.updatedAt != null && caseVm.updatedAt.toLocalDate().isBefore(inactiveBefore)"),
                 "Inactive assigned case counts should be based on UpdatedAt before the 45-day cutoff");
         assertTrue(source.contains("!date.isBefore(recentSince) && !date.isAfter(effectiveToday)"),

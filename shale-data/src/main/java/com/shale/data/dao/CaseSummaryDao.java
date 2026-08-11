@@ -440,6 +440,7 @@ public final class CaseSummaryDao {
 			throw new IllegalArgumentException("tenant and assignedUserId must be > 0");
 		try (Connection con = db.requireConnection()) {
 			verifyTenant(con, requestedTenantId);
+			verifyEligibleAssignedUser(con, requestedTenantId, assignedUserId);
 			String sql = """
 				SELECT c.Id, c.ShaleClientId, c.CaseNumber, c.Name,
 				 status_row.StatusId, status_row.SystemKey StatusSystemKey,
@@ -637,6 +638,18 @@ public final class CaseSummaryDao {
 
 	private static LocalDate localDate(ResultSet rs, String column) throws SQLException {
 		java.sql.Date value=rs.getDate(column); return value==null?null:value.toLocalDate();
+	}
+
+	private static void verifyEligibleAssignedUser(Connection con, int requestedTenantId, int assignedUserId) throws SQLException {
+		try (PreparedStatement ps = con.prepareStatement(
+				"SELECT 1 FROM dbo.Users u WHERE u.id=? AND u.ShaleClientId=? AND ISNULL(u.is_deleted,0)=0")) {
+			ps.setInt(1, assignedUserId);
+			ps.setInt(2, requestedTenantId);
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) throw new IllegalArgumentException(
+						"assignedUserId must identify a nondeleted user in the trusted tenant");
+			}
+		}
 	}
 
 	private static int verifyTenant(Connection con, int requestedTenantId) throws SQLException {
