@@ -17,6 +17,8 @@ final class MyShaleCaseBoardProjectionCutoverTest {
 		String source=source();
 		assertTrue(source.contains("caseSummaryDao.listActiveAssignedBoard(shaleClientId, userIdValue)"));
 		assertFalse(source.contains("caseDao.listAssignedCasesForBoard(userIdValue)"));
+		assertFalse(source.contains("caseDao.findMyCasesPage("));
+		assertFalse(source.contains("caseDao.getMyCaseRow("));
 		assertTrue(source.contains("Node card = buildCaseCard(vm)"));
 		assertTrue(source.contains("caseCardFactory.create(new CaseCardModel("));
 		assertTrue(source.contains("Objects.equals(selectedStatusId, vm.primaryStatusId)"));
@@ -29,5 +31,7 @@ final class MyShaleCaseBoardProjectionCutoverTest {
 		assertTrue(source.contains("caseStatusOptionsInitialized = true;"));
 		assertTrue(source.contains("generationAtSubmit != myCasesBoardLoadGeneration"));
 		assertTrue(source.contains("!Objects.equals(appState.getShaleClientId(), shaleClientId)"));
+		assertTrue(source.contains("myCasesDirty = true;") && source.contains("refreshMyCasesBoard(true);"));
+		assertTrue(source.contains("myCasesSectionPane.sceneProperty()"));
 	}
 }

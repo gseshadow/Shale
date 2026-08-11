@@ -46,14 +46,12 @@ final class MyShaleControllerClearAllFiltersTest {
                 "My Cases should expose a clearly labeled Clear all filters button near its filter/search controls.");
         assertTrue(source.contains("private void clearAllMyCasesFilters()"),
                 "My Cases should use a single clear-all action path.");
-        assertTrue(source.contains("myCasesBoardSearchField.clear()")
-                        && source.contains("myCasesSearchField.clear()"),
-                "My Cases clear-all should clear visible board search and legacy card search text.");
-        assertTrue(source.contains("myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION)")
-                        && source.contains("selectAllMyCasesStatuses()"),
-                "My Cases clear-all should reset board and legacy status filters to defaults.");
+        assertTrue(source.contains("myCasesBoardSearchField.clear()"),
+                "My Cases clear-all should clear the visible board search text.");
+        assertTrue(source.contains("myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION)"),
+                "My Cases clear-all should reset the authoritative board status filter.");
         assertTrue(source.contains("suppressMyCasesFilterEvents = true")
-                        && containsStatementsInOrder(source, "renderMyCasesBoard();", "rerender();", "ensureMyCasesFresh(false);"),
+                        && containsStatementsInOrder(source, "renderMyCasesBoard();", "ensureMyCasesFresh(false);"),
                 "My Cases clear-all should suppress duplicate listener renders and refresh the default board state once.");
     }
 

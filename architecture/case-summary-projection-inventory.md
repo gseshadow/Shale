@@ -218,3 +218,51 @@ generation, Organization ID, and tenant ID; both success and failure callbacks v
 context on the JavaFX thread before changing cards or empty state. Navigation or refresh therefore
 cannot accept an older related-Case result. Active grid, board, export, Search, Deleted Cases,
 remaining My Shale, Reports, Documents, Calendar, server/API, and web paths are unchanged.
+
+## Remaining desktop MyShale Case-consumer cutover
+
+The final MyShale audit found one current Case surface and one unreachable compatibility implementation
+inside the same controller. The visible Overview and **My Cases** lanes already consumed
+`CaseSummaryDao.listActiveAssignedBoard`; the controller still retained an older, non-FXML paging
+implementation (`CaseDao.findMyCasesPage`), its `CaseRow` mapper, and a LiveBus single-Case hydration
+through `CaseDao.getMyCaseRow`. No selected-user selector exists on MyShale: membership is for the
+authenticated `AppState.userId`, captured with `AppState.shaleClientId`. My Tasks case selectors and
+embedded Case metadata remain task-service data and are not independent Case-list consumers.
+`UserDetailService.listActiveCasesForUserTeamMember` is a separate user-detail surface and remains
+explicitly deferred.
+
+MyShale now has one Case read/list entry point:
+`SceneManager.createMyShaleView` → `MyShaleController.refreshMyCasesBoard` →
+`CaseSummaryDao.listActiveAssignedBoard`. The requested tenant must match SQL Server session context;
+the authenticated user ID must identify a nondeleted `Users` row owned by that trusted tenant. Case
+membership remains **any** `CaseUsers` row for that user, regardless of assignment role or
+`IsPrimary`; multiple assignments are collapsed by `EXISTS`. Cases are explicitly active/nondeleted.
+The query does not exclude closed Cases; configured status lanes and their ID-based filter preserve
+the established presentation, including an ID-keyed lane for an unconfigured status and a No Status
+lane. Empty lanes remain omitted. SQL returns a complete snapshot ordered by status ID, Intake date
+descending, then Case ID descending. In-memory lane sorts preserve Name, Intake, Statute, Tort,
+Updated oldest, and Updated newest behavior and use Case ID as the final tie-breaker.
+
+The card composition reuses Case/tenant ID, number/name, authoritative current-status ID/stable
+keys/name/color, Practice Area ID/name, responsible-attorney and primary-legal-assistant IDs/display,
+created/updated timestamps, and deletion state. MyShale-only enrichment remains the three configured
+semantic dates, Practice Area color, and non-engagement flag. Dates come only from `CaseDates`,
+`CaseDateTypes`, and active semantic-role mappings. Status and assignments reuse scalar shared
+projection resolvers with `RoleSemantics`; there is no label identity, numeric role literal, row
+multiplication, per-Case hydration, narrative expansion, or deprecated `Cases` date read.
+
+Initial loading remains gated on status-option completion. Every snapshot captures tenant, user, and
+generation; success and failure apply on the FX thread only while all three remain current. LiveBus
+now invalidates and replaces the authoritative snapshot instead of issuing the legacy per-Case query,
+so a membership removal, tenant/user change, or superseded refresh cannot leave a stale card or
+counter. Loading, accepted empty, and failure remain distinct. The visible section's scene lifecycle
+owns LiveBus subscription and rejects refreshes after replacement. This changes a live event from one
+legacy hydration query (plus fallback full load on failure) to one set-based snapshot query, while
+normal loads remain one validation query plus one set query and have no N+1 work.
+
+The unreachable paging fields/methods and their `CaseRow` mapping were removed from
+`MyShaleController`. `CaseDao.findMyCasesPage`, `getMyCaseRow`, `listAssignedCasesForBoard`, and
+`listActiveCasesForUserTeamMember` remain available because compatibility/service-adapter and deferred
+desktop consumers still reference those DAO boundaries. The verified global Cases grid, global Case
+board behavior, export, Search, Deleted Cases, Contact/Organization related views, Reports, Documents,
+Calendar, server/API, and web paths are unchanged.

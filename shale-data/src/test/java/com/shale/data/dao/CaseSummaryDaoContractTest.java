@@ -116,6 +116,7 @@ final class CaseSummaryDaoContractTest {
 		String board = source.substring(source.indexOf("public List<CaseBoardRow> listActiveAssignedBoard"),
 				source.indexOf("static String statusPredicate"));
 		assertTrue(board.contains("verifyTenant(con, requestedTenantId)"));
+		assertTrue(board.contains("verifyEligibleAssignedUser(con, requestedTenantId, assignedUserId)"));
 		assertTrue(board.contains("c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0"));
 		assertTrue(board.contains("EXISTS (SELECT 1 FROM dbo.CaseUsers scope"));
 		assertTrue(board.contains("scope.UserId=?"));
@@ -127,7 +128,8 @@ final class CaseSummaryDaoContractTest {
 		assertFalse(board.contains("c.StatuteOfLimitations"));
 		assertFalse(board.contains("c.TortNoticeDeadline"));
 		assertTrue(board.lines().filter(line -> line.contains("executeQuery()")).count() == 1,
-				"Board hydration must remain a single query after tenant verification");
+				"Board hydration must remain a single set query after boundary validation");
+		assertTrue(source.contains("u.id=? AND u.ShaleClientId=? AND ISNULL(u.is_deleted,0)=0"));
 	}
 
 	@Test void deletedSearchIsExplicitSetBasedTenantScopedAndDeterministic() throws Exception {
