@@ -892,18 +892,7 @@ public final class ContactViewController {
     }
 
     private Node createRelatedCaseCard(RelatedCaseRow row) {
-        Node card = caseCardFactory.create(new CaseCardModel(
-                row.summary().caseId(),
-                row.summary().caseName(),
-                row.intakeDate(),
-                row.statuteOfLimitationsDate(),
-                row.tortClaimsNoticeDeadline(),
-                row.summary().responsibleAttorneyName(),
-                row.summary().responsibleAttorneyColor(),
-                row.nonEngagementLetterSent(),
-                row.summary().statusName(),
-                row.summary().statusColor(),
-                row.practiceAreaColor()), CaseCardFactory.Variant.FULL);
+        Node card = caseCardFactory.create(toRelatedCaseCardModel(row), CaseCardFactory.Variant.FULL);
         if (card instanceof Region region) {
             region.setMaxWidth(Double.MAX_VALUE);
             region.setPrefWidth(380);
@@ -915,6 +904,21 @@ public final class ContactViewController {
         VBox container = new VBox(4, card, relationshipMeta);
         VBox.setVgrow(container, javafx.scene.layout.Priority.NEVER);
         return container;
+    }
+
+    static CaseCardModel toRelatedCaseCardModel(RelatedCaseRow row) {
+        return new CaseCardModel(
+                row.summary().caseId(),
+                row.summary().caseName(),
+                row.intakeDate(),
+                row.statuteOfLimitationsDate(),
+                row.tortClaimsNoticeDeadline(),
+                row.summary().responsibleAttorneyName(),
+                row.summary().responsibleAttorneyColor(),
+                row.nonEngagementLetterSent(),
+                row.summary().primaryStatusName(),
+                row.summary().primaryStatusColor(),
+                row.practiceAreaColor());
     }
 
 
