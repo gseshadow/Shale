@@ -26,6 +26,19 @@ final class EntityActionAuditEventTest {
 	}
 
 	@Test
+	void supportsCalendarCaseDateMappingVocabularyAndSafeMetadata() {
+		var metadata = new java.util.EnumMap<EntityActionAuditEvent.MetadataKey, Object>(EntityActionAuditEvent.MetadataKey.class);
+		metadata.put(EntityActionAuditEvent.MetadataKey.CALENDAR_EVENT_TYPE_ID, 4);
+		metadata.put(EntityActionAuditEvent.MetadataKey.CASE_DATE_TYPE_ID, 8);
+		metadata.put(EntityActionAuditEvent.MetadataKey.CASE_DATE_TO_CALENDAR, true);
+		metadata.put(EntityActionAuditEvent.MetadataKey.CALENDAR_TO_CASE_DATE, false);
+		EntityActionAuditEvent event = assertDoesNotThrow(() -> EntityActionAuditEvent.now(7, 9,
+				EntityActionAuditEvent.EntityType.CALENDAR_CASE_DATE_TYPE_MAPPING, 11,
+				EntityActionAuditEvent.Action.CREATED, null, null, metadata));
+		assertEquals("4", event.metadata().get(EntityActionAuditEvent.MetadataKey.CALENDAR_EVENT_TYPE_ID));
+	}
+
+	@Test
 	void metadataIsAllowlistedAndDefensivelyCopied() {
 		var metadata = new java.util.EnumMap<EntityActionAuditEvent.MetadataKey, Object>(EntityActionAuditEvent.MetadataKey.class);
 		metadata.put(EntityActionAuditEvent.MetadataKey.CASE_ID, 42L);
