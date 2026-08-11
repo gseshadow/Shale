@@ -76,6 +76,7 @@ import com.shale.ui.component.UserSelectionField;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.document.CaseDocumentExportService;
 import com.shale.ui.document.CaseDocumentFormat;
+import com.shale.ui.document.CaseDocumentGenerationRequest;
 import com.shale.ui.document.CaseDocumentService;
 import com.shale.ui.document.CaseDocumentType;
 import com.shale.ui.document.GeneratedDocument;
@@ -418,6 +419,7 @@ public class CaseController {
 	private MenuItem generateSummaryPdfMenuItem;
 	@FXML
 	private Label summaryGenerationStatusLabel;
+	private long documentGeneration;
 
 	@FXML
 	private Button detailsEditButton;
@@ -852,6 +854,7 @@ public class CaseController {
 	}
 
 	public void init(Integer caseId) {
+		documentGeneration++;
 		synchronized (receivedCaseDateEventIds) { receivedCaseDateEventIds.clear(); }
 		remoteCaseDatesRefreshDeferred = false;
 		compatibilityDates.invalidate();
@@ -874,8 +877,9 @@ public class CaseController {
 		refreshOverviewPlaceholders();
 	}
 
-	public void init(Integer caseId, CaseDao caseDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseServicePort caseService, OrganizationDao organizationDao, ContactDao contactDao,
+	public void init(Integer caseId, CaseDao caseDao, CaseSummaryDao caseSummaryDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseServicePort caseService, OrganizationDao organizationDao, ContactDao contactDao,
 			AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted, PhiReadAuditService phiReadAuditService) {
+		documentGeneration++;
 		synchronized (receivedCaseDateEventIds) { receivedCaseDateEventIds.clear(); }
 		remoteCaseDatesRefreshDeferred = false;
 		compatibilityDates.invalidate();
@@ -904,7 +908,7 @@ public class CaseController {
 		this.contactDao = contactDao;
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
-		this.caseDocumentService = (caseDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, contactDao);
+		this.caseDocumentService = (caseDao == null || caseSummaryDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, caseSummaryDao, contactDao);
 		this.caseDocumentExportService = this.caseDocumentService == null ? null : new CaseDocumentExportService(this.caseDocumentService);
 		this.onCaseDeleted = onCaseDeleted;
 		this.phiReadAuditService = phiReadAuditService;
@@ -1204,6 +1208,10 @@ public class CaseController {
 			showError("Unable to resolve tenant context for summary generation.");
 			return;
 		}
+		if (appState.getUserId() == null || appState.getUserId() <= 0) {
+			showError("Unable to resolve authenticated user for summary generation.");
+			return;
+		}
 		if (caseDocumentExportService == null) {
 			showError("Summary generation service is unavailable.");
 			return;
@@ -1211,6 +1219,9 @@ public class CaseController {
 
 		final int tenantId = appState.getShaleClientId();
 		final int activeCaseId = caseId;
+		final CaseDocumentGenerationRequest request = new CaseDocumentGenerationRequest(
+				tenantId, appState.getUserId(), activeCaseId, CaseDocumentType.CASE_SUMMARY, format);
+		final long generation = ++documentGeneration;
 		final String loadingText = format == CaseDocumentFormat.PDF ? "Generating PDF summary..." : "Generating HTML summary...";
 		setSummaryGenerationBusy(true, loadingText);
 
@@ -1218,12 +1229,13 @@ public class CaseController {
 			@Override
 			protected GeneratedDocument call() throws Exception {
 				System.out.println("[Document] Generating " + format + " CASE_SUMMARY for caseId=" + activeCaseId + " shaleClientId=" + tenantId);
-				return caseDocumentExportService.exportCaseSummary(activeCaseId, tenantId, CaseDocumentType.CASE_SUMMARY, format);
+				return caseDocumentExportService.exportCaseSummary(request);
 			}
 		};
 
 		task.setOnSucceeded(event ->
 		{
+			if (!isCurrentDocumentRequest(request, generation)) return;
 			setSummaryGenerationBusy(false, null);
 			GeneratedDocument generated = task.getValue();
 			try {
@@ -1231,24 +1243,30 @@ public class CaseController {
 				if (!opened) {
 					throw new IllegalStateException("Unable to open generated summary preview.");
 				}
-				System.out.println("[Document] Generated case summary " + format + " at " + generated.path());
+				System.out.println("[Document] Generated case summary " + format);
 			} catch (Exception ex) {
-				System.err.println("[Document] Failed to open generated case summary " + format + ": " + ex.getMessage());
+				System.err.println("[Document] Failed to open generated case summary " + format);
 				showSummaryGenerationError("Could not open generated case summary.");
 			}
 		});
 
 		task.setOnFailed(event ->
 		{
+			if (!isCurrentDocumentRequest(request, generation)) return;
 			setSummaryGenerationBusy(false, null);
-			Throwable ex = task.getException();
-			System.err.println("[Document] Failed to generate case summary " + format + ": " + (ex == null ? "<unknown>" : ex.getMessage()));
+			System.err.println("[Document] Failed to generate case summary " + format);
 			showSummaryGenerationError("Could not generate case summary " + format.name().toLowerCase() + ". Please try again.");
 		});
 
 		Thread worker = new Thread(task, "case-summary-export-" + format.name().toLowerCase() + "-" + activeCaseId);
 		worker.setDaemon(true);
 		worker.start();
+	}
+
+	private boolean isCurrentDocumentRequest(CaseDocumentGenerationRequest request, long generation) {
+		return generation == documentGeneration && caseId != null && caseId == request.caseId()
+				&& appState != null && Objects.equals(appState.getShaleClientId(), request.tenantId())
+				&& Objects.equals(appState.getUserId(), request.authenticatedUserId());
 	}
 
 	private void setSummaryGenerationBusy(boolean busy, String message) {
