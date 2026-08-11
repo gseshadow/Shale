@@ -513,8 +513,10 @@ public final class CasesController {
 		if (exportInProgress || caseExportService == null || appState == null) return;
 		Integer tenantId = appState.getShaleClientId();
 		if (tenantId == null || tenantId <= 0) { showActionError("No tenant is selected."); return; }
-		CaseExportService.CasesCriteria criteria = new CaseExportService.CasesCriteria(tenantId, selectedSort(),
-				includeClosedDeniedInQuery(), normalizedSearchQuery(), new LinkedHashSet<>(selectedStatusIds));
+		if (statusFilterOptions.isEmpty()) { showActionError("Cases are still initializing. Please try again."); return; }
+		Set<Integer> statusesSnapshot = new LinkedHashSet<>(selectedStatusIds);
+		CaseExportService.CasesCriteria criteria = new CaseExportService.CasesCriteria(tenantId, gridOrder(selectedSort()),
+				normalizedSearchQuery(), statusMode(statusesSnapshot, statusFilterOptions), statusesSnapshot);
 		FileChooser chooser = new FileChooser();
 		chooser.setTitle(format == ExportFormat.XLSX ? "Export Cases to XLSX" : "Export Cases to CSV");
 		chooser.setInitialFileName(format == ExportFormat.XLSX ? "cases-export.xlsx" : "cases-export.csv");
@@ -535,8 +537,8 @@ public final class CasesController {
 				else writeCsv(file, daoRows.stream().map(this::toViewModel).toList());
 				Platform.runLater(() -> finishExport(() -> showExportSuccess(file)));
 			} catch (Exception ex) {
-				LOG.error("Cases export failed format={} tenantId={} outputPath={} criteriaIncludeClosedDenied={}",
-						format, tenantId, file.toPath().toAbsolutePath(), criteria.includeClosedDenied(), ex);
+				LOG.error("Cases export failed format={} tenantId={} outputPath={} statusMode={} statusCount={}",
+						format, tenantId, file.toPath().toAbsolutePath(), criteria.statusMode(), criteria.statusIds().size(), ex);
 				Platform.runLater(() -> finishExport(() -> showExportError(file)));
 			}
 		});
@@ -558,12 +560,12 @@ public final class CasesController {
 	}
 
 	private CaseCardVm toViewModel(CaseExportService.ExportCaseRow row) {
-		CaseDao.CaseRow base = row.base();
-		return new CaseCardVm(base.id(), safe(base.name()), row.intakeDate(), row.statuteOfLimitationsDate(),
-				base.primaryStatusId(), safe(base.responsibleAttorneyName()), safe(base.responsibleAttorneyColor()),
-				base.nonEngagementLetterSent(), safe(base.primaryStatusName()), safe(base.primaryStatusColor()),
-				safe(base.practiceAreaColor()), safe(base.clientName()), safe(base.opposingPartiesName()), safe(base.latestCaseUpdate()),
-				safe(base.description()), row.dateOfIncident(), row.tortClaimsNoticeDeadline());
+		var summary = row.summary();
+		return new CaseCardVm(summary.caseId(), safe(summary.caseName()), row.intakeDate(), row.statuteOfLimitationsDate(),
+				summary.primaryStatusId(), safe(summary.responsibleAttorneyName()), safe(summary.responsibleAttorneyColor()),
+				null, safe(summary.primaryStatusName()), safe(summary.primaryStatusColor()), "", safe(row.clientName()),
+				safe(row.opposingPartiesName()), safe(row.latestCaseUpdate()), safe(row.description()), row.dateOfIncident(),
+				row.tortClaimsNoticeDeadline());
 	}
 
 

@@ -95,6 +95,20 @@ final class CaseSummaryDaoContractTest {
 		assertTrue(selected.contains("IN (?,?)"));
 	}
 
+	@Test void casesExportReusesTheAuthoritativeBoundedGridContract() throws Exception {
+		String source = source();
+		String export = source.substring(source.indexOf("public List<CaseGridRow> listActiveGridForExport"),
+				source.indexOf("/**", source.indexOf("public List<CaseGridRow> listActiveGridForExport") + 10));
+		assertTrue(export.contains("findActiveGridPage(requestedTenantId"));
+		assertTrue(export.contains("EXPORT_BATCH_SIZE"));
+		assertTrue(export.contains("total = batch.total()"));
+		assertTrue(export.contains("rows.size() < total"));
+		assertTrue(export.contains("Set.copyOf"), "criteria must be immutable across every batch");
+		assertFalse(export.contains("CaseDao"));
+		assertFalse(export.contains("CaseService"));
+		assertFalse(export.contains("for (CaseGridRow"), "export must not hydrate one Case at a time");
+	}
+
 	@Test void assignedBoardIsOneSetBasedAuthoritativeSnapshot() throws Exception {
 		String source = source();
 		String board = source.substring(source.indexOf("public List<CaseBoardRow> listActiveAssignedBoard"),
