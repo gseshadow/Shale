@@ -890,19 +890,7 @@ public final class OrganizationController {
 	}
 
 	private Node createRelatedCaseCardContainer(RelatedCaseRow row) {
-		Node card = caseCardFactory.create(new CaseCardModel(
-				row.summary().caseId(),
-				row.summary().caseName(),
-				row.intakeDate(),
-				row.statuteOfLimitationsDate(),
-				row.tortClaimsNoticeDeadline(),
-				row.summary().responsibleAttorneyName(),
-				row.summary().responsibleAttorneyColor(),
-				row.nonEngagementLetterSent(),
-				row.summary().statusName(),
-				row.summary().statusColor(),
-				row.practiceAreaColor()
-		), CaseCardFactory.Variant.FULL);
+		Node card = caseCardFactory.create(toRelatedCaseCardModel(row), CaseCardFactory.Variant.FULL);
 		if (card instanceof Region region) {
 			region.setMaxWidth(Double.MAX_VALUE);
 			region.setPrefWidth(380);
@@ -912,6 +900,22 @@ public final class OrganizationController {
 		relationshipMeta.getStyleClass().add("muted");
 		relationshipMeta.setWrapText(true);
 		return new VBox(4, card, relationshipMeta);
+	}
+
+	static CaseCardModel toRelatedCaseCardModel(RelatedCaseRow row) {
+		return new CaseCardModel(
+				row.summary().caseId(),
+				row.summary().caseName(),
+				row.intakeDate(),
+				row.statuteOfLimitationsDate(),
+				row.tortClaimsNoticeDeadline(),
+				row.summary().responsibleAttorneyName(),
+				row.summary().responsibleAttorneyColor(),
+				row.nonEngagementLetterSent(),
+				row.summary().primaryStatusName(),
+				row.summary().primaryStatusColor(),
+				row.practiceAreaColor()
+		);
 	}
 
 	private static String formatRelationshipMeta(String roleName, String side, boolean primary) {
