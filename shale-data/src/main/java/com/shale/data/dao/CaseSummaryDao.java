@@ -39,6 +39,7 @@ public final class CaseSummaryDao {
 			String opposingPartiesName, String latestCaseUpdate, String description) { }
 
 	public record GridPage(List<CaseGridRow> items, int page, int pageSize, long total) { }
+	private static final int EXPORT_BATCH_SIZE = 500;
 
 	/** Assigned-Case board enrichment; sensitive card fields remain outside the shared projection. */
 	public record CaseBoardRow(CaseSummaryProjection summary, LocalDate intakeDate,
@@ -182,6 +183,30 @@ public final class CaseSummaryDao {
 			verifyTenant(con, requestedTenantId);
 			return countActiveGrid(con, requestedTenantId, normalized, boundStatuses, search, status);
 		} catch (SQLException e) { throw new RuntimeException("Failed to count authoritative Cases grid", e); }
+	}
+
+	/**
+	 * Complete, immutable-criteria Cases export snapshot. Retrieval remains bounded at the SQL
+	 * boundary while reusing the exact grid count/data predicates and authoritative enrichment.
+	 * The returned list is materialized because the established CSV/XLSX writers require a list.
+	 */
+	public List<CaseGridRow> listActiveGridForExport(int requestedTenantId, GridOrder order, String query,
+			GridStatusMode statusMode, Set<Integer> selectedStatusIds) {
+		Objects.requireNonNull(order, "order");
+		Objects.requireNonNull(statusMode, "statusMode");
+		Set<Integer> statuses = selectedStatusIds == null ? Set.of()
+				: Set.copyOf(new LinkedHashSet<>(selectedStatusIds));
+		validateStatusMode(statusMode, statuses);
+		List<CaseGridRow> rows = new ArrayList<>();
+		long total = -1;
+		for (int page = 0; total < 0 || rows.size() < total; page++) {
+			GridPage batch = findActiveGridPage(requestedTenantId, page, EXPORT_BATCH_SIZE, order,
+					query, statusMode, statuses, total < 0 ? null : total);
+			total = batch.total();
+			rows.addAll(batch.items());
+			if (batch.items().isEmpty()) break;
+		}
+		return List.copyOf(rows);
 	}
 
 	/**
@@ -353,16 +378,20 @@ public final class CaseSummaryDao {
 			FROM Ordered c
 			LEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId AND (pa.ShaleClientId=c.ShaleClientId OR pa.ShaleClientId IS NULL)
 			OUTER APPLY (SELECT TOP(1) CASE WHEN NULLIF(LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))),'') IS NULL THEN ct.Name ELSE LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))) END ClientName
-			 FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId JOIN dbo.Contacts ct ON ct.Id=cp.ContactId
+			 FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId
+			  AND (pr.ShaleClientId=c.ShaleClientId OR pr.ShaleClientId IS NULL)
+			 JOIN dbo.Contacts ct ON ct.Id=cp.ContactId AND ct.ShaleClientId=c.ShaleClientId
 			 WHERE cp.CaseId=c.Id AND LOWER(LTRIM(RTRIM(pr.SystemKey)))='party' AND LOWER(LTRIM(RTRIM(cp.Side)))='represented'
 			  AND ISNULL(ct.IsDeleted,0)=0 ORDER BY cp.IsPrimary DESC,cp.UpdatedAt DESC,cp.CreatedAt DESC,cp.Id DESC) client
 			OUTER APPLY (SELECT STRING_AGG(x.DisplayName,', ') WITHIN GROUP(ORDER BY x.Id) OpposingPartiesName FROM
-			 (SELECT cp.Id,COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))),''),ct.Name,o.Name) DisplayName
-			  FROM dbo.CaseParties cp LEFT JOIN dbo.Contacts ct ON ct.Id=cp.ContactId LEFT JOIN dbo.Organizations o ON o.Id=cp.OrganizationId
+				 (SELECT cp.Id,COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))),''),ct.Name,o.Name) DisplayName
+			  FROM dbo.CaseParties cp LEFT JOIN dbo.Contacts ct ON ct.Id=cp.ContactId AND ct.ShaleClientId=c.ShaleClientId
+			  LEFT JOIN dbo.Organizations o ON o.Id=cp.OrganizationId AND o.ShaleClientId=c.ShaleClientId
 			  WHERE cp.CaseId=c.Id AND LOWER(LTRIM(RTRIM(cp.Side)))='opposing' AND ISNULL(ct.IsDeleted,0)=0 AND ISNULL(o.IsDeleted,0)=0) x
 			 WHERE NULLIF(x.DisplayName,'') IS NOT NULL) opposing
 			OUTER APPLY (SELECT TOP(1) NULLIF(LTRIM(RTRIM(cu.NoteText)),'') LatestCaseUpdate FROM dbo.CaseUpdates cu
-			 WHERE cu.CaseId=c.Id AND ISNULL(cu.IsDeleted,0)=0 AND NULLIF(LTRIM(RTRIM(cu.NoteText)),'') IS NOT NULL
+			 WHERE cu.CaseId=c.Id AND cu.ShaleClientId=c.ShaleClientId AND ISNULL(cu.IsDeleted,0)=0
+			  AND NULLIF(LTRIM(RTRIM(cu.NoteText)),'') IS NOT NULL
 			 ORDER BY cu.CreatedAt DESC,cu.Id DESC) latest
 			ORDER BY c.PageOrdinal
 			""".formatted(statusApplySql(), search, status, orderBy, orderBy);

@@ -1,7 +1,7 @@
 package com.shale.ui.controller;
 
 import com.shale.core.dto.ReportCaseDetailRowDto;
-import com.shale.data.dao.CaseDao.CaseRow;
+import com.shale.core.dto.CaseSummaryProjection;
 import com.shale.ui.export.CaseXlsxExporter;
 import com.shale.ui.services.CaseExportService.ReportExportRow;
 import com.shale.ui.services.CaseExportService.ExportCaseRow;
@@ -25,8 +25,8 @@ final class CompleteExportContractTest {
 
     @Test void casesExportUsesSnapshotServiceAndNotRenderedOrLoadedRows() {
         String controller = read("src/main/java/com/shale/ui/controller/CasesController.java");
-        assertTrue(controller.contains("new CaseExportService.CasesCriteria(tenantId, selectedSort()"));
-        assertTrue(controller.contains("includeClosedDeniedInQuery(), normalizedSearchQuery(), new LinkedHashSet<>(selectedStatusIds)"));
+        assertTrue(controller.contains("new CaseExportService.CasesCriteria(tenantId, gridOrder(selectedSort())"));
+        assertTrue(controller.contains("statusMode(statusesSnapshot, statusFilterOptions), statusesSnapshot"));
         assertTrue(controller.contains("caseExportService.exportCases(criteria)"));
         assertFalse(controller.contains("currentExportRows()"));
         assertTrue(controller.contains("dbExec.submit"));
@@ -36,11 +36,11 @@ final class CompleteExportContractTest {
     }
 
     @Test void daoExportWalksPastFirstHundredWithoutChangingUiPage() {
-        String dao = read("../shale-data/src/main/java/com/shale/data/dao/CaseDao.java");
-        String method = dao.substring(dao.indexOf("listCasesViewForExport"), dao.indexOf("findMyCasesPage", dao.indexOf("listCasesViewForExport")));
-        assertTrue(method.contains("exportBatchSize = 500"));
+        String dao = read("../shale-data/src/main/java/com/shale/data/dao/CaseSummaryDao.java");
+        String method = dao.substring(dao.indexOf("listActiveGridForExport"), dao.indexOf("/**", dao.indexOf("listActiveGridForExport") + 10));
+        assertTrue(method.contains("EXPORT_BATCH_SIZE"));
         assertTrue(method.contains("rows.size() < total"));
-        assertTrue(method.contains("findPageInternal(page, exportBatchSize"));
+        assertTrue(method.contains("findActiveGridPage"));
         assertFalse(method.contains("TOP (100)"));
         assertFalse(method.contains("pageSize = 100"));
     }
@@ -94,10 +94,11 @@ final class CompleteExportContractTest {
             List<ExportCaseRow> rows = new ArrayList<>();
             for (int i = 0; i < 1_127; i++) {
                 String description = i == 417 ? "x".repeat(40_000) : (i % 2 == 0 ? null : "Description");
-                CaseRow base = new CaseRow(i + 1L, "Case " + i, null, null, 1, null, null, null, null,
-                        "Open", null, null, null, null, null, description, null, null, null);
-                rows.add(new ExportCaseRow(base, i % 3 == 0 ? null : LocalDate.of(2026, 1, 1).plusDays(i),
-                        i % 5 == 0 ? null : LocalDate.of(2025, 6, 15), LocalDate.of(2027, 12, 31), null));
+                var summary = new CaseSummaryProjection(i + 1L, 7, null, "Case " + i, 1, "open", "active",
+                        "Open", null, null, null, 9, "Attorney", null, 10, "Assistant", null, null, null, false);
+                rows.add(new ExportCaseRow(summary, i % 3 == 0 ? null : LocalDate.of(2026, 1, 1).plusDays(i),
+                        i % 5 == 0 ? null : LocalDate.of(2025, 6, 15), LocalDate.of(2027, 12, 31), null,
+                        null, null, null, description));
             }
 
             new CaseXlsxExporter().writeCases(file, rows);

@@ -42,10 +42,12 @@ final class CasesMigratedDateCutoverContractTest {
 
     @Test void exportUsesOneBatchBoundaryAndRetainsFormattingGuards() throws Exception {
         String service = read("src/main/java/com/shale/ui/services/CaseExportService.java");
+		String dao = read("../shale-data/src/main/java/com/shale/data/dao/CaseSummaryDao.java");
         String exporter = read("src/main/java/com/shale/ui/export/CaseXlsxExporter.java");
-        assertTrue(service.contains("caseService.projectMigratedCaseDates"));
-        assertTrue(service.contains("rows.stream().map(CaseRow::id).toList()"));
-        assertFalse(service.contains("for (CaseRow row"));
+		assertTrue(service.contains("caseSummaryDao.listActiveGridForExport"));
+		assertFalse(service.contains("projectMigratedCaseDates"));
+		assertTrue(dao.contains("EXPORT_BATCH_SIZE = 500"));
+		assertTrue(dao.contains("findActiveGridPage(requestedTenantId"));
         assertTrue(exporter.contains("ExportCaseRow"));
         assertTrue(exporter.contains("MAX_CELL_TEXT_LENGTH = 32_767"));
         assertTrue(exporter.contains("yyyy-mm-dd"));

@@ -613,7 +613,7 @@ public final class SceneManager {
 					dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			c.init(appState, runtimeBridge, caseDao, caseSummaryDao, caseTaskService,
-					new CaseExportService(caseDao, new CaseServiceAdapter(caseDao), appState, phiReadAuditService), onOpenCase);
+					new CaseExportService(caseDao, caseSummaryDao, new CaseServiceAdapter(caseDao), appState, phiReadAuditService), onOpenCase);
 			return c;
 		});
 	}

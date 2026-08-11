@@ -1,12 +1,10 @@
 package com.shale.ui.services;
 
 import com.shale.core.dto.ReportCaseDetailRowDto;
-import com.shale.core.dto.MigratedCaseDateProjectionDto;
-import com.shale.core.model.MigratedCaseDateKey;
 import com.shale.core.service.CaseServicePort;
 import com.shale.data.dao.CaseDao;
-import com.shale.data.dao.CaseDao.CaseRow;
-import com.shale.data.dao.CaseDao.CaseSort;
+import com.shale.data.dao.CaseSummaryDao;
+import com.shale.data.dao.CaseSummaryDao.CaseGridRow;
 import com.shale.ui.state.AppState;
 
 import java.time.LocalDate;
@@ -23,9 +21,16 @@ public final class CaseExportService {
     private final AppState appState;
     private final PhiReadAuditService phiReadAuditService;
     private final CaseServicePort caseService;
+    private final CaseSummaryDao caseSummaryDao;
 
     public CaseExportService(CaseDao caseDao, CaseServicePort caseService, AppState appState, PhiReadAuditService phiReadAuditService) {
+		this(caseDao, null, caseService, appState, phiReadAuditService);
+	}
+
+    public CaseExportService(CaseDao caseDao, CaseSummaryDao caseSummaryDao, CaseServicePort caseService,
+            AppState appState, PhiReadAuditService phiReadAuditService) {
         this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
+		this.caseSummaryDao = caseSummaryDao;
         this.caseService = Objects.requireNonNull(caseService, "caseService");
         this.appState = Objects.requireNonNull(appState, "appState");
         this.phiReadAuditService = Objects.requireNonNull(phiReadAuditService, "phiReadAuditService");
@@ -33,12 +38,9 @@ public final class CaseExportService {
 
     public List<ExportCaseRow> exportCases(CasesCriteria criteria) {
         requireAuthorizedTenant(criteria.tenantId());
-        List<CaseRow> rows = caseDao.listCasesViewForExport(criteria.sort(), criteria.includeClosedDenied(),
-                criteria.query(), criteria.statusIds());
-        Integer actor = appState.getUserId();
-        Map<Long, MigratedCaseDateProjectionDto> dates = caseService.projectMigratedCaseDates(
-                rows.stream().map(CaseRow::id).toList(), criteria.tenantId(), actor);
-        List<ExportCaseRow> result = rows.stream().map(row -> ExportCaseRow.from(row, dates.get(row.id()))).toList();
+		if (caseSummaryDao == null) throw new IllegalStateException("Authoritative Cases export is unavailable.");
+        List<ExportCaseRow> result = caseSummaryDao.listActiveGridForExport(criteria.tenantId(), criteria.order(),
+				criteria.query(), criteria.statusMode(), criteria.statusIds()).stream().map(ExportCaseRow::from).toList();
         phiReadAuditService.auditRead("Case.Export", "Cases.Export", "Case", null);
         return result;
     }
@@ -65,12 +67,15 @@ public final class CaseExportService {
         }
     }
 
-    public record CasesCriteria(int tenantId, CaseSort sort, boolean includeClosedDenied, String query,
-                                Set<Integer> statusIds) {
+    public record CasesCriteria(int tenantId, CaseSummaryDao.GridOrder order, String query,
+			CaseSummaryDao.GridStatusMode statusMode, Set<Integer> statusIds) {
         public CasesCriteria {
-            sort = sort == null ? CaseSort.INTAKE_NEWEST : sort;
+			order = Objects.requireNonNull(order, "order");
+			statusMode = Objects.requireNonNull(statusMode, "statusMode");
             query = query == null ? "" : query.trim();
             statusIds = statusIds == null ? Set.of() : Set.copyOf(new LinkedHashSet<>(statusIds));
+			if (statusMode == CaseSummaryDao.GridStatusMode.SELECTED && statusIds.isEmpty())
+				throw new IllegalArgumentException("SELECTED status mode requires status IDs");
         }
     }
 
@@ -81,18 +86,14 @@ public final class CaseExportService {
     }
 
 
-    public record ExportCaseRow(CaseRow base, LocalDate intakeDate, LocalDate dateOfIncident,
-                                LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline) {
-        static ExportCaseRow from(CaseRow row, MigratedCaseDateProjectionDto projection) {
-            MigratedCaseDateProjectionDto p = projection == null ? MigratedCaseDateProjectionDto.empty(row.id()) : projection;
-            return new ExportCaseRow(row, date(p, MigratedCaseDateKey.CALLER_DATE),
-                    date(p, MigratedCaseDateKey.DATE_OF_INJURY), date(p, MigratedCaseDateKey.STATUTE_OF_LIMITATIONS),
-                    date(p, MigratedCaseDateKey.TORT_NOTICE_DEADLINE));
-        }
-        private static LocalDate date(MigratedCaseDateProjectionDto p, MigratedCaseDateKey key) {
-            var slot = p.date(key);
-            return slot.present() ? slot.startsAt().toLocalDate() : null;
-        }
+    public record ExportCaseRow(com.shale.core.dto.CaseSummaryProjection summary, LocalDate intakeDate,
+			LocalDate dateOfIncident, LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline,
+			String clientName, String opposingPartiesName, String latestCaseUpdate, String description) {
+		static ExportCaseRow from(CaseGridRow row) {
+			return new ExportCaseRow(row.summary(), row.intakeDate(), row.dateOfIncident(),
+					row.statuteOfLimitationsDate(), row.tortClaimsNoticeDeadline(), row.clientName(),
+					row.opposingPartiesName(), row.latestCaseUpdate(), row.description());
+		}
     }
 
     public record ReportExportRow(String statusName, ReportCaseDetailRowDto detail) {}
