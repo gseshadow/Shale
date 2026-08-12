@@ -3,8 +3,9 @@ package com.shale.ui.services;
 import java.util.List;
 import java.util.Objects;
 
-import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDao.CaseRow;
+import com.shale.data.dao.CaseSummaryDao;
+import com.shale.data.dao.CaseSummaryDao.CaseGridRow;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.TaskDao.AssignedUserTaskRow;
 import com.shale.data.dao.UserDao;
@@ -18,12 +19,12 @@ public final class UserDetailService {
 	private static final int ASSIGNED_CASES_LIMIT = Integer.MAX_VALUE;
 
 	private final UserDao userDao;
-	private final CaseDao caseDao;
+	private final CaseSummaryDao caseSummaryDao;
 	private final TaskDao taskDao;
 
-	public UserDetailService(UserDao userDao, CaseDao caseDao, TaskDao taskDao) {
+	public UserDetailService(UserDao userDao, CaseSummaryDao caseSummaryDao, TaskDao taskDao) {
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
-		this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
+		this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
 		this.taskDao = Objects.requireNonNull(taskDao, "taskDao");
 	}
 
@@ -63,16 +64,27 @@ public final class UserDetailService {
 		return userDao.removeRoleFromUser(userId, roleId, shaleClientId);
 	}
 
-	public List<CaseRow> loadAssignedCases(int userId) {
+	public List<CaseRow> loadAssignedCases(int shaleClientId, int userId) {
 		System.out.println("[TRACE ASSIGNED_CASES][UserDetailService.loadAssignedCases] "
-				+ "daoMethod=listActiveCasesForUserTeamMember "
+				+ "daoMethod=listActiveAssignedForUserDetail "
 				+ "selectedUserId=" + userId
 				+ " limit=" + ASSIGNED_CASES_LIMIT);
-		List<CaseRow> rows = caseDao.listActiveCasesForUserTeamMember(userId, ASSIGNED_CASES_LIMIT);
+		List<CaseRow> rows = caseSummaryDao.listActiveAssignedForUserDetail(shaleClientId, userId, ASSIGNED_CASES_LIMIT)
+				.stream().map(UserDetailService::toCaseRow).toList();
 		System.out.println("[TRACE ASSIGNED_CASES][UserDetailService.loadAssignedCases] "
 				+ "selectedUserId=" + userId
 				+ " serviceRowsReceived=" + (rows == null ? 0 : rows.size()));
 		return rows;
+	}
+
+	private static CaseRow toCaseRow(CaseGridRow row) {
+		var summary = row.summary();
+		return new CaseRow(summary.caseId(), summary.caseName(), row.intakeDate(),
+				row.statuteOfLimitationsDate(), summary.primaryStatusId(), summary.responsibleAttorneyId(),
+				summary.responsibleAttorneyName(), summary.responsibleAttorneyColor(), row.nonEngagementLetterSent(),
+				summary.primaryStatusName(), summary.primaryStatusColor(), row.practiceAreaColor(), row.clientName(),
+				row.opposingPartiesName(), row.latestCaseUpdate(), row.description(), row.dateOfIncident(),
+				row.tortClaimsNoticeDeadline(), summary.updatedAt());
 	}
 
 	public List<AssignedUserTaskRow> loadAssignedTasks(int shaleClientId, int userId) {

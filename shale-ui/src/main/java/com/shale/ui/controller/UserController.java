@@ -561,7 +561,7 @@ public final class UserController {
 			try {
 				long assignedCasesStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadAssignedCases page=user_view userId=" + targetUserId);
-				List<CaseRow> loaded = userDetailService.loadAssignedCases(targetUserId);
+				List<CaseRow> loaded = userDetailService.loadAssignedCases(shaleClientId, targetUserId);
 				PerfLog.logDone("DAO", "method=loadAssignedCases page=user_view userId=" + targetUserId + " rows=" + (loaded == null ? 0 : loaded.size()), assignedCasesStartNanos);
 				Platform.runLater(() -> {
 					if (requestId != assignedCasesRefreshSequence || currentUser == null || currentUser.id() != targetUserId) {

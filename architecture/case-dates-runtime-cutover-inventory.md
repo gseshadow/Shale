@@ -95,7 +95,7 @@ This gate deliberately converts **no production writer**: desktop (through `shal
 | --- | --- | --- |
 | `shale-data/src/main/java/com/shale/data/dao/CaseDao.java` | Case create/update SQL writes all nine migrated columns; detail, overview/grid/search and selection queries read subsets; PHI change auditing names injury and both medical dates. Existing broad updates also touch `Cases.UpdatedAt` and use the case row version. | **CONVERT (highest risk).** Remove migrated columns from ordinary `INSERT`/`UPDATE` ownership and hydrate legacy-shaped consumers from one tenant-scoped, effective-SystemKey occurrence projection. Mutations must resolve the exact tenant-effective type, update/create the single mapped occurrence transactionally with expected `CaseDates.RowVer`, retain PHI/entity audit, and touch `Cases.UpdatedAt`. Do not dual-write legacy columns. |
 | `shale-data/src/main/java/com/shale/data/dao/CalendarFeedDao.java` | **COMPLETED:** the former `CASE_DATE_PROJECTIONS` loop selected nine migrated `dbo.Cases` columns and emitted `CASE_SOL`, `CASE_TORT`, `CASE_DISC`, `CASE_CALLER`, `CASE_INJURY`, `CASE_FEE_AGREEMENT`, `CASE_NON_ENGAGEMENT`, `CASE_MED_NEG`, and `CASE_MED_NEG_DISCOVERED` entries beside authoritative occurrences. | Calendar now reads authoritative `CASE_DATE:<CaseDates.Id>` occurrences only for migrated meanings. It retains genuine `CalendarEvents`, task due dates, and the explicitly named `AcceptedDate`, `DeniedDate`, and `ClosedDate` lifecycle projections. There is no migrated legacy fallback and no Calendar CaseDates writer. |
-| `shale-data/src/main/java/com/shale/data/dao/OrganizationDao.java` and `ContactDao.java` | **PARTIALLY COMPLETED:** desktop Contact/Organization and server/web Organization related Cases use `CaseSummaryDao`; `ContactDao.findRelatedCases` remains for deferred server/contact compatibility. The removed `OrganizationDao.findRelatedCases` formerly selected legacy intake, SOL, and tort columns. | **SERVER ORGANIZATION AUTHORITATIVE.** `GET /api/organizations/{organizationId}` now reuses the set-based, tenant-safe `CaseSummaryDao.RelatedCaseRow` projection. Server Case search and assigned Cases are the next recommended cutover. |
+| `shale-data/src/main/java/com/shale/data/dao/OrganizationDao.java` and `ContactDao.java` | **PARTIALLY COMPLETED:** desktop Contact/Organization and server/web Organization related Cases use `CaseSummaryDao`; `ContactDao.findRelatedCases` remains for deferred server/contact compatibility. The removed `OrganizationDao.findRelatedCases` formerly selected legacy intake, SOL, and tort columns. | **SERVER ORGANIZATION AUTHORITATIVE.** `GET /api/organizations/{organizationId}` now reuses the set-based, tenant-safe `CaseSummaryDao.RelatedCaseRow` projection. Server Case search and assigned Cases were the next recommended cutover at that checkpoint and are now complete. |
 | `shale-data/src/main/java/com/shale/data/service/adapter/CaseServiceAdapter.java` | Web/core create and core-detail commands pass caller/injury/SOL/tort values into `CaseDao`; desktop generic case updates transit here as well. Existing occurrence APIs accept type ids rather than stable migrated meanings. | **CONVERT / REVIEW.** Add an actor-aware stable-key mutation boundary for mapped singleton meanings and coordinate case plus occurrence writes in one transaction. Decide expected occurrence row-version representation for legacy-shaped editors before coding; never bypass current type/case/actor validation. |
 | Other `shale-data` production DAOs (`TaskDao`, `NotificationDao`) | Matches for `NonEngagementLetterSent` are the workflow flag used to decorate task/notification case cards, not the migrated date. | **KEEP (not a date dependency).** Preserve the workflow flag and do not synthesize `non_engagement_letter_sent` when it is true and its date occurrence is absent. |
 
@@ -244,7 +244,7 @@ The production path `GET /api/organizations/{organizationId}` → `OrganizationS
 
 The shared query preserves trusted session/request tenant equality, active nondeleted Organization and Case predicates, one result per `CaseParties.Id`, Party Role identity/presentation, primary state, responsible-attorney metadata, and primary-first Case-name/Case-ID/relationship-ID ordering. It resolves dates set-wise from stored `CaseDateTypeId` identities and active tenant-effective semantic-role mappings, retaining historical type presentation behavior and performing no per-Case hydration. `OrganizationDao.findRelatedCases` was removed after call-site verification found no remaining production consumer; `ContactDao.findRelatedCases` is intentionally retained. Existing Organization detail PHI-read behavior is unchanged because the controller/session and response boundary did not change and this slice adds no mutation or audit event.
 
-The active Organization path no longer reads or falls back to `Cases.CallerDate`, `Cases.StatuteOfLimitations`, or `Cases.TortNoticeDeadline`. Server Case search and assigned Cases are the next recommended runtime cutover; User detail, Documents, `CaseOverviewDto`, Calendar, and mutations remain deferred.
+The active Organization path no longer reads or falls back to `Cases.CallerDate`, `Cases.StatuteOfLimitations`, or `Cases.TortNoticeDeadline`. Server Case search, server assigned Cases, and desktop User Detail assigned Cases are now complete; Documents, `CaseOverviewDto`, and mutations remain deferred.
 
 ## Server/web search and My Cases runtime cutover
 
@@ -253,5 +253,22 @@ Server/web Case search (list and page endpoints) and assigned/My Cases now use t
 legacy ID lookup plus per-result `CaseDao.getOverview` hydration is removed. Existing response fields,
 matching, paging/limits, assignment scope, responsible-attorney metadata, null behavior, and ISO
 `LocalDate` serialization are retained. `CaseDao.getOverview` remains for explicitly deferred desktop
-Case View/document compatibility. Desktop User Detail assigned Cases is the next smallest remaining
-runtime cutover. Live SQL Server verification was not performed.
+Case View/document compatibility. Desktop User Detail assigned Cases now uses `CaseSummaryDao.listActiveAssignedForUserDetail` with a bounded, set-based authoritative CaseDates projection and the existing card contract. The legacy `CaseDao.listActiveCasesForUserTeamMember` method was removed after no-caller verification. Desktop document generation and `CaseDao.getOverview` cleanup are the next remaining cutover. Live SQL Server verification was not performed.
+
+
+## Desktop User Detail assigned Cases runtime cutover
+
+`SceneManager.createUserView` → `UserController.refreshAssignedCasesAsync` →
+`UserDetailService.loadAssignedCases` now delegates to the consumer-specific
+`CaseSummaryDao.listActiveAssignedForUserDetail` projection and maps it to the unchanged `CaseRow` /
+shared Case-card contract. One bounded statement applies authenticated tenant scope, selected-user
+`CaseUsers` membership, active/nondeleted Case eligibility, the existing result limit, deterministic
+authoritative-intake-descending then Case-ID-descending ordering, and set-based optional card metadata.
+Tenant-effective protected mappings resolve intake, statute, and tort; `date_of_injury` remains the
+authoritative injury type identity. Missing occurrences stay null, and neither workflow flags nor other
+dates fabricate them. The controller's executor, generation, selected-user, and cache-tenant staleness
+guards are unchanged.
+
+The legacy `CaseDao.listActiveCasesForUserTeamMember` query and its obsolete SQL test were removed after
+production no-caller proof; focused authoritative and no-caller coverage replaces it. No live SQL Server
+verification was performed. Desktop document generation and `CaseDao.getOverview` cleanup are next.
