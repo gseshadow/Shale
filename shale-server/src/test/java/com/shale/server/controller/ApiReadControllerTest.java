@@ -471,15 +471,9 @@ class ApiReadControllerTest {
                 .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.caseId").value(6503))
-                .andExpect(jsonPath("$.dateOfInjury[0]").value(2026))
-                .andExpect(jsonPath("$.dateOfInjury[1]").value(2))
-                .andExpect(jsonPath("$.dateOfInjury[2]").value(3))
-                .andExpect(jsonPath("$.statuteOfLimitations[0]").value(2026))
-                .andExpect(jsonPath("$.statuteOfLimitations[1]").value(3))
-                .andExpect(jsonPath("$.statuteOfLimitations[2]").value(4))
-                .andExpect(jsonPath("$.tortNoticeDeadline[0]").value(2026))
-                .andExpect(jsonPath("$.tortNoticeDeadline[1]").value(4))
-                .andExpect(jsonPath("$.tortNoticeDeadline[2]").value(5));
+                .andExpect(jsonPath("$.dateOfInjury").value("2026-02-03"))
+                .andExpect(jsonPath("$.statuteOfLimitations").value("2026-03-04"))
+                .andExpect(jsonPath("$.tortNoticeDeadline").value("2026-04-05"));
     }
 
     @Test
