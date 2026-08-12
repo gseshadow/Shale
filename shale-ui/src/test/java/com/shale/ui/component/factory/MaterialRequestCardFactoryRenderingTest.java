@@ -49,8 +49,10 @@ final class MaterialRequestCardFactoryRenderingTest {
 			assertFalse(rendered.rail().getStyle().contains(DueProximityStyles.DUE_WITHIN_ONE_WEEK_COLOR),
 					"Material Type rail must not use due-proximity color.");
 			assertEquals(7.0, rendered.rail().getPrefWidth(), 0.1);
-			assertTrue(rendered.rail().getBoundsInParent().getMaxX() <= rendered.body().getBoundsInParent().getMinX() + 0.1,
-					"Body must start after the rail rather than covering it.");
+			double railLayoutMaxX = rendered.rail().localToParent(rendered.rail().getLayoutBounds()).getMaxX();
+			double bodyLayoutMinX = rendered.body().localToParent(rendered.body().getLayoutBounds()).getMinX();
+			assertEquals(railLayoutMaxX, bodyLayoutMinX, 0.1,
+					"HBox layout boxes must meet exactly; boundsInParent includes descendant effects and is not an occupancy boundary.");
 
 			assertTrue(rendered.body().getStyle().contains("-fx-background-color: transparent"), rendered.body().getStyle());
 			assertNotNull(rendered.card().getClip(), "The outer painted card should own the rounded clip.");
@@ -229,8 +231,10 @@ final class MaterialRequestCardFactoryRenderingTest {
 					"Facts remain fully visible inside modest bottom padding.");
 			assertEquals(18.0, facts.getHgap(), 0.1);
 			assertEquals(7.0, facts.getVgap(), 0.1);
-			assertTrue(rendered.card().getHeight() <= 190,
-					"The seventh compact fact may wrap but must not make the wide card excessively tall.");
+			double computedBodyHeight = rendered.body().prefHeight(rendered.body().getWidth());
+			assertEquals(computedBodyHeight, rendered.body().getHeight(), 1.0,
+					"The seven-fact card must use its computed content height (facts=" + facts.getHeight()
+							+ ", bodyWidth=" + rendered.body().getWidth() + ", card=" + rendered.card().getHeight() + ").");
 			assertTrue(rendered.card().getHeight() < rendered.stage().getScene().getHeight() - 80,
 					"A short request should not stretch to fill the available scene height.");
 			assertEquals(rendered.card().getHeight(), rendered.card().getClip().getBoundsInLocal().getHeight(), 0.5,
