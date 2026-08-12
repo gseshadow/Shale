@@ -108,7 +108,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	private static CaseOverviewDto toOverview(CaseSummaryDao.ServerCaseRow row) {
 		var s=row.summary();
 		List<CaseOverviewDto.ContactSummary> clients=row.clientContactId()==null?List.of():List.of(new CaseOverviewDto.ContactSummary(row.clientContactId(),row.clientName()));
-		return new CaseOverviewDto(s.caseId(),s.caseNumber(),s.caseName(),s.statusName(),s.statusId(),s.statusColor(),
+		return new CaseOverviewDto(s.caseId(),s.caseNumber(),s.caseName(),s.primaryStatusName(),s.primaryStatusId(),s.primaryStatusColor(),
 				s.responsibleAttorneyId(),s.responsibleAttorneyName(),s.responsibleAttorneyColor(),s.primaryLegalAssistantId(),
 				s.primaryLegalAssistantName(),s.primaryLegalAssistantColor(),s.practiceAreaId(),s.practiceAreaName(),row.practiceAreaColor(),
 				row.intakeDate(),row.injuryDate(),row.statuteDate(),row.tortDate(),row.callerContactId(),row.clientContactId(),
