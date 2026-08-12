@@ -29,7 +29,7 @@ final class CaseSummaryRelatedCasesContractTest {
 		String sql = method();
 		assertTrue(sql.contains("cp.Id RelationshipId,cp.PartyRoleId"));
 		assertTrue(sql.contains("FROM dbo.CaseParties cp"));
-		assertTrue(sql.contains("c.Name ASC,c.Id ASC,cp.Id ASC"));
+		assertTrue(sql.contains("CASE WHEN ISNULL(cp.IsPrimary,0)=1 THEN 0 ELSE 1 END,c.Name ASC,c.Id ASC,cp.Id ASC"));
 		assertTrue(sql.contains("mapGridSummary(rs)"));
 		assertFalse(sql.contains("DISTINCT"));
 	}
@@ -46,6 +46,10 @@ final class CaseSummaryRelatedCasesContractTest {
 		assertFalse(sql.contains("c.CallerDate"));
 		assertFalse(sql.contains("c.StatuteOfLimitations"));
 		assertFalse(sql.contains("c.TortNoticeDeadline"));
+		assertFalse(sql.contains("FeeAgreementSigned"));
+		assertTrue(sql.contains("c.NonEngagementLetterSent"), "workflow display state may be returned but cannot source dates");
+		assertTrue(sql.contains("m.IsActive=1 AND m.IsDeleted=0"));
+		assertTrue(sql.contains("ORDER BY CASE WHEN m.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,m.Id DESC"));
 		assertTrue(sql.lines().filter(line -> line.contains("executeQuery()")).count() == 1,
 				"Only one set query is allowed after tenant verification");
 	}
