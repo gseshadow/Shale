@@ -293,16 +293,6 @@ class CaseServiceAdapterTest {
 		}
 
 		@Override
-		public List<CaseDao.CaseRow> searchCasesByName(String query) {
-			return List.of();
-		}
-
-		@Override
-		public List<CaseDao.CaseRow> listAssignedCasesForBoard(int assignedUserId) {
-			return List.of();
-		}
-
-		@Override
 		public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
 			lastCaseUpdatesCaseId = caseId;
 			return caseUpdates;
