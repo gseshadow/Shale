@@ -11,9 +11,11 @@ import javafx.scene.control.MenuButton;
 import javafx.scene.layout.FlowPane;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -47,17 +49,33 @@ final class ReportsSemanticControlMigrationTest {
 
     @Test
     void productionFxmlAndCssRenderAtNormalAndNarrowWidthsWithoutWarnings() throws Exception {
-        Process process = new ProcessBuilder(
-                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                "-cp", System.getProperty("java.class.path"), Probe.class.getName())
+        List<String> command = javaFxProbeCommand();
+        Process process = new ProcessBuilder(command)
                 .redirectErrorStream(true).start();
         assertTrue(process.waitFor(25, TimeUnit.SECONDS), "Reports rendering probe timed out");
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertEquals(0, process.exitValue(), output);
+        assertFalse(output.contains("Unsupported JavaFX configuration"), output);
         assertFalse(output.contains("CSS Error"), output);
         assertFalse(output.contains("CssStyleHelper"), output);
         assertFalse(output.contains("ClassCastException"), output);
         assertFalse(output.contains("cannot be cast to javafx.css.Size"), output);
+    }
+
+    private static List<String> javaFxProbeCommand() {
+        List<String> modulePath = new ArrayList<>();
+        List<String> classPath = new ArrayList<>();
+        for (String entry : System.getProperty("java.class.path").split(File.pathSeparator)) {
+            String fileName = Path.of(entry).getFileName().toString();
+            (fileName.startsWith("javafx-") ? modulePath : classPath).add(entry);
+        }
+        assertFalse(modulePath.isEmpty(), "JavaFX modules missing from test runtime");
+        return List.of(
+                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "--module-path", String.join(File.pathSeparator, modulePath),
+                "--add-modules", "javafx.controls,javafx.fxml",
+                "-cp", String.join(File.pathSeparator, classPath),
+                Probe.class.getName());
     }
 
     private static int count(String text, String value) {
