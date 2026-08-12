@@ -17,6 +17,7 @@ import java.util.Collection;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.CaseDateSemanticRoleMappingDto;
 import com.shale.core.dto.CaseDetailDto;
+import com.shale.core.dto.MappedCaseDateSnapshotDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
@@ -58,6 +59,19 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override
 	public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
 		return Optional.ofNullable(caseGateway.getDetail(caseId));
+	}
+
+	/** Existing-case API read boundary; actor/tenant are verified by the SQL-session-backed DAO. */
+	public Optional<CaseDetailDto> getAuthoritativeCaseDetail(long caseId, int tenant, int actor) {
+		CaseDetailDto detail=caseGateway.getDetail(caseId);
+		if(detail==null)return Optional.empty();
+		return Optional.of(detail.withMappedCaseDates(toApiDates(caseGateway.listMigratedCompatibilityStateForCase(caseId,tenant,actor))));
+	}
+
+	private static List<MappedCaseDateSnapshotDto> toApiDates(Map<MigratedCaseDateKey,CompatibilityCaseDateState> states){
+		return List.of(MigratedCaseDateKey.values()).stream().map(states::get).map(s -> new MappedCaseDateSnapshotDto(
+				s.key().name(),s.systemKey(),s.occurrenceId(),s.caseDateTypeId(),s.startsAt(),s.endsAt(),s.allDay(),
+				s.occurrenceRowVer(),s.expectedAbsent()!=null,s.expectedAbsent()==null?null:s.expectedAbsent().observedCaseRowVer())).toList();
 	}
 
 	@Override public Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId,int tenant,int actor){
@@ -695,17 +709,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override
 	public CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command) {
 		Objects.requireNonNull(command, "command");
-		return caseGateway.updateCase(
-				command.caseId(),
-				command.caseName(),
-				command.caseNumber(),
-				command.description(),
-				command.dateOfInjury(),
-				command.statuteOfLimitations(),
-				command.tortNoticeDeadline(),
-				command.summary(),
-				command.expectedRowVer(),
-				command.actorUserId());
+		caseGateway.updateExistingCaseAggregate(command);
+		return getAuthoritativeCaseDetail(command.caseId(),command.shaleClientId(),command.actorUserId()).orElseThrow();
 	}
 
 	interface CaseGateway {
@@ -802,6 +807,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
 				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
 				byte[] expectedRowVer, Integer actorUserId);
+		default void updateExistingCaseAggregate(UpdateCaseCoreDetailsCommand command) { throw new UnsupportedOperationException("Existing-case aggregate update is unavailable."); }
 
 		long createBasicCase(CreateCaseCommand command, int statusId);
 	}
@@ -929,6 +935,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override public Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId,int tenant,int actor){return caseDateDao.listMigratedCompatibilityStateForCase(caseId,tenant,actor);}
 		@Override public CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(long caseId,int tenant,int actor){return caseDateDao.loadMigratedCompatibilityDateSnapshot(caseId,tenant,actor);}
 		@Override public CaseDateAggregateResult mutateMigratedCompatibilityDates(CaseDateAggregateCommand command){return caseDateDao.mutateMigratedCompatibilityDates(command);}
+		@Override public void updateExistingCaseAggregate(UpdateCaseCoreDetailsCommand command){caseDateDao.mutateExistingCaseAggregate(caseDao,command);}
 		@Override public CaseDateDto createCaseDate(CreateCaseDateCommand command) { return caseDateDao.createCaseDate(command); }
 		@Override public CaseDateDto updateCaseDate(UpdateCaseDateCommand command) { return caseDateDao.updateCaseDate(command); }
 		@Override public void deleteCaseDate(DeleteCaseDateCommand command) { caseDateDao.deleteCaseDate(command); }

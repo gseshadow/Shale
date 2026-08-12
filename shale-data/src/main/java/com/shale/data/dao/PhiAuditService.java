@@ -90,6 +90,9 @@ public final class PhiAuditService {
                     dateValue);
             }
         } catch (RuntimeException ex) {
+            if (con != null) {
+                throw ex; // connection-bound aggregate audits are transactional and fail closed
+            }
             System.err.println("[PHI_AUDIT] append suppressed"
                     + " table=" + tableName
                     + " field=" + fieldName

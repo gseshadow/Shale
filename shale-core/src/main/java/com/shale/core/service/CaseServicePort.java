@@ -38,6 +38,9 @@ import java.util.Collection;
 public interface CaseServicePort {
 
 	Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId);
+	default Optional<CaseDetailDto> getAuthoritativeCaseDetail(long caseId, int shaleClientId, int actorUserId) {
+		throw new UnsupportedOperationException("Authoritative existing-case detail is unavailable.");
+	}
 
 	Optional<CaseOverviewDto> getCaseOverview(long caseId, int shaleClientId);
 
@@ -385,11 +388,9 @@ public interface CaseServicePort {
 			String caseName,
 			String caseNumber,
 			String description,
-			LocalDate dateOfInjury,
-			LocalDate statuteOfLimitations,
-			LocalDate tortNoticeDeadline,
 			String summary,
-			byte[] expectedRowVer) {
+			byte[] expectedRowVer,
+			com.shale.core.model.CaseDateAggregateCommand caseDates) {
 	}
 
 	record CreateCaseCommand(

@@ -4,6 +4,14 @@
 
 This is the Phase 3D inventory and cutover plan. Phase 3B backfill and Phase 3C post-validation are complete: 2,233 eligible source rows reconcile exactly, `BlockerCount = 0`, and 610 flag-set/date-missing rows are intentional historical anomalies. The inventory assumes those deployed results and must not rerun, repair, or reinterpret them.
 
+### Existing-case server and React cutover (2026-08-12)
+
+The existing `GET /api/cases/{id}` and `PATCH /api/cases/{id}/core-details` round trip now carries the established complete nine-slot snapshot. Each slot has its enum key and canonical SystemKey, stored type id, occurrence id/RowVer and value when present, or an explicit absent flag and witnessed `Cases.RowVer`. The server derives tenant and actor from the authenticated runtime session; request identity is never authoritative. The React detail and currently exposed core editor use stable SystemKeys, preserve absent slots without creating them, preserve unedited timed intake values, and display a reload-required conflict without retrying.
+
+The API detail query no longer selects any of the nine migrated scalar columns. Accepted, denied, and closed dates remain workflow-owned `Cases` fields. The aggregate PATCH mutates occurrences and non-date Case fields on one connection under `CaseAggregateTransaction`; its Case participant advances `UpdatedAt`/`RowVer`, and occurrence PHI/entity audits and Case PHI audits use that connection so any mutation or audit failure rolls back the unit. The response is reloaded after commit from `Cases` plus authoritative mapped occurrences. The old `CaseDao.updateCase` compatibility method remains because unconverted callers still exist, but this server path cannot call it. There is no dual read or dual write.
+
+Desktop fixed editors, configurable intake, summary projections, Calendar feed, protected mapping administration, and Case Date live update invalidation were completed in their earlier documented slices. This slice does not alter those boundaries. Web **new-case creation** remains the next separate authority cutover; its legacy request and creation transaction are intentionally unchanged. No database migration, reconciliation, backfill, or live database verification was executed for this server/web slice.
+
 ### First runtime-cutover slice (2026-08-06)
 
 The fixed contract and read-foundation gate are implemented: `MigratedCaseDateKey` is the single immutable mapping, rejects the discarded alias, and records that only `intake` supports time. `CaseDateDao.listMigratedSingletonsForCase` uses the existing tenant-scoped occurrence query and effective tenant/global presentation overlay, retains stored historical type fallback, ignores soft-deleted occurrences, and fails explicitly for duplicate active singleton occurrences or a discarded-alias occurrence.

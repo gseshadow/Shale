@@ -9,29 +9,26 @@ import org.junit.jupiter.api.Test;
 
 final class CaseDaoCaseDetailQueryTest {
     @Test
-    void caseDetailSelectKeepsDateFieldsNullableAndStableForApiDetail() throws Exception {
+    void existingCaseDetailSelectExcludesAllNineMigratedCaseColumns() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
         String method = method(source, "private com.shale.core.dto.CaseDetailDto selectCaseDetail", "private static com.shale.core.dto.CaseDetailDto mapCaseDetail");
         String mapper = method(source, "private static com.shale.core.dto.CaseDetailDto mapCaseDetail", "public com.shale.core.dto.CaseDetailDto updateCase");
 
-        assertTrue(method.contains("c.CallerDate"));
         assertTrue(method.contains("c.AcceptedDate"));
         assertTrue(method.contains("c.ClosedDate"));
         assertTrue(method.contains("c.DeniedDate"));
-        assertTrue(method.contains("c.DateOfInjury"));
-        assertTrue(method.contains("c.StatuteOfLimitations"));
-        assertTrue(method.contains("c.TortNoticeDeadline"));
+        for (String legacy : java.util.List.of("CallerDate", "CallerTime", "DateOfInjury", "DateOfMedicalNegligence",
+                "DateMedicalNegligenceWasDiscovered", "StatuteOfLimitations", "TortNoticeDeadline",
+                "DiscoveryDeadline", "DateFeeAgreementSigned", "DateNonEngagementLetterSent")) {
+            assertTrue(!method.contains("c." + legacy), legacy + " must not be read by existing-case detail");
+        }
         assertTrue(method.contains("c.MedicalRecordsRequested"));
         assertTrue(method.contains("c.UpdatedAt"));
         assertTrue(method.contains("schema.rowVersionSelectExpression(\"c\")"));
 
-        assertTrue(mapper.contains("toLocalDate(rs.getDate(\"CallerDate\"))"));
         assertTrue(mapper.contains("toLocalDate(rs.getDate(\"AcceptedDate\"))"));
         assertTrue(mapper.contains("toLocalDate(rs.getDate(\"ClosedDate\"))"));
         assertTrue(mapper.contains("toLocalDate(rs.getDate(\"DeniedDate\"))"));
-        assertTrue(mapper.contains("toLocalDate(rs.getDate(\"DateOfInjury\"))"));
-        assertTrue(mapper.contains("toLocalDate(rs.getDate(\"StatuteOfLimitations\"))"));
-        assertTrue(mapper.contains("toLocalDate(rs.getDate(\"TortNoticeDeadline\"))"));
         assertTrue(mapper.contains("getNullableBoolean(rs, \"MedicalRecordsRequested\")"));
         assertTrue(mapper.contains("toLocalDateTime(rs.getTimestamp(\"UpdatedAt\"))"));
         assertTrue(mapper.contains("rs.getBytes(\"RowVer\")"));
