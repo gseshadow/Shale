@@ -6,7 +6,7 @@ import org.junit.jupiter.api.*;
 
 final class CaseCalendarFoundationMigrationTest {
  private static String sql;
- @BeforeAll static void load() throws Exception { sql=Files.readString(Path.of("../docs/sql/2026-08-11_case_date_calendar_link_foundation_step1.sql")); }
+ @BeforeAll static void load() throws Exception { sql=Files.readString(Path.of("../docs/sql/2026-08-11_case_date_calendar_link_foundation_step1.sql")).replace("\r\n","\n").replace('\r','\n'); }
 
  @Test void installsCompleteStrictTenantRlsAndSelectsPolicyDeterministically(){
   assertAll(

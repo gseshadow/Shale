@@ -12,9 +12,10 @@ final class SceneManagerDashboardNotificationContractTest {
         String widgets = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/DashboardWidgetFactory.java"));
         String creation = scene.substring(scene.indexOf("public Parent createMyShaleView"),
                 scene.indexOf("public Parent createCaseView", scene.indexOf("public Parent createMyShaleView")));
-        assertTrue(creation.contains("caseDao, caseTaskService, userBoardLanePreferencesDao"));
-        assertFalse(creation.contains("caseDao, new CaseServiceAdapter(caseDao), caseTaskService"));
-        assertTrue(creation.contains("notificationCenterService, this::openNotificationCenterFromDashboard, onOpenCase, onOpenUser"));
+        String compactCreation=creation.replaceAll("\\s+"," ");
+        assertTrue(compactCreation.contains("caseDao, caseSummaryDao, caseTaskService, userBoardLanePreferencesDao"));
+        assertFalse(compactCreation.contains("caseDao, new CaseServiceAdapter(caseDao), caseTaskService"));
+        assertTrue(compactCreation.contains("notificationCenterService, this::openNotificationCenterFromDashboard, onOpenCase, onOpenUser"));
         assertTrue(creation.contains("private void openNotificationCenterFromDashboard()"));
         assertTrue(creation.contains("mainController.openNotificationCenter()"));
         assertTrue(dashboard.contains("Runnable onOpenNotificationCenter"));
