@@ -12,7 +12,6 @@ import java.util.Objects;
 
 import com.shale.core.model.Organization;
 import com.shale.core.runtime.DbSessionProvider;
-import com.shale.core.semantics.RoleSemantics;
 import com.shale.core.util.PerformanceLogging;
 
 public final class OrganizationDao {
@@ -29,24 +28,6 @@ public final class OrganizationDao {
 	public record PagedResult<T>(List<T> items, int page, int pageSize, long total) {
 	}
 
-	public record RelatedCaseRow(
-			long id,
-			String name,
-			java.time.LocalDate intakeDate,
-			java.time.LocalDate statuteOfLimitationsDate,
-			java.time.LocalDate tortClaimsNoticeDeadline,
-			String responsibleAttorneyName,
-			String responsibleAttorneyColor,
-			Boolean nonEngagementLetterSent,
-			String primaryStatusName,
-			String primaryStatusColor,
-			String practiceAreaColor,
-			String partyRoleName,
-			String side,
-			boolean primary,
-			String notes
-	) {
-	}
 
 	public record SelectableCaseRow(long id, String name) {
 	}
@@ -709,115 +690,6 @@ public final class OrganizationDao {
 		}
 	}
 
-	public List<RelatedCaseRow> findRelatedCases(int organizationId) {
-		long started = perfStart();
-		if (organizationId <= 0) {
-			throw new IllegalArgumentException("organizationId must be > 0");
-		}
-
-		String sql = """
-				SELECT
-				  c.Id,
-				  c.Name,
-				  c.CallerDate,
-				  c.StatuteOfLimitations,
-				  c.TortNoticeDeadline,
-				  current_status.CurrentStatusName,
-				  current_status.PrimaryStatusColor,
-				  pa.Color AS PracticeAreaColor,
-				  pr.Name AS PartyRoleName,
-				  cp.Side,
-				  COALESCE(cp.IsPrimary, 0) AS IsPrimary,
-				  cp.Notes,
-				  u.color AS ResponsibleAttorneyColor,
-				  c.NonEngagementLetterSent AS NonEngagementLetterSent,
-				  LTRIM(RTRIM(
-				    COALESCE(u.name_first, '') +
-				    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-				    COALESCE(u.name_last, '')
-				  )) AS ResponsibleAttorneyName
-				FROM dbo.CaseParties cp
-				INNER JOIN dbo.Cases c
-				  ON c.Id = cp.CaseId
-				LEFT JOIN dbo.PartyRoles pr
-				  ON pr.Id = cp.PartyRoleId
-				LEFT JOIN dbo.PracticeAreas pa
-				  ON pa.Id = c.PracticeAreaId
-				OUTER APPLY (
-				    SELECT TOP (1) s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
-				    FROM dbo.CaseStatuses cs
-				    INNER JOIN dbo.Statuses s ON s.Id = cs.StatusId
-				    WHERE cs.CaseId = c.Id
-				    ORDER BY
-				      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-				      cs.UpdatedAt DESC,
-				      cs.CreatedAt DESC,
-				      cs.Id DESC
-				) current_status
-				INNER JOIN dbo.Organizations o
-				  ON o.Id = cp.OrganizationId
-				OUTER APPLY (
-				    SELECT TOP (1)
-				      cu.UserId
-				    FROM dbo.CaseUsers cu
-				    WHERE cu.CaseId = c.Id
-				      AND cu.RoleId = ?
-				      AND cu.IsPrimary = 1
-				    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
-				) ra
-				LEFT JOIN dbo.Users u
-				  ON u.Id = ra.UserId
-				WHERE cp.OrganizationId = ?
-				  AND o.ShaleClientId = ?
-				  AND (o.IsDeleted = 0 OR o.IsDeleted IS NULL)
-				  AND c.ShaleClientId = ?
-				  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
-				ORDER BY
-				  CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END,
-				  c.Name ASC,
-				  c.Id ASC,
-				  cp.Id ASC;
-				""";
-
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-
-			int shaleClientId = requireCurrentShaleClientId(con);
-			int idx = 1;
-			ps.setInt(idx++, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
-			ps.setInt(idx++, organizationId);
-			ps.setInt(idx++, shaleClientId);
-			ps.setInt(idx++, shaleClientId);
-
-			List<RelatedCaseRow> out = new ArrayList<>();
-			try (ResultSet rs = ps.executeQuery()) {
-				while (rs.next()) {
-					out.add(new RelatedCaseRow(
-						rs.getLong("Id"),
-						rs.getString("Name"),
-						toLocalDate(rs.getDate("CallerDate")),
-						toLocalDate(rs.getDate("StatuteOfLimitations")),
-						toLocalDate(rs.getDate("TortNoticeDeadline")),
-						rs.getString("ResponsibleAttorneyName"),
-						rs.getString("ResponsibleAttorneyColor"),
-						(Boolean) rs.getObject("NonEngagementLetterSent"),
-						rs.getString("CurrentStatusName"),
-						rs.getString("PrimaryStatusColor"),
-						rs.getString("PracticeAreaColor"),
-						rs.getString("PartyRoleName"),
-						rs.getString("Side"),
-						rs.getBoolean("IsPrimary"),
-						rs.getString("Notes")
-					));
-				}
-			}
-			logPerf("organizations.relatedCases.dao", "organizationId=" + organizationId
-					+ " queryPath=CasePartiesOnly rows=" + out.size(), started);
-			return out;
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to load related cases for organization (id=" + organizationId + ")", e);
-		}
-	}
 
 
 	public List<OrganizationTypeRow> findOrganizationTypes() {
@@ -1020,7 +892,4 @@ public final class OrganizationDao {
 		return ts == null ? null : ts.toInstant();
 	}
 
-	private static java.time.LocalDate toLocalDate(java.sql.Date d) {
-		return d == null ? null : d.toLocalDate();
-	}
 }

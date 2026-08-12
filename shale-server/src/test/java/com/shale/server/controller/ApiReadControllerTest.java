@@ -60,7 +60,8 @@ class ApiReadControllerTest {
         mvc.perform(post("/api/cases").contentType(MediaType.APPLICATION_JSON)
                 .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
                 .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41")
-                .content("""{"caseName":"Stable Dates","practiceAreaId":2,"responsibleAttorneyUserId":31,
+                .content("""
+                   {"caseName":"Stable Dates","practiceAreaId":2,"responsibleAttorneyUserId":31,
                    "caseDates":[{"systemKey":"intake","startsAt":"2026-08-12T09:30:00","allDay":false},
                    {"systemKey":"date_of_injury","caseDateTypeId":17,"startsAt":"2026-08-01T00:00:00","allDay":true}]}"""))
                 .andExpect(status().isOk());
@@ -105,18 +106,19 @@ class ApiReadControllerTest {
             TaskServicePort taskServicePort,
             ContactServicePort contactServicePort,
             NotificationServicePort notificationServicePort) {
-        ApiReadController apiReadController = new ApiReadController(
-                caseServicePort,
-                taskServicePort,
-                contactServicePort,
-                notificationServicePort,
-                unusedPort(OrganizationServicePort.class),
+        return developmentMockMvc(caseServicePort, taskServicePort, contactServicePort,
+                notificationServicePort, unusedPort(OrganizationServicePort.class));
+    }
+
+    private static MockMvc developmentMockMvc(CaseServicePort caseServicePort, TaskServicePort taskServicePort,
+            ContactServicePort contactServicePort, NotificationServicePort notificationServicePort,
+            OrganizationServicePort organizationServicePort) {
+        ApiReadController apiReadController = new ApiReadController(caseServicePort, taskServicePort,
+                contactServicePort, notificationServicePort, organizationServicePort,
                 unusedPort(UserServicePort.class),
                 new ServerRuntimeSessionState(new DevelopmentHeaderServerSessionResolver(), currentRequestProvider()));
-        return MockMvcBuilders
-                .standaloneSetup(apiReadController)
-                .setControllerAdvice(new ApiExceptionHandler())
-                .build();
+        return MockMvcBuilders.standaloneSetup(apiReadController)
+                .setControllerAdvice(new ApiExceptionHandler()).build();
     }
 
 
@@ -140,6 +142,45 @@ class ApiReadControllerTest {
                 .build();
     }
 
+
+    @Test
+    void organizationDetailUsesSessionTenantAndPreservesRelatedCaseResponse() throws Exception {
+        int[] requested = new int[2];
+        OrganizationServicePort organizations = (OrganizationServicePort) Proxy.newProxyInstance(
+                OrganizationServicePort.class.getClassLoader(), new Class<?>[] {OrganizationServicePort.class},
+                (proxy, method, args) -> {
+                    if (!method.getName().equals("getOrganizationDetail")) throw new AssertionError(method.getName());
+                    requested[0] = (Integer) args[0]; requested[1] = (Integer) args[1];
+                    var related = new OrganizationServicePort.RelatedCaseSummary(91,"Alpha",LocalDate.of(2026,1,2),
+                            null,"Responsible Lawyer","Client","Plaintiff",true,"notes");
+                    return Optional.of(new OrganizationServicePort.OrganizationDetail(7,41,null,null,"Org",null,null,
+                            null,null,null,null,null,null,null,null,null,List.of(related)));
+                });
+        MockMvc mvc = developmentMockMvc(unusedPort(CaseServicePort.class), unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class), organizations);
+        mvc.perform(get("/api/organizations/7")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.relatedCases[0].id").value(91))
+                .andExpect(jsonPath("$.relatedCases[0].intakeDate").value("2026-01-02"))
+                .andExpect(jsonPath("$.relatedCases[0].statuteOfLimitationsDate").isEmpty())
+                .andExpect(jsonPath("$.relatedCases[0].responsibleAttorneyName").value("Responsible Lawyer"))
+                .andExpect(jsonPath("$.relatedCases[0].partyRoleName").value("Client"));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[] {7,41}, requested);
+    }
+
+    @Test
+    void inaccessibleOrganizationUsesEstablishedNotFoundResponse() throws Exception {
+        OrganizationServicePort organizations = (OrganizationServicePort) Proxy.newProxyInstance(
+                OrganizationServicePort.class.getClassLoader(), new Class<?>[] {OrganizationServicePort.class},
+                (proxy, method, args) -> Optional.empty());
+        MockMvc mvc = developmentMockMvc(unusedPort(CaseServicePort.class), unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class), organizations);
+        mvc.perform(get("/api/organizations/7")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"99"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Organization not found."));
+    }
 
     @Test
     void caseSearchReachesServiceLayerWithDevelopmentHeaders() throws Exception {
