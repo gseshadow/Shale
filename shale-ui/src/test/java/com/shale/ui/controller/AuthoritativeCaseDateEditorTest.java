@@ -13,8 +13,8 @@ class AuthoritativeCaseDateEditorTest {
     private static CaseDateAggregateResult snapshot(byte token, boolean present) {
         EnumMap<MigratedCaseDateKey, CompatibilityCaseDateState> states = new EnumMap<>(MigratedCaseDateKey.class);
         for (MigratedCaseDateKey key : MigratedCaseDateKey.values()) states.put(key, present
-                ? new CompatibilityCaseDateState(key,key.systemKey(),LocalDateTime.of(2026,1,1,0,0),null,!key.supportsTime(),10L+key.ordinal(),new byte[]{token},null)
-                : new CompatibilityCaseDateState(key,key.systemKey(),null,null,true,null,null,new CompatibilityCaseDateMutation.ExpectedAbsent(new byte[]{token})));
+                ? new CompatibilityCaseDateState(key,key.systemKey(),LocalDateTime.of(2026,1,1,0,0),null,!key.supportsTime(),10L+key.ordinal(),100+key.ordinal(),new byte[]{token},null)
+                : new CompatibilityCaseDateState(key,key.systemKey(),null,null,true,null,null,null,new CompatibilityCaseDateMutation.ExpectedAbsent(new byte[]{token})));
         return new CaseDateAggregateResult(new byte[]{token}, states);
     }
 

@@ -228,11 +228,19 @@ class ApiReadControllerTest {
                         {
                           "caseName": "Smith v. Updated",
                           "description": "Updated detail",
-                          "dateOfInjury": "2026-02-03",
-                          "statuteOfLimitations": "2027-02-03",
-                          "tortNoticeDeadline": "2026-08-09",
                           "summary": "Updated summary",
-                          "expectedRowVer": "AQ=="
+                          "expectedRowVer": "AQ==",
+                          "mappedCaseDates": [
+                            {"key":"CALLER_DATE","systemKey":"intake","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DATE_OF_INJURY","systemKey":"date_of_injury","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DATE_OF_MEDICAL_NEGLIGENCE","systemKey":"date_of_medical_negligence","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DATE_MEDICAL_NEGLIGENCE_DISCOVERED","systemKey":"date_medical_negligence_discovered","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"STATUTE_OF_LIMITATIONS","systemKey":"statute_of_limitations","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"TORT_NOTICE_DEADLINE","systemKey":"tort_notice_deadline","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DISCOVERY_DEADLINE","systemKey":"discovery_deadline","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DATE_FEE_AGREEMENT_SIGNED","systemKey":"fee_agreement_signed","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DATE_NON_ENGAGEMENT_LETTER_SENT","systemKey":"non_engagement_letter_sent","absent":true,"absenceCaseRowVer":"AQ=="}
+                          ]
                         }
                         """)
                 .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
@@ -241,9 +249,6 @@ class ApiReadControllerTest {
                 .andExpect(jsonPath("$.caseId").value(501))
                 .andExpect(jsonPath("$.caseName").value("Smith v. Updated"))
                 .andExpect(jsonPath("$.description").value("Updated detail"))
-                .andExpect(jsonPath("$.tortNoticeDeadline[0]").value(2026))
-                .andExpect(jsonPath("$.tortNoticeDeadline[1]").value(8))
-                .andExpect(jsonPath("$.tortNoticeDeadline[2]").value(9))
                 .andExpect(jsonPath("$.summary").value("Updated summary"));
 
         org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.updateCaseId);
@@ -251,9 +256,6 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.updateActorUserId);
         org.junit.jupiter.api.Assertions.assertEquals("Smith v. Updated", caseServicePort.updateCaseName);
         org.junit.jupiter.api.Assertions.assertEquals("CASE-501", caseServicePort.updateCaseNumber);
-        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2026, 2, 3), caseServicePort.updateDateOfInjury);
-        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2027, 2, 3), caseServicePort.updateStatuteOfLimitations);
-        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2026, 8, 9), caseServicePort.updateTortNoticeDeadline);
         org.junit.jupiter.api.Assertions.assertEquals("Updated summary", caseServicePort.updateSummary);
         org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[] {1}, caseServicePort.updateExpectedRowVer);
     }
@@ -861,6 +863,11 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public Optional<CaseDetailDto> getAuthoritativeCaseDetail(long caseId, int shaleClientId, int actorUserId) {
+            return getCaseDetail(caseId, shaleClientId);
+        }
+
+        @Override
         public Optional<CaseOverviewDto> getCaseOverview(long caseId, int shaleClientId) {
             throw new AssertionError("getCaseOverview should not be called");
         }
@@ -1110,13 +1117,10 @@ class ApiReadControllerTest {
             this.updateActorUserId = command.actorUserId();
             this.updateCaseName = command.caseName();
             this.updateCaseNumber = command.caseNumber();
-            this.updateDateOfInjury = command.dateOfInjury();
-            this.updateStatuteOfLimitations = command.statuteOfLimitations();
-            this.updateTortNoticeDeadline = command.tortNoticeDeadline();
             this.updateSummary = command.summary();
             this.updateExpectedRowVer = command.expectedRowVer();
             return new CaseDetailDto(command.caseId(), command.caseNumber(), command.caseName(), command.description(), "Open", "Ada Attorney", 10,
-                    null, null, null, null, null, null, null, command.dateOfInjury(), command.statuteOfLimitations(), command.tortNoticeDeadline(), null,
+                    null, null, null, null, null, null, null, null, null, null, null,
                     null, null, null, null, null, null, null, null, null, null, null,
                     null, null, null, command.summary(), null, LocalDateTime.of(2026, 1, 2, 0, 0), new byte[] {2});
         }
