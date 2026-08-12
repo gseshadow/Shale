@@ -11,14 +11,27 @@ final class CaseSummarySearchContractTest {
 		return Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseSummaryDao.java"));
 	}
 
+	private static String method(String source, String signature) {
+		int start = source.indexOf(signature);
+		assertTrue(start >= 0, signature);
+		int openingBrace = source.indexOf('{', start);
+		assertTrue(openingBrace >= 0, signature + " opening brace");
+		int depth = 0;
+		for (int index = openingBrace; index < source.length(); index++) {
+			char character = source.charAt(index);
+			if (character == '{') depth++;
+			if (character == '}' && --depth == 0) return source.substring(start, index + 1);
+		}
+		fail(signature + " closing brace");
+		return "";
+	}
+
 	@Test void wildcardCharactersAreLiteral() {
 		assertEquals("a[%]b[_]c[[]d", CaseSummaryDao.escapeLike("a%b_c[d"));
 	}
 
 	@Test void searchUsesTheAuthoritativeTenantActiveAndOneRowBoundary() throws Exception {
-		String all = source();
-		String method = all.substring(all.indexOf("public List<SearchCaseRow> searchActiveByName"),
-				all.indexOf("/** Main active Cases grid"));
+		String method = method(source(), "public List<SearchCaseRow> searchActiveByName");
 		assertTrue(method.contains("verifyTenant(con, requestedTenantId)"));
 		assertTrue(method.contains("c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0"));
 		assertTrue(method.contains("LOWER(COALESCE(c.Name,'')) LIKE ?"));
