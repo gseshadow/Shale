@@ -21,6 +21,7 @@ import com.shale.data.auth.BCryptPasswordVerifier;
 import com.shale.data.config.Config;
 import com.shale.data.config.DataSources;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.OrganizationDao;
