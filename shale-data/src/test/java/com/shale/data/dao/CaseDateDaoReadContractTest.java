@@ -2,12 +2,29 @@ package com.shale.data.dao;
 
 import com.shale.core.dto.CaseDateDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import com.shale.core.model.MigratedCaseDateKey;
 import java.lang.reflect.Method;
 import java.time.LocalDateTime;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CaseDateDaoReadContractTest {
+    @Test void protectedOverviewDatesAreClassifiedByEffectiveSemanticIdentity() {
+        Map<Integer, MigratedCaseDateKey> protectedTypes = Map.of(
+                701, MigratedCaseDateKey.STATUTE_OF_LIMITATIONS,
+                702, MigratedCaseDateKey.TORT_NOTICE_DEADLINE);
+
+        assertEquals(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS,
+                CaseDateDao.migratedOccurrenceKey(701, null, protectedTypes));
+        assertEquals(MigratedCaseDateKey.TORT_NOTICE_DEADLINE,
+                CaseDateDao.migratedOccurrenceKey(702, "tenant_custom_deadline", protectedTypes));
+        assertNull(CaseDateDao.migratedOccurrenceKey(999, "statute_of_limitations", protectedTypes),
+                "a legacy-key row that is not the active protected mapping is not authoritative");
+        assertEquals(MigratedCaseDateKey.DATE_OF_INJURY,
+                CaseDateDao.migratedOccurrenceKey(703, "date_of_injury", protectedTypes));
+    }
+
     @Test void effectiveSelectorSqlUsesModernOverlayResetAndOrderingContract() throws Exception {
         String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
         assertTrue(source.contains("ROW_NUMBER() OVER (PARTITION BY t.SystemKey"));
