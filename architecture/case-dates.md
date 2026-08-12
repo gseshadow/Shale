@@ -432,7 +432,13 @@ conflict/reload workflow.
 
 ## Existing-case server/web authority cutover
 
-The server existing-case detail and core-details PATCH now expose and consume the same complete nine-slot occurrence concurrency model as desktop. Reads use only active `CaseDates` plus effective semantic-role/type resolution; absent meanings remain explicit witnessed absence. The Case and occurrence participants share `CaseAggregateTransaction`, including PHI and entity-action audits, and the committed aggregate is authoritatively reloaded. React renders these occurrences and submits their stable keys, type/occurrence identity, occurrence RowVer, and absence witnesses. It never uses labels as identity or silently retries conflicts. Accepted, denied, and closed dates retain workflow ownership. Web new-case creation is deliberately the next separate phase.
+The server existing-case detail and core-details PATCH now expose and consume the same complete nine-slot occurrence concurrency model as desktop. Reads use only active `CaseDates` plus effective semantic-role/type resolution; absent meanings remain explicit witnessed absence. The Case and occurrence participants share `CaseAggregateTransaction`, including PHI and entity-action audits, and the committed aggregate is authoritatively reloaded. React renders these occurrences and submits their stable keys, type/occurrence identity, occurrence RowVer, and absence witnesses. It never uses labels as identity or silently retries conflicts. Accepted, denied, and closed dates retain workflow ownership.
+
+## Server/web new-case authority cutover
+
+`POST /api/cases` stages the currently exposed intake, injury, statute, and tort meanings as authoritative Case Date inputs. Identity is a canonical `SystemKey` with an optional authoritative type id that must equal effective tenant/global resolution; labels and names are never accepted. Blank controls are omitted rather than materialized. Values retain local `StartsAt`, optional `EndsAt`, and `AllDay`, including timed intake values.
+
+`CaseDateDao.createCaseAggregate` owns one `CaseAggregateTransaction`. Its connection-bound Case participant inserts the Case, primary status, and responsible attorney while omitting all nine migrated columns; the Case Date participant validates SQL-session identity, membership, effective ownership/eligibility, mapping uniqueness, time support, and singleton duplication. Occurrence PHI and Case/occurrence entity-action audits use the same connection. Failure before commit rolls back the unit; success is reloaded through the mapped Case detail contract. There is no scalar compatibility create input and no dual-write. The next evidenced cutover is organization/contact related-case and remaining report/export compatibility reads. No live SQL Server verification occurred in this slice.
 
 ## Configurable New Intake writer cutover
 

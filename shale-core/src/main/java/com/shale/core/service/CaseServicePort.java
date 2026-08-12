@@ -400,11 +400,13 @@ public interface CaseServicePort {
 			String caseNumber,
 			int practiceAreaId,
 			int responsibleAttorneyUserId,
-			LocalDate callerDate,
-			LocalDate dateOfInjury,
-			LocalDate statuteOfLimitations,
-			LocalDate tortNoticeDeadline,
+			List<CreateMappedCaseDate> caseDates,
 			String summary,
 			String description) {
+		public CreateCaseCommand { caseDates = caseDates == null ? List.of() : List.copyOf(caseDates); }
 	}
+
+	/** Stable identity and lossless value for an authoritative mapped Case Date. */
+	record CreateMappedCaseDate(String systemKey, Integer caseDateTypeId,
+			java.time.LocalDateTime startsAt, java.time.LocalDateTime endsAt, boolean allDay) {}
 }

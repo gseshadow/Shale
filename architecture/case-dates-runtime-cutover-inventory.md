@@ -10,7 +10,13 @@ The existing `GET /api/cases/{id}` and `PATCH /api/cases/{id}/core-details` roun
 
 The API detail query no longer selects any of the nine migrated scalar columns. Accepted, denied, and closed dates remain workflow-owned `Cases` fields. The aggregate PATCH mutates occurrences and non-date Case fields on one connection under `CaseAggregateTransaction`; its Case participant advances `UpdatedAt`/`RowVer`, and occurrence PHI/entity audits and Case PHI audits use that connection so any mutation or audit failure rolls back the unit. The response is reloaded after commit from `Cases` plus authoritative mapped occurrences. The old `CaseDao.updateCase` compatibility method remains because unconverted callers still exist, but this server path cannot call it. There is no dual read or dual write.
 
-Desktop fixed editors, configurable intake, summary projections, Calendar feed, protected mapping administration, and Case Date live update invalidation were completed in their earlier documented slices. This slice does not alter those boundaries. Web **new-case creation** remains the next separate authority cutover; its legacy request and creation transaction are intentionally unchanged. No database migration, reconciliation, backfill, or live database verification was executed for this server/web slice.
+Desktop fixed editors, configurable intake, summary projections, Calendar feed, protected mapping administration, and Case Date live update invalidation were completed in their earlier documented slices. The earlier existing-case slice did not alter those boundaries; the following new-case slice completes the server/web creation cutover without changing them.
+
+### Server and React new-case cutover (2026-08-12)
+
+Web **new-case creation is now cut over**. `ApiReadController.createCase` accepts `caseDates` identified by canonical `systemKey` and optional authoritative `caseDateTypeId`, preserving `startsAt`, optional `endsAt`, `allDay`, timed values, and omission. `CaseServiceAdapter.createCase` delegates to `CaseDateDao.createCaseAggregate`; its `CaseAggregateTransaction` owns commit and rollback while the connection-bound `CaseDao.insertBasicCaseAggregate` inserts the Case, status, and responsible attorney without any migrated `Cases` date column. Occurrences and PHI/entity-action audits share that transaction, and SQL session tenant/actor, active membership, effective type/mapping identity, timing, ownership, and singleton duplication are validated before commit. Detail is reloaded through the authoritative nine-slot projection after commit. No legacy scalar create alias is retained and there is no dual-write.
+
+The next evidenced Phase 3D boundary is the legacy organization/contact related-case projection and remaining report/export compatibility reads inventoried below. No migration, reconciliation, backfill, column removal, or live SQL Server verification was performed for this slice.
 
 ### First runtime-cutover slice (2026-08-06)
 
