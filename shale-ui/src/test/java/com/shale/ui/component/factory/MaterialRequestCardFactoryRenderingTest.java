@@ -38,11 +38,11 @@ final class MaterialRequestCardFactoryRenderingTest {
 	}
 
 	@Test
-	void renderedCardShowsMaterialRailAndDueGradientThroughTransparentBody() throws Exception {
+	void renderedCardShowsMaterialRailAndStatusGradientThroughTransparentBody() throws Exception {
 		RenderedMaterialRequestCard rendered = render(summary(LocalDateTime.of(2026, 7, 25, 12, 0)));
 		try {
 			assertTrue(rendered.card().getStyle().contains("linear-gradient(to right"), rendered.card().getStyle());
-			assertTrue(rendered.card().getStyle().contains(DueProximityStyles.DUE_WITHIN_ONE_WEEK_COLOR), rendered.card().getStyle());
+			assertTrue(rendered.card().getStyle().contains("rgba(226,232,240"), rendered.card().getStyle());
 			assertFalse(rendered.card().getStyle().contains("#2F80ED"), "Due gradient must not use the material type color.");
 
 			assertTrue(rendered.rail().getStyle().contains("#2F80ED"), rendered.rail().getStyle());
@@ -63,11 +63,11 @@ final class MaterialRequestCardFactoryRenderingTest {
 	}
 
 	@Test
-	void distantDueDateStillRendersNeutralGradientInsteadOfFlatWhite() throws Exception {
+	void distantDueDateStillRendersConfiguredNeutralStatusGradientInsteadOfFlatWhite() throws Exception {
 		RenderedMaterialRequestCard rendered = render(summary(LocalDateTime.of(2026, 8, 22, 0, 0)));
 		try {
 			assertTrue(rendered.card().getStyle().contains("linear-gradient(to right"), rendered.card().getStyle());
-			assertTrue(rendered.card().getStyle().contains("rgba(203,213,225"), rendered.card().getStyle());
+			assertTrue(rendered.card().getStyle().contains("rgba(226,232,240"), rendered.card().getStyle());
 			assertTrue(rendered.rail().getStyle().contains("#2F80ED"), rendered.rail().getStyle());
 		} finally {
 			runFxAndWait(rendered.stage()::close);
@@ -218,7 +218,7 @@ final class MaterialRequestCardFactoryRenderingTest {
 		try {
 			FlowPane facts = (FlowPane) rendered.card().lookup(".material-request-card__facts");
 			assertNotNull(facts);
-			assertEquals(6, facts.getChildren().size(), "Typical hydrated request should render six compact facts.");
+			assertEquals(7, facts.getChildren().size(), "Typical hydrated request should include the current Next Follow-up fact.");
 			assertEquals(Priority.NEVER, VBox.getVgrow(rendered.userMiniCard()),
 					"MINI cards should not grow vertically to push date facts down.");
 			assertNull(VBox.getVgrow(facts), "Facts section must keep natural height.");
@@ -227,13 +227,10 @@ final class MaterialRequestCardFactoryRenderingTest {
 
 			assertTrue(facts.getBoundsInParent().getMaxY() <= rendered.body().getHeight() - rendered.body().getPadding().getBottom() + 0.5,
 					"Facts remain fully visible inside modest bottom padding.");
-			double firstY = facts.getChildren().get(0).getBoundsInParent().getMinY();
-			for (Node fact : facts.getChildren()) {
-				assertEquals(firstY, fact.getBoundsInParent().getMinY(), 1.0,
-						"At representative wide width all six facts should share one horizontal row.");
-			}
-			assertTrue(rendered.card().getHeight() <= 150,
-					"Compact facts should materially reduce typical card height at the wide width.");
+			assertEquals(18.0, facts.getHgap(), 0.1);
+			assertEquals(7.0, facts.getVgap(), 0.1);
+			assertTrue(rendered.card().getHeight() <= 190,
+					"The seventh compact fact may wrap but must not make the wide card excessively tall.");
 			assertTrue(rendered.card().getHeight() < rendered.stage().getScene().getHeight() - 80,
 					"A short request should not stretch to fill the available scene height.");
 			assertEquals(rendered.card().getHeight(), rendered.card().getClip().getBoundsInLocal().getHeight(), 0.5,

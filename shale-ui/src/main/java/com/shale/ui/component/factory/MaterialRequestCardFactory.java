@@ -100,6 +100,7 @@ public final class MaterialRequestCardFactory {
         Label title = new Label(nvl(request.title(), nvl(request.materialTypeName(), "Material Request #" + request.id())));
         title.getStyleClass().add("material-request-card__title");
         title.setWrapText(true);
+        title.setMinHeight(Region.USE_PREF_SIZE);
         title.setMaxWidth(Double.MAX_VALUE);
         title.setStyle("-fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: #112542;");
 

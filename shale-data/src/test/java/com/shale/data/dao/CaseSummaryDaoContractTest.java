@@ -15,6 +15,13 @@ final class CaseSummaryDaoContractTest {
 		return Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseSummaryDao.java"));
 	}
 
+	private static String method(String source, String signature) {
+		int start=source.indexOf(signature), open=source.indexOf('{',start), depth=0;
+		assertTrue(start>=0 && open>=0, "missing method "+signature);
+		for(int i=open;i<source.length();i++){char ch=source.charAt(i);if(ch=='{')depth++;else if(ch=='}'&&--depth==0)return source.substring(start,i+1);}
+		throw new AssertionError("unbalanced method "+signature);
+	}
+
 	@Test void tenantAuthorityIsSessionBackedAndCrossTenantMismatchFails() throws Exception {
 		String source = source();
 		assertTrue(source.contains("SESSION_CONTEXT(N'ShaleClientId')"));
@@ -53,21 +60,20 @@ final class CaseSummaryDaoContractTest {
 
 	@Test void optionalRelationshipsCannotRemoveOrMultiplyCasesAndQueryIsNotNPlusOne() throws Exception {
 		String source = source();
-		String projectionList = source.substring(source.indexOf("public List<CaseSummaryProjection> list"),
-				source.indexOf("public List<SearchCaseRow> searchActiveByName"));
+		String projectionList = method(source,"public List<CaseSummaryProjection> list(");
 		assertTrue(source.contains("OUTER APPLY ("));
 		assertTrue(source.contains("SELECT TOP (1)"));
 		assertTrue(source.contains("LEFT JOIN dbo.PracticeAreas"));
 		assertTrue(source.contains("while (rs.next()) rows.add(map(rs))"));
 		assertTrue(source.contains("return List.copyOf(rows)"));
-		assertTrue(projectionList.lines().filter(line -> line.contains("executeQuery()")).count() == 2,
-				"Exactly one context check and one set query are allowed");
+		assertTrue(projectionList.contains("verifyTenant(con, requestedTenantId)"));
+		assertTrue(projectionList.lines().filter(line -> line.contains("executeQuery()")).count() == 1,
+				"The projection method must execute exactly one set query after tenant verification");
 	}
 
 	@Test void projectionDoesNotExpandPhiOrRemoveLegacyQueries() throws Exception {
 		String source = source();
-		String projectionList = source.substring(source.indexOf("public List<CaseSummaryProjection> list"),
-				source.indexOf("public List<SearchCaseRow> searchActiveByName"));
+		String projectionList = method(source,"public List<CaseSummaryProjection> list(");
 		for (String forbidden : new String[] { "c.Description", "c.Summary", "CaseUpdates", "Contacts", "Organizations", "Medical" })
 			assertFalse(projectionList.contains(forbidden), forbidden);
 		String legacy = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));

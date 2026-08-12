@@ -182,6 +182,7 @@ final class MyShaleControllerBoardLayoutTest {
     void notificationsWidgetReusesCenterServiceAndKeepsCompactUnreadFirstBriefing() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
         String sceneManager = Files.readString(Path.of("src/main/java/com/shale/ui/navigation/SceneManager.java"));
+        String compactSceneManager = sceneManager.replaceAll("\\s+", " ");
 
         assertTrue(source.contains("buildNotificationsWidget()"),
                 "Overview dashboard should render the live Notifications widget instead of the placeholder");
@@ -201,7 +202,7 @@ final class MyShaleControllerBoardLayoutTest {
                 "Recent-read support should remain an explicit TODO until the existing service exposes it");
         assertTrue(source.contains("notificationCenterService.markRead(notification)"),
                 "Notification row clicks should reuse the existing mark-read behavior");
-        assertTrue(sceneManager.contains("notificationCenterService, this::openNotificationCenterFromDashboard"),
+        assertTrue(compactSceneManager.contains("notificationCenterService, this::openNotificationCenterFromDashboard"),
                 "My Shale should receive the existing notification center service and View All route from SceneManager");
     }
 
@@ -266,7 +267,9 @@ final class MyShaleControllerBoardLayoutTest {
         assertTrue(source.contains("overviewWidgetRenderQueued"),
                 "Coalesced refreshes should track pending JavaFX render work");
         assertTrue(source.contains("subscribeCaseUpdated(liveCaseUpdatedHandler)"));
-        assertTrue(source.contains("refreshCaseIncremental(event.caseId())"));
+        assertTrue(source.contains("handleLiveCaseUpdatedEvent"));
+        assertTrue(source.contains("refreshMyCasesBoard(true)"),
+                "Accepted Case updates should invalidate and reload the authoritative assigned-case snapshot.");
         assertTrue(source.contains("refreshRecentCaseActivity()"),
                 "Live case updates and assigned task/case loads should keep the activity widget independently refreshable");
         assertTrue(source.contains("activeAssignedCaseRadarSource()"),
