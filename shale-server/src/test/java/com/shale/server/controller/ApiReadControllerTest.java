@@ -20,6 +20,11 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
@@ -117,7 +122,11 @@ class ApiReadControllerTest {
                 contactServicePort, notificationServicePort, organizationServicePort,
                 unusedPort(UserServicePort.class),
                 new ServerRuntimeSessionState(new DevelopmentHeaderServerSessionResolver(), currentRequestProvider()));
+        ObjectMapper objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         return MockMvcBuilders.standaloneSetup(apiReadController)
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setControllerAdvice(new ApiExceptionHandler()).build();
     }
 
