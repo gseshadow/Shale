@@ -5666,12 +5666,20 @@ public class CaseController {
 		// Responsible Attorney is the one Case Overview user editor whose candidates
 		// must come from the authoritative Users.is_attorney eligibility query.
 		List<CaseDao.UserRow> eligibleAttorneys = caseDao.listAttorneysForTenant(appState.getShaleClientId());
-		CaseDao.UserRow currentValue = currentOverview == null ? null : eligibleAttorneys.stream()
-				.filter(v -> Objects.equals(v.id(), currentOverview.getResponsibleAttorneyUserId())).findFirst()
-				.orElse(new CaseDao.UserRow(currentOverview.getResponsibleAttorneyUserId(), currentOverview.getResponsibleAttorney(),
-						currentOverview.getResponsibleAttorneyColor()));
+		CaseDao.UserRow currentValue = currentOverview == null ? null : resolveResponsibleAttorneySelection(
+				currentOverview.getResponsibleAttorneyUserId(), currentOverview.getResponsibleAttorney(),
+				currentOverview.getResponsibleAttorneyColor(), eligibleAttorneys);
 		showUserCardChoice("Edit Responsible Attorney", "Responsible Attorney", currentValue, eligibleAttorneys, false,
 				null, changeResponsibleAttorneyButton).ifPresent(v -> saveResponsibleAttorneyField(v.id()));
+	}
+
+	static CaseDao.UserRow resolveResponsibleAttorneySelection(Integer currentUserId, String displayName, String color,
+			List<CaseDao.UserRow> eligibleAttorneys) {
+		if (currentUserId == null) return null;
+		return eligibleAttorneys.stream()
+				.filter(v -> Objects.equals(v.id(), currentUserId))
+				.findFirst()
+				.orElse(new CaseDao.UserRow(currentUserId, displayName, color));
 	}
 
 	private void onEditPrimaryLegalAssistantField() {
