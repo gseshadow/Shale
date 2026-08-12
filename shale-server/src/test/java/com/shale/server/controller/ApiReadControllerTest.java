@@ -60,7 +60,8 @@ class ApiReadControllerTest {
         mvc.perform(post("/api/cases").contentType(MediaType.APPLICATION_JSON)
                 .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
                 .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41")
-                .content("""{"caseName":"Stable Dates","practiceAreaId":2,"responsibleAttorneyUserId":31,
+                .content("""
+                   {"caseName":"Stable Dates","practiceAreaId":2,"responsibleAttorneyUserId":31,
                    "caseDates":[{"systemKey":"intake","startsAt":"2026-08-12T09:30:00","allDay":false},
                    {"systemKey":"date_of_injury","caseDateTypeId":17,"startsAt":"2026-08-01T00:00:00","allDay":true}]}"""))
                 .andExpect(status().isOk());
