@@ -183,7 +183,7 @@ public class ShaleServerServiceConfiguration {
 
     @Bean
     OrganizationServicePort organizationServicePort(DbSessionProvider serverDbSessionProvider) {
-        return new OrganizationServiceAdapter(new OrganizationDao(serverDbSessionProvider));
+        return new OrganizationServiceAdapter(new OrganizationDao(serverDbSessionProvider), new CaseSummaryDao(serverDbSessionProvider));
     }
 
     @Bean
