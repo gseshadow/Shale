@@ -266,25 +266,42 @@ public final class CaseDateDao {
      */
     public Map<MigratedCaseDateKey, CaseDateDto> listMigratedSingletonsForCase(long caseId, int tenant, int actor) {
         List<CaseDateDto> occurrences = listCaseDatesForCase(caseId, tenant, actor);
+        Map<Integer, MigratedCaseDateKey> protectedTypeKeys = resolveProtectedTypeKeys(tenant, actor);
         EnumMap<MigratedCaseDateKey, CaseDateDto> result = new EnumMap<>(MigratedCaseDateKey.class);
         for (CaseDateDto occurrence : occurrences) {
-            String systemKey = occurrence.typeSystemKey();
-            if (systemKey == null) continue;
-            if (MigratedCaseDateKey.DISCARDED_ALIAS.equalsIgnoreCase(systemKey.trim())) {
-                throw new IllegalStateException("Discarded Case Date SystemKey alias occurrence detected.");
-            }
-            final MigratedCaseDateKey mapped;
-            try {
-                mapped = MigratedCaseDateKey.require(systemKey);
-            } catch (IllegalArgumentException notMapped) {
-                continue;
-            }
+            MigratedCaseDateKey mapped = migratedOccurrenceKey(
+                    occurrence.caseDateTypeId(), occurrence.typeSystemKey(), protectedTypeKeys);
+            if (mapped == null) continue;
             CaseDateDto conflict = result.putIfAbsent(mapped, occurrence);
             if (conflict != null) {
                 throw new IllegalStateException("Multiple active Case Date occurrences for singleton SystemKey: " + mapped.systemKey());
             }
         }
         return Collections.unmodifiableMap(result);
+    }
+
+    private Map<Integer, MigratedCaseDateKey> resolveProtectedTypeKeys(int tenant, int actor) {
+        try (Connection con = db.requireConnection()) {
+            verifyTenant(con, tenant); validateActor(con, tenant, actor);
+            Map<Integer, MigratedCaseDateKey> result = new HashMap<>();
+            for (CaseDateSemanticRole role : CaseDateSemanticRole.values()) {
+                result.put(CaseDateSemanticRoleResolver.requireEffectiveTypeId(con, tenant, role), migratedKey(role));
+            }
+            return Map.copyOf(result);
+        } catch (SQLException e) { throw fail(e); }
+    }
+
+    static MigratedCaseDateKey migratedOccurrenceKey(int typeId, String systemKey,
+            Map<Integer, MigratedCaseDateKey> protectedTypeKeys) {
+        MigratedCaseDateKey protectedKey = protectedTypeKeys.get(typeId);
+        if (protectedKey != null) return protectedKey;
+        if (systemKey == null) return null;
+        if (MigratedCaseDateKey.DISCARDED_ALIAS.equalsIgnoreCase(systemKey.trim()))
+            throw new IllegalStateException("Discarded Case Date SystemKey alias occurrence detected.");
+        try {
+            MigratedCaseDateKey key = MigratedCaseDateKey.require(systemKey);
+            return semanticRole(key) == null ? key : null;
+        } catch (IllegalArgumentException notMapped) { return null; }
     }
 
     public CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(long caseId, int tenant, int actor) {
