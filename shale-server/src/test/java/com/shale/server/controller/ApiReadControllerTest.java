@@ -946,6 +946,86 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public void resetCaseDateTypeOverride(ResetCaseDateTypeOverrideCommand command) {
+            throw new AssertionError("resetCaseDateTypeOverride should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) {
+            throw new AssertionError("listEffectiveCaseDateTypes should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.EffectiveCaseDateTypeDto> listCaseDateTypesForAdministration(int shaleClientId, int actorUserId) {
+            throw new AssertionError("listCaseDateTypesForAdministration should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.CaseDateSemanticRoleMappingDto> listCaseDateSemanticRoleMappings(int shaleClientId, int actorUserId) {
+            throw new AssertionError("listCaseDateSemanticRoleMappings should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseDateSemanticRoleMappingDto saveCaseDateSemanticRoleMapping(SaveCaseDateSemanticRoleMappingCommand command) {
+            throw new AssertionError("saveCaseDateSemanticRoleMapping should not be called");
+        }
+
+        @Override
+        public void resetCaseDateSemanticRoleMapping(ResetCaseDateSemanticRoleMappingCommand command) {
+            throw new AssertionError("resetCaseDateSemanticRoleMapping should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) {
+            throw new AssertionError("listCaseDatesForCase should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.CaseDateDto> listDeletedCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) {
+            throw new AssertionError("listDeletedCaseDatesForCase should not be called");
+        }
+
+        @Override
+        public Optional<com.shale.core.dto.CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) {
+            throw new AssertionError("getCaseDate should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseDateDto createCaseDate(CreateCaseDateCommand command) {
+            throw new AssertionError("createCaseDate should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseDateDto updateCaseDate(UpdateCaseDateCommand command) {
+            throw new AssertionError("updateCaseDate should not be called");
+        }
+
+        @Override
+        public void deleteCaseDate(DeleteCaseDateCommand command) {
+            throw new AssertionError("deleteCaseDate should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseDateDto restoreCaseDate(RestoreCaseDateCommand command) {
+            throw new AssertionError("restoreCaseDate should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.EffectiveCaseDateTypeDto createCaseDateType(CaseDateTypeCommand command) {
+            throw new AssertionError("createCaseDateType should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.EffectiveCaseDateTypeDto updateCaseDateType(CaseDateTypeCommand command) {
+            throw new AssertionError("updateCaseDateType should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.EffectiveCaseDateTypeDto setCaseDateTypeActive(SetCaseDateTypeActiveCommand command) {
+            throw new AssertionError("setCaseDateTypeActive should not be called");
+        }
+
+        @Override
         public com.shale.core.dto.PracticeAreaDto createPracticeArea(PracticeAreaCommand command) {
             throw new AssertionError("createPracticeArea should not be called");
         }
