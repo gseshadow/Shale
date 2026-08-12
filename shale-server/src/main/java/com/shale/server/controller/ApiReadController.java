@@ -190,7 +190,7 @@ public final class ApiReadController {
     public List<CaseOverviewDto> searchCases(@RequestParam(name = "query", defaultValue = "") String query) {
         String safeQuery = ApiValidation.searchQuery(query);
         int shaleClientId = runtimeSessionState.requireShaleClientId();
-        return caseServicePort.searchCases(safeQuery, shaleClientId, DEFAULT_SEARCH_LIMIT);
+        return caseServicePort.searchCases(safeQuery, shaleClientId, runtimeSessionState.requireUserId(), DEFAULT_SEARCH_LIMIT);
     }
 
     @Operation(summary = "Search cases with pagination metadata", description = "Returns a page-shaped response for web clients. total is null because no cheap count is currently available.")
@@ -206,6 +206,7 @@ public final class ApiReadController {
         List<CaseOverviewDto> fetched = caseServicePort.searchCases(
                 safeQuery,
                 shaleClientId,
+                runtimeSessionState.requireUserId(),
                 ApiValidation.searchLimitForPage(safePage, safeSize));
         return new PagedResponse<>(slice(fetched, safePage, safeSize), safePage, safeSize, null);
     }

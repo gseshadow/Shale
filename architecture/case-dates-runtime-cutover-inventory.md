@@ -245,3 +245,13 @@ The production path `GET /api/organizations/{organizationId}` → `OrganizationS
 The shared query preserves trusted session/request tenant equality, active nondeleted Organization and Case predicates, one result per `CaseParties.Id`, Party Role identity/presentation, primary state, responsible-attorney metadata, and primary-first Case-name/Case-ID/relationship-ID ordering. It resolves dates set-wise from stored `CaseDateTypeId` identities and active tenant-effective semantic-role mappings, retaining historical type presentation behavior and performing no per-Case hydration. `OrganizationDao.findRelatedCases` was removed after call-site verification found no remaining production consumer; `ContactDao.findRelatedCases` is intentionally retained. Existing Organization detail PHI-read behavior is unchanged because the controller/session and response boundary did not change and this slice adds no mutation or audit event.
 
 The active Organization path no longer reads or falls back to `Cases.CallerDate`, `Cases.StatuteOfLimitations`, or `Cases.TortNoticeDeadline`. Server Case search and assigned Cases are the next recommended runtime cutover; User detail, Documents, `CaseOverviewDto`, Calendar, and mutations remain deferred.
+
+## Server/web search and My Cases runtime cutover
+
+Server/web Case search (list and page endpoints) and assigned/My Cases now use the bounded
+`CaseSummaryDao` server projection with authoritative tenant-effective semantic Case Dates. The
+legacy ID lookup plus per-result `CaseDao.getOverview` hydration is removed. Existing response fields,
+matching, paging/limits, assignment scope, responsible-attorney metadata, null behavior, and ISO
+`LocalDate` serialization are retained. `CaseDao.getOverview` remains for explicitly deferred desktop
+Case View/document compatibility. Desktop User Detail assigned Cases is the next smallest remaining
+runtime cutover. Live SQL Server verification was not performed.

@@ -32,6 +32,7 @@ import com.shale.core.service.CaseServicePort;
 import com.shale.core.util.CaseLinkUrlNormalizer;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDateDao;
+import com.shale.data.dao.CaseSummaryDao;
 import com.shale.core.model.CaseDateAggregateCommand;
 import com.shale.core.model.CaseDateAggregateResult;
 import com.shale.core.model.CompatibilityCaseDateState;
@@ -45,11 +46,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	private final CaseGateway caseGateway;
 
 	public CaseServiceAdapter(CaseDao caseDao) {
-		this(new DaoCaseGateway(caseDao, new CaseDateDao(caseDao.dbSessionProvider())));
+		this(new DaoCaseGateway(caseDao, new CaseDateDao(caseDao.dbSessionProvider()), new CaseSummaryDao(caseDao.dbSessionProvider())));
 	}
 
 	public CaseServiceAdapter(CaseDao caseDao, CaseDateDao caseDateDao) {
-		this(new DaoCaseGateway(caseDao, caseDateDao));
+		this(new DaoCaseGateway(caseDao, caseDateDao, new CaseSummaryDao(caseDao.dbSessionProvider())));
 	}
 
 	CaseServiceAdapter(CaseGateway caseGateway) {
@@ -91,25 +92,27 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
-	public List<CaseOverviewDto> searchCases(String query, int shaleClientId, int limit) {
+	public List<CaseOverviewDto> searchCases(String query, int shaleClientId, int actorUserId, int limit) {
 		int resolvedLimit = limit <= 0 ? 25 : limit;
-		return caseGateway.searchCasesByName(query).stream()
-				.limit(resolvedLimit)
-				.map(CaseDao.CaseRow::id)
-				.map(caseGateway::getOverview)
-				.filter(Objects::nonNull)
-				.toList();
+		return caseGateway.searchActiveForServer(shaleClientId, actorUserId, query, 0, resolvedLimit).stream()
+				.map(CaseServiceAdapter::toOverview).toList();
 	}
 
 	@Override
 	public List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit) {
 		int resolvedLimit = limit <= 0 ? 25 : limit;
-		return caseGateway.listAssignedCasesForBoard(assignedUserId).stream()
-				.limit(resolvedLimit)
-				.map(CaseDao.CaseRow::id)
-				.map(caseGateway::getOverview)
-				.filter(Objects::nonNull)
-				.toList();
+		return caseGateway.listActiveAssignedForServer(shaleClientId, assignedUserId, assignedUserId, resolvedLimit).stream()
+				.map(CaseServiceAdapter::toOverview).toList();
+	}
+
+	private static CaseOverviewDto toOverview(CaseSummaryDao.ServerCaseRow row) {
+		var s=row.summary();
+		List<CaseOverviewDto.ContactSummary> clients=row.clientContactId()==null?List.of():List.of(new CaseOverviewDto.ContactSummary(row.clientContactId(),row.clientName()));
+		return new CaseOverviewDto(s.caseId(),s.caseNumber(),s.caseName(),s.statusName(),s.statusId(),s.statusColor(),
+				s.responsibleAttorneyId(),s.responsibleAttorneyName(),s.responsibleAttorneyColor(),s.primaryLegalAssistantId(),
+				s.primaryLegalAssistantName(),s.primaryLegalAssistantColor(),s.practiceAreaId(),s.practiceAreaName(),row.practiceAreaColor(),
+				row.intakeDate(),row.injuryDate(),row.statuteDate(),row.tortDate(),row.callerContactId(),row.clientContactId(),
+				row.opposingCounselContactId(),row.callerName(),row.clientName(),clients,row.opposingCounselName(),List.of(),row.description());
 	}
 
 	@Override
@@ -718,9 +721,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		CaseOverviewDto getOverview(long caseId);
 
-		List<CaseDao.CaseRow> searchCasesByName(String query);
-
-		List<CaseDao.CaseRow> listAssignedCasesForBoard(int assignedUserId);
+		default List<CaseSummaryDao.ServerCaseRow> searchActiveForServer(int tenant,int actor,String query,int offset,int limit){throw unsupportedCaseLinkGatewayOperation("searchActiveForServer");}
+		default List<CaseSummaryDao.ServerCaseRow> listActiveAssignedForServer(int tenant,int actor,int assignedUserId,int limit){throw unsupportedCaseLinkGatewayOperation("listActiveAssignedForServer");}
 
 		List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId);
 
@@ -812,10 +814,10 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		long createBasicCase(CreateCaseCommand command, int statusId);
 	}
 
-	private record DaoCaseGateway(CaseDao caseDao, CaseDateDao caseDateDao) implements CaseGateway {
+	private record DaoCaseGateway(CaseDao caseDao, CaseDateDao caseDateDao, CaseSummaryDao caseSummaryDao) implements CaseGateway {
 		private DaoCaseGateway {
 			Objects.requireNonNull(caseDao, "caseDao");
-			Objects.requireNonNull(caseDateDao, "caseDateDao");
+			Objects.requireNonNull(caseDateDao, "caseDateDao"); Objects.requireNonNull(caseSummaryDao,"caseSummaryDao");
 		}
 
 		@Override
@@ -829,14 +831,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		}
 
 		@Override
-		public List<CaseDao.CaseRow> searchCasesByName(String query) {
-			return caseDao.searchCasesByName(query);
-		}
-
-		@Override
-		public List<CaseDao.CaseRow> listAssignedCasesForBoard(int assignedUserId) {
-			return caseDao.listAssignedCasesForBoard(assignedUserId);
-		}
+		@Override public List<CaseSummaryDao.ServerCaseRow> searchActiveForServer(int t,int a,String q,int o,int l){return caseSummaryDao.searchActiveForServer(t,a,q,o,l);}
+		@Override public List<CaseSummaryDao.ServerCaseRow> listActiveAssignedForServer(int t,int a,int u,int l){return caseSummaryDao.listActiveAssignedForServer(t,a,u,l);}
 
 		@Override
 		public List<CaseUpdateDto> listCaseUpdates(long caseId, int shaleClientId) {
