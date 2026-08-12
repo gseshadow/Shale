@@ -918,6 +918,16 @@ Phase 6.1 adds a dedicated append-only entity-action audit table because existin
 
 Audit metadata may contain only stable IDs and non-sensitive state markers, including CaseId, CaseLinkId, CaseLinkShareId, ExternalLinkId, LinkTypeId, ContactId, previous/new Primary CaseLinkId, reordered link count, and activation state. It must not contain URLs, descriptions, link notes, share notes, Contact names/emails/phones, credentials, RowVer bytes, raw commands/DTOs, SQL, or exception text. Ordinary application paths insert only and must not update/delete audit history.
 
+Deployed databases must apply the forward-only migration
+`docs/sql/2026-08-12_entity_action_audit_entity_type_constraint.sql` after all earlier audit migrations. It rebuilds the
+durable `EntityType` CHECK from authoritative table/column dependency metadata, preserves values allowed by any
+deployed historical EntityType constraint, and adds the complete production vocabulary: `CASE`, `LINK_TYPE`,
+`CASE_LINK`, `CASE_LINK_SHARE`, `CASE_DATE`, `CALENDAR_EVENT`, `CASE_DATE_ROLE_MAPPING`,
+`CALENDAR_CASE_DATE_TYPE_MAPPING`, `FORM_CONFIGURATION`, `MATERIAL_TYPE`, `MATERIAL_REQUEST`,
+`MATERIAL_REQUEST_FOLLOW_UP`, `MATERIAL_ITEM`, and `USER`. The migration is transactional, repeatable, and verifies
+that the rebuilt constraint is enabled and trusted; historical migrations must not be edited or rerun to obtain this
+constraint update.
+
 Form-configuration replacement uses this same append-only audit contract at the DAO transaction boundary. It records entity type `FORM_CONFIGURATION`, the authoritative configuration id, action `CREATED` for the first saved configuration or `UPDATED` for a replacement, and only `FORM_CONFIGURATION_ID`, stable `FORM_KEY`, `SECTION_COUNT`, `CONFIGURED_FIELD_COUNT`, and `INITIAL_CREATION` metadata. The validated tenant administrator is the actor. The event is inserted on the replacement connection before commit, so audit failure rolls back the configuration, sections, and fields; rejected validation, authorization, tenant, and row-version checks do not emit a mutation event. Labels, configured or entered values, Case data, Contact data, dates, and row-version bytes are prohibited.
 
 ## Phase 6.2 unified Audit Log viewer
