@@ -53,6 +53,24 @@ import jakarta.servlet.http.HttpServletRequest;
 class ApiReadControllerTest {
     private MockMvc mockMvc;
 
+    @Test
+    void createCaseUsesStableAuthoritativeCaseDatesAndSessionIdentity() throws Exception {
+        RecordingCaseServicePort port = new RecordingCaseServicePort();
+        MockMvc mvc = developmentMockMvc(port, unusedPort(TaskServicePort.class), unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class));
+        mvc.perform(post("/api/cases").contentType(MediaType.APPLICATION_JSON)
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41")
+                .content("""{"caseName":"Stable Dates","practiceAreaId":2,"responsibleAttorneyUserId":31,
+                   "caseDates":[{"systemKey":"intake","startsAt":"2026-08-12T09:30:00","allDay":false},
+                   {"systemKey":"date_of_injury","caseDateTypeId":17,"startsAt":"2026-08-01T00:00:00","allDay":true}]}"""))
+                .andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertEquals(41,port.createdCommand.shaleClientId());
+        org.junit.jupiter.api.Assertions.assertEquals(31,port.createdCommand.actorUserId());
+        org.junit.jupiter.api.Assertions.assertEquals("intake",port.createdCommand.caseDates().get(0).systemKey());
+        org.junit.jupiter.api.Assertions.assertFalse(port.createdCommand.caseDates().get(0).allDay());
+        org.junit.jupiter.api.Assertions.assertEquals(17,port.createdCommand.caseDates().get(1).caseDateTypeId());
+    }
+
     @BeforeEach
     void setUp() {
         ApiReadController apiReadController = new ApiReadController(
@@ -823,6 +841,7 @@ class ApiReadControllerTest {
 
 
     private static final class RecordingCaseServicePort implements CaseServicePort {
+        private CaseServicePort.CreateCaseCommand createdCommand;
         private String searchQuery;
         private int searchShaleClientId;
         private int searchLimit;
@@ -890,6 +909,7 @@ class ApiReadControllerTest {
 
         @Override
         public CaseDetailDto createCase(CaseServicePort.CreateCaseCommand command) {
+            createdCommand = command;
             return getCaseDetail(777L, command.shaleClientId()).orElseThrow();
         }
 

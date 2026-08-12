@@ -75,13 +75,13 @@ public final class ApiReadController {
             String caseNumber,
             Integer practiceAreaId,
             Integer responsibleAttorneyUserId,
-            String callerDate,
-            String dateOfInjury,
-            String statuteOfLimitations,
-            String tortNoticeDeadline,
+            List<CreateMappedCaseDateRequest> caseDates,
             String summary,
             String description) {
     }
+
+    public record CreateMappedCaseDateRequest(String systemKey, Integer caseDateTypeId,
+            String startsAt, String endsAt, Boolean allDay) {}
 
     public record UpdateCaseAssignmentRequest(Integer practiceAreaId, Integer responsibleAttorneyUserId) {
     }
@@ -231,17 +231,30 @@ public final class ApiReadController {
         }
         int practiceAreaId = Math.toIntExact(ApiValidation.positiveId(request.practiceAreaId(), "practiceAreaId"));
         int responsibleAttorneyUserId = Math.toIntExact(ApiValidation.positiveId(request.responsibleAttorneyUserId(), "responsibleAttorneyUserId"));
-        LocalDate callerDate = parseOptionalIsoDate(request.callerDate(), "callerDate");
-        LocalDate dateOfInjury = parseOptionalIsoDate(request.dateOfInjury(), "dateOfInjury");
-        LocalDate statuteOfLimitations = parseOptionalIsoDate(request.statuteOfLimitations(), "statuteOfLimitations");
-        LocalDate tortNoticeDeadline = parseOptionalIsoDate(request.tortNoticeDeadline(), "tortNoticeDeadline");
+        List<CaseServicePort.CreateMappedCaseDate> caseDates = request.caseDates() == null ? List.of()
+                : request.caseDates().stream().map(this::parseCreateCaseDate).toList();
         String summary = ApiValidation.optionalCaseSummary(request.summary());
         String description = ApiValidation.optionalCaseDescription(request.description());
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
         return caseServicePort.createCase(new CreateCaseCommand(shaleClientId, userId, caseName, caseNumber,
-                practiceAreaId, responsibleAttorneyUserId, callerDate, dateOfInjury, statuteOfLimitations,
-                tortNoticeDeadline, summary, description));
+                practiceAreaId, responsibleAttorneyUserId, caseDates, summary, description));
+    }
+
+    private CaseServicePort.CreateMappedCaseDate parseCreateCaseDate(CreateMappedCaseDateRequest value) {
+        if (value == null || value.systemKey() == null || value.systemKey().isBlank())
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "caseDates.systemKey is required.");
+        java.time.LocalDateTime startsAt = parseIsoDateTime(value.startsAt(), "caseDates.startsAt");
+        java.time.LocalDateTime endsAt = value.endsAt() == null || value.endsAt().isBlank() ? null
+                : parseIsoDateTime(value.endsAt(), "caseDates.endsAt");
+        return new CaseServicePort.CreateMappedCaseDate(value.systemKey().trim(), value.caseDateTypeId(),
+                startsAt, endsAt, Boolean.TRUE.equals(value.allDay()));
+    }
+
+    private static java.time.LocalDateTime parseIsoDateTime(String value, String field) {
+        if (value == null || value.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " is required.");
+        try { return java.time.LocalDateTime.parse(value.trim()); }
+        catch (java.time.format.DateTimeParseException e) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must be an ISO local date-time."); }
     }
 
     @Operation(summary = "List my tasks", description = "Returns active tasks assigned to the current authenticated user.")

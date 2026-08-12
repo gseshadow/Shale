@@ -34,6 +34,55 @@ public final class CaseDateDao {
     private final CaseCalendarSynchronizer caseCalendarSynchronizer = new CaseCalendarSynchronizer();
     public CaseDateDao(DbSessionProvider db) { this.db = Objects.requireNonNull(db, "db"); this.phiAuditService = new PhiAuditService(new AuditLogDao(db)); }
 
+    /** Outer transaction for web new-case creation; participants never commit or close the connection. */
+    public long createCaseAggregate(CaseDao caseDao, CaseServicePort.CreateCaseCommand command, int statusId) {
+        Objects.requireNonNull(caseDao,"caseDao"); Objects.requireNonNull(command,"command");
+        return new CaseAggregateTransaction(db).execute(con -> {
+            verifyTenant(con,command.shaleClientId());
+            validateSessionActor(con,command.shaleClientId(),command.actorUserId());
+            EnumMap<MigratedCaseDateKey,CaseServicePort.CreateMappedCaseDate> dates=new EnumMap<>(MigratedCaseDateKey.class);
+            for (CaseServicePort.CreateMappedCaseDate value:command.caseDates()) {
+                if(value==null)throw new IllegalArgumentException("Case Date value is required.");
+                MigratedCaseDateKey key=MigratedCaseDateKey.require(value.systemKey());
+                if(dates.putIfAbsent(key,value)!=null)throw new IllegalArgumentException("Duplicate Case Date singleton: "+key.systemKey());
+                if(value.startsAt()==null)throw new IllegalArgumentException("startsAt is required.");
+                if(value.endsAt()!=null&&value.endsAt().isBefore(value.startsAt()))throw new IllegalArgumentException("endsAt cannot precede startsAt.");
+            }
+            long caseId=caseDao.insertBasicCaseAggregate(con,command,statusId);
+            for(var entry:dates.entrySet()) insertCreatedMappedDate(con,command,caseId,entry.getKey(),entry.getValue());
+            entityActionAuditDao.append(con,EntityActionAuditEvent.now(command.shaleClientId(),command.actorUserId(),
+                    EntityActionAuditEvent.EntityType.CASE,caseId,EntityActionAuditEvent.Action.CREATED,null,null,Map.of()));
+            phiAuditService.auditCreate(con,command.actorUserId(),"Cases","Name",caseId,command.caseName());
+            phiAuditService.auditCreate(con,command.actorUserId(),"Cases","Description",caseId,command.description());
+            phiAuditService.auditCreate(con,command.actorUserId(),"Cases","Summary",caseId,command.summary());
+            return caseId;
+        });
+    }
+
+    private void insertCreatedMappedDate(Connection con,CaseServicePort.CreateCaseCommand command,long caseId,
+            MigratedCaseDateKey key,CaseServicePort.CreateMappedCaseDate value)throws SQLException {
+        int effectiveTypeId=requireEffectiveMappedType(con,command.shaleClientId(),key);
+        if(value.caseDateTypeId()!=null&&value.caseDateTypeId()!=effectiveTypeId)
+            throw new IllegalArgumentException("Case Date type is not the effective mapping for "+key.systemKey()+".");
+        TypeRow type=requireSelectableType(con,command.shaleClientId(),effectiveTypeId);
+        validateAllDay(type,value.allDay());
+        long id;
+        try(PreparedStatement ps=con.prepareStatement("INSERT dbo.CaseDates (ShaleClientId,CaseId,CaseDateTypeId,StartsAt,EndsAt,AllDay,CreatedAt,CreatedByUserId) OUTPUT INSERTED.Id VALUES (?,?,?,?,?,?,SYSUTCDATETIME(),?)")){
+            ps.setInt(1,command.shaleClientId());ps.setLong(2,caseId);ps.setInt(3,effectiveTypeId);setLdt(ps,4,value.startsAt());setLdt(ps,5,value.endsAt());ps.setBoolean(6,value.allDay());ps.setInt(7,command.actorUserId());
+            try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalStateException("Case Date was not created.");id=rs.getLong(1);}
+        }
+        audit(con,command.shaleClientId(),command.actorUserId(),caseId,id,EntityActionAuditEvent.Action.CREATED);
+        phiAuditService.auditCreate(con,command.actorUserId(),"CaseDates","StartsAt",id,value.startsAt());
+        phiAuditService.auditCreate(con,command.actorUserId(),"CaseDates","EndsAt",id,value.endsAt());
+    }
+
+    private static void validateSessionActor(Connection con,int tenant,int actor)throws SQLException{
+        try(PreparedStatement ps=con.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT),CAST(SESSION_CONTEXT(N'PrincipalUserId') AS INT)" );ResultSet rs=ps.executeQuery()){
+            if(!rs.next()||rs.getInt(1)!=tenant||rs.getInt(2)!=actor)throw new IllegalStateException("Authenticated SQL session context mismatch.");
+        }
+        validateActor(con,tenant,actor);
+    }
+
     /** Public aggregate boundary used by the converted desktop editor. */
     public CaseDateAggregateResult mutateMigratedCompatibilityDates(CaseDateAggregateCommand command) {
         new CaseAggregateTransaction(db).execute(con -> { mutateMigratedCompatibilityDates(con, command); return null; });

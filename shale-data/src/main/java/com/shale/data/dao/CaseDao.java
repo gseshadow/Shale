@@ -45,6 +45,7 @@ import com.shale.core.semantics.RoleSemantics;
 import com.shale.core.service.CaseServicePort.CaseLinkShareDraft;
 import com.shale.core.service.CaseServicePort.CaseLinkShareUpdate;
 import com.shale.core.service.CaseServicePort.CaseLinkShareRemoval;
+import com.shale.core.service.CaseServicePort;
 
 public final class CaseDao {
 	private static final boolean AUTHORITATIVE_MIGRATED_DATES = true;
@@ -1085,6 +1086,37 @@ public final class CaseDao {
 				}
 			}
 		}
+	}
+
+	/** Connection-bound participant for the authoritative web new-case aggregate. */
+	long insertBasicCaseAggregate(Connection con, CaseServicePort.CreateCaseCommand command, int statusId)
+			throws SQLException {
+		validatePracticeAreaForTenant(con, command.shaleClientId(), command.practiceAreaId());
+		validateResponsibleAttorneyForTenant(con, command.shaleClientId(), command.responsibleAttorneyUserId());
+		try (PreparedStatement check = con.prepareStatement("SELECT 1 FROM dbo.Statuses WHERE Id=? AND (ShaleClientId=? OR ShaleClientId IS NULL) AND IsActive=1 AND IsDeleted=0")) {
+			check.setInt(1,statusId); check.setInt(2,command.shaleClientId());
+			try(ResultSet rs=check.executeQuery()){if(!rs.next())throw new IllegalArgumentException("Case status is invalid for this tenant.");}
+		}
+		String sql = """
+				INSERT INTO dbo.Cases
+				  (Name,CaseNumber,PracticeAreaId,ClientEstate,Description,Summary,
+				   FollowUpMeetWithClient,FollowUpNurseReview,FollowUpExpertReview,FollowUpCaseTransferred,
+				   AcceptedChronology,AcceptedConsultantExpertSearch,AcceptedTestifyingExpertSearch,AcceptedMedicalLiterature,
+				   DeniedChronology,FeeAgreementSigned,MedicalRecordsRequested,IsDeleted,CreatedAt,UpdatedAt,ShaleClientId,IntakeTakenByUserId)
+				OUTPUT INSERTED.Id
+				VALUES (?,?,?,0,?,?,0,0,0,0,0,0,0,0,0,0,0,0,SYSUTCDATETIME(),SYSUTCDATETIME(),?,?)
+				""";
+		long id;
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int i=1; setNullableString(ps,i++,command.caseName()); setNullableString(ps,i++,command.caseNumber());
+			ps.setInt(i++,command.practiceAreaId()); setNullableString(ps,i++,command.description());
+			setNullableString(ps,i++,command.summary()); ps.setInt(i++,command.shaleClientId()); ps.setInt(i,command.actorUserId());
+			try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalStateException("Case was not created.");id=rs.getLong(1);}
+		}
+		Timestamp now = Timestamp.valueOf(LocalDateTime.now(java.time.Clock.systemUTC()));
+		insertCaseStatus(con,id,statusId,now);
+		insertResponsibleAttorney(con,id,command.responsibleAttorneyUserId(),now);
+		return id;
 	}
 
 	private long insertBasicCase(Connection con, int shaleClientId, String caseName, String caseNumber,

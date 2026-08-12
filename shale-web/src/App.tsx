@@ -953,15 +953,18 @@ function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string
     setIsSubmitting(true);
     setSubmitError(null);
     try {
+      const caseDates = [
+        callerDate ? { systemKey: 'intake' as const, startsAt: `${callerDate}T00:00:00`, endsAt: null, allDay: true } : null,
+        dateOfInjury ? { systemKey: 'date_of_injury' as const, startsAt: `${dateOfInjury}T00:00:00`, endsAt: null, allDay: true } : null,
+        statuteOfLimitations ? { systemKey: 'statute_of_limitations' as const, startsAt: `${statuteOfLimitations}T00:00:00`, endsAt: null, allDay: true } : null,
+        tortNoticeDeadline ? { systemKey: 'tort_notice_deadline' as const, startsAt: `${tortNoticeDeadline}T00:00:00`, endsAt: null, allDay: true } : null,
+      ].filter((value): value is NonNullable<typeof value> => value !== null);
       const created = await createCase(accessToken, {
         caseName: caseName.trim(),
         caseNumber: caseNumber.trim() || null,
         practiceAreaId: selectedPracticeAreaId,
         responsibleAttorneyUserId: selectedAttorneyId,
-        callerDate: callerDate || null,
-        dateOfInjury: dateOfInjury || null,
-        statuteOfLimitations: statuteOfLimitations || null,
-        tortNoticeDeadline: tortNoticeDeadline || null,
+        caseDates,
         summary: summary.trim() || null,
         description: description.trim() || null,
       });

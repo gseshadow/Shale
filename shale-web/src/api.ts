@@ -313,12 +313,17 @@ export interface CreateCasePayload {
   caseNumber?: string | null;
   practiceAreaId: number;
   responsibleAttorneyUserId: number;
-  callerDate?: string | null;
-  dateOfInjury?: string | null;
-  statuteOfLimitations?: string | null;
-  tortNoticeDeadline?: string | null;
+  caseDates: CreateMappedCaseDateInput[];
   summary?: string | null;
   description?: string | null;
+}
+
+export interface CreateMappedCaseDateInput {
+  systemKey: 'intake' | 'date_of_injury' | 'statute_of_limitations' | 'tort_notice_deadline';
+  caseDateTypeId?: number | null;
+  startsAt: string;
+  endsAt?: string | null;
+  allDay: boolean;
 }
 
 export class ApiError extends Error {

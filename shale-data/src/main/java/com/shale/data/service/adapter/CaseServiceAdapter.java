@@ -974,10 +974,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		@Override
 		public long createBasicCase(CreateCaseCommand command, int statusId) {
-			return caseDao.createBasicCase(command.shaleClientId(), command.caseName(), command.caseNumber(),
-					command.callerDate(), command.practiceAreaId(), command.responsibleAttorneyUserId(),
-					statusId, command.description(), command.summary(), command.dateOfInjury(),
-					command.statuteOfLimitations(), command.tortNoticeDeadline(), command.actorUserId());
+			return caseDateDao.createCaseAggregate(caseDao, command, statusId);
 		}
 	}
 }
