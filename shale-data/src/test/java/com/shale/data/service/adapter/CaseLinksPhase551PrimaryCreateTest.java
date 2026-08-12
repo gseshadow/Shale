@@ -38,7 +38,8 @@ final class CaseLinksPhase551PrimaryCreateTest {
 				"insertExternalLink(con",
 				"insertCaseLink(con, shaleClientId, actorUserId, caseId, externalId, makePrimaryOnInsert",
 				"insertCaseLinkShare(con");
-		assertTrue(method.contains("catch (Exception e) { con.rollback(); throw e; }"));
+		String compact = method.replaceAll("\\s+", " ");
+		assertTrue(compact.contains("catch (Exception e) { con.rollback(); throw e; }"));
 	}
 
 	@Test

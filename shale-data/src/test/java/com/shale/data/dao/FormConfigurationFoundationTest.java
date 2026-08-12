@@ -43,7 +43,8 @@ class FormConfigurationFoundationTest {
                 ()->assertTrue(source.contains("validateAdmin(con, command.shaleClientId(), command.actorUserId())")),
                 ()->assertTrue(source.contains("ISNULL(is_admin,0)=1")),
                 ()->assertTrue(source.indexOf("validateReferences") < source.indexOf("DELETE FROM dbo.FormConfiguredFields")),
-                ()->assertTrue(source.contains("ShaleClientId=? AND (ShaleClientId=? OR ShaleClientId IS NULL)")));
+                ()->assertTrue(source.contains("t.Id=? AND (t.ShaleClientId=? OR (t.ShaleClientId IS NULL AND EXISTS")),
+                ()->assertTrue(source.contains("pm.ShaleClientId IS NULL AND pm.IsActive=1 AND pm.IsDeleted=0")));
     }
 
     @Test void replacementAuditIsAuthoritativeSafeAndTransactional() throws Exception {

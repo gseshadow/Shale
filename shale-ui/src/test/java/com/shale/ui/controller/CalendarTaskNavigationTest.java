@@ -12,8 +12,9 @@ class CalendarTaskNavigationTest {
     void calendarTaskNavigationUsesSceneManagerTaskDetailsAndRefreshCallback() throws Exception {
         String sceneManager = Files.readString(Path.of("src/main/java/com/shale/ui/navigation/SceneManager.java"));
         String calendarController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
+        String compactSceneManager = sceneManager.replaceAll("\\s+", " ");
 
-        assertTrue(sceneManager.contains("taskId -> openTaskProfile(taskId, c::refreshCurrentRange)"),
+        assertTrue(compactSceneManager.contains("taskId -> openTaskProfile( taskId, c::refreshCurrentRange)"),
                 "Calendar projected task clicks should route through SceneManager's canonical task details opener with a Calendar refresh callback.");
         assertTrue(sceneManager.contains("public void openTaskProfile(Long taskId, Runnable onTaskChanged)"),
                 "SceneManager should expose the existing task details opener with an optional mutation callback instead of adding a Calendar task dialog.");

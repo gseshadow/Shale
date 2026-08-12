@@ -10,8 +10,10 @@ import org.junit.jupiter.api.Test;
 final class CaseSummaryRelatedCasesContractTest {
 	private static String method() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseSummaryDao.java"));
-		return source.substring(source.indexOf("public List<RelatedCaseRow> listActiveRelatedToContact"),
-				source.indexOf("/**\n\t * Executes one bounded query"));
+		int start=source.indexOf("private List<RelatedCaseRow> listActiveRelated("),open=source.indexOf('{',start),depth=0;
+		assertTrue(start>=0&&open>=0,"missing related-Cases query method");
+		for(int i=open;i<source.length();i++){char ch=source.charAt(i);if(ch=='{')depth++;else if(ch=='}'&&--depth==0)return source.substring(start,i+1);}
+		throw new AssertionError("unbalanced related-Cases query method");
 	}
 
 	@Test void relationshipAndBothEntitiesAreTenantAndActiveConstrained() throws Exception {
