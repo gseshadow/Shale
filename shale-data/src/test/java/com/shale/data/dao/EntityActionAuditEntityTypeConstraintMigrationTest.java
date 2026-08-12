@@ -22,9 +22,7 @@ final class EntityActionAuditEntityTypeConstraintMigrationTest {
             "MATERIAL_REQUEST_FOLLOW_UP", "MATERIAL_ITEM", "CASE_DATE", "CALENDAR_EVENT",
             "CASE_DATE_ROLE_MAPPING", "CALENDAR_CASE_DATE_TYPE_MAPPING", "FORM_CONFIGURATION", "USER");
 
-    private static String sql() throws Exception {
-        return Files.readString(MIGRATION);
-    }
+    private static String sql() throws Exception { return Files.readString(MIGRATION); }
 
     @Test
     void acceptsEveryEmittedAndPreviouslyDeployedEntityType() throws Exception {
@@ -38,35 +36,75 @@ final class EntityActionAuditEntityTypeConstraintMigrationTest {
     }
 
     @Test
-    void isForwardOnlyTransactionalIdempotentTrustedAndRollsBackOnFailure() throws Exception {
+    void preservesUnrelatedEntityTypeChecksAndReplacesExactlyOneValidatedAllowlist() throws Exception {
         String migration = sql();
-        assertTrue(migration.contains("SET XACT_ABORT ON"));
-        assertTrue(migration.contains("BEGIN TRY\n    BEGIN TRANSACTION"));
-        assertTrue(migration.contains("COMMIT TRANSACTION"));
-        assertTrue(migration.contains("IF XACT_STATE() <> 0 ROLLBACK TRANSACTION"));
-        assertTrue(migration.contains("THROW;"));
-        assertTrue(migration.contains("WITH CHECK ADD CONSTRAINT"));
-        assertTrue(migration.contains("CHECK CONSTRAINT CK_EntityActionAuditLog_EntityType"));
-        assertTrue(migration.contains("cc.is_disabled = 0"));
-        assertTrue(migration.contains("cc.is_not_trusted = 0"));
-        assertTrue(migration.contains("sys.sql_expression_dependencies"));
-        assertTrue(migration.contains("dep.referenced_minor_id = @EntityTypeColumnId"));
-        assertTrue(migration.contains("QUOTENAME(@ConstraintName)"));
-        assertTrue(migration.contains("Preserve every quoted value allowed"));
-        assertFalse(migration.contains("2026-07-20_entity_action_audit_phase61.sql"));
-        assertFalse(migration.contains("2026-08-03_users_management_completion.sql"));
+        assertTrue(migration.contains("IsPositiveAllowlist"));
+        assertTrue(migration.contains("COUNT(*) FROM @Checks WHERE IsPositiveAllowlist = 1) <> 1"));
+        assertTrue(migration.contains("@AllowlistName"));
+        assertTrue(migration.contains("QUOTENAME(@AllowlistName)"));
+        assertFalse(migration.contains("QUOTENAME(@ConstraintName)"), "must not loop over and drop every check");
+        assertTrue(migration.contains("before_check.ObjectId <> @AllowlistObjectId"));
+        assertTrue(migration.contains("after_check.definition = before_check.ConstraintDefinition"));
+        assertTrue(migration.contains("after_check.is_disabled = before_check.IsDisabled"));
+        assertTrue(migration.contains("after_check.is_not_trusted = before_check.IsNotTrusted"));
     }
 
     @Test
-    void neverMutatesAuditDataOrCreatesAnotherAuditTable() throws Exception {
-        String migration = sql().toUpperCase();
-        assertFalse(Pattern.compile("\\b(UPDATE|DELETE|MERGE|TRUNCATE)\\s+(?:TABLE\\s+)?DBO\\.ENTITYACTIONAUDITLOG\\b")
-                .matcher(migration).find());
-        assertFalse(Pattern.compile("\\bINSERT\\s+(?:INTO\\s+)?DBO\\.ENTITYACTIONAUDITLOG\\b")
-                .matcher(migration).find());
-        assertFalse(migration.contains("CREATE TABLE DBO.ENTITYACTIONAUDITLOG"));
-        assertEquals(1, Pattern.compile("ALTER TABLE DBO\\.ENTITYACTIONAUDITLOG WITH CHECK ADD CONSTRAINT")
-                .matcher(migration).results().count());
+    void parsesOnlyCompletePositiveInOrEqualityAllowlistGrammar() throws Exception {
+        String migration = sql();
+        assertTrue(migration.contains("LEFT(@Expression, 12) = N'ENTITYTYPEIN'"));
+        assertTrue(migration.contains("LEFT(@Expression, 11) = N'ENTITYTYPE='"));
+        assertTrue(migration.contains("IF LEFT(@Work, 1) <> N',' SET @Valid = 0"));
+        assertTrue(migration.contains("IF LEFT(@Work, 2) <> N'OR' SET @Valid = 0"));
+        assertTrue(migration.contains("LIKE N'%[^A-Z_]%'"));
+        assertTrue(migration.contains("ELSE SET @Valid = 0"));
+        assertTrue(migration.contains("DELETE FROM @Extracted WHERE ConstraintObjectId = @CheckId"));
+        assertTrue(migration.contains("Value = 'LINK_TYPE'"));
+        assertTrue(migration.contains("Value = 'CASE_LINK'"));
+        assertTrue(migration.contains("Value = 'CASE_LINK_SHARE'"));
+        assertFalse(recognizedByDocumentedGrammar("EntityType NOT IN ('EVIL')"));
+        assertFalse(recognizedByDocumentedGrammar("EntityType <> 'EVIL'"));
+        assertFalse(recognizedByDocumentedGrammar("LEN(EntityType) > 0"));
+        assertFalse(recognizedByDocumentedGrammar("EntityType = 'CASE' AND 1 = 1"));
+        assertFalse(recognizedByDocumentedGrammar("EntityType IN ('CASE', broken)"));
+        assertTrue(recognizedByDocumentedGrammar("EntityType IN ('CASE','CALENDAR_EVENT')"));
+        assertTrue(recognizedByDocumentedGrammar("EntityType='CASE' OR EntityType='USER'"));
+    }
+
+    @Test
+    void ambiguityMalformedDiscoveryAndIncompatibleRowsFailBeforeDdl() throws Exception {
+        String migration = sql();
+        int ambiguityGuard = migration.indexOf("allowlist discovery is missing or ambiguous");
+        int dataGuard = migration.indexOf("Existing EntityActionAuditLog rows contain an EntityType");
+        int drop = migration.indexOf("ALTER TABLE dbo.EntityActionAuditLog DROP CONSTRAINT");
+        assertTrue(ambiguityGuard > 0 && ambiguityGuard < drop);
+        assertTrue(dataGuard > ambiguityGuard && dataGuard < drop);
+        assertTrue(migration.contains("NOT EXISTS (SELECT 1 FROM @Allowed AS a WHERE a.Value = audit_row.EntityType)"));
+        assertFalse(migration.toUpperCase().matches("(?s).*UPDATE\\s+DBO\\.ENTITYACTIONAUDITLOG.*"));
+        assertFalse(migration.toUpperCase().matches("(?s).*DELETE\\s+FROM\\s+DBO\\.ENTITYACTIONAUDITLOG.*"));
+    }
+
+    @Test
+    void rerunIsTransactionalRollbackSafeAndProducesOneTrustedCanonicalConstraint() throws Exception {
+        String migration = sql();
+        assertTrue(migration.contains("SET XACT_ABORT ON"));
+        assertTrue(migration.contains("BEGIN TRY\n    BEGIN TRANSACTION"));
+        assertTrue(migration.contains("WITH CHECK ADD CONSTRAINT"));
+        assertTrue(migration.contains("CHECK CONSTRAINT CK_EntityActionAuditLog_EntityType"));
+        assertTrue(migration.contains("name = N'CK_EntityActionAuditLog_EntityType'"));
+        assertTrue(migration.contains("is_disabled = 0 AND is_not_trusted = 0) <> 1"));
+        assertTrue(migration.contains("COMMIT TRANSACTION"));
+        assertTrue(migration.contains("IF XACT_STATE() <> 0 ROLLBACK TRANSACTION"));
+        assertTrue(migration.contains("THROW;"));
+        assertFalse(migration.contains("CREATE TABLE dbo.EntityActionAuditLog"));
+        assertFalse(migration.contains("2026-07-20_entity_action_audit_phase61.sql"));
+    }
+
+    private static boolean recognizedByDocumentedGrammar(String expression) {
+        String normalized = expression.toUpperCase().replaceAll("[\\s\\[\\]()]", "");
+        String value = "'[A-Z_]+'";
+        return normalized.matches("ENTITYTYPEIN" + value + "(?:," + value + ")*")
+                || normalized.matches("ENTITYTYPE=" + value + "(?:ORENTITYTYPE=" + value + ")*");
     }
 
     private static Set<String> seededValues(String migration) {
