@@ -953,15 +953,18 @@ function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string
     setIsSubmitting(true);
     setSubmitError(null);
     try {
+      const caseDates = [
+        callerDate ? { systemKey: 'intake' as const, startsAt: `${callerDate}T00:00:00`, endsAt: null, allDay: true } : null,
+        dateOfInjury ? { systemKey: 'date_of_injury' as const, startsAt: `${dateOfInjury}T00:00:00`, endsAt: null, allDay: true } : null,
+        statuteOfLimitations ? { systemKey: 'statute_of_limitations' as const, startsAt: `${statuteOfLimitations}T00:00:00`, endsAt: null, allDay: true } : null,
+        tortNoticeDeadline ? { systemKey: 'tort_notice_deadline' as const, startsAt: `${tortNoticeDeadline}T00:00:00`, endsAt: null, allDay: true } : null,
+      ].filter((value): value is NonNullable<typeof value> => value !== null);
       const created = await createCase(accessToken, {
         caseName: caseName.trim(),
         caseNumber: caseNumber.trim() || null,
         practiceAreaId: selectedPracticeAreaId,
         responsibleAttorneyUserId: selectedAttorneyId,
-        callerDate: callerDate || null,
-        dateOfInjury: dateOfInjury || null,
-        statuteOfLimitations: statuteOfLimitations || null,
-        tortNoticeDeadline: tortNoticeDeadline || null,
+        caseDates,
         summary: summary.trim() || null,
         description: description.trim() || null,
       });
@@ -1756,10 +1759,10 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
       <section aria-labelledby="important-dates-title">
         <h2 id="important-dates-title">Important Dates</h2>
         <dl className="detail-list compact">
-          <DetailItem label="Intake Date" value={formatDate(detail.callerDate)} />
-          <DetailItem label="Date of Injury" value={formatDate(detail.dateOfInjury)} />
-          <DetailItem label="Statute of Limitations" value={formatDate(detail.statuteOfLimitations)} />
-          <DetailItem label="Tort Notice Deadline" value={formatDate(detail.tortNoticeDeadline)} />
+          <DetailItem label="Intake Date" value={formatMappedCaseDate(detail, 'intake')} />
+          <DetailItem label="Date of Injury" value={formatMappedCaseDate(detail, 'date_of_injury')} />
+          <DetailItem label="Statute of Limitations" value={formatMappedCaseDate(detail, 'statute_of_limitations')} />
+          <DetailItem label="Tort Notice Deadline" value={formatMappedCaseDate(detail, 'tort_notice_deadline')} />
         </dl>
       </section>
 
@@ -1879,9 +1882,9 @@ function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { access
 function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
   const [caseName, setCaseName] = useState(detail.caseName || '');
   const [description, setDescription] = useState(detail.description || '');
-  const [dateOfInjury, setDateOfInjury] = useState(toDateInputValue(detail.dateOfInjury));
-  const [statuteOfLimitations, setStatuteOfLimitations] = useState(toDateInputValue(detail.statuteOfLimitations));
-  const [tortNoticeDeadline, setTortNoticeDeadline] = useState(toDateInputValue(detail.tortNoticeDeadline));
+  const [dateOfInjury, setDateOfInjury] = useState(mappedDateInput(detail, 'date_of_injury'));
+  const [statuteOfLimitations, setStatuteOfLimitations] = useState(mappedDateInput(detail, 'statute_of_limitations'));
+  const [tortNoticeDeadline, setTortNoticeDeadline] = useState(mappedDateInput(detail, 'tort_notice_deadline'));
   const [summary, setSummary] = useState(detail.summary || '');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1908,11 +1911,14 @@ function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { acces
       const updated = await updateCaseCoreDetails(accessToken, detail.caseId, {
         caseName: trimmedCaseName,
         description,
-        dateOfInjury: dateOfInjury || null,
-        statuteOfLimitations: statuteOfLimitations || null,
-        tortNoticeDeadline: tortNoticeDeadline || null,
         summary,
         expectedRowVer: detail.rowVer,
+        mappedCaseDates: detail.mappedCaseDates.map((date) => {
+          const edited = date.systemKey === 'date_of_injury' ? dateOfInjury
+            : date.systemKey === 'statute_of_limitations' ? statuteOfLimitations
+            : date.systemKey === 'tort_notice_deadline' ? tortNoticeDeadline : undefined;
+          return edited === undefined ? date : { ...date, startsAt: edited ? `${edited}T00:00:00` : null, endsAt: null, allDay: true };
+        }),
       });
       onSaved(updated);
     } catch (caught) {
@@ -1951,6 +1957,23 @@ function toDateInputValue(value: string | null | undefined): string {
   }
   const match = /^(\d{4}-\d{2}-\d{2})/.exec(value);
   return match ? match[1] : '';
+}
+
+function mappedCaseDate(detail: CaseDetail, systemKey: string) {
+  return detail.mappedCaseDates?.find((date) => date.systemKey === systemKey);
+}
+
+function mappedDateInput(detail: CaseDetail, systemKey: string): string {
+  const date = mappedCaseDate(detail, systemKey);
+  return date && !date.absent && date.startsAt ? date.startsAt.slice(0, 10) : '';
+}
+
+function formatMappedCaseDate(detail: CaseDetail, systemKey: string): string | null {
+  const date = mappedCaseDate(detail, systemKey);
+  if (!date || date.absent || !date.startsAt) return null;
+  if (date.allDay) return formatDate(date.startsAt.slice(0, 10));
+  const parsed = new Date(date.startsAt);
+  return Number.isNaN(parsed.getTime()) ? date.startsAt : parsed.toLocaleString();
 }
 
 function StatusTimelineSection({ accessToken, detail, history, onDetailChanged }: { accessToken: string | null; detail: CaseDetail; history: CaseStatusHistoryItem[]; onDetailChanged: (detail: CaseDetail) => void }) {

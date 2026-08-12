@@ -19,7 +19,7 @@ public record EntityActionAuditEvent(
 		String source,
 		Map<MetadataKey, String> metadata) {
 
-	public enum EntityType { LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM }
+	public enum EntityType { CASE, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CALENDAR_EVENT, CASE_DATE_ROLE_MAPPING, CALENDAR_CASE_DATE_TYPE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER }
 
 	public enum Action {
 		CREATED,
@@ -38,13 +38,17 @@ public record EntityActionAuditEvent(
 		LINKED,
 		UNLINKED,
 		LOCATION_UPDATED,
-		RELEASED
+		RELEASED,
+		RESTORED
 	}
 
 	public enum MetadataKey {
 		CASE_ID,
 		CASE_LINK_ID,
 		CASE_LINK_SHARE_ID,
+		CASE_DATE_ID,
+		CALENDAR_EVENT_ID,
+		CALENDAR_EVENT_TYPE_ID,
 		EXTERNAL_LINK_ID,
 		LINK_TYPE_ID,
 		CONTACT_ID,
@@ -66,7 +70,20 @@ public record EntityActionAuditEvent(
 		QUANTITY_COUNT,
 		PAGE_COUNT,
 		FILE_COUNT,
-		HAS_EXTERNAL_LINK
+		HAS_EXTERNAL_LINK,
+		TARGET_USER_ID,
+		ADMIN_ROLE,
+		ATTORNEY_ROLE,
+		FORM_CONFIGURATION_ID,
+		FORM_KEY,
+		SECTION_COUNT,
+		CONFIGURED_FIELD_COUNT,
+		INITIAL_CREATION,
+		SEMANTIC_ROLE,
+		CASE_DATE_TYPE_ID,
+		CASE_DATE_TO_CALENDAR,
+		CALENDAR_TO_CASE_DATE
+		,SYNCHRONIZATION_DIRECTION
 	}
 
 	private static final Set<String> PROHIBITED_KEY_FRAGMENTS = Set.of(
@@ -87,11 +104,18 @@ public record EntityActionAuditEvent(
 
 	private static boolean isAllowedCombination(EntityType entityType, Action action) {
 		return switch (entityType) {
+			case CASE -> action == Action.DELETED || action == Action.RESTORED;
 			case LINK_TYPE, MATERIAL_TYPE -> action == Action.CREATED || action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.OVERRIDE_RESET || action == Action.DELETED || action == Action.REMOVED;
 			case CASE_LINK -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.PRIMARY_SET || action == Action.REORDERED;
 			case CASE_LINK_SHARE -> action == Action.ADDED || action == Action.UPDATED || action == Action.REMOVED;
+			case CASE_DATE -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.ACTIVATED || action == Action.RESTORED || action == Action.LINKED || action == Action.UNLINKED;
+			case CALENDAR_EVENT -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.RESTORED || action == Action.LINKED || action == Action.UNLINKED;
+			case CASE_DATE_ROLE_MAPPING -> action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.OVERRIDE_RESET;
+			case CALENDAR_CASE_DATE_TYPE_MAPPING -> action == Action.CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.DELETED;
+			case FORM_CONFIGURATION -> action == Action.CREATED || action == Action.UPDATED;
 			case MATERIAL_REQUEST -> action == Action.CREATED || action == Action.UPDATED || action == Action.STATUS_CHANGED || action == Action.FOLLOW_UP_ADDED || action == Action.LINKED || action == Action.DELETED;
 			case MATERIAL_REQUEST_FOLLOW_UP -> action == Action.CREATED || action == Action.FOLLOW_UP_ADDED;
+			case USER -> action == Action.CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.REMOVED;
 			case MATERIAL_ITEM -> action == Action.CREATED || action == Action.UPDATED || action == Action.LINKED || action == Action.UNLINKED || action == Action.LOCATION_UPDATED || action == Action.RELEASED || action == Action.DELETED;
 		};
 	}

@@ -11,6 +11,10 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -18,7 +22,10 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseSummaryDao;
+import com.shale.data.dao.CaseSummaryDao.CaseGridRow;
 import com.shale.data.dao.CaseDao.CaseSort;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
@@ -30,6 +37,9 @@ import com.shale.ui.export.CaseXlsxExporter;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.ControlStyles;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -67,6 +77,7 @@ import javafx.stage.Window;
 import javafx.util.Duration;
 
 public final class CasesController {
+	private static final Logger LOG = LoggerFactory.getLogger(CasesController.class);
 
 	private static final int LATEST_CASE_UPDATE_PREVIEW_LIMIT = 100;
 	private static final int DESCRIPTION_PREVIEW_LIMIT = 100;
@@ -114,6 +125,7 @@ public final class CasesController {
 	private FlowPane casesFlow;
 
 	private CaseDao caseDao;
+	private CaseSummaryDao caseSummaryDao;
 	private CaseTaskService caseTaskService;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
@@ -140,6 +152,10 @@ public final class CasesController {
 	private Consumer<Integer> onOpenCase;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
 	private boolean liveSubscribed;
+	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> caseDatesUpdatedHandler;
+	private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
+	private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
+	private final long controllerCreatedNanos = PerfLog.start();
 
 	private final Set<Integer> selectedStatusIds = new LinkedHashSet<>();
 	private List<CaseListUiSupport.StatusFilterOption> statusFilterOptions = List.of();
@@ -159,11 +175,13 @@ public final class CasesController {
 	public void init(AppState appState,
 			UiRuntimeBridge runtimeBridge,
 			CaseDao caseDao,
+			CaseSummaryDao caseSummaryDao,
 			CaseTaskService caseTaskService, CaseExportService caseExportService,
 			Consumer<Integer> onOpenCase) {
 		System.out.println("CasesController.init()");
 		PerfLog.log("CTRL", "start", "controller=CasesController page=cases_list");
 		this.caseDao = caseDao;
+		this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
 		this.caseTaskService = caseTaskService;
 		this.caseExportService = caseExportService;
 		this.onOpenCase = onOpenCase;
@@ -176,6 +194,9 @@ public final class CasesController {
 	@FXML
 	private void initialize() {
 		System.out.println("CasesController.initialize()");
+		long initializeStartedNanos = PerfLog.start();
+
+		applySemanticControls();
 
 		// sort choices
 		if (casesSortChoice != null) {
@@ -216,6 +237,7 @@ public final class CasesController {
 		initializeGridRowActions();
 		initializeStatusFilter();
 		initializeExportMenu();
+		PerfLog.logDone("CTRL", "operation=cases-load boundary=defaults-finalized", initializeStartedNanos);
 
 		Platform.runLater(() ->
 		{
@@ -224,7 +246,7 @@ public final class CasesController {
 				return;
 			}
 			wireInfiniteScroll();
-			loadFirstPage();
+			PerfLog.logDone("CTRL", "operation=cases-load boundary=status-filter-load-pending", controllerCreatedNanos);
 		});
 		if (casesFlow != null) {
 			casesFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -237,6 +259,16 @@ public final class CasesController {
 		}
 
 		subscribeLiveCaseUpdates();
+	}
+
+	private void applySemanticControls() {
+		if (casesSearchField != null) ControlStyles.formControl(casesSearchField);
+		if (casesSortChoice != null) ControlStyles.formControl(casesSortChoice);
+		if (statusFilterMenuButton != null) ControlStyles.formControl(statusFilterMenuButton);
+		if (cardsViewToggle != null) ControlStyles.apply(cardsViewToggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+		if (gridViewToggle != null) ControlStyles.apply(gridViewToggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+		if (columnMenuButton != null) ControlStyles.apply(columnMenuButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		if (exportMenuButton != null) ControlStyles.apply(exportMenuButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 	}
 
 	private void initializeExportMenu() {
@@ -481,8 +513,10 @@ public final class CasesController {
 		if (exportInProgress || caseExportService == null || appState == null) return;
 		Integer tenantId = appState.getShaleClientId();
 		if (tenantId == null || tenantId <= 0) { showActionError("No tenant is selected."); return; }
-		CaseExportService.CasesCriteria criteria = new CaseExportService.CasesCriteria(tenantId, selectedSort(),
-				includeClosedDeniedInQuery(), normalizedSearchQuery(), new LinkedHashSet<>(selectedStatusIds));
+		if (statusFilterOptions.isEmpty()) { showActionError("Cases are still initializing. Please try again."); return; }
+		Set<Integer> statusesSnapshot = new LinkedHashSet<>(selectedStatusIds);
+		CaseExportService.CasesCriteria criteria = new CaseExportService.CasesCriteria(tenantId, gridOrder(selectedSort()),
+				normalizedSearchQuery(), statusMode(statusesSnapshot, statusFilterOptions), statusesSnapshot);
 		FileChooser chooser = new FileChooser();
 		chooser.setTitle(format == ExportFormat.XLSX ? "Export Cases to XLSX" : "Export Cases to CSV");
 		chooser.setInitialFileName(format == ExportFormat.XLSX ? "cases-export.xlsx" : "cases-export.csv");
@@ -503,6 +537,8 @@ public final class CasesController {
 				else writeCsv(file, daoRows.stream().map(this::toViewModel).toList());
 				Platform.runLater(() -> finishExport(() -> showExportSuccess(file)));
 			} catch (Exception ex) {
+				LOG.error("Cases export failed format={} tenantId={} outputPath={} statusMode={} statusCount={}",
+						format, tenantId, file.toPath().toAbsolutePath(), criteria.statusMode(), criteria.statusIds().size(), ex);
 				Platform.runLater(() -> finishExport(() -> showExportError(file)));
 			}
 		});
@@ -514,13 +550,24 @@ public final class CasesController {
 		feedback.run();
 	}
 
-	private CaseCardVm toViewModel(CaseDao.CaseRow row) {
-		return new CaseCardVm(row.id(), safe(row.name()), row.intakeDate(), row.statuteOfLimitationsDate(),
-				row.primaryStatusId(), safe(row.responsibleAttorneyName()), safe(row.responsibleAttorneyColor()),
-				row.nonEngagementLetterSent(), safe(row.primaryStatusName()), safe(row.primaryStatusColor()),
+	private CaseCardVm toViewModel(CaseGridRow row) {
+		var summary = row.summary();
+		return new CaseCardVm(summary.caseId(), safe(summary.caseName()), row.intakeDate(), row.statuteOfLimitationsDate(),
+				summary.primaryStatusId(), safe(summary.responsibleAttorneyName()), safe(summary.responsibleAttorneyColor()),
+				row.nonEngagementLetterSent(), safe(summary.primaryStatusName()), safe(summary.primaryStatusColor()),
 				safe(row.practiceAreaColor()), safe(row.clientName()), safe(row.opposingPartiesName()),
 				safe(row.latestCaseUpdate()), safe(row.description()), row.dateOfIncident(), row.tortClaimsNoticeDeadline());
 	}
+
+	private CaseCardVm toViewModel(CaseExportService.ExportCaseRow row) {
+		var summary = row.summary();
+		return new CaseCardVm(summary.caseId(), safe(summary.caseName()), row.intakeDate(), row.statuteOfLimitationsDate(),
+				summary.primaryStatusId(), safe(summary.responsibleAttorneyName()), safe(summary.responsibleAttorneyColor()),
+				null, safe(summary.primaryStatusName()), safe(summary.primaryStatusColor()), "", safe(row.clientName()),
+				safe(row.opposingPartiesName()), safe(row.latestCaseUpdate()), safe(row.description()), row.dateOfIncident(),
+				row.tortClaimsNoticeDeadline());
+	}
+
 
 	private void writeCsv(File file, List<CaseCardVm> rows) throws IOException {
 		try (BufferedWriter writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
@@ -654,7 +701,28 @@ public final class CasesController {
 			}
 		};
 		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		caseDatesUpdatedHandler = this::handleCaseDatesUpdated;
+		runtimeBridge.subscribeEntityUpdated(caseDatesUpdatedHandler);
 		liveSubscribed = true;
+	}
+
+	private void handleCaseDatesUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
+		if (event == null || !LiveUpdateEvents.ENTITY_CASE_DATES.equals(event.entityType()) || appState == null) return;
+		Integer tenant = appState.getShaleClientId();
+		if (tenant == null || tenant <= 0 || event.shaleClientId() != tenant || event.entityId() <= 0) return;
+		String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+		if (!mine.isBlank() && mine.equals(event.clientInstanceId())) return;
+		if (!rememberCaseDatesEvent(event.eventId()) || !caseDatesRefreshQueued.compareAndSet(false, true)) return;
+		Platform.runLater(() -> { caseDatesRefreshQueued.set(false); loadFirstPage(); });
+	}
+
+	private boolean rememberCaseDatesEvent(String eventId) {
+		if (eventId == null || eventId.isBlank()) return true;
+		synchronized (seenCaseDatesEventIds) {
+			if (!seenCaseDatesEventIds.add(eventId)) return false;
+			while (seenCaseDatesEventIds.size() > 256) seenCaseDatesEventIds.remove(seenCaseDatesEventIds.iterator().next());
+			return true;
+		}
 	}
 
 	private void unsubscribeLiveCaseUpdates() {
@@ -662,6 +730,7 @@ public final class CasesController {
 			return;
 		}
 		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		if (caseDatesUpdatedHandler != null) runtimeBridge.unsubscribeEntityUpdated(caseDatesUpdatedHandler);
 		liveSubscribed = false;
 	}
 
@@ -777,6 +846,7 @@ public final class CasesController {
 		final int generationAtSubmit = loadGeneration;
 		final String queryAtSubmit = normalizedSearchQuery();
 		final Set<Integer> statusesAtSubmit = new LinkedHashSet<>(selectedStatusIds);
+		final CaseSummaryDao.GridStatusMode statusModeAtSubmit = statusMode(statusesAtSubmit, statusFilterOptions);
 		final Long knownTotalAtSubmit = knownResultsTotal(queryAtSubmit, statusesAtSubmit);
 		final boolean gridAtSubmit = isGridViewActive();
 		final CaseSort sortAtSubmit = selectedSort();
@@ -785,36 +855,35 @@ public final class CasesController {
 		dbExec.submit(() ->
 		{
 			try {
+				long loadStartedNanos = PerfLog.start();
+				PerfLog.log("CTRL", "start", "operation=cases-load boundary=background-dao-start loadGeneration="
+						+ generationAtSubmit + " pageIndex=" + pageToLoad);
 				long daoStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=findCasesViewPage page=cases_list pageIndex=" + pageToLoad + " grid=" + gridAtSubmit);
-				var page = caseDao.findCasesViewPage(pageToLoad, pageSize, sortAtSubmit, includeClosedDeniedAtSubmit, queryAtSubmit, statusesAtSubmit, knownTotalAtSubmit);
+				int tenantId = requireTenantId();
+				var page = caseSummaryDao.findActiveGridPage(tenantId, pageToLoad, pageSize, gridOrder(sortAtSubmit), queryAtSubmit,
+						statusModeAtSubmit, statusesAtSubmit, knownTotalAtSubmit);
 				PerfLog.logDone("DAO", "method=findCasesViewPage page=cases_list pageIndex=" + pageToLoad + " rows=" + (page == null || page.items() == null ? 0 : page.items().size()), daoStartNanos);
+				PerfLog.logDone("CTRL", "operation=cases-load boundary=dao-complete loadGeneration="
+						+ generationAtSubmit + " pageIndex=" + pageToLoad, daoStartNanos);
 
 				// map DAO rows into UI VM
-				long mapStartNanos = PerfLog.start();
+				long projectionStartNanos = PerfLog.start();
 				PerfLog.log("DAO_MAP", "start", "method=findPage page=cases_list rows=" + (page == null || page.items() == null ? 0 : page.items().size()));
+				int projectionChunks = 0;
+				PerfLog.logDone("DAO", "operation=cases-load phase=projection-hydration pageIndex=" + pageToLoad
+						+ " pageSize=" + pageSize + " resultCount=" + page.items().size() + " queryCount="
+						+ projectionChunks + " projectionChunkCount=" + projectionChunks, projectionStartNanos);
+				long mapStartNanos = PerfLog.start();
 				List<CaseCardVm> newItems = page.items().stream()
-						.map(r -> new CaseCardVm(
-								r.id(),
-								safe(r.name()),
-								r.intakeDate(),
-								r.statuteOfLimitationsDate(),
-								r.primaryStatusId(),
-								safe(r.responsibleAttorneyName()),
-								safe(r.responsibleAttorneyColor()),
-								r.nonEngagementLetterSent(),
-								safe(r.primaryStatusName()),
-								safe(r.primaryStatusColor()),
-								safe(r.practiceAreaColor()),
-								safe(r.clientName()),
-								safe(r.opposingPartiesName()),
-								safe(r.latestCaseUpdate()),
-								safe(r.description()),
-								r.dateOfIncident(),
-								r.tortClaimsNoticeDeadline()
-						))
+						.map(this::toViewModel)
 						.toList();
-				PerfLog.logDone("DAO_MAP", "method=findPage page=cases_list rows=" + newItems.size(), mapStartNanos);
+				PerfLog.logDone("DAO_MAP", "operation=cases-load phase=projection-merge-dto-map pageIndex="
+						+ pageToLoad + " resultCount=" + newItems.size(), mapStartNanos);
+				PerfLog.logDone("CTRL", "operation=cases-load boundary=complete-background loadGeneration="
+						+ generationAtSubmit + " pageIndex=" + pageToLoad + " resultCount=" + newItems.size()
+						+ " queryCount=" + (1 + (knownTotalAtSubmit == null ? 1 : 0) + projectionChunks)
+						+ " totalCached=" + (knownTotalAtSubmit != null), loadStartedNanos);
 
 				Platform.runLater(() ->
 				{
@@ -833,12 +902,17 @@ public final class CasesController {
 
 					// Render according to current search/sort
 					rerender();
+					PerfLog.logDone("CTRL", "operation=cases-load boundary=page-applied-rendered loadGeneration="
+							+ generationAtSubmit + " pageIndex=" + pageToLoad + " resultCount=" + newItems.size(), loadStartedNanos);
 
 					System.out.println("Loaded cases page " + pageToLoad + ": " + newItems.size()
 							+ " (loaded=" + loaded.size() + " / total=" + page.total() + ")");
 				});
 
 			} catch (Exception ex) {
+				LOG.error("Cases grid load failed tenantId={} page={} pageSize={} sort={} searchEnabled={} statusMode={} statusCount={}",
+						appState == null ? null : appState.getShaleClientId(), pageToLoad, pageSize, sortAtSubmit,
+						!queryAtSubmit.isBlank(), statusModeAtSubmit, statusesAtSubmit.size(), ex);
 				Platform.runLater(() ->
 				{
 					if (generationAtSubmit != loadGeneration) {
@@ -928,7 +1002,8 @@ public final class CasesController {
 			try {
 				long daoStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=countForCasesView page=cases_list");
-				long total = caseDao.countForCasesView(query, statusesSnapshot);
+				long total = caseSummaryDao.countActiveGrid(requireTenantId(), query,
+						statusMode(statusesSnapshot, statusFilterOptions), statusesSnapshot);
 				PerfLog.logDone("DAO", "method=countForCasesView page=cases_list rows=1", daoStartNanos);
 				Platform.runLater(() ->
 				{
@@ -978,6 +1053,39 @@ public final class CasesController {
 		return false;
 	}
 
+	private int requireTenantId() {
+		Integer tenant = appState == null ? null : appState.getShaleClientId();
+		if (tenant == null || tenant <= 0) throw new SecurityException("Cases grid tenant is not authorized.");
+		return tenant;
+	}
+
+	private static CaseSummaryDao.GridOrder gridOrder(CaseSort sort) {
+		return switch (sort) {
+			case INTAKE_NEWEST -> CaseSummaryDao.GridOrder.INTAKE_NEWEST;
+			case INTAKE_OLDEST -> CaseSummaryDao.GridOrder.INTAKE_OLDEST;
+			case STATUTE_SOONEST -> CaseSummaryDao.GridOrder.STATUTE_SOONEST;
+			case STATUTE_LATEST -> CaseSummaryDao.GridOrder.STATUTE_LATEST;
+			case CASE_NAME_ASC -> CaseSummaryDao.GridOrder.CASE_NAME_ASC;
+			case CASE_NAME_DESC -> CaseSummaryDao.GridOrder.CASE_NAME_DESC;
+			case RESPONSIBLE_ATTORNEY_ASC -> CaseSummaryDao.GridOrder.RESPONSIBLE_ATTORNEY_ASC;
+			case RESPONSIBLE_ATTORNEY_DESC -> CaseSummaryDao.GridOrder.RESPONSIBLE_ATTORNEY_DESC;
+			case CASE_STATUS_ASC -> CaseSummaryDao.GridOrder.CASE_STATUS_ASC;
+			case CASE_STATUS_DESC -> CaseSummaryDao.GridOrder.CASE_STATUS_DESC;
+			default -> throw new IllegalArgumentException("Unsupported Cases grid sort: " + sort);
+		};
+	}
+
+	static CaseSummaryDao.GridStatusMode statusMode(Set<Integer> selected,
+			List<CaseListUiSupport.StatusFilterOption> available) {
+		Set<Integer> chosen = selected == null ? Set.of() : selected;
+		if (chosen.isEmpty()) return CaseSummaryDao.GridStatusMode.NO_STATUS;
+		Set<Integer> all = available == null ? Set.of() : available.stream().filter(Objects::nonNull)
+				.map(CaseListUiSupport.StatusFilterOption::id).collect(java.util.stream.Collectors.toSet());
+		if (!all.isEmpty() && chosen.size() == all.size() && chosen.containsAll(all))
+			return CaseSummaryDao.GridStatusMode.UNRESTRICTED;
+		return CaseSummaryDao.GridStatusMode.SELECTED;
+	}
+
 	private void initializeStatusFilter() {
 		reloadStatusFilterOptionsAndThen(this::loadFirstPage);
 	}
@@ -988,6 +1096,7 @@ public final class CasesController {
 			statusFilterOptions = List.of();
 			selectedStatusIds.clear();
 			CaseListUiSupport.initializeStatusFilterMenu(statusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+			onLoaded.run();
 			return;
 		}
 
@@ -1016,6 +1125,7 @@ public final class CasesController {
 				}
 				statusFilterOptions = options;
 				CaseListUiSupport.initializeStatusFilterMenu(statusFilterMenuButton, selectedStatusIds, statusFilterOptions, onLoaded);
+				onLoaded.run();
 			});
 		});
 	}
@@ -1239,96 +1349,9 @@ public final class CasesController {
 	}
 
 	private void refreshCaseRowFromDb(long caseId) {
-		if (caseDao == null)
-			return;
-
-		final int generationAtSubmit = loadGeneration;
-
-		dbExec.submit(() ->
-		{
-			try {
-				// simplest: fetch a 1-item "page" by filtering current page is awkward,
-				// so add a DAO method later. For now: just reload the *current page* row via DAO helper.
-				long daoStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=getCaseRow page=cases_list caseId=" + caseId);
-				CaseDao.CaseRow row = caseDao.getCaseRow(caseId);
-				PerfLog.logDone("DAO", "method=getCaseRow page=cases_list caseId=" + caseId + " rows=" + (row == null ? 0 : 1), daoStartNanos);
-
-				Platform.runLater(() ->
-				{
-					if (generationAtSubmit != loadGeneration)
-						return;
-
-					boolean changed = row == null ? removeLoadedCase(caseId) : applyCaseRowToList(row);
-					if (changed)
-						rerender();
-				});
-			} catch (Exception ex) {
-				Platform.runLater(ex::printStackTrace);
-			}
-		});
+		// A row-level legacy-shaped DAO read cannot preserve authoritative date ordering.
+		// Restart the bounded query so CaseDates sorting, paging, and projection hydration remain coherent.
+		runOnFx(this::loadFirstPage);
 	}
 
-	private boolean removeLoadedCase(long caseId) {
-		for (int i = 0; i < loaded.size(); i++) {
-			if (loaded.get(i).id == caseId) {
-				loaded.remove(i);
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private boolean applyCaseRowToList(CaseDao.CaseRow r) {
-		for (int i = 0; i < loaded.size(); i++) {
-			CaseCardVm vm = loaded.get(i);
-			if (vm.id == r.id()) {
-				String newName = safe(r.name());
-				String newAtty = safe(r.responsibleAttorneyName());
-				String newColor = safe(r.responsibleAttorneyColor());
-
-				boolean same = newName.equals(vm.name)
-						&& Objects.equals(r.intakeDate(), vm.intakeDate)
-						&& Objects.equals(r.statuteOfLimitationsDate(), vm.solDate)
-						&& Objects.equals(r.primaryStatusId(), vm.primaryStatusId)
-						&& newAtty.equals(vm.responsibleAttorney)
-						&& newColor.equals(vm.responsibleAttorneyColor)
-						&& Objects.equals(r.nonEngagementLetterSent(), vm.nonEngagementLetterSent)
-						&& safe(r.primaryStatusName()).equals(vm.primaryStatusName)
-						&& safe(r.primaryStatusColor()).equals(vm.primaryStatusColor)
-						&& safe(r.practiceAreaColor()).equals(vm.practiceAreaColor)
-						&& safe(r.clientName()).equals(vm.clientName)
-						&& safe(r.opposingPartiesName()).equals(vm.opposingPartiesName)
-						&& safe(r.latestCaseUpdate()).equals(vm.latestCaseUpdate)
-						&& safe(r.description()).equals(vm.description)
-						&& Objects.equals(r.dateOfIncident(), vm.dateOfIncident)
-						&& Objects.equals(r.tortClaimsNoticeDeadline(), vm.tortClaimsNoticeDeadline);
-
-				if (same)
-					return false;
-
-				loaded.set(i, new CaseCardVm(
-						r.id(),
-						newName,
-						r.intakeDate(),
-						r.statuteOfLimitationsDate(),
-						r.primaryStatusId(),
-						newAtty,
-						newColor,
-						r.nonEngagementLetterSent(),
-						safe(r.primaryStatusName()),
-						safe(r.primaryStatusColor()),
-						safe(r.practiceAreaColor()),
-						safe(r.clientName()),
-						safe(r.opposingPartiesName()),
-						safe(r.latestCaseUpdate()),
-						safe(r.description()),
-						r.dateOfIncident(),
-						r.tortClaimsNoticeDeadline()
-				));
-				return true;
-			}
-		}
-		return false;
-	}
 }

@@ -2,6 +2,7 @@ package com.shale.ui.services;
 
 import com.shale.core.model.Organization;
 import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
@@ -43,14 +44,16 @@ public final class SearchService {
 	private static final Logger LOG = LoggerFactory.getLogger(SearchService.class);
 
 	private final CaseDao caseDao;
+	private final CaseSummaryDao caseSummaryDao;
 	private final ContactDao contactDao;
 	private final OrganizationDao organizationDao;
 	private final UserDao userDao;
 	private final TaskDao taskDao;
 	private final CalendarEventDao calendarEventDao;
 
-	public SearchService(CaseDao caseDao, ContactDao contactDao, OrganizationDao organizationDao, UserDao userDao, TaskDao taskDao, CalendarEventDao calendarEventDao) {
+	public SearchService(CaseDao caseDao, CaseSummaryDao caseSummaryDao, ContactDao contactDao, OrganizationDao organizationDao, UserDao userDao, TaskDao taskDao, CalendarEventDao calendarEventDao) {
 		this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
+		this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
 		this.contactDao = Objects.requireNonNull(contactDao, "contactDao");
 		this.organizationDao = Objects.requireNonNull(organizationDao, "organizationDao");
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
@@ -63,10 +66,10 @@ public final class SearchService {
 		if (searchQuery.normalizedText().isBlank()) {
 			return SearchResults.empty(searchQuery.rawQuery());
 		}
-		LOG.info("Global search start query=\"{}\" userId={} shaleClientId={} providers={}", searchQuery.rawQuery(), currentUserId, shaleClientId, "cases,deletedCases,contacts,organizations,users,tasks,calendarEvents");
+		LOG.info("Global search start userId={} shaleClientId={} providers={}", currentUserId, shaleClientId, "cases,deletedCases,contacts,organizations,users,tasks,calendarEvents");
 		List<ProviderFailure> failures = new java.util.ArrayList<>();
-		List<CaseDao.CaseRow> cases = provider("cases", failures, () -> sortResults(caseDao.searchCasesByName(searchQuery.rawQuery()), row -> scoreCase(row, searchQuery), CaseDao.CaseRow::name, row -> Long.toString(row.id())));
-		List<CaseDao.CaseRow> deletedCases = includeDeletedCases ? provider("deletedCases", failures, () -> sortResults(caseDao.searchDeletedCasesByName(searchQuery.rawQuery()), row -> scoreCase(row, searchQuery), CaseDao.CaseRow::name, row -> Long.toString(row.id()))) : List.of();
+		List<CaseSummaryDao.SearchCaseRow> cases = provider("cases", failures, () -> sortResults(caseSummaryDao.searchActiveByName(shaleClientId, searchQuery.rawQuery()), row -> scoreCase(row, searchQuery), row -> row.summary().caseName(), row -> Long.toString(row.summary().caseId())));
+		List<CaseSummaryDao.DeletedCaseRow> deletedCases = includeDeletedCases ? provider("deletedCases", failures, () -> sortResults(caseSummaryDao.searchDeletedByName(shaleClientId, searchQuery.rawQuery()), row -> scoreDeletedCase(row, searchQuery), row -> row.summary().caseName(), row -> Long.toString(row.summary().caseId()))) : List.of();
 		List<ContactDao.DirectoryContactRow> contacts = provider("contacts", failures, () -> sortResults(contactDao.searchContacts(shaleClientId, searchQuery.rawQuery()), row -> scoreContact(row, searchQuery), ContactDao.DirectoryContactRow::displayName, row -> Integer.toString(row.id())));
 		List<Organization> organizations = provider("organizations", failures, () -> sortResults(organizationDao.searchOrganizations(searchQuery.rawQuery()), row -> scoreOrganization(row, searchQuery), Organization::getName, row -> Integer.toString(Objects.requireNonNullElse(row.getId(), 0))));
 		List<UserDao.DirectoryUserRow> users = provider("users", failures, () -> sortResults(userDao.searchUsers(shaleClientId, searchQuery.rawQuery()), row -> scoreUser(row, searchQuery), UserDao.DirectoryUserRow::displayName, row -> Integer.toString(row.id())));
@@ -88,8 +91,12 @@ public final class SearchService {
 		}
 	}
 
-	private static int scoreCase(CaseDao.CaseRow row, SearchQuery query) {
-		return weightedTextScore(query, row == null ? null : row.name(), CASE_NAME_WEIGHT);
+	private static int scoreCase(CaseSummaryDao.SearchCaseRow row, SearchQuery query) {
+		return weightedTextScore(query, row == null ? null : row.summary().caseName(), CASE_NAME_WEIGHT);
+	}
+
+	private static int scoreDeletedCase(CaseSummaryDao.DeletedCaseRow row, SearchQuery query) {
+		return weightedTextScore(query, row == null ? null : row.summary().caseName(), CASE_NAME_WEIGHT);
 	}
 
 	private static int scoreContact(ContactDao.DirectoryContactRow row, SearchQuery query) {
@@ -256,8 +263,8 @@ public final class SearchService {
 
 	public record SearchResults(
 			String query,
-			List<CaseDao.CaseRow> cases,
-			List<CaseDao.CaseRow> deletedCases,
+			List<CaseSummaryDao.SearchCaseRow> cases,
+			List<CaseSummaryDao.DeletedCaseRow> deletedCases,
 			List<ContactDao.DirectoryContactRow> contacts,
 			List<Organization> organizations,
 			List<UserDao.DirectoryUserRow> users,

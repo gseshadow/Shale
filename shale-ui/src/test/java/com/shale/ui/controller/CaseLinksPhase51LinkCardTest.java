@@ -36,8 +36,8 @@ final class CaseLinksPhase51LinkCardTest {
         assertTrue(card.contains("if (variant != Variant.MINI && link.primary())"));
         assertTrue(card.contains("if (variant == Variant.FULL && !blank(link.notes()))"));
         assertTrue(card.contains("if (!link.primary()) footer.getChildren().add"));
-        assertTrue(card.contains("ActionButtonFactory.danger(\"Delete\""));
-        assertTrue(card.contains("ActionButtonFactory.cardAction(\"Edit\""));
+        assertTrue(card.contains("semantic(\"Delete\", ControlStyles.Purpose.DANGER"));
+        assertTrue(card.contains("semantic(\"Edit\", ControlStyles.Purpose.GHOST"));
         assertFalse(card.contains("new Label(blankTo(link.url()"));
         assertFalse(card.contains("Open Link"));
         assertFalse(card.contains("Move Up"));

@@ -480,3 +480,108 @@ Case Link URL handling is intentionally limited to normalization and browser lau
 The Audit Log viewer uses the existing light table-in-glass-panel administration visual language and adds a compact mode filter at the top of the existing screen rather than a second administration page. The selector offers All, PHI Audit, and Entity Activity, with All as the default.
 
 PHI Audit rows keep the established field-audit columns and meaning. Entity Activity rows use the same dense audit table treatment but present a subtle category label, friendly action/entity wording, stable entity ids, safe parent context, actor, and local occurrence time. Entity Activity presentation must not add URL previews, Contact-name hydration, raw JSON details, or other rich content that would break the compact audit-row pattern or expose sensitive Case Link content.
+
+---
+
+## Unified JavaFX controls
+
+The authoritative JavaFX semantic API is `com.shale.ui.util.ControlStyles`. Ordinary actions are
+classified with `ControlStyles.apply(ButtonBase, Purpose, Size)`; programmatically constructed actions
+use `ActionButtonFactory.semantic(String, EventHandler<ActionEvent>, Purpose, Size)`. The runtime class
+contract is `shale-control-button` plus exactly one of `shale-control-primary`,
+`shale-control-secondary`, `shale-control-ghost`, `shale-control-danger`, or
+`shale-control-navigation`, and exactly one of `shale-control-small` or `shale-control-standard`.
+`foundation/buttons.css`, imported by the production `app.css`, is the sole owner of these selectors.
+
+### Semantic button purposes
+
+* **Primary** is the single dominant affirmative action in a local action area (for example, Save or Create).
+* **Secondary** is an ordinary supporting action, including dialog Cancel where it should remain visibly available.
+* **Ghost** is a low-emphasis, reversible action on a card or within compact content.
+* **Danger** is reserved for confirmed destructive or irreversible behavior, not an action merely named Remove, Clear, or Unlink.
+* **Navigation** is movement to another place or entity and remains distinct from Ghost.
+
+Standard buttons are 40px high; Small buttons are 32px high. Ordinary dialog buttons use a 10px radius, 16px horizontal padding, and an 8px icon/text gap. Icon-only buttons use the Small square treatment, must have accessible text or an accessible label, and are not a substitute for navigation. Form controls retain the initial 36px height. Deliberately pill-shaped toolbar, filter, and lookup-content treatments remain pills.
+
+The shared tokens in `foundation/buttons.css` cover primary, secondary, ghost, danger, and navigation normal/hover/pressed colors; focus border/ring; disabled opacity; 40px and 32px heights; radius; padding; and icon gap. `foundation/forms.css` owns control surface, foreground, border, hover/pressed/focus, prompt, and invalid border/ring tokens. Feature and data colors identify stored status/type data inside indicators and lookup pills; control colors identify actions. Never flood an action button or an entire selector shell with a feature/status color.
+
+### Java API and validation
+
+Use the centralized helper rather than repeating class strings:
+
+```java
+ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
+ControlStyles.apply(removeChipButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+ControlStyles.formControl(titleField);
+ControlStyles.setInvalid(titleField, titleIsInvalid);
+```
+
+Applying a purpose or size is idempotent, removes conflicting semantic classes, and preserves unrelated feature classes. The JavaFX `:invalid` pseudo-class changes only paint (including a distinguishable invalid-focus ring), so validation does not change dimensions. Continue to use each workflow's established validation rules and timing.
+
+FXML-injected actions must be classified in the controller's `initialize()` method (or a method called
+from it), after injection and before user interaction. Later initialization may change disabled,
+default-button, text, graphic, or handler state, but must not clear the semantic classes. Disabled
+buttons retain their purpose and size identity; CSS supplies only disabled opacity. Hover, pressed,
+focused, and default-button presentation remains owned by `foundation/buttons.css`. Each local action
+group or surface normally has one `PRIMARY`; supporting actions are `SECONDARY`, low-emphasis utilities
+are `GHOST`, destructive actions are `DANGER`, and location changes are `NAVIGATION`. Use `STANDARD`
+for forms/dialog action bars and `SMALL` for dense toolbars, cards, tables, and compact filters.
+
+New inline action colors, local semantic CSS, duplicate button factories, manually assembled semantic
+class names, and broad `.button` overrides are prohibited. A genuinely specialized control (segmented
+view, section-tab pill, switch, status pill, icon-only affordance, calendar cell, card activation
+surface, or real hyperlink) must have a narrowly scoped feature class and be documented in its feature
+contract; it must not work only because of generic button CSS. Architectural tests must inspect the
+final runtime style-class list, including disabled controls, rather than merely finding helper names in
+source.
+
+### Dropdown-selector API
+
+The general selector is a DTO-typed JavaFX `ComboBox<T>` (or `ChoiceBox<T>` where its intentionally
+smaller native interaction is required) classified with `ControlStyles.formControl(control)`. For FXML,
+declare the typed field and call `formControl` in `initialize()` after injection. Programmatic selectors
+call it immediately after construction. `shale-form-control` and `foundation/forms.css` own the shared
+surface, arrow, prompt, hover, focus, disabled, and `:invalid` presentation; validation is applied with
+`ControlStyles.setInvalid(control, boolean)`. Native keyboard navigation and the caller's established
+prompt/null-selection behavior must remain intact.
+
+Use `com.shale.ui.component.ColorCodedComboBox<T>` for database-backed status, priority, type, method,
+role, or other lookup DTOs whose authoritative color belongs in popup and selected-value rendering.
+Its extractor functions render the label, stored color, and optional secondary description without
+changing the selected DTO. `ColoredLookupComboBoxCellFactory.configure(...)` is the FXML bridge when an
+existing injected `ComboBox<T>` needs that renderer. Use `UserSelector<T>` for searchable rich user-card
+selection and call `useSemanticFormControl()` for its search shell; use `UserSelectionField<T>` for the
+compact selected-user field/picker composition. Calendar time/duration selectors, segmented controls,
+and feature-specific searchable or rich selectors are intentional exceptions when their distinct
+interaction is documented and still opt into the shared form shell where applicable.
+
+DTO instances and immutable IDs—not labels or table positions—remain authoritative for filtering and
+mutation. Preserve null/None values, prompts, disabled/read-only state, validation, type-ahead/search,
+keyboard operation, async generation guards, tenant-aware hydration, RowVer boundaries, colors, and
+button/popup cell parity. Local one-off ComboBox CSS, inline selector colors, duplicated cell/button-cell
+factories, and broad `.combo-box` overrides are prohibited. If a shared selector lacks a capability,
+add a narrowly scoped reusable enhancement and focused behavior tests rather than creating a local
+parallel selector.
+
+### Legacy compatibility and intentional exceptions
+
+Existing `ActionButtonFactory.primary`, `neutral`, `danger`, `compact`, and `cardAction` methods are
+compatibility methods only and retain their legacy toolbar classes until each caller is deliberately
+migrated. New code must use `semantic`; `neutral` must not become a parallel name for Secondary.
+Documented specialized controls may retain their feature selectors, but ordinary actions and selectors
+must use the APIs above. Legacy styling may be removed only after its final caller is migrated.
+
+Newly migrated areas must not introduce:
+
+* default-styled ordinary action buttons;
+* screen-specific Save-button colors;
+* feature or status colors on action buttons;
+* inline hard-coded control colors;
+* arbitrary per-screen control heights, radii, or padding;
+* multiple competing Primary actions in one local action area without documented justification;
+* broad global selectors that accidentally migrate unrelated screens;
+* custom Button subclasses, Success button variants, or a parallel styling vocabulary.
+
+### Case Links semantic-control adoption
+
+Case Links is the second opt-in desktop area. Its tab action and dialog affirmative actions use Primary/Standard; dialog cancellation uses Secondary/Standard; card Edit and staged share-management actions use Small Ghost or Secondary controls; Set Primary is Secondary/Small; and confirmed Case Link deletion is Danger/Small. Link cards themselves remain the established keyboard- and mouse-activatable navigation surface rather than adding a competing Open button solely to demonstrate the Navigation button variant. Link Type colors remain data presentation in pills, rails, and card washes and never determine action colors. The create/edit and share-detail fields use the shared form shell and show `:invalid` only after the existing validation workflow rejects a save, clearing the state as values are corrected.

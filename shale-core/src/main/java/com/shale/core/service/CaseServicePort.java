@@ -6,6 +6,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
+import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.MigratedCaseDateProjectionDto;
+import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import com.shale.core.dto.CaseDateSemanticRoleMappingDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseOverviewDto;
@@ -17,6 +21,12 @@ import com.shale.core.dto.CaseLinkContactOptionDto;
 import com.shale.core.dto.CasePartyEntityOptionDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.PracticeAreaDto;
+import com.shale.core.model.CaseDateAggregateCommand;
+import com.shale.core.model.CaseDateAggregateResult;
+import com.shale.core.model.CompatibilityCaseDateState;
+import com.shale.core.model.MigratedCaseDateKey;
+import java.util.Map;
+import java.util.Collection;
 
 /**
  * Shared case application boundary for future desktop/server adapters.
@@ -28,6 +38,9 @@ import com.shale.core.dto.PracticeAreaDto;
 public interface CaseServicePort {
 
 	Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId);
+	default Optional<CaseDetailDto> getAuthoritativeCaseDetail(long caseId, int shaleClientId, int actorUserId) {
+		throw new UnsupportedOperationException("Authoritative existing-case detail is unavailable.");
+	}
 
 	Optional<CaseOverviewDto> getCaseOverview(long caseId, int shaleClientId);
 
@@ -49,6 +62,46 @@ public interface CaseServicePort {
 
 	List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
 
+	List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId);
+
+	List<EffectiveCaseDateTypeDto> listCaseDateTypesForAdministration(int shaleClientId, int actorUserId);
+
+	List<CaseDateSemanticRoleMappingDto> listCaseDateSemanticRoleMappings(int shaleClientId, int actorUserId);
+
+	CaseDateSemanticRoleMappingDto saveCaseDateSemanticRoleMapping(SaveCaseDateSemanticRoleMappingCommand command);
+
+	void resetCaseDateSemanticRoleMapping(ResetCaseDateSemanticRoleMappingCommand command);
+
+	List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId);
+
+	/** Batch read boundary for list-style consumers of the nine migrated authoritative meanings. */
+	default Map<Long, MigratedCaseDateProjectionDto> projectMigratedCaseDates(
+			Collection<Long> caseIds, int shaleClientId, int actorUserId) {
+		throw unsupportedCaseLinkOperation("projectMigratedCaseDates");
+	}
+
+	List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int shaleClientId, int actorUserId);
+
+	Optional<CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId);
+
+	/** Authoritative snapshot used by the existing-case desktop compatibility-date editors. */
+	default Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(
+			long caseId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkOperation("listMigratedCompatibilityStateForCase"); }
+	default CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(
+			long caseId, int shaleClientId, int actorUserId) { throw unsupportedCaseLinkOperation("loadMigratedCompatibilityDateSnapshot"); }
+
+	/** Atomic nine-slot mutation; this boundary never writes legacy dbo.Cases date columns. */
+	default CaseDateAggregateResult mutateMigratedCompatibilityDates(CaseDateAggregateCommand command) {
+		throw unsupportedCaseLinkOperation("mutateMigratedCompatibilityDates");
+	}
+
+	CaseDateDto createCaseDate(CreateCaseDateCommand command);
+
+	CaseDateDto updateCaseDate(UpdateCaseDateCommand command);
+
+	void deleteCaseDate(DeleteCaseDateCommand command);
+
+	CaseDateDto restoreCaseDate(RestoreCaseDateCommand command);
 
 	List<LinkTypeDto> listLinkTypesForAdministration(int shaleClientId, int actorUserId);
 
@@ -122,6 +175,36 @@ public interface CaseServicePort {
 	CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command);
 
 	CaseDetailDto updateCaseAssignment(UpdateCaseAssignmentCommand command);
+
+	record CaseDateTypeCommand(Integer id, int shaleClientId, int actorUserId, String systemKey, String name, String description, String calendarCategory, String color, boolean supportsTime, Integer sortOrder, boolean active, byte[] expectedRowVer) { public CaseDateTypeCommand { expectedRowVer = copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); } }
+	record SetCaseDateTypeActiveCommand(int shaleClientId, int actorUserId, int id, boolean active, byte[] expectedRowVer) { public SetCaseDateTypeActiveCommand { expectedRowVer = copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); } }
+	record ResetCaseDateTypeOverrideCommand(int shaleClientId, int actorUserId, int id, byte[] expectedRowVer) { public ResetCaseDateTypeOverrideCommand { expectedRowVer = copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); } }
+
+	EffectiveCaseDateTypeDto createCaseDateType(CaseDateTypeCommand command);
+	EffectiveCaseDateTypeDto updateCaseDateType(CaseDateTypeCommand command);
+	EffectiveCaseDateTypeDto setCaseDateTypeActive(SetCaseDateTypeActiveCommand command);
+	void resetCaseDateTypeOverride(ResetCaseDateTypeOverrideCommand command);
+
+	record SaveCaseDateSemanticRoleMappingCommand(int shaleClientId, int actorUserId, String roleKey, int caseDateTypeId, Long expectedMappingId, byte[] expectedRowVer) { public SaveCaseDateSemanticRoleMappingCommand { expectedRowVer=copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);} }
+	record ResetCaseDateSemanticRoleMappingCommand(int shaleClientId, int actorUserId, String roleKey, long mappingId, byte[] expectedRowVer) { public ResetCaseDateSemanticRoleMappingCommand { expectedRowVer=copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);} }
+
+	record CreateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, int caseDateTypeId, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes) {
+	}
+
+	record UpdateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId, int caseDateTypeId, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes, byte[] expectedRowVer) {
+		public UpdateCaseDateCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record DeleteCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId, byte[] expectedRowVer) {
+		public DeleteCaseDateCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record RestoreCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId, byte[] expectedRowVer) {
+		public RestoreCaseDateCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
 
 	record AddCaseNoteCommand(
 			long caseId,
@@ -305,11 +388,9 @@ public interface CaseServicePort {
 			String caseName,
 			String caseNumber,
 			String description,
-			LocalDate dateOfInjury,
-			LocalDate statuteOfLimitations,
-			LocalDate tortNoticeDeadline,
 			String summary,
-			byte[] expectedRowVer) {
+			byte[] expectedRowVer,
+			com.shale.core.model.CaseDateAggregateCommand caseDates) {
 	}
 
 	record CreateCaseCommand(
@@ -319,11 +400,13 @@ public interface CaseServicePort {
 			String caseNumber,
 			int practiceAreaId,
 			int responsibleAttorneyUserId,
-			LocalDate callerDate,
-			LocalDate dateOfInjury,
-			LocalDate statuteOfLimitations,
-			LocalDate tortNoticeDeadline,
+			List<CreateMappedCaseDate> caseDates,
 			String summary,
 			String description) {
+		public CreateCaseCommand { caseDates = caseDates == null ? List.of() : List.copyOf(caseDates); }
 	}
+
+	/** Stable identity and lossless value for an authoritative mapped Case Date. */
+	record CreateMappedCaseDate(String systemKey, Integer caseDateTypeId,
+			java.time.LocalDateTime startsAt, java.time.LocalDateTime endsAt, boolean allDay) {}
 }

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Base64;
 import java.util.List;
+import java.util.EnumMap;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,6 +31,9 @@ import com.shale.core.service.CaseServicePort.CreateCaseCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseCoreDetailsCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseStatusCommand;
 import com.shale.core.service.CaseServicePort.UpdateCaseAssignmentCommand;
+import com.shale.core.model.CaseDateAggregateCommand;
+import com.shale.core.model.CompatibilityCaseDateMutation;
+import com.shale.core.model.MigratedCaseDateKey;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.ContactServicePort.ContactDetail;
 import com.shale.core.service.ContactServicePort.ContactSummary;
@@ -71,13 +75,13 @@ public final class ApiReadController {
             String caseNumber,
             Integer practiceAreaId,
             Integer responsibleAttorneyUserId,
-            String callerDate,
-            String dateOfInjury,
-            String statuteOfLimitations,
-            String tortNoticeDeadline,
+            List<CreateMappedCaseDateRequest> caseDates,
             String summary,
             String description) {
     }
+
+    public record CreateMappedCaseDateRequest(String systemKey, Integer caseDateTypeId,
+            String startsAt, String endsAt, Boolean allDay) {}
 
     public record UpdateCaseAssignmentRequest(Integer practiceAreaId, Integer responsibleAttorneyUserId) {
     }
@@ -85,12 +89,14 @@ public final class ApiReadController {
     public record UpdateCaseCoreDetailsRequest(
             String caseName,
             String description,
-            String dateOfInjury,
-            String statuteOfLimitations,
-            String tortNoticeDeadline,
             String summary,
-            String expectedRowVer) {
+            String expectedRowVer,
+            List<MappedCaseDateUpdateRequest> mappedCaseDates) {
     }
+
+    public record MappedCaseDateUpdateRequest(String key, String systemKey, Long occurrenceId,
+            Integer caseDateTypeId, String startsAt, String endsAt, Boolean allDay,
+            String occurrenceRowVer, Boolean absent, String absenceCaseRowVer) {}
 
     public record UpdateCaseStatusRequest(Integer statusId) {
     }
@@ -225,17 +231,30 @@ public final class ApiReadController {
         }
         int practiceAreaId = Math.toIntExact(ApiValidation.positiveId(request.practiceAreaId(), "practiceAreaId"));
         int responsibleAttorneyUserId = Math.toIntExact(ApiValidation.positiveId(request.responsibleAttorneyUserId(), "responsibleAttorneyUserId"));
-        LocalDate callerDate = parseOptionalIsoDate(request.callerDate(), "callerDate");
-        LocalDate dateOfInjury = parseOptionalIsoDate(request.dateOfInjury(), "dateOfInjury");
-        LocalDate statuteOfLimitations = parseOptionalIsoDate(request.statuteOfLimitations(), "statuteOfLimitations");
-        LocalDate tortNoticeDeadline = parseOptionalIsoDate(request.tortNoticeDeadline(), "tortNoticeDeadline");
+        List<CaseServicePort.CreateMappedCaseDate> caseDates = request.caseDates() == null ? List.of()
+                : request.caseDates().stream().map(this::parseCreateCaseDate).toList();
         String summary = ApiValidation.optionalCaseSummary(request.summary());
         String description = ApiValidation.optionalCaseDescription(request.description());
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
         return caseServicePort.createCase(new CreateCaseCommand(shaleClientId, userId, caseName, caseNumber,
-                practiceAreaId, responsibleAttorneyUserId, callerDate, dateOfInjury, statuteOfLimitations,
-                tortNoticeDeadline, summary, description));
+                practiceAreaId, responsibleAttorneyUserId, caseDates, summary, description));
+    }
+
+    private CaseServicePort.CreateMappedCaseDate parseCreateCaseDate(CreateMappedCaseDateRequest value) {
+        if (value == null || value.systemKey() == null || value.systemKey().isBlank())
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "caseDates.systemKey is required.");
+        java.time.LocalDateTime startsAt = parseIsoDateTime(value.startsAt(), "caseDates.startsAt");
+        java.time.LocalDateTime endsAt = value.endsAt() == null || value.endsAt().isBlank() ? null
+                : parseIsoDateTime(value.endsAt(), "caseDates.endsAt");
+        return new CaseServicePort.CreateMappedCaseDate(value.systemKey().trim(), value.caseDateTypeId(),
+                startsAt, endsAt, Boolean.TRUE.equals(value.allDay()));
+    }
+
+    private static java.time.LocalDateTime parseIsoDateTime(String value, String field) {
+        if (value == null || value.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " is required.");
+        try { return java.time.LocalDateTime.parse(value.trim()); }
+        catch (java.time.format.DateTimeParseException e) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must be an ISO local date-time."); }
     }
 
     @Operation(summary = "List my tasks", description = "Returns active tasks assigned to the current authenticated user.")
@@ -251,7 +270,8 @@ public final class ApiReadController {
     public Object getCase(@PathVariable("caseId") long caseId) {
         long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
         int shaleClientId = runtimeSessionState.requireShaleClientId();
-        return caseServicePort.getCaseDetail(safeCaseId, shaleClientId)
+        int actor = runtimeSessionState.requireUserId();
+        return caseServicePort.getAuthoritativeCaseDetail(safeCaseId, shaleClientId, actor)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found."));
     }
 
@@ -264,27 +284,22 @@ public final class ApiReadController {
         long safeCaseId = ApiValidation.positiveId(caseId, "caseId");
         String caseName = ApiValidation.caseName(request == null ? null : request.caseName());
         String description = ApiValidation.optionalCaseDescription(request == null ? null : request.description());
-        LocalDate dateOfInjury = parseOptionalIsoDate(request == null ? null : request.dateOfInjury(), "dateOfInjury");
-        LocalDate statuteOfLimitations = parseOptionalIsoDate(request == null ? null : request.statuteOfLimitations(), "statuteOfLimitations");
-        LocalDate tortNoticeDeadline = parseOptionalIsoDate(request == null ? null : request.tortNoticeDeadline(), "tortNoticeDeadline");
         String summary = ApiValidation.optionalCaseSummary(request == null ? null : request.summary());
         byte[] expectedRowVer = parseExpectedRowVer(request == null ? null : request.expectedRowVer());
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
-        CaseDetailDto current = caseServicePort.getCaseDetail(safeCaseId, shaleClientId)
+        CaseDetailDto current = caseServicePort.getAuthoritativeCaseDetail(safeCaseId, shaleClientId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Case not found."));
-        CaseDetailDto updated = caseServicePort.updateCaseCoreDetails(new UpdateCaseCoreDetailsCommand(
-                safeCaseId,
-                shaleClientId,
-                userId,
-                caseName,
-                current.getCaseNumber(),
-                description,
-                dateOfInjury,
-                statuteOfLimitations,
-                tortNoticeDeadline,
-                summary,
-                expectedRowVer));
+        CaseDateAggregateCommand dates = mappedDateCommand(safeCaseId, shaleClientId, userId, expectedRowVer,
+                request == null ? null : request.mappedCaseDates());
+        CaseDetailDto updated;
+        try {
+            updated = caseServicePort.updateCaseCoreDetails(new UpdateCaseCoreDetailsCommand(
+                    safeCaseId, shaleClientId, userId, caseName, current.getCaseNumber(),
+                    description, summary, expectedRowVer, dates));
+        } catch (IllegalStateException conflict) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Case details changed. Reload before saving.");
+        }
         if (updated == null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Case details were changed by someone else. Refresh and try again.");
         }
@@ -732,6 +747,47 @@ public final class ApiReadController {
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "expectedRowVer must be base64 encoded.");
         }
+    }
+
+    private static CaseDateAggregateCommand mappedDateCommand(long caseId,int tenant,int actor,byte[] caseRowVer,
+            List<MappedCaseDateUpdateRequest> requests) {
+        if(requests==null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"mappedCaseDates is required.");
+        EnumMap<MigratedCaseDateKey,CompatibilityCaseDateMutation> mutations=new EnumMap<>(MigratedCaseDateKey.class);
+        for(MappedCaseDateUpdateRequest request:requests){
+            if(request==null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Mapped Case Date state is required.");
+            MigratedCaseDateKey key;
+            try { key=MigratedCaseDateKey.valueOf(request.key()); }
+            catch(Exception e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid mapped Case Date key.");}
+            if(!key.systemKey().equals(request.systemKey()) || mutations.containsKey(key))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid or duplicate mapped Case Date identity.");
+            boolean absent=Boolean.TRUE.equals(request.absent());
+            LocalDateTime starts=parseOptionalIsoDateTime(request.startsAt(),"startsAt");
+            LocalDateTime ends=parseOptionalIsoDateTime(request.endsAt(),"endsAt");
+            boolean allDay=request.allDay()==null || request.allDay();
+            CompatibilityCaseDateMutation mutation;
+            if(absent){
+                if(request.occurrenceId()!=null || request.caseDateTypeId()!=null || request.occurrenceRowVer()!=null)
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Absent mapped Case Date contains occurrence identity.");
+                byte[] witness=parseExpectedRowVer(request.absenceCaseRowVer());
+                mutation=starts==null ? new CompatibilityCaseDateMutation.Unchanged(key)
+                        : new CompatibilityCaseDateMutation.Create(key,new CompatibilityCaseDateMutation.ExpectedAbsent(witness),new CompatibilityCaseDateMutation.Value(starts,ends,allDay));
+            } else {
+                if(request.occurrenceId()==null || request.caseDateTypeId()==null)
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Present mapped Case Date identity is required.");
+                byte[] rowVer=parseExpectedRowVer(request.occurrenceRowVer());
+                mutation=starts==null ? new CompatibilityCaseDateMutation.Clear(key,request.occurrenceId(),rowVer)
+                        : new CompatibilityCaseDateMutation.Update(key,request.occurrenceId(),rowVer,new CompatibilityCaseDateMutation.Value(starts,ends,allDay));
+            }
+            mutations.put(key,mutation);
+        }
+        try{return new CaseDateAggregateCommand(tenant,actor,caseId,caseRowVer,mutations);}
+        catch(IllegalArgumentException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,e.getMessage());}
+    }
+
+    private static LocalDateTime parseOptionalIsoDateTime(String value,String field){
+        if(value==null || value.isBlank())return null;
+        try{return LocalDateTime.parse(value.trim());}
+        catch(DateTimeParseException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,field+" must be an ISO local date-time.");}
     }
 
     private static LocalDateTime parseOptionalDueDate(String dueDate) {

@@ -44,4 +44,11 @@ public final class CaseDetailService {
         }
         return caseDao.restoreCase(caseId, shaleClientId);
     }
+
+    public boolean restoreCase(long caseId, Integer shaleClientId, byte[] expectedRowVer) {
+        if (!canRestoreCase()) {
+            throw new IllegalStateException("Only admin and attorney users can restore cases.");
+        }
+        return caseDao.restoreCase(caseId, shaleClientId, expectedRowVer);
+    }
 }

@@ -5,6 +5,7 @@ import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.ControlStyles;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.application.Platform;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -50,15 +52,15 @@ public final class NewCalendarEventDialog {
     public static Optional<CreateCalendarEventInput> showAndWait(Window owner, List<CalendarEventType> eventTypes, LocalDate defaultDate, List<CaseOption> caseOptions, List<AssignedUserOption> assignedUserOptions, CaseOption initialSelectedCase) {
         Stage stage = AppDialogs.createModalStage(owner, "New Event");
         ResultHolder holder = new ResultHolder();
-        DialogParts p = DialogParts.build(eventTypes, new CreateCalendarEventInput("", 0, defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", initialSelectedCase == null ? null : initialSelectedCase.caseId(), null), null, null, () -> caseOptions, () -> assignedUserOptions, id -> {}, initialSelectedCase, true);
+        DialogParts p = DialogParts.build(eventTypes, new CreateCalendarEventInput("", 0, defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", initialSelectedCase == null ? null : initialSelectedCase.caseId(), null), null, null, () -> caseOptions, () -> assignedUserOptions, id -> {}, initialSelectedCase, true, Runnable::run);
 
         Button cancelButton = new Button("Cancel");
-        cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> stage.close());
 
         Button saveButton = new Button("Save");
-        saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+        ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
         saveButton.setDefaultButton(true);
         saveButton.setOnAction(e -> {
             Optional<CreateCalendarEventInput> input = p.readInput().get();
@@ -80,15 +82,15 @@ public final class NewCalendarEventDialog {
     }
     public static void showEditDialog(Window owner, List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Function<CreateCalendarEventInput, String> onSave, Supplier<String> onDelete, Node relatedCaseNode, Node relatedTaskNode, List<CaseOption> caseOptions, List<AssignedUserOption> assignedUserOptions) {
         Stage stage = AppDialogs.createModalStage(owner, "Edit Event");
-        DialogParts p = DialogParts.build(eventTypes, initial, relatedCaseNode, relatedTaskNode, () -> caseOptions, () -> assignedUserOptions, id -> {}, null, true);
+        DialogParts p = DialogParts.build(eventTypes, initial, relatedCaseNode, relatedTaskNode, () -> caseOptions, () -> assignedUserOptions, id -> {}, null, true, Runnable::run);
 
         Button cancelButton = new Button("Cancel");
-        cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> stage.close());
 
         Button deleteButton = new Button("Delete");
-        deleteButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(deleteButton, ControlStyles.Purpose.DANGER);
         deleteButton.setOnAction(e -> {
             boolean confirmed = AppDialogs.showConfirmation(stage.getOwner(), "Delete Event", "Delete event", "Delete this event?", "Delete", AppDialogs.DialogActionKind.DANGER);
             if (!confirmed) return;
@@ -97,7 +99,7 @@ public final class NewCalendarEventDialog {
         });
 
         Button saveButton = new Button("Save");
-        saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+        ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
         saveButton.setDefaultButton(true);
         saveButton.setOnAction(e -> {
             Optional<CreateCalendarEventInput> input = p.readInput().get();
@@ -117,23 +119,23 @@ public final class NewCalendarEventDialog {
         Label loadingLabel = new Label("Loading event…");
         loadingLabel.getStyleClass().add("app-dialog-message");
         Label errorLabel = new Label();
-        errorLabel.setStyle("-fx-text-fill: #b42318;");
+        errorLabel.getStyleClass().add("error");
         errorLabel.setVisible(false);
         errorLabel.setManaged(false);
         VBox content = new VBox(8, loadingLabel, errorLabel);
         content.setPadding(new Insets(6,2,2,2));
 
         Button cancelButton = new Button("Cancel");
-        cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> stage.close());
 
         Button deleteButton = new Button("Delete");
-        deleteButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(deleteButton, ControlStyles.Purpose.DANGER);
         deleteButton.setDisable(true);
 
         Button saveButton = new Button("Save");
-        saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+        ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
         saveButton.setDefaultButton(true);
         saveButton.setDisable(true);
 
@@ -167,8 +169,8 @@ public final class NewCalendarEventDialog {
 
         public void showLoadError(String message) { showError(errorLabel, message); }
 
-        public void populate(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Function<CreateCalendarEventInput, String> onSave, Supplier<String> onDelete, Node relatedCaseNode, Node relatedTaskNode, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier, Consumer<Integer> onOpenCase, CaseOption initialSelectedCase) {
-            DialogParts p = DialogParts.build(eventTypes, initial, relatedCaseNode, relatedTaskNode, caseOptionsSupplier, assignedUserOptionsSupplier, onOpenCase, initialSelectedCase, true);
+        public void populate(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Function<CreateCalendarEventInput, String> onSave, Supplier<String> onDelete, Node relatedCaseNode, Node relatedTaskNode, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier, Consumer<Integer> onOpenCase, CaseOption initialSelectedCase, Executor backgroundExecutor) {
+            DialogParts p = DialogParts.build(eventTypes, initial, relatedCaseNode, relatedTaskNode, caseOptionsSupplier, assignedUserOptionsSupplier, onOpenCase, initialSelectedCase, true, backgroundExecutor);
             content.getChildren().setAll(p.content());
             deleteButton.setDisable(false);
             saveButton.setDisable(false);
@@ -190,25 +192,25 @@ public final class NewCalendarEventDialog {
     }
 
 
-    public static CreateDialogHandle showCreateDialogAsyncShell(Window owner, LocalDate defaultDate, Function<CreateCalendarEventInput, String> onSave, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier) {
+    public static CreateDialogHandle showCreateDialogAsyncShell(Window owner, LocalDate defaultDate, Function<CreateCalendarEventInput, String> onSave, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier, Executor backgroundExecutor) {
         long stageCreateStart = PerfLog.start();
         PerfLog.log("DIALOG", "start", "calendar new-event stage create");
         Stage stage = AppDialogs.createModalStage(owner, "New Event");
         PerfLog.logDone("DIALOG", "calendar new-event stage create", stageCreateStart);
         CreateCalendarEventInput initial = new CreateCalendarEventInput("", 0, defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, defaultAssignedUserId(assignedUserOptionsSupplier));
-        DialogParts p = DialogParts.build(List.of(), initial, null, null, caseOptionsSupplier, assignedUserOptionsSupplier, id -> {}, null, false);
+        DialogParts p = DialogParts.build(List.of(), initial, null, null, caseOptionsSupplier, assignedUserOptionsSupplier, id -> {}, null, false, backgroundExecutor);
         Button cancelButton = new Button("Cancel");
-        cancelButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+        ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
         cancelButton.setOnAction(e -> stage.close());
         Button saveButton = new Button("Save");
-        saveButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-primary");
+        ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
         saveButton.setDisable(true);
         saveButton.setOnAction(e -> { Optional<CreateCalendarEventInput> input = p.readInput().get(); if (input.isEmpty()) return; String err = onSave == null ? "Save is unavailable." : onSave.apply(input.get()); if (err == null || err.isBlank()) stage.close(); else showError(p.errorLabel(), err); });
         long showStart = PerfLog.start();
         showStageNonBlocking(stage, "New Event", "Create event", p.content(), null, cancelButton, saveButton);
         PerfLog.logDone("DIALOG", "calendar new-event show", showStart);
         Platform.runLater(() -> PerfLog.log("DIALOG", "tick", "calendar new-event first-runLater-after-show"));
-        return new CreateDialogHandle(stage, p.content(), p.errorLabel(), saveButton, defaultDate, onSave, caseOptionsSupplier, assignedUserOptionsSupplier);
+        return new CreateDialogHandle(stage, p.content(), p.errorLabel(), saveButton, defaultDate, onSave, caseOptionsSupplier, assignedUserOptionsSupplier, backgroundExecutor);
     }
 
     public static final class CreateDialogHandle {
@@ -217,12 +219,13 @@ public final class NewCalendarEventDialog {
         private final Function<CreateCalendarEventInput, String> onSave;
         private final Supplier<List<CaseOption>> caseOptionsSupplier;
         private final Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier;
-        private CreateDialogHandle(Stage stage, VBox content, Label errorLabel, Button saveButton, LocalDate defaultDate, Function<CreateCalendarEventInput, String> onSave, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier){ this.stage=stage; this.content=content; this.errorLabel=errorLabel; this.saveButton=saveButton; this.defaultDate=defaultDate; this.onSave=onSave; this.caseOptionsSupplier=caseOptionsSupplier; this.assignedUserOptionsSupplier=assignedUserOptionsSupplier; }
+        private final Executor backgroundExecutor;
+        private CreateDialogHandle(Stage stage, VBox content, Label errorLabel, Button saveButton, LocalDate defaultDate, Function<CreateCalendarEventInput, String> onSave, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier, Executor backgroundExecutor){ this.stage=stage; this.content=content; this.errorLabel=errorLabel; this.saveButton=saveButton; this.defaultDate=defaultDate; this.onSave=onSave; this.caseOptionsSupplier=caseOptionsSupplier; this.assignedUserOptionsSupplier=assignedUserOptionsSupplier; this.backgroundExecutor=backgroundExecutor; }
         public void populateEventTypes(List<CalendarEventType> eventTypes){
             if(!stage.isShowing()) return;
             List<CalendarEventType> safeTypes = eventTypes == null ? List.of() : eventTypes;
             CreateCalendarEventInput initial = new CreateCalendarEventInput("", resolveDefaultTypeId(safeTypes), defaultDate == null ? LocalDate.now() : defaultDate, false, null, DEFAULT_DURATION_MINUTES, "", null, defaultAssignedUserId(assignedUserOptionsSupplier));
-            DialogParts updated = DialogParts.build(safeTypes, initial, null, null, caseOptionsSupplier, assignedUserOptionsSupplier, id -> {}, null, true);
+            DialogParts updated = DialogParts.build(safeTypes, initial, null, null, caseOptionsSupplier, assignedUserOptionsSupplier, id -> {}, null, true, backgroundExecutor);
             content.getChildren().setAll(updated.content());
             saveButton.setDisable(safeTypes.isEmpty());
             saveButton.setOnAction(e -> { Optional<CreateCalendarEventInput> input = updated.readInput().get(); if (input.isEmpty()) return; String err = onSave == null ? "Save is unavailable." : onSave.apply(input.get()); if (err == null || err.isBlank()) stage.close(); else showError(updated.errorLabel(), err); });
@@ -304,13 +307,15 @@ public final class NewCalendarEventDialog {
 
     private record DialogParts(VBox content, Label errorLabel, Supplier<Optional<CreateCalendarEventInput>> readInput) {
         static DialogParts build(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial) {
-            return build(eventTypes, initial, null, null, () -> List.of(), () -> List.of(), id -> {}, null, true);
+            return build(eventTypes, initial, null, null, () -> List.of(), () -> List.of(), id -> {}, null, true, Runnable::run);
         }
-        static DialogParts build(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Node relatedCaseNode, Node relatedTaskNode, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier, Consumer<Integer> onOpenCase, CaseOption initialSelectedCase, boolean typesReady) {
+        static DialogParts build(List<CalendarEventType> eventTypes, CreateCalendarEventInput initial, Node relatedCaseNode, Node relatedTaskNode, Supplier<List<CaseOption>> caseOptionsSupplier, Supplier<List<AssignedUserOption>> assignedUserOptionsSupplier, Consumer<Integer> onOpenCase, CaseOption initialSelectedCase, boolean typesReady, Executor backgroundExecutor) {
             Label titleLabel = new Label("Title");
             TextField titleField = new TextField(initial == null ? "" : initial.title());
+            ControlStyles.formControl(titleField);
             Label eventTypeLabel = new Label("Type");
             ComboBox<CalendarEventType> eventTypeComboBox = new ComboBox<>();
+            ControlStyles.formControl(eventTypeComboBox);
             eventTypeComboBox.setMaxWidth(Double.MAX_VALUE);
             List<CalendarEventType> safeTypes = eventTypes == null ? List.of() : eventTypes;
             eventTypeComboBox.getItems().setAll(safeTypes);
@@ -322,17 +327,20 @@ public final class NewCalendarEventDialog {
 
             Label dateLabel = new Label("Date");
             DatePicker datePicker = new DatePicker(initial == null || initial.date() == null ? LocalDate.now() : initial.date());
+            ControlStyles.formControl(datePicker);
             CheckBox allDayCheckBox = new CheckBox("All day");
             allDayCheckBox.setSelected(initial == null || initial.allDay());
 
             Label startLabel = new Label("Start time");
             ComboBox<String> startTimeCombo = new ComboBox<>();
+            ControlStyles.formControl(startTimeCombo);
             startTimeCombo.getItems().setAll(TIME_OPTIONS);
             startTimeCombo.setMaxWidth(Double.MAX_VALUE);
             startTimeCombo.setPromptText("Select start");
 
             Label amPmLabel = new Label("AM/PM");
             ComboBox<String> amPmCombo = new ComboBox<>();
+            ControlStyles.formControl(amPmCombo);
             amPmCombo.getItems().setAll("AM", "PM");
             amPmCombo.setMaxWidth(Double.MAX_VALUE);
 
@@ -346,6 +354,7 @@ public final class NewCalendarEventDialog {
 
             Label durationLabel = new Label("Duration");
             ComboBox<Integer> durationCombo = new ComboBox<>();
+            ControlStyles.formControl(durationCombo);
             durationCombo.getItems().setAll(DURATION_OPTIONS_MINUTES);
             durationCombo.setCellFactory(cb -> new ListCell<>() { protected void updateItem(Integer item, boolean empty){ super.updateItem(item, empty); setText(empty||item==null?null:formatDuration(item)); }});
             durationCombo.setButtonCell(new ListCell<>() { protected void updateItem(Integer item, boolean empty){ super.updateItem(item, empty); setText(empty||item==null?null:formatDuration(item)); }});
@@ -366,6 +375,7 @@ public final class NewCalendarEventDialog {
 
             Label descriptionLabel = new Label("Description");
             TextArea descriptionArea = new TextArea(initial == null ? "" : initial.description());
+            ControlStyles.formControl(descriptionArea);
             descriptionArea.setPrefRowCount(4);
             descriptionArea.setWrapText(true);
             VBox selectedCaseHost = new VBox();
@@ -381,8 +391,9 @@ public final class NewCalendarEventDialog {
                 if (selectedCase[0] != null) selectedCaseHost.getChildren().add(createRelatedCasePreview(caseCardFactory, selectedCase[0]));
             };
             Button addCaseButton = new Button();
+            ControlStyles.apply(addCaseButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
             Button clearCaseButton = new Button("Clear");
-            clearCaseButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            ControlStyles.apply(clearCaseButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
             Runnable refreshCaseControls = () -> {
                 boolean hasAssigned = selectedCase[0] != null || hasCaseAssignment[0];
                 addCaseButton.setText(hasAssigned ? "Change Case" : "Add Case");
@@ -415,10 +426,12 @@ public final class NewCalendarEventDialog {
             }
             renderCase.run();
             addCaseButton.setOnAction(e -> {
-                List<CaseOption> sortedCases = (caseOptionsSupplier == null ? List.<CaseOption>of() : safeList(caseOptionsSupplier.get())).stream()
-                        .sorted(Comparator.comparing(c -> safe(c.displayName()).toLowerCase()))
-                        .toList();
-                CasePickerDialog.show(addCaseButton.getScene().getWindow(), sortedCases).ifPresent(v -> { selectedCase[0] = v; hasCaseAssignment[0] = true; renderCase.run(); refreshCaseControls.run(); });
+                CasePickerDialog.showAsync(addCaseButton.getScene().getWindow(), () ->
+                                (caseOptionsSupplier == null ? List.<CaseOption>of() : safeList(caseOptionsSupplier.get())).stream()
+                                        .sorted(Comparator.comparing(c -> safe(c.displayName()).toLowerCase()))
+                                        .toList(),
+                        backgroundExecutor,
+                        v -> { selectedCase[0] = v; hasCaseAssignment[0] = true; renderCase.run(); refreshCaseControls.run(); });
             });
             clearCaseButton.setOnAction(e -> { selectedCase[0] = null; hasCaseAssignment[0] = false; renderCase.run(); refreshCaseControls.run(); });
             HBox caseActionsRow = new HBox(8, addCaseButton, clearCaseButton);
@@ -456,8 +469,9 @@ public final class NewCalendarEventDialog {
             }
             renderUser.run();
             Button assignUserButton = new Button();
+            ControlStyles.apply(assignUserButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
             Button clearAssignedButton = new Button("Clear");
-            clearAssignedButton.getStyleClass().addAll("app-dialog-button", "app-dialog-button-secondary");
+            ControlStyles.apply(clearAssignedButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
             Runnable refreshUserControls = () -> {
                 boolean hasAssigned = selectedUser[0] != null || hasUserAssignment[0];
                 assignUserButton.setText(hasAssigned ? "Change Calendar" : "Choose Calendar");
@@ -505,7 +519,7 @@ public final class NewCalendarEventDialog {
             allDayCheckBox.selectedProperty().addListener((obs,o,n)->refresh.run());
             refresh.run();
 
-            Label errorLabel = new Label(); errorLabel.setStyle("-fx-text-fill: #b42318;"); errorLabel.setVisible(false); errorLabel.setManaged(false);
+            Label errorLabel = new Label(); errorLabel.getStyleClass().add("error"); errorLabel.setVisible(false); errorLabel.setManaged(false);
             VBox content = new VBox(8);
             if (relatedCaseNode != null || relatedTaskNode != null) {
                 Label relatedLabel = new Label("Related");

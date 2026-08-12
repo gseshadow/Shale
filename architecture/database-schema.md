@@ -918,6 +918,18 @@ Phase 6.1 adds a dedicated append-only entity-action audit table because existin
 
 Audit metadata may contain only stable IDs and non-sensitive state markers, including CaseId, CaseLinkId, CaseLinkShareId, ExternalLinkId, LinkTypeId, ContactId, previous/new Primary CaseLinkId, reordered link count, and activation state. It must not contain URLs, descriptions, link notes, share notes, Contact names/emails/phones, credentials, RowVer bytes, raw commands/DTOs, SQL, or exception text. Ordinary application paths insert only and must not update/delete audit history.
 
+Deployed databases must apply the forward-only migration
+`docs/sql/2026-08-12_entity_action_audit_entity_type_constraint.sql` after all earlier audit migrations. It rebuilds the
+durable `EntityType` CHECK from authoritative table/column dependency metadata, preserves values allowed by any
+deployed historical EntityType constraint, and adds the complete production vocabulary: `CASE`, `LINK_TYPE`,
+`CASE_LINK`, `CASE_LINK_SHARE`, `CASE_DATE`, `CALENDAR_EVENT`, `CASE_DATE_ROLE_MAPPING`,
+`CALENDAR_CASE_DATE_TYPE_MAPPING`, `FORM_CONFIGURATION`, `MATERIAL_TYPE`, `MATERIAL_REQUEST`,
+`MATERIAL_REQUEST_FOLLOW_UP`, `MATERIAL_ITEM`, and `USER`. The migration is transactional, repeatable, and verifies
+that the rebuilt constraint is enabled and trusted; historical migrations must not be edited or rerun to obtain this
+constraint update.
+
+Form-configuration replacement uses this same append-only audit contract at the DAO transaction boundary. It records entity type `FORM_CONFIGURATION`, the authoritative configuration id, action `CREATED` for the first saved configuration or `UPDATED` for a replacement, and only `FORM_CONFIGURATION_ID`, stable `FORM_KEY`, `SECTION_COUNT`, `CONFIGURED_FIELD_COUNT`, and `INITIAL_CREATION` metadata. The validated tenant administrator is the actor. The event is inserted on the replacement connection before commit, so audit failure rolls back the configuration, sections, and fields; rejected validation, authorization, tenant, and row-version checks do not emit a mutation event. Labels, configured or entered values, Case data, Contact data, dates, and row-version bytes are prohibited.
+
 ## Phase 6.2 unified Audit Log viewer
 
 The desktop Audit Log viewer now supports three read-only modes on one screen: **All**, **PHI Audit**, and **Entity Activity**. PHI Audit rows retain the `dbo.AuditLog` field/value semantics; Entity Activity rows retain the `dbo.EntityActionAuditLog` action/entity semantics and are not projected into fake `FieldName`, old-value, or new-value changes.
@@ -953,3 +965,28 @@ If a combined All-mode load partially fails, the viewer must not present incompl
 | `RowVer` | `rowversion` | Not null; database generated |
 
 `Color` uses the standard optional `nvarchar(20)` presentation contract documented for customizable lookups and already established by the authoritative `MaterialTypes` schema. The Phase 1 migration stores built-in defaults but **the application does not read or mutate `RequestMethods.Color` yet**. `RequestStatuses` retains its independent color implementation. Global rows seed the approved request methods (`email`, `phone`, `fax`, `mail`, `portal`, `in_person`, `other`) and lifecycle statuses including the creation default `requested`. The legacy `dbo.MaterialRequests.RequestMethod` and `dbo.MaterialRequests.Status` text columns remain in place; no Request Method foreign key is introduced.
+
+---
+
+## Case Dates
+
+### dbo.CaseDateTypes
+
+Customizable lookup for authoritative case-date meanings. Intake, Statute of Limitations, and Tort Notice Deadline are the only global required built-ins. The ten deployed noncritical definitions (Trial, Hearing, Mediation, Deposition, Discovery Deadline, Date of Injury, Date of Medical Negligence, Date Medical Negligence Was Discovered, Fee Agreement Signed, and Non-Engagement Letter Sent) are owned by tenant 7; tenant 8 begins built-in-only. Existing ids and references were preserved by changing ownership in place. Optional templates are outside this phase. Rows retain stable lowercase `SystemKey`, display `Name`, `Description`, constrained `CalendarCategory`, `Color`, `SupportsTime`, active/deleted lifecycle fields, actor metadata, timestamps, and `RowVer`.
+
+### dbo.CaseDates
+
+Strict tenant-owned case occurrence table with `ShaleClientId`, `CaseId`, `CaseDateTypeId`, `StartsAt`, optional `EndsAt`, `AllDay`, notes, actor metadata, soft-deletion metadata, timestamps, and `RowVer`. Multiple occurrences of the same type may exist on one case.
+
+Ownership: `CaseDates` owns legal/factual case dates. Following the completed Phase 3B backfill and Phase 3C validation, it is the target authoritative runtime representation for the nine migrated fixed-date meanings; their `Cases` columns are retained temporarily for rollback/history only. `CalendarEvents` owns manually created calendar events only. The unified calendar projects from authoritative sources instead of becoming the owner or duplicating domain dates. Unmigrated workflow/lifecycle dates remain separate unless deliberately reclassified. Runtime cutover and later column removal are distinct, independently gated phases.
+
+### dbo.CaseDateSemanticRoles / dbo.CaseDateTypeSemanticRoleMappings
+
+`CaseDateSemanticRoles` contains the explicit protected application meanings
+`INTAKE`, `STATUTE_OF_LIMITATIONS`, and `TORT_NOTICE_DEADLINE`.
+`CaseDateTypeSemanticRoleMappings` associates one active global compatibility type,
+or at most one active tenant-specific type, with each role. The association has its
+own tenant/global scope, active and soft-deleted lifecycle, actor/timestamp provenance,
+`RowVer`, foreign keys, filtered singleton indexes, and tenant-or-global RLS. Type
+presentation and occurrence identity remain in `CaseDateTypes` and `CaseDates`;
+neither existing id is rewritten by the semantic-role foundation.

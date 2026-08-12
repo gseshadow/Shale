@@ -1,13 +1,19 @@
 package com.shale.ui.component.factory;
 
 import com.shale.core.dto.MaterialRequestSummaryDto;
+import com.shale.core.dto.RequestStatusDto;
+import com.shale.core.dto.MaterialRequestStatusHistoryDto;
+import com.shale.ui.component.StatusTimeline;
 import com.shale.ui.util.ColorUtil;
 import javafx.geometry.Insets;
+import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.input.MouseButton;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -20,6 +26,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
@@ -27,6 +36,7 @@ import java.util.function.Consumer;
  * Controllers supply fully hydrated summary DTOs and own all service calls.
  */
 public final class MaterialRequestCardFactory {
+    static final String MATERIAL_REQUEST_ID_KEY = "shale.materialRequestId";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
     private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
     static final String NEUTRAL_STATUS_COLOR = "#E2E8F0";
@@ -65,6 +75,16 @@ public final class MaterialRequestCardFactory {
     }
 
     public Node create(MaterialRequestSummaryDto request, Variant variant, String statusDisplayName, String configuredStatusColor) {
+        return create(request, variant, statusDisplayName, configuredStatusColor, List.of());
+    }
+
+    public Node create(MaterialRequestSummaryDto request, Variant variant, String statusDisplayName, String configuredStatusColor,
+                       List<RequestStatusDto> effectiveStatuses) {
+        return create(request, variant, statusDisplayName, configuredStatusColor, List.of(), effectiveStatuses);
+    }
+
+    public Node create(MaterialRequestSummaryDto request, Variant variant, String statusDisplayName, String configuredStatusColor,
+                       List<MaterialRequestStatusHistoryDto> history, List<RequestStatusDto> effectiveStatuses) {
         Objects.requireNonNull(request, "request");
         if (variant != Variant.LIST) throw new IllegalArgumentException("Unsupported material request card variant: " + variant);
 
@@ -78,7 +98,9 @@ public final class MaterialRequestCardFactory {
         HBox.setHgrow(body, Priority.ALWAYS);
 
         Label title = new Label(nvl(request.title(), nvl(request.materialTypeName(), "Material Request #" + request.id())));
+        title.getStyleClass().add("material-request-card__title");
         title.setWrapText(true);
+        title.setMinHeight(Region.USE_PREF_SIZE);
         title.setMaxWidth(Double.MAX_VALUE);
         title.setStyle("-fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: #112542;");
 
@@ -96,11 +118,14 @@ public final class MaterialRequestCardFactory {
         addEntityFact(facts, "Requested From", requestedFromNode(request));
         addEntityFact(facts, "Requested By", userNode(request.requestedByUserId(), request.requestedByDisplayName(), request.requestedByUserColor()));
         addEntityFact(facts, "Assigned To", userNode(request.assignedToUserId(), request.assignedToDisplayName(), request.assignedToUserColor()));
-        addTextFact(facts, "Requested", fmt(request.requestedAt()));
+        addTextFact(facts, "Created By", nvl(request.createdByDisplayName(), "Unknown"));
+        addTextFact(facts, "Request Date", fmt(request.requestedAt()));
         addTextFact(facts, "Due", fmt(request.expectedResponseDate()));
         addTextFact(facts, "Next Follow-up", fmt(request.nextFollowUpAt()));
+        addTextFact(facts, "Requested Date Range", fmtRange(request.requestedRangeStartDate(), request.requestedRangeEndDate()));
 
         Label timing = dueIndicator(request);
+        body.getChildren().add(requestStatusTimeline(history, effectiveStatuses));
         body.getChildren().add(header);
         if (!facts.getChildren().isEmpty()) body.getChildren().add(facts);
         if (timing != null) body.getChildren().add(timing);
@@ -110,7 +135,9 @@ public final class MaterialRequestCardFactory {
         rail.setMinWidth(7); rail.setPrefWidth(7); rail.setMaxWidth(7);
         rail.setStyle("-fx-background-color: " + materialTypeRailColor + "; -fx-background-radius: " + CARD_RADIUS + " 0 0 " + CARD_RADIUS + ";");
 
+        final long requestId = request.id();
         HBox card = new HBox(0, rail, body);
+        card.getProperties().put(MATERIAL_REQUEST_ID_KEY, requestId);
         card.getStyleClass().addAll("material-request-card", "material-request-list-card");
         card.setMinWidth(0);
         card.setMaxWidth(Double.MAX_VALUE);
@@ -121,11 +148,62 @@ public final class MaterialRequestCardFactory {
         card.setOnMouseExited(e -> applyCardStyle(card, statusColor, false));
         if (onOpenRequest != null) {
             card.setCursor(Cursor.HAND);
+            card.setFocusTraversable(true);
+            card.setAccessibleText("Open material request " + nvl(request.title(), "#" + requestId));
             card.setOnMouseClicked(e -> {
-                if (e.getButton() == MouseButton.PRIMARY) onOpenRequest.accept(request.id());
+                if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) {
+                    activateRequest(card, requestId);
+                    e.consume();
+                }
+            });
+            card.setOnKeyPressed(e -> {
+                if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) {
+                    activateRequest(card, requestId);
+                    e.consume();
+                }
             });
         }
         return card;
+    }
+
+    private void activateRequest(Node card, long requestId) {
+        // Keep one queue boundary so the accepted input dispatch completes before window
+        // creation, and reject the activation if an intervening list rebuild detached it.
+        Platform.runLater(() -> {
+            if (card.getParent() == null || card.getScene() == null) return;
+            onOpenRequest.accept(requestId);
+        });
+    }
+
+    static ScrollPane requestStatusTimeline(List<MaterialRequestStatusHistoryDto> history, List<RequestStatusDto> effectiveStatuses) {
+        return StatusTimeline.create(requestStatusItems(history, effectiveStatuses), StatusTimeline.Variant.COMPACT_CARD);
+    }
+
+    static List<StatusTimeline.Item> requestStatusItems(List<MaterialRequestStatusHistoryDto> history, List<RequestStatusDto> effectiveStatuses) {
+        List<MaterialRequestStatusHistoryDto> occurrences=(history==null?List.<MaterialRequestStatusHistoryDto>of():history).stream().filter(Objects::nonNull)
+                .sorted(Comparator.comparing(MaterialRequestStatusHistoryDto::occurredAt,Comparator.nullsFirst(Comparator.naturalOrder())).thenComparingLong(MaterialRequestStatusHistoryDto::id)).toList();
+        List<RequestStatusDto> definitions=effectiveStatuses==null?List.of():effectiveStatuses.stream().filter(Objects::nonNull).toList();
+        List<StatusTimeline.Item> items=new ArrayList<>();
+        for(int i=0;i<occurrences.size();i++){
+            MaterialRequestStatusHistoryDto occurrence=occurrences.get(i);
+            RequestStatusDto definition=definitions.stream().filter(s->lookupValueMatches(s,occurrence.statusSystemKey())||lookupValueMatches(s,occurrence.storedStatus())).findFirst().orElse(null);
+            String fallback=occurrence.storedStatus()==null||occurrence.storedStatus().isBlank()?"Unknown":occurrence.storedStatus().trim();
+            String name=definition==null||definition.name()==null||definition.name().isBlank()?fallback:definition.name().trim();
+            String color=definition==null?NEUTRAL_STATUS_COLOR:definition.color();
+            boolean current=i==occurrences.size()-1;
+            String tooltip=name+(current?" (Current)":" (Completed)");
+            if(occurrence.occurredAt()!=null)tooltip+="\nChanged: "+occurrence.occurredAt().format(DATE_TIME_FORMAT);
+            if(occurrence.actorDisplayName()!=null&&!occurrence.actorDisplayName().isBlank())tooltip+="\nBy: "+occurrence.actorDisplayName().trim();
+            String identity=occurrence.statusSystemKey()==null||occurrence.statusSystemKey().isBlank()?fallback:occurrence.statusSystemKey();
+            items.add(new StatusTimeline.Item(identity,name,color,current?StatusTimeline.State.CURRENT:StatusTimeline.State.COMPLETED,tooltip));
+        }
+        return List.copyOf(items);
+    }
+
+    private static boolean lookupValueMatches(RequestStatusDto status, String value) {
+        if (value == null || value.isBlank()) return false;
+        return (status.systemKey() != null && status.systemKey().trim().equalsIgnoreCase(value.trim()))
+                || (status.name() != null && status.name().trim().equalsIgnoreCase(value.trim()));
     }
 
     private static void applyCardStyle(HBox card, String statusColor, boolean hovered) {
@@ -266,6 +344,12 @@ public final class MaterialRequestCardFactory {
     private static Region spacer() { Region r = new Region(); HBox.setHgrow(r, Priority.ALWAYS); return r; }
     private static boolean terminal(String s) { String v = s == null ? "" : s.trim().toUpperCase(); return v.equals("CLOSED") || v.equals("CANCELLED"); }
     private static String fmt(LocalDateTime t) { return t == null ? null : (t.toLocalTime().equals(java.time.LocalTime.MIDNIGHT) ? DATE_FORMAT.format(t) : DATE_TIME_FORMAT.format(t)); }
+    private static String fmtRange(LocalDate start, LocalDate end) {
+        if (start == null && end == null) return null;
+        if (start == null) return "Through " + DATE_FORMAT.format(end);
+        if (end == null) return "From " + DATE_FORMAT.format(start);
+        return DATE_FORMAT.format(start) + " – " + DATE_FORMAT.format(end);
+    }
     private static boolean has(String s) { return s != null && !s.isBlank(); }
     private static String nvl(String s, String fallback) { return s == null || s.isBlank() ? fallback : s.trim(); }
 }

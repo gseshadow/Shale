@@ -10,6 +10,9 @@ public final class LiveUpdateEvents {
     public static final String ENTITY_CASE_LINK_SHARE = "CaseLinkShare";
     public static final String ENTITY_LINK_TYPE = "LinkType";
     public static final String ENTITY_AUDIT_ACTIVITY = "EntityAuditActivity";
+    /** PHI-free invalidation for any committed dbo.CaseDates occurrence mutation. */
+    public static final String ENTITY_CASE_DATES = "CaseDates";
+    public static final String ENTITY_CASE_DATE_TYPES = "CaseDateTypes";
 
     public static final String CHANGE_CREATED = "CREATED";
     public static final String CHANGE_UPDATED = "UPDATED";
@@ -59,6 +62,13 @@ public final class LiveUpdateEvents {
         StringBuilder json = new StringBuilder("{");
         append(json, "entityActionAuditLogId", entityActionAuditLogId);
         append(json, "change", CHANGE_ACTIVITY_ADDED);
+        return json.append('}').toString();
+    }
+
+    public static String caseDatesPatch(long caseId, String change) {
+        StringBuilder json = new StringBuilder("{");
+        append(json, "caseId", caseId);
+        append(json, "change", change);
         return json.append('}').toString();
     }
 

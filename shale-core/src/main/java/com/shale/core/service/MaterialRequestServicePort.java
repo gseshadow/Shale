@@ -27,6 +27,9 @@ public interface MaterialRequestServicePort {
     List<MaterialRequestSummaryDto> listMaterialRequests(long caseId, int shaleClientId);
     default List<MaterialRequestSummaryDto> listMaterialRequests(long caseId, int shaleClientId, boolean includeDeleted) { return listMaterialRequests(caseId, shaleClientId); }
     Optional<MaterialRequestDetailDto> getMaterialRequest(long caseId, long materialRequestId, int shaleClientId, int actorUserId);
+    default List<MaterialRequestUpdateDto> listUpdates(long caseId, long materialRequestId, int shaleClientId, int actorUserId) { return List.of(); }
+    default List<MaterialRequestStatusHistoryDto> listStatusHistory(long caseId, List<Long> materialRequestIds, int shaleClientId) { return List.of(); }
+    default MaterialRequestUpdateDto addNote(AddMaterialRequestNoteCommand command) { throw new UnsupportedOperationException("addNote"); }
     List<MaterialRequestFollowUpDto> listFollowUps(long caseId, long materialRequestId, int shaleClientId, int actorUserId);
     MaterialRequestDetailDto createMaterialRequest(CreateMaterialRequestCommand command);
     MaterialRequestDetailDto updateMaterialRequest(UpdateMaterialRequestCommand command);
@@ -41,17 +44,30 @@ public interface MaterialRequestServicePort {
     record CreateMaterialRequestCommand(int shaleClientId, int actorUserId, long caseId, int materialTypeId,
                                         String title, String description, Integer requestedFromContactId,
                                         Integer requestedFromOrganizationId, String requestedFromText,
-                                        String requestMethod, String status, int requestedByUserId,
+                                        String requestMethod, String status, Integer requestedByUserId,
                                         Integer assignedToUserId, LocalDateTime requestedAt,
-                                        LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays) {}
+                                        LocalDate requestedRangeStartDate, LocalDate requestedRangeEndDate,
+                                        LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays) {
+        public CreateMaterialRequestCommand(int shaleClientId,int actorUserId,long caseId,int materialTypeId,String title,String description,Integer requestedFromContactId,Integer requestedFromOrganizationId,String requestedFromText,String requestMethod,String status,Integer requestedByUserId,Integer assignedToUserId,LocalDateTime requestedAt,LocalDate expectedResponseDate,LocalDateTime nextFollowUpAt,Integer followUpIntervalDays) {
+            this(shaleClientId,actorUserId,caseId,materialTypeId,title,description,requestedFromContactId,requestedFromOrganizationId,requestedFromText,requestMethod,status,requestedByUserId,assignedToUserId,requestedAt,null,null,expectedResponseDate,nextFollowUpAt,followUpIntervalDays);
+        }
+    }
 
     record UpdateMaterialRequestCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, int materialTypeId,
                                         String title, String description, Integer requestedFromContactId,
                                         Integer requestedFromOrganizationId, String requestedFromText,
-                                        String requestMethod, String status, int requestedByUserId,
-                                        Integer assignedToUserId, LocalDateTime requestedAt, LocalDate relevantStartDate,
-                                        LocalDate relevantEndDate, LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays,
+                                        String requestMethod, String status, Integer requestedByUserId,
+                                        Integer assignedToUserId, LocalDateTime requestedAt, LocalDate requestedRangeStartDate,
+                                        LocalDate requestedRangeEndDate, LocalDate expectedResponseDate, LocalDateTime nextFollowUpAt, Integer followUpIntervalDays,
                                         LocalDateTime firstReceivedAt, LocalDateTime fullyReceivedAt, LocalDateTime closedAt,
-                                        Integer closedByUserId, String closureReason, String notes, byte[] rowVer) {}
+                                        Integer closedByUserId, String closureReason, String notes, byte[] rowVer) {
+        public UpdateMaterialRequestCommand { rowVer = copyRowVer(rowVer); }
+        @Override public byte[] rowVer() { return copyRowVer(rowVer); }
+    }
+    record AddMaterialRequestNoteCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, String body) {}
     record DeleteMaterialRequestCommand(int shaleClientId, int actorUserId, long caseId, long materialRequestId, byte[] rowVer) {}
+
+    private static byte[] copyRowVer(byte[] rowVer) {
+        return rowVer == null ? null : java.util.Arrays.copyOf(rowVer, rowVer.length);
+    }
 }

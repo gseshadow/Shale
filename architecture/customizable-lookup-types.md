@@ -9,6 +9,7 @@ Related references:
 - [Database schema reference](database-schema.md)
 - [Tenancy and RLS architecture](tenancy-and-rls.md)
 - [Case materials architecture](case-materials.md)
+- [Case dates architecture](case-dates.md)
 - [Request lookup overlay SQL](../docs/sql/2026-07-21_request_lookup_overlay.sql)
 - [Case materials foundation SQL](../docs/sql/2026-07-21_case_materials_foundation_phase1.sql)
 - [Link type foundation SQL](../docs/sql/2026-07-16_case_links_foundation_phase1.sql)
@@ -175,8 +176,16 @@ Some customizable lookup types affect workflow, authorization, filtering, or ren
 - A separate authorization/capability model and migration plan is required first.
 - Unknown tenant-created roles MUST receive no privileged capabilities by default.
 
+### CaseDateTypes
+
+- `CaseDateTypes` describes authoritative case facts or deadlines, not manually created calendar events.
+- Broad presentation/filter categories use a constrained `CalendarCategory` vocabulary rather than a separate table.
+- Built-in fixed legal/factual case fields stay authoritative in `Cases` until a later verified migration.
+- Workflow/lifecycle dates remain owned by workflow fields unless deliberately reclassified.
+
 ### CalendarEventTypes
 
+- `CalendarEventTypes` describes manually created events only; do not use it for authoritative case facts or deadlines.
 - Unknown custom event types MUST render and schedule normally.
 - Unknown custom event types MUST receive no special synchronization/reminder behavior unless explicitly configured.
 
@@ -238,6 +247,7 @@ Implementations SHOULD include focused coverage for:
 Initial classification from the read-only audit:
 
 - Mature or comparatively mature overlay implementations: `LinkTypes`, `MaterialTypes`, `RequestMethods`, `RequestStatuses`.
+- New Phase 1A foundation following this standard: `CaseDateTypes` with `CaseDates` as the tenant-owned occurrence table.
 - Partial overlay implementations: `CalendarEventTypes`, `PracticeAreas`, `Statuses`.
 - Behavior-sensitive customizable lookups: `PartyRoles`, `PartySides`, `Statuses`, `TaskStatuses`, `RequestStatuses`, and `Roles`, although `Roles` is not yet safe for tenant customization.
 - Uncertain or requiring a product decision: `Categories`, `OrganizationTypes`.

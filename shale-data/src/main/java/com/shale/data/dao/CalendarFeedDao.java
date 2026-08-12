@@ -2,6 +2,7 @@ package com.shale.data.dao;
 
 import com.shale.core.model.CalendarFeedItem;
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.semantics.RoleSemantics;
 
 import java.sql.*;
 import java.time.LocalDate;
@@ -18,37 +19,7 @@ public final class CalendarFeedDao {
     }
 
 
-    public record CalendarCaseCardRow(int caseId, String caseName, String responsibleAttorney, String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {}
     public record CalendarTaskCardRow(long taskId, Integer caseId, String caseName, String caseResponsibleAttorney, String caseResponsibleAttorneyColor, Boolean caseNonEngagementLetterSent, String title, String description, LocalDateTime dueAt, LocalDateTime completedAt, String createdByDisplayName, String priorityColorHex) {}
-
-    public List<CalendarCaseCardRow> listCaseCardRows(int shaleClientId, List<Integer> caseIds) {
-        if (shaleClientId <= 0 || caseIds == null || caseIds.isEmpty()) return List.of();
-        String placeholders = String.join(",", java.util.Collections.nCopies(caseIds.size(), "?"));
-        String sql = """
-                SELECT c.Id,
-                       c.Name,
-                       LTRIM(RTRIM(
-                         COALESCE(ra.name_first, '') +
-                         CASE WHEN COALESCE(ra.name_first, '') = '' OR COALESCE(ra.name_last, '') = '' THEN '' ELSE ' ' END +
-                         COALESCE(ra.name_last, '')
-                       )) AS ResponsibleAttorney,
-                       ra.color AS ResponsibleAttorneyColor,
-                       c.NonEngagementLetterSent
-                FROM dbo.Cases c
-                LEFT JOIN dbo.CaseUsers cu ON cu.CaseId = c.Id AND cu.RoleId = 1
-                LEFT JOIN dbo.Users ra ON ra.Id = cu.UserId
-                WHERE c.ShaleClientId = ? AND c.Id IN (""" + placeholders + ") AND ISNULL(c.IsDeleted,0)=0";
-        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-            int i = 1;
-            ps.setInt(i++, shaleClientId);
-            for (Integer id : caseIds) ps.setInt(i++, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                List<CalendarCaseCardRow> rows = new ArrayList<>();
-                while (rs.next()) rows.add(new CalendarCaseCardRow(rs.getInt("Id"), rs.getString("Name"), rs.getString("ResponsibleAttorney"), rs.getString("ResponsibleAttorneyColor"), (Boolean) rs.getObject("NonEngagementLetterSent")));
-                return rows;
-            }
-        } catch (SQLException e) { throw new RuntimeException("Failed to load calendar case card rows", e); }
-    }
 
     public List<CalendarTaskCardRow> listTaskCardRows(int shaleClientId, List<Integer> taskIds) {
         if (shaleClientId <= 0 || taskIds == null || taskIds.isEmpty()) return List.of();
@@ -67,13 +38,19 @@ public final class CalendarFeedDao {
                        LTRIM(RTRIM(COALESCE(u.name_first,'') + CASE WHEN COALESCE(u.name_first,'')='' OR COALESCE(u.name_last,'')='' THEN '' ELSE ' ' END + COALESCE(u.name_last,''))) AS CreatedByDisplayName
                 FROM dbo.Tasks t
                 LEFT JOIN dbo.Cases c ON c.Id = t.CaseId
-                LEFT JOIN dbo.CaseUsers cu ON cu.CaseId = c.Id AND cu.RoleId = 1
-                LEFT JOIN dbo.Users ra ON ra.Id = cu.UserId
+                OUTER APPLY (
+                  SELECT TOP (1) cu.UserId
+                  FROM dbo.CaseUsers cu
+                  WHERE cu.CaseId = c.Id AND cu.RoleId = ?
+                  ORDER BY cu.IsPrimary DESC, cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
+                ) responsibleAttorney
+                LEFT JOIN dbo.Users ra ON ra.Id = responsibleAttorney.UserId AND ra.ShaleClientId = t.ShaleClientId
                 LEFT JOIN dbo.Users u ON u.Id = t.CreatedByUserId
                 LEFT JOIN dbo.Priorities p ON p.Id = t.PriorityId
                 WHERE t.ShaleClientId = ? AND t.Id IN (""" + placeholders + ") AND ISNULL(t.IsDeleted,0)=0";
         try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
             int i = 1;
+            ps.setInt(i++, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
             ps.setInt(i++, shaleClientId);
             for (Integer id : taskIds) ps.setInt(i++, id);
             try (ResultSet rs = ps.executeQuery()) {
@@ -83,27 +60,13 @@ public final class CalendarFeedDao {
             }
         } catch (SQLException e) { throw new RuntimeException("Failed to load calendar task card rows", e); }
     }
-    record CaseDateProjection(String keyPrefix, String columnName, String titlePrefix, String systemKey, String displayTypeName) {
-        boolean deadline() {
-            return "STATUTE_OF_LIMITATIONS".equals(systemKey)
-                    || "TORT_NOTICE_DEADLINE".equals(systemKey)
-                    || "DISCOVERY_DEADLINE".equals(systemKey);
-        }
-    }
+    record LifecycleDateProjection(String keyPrefix, String columnName, String titlePrefix) {}
 
-    static final List<CaseDateProjection> CASE_DATE_PROJECTIONS = List.of(
-            new CaseDateProjection("CASE_SOL", "StatuteOfLimitations", "SOL", "STATUTE_OF_LIMITATIONS", "Statute of Limitations"),
-            new CaseDateProjection("CASE_TORT", "TortNoticeDeadline", "Tort Notice", "TORT_NOTICE_DEADLINE", "Tort Notice Deadline"),
-            new CaseDateProjection("CASE_DISC", "DiscoveryDeadline", "Discovery Deadline", "DISCOVERY_DEADLINE", "Discovery Deadline"),
-            new CaseDateProjection("CASE_CALLER", "CallerDate", "Intake", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_ACCEPTED", "AcceptedDate", "Accepted", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_DENIED", "DeniedDate", "Denied", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_CLOSED", "ClosedDate", "Closed", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_INJURY", "DateOfInjury", "Date of Injury", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_FEE_AGREEMENT", "DateFeeAgreementSigned", "Fee Agreement Signed", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_NON_ENGAGEMENT", "DateNonEngagementLetterSent", "Non-Engagement Letter Sent", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_MED_NEG", "DateOfMedicalNegligence", "Medical Negligence", "CASE_DATE", "Case Date"),
-            new CaseDateProjection("CASE_MED_NEG_DISCOVERED", "DateMedicalNegligenceWasDiscovered", "Medical Negligence Discovered", "CASE_DATE", "Case Date"));
+    /** Status/lifecycle dates are not part of the Case Dates migration. */
+    static final List<LifecycleDateProjection> LIFECYCLE_DATE_PROJECTIONS = List.of(
+            new LifecycleDateProjection("CASE_ACCEPTED", "AcceptedDate", "Accepted"),
+            new LifecycleDateProjection("CASE_DENIED", "DeniedDate", "Denied"),
+            new LifecycleDateProjection("CASE_CLOSED", "ClosedDate", "Closed"));
 
     public List<CalendarFeedItem> listCalendarFeed(int shaleClientId, LocalDateTime startInclusive, LocalDateTime endExclusive) {
         return listCalendarFeed(shaleClientId, startInclusive, endExclusive, null, null);
@@ -130,7 +93,8 @@ public final class CalendarFeedDao {
             ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive)); if (userScheduleUserId != null) ps.setInt(i++, userScheduleUserId); if (caseId != null) ps.setInt(i++, caseId);
             LocalDate startDate = startInclusive.toLocalDate();
             LocalDate endDate = endExclusive.toLocalDate();
-            for (int branch = 0; branch < CASE_DATE_PROJECTIONS.size(); branch++) {
+            ps.setInt(i++, shaleClientId); ps.setTimestamp(i++, Timestamp.valueOf(endExclusive)); ps.setTimestamp(i++, Timestamp.valueOf(startInclusive)); if (userScheduleUserId != null) ps.setInt(i++, userScheduleUserId); if (caseId != null) ps.setInt(i++, caseId);
+            for (int branch = 0; branch < LIFECYCLE_DATE_PROJECTIONS.size(); branch++) {
                 ps.setInt(i++, shaleClientId); ps.setDate(i++, Date.valueOf(startDate)); ps.setDate(i++, Date.valueOf(endDate)); if (userScheduleUserId != null) ps.setInt(i++, userScheduleUserId); if (caseId != null) ps.setInt(i++, caseId);
             }
             try (ResultSet rs = ps.executeQuery()) {
@@ -249,8 +213,9 @@ public final class CalendarFeedDao {
                       )
 """ : "") + (caseFiltered ? "AND t.CaseId = ?\n" : "") + """
                 """);
-        for (CaseDateProjection projection : CASE_DATE_PROJECTIONS) {
-            sql.append("\n                    UNION ALL\n\n").append(caseDateBranch(projection, caseFiltered, userScheduleScoped));
+        sql.append("\n                    UNION ALL\n\n").append(authoritativeCaseDatesBranch(caseFiltered, userScheduleScoped));
+        for (LifecycleDateProjection projection : LIFECYCLE_DATE_PROJECTIONS) {
+            sql.append("\n                    UNION ALL\n\n").append(lifecycleDateBranch(projection, caseFiltered, userScheduleScoped));
         }
         sql.append("""
                 ) feed
@@ -259,8 +224,68 @@ public final class CalendarFeedDao {
         return sql.toString();
     }
 
-    private static String caseDateBranch(CaseDateProjection projection, boolean caseFiltered, boolean userScheduleScoped) {
-        String fallbackSystemKey = projection.deadline() ? "DEADLINE" : "REMINDER";
+    private static String authoritativeCaseDatesBranch(boolean caseFiltered, boolean userScheduleScoped) {
+        return """
+                    SELECT CONCAT('CASE_DATE:', CAST(cd.Id AS varchar(20))),
+                           CONCAT(typePresentation.Name, N' — ', c.Name),
+                           NULL AS Details,
+                           cd.StartsAt,
+                           cd.EndsAt,
+                           cd.AllDay,
+                           'CASE_DATE',
+                           typePresentation.CalendarCategory,
+                           c.Id,
+                           c.Name AS CaseName,
+                           NULL,
+                           c.Name,
+                           CONCAT('CASE_DATE_', typePresentation.CalendarCategory),
+                           typePresentation.Name,
+                           typePresentation.Color,
+                           NULL AS AssignedUserColor,
+                           NULL AS AssignedToUserId,
+                           NULL AS AssignedUserDisplayName
+                    FROM dbo.CaseDates cd
+                    INNER JOIN dbo.Cases c ON c.Id = cd.CaseId AND c.ShaleClientId = cd.ShaleClientId AND ISNULL(c.IsDeleted, 0) = 0
+                    INNER JOIN dbo.CaseDateTypes storedType ON storedType.Id = cd.CaseDateTypeId AND (storedType.ShaleClientId = cd.ShaleClientId OR storedType.ShaleClientId IS NULL)
+                    OUTER APPLY (
+                      SELECT TOP (1) effectiveType.Name, effectiveType.CalendarCategory, effectiveType.Color
+                      FROM dbo.CaseDateTypes effectiveType
+                      WHERE storedType.SystemKey IS NOT NULL
+                        AND effectiveType.SystemKey = storedType.SystemKey
+                        AND (effectiveType.ShaleClientId = cd.ShaleClientId OR effectiveType.ShaleClientId IS NULL)
+                        AND ISNULL(effectiveType.IsDeleted, 0) = 0
+                        AND effectiveType.IsActive = 1
+                      ORDER BY CASE WHEN effectiveType.ShaleClientId = cd.ShaleClientId THEN 0 ELSE 1 END,
+                               effectiveType.SortOrder ASC, effectiveType.Name ASC, effectiveType.Id ASC
+                    ) effectiveType
+                    CROSS APPLY (
+                      SELECT COALESCE(effectiveType.Name, storedType.Name) AS Name,
+                             COALESCE(effectiveType.CalendarCategory, storedType.CalendarCategory) AS CalendarCategory,
+                             COALESCE(effectiveType.Color, storedType.Color) AS Color
+                    ) typePresentation
+                    WHERE cd.ShaleClientId = ?
+                      AND ISNULL(cd.IsDeleted, 0) = 0
+                      AND typePresentation.CalendarCategory IN ('DEADLINE','TRIAL','HEARING','MEDIATION','DEPOSITION','NOTICE','APPOINTMENT','MILESTONE','OTHER')
+                      AND cd.StartsAt < ?
+                      AND COALESCE(cd.EndsAt, cd.StartsAt) >= ?
+                      """ + (userScheduleScoped ? """
+                      AND EXISTS (
+                        SELECT 1
+                        FROM dbo.CaseUsers responsibleAttorney
+                        INNER JOIN dbo.Users responsibleAttorneyUser
+                          ON responsibleAttorneyUser.id = responsibleAttorney.UserId
+                         AND responsibleAttorneyUser.ShaleClientId = c.ShaleClientId
+                         AND ISNULL(responsibleAttorneyUser.is_deleted, 0) = 0
+                        WHERE responsibleAttorney.CaseId = c.Id
+                          AND responsibleAttorney.RoleId = 4
+                          AND responsibleAttorney.IsPrimary = 1
+                          AND responsibleAttorney.UserId = ?
+                      )
+""" : "") + (caseFiltered ? "AND c.Id = ?\n" : "") + """
+                """;
+    }
+
+    private static String lifecycleDateBranch(LifecycleDateProjection projection, boolean caseFiltered, boolean userScheduleScoped) {
         return ("""
                     SELECT CONCAT('%s:', CAST(c.Id AS varchar(20))),
                            CONCAT('%s', N' — ', c.Name),
@@ -274,8 +299,8 @@ public final class CalendarFeedDao {
                            c.Name AS CaseName,
                            NULL,
                            c.Name,
-                           COALESCE(projectedType.SystemKey, fallbackType.SystemKey, '%s'),
-                           COALESCE(projectedType.Name, fallbackType.Name, '%s'),
+                           COALESCE(projectedType.SystemKey, fallbackType.SystemKey, 'CASE_DATE'),
+                           COALESCE(projectedType.Name, fallbackType.Name, 'Case Date'),
                            COALESCE(projectedType.ColorHex, fallbackType.ColorHex),
                            NULL AS AssignedUserColor,
                            NULL AS AssignedToUserId,
@@ -320,7 +345,7 @@ public final class CalendarFeedDao {
 """ : "") + (caseFiltered ? "AND c.Id = ?\n" : "") + """
                 """).formatted(
                 projection.keyPrefix(), projection.titlePrefix().replace("'", "''"), projection.columnName(), projection.columnName(),
-                projection.systemKey(), projection.displayTypeName().replace("'", "''"), projection.systemKey(), fallbackSystemKey,
+                "CASE_DATE", "REMINDER",
                 projection.columnName(), projection.columnName(), projection.columnName());
     }
 

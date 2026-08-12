@@ -16,7 +16,7 @@ final class MaterialRequestNotificationContractTest {
         String dao = source("src/main/java/com/shale/data/dao/MaterialRequestDao.java");
         assertTrue(dao.contains("RecipientSnapshot previous=findRecipientSnapshot(con,c)"));
         assertTrue(dao.contains("LinkedHashSet<Integer> recipients"));
-        assertTrue(dao.contains("newRequester!=actor"));
+        assertTrue(dao.contains("!Objects.equals(newRequester,actor)"));
         assertTrue(dao.contains("newAssignee!=actor"));
         assertTrue(dao.contains("notifications.createMaterialRequestNotification(con"));
         assertTrue(dao.indexOf("createRecipientNotifications(con,id") < dao.indexOf("con.commit();return findMaterialRequest"));
@@ -28,7 +28,7 @@ final class MaterialRequestNotificationContractTest {
         assertTrue(dao.contains("COALESCE(rs.SystemKey,mr.Status)"));
         assertTrue(dao.contains("NOT IN ('closed','cancelled')"));
         assertTrue(dao.contains("mr.ExpectedResponseDate IS NOT NULL"));
-        assertTrue(generator.contains("candidate.assignedToUserId()!=null") || dao.contains("assignedToUserId!=null?assignedToUserId:requestedByUserId"));
+        assertTrue(generator.contains("candidate.recipientUserIds()"));
         assertTrue(generator.contains("\":due:\" + candidate.dueAt() + \":\" + recipient"));
     }
 
@@ -36,8 +36,8 @@ final class MaterialRequestNotificationContractTest {
         String dao = source("src/main/java/com/shale/data/dao/MaterialRequestDao.java");
         String notifications = source("src/main/java/com/shale/data/dao/NotificationDao.java");
         String generator = source("../shale-ui/src/main/java/com/shale/ui/notification/TaskDueDateNotificationGenerator.java");
-        assertTrue(dao.contains("mr.FollowUpIntervalDays IS NOT NULL"));
-        assertTrue(dao.contains("assignedToUserId!=null?assignedToUserId:requestedByUserId"));
+        assertTrue(dao.contains("mr.NextFollowUpAt IS NOT NULL"));
+        assertTrue(dao.contains("responsibleUsers(requestedByUserId,assignedToUserId)"));
         assertTrue(generator.contains("\":follow-up:\"+candidate.nextFollowUpAt()"));
         assertTrue(notifications.contains("FOLLOW_UP_DUE"));
         assertTrue(notifications.contains("WITH (UPDLOCK,ROWLOCK)"));

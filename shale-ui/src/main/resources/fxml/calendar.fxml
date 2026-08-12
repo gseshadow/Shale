@@ -7,6 +7,8 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Priority?>
 <?import javafx.scene.layout.Region?>
@@ -23,9 +25,9 @@
                 <Label text="Calendars" styleClass="shale-toolbar-heading" />
                 <HBox spacing="8" alignment="CENTER_LEFT" styleClass="calendar-overlay-actions">
                     <children>
-                        <Button fx:id="selectAllCalendarsButton" text="Select All" onAction="#onSelectAllCalendars" styleClass="calendar-sidebar-link-button" />
-                        <Button fx:id="clearAllCalendarsButton" text="Clear All" onAction="#onClearAllCalendars" styleClass="calendar-sidebar-link-button" />
-                        <Button fx:id="resetCalendarsButton" text="Reset" onAction="#onResetCalendars" styleClass="calendar-sidebar-link-button" />
+                        <Button fx:id="selectAllCalendarsButton" text="Select All" onAction="#onSelectAllCalendars" />
+                        <Button fx:id="clearAllCalendarsButton" text="Clear All" onAction="#onClearAllCalendars" />
+                        <Button fx:id="resetCalendarsButton" text="Reset" onAction="#onResetCalendars" />
                     </children>
                 </HBox>
                 <ScrollPane fx:id="calendarRowsScrollPane" fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS" styleClass="calendar-overlay-list-scroll">
@@ -47,33 +49,39 @@
 
         <VBox spacing="12" HBox.hgrow="ALWAYS" styleClass="calendar-main-content">
             <children>
-                <HBox spacing="8" alignment="CENTER_LEFT" styleClass="shale-filter-panel calendar-toolbar">
+                <FlowPane hgap="8" vgap="8" alignment="CENTER_LEFT" styleClass="shale-filter-panel calendar-toolbar">
                     <children>
                         <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group calendar-toolbar-nav">
                             <children>
-                                <Button fx:id="todayButton" text="Today" onAction="#onToday" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
-                                <Button fx:id="prevWeekButton" text="◀" onAction="#onPreviousWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact calendar-toolbar-icon-button" />
-                                <Button fx:id="nextWeekButton" text="▶" onAction="#onNextWeek" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact calendar-toolbar-icon-button" />
+                                <Button fx:id="todayButton" text="Today" onAction="#onToday" />
+                                <Button fx:id="prevWeekButton" text="◀" onAction="#onPreviousWeek" styleClass="calendar-toolbar-icon-button" />
+                                <Button fx:id="nextWeekButton" text="▶" onAction="#onNextWeek" styleClass="calendar-toolbar-icon-button" />
                                 <Label fx:id="weekRangeLabel" styleClass="search-section-title shale-toolbar-heading calendar-toolbar-range" />
                             </children>
                         </HBox>
-                        <Region HBox.hgrow="ALWAYS" />
                         <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group calendar-toolbar-actions">
                             <children>
-                                <Button fx:id="newEventButton" text="New Event" onAction="#onNewEvent" styleClass="app-toolbar-button app-toolbar-button-primary app-toolbar-button-compact" />
-                                <ChoiceBox fx:id="viewModeChoice" styleClass="shale-filter-combo calendar-toolbar-view-select" />
+                                <Button fx:id="newEventButton" text="New Event" onAction="#onNewEvent" />
+                                <HBox fx:id="viewModeSelector" styleClass="shale-segmented-control calendar-toolbar-view-selector">
+                                    <children>
+                                        <ToggleButton fx:id="weekViewButton" text="Week" styleClass="shale-segment" />
+                                        <ToggleButton fx:id="fiveDayViewButton" text="5 Day" styleClass="shale-segment" />
+                                        <ToggleButton fx:id="dayViewButton" text="Day" styleClass="shale-segment" />
+                                        <ToggleButton fx:id="monthViewButton" text="Month" styleClass="shale-segment" />
+                                    </children>
+                                </HBox>
                             </children>
                         </HBox>
                         <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group calendar-toolbar-filters">
                             <children>
-                                <TextField fx:id="searchTextField" promptText="Search" prefWidth="150" styleClass="shale-search-field calendar-toolbar-search" />
-                                <ComboBox fx:id="caseFilterCombo" promptText="All cases" prefWidth="150" styleClass="shale-filter-combo calendar-toolbar-filter" />
-                                <ComboBox fx:id="eventTypeFilterCombo" promptText="All types" prefWidth="130" styleClass="shale-filter-combo calendar-toolbar-filter" />
-                                <Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#onClearFilters" styleClass="app-toolbar-button app-toolbar-button-neutral app-toolbar-button-compact" />
+                                <TextField fx:id="searchTextField" promptText="Search" prefWidth="150" styleClass="calendar-toolbar-search" />
+                                <ComboBox fx:id="caseFilterCombo" promptText="All cases" prefWidth="150" styleClass="calendar-toolbar-filter" />
+                                <ComboBox fx:id="eventTypeFilterCombo" promptText="All types" prefWidth="130" styleClass="calendar-toolbar-filter" />
+                                <Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#onClearFilters" />
                             </children>
                         </HBox>
                     </children>
-                </HBox>
+                </FlowPane>
 
                 <Label fx:id="calendarLoadingLabel" text="Loading week..." styleClass="shale-loading-placeholder" visible="false" managed="false" />
                 <Label fx:id="calendarErrorLabel" styleClass="error" visible="false" managed="false" />

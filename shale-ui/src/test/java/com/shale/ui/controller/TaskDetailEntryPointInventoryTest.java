@@ -16,6 +16,7 @@ class TaskDetailEntryPointInventoryTest {
         String sceneManager = Files.readString(Path.of("src/main/java/com/shale/ui/navigation/SceneManager.java"));
         String notificationDialog = Files.readString(Path.of("src/main/java/com/shale/ui/component/dialog/NotificationCenterDialog.java"));
         String taskCardFactory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/TaskCardFactory.java"));
+        String compactSceneManager = sceneManager.replaceAll("\\s+", " ");
 
         assertTrue(myShale.contains("private void openTask(Long taskId)") && myShale.contains("TaskDetailDialog.showAndWait"),
                 "My Shale/My Tasks task cards open the TaskDetailDialog-specific task detail window.");
@@ -27,7 +28,7 @@ class TaskDetailEntryPointInventoryTest {
                 "Notification task links route through the app-level task opener for the specific TaskId.");
         assertTrue(taskCardFactory.contains("card.setOnOpen(onOpenTask)"),
                 "TaskCardFactory delegates task-card clicks to the shared task opener callback with the card TaskId.");
-        assertTrue(sceneManager.contains("taskId -> openTaskProfile(taskId, c::refreshCurrentRange)"),
+        assertTrue(compactSceneManager.contains("taskId -> openTaskProfile( taskId, c::refreshCurrentRange)"),
                 "Calendar projected tasks use the same app-level specific-task opener and add only a Calendar refresh callback.");
     }
 }

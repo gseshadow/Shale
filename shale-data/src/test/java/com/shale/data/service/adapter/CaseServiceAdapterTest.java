@@ -63,65 +63,6 @@ class CaseServiceAdapterTest {
 	}
 
 	@Test
-	void updateCaseCoreDetailsDelegatesWithRowVersion() {
-		CaseDetailDto updated = detail(99, "Updated");
-		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
-		gateway.updatedCase = updated;
-		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
-		byte[] rowVer = new byte[] {1, 2, 3};
-
-		CaseDetailDto actual = adapter.updateCaseCoreDetails(new UpdateCaseCoreDetailsCommand(
-				99, 42, 5, "Updated", "C-1", "description", LocalDate.of(2026, 1, 2),
-				LocalDate.of(2026, 2, 3), LocalDate.of(2026, 3, 4), "summary", rowVer));
-
-		assertSame(updated, actual);
-		assertEquals(99, gateway.lastUpdateCaseId);
-		assertEquals("Updated", gateway.lastUpdateName);
-		assertEquals("C-1", gateway.lastUpdateCaseNumber);
-		assertEquals("description", gateway.lastUpdateDescription);
-		assertEquals(LocalDate.of(2026, 1, 2), gateway.lastUpdateIncidentDate);
-		assertEquals(LocalDate.of(2026, 2, 3), gateway.lastUpdateSolDate);
-		assertEquals(LocalDate.of(2026, 3, 4), gateway.lastUpdateTortNoticeDeadline);
-		assertEquals("summary", gateway.lastUpdateSummary);
-		assertArrayEquals(rowVer, gateway.lastUpdateRowVer);
-		assertEquals(5, gateway.lastUpdateActorUserId);
-	}
-
-	@Test
-	void updateCaseCoreDetailsDelegatesClearedSolAsNull() {
-		CaseDetailDto updated = detail(99, "Updated");
-		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
-		gateway.updatedCase = updated;
-		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
-		byte[] rowVer = new byte[] {4, 5, 6};
-
-		adapter.updateCaseCoreDetails(new UpdateCaseCoreDetailsCommand(
-				99, 42, 5, "Updated", "C-1", "description", LocalDate.of(2026, 1, 2),
-				null, LocalDate.of(2026, 3, 4), "summary", rowVer));
-
-		assertNull(gateway.lastUpdateSolDate);
-		assertEquals(LocalDate.of(2026, 3, 4), gateway.lastUpdateTortNoticeDeadline);
-		assertArrayEquals(rowVer, gateway.lastUpdateRowVer);
-	}
-
-	@Test
-	void updateCaseCoreDetailsDelegatesClearedTortNoticeAsNull() {
-		CaseDetailDto updated = detail(99, "Updated");
-		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
-		gateway.updatedCase = updated;
-		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
-		byte[] rowVer = new byte[] {7, 8, 9};
-
-		adapter.updateCaseCoreDetails(new UpdateCaseCoreDetailsCommand(
-				99, 42, 5, "Updated", "C-1", "description", LocalDate.of(2026, 1, 2),
-				LocalDate.of(2026, 2, 3), null, "summary", rowVer));
-
-		assertEquals(LocalDate.of(2026, 2, 3), gateway.lastUpdateSolDate);
-		assertNull(gateway.lastUpdateTortNoticeDeadline);
-		assertArrayEquals(rowVer, gateway.lastUpdateRowVer);
-	}
-
-	@Test
 	void listPracticeAreasReturnsEffectiveTenantOverlayOnly() {
 		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
 		gateway.practiceAreas = List.of(

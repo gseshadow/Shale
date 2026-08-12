@@ -16,6 +16,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import com.shale.core.service.CaseServicePort;
+import com.shale.core.service.CalendarCaseDateTypeMappingServicePort;
+import com.shale.core.service.MaterialRequestServicePort;
+import com.shale.data.dao.CalendarEventTypeDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserPreferencesDao;
 import com.shale.ui.notification.NotificationPreferencesService;
@@ -43,7 +46,9 @@ final class SettingsFxmlLoadTest {
             loader.setControllerFactory(type -> {
                 Object controller = assertDoesNotThrow(() -> type.getDeclaredConstructor().newInstance());
                 if (controller instanceof SettingsController settingsController) {
-                    settingsController.init(notificationPreferences(), nonAdminState(), () -> auditOpened.set(true), noDatabaseCaseService(), noDatabaseUserDao(), null);
+                    settingsController.init(notificationPreferences(), nonAdminState(), () -> auditOpened.set(true),
+                            noDatabaseCaseService(), noDatabaseMaterialRequestService(), noDatabaseUserDao(), null,
+                            noDatabaseMappingService(), noDatabaseCalendarEventTypeDao());
                 }
                 return controller;
             });
@@ -107,5 +112,27 @@ final class SettingsFxmlLoadTest {
                 SettingsFxmlLoadTest.class.getClassLoader(),
                 new Class<?>[] { CaseServicePort.class },
                 handler);
+    }
+
+    private static MaterialRequestServicePort noDatabaseMaterialRequestService() {
+        return noDatabaseProxy(MaterialRequestServicePort.class);
+    }
+
+    private static CalendarCaseDateTypeMappingServicePort noDatabaseMappingService() {
+        return noDatabaseProxy(CalendarCaseDateTypeMappingServicePort.class);
+    }
+
+    private static CalendarEventTypeDao noDatabaseCalendarEventTypeDao() {
+        return new CalendarEventTypeDao(() -> {
+            throw new AssertionError("Settings FXML compatibility validation must not open a database connection.");
+        });
+    }
+
+    private static <T> T noDatabaseProxy(Class<T> port) {
+        InvocationHandler handler = (Object proxy, Method method, Object[] args) -> {
+            if (java.util.List.class.isAssignableFrom(method.getReturnType())) return java.util.List.of();
+            throw new AssertionError("Settings FXML compatibility validation must not call " + port.getSimpleName() + "." + method.getName());
+        };
+        return port.cast(Proxy.newProxyInstance(SettingsFxmlLoadTest.class.getClassLoader(), new Class<?>[] { port }, handler));
     }
 }

@@ -1,89 +1,102 @@
 package com.shale.ui.controller;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
-import java.io.IOException;
+import com.shale.core.model.CaseDateAggregateResult;
+import com.shale.core.model.CompatibilityCaseDateEditor;
+import com.shale.core.model.CompatibilityCaseDateMutation;
+import com.shale.core.model.CompatibilityCaseDateState;
+import com.shale.core.model.MigratedCaseDateKey;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.regex.Pattern;
-
+import java.time.LocalDateTime;
+import java.util.EnumMap;
 import org.junit.jupiter.api.Test;
 
 class CaseControllerNullableDateDialogTest {
     private static final Path SOURCE = Path.of("src/main/java/com/shale/ui/controller/CaseController.java");
-    private static final Path FXML = Path.of("src/main/resources/fxml/case.fxml");
 
     @Test
-    void statuteAndTortDateDialogsCanSaveNullValues() throws IOException {
-        String source = Files.readString(SOURCE);
+    void statuteAndTortClearsUseAuthoritativeClearIntents() {
+        AuthoritativeCaseDateEditor editor = new AuthoritativeCaseDateEditor();
+        editor.replace(snapshot((byte) 4, true));
+        EnumMap<MigratedCaseDateKey, CompatibilityCaseDateEditor.EditedValue> values =
+                new EnumMap<>(AuthoritativeCaseDateEditor.values(editor.states()));
+        values.put(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS, cleared());
+        values.put(MigratedCaseDateKey.TORT_NOTICE_DEADLINE, cleared());
 
-        assertTrue(Pattern.compile("editor\\s*==\\s*detStatuteOfLimitationsEditor\\)\\s*\\{\\s*showDetailsNullableDateDialog",
-                        Pattern.DOTALL).matcher(source).find(),
-                "Statute of Limitations should use the null-aware date dialog.");
-        assertTrue(Pattern.compile("editor\\s*==\\s*detTortNoticeDeadlineEditor\\)\\s*\\{\\s*showDetailsNullableDateDialog",
-                        Pattern.DOTALL).matcher(source).find(),
-                "Tort Notice Deadline should use the null-aware date dialog.");
-        assertTrue(source.contains("Dialog<Optional<LocalDate>> dialog = new Dialog<>()"),
-                "The dialog result must distinguish Save with an empty date from Cancel.");
-        assertTrue(source.contains("Optional.ofNullable(nullableDatePickerValue(picker))"),
-                "Saving an empty DatePicker editor should produce a present dialog result containing an empty Optional.");
-        assertTrue(source.contains("dialog.showAndWait().ifPresent(value -> onSave.accept(value.orElse(null)))"),
-                "The saved empty Optional should be forwarded as null so the database date column can be cleared.");
-        assertTrue(source.contains("d.statuteOfLimitations = nullableDatePickerValue(detStatuteOfLimitationsEditor);"),
-                "The full details save path should capture a cleared SOL editor as null.");
-        assertTrue(source.contains("d.tortNoticeDeadline = nullableDatePickerValue(detTortNoticeDeadlineEditor);"),
-                "The full details save path should capture a cleared TCN editor as null.");
-        assertTrue(Pattern.compile("""
-                        static\\s+LocalDate\\s+nullableDatePickerValue\\s*\\([^)]*DatePicker\\s+picker[^)]*\\)\\s*\\{.*?
-                        String\\s+editorText\\s*=\\s*picker\\.getEditor\\(\\)\\s*==\\s*null\\s*\\?\\s*null\\s*:\\s*picker\\.getEditor\\(\\)\\.getText\\(\\)\\s*;.*?
-                        if\\s*\\(\\s*editorText\\s*==\\s*null\\s*\\|\\|\\s*editorText\\.trim\\(\\)\\.isEmpty\\(\\)\\s*\\)\\s*
-                        return\\s+null\\s*;.*?
-                        return\\s+picker\\.getValue\\(\\)\\s*;
-                        """, Pattern.DOTALL | Pattern.COMMENTS).matcher(source).find(),
-                "Blank DatePicker editor text must be treated as an explicit clear instead of preserving the previous value.");
+        var command = editor.beginSave(7, 8, 9, values);
+
+        assertArrayEquals(new byte[]{4}, command.expectedCaseRowVer());
+        var sol = assertInstanceOf(CompatibilityCaseDateMutation.Clear.class,
+                command.dates().get(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS));
+        var tort = assertInstanceOf(CompatibilityCaseDateMutation.Clear.class,
+                command.dates().get(MigratedCaseDateKey.TORT_NOTICE_DEADLINE));
+        assertArrayEquals(new byte[]{4}, sol.expectedRowVer());
+        assertArrayEquals(new byte[]{4}, tort.expectedRowVer());
     }
 
     @Test
-    void overviewStatuteAndTortDialogsUseNullableDateCapture() throws IOException {
-        String source = Files.readString(SOURCE);
-        String fxml = Files.readString(FXML);
+    void blankAuthoritativeSlotsRemainUnchangedRatherThanCreatingOrClearing() {
+        AuthoritativeCaseDateEditor editor = new AuthoritativeCaseDateEditor();
+        editor.replace(snapshot((byte) 5, false));
 
-        assertTrue(source.contains("showNullableDateFieldDialog(\"Edit SOL Date\""),
-                "Overview SOL single-field edit should use the null-aware date dialog.");
-        assertTrue(source.contains("showNullableDateFieldDialog(\"Edit Tort Notice Deadline\""),
-                "Overview TCN single-field edit should use the null-aware date dialog.");
-        assertTrue(source.contains("saveCoreOverviewField(\"solDate\", null, null, value, null)"),
-                "Overview SOL saves should forward the nullable dialog result to the update path.");
-        assertTrue(source.contains("saveCoreOverviewField(\"tortNoticeDeadline\", null, null, null, value)"),
-                "Overview TCN saves should forward the nullable dialog result to the update path.");
-        assertTrue(source.contains("\"tortNoticeDeadline\".equals(field) ? tortNoticeDeadline : latest.getTortNoticeDeadline()"),
-                "Overview TCN saves should send null when explicitly cleared and preserve the existing value for other fields.");
-        assertTrue(source.contains("button == saveType ? Optional.ofNullable(nullableDatePickerValue(picker)) : null"),
-                "Overview nullable dialog cancel should produce no result while save-empty produces a present empty Optional.");
-        assertTrue(fxml.contains("fx:id=\"ovTortNoticeDeadlineEditor\""),
-                "Overview should expose a Tort Notice Deadline DatePicker that participates in the overview edit path.");
+        assertNull(editor.beginSave(7, 8, 9, AuthoritativeCaseDateEditor.values(editor.states())));
+        assertFalse(editor.isSaving());
     }
 
     @Test
-    void overviewFullSaveCapturesBlankDateEditorsAsNull() throws IOException {
+    void overviewAndDetailsSaveThroughTheAggregateEditor() throws Exception {
         String source = Files.readString(SOURCE);
+        String save = method(source, "private void saveAuthoritativeValues(");
 
-        assertTrue(source.contains("(ovSolDateEditor == null ? null : nullableDatePickerValue(ovSolDateEditor))"),
-                "Overview full-save SOL capture should treat a blank editor as null.");
-        assertTrue(source.contains("(ovTortNoticeDeadlineEditor == null ? current.getTortNoticeDeadline() : nullableDatePickerValue(ovTortNoticeDeadlineEditor))"),
-                "Overview full-save TCN capture should treat a blank editor as null while preserving the current value when the control is absent.");
-        assertTrue(source.contains("request.desired().desiredTortNoticeDeadline()"),
-                "Overview full-save should pass the captured TCN value to updateCase.");
-        assertTrue(source.contains("boolean tortNoticeChanged = !Objects.equals(desired.desiredTortNoticeDeadline(), baseTortNoticeDeadline);"),
-                "Overview full-save should detect cleared and newly selected TCN dates as changes.");
+        assertTrue(source.contains("saveAuthoritativeDate(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS, value)"));
+        assertTrue(source.contains("saveAuthoritativeDate(MigratedCaseDateKey.TORT_NOTICE_DEADLINE, value)"));
+        assertTrue(save.contains("compatibilityDates.beginSave("));
+        assertTrue(save.contains("caseService.mutateMigratedCompatibilityDates(command)"));
+        assertFalse(save.contains("saveCoreOverviewField"));
+        assertFalse(save.contains("caseDao.updateCase"));
     }
 
     @Test
-    void overviewDisplaysTortNoticeDeadlineFromOverviewDto() throws IOException {
+    void overviewAndDetailsHydrateOnlyFromAuthoritativeSnapshot() throws Exception {
         String source = Files.readString(SOURCE);
+        String render = method(source, "private void renderCompatibilityDates()");
 
-        assertTrue(source.contains("ovTortNoticeDeadlineValue.setText(formatDate(dto.getTortNoticeDeadline()))"),
-                "Overview display should read Tort Notice Deadline from the CaseOverviewDto instead of depending on the details tab model.");
+        assertTrue(render.contains("compatibilityDates.states()"));
+        assertTrue(render.contains("s.get(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS)"));
+        assertTrue(render.contains("s.get(MigratedCaseDateKey.TORT_NOTICE_DEADLINE)"));
+        assertTrue(render.contains("ovTortNoticeDeadlineValue"));
+        assertFalse(render.contains("CaseOverviewDto"));
+        assertFalse(render.contains("getTortNoticeDeadline()"));
+        assertFalse(render.contains("current.get"));
     }
 
+    private static CompatibilityCaseDateEditor.EditedValue cleared() {
+        return new CompatibilityCaseDateEditor.EditedValue(null, null, true);
+    }
+
+    private static CaseDateAggregateResult snapshot(byte token, boolean present) {
+        EnumMap<MigratedCaseDateKey, CompatibilityCaseDateState> states = new EnumMap<>(MigratedCaseDateKey.class);
+        for (MigratedCaseDateKey key : MigratedCaseDateKey.values()) {
+            states.put(key, present
+                    ? new CompatibilityCaseDateState(key, key.systemKey(), LocalDateTime.of(2026, 1, 1, 0, 0),
+                            null, !key.supportsTime(), 100L + key.ordinal(), 200 + key.ordinal(), new byte[]{token}, null)
+                    : new CompatibilityCaseDateState(key, key.systemKey(), null, null, true, null, null, null,
+                            new CompatibilityCaseDateMutation.ExpectedAbsent(new byte[]{token})));
+        }
+        return new CaseDateAggregateResult(new byte[]{token}, states);
+    }
+
+    private static String method(String source, String signature) {
+        int start = source.indexOf(signature);
+        assertTrue(start >= 0, signature);
+        int open = source.indexOf('{', start);
+        int depth = 0;
+        for (int i = open; i < source.length(); i++) {
+            if (source.charAt(i) == '{') depth++;
+            else if (source.charAt(i) == '}' && --depth == 0) return source.substring(start, i + 1);
+        }
+        throw new AssertionError("Unclosed method: " + signature);
+    }
 }

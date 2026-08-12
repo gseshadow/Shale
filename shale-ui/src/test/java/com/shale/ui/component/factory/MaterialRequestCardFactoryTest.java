@@ -121,7 +121,7 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("FlowPane facts = new FlowPane(18, 7)"));
         assertTrue(source.contains("material-request-card__facts"));
         assertTrue(source.indexOf("addEntityFact(facts, \"Requested From\"")
-                < source.indexOf("addTextFact(facts, \"Requested\""),
+                < source.indexOf("addTextFact(facts, \"Request Date\""),
                 "Entity facts should keep logical order ahead of date facts.");
         assertTrue(source.contains("fact.setMinWidth(Region.USE_PREF_SIZE)"));
         assertTrue(source.contains("fact.setMaxWidth(Region.USE_PREF_SIZE)"));
@@ -144,7 +144,7 @@ class MaterialRequestCardFactoryTest {
         assertTrue(source.contains("if (e.getButton() == MouseButton.PRIMARY)"));
         assertTrue(source.contains("onOpenEntity.accept(entityId);"));
         assertTrue(source.contains("e.consume();"));
-        assertTrue(source.contains("if (e.getButton() == MouseButton.PRIMARY) onOpenRequest.accept(request.id())"));
+        assertTrue(source.contains("activateRequest(card, requestId)"));
     }
 
 
@@ -177,7 +177,8 @@ class MaterialRequestCardFactoryTest {
     @Test
     void requestListLoadsEffectiveStatusesOnceAndResolvesSavedKeysCaseInsensitively() throws Exception {
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java"));
-        assertTrue(controller.contains("new RequestListData(svc.listMaterialRequests(cid,tid,include),svc.listEffectiveRequestStatuses(tid),svc.listEffectiveRequestMethods(tid))"));
+        assertTrue(controller.contains("List<MaterialRequestSummaryDto> requests=svc.listMaterialRequests(cid,tid,include)"));
+        assertTrue(controller.contains("svc.listStatusHistory(cid,ids,tid)"), "All visible request histories should be loaded in one bulk call.");
         assertTrue(controller.contains("lookupValueMatches(s.systemKey(),s.name(),savedStatus)"));
         assertTrue(controller.contains("new RequestStatusPresentation(resolved.name()==null||resolved.name().isBlank()?readableStatusLabel(savedStatus):resolved.name().trim(),resolved.color())"));
     }

@@ -249,11 +249,11 @@
 .app-section-tab {
     -fx-padding: 6 10 6 10;
     -fx-min-height: 30;
-    -fx-background-radius: 8 8 0 0;
-    -fx-border-radius: 8 8 0 0;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
     -fx-background-color: rgba(18, 38, 69, 0.18);
     -fx-border-color: rgba(232, 242, 255, 0.26);
-    -fx-border-width: 0 0 2 0;
+    -fx-border-width: 1;
     -fx-text-fill: rgba(232, 242, 255, 0.88);
     -fx-font-weight: 600;
     -fx-cursor: hand;
@@ -264,11 +264,48 @@
     -fx-border-color: rgba(232, 242, 255, 0.42);
 }
 
+.app-section-tab:pressed {
+    -fx-background-color: rgba(34, 66, 109, 0.38);
+    -fx-border-color: rgba(232, 242, 255, 0.52);
+}
+
+.app-section-tab:focused {
+    -fx-border-color: rgba(220, 237, 255, 0.92);
+    -fx-effect: dropshadow(gaussian, rgba(159, 196, 255, 0.48), 5, 0.22, 0, 0);
+}
+
 .app-section-tab-active {
-    -fx-background-color: rgba(84, 130, 195, 0.28);
+    -fx-background-color: rgba(84, 130, 195, 0.58);
     -fx-border-color: #9fc4ff;
     -fx-text-fill: #f8fbff;
     -fx-font-weight: 800;
+}
+
+.app-section-tab-active:focused {
+    -fx-border-color: white;
+}
+
+.app-section-tab-active:hover {
+    -fx-background-color: rgba(84, 130, 195, 0.70);
+}
+
+.app-section-tab-active:pressed {
+    -fx-background-color: rgba(84, 130, 195, 0.82);
+}
+
+.app-section-tab:disabled {
+    -fx-opacity: 0.48;
+    -fx-cursor: default;
+}
+
+.app-section-tabs-scroll,
+.app-section-tabs-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.app-section-tabs-scroll {
+    -fx-background-insets: 0;
+    -fx-padding: 0;
 }
 
 
@@ -2207,7 +2244,7 @@
 }
 
 .calendar-main-content {
-    -fx-min-width: 720;
+    -fx-min-width: 480;
 }
 
 .calendar-overlay-actions {
@@ -2347,8 +2384,8 @@
     -fx-padding: 5 0 5 0;
 }
 
-.calendar-toolbar-view-select {
-    -fx-pref-width: 92;
+.calendar-toolbar-view-selector {
+    -fx-max-width: Infinity;
 }
 
 .calendar-toolbar-search {
@@ -2496,7 +2533,8 @@
     -fx-text-overrun: ellipsis;
 }
 
-.task-detail-dialog-action-bar {
+.task-detail-dialog-action-bar,
+.new-task-dialog-action-bar {
     -fx-background-radius: 0 0 16 16;
     -fx-border-radius: 0 0 16 16;
 }
@@ -2540,3 +2578,67 @@
     -fx-font-size: 12px;
     -fx-text-fill: rgba(17,37,66,0.70);
 }
+
+/* Material Request detail: stable fields/history desktop split. */
+.material-request-detail-columns {
+    -fx-background-color: transparent;
+}
+
+.material-request-updates {
+    -fx-border-color: transparent transparent transparent -shale-color-strong-panel-border;
+    -fx-border-width: 0 0 0 1;
+}
+
+.material-request-updates-history {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.material-request-updates-history > .viewport {
+    -fx-background-color: transparent;
+}
+
+.request-update-body {
+    -fx-wrap-text: true;
+    -fx-font-size: 12px;
+    -fx-text-fill: rgba(17,37,66,0.86);
+}
+
+/* Mirrors Task History's note-card/activity-row hierarchy. */
+.request-update-note-card {
+    -fx-background-color: rgba(52, 110, 201, 0.22);
+    -fx-background-radius: 8;
+}
+
+.request-update-note-card .request-update-body {
+    -fx-font-size: 13px;
+}
+
+.request-update-meta {
+    -fx-font-size: 10px;
+    -fx-text-fill: rgba(17,37,66,0.56);
+    -fx-wrap-text: true;
+}
+
+.request-update-note-card .request-update-meta {
+    -fx-font-size: 11px;
+    -fx-text-fill: rgba(17,37,66,0.70);
+}
+
+.request-update-system-row .request-update-body {
+    -fx-text-fill: rgba(17,37,66,0.72);
+}
+.status-timeline {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+    -fx-padding: 0;
+}
+.status-timeline > .viewport,
+.status-timeline > .viewport > .content { -fx-background-color: transparent; }
+.status-timeline--compact .scroll-bar:horizontal {
+    -fx-pref-height: 5px;
+    -fx-background-color: transparent;
+}
+.status-timeline--compact .scroll-bar:horizontal .track { -fx-background-color: rgba(91,103,124,0.10); }
+.status-timeline--compact .scroll-bar:horizontal .thumb { -fx-background-color: rgba(91,103,124,0.38); }

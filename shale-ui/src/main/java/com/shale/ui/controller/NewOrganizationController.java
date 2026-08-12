@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.OrganizationDao.OrganizationCreateRequest;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.ControlStyles;
 
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -52,6 +53,13 @@ public final class NewOrganizationController {
 
     @FXML
     private void initialize() {
+        ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
+        ControlStyles.apply(createOrganizationButton, ControlStyles.Purpose.PRIMARY);
+        ControlStyles.formControl(organizationTypeComboBox);
+        for (var control : List.of(nameField, phoneField, faxField, emailField, websiteField,
+                address1Field, address2Field, cityField, stateField, postalCodeField, countryField, notesArea)) {
+            ControlStyles.formControl(control);
+        }
         if (organizationTypeComboBox != null) {
             organizationTypeComboBox.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
                 @Override

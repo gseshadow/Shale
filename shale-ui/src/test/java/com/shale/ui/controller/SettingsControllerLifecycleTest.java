@@ -72,12 +72,12 @@ final class SettingsControllerLifecycleTest {
         assertEquals(0xA7 / 255.0, color.getGreen(), 0.0001);
         assertEquals(0x45 / 255.0, color.getBlue(), 0.0001);
         assertEquals(1.0, color.getOpacity(), 0.0001);
-        assertEquals("0x28A745FF", SettingsController.fxColorToDb(color));
+        assertEquals("#28A745", SettingsController.fxColorToDb(color));
     }
 
     @Test
     void colorConversionUsesSafeDefaultForBlankValues() {
-        assertEquals("0x6C757DFF", SettingsController.fxColorToDb(SettingsController.dbColorToFx("")));
+        assertEquals("#6C757D", SettingsController.fxColorToDb(SettingsController.dbColorToFx("")));
     }
 
     @Test

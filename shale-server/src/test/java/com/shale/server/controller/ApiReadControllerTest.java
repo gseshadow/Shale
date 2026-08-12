@@ -20,6 +20,11 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
@@ -52,6 +57,25 @@ import jakarta.servlet.http.HttpServletRequest;
 
 class ApiReadControllerTest {
     private MockMvc mockMvc;
+
+    @Test
+    void createCaseUsesStableAuthoritativeCaseDatesAndSessionIdentity() throws Exception {
+        RecordingCaseServicePort port = new RecordingCaseServicePort();
+        MockMvc mvc = developmentMockMvc(port, unusedPort(TaskServicePort.class), unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class));
+        mvc.perform(post("/api/cases").contentType(MediaType.APPLICATION_JSON)
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41")
+                .content("""
+                   {"caseName":"Stable Dates","practiceAreaId":2,"responsibleAttorneyUserId":31,
+                   "caseDates":[{"systemKey":"intake","startsAt":"2026-08-12T09:30:00","allDay":false},
+                   {"systemKey":"date_of_injury","caseDateTypeId":17,"startsAt":"2026-08-01T00:00:00","allDay":true}]}"""))
+                .andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertEquals(41,port.createdCommand.shaleClientId());
+        org.junit.jupiter.api.Assertions.assertEquals(31,port.createdCommand.actorUserId());
+        org.junit.jupiter.api.Assertions.assertEquals("intake",port.createdCommand.caseDates().get(0).systemKey());
+        org.junit.jupiter.api.Assertions.assertFalse(port.createdCommand.caseDates().get(0).allDay());
+        org.junit.jupiter.api.Assertions.assertEquals(17,port.createdCommand.caseDates().get(1).caseDateTypeId());
+    }
 
     @BeforeEach
     void setUp() {
@@ -87,18 +111,23 @@ class ApiReadControllerTest {
             TaskServicePort taskServicePort,
             ContactServicePort contactServicePort,
             NotificationServicePort notificationServicePort) {
-        ApiReadController apiReadController = new ApiReadController(
-                caseServicePort,
-                taskServicePort,
-                contactServicePort,
-                notificationServicePort,
-                unusedPort(OrganizationServicePort.class),
+        return developmentMockMvc(caseServicePort, taskServicePort, contactServicePort,
+                notificationServicePort, unusedPort(OrganizationServicePort.class));
+    }
+
+    private static MockMvc developmentMockMvc(CaseServicePort caseServicePort, TaskServicePort taskServicePort,
+            ContactServicePort contactServicePort, NotificationServicePort notificationServicePort,
+            OrganizationServicePort organizationServicePort) {
+        ApiReadController apiReadController = new ApiReadController(caseServicePort, taskServicePort,
+                contactServicePort, notificationServicePort, organizationServicePort,
                 unusedPort(UserServicePort.class),
                 new ServerRuntimeSessionState(new DevelopmentHeaderServerSessionResolver(), currentRequestProvider()));
-        return MockMvcBuilders
-                .standaloneSetup(apiReadController)
-                .setControllerAdvice(new ApiExceptionHandler())
-                .build();
+        ObjectMapper objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        return MockMvcBuilders.standaloneSetup(apiReadController)
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .setControllerAdvice(new ApiExceptionHandler()).build();
     }
 
 
@@ -122,6 +151,45 @@ class ApiReadControllerTest {
                 .build();
     }
 
+
+    @Test
+    void organizationDetailUsesSessionTenantAndPreservesRelatedCaseResponse() throws Exception {
+        int[] requested = new int[2];
+        OrganizationServicePort organizations = (OrganizationServicePort) Proxy.newProxyInstance(
+                OrganizationServicePort.class.getClassLoader(), new Class<?>[] {OrganizationServicePort.class},
+                (proxy, method, args) -> {
+                    if (!method.getName().equals("getOrganizationDetail")) throw new AssertionError(method.getName());
+                    requested[0] = (Integer) args[0]; requested[1] = (Integer) args[1];
+                    var related = new OrganizationServicePort.RelatedCaseSummary(91,"Alpha",LocalDate.of(2026,1,2),
+                            null,"Responsible Lawyer","Client","Plaintiff",true,"notes");
+                    return Optional.of(new OrganizationServicePort.OrganizationDetail(7,41,null,null,"Org",null,null,
+                            null,null,null,null,null,null,null,null,null,List.of(related)));
+                });
+        MockMvc mvc = developmentMockMvc(unusedPort(CaseServicePort.class), unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class), organizations);
+        mvc.perform(get("/api/organizations/7")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.relatedCases[0].id").value(91))
+                .andExpect(jsonPath("$.relatedCases[0].intakeDate").value("2026-01-02"))
+                .andExpect(jsonPath("$.relatedCases[0].statuteOfLimitationsDate").isEmpty())
+                .andExpect(jsonPath("$.relatedCases[0].responsibleAttorneyName").value("Responsible Lawyer"))
+                .andExpect(jsonPath("$.relatedCases[0].partyRoleName").value("Client"));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new int[] {7,41}, requested);
+    }
+
+    @Test
+    void inaccessibleOrganizationUsesEstablishedNotFoundResponse() throws Exception {
+        OrganizationServicePort organizations = (OrganizationServicePort) Proxy.newProxyInstance(
+                OrganizationServicePort.class.getClassLoader(), new Class<?>[] {OrganizationServicePort.class},
+                (proxy, method, args) -> Optional.empty());
+        MockMvc mvc = developmentMockMvc(unusedPort(CaseServicePort.class), unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class), organizations);
+        mvc.perform(get("/api/organizations/7")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"99"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Organization not found."));
+    }
 
     @Test
     void caseSearchReachesServiceLayerWithDevelopmentHeaders() throws Exception {
@@ -228,11 +296,19 @@ class ApiReadControllerTest {
                         {
                           "caseName": "Smith v. Updated",
                           "description": "Updated detail",
-                          "dateOfInjury": "2026-02-03",
-                          "statuteOfLimitations": "2027-02-03",
-                          "tortNoticeDeadline": "2026-08-09",
                           "summary": "Updated summary",
-                          "expectedRowVer": "AQ=="
+                          "expectedRowVer": "AQ==",
+                          "mappedCaseDates": [
+                            {"key":"CALLER_DATE","systemKey":"intake","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DATE_OF_INJURY","systemKey":"date_of_injury","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DATE_OF_MEDICAL_NEGLIGENCE","systemKey":"date_of_medical_negligence","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DATE_MEDICAL_NEGLIGENCE_DISCOVERED","systemKey":"date_medical_negligence_discovered","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"STATUTE_OF_LIMITATIONS","systemKey":"statute_of_limitations","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"TORT_NOTICE_DEADLINE","systemKey":"tort_notice_deadline","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DISCOVERY_DEADLINE","systemKey":"discovery_deadline","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DATE_FEE_AGREEMENT_SIGNED","systemKey":"fee_agreement_signed","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"DATE_NON_ENGAGEMENT_LETTER_SENT","systemKey":"non_engagement_letter_sent","absent":true,"absenceCaseRowVer":"AQ=="}
+                          ]
                         }
                         """)
                 .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
@@ -241,9 +317,6 @@ class ApiReadControllerTest {
                 .andExpect(jsonPath("$.caseId").value(501))
                 .andExpect(jsonPath("$.caseName").value("Smith v. Updated"))
                 .andExpect(jsonPath("$.description").value("Updated detail"))
-                .andExpect(jsonPath("$.tortNoticeDeadline[0]").value(2026))
-                .andExpect(jsonPath("$.tortNoticeDeadline[1]").value(8))
-                .andExpect(jsonPath("$.tortNoticeDeadline[2]").value(9))
                 .andExpect(jsonPath("$.summary").value("Updated summary"));
 
         org.junit.jupiter.api.Assertions.assertEquals(501L, caseServicePort.updateCaseId);
@@ -251,9 +324,6 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.updateActorUserId);
         org.junit.jupiter.api.Assertions.assertEquals("Smith v. Updated", caseServicePort.updateCaseName);
         org.junit.jupiter.api.Assertions.assertEquals("CASE-501", caseServicePort.updateCaseNumber);
-        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2026, 2, 3), caseServicePort.updateDateOfInjury);
-        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2027, 2, 3), caseServicePort.updateStatuteOfLimitations);
-        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2026, 8, 9), caseServicePort.updateTortNoticeDeadline);
         org.junit.jupiter.api.Assertions.assertEquals("Updated summary", caseServicePort.updateSummary);
         org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[] {1}, caseServicePort.updateExpectedRowVer);
     }
@@ -401,15 +471,9 @@ class ApiReadControllerTest {
                 .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.caseId").value(6503))
-                .andExpect(jsonPath("$.dateOfInjury[0]").value(2026))
-                .andExpect(jsonPath("$.dateOfInjury[1]").value(2))
-                .andExpect(jsonPath("$.dateOfInjury[2]").value(3))
-                .andExpect(jsonPath("$.statuteOfLimitations[0]").value(2026))
-                .andExpect(jsonPath("$.statuteOfLimitations[1]").value(3))
-                .andExpect(jsonPath("$.statuteOfLimitations[2]").value(4))
-                .andExpect(jsonPath("$.tortNoticeDeadline[0]").value(2026))
-                .andExpect(jsonPath("$.tortNoticeDeadline[1]").value(4))
-                .andExpect(jsonPath("$.tortNoticeDeadline[2]").value(5));
+                .andExpect(jsonPath("$.dateOfInjury").value("2026-02-03"))
+                .andExpect(jsonPath("$.statuteOfLimitations").value("2026-03-04"))
+                .andExpect(jsonPath("$.tortNoticeDeadline").value("2026-04-05"));
     }
 
     @Test
@@ -821,6 +885,7 @@ class ApiReadControllerTest {
 
 
     private static final class RecordingCaseServicePort implements CaseServicePort {
+        private CaseServicePort.CreateCaseCommand createdCommand;
         private String searchQuery;
         private int searchShaleClientId;
         private int searchLimit;
@@ -861,6 +926,11 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public Optional<CaseDetailDto> getAuthoritativeCaseDetail(long caseId, int shaleClientId, int actorUserId) {
+            return getCaseDetail(caseId, shaleClientId);
+        }
+
+        @Override
         public Optional<CaseOverviewDto> getCaseOverview(long caseId, int shaleClientId) {
             throw new AssertionError("getCaseOverview should not be called");
         }
@@ -883,6 +953,7 @@ class ApiReadControllerTest {
 
         @Override
         public CaseDetailDto createCase(CaseServicePort.CreateCaseCommand command) {
+            createdCommand = command;
             return getCaseDetail(777L, command.shaleClientId()).orElseThrow();
         }
 
@@ -943,6 +1014,86 @@ class ApiReadControllerTest {
         @Override
         public void resetLinkTypeOverride(ResetLinkTypeOverrideCommand command) {
             throw new AssertionError("resetLinkTypeOverride should not be called");
+        }
+
+        @Override
+        public void resetCaseDateTypeOverride(ResetCaseDateTypeOverrideCommand command) {
+            throw new AssertionError("resetCaseDateTypeOverride should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) {
+            throw new AssertionError("listEffectiveCaseDateTypes should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.EffectiveCaseDateTypeDto> listCaseDateTypesForAdministration(int shaleClientId, int actorUserId) {
+            throw new AssertionError("listCaseDateTypesForAdministration should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.CaseDateSemanticRoleMappingDto> listCaseDateSemanticRoleMappings(int shaleClientId, int actorUserId) {
+            throw new AssertionError("listCaseDateSemanticRoleMappings should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseDateSemanticRoleMappingDto saveCaseDateSemanticRoleMapping(SaveCaseDateSemanticRoleMappingCommand command) {
+            throw new AssertionError("saveCaseDateSemanticRoleMapping should not be called");
+        }
+
+        @Override
+        public void resetCaseDateSemanticRoleMapping(ResetCaseDateSemanticRoleMappingCommand command) {
+            throw new AssertionError("resetCaseDateSemanticRoleMapping should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) {
+            throw new AssertionError("listCaseDatesForCase should not be called");
+        }
+
+        @Override
+        public List<com.shale.core.dto.CaseDateDto> listDeletedCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) {
+            throw new AssertionError("listDeletedCaseDatesForCase should not be called");
+        }
+
+        @Override
+        public Optional<com.shale.core.dto.CaseDateDto> getCaseDate(long caseDateId, int shaleClientId, int actorUserId) {
+            throw new AssertionError("getCaseDate should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseDateDto createCaseDate(CreateCaseDateCommand command) {
+            throw new AssertionError("createCaseDate should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseDateDto updateCaseDate(UpdateCaseDateCommand command) {
+            throw new AssertionError("updateCaseDate should not be called");
+        }
+
+        @Override
+        public void deleteCaseDate(DeleteCaseDateCommand command) {
+            throw new AssertionError("deleteCaseDate should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseDateDto restoreCaseDate(RestoreCaseDateCommand command) {
+            throw new AssertionError("restoreCaseDate should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.EffectiveCaseDateTypeDto createCaseDateType(CaseDateTypeCommand command) {
+            throw new AssertionError("createCaseDateType should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.EffectiveCaseDateTypeDto updateCaseDateType(CaseDateTypeCommand command) {
+            throw new AssertionError("updateCaseDateType should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.EffectiveCaseDateTypeDto setCaseDateTypeActive(SetCaseDateTypeActiveCommand command) {
+            throw new AssertionError("setCaseDateTypeActive should not be called");
         }
 
         @Override
@@ -1030,13 +1181,10 @@ class ApiReadControllerTest {
             this.updateActorUserId = command.actorUserId();
             this.updateCaseName = command.caseName();
             this.updateCaseNumber = command.caseNumber();
-            this.updateDateOfInjury = command.dateOfInjury();
-            this.updateStatuteOfLimitations = command.statuteOfLimitations();
-            this.updateTortNoticeDeadline = command.tortNoticeDeadline();
             this.updateSummary = command.summary();
             this.updateExpectedRowVer = command.expectedRowVer();
             return new CaseDetailDto(command.caseId(), command.caseNumber(), command.caseName(), command.description(), "Open", "Ada Attorney", 10,
-                    null, null, null, null, null, null, null, command.dateOfInjury(), command.statuteOfLimitations(), command.tortNoticeDeadline(), null,
+                    null, null, null, null, null, null, null, null, null, null, null,
                     null, null, null, null, null, null, null, null, null, null, null,
                     null, null, null, command.summary(), null, LocalDateTime.of(2026, 1, 2, 0, 0), new byte[] {2});
         }

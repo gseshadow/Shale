@@ -201,21 +201,26 @@
                                 <Label text="Summary" GridPane.rowIndex="4" GridPane.columnSpan="2" />
                                 <TextArea fx:id="summaryArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="5" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Date of Medical Negligence" wrapText="true" GridPane.rowIndex="6" />
-                                <DatePicker fx:id="dateMedicalNegligencePicker" GridPane.rowIndex="6" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Date Medical Negligence Was Discovered" wrapText="true" GridPane.rowIndex="7" />
-                                <DatePicker fx:id="dateMedicalNegligenceDiscoveredPicker" GridPane.rowIndex="7" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Date of Injury" GridPane.rowIndex="8" />
-                                <DatePicker fx:id="dateOfInjuryPicker" GridPane.rowIndex="8" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Statute of Limitations" wrapText="true" GridPane.rowIndex="9" />
-                                <DatePicker fx:id="statuteOfLimitationsPicker" GridPane.rowIndex="9" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Tort Claims Notice" GridPane.rowIndex="10" />
-                                <DatePicker fx:id="tortClaimsNoticePicker" GridPane.rowIndex="10" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
                             </GridPane>
+                        </VBox>
+
+                        <VBox fx:id="datesSection" spacing="10" styleClass="secondary-panel dates-section-panel" maxWidth="1.7976931348623157E308">
+                            <HBox alignment="CENTER_LEFT" spacing="8">
+                                <Label text="Dates" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
+                                <Region HBox.hgrow="ALWAYS" />
+                                <HBox fx:id="datesAdminActions" spacing="8" />
+                            </HBox>
+                            <Label fx:id="datesStatusLabel" text="Using standard intake dates." style="-fx-opacity: 0.75;" wrapText="true" />
+                            <GridPane fx:id="legacyDatesGrid" hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
+                                <columnConstraints><ColumnConstraints minWidth="250" prefWidth="290"/><ColumnConstraints minWidth="250" hgrow="ALWAYS" fillWidth="true"/></columnConstraints>
+                                <Label text="Date of Medical Negligence" wrapText="true" GridPane.rowIndex="0"/><DatePicker fx:id="dateMedicalNegligencePicker" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <Label text="Date Medical Negligence Was Discovered" wrapText="true" GridPane.rowIndex="1"/><DatePicker fx:id="dateMedicalNegligenceDiscoveredPicker" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <Label text="Date of Injury" GridPane.rowIndex="2"/><DatePicker fx:id="dateOfInjuryPicker" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <Label text="Statute of Limitations" wrapText="true" GridPane.rowIndex="3"/><DatePicker fx:id="statuteOfLimitationsPicker" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <Label text="Tort Claims Notice" GridPane.rowIndex="4"/><DatePicker fx:id="tortClaimsNoticePicker" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                            </GridPane>
+                            <VBox fx:id="configuredDatesBox" spacing="10" visible="false" managed="false"/>
+                            <VBox fx:id="datesCustomizationBox" spacing="10" visible="false" managed="false"/>
                         </VBox>
                     </VBox>
                 </HBox>

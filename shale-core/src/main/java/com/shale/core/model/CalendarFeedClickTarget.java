@@ -5,6 +5,7 @@ public record CalendarFeedClickTarget(Kind kind, long id) {
         CALENDAR_EVENT,
         TASK,
         CASE,
+        CASE_DATES,
         NONE
     }
 
@@ -16,6 +17,9 @@ public record CalendarFeedClickTarget(Kind kind, long id) {
         }
         if (item.taskId() != null && item.taskId() > 0) {
             return new CalendarFeedClickTarget(Kind.TASK, item.taskId());
+        }
+        if (item.key() != null && item.key().startsWith("CASE_DATE:") && item.caseId() != null && item.caseId() > 0) {
+            return new CalendarFeedClickTarget("CASE_DATE".equalsIgnoreCase(item.sourceType()) ? Kind.CASE_DATES : Kind.CASE, item.caseId());
         }
         if (item.caseId() != null && item.caseId() > 0) {
             return new CalendarFeedClickTarget(Kind.CASE, item.caseId());

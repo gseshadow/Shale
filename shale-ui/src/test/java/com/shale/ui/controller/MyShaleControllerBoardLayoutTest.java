@@ -15,6 +15,33 @@ import org.junit.jupiter.api.Test;
 final class MyShaleControllerBoardLayoutTest {
 
     @Test
+    void singleTaskLaneUsesViewportWithoutExceedingReadableMaximum() {
+        assertEquals(260.0, MyShaleController.responsiveSingleTaskLaneWidth(0), 0.01);
+        assertEquals(225.0, MyShaleController.responsiveSingleTaskLaneWidth(180), 0.01);
+        assertEquals(400.0, MyShaleController.responsiveSingleTaskLaneWidth(400), 0.01);
+        assertEquals(430.0, MyShaleController.responsiveSingleTaskLaneWidth(560), 0.01);
+        assertEquals(430.0, MyShaleController.responsiveSingleTaskLaneWidth(1400), 0.01);
+    }
+
+    @Test
+    void taskLaneResponsivenessOnlyAppliesToOneExpandedBoardLane() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+
+        assertTrue(source.contains("orderedLanes.size() == 1 && !isCollapsedLane"),
+                "Collapsed and multi-lane boards must retain their established compact widths.");
+        assertTrue(source.contains("myTasksScroll.viewportBoundsProperty()"),
+                "The sole expanded lane must update when its viewport is resized.");
+        assertTrue(source.contains("TASKS_SINGLE_LANE_MAX_WIDTH = 430"));
+        assertTrue(source.contains("new LaneBoardLayout.LaneWidth(")
+                        && source.contains("TASKS_CASE_COLUMN_MIN_WIDTH")
+                        && source.contains("TASKS_CASE_COLUMN_PREF_WIDTH")
+                        && source.contains("TASKS_CASE_COLUMN_MAX_WIDTH"),
+                "All lanes should still originate with the established multi-lane width constraints.");
+        assertTrue(source.contains("renderMyTasksGrid") && source.contains("setMyTasksViewMode"),
+                "Board/Grid switching should continue rebuilding through the existing render path.");
+    }
+
+    @Test
     void caseRadarReplacesPlaceholderAndKeepsUrgentRowsFirst() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 
@@ -135,20 +162,16 @@ final class MyShaleControllerBoardLayoutTest {
     @Test
     void updatedAtIsCarriedThroughAssignedCaseModelAndSorts() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
-        String dao = Files.readString(Path.of("../shale-data/src/main/java/com/shale/data/dao/CaseDao.java"));
+        String dao = Files.readString(Path.of("../shale-data/src/main/java/com/shale/data/dao/CaseSummaryDao.java"));
 
-        assertTrue(dao.contains("c.UpdatedAt"),
-                "Assigned-case board query should select Cases.UpdatedAt");
-        assertTrue(dao.contains("LocalDateTime updatedAt"),
-                "CaseRow should expose UpdatedAt to the UI model");
-        assertTrue(source.contains("r.updatedAt()"),
-                "MyShaleController should carry CaseRow UpdatedAt into CaseCardVm");
+        assertTrue(dao.contains("c.CreatedAt, c.UpdatedAt"),
+                "Authoritative assigned-case query should select Cases.UpdatedAt");
+        assertTrue(source.contains("summary.updatedAt()"),
+                "MyShaleController should carry projection UpdatedAt into CaseCardVm");
         assertTrue(source.contains("final LocalDateTime updatedAt"),
                 "Assigned-case VM should retain UpdatedAt for radar and sorting");
         assertTrue(source.contains("SORT_UPDATED_OLDEST") && source.contains("SORT_UPDATED_NEWEST"),
                 "My Cases should expose narrow UpdatedAt sort options for radar click-through");
-        assertTrue(source.contains("CaseSort.UPDATED_OLDEST") && source.contains("CaseSort.UPDATED_NEWEST"),
-                "Paged My Cases loading should use DAO UpdatedAt sorting when selected");
         assertTrue(source.contains("caseVm.updatedAt != null && caseVm.updatedAt.toLocalDate().isBefore(inactiveBefore)"),
                 "Inactive assigned case counts should be based on UpdatedAt before the 45-day cutoff");
         assertTrue(source.contains("!date.isBefore(recentSince) && !date.isAfter(effectiveToday)"),
@@ -159,6 +182,7 @@ final class MyShaleControllerBoardLayoutTest {
     void notificationsWidgetReusesCenterServiceAndKeepsCompactUnreadFirstBriefing() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
         String sceneManager = Files.readString(Path.of("src/main/java/com/shale/ui/navigation/SceneManager.java"));
+        String compactSceneManager = sceneManager.replaceAll("\\s+", " ");
 
         assertTrue(source.contains("buildNotificationsWidget()"),
                 "Overview dashboard should render the live Notifications widget instead of the placeholder");
@@ -178,7 +202,7 @@ final class MyShaleControllerBoardLayoutTest {
                 "Recent-read support should remain an explicit TODO until the existing service exposes it");
         assertTrue(source.contains("notificationCenterService.markRead(notification)"),
                 "Notification row clicks should reuse the existing mark-read behavior");
-        assertTrue(sceneManager.contains("notificationCenterService, this::openNotificationCenterFromDashboard"),
+        assertTrue(compactSceneManager.contains("notificationCenterService, this::openNotificationCenterFromDashboard"),
                 "My Shale should receive the existing notification center service and View All route from SceneManager");
     }
 
@@ -243,7 +267,9 @@ final class MyShaleControllerBoardLayoutTest {
         assertTrue(source.contains("overviewWidgetRenderQueued"),
                 "Coalesced refreshes should track pending JavaFX render work");
         assertTrue(source.contains("subscribeCaseUpdated(liveCaseUpdatedHandler)"));
-        assertTrue(source.contains("refreshCaseIncremental(event.caseId())"));
+        assertTrue(source.contains("handleLiveCaseUpdatedEvent"));
+        assertTrue(source.contains("refreshMyCasesBoard(true)"),
+                "Accepted Case updates should invalidate and reload the authoritative assigned-case snapshot.");
         assertTrue(source.contains("refreshRecentCaseActivity()"),
                 "Live case updates and assigned task/case loads should keep the activity widget independently refreshable");
         assertTrue(source.contains("activeAssignedCaseRadarSource()"),

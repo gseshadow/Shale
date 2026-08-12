@@ -44,6 +44,15 @@
     -fx-spacing: 8;
 }
 
+.case-date-built-in-card {
+    -fx-background-color: -shale-color-card-embedded-surface;
+    -fx-border-color: -shale-color-card-border;
+}
+
+.case-date-custom-card {
+    -fx-background-color: -shale-color-card-surface;
+}
+
 /* Entity Card inline variant: small inline relationship previews. */
 .shale-entity-card-inline {
     -fx-padding: 8 10 8 10;
@@ -53,6 +62,13 @@
 /* Entity Card selectable variant: same card, selectable affordance border. */
 .shale-entity-card-selectable {
     -fx-border-color: -shale-color-card-hover-border;
+}
+
+/* Selection is visual state only; card contents and backing lookup rows stay intact. */
+.shale-entity-card-selectable:selected {
+    -fx-background-color: -shale-color-card-hover-surface;
+    -fx-border-color: -shale-color-primary-accent;
+    -fx-border-width: 2;
 }
 
 /* Entity Card clickable variant: same card, pointer affordance only. */

@@ -17,6 +17,8 @@ public final class CaseDetailDto {
 	private final String caseStatus;
 	private final String responsibleAttorney;
 	private final Integer responsibleAttorneyId;
+	private final Integer intakeTakenByUserId;
+	private final String intakeTakenByDisplayName;
 
 	private final Integer practiceAreaId;
 
@@ -57,6 +59,7 @@ public final class CaseDetailDto {
 	private final byte[] rowVer;
 	private final List<RelatedContactDto> relatedContacts;
 	private final List<CaseStatusHistoryDto> statusHistory;
+	private List<MappedCaseDateSnapshotDto> mappedCaseDates = List.of();
 
 	public CaseDetailDto(long caseId,
 			String caseNumber,
@@ -289,6 +292,33 @@ public final class CaseDetailDto {
 			byte[] rowVer,
 			List<RelatedContactDto> relatedContacts,
 			List<CaseStatusHistoryDto> statusHistory) {
+		this(caseId, caseNumber, caseName, description, caseStatus, responsibleAttorney, responsibleAttorneyId,
+				practiceAreaId, callerDate, callerTime, acceptedDate, closedDate, deniedDate,
+				dateOfMedicalNegligence, dateMedicalNegligenceWasDiscovered, dateOfInjury,
+				statuteOfLimitations, tortNoticeDeadline, discoveryDeadline, clientEstate,
+				officePrinterCode, medicalRecordsRequested, feeAgreementSigned, dateFeeAgreementSigned,
+				nonEngagementLetterSent, dateNonEngagementLetterSent, acceptedChronology,
+				acceptedConsultantExpertSearch, acceptedTestifyingExpertSearch, acceptedMedicalLiterature,
+				acceptedDetail, deniedChronology, deniedDetail, summary, receivedUpdates, updatedAt, rowVer,
+				relatedContacts, statusHistory, null, null);
+	}
+
+	public CaseDetailDto(long caseId,
+			String caseNumber, String caseName, String description, String caseStatus,
+			String responsibleAttorney, Integer responsibleAttorneyId, Integer practiceAreaId,
+			LocalDate callerDate, String callerTime, LocalDate acceptedDate, LocalDate closedDate,
+			LocalDate deniedDate, LocalDate dateOfMedicalNegligence,
+			LocalDate dateMedicalNegligenceWasDiscovered, LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations, LocalDate tortNoticeDeadline, LocalDate discoveryDeadline,
+			String clientEstate, String officePrinterCode, Boolean medicalRecordsRequested,
+			Boolean feeAgreementSigned, LocalDate dateFeeAgreementSigned,
+			Boolean nonEngagementLetterSent, LocalDate dateNonEngagementLetterSent,
+			Boolean acceptedChronology, Boolean acceptedConsultantExpertSearch,
+			Boolean acceptedTestifyingExpertSearch, Boolean acceptedMedicalLiterature,
+			String acceptedDetail, Boolean deniedChronology, String deniedDetail, String summary,
+			String receivedUpdates, LocalDateTime updatedAt, byte[] rowVer,
+			List<RelatedContactDto> relatedContacts, List<CaseStatusHistoryDto> statusHistory,
+			Integer intakeTakenByUserId, String intakeTakenByDisplayName) {
 		this.caseId = caseId;
 		this.caseNumber = caseNumber;
 		this.caseName = caseName == null ? "" : caseName;
@@ -296,6 +326,8 @@ public final class CaseDetailDto {
 		this.caseStatus = caseStatus == null ? "" : caseStatus;
 		this.responsibleAttorney = responsibleAttorney == null ? "" : responsibleAttorney;
 		this.responsibleAttorneyId = responsibleAttorneyId;
+		this.intakeTakenByUserId = intakeTakenByUserId;
+		this.intakeTakenByDisplayName = intakeTakenByDisplayName == null ? "" : intakeTakenByDisplayName;
 		this.practiceAreaId = practiceAreaId;
 		this.callerDate = callerDate;
 		this.callerTime = callerTime == null ? "" : callerTime;
@@ -331,31 +363,42 @@ public final class CaseDetailDto {
 	}
 
 	public long getCaseId() { return caseId; }
+	public List<MappedCaseDateSnapshotDto> getMappedCaseDates() { return mappedCaseDates; }
+	public CaseDetailDto withMappedCaseDates(List<MappedCaseDateSnapshotDto> values) {
+		this.mappedCaseDates = values == null ? List.of() : List.copyOf(values);
+		return this;
+	}
 	public String getCaseNumber() { return caseNumber; }
 	public String getCaseName() { return caseName; }
 	public String getDescription() { return description; }
 	public String getCaseStatus() { return caseStatus; }
 	public String getResponsibleAttorney() { return responsibleAttorney; }
 	public Integer getResponsibleAttorneyId() { return responsibleAttorneyId; }
+	public Integer getIntakeTakenByUserId() { return intakeTakenByUserId; }
+	public String getIntakeTakenByDisplayName() { return intakeTakenByDisplayName; }
 	public Integer getPracticeAreaId() { return practiceAreaId; }
-	public LocalDate getCallerDate() { return callerDate; }
-	public String getCallerTime() { return callerTime; }
+	/** @deprecated API compatibility alias derived from mappedCaseDates when hydrated. */
+	@Deprecated public LocalDate getCallerDate() { return mappedDate("intake", callerDate); }
+	/** @deprecated API compatibility alias; updates must use mappedCaseDates. */
+	@Deprecated public String getCallerTime() { var d=mapped("intake"); return d!=null && !d.allDay() ? d.startsAt().toLocalTime().toString() : callerTime; }
 	public LocalDate getAcceptedDate() { return acceptedDate; }
 	public LocalDate getClosedDate() { return closedDate; }
 	public LocalDate getDeniedDate() { return deniedDate; }
-	public LocalDate getDateOfMedicalNegligence() { return dateOfMedicalNegligence; }
-	public LocalDate getDateMedicalNegligenceWasDiscovered() { return dateMedicalNegligenceWasDiscovered; }
-	public LocalDate getDateOfInjury() { return dateOfInjury; }
-	public LocalDate getStatuteOfLimitations() { return statuteOfLimitations; }
-	public LocalDate getTortNoticeDeadline() { return tortNoticeDeadline; }
-	public LocalDate getDiscoveryDeadline() { return discoveryDeadline; }
+	@Deprecated public LocalDate getDateOfMedicalNegligence() { return mappedDate("date_of_medical_negligence",dateOfMedicalNegligence); }
+	@Deprecated public LocalDate getDateMedicalNegligenceWasDiscovered() { return mappedDate("date_medical_negligence_discovered",dateMedicalNegligenceWasDiscovered); }
+	@Deprecated public LocalDate getDateOfInjury() { return mappedDate("date_of_injury",dateOfInjury); }
+	@Deprecated public LocalDate getStatuteOfLimitations() { return mappedDate("statute_of_limitations",statuteOfLimitations); }
+	@Deprecated public LocalDate getTortNoticeDeadline() { return mappedDate("tort_notice_deadline",tortNoticeDeadline); }
+	@Deprecated public LocalDate getDiscoveryDeadline() { return mappedDate("discovery_deadline",discoveryDeadline); }
 	public String getClientEstate() { return clientEstate; }
 	public String getOfficePrinterCode() { return officePrinterCode; }
 	public Boolean getMedicalRecordsRequested() { return medicalRecordsRequested; }
 	public Boolean getFeeAgreementSigned() { return feeAgreementSigned; }
-	public LocalDate getDateFeeAgreementSigned() { return dateFeeAgreementSigned; }
+	@Deprecated public LocalDate getDateFeeAgreementSigned() { return mappedDate("fee_agreement_signed",dateFeeAgreementSigned); }
 	public Boolean getNonEngagementLetterSent() { return nonEngagementLetterSent; }
-	public LocalDate getDateNonEngagementLetterSent() { return dateNonEngagementLetterSent; }
+	@Deprecated public LocalDate getDateNonEngagementLetterSent() { return mappedDate("non_engagement_letter_sent",dateNonEngagementLetterSent); }
+	private MappedCaseDateSnapshotDto mapped(String key){return mappedCaseDates.stream().filter(d->key.equals(d.systemKey())&&!d.absent()).findFirst().orElse(null);}
+	private LocalDate mappedDate(String key,LocalDate fallback){var d=mapped(key);return d==null?fallback:d.startsAt().toLocalDate();}
 	public Boolean getAcceptedChronology() { return acceptedChronology; }
 	public Boolean getAcceptedConsultantExpertSearch() { return acceptedConsultantExpertSearch; }
 	public Boolean getAcceptedTestifyingExpertSearch() { return acceptedTestifyingExpertSearch; }

@@ -3,13 +3,27 @@ package com.shale.ui.controller;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.LinkTypeDto;
+import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import com.shale.core.dto.CaseDateSemanticRoleMappingDto;
 import com.shale.core.dto.MaterialTypeDto;
 import com.shale.core.dto.RequestMethodDto;
 import com.shale.core.dto.RequestStatusDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.MaterialRequestServicePort;
+import com.shale.core.service.CalendarCaseDateTypeMappingServicePort;
+import com.shale.core.model.CalendarCaseDateTypeMapping;
+import com.shale.core.model.CalendarEventType;
+import com.shale.core.model.CreateCalendarCaseDateTypeMappingCommand;
+import com.shale.core.model.UpdateCalendarCaseDateTypeMappingCommand;
+import com.shale.core.model.SetCalendarCaseDateTypeMappingActiveCommand;
+import com.shale.core.model.DeleteCalendarCaseDateTypeMappingCommand;
+import com.shale.data.dao.CalendarEventTypeDao;
 import com.shale.data.dao.UserDao;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.UserCard;
+import com.shale.ui.component.ColorCodedComboBox;
+import com.shale.ui.component.factory.UserCardFactory;
+import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.notification.NotificationPreferenceKey;
 import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
@@ -17,6 +31,7 @@ import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ActionButtonFactory;
+import com.shale.ui.util.ControlStyles;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -24,23 +39,35 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ColorPicker;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Control;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TableCell;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
 import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.paint.Color;
 import javafx.stage.Window;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.geometry.Pos;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.GridPane;
 import javafx.scene.shape.Circle;
+import javafx.css.PseudoClass;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.component.factory.StatusIndicatorFactory;
 import com.shale.ui.component.factory.PracticeAreaIndicatorFactory;
@@ -79,6 +106,12 @@ public final class SettingsController {
 	@FXML
 	private Label notificationSettingsStatusLabel;
 	@FXML
+	private Button applyNotificationPreferencesButton;
+	@FXML
+	private Button resetNotificationPreferencesButton;
+	@FXML
+	private Button viewAuditLogButton;
+	@FXML
 	private VBox auditSection;
 	@FXML
 	private VBox caseStatusAdministrationSection;
@@ -104,6 +137,15 @@ public final class SettingsController {
 	private HBox linkTypeActionRow;
 	@FXML
 	private Label linkTypeSettingsStatusLabel;
+	@FXML private VBox caseDateTypeAdministrationSection;
+	@FXML private VBox caseDateTypeCardsContainer;
+	@FXML private VBox caseDateRoleMappingsContainer;
+	@FXML private HBox caseDateTypeActionRow;
+	@FXML private Label caseDateTypeSettingsStatusLabel;
+	@FXML private VBox calendarCaseDateMappingAdministrationSection;
+	@FXML private VBox calendarCaseDateMappingCardsContainer;
+	@FXML private HBox calendarCaseDateMappingActionRow;
+	@FXML private Label calendarCaseDateMappingStatusLabel;
 	@FXML private VBox requestAdministrationSection;
 	@FXML private VBox materialTypeCardsContainer;
 	@FXML private HBox materialTypeActionRow;
@@ -117,19 +159,22 @@ public final class SettingsController {
 	@FXML
 	private TableView<UserManagementViewRow> userManagementTable;
 	@FXML
-	private TableColumn<UserManagementViewRow, String> userNameColumn;
+	private TableColumn<UserManagementViewRow, UserManagementViewRow> userNameColumn;
 	@FXML
 	private TableColumn<UserManagementViewRow, String> userEmailColumn;
 	@FXML
 	private TableColumn<UserManagementViewRow, String> userInitialsColumn;
 	@FXML
-	private TableColumn<UserManagementViewRow, String> userAttorneyColumn;
-	@FXML
-	private TableColumn<UserManagementViewRow, String> userAdminColumn;
+	private TableColumn<UserManagementViewRow, String> userRolesColumn;
 	@FXML
 	private TableColumn<UserManagementViewRow, String> userStatusColumn;
 	@FXML
 	private CheckBox showInactiveUsersCheck;
+	@FXML private TextField userSearchField;
+	@FXML private Button addUserButton;
+	@FXML private Button editUserButton;
+	@FXML private Button refreshUsersButton;
+	@FXML private Button removeUserButton;
 	@FXML
 	private Button deactivateUserButton;
 	@FXML
@@ -143,6 +188,8 @@ public final class SettingsController {
 	private AppState appState;
 	private CaseServicePort caseService;
 	private MaterialRequestServicePort materialRequestService;
+	private CalendarCaseDateTypeMappingServicePort calendarCaseDateMappingService;
+	private CalendarEventTypeDao calendarEventTypeDao;
 	private UserDao userDao;
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
@@ -154,16 +201,37 @@ public final class SettingsController {
 	private CaseStatusViewRow selectedCaseStatusRow;
 	private PracticeAreaViewRow selectedPracticeAreaRow;
 	private LinkTypeViewRow selectedLinkTypeRow;
+	private CaseDateTypeViewRow selectedCaseDateTypeRow;
+	private Button editCaseDateTypeButton;
+	private Button toggleCaseDateTypeButton;
+	private Button removeCaseDateTypeButton;
 	private RequestLookupSelection selectedMaterialTypeRow;
 	private RequestLookupSelection selectedRequestMethodRow;
 	private RequestLookupSelection selectedRequestStatusRow;
 	private boolean materialTypeMutationRunning;
 	private boolean requestMethodMutationRunning;
 	private boolean requestStatusMutationRunning;
+	private int requestLookupLoadGeneration;
+	private static final PseudoClass SELECTED_CARD = PseudoClass.getPseudoClass("selected");
 	private int caseStatusLoadGeneration;
 	private int practiceAreaLoadGeneration;
 	private int linkTypeLoadGeneration;
+	private int caseDateTypeLoadGeneration;
+	private int calendarCaseDateMappingLoadGeneration;
+	private boolean calendarCaseDateMappingMutationRunning;
+	private List<CalendarCaseDateTypeMapping> calendarCaseDateMappings = List.of();
+	private List<CalendarEventType> eligibleCalendarEventTypes = List.of();
+	private List<EffectiveCaseDateTypeDto> eligibleMappingCaseDateTypes = List.of();
+	private List<CalendarEventType> visibleCalendarEventTypes = List.of();
+	private List<EffectiveCaseDateTypeDto> visibleMappingCaseDateTypes = List.of();
+	private CalendarCaseDateTypeMapping selectedCalendarCaseDateMapping;
+	private Button editCalendarCaseDateMappingButton;
+	private Button toggleCalendarCaseDateMappingButton;
+	private Button deleteCalendarCaseDateMappingButton;
 	private int userManagementLoadGeneration;
+	private final List<UserManagementViewRow> managedUserRows = new ArrayList<>();
+	private final UserCardFactory userManagementCardFactory = new UserCardFactory(null);
+	private boolean userMutationRunning;
 
 	private final ExecutorService settingsLoadExecutor = Executors.newFixedThreadPool(4, runnable -> {
 		Thread thread = new Thread(runnable, "settings-section-loader");
@@ -174,6 +242,8 @@ public final class SettingsController {
 	@FXML
 	private void initialize() {
 		fxmlReady = true;
+		configureSettingsSemanticButtons();
+		configureUserManagementSemanticButtons();
 		configureLookupActionRows();
 		configureUserManagementTable();
 		updateAdminControlsVisibility();
@@ -183,7 +253,23 @@ public final class SettingsController {
 		loadAdminSectionsAsync();
 	}
 
-	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
+	private void configureSettingsSemanticButtons() {
+		ControlStyles.apply(applyNotificationPreferencesButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(resetNotificationPreferencesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(viewAuditLogButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+	}
+
+	private void configureUserManagementSemanticButtons() {
+		ControlStyles.apply(addUserButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(editUserButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(deactivateUserButton, ControlStyles.Purpose.DANGER, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(reactivateUserButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(resetPasswordButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(refreshUsersButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(removeUserButton, ControlStyles.Purpose.DANGER, ControlStyles.Size.STANDARD);
+	}
+
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService, UserDao userDao, UiRuntimeBridge runtimeBridge, CalendarCaseDateTypeMappingServicePort mappingService, CalendarEventTypeDao calendarEventTypeDao) {
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.onOpenAuditLog = Objects.requireNonNull(onOpenAuditLog, "onOpenAuditLog");
@@ -192,11 +278,17 @@ public final class SettingsController {
 		this.caseService = Objects.requireNonNull(caseService, "caseService");
 		this.materialRequestService = Objects.requireNonNull(materialRequestService, "materialRequestService");
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
+		this.calendarCaseDateMappingService = Objects.requireNonNull(mappingService, "mappingService");
+		this.calendarEventTypeDao = Objects.requireNonNull(calendarEventTypeDao, "calendarEventTypeDao");
 		if (fxmlReady) {
 			loadFromPreferences();
 			updateAdminControlsVisibility();
 			loadAdminSectionsAsync();
 		}
+	}
+
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
+		throw new IllegalStateException("Calendar/case-date mapping services are required by Settings.");
 	}
 
 	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
@@ -245,6 +337,11 @@ public final class SettingsController {
 		} catch (RuntimeException ignored) { }
 	}
 
+	private void publishCaseDateTypeChanged(int typeId) {
+		if (runtimeBridge == null) return;
+		try { runtimeBridge.publishCaseDateTypeChanged(typeId, requireTenantId(), requireActorUserId()); } catch (RuntimeException ignored) { }
+	}
+
 	private void handleLinkTypeLiveEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
 		if (event == null || appState == null || !LiveUpdateEvents.ENTITY_LINK_TYPE.equals(event.entityType())) return;
 		Integer tenantId = appState.getShaleClientId();
@@ -276,32 +373,45 @@ public final class SettingsController {
 		loadCaseStatusesAsync(null);
 		loadPracticeAreasAsync(null);
 		loadLinkTypesAsync(null);
+		loadCaseDateTypesAsync(null);
+		loadCalendarCaseDateMappingsAsync(null, null);
 		loadRequestLookupsAsync();
 		loadManagedUsersAsync(null);
 	}
 
 	private void loadRequestLookupsAsync() {
 		if (materialRequestService == null) return;
+		final int generation = ++requestLookupLoadGeneration;
 		final int tenantId;
 		final int actorUserId;
 		try { tenantId = requireTenantId(); actorUserId = requireActorUserId(); } catch (RuntimeException ex) { setMaterialTypeMessage(rootMessage(ex)); return; }
-		if (materialTypeCardsContainer != null) materialTypeCardsContainer.getChildren().setAll(loadingLabel("Loading material types…"));
-		if (requestMethodCardsContainer != null) requestMethodCardsContainer.getChildren().setAll(loadingLabel("Loading request methods…"));
-		if (requestStatusCardsContainer != null) requestStatusCardsContainer.getChildren().setAll(loadingLabel("Loading request statuses…"));
+		showRequestLookupLoadingIfEmpty(materialTypeCardsContainer, "Loading material types…");
+		showRequestLookupLoadingIfEmpty(requestMethodCardsContainer, "Loading request methods…");
+		showRequestLookupLoadingIfEmpty(requestStatusCardsContainer, "Loading request statuses…");
 		settingsLoadExecutor.submit(() -> {
 			try {
 				List<MaterialTypeDto> materialTypes = buildMaterialTypeRows(materialRequestService.listMaterialTypesForAdministration(tenantId, actorUserId), tenantId);
 				List<RequestMethodDto> methods = buildRequestMethodRows(materialRequestService.listRequestMethodsForAdministration(tenantId, actorUserId), tenantId);
 				List<RequestStatusDto> statuses = buildRequestStatusRows(materialRequestService.listRequestStatusesForAdministration(tenantId, actorUserId), tenantId);
-				Platform.runLater(() -> { renderMaterialTypeCards(materialTypes); renderRequestMethodCards(methods); renderRequestStatusCards(statuses); });
+				Platform.runLater(() -> {
+					if (generation != requestLookupLoadGeneration) return;
+					renderMaterialTypeCards(materialTypes);
+					renderRequestMethodCards(methods);
+					renderRequestStatusCards(statuses);
+				});
 			} catch (RuntimeException ex) {
 				Platform.runLater(() -> {
+					if (generation != requestLookupLoadGeneration) return;
 					if (materialTypeCardsContainer != null) materialTypeCardsContainer.getChildren().setAll(loadingLabel("Failed to load material types. " + rootMessage(ex)));
 					if (requestMethodCardsContainer != null) requestMethodCardsContainer.getChildren().setAll(loadingLabel("Failed to load request methods. " + rootMessage(ex)));
 					if (requestStatusCardsContainer != null) requestStatusCardsContainer.getChildren().setAll(loadingLabel("Failed to load request statuses. " + rootMessage(ex)));
 				});
 			}
 		});
+	}
+
+	private void showRequestLookupLoadingIfEmpty(VBox container, String message) {
+		if (container != null && container.getChildren().isEmpty()) container.getChildren().setAll(loadingLabel(message));
 	}
 
 	private void setCaseStatusLoadingState(String message) {
@@ -350,36 +460,321 @@ public final class SettingsController {
 	private void configureLookupActionRows() {
 		if (caseStatusActionRow != null) {
 			caseStatusActionRow.getChildren().setAll(
-					ActionButtonFactory.primary("Add Status", event -> onAddCaseStatus()),
-					ActionButtonFactory.neutral("Edit Status", event -> onEditCaseStatus()),
-					ActionButtonFactory.neutral("Move Up", event -> onMoveCaseStatusUp()),
-					ActionButtonFactory.neutral("Move Down", event -> onMoveCaseStatusDown()),
+					semanticButton("Add Status", ControlStyles.Purpose.PRIMARY, event -> onAddCaseStatus()),
+					semanticButton("Edit Status", ControlStyles.Purpose.SECONDARY, event -> onEditCaseStatus()),
+					semanticButton("Move Up", ControlStyles.Purpose.GHOST, event -> onMoveCaseStatusUp()),
+					semanticButton("Move Down", ControlStyles.Purpose.GHOST, event -> onMoveCaseStatusDown()),
 					caseStatusSettingsStatusLabel);
 		}
 		if (linkTypeActionRow != null) {
 			linkTypeActionRow.getChildren().setAll(
-					ActionButtonFactory.primary("Add Link Type", event -> onAddLinkType()),
-					ActionButtonFactory.neutral("Edit/Customize", event -> onEditLinkType()),
-					ActionButtonFactory.neutral("Activate/Deactivate", event -> onToggleLinkTypeActive()),
-					ActionButtonFactory.neutral("Reset/Remove", event -> onResetOrRemoveLinkType()),
+					semanticButton("Add Link Type", ControlStyles.Purpose.PRIMARY, event -> onAddLinkType()),
+					semanticButton("Edit/Customize", ControlStyles.Purpose.SECONDARY, event -> onEditLinkType()),
+					semanticButton("Activate/Deactivate", ControlStyles.Purpose.GHOST, event -> onToggleLinkTypeActive()),
+					semanticButton("Reset/Remove", ControlStyles.Purpose.SECONDARY, event -> onResetOrRemoveLinkType()),
 					linkTypeSettingsStatusLabel);
 		}
 		if (practiceAreaActionRow != null) {
 			practiceAreaActionRow.getChildren().setAll(
-					ActionButtonFactory.primary("Add Practice Area", event -> onAddPracticeArea()),
-					ActionButtonFactory.neutral("Edit Practice Area", event -> onEditPracticeArea()),
-					ActionButtonFactory.neutral("Remove Practice Area", event -> onRemovePracticeArea()),
+					semanticButton("Add Practice Area", ControlStyles.Purpose.PRIMARY, event -> onAddPracticeArea()),
+					semanticButton("Edit Practice Area", ControlStyles.Purpose.SECONDARY, event -> onEditPracticeArea()),
+					semanticButton("Deactivate Practice Area", ControlStyles.Purpose.GHOST, event -> onRemovePracticeArea()),
 					practiceAreaSettingsStatusLabel);
 		}
-		if (materialTypeActionRow != null) materialTypeActionRow.getChildren().setAll(ActionButtonFactory.primary("Add Material Type", e -> onAddMaterialType()), ActionButtonFactory.neutral("Edit/Customize", e -> onEditMaterialType()), ActionButtonFactory.neutral("Activate/Deactivate", e -> onToggleMaterialTypeActive()), ActionButtonFactory.neutral("Reset/Remove", e -> onResetOrRemoveMaterialType()), materialTypeSettingsStatusLabel);
-		if (requestMethodActionRow != null) requestMethodActionRow.getChildren().setAll(ActionButtonFactory.primary("Add Request Method", e -> onAddRequestMethod()), ActionButtonFactory.neutral("Edit/Customize", e -> onEditRequestMethod()), ActionButtonFactory.neutral("Activate/Deactivate", e -> onToggleRequestMethodActive()), ActionButtonFactory.neutral("Reset/Remove", e -> onResetOrRemoveRequestMethod()), requestMethodSettingsStatusLabel);
-		if (requestStatusActionRow != null) requestStatusActionRow.getChildren().setAll(ActionButtonFactory.primary("Add Request Status", e -> onAddRequestStatus()), ActionButtonFactory.neutral("Edit/Customize", e -> onEditRequestStatus()), ActionButtonFactory.neutral("Activate/Deactivate", e -> onToggleRequestStatusActive()), ActionButtonFactory.neutral("Reset/Remove", e -> onResetOrRemoveRequestStatus()), requestStatusSettingsStatusLabel);
+		if (caseDateTypeActionRow != null) configureCaseDateTypeActionRow();
+		if (calendarCaseDateMappingActionRow != null) configureCalendarCaseDateMappingActionRow();
+		if (materialTypeActionRow != null) configureRequestActionRow(materialTypeActionRow, "Material Type", materialTypeSettingsStatusLabel, this::onAddMaterialType, this::onEditMaterialType, this::onToggleMaterialTypeActive, this::onResetOrRemoveMaterialType);
+		if (requestMethodActionRow != null) configureRequestActionRow(requestMethodActionRow, "Request Method", requestMethodSettingsStatusLabel, this::onAddRequestMethod, this::onEditRequestMethod, this::onToggleRequestMethodActive, this::onResetOrRemoveRequestMethod);
+		if (requestStatusActionRow != null) configureRequestActionRow(requestStatusActionRow, "Request Status", requestStatusSettingsStatusLabel, this::onAddRequestStatus, this::onEditRequestStatus, this::onToggleRequestStatusActive, this::onResetOrRemoveRequestStatus);
+	}
+
+	private void configureCalendarCaseDateMappingActionRow() {
+		Button add = semanticButton("Add Mapping", ControlStyles.Purpose.PRIMARY, e -> addCalendarCaseDateMapping());
+		editCalendarCaseDateMappingButton = semanticButton("Edit", ControlStyles.Purpose.SECONDARY, e -> editCalendarCaseDateMapping());
+		toggleCalendarCaseDateMappingButton = semanticButton("Activate/Deactivate", ControlStyles.Purpose.GHOST, e -> toggleCalendarCaseDateMapping());
+		deleteCalendarCaseDateMappingButton = semanticButton("Delete", ControlStyles.Purpose.DANGER, e -> deleteCalendarCaseDateMapping());
+		calendarCaseDateMappingActionRow.getChildren().setAll(add, editCalendarCaseDateMappingButton,
+				toggleCalendarCaseDateMappingButton, deleteCalendarCaseDateMappingButton, calendarCaseDateMappingStatusLabel);
+		updateCalendarCaseDateMappingActions();
+	}
+
+	private Button semanticButton(String text, ControlStyles.Purpose purpose, javafx.event.EventHandler<ActionEvent> handler) {
+		return ActionButtonFactory.semantic(text, handler, purpose, ControlStyles.Size.STANDARD);
+	}
+
+	private void configureRequestActionRow(HBox row, String label, Label status, Runnable add, Runnable edit, Runnable toggle, Runnable reset) {
+		row.getChildren().setAll(
+				semanticButton("Add " + label, ControlStyles.Purpose.PRIMARY, e -> add.run()),
+				semanticButton("Edit/Customize", ControlStyles.Purpose.SECONDARY, e -> edit.run()),
+				semanticButton("Activate/Deactivate", ControlStyles.Purpose.GHOST, e -> toggle.run()),
+				semanticButton("Reset/Remove", ControlStyles.Purpose.SECONDARY, e -> reset.run()), status);
+	}
+
+	private void configureCaseDateTypeActionRow() {
+		Button add = semanticButton("Add Case Date Type", ControlStyles.Purpose.PRIMARY, e -> onAddCaseDateType());
+		editCaseDateTypeButton = semanticButton("Edit", ControlStyles.Purpose.SECONDARY, e -> onEditCaseDateType());
+		toggleCaseDateTypeButton = semanticButton("Activate/Deactivate", ControlStyles.Purpose.GHOST, e -> onToggleCaseDateTypeActive());
+		removeCaseDateTypeButton = semanticButton("Remove", ControlStyles.Purpose.DANGER, e -> onResetOrRemoveCaseDateType());
+		caseDateTypeActionRow.getChildren().setAll(add, editCaseDateTypeButton, toggleCaseDateTypeButton, removeCaseDateTypeButton, caseDateTypeSettingsStatusLabel);
+		updateCaseDateTypeActionState(null);
 	}
 
 	private void renderMaterialTypeCards(List<MaterialTypeDto> rows) { if (materialTypeCardsContainer == null) return; List<MaterialTypeDto> effective = rows == null ? List.of() : rows; materialTypeCardsContainer.getChildren().setAll(effective.isEmpty() ? List.of(loadingLabel("No material types are configured for this tenant.")) : effective.stream().map(r -> buildRequestLookupCard(RequestLookupKind.MATERIAL_TYPE, RequestLookupSelection.material(r))).toList()); setMaterialTypeMessage(""); }
 	private void renderRequestMethodCards(List<RequestMethodDto> rows) { if (requestMethodCardsContainer == null) return; List<RequestMethodDto> effective = rows == null ? List.of() : rows; requestMethodCardsContainer.getChildren().setAll(effective.isEmpty() ? List.of(loadingLabel("No request methods are configured for this tenant.")) : effective.stream().map(r -> buildRequestLookupCard(RequestLookupKind.REQUEST_METHOD, RequestLookupSelection.method(r))).toList()); setRequestMethodMessage(""); }
 	private void renderRequestStatusCards(List<RequestStatusDto> rows) { if (requestStatusCardsContainer == null) return; List<RequestStatusDto> effective = rows == null ? List.of() : rows; requestStatusCardsContainer.getChildren().setAll(effective.isEmpty() ? List.of(loadingLabel("No request statuses are configured for this tenant.")) : effective.stream().map(r -> buildRequestLookupCard(RequestLookupKind.REQUEST_STATUS, RequestLookupSelection.status(r))).toList()); setRequestStatusMessage(""); }
-	private VBox buildRequestLookupCard(RequestLookupKind kind, RequestLookupSelection row) { VBox card = new VBox(8); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact"); if (selectedRequestLookup(kind) != null && selectedRequestLookup(kind).id() == row.id()) card.getStyleClass().add("link-type-card-selected"); card.setOnMouseClicked(e -> selectRequestLookup(kind, row)); HBox header = new HBox(10); header.setAlignment(Pos.CENTER_LEFT); Circle dot = new Circle(6); String css = safe(ColorUtil.toCssBackgroundColorOrNull(row.color())); if (!css.isBlank()) dot.setStyle("-fx-background-color: " + css + "; -fx-fill: " + css + ";"); Label name = new Label(row.name()); name.getStyleClass().add("app-dialog-field-label"); Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); header.getChildren().addAll(dot, name, spacer, LinkTypeIndicatorFactory.createLinkTypePill(row.name(), row.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); HBox metadata = new HBox(6); metadata.setAlignment(Pos.CENTER_LEFT); metadata.getChildren().addAll(metadataPill(row.active() ? "Active" : "Inactive"), metadataPill(row.scopeLabel())); if (!row.systemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.systemKey())); if (!row.color().isBlank()) metadata.getChildren().add(metadataPill(row.color())); HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", "app-toolbar-button-neutral"); edit.setOnAction(e -> { selectRequestLookup(kind,row); editRequestLookup(kind); e.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", "app-toolbar-button-neutral"); toggle.setOnAction(e -> { selectRequestLookup(kind,row); toggleRequestLookup(kind); e.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", row.custom() ? "app-toolbar-button-danger" : "app-toolbar-button-neutral"); reset.setDisable(row.global()); reset.setOnAction(e -> { selectRequestLookup(kind,row); resetRequestLookup(kind); e.consume(); }); Label help = new Label(row.description().isBlank() ? row.lifecycleText() : row.description()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit,toggle,reset,help); card.getChildren().addAll(header,metadata,actions); return card; }
+	private VBox buildRequestLookupCard(RequestLookupKind kind, RequestLookupSelection row) {
+		VBox card = new VBox(8);
+		card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact");
+		card.setUserData(row);
+		card.setFocusTraversable(true);
+		card.pseudoClassStateChanged(SELECTED_CARD, isSelectedRequestLookup(kind, row));
+		card.setOnMouseClicked(event -> {
+			if (event.getButton() == MouseButton.PRIMARY && !isActionControl(event.getTarget())) selectRequestLookup(kind, row);
+		});
+		card.setOnKeyPressed(event -> {
+			if (event.getCode() == KeyCode.SPACE || event.getCode() == KeyCode.ENTER) {
+				selectRequestLookup(kind, row);
+				event.consume();
+			}
+		});
+		HBox header = new HBox(10); header.setAlignment(Pos.CENTER_LEFT); Circle dot = new Circle(6); String css = safe(ColorUtil.toCssBackgroundColorOrNull(row.color())); if (!css.isBlank()) dot.setStyle("-fx-background-color: " + css + "; -fx-fill: " + css + ";"); Label name = new Label(row.name()); name.getStyleClass().add("app-dialog-field-label"); Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); header.getChildren().addAll(dot, name, spacer, LinkTypeIndicatorFactory.createLinkTypePill(row.name(), row.color(), LinkTypeIndicatorFactory.PillSize.COMPACT)); HBox metadata = new HBox(6); metadata.setAlignment(Pos.CENTER_LEFT); metadata.getChildren().addAll(metadataPill(row.active() ? "Active" : "Inactive"), metadataPill(row.scopeLabel())); if (!row.systemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.systemKey())); if (!row.color().isBlank()) metadata.getChildren().add(metadataPill(row.color())); HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", ControlStyles.Purpose.GHOST); edit.setOnAction(e -> { selectRequestLookup(kind,row); editRequestLookup(kind); e.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", ControlStyles.Purpose.GHOST); toggle.setOnAction(e -> { selectRequestLookup(kind,row); toggleRequestLookup(kind); e.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", ControlStyles.Purpose.SECONDARY); reset.setDisable(row.global()); reset.setOnAction(e -> { selectRequestLookup(kind,row); resetRequestLookup(kind); e.consume(); }); Label help = new Label(row.description().isBlank() ? row.lifecycleText() : row.description()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit,toggle,reset,help); card.getChildren().addAll(header,metadata,actions); return card;
+	}
+
+
+
+	@FXML private void onAddCaseDateType(){ if(!requireAdminLookupManagement("Case Date Types"))return; showCaseDateTypeDialog(null).ifPresent(input->{try{EffectiveCaseDateTypeDto saved=caseService.createCaseDateType(new CaseServicePort.CaseDateTypeCommand(null,requireTenantId(),requireActorUserId(),input.systemKey(),input.name(),input.description(),input.category(),input.color(),input.supportsTime(),input.sortOrder(),input.active(),null)); publishCaseDateTypeChanged(saved.id()); loadCaseDateTypesAsync("Case date type added.");}catch(RuntimeException ex){showCaseDateTypeError(ex);}}); }
+	@FXML private void onEditCaseDateType(){ if(!requireAdminLookupManagement("Case Date Types"))return; CaseDateTypeViewRow selected=selectedCaseDateTypeRow(); if(selected==null)return; if(!selected.canEdit()){explainProtectedCaseDateType();return;} showCaseDateTypeDialog(selected.type()).ifPresent(input->{try{caseService.updateCaseDateType(new CaseServicePort.CaseDateTypeCommand(selected.id(),requireTenantId(),requireActorUserId(),selected.systemKeyForSave(),input.name(),input.description(),input.category(),input.color(),input.supportsTime(),input.sortOrder(),input.active(),selected.rowVer())); publishCaseDateTypeChanged(selected.id()); loadCaseDateTypesAsync("Case date type updated.");}catch(RuntimeException ex){showCaseDateTypeError(ex);}}); }
+	@FXML private void onToggleCaseDateTypeActive(){ if(!requireAdminLookupManagement("Case Date Types"))return; CaseDateTypeViewRow selected=selectedCaseDateTypeRow(); if(selected==null)return; if(!selected.canToggleActive()){explainProtectedCaseDateType();return;} try{caseService.setCaseDateTypeActive(new CaseServicePort.SetCaseDateTypeActiveCommand(requireTenantId(),requireActorUserId(),selected.id(),!selected.active(),selected.rowVer())); publishCaseDateTypeChanged(selected.id()); loadCaseDateTypesAsync(selected.active()?"Case date type deactivated for new occurrences.":"Case date type activated.");}catch(RuntimeException ex){showCaseDateTypeError(ex);} }
+	@FXML private void onResetOrRemoveCaseDateType(){ if(!requireAdminLookupManagement("Case Date Types"))return; CaseDateTypeViewRow selected=selectedCaseDateTypeRow(); if(selected==null)return; if(!selected.canRemove()){explainProtectedCaseDateType();return;} String action="Remove"; if(!AppDialogs.showConfirmation(caseDateTypeCardsContainer==null||caseDateTypeCardsContainer.getScene()==null?null:caseDateTypeCardsContainer.getScene().getWindow(),"Case Date Types",action+" "+selected.name()+"?","This affects future type selections only. Existing Case Dates retain their stored type presentation.",action,AppDialogs.DialogActionKind.DANGER))return; try{caseService.resetCaseDateTypeOverride(new CaseServicePort.ResetCaseDateTypeOverrideCommand(requireTenantId(),requireActorUserId(),selected.id(),selected.rowVer())); publishCaseDateTypeChanged(selected.id()); loadCaseDateTypesAsync("Custom case date type removed from future selections.");}catch(RuntimeException ex){showCaseDateTypeError(ex);} }
+	private void loadCaseDateTypesAsync(String successMessage){ if(caseService==null||caseDateTypeCardsContainer==null)return; if(!requireAdminLookupManagement("Case Date Types")){selectedCaseDateTypeRow=null;caseDateTypeCardsContainer.getChildren().clear();updateCaseDateTypeActionState(null);return;} final int generation=++caseDateTypeLoadGeneration; final int tenantId; final int actorUserId; try{tenantId=requireTenantId();actorUserId=requireActorUserId();}catch(RuntimeException ex){setCaseDateTypeMessage(rootMessage(ex));return;} caseDateTypeCardsContainer.getChildren().setAll(loadingLabel("Loading case date types…")); settingsLoadExecutor.submit(()->{try{List<EffectiveCaseDateTypeDto> types=caseService.listCaseDateTypesForAdministration(tenantId,actorUserId); List<CaseDateSemanticRoleMappingDto> mappings=caseService.listCaseDateSemanticRoleMappings(tenantId,actorUserId); List<CaseDateTypeViewRow> rows=buildCaseDateTypeRows(types,tenantId,mappings); Platform.runLater(()->{applyCaseDateTypeRows(generation,rows,successMessage);renderCaseDateRoleMappings(mappings,types);});}catch(RuntimeException ex){Platform.runLater(()->{if(generation!=caseDateTypeLoadGeneration)return;selectedCaseDateTypeRow=null;updateCaseDateTypeActionState(null);caseDateTypeCardsContainer.getChildren().setAll(loadingLabel("Failed to load case date types. "+rootMessage(ex)));});}}); }
+	static List<CaseDateTypeViewRow> buildCaseDateTypeRows(List<EffectiveCaseDateTypeDto> rows,int tenantId){return buildCaseDateTypeRows(rows,tenantId,List.of());}
+	static List<CaseDateTypeViewRow> buildCaseDateTypeRows(List<EffectiveCaseDateTypeDto> rows,int tenantId,List<CaseDateSemanticRoleMappingDto> mappings){Map<Integer,String> roles=new java.util.HashMap<>();for(CaseDateSemanticRoleMappingDto m:mappings==null?List.<CaseDateSemanticRoleMappingDto>of():mappings)if(m.tenantOverride())roles.put(m.effectiveTypeId(),m.roleName());List<CaseDateTypeViewRow> out=new ArrayList<>();for(EffectiveCaseDateTypeDto r:rows==null?List.<EffectiveCaseDateTypeDto>of():rows){if(r!=null&&r.shaleClientId()!=null&&r.shaleClientId()==tenantId&&!r.deleted())out.add(new CaseDateTypeViewRow(r,roles.get(r.id())));}out.sort(java.util.Comparator.comparing(CaseDateTypeViewRow::name,String.CASE_INSENSITIVE_ORDER).thenComparingInt(CaseDateTypeViewRow::id));return List.copyOf(out);}
+	private void applyCaseDateTypeRows(int generation,List<CaseDateTypeViewRow> rows,String successMessage){if(generation!=caseDateTypeLoadGeneration)return;Integer selectedId=selectedCaseDateTypeRow==null?null:selectedCaseDateTypeRow.id();selectedCaseDateTypeRow=preserveCaseDateTypeSelection(rows,selectedId);renderCaseDateTypeCards(rows);updateCaseDateTypeActionState(selectedCaseDateTypeRow);setCaseDateTypeMessage(successMessage==null?"":successMessage);}
+	static CaseDateTypeViewRow preserveCaseDateTypeSelection(List<CaseDateTypeViewRow> rows,Integer selectedId){return rows.stream().filter(row->selectedId!=null&&row.id()==selectedId).findFirst().orElse(null);}
+	private void renderCaseDateRoleMappings(List<CaseDateSemanticRoleMappingDto> mappings, List<EffectiveCaseDateTypeDto> types) {
+		if (caseDateRoleMappingsContainer == null) return;
+		List<EffectiveCaseDateTypeDto> eligible = types.stream()
+				.filter(type -> type.shaleClientId() != null && type.active() && !type.deleted())
+				.toList();
+		FlowPane section = new FlowPane(10, 10);
+		section.setPrefWrapLength(760);
+		if (eligible.isEmpty()) {
+			Label empty = new Label("No custom types are available for overrides.");
+			empty.getStyleClass().add("search-summary-text");
+			empty.setWrapText(true);
+			section.getChildren().add(empty);
+		}
+		for (CaseDateSemanticRoleMappingDto mapping : mappings) {
+			section.getChildren().add(buildCaseDateRoleMappingRow(mapping, eligible));
+		}
+		caseDateRoleMappingsContainer.getChildren().setAll(section);
+	}
+
+	private VBox buildCaseDateRoleMappingRow(CaseDateSemanticRoleMappingDto mapping,
+			List<EffectiveCaseDateTypeDto> eligible) {
+		VBox row = new VBox(6);
+		row.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "case-date-built-in-card", "shale-density-compact");
+		row.setMinWidth(240); row.setPrefWidth(340); row.setMaxWidth(380);
+		Label role = new Label(mapping.roleName());
+		role.getStyleClass().add("app-dialog-field-label");
+		role.setWrapText(true);
+		HBox badges = new HBox(6, metadataPill("Built-in"), metadataPill("Required"));
+		Label effective = new Label(mapping.tenantOverride()
+				? mapping.effectiveTypeName() + " is currently used for this required date."
+				: "Using the built-in default.");
+		effective.getStyleClass().add("search-summary-text");
+		effective.setWrapText(true);
+		row.getChildren().addAll(role, badges, effective);
+
+		FlowPane actions = new FlowPane(8, 6);
+		actions.setPrefWrapLength(520);
+		if (!eligible.isEmpty()) {
+			ComboBox<EffectiveCaseDateTypeDto> selector = ControlStyles.formControl(new ComboBox<>());
+			selector.setPromptText("Select a custom Case Date Type");
+			selector.setMaxWidth(360);
+			selector.getItems().setAll(eligible);
+			selector.setConverter(new javafx.util.StringConverter<>() {
+				@Override public String toString(EffectiveCaseDateTypeDto value) { return value == null ? "" : value.name(); }
+				@Override public EffectiveCaseDateTypeDto fromString(String value) { return null; }
+			});
+			eligible.stream().filter(type -> type.id() == mapping.effectiveTypeId()).findFirst().ifPresent(selector::setValue);
+			Button save = ActionButtonFactory.semantic(mapping.tenantOverride() ? "Change" : "Save override", event -> {
+				EffectiveCaseDateTypeDto selected = selector.getValue();
+				if (selected == null) { setCaseDateTypeMessage("Select an eligible tenant Case Date Type."); return; }
+				try {
+					caseService.saveCaseDateSemanticRoleMapping(new CaseServicePort.SaveCaseDateSemanticRoleMappingCommand(
+							requireTenantId(), requireActorUserId(), mapping.roleKey(), selected.id(),
+							mapping.tenantMappingId(), mapping.tenantMappingRowVer()));
+					publishCaseDateTypeChanged(selected.id());
+					loadCaseDateTypesAsync("Protected role mapping saved.");
+				} catch (RuntimeException ex) { showCaseDateTypeError(ex); }
+			}, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.SMALL);
+			actions.getChildren().addAll(selector, save);
+		}
+		if (mapping.tenantOverride()) {
+			Button reset = ActionButtonFactory.semantic("Reset to global default", event -> {
+				try {
+					caseService.resetCaseDateSemanticRoleMapping(new CaseServicePort.ResetCaseDateSemanticRoleMappingCommand(
+							requireTenantId(), requireActorUserId(), mapping.roleKey(), mapping.tenantMappingId(),
+							mapping.tenantMappingRowVer()));
+					publishCaseDateTypeChanged(mapping.effectiveTypeId());
+					loadCaseDateTypesAsync("Protected role mapping reset to the global default.");
+				} catch (RuntimeException ex) { showCaseDateTypeError(ex); }
+			}, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+			actions.getChildren().add(reset);
+		}
+		if (!actions.getChildren().isEmpty()) row.getChildren().add(actions);
+		return row;
+	}
+
+	private void renderCaseDateTypeCards(List<CaseDateTypeViewRow> rows){if(rows.isEmpty()){caseDateTypeCardsContainer.getChildren().setAll(loadingLabel("No custom Case Date Types yet."));return;}FlowPane grid=new FlowPane(10,10);grid.setPrefWrapLength(760);grid.getChildren().setAll(rows.stream().map(this::buildCaseDateTypeCard).toList());caseDateTypeCardsContainer.getChildren().setAll(grid);}
+	private VBox buildCaseDateTypeCard(CaseDateTypeViewRow row){VBox card=new VBox(8);card.getStyleClass().addAll("shale-entity-card","shale-entity-card-compact","shale-entity-card-selectable","case-date-custom-card","shale-density-compact");card.setMinWidth(240);card.setPrefWidth(340);card.setMaxWidth(380);card.setUserData(row);card.setFocusTraversable(true);card.pseudoClassStateChanged(SELECTED_CARD,selectedCaseDateTypeRow!=null&&selectedCaseDateTypeRow.id()==row.id());card.setOnMouseClicked(e->{if(e.getButton()==MouseButton.PRIMARY&&!isActionControl(e.getTarget()))selectCaseDateTypeRow(row);});card.setOnKeyPressed(e->{if(e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE){selectCaseDateTypeRow(row);e.consume();}});HBox h=new HBox(10);h.setAlignment(Pos.CENTER_LEFT);Circle dot=new Circle(6);String css=safe(ColorUtil.toCssBackgroundColorOrNull(row.color()));if(!css.isBlank())dot.setStyle("-fx-background-color: "+css+"; -fx-fill: "+css+";");Label name=new Label(row.name());name.getStyleClass().add("app-dialog-field-label");h.getChildren().addAll(dot,name,metadataPill("Custom"));FlowPane meta=new FlowPane(6,6);meta.getChildren().addAll(metadataPill(row.active()?"Active":"Inactive"),metadataPill(row.category()),metadataPill(row.supportsTime()?"Timed or all-day":"All-day only"));if(row.mappedRoleName()!=null)meta.getChildren().add(metadataPill("Used for "+row.mappedRoleName()));Label help=new Label(row.mappedRoleName()==null?"Select this type to manage it.":"Change or reset its required-date mapping before deactivating or removing it.");help.getStyleClass().add("search-summary-text");help.setWrapText(true);card.getChildren().addAll(h,meta,help);return card;}
+	private void selectCaseDateTypeRow(CaseDateTypeViewRow row){selectedCaseDateTypeRow=row;updateSelectionStyles(caseDateTypeCardsContainer,row.id());updateCaseDateTypeActionState(row);setCaseDateTypeMessage(row.protectedType()?PROTECTED_CASE_DATE_TYPE_MESSAGE:"");}
+	private CaseDateTypeViewRow selectedCaseDateTypeRow(){if(selectedCaseDateTypeRow==null)setCaseDateTypeMessage("Select a case date type first.");return selectedCaseDateTypeRow;}
+	private static final String PROTECTED_CASE_DATE_TYPE_MESSAGE="Required built-in dates are managed with the controls on their cards.";
+	private void explainProtectedCaseDateType(){setCaseDateTypeMessage(PROTECTED_CASE_DATE_TYPE_MESSAGE);}
+	private void updateCaseDateTypeActionState(CaseDateTypeViewRow row){boolean editable=row!=null&&row.canEdit();boolean toggle=row!=null&&row.canToggleActive();boolean remove=row!=null&&row.canRemove();if(editCaseDateTypeButton!=null){editCaseDateTypeButton.setDisable(!editable);editCaseDateTypeButton.setTooltip(new Tooltip(row!=null&&row.protectedType()?PROTECTED_CASE_DATE_TYPE_MESSAGE:"Edit the selected custom Case Date Type."));}if(toggleCaseDateTypeButton!=null){toggleCaseDateTypeButton.setDisable(!toggle);toggleCaseDateTypeButton.setText(row==null?"Activate/Deactivate":row.active()?"Deactivate":"Activate");toggleCaseDateTypeButton.setTooltip(new Tooltip(row!=null&&row.protectedType()?PROTECTED_CASE_DATE_TYPE_MESSAGE:"Change whether the selected custom type is available for new Case Dates."));}if(removeCaseDateTypeButton!=null){removeCaseDateTypeButton.setDisable(!remove);removeCaseDateTypeButton.setText("Remove");removeCaseDateTypeButton.setTooltip(new Tooltip(row!=null&&row.protectedType()?PROTECTED_CASE_DATE_TYPE_MESSAGE:"Remove the selected custom type from future selections."));}}
+	private Optional<CaseDateTypeInput> showCaseDateTypeDialog(EffectiveCaseDateTypeDto existing){Dialog<CaseDateTypeInput> dialog=new Dialog<>();String title=existing==null?"Add Case Date Type":"Edit Case Date Type";dialog.setTitle(title);AppDialogs.applySecondaryDialogShell(dialog,title);dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK,ButtonType.CANCEL);TextField name=new TextField(existing==null?"":existing.name());TextField description=new TextField(existing==null?"":safe(existing.description()));ChoiceBox<String> category=new ChoiceBox<>();category.getItems().setAll("DEADLINE","TRIAL","HEARING","MEDIATION","DEPOSITION","NOTICE","APPOINTMENT","MILESTONE","OTHER");category.getSelectionModel().select(existing==null?"OTHER":existing.calendarCategory());ControlStyles.formControl(category);ColorPicker colorPicker=new ColorPicker(dbColorToFx(existing==null?null:existing.color()));CheckBox active=new CheckBox("Active");active.setSelected(existing==null||existing.active());CheckBox supports=new CheckBox("Supports time of day");supports.setSelected(existing!=null&&existing.supportsTime());GridPane grid=new GridPane();grid.setHgap(8);grid.setVgap(8);grid.add(new Label("Name"),0,0);grid.add(name,1,0);grid.add(new Label("Description"),0,1);grid.add(description,1,1);grid.add(new Label("Calendar Category"),0,2);grid.add(category,1,2);grid.add(new Label("Color"),0,3);grid.add(colorPicker,1,3);grid.add(supports,1,4);grid.add(active,1,5);dialog.getDialogPane().setContent(grid);styleLookupDialog(dialog,name,colorPicker,active);dialog.setResultConverter(b->{if(b!=ButtonType.OK)return null;return new CaseDateTypeInput(trim(name.getText()),trim(description.getText()),category.getValue(),fxColorToDb(colorPicker.getValue()),supports.isSelected(),existing==null?null:safe(existing.systemKey()),existing==null?null:existing.sortOrder(),active.isSelected());});try{return dialog.showAndWait();}catch(RuntimeException ex){AppDialogs.showError(dialog.getOwner(),"Case Date Types",rootMessage(ex));return Optional.empty();}}
+	private void setCaseDateTypeMessage(String msg){if(caseDateTypeSettingsStatusLabel!=null)caseDateTypeSettingsStatusLabel.setText(msg==null?"":msg);} private void showCaseDateTypeError(RuntimeException ex){AppDialogs.showError(caseDateTypeCardsContainer==null||caseDateTypeCardsContainer.getScene()==null?null:caseDateTypeCardsContainer.getScene().getWindow(),"Case Date Types",rootMessage(ex));}
+	public record CaseDateTypeViewRow(EffectiveCaseDateTypeDto type, String mappedRoleName){int id(){return type.id();}String name(){return safe(type.name());}String color(){return safe(type.color());}String category(){return safe(type.calendarCategory());}boolean supportsTime(){return type.supportsTime();}boolean active(){return type.active();}boolean global(){return false;}boolean custom(){return true;}boolean protectedType(){return false;}boolean canEdit(){return true;}boolean canToggleActive(){return mappedRoleName==null;}boolean canRemove(){return mappedRoleName==null;}boolean canReset(){return false;}String scopeLabel(){return "Custom";}byte[] rowVer(){return type.rowVer();}String systemKeyForSave(){return safe(type.systemKey()).isBlank()?null:type.systemKey();}}
+	private record CaseDateTypeInput(String name,String description,String category,String color,boolean supportsTime,String systemKey,Integer sortOrder,boolean active){}
+
+	private void loadCalendarCaseDateMappingsAsync(String successMessage, Long selectId) {
+		if (calendarCaseDateMappingService == null || calendarEventTypeDao == null || calendarCaseDateMappingCardsContainer == null) return;
+		if (!requireAdminLookupManagement("Calendar / Case Date Mappings")) return;
+		final int generation = ++calendarCaseDateMappingLoadGeneration;
+		final int tenantId;
+		final int actorId;
+		try { tenantId = requireTenantId(); actorId = requireActorUserId(); }
+		catch (RuntimeException ex) { setCalendarCaseDateMappingMessage(mappingErrorMessage(ex)); return; }
+		if (calendarCaseDateMappings.isEmpty()) calendarCaseDateMappingCardsContainer.getChildren().setAll(loadingLabel("Loading mappings…"));
+		else setCalendarCaseDateMappingMessage("Refreshing mappings…");
+		settingsLoadExecutor.submit(() -> {
+			try {
+				List<CalendarCaseDateTypeMapping> mappings = List.copyOf(calendarCaseDateMappingService.listMappings());
+				List<CalendarEventType> visibleEvents = List.copyOf(calendarEventTypeDao.listEffectiveEventTypes(tenantId));
+				List<EffectiveCaseDateTypeDto> visibleDates = List.copyOf(caseService.listEffectiveCaseDateTypes(tenantId, actorId));
+				List<CalendarEventType> events = eligibleCalendarEventTypes(visibleEvents, tenantId);
+				List<EffectiveCaseDateTypeDto> dates = eligibleCaseDateTypes(visibleDates, tenantId);
+				Platform.runLater(() -> applyCalendarCaseDateMappingLoad(generation, mappings, events, dates, visibleEvents, visibleDates, successMessage, selectId));
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> { if (generation == calendarCaseDateMappingLoadGeneration) setCalendarCaseDateMappingMessage("Unable to refresh mappings. " + mappingErrorMessage(ex)); });
+			}
+		});
+	}
+
+	void applyCalendarCaseDateMappingLoad(int generation, List<CalendarCaseDateTypeMapping> mappings,
+			List<CalendarEventType> events, List<EffectiveCaseDateTypeDto> dates, List<CalendarEventType> visibleEvents,
+			List<EffectiveCaseDateTypeDto> visibleDates, String successMessage, Long selectId) {
+		if (generation != calendarCaseDateMappingLoadGeneration) return;
+		Long preserved = selectId != null ? selectId : selectedCalendarCaseDateMapping == null ? null : selectedCalendarCaseDateMapping.id();
+		calendarCaseDateMappings = List.copyOf(mappings);
+		eligibleCalendarEventTypes = List.copyOf(events);
+		eligibleMappingCaseDateTypes = List.copyOf(dates);
+		visibleCalendarEventTypes = List.copyOf(visibleEvents);
+		visibleMappingCaseDateTypes = List.copyOf(visibleDates);
+		selectedCalendarCaseDateMapping = mappings.stream().filter(row -> preserved != null && row.id() == preserved).findFirst().orElse(null);
+		renderCalendarCaseDateMappingCards();
+		updateCalendarCaseDateMappingActions();
+		setCalendarCaseDateMappingMessage(successMessage == null ? "" : successMessage);
+	}
+
+	static List<CalendarEventType> eligibleCalendarEventTypes(List<CalendarEventType> rows, int tenantId) {
+		return (rows == null ? List.<CalendarEventType>of() : rows).stream().filter(Objects::nonNull)
+				.filter(row -> row.active() && (row.shaleClientId() == null || row.shaleClientId() == tenantId)).toList();
+	}
+
+	static List<EffectiveCaseDateTypeDto> eligibleCaseDateTypes(List<EffectiveCaseDateTypeDto> rows, int tenantId) {
+		return (rows == null ? List.<EffectiveCaseDateTypeDto>of() : rows).stream().filter(Objects::nonNull)
+				.filter(row -> row.active() && !row.deleted() && (row.shaleClientId() == null || row.shaleClientId() == tenantId)).toList();
+	}
+
+	static String activeMappingConflict(List<CalendarCaseDateTypeMapping> rows, Long excludedId, int eventTypeId, int dateTypeId, boolean active) {
+		if (!active) return null;
+		for (CalendarCaseDateTypeMapping row : rows == null ? List.<CalendarCaseDateTypeMapping>of() : rows) {
+			if (row.active() && (excludedId == null || row.id() != excludedId) &&
+					(row.calendarEventTypeId() == eventTypeId || row.caseDateTypeId() == dateTypeId))
+				return "An active mapping already uses the selected Calendar Event Type or Case Date Type.";
+		}
+		return null;
+	}
+
+	private void renderCalendarCaseDateMappingCards() {
+		if (calendarCaseDateMappings.isEmpty()) { calendarCaseDateMappingCardsContainer.getChildren().setAll(loadingLabel("No mappings are configured.")); return; }
+		FlowPane grid = new FlowPane(10, 10); grid.setPrefWrapLength(760);
+		grid.getChildren().setAll(calendarCaseDateMappings.stream().map(this::buildCalendarCaseDateMappingCard).toList());
+		calendarCaseDateMappingCardsContainer.getChildren().setAll(grid);
+	}
+
+	private VBox buildCalendarCaseDateMappingCard(CalendarCaseDateTypeMapping row) {
+		VBox card = new VBox(8); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact");
+		card.setMinWidth(280); card.setPrefWidth(360); card.setMaxWidth(410); card.setFocusTraversable(true); card.setUserData(row);
+		card.pseudoClassStateChanged(SELECTED_CARD, selectedCalendarCaseDateMapping != null && selectedCalendarCaseDateMapping.id() == row.id());
+		Runnable select = () -> { selectedCalendarCaseDateMapping = row; renderCalendarCaseDateMappingCards(); updateCalendarCaseDateMappingActions(); };
+		card.setOnMouseClicked(e -> { if (e.getButton() == MouseButton.PRIMARY && !isActionControl(e.getTarget())) select.run(); });
+		card.setOnKeyPressed(e -> { if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) { select.run(); e.consume(); } });
+		Label event = new Label("Calendar Event Type: " + eventTypeName(row.calendarEventTypeId())); event.getStyleClass().add("app-dialog-field-label");
+		Label date = new Label("Case Date Type: " + caseDateTypeName(row.caseDateTypeId())); date.getStyleClass().add("app-dialog-field-label");
+		FlowPane meta = new FlowPane(6, 6); meta.getChildren().addAll(metadataPill(row.active() ? "Active" : "Inactive"),
+				metadataPill("Case Date → Calendar: " + yesNo(row.caseDateToCalendar())), metadataPill("Calendar → Case Date: " + yesNo(row.calendarToCaseDate())));
+		card.getChildren().addAll(event, date, meta); return card;
+	}
+
+	private String eventTypeName(int id) { return visibleCalendarEventTypes.stream().filter(x -> x.calendarEventTypeId() == id).map(CalendarEventType::name).findFirst().orElse("Unavailable type (ID " + id + ")"); }
+	private String caseDateTypeName(int id) { return visibleMappingCaseDateTypes.stream().filter(x -> x.id() == id).map(EffectiveCaseDateTypeDto::name).findFirst().orElse("Unavailable type (ID " + id + ")"); }
+	private static String yesNo(boolean value) { return value ? "Enabled" : "Disabled"; }
+
+	private void addCalendarCaseDateMapping() { if (canMutateCalendarCaseDateMapping()) showCalendarCaseDateMappingDialog(null).ifPresent(this::createCalendarCaseDateMapping); }
+	private void editCalendarCaseDateMapping() { if (!canMutateCalendarCaseDateMapping()) return; if (selectedCalendarCaseDateMapping == null) { setCalendarCaseDateMappingMessage("Select a mapping first."); return; } showCalendarCaseDateMappingDialog(selectedCalendarCaseDateMapping).ifPresent(input -> updateCalendarCaseDateMapping(selectedCalendarCaseDateMapping, input)); }
+	private boolean canMutateCalendarCaseDateMapping() { return requireAdminLookupManagement("Calendar / Case Date Mappings") && !calendarCaseDateMappingMutationRunning; }
+
+	private Optional<MappingInput> showCalendarCaseDateMappingDialog(CalendarCaseDateTypeMapping existing) {
+		Dialog<MappingInput> dialog = new Dialog<>(); String title = existing == null ? "Add Mapping" : "Edit Mapping";
+		dialog.setTitle(title); AppDialogs.applySecondaryDialogShell(dialog, title); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+		ColorCodedComboBox<CalendarEventType> event = ControlStyles.formControl(new ColorCodedComboBox<>(CalendarEventType::name, CalendarEventType::colorHex));
+		ColorCodedComboBox<EffectiveCaseDateTypeDto> date = ControlStyles.formControl(new ColorCodedComboBox<>(EffectiveCaseDateTypeDto::name, EffectiveCaseDateTypeDto::color));
+		event.getItems().setAll(eligibleCalendarEventTypes); date.getItems().setAll(eligibleMappingCaseDateTypes);
+		if (existing != null) { eligibleCalendarEventTypes.stream().filter(x -> x.calendarEventTypeId() == existing.calendarEventTypeId()).findFirst().ifPresent(event::setValue); eligibleMappingCaseDateTypes.stream().filter(x -> x.id() == existing.caseDateTypeId()).findFirst().ifPresent(date::setValue); }
+		CheckBox dateToCalendar = new CheckBox("Case Date → Calendar"); CheckBox calendarToDate = new CheckBox("Calendar → Case Date"); CheckBox active = new CheckBox("Active");
+		dateToCalendar.setSelected(existing == null || existing.caseDateToCalendar()); calendarToDate.setSelected(existing != null && existing.calendarToCaseDate()); active.setSelected(existing == null || existing.active());
+		if (existing != null) { active.setDisable(true); active.setTooltip(new Tooltip("Use Activate/Deactivate to change lifecycle state.")); }
+		Label validation = new Label(); validation.getStyleClass().add("search-summary-text"); validation.setWrapText(true);
+		GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(new Label("Calendar Event Type"),0,0); grid.add(event,1,0); grid.add(new Label("Case Date Type"),0,1); grid.add(date,1,1); grid.add(dateToCalendar,1,2); grid.add(calendarToDate,1,3); grid.add(active,1,4); grid.add(validation,1,5); dialog.getDialogPane().setContent(grid);
+		Node save = dialog.getDialogPane().lookupButton(ButtonType.OK); ControlStyles.apply((ButtonBase) save, ControlStyles.Purpose.PRIMARY); ControlStyles.apply((ButtonBase) dialog.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
+		save.addEventFilter(ActionEvent.ACTION, e -> { String message = validateMappingInput(event.getValue(), date.getValue(), dateToCalendar.isSelected(), calendarToDate.isSelected(), active.isSelected(), existing == null ? null : existing.id()); if (message != null) { validation.setText(message); ControlStyles.setInvalid(event, event.getValue() == null); ControlStyles.setInvalid(date, date.getValue() == null); e.consume(); } });
+		dialog.setResultConverter(button -> button == ButtonType.OK ? new MappingInput(event.getValue().calendarEventTypeId(), date.getValue().id(), dateToCalendar.isSelected(), calendarToDate.isSelected(), active.isSelected()) : null);
+		return dialog.showAndWait();
+	}
+
+	private String validateMappingInput(CalendarEventType event, EffectiveCaseDateTypeDto date, boolean a, boolean b, boolean active, Long excludedId) {
+		if (event == null || date == null) return "Select both a Calendar Event Type and a Case Date Type.";
+		if (!a && !b) return "Select at least one synchronization direction.";
+		return activeMappingConflict(calendarCaseDateMappings, excludedId, event.calendarEventTypeId(), date.id(), active);
+	}
+
+	private void createCalendarCaseDateMapping(MappingInput input) { mutateCalendarCaseDateMapping(() -> calendarCaseDateMappingService.createMapping(new CreateCalendarCaseDateTypeMappingCommand(input.eventTypeId(), input.dateTypeId(), input.dateToCalendar(), input.calendarToDate(), input.active())), "Mapping created."); }
+	private void updateCalendarCaseDateMapping(CalendarCaseDateTypeMapping row, MappingInput input) { mutateCalendarCaseDateMapping(() -> calendarCaseDateMappingService.updateMapping(new UpdateCalendarCaseDateTypeMappingCommand(row.id(), input.eventTypeId(), input.dateTypeId(), input.dateToCalendar(), input.calendarToDate(), row.rowVer())), "Mapping updated."); }
+	private void toggleCalendarCaseDateMapping() {
+		if (!canMutateCalendarCaseDateMapping()) return; CalendarCaseDateTypeMapping row = selectedCalendarCaseDateMapping; if (row == null) { setCalendarCaseDateMappingMessage("Select a mapping first."); return; }
+		if (!row.active()) { String conflict = activeMappingConflict(calendarCaseDateMappings, row.id(), row.calendarEventTypeId(), row.caseDateTypeId(), true); if (conflict != null) { setCalendarCaseDateMappingMessage(conflict); return; } }
+		mutateCalendarCaseDateMapping(() -> calendarCaseDateMappingService.setMappingActive(new SetCalendarCaseDateTypeMappingActiveCommand(row.id(), !row.active(), row.rowVer())), row.active() ? "Mapping deactivated." : "Mapping activated.");
+	}
+	private void deleteCalendarCaseDateMapping() {
+		if (!canMutateCalendarCaseDateMapping()) return; CalendarCaseDateTypeMapping row = selectedCalendarCaseDateMapping; if (row == null) { setCalendarCaseDateMappingMessage("Select a mapping first."); return; }
+		if (!AppDialogs.showConfirmation(calendarCaseDateMappingCardsContainer.getScene() == null ? null : calendarCaseDateMappingCardsContainer.getScene().getWindow(), "Delete Mapping", "Delete this mapping?", "This removes the configuration permanently.", "Delete", AppDialogs.DialogActionKind.DANGER)) return;
+		mutateCalendarCaseDateMapping(() -> { calendarCaseDateMappingService.deleteMapping(new DeleteCalendarCaseDateTypeMappingCommand(row.id(), row.rowVer())); return null; }, "Mapping deleted.");
+	}
+
+	private void mutateCalendarCaseDateMapping(java.util.concurrent.Callable<CalendarCaseDateTypeMapping> mutation, String success) {
+		if (calendarCaseDateMappingMutationRunning) return; calendarCaseDateMappingMutationRunning = true; updateCalendarCaseDateMappingActions(); setCalendarCaseDateMappingMessage("Saving…");
+		settingsLoadExecutor.submit(() -> { try { CalendarCaseDateTypeMapping saved = mutation.call(); Platform.runLater(() -> { calendarCaseDateMappingMutationRunning = false; loadCalendarCaseDateMappingsAsync(success, saved == null ? null : saved.id()); updateCalendarCaseDateMappingActions(); }); }
+			catch (Exception ex) { Platform.runLater(() -> { calendarCaseDateMappingMutationRunning = false; setCalendarCaseDateMappingMessage(mappingErrorMessage(ex)); updateCalendarCaseDateMappingActions(); }); } });
+	}
+
+	private void updateCalendarCaseDateMappingActions() { boolean enabled = selectedCalendarCaseDateMapping != null && !calendarCaseDateMappingMutationRunning; if (editCalendarCaseDateMappingButton != null) editCalendarCaseDateMappingButton.setDisable(!enabled); if (toggleCalendarCaseDateMappingButton != null) { toggleCalendarCaseDateMappingButton.setDisable(!enabled); toggleCalendarCaseDateMappingButton.setText(selectedCalendarCaseDateMapping != null && selectedCalendarCaseDateMapping.active() ? "Deactivate" : "Activate"); } if (deleteCalendarCaseDateMappingButton != null) deleteCalendarCaseDateMappingButton.setDisable(!enabled); }
+	private void setCalendarCaseDateMappingMessage(String text) { if (calendarCaseDateMappingStatusLabel != null) calendarCaseDateMappingStatusLabel.setText(text == null ? "" : text); }
+	static String mappingErrorMessage(Throwable ex) { String message = rootMessage(ex); String lower = message.toLowerCase(); if (lower.contains("changed by another") || lower.contains("rowver") || lower.contains("stale")) return "This mapping changed elsewhere. Refresh and try again."; if (lower.contains("already uses") || lower.contains("duplicate") || lower.contains("unique")) return "An active mapping already uses the selected Calendar Event Type or Case Date Type."; if (lower.contains("active calendar") || lower.contains("active case date") || lower.contains("reference")) return "The selected type is no longer active or available to this tenant."; if (lower.contains("admin") || lower.contains("authoriz") || lower.contains("permission")) return "Only administrators can manage calendar/case-date mappings."; if (lower.contains("not found") || lower.contains("inaccessible")) return "This mapping is no longer available. Refresh and try again."; return "Unable to save the mapping. " + message; }
+	private record MappingInput(int eventTypeId, int dateTypeId, boolean dateToCalendar, boolean calendarToDate, boolean active) {}
 
 
 
@@ -485,17 +880,20 @@ public final class SettingsController {
 	private void applyLinkTypeRows(int generation, List<LinkTypeViewRow> rows, String successMessage) { if (generation != linkTypeLoadGeneration) return; Integer selectedId = selectedLinkTypeRow == null ? null : selectedLinkTypeRow.id(); linkTypeRows.clear(); linkTypeRows.addAll(rows); selectedLinkTypeRow = rows.stream().filter(row -> selectedId != null && row.id() == selectedId).findFirst().orElse(null); renderLinkTypeCards(); setLinkTypeMessage(successMessage != null && !successMessage.isBlank() ? successMessage : rows.isEmpty() ? "No link types are configured for this tenant." : ""); }
 	private void renderLinkTypeCards() { if (linkTypeCardsContainer == null) return; linkTypeCardsContainer.getChildren().clear(); for (LinkTypeViewRow row : linkTypeRows) linkTypeCardsContainer.getChildren().add(buildLinkTypeCard(row)); }
 	private VBox buildLinkTypeCard(LinkTypeViewRow row) {
-		VBox card = new VBox(8); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact"); if (selectedLinkTypeRow != null && selectedLinkTypeRow.id() == row.id()) card.getStyleClass().add("link-type-card-selected"); card.setOnMouseClicked(event -> selectLinkTypeRow(row));
+		VBox card = new VBox(8); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact"); card.setUserData(row); card.setFocusTraversable(true); card.pseudoClassStateChanged(SELECTED_CARD, selectedLinkTypeRow != null && selectedLinkTypeRow.id() == row.id());
+		card.setOnMouseClicked(event -> { if (event.getButton() == MouseButton.PRIMARY && !isActionControl(event.getTarget())) selectLinkTypeRow(row); });
+		card.setOnKeyPressed(event -> { if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) { selectLinkTypeRow(row); event.consume(); } });
 		HBox header = new HBox(10); header.setAlignment(Pos.CENTER_LEFT); Circle dot = new Circle(6); String colorCss = safe(ColorUtil.toCssBackgroundColorOrNull(row.getColor())); if (!colorCss.isBlank()) dot.setStyle("-fx-background-color: " + colorCss + "; -fx-fill: " + colorCss + ";"); Label name = new Label(row.getName()); name.getStyleClass().add("app-dialog-field-label"); Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); header.getChildren().addAll(dot, name, spacer, LinkTypeIndicatorFactory.createLinkTypePill(row.getName(), row.getColor(), LinkTypeIndicatorFactory.PillSize.COMPACT));
 		HBox metadata = new HBox(6); metadata.setAlignment(Pos.CENTER_LEFT); metadata.getChildren().addAll(metadataPill(row.getActiveState()), metadataPill(row.scopeLabel())); if (!row.getSystemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.getSystemKey())); if (!row.getColor().isBlank()) metadata.getChildren().add(metadataPill(row.getColor()));
-		HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", "app-toolbar-button-neutral"); edit.setOnAction(event -> { selectLinkTypeRow(row); onEditLinkType(); event.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", "app-toolbar-button-neutral"); toggle.setOnAction(event -> { selectLinkTypeRow(row); onToggleLinkTypeActive(); event.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", row.custom() ? "app-toolbar-button-danger" : "app-toolbar-button-neutral"); reset.setDisable(row.global()); reset.setOnAction(event -> { selectLinkTypeRow(row); onResetOrRemoveLinkType(); event.consume(); }); Label help = new Label(row.lifecycleText()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit, toggle, reset, help);
+		HBox actions = new HBox(8); actions.setAlignment(Pos.CENTER_LEFT); Button edit = cardButton(row.global() ? "Customize" : "Edit", ControlStyles.Purpose.GHOST); edit.setOnAction(event -> { selectLinkTypeRow(row); onEditLinkType(); event.consume(); }); Button toggle = cardButton(row.active() ? "Deactivate" : "Activate", ControlStyles.Purpose.GHOST); toggle.setOnAction(event -> { selectLinkTypeRow(row); onToggleLinkTypeActive(); event.consume(); }); Button reset = cardButton(row.custom() ? "Remove" : "Reset to Default", ControlStyles.Purpose.SECONDARY); reset.setDisable(row.global()); reset.setOnAction(event -> { selectLinkTypeRow(row); onResetOrRemoveLinkType(); event.consume(); }); Label help = new Label(row.lifecycleText()); help.getStyleClass().add("search-summary-text"); help.setWrapText(true); actions.getChildren().addAll(edit, toggle, reset, help);
 		card.getChildren().addAll(header, metadata, actions); return card;
 	}
-	private void selectLinkTypeRow(LinkTypeViewRow row) { selectedLinkTypeRow = row; renderLinkTypeCards(); }
+	private void selectLinkTypeRow(LinkTypeViewRow row) { selectedLinkTypeRow = row; updateSelectionStyles(linkTypeCardsContainer, row.id()); }
 	private LinkTypeViewRow selectedLinkTypeRow() { if (selectedLinkTypeRow == null) setLinkTypeMessage("Select a link type first."); return selectedLinkTypeRow; }
 	private Optional<LinkTypeInput> showLinkTypeDialog(LinkTypeDto existing) {
 		Dialog<LinkTypeInput> dialog = new Dialog<>(); String dialogTitle = existing == null ? "Add Link Type" : (existing.shaleClientId() == null ? "Customize Link Type" : "Edit Link Type"); dialog.setTitle(dialogTitle); AppDialogs.applySecondaryDialogShell(dialog, dialogTitle); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		TextField name = new TextField(existing == null ? "" : existing.name()); name.setPromptText("100 characters max"); CheckBox active = new CheckBox("Active"); active.setSelected(existing == null || existing.active()); ColorPicker colorPicker = new ColorPicker(dbColorToFx(existing == null ? null : existing.color())); GridPane grid = new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(new Label("Name"),0,0); grid.add(name,1,0); grid.add(new Label("Color"),0,1); grid.add(colorPicker,1,1); grid.add(active,1,2); if (existing != null && !safe(existing.systemKey()).isBlank()) { grid.add(new Label("System Key"),0,3); grid.add(new Label(existing.systemKey()),1,3); } dialog.getDialogPane().setContent(grid);
+		styleLookupDialog(dialog, name, colorPicker, active);
 		dialog.setResultConverter(button -> { if (button != ButtonType.OK) return null; String trimmedName = trim(name.getText()); if (trimmedName.isBlank()) throw new IllegalArgumentException("Name is required."); if (trimmedName.length() > 100) throw new IllegalArgumentException("Name must be 100 characters or fewer."); String systemKey = linkTypeSystemKeyForSave(existing); if (systemKey != null && systemKey.length() > 64) throw new IllegalArgumentException("SystemKey must be 64 characters or fewer."); String color = fxColorToDb(colorPicker.getValue()); if (color.length() > 20) throw new IllegalArgumentException("Color must be 20 characters or fewer."); return new LinkTypeInput(trimmedName, color, active.isSelected(), systemKey); });
 		try { return dialog.showAndWait(); } catch (RuntimeException ex) { AppDialogs.showError(dialog.getOwner(), "Link Types", rootMessage(ex)); return Optional.empty(); }
 	}
@@ -588,10 +986,10 @@ public final class SettingsController {
 	private VBox buildPracticeAreaCard(PracticeAreaViewRow row) {
 		VBox card = new VBox(8);
 		card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact");
-		if (selectedPracticeAreaRow != null && selectedPracticeAreaRow.id() == row.id()) {
-			card.getStyleClass().add("practice-area-card-selected");
-		}
-		card.setOnMouseClicked(event -> selectPracticeAreaRow(row));
+		card.setUserData(row); card.setFocusTraversable(true);
+		card.pseudoClassStateChanged(SELECTED_CARD, selectedPracticeAreaRow != null && selectedPracticeAreaRow.id() == row.id());
+		card.setOnMouseClicked(event -> { if (event.getButton() == MouseButton.PRIMARY && !isActionControl(event.getTarget())) selectPracticeAreaRow(row); });
+		card.setOnKeyPressed(event -> { if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) { selectPracticeAreaRow(row); event.consume(); } });
 
 		HBox header = new HBox(10);
 		header.setAlignment(Pos.CENTER_LEFT);
@@ -615,9 +1013,9 @@ public final class SettingsController {
 
 		HBox actions = new HBox(8);
 		actions.setAlignment(Pos.CENTER_LEFT);
-		Button edit = cardButton("Edit", "app-toolbar-button-neutral");
+		Button edit = cardButton("Edit", ControlStyles.Purpose.GHOST);
 		edit.setOnAction(event -> { selectPracticeAreaRow(row); onEditPracticeArea(); event.consume(); });
-		Button remove = cardButton("Remove", "app-toolbar-button-danger");
+		Button remove = cardButton("Deactivate", ControlStyles.Purpose.GHOST);
 		remove.setOnAction(event -> { selectPracticeAreaRow(row); onRemovePracticeArea(); event.consume(); });
 		Label restriction = new Label(row.global() ? "Global/default practice area: editing creates or updates a tenant-scoped override when supported." : "Tenant-specific/custom practice area.");
 		restriction.getStyleClass().add("search-summary-text");
@@ -629,7 +1027,7 @@ public final class SettingsController {
 
 	private void selectPracticeAreaRow(PracticeAreaViewRow row) {
 		selectedPracticeAreaRow = row;
-		renderPracticeAreaCards();
+		updateSelectionStyles(practiceAreaCardsContainer, row.id());
 	}
 
 	private Optional<PracticeAreaInput> showPracticeAreaDialog(PracticeAreaDto existing) {
@@ -651,6 +1049,7 @@ public final class SettingsController {
 			grid.add(new Label(existing.systemKey()), 1, 3);
 		}
 		dialog.getDialogPane().setContent(grid);
+		styleLookupDialog(dialog, name, colorPicker, active);
 		dialog.setResultConverter(button -> {
 			if (button != ButtonType.OK) return null;
 			String trimmedName = name.getText() == null ? "" : name.getText().trim();
@@ -759,10 +1158,10 @@ public final class SettingsController {
 	private VBox buildCaseStatusCard(CaseStatusViewRow row, int index) {
 		VBox card = new VBox(8);
 		card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "shale-entity-card-selectable", "shale-density-compact");
-		if (selectedCaseStatusRow != null && selectedCaseStatusRow.id() == row.id()) {
-			card.getStyleClass().add("case-status-card-selected");
-		}
-		card.setOnMouseClicked(event -> selectCaseStatusRow(row));
+		card.setUserData(row); card.setFocusTraversable(true);
+		card.pseudoClassStateChanged(SELECTED_CARD, selectedCaseStatusRow != null && selectedCaseStatusRow.id() == row.id());
+		card.setOnMouseClicked(event -> { if (event.getButton() == MouseButton.PRIMARY && !isActionControl(event.getTarget())) selectCaseStatusRow(row); });
+		card.setOnKeyPressed(event -> { if (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) { selectCaseStatusRow(row); event.consume(); } });
 
 		HBox header = new HBox(10);
 		header.setAlignment(Pos.CENTER_LEFT);
@@ -784,12 +1183,12 @@ public final class SettingsController {
 
 		HBox actions = new HBox(8);
 		actions.setAlignment(Pos.CENTER_LEFT);
-		Button edit = cardButton("Edit", "app-toolbar-button-neutral");
+		Button edit = cardButton("Edit", ControlStyles.Purpose.GHOST);
 		edit.setOnAction(event -> { selectCaseStatusRow(row); onEditCaseStatus(); event.consume(); });
-		Button up = cardButton("Move Up", "app-toolbar-button-neutral");
+		Button up = cardButton("Move Up", ControlStyles.Purpose.GHOST);
 		up.setDisable(index == 0);
 		up.setOnAction(event -> { selectCaseStatusRow(row); moveSelectedStatus(-1); event.consume(); });
-		Button down = cardButton("Move Down", "app-toolbar-button-neutral");
+		Button down = cardButton("Move Down", ControlStyles.Purpose.GHOST);
 		down.setDisable(index >= caseStatusRows.size() - 1);
 		down.setOnAction(event -> { selectCaseStatusRow(row); moveSelectedStatus(1); event.consume(); });
 		Label restriction = new Label(row.global() ? "Global/default status: editing creates a tenant override; reordering requires tenant-specific status." : "Tenant-specific/custom status.");
@@ -800,21 +1199,41 @@ public final class SettingsController {
 		return card;
 	}
 
+	private void updateSelectionStyles(VBox container, int selectedId) {
+		if (container == null) return;
+		java.util.Set<Node> candidates = new java.util.LinkedHashSet<>(container.getChildren());
+		candidates.addAll(container.lookupAll(".shale-entity-card-selectable"));
+		for (Node node : candidates) {
+			Object value = node.getUserData();
+			int id = value instanceof LinkTypeViewRow row ? row.id()
+					: value instanceof PracticeAreaViewRow row ? row.id()
+					: value instanceof CaseStatusViewRow row ? row.id()
+					: value instanceof CaseDateTypeViewRow row ? row.id() : Integer.MIN_VALUE;
+			node.pseudoClassStateChanged(SELECTED_CARD, id == selectedId);
+		}
+	}
+
 	private Label metadataPill(String text) {
 		Label label = new Label(text == null || text.isBlank() ? "—" : text);
 		label.getStyleClass().addAll("shale-indicator-chip");
 		return label;
 	}
 
-	private Button cardButton(String text, String roleClass) {
-		Button button = new Button(text);
-		button.getStyleClass().addAll("app-toolbar-button", roleClass, "app-toolbar-button-compact");
-		return button;
+	private Button cardButton(String text, ControlStyles.Purpose purpose) {
+		return ActionButtonFactory.semantic(text, null, purpose, ControlStyles.Size.SMALL);
+	}
+
+	private void styleLookupDialog(Dialog<?> dialog, Control... controls) {
+		for (Control control : controls) ControlStyles.formControl(control);
+		Node ok = dialog.getDialogPane().lookupButton(ButtonType.OK);
+		Node cancel = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+		if (ok instanceof ButtonBase button) ControlStyles.apply(button, ControlStyles.Purpose.PRIMARY);
+		if (cancel instanceof ButtonBase button) ControlStyles.apply(button, ControlStyles.Purpose.SECONDARY);
 	}
 
 	private void selectCaseStatusRow(CaseStatusViewRow row) {
 		selectedCaseStatusRow = row;
-		renderCaseStatusCards();
+		updateSelectionStyles(caseStatusCardsContainer, row.id());
 	}
 
 	private void moveSelectedStatus(int delta) {
@@ -857,6 +1276,7 @@ public final class SettingsController {
 			grid.add(new Label(existing.systemKey()), 1, 4);
 		}
 		dialog.getDialogPane().setContent(grid);
+		styleLookupDialog(dialog, name, colorPicker, closed);
 		dialog.setResultConverter(button -> {
 			if (button != ButtonType.OK) return null;
 			String trimmedName = name.getText() == null ? "" : name.getText().trim();
@@ -889,6 +1309,10 @@ public final class SettingsController {
 			setPracticeAreaMessage(message);
 		} else if ("Link Types".equals(sectionName)) {
 			setLinkTypeMessage(message);
+		} else if ("Case Date Types".equals(sectionName)) {
+			setCaseDateTypeMessage(message);
+		} else if ("Calendar / Case Date Mappings".equals(sectionName)) {
+			setCalendarCaseDateMappingMessage(message);
 		}
 		return false;
 	}
@@ -929,11 +1353,10 @@ public final class SettingsController {
 
 	static String fxColorToDb(Color color) {
 		Color safeColor = color == null ? DEFAULT_STATUS_COLOR : color;
-		return String.format("0x%02X%02X%02X%02X",
+		return String.format("#%02X%02X%02X",
 				toColorByte(safeColor.getRed()),
 				toColorByte(safeColor.getGreen()),
-				toColorByte(safeColor.getBlue()),
-				toColorByte(safeColor.getOpacity()));
+				toColorByte(safeColor.getBlue()));
 	}
 
 	private static int toColorByte(double value) {
@@ -1044,6 +1467,32 @@ public final class SettingsController {
 		}
 	}
 
+	private void applyUserFilter(){
+		if(userManagementTable==null)return;String q=userSearchField==null?"":trim(userSearchField.getText()).toLowerCase(java.util.Locale.ROOT);
+		List<UserManagementViewRow> filtered=managedUserRows.stream().filter(r->q.isBlank()||r.searchText().contains(q)).toList(); userManagementTable.getItems().setAll(filtered);
+		if(filtered.isEmpty())setUserManagementMessage(managedUserRows.isEmpty()?"No users exist for this tenant.":"No users match the current search.");
+	}
+	@FXML private void onRefreshUsers(){loadManagedUsersAsync(null);}
+	@FXML private void onRemoveUserFromTenant(){
+		UserManagementViewRow selected=selectedManagedUser();if(selected==null||userMutationRunning)return;
+		String warning="They will no longer be able to sign in and will disappear from User Management and assignment lists. Historical records will be preserved.";
+		if(!AppDialogs.showConfirmation(null,"Remove from Tenant","Remove "+selected.name()+" from this tenant?",warning,"Remove from Tenant",AppDialogs.DialogActionKind.DANGER))return;
+		userMutationRunning=true;updateUserActionButtons(selected);setUserManagementMessage("Removing user from tenant…");int removedId=selected.id();int generation=++userManagementLoadGeneration;
+		settingsLoadExecutor.submit(()->{try{userDao.removeUserFromTenant(removedId,selected.rowVer());Platform.runLater(()->{if(generation!=userManagementLoadGeneration)return;userMutationRunning=false;managedUserRows.removeIf(r->r.id()==removedId);applyUserFilter();userManagementTable.getSelectionModel().clearSelection();updateUserActionButtons(null);setUserManagementMessage("User removed from tenant.");loadManagedUsersAsync("User removed from tenant.");});}catch(RuntimeException ex){Platform.runLater(()->{if(generation!=userManagementLoadGeneration)return;userMutationRunning=false;updateUserActionButtons(selected);AppDialogs.showError(null,"Remove from Tenant",rootMessage(ex));setUserManagementMessage(rootMessage(ex));});}});
+	}
+	@FXML private void onEditUser(){
+		UserManagementViewRow selected=selectedManagedUser();if(selected==null||userMutationRunning)return;
+		showEditUserDialog(selected).ifPresent(request->{userMutationRunning=true;updateUserActionButtons(selected);setUserManagementMessage("Saving changes…");settingsLoadExecutor.submit(()->{try{var result=userDao.updateManagedUser(request);Platform.runLater(()->{userMutationRunning=false;loadManagedUsersAsync(result.changed()?"User updated.":"No changes to save.");});}catch(RuntimeException ex){Platform.runLater(()->{userMutationRunning=false;updateUserActionButtons(selected);AppDialogs.showError(null,"Edit User",rootMessage(ex));setUserManagementMessage(rootMessage(ex));});}});});
+	}
+	private Optional<UserDao.UserUpdateRequest> showEditUserDialog(UserManagementViewRow row){
+		Dialog<UserDao.UserUpdateRequest> d=new Dialog<>();d.setTitle("Edit User");AppDialogs.applySecondaryDialogShell(d,"Edit User");
+		ButtonType save=new ButtonType("Save Changes",javafx.scene.control.ButtonBar.ButtonData.OK_DONE),cancel=new ButtonType("Cancel",javafx.scene.control.ButtonBar.ButtonData.CANCEL_CLOSE);d.getDialogPane().getButtonTypes().setAll(save,cancel);
+		TextField first=ControlStyles.formControl(new TextField(row.firstName())),last=ControlStyles.formControl(new TextField(row.lastName())),email=ControlStyles.formControl(new TextField(row.email())),phone=ControlStyles.formControl(new TextField(row.phone())),initials=ControlStyles.formControl(new TextField(row.initials()));ColorPicker color=ControlStyles.formControl(new ColorPicker(dbColorToFx(row.color())));CheckBox attorney=ControlStyles.formControl(new CheckBox("Attorney — eligible for attorney assignments")),admin=ControlStyles.formControl(new CheckBox("Administrator — may manage tenant settings and users"));attorney.setSelected(row.attorney());admin.setSelected(row.admin());
+		GridPane g=new GridPane();g.setHgap(12);g.setVgap(10);g.add(new Label("Identity"),0,0,2,1);g.add(new Label("First name"),0,1);g.add(first,1,1);g.add(new Label("Last name"),0,2);g.add(last,1,2);g.add(new Label("Email / login"),0,3);g.add(email,1,3);g.add(new Label("Phone"),0,4);g.add(phone,1,4);g.add(new Label("Initials"),0,5);g.add(initials,1,5);g.add(new Label("User color"),0,6);g.add(color,1,6);g.add(new Label("Application roles"),0,7,2,1);g.add(attorney,1,8);g.add(admin,1,9);g.add(new Label("User ID "+row.id()+" · Status "+row.getStatus()+" (managed separately)"),0,10,2,1);d.getDialogPane().setContent(g);ControlStyles.apply((ButtonBase)d.getDialogPane().lookupButton(save),ControlStyles.Purpose.PRIMARY);ControlStyles.apply((ButtonBase)d.getDialogPane().lookupButton(cancel),ControlStyles.Purpose.SECONDARY);
+		Node saveButton=d.getDialogPane().lookupButton(save);saveButton.addEventFilter(ActionEvent.ACTION,e->{boolean invalid=trim(first.getText()).isBlank()||trim(last.getText()).isBlank()||!UserDao.normalizeEmail(email.getText()).contains("@");ControlStyles.setInvalid(first,trim(first.getText()).isBlank());ControlStyles.setInvalid(last,trim(last.getText()).isBlank());ControlStyles.setInvalid(email,!UserDao.normalizeEmail(email.getText()).contains("@"));if(invalid)e.consume();});
+		d.setResultConverter(b->{if(b!=save)return null;java.util.Set<Integer> roles=new java.util.HashSet<>();if(admin.isSelected())roles.add(com.shale.core.semantics.RoleSemantics.ROLE_ADMIN);if(attorney.isSelected())roles.add(com.shale.core.semantics.RoleSemantics.ROLE_ATTORNEY);return new UserDao.UserUpdateRequest(row.id(),row.rowVer(),first.getText(),last.getText(),email.getText(),phone.getText(),initials.getText(),fxColorToDb(color.getValue()),roles);});return d.showAndWait();
+	}
+
 	@FXML
 	private void onToggleInactiveUsers() { loadManagedUsersAsync(null); }
 
@@ -1124,13 +1573,28 @@ public final class SettingsController {
 
 	private void configureUserManagementTable() {
 		if (userManagementTable == null) return;
-		userNameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
+		userNameColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue()));
+		userNameColumn.setCellFactory(column -> new TableCell<>() {
+			@Override protected void updateItem(UserManagementViewRow row, boolean empty) {
+				super.updateItem(row, empty);
+				setText(null); setGraphic(null); pseudoClassStateChanged(PseudoClass.getPseudoClass("inactive"), false);
+				if (empty || row == null) return;
+				UserCard card = userManagementCardFactory.create(
+						new UserCardModel(row.id(), row.name(), row.color(), row.initials()),
+						UserCardFactory.Variant.MINI);
+				card.setInactive(row.deleted());
+				card.setMaxWidth(Double.MAX_VALUE);
+				setGraphic(card);
+			}
+		});
 		userEmailColumn.setCellValueFactory(new PropertyValueFactory<>("email"));
 		userInitialsColumn.setCellValueFactory(new PropertyValueFactory<>("initials"));
-		userAttorneyColumn.setCellValueFactory(new PropertyValueFactory<>("attorneyState"));
-		userAdminColumn.setCellValueFactory(new PropertyValueFactory<>("adminState"));
+		userRolesColumn.setCellValueFactory(new PropertyValueFactory<>("roles"));
 		userStatusColumn.setCellValueFactory(new PropertyValueFactory<>("status"));
 		userManagementTable.getSelectionModel().selectedItemProperty().addListener((obs, oldRow, newRow) -> updateUserActionButtons(newRow));
+		if(userSearchField!=null) userSearchField.textProperty().addListener((obs,o,n)->applyUserFilter());
+		userManagementTable.setOnMouseClicked(e->{if(e.getButton()==MouseButton.PRIMARY&&e.getClickCount()==2&&selectedManagedUser()!=null)onEditUser();});
+		userManagementTable.setOnKeyPressed(e->{if(e.getCode()==KeyCode.ENTER&&userManagementTable.getSelectionModel().getSelectedItem()!=null){onEditUser();e.consume();}});
 	}
 
 	private void loadManagedUsers() {
@@ -1141,8 +1605,8 @@ public final class SettingsController {
 		if (userDao == null || userManagementTable == null || !isAdminUser()) return;
 		final int generation = ++userManagementLoadGeneration;
 		boolean includeInactive = showInactiveUsersCheck != null && showInactiveUsersCheck.isSelected();
-		userManagementTable.getItems().clear();
-		updateUserActionButtons(null);
+		int selectedId=userManagementTable.getSelectionModel().getSelectedItem()==null?0:userManagementTable.getSelectionModel().getSelectedItem().id();
+		updateUserActionButtons(userManagementTable.getSelectionModel().getSelectedItem());
 		setUserManagementMessage("Loading users…");
 		settingsLoadExecutor.submit(() -> {
 			try {
@@ -1150,7 +1614,8 @@ public final class SettingsController {
 				for (UserDao.UserManagementRow row : userDao.listUsersForManagement(includeInactive)) rows.add(new UserManagementViewRow(row));
 				Platform.runLater(() -> {
 					if (generation != userManagementLoadGeneration) return;
-					userManagementTable.getItems().setAll(rows);
+					managedUserRows.clear(); managedUserRows.addAll(rows); applyUserFilter();
+					if(selectedId>0) managedUserRows.stream().filter(r->r.id()==selectedId).findFirst().ifPresent(userManagementTable.getSelectionModel()::select);
 					updateUserActionButtons(userManagementTable.getSelectionModel().getSelectedItem());
 					setUserManagementMessage(successMessage != null && !successMessage.isBlank() ? successMessage : rows.isEmpty() ? "No users found for this tenant." : "");
 				});
@@ -1173,10 +1638,15 @@ public final class SettingsController {
 	}
 
 	private void updateUserActionButtons(UserManagementViewRow selected) {
-		boolean has = selected != null;
-		if (deactivateUserButton != null) deactivateUserButton.setDisable(!has || selected.deleted());
+		boolean has = selected != null && !selected.removed() && !userMutationRunning;
+		boolean self = has && appState != null && appState.getUserId() != null && selected.id() == appState.getUserId();
+		if(editUserButton!=null)editUserButton.setDisable(!has);
+		if (deactivateUserButton != null) deactivateUserButton.setDisable(!has || selected.deleted() || self);
 		if (reactivateUserButton != null) reactivateUserButton.setDisable(!has || !selected.deleted());
 		if (resetPasswordButton != null) resetPasswordButton.setDisable(!has || selected.deleted());
+		if (removeUserButton != null) removeUserButton.setDisable(!has || self);
+		if (addUserButton != null) addUserButton.setDisable(userMutationRunning);
+		if (refreshUsersButton != null) refreshUsersButton.setDisable(userMutationRunning);
 	}
 
 	private void setUserManagementMessage(String message) { if (userManagementStatusLabel != null) userManagementStatusLabel.setText(message == null ? "" : message); }
@@ -1213,9 +1683,30 @@ public final class SettingsController {
 	public enum RequestLookupKind { MATERIAL_TYPE, REQUEST_METHOD, REQUEST_STATUS }
 
 	private RequestLookupSelection selectedRequestLookup(RequestLookupKind kind) { return switch (kind) { case MATERIAL_TYPE -> selectedMaterialTypeRow; case REQUEST_METHOD -> selectedRequestMethodRow; case REQUEST_STATUS -> selectedRequestStatusRow; }; }
-	private void selectRequestLookup(RequestLookupKind kind, RequestLookupSelection row) { switch (kind) { case MATERIAL_TYPE -> selectedMaterialTypeRow = row; case REQUEST_METHOD -> selectedRequestMethodRow = row; case REQUEST_STATUS -> selectedRequestStatusRow = row; } renderRequestLookupCards(kind); }
-
-	private void renderRequestLookupCards(RequestLookupKind kind) { loadRequestLookupsAsync(); }
+	private void selectRequestLookup(RequestLookupKind kind, RequestLookupSelection row) {
+		switch (kind) { case MATERIAL_TYPE -> selectedMaterialTypeRow = row; case REQUEST_METHOD -> selectedRequestMethodRow = row; case REQUEST_STATUS -> selectedRequestStatusRow = row; }
+		updateRequestLookupSelectionStyles(kind);
+	}
+	private boolean isSelectedRequestLookup(RequestLookupKind kind, RequestLookupSelection row) {
+		RequestLookupSelection selected = selectedRequestLookup(kind);
+		return selected != null && selected.id() == row.id();
+	}
+	private void updateRequestLookupSelectionStyles(RequestLookupKind kind) {
+		VBox container = switch (kind) { case MATERIAL_TYPE -> materialTypeCardsContainer; case REQUEST_METHOD -> requestMethodCardsContainer; case REQUEST_STATUS -> requestStatusCardsContainer; };
+		if (container == null) return;
+		for (Node node : container.getChildren()) {
+			if (node.getUserData() instanceof RequestLookupSelection row) node.pseudoClassStateChanged(SELECTED_CARD, isSelectedRequestLookup(kind, row));
+		}
+	}
+	private static boolean isActionControl(Object target) {
+		Node node = target instanceof Node n ? n : null;
+		while (node != null) {
+			if (node instanceof ButtonBase) return true;
+			Parent parent = node.getParent();
+			node = parent;
+		}
+		return false;
+	}
 	private void onAddMaterialType(){ addRequestLookup(RequestLookupKind.MATERIAL_TYPE); } private void onEditMaterialType(){ editRequestLookup(RequestLookupKind.MATERIAL_TYPE); } private void onToggleMaterialTypeActive(){ toggleRequestLookup(RequestLookupKind.MATERIAL_TYPE); } private void onResetOrRemoveMaterialType(){ resetRequestLookup(RequestLookupKind.MATERIAL_TYPE); }
 	private void onAddRequestMethod(){ addRequestLookup(RequestLookupKind.REQUEST_METHOD); } private void onEditRequestMethod(){ editRequestLookup(RequestLookupKind.REQUEST_METHOD); } private void onToggleRequestMethodActive(){ toggleRequestLookup(RequestLookupKind.REQUEST_METHOD); } private void onResetOrRemoveRequestMethod(){ resetRequestLookup(RequestLookupKind.REQUEST_METHOD); }
 	private void onAddRequestStatus(){ addRequestLookup(RequestLookupKind.REQUEST_STATUS); } private void onEditRequestStatus(){ editRequestLookup(RequestLookupKind.REQUEST_STATUS); } private void onToggleRequestStatusActive(){ toggleRequestLookup(RequestLookupKind.REQUEST_STATUS); } private void onResetOrRemoveRequestStatus(){ resetRequestLookup(RequestLookupKind.REQUEST_STATUS); }
@@ -1223,7 +1714,7 @@ public final class SettingsController {
 	private void editRequestLookup(RequestLookupKind kind){ RequestLookupSelection row=selectedRequestLookup(kind); if(row==null){message(kind,"Select a "+label(kind).toLowerCase(java.util.Locale.ROOT)+" first.");return;} if(mutationRunning(kind))return; showRequestLookupDialog(kind,row).ifPresent(input -> mutateRequestLookup(kind, () -> { switch(kind){ case MATERIAL_TYPE -> materialRequestService.updateMaterialType(new MaterialRequestServicePort.MaterialTypeCommand(row.id(),requireTenantId(),requireActorUserId(),input.name(),input.description(),input.color(),input.active(),row.systemKey().isBlank()?input.systemKey():row.systemKey(),input.sortOrder(),row.rowVer())); case REQUEST_METHOD -> materialRequestService.updateRequestMethod(new MaterialRequestServicePort.RequestMethodCommand(row.id(),requireTenantId(),requireActorUserId(),input.name(),input.color(),input.active(),row.systemKey().isBlank()?input.systemKey():row.systemKey(),row.sortOrder(),row.rowVer())); case REQUEST_STATUS -> materialRequestService.updateRequestStatus(new MaterialRequestServicePort.RequestStatusCommand(row.id(),requireTenantId(),requireActorUserId(),input.name(),input.color(),input.active(),row.systemKey().isBlank()?input.systemKey():row.systemKey(),input.sortOrder(),row.rowVer())); } }, row.global()?"Tenant override saved.":label(kind)+" updated.")); }
 	private void toggleRequestLookup(RequestLookupKind kind){ RequestLookupSelection row=selectedRequestLookup(kind); if(row==null){message(kind,"Select a "+label(kind).toLowerCase(java.util.Locale.ROOT)+" first.");return;} mutateRequestLookup(kind, () -> { var c=new MaterialRequestServicePort.SetLookupActiveCommand(requireTenantId(),requireActorUserId(),row.id(),!row.active(),row.rowVer()); switch(kind){ case MATERIAL_TYPE -> materialRequestService.setMaterialTypeActive(c); case REQUEST_METHOD -> materialRequestService.setRequestMethodActive(c); case REQUEST_STATUS -> materialRequestService.setRequestStatusActive(c); } }, row.active()?label(kind)+" deactivated for future selections.":label(kind)+" activated."); }
 	private void resetRequestLookup(RequestLookupKind kind){ RequestLookupSelection row=selectedRequestLookup(kind); if(row==null){message(kind,"Select a "+label(kind).toLowerCase(java.util.Locale.ROOT)+" first.");return;} String action=row.custom()?"Remove":"Reset to Default"; if(row.global()){message(kind,"Global defaults do not need reset.");return;} if(!AppDialogs.showConfirmation(null,label(kind),action+" "+row.name()+"?","Existing records retain their stored lookup relationship.",action,row.custom()?AppDialogs.DialogActionKind.DANGER:AppDialogs.DialogActionKind.PRIMARY))return; mutateRequestLookup(kind, () -> { var c=new MaterialRequestServicePort.ResetLookupOverrideCommand(requireTenantId(),requireActorUserId(),row.id()); switch(kind){ case MATERIAL_TYPE -> materialRequestService.resetMaterialTypeOverride(c); case REQUEST_METHOD -> materialRequestService.resetRequestMethodOverride(c); case REQUEST_STATUS -> materialRequestService.resetRequestStatusOverride(c); } }, row.custom()?label(kind)+" removed from future selections.":"Tenant override reset to global default."); }
-	private Optional<RequestLookupInput> showRequestLookupDialog(RequestLookupKind kind, RequestLookupSelection existing){ Dialog<RequestLookupInput> d=new Dialog<>(); String title=(existing==null?"Add ":existing.global()?"Customize ":"Edit ")+label(kind); d.setTitle(title); AppDialogs.applySecondaryDialogShell(d,title); d.getDialogPane().getButtonTypes().setAll(ButtonType.OK,ButtonType.CANCEL); TextField name=new TextField(existing==null?"":existing.name()); TextField description=new TextField(existing==null?"":existing.description()); TextField sort=new TextField(existing==null?"0":String.valueOf(existing.sortOrder())); CheckBox active=new CheckBox("Active"); active.setSelected(existing==null||existing.active()); ColorPicker colorPicker=new ColorPicker(dbColorToFx(existing==null?null:existing.color())); colorPicker.setMaxWidth(Double.MAX_VALUE); GridPane grid=new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(new Label("Name"),0,0);grid.add(name,1,0); int r=1; if(kind==RequestLookupKind.MATERIAL_TYPE){grid.add(new Label("Description"),0,r);grid.add(description,1,r++);} grid.add(new Label("Color"),0,r);grid.add(colorPicker,1,r++); if(kind!=RequestLookupKind.REQUEST_METHOD){grid.add(new Label("Sort Order"),0,r);grid.add(sort,1,r++);} grid.add(active,1,r++); if(existing!=null&&!existing.systemKey().isBlank()){grid.add(new Label("System Key"),0,r);grid.add(new Label(existing.systemKey()),1,r);} d.getDialogPane().setContent(grid); d.setResultConverter(b->{if(b!=ButtonType.OK)return null; String nm=trim(name.getText()); if(nm.isBlank())throw new IllegalArgumentException("Name is required."); int sortOrder=existing==null?0:existing.sortOrder(); if(kind!=RequestLookupKind.REQUEST_METHOD){try{sortOrder=Integer.parseInt(trim(sort.getText()).isBlank()?"0":trim(sort.getText()));}catch(NumberFormatException ex){throw new IllegalArgumentException("Sort Order must be a number.");}} return new RequestLookupInput(nm, kind==RequestLookupKind.MATERIAL_TYPE?trim(description.getText()):null, fxColorToDb(colorPicker.getValue()), active.isSelected(), existing==null?null:existing.systemKey(), sortOrder);}); try{return d.showAndWait();}catch(RuntimeException ex){AppDialogs.showError(null,label(kind),rootMessage(ex));return Optional.empty();}}
+	private Optional<RequestLookupInput> showRequestLookupDialog(RequestLookupKind kind, RequestLookupSelection existing){ Dialog<RequestLookupInput> d=new Dialog<>(); String title=(existing==null?"Add ":existing.global()?"Customize ":"Edit ")+label(kind); d.setTitle(title); AppDialogs.applySecondaryDialogShell(d,title); d.getDialogPane().getButtonTypes().setAll(ButtonType.OK,ButtonType.CANCEL); TextField name=new TextField(existing==null?"":existing.name()); TextField description=new TextField(existing==null?"":existing.description()); TextField sort=new TextField(existing==null?"0":String.valueOf(existing.sortOrder())); CheckBox active=new CheckBox("Active"); active.setSelected(existing==null||existing.active()); ColorPicker colorPicker=new ColorPicker(dbColorToFx(existing==null?null:existing.color())); colorPicker.setMaxWidth(Double.MAX_VALUE); GridPane grid=new GridPane(); grid.setHgap(8); grid.setVgap(8); grid.add(new Label("Name"),0,0);grid.add(name,1,0); int r=1; if(kind==RequestLookupKind.MATERIAL_TYPE){grid.add(new Label("Description"),0,r);grid.add(description,1,r++);} grid.add(new Label("Color"),0,r);grid.add(colorPicker,1,r++); if(kind!=RequestLookupKind.REQUEST_METHOD){grid.add(new Label("Sort Order"),0,r);grid.add(sort,1,r++);} grid.add(active,1,r++); if(existing!=null&&!existing.systemKey().isBlank()){grid.add(new Label("System Key"),0,r);grid.add(new Label(existing.systemKey()),1,r);} d.getDialogPane().setContent(grid); styleLookupDialog(d,name,description,sort,colorPicker,active); d.setResultConverter(b->{if(b!=ButtonType.OK)return null; String nm=trim(name.getText()); if(nm.isBlank())throw new IllegalArgumentException("Name is required."); int sortOrder=existing==null?0:existing.sortOrder(); if(kind!=RequestLookupKind.REQUEST_METHOD){try{sortOrder=Integer.parseInt(trim(sort.getText()).isBlank()?"0":trim(sort.getText()));}catch(NumberFormatException ex){throw new IllegalArgumentException("Sort Order must be a number.");}} return new RequestLookupInput(nm, kind==RequestLookupKind.MATERIAL_TYPE?trim(description.getText()):null, fxColorToDb(colorPicker.getValue()), active.isSelected(), existing==null?null:existing.systemKey(), sortOrder);}); try{return d.showAndWait();}catch(RuntimeException ex){AppDialogs.showError(null,label(kind),rootMessage(ex));return Optional.empty();}}
 	private void mutateRequestLookup(RequestLookupKind kind,Runnable work,String success){ if(mutationRunning(kind))return; setMutationRunning(kind,true); message(kind,"Saving…"); settingsLoadExecutor.submit(()->{try{work.run(); Platform.runLater(()->{setMutationRunning(kind,false);message(kind,success);loadRequestLookupsAsync();});}catch(RuntimeException ex){Platform.runLater(()->{setMutationRunning(kind,false);AppDialogs.showError(null,label(kind),rootMessage(ex));message(kind,rootMessage(ex));});}});}
 	private boolean mutationRunning(RequestLookupKind kind){return switch(kind){case MATERIAL_TYPE->materialTypeMutationRunning;case REQUEST_METHOD->requestMethodMutationRunning;case REQUEST_STATUS->requestStatusMutationRunning;};}
 	private void setMutationRunning(RequestLookupKind kind,boolean v){switch(kind){case MATERIAL_TYPE->materialTypeMutationRunning=v;case REQUEST_METHOD->requestMethodMutationRunning=v;case REQUEST_STATUS->requestStatusMutationRunning=v;}}
@@ -1255,18 +1746,11 @@ public final class SettingsController {
 	}
 
 	public static final class UserManagementViewRow {
-		private final UserDao.UserManagementRow row;
-		UserManagementViewRow(UserDao.UserManagementRow row) { this.row = row; }
-		public int getId() { return row.id(); }
-		public int id() { return row.id(); }
-		public String getName() { return safe(row.name()); }
-		public String name() { return getName(); }
-		public String getEmail() { return safe(row.email()); }
-		public String getInitials() { return safe(row.initials()); }
-		public String getAttorneyState() { return row.attorney() ? "Yes" : "No"; }
-		public String getAdminState() { return row.admin() ? "Yes" : "No"; }
-		public String getStatus() { return row.deleted() ? "Inactive" : "Active"; }
-		public boolean deleted() { return row.deleted(); }
+		private final UserDao.UserManagementRow row; UserManagementViewRow(UserDao.UserManagementRow row){this.row=row;}
+		public int getId(){return row.id();} public int id(){return row.id();} public String getName(){return safe(row.name())+"  (#"+row.id()+")";} public String name(){return safe(row.name());}
+		public String getEmail(){return safe(row.email());} public String email(){return getEmail();} public String firstName(){return safe(row.firstName());} public String lastName(){return safe(row.lastName());} public String phone(){return safe(row.phone());} public String initials(){return safe(row.initials());} public String color(){return safe(row.color());}
+		public String getInitials(){return initials();} public String getRoles(){return (row.admin()?"Administrator":"")+(row.admin()&&row.attorney()?", ":"")+(row.attorney()?"Attorney":"");} public String getStatus(){return row.deleted()?"Inactive":"Active";} public boolean deleted(){return row.deleted();} public boolean removed(){return row.removed();} public boolean admin(){return row.admin();} public boolean attorney(){return row.attorney();} public byte[] rowVer(){return row.rowVer()==null?null:row.rowVer().clone();}
+		String searchText(){return (name()+" "+email()+" "+initials()+" "+getRoles()+" "+id()).toLowerCase(java.util.Locale.ROOT);}
 	}
 
 	public static final class PracticeAreaViewRow {
@@ -1370,6 +1854,10 @@ public final class SettingsController {
 		if (requestAdministrationSection != null) {
 			requestAdministrationSection.setVisible(visible);
 			requestAdministrationSection.setManaged(visible);
+		}
+		if (calendarCaseDateMappingAdministrationSection != null) {
+			calendarCaseDateMappingAdministrationSection.setVisible(visible);
+			calendarCaseDateMappingAdministrationSection.setManaged(visible);
 		}
 		if (userAdministrationSection != null) {
 			userAdministrationSection.setVisible(visible);

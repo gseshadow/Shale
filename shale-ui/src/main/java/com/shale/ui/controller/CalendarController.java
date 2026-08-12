@@ -8,7 +8,7 @@ import com.shale.core.model.CalendarFeedItem;
 import com.shale.core.model.CalendarFeedSourceFilter;
 import com.shale.core.model.CalendarOverlaySelection;
 import com.shale.data.dao.CalendarFeedDao;
-import com.shale.data.dao.CaseDao;
+import com.shale.data.dao.CaseSummaryDao;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
@@ -16,8 +16,11 @@ import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.services.CalendarService;
 import com.shale.ui.services.CaseTaskService;
+import com.shale.ui.services.LiveUpdateEvents;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ColorUtil;
+import com.shale.ui.util.ControlStyles;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -40,6 +43,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import com.shale.ui.util.PerfLog;
 import org.slf4j.Logger;
@@ -62,7 +66,14 @@ public final class CalendarController {
     private static final CalendarCaseFilterOptions.CaseOption ALL_CASES_OPTION = CalendarCaseFilterOptions.ALL_CASES;
     private static final EventTypeFilterOption ALL_TYPES_OPTION = new EventTypeFilterOption("", "All types");
 
-    @FXML private ChoiceBox<String> viewModeChoice;
+    @FXML private ToggleButton weekViewButton;
+    @FXML private ToggleButton fiveDayViewButton;
+    @FXML private ToggleButton dayViewButton;
+    @FXML private ToggleButton monthViewButton;
+    @FXML private Button todayButton;
+    @FXML private Button prevWeekButton;
+    @FXML private Button nextWeekButton;
+    @FXML private Button newEventButton;
     @FXML private Label weekRangeLabel;
     @FXML private Label calendarLoadingLabel;
     @FXML private Label calendarErrorLabel;
@@ -86,7 +97,11 @@ public final class CalendarController {
     private Consumer<Integer> onOpenCase;
     private Consumer<Long> onOpenTask;
     private CaseTaskService caseTaskService;
-    private CaseDao caseDao;
+    private CaseSummaryDao caseSummaryDao;
+    private UiRuntimeBridge runtimeBridge;
+    private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
+    private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
+    private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> entityUpdatedHandler = this::handleEntityUpdated;
     private int loadGeneration;
     private LocalDate selectedDate;
     private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(300));
@@ -112,27 +127,94 @@ public final class CalendarController {
     private TaskCardFactory taskCardFactory = new TaskCardFactory(id -> {}, id -> {}, id -> {}, id -> {});
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "calendar-feed-loader"); t.setDaemon(true); return t; });
 
-    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseDao caseDao, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
+    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseSummaryDao caseSummaryDao, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
         this.appState = appState; this.calendarService = calendarService; this.calendarFeedDao = calendarFeedDao;
         this.caseTaskService = caseTaskService;
-        this.caseDao = caseDao;
+        this.caseSummaryDao = caseSummaryDao;
+        this.runtimeBridge = runtimeBridge;
         this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase; this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
         resetCalendarOverlayDefaults();
         configureCalendarOverlayControls();
         this.caseCardFactory = new CaseCardFactory(this.onOpenCase);
         this.taskCardFactory = new TaskCardFactory(this.onOpenTask, id -> {}, this.onOpenCase, id -> {});
+        if (runtimeBridge != null) runtimeBridge.subscribeEntityUpdated(entityUpdatedHandler);
+    }
+
+    private void handleEntityUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
+        if (event == null || !LiveUpdateEvents.ENTITY_CASE_DATES.equals(event.entityType()) || appState == null) return;
+        Integer tenantId = appState.getShaleClientId();
+        if (tenantId == null || tenantId <= 0 || event.shaleClientId() != tenantId || event.entityId() <= 0) return;
+        String localInstance = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
+        if (localInstance != null && !localInstance.isBlank() && localInstance.equals(event.clientInstanceId())) return;
+        if (!rememberCaseDatesEvent(event.eventId()) || !caseDatesRefreshQueued.compareAndSet(false, true)) return;
+        Platform.runLater(() -> {
+            caseDatesRefreshQueued.set(false);
+            loadCurrentRange(false); // load generation discards any older in-flight response
+        });
+    }
+
+    private boolean rememberCaseDatesEvent(String eventId) {
+        if (eventId == null || eventId.isBlank()) return true;
+        synchronized (seenCaseDatesEventIds) {
+            if (!seenCaseDatesEventIds.add(eventId)) return false;
+            while (seenCaseDatesEventIds.size() > 256) seenCaseDatesEventIds.remove(seenCaseDatesEventIds.iterator().next());
+            return true;
+        }
     }
 
     @FXML private void initialize() {
-        viewModeChoice.getItems().setAll(VIEW_WEEK, VIEW_FIVE_DAY, VIEW_DAY, VIEW_MONTH);
-        viewModeChoice.setValue(VIEW_WEEK);
+        configureSemanticControls();
+        configureViewModeSelector();
         selectedDate = LocalDate.now();
-        viewModeChoice.valueProperty().addListener((obs, o, n) -> { if (!Objects.equals(o, n)) loadCurrentRange(false); });
         configureFilters();
         configureSourceLayerFilters();
         configureCalendarOverlayControls();
         renderCurrentShell();
         Platform.runLater(() -> loadCurrentRange(false));
+    }
+
+    private void configureSemanticControls() {
+        ControlStyles.apply(todayButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+        ControlStyles.apply(prevWeekButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
+        ControlStyles.iconOnly(prevWeekButton);
+        prevWeekButton.setAccessibleText("Previous calendar period");
+        Tooltip.install(prevWeekButton, new Tooltip("Previous period"));
+        ControlStyles.apply(nextWeekButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
+        ControlStyles.iconOnly(nextWeekButton);
+        nextWeekButton.setAccessibleText("Next calendar period");
+        Tooltip.install(nextWeekButton, new Tooltip("Next period"));
+        ControlStyles.apply(newEventButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+        ControlStyles.apply(selectAllCalendarsButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.apply(clearAllCalendarsButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.apply(resetCalendarsButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.apply(clearFiltersButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.formControl(searchTextField);
+        ControlStyles.formControl(caseFilterCombo);
+        ControlStyles.formControl(eventTypeFilterCombo);
+    }
+
+    private void configureViewModeSelector() {
+        ToggleGroup group = new ToggleGroup();
+        List.of(weekViewButton, fiveDayViewButton, dayViewButton, monthViewButton).forEach(button -> button.setToggleGroup(group));
+        weekViewButton.setUserData(VIEW_WEEK);
+        fiveDayViewButton.setUserData(VIEW_FIVE_DAY);
+        dayViewButton.setUserData(VIEW_DAY);
+        monthViewButton.setUserData(VIEW_MONTH);
+        weekViewButton.setSelected(true);
+        group.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
+            if (newToggle == null) {
+                if (oldToggle != null) oldToggle.setSelected(true);
+                return;
+            }
+            if (oldToggle != null && oldToggle != newToggle) loadCurrentRange(false);
+        });
+    }
+
+    private String selectedViewMode() {
+        for (ToggleButton button : List.of(weekViewButton, fiveDayViewButton, dayViewButton, monthViewButton)) {
+            if (button != null && button.isSelected()) return String.valueOf(button.getUserData());
+        }
+        return VIEW_WEEK;
     }
     private void configureFilters() {
         caseFilterCombo.setButtonCell(new ListCell<>() { @Override protected void updateItem(CalendarCaseFilterOptions.CaseOption item, boolean empty) { super.updateItem(item, empty); setText(empty || item == null ? "All cases" : item.displayName()); }});
@@ -351,7 +433,7 @@ public final class CalendarController {
                 calendarService.createEvent(new com.shale.core.model.CalendarEvent(null, tenantId, input.calendarEventTypeId(), input.caseId(), null, input.title(), input.description(), startsAt, endsAt, input.allDay(), "MANUAL", null, null, input.assignedToUserId(), false, false, appState == null ? null : appState.getUserId(), null, null));
                 showError(null); loadCurrentRange(false); return null;
             } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; }
-        }, () -> caseOptionsForPicker(null), () -> assignedUserOptionsForPicker(tenantId, null));
+        }, () -> caseOptionsForPicker(null), () -> assignedUserOptionsForPicker(tenantId, null), dbExec);
         PerfLog.logDone("DIALOG", "calendar new-event shell shown", dialogStart);
         dbExec.submit(() -> {
             long loadStart = PerfLog.start();
@@ -443,7 +525,7 @@ public final class CalendarController {
             renderEmptyCalendarState("No calendar layers selected.");
             return;
         }
-        switch (safe(viewModeChoice.getValue())) {
+        switch (selectedViewMode()) {
             case VIEW_DAY -> renderDay(items);
             case VIEW_MONTH -> renderMonth(items);
             case VIEW_FIVE_DAY -> renderWeekLike(items, true);
@@ -561,11 +643,9 @@ public final class CalendarController {
     void openDayView(LocalDate date) {
         if (date == null) return;
         selectedDate = date;
-        boolean alreadyDay = viewModeChoice != null && VIEW_DAY.equals(viewModeChoice.getValue());
-        if (viewModeChoice != null) {
-            viewModeChoice.setValue(VIEW_DAY);
-        }
-        if (alreadyDay || viewModeChoice == null) {
+        boolean alreadyDay = VIEW_DAY.equals(selectedViewMode());
+        if (dayViewButton != null) dayViewButton.setSelected(true);
+        if (alreadyDay || dayViewButton == null) {
             loadCurrentRange(false);
         }
     }
@@ -583,6 +663,7 @@ public final class CalendarController {
 
     private Button createMonthDayButton(LocalDate day) {
         Button dayButton = new Button(String.valueOf(day.getDayOfMonth()));
+        ControlStyles.apply(dayButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
         dayButton.getStyleClass().add("calendar-month-day-link");
         dayButton.setMaxWidth(Region.USE_PREF_SIZE);
         dayButton.setCursor(Cursor.HAND);
@@ -600,6 +681,7 @@ public final class CalendarController {
 
     private Button createMonthMoreButton(LocalDate day, int hiddenCount) {
         Button moreButton = new Button("+" + hiddenCount + " more");
+        ControlStyles.apply(moreButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
         moreButton.getStyleClass().add("calendar-month-more-link");
         moreButton.setMaxWidth(Region.USE_PREF_SIZE);
         moreButton.setCursor(Cursor.HAND);
@@ -625,6 +707,9 @@ public final class CalendarController {
         Label label = new Label("All day");
         label.getStyleClass().add("calendar-all-day-label");
         Button toggle = new Button(allDayCollapsed ? "▾" : "▸");
+        ControlStyles.apply(toggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.iconOnly(toggle);
+        toggle.setAccessibleText(allDayCollapsed ? "Expand all-day events" : "Collapse all-day events");
         toggle.getStyleClass().add("calendar-disclosure-toggle");
         toggle.setOnAction(evt -> {
             allDayCollapsed = !allDayCollapsed;
@@ -954,6 +1039,7 @@ public final class CalendarController {
                 case CALENDAR_EVENT -> openEditEventDialog(Math.toIntExact(target.id()));
                 case TASK -> onOpenTask.accept(target.id());
                 case CASE -> onOpenCase.accept(Math.toIntExact(target.id()));
+                case CASE_DATES -> onOpenCase.accept(Math.toIntExact(target.id()));
                 case NONE -> { }
             }
             evt.consume();
@@ -982,7 +1068,7 @@ public final class CalendarController {
                     return;
                 }
                 var initial = new NewCalendarEventDialog.CreateCalendarEventInput(event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(), event.allDay() ? null : event.startsAt().toLocalTime(), resolveDurationMinutes(event), event.description(), event.caseId(), event.assignedToUserId());
-                CalendarFeedDao.CalendarCaseCardRow caseRow = loadCaseRowForEvent(event, tenantId);
+                CaseSummaryDao.CalendarCaseRow caseRow = loadCaseRowForEvent(event, tenantId);
                 CalendarFeedDao.CalendarTaskCardRow taskRow = loadTaskRowForEvent(event, tenantId);
                 var eventTypes = calendarService.listEffectiveEventTypes(tenantId);
                 PerfLog.logDone("DAO", "calendar edit-event hydrate eventId=" + eventId, loadStart);
@@ -990,7 +1076,8 @@ public final class CalendarController {
                     if (!dialog.isShowing()) return;
                     Node rc = caseRow == null ? null : createRelatedCaseNode(caseRow);
                     Node rt = taskRow == null ? null : createRelatedTaskNode(taskRow);
-                    dialog.populate(eventTypes, initial, input -> saveEditedEvent(event, input), () -> deleteEvent(event.calendarEventId(), tenantId), rc, rt, () -> caseOptionsForPicker(event.caseId()), () -> assignedUserOptionsForPicker(tenantId, event.assignedToUserId()), onOpenCase, caseRow == null ? null : new NewCalendarEventDialog.CaseOption(caseRow.caseId(), caseRow.caseName(), caseRow.responsibleAttorney(), caseRow.responsibleAttorneyColor(), caseRow.nonEngagementLetterSent()));
+                    var summary = caseRow == null ? null : caseRow.summary();
+                    dialog.populate(eventTypes, initial, input -> saveEditedEvent(event, input), () -> deleteEvent(event.calendarEventId(), tenantId), rc, rt, () -> caseOptionsForPicker(event.caseId()), () -> assignedUserOptionsForPicker(tenantId, event.assignedToUserId()), onOpenCase, summary == null ? null : new NewCalendarEventDialog.CaseOption(Math.toIntExact(summary.caseId()), summary.caseName(), summary.responsibleAttorneyName(), summary.responsibleAttorneyColor(), caseRow.nonEngagementLetterSent()), dbExec);
                     openingEditDialogEventIds.remove(eventId);
                 });
             } catch (RuntimeException ex) {
@@ -1008,37 +1095,23 @@ public final class CalendarController {
         }
         openEditEventDialog((int) eventId);
     }
-    private CalendarFeedDao.CalendarCaseCardRow loadCaseRowForEvent(com.shale.core.model.CalendarEvent event, int tenantId) { if (event == null || event.caseId() == null) return null; List<CalendarFeedDao.CalendarCaseCardRow> rows = calendarFeedDao.listCaseCardRows(tenantId, List.of(event.caseId())); return rows.isEmpty() ? null : rows.getFirst(); }
+    private CaseSummaryDao.CalendarCaseRow loadCaseRowForEvent(com.shale.core.model.CalendarEvent event, int tenantId) { return event == null || event.caseId() == null || caseSummaryDao == null ? null : caseSummaryDao.findActiveForCalendar(tenantId, event.caseId()); }
     private CalendarFeedDao.CalendarTaskCardRow loadTaskRowForEvent(com.shale.core.model.CalendarEvent event, int tenantId) { if (event == null || event.taskId() == null) return null; List<CalendarFeedDao.CalendarTaskCardRow> rows = calendarFeedDao.listTaskCardRows(tenantId, List.of(event.taskId())); return rows.isEmpty() ? null : rows.getFirst(); }
-    private Node createRelatedCaseNode(CalendarFeedDao.CalendarCaseCardRow row) { if (row == null) return null; return caseCardFactory.create(new CaseCardFactory.CaseCardModel(row.caseId(), row.caseName(), null, null, row.responsibleAttorney(), row.responsibleAttorneyColor(), row.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI); }
+    private Node createRelatedCaseNode(CaseSummaryDao.CalendarCaseRow row) { if (row == null) return null; var summary = row.summary(); return caseCardFactory.create(new CaseCardFactory.CaseCardModel(Math.toIntExact(summary.caseId()), summary.caseName(), null, null, summary.responsibleAttorneyName(), summary.responsibleAttorneyColor(), row.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI); }
     private Node createRelatedTaskNode(CalendarFeedDao.CalendarTaskCardRow row) { if (row == null) return null; return taskCardFactory.create(new TaskCardFactory.TaskCardModel(row.taskId(), row.caseId() == null ? null : row.caseId().longValue(), row.caseName(), null, null, null, row.caseResponsibleAttorney(), row.caseResponsibleAttorneyColor(), row.caseNonEngagementLetterSent(), row.title(), row.description(), row.createdByDisplayName(), null, null, row.priorityColorHex(), row.dueAt(), row.completedAt(), List.of()), TaskCardFactory.Variant.MINI); }
     private String saveEditedEvent(com.shale.core.model.CalendarEvent existing, NewCalendarEventDialog.CreateCalendarEventInput input) { LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime()); LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes()); try { calendarService.updateEvent(new com.shale.core.model.CalendarEvent(existing.calendarEventId(), existing.shaleClientId(), input.calendarEventTypeId(), input.caseId(), existing.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), existing.sourceType(), existing.sourceField(), existing.sourceId(), input.assignedToUserId(), existing.completed(), existing.cancelled(), appState == null ? null : appState.getUserId(), existing.createdAt(), existing.updatedAt())); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; } }
     private List<NewCalendarEventDialog.CaseOption> caseOptionsForPicker(Integer selectedCaseId) {
-        Map<Integer, CaseDao.CaseRow> casesById = new LinkedHashMap<>();
-        if (caseDao != null) {
-            int page = 1;
-            int pageSize = 250;
-            while (true) {
-                CaseDao.PagedResult<CaseDao.CaseRow> result = caseDao.findPage(page, pageSize, CaseDao.CaseSort.INTAKE_NEWEST, false);
-                if (result == null || result.items() == null || result.items().isEmpty()) break;
-                result.items().forEach(c -> casesById.putIfAbsent(Math.toIntExact(c.id()), c));
-                if (result.items().size() < pageSize) break;
-                page++;
-            }
-            if (selectedCaseId != null && selectedCaseId > 0 && !casesById.containsKey(selectedCaseId)) {
-                var row = caseDao.getCaseRow(selectedCaseId.longValue());
-                if (row != null) casesById.put(selectedCaseId, row);
-            }
-        }
-        return casesById.values().stream()
-                .map(row -> new NewCalendarEventDialog.CaseOption(
-                        Math.toIntExact(row.id()),
-                        safe(row.name()),
-                        row.responsibleAttorneyName(),
-                        row.responsibleAttorneyColor(),
-                        row.nonEngagementLetterSent()))
-                .sorted(Comparator.comparing(o -> safe(o.displayName()).toLowerCase(Locale.ROOT)))
+        if (Platform.isFxApplicationThread()) throw new IllegalStateException("Calendar case options must load off the JavaFX Application Thread");
+        long started = PerfLog.start();
+        int tenantId = appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId();
+        List<NewCalendarEventDialog.CaseOption> options = (caseSummaryDao == null ? List.<CaseSummaryDao.CalendarCaseRow>of()
+                : caseSummaryDao.listActiveForCalendar(tenantId)).stream()
+                .map(row -> new NewCalendarEventDialog.CaseOption(Math.toIntExact(row.summary().caseId()), safe(row.summary().caseName()),
+                        row.summary().responsibleAttorneyName(), row.summary().responsibleAttorneyColor(), row.nonEngagementLetterSent()))
                 .toList();
+        PerfLog.logDone("DAO", "calendar case-picker options rows=" + options.size()
+                + " dbRoundTrips=" + (caseSummaryDao == null ? 0 : 1) + " fxThread=false", started);
+        return options;
     }
     private List<NewCalendarEventDialog.AssignedUserOption> assignedUserOptionsForPicker(int tenantId, Integer selectedUserId) {
         if (caseTaskService == null) return List.of();
@@ -1058,10 +1131,10 @@ public final class CalendarController {
     private String deleteEvent(Integer calendarEventId, int tenantId) { try { calendarService.deleteCalendarEvent(calendarEventId, tenantId); showError(null); loadCurrentRange(); return null; } catch (RuntimeException ex) { return "Could not delete event. Please try again."; } }
     private static LocalDate weekStartFor(LocalDate date) { return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY)); }
     private static LocalDate workWeekStartFor(LocalDate date) { return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)); }
-    private LocalDate currentRangeStart() { return switch (safe(viewModeChoice.getValue())) { case VIEW_FIVE_DAY -> workWeekStartFor(selectedDate); case VIEW_DAY -> selectedDate; case VIEW_MONTH -> selectedDate.withDayOfMonth(1); default -> weekStartFor(selectedDate); }; }
-    private LocalDate currentRangeEndInclusive() { LocalDate start = currentRangeStart(); return switch (safe(viewModeChoice.getValue())) { case VIEW_FIVE_DAY -> start.plusDays(4); case VIEW_DAY -> start; case VIEW_MONTH -> YearMonth.from(selectedDate).atEndOfMonth(); default -> start.plusDays(6); }; }
-    private LocalDate shiftSelectedDate(int direction) { return switch (safe(viewModeChoice.getValue())) { case VIEW_FIVE_DAY -> workWeekStartFor(selectedDate).plusWeeks(direction); case VIEW_DAY -> selectedDate.plusDays(direction); case VIEW_MONTH -> selectedDate.plusMonths(direction); default -> weekStartFor(selectedDate).plusWeeks(direction); }; }
-    private String currentRangeLabel() { return switch (safe(viewModeChoice.getValue())) { case VIEW_MONTH -> MONTH_RANGE_FORMAT.format(selectedDate); case VIEW_DAY -> WEEK_RANGE_FORMAT.format(selectedDate); default -> WEEK_RANGE_FORMAT.format(currentRangeStart()) + " - " + WEEK_RANGE_FORMAT.format(currentRangeEndInclusive()); }; }
+    private LocalDate currentRangeStart() { return switch (selectedViewMode()) { case VIEW_FIVE_DAY -> workWeekStartFor(selectedDate); case VIEW_DAY -> selectedDate; case VIEW_MONTH -> selectedDate.withDayOfMonth(1); default -> weekStartFor(selectedDate); }; }
+    private LocalDate currentRangeEndInclusive() { LocalDate start = currentRangeStart(); return switch (selectedViewMode()) { case VIEW_FIVE_DAY -> start.plusDays(4); case VIEW_DAY -> start; case VIEW_MONTH -> YearMonth.from(selectedDate).atEndOfMonth(); default -> start.plusDays(6); }; }
+    private LocalDate shiftSelectedDate(int direction) { return switch (selectedViewMode()) { case VIEW_FIVE_DAY -> workWeekStartFor(selectedDate).plusWeeks(direction); case VIEW_DAY -> selectedDate.plusDays(direction); case VIEW_MONTH -> selectedDate.plusMonths(direction); default -> weekStartFor(selectedDate).plusWeeks(direction); }; }
+    private String currentRangeLabel() { return switch (selectedViewMode()) { case VIEW_MONTH -> MONTH_RANGE_FORMAT.format(selectedDate); case VIEW_DAY -> WEEK_RANGE_FORMAT.format(selectedDate); default -> WEEK_RANGE_FORMAT.format(currentRangeStart()) + " - " + WEEK_RANGE_FORMAT.format(currentRangeEndInclusive()); }; }
     private static String safe(String value) { return value == null ? "" : value; }
     private static String formatHourLabel(int hour24) { int hour12 = hour24 % 12; if (hour12 == 0) hour12 = 12; return hour12 + (hour24 < 12 ? " AM" : " PM"); }
     private void setLoading(boolean loading) { calendarLoadingLabel.setVisible(loading); calendarLoadingLabel.setManaged(loading); }

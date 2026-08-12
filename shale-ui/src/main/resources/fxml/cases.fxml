@@ -16,39 +16,34 @@
 				<Insets top="10" right="10" bottom="10" left="10" />
 			</padding>
 			<left>
-				<HBox spacing="10" alignment="CENTER_LEFT">
+				<FlowPane hgap="10" vgap="8" alignment="CENTER_LEFT" prefWrapLength="1040">
+					<HBox spacing="0" alignment="CENTER_LEFT" styleClass="shale-segmented-control">
 					<ToggleButton fx:id="cardsViewToggle" text="Cards" selected="true" />
 					<ToggleButton fx:id="gridViewToggle" text="List" />
+					</HBox>
 					<TextField fx:id="casesSearchField"
-						promptText="Search cases…" HBox.hgrow="ALWAYS" />
+						promptText="Search cases…" prefWidth="280" />
 					<MenuButton fx:id="statusFilterMenuButton" text="Status (8/8)">
 						<styleClass>
 							<String fx:value="menu-button" />
-							<String fx:value="app-toolbar-button" />
-							<String fx:value="app-toolbar-button-neutral" />
 						</styleClass>
 					</MenuButton>
 					<ChoiceBox fx:id="casesSortChoice" prefWidth="220">
 						<styleClass>
 							<String fx:value="choice-box" />
-							<String fx:value="app-toolbar-select" />
 						</styleClass>
 					</ChoiceBox>
 					<MenuButton fx:id="columnMenuButton" text="Customize Columns">
 						<styleClass>
 							<String fx:value="menu-button" />
-							<String fx:value="app-toolbar-button" />
-							<String fx:value="app-toolbar-button-neutral" />
 						</styleClass>
 					</MenuButton>
 					<MenuButton fx:id="exportMenuButton" text="Export...">
 						<styleClass>
 							<String fx:value="menu-button" />
-							<String fx:value="app-toolbar-button" />
-							<String fx:value="app-toolbar-button-neutral" />
 						</styleClass>
 					</MenuButton>
-				</HBox>
+				</FlowPane>
 			</left>
 			<right>
 				<Label fx:id="resultsCountLabel" text="0 results" styleClass="cases-results-count" />

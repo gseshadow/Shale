@@ -292,6 +292,20 @@ export interface CaseDetail {
   rowVer: string;
   relatedContacts: CaseRelatedContact[];
   statusHistory: CaseStatusHistoryItem[];
+  mappedCaseDates: MappedCaseDateSnapshot[];
+}
+
+export interface MappedCaseDateSnapshot {
+  key: string;
+  systemKey: string;
+  occurrenceId: number | null;
+  caseDateTypeId: number | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  allDay: boolean;
+  occurrenceRowVer: string | null;
+  absent: boolean;
+  absenceCaseRowVer: string | null;
 }
 
 export interface CreateCasePayload {
@@ -299,12 +313,17 @@ export interface CreateCasePayload {
   caseNumber?: string | null;
   practiceAreaId: number;
   responsibleAttorneyUserId: number;
-  callerDate?: string | null;
-  dateOfInjury?: string | null;
-  statuteOfLimitations?: string | null;
-  tortNoticeDeadline?: string | null;
+  caseDates: CreateMappedCaseDateInput[];
   summary?: string | null;
   description?: string | null;
+}
+
+export interface CreateMappedCaseDateInput {
+  systemKey: 'intake' | 'date_of_injury' | 'statute_of_limitations' | 'tort_notice_deadline';
+  caseDateTypeId?: number | null;
+  startsAt: string;
+  endsAt?: string | null;
+  allDay: boolean;
 }
 
 export class ApiError extends Error {
@@ -438,11 +457,9 @@ export async function updateCaseAssignment(accessToken: string, caseId: number, 
 export interface UpdateCaseCoreDetailsPayload {
   caseName: string;
   description: string;
-  dateOfInjury?: string | null;
-  statuteOfLimitations?: string | null;
-  tortNoticeDeadline?: string | null;
   summary: string;
   expectedRowVer: string;
+  mappedCaseDates: MappedCaseDateSnapshot[];
 }
 
 export async function updateCaseCoreDetails(accessToken: string, caseId: number, payload: UpdateCaseCoreDetailsPayload): Promise<CaseDetail> {

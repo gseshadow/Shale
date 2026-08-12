@@ -11,8 +11,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class CalendarOverlaySelectionTest {
     @Test void projectedItemsClassifyAsSharedCalendar() {
         assertTrue(CalendarOverlayClassifier.classify(item("TASK:7", "DueAt", 7, 12, null)).sharedCalendar());
-        assertTrue(CalendarOverlayClassifier.classify(item("CASE_SOL:1", "StatuteOfLimitations", null, 1, null)).sharedCalendar());
-        assertTrue(CalendarOverlayClassifier.classify(item("CASE_CALLER:1", "CallerDate", null, 1, null)).sharedCalendar());
+        assertTrue(CalendarOverlayClassifier.classify(item("CASE_DATE:1", "DEADLINE", null, 1, null)).sharedCalendar());
+        assertTrue(CalendarOverlayClassifier.classify(item("CASE_DATE:2", "OTHER", null, 1, null)).sharedCalendar());
     }
 
     @Test void persistedEventOwnershipUsesAssignedToUserIdOnly() {
@@ -54,7 +54,7 @@ class CalendarOverlaySelectionTest {
 
     private static CalendarFeedItem item(String key, String sourceField, Integer taskId, Integer caseId, Integer assignedToUserId) {
         return new CalendarFeedItem(key, "Title", null, LocalDateTime.of(2026, 7, 10, 9, 0), null, true,
-                key.startsWith("EVENT:") ? "MANUAL" : "PROJECTED", sourceField, caseId, "Case", taskId,
+                key.startsWith("EVENT:") ? "MANUAL" : key.startsWith("CASE_DATE:") ? "CASE_DATE" : "PROJECTED", sourceField, caseId, "Case", taskId,
                 "Related", key.startsWith("EVENT:") ? "MEETING" : "CASE_DATE", key.startsWith("EVENT:") ? "Meeting" : "Case Date",
                 null, null, assignedToUserId, "User");
     }

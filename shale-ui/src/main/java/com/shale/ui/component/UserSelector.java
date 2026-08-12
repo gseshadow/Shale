@@ -9,6 +9,7 @@ import java.util.function.Function;
 
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
+import com.shale.ui.util.ControlStyles;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
@@ -106,6 +107,11 @@ public class UserSelector<T> extends VBox {
     public boolean isLoading() { return loading.get(); }
 
     public void setLoading(boolean loading) { this.loading.set(loading); }
+
+    /** Opts this selector's ordinary input into the shared form-control shell. */
+    public void useSemanticFormControl() {
+        ControlStyles.formControl(searchField);
+    }
 
     private void buildUi() {
         getStyleClass().add("user-selector");
