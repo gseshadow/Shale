@@ -44,7 +44,7 @@ public interface CaseServicePort {
 
 	Optional<CaseOverviewDto> getCaseOverview(long caseId, int shaleClientId);
 
-	List<CaseOverviewDto> searchCases(String query, int shaleClientId, int limit);
+	List<CaseOverviewDto> searchCases(String query, int shaleClientId, int actorUserId, int limit);
 
 	List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit);
 

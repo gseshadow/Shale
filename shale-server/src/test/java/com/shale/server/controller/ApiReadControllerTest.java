@@ -805,6 +805,7 @@ class ApiReadControllerTest {
 
         org.junit.jupiter.api.Assertions.assertEquals("smith", caseServicePort.searchQuery);
         org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.searchShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.searchActorUserId);
         org.junit.jupiter.api.Assertions.assertEquals(2, caseServicePort.searchLimit);
     }
 
@@ -888,6 +889,7 @@ class ApiReadControllerTest {
         private CaseServicePort.CreateCaseCommand createdCommand;
         private String searchQuery;
         private int searchShaleClientId;
+        private int searchActorUserId;
         private int searchLimit;
         private long detailCaseId;
         private int detailShaleClientId;
@@ -936,9 +938,10 @@ class ApiReadControllerTest {
         }
 
         @Override
-        public List<CaseOverviewDto> searchCases(String query, int shaleClientId, int limit) {
+        public List<CaseOverviewDto> searchCases(String query, int shaleClientId, int actorUserId, int limit) {
             this.searchQuery = query;
             this.searchShaleClientId = shaleClientId;
+            this.searchActorUserId = actorUserId;
             this.searchLimit = limit;
             return List.of(caseOverview(), secondCaseOverview());
         }

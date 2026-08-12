@@ -380,3 +380,21 @@ feed, or synchronization boundary changed. The legacy `CaseDao.listCaseSelection
 unverified compatibility consumers; the Calendar-exclusive `CalendarFeedDao.listCaseCardRows` and its
 DTO were removed. Previously verified grid, board, export, Search, Deleted Cases, related views,
 MyShale, Reports, and Documents consumers, plus server/API/web, are unchanged.
+
+## Server/web Case search and assigned Cases cutover
+
+The production paths `GET /api/cases/search` and `GET /api/cases/search-page` now run through
+`ApiReadController` → `CaseServiceAdapter.searchCases` → `CaseSummaryDao.searchActiveForServer`.
+`GET /api/cases/assigned` runs through `CaseServiceAdapter.listAssignedCases` →
+`CaseSummaryDao.listActiveAssignedForServer`. Both boundaries are bounded, set-based projections;
+the former Case-ID result followed by one `CaseDao.getOverview` hydration per Case is gone.
+
+The server projection preserves the existing `CaseOverviewDto`/React shape and supplies intake,
+date of injury, statute of limitations, and tort notice exclusively from active `CaseDates` through
+the tenant-effective semantic-role mapping. Absent occurrences remain null, timed intake is reduced
+to the contract's existing `LocalDate`, and workflow flags cannot fabricate dates. Tenant and actor
+come from the authenticated runtime session, active/nondeleted and assignment predicates remain in
+SQL, and name/Case-ID ordering plus bounded paging/limits are deterministic. Compatibility
+`CaseDao.getOverview` remains for desktop Case View and document-era consumers; desktop User Detail's
+`listActiveCasesForUserTeamMember` is the next smallest Case Dates cutover. No live SQL Server
+verification was performed for this documentation update.
