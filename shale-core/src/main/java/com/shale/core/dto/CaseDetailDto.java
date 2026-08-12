@@ -59,6 +59,7 @@ public final class CaseDetailDto {
 	private final byte[] rowVer;
 	private final List<RelatedContactDto> relatedContacts;
 	private final List<CaseStatusHistoryDto> statusHistory;
+	private List<MappedCaseDateSnapshotDto> mappedCaseDates = List.of();
 
 	public CaseDetailDto(long caseId,
 			String caseNumber,
@@ -362,6 +363,11 @@ public final class CaseDetailDto {
 	}
 
 	public long getCaseId() { return caseId; }
+	public List<MappedCaseDateSnapshotDto> getMappedCaseDates() { return mappedCaseDates; }
+	public CaseDetailDto withMappedCaseDates(List<MappedCaseDateSnapshotDto> values) {
+		this.mappedCaseDates = values == null ? List.of() : List.copyOf(values);
+		return this;
+	}
 	public String getCaseNumber() { return caseNumber; }
 	public String getCaseName() { return caseName; }
 	public String getDescription() { return description; }
@@ -371,24 +377,28 @@ public final class CaseDetailDto {
 	public Integer getIntakeTakenByUserId() { return intakeTakenByUserId; }
 	public String getIntakeTakenByDisplayName() { return intakeTakenByDisplayName; }
 	public Integer getPracticeAreaId() { return practiceAreaId; }
-	public LocalDate getCallerDate() { return callerDate; }
-	public String getCallerTime() { return callerTime; }
+	/** @deprecated API compatibility alias derived from mappedCaseDates when hydrated. */
+	@Deprecated public LocalDate getCallerDate() { return mappedDate("intake", callerDate); }
+	/** @deprecated API compatibility alias; updates must use mappedCaseDates. */
+	@Deprecated public String getCallerTime() { var d=mapped("intake"); return d!=null && !d.allDay() ? d.startsAt().toLocalTime().toString() : callerTime; }
 	public LocalDate getAcceptedDate() { return acceptedDate; }
 	public LocalDate getClosedDate() { return closedDate; }
 	public LocalDate getDeniedDate() { return deniedDate; }
-	public LocalDate getDateOfMedicalNegligence() { return dateOfMedicalNegligence; }
-	public LocalDate getDateMedicalNegligenceWasDiscovered() { return dateMedicalNegligenceWasDiscovered; }
-	public LocalDate getDateOfInjury() { return dateOfInjury; }
-	public LocalDate getStatuteOfLimitations() { return statuteOfLimitations; }
-	public LocalDate getTortNoticeDeadline() { return tortNoticeDeadline; }
-	public LocalDate getDiscoveryDeadline() { return discoveryDeadline; }
+	@Deprecated public LocalDate getDateOfMedicalNegligence() { return mappedDate("date_of_medical_negligence",dateOfMedicalNegligence); }
+	@Deprecated public LocalDate getDateMedicalNegligenceWasDiscovered() { return mappedDate("date_medical_negligence_discovered",dateMedicalNegligenceWasDiscovered); }
+	@Deprecated public LocalDate getDateOfInjury() { return mappedDate("date_of_injury",dateOfInjury); }
+	@Deprecated public LocalDate getStatuteOfLimitations() { return mappedDate("statute_of_limitations",statuteOfLimitations); }
+	@Deprecated public LocalDate getTortNoticeDeadline() { return mappedDate("tort_notice_deadline",tortNoticeDeadline); }
+	@Deprecated public LocalDate getDiscoveryDeadline() { return mappedDate("discovery_deadline",discoveryDeadline); }
 	public String getClientEstate() { return clientEstate; }
 	public String getOfficePrinterCode() { return officePrinterCode; }
 	public Boolean getMedicalRecordsRequested() { return medicalRecordsRequested; }
 	public Boolean getFeeAgreementSigned() { return feeAgreementSigned; }
-	public LocalDate getDateFeeAgreementSigned() { return dateFeeAgreementSigned; }
+	@Deprecated public LocalDate getDateFeeAgreementSigned() { return mappedDate("fee_agreement_signed",dateFeeAgreementSigned); }
 	public Boolean getNonEngagementLetterSent() { return nonEngagementLetterSent; }
-	public LocalDate getDateNonEngagementLetterSent() { return dateNonEngagementLetterSent; }
+	@Deprecated public LocalDate getDateNonEngagementLetterSent() { return mappedDate("non_engagement_letter_sent",dateNonEngagementLetterSent); }
+	private MappedCaseDateSnapshotDto mapped(String key){return mappedCaseDates.stream().filter(d->key.equals(d.systemKey())&&!d.absent()).findFirst().orElse(null);}
+	private LocalDate mappedDate(String key,LocalDate fallback){var d=mapped(key);return d==null?fallback:d.startsAt().toLocalDate();}
 	public Boolean getAcceptedChronology() { return acceptedChronology; }
 	public Boolean getAcceptedConsultantExpertSearch() { return acceptedConsultantExpertSearch; }
 	public Boolean getAcceptedTestifyingExpertSearch() { return acceptedTestifyingExpertSearch; }

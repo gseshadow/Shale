@@ -14,6 +14,7 @@ import com.shale.core.service.CaseServicePort.SetCaseDateTypeActiveCommand;
 import com.shale.core.service.CaseServicePort.ResetCaseDateTypeOverrideCommand;
 import com.shale.core.service.CaseServicePort.SaveCaseDateSemanticRoleMappingCommand;
 import com.shale.core.service.CaseServicePort.ResetCaseDateSemanticRoleMappingCommand;
+import com.shale.core.service.CaseServicePort;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -40,6 +41,16 @@ public final class CaseDateDao {
                 command.caseId(), command.shaleClientId(), command.actorUserId());
         byte[] rowVer = readCaseRowVer(command.caseId(), command.shaleClientId(), command.actorUserId());
         return new CaseDateAggregateResult(rowVer, refreshed);
+    }
+
+    /** One transaction for non-date Case fields and all mapped occurrence mutations. */
+    public void mutateExistingCaseAggregate(CaseDao caseDao, CaseServicePort.UpdateCaseCoreDetailsCommand command) {
+        new CaseAggregateTransaction(db).execute(con -> {
+            mutateMigratedCompatibilityDates(con, command.caseDates(), false);
+            caseDao.updateCaseNonDate(con, command.caseId(), command.shaleClientId(), command.caseName(),
+                    command.caseNumber(), command.description(), command.summary(), command.expectedRowVer(), command.actorUserId());
+            return null;
+        });
     }
 
     private byte[] readCaseRowVer(long caseId,int tenant,int actor){try(Connection con=db.requireConnection()){
@@ -268,10 +279,10 @@ public final class CaseDateDao {
         for (MigratedCaseDateKey key : MigratedCaseDateKey.values()) {
             CaseDateDto date = present.get(key);
             result.put(key, date == null
-                    ? new CompatibilityCaseDateState(key, key.systemKey(), null, null, true, null, null,
+                    ? new CompatibilityCaseDateState(key, key.systemKey(), null, null, true, null, null, null,
                             new CompatibilityCaseDateMutation.ExpectedAbsent(caseRowVer))
                     : new CompatibilityCaseDateState(key, key.systemKey(), date.startsAt(), date.endsAt(), date.allDay(),
-                            date.id(), date.rowVer(), null));
+                            date.id(), date.caseDateTypeId(), date.rowVer(), null));
         }
         return Collections.unmodifiableMap(result);
     }
@@ -282,6 +293,11 @@ public final class CaseDateDao {
      * after all occurrence writes, only when at least one intent changed data.
      */
     public void mutateMigratedCompatibilityDates(Connection con, CaseDateAggregateCommand command) throws SQLException {
+        mutateMigratedCompatibilityDates(con, command, true);
+    }
+
+    /** Aggregate participant variant used when the Case participant advances RowVer. */
+    public void mutateMigratedCompatibilityDates(Connection con, CaseDateAggregateCommand command, boolean touchCaseRow) throws SQLException {
         Objects.requireNonNull(con, "connection"); Objects.requireNonNull(command, "command");
         verifyTenant(con, command.shaleClientId());
         validateActor(con, command.shaleClientId(), command.actorUserId());
@@ -316,7 +332,7 @@ public final class CaseDateDao {
             }
             changed = true;
         }
-        if (changed) touchCase(con, command.caseId(), command.shaleClientId());
+        if (changed && touchCaseRow) touchCase(con, command.caseId(), command.shaleClientId());
     }
 
     private static byte[] lockCaseRow(Connection con, int tenant, long caseId) throws SQLException {

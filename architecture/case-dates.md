@@ -430,6 +430,10 @@ CaseDates-backed `AuthoritativeCaseDateEditor` state: there is no legacy read, l
 write, or dual-write. Active edits are preserved and stale saves retain the explicit
 conflict/reload workflow.
 
+## Existing-case server/web authority cutover
+
+The server existing-case detail and core-details PATCH now expose and consume the same complete nine-slot occurrence concurrency model as desktop. Reads use only active `CaseDates` plus effective semantic-role/type resolution; absent meanings remain explicit witnessed absence. The Case and occurrence participants share `CaseAggregateTransaction`, including PHI and entity-action audits, and the committed aggregate is authoritatively reloaded. React renders these occurrences and submits their stable keys, type/occurrence identity, occurrence RowVer, and absence witnesses. It never uses labels as identity or silently retries conflicts. Accepted, denied, and closed dates retain workflow ownership. Web new-case creation is deliberately the next separate phase.
+
 ## Configurable New Intake writer cutover
 
 When a tenant has a saved `NEW_INTAKE` form configuration, its enabled and visible

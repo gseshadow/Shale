@@ -2915,24 +2915,14 @@ public final class CaseDao {
 				  c.Name,
 				  c.PracticeAreaId,
 				  c.Description AS Description,
-				  c.CallerDate,
-				  c.CallerTime,
 				  c.AcceptedDate,
 				  c.ClosedDate,
 				  c.DeniedDate,
-				  c.DateOfMedicalNegligence,
-				  c.DateMedicalNegligenceWasDiscovered,
-				  c.DateOfInjury,
-				  c.StatuteOfLimitations,
-				  c.TortNoticeDeadline,
-				  c.DiscoveryDeadline,
 				  c.ClientEstate,
 				  c.OfficePrinterCode,
 				  c.MedicalRecordsRequested,
 				  c.FeeAgreementSigned,
-				  c.DateFeeAgreementSigned,
 				  c.NonEngagementLetterSent,
-				  c.DateNonEngagementLetterSent,
 				  c.AcceptedChronology,
 				  c.AcceptedConsultantExpertSearch,
 				  c.AcceptedTestifyingExpertSearch,
@@ -3013,24 +3003,19 @@ public final class CaseDao {
 				rs.getString("ResponsibleAttorneyName"),
 				getNullableInt(rs, "ResponsibleAttorneyId"),
 				getNullableInt(rs, "PracticeAreaId"),
-				toLocalDate(rs.getDate("CallerDate")),
-				rs.getString("CallerTime"),
+				null,
+				"",
 				toLocalDate(rs.getDate("AcceptedDate")),
 				toLocalDate(rs.getDate("ClosedDate")),
 				toLocalDate(rs.getDate("DeniedDate")),
-				toLocalDate(rs.getDate("DateOfMedicalNegligence")),
-				toLocalDate(rs.getDate("DateMedicalNegligenceWasDiscovered")),
-				toLocalDate(rs.getDate("DateOfInjury")),
-				toLocalDate(rs.getDate("StatuteOfLimitations")),
-				toLocalDate(rs.getDate("TortNoticeDeadline")),
-				toLocalDate(rs.getDate("DiscoveryDeadline")),
+				null, null, null, null, null, null,
 				rs.getString("ClientEstate"),
 				rs.getString("OfficePrinterCode"),
 				getNullableBoolean(rs, "MedicalRecordsRequested"),
 				getNullableBoolean(rs, "FeeAgreementSigned"),
-				toLocalDate(rs.getDate("DateFeeAgreementSigned")),
+				null,
 				getNullableBoolean(rs, "NonEngagementLetterSent"),
-				toLocalDate(rs.getDate("DateNonEngagementLetterSent")),
+				null,
 				getNullableBoolean(rs, "AcceptedChronology"),
 				getNullableBoolean(rs, "AcceptedConsultantExpertSearch"),
 				getNullableBoolean(rs, "AcceptedTestifyingExpertSearch"),
@@ -3162,6 +3147,24 @@ public final class CaseDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update non-date case fields (caseId=" + caseId + ")", e);
 		}
+	}
+
+	/** Connection-bound participant for the server existing-case aggregate. */
+	public CaseDetailDto updateCaseNonDate(Connection con, long caseId, int tenant, String name,
+			String caseNumber, String description, String summary, byte[] expectedRowVer, int actorUserId) throws SQLException {
+		CaseDetailDto before = selectCaseDetail(con, caseId);
+		String sql = "UPDATE dbo.Cases SET Name=?,CaseNumber=?,Description=?,Summary=?,UpdatedAt=SYSDATETIME() "
+				+ "WHERE Id=? AND ShaleClientId=? AND RowVer=? AND ISNULL(IsDeleted,0)=0";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setString(1,name); ps.setString(2,caseNumber); ps.setString(3,description); ps.setString(4,summary);
+			ps.setLong(5,caseId); ps.setInt(6,tenant); ps.setBytes(7,expectedRowVer);
+			if (ps.executeUpdate()!=1) throw new IllegalStateException("Case changed; reload before saving.");
+		}
+		CaseDetailDto after=selectCaseDetail(con,caseId);
+		if(after==null) throw new IllegalStateException("Case is not available for this tenant.");
+		phiAuditService.auditUpdate(con,actorUserId,"Cases","Description",caseId,before==null?null:before.getDescription(),after.getDescription());
+		phiAuditService.auditUpdate(con,actorUserId,"Cases","Summary",caseId,before==null?null:before.getSummary(),after.getSummary());
+		return after;
 	}
 
 	/** Broad Details boundary for unrelated existing-case fields only. */

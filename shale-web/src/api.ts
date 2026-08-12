@@ -292,6 +292,20 @@ export interface CaseDetail {
   rowVer: string;
   relatedContacts: CaseRelatedContact[];
   statusHistory: CaseStatusHistoryItem[];
+  mappedCaseDates: MappedCaseDateSnapshot[];
+}
+
+export interface MappedCaseDateSnapshot {
+  key: string;
+  systemKey: string;
+  occurrenceId: number | null;
+  caseDateTypeId: number | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  allDay: boolean;
+  occurrenceRowVer: string | null;
+  absent: boolean;
+  absenceCaseRowVer: string | null;
 }
 
 export interface CreateCasePayload {
@@ -438,11 +452,9 @@ export async function updateCaseAssignment(accessToken: string, caseId: number, 
 export interface UpdateCaseCoreDetailsPayload {
   caseName: string;
   description: string;
-  dateOfInjury?: string | null;
-  statuteOfLimitations?: string | null;
-  tortNoticeDeadline?: string | null;
   summary: string;
   expectedRowVer: string;
+  mappedCaseDates: MappedCaseDateSnapshot[];
 }
 
 export async function updateCaseCoreDetails(accessToken: string, caseId: number, payload: UpdateCaseCoreDetailsPayload): Promise<CaseDetail> {

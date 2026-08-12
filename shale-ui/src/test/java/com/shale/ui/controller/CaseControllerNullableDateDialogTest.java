@@ -81,8 +81,8 @@ class CaseControllerNullableDateDialogTest {
         for (MigratedCaseDateKey key : MigratedCaseDateKey.values()) {
             states.put(key, present
                     ? new CompatibilityCaseDateState(key, key.systemKey(), LocalDateTime.of(2026, 1, 1, 0, 0),
-                            null, !key.supportsTime(), 100L + key.ordinal(), new byte[]{token}, null)
-                    : new CompatibilityCaseDateState(key, key.systemKey(), null, null, true, null, null,
+                            null, !key.supportsTime(), 100L + key.ordinal(), 200 + key.ordinal(), new byte[]{token}, null)
+                    : new CompatibilityCaseDateState(key, key.systemKey(), null, null, true, null, null, null,
                             new CompatibilityCaseDateMutation.ExpectedAbsent(new byte[]{token})));
         }
         return new CaseDateAggregateResult(new byte[]{token}, states);

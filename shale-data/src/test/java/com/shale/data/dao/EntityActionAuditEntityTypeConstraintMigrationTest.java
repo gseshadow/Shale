@@ -88,7 +88,8 @@ final class EntityActionAuditEntityTypeConstraintMigrationTest {
     void rerunIsTransactionalRollbackSafeAndProducesOneTrustedCanonicalConstraint() throws Exception {
         String migration = sql();
         assertTrue(migration.contains("SET XACT_ABORT ON"));
-        assertTrue(migration.contains("BEGIN TRY\n    BEGIN TRANSACTION"));
+        assertTrue(Pattern.compile("(?is)\\bBEGIN\\s+TRY\\s+BEGIN\\s+TRANSACTION\\s*;")
+                .matcher(migration).find(), "the TRY body must open the explicit transaction before other work");
         assertTrue(migration.contains("WITH CHECK ADD CONSTRAINT"));
         assertTrue(migration.contains("CHECK CONSTRAINT CK_EntityActionAuditLog_EntityType"));
         assertTrue(migration.contains("name = N'CK_EntityActionAuditLog_EntityType'"));
