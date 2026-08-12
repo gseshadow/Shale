@@ -6,22 +6,29 @@ import java.util.Optional;
 
 import com.shale.core.model.Organization;
 import com.shale.core.service.OrganizationServicePort;
+import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.OrganizationDao;
 
 /**
  * Thin OrganizationServicePort adapter over existing OrganizationDao operations.
  */
 public final class OrganizationServiceAdapter implements OrganizationServicePort {
-	private final OrganizationDao organizationDao;
+	private final OrganizationGateway organizationGateway;
+	private final RelatedCasesGateway relatedCasesGateway;
 
-	public OrganizationServiceAdapter(OrganizationDao organizationDao) {
-		this.organizationDao = Objects.requireNonNull(organizationDao, "organizationDao");
+	public OrganizationServiceAdapter(OrganizationDao organizationDao, CaseSummaryDao caseSummaryDao) {
+		this(new DaoOrganizationGateway(organizationDao), caseSummaryDao::listActiveRelatedToOrganization);
+	}
+
+	OrganizationServiceAdapter(OrganizationGateway organizationGateway, RelatedCasesGateway relatedCasesGateway) {
+		this.organizationGateway = Objects.requireNonNull(organizationGateway, "organizationGateway");
+		this.relatedCasesGateway = Objects.requireNonNull(relatedCasesGateway, "relatedCasesGateway");
 	}
 
 	@Override
 	public List<OrganizationSummary> searchOrganizations(int shaleClientId, String query, int limit) {
 		int resolvedLimit = limit <= 0 ? 25 : limit;
-		return organizationDao.findDirectoryPage(0, resolvedLimit, query).items().stream()
+		return organizationGateway.findDirectoryPage(0, resolvedLimit, query).items().stream()
 				.map(row -> new OrganizationSummary(
 						row.id() == null ? 0 : row.id(),
 						row.name(),
@@ -37,17 +44,18 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 
 	@Override
 	public Optional<OrganizationDetail> getOrganizationDetail(int organizationId, int shaleClientId) {
-		Organization organization = organizationDao.findById(organizationId);
-		if (organization == null) {
+		Organization organization = organizationGateway.findById(organizationId);
+		if (organization == null || organization.getShaleClientId() == null
+				|| organization.getShaleClientId() != shaleClientId || organization.isDeleted()) {
 			return Optional.empty();
 		}
-		List<RelatedCaseSummary> relatedCases = organizationDao.findRelatedCases(organizationId).stream()
+		List<RelatedCaseSummary> relatedCases = relatedCasesGateway.listActiveRelatedToOrganization(shaleClientId, organizationId).stream()
 				.map(row -> new RelatedCaseSummary(
-						row.id(),
-						row.name(),
+						row.summary().caseId(),
+						row.summary().caseName(),
 						row.intakeDate(),
 						row.statuteOfLimitationsDate(),
-						row.responsibleAttorneyName(),
+						row.summary().responsibleAttorneyName(),
 						row.partyRoleName(),
 						row.side(),
 						row.primary(),
@@ -75,10 +83,10 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 	@Override
 	public int createOrganization(CreateOrganizationCommand command) {
 		Objects.requireNonNull(command, "command");
-		OrganizationDao.OrganizationTypeRow organizationType = organizationDao.findOrganizationTypes().stream()
+		OrganizationDao.OrganizationTypeRow organizationType = organizationGateway.findOrganizationTypes().stream()
 				.findFirst()
 				.orElseThrow(() -> new IllegalStateException("No organization types are configured."));
-		return organizationDao.create(new OrganizationDao.OrganizationCreateRequest(
+		return organizationGateway.create(new OrganizationDao.OrganizationCreateRequest(
 				command.shaleClientId(),
 				organizationType.organizationTypeId(),
 				command.name(),
@@ -98,7 +106,7 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 	@Override
 	public boolean updateOrganization(UpdateOrganizationCommand command) {
 		Objects.requireNonNull(command, "command");
-		Organization current = organizationDao.findById(command.organizationId());
+		Organization current = organizationGateway.findById(command.organizationId());
 		if (current == null) {
 			return false;
 		}
@@ -123,8 +131,31 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 				.createdAt(current.getCreatedAt())
 				.updatedAt(current.getUpdatedAt())
 				.build();
-		organizationDao.update(updated);
+		organizationGateway.update(updated);
 		return true;
+	}
+
+
+	interface OrganizationGateway {
+		OrganizationDao.PagedResult<OrganizationDao.DirectoryOrganizationRow> findDirectoryPage(int page, int pageSize, String query);
+		Organization findById(int organizationId);
+		List<OrganizationDao.OrganizationTypeRow> findOrganizationTypes();
+		int create(OrganizationDao.OrganizationCreateRequest request);
+		void update(Organization organization);
+	}
+
+	@FunctionalInterface
+	interface RelatedCasesGateway {
+		List<CaseSummaryDao.RelatedCaseRow> listActiveRelatedToOrganization(int shaleClientId, int organizationId);
+	}
+
+	private record DaoOrganizationGateway(OrganizationDao dao) implements OrganizationGateway {
+		private DaoOrganizationGateway { Objects.requireNonNull(dao, "dao"); }
+		@Override public OrganizationDao.PagedResult<OrganizationDao.DirectoryOrganizationRow> findDirectoryPage(int page, int pageSize, String query) { return dao.findDirectoryPage(page, pageSize, query); }
+		@Override public Organization findById(int organizationId) { return dao.findById(organizationId); }
+		@Override public List<OrganizationDao.OrganizationTypeRow> findOrganizationTypes() { return dao.findOrganizationTypes(); }
+		@Override public int create(OrganizationDao.OrganizationCreateRequest request) { return dao.create(request); }
+		@Override public void update(Organization organization) { dao.update(organization); }
 	}
 
 }
