@@ -51,6 +51,8 @@ class NewIntakeConfiguredDatesStep3ContractTest {
     @Test void configuredIntakeHasNoPostCreateDateTransactionAndReportsCommittedDateCount() throws Exception {
         String s=source();
         String create=s.substring(s.indexOf("public NewIntakeCreateResult createIntake"), s.indexOf("public static final class IntakeConfigurationException"));
+        assertEquals(1, create.split("insertConfiguredCaseDate\\(con, request, caseId, date\\)", -1).length - 1);
+        assertFalse(create.contains("CalendarEvent"));
         assertEquals(1, create.split("db.requireConnection\\(\\)", -1).length - 1);
         assertEquals(1, create.split("con.commit\\(\\)", -1).length - 1);
         assertTrue(create.contains("configuredDates.size()"));

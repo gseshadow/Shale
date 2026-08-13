@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
 
 /** Pure model operations for the configurable New Intake Dates section. */
 public final class NewIntakeDatesConfiguration {
@@ -68,6 +69,13 @@ public final class NewIntakeDatesConfiguration {
     public static Selection withRequired(Selection selection, boolean required) {
         if (selection == null) throw new IllegalArgumentException("Selection is required.");
         return new Selection(selection.type(), required);
+    }
+
+    public static LocalDate initialValue(String fieldKey, int caseDateTypeId, Integer intakeCaseDateTypeId,
+            LocalDate today, Map<String, LocalDate> preservedUserValues) {
+        if (preservedUserValues != null && preservedUserValues.containsKey(fieldKey))
+            return preservedUserValues.get(fieldKey);
+        return intakeCaseDateTypeId != null && caseDateTypeId == intakeCaseDateTypeId ? today : null;
     }
 
     private static Map<Integer, EffectiveCaseDateTypeDto> effectiveById(List<EffectiveCaseDateTypeDto> types,

@@ -9,6 +9,7 @@ import java.util.Optional;
 import com.shale.core.dto.CaseDateDto;
 import com.shale.core.dto.MigratedCaseDateProjectionDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import com.shale.core.model.CaseDateSemanticRole;
 import com.shale.core.dto.CaseDateSemanticRoleMappingDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseStatusDto;
@@ -63,6 +64,10 @@ public interface CaseServicePort {
 	List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
 
 	List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId);
+
+	default int resolveEffectiveCaseDateTypeId(int shaleClientId, int actorUserId, CaseDateSemanticRole role) {
+		throw unsupportedCaseLinkOperation("resolveEffectiveCaseDateTypeId");
+	}
 
 	List<EffectiveCaseDateTypeDto> listCaseDateTypesForAdministration(int shaleClientId, int actorUserId);
 
