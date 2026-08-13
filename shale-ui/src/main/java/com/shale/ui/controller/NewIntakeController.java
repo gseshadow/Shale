@@ -15,6 +15,7 @@ import com.shale.ui.controller.support.NewIntakeDatesConfiguration.ConfiguredDat
 import com.shale.ui.controller.support.NewIntakeDatesConfiguration.Selection;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.FormConfigurationDto;
+import com.shale.core.model.CaseDateSemanticRole;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.FormConfigurationServicePort;
 import com.shale.ui.util.ActionButtonFactory;
@@ -79,7 +80,6 @@ public final class NewIntakeController {
 	@FXML private Label validationLabel;
 
 	@FXML private TextField caseNameField;
-	@FXML private DatePicker dateOfIntakePicker;
 	@FXML private TextField timeOfIntakeField;
 	@FXML private CheckBox estateCaseCheckBox;
 
@@ -134,6 +134,8 @@ public final class NewIntakeController {
 	private FormConfigurationDto loadedDatesConfiguration;
 	private List<EffectiveCaseDateTypeDto> effectiveDateTypes = List.of();
 	private final Map<String, ConfiguredDateInput> configuredDateInputs = new LinkedHashMap<>();
+	private final Map<String, LocalDate> preservedConfiguredDateValues = new LinkedHashMap<>();
+	private Integer intakeCaseDateTypeId;
 	private final List<Selection> stagedDateSelections = new ArrayList<>();
 	private long datesLoadGeneration;
 	private boolean datesViewClosed;
@@ -231,7 +233,6 @@ public final class NewIntakeController {
 		ControlStyles.apply(selectPracticeAreaButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		ControlStyles.apply(selectStatusButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		if (addPartyButton != null) ControlStyles.apply(addPartyButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
-		dateOfIntakePicker.setValue(LocalDate.now());
 		timeOfIntakeField.setText(LocalTime.now().format(TIME_FORMAT));
 
 		callerIsClientCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
@@ -286,7 +287,8 @@ public final class NewIntakeController {
 		datesStatusLabel.setText("Loading saved date fields…");
 		CompletableFuture.supplyAsync(() -> new DatesLoad(
 				formConfigurationService.load(tenant, actor, NewIntakeDatesConfiguration.FORM_KEY),
-				caseService.listEffectiveCaseDateTypes(tenant, actor)), datesExecutor)
+				caseService.listEffectiveCaseDateTypes(tenant, actor),
+				caseService.resolveEffectiveCaseDateTypeId(tenant, actor, CaseDateSemanticRole.INTAKE)), datesExecutor)
 				.whenComplete((result, failure) -> Platform.runLater(() -> {
 					if (isDatesResultStale(generation)) return;
 					if (failure != null) {
@@ -297,6 +299,7 @@ public final class NewIntakeController {
 					}
 					loadedDatesConfiguration = result.configuration();
 					effectiveDateTypes = result.types();
+					intakeCaseDateTypeId = result.intakeCaseDateTypeId();
 					datesReloadRequired = false;
 					renderDatesNormalMode();
 				}));
@@ -315,7 +318,12 @@ public final class NewIntakeController {
 		for (ConfiguredDate field : fields) {
 			Label label = new Label(field.type().name() + (field.required() ? " *" : ""));
 			DatePicker picker = ControlStyles.formControl(new DatePicker());
+			String fieldKey = field.fieldKey();
+			LocalDate initialValue = NewIntakeDatesConfiguration.initialValue(fieldKey, field.type().id(),
+					intakeCaseDateTypeId, LocalDate.now(), preservedConfiguredDateValues);
+			picker.setValue(initialValue);
 			picker.valueProperty().addListener((observable, oldValue, newValue) -> {
+				preservedConfiguredDateValues.put(fieldKey, newValue);
 				if (newValue != null) ControlStyles.setInvalid(picker, false);
 			});
 			HBox row = new HBox(16, label, picker); row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
@@ -423,7 +431,8 @@ public final class NewIntakeController {
 				|| (datesViewAttached && datesSection.getScene() == null);
 	}
 
-	private record DatesLoad(FormConfigurationDto configuration, List<EffectiveCaseDateTypeDto> types) {}
+	private record DatesLoad(FormConfigurationDto configuration, List<EffectiveCaseDateTypeDto> types,
+			int intakeCaseDateTypeId) {}
 	public record ConfiguredDateInput(int caseDateTypeId, String fieldKey, boolean required, DatePicker input) {
 		public LocalDate value() { return input.getValue(); }
 	}
@@ -880,7 +889,7 @@ public final class NewIntakeController {
 		return new CaseDao.NewIntakeCreateRequest(
 				requireClientId(),
 				safeTrim(caseNameField.getText()),
-				dateOfIntakePicker.getValue(),
+				null,
 				LocalTime.parse(safeTrim(timeOfIntakeField.getText()), TIME_PARSE_FORMAT),
 				estateCaseCheckBox.isSelected(),
 				selectedPracticeArea.id(),
@@ -1100,7 +1109,6 @@ public final class NewIntakeController {
 	private void applySnapshot(IntakeFormSnapshot snapshot) {
 		if (snapshot == null) return;
 		caseNameField.setText(snapshot.caseName());
-		dateOfIntakePicker.setValue(snapshot.dateOfIntake());
 		timeOfIntakeField.setText(snapshot.timeOfIntake());
 		estateCaseCheckBox.setSelected(snapshot.estateCase());
 		clientFirstNameField.setText(snapshot.clientFirstName());
@@ -1288,7 +1296,7 @@ public final class NewIntakeController {
 	private IntakeFormSnapshot captureCurrentSnapshot() {
 		return new IntakeFormSnapshot(
 				safeTrim(caseNameField == null ? null : caseNameField.getText()),
-				dateOfIntakePicker == null ? null : dateOfIntakePicker.getValue(),
+				null,
 				safeTrim(timeOfIntakeField == null ? null : timeOfIntakeField.getText()),
 				estateCaseCheckBox != null && estateCaseCheckBox.isSelected(),
 				safeTrim(clientFirstNameField == null ? null : clientFirstNameField.getText()),
@@ -1354,7 +1362,6 @@ public final class NewIntakeController {
 	private List<String> validateRequiredFields() {
 		List<String> errors = new ArrayList<>(java.util.stream.Stream.of(
 				required(caseNameField.getText(), "Case Name is required."),
-				requiredDate(dateOfIntakePicker.getValue(), "Date of Intake is required."),
 				validateIntakeTime(),
 				required(clientFirstNameField.getText(), "Client First Name is required."),
 				required(clientLastNameField.getText(), "Client Last Name is required."),

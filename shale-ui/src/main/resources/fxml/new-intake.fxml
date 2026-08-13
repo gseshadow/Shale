@@ -125,19 +125,13 @@
                                 <TextField fx:id="caseNameField" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
                                 <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1">
-                                    <Label text="Date of Intake" />
-                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <DatePicker fx:id="dateOfIntakePicker" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="2">
                                     <Label text="Time of Intake" />
                                     <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
                                 </HBox>
-                                <TextField fx:id="timeOfIntakeField" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                                <TextField fx:id="timeOfIntakeField" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Estate Case" GridPane.rowIndex="3" />
-                                <CheckBox fx:id="estateCaseCheckBox" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+                                <Label text="Estate Case" GridPane.rowIndex="2" />
+                                <CheckBox fx:id="estateCaseCheckBox" GridPane.rowIndex="2" GridPane.columnIndex="1" />
                             </GridPane>
                         </VBox>
 

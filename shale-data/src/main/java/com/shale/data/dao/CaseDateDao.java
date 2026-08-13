@@ -137,6 +137,13 @@ public final class CaseDateDao {
         } catch (SQLException e) { throw fail(e); }
     }
 
+    public int resolveEffectiveCaseDateTypeId(int tenant, int actor, CaseDateSemanticRole role) {
+        try (Connection con = db.requireConnection()) {
+            verifyTenant(con, tenant); validateActor(con, tenant, actor);
+            return CaseDateSemanticRoleResolver.requireEffectiveTypeId(con, tenant, role);
+        } catch (SQLException e) { throw fail(e); }
+    }
+
     public List<CaseDateDto> listCaseDatesForCase(long caseId, int tenant, int actor) {
         String sql = occurrenceSql("cd.CaseId = ? AND cd.ShaleClientId = ? AND cd.IsDeleted = 0 ORDER BY cd.StartsAt, cd.EndsAt, COALESCE(eff.SortOrder, st.SortOrder), COALESCE(eff.Name, st.Name), cd.Id");
         try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {

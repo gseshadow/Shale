@@ -37,6 +37,7 @@ import com.shale.core.model.CaseDateAggregateCommand;
 import com.shale.core.model.CaseDateAggregateResult;
 import com.shale.core.model.CompatibilityCaseDateState;
 import com.shale.core.model.MigratedCaseDateKey;
+import com.shale.core.model.CaseDateSemanticRole;
 
 /**
  * Thin CaseServicePort adapter over existing CaseDao read operations.
@@ -283,6 +284,13 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		validatePositive(shaleClientId, "ShaleClientId");
 		validatePositive(actorUserId, "ActorUserId");
 		return caseGateway.listEffectiveCaseDateTypes(shaleClientId, actorUserId);
+	}
+
+	@Override
+	public int resolveEffectiveCaseDateTypeId(int shaleClientId, int actorUserId, CaseDateSemanticRole role) {
+		validatePositive(shaleClientId, "ShaleClientId");
+		validatePositive(actorUserId, "ActorUserId");
+		return caseGateway.resolveEffectiveCaseDateTypeId(shaleClientId, actorUserId, Objects.requireNonNull(role, "role"));
 	}
 
 	@Override
@@ -871,6 +879,10 @@ public final class CaseServiceAdapter implements CaseServicePort {
 			throw unsupportedCaseLinkGatewayOperation("listEffectiveCaseDateTypes");
 		}
 
+		default int resolveEffectiveCaseDateTypeId(int shaleClientId, int actorUserId, CaseDateSemanticRole role) {
+			throw unsupportedCaseLinkGatewayOperation("resolveEffectiveCaseDateTypeId");
+		}
+
 		default List<EffectiveCaseDateTypeDto> listCaseDateTypesForAdministration(int shaleClientId, int actorUserId) {
 			throw unsupportedCaseLinkGatewayOperation("listCaseDateTypesForAdministration");
 		}
@@ -1165,6 +1177,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override
 		public List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId) {
 			return caseDateDao.listEffectiveCaseDateTypes(shaleClientId, actorUserId);
+		}
+
+		@Override
+		public int resolveEffectiveCaseDateTypeId(int shaleClientId, int actorUserId, CaseDateSemanticRole role) {
+			return caseDateDao.resolveEffectiveCaseDateTypeId(shaleClientId, actorUserId, role);
 		}
 
 		@Override
