@@ -538,12 +538,21 @@ public final class CaseDao {
 		byte[] submittedRowVer = request.formConfigurationRowVer();
 		if (currentId != request.formConfigurationId() || !java.util.Arrays.equals(currentRowVer, submittedRowVer))
 			throw new IntakeConfigurationException("The intake form configuration changed. Reload the form before submitting again.");
-		if (currentId == 0)
-			throw new IntakeConfigurationException("The intake form configuration is unavailable. Reload the form before submitting again.");
 		LinkedHashMap<String, ConfiguredDateValue> submitted = new LinkedHashMap<>();
 		for (ConfiguredDateValue value : request.configuredDates()) {
 			if (value == null || value.fieldKey() == null || submitted.putIfAbsent(value.fieldKey(), value) != null)
 				throw invalidConfiguredDates();
+		}
+		if (currentId == 0) {
+			List<ConfiguredDateValue> result = new ArrayList<>();
+			Set<Integer> typeIds = new HashSet<>();
+			for (ConfiguredDateValue value : submitted.values()) {
+				if (value.caseDateTypeId() <= 0 || !fieldKeyForCaseDateType(value.caseDateTypeId()).equals(value.fieldKey())
+						|| value.required() || !typeIds.add(value.caseDateTypeId())) throw invalidConfiguredDates();
+				validateEffectiveConfiguredDateType(con, request.shaleClientId(), value.caseDateTypeId());
+				if (value.value() != null) result.add(value);
+			}
+			return List.copyOf(result);
 		}
 		LinkedHashMap<String, ConfiguredDateValue> authoritative = new LinkedHashMap<>();
 		String sql = """
@@ -636,6 +645,8 @@ public final class CaseDao {
 			}
 		}
 	}
+
+	private static String fieldKeyForCaseDateType(int typeId) { return "case_date:" + typeId; }
 
 	private static IntakeConfigurationException invalidConfiguredDates() {
 		return new IntakeConfigurationException("The configured date fields are no longer valid. Reload the form before submitting again.");
