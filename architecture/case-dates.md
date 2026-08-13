@@ -127,7 +127,16 @@ Case Date Type administration now appends exactly one `CASE_DATE_TYPE` entity-ac
 
 The DAO owns validation, the `CaseDateTypes` write, dependent semantic-role protection checks, audit append, and commit on one connection and transaction. Tenant and actor must match trusted `ShaleClientId` and `PrincipalUserId` SQL session context, and the actor must be an active tenant administrator. Audit follows successful validation and optimistic-concurrency mutation and precedes commit, so any validation, SQL, audit, concurrency, or commit failure rolls back both mutation and event. The returned DTO is the authoritative post-mutation row. Existing Settings publication/refresh remains outside and after this committed DAO call. Entity-action auditing does not replace occurrence PHI auditing.
 
-Case Date Type entity-action auditing is complete. The only immediate roadmap work remaining is live SQL Server/manual QA and final sign-off; no live SQL Server verification occurred for this implementation.
+Case Date Type entity-action auditing is implemented, including the ordered, idempotent
+`2026-08-12_entity_action_audit_entity_type_constraint.sql` schema migration. Final
+sign-off was attempted on 2026-08-13, but the verification environment had no explicitly
+configured development/test SQL Server connection. No live SQL, tenant mutation,
+desktop scenario, or server scenario was therefore run or claimed. The production
+call-site inventory and web static build checks passed; the full Maven run was blocked
+by an HTTP 403 while resolving the Spring Boot BOM. The roadmap **is not complete**.
+The exact remaining SQL, mutation, RLS, audit, concurrency, Calendar-duplication,
+desktop, and web checks are recorded under **Final verification and sign-off status** in
+`case-dates-runtime-cutover-inventory.md`. Completion criteria are unchanged.
 
 Effective active selector reads remain separate from administration reads. New-occurrence selectors use only `listEffectiveCaseDateTypes`; inactive, deleted, reset-marker, and shadowed rows must not leak into ordinary selectors.
 
