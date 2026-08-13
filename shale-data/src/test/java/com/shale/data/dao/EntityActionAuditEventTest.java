@@ -26,6 +26,21 @@ final class EntityActionAuditEventTest {
 	}
 
 	@Test
+	void caseDateTypeAdministrationUsesSafeStructuralMetadata() {
+		for (EntityActionAuditEvent.Action action : java.util.List.of(EntityActionAuditEvent.Action.CREATED,
+				EntityActionAuditEvent.Action.UPDATED, EntityActionAuditEvent.Action.ACTIVATED,
+				EntityActionAuditEvent.Action.DEACTIVATED, EntityActionAuditEvent.Action.DELETED,
+				EntityActionAuditEvent.Action.RESTORED)) {
+			EntityActionAuditEvent event=EntityActionAuditEvent.now(7,9,EntityActionAuditEvent.EntityType.CASE_DATE_TYPE,31,action,null,null,
+					Map.of(EntityActionAuditEvent.MetadataKey.CASE_DATE_TYPE_ID,31,EntityActionAuditEvent.MetadataKey.ACTIVE,action!=EntityActionAuditEvent.Action.DELETED));
+			assertEquals(7,event.shaleClientId()); assertEquals(9,event.actorUserId()); assertEquals(31,event.entityId());
+			String json=EntityActionAuditDao.metadataJson(event.metadata()).toLowerCase();
+			assertFalse(json.matches(".*(case_id|case_date_id|name|description|label|color|note|rowver|starts_at|ends_at).*"));
+		}
+		assertThrows(IllegalArgumentException.class,()->EntityActionAuditEvent.now(7,9,EntityActionAuditEvent.EntityType.CASE_DATE_TYPE,31,EntityActionAuditEvent.Action.LINKED,null,null,Map.of()));
+	}
+
+	@Test
 	void supportsCalendarCaseDateMappingVocabularyAndSafeMetadata() {
 		var metadata = new java.util.EnumMap<EntityActionAuditEvent.MetadataKey, Object>(EntityActionAuditEvent.MetadataKey.class);
 		metadata.put(EntityActionAuditEvent.MetadataKey.CALENDAR_EVENT_TYPE_ID, 4);
