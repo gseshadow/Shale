@@ -18,7 +18,24 @@ final class CaseSummaryDocumentsContractTest {
 		assertTrue(method.contains("RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY"));
 		assertTrue(method.contains("RoleSemantics.ROLE_LEGAL_ASSISTANT"));
 		assertTrue(method.contains("ps.setLong(4, caseId)"));
+		assertTrue(method.contains("localDate(rs, \"InjuryDate\")"));
+		assertTrue(method.contains("localDate(rs, \"StatuteDate\")"));
 		assertFalse(method.matches("(?s).*RoleId\\s*=\\s*[0-9]+.*"));
+	}
+
+	@Test void documentsDatesAreAuthoritativeBoundedAndTenantEffective() throws Exception {
+		String sql = CaseSummaryDao.documentSelectSql();
+		assertTrue(sql.contains("FROM dbo.CaseDates cd"));
+		assertTrue(sql.contains("stored_type.SystemKey='date_of_injury'"));
+		assertTrue(sql.contains("SemanticRoleKey='STATUTE_OF_LIMITATIONS'"));
+		assertTrue(sql.contains("tenant_mapping.ShaleClientId=c.ShaleClientId"));
+		assertTrue(sql.contains("NOT (role_mapping.ShaleClientId IS NULL AND EXISTS"));
+		assertTrue(sql.contains("cd.IsDeleted=0"));
+		assertTrue(sql.contains("c.Id = ?"));
+		assertFalse(sql.contains("c.DateOfInjury"));
+		assertFalse(sql.contains("c.StatuteOfLimitations"));
+		assertFalse(sql.contains("c.CallerDate"));
+		assertFalse(sql.contains("c.TortNoticeDeadline"));
 	}
 
 	@Test void sharedProjectionSqlHasDeterministicScalarResolution() throws Exception {

@@ -317,15 +317,29 @@ scalar applies and the left Practice Area join preserve missing optional values 
 The document consumes only `caseName`, `primaryStatusName`, and `practiceAreaName`. Status color and both
 assignment identities remain correctly mapped in the projection but are not document template fields.
 
-The full-detail generation queries remain specialized and unchanged: overview still supplies primary caller
-and client identity plus incident/statute semantic dates and description; detail supplies workflow accepted,
+The document generation path is authoritative for Date of Injury and Statute of Limitations. The bounded
+`findActiveForDocuments` query extends its document-only row with both values in the same statement:
+injury resolves by the established `date_of_injury` type identity and SOL through the tenant-effective
+semantic-role mapping. Only active, nondeleted occurrences participate; absent values remain null, workflow
+flags do not manufacture dates, and there is no legacy fallback or per-date hydration.
+
+The remaining full-detail generation queries stay specialized: overview supplies primary caller
+and client identity plus description; detail supplies workflow accepted,
 denied, and closed dates plus narrative summary and retains its existing related-contact grain; contact
 lookups supply the established phone/address/email values; updates retain their deterministic created-time/ID
 ordering. Templates, placeholders, normalization, filenames, formats, temporary storage, rendering, opening,
 and PHI audit timing are unchanged. Legacy PDF debug logging no longer emits generated XHTML snippets or
 temporary paths, and controller failures no longer echo exception/path details that can contain Case names.
+The four deprecated date accessors remain on `CaseOverviewDto` for source compatibility but
+`CaseDao.getOverview` now leaves them null and its active query selects none of `CallerDate`,
+`DateOfInjury`, `StatuteOfLimitations`, or `TortNoticeDeadline`. The desktop controller's overview
+copy/baseline helpers likewise do not carry those scalars. Remaining `getOverview` consumers use only
+non-date identity, assignment, party, description, and display fields. Dead compatibility accessor removal
+and the latent New Intake legacy fallback are the next cleanup phase.
+
 Calendar, server/API/web, template management, persistence/mutations,
 and every previously converted desktop consumer are deferred and unchanged.
+No live SQL Server verification was performed for this cutover.
 
 Before dispatch, `CaseController` now captures tenant ID, authenticated user ID, Case ID, type, and format in
 an immutable `CaseDocumentGenerationRequest`. Incomplete context cannot generate. The background task uses

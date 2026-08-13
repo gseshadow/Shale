@@ -8,7 +8,6 @@ import java.util.Objects;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
-import com.shale.core.dto.CaseSummaryProjection;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.ContactDao;
@@ -38,8 +37,9 @@ public final class CaseDocumentService {
         if (caseId <= 0 || shaleClientId <= 0) throw new IllegalArgumentException("caseId and shaleClientId must be > 0");
         if (type != CaseDocumentType.CASE_SUMMARY) throw new IllegalArgumentException("Unsupported type: " + type);
 
-        CaseSummaryProjection summary = caseSummaryDao.findActiveForDocuments(shaleClientId, caseId);
-        if (summary == null) throw new IllegalStateException("Case is unavailable for document generation");
+        CaseSummaryDao.DocumentCaseRow documentCase = caseSummaryDao.findActiveForDocuments(shaleClientId, caseId);
+        if (documentCase == null) throw new IllegalStateException("Case is unavailable for document generation");
+        var summary = documentCase.summary();
         CaseOverviewDto overview = caseDao.getOverview(caseId);
         CaseDetailDto detail = caseDao.getDetail(caseId);
         if (overview == null || detail == null) throw new IllegalStateException("Case not found for id=" + caseId);
@@ -66,8 +66,8 @@ public final class CaseDocumentService {
                 client == null ? "" : client.phone(),
                 client == null ? "" : client.addressHome(),
                 client == null ? "" : client.email(),
-                overview.getIncidentDate(),
-                overview.getSolDate(),
+                documentCase.dateOfInjury(),
+                documentCase.statuteOfLimitations(),
                 detail.getAcceptedDate(),
                 detail.getDeniedDate(),
                 detail.getClosedDate(),

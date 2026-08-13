@@ -64,6 +64,12 @@ public final class CaseSummaryDao {
 		public CalendarCaseRow { Objects.requireNonNull(summary, "summary"); }
 	}
 
+	/** PHI-bearing dates needed only by the bounded desktop Case document composition. */
+	public record DocumentCaseRow(CaseSummaryProjection summary, LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations) {
+		public DocumentCaseRow { Objects.requireNonNull(summary, "summary"); }
+	}
+
 	/** Case-party relationship metadata composed with the authoritative Case summary. */
 	public record RelatedCaseRow(long relationshipId, int partyRoleId, CaseSummaryProjection summary,
 			LocalDate intakeDate, LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline,
@@ -301,19 +307,57 @@ public final class CaseSummaryDao {
 
 
 	/** Authoritative active one-Case lookup for desktop Documents generation. */
-	public CaseSummaryProjection findActiveForDocuments(int requestedTenantId, long caseId) {
+	public DocumentCaseRow findActiveForDocuments(int requestedTenantId, long caseId) {
 		if (requestedTenantId <= 0 || caseId <= 0) throw new IllegalArgumentException("requestedTenantId and caseId must be > 0");
 		try (Connection con = db.requireConnection()) {
 			verifyTenant(con, requestedTenantId);
-			try (PreparedStatement ps = con.prepareStatement(summarySelectSql(
-					"AND ISNULL(c.IsDeleted, 0) = 0 AND c.Id = ?", "c.Id ASC"))) {
+			try (PreparedStatement ps = con.prepareStatement(documentSelectSql())) {
 				ps.setInt(1, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(2, RoleSemantics.ROLE_LEGAL_ASSISTANT);
 				ps.setInt(3, requestedTenantId);
 				ps.setLong(4, caseId);
-				try (ResultSet rs = ps.executeQuery()) { return rs.next() ? map(rs) : null; }
+				try (ResultSet rs = ps.executeQuery()) {
+					return rs.next() ? new DocumentCaseRow(map(rs), localDate(rs, "InjuryDate"),
+							localDate(rs, "StatuteDate")) : null;
+				}
 			}
 		} catch (SQLException e) { throw new RuntimeException("Failed to validate Documents Case summary", e); }
+	}
+
+	static String documentSelectSql() {
+		String dates = """
+			OUTER APPLY (
+			 SELECT
+			  MAX(CASE WHEN stored_type.SystemKey='date_of_injury' THEN CAST(cd.StartsAt AS date) END) InjuryDate,
+			  MAX(CASE WHEN effective_sol.CaseDateTypeId IS NOT NULL THEN CAST(cd.StartsAt AS date) END) StatuteDate
+			 FROM dbo.CaseDates cd
+			 JOIN dbo.CaseDateTypes stored_type ON stored_type.Id=cd.CaseDateTypeId
+			  AND (stored_type.ShaleClientId=c.ShaleClientId OR stored_type.ShaleClientId IS NULL)
+			 OUTER APPLY (
+			  SELECT role_mapping.CaseDateTypeId
+			  FROM dbo.CaseDateTypeSemanticRoleMappings role_mapping
+			  JOIN dbo.CaseDateTypes mapped_type ON mapped_type.Id=role_mapping.CaseDateTypeId
+			  WHERE role_mapping.CaseDateTypeId=stored_type.Id
+			   AND role_mapping.SemanticRoleKey='STATUTE_OF_LIMITATIONS'
+			   AND role_mapping.IsActive=1 AND role_mapping.IsDeleted=0
+			   AND mapped_type.IsActive=1 AND mapped_type.IsDeleted=0
+			   AND (role_mapping.ShaleClientId=c.ShaleClientId OR role_mapping.ShaleClientId IS NULL)
+			   AND (mapped_type.ShaleClientId=c.ShaleClientId OR mapped_type.ShaleClientId IS NULL)
+			   AND NOT (role_mapping.ShaleClientId IS NULL AND EXISTS (
+			    SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings tenant_mapping
+			    JOIN dbo.CaseDateTypes tenant_type ON tenant_type.Id=tenant_mapping.CaseDateTypeId
+			    WHERE tenant_mapping.ShaleClientId=c.ShaleClientId
+			     AND tenant_mapping.SemanticRoleKey=role_mapping.SemanticRoleKey
+			     AND tenant_mapping.IsActive=1 AND tenant_mapping.IsDeleted=0
+			     AND tenant_type.ShaleClientId=c.ShaleClientId
+			     AND tenant_type.IsActive=1 AND tenant_type.IsDeleted=0))
+			 ) effective_sol
+			 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0
+			) document_dates
+			""";
+		return summarySelectSql("AND ISNULL(c.IsDeleted, 0) = 0 AND c.Id = ?", "c.Id ASC")
+				.replace("c.NonEngagementLetterSent", "c.NonEngagementLetterSent, document_dates.InjuryDate, document_dates.StatuteDate")
+				.replace("WHERE c.ShaleClientId = ?", dates + " WHERE c.ShaleClientId = ?");
 	}
 
 	/** Complete active Case selector snapshot for desktop Calendar, ordered by label then authoritative ID. */
