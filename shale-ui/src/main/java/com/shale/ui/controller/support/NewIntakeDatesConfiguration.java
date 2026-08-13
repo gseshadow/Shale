@@ -25,8 +25,9 @@ public final class NewIntakeDatesConfiguration {
 
     public static List<ConfiguredDate> renderable(FormConfigurationDto configuration,
             List<EffectiveCaseDateTypeDto> effectiveTypes) {
-        if (configuration == null || configuration.id() == 0) return List.of();
         Map<Integer, EffectiveCaseDateTypeDto> byId = effectiveById(effectiveTypes);
+        if (configuration == null || configuration.id() == 0)
+            return byId.values().stream().map(type -> new ConfiguredDate(fieldKey(type.id()), type, false)).toList();
         return configuration.sections().stream()
                 .filter(s -> SECTION_KEY.equals(s.sectionKey()) && s.enabled() && s.visible())
                 .flatMap(s -> s.fields().stream())
@@ -41,7 +42,8 @@ public final class NewIntakeDatesConfiguration {
     public static List<Selection> selections(FormConfigurationDto configuration,
             List<EffectiveCaseDateTypeDto> effectiveTypes) {
         Map<Integer, EffectiveCaseDateTypeDto> byId = effectiveById(effectiveTypes);
-        if (configuration == null || configuration.id() == 0) return List.of();
+        if (configuration == null || configuration.id() == 0)
+            return byId.values().stream().map(type -> new Selection(type, false)).toList();
         return configuration.sections().stream().filter(s -> SECTION_KEY.equals(s.sectionKey()))
                 .flatMap(s -> s.fields().stream())
                 .filter(f -> FIELD_KIND.equals(f.fieldKind()) && f.caseDateTypeId() != null
