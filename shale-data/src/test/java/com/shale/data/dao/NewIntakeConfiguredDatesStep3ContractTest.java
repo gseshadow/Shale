@@ -34,7 +34,7 @@ class NewIntakeConfiguredDatesStep3ContractTest {
         assertTrue(s.contains("?,NULL,1,SYSUTCDATETIME()"));
     }
 
-    @Test void configuredModeDoesNotDualWriteAndMissingConfigurationFailsClosed() throws Exception {
+    @Test void configuredModeDoesNotDualWriteAndMissingConfigurationUsesValidatedEffectiveTypes() throws Exception {
         String s=source();
         String insertCase=s.substring(s.indexOf("private long insertCase("), s.indexOf("/** Configured intake"));
         assertTrue(insertCase.contains("return insertConfiguredIntakeCase"));
@@ -42,7 +42,8 @@ class NewIntakeConfiguredDatesStep3ContractTest {
         for (String legacy : new String[]{"CallerDate", "CallerTime", "DateOfMedicalNegligence", "DateMedicalNegligenceWasDiscovered", "DateOfInjury", "StatuteOfLimitations", "TortNoticeDeadline"})
             assertFalse(configured.contains(legacy), legacy);
         assertTrue(s.contains("if (currentId == 0)"));
-        assertTrue(s.contains("intake form configuration is unavailable"));
+        assertTrue(s.contains("fieldKeyForCaseDateType(value.caseDateTypeId()).equals(value.fieldKey())"));
+        assertTrue(s.contains("validateEffectiveConfiguredDateType(con, request.shaleClientId(), value.caseDateTypeId())"));
         String validation=s.substring(s.indexOf("private List<ConfiguredDateValue> validateConfiguredIntakeDates"), s.indexOf("private static void validateEffectiveConfiguredDateType"));
         assertFalse(validation.contains("return List.of()"));
     }

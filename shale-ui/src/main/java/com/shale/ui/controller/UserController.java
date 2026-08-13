@@ -644,7 +644,8 @@ public final class UserController {
 				PerfLog.logDone("DAO", "method=loadAssignedCases page=user_view userId=" + targetUserId + " rows=" + (loaded == null ? 0 : loaded.size()), assignedCasesStartNanos);
 				Platform.runLater(() ->
 				{
-					if (requestId != assignedCasesRefreshSequence || currentUser == null || currentUser.id() != targetUserId) {
+					if (requestId != assignedCasesRefreshSequence || currentUser == null
+                            || currentUser.id() != targetUserId || currentUser.shaleClientId() != targetShaleClientId) {
 						System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
 								+ "requestId=" + requestId
 								+ " selectedUserId=" + targetUserId

@@ -210,8 +210,8 @@
                                 <Region HBox.hgrow="ALWAYS" />
                                 <HBox fx:id="datesAdminActions" spacing="8" />
                             </HBox>
-                            <Label fx:id="datesStatusLabel" text="Using standard intake dates." style="-fx-opacity: 0.75;" wrapText="true" />
-                            <GridPane fx:id="legacyDatesGrid" hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
+                            <Label fx:id="datesStatusLabel" text="Loading date fields…" style="-fx-opacity: 0.75;" wrapText="true" />
+                            <GridPane fx:id="legacyDatesGrid" visible="false" managed="false" hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
                                 <columnConstraints><ColumnConstraints minWidth="250" prefWidth="290"/><ColumnConstraints minWidth="250" hgrow="ALWAYS" fillWidth="true"/></columnConstraints>
                                 <Label text="Date of Medical Negligence" wrapText="true" GridPane.rowIndex="0"/><DatePicker fx:id="dateMedicalNegligencePicker" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
                                 <Label text="Date Medical Negligence Was Discovered" wrapText="true" GridPane.rowIndex="1"/><DatePicker fx:id="dateMedicalNegligenceDiscoveredPicker" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>

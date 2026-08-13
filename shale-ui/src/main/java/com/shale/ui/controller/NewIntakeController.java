@@ -290,7 +290,9 @@ public final class NewIntakeController {
 				.whenComplete((result, failure) -> Platform.runLater(() -> {
 					if (isDatesResultStale(generation)) return;
 					if (failure != null) {
-						datesStatusLabel.setText("Standard intake dates remain available. Saved customization could not be loaded.");
+						legacyDatesGrid.setVisible(false); legacyDatesGrid.setManaged(false);
+						configuredDatesBox.getChildren().clear(); configuredDateInputs.clear();
+						datesStatusLabel.setText("Date fields could not be loaded. Reload New Intake before entering dates.");
 						return;
 					}
 					loadedDatesConfiguration = result.configuration();
@@ -306,10 +308,10 @@ public final class NewIntakeController {
 		configuredDatesBox.getChildren().clear(); configuredDateInputs.clear();
 		List<ConfiguredDate> fields = NewIntakeDatesConfiguration.renderable(loadedDatesConfiguration, effectiveDateTypes);
 		boolean saved = loadedDatesConfiguration != null && loadedDatesConfiguration.id() != 0;
-		legacyDatesGrid.setVisible(!saved); legacyDatesGrid.setManaged(!saved);
-		configuredDatesBox.setVisible(saved); configuredDatesBox.setManaged(saved);
-		if (!saved) { datesStatusLabel.setText("Using standard intake dates."); return; }
-		datesStatusLabel.setText(fields.isEmpty() ? "No date fields are configured for this form." : "Date fields configured for this tenant.");
+		legacyDatesGrid.setVisible(false); legacyDatesGrid.setManaged(false);
+		configuredDatesBox.setVisible(true); configuredDatesBox.setManaged(true);
+		datesStatusLabel.setText(fields.isEmpty() ? "No date fields are configured for this form."
+				: saved ? "Date fields configured for this tenant." : "Using active Case Date Types for this tenant.");
 		for (ConfiguredDate field : fields) {
 			Label label = new Label(field.type().name() + (field.required() ? " *" : ""));
 			DatePicker picker = ControlStyles.formControl(new DatePicker());
