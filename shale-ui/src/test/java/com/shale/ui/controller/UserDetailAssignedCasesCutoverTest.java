@@ -19,10 +19,11 @@ final class UserDetailAssignedCasesCutoverTest {
     @Test void controllerKeepsAsyncGenerationAndSelectedUserTenantStalenessGuards() throws Exception {
         String controller=read("src/main/java/com/shale/ui/controller/UserController.java");
         assertTrue(controller.contains("dbExec.submit(() ->"));
-        assertTrue(controller.contains("userDetailService.loadAssignedCases(shaleClientId, targetUserId)"));
-        assertTrue(controller.contains("requestId != assignedCasesRefreshSequence || currentUser == null || currentUser.id() != targetUserId"));
-        assertTrue(controller.contains("userDetailCache.matches(targetUserId, currentUser.shaleClientId())"));
-        assertTrue(controller.contains("createAssignedCaseCard(row)"));
+        assertTrue(controller.contains("userDetailService.loadAssignedCases(targetShaleClientId, targetUserId)"));
+        assertTrue(controller.contains("requestId != assignedCasesRefreshSequence || currentUser == null"));
+        assertTrue(controller.contains("currentUser.id() != targetUserId || currentUser.shaleClientId() != targetShaleClientId"));
+        assertTrue(controller.contains("userDetailCache.matches(targetUserId, targetShaleClientId)"));
+        assertTrue(controller.contains(".map(this::createAssignedCaseCard)"));
     }
     @Test void productionCompositionInjectsCaseSummaryDao() throws Exception {
         String scene=read("src/main/java/com/shale/ui/navigation/SceneManager.java");
