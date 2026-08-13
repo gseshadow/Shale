@@ -436,25 +436,9 @@ class CaseServiceAdapterTest {
 		public void updateCaseAssignment(long caseId, int shaleClientId, int practiceAreaId, int responsibleAttorneyUserId) {
 		}
 
-		@Override
-		public CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
-				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
-				byte[] expectedRowVer, Integer actorUserId) {
-			lastUpdateCaseId = caseId;
-			lastUpdateName = name;
-			lastUpdateCaseNumber = caseNumber;
-			lastUpdateDescription = description;
-			lastUpdateIncidentDate = incidentDate;
-			lastUpdateSolDate = solDate;
-			lastUpdateTortNoticeDeadline = tortNoticeDeadline;
-			lastUpdateSummary = summary;
-			lastUpdateRowVer = expectedRowVer;
-			lastUpdateActorUserId = actorUserId;
-			return updatedCase;
-		}
 
 		@Override
-		public long createBasicCase(CaseServicePort.CreateCaseCommand command, int statusId) {
+		public long createCaseAggregate(CaseServicePort.CreateCaseCommand command, int statusId) {
 			return 42L;
 		}
 	}
