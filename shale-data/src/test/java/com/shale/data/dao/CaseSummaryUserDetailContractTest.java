@@ -35,7 +35,10 @@ final class CaseSummaryUserDetailContractTest {
     @Test void userDetailDatesAreAuthoritativeEffectiveNullableAndSetBased() throws Exception {
         String body=method(source(Path.of("src/main/java/com/shale/data/dao/CaseSummaryDao.java")),
                 "public List<CaseGridRow> listActiveAssignedForUserDetail");
-        String dateProjection=body.substring(body.indexOf("OUTER APPLY (SELECT\n\t\t\t\t MAX(CASE"), body.indexOf("OUTER APPLY (SELECT TOP(1) COALESCE"));
+        int dateStart=body.indexOf("MAX(CASE WHEN effective.SemanticRoleKey='INTAKE'");
+        int dateEnd=body.indexOf(") dates", dateStart);
+        assertTrue(dateStart >= 0 && dateEnd > dateStart, "authoritative Case Dates projection must remain in User Detail query");
+        String dateProjection=body.substring(dateStart,dateEnd);
         assertAll(
             ()->assertTrue(body.contains("FROM dbo.CaseDates")),
             ()->assertTrue(body.contains("CaseDateTypeSemanticRoleMappings")),
