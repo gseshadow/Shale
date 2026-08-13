@@ -82,69 +82,131 @@ public final class UserController {
 			+ "-fx-background-radius: 11px; -fx-border-radius: 11px; "
 			+ "-fx-border-color: rgba(0,0,0,0.18); -fx-border-width: 1px;";
 
-	@FXML private Label userTitleLabel;
-	@FXML private Label userSubtitleLabel;
-	@FXML private Label userPermissionLabel;
-	@FXML private Label errorLabel;
-	@FXML private Button editButton;
-	@FXML private Button saveButton;
-	@FXML private Button cancelButton;
-	@FXML private Button addRoleButton;
-	@FXML private FlowPane rolesFlow;
-	@FXML private Label rolesEmptyLabel;
-	@FXML private VBox assignedCasesContainer;
-	@FXML private Label assignedCasesEmptyLabel;
-	@FXML private TextField assignedCasesSearchField;
-	@FXML private ChoiceBox<String> assignedCasesSortChoice;
-	@FXML private ScrollPane assignedCasesScroll;
-	@FXML private VBox assignedTasksContainer;
-	@FXML private Label assignedTasksEmptyLabel;
-	@FXML private TextField assignedTasksSearchField;
-	@FXML private ChoiceBox<String> assignedTasksSortChoice;
-	@FXML private Button assignedTasksCompletedToggleButton;
-	@FXML private ScrollPane assignedTasksScroll;
-	@FXML private ScrollPane pageScroll;
-	@FXML private FlowPane sectionsFlow;
-	@FXML private VBox pageContent;
-	@FXML private VBox userDetailsSection;
-	@FXML private ScrollPane userDetailsScroll;
-	@FXML private VBox tasksSection;
-	@FXML private VBox casesSection;
-	@FXML private VBox calendarSection;
-	@FXML private Label userCalendarTitleLabel;
-	@FXML private Button userCalendarNewEventButton;
-	@FXML private Button userCalendarRefreshButton;
-	@FXML private CheckBox userCalendarEventsLayerCheckBox;
-	@FXML private CheckBox userCalendarTasksLayerCheckBox;
-	@FXML private CheckBox userCalendarDeadlinesLayerCheckBox;
-	@FXML private CheckBox userCalendarCaseDatesLayerCheckBox;
-	@FXML private ScrollPane userCalendarScroll;
-	@FXML private VBox userCalendarAgendaBox;
-	@FXML private Label userCalendarStatusLabel;
+	@FXML
+	private Label userTitleLabel;
+	@FXML
+	private Label userSubtitleLabel;
+	@FXML
+	private Label userPermissionLabel;
+	@FXML
+	private Label errorLabel;
+	@FXML
+	private Button editButton;
+	@FXML
+	private Button saveButton;
+	@FXML
+	private Button cancelButton;
+	@FXML
+	private Button addRoleButton;
+	@FXML
+	private FlowPane rolesFlow;
+	@FXML
+	private Label rolesEmptyLabel;
+	@FXML
+	private VBox assignedCasesContainer;
+	@FXML
+	private Label assignedCasesEmptyLabel;
+	@FXML
+	private TextField assignedCasesSearchField;
+	@FXML
+	private ChoiceBox<String> assignedCasesSortChoice;
+	@FXML
+	private ScrollPane assignedCasesScroll;
+	@FXML
+	private VBox assignedTasksContainer;
+	@FXML
+	private Label assignedTasksEmptyLabel;
+	@FXML
+	private TextField assignedTasksSearchField;
+	@FXML
+	private ChoiceBox<String> assignedTasksSortChoice;
+	@FXML
+	private Button assignedTasksCompletedToggleButton;
+	@FXML
+	private ScrollPane assignedTasksScroll;
+	@FXML
+	private ScrollPane pageScroll;
+	@FXML
+	private FlowPane sectionsFlow;
+	@FXML
+	private VBox pageContent;
+	@FXML
+	private VBox userDetailsSection;
+	@FXML
+	private ScrollPane userDetailsScroll;
+	@FXML
+	private VBox tasksSection;
+	@FXML
+	private VBox casesSection;
+	@FXML
+	private VBox calendarSection;
+	@FXML
+	private Label userCalendarTitleLabel;
+	@FXML
+	private Button userCalendarNewEventButton;
+	@FXML
+	private Button userCalendarRefreshButton;
+	@FXML
+	private CheckBox userCalendarEventsLayerCheckBox;
+	@FXML
+	private CheckBox userCalendarTasksLayerCheckBox;
+	@FXML
+	private CheckBox userCalendarDeadlinesLayerCheckBox;
+	@FXML
+	private CheckBox userCalendarCaseDatesLayerCheckBox;
+	@FXML
+	private ScrollPane userCalendarScroll;
+	@FXML
+	private VBox userCalendarAgendaBox;
+	@FXML
+	private Label userCalendarStatusLabel;
 
-	@FXML private Label displayNameValue;
-	@FXML private Label firstNameValue;
-	@FXML private Button editFirstNameButton;
-	@FXML private TextField firstNameEditor;
-	@FXML private Label lastNameValue;
-	@FXML private Button editLastNameButton;
-	@FXML private TextField lastNameEditor;
-	@FXML private Label emailValue;
-	@FXML private Button editEmailButton;
-	@FXML private TextField emailEditor;
-	@FXML private Label phoneValue;
-	@FXML private Button editPhoneButton;
-	@FXML private TextField phoneEditor;
-	@FXML private Label initialsValue;
-	@FXML private Button editInitialsButton;
-	@FXML private TextField initialsEditor;
-	@FXML private HBox colorValueContainer;
-	@FXML private Region colorPreview;
-	@FXML private Label colorValue;
-	@FXML private Button editColorButton;
-	@FXML private HBox colorEditorContainer;
-	@FXML private ColorPicker colorEditor;
-	@FXML private Label colorEditorValue;
+	@FXML
+	private Label displayNameValue;
+	@FXML
+	private Label firstNameValue;
+	@FXML
+	private Button editFirstNameButton;
+	@FXML
+	private TextField firstNameEditor;
+	@FXML
+	private Label lastNameValue;
+	@FXML
+	private Button editLastNameButton;
+	@FXML
+	private TextField lastNameEditor;
+	@FXML
+	private Label emailValue;
+	@FXML
+	private Button editEmailButton;
+	@FXML
+	private TextField emailEditor;
+	@FXML
+	private Label phoneValue;
+	@FXML
+	private Button editPhoneButton;
+	@FXML
+	private TextField phoneEditor;
+	@FXML
+	private Label initialsValue;
+	@FXML
+	private Button editInitialsButton;
+	@FXML
+	private TextField initialsEditor;
+	@FXML
+	private HBox colorValueContainer;
+	@FXML
+	private Region colorPreview;
+	@FXML
+	private Label colorValue;
+	@FXML
+	private Button editColorButton;
+	@FXML
+	private HBox colorEditorContainer;
+	@FXML
+	private ColorPicker colorEditor;
+	@FXML
+	private Label colorEditorValue;
 
 	private Integer userId;
 	private UserDetailService userDetailService;
@@ -198,7 +260,8 @@ public final class UserController {
 	private static final double NARROW_LIST_HEIGHT = 360;
 	private static final double SECTION_HEIGHT_PADDING = 36;
 
-	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
+	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
+	{
 		Thread t = new Thread(r, "user-detail-loader");
 		t.setDaemon(true);
 		return t;
@@ -218,7 +281,8 @@ public final class UserController {
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.onOpenCase = onOpenCase;
-		this.onOpenUser = onOpenUser == null ? id -> {
+		this.onOpenUser = onOpenUser == null ? id ->
+		{
 		} : onOpenUser;
 		this.caseTaskService = caseTaskService;
 		this.phiReadAuditService = phiReadAuditService;
@@ -265,7 +329,8 @@ public final class UserController {
 	private void initializeAssignedCaseControls() {
 		assignedCasesFilterDebounce = new PauseTransition(Duration.millis(180));
 		assignedCasesFilterDebounce.setOnFinished(e -> renderAssignedCases());
-		CaseListFilterSortSupport.initializeControls(assignedCasesSearchField, assignedCasesSortChoice, () -> {
+		CaseListFilterSortSupport.initializeControls(assignedCasesSearchField, assignedCasesSortChoice, () ->
+		{
 			long filterStartNanos = PerfLog.start();
 			long generation = ++assignedCasesRenderSequence;
 			PerfLog.log("FILTER", "start", "panel=assigned_cases page=user_view userId=" + (currentUser == null ? null : currentUser.id())
@@ -298,7 +363,8 @@ public final class UserController {
 			return;
 		}
 		button.setTooltip(new Tooltip("Edit " + fieldLabel));
-		button.setOnAction(e -> {
+		button.setOnAction(e ->
+		{
 			if (!canEditCurrentUser()) {
 				setError("You do not have permission to edit this user.");
 				return;
@@ -399,7 +465,8 @@ public final class UserController {
 		if (assignedCasesContainer == null) {
 			return;
 		}
-		assignedCasesContainer.sceneProperty().addListener((obs, oldScene, newScene) -> {
+		assignedCasesContainer.sceneProperty().addListener((obs, oldScene, newScene) ->
+		{
 			if (newScene == null) {
 				unsubscribeLiveCaseUpdates();
 			} else {
@@ -455,15 +522,18 @@ public final class UserController {
 		}
 
 		setBusy(true);
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				long daoStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadUser page=user_view userId=" + userId + " organizationId=" + shaleClientId);
 				UserDetailRow loaded = userDetailService.loadUser(userId, shaleClientId);
 				PerfLog.logDone("DAO", "method=loadUser page=user_view userId=" + userId + " organizationId=" + shaleClientId + " rows=" + (loaded == null ? 0 : 1), daoStartNanos);
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					if (requestId != userLoadSequence) {
-						PerfLog.log("CTRL", "stale", "controller=UserController page=user_view userId=" + userId + " requestId=" + requestId + " activeRequestId=" + userLoadSequence);
+						PerfLog.log("CTRL", "stale", "controller=UserController page=user_view userId=" + userId + " requestId=" + requestId + " activeRequestId="
+								+ userLoadSequence);
 						return;
 					}
 					setBusy(false);
@@ -471,11 +541,11 @@ public final class UserController {
 						setError("User not found.");
 						return;
 					}
-						currentUser = loaded;
-						userDetailCache = new UserDetailCache(loaded.id(), loaded.shaleClientId());
-						resetAssignedCaseControls();
-						resetAssignedTaskControls();
-						renderFromCurrent();
+					currentUser = loaded;
+					userDetailCache = new UserDetailCache(loaded.id(), loaded.shaleClientId());
+					resetAssignedCaseControls();
+					resetAssignedTaskControls();
+					renderFromCurrent();
 					setEditMode(false);
 					clearError();
 					refreshRolesAsync();
@@ -485,7 +555,8 @@ public final class UserController {
 					PerfLog.logDone("NAV", "ready page=user_view userId=" + userId, pageLoadStartNanos);
 				});
 			} catch (Exception ex) {
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					setBusy(false);
 					setError("Failed to load user details.");
 				});
@@ -504,18 +575,23 @@ public final class UserController {
 		final int targetUserId = currentUser.id();
 		final int shaleClientId = currentUser.shaleClientId();
 		final long requestId = ++rolesRefreshSequence;
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				long assignedRolesStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadAssignedRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId);
 				List<UserRoleRow> loadedAssigned = userDetailService.loadAssignedRoles(targetUserId, shaleClientId);
-				PerfLog.logDone("DAO", "method=loadAssignedRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows=" + (loadedAssigned == null ? 0 : loadedAssigned.size()), assignedRolesStartNanos);
+				PerfLog.logDone("DAO", "method=loadAssignedRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows=" + (loadedAssigned == null
+						? 0
+						: loadedAssigned.size()), assignedRolesStartNanos);
 				long assignableRolesStartNanos = PerfLog.start();
 				List<UserRoleRow> loadedAssignable = canManageRoles()
 						? userDetailService.loadAssignableRoles(targetUserId, shaleClientId)
 						: List.of();
-				PerfLog.logDone("DAO", "method=loadAssignableRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows=" + (loadedAssignable == null ? 0 : loadedAssignable.size()), assignableRolesStartNanos);
-				Platform.runLater(() -> {
+				PerfLog.logDone("DAO", "method=loadAssignableRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows="
+						+ (loadedAssignable == null ? 0 : loadedAssignable.size()), assignableRolesStartNanos);
+				Platform.runLater(() ->
+				{
 					if (requestId != rolesRefreshSequence || currentUser == null || currentUser.id() != targetUserId) {
 						PerfLog.log("CTRL", "stale", "panel=roles page=user_view userId=" + targetUserId + " requestId=" + requestId);
 						return;
@@ -525,7 +601,8 @@ public final class UserController {
 					renderRoles();
 				});
 			} catch (Exception ex) {
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					assignedRoles = List.of();
 					assignableRoles = List.of();
 					renderRoles();
@@ -544,7 +621,8 @@ public final class UserController {
 			return;
 		}
 		final int targetUserId = currentUser.id();
-		if (userDetailCache != null && userDetailCache.matches(targetUserId, currentUser.shaleClientId()) && userDetailCache.assignedCases != null) {
+		final int targetShaleClientId = currentUser.shaleClientId();
+		if (userDetailCache != null && userDetailCache.matches(targetUserId, targetShaleClientId) && userDetailCache.assignedCases != null) {
 			assignedCases = userDetailCache.assignedCases;
 			PerfLog.log("CACHE", "hit", "panel=assigned_cases page=user_view userId=" + targetUserId + " rows=" + assignedCases.size());
 			renderAssignedCases();
@@ -557,13 +635,15 @@ public final class UserController {
 				+ " selectedUserId=" + targetUserId
 				+ " selectedUserName=\"" + targetUserName + "\""
 				+ " selectedUserEmail=\"" + targetUserEmail + "\"");
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				long assignedCasesStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadAssignedCases page=user_view userId=" + targetUserId);
-				List<CaseRow> loaded = userDetailService.loadAssignedCases(shaleClientId, targetUserId);
+				List<CaseRow> loaded = userDetailService.loadAssignedCases(targetShaleClientId, targetUserId);
 				PerfLog.logDone("DAO", "method=loadAssignedCases page=user_view userId=" + targetUserId + " rows=" + (loaded == null ? 0 : loaded.size()), assignedCasesStartNanos);
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					if (requestId != assignedCasesRefreshSequence || currentUser == null || currentUser.id() != targetUserId) {
 						System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
 								+ "requestId=" + requestId
@@ -572,7 +652,7 @@ public final class UserController {
 						return;
 					}
 					assignedCases = loaded == null ? List.of() : List.copyOf(loaded);
-					if (userDetailCache != null && userDetailCache.matches(targetUserId, currentUser.shaleClientId())) {
+					if (userDetailCache != null && userDetailCache.matches(targetUserId, targetShaleClientId)) {
 						userDetailCache.assignedCases = assignedCases;
 					}
 					System.out.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
@@ -584,7 +664,8 @@ public final class UserController {
 					renderAssignedCases();
 				});
 			} catch (Exception ex) {
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					System.err.println("[TRACE ASSIGNED_CASES][UserController.refreshAssignedCasesAsync] "
 							+ "requestId=" + requestId
 							+ " selectedUserId=" + targetUserId
@@ -621,12 +702,14 @@ public final class UserController {
 			renderAssignedTasks();
 		}
 		final long requestId = ++assignedTasksRefreshSequence;
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				long assignedTasksStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadAssignedTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId);
 				List<AssignedUserTaskRow> loaded = userDetailService.loadAssignedTasks(tenantId, targetUserId);
-				PerfLog.logDone("DAO", "method=loadAssignedTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId + " rows=" + (loaded == null ? 0 : loaded.size()), assignedTasksStartNanos);
+				PerfLog.logDone("DAO", "method=loadAssignedTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId + " rows=" + (loaded == null ? 0
+						: loaded.size()), assignedTasksStartNanos);
 				List<Long> taskIds = (loaded == null ? List.<AssignedUserTaskRow>of() : loaded).stream()
 						.map(AssignedUserTaskRow::taskId)
 						.toList();
@@ -641,10 +724,12 @@ public final class UserController {
 												row -> new TaskCardFactory.AssignedUserModel(
 														row.userId(),
 														row.displayName(),
-												row.color()),
+														row.color()),
 												java.util.stream.Collectors.toList())));
-				PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId + " rows=" + usersByTask.size(), assignedTaskUsersStartNanos);
-				Platform.runLater(() -> {
+				PerfLog.logDone("DAO", "method=loadAssignedUsersForTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId + " rows=" + usersByTask.size(),
+						assignedTaskUsersStartNanos);
+				Platform.runLater(() ->
+				{
 					if (requestId != assignedTasksRefreshSequence || currentUser == null || currentUser.id() != targetUserId) {
 						return;
 					}
@@ -657,7 +742,8 @@ public final class UserController {
 					renderAssignedTasks();
 				});
 			} catch (Exception ex) {
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					assignedTasks = List.of();
 					assignedTaskUsers = java.util.Map.of();
 					renderAssignedTasks();
@@ -666,7 +752,6 @@ public final class UserController {
 			}
 		});
 	}
-
 
 	private void initializeUserCalendarControls() {
 		setUserCalendarLayerDefaults();
@@ -677,36 +762,48 @@ public final class UserController {
 		List<CheckBox> boxes = List.of(userCalendarEventsLayerCheckBox, userCalendarTasksLayerCheckBox,
 				userCalendarDeadlinesLayerCheckBox, userCalendarCaseDatesLayerCheckBox).stream().filter(Objects::nonNull).toList();
 		for (CheckBox box : boxes) {
-			box.selectedProperty().addListener((obs, oldValue, newValue) -> {
+			box.selectedProperty().addListener((obs, oldValue, newValue) ->
+			{
 				updateUserCalendarSourceFilterFromControls();
 				renderUserCalendar(false);
 			});
 		}
-		if (userCalendarRefreshButton != null) userCalendarRefreshButton.setOnAction(e -> loadUserCalendarAsync(true));
-		if (userCalendarNewEventButton != null) userCalendarNewEventButton.setOnAction(e -> onUserCalendarNewEvent());
+		if (userCalendarRefreshButton != null)
+			userCalendarRefreshButton.setOnAction(e -> loadUserCalendarAsync(true));
+		if (userCalendarNewEventButton != null)
+			userCalendarNewEventButton.setOnAction(e -> onUserCalendarNewEvent());
 	}
 
 	private void setUserCalendarLayerDefaults() {
-		if (userCalendarEventsLayerCheckBox != null) userCalendarEventsLayerCheckBox.setSelected(true);
-		if (userCalendarTasksLayerCheckBox != null) userCalendarTasksLayerCheckBox.setSelected(true);
-		if (userCalendarDeadlinesLayerCheckBox != null) userCalendarDeadlinesLayerCheckBox.setSelected(true);
-		if (userCalendarCaseDatesLayerCheckBox != null) userCalendarCaseDatesLayerCheckBox.setSelected(true);
+		if (userCalendarEventsLayerCheckBox != null)
+			userCalendarEventsLayerCheckBox.setSelected(true);
+		if (userCalendarTasksLayerCheckBox != null)
+			userCalendarTasksLayerCheckBox.setSelected(true);
+		if (userCalendarDeadlinesLayerCheckBox != null)
+			userCalendarDeadlinesLayerCheckBox.setSelected(true);
+		if (userCalendarCaseDatesLayerCheckBox != null)
+			userCalendarCaseDatesLayerCheckBox.setSelected(true);
 		userCalendarSourceFilter = CalendarFeedSourceFilter.caseCalendarDefaults();
 	}
 
 	private void updateUserCalendarSourceFilterFromControls() {
 		EnumSet<CalendarFeedCategory> enabled = EnumSet.noneOf(CalendarFeedCategory.class);
-		if (userCalendarEventsLayerCheckBox == null || userCalendarEventsLayerCheckBox.isSelected()) enabled.add(CalendarFeedCategory.CALENDAR_EVENTS);
-		if (userCalendarTasksLayerCheckBox == null || userCalendarTasksLayerCheckBox.isSelected()) enabled.add(CalendarFeedCategory.TASKS);
-		if (userCalendarDeadlinesLayerCheckBox == null || userCalendarDeadlinesLayerCheckBox.isSelected()) enabled.add(CalendarFeedCategory.CASE_DEADLINES);
-		if (userCalendarCaseDatesLayerCheckBox == null || userCalendarCaseDatesLayerCheckBox.isSelected()) enabled.add(CalendarFeedCategory.OTHER_CASE_DATES);
+		if (userCalendarEventsLayerCheckBox == null || userCalendarEventsLayerCheckBox.isSelected())
+			enabled.add(CalendarFeedCategory.CALENDAR_EVENTS);
+		if (userCalendarTasksLayerCheckBox == null || userCalendarTasksLayerCheckBox.isSelected())
+			enabled.add(CalendarFeedCategory.TASKS);
+		if (userCalendarDeadlinesLayerCheckBox == null || userCalendarDeadlinesLayerCheckBox.isSelected())
+			enabled.add(CalendarFeedCategory.CASE_DEADLINES);
+		if (userCalendarCaseDatesLayerCheckBox == null || userCalendarCaseDatesLayerCheckBox.isSelected())
+			enabled.add(CalendarFeedCategory.OTHER_CASE_DATES);
 		userCalendarSourceFilter = new CalendarFeedSourceFilter(enabled);
 	}
 
 	private void resetAndLoadUserCalendar() {
 		userCalendarItems = List.of();
 		setUserCalendarLayerDefaults();
-		if (userCalendarScroll != null) userCalendarScroll.setVvalue(0.0);
+		if (userCalendarScroll != null)
+			userCalendarScroll.setVvalue(0.0);
 		loadUserCalendarAsync(true);
 	}
 
@@ -727,32 +824,43 @@ public final class UserController {
 		LocalDateTime start = today.minusMonths(USER_CALENDAR_PAST_MONTHS).atStartOfDay();
 		LocalDateTime end = today.plusMonths(USER_CALENDAR_UPCOMING_MONTHS).plusDays(1).atStartOfDay();
 		showUserCalendarMessage("Loading calendar…");
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				List<CalendarFeedItem> loaded = calendarService.listCalendarFeedForUserSchedule(targetTenantId, start, end, targetUserId);
-				Platform.runLater(() -> {
-					if (requestId != userCalendarRefreshSequence || currentUser == null || currentUser.id() != targetUserId) return;
+				Platform.runLater(() ->
+				{
+					if (requestId != userCalendarRefreshSequence || currentUser == null || currentUser.id() != targetUserId)
+						return;
 					userCalendarItems = loaded == null ? List.of() : List.copyOf(loaded);
 					renderUserCalendar(resetScroll);
 				});
 			} catch (RuntimeException ex) {
-				Platform.runLater(() -> { if (requestId == userCalendarRefreshSequence) showUserCalendarMessage("Failed to load user schedule."); });
+				Platform.runLater(() ->
+				{
+					if (requestId == userCalendarRefreshSequence)
+						showUserCalendarMessage("Failed to load user schedule.");
+				});
 			}
 		});
 	}
 
 	private void renderUserCalendar(boolean resetScroll) {
-		if (userCalendarTitleLabel != null) userCalendarTitleLabel.setText((currentUser == null ? "User" : safeText(currentUser.displayName())) + "'s Schedule");
-		if (userScheduleAgendaPane == null) return;
+		if (userCalendarTitleLabel != null)
+			userCalendarTitleLabel.setText((currentUser == null ? "User" : safeText(currentUser.displayName())) + "'s Schedule");
+		if (userScheduleAgendaPane == null)
+			return;
 		userScheduleAgendaPane.render(userCalendarItems, userCalendarSourceFilter,
 				"No user schedule layers selected.",
 				"No shared or user calendar items in this range.",
 				"No upcoming schedule items.");
-		if (resetScroll && userCalendarScroll != null) userCalendarScroll.setVvalue(0.0);
+		if (resetScroll && userCalendarScroll != null)
+			userCalendarScroll.setVvalue(0.0);
 	}
 
 	private void showUserCalendarMessage(String message) {
-		if (userScheduleAgendaPane != null) userScheduleAgendaPane.showMessage(message);
+		if (userScheduleAgendaPane != null)
+			userScheduleAgendaPane.showMessage(message);
 	}
 
 	private void openTaskFromCalendar(Long taskId) {
@@ -761,26 +869,36 @@ public final class UserController {
 	}
 
 	private void openCaseFromCalendar(Integer caseId) {
-		if (caseId != null && caseId > 0 && onOpenCase != null) onOpenCase.accept(caseId);
+		if (caseId != null && caseId > 0 && onOpenCase != null)
+			onOpenCase.accept(caseId);
 	}
 
 	private void onUserCalendarNewEvent() {
-		if (calendarService == null || appState == null || currentUser == null) return;
+		if (calendarService == null || appState == null || currentUser == null)
+			return;
 		Integer tenantId = appState.getShaleClientId();
-		if (tenantId == null || tenantId <= 0) return;
+		if (tenantId == null || tenantId <= 0)
+			return;
 		final int viewedUserId = currentUser.id();
 		final String viewedName = safeText(currentUser.displayName());
 		final String viewedColor = currentUser.color();
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				var eventTypes = calendarService.listEffectiveEventTypes(tenantId);
 				Platform.runLater(() -> NewCalendarEventDialog.showAndWait(taskDialogOwner(), eventTypes, LocalDate.now(), List.of(),
-						List.of(new NewCalendarEventDialog.AssignedUserOption(viewedUserId, viewedName, viewedColor))).ifPresent(value -> {
-					LocalDateTime startsAt = value.allDay() ? value.date().atStartOfDay() : value.date().atTime(value.startTime());
-					LocalDateTime endsAt = value.allDay() ? null : startsAt.plusMinutes(value.durationMinutes());
-					CalendarEvent event = new CalendarEvent(null, tenantId, value.calendarEventTypeId(), value.caseId(), null, value.title(), value.description(), startsAt, endsAt, value.allDay(), "MANUAL", null, null, value.assignedToUserId(), false, false, appState.getUserId(), null, null);
-					dbExec.submit(() -> { calendarService.createEvent(event); Platform.runLater(() -> loadUserCalendarAsync(false)); });
-				}));
+						List.of(new NewCalendarEventDialog.AssignedUserOption(viewedUserId, viewedName, viewedColor))).ifPresent(value ->
+						{
+							LocalDateTime startsAt = value.allDay() ? value.date().atStartOfDay() : value.date().atTime(value.startTime());
+							LocalDateTime endsAt = value.allDay() ? null : startsAt.plusMinutes(value.durationMinutes());
+							CalendarEvent event = new CalendarEvent(null, tenantId, value.calendarEventTypeId(), value.caseId(), null, value.title(), value.description(), startsAt,
+									endsAt, value.allDay(), "MANUAL", null, null, value.assignedToUserId(), false, false, appState.getUserId(), null, null);
+							dbExec.submit(() ->
+							{
+								calendarService.createEvent(event);
+								Platform.runLater(() -> loadUserCalendarAsync(false));
+							});
+						}));
 			} catch (RuntimeException ex) {
 				Platform.runLater(() -> showUserCalendarMessage("Unable to open the event dialog."));
 			}
@@ -788,26 +906,36 @@ public final class UserController {
 	}
 
 	private void openUserCalendarEventEditor(int eventId) {
-		if (calendarService == null || appState == null) return;
+		if (calendarService == null || appState == null)
+			return;
 		Integer tenantId = appState.getShaleClientId();
-		if (tenantId == null || tenantId <= 0) return;
-		dbExec.submit(() -> {
+		if (tenantId == null || tenantId <= 0)
+			return;
+		dbExec.submit(() ->
+		{
 			try {
 				CalendarEvent event = calendarService.getEventById(eventId, tenantId);
-				if (event == null) return;
+				if (event == null)
+					return;
 				var types = calendarService.listEffectiveEventTypes(tenantId);
-				var initial = new NewCalendarEventDialog.CreateCalendarEventInput(event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(), event.allDay() ? null : event.startsAt().toLocalTime(), 60, event.description(), event.caseId(), event.assignedToUserId());
-				Platform.runLater(() -> NewCalendarEventDialog.showEditDialog(taskDialogOwner(), types, initial, input -> {
+				var initial = new NewCalendarEventDialog.CreateCalendarEventInput(event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(), event
+						.allDay() ? null : event.startsAt().toLocalTime(), 60, event.description(), event.caseId(), event.assignedToUserId());
+				Platform.runLater(() -> NewCalendarEventDialog.showEditDialog(taskDialogOwner(), types, initial, input ->
+				{
 					LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
 					LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
-					calendarService.updateEvent(new CalendarEvent(event.calendarEventId(), event.shaleClientId(), input.calendarEventTypeId(), input.caseId(), event.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), event.sourceType(), event.sourceField(), event.sourceId(), input.assignedToUserId(), event.completed(), event.cancelled(), appState.getUserId(), event.createdAt(), event.updatedAt()));
+					calendarService.updateEvent(new CalendarEvent(event.calendarEventId(), event.shaleClientId(), input.calendarEventTypeId(), input.caseId(), event.taskId(), input
+							.title(), input.description(), startsAt, endsAt, input.allDay(), event.sourceType(), event.sourceField(), event.sourceId(), input.assignedToUserId(),
+							event.completed(), event.cancelled(), appState.getUserId(), event.createdAt(), event.updatedAt()));
 					loadUserCalendarAsync(false);
 					return null;
-				}, () -> {
+				}, () ->
+				{
 					calendarService.deleteCalendarEvent(event.calendarEventId(), tenantId);
 					loadUserCalendarAsync(false);
 					return null;
-				}, null, null, List.of(), List.of(new NewCalendarEventDialog.AssignedUserOption(event.assignedToUserId(), event.assignedToUserId() == null ? "Shared" : safeText(event.title()), null))));
+				}, null, null, List.of(), List.of(new NewCalendarEventDialog.AssignedUserOption(event.assignedToUserId(), event.assignedToUserId() == null ? "Shared"
+						: safeText(event.title()), null))));
 			} catch (RuntimeException ex) {
 				Platform.runLater(() -> showUserCalendarMessage("Unable to open this event."));
 			}
@@ -881,7 +1009,8 @@ public final class UserController {
 		dialog.getDialogPane().setContent(body);
 
 		Node save = dialog.getDialogPane().lookupButton(saveType);
-		save.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+		save.addEventFilter(javafx.event.ActionEvent.ACTION, e ->
+		{
 			String validationMessage = validateUserField(label, field.getText());
 			if (!validationMessage.isBlank()) {
 				error.setText(validationMessage);
@@ -921,7 +1050,8 @@ public final class UserController {
 		if (cancel == null) {
 			return;
 		}
-		cancel.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+		cancel.addEventFilter(javafx.event.ActionEvent.ACTION, e ->
+		{
 			if (hasChanges == null || !hasChanges.getAsBoolean()) {
 				return;
 			}
@@ -955,21 +1085,25 @@ public final class UserController {
 		setBusy(true);
 		long saveStartNanos = PerfLog.start();
 		PerfLog.log("SAVE", "start", "page=user_view userId=" + request.userId() + " organizationId=" + request.shaleClientId());
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				long daoStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=updateBasicProfile page=user_view userId=" + request.userId() + " organizationId=" + request.shaleClientId());
 				boolean updated = userDetailService.updateBasicProfile(request);
-				PerfLog.logDone("DAO", "method=updateBasicProfile page=user_view userId=" + request.userId() + " organizationId=" + request.shaleClientId() + " updated=" + updated, daoStartNanos);
+				PerfLog.logDone("DAO", "method=updateBasicProfile page=user_view userId=" + request.userId() + " organizationId=" + request.shaleClientId() + " updated=" + updated,
+						daoStartNanos);
 				if (!updated) {
-					Platform.runLater(() -> {
+					Platform.runLater(() ->
+					{
 						setBusy(false);
 						setError("User profile could not be saved.");
 					});
 					return;
 				}
 				UserDetailRow reloaded = userDetailService.loadUser(request.userId(), request.shaleClientId());
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					setBusy(false);
 					if (reloaded == null) {
 						setError("User could not be reloaded after save.");
@@ -986,7 +1120,8 @@ public final class UserController {
 					PerfLog.logDone("SAVE", "page=user_view userId=" + request.userId() + " organizationId=" + request.shaleClientId(), saveStartNanos);
 				});
 			} catch (Exception ex) {
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					setBusy(false);
 					setError("Failed to save user profile.");
 				});
@@ -1022,10 +1157,12 @@ public final class UserController {
 
 		UserRoleRow chosen = selected.get();
 		setBusy(true);
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				boolean added = userDetailService.addRoleToUser(currentUser.id(), chosen.roleId(), currentUser.shaleClientId());
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					setBusy(false);
 					if (!added) {
 						setError("Role could not be added. It may already be assigned.");
@@ -1036,7 +1173,8 @@ public final class UserController {
 					refreshRolesAsync();
 				});
 			} catch (Exception ex) {
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					setBusy(false);
 					setError("Failed to add role to this user.");
 				});
@@ -1065,10 +1203,12 @@ public final class UserController {
 		}
 
 		setBusy(true);
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				boolean removed = userDetailService.removeRoleFromUser(currentUser.id(), role.roleId(), currentUser.shaleClientId());
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					setBusy(false);
 					if (!removed) {
 						setError("Role could not be removed from this user.");
@@ -1079,7 +1219,8 @@ public final class UserController {
 					refreshRolesAsync();
 				});
 			} catch (Exception ex) {
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					setBusy(false);
 					setError("Failed to remove role from this user.");
 				});
@@ -1205,7 +1346,8 @@ public final class UserController {
 				assignedCasesEmptyLabel.setText("No assigned cases");
 			}
 		}
-		PerfLog.logDone("RENDER", "panel=assigned_cases page=user_view userId=" + (currentUser == null ? null : currentUser.id()) + " childCount=" + assignedCasesContainer.getChildren().size(), renderStartNanos);
+		PerfLog.logDone("RENDER", "panel=assigned_cases page=user_view userId=" + (currentUser == null ? null : currentUser.id()) + " childCount=" + assignedCasesContainer
+				.getChildren().size(), renderStartNanos);
 	}
 
 	private void initializeAssignedTaskControls() {
@@ -1223,10 +1365,12 @@ public final class UserController {
 			assignedTasksSearchField.textProperty().addListener((obs, oldV, newV) -> scheduleAssignedTasksRender());
 		}
 		if (assignedTasksCompletedToggleButton != null) {
-			assignedTasksCompletedToggleButton.setOnAction(e -> {
+			assignedTasksCompletedToggleButton.setOnAction(e ->
+			{
 				long toggleStartNanos = PerfLog.start();
 				showCompletedTasks = !showCompletedTasks;
-				PerfLog.log("FILTER", "start", "panel=assigned_tasks_completed_toggle page=user_view userId=" + (currentUser == null ? null : currentUser.id()) + " showCompleted=" + showCompletedTasks);
+				PerfLog.log("FILTER", "start", "panel=assigned_tasks_completed_toggle page=user_view userId=" + (currentUser == null ? null : currentUser.id()) + " showCompleted="
+						+ showCompletedTasks);
 				renderAssignedTasks();
 				PerfLog.logDone("FILTER", "panel=assigned_tasks_completed_toggle page=user_view showCompleted=" + showCompletedTasks, toggleStartNanos);
 			});
@@ -1287,7 +1431,8 @@ public final class UserController {
 				assignedTasksEmptyLabel.setText("No assigned tasks");
 			}
 		}
-		PerfLog.logDone("RENDER", "panel=assigned_tasks page=user_view userId=" + (currentUser == null ? null : currentUser.id()) + " childCount=" + assignedTasksContainer.getChildren().size(), renderStartNanos);
+		PerfLog.logDone("RENDER", "panel=assigned_tasks page=user_view userId=" + (currentUser == null ? null : currentUser.id()) + " childCount=" + assignedTasksContainer
+				.getChildren().size(), renderStartNanos);
 	}
 
 	private List<AssignedUserTaskRow> filteredAssignedTasks(String query) {
@@ -1566,7 +1711,8 @@ public final class UserController {
 		boolean currentlyCompleted = findAssignedTaskById(taskId)
 				.map(task -> task.completedAt() != null)
 				.orElse(false);
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				invalidateAssignedTasksCache();
 				if (currentlyCompleted) {
@@ -1615,7 +1761,8 @@ public final class UserController {
 			return;
 		}
 
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				TaskDetailDto detail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 				List<TaskStatusOptionDto> statuses = caseTaskService.loadActiveTaskStatuses(shaleClientId);
@@ -1623,35 +1770,36 @@ public final class UserController {
 				List<CaseTaskService.AssignedTaskUserOption> assignedTeam = detail == null
 						? List.of()
 						: caseTaskService.loadAssignedUsersForTask(detail.id(), shaleClientId);
-					List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
-							? List.of()
-							: caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
-									.map(item -> new TaskDetailDialog.TaskActivityEntry(
-											item.title(),
-											item.body(),
-											item.actorDisplayName(),
-											item.occurredAt()))
-									.toList();
-					List<TaskDetailDialog.TaskNoteEntry> noteEntries = detail == null
-							? List.of()
-							: caseTaskService.loadTaskNotes(detail.id(), shaleClientId).stream()
-									.map(note -> new TaskDetailDialog.TaskNoteEntry(
-											note.id(),
-											note.userId(),
-											note.userDisplayName(),
-											note.body(),
-											note.createdAt(),
-											note.updatedAt(),
-											note.userId() == currentUserId))
-									.toList();
-				Platform.runLater(() -> {
+				List<TaskDetailDialog.TaskActivityEntry> activityEntries = detail == null
+						? List.of()
+						: caseTaskService.loadTaskActivity(detail.id(), shaleClientId).stream()
+								.map(item -> new TaskDetailDialog.TaskActivityEntry(
+										item.title(),
+										item.body(),
+										item.actorDisplayName(),
+										item.occurredAt()))
+								.toList();
+				List<TaskDetailDialog.TaskNoteEntry> noteEntries = detail == null
+						? List.of()
+						: caseTaskService.loadTaskNotes(detail.id(), shaleClientId).stream()
+								.map(note -> new TaskDetailDialog.TaskNoteEntry(
+										note.id(),
+										note.userId(),
+										note.userDisplayName(),
+										note.body(),
+										note.createdAt(),
+										note.updatedAt(),
+										note.userId() == currentUserId))
+								.toList();
+				Platform.runLater(() ->
+				{
 					try {
 						if (detail == null) {
 							showTaskActionError("Task was not found or may have been deleted.");
 							refreshAssignedTasksAsync();
 							return;
 						}
-							TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
+						TaskDetailDialog.TaskDetailModel model = new TaskDetailDialog.TaskDetailModel(
 								detail.id(),
 								detail.caseId(),
 								detail.caseName(),
@@ -1662,22 +1810,22 @@ public final class UserController {
 								detail.casePrimaryStatusColor(),
 								detail.casePracticeAreaColor(),
 								detail.title(),
-						detail.description(),
-						detail.dueAt(),
-						detail.statusId(),
-						detail.priorityId(),
+								detail.description(),
+								detail.dueAt(),
+								detail.statusId(),
+								detail.priorityId(),
 								detail.createdByDisplayName(),
-									assignedTeam.stream()
-											.map(member -> new TaskDetailDialog.AssignedTeamMember(
-													member.userId(),
-													member.displayName(),
-													member.color()))
-											.toList(),
-										activityEntries,
-										noteEntries,
-										detail.completedAt() != null);
-							auditTaskRead(detail.id());
-							Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
+								assignedTeam.stream()
+										.map(member -> new TaskDetailDialog.AssignedTeamMember(
+												member.userId(),
+												member.displayName(),
+												member.color()))
+										.toList(),
+								activityEntries,
+								noteEntries,
+								detail.completedAt() != null);
+						auditTaskRead(detail.id());
+						Optional<TaskDetailDialog.TaskDetailResult> result = TaskDetailDialog.showAndWait(
 								"USER_CONTROLLER",
 								0L,
 								taskDialogOwner(),
@@ -1709,7 +1857,7 @@ public final class UserController {
 												note.updatedAt(),
 												note.userId() == currentUserId))
 										.toList(),
-									new TaskDetailDialog.AssignmentEditor() {
+								new TaskDetailDialog.AssignmentEditor() {
 									@Override
 									public List<TaskDetailDialog.AssignedTeamMember> addAndReload(int userId) {
 										caseTaskService.addTaskAssignment(model.taskId(), shaleClientId, userId, currentUserId);
@@ -1731,40 +1879,40 @@ public final class UserController {
 														member.color()))
 												.toList();
 									}
-									},
-									new TaskDetailDialog.NotesEditor() {
-										@Override
-										public List<TaskDetailDialog.TaskNoteEntry> addAndReload(String body) {
-											caseTaskService.addTaskNote(model.taskId(), shaleClientId, currentUserId, body);
-											return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
-													.map(note -> new TaskDetailDialog.TaskNoteEntry(
-															note.id(),
-															note.userId(),
-															note.userDisplayName(),
-															note.body(),
-															note.createdAt(),
-															note.updatedAt(),
-															note.userId() == currentUserId))
-													.toList();
-										}
+								},
+								new TaskDetailDialog.NotesEditor() {
+									@Override
+									public List<TaskDetailDialog.TaskNoteEntry> addAndReload(String body) {
+										caseTaskService.addTaskNote(model.taskId(), shaleClientId, currentUserId, body);
+										return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+												.map(note -> new TaskDetailDialog.TaskNoteEntry(
+														note.id(),
+														note.userId(),
+														note.userDisplayName(),
+														note.body(),
+														note.createdAt(),
+														note.updatedAt(),
+														note.userId() == currentUserId))
+												.toList();
+									}
 
-										@Override
-										public List<TaskDetailDialog.TaskNoteEntry> editAndReload(long noteId, String body) {
-											caseTaskService.updateTaskNote(noteId, shaleClientId, currentUserId, body);
-											return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
-													.map(note -> new TaskDetailDialog.TaskNoteEntry(
-															note.id(),
-															note.userId(),
-															note.userDisplayName(),
-															note.body(),
-															note.createdAt(),
-															note.updatedAt(),
-															note.userId() == currentUserId))
-													.toList();
-										}
-									},
-									this::onOpenUserFromTask,
-									onOpenCase);
+									@Override
+									public List<TaskDetailDialog.TaskNoteEntry> editAndReload(long noteId, String body) {
+										caseTaskService.updateTaskNote(noteId, shaleClientId, currentUserId, body);
+										return caseTaskService.loadTaskNotes(model.taskId(), shaleClientId).stream()
+												.map(note -> new TaskDetailDialog.TaskNoteEntry(
+														note.id(),
+														note.userId(),
+														note.userDisplayName(),
+														note.body(),
+														note.createdAt(),
+														note.updatedAt(),
+														note.userId() == currentUserId))
+												.toList();
+									}
+								},
+								this::onOpenUserFromTask,
+								onOpenCase);
 						if (result.isEmpty()) {
 							return;
 						}
@@ -1783,7 +1931,8 @@ public final class UserController {
 					}
 				});
 			} catch (Exception ex) {
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					taskDetailDialogInFlight.set(false);
 					showTaskActionError("Failed to load task details.");
 				});
@@ -1803,7 +1952,8 @@ public final class UserController {
 				payload.priorityId(),
 				payload.completed(),
 				currentUserId);
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseTaskService.updateTask(request);
 				Platform.runLater(this::refreshAssignedTasksAsync);
@@ -1815,7 +1965,8 @@ public final class UserController {
 
 	private void deleteTaskFromDetail(long taskId, int shaleClientId, int currentUserId) {
 		invalidateAssignedTasksCache();
-		new Thread(() -> {
+		new Thread(() ->
+		{
 			try {
 				caseTaskService.deleteTask(taskId, shaleClientId, currentUserId);
 				Platform.runLater(this::refreshAssignedTasksAsync);
@@ -1842,7 +1993,8 @@ public final class UserController {
 		}
 		if (colorEditor != null) {
 			colorEditor.setValue(DEFAULT_USER_COLOR);
-			colorEditor.setOnAction(e -> {
+			colorEditor.setOnAction(e ->
+			{
 				colorEditedInSession = true;
 				updateColorEditorValueLabel(colorEditor.getValue());
 			});
@@ -1988,43 +2140,74 @@ public final class UserController {
 
 	private enum UserField {
 		FIRST_NAME {
-			@Override String value(UserDetailRow user) { return user.firstName(); }
-			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+			@Override
+			String value(UserDetailRow user) {
+				return user.firstName();
+			}
+
+			@Override
+			UserProfileUpdateRequest request(UserDetailRow user, String value) {
 				return base(user, safeText(value), user.lastName(), user.email(), user.phone(), user.initials(), user.color());
 			}
 		},
 		LAST_NAME {
-			@Override String value(UserDetailRow user) { return user.lastName(); }
-			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+			@Override
+			String value(UserDetailRow user) {
+				return user.lastName();
+			}
+
+			@Override
+			UserProfileUpdateRequest request(UserDetailRow user, String value) {
 				return base(user, user.firstName(), safeText(value), user.email(), user.phone(), user.initials(), user.color());
 			}
 		},
 		EMAIL {
-			@Override String value(UserDetailRow user) { return user.email(); }
-			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+			@Override
+			String value(UserDetailRow user) {
+				return user.email();
+			}
+
+			@Override
+			UserProfileUpdateRequest request(UserDetailRow user, String value) {
 				return base(user, user.firstName(), user.lastName(), safeText(value), user.phone(), user.initials(), user.color());
 			}
 		},
 		PHONE {
-			@Override String value(UserDetailRow user) { return user.phone(); }
-			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+			@Override
+			String value(UserDetailRow user) {
+				return user.phone();
+			}
+
+			@Override
+			UserProfileUpdateRequest request(UserDetailRow user, String value) {
 				return base(user, user.firstName(), user.lastName(), user.email(), safeText(value), user.initials(), user.color());
 			}
 		},
 		INITIALS {
-			@Override String value(UserDetailRow user) { return user.initials(); }
-			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+			@Override
+			String value(UserDetailRow user) {
+				return user.initials();
+			}
+
+			@Override
+			UserProfileUpdateRequest request(UserDetailRow user, String value) {
 				return base(user, user.firstName(), user.lastName(), user.email(), user.phone(), safeText(value), user.color());
 			}
 		},
 		COLOR {
-			@Override String value(UserDetailRow user) { return user.color(); }
-			@Override UserProfileUpdateRequest request(UserDetailRow user, String value) {
+			@Override
+			String value(UserDetailRow user) {
+				return user.color();
+			}
+
+			@Override
+			UserProfileUpdateRequest request(UserDetailRow user, String value) {
 				return base(user, user.firstName(), user.lastName(), user.email(), user.phone(), user.initials(), safeText(value));
 			}
 		};
 
 		abstract String value(UserDetailRow user);
+
 		abstract UserProfileUpdateRequest request(UserDetailRow user, String value);
 
 		static UserProfileUpdateRequest base(UserDetailRow user, String firstName, String lastName, String email, String phone, String initials, String color) {
