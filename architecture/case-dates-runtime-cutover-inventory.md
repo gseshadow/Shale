@@ -321,3 +321,163 @@ architecture documentation. The database columns themselves are not changed.
 Final remaining Case Dates work is SQL Server integration/manual QA and the separately
 scoped schema support for Case Date Type entity-action auditing. This phase did not
 perform live SQL Server verification and does not claim it.
+
+## Final verification and sign-off status (2026-08-13)
+
+The final verification pass started from clean commit
+`fc35a132888739002fd58fb2c3717658256ac58d` on branch `work`. No configured
+development/test SQL Server connection was available in the verification environment:
+none of `SHALE_APP_DB_URL`, `SHALE_APP_JDBC_URL`, `SHALE_APP_DB_USER`,
+`SHALE_APP_USER`, `SHALE_APP_DB_PASSWORD`, or `SHALE_APP_PASS` was set, and no local
+environment file supplied them. Consequently **no live SQL was executed, no tenant or
+user was used, no disposable records were created, and no desktop or server process was
+claimed as manually verified**. Production was not contacted. This is a release-sign-off
+blocker, so the Case Dates roadmap remains incomplete.
+
+The production-source inventory was rerun for `CallerDate`/`CallerTime`,
+`DateOfInjury`, `DateOfMedicalNegligence`,
+`DateMedicalNegligenceWasDiscovered`, `StatuteOfLimitations`,
+`TortNoticeDeadline`, `DiscoveryDeadline`, `DateFeeAgreementSigned`, and
+`DateNonEngagementLetterSent`. It found no SQL read from or write to those
+`dbo.Cases` columns in an active runtime path. Remaining source hits are the frozen
+`MigratedCaseDateKey` compatibility identifiers, deprecated DTO/UI property and control
+names whose values are populated from authoritative mapped occurrences, null-valued
+compatibility aliases in `CaseDao`, and the approved PHI field registry. Migration,
+reconciliation, schema, validation, audit, and architecture references remain preserved.
+
+The forward-only
+`docs/sql/2026-08-12_entity_action_audit_entity_type_constraint.sql` migration is present
+after the 2026-07-20 audit foundation and the intervening allowlist extensions. Its
+contract test verifies that `CASE_DATE_TYPE` and the complete emitted vocabulary are
+included, exactly one positively parsed allowlist is replaced, unrelated checks are
+unchanged, existing incompatible rows fail before DDL, and reruns are transactional,
+rollback-safe, and leave one enabled, trusted canonical constraint. Deployment must run
+this schema migration **before** the application version that emits `CASE_DATE_TYPE`;
+filename ordering is not a substitute for verifying the deployment runner's actual
+order.
+
+### Required live verification (still outstanding)
+
+Use only an explicitly approved disposable development/test tenant and active admin/user;
+record the server/database name, tenant id, actor id, Case ids, UTC test window, and
+application commit, but never credentials. First deploy the pending schema migration,
+then execute these read-only checks from a fresh runtime connection after the normal
+connection initializer has set session context:
+
+```sql
+SELECT CONVERT(int, SESSION_CONTEXT(N'ShaleClientId')) AS ShaleClientId,
+       CONVERT(int, SESSION_CONTEXT(N'PrincipalUserId')) AS PrincipalUserId;
+
+SELECT name, is_enabled, is_not_trusted
+FROM sys.check_constraints
+WHERE parent_object_id = OBJECT_ID(N'dbo.EntityActionAuditLog')
+  AND name = N'CK_EntityActionAuditLog_EntityType';
+
+SELECT definition
+FROM sys.check_constraints
+WHERE parent_object_id = OBJECT_ID(N'dbo.EntityActionAuditLog')
+  AND name = N'CK_EntityActionAuditLog_EntityType'
+  AND definition LIKE N'%CASE_DATE_TYPE%';
+
+SELECT sp.name AS PolicyName, OBJECT_SCHEMA_NAME(pr.target_object_id) AS SchemaName,
+       OBJECT_NAME(pr.target_object_id) AS TableName, pr.operation_desc, pr.predicate_definition
+FROM sys.security_policies AS sp
+JOIN sys.security_predicates AS pr ON pr.object_id = sp.object_id
+WHERE pr.target_object_id IN
+ (OBJECT_ID(N'dbo.CaseDateTypes'), OBJECT_ID(N'dbo.CaseDates'),
+  OBJECT_ID(N'dbo.CaseDateTypeSemanticRoleMappings'),
+  OBJECT_ID(N'dbo.FormConfigurations'), OBJECT_ID(N'dbo.FormConfiguredFields'),
+  OBJECT_ID(N'dbo.EntityActionAuditLog'))
+ORDER BY TableName, pr.operation_desc;
+
+SELECT ShaleClientId, COUNT_BIG(*) AS VisibleRows FROM dbo.CaseDateTypes GROUP BY ShaleClientId;
+SELECT ShaleClientId, COUNT_BIG(*) AS VisibleRows FROM dbo.CaseDates GROUP BY ShaleClientId;
+SELECT ShaleClientId, COUNT_BIG(*) AS VisibleRows
+FROM dbo.CaseDateTypeSemanticRoleMappings GROUP BY ShaleClientId;
+SELECT ShaleClientId, COUNT_BIG(*) AS VisibleRows FROM dbo.FormConfigurations GROUP BY ShaleClientId;
+SELECT ShaleClientId, COUNT_BIG(*) AS VisibleRows FROM dbo.FormConfiguredFields GROUP BY ShaleClientId;
+SELECT ShaleClientId, COUNT_BIG(*) AS VisibleRows
+FROM dbo.EntityActionAuditLog GROUP BY ShaleClientId;
+```
+
+Expected results: both session values equal the authenticated disposable principal;
+the canonical audit constraint is enabled/trusted and contains `CASE_DATE_TYPE`; all six
+areas have enabled tenant predicates appropriate to their global/tenant ownership model;
+and runtime visibility contains only global rows where explicitly allowed plus the
+session tenant's rows. Repeat using a second disposable tenant and prove that known ids
+from the first tenant return the same safe not-found result as nonexistent ids. Clear or
+mismatch each session value on a fresh disposable connection and prove all protected
+reads/writes fail closed. Do not alter read-only session context on a pooled connection.
+
+Through the real DAO/service and desktop/web clients—not ad-hoc SQL—run rollback-contained
+or disposable-record scenarios for:
+
+1. Tenant-effective global/type precedence, protected semantic mappings, missing versus
+   explicitly empty form configuration, field order/required state, and active,
+   inactive, deleted/reset, and restored definitions.
+2. Date-only (`AllDay=1`, midnight, no fabricated end) and timed (`SupportsTime=1`, exact
+   start/end) occurrences, explicit null/absent slots, and rejection of timed values for
+   non-timed types.
+3. Case Date create, update, soft-delete, restore, and remove/reset; and Case Date Type
+   create, update, activate, deactivate, delete/reset, and restore. Reuse an old RowVer
+   to prove stale-write rejection.
+4. Snapshot `EntityActionAuditLog` immediately before and after every type mutation,
+   scoped by tenant, entity id, and the recorded UTC window. Each success must add exactly
+   one `CASE_DATE_TYPE` event with the correct action and metadata containing only
+   `CASE_DATE_TYPE_ID` and `ACTIVE`. Validation, stale RowVer, cross-tenant, injected audit
+   failure, and injected transaction/commit failure must change neither domain nor audit
+   counts.
+5. Snapshot `CalendarEvents` counts and ids for the disposable Case before and after every
+   Case Date mutation. The count must not increase and no duplicate event may appear.
+6. Desktop New Intake and Case Overview/Dates, followed by grids, boards, Search, User
+   Detail, related Cases, reports, exports, Calendar, and generated Case Summary. Only
+   tenant-effective active configured types may render for new selection; Intake Date
+   appears once in Dates with the correct default; authoritative values/nulls persist;
+   deleted historical values can be restored; and live refresh occurs only after commit.
+7. Server/web existing GET/PATCH and new POST, Search, assigned/My Cases, and Organization
+   related Cases. Inspect requests and responses to prove `mappedCaseDates`/`caseDates` are
+   authoritative, date-only values are ISO-8601 strings, timed values and nulls survive,
+   and migrated scalar aliases are rejected as write authority.
+
+After each successful disposable mutation, run these exact evidence queries with bound
+parameters (never concatenate ids):
+
+```sql
+SELECT Id, ShaleClientId, CaseId, CaseDateTypeId, StartsAt, EndsAt, AllDay,
+       IsDeleted, DeletedAt, UpdatedAt, RowVer
+FROM dbo.CaseDates
+WHERE ShaleClientId = @TenantId AND CaseId = @CaseId
+ORDER BY Id;
+
+SELECT Id, ShaleClientId, SystemKey, SupportsTime, IsActive, IsDeleted, RowVer
+FROM dbo.CaseDateTypes
+WHERE (ShaleClientId IS NULL OR ShaleClientId = @TenantId)
+ORDER BY SystemKey, ShaleClientId, Id;
+
+SELECT Id, EntityType, EntityId, Action, Metadata, OccurredAt
+FROM dbo.EntityActionAuditLog
+WHERE ShaleClientId = @TenantId AND OccurredAt >= @StartedAt
+  AND (EntityType = 'CASE_DATE_TYPE' OR EntityType = 'CASE_DATE')
+ORDER BY Id;
+
+SELECT Id, CaseId, StartsAt, EndsAt, IsCancelled
+FROM dbo.CalendarEvents
+WHERE CaseId = @CaseId
+ORDER BY Id;
+```
+
+Record redacted screenshots/logs and before/after result counts. Roll back the enclosing
+test transaction where supported; otherwise remove only the specifically approved
+disposable records through normal application lifecycle operations. A successful web
+typecheck/build is not a substitute for these scenarios. The full Maven test was also
+blocked in this environment because Maven Central returned HTTP 403 for the Spring Boot
+3.3.4 BOM; rerun it in the approved build environment with dependency access.
+
+Legacy-column removal remains deferred until a separate approved phase after at least
+one release/rollback observation window and every prerequisite in **Deferred removal
+gate** above is evidenced. In particular: rerun the static allowlist gate; reconfirm exact
+post-migration reconciliation and the approved disposition of all 610 anomalies without
+backfilling; prove no supported scalar API/client dependency; verify reports/exports,
+RLS, overlay precedence, concurrency, audit rollback, `UpdatedAt`, history/restore,
+time/null semantics, and Calendar routing; retire column-based rollback; and review a
+dedicated backup/validation/rollback plan. This phase creates no removal migration.
