@@ -95,14 +95,18 @@ final class CaseDaoCasesGridQueryTest {
     }
 
     @Test
-    void caseOverviewQueryHydratesTortNoticeDeadline() throws Exception {
+    void caseOverviewQueryDoesNotHydrateMigratedDates() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
         String method = source.substring(source.indexOf("public com.shale.core.dto.CaseOverviewDto getOverview"), source.indexOf("private List<com.shale.core.dto.CaseOverviewDto.ContactSummary>"));
 
-        assertTrue(method.contains("c.TortNoticeDeadline"),
-                "Case Overview query should select the existing TortNoticeDeadline column.");
-        assertTrue(method.contains("toLocalDate(rs.getDate(\"TortNoticeDeadline\"))"),
-                "Case Overview DTO should be hydrated from the selected TortNoticeDeadline column.");
+        assertFalse(method.contains("c.CallerDate"));
+        assertFalse(method.contains("c.DateOfInjury"));
+        assertFalse(method.contains("c.StatuteOfLimitations"));
+        assertFalse(method.contains("c.TortNoticeDeadline"));
+        assertFalse(method.contains("rs.getDate(\"CallerDate\")"));
+        assertFalse(method.contains("rs.getDate(\"DateOfInjury\")"));
+        assertFalse(method.contains("rs.getDate(\"StatuteOfLimitations\")"));
+        assertFalse(method.contains("rs.getDate(\"TortNoticeDeadline\")"));
     }
 
     @Test

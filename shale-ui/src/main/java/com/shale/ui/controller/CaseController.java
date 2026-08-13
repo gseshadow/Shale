@@ -4946,10 +4946,10 @@ public class CaseController {
 				overview.getPracticeAreaId(),
 				overview.getPracticeArea(),
 				overview.getPracticeAreaColor(),
-				overview.getIntakeDate(),
-				overview.getIncidentDate(),
-				overview.getSolDate(),
-				overview.getTortNoticeDeadline(),
+				null,
+				null,
+				null,
+				null,
 				effectiveCallerId,
 				overview.getPrimaryClientContactId(),
 				effectiveOpposingCounselId,
@@ -7156,39 +7156,6 @@ public class CaseController {
 		return rawPatchJson.regionMatches(true, i, "null", 0, 4);
 	}
 
-	private static CaseOverviewDto copyOverviewWithDates(CaseOverviewDto base, LocalDate incidentDate, LocalDate solDate) {
-		return new CaseOverviewDto(
-				base.getCaseId(),
-				base.getCaseNumber(),
-				base.getCaseName(),
-				base.getCaseStatus(),
-				base.getPrimaryStatusId(),
-				base.getPrimaryStatusColor(),
-				base.getResponsibleAttorneyUserId(),
-				base.getResponsibleAttorney(),
-				base.getResponsibleAttorneyColor(),
-				base.getPrimaryLegalAssistantUserId(),
-				base.getPrimaryLegalAssistant(),
-				base.getPrimaryLegalAssistantColor(),
-				base.getPracticeAreaId(),
-				base.getPracticeArea(),
-				base.getPracticeAreaColor(),
-				base.getIntakeDate(),
-				incidentDate,
-				solDate,
-				base.getTortNoticeDeadline(),
-				base.getPrimaryCallerContactId(),
-				base.getPrimaryClientContactId(),
-				base.getPrimaryOpposingCounselContactId(),
-				base.getCaller(),
-				base.getClient(),
-				base.getClients(),
-				base.getOpposingCounsel(),
-				base.getTeam(),
-				base.getDescription()
-		);
-	}
-
 	private static String extractPatchString(String rawPatchJson, String key) {
 		if (rawPatchJson == null || rawPatchJson.isBlank() || key == null || key.isBlank())
 			return null;
@@ -7686,6 +7653,8 @@ public class CaseController {
 					safeText(current.getDescription()),
 					safeText(current.getCaseNumber()).trim(),
 					currentOverview,
+					authoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY),
+					authoritativeDate(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS),
 					authoritativeDate(MigratedCaseDateKey.TORT_NOTICE_DEADLINE),
 					current.getSummary(),
 					expectedRowVer
@@ -7808,7 +7777,7 @@ public class CaseController {
 							request.userId(),
 							CaseDao.CaseTimelineEventTypes.INCIDENT_DATE_CHANGED,
 							"Incident date changed",
-							baseOverview == null ? null : baseOverview.getIncidentDate(),
+							request.baseline().incidentDate(),
 							request.desired().desiredIncidentDate()
 					);
 				}
@@ -7819,7 +7788,7 @@ public class CaseController {
 							request.userId(),
 							CaseDao.CaseTimelineEventTypes.SOL_DATE_CHANGED,
 							"SOL date changed",
-							baseOverview == null ? null : baseOverview.getSolDate(),
+							request.baseline().solDate(),
 							request.desired().desiredSolDate()
 					);
 				}
@@ -7902,8 +7871,8 @@ public class CaseController {
 			CaseOverviewDto baseOverview = request.baseline().baseOverview();
 			SaveDesiredValues desired = request.desired();
 
-			LocalDate baseIncidentDate = baseOverview == null ? null : baseOverview.getIncidentDate();
-			LocalDate baseSolDate = baseOverview == null ? null : baseOverview.getSolDate();
+			LocalDate baseIncidentDate = request.baseline().incidentDate();
+			LocalDate baseSolDate = request.baseline().solDate();
 			LocalDate baseTortNoticeDeadline = request.baseline().tortNoticeDeadline();
 
 			boolean incidentChanged = !Objects.equals(desired.desiredIncidentDate(), baseIncidentDate);
@@ -8120,6 +8089,8 @@ public class CaseController {
 			String oldDescription,
 			String oldNumber,
 			CaseOverviewDto baseOverview,
+			LocalDate incidentDate,
+			LocalDate solDate,
 			LocalDate tortNoticeDeadline,
 			String summary,
 			byte[] expectedRowVer
@@ -8924,15 +8895,6 @@ public class CaseController {
 				} else if (isPatchExplicitNull(patch.rawPatch(), "solDate")) {
 					nextSolDate = null;
 					solApplied = true;
-				}
-			}
-
-			if (incidentApplied || solApplied) {
-				CaseOverviewDto base = currentOverview;
-				if (base != null) {
-					LocalDate mergedIncident = incidentApplied ? nextIncidentDate : base.getIncidentDate();
-					LocalDate mergedSol = solApplied ? nextSolDate : base.getSolDate();
-					currentOverview = copyOverviewWithDates(base, mergedIncident, mergedSol);
 				}
 			}
 
