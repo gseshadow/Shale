@@ -119,8 +119,7 @@ final class CaseSummaryDaoContractTest {
 
 	@Test void assignedBoardIsOneSetBasedAuthoritativeSnapshot() throws Exception {
 		String source = source();
-		String board = source.substring(source.indexOf("public List<CaseBoardRow> listActiveAssignedBoard"),
-				source.indexOf("static String statusPredicate"));
+		String board = method(source, "public List<CaseBoardRow> listActiveAssignedBoard");
 		assertTrue(board.contains("verifyTenant(con, requestedTenantId)"));
 		assertTrue(board.contains("verifyEligibleAssignedUser(con, requestedTenantId, assignedUserId)"));
 		assertTrue(board.contains("c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0"));

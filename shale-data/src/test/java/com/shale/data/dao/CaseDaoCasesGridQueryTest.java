@@ -12,20 +12,22 @@ import org.junit.jupiter.api.Test;
 final class CaseDaoCasesGridQueryTest {
 
     @Test
-    void everyPagingEntryPointChoosesAnExplicitDateAuthorityMode() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        assertTrue(source.contains("AUTHORITATIVE_MIGRATED_DATES = true"));
-        assertTrue(source.contains("LEGACY_MIGRATED_DATE_COMPATIBILITY = false"));
-        assertTrue(source.contains("null, null, null, null, AUTHORITATIVE_MIGRATED_DATES)"),
-                "The general public Cases paging entry point must use authoritative migrated dates");
-        assertTrue(source.contains("selectedStatusIds, knownTotal, AUTHORITATIVE_MIGRATED_DATES)"),
-                "The converted Cases grid path must be authoritative");
-        assertTrue(source.contains("null, AUTHORITATIVE_MIGRATED_DATES))"),
-                "The converted Cases export path must be authoritative");
-        assertTrue(source.contains("userId, null, null, null, LEGACY_MIGRATED_DATE_COMPATIBILITY)"),
-                "Deferred MyShale paging must remain explicitly compatible");
-        long internalCalls = source.lines().filter(line -> line.contains("findPageInternal(")).count();
-        assertEquals(5, internalCalls, "Four callers plus the private declaration must be reviewed together");
+    void activePagingUsesOnlyTheAuthoritativeCaseSummaryBoundary() throws Exception {
+        String legacyDao = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+        String summaryDao = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseSummaryDao.java"));
+        String page = method(summaryDao, "public GridPage findActiveGridPage");
+        String query = method(summaryDao, "private static String gridSql");
+
+        assertTrue(page.contains("gridSql(searchPredicate, statusPredicate, orderBy)"));
+        assertTrue(page.contains("bindGridCriteria(ps, requestedTenantId"));
+        assertTrue(page.contains("OFFSET") || query.contains("OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"));
+        assertTrue(query.contains("FROM dbo.CaseDates"));
+        assertTrue(query.contains("CaseDateTypeSemanticRoleMappings"));
+        assertFalse(query.contains("c.CallerDate"));
+        assertFalse(query.contains("c.StatuteOfLimitations"));
+        assertFalse(query.contains("c.TortNoticeDeadline"));
+        assertFalse(legacyDao.contains("AUTHORITATIVE_MIGRATED_DATES"));
+        assertFalse(legacyDao.contains("LEGACY_MIGRATED_DATE_COMPATIBILITY"));
     }
 
     @Test
@@ -52,17 +54,18 @@ final class CaseDaoCasesGridQueryTest {
 
     @Test
     void authoritativeDateSortIsGlobalParameterizedAndHasNoLegacyFallback() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        String boundaryDate = source.substring(source.indexOf("private static String authoritativeBoundaryDateApplySql"),
-                source.indexOf("private static boolean requiresAuthoritativeDateSort"));
-        assertTrue(boundaryDate.contains("MAX(cd.StartsAt) AS SortDate"));
-        assertTrue(boundaryDate.contains("role_mapping.SemanticRoleKey=?"));
-        assertTrue(boundaryDate.contains("cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId"));
-        assertFalse(boundaryDate.contains("c.CallerDate"));
-        assertFalse(boundaryDate.contains("c.StatuteOfLimitations"));
-        assertTrue(source.contains("authoritativeSortSemanticRole(effectiveSort)"));
-        assertTrue(source.contains("boundary_date.SortDate\" : \"c.CallerDate"));
-        assertTrue(source.contains("boundary_date.SortDate\" : \"c.StatuteOfLimitations"));
+        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseSummaryDao.java"));
+        String query = method(source, "private static String gridSql");
+        String ordering = method(source, "private static String gridOrderSql");
+        assertTrue(query.contains("FROM dbo.CaseDates cd"));
+        assertTrue(query.contains("cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId"));
+        assertTrue(query.contains("cd.IsDeleted=0"));
+        assertTrue(query.contains("effective.SemanticRoleKey='INTAKE'"));
+        assertTrue(query.contains("effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS'"));
+        assertTrue(ordering.contains("dates.IntakeDate"));
+        assertTrue(ordering.contains("dates.StatuteDate"));
+        for (String legacy : new String[] { "c.CallerDate", "c.DateOfInjury", "c.StatuteOfLimitations", "c.TortNoticeDeadline" })
+            assertFalse(query.contains(legacy), legacy + " must not be a paging fallback");
     }
 
     @Test
@@ -126,12 +129,17 @@ final class CaseDaoCasesGridQueryTest {
         assertTrue(source.contains("ORDER BY cu.CreatedAt DESC, cu.Id DESC"));
     }
 
-
-
-
-
-
-
-
+    private static String method(String source, String signature) {
+        int start = source.indexOf(signature);
+        int open = source.indexOf('{', start);
+        assertTrue(start >= 0 && open >= 0, "Missing method: " + signature);
+        int depth = 0;
+        for (int i = open; i < source.length(); i++) {
+            char ch = source.charAt(i);
+            if (ch == '{') depth++;
+            else if (ch == '}' && --depth == 0) return source.substring(start, i + 1);
+        }
+        throw new AssertionError("Unbalanced method: " + signature);
+    }
 
 }
