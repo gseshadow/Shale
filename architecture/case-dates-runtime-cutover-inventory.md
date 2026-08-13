@@ -272,3 +272,52 @@ guards are unchanged.
 The legacy `CaseDao.listActiveCasesForUserTeamMember` query and its obsolete SQL test were removed after
 production no-caller proof; focused authoritative and no-caller coverage replaces it. No live SQL Server
 verification was performed. Desktop document generation and `CaseDao.getOverview` cleanup are next.
+
+## Final runtime compatibility cleanup and desktop intake hardening (2026-08-13)
+
+Production call-site reconfirmation found no runtime consumer of the scalar
+`CaseDao.createBasicCase`/`insertBasicCase`, `CaseDao.updateCase`,
+`CaseDao.updateCaseDetails`, `ContactDao.findRelatedCases`,
+`CaseDao.findMyCasesPage`, `CaseDao.listAssignedCasesForBoard`,
+`CaseDao.searchCasesByName`, `CaseDao.searchDeletedCasesByName`,
+`CaseDao.getCaseRow`, `CaseDao.getMyCaseRow`, or the two legacy Case Status report
+methods. The production replacements were already `CaseDateDao.createCaseAggregate`,
+non-migrated and authoritative aggregate update boundaries, `CaseSummaryDao` related,
+search/deleted, assigned/MyShale, report, export, and single-row projections. Those
+dead methods and the unused `CaseGateway.updateCase` declaration/delegation were
+removed. The active web creation gateway was renamed `createCaseAggregate`; it still
+delegates to the single `CaseDateDao` aggregate transaction and is not a second create
+path. Broad `CaseDao` paging composition no longer has a legacy-date mode: when date
+sorting is requested it always resolves `CaseDates`, and its compatibility-shaped date
+columns are null rather than selected from `Cases`.
+
+Desktop New Intake now requires the current authoritative `NEW_INTAKE`
+`FormConfigurations` row and matching row version. A missing configuration raises the
+existing safe reload/configuration exception during validation, before party-role
+seeding, Contact, Case, CaseDate, status, party, audit, timeline, publication, or any
+other persistence. A changed configuration retains the same fail-closed reload
+message. The only reachable Case insert is the configured insert, which omits all nine
+migrated date meanings (and `CallerTime`); configured values create `CaseDates` in the
+same transaction. Existing commit, rollback, child/contact/party/status construction,
+intake attribution, audit ownership, and post-commit behavior are unchanged.
+
+Intentionally retained compatibility is narrow and consumer-proven:
+`CaseDao.getOverview` remains used by desktop Case View non-date hydration and document
+composition; its dates are authoritatively overlaid before consumption.
+`CaseOverviewDto` date getters remain part of the server JSON/desktop DTO response and
+are populated from authoritative projections. Deprecated `CaseDetailDto` date aliases
+remain server compatibility properties and derive from `mappedCaseDates`. The
+`MigratedCaseDateKey` identifiers and historical PHI/audit field vocabulary remain
+unchanged. Accepted, denied, and closed workflow dates, plus
+`FeeAgreementSigned` and `NonEngagementLetterSent`, remain on their independent
+workflow paths.
+
+No active production create or update path writes any of the nine migrated
+`dbo.Cases` date columns, and no active production read uses them. Their names remain
+only where required for historical migration, reconciliation, rollback, schema and
+validation evidence, PHI/audit vocabulary, frozen compatibility identifiers, and
+architecture documentation. The database columns themselves are not changed.
+
+Final remaining Case Dates work is SQL Server integration/manual QA and the separately
+scoped schema support for Case Date Type entity-action auditing. This phase did not
+perform live SQL Server verification and does not claim it.

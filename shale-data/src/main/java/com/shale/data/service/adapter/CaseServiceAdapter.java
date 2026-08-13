@@ -143,7 +143,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 				.filter(status -> !status.closed())
 				.findFirst()
 				.orElseThrow(() -> new IllegalStateException("No active non-closed case status is available for this tenant."));
-		long caseId = caseGateway.createBasicCase(command, initialStatus.id());
+		long caseId = caseGateway.createCaseAggregate(command, initialStatus.id());
 		return caseGateway.getDetail(caseId);
 	}
 
@@ -1046,15 +1046,12 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 		void updateCaseAssignment(long caseId, int shaleClientId, int practiceAreaId, int responsibleAttorneyUserId);
 
-		CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
-				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
-				byte[] expectedRowVer, Integer actorUserId);
 
 		default void updateExistingCaseAggregate(UpdateCaseCoreDetailsCommand command) {
 			throw new UnsupportedOperationException("Existing-case aggregate update is unavailable.");
 		}
 
-		long createBasicCase(CreateCaseCommand command, int statusId);
+		long createCaseAggregate(CreateCaseCommand command, int statusId);
 	}
 
 	private record DaoCaseGateway(CaseDao caseDao, CaseDateDao caseDateDao, CaseSummaryDao caseSummaryDao) implements CaseGateway {
@@ -1399,14 +1396,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		}
 
 		@Override
-		public CaseDetailDto updateCase(long caseId, String name, String caseNumber, String description,
-				LocalDate incidentDate, LocalDate solDate, LocalDate tortNoticeDeadline, String summary,
-				byte[] expectedRowVer, Integer actorUserId) {
-			return caseDao.updateCase(caseId, name, caseNumber, description, incidentDate, solDate, tortNoticeDeadline, summary, expectedRowVer, actorUserId);
-		}
-
-		@Override
-		public long createBasicCase(CreateCaseCommand command, int statusId) {
+		public long createCaseAggregate(CreateCaseCommand command, int statusId) {
 			return caseDateDao.createCaseAggregate(caseDao, command, statusId);
 		}
 	}

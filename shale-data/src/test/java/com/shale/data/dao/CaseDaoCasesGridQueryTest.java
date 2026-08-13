@@ -125,106 +125,13 @@ final class CaseDaoCasesGridQueryTest {
         assertTrue(source.contains("cu.NoteText"));
         assertTrue(source.contains("ORDER BY cu.CreatedAt DESC, cu.Id DESC"));
     }
-    @Test
-    void activeCaseSearchRestoresLatestUpdateAlias() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        String method = source.substring(source.indexOf("public List<CaseRow> searchCasesByName"), source.indexOf("public List<CaseRow> searchDeletedCasesByName"));
 
-        assertTrue(method.contains("latestUpdate.LatestCaseUpdate"));
-        assertTrue(method.contains(") latestUpdate"),
-                "Active case search must define the latestUpdate OUTER APPLY alias used by the SELECT list");
-        assertTrue(method.contains("FROM dbo.CaseUpdates cu"));
-        assertTrue(method.contains("ORDER BY cu.CreatedAt DESC, cu.Id DESC"));
-    }
 
-    @Test
-    void deletedCaseSearchRestoresLatestUpdateAlias() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        String method = source.substring(source.indexOf("public List<CaseRow> searchDeletedCasesByName"), source.indexOf("private PagedResult<CaseRow> findPageInternal"));
 
-        assertTrue(method.contains("latestUpdate.LatestCaseUpdate"));
-        assertTrue(method.contains(") latestUpdate"),
-                "Deleted case search must define the latestUpdate OUTER APPLY alias used by the SELECT list");
-        assertTrue(method.contains("FROM dbo.CaseUpdates cu"));
-        assertTrue(method.contains("ORDER BY cu.CreatedAt DESC, cu.Id DESC"));
-    }
 
-    @Test
-    void caseStatusReportUsesCurrentCaseStatusesAndTenantFilters() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        String method = source.substring(source.indexOf("public List<CaseStatusReportRowDto> listCaseStatusReport"), source.indexOf("public List<ReportCaseDetailRowDto> listCaseStatusReportCases"));
 
-        assertTrue(method.contains("FROM dbo.Cases c"));
-        assertTrue(method.contains("FROM dbo.CaseStatuses cs"));
-        assertTrue(method.contains("cs.EndDate IS NULL"));
-        assertTrue(method.contains("cs.IsPrimary DESC"));
-        assertTrue(method.contains("cs.EffectiveDate DESC"));
-        assertTrue(method.contains("cs.Id DESC"));
-        assertTrue(method.contains("INNER JOIN dbo.Statuses s"));
-        assertTrue(method.contains("WHERE c.ShaleClientId = ?"));
-        assertTrue(method.contains("ISNULL(c.IsDeleted, 0) = 0"));
-        assertTrue(method.contains("(? IS NULL OR c.CallerDate >= ?)"));
-        assertTrue(method.contains("(? IS NULL OR c.CallerDate < DATEADD(day, 1, ?))"));
-        assertTrue(method.contains("s.Id IN (%s)"));
-        assertTrue(method.contains("sqlPlaceholders(selectedStatusIds.size())"));
-        assertTrue(method.contains("status.lifecycleKey()"));
-        assertTrue(method.contains("status.sortOrder()"));
-        assertTrue(method.contains("status.color()"),
-                "Reports rows must carry the authoritative color from the effective status record.");
-        assertFalse(method.contains("Cases.CaseStatusId"));
-        assertFalse(method.contains("c.CaseStatusId"));
-        assertFalse(method.contains("AcceptedDate"));
-        assertFalse(method.contains("DeniedDate"));
-        assertFalse(method.contains("ClosedDate"));
-        assertFalse(method.contains("NonEngagementLetterSent"));
-    }
-    @Test
-    void caseStatusReportUsesEffectiveOverlayStatusesForNamesAndColors() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        String reportMethod = source.substring(source.indexOf("public List<CaseStatusReportRowDto> listCaseStatusReport"), source.indexOf("private Map<Integer, Long> loadCaseStatusReportCounts"));
-        String overlayMethod = source.substring(source.indexOf("private static List<StatusRow> resolveEffectiveStatuses"), source.indexOf("public List<StatusRow> listStatusesForTenant"));
 
-        assertTrue(reportMethod.contains("List<StatusRow> availableStatuses = listStatusesForTenant(shaleClientId)"),
-                "Reports should use the shared effective tenant/global status lookup before creating report rows.");
-        assertTrue(reportMethod.contains("status.name()"));
-        assertTrue(reportMethod.contains("status.color()"));
-        assertTrue(overlayMethod.contains("bySystemKey.putIfAbsent(systemKey, status)"),
-                "Global statuses should be loaded first for effective overlay resolution.");
-        assertTrue(overlayMethod.contains("bySystemKey.put(systemKey, status)"),
-                "Tenant statuses with the same SystemKey should mask the global status name and color.");
-        assertTrue(overlayMethod.contains("merged.sort"),
-                "Effective status ordering should remain deterministic after overlay resolution.");
-    }
 
-    @Test
-    void assignedCaseBoardUsesDynamicCurrentStatusAliasesAndTenantStatuses() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        String method = source.substring(source.indexOf("public List<CaseRow> listAssignedCasesForBoard"), source.indexOf("public List<CaseRow> searchCasesByName"));
 
-        assertTrue(method.contains("current_status.CurrentStatusName"),
-                "Assigned case board must select the status alias read by the mapper");
-        assertTrue(method.contains("s.Name AS CurrentStatusName"),
-                "Current status display name must come from dbo.Statuses");
-        assertTrue(method.contains("s.Color AS PrimaryStatusColor"),
-                "Current status color must come from dbo.Statuses");
-        assertTrue(method.contains("FROM %s cs"));
-        assertTrue(method.contains("INNER JOIN %s s"));
-        assertTrue(method.contains("AND (s.ShaleClientId = ? OR s.ShaleClientId IS NULL)"),
-                "Assigned case board must allow tenant-specific and global statuses");
-        assertTrue(method.contains("cs.EndDate IS NULL"),
-                "Assigned case board must resolve the current CaseStatuses row");
-        assertTrue(method.contains("cs.IsPrimary DESC"));
-        assertTrue(method.contains("s.SortOrder"),
-                "Assigned case board ordering must use status sort order instead of fixed names");
-        assertTrue(method.contains("cs.EffectiveDate DESC"));
-        assertTrue(method.contains("rs.getString(\"CurrentStatusName\")"));
-        assertTrue(method.contains("rs.getString(\"PrimaryStatusColor\")"));
-        assertFalse(method.contains("c.CaseStatusId"));
-        assertFalse(method.contains("Accepted"));
-        assertFalse(method.contains("Denied"));
-        assertFalse(method.contains("Closed"));
-        assertFalse(method.contains("Prelitigation"));
-        assertFalse(method.contains("Testing"));
-    }
 
 }

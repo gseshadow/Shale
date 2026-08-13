@@ -34,14 +34,17 @@ class NewIntakeConfiguredDatesStep3ContractTest {
         assertTrue(s.contains("?,NULL,1,SYSUTCDATETIME()"));
     }
 
-    @Test void configuredModeDoesNotDualWriteAndMissingConfigurationRetainsLegacyValues() throws Exception {
+    @Test void configuredModeDoesNotDualWriteAndMissingConfigurationFailsClosed() throws Exception {
         String s=source();
-        assertTrue(s.contains("if (request.formConfigurationId() != 0)"));
+        String insertCase=s.substring(s.indexOf("private long insertCase("), s.indexOf("/** Configured intake"));
+        assertTrue(insertCase.contains("return insertConfiguredIntakeCase"));
         String configured=s.substring(s.indexOf("private static long insertConfiguredIntakeCase"), s.indexOf("private void insertCaseParty"));
         for (String legacy : new String[]{"CallerDate", "CallerTime", "DateOfMedicalNegligence", "DateMedicalNegligenceWasDiscovered", "DateOfInjury", "StatuteOfLimitations", "TortNoticeDeadline"})
             assertFalse(configured.contains(legacy), legacy);
         assertTrue(s.contains("if (currentId == 0)"));
-        assertTrue(s.contains("return List.of()"));
+        assertTrue(s.contains("intake form configuration is unavailable"));
+        String validation=s.substring(s.indexOf("private List<ConfiguredDateValue> validateConfiguredIntakeDates"), s.indexOf("private static void validateEffectiveConfiguredDateType"));
+        assertFalse(validation.contains("return List.of()"));
     }
 
     @Test void configuredIntakeHasNoPostCreateDateTransactionAndReportsCommittedDateCount() throws Exception {
