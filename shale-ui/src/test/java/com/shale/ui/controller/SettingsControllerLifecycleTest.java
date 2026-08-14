@@ -82,7 +82,7 @@ final class SettingsControllerLifecycleTest {
 
     @Test
     void protectedStatusKeysArePreservedOnEditAndOmittedForNewStatuses() {
-        CaseStatusDto existing = new CaseStatusDto(7, "Accepted", true, 20, "0x28A745FF", "accepted", "accepted", 7);
+        CaseStatusDto existing = new CaseStatusDto(7, "Accepted", true, 20, "0x28A745FF", "accepted", "accepted", 7, true, false);
 
         assertEquals("accepted", SettingsController.lifecycleKeyForSave(existing));
         assertEquals("accepted", SettingsController.systemKeyForSave(existing));
@@ -92,7 +92,7 @@ final class SettingsControllerLifecycleTest {
 
     @Test
     void statusDialogPreservesExistingSortOrderAndOmitsSortForNewStatuses() {
-        CaseStatusDto existing = new CaseStatusDto(7, "Accepted", true, 20, "0x28A745FF", "accepted", "accepted", 7);
+        CaseStatusDto existing = new CaseStatusDto(7, "Accepted", true, 20, "0x28A745FF", "accepted", "accepted", 7, true, false);
 
         assertEquals(20, SettingsController.sortOrderForSave(existing));
         assertNull(SettingsController.sortOrderForSave(null));

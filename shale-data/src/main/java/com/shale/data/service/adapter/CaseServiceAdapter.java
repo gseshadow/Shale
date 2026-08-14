@@ -812,6 +812,12 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public void removeCaseStatus(CaseServicePort.StatusLifecycleCommand command) { Objects.requireNonNull(command,"command"); caseGateway.removeCaseStatus(command.shaleClientId(),command.actorUserId(),command.statusId()); }
+
+	@Override
+	public CaseStatusDto restoreCaseStatus(CaseServicePort.StatusLifecycleCommand command) { Objects.requireNonNull(command,"command"); return caseGateway.restoreCaseStatus(command.shaleClientId(),command.actorUserId(),command.statusId()); }
+
+	@Override
 	public CaseDetailDto updateCaseCurrentStatus(UpdateCaseStatusCommand command) {
 		Objects.requireNonNull(command, "command");
 		CaseDao.StatusRow status = caseGateway.findStatusForTenantById(command.shaleClientId(), command.statusId());
@@ -868,6 +874,10 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive);
 
 		List<CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive);
+
+		void removeCaseStatus(int shaleClientId,int actorUserId,int statusId);
+
+		CaseStatusDto restoreCaseStatus(int shaleClientId,int actorUserId,int statusId);
 
 		List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive);
 
@@ -1112,6 +1122,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		public List<CaseStatusDto> listTenantCaseStatuses(int shaleClientId, boolean includeInactive) {
 			return caseDao.listTenantCaseStatuses(shaleClientId, includeInactive);
 		}
+
+		@Override public void removeCaseStatus(int t,int a,int id){caseDao.removeCaseStatus(t,a,id);}
+		@Override public CaseStatusDto restoreCaseStatus(int t,int a,int id){return caseDao.restoreCaseStatus(t,a,id);}
 
 		@Override
 		public List<PracticeAreaDto> listPracticeAreas(int shaleClientId, boolean includeInactive) {

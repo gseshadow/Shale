@@ -216,8 +216,14 @@ Status lookup table.
 | `Color`         | nvarchar(20)  | Display color       |
 | `LifecycleKey`  | nvarchar(64)  | Lifecycle key       |
 | `SystemKey`     | nvarchar(128) | System key          |
+| `IsActive`      | bit           | Selector eligibility; added by the Status soft-delete migration |
+| `IsDeleted`     | bit           | Soft-delete marker; added by the Status soft-delete migration |
 
 Important: status table exists, but no confirmed FK from `dbo.Cases` appears in the current live schema output.
+
+Status removal is an in-place lifecycle update (`IsActive=0, IsDeleted=1`) on the tenant-owned `Statuses` row. It never deletes the definition or changes `CaseStatuses`. Effective assignment selectors resolve tenant/global precedence before excluding inactive/deleted winners, so an inactive tenant override cannot reveal its global fallback. Historical and current-status reads retain their ID join without lifecycle predicates.
+
+Status removal and restoration use the entity-action audit transaction seam with `CASE_STATUS` plus `DEACTIVATED`/`RESTORED`. Metadata is restricted to `ACTIVE`; names, colors, notes, history dates, RowVer, and case data are excluded. The business update and audit append share the DAO-owned connection and rollback together.
 
 ---
 

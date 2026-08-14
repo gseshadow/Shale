@@ -161,6 +161,10 @@ public interface CaseServicePort {
 
 	CaseStatusDto updateCaseStatus(CaseStatusCommand command);
 
+	void removeCaseStatus(StatusLifecycleCommand command);
+
+	CaseStatusDto restoreCaseStatus(StatusLifecycleCommand command);
+
 	CaseDetailDto updateCaseCurrentStatus(UpdateCaseStatusCommand command);
 
 	void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
@@ -370,6 +374,8 @@ public interface CaseServicePort {
 			String lifecycleKey,
 			String systemKey) {
 	}
+
+	record StatusLifecycleCommand(int shaleClientId, int actorUserId, int statusId) { }
 
 	record UpdateCaseStatusCommand(
 			long caseId,
