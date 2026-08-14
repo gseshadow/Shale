@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 final class UserManagementCompletionMigrationTest {
     private static String sql() throws Exception { return Files.readString(Path.of("../docs/sql/2026-08-03_users_management_completion.sql")); }
     private static String finalAuditConstraintSql() throws Exception {
-        return Files.readString(Path.of("../docs/sql/2026-08-12_entity_action_audit_entity_type_constraint.sql"));
+        return Files.readString(Path.of("../docs/sql/2026-08-14_entity_action_audit_entity_type_constraint_case_status.sql"));
     }
 
     @Test void auditConstraintIsTransactionalTrustedIdempotentAndAcceptsEveryEmittedEntityType() throws Exception {
