@@ -25,6 +25,14 @@ class CaseDateDaoReadContractTest {
                 CaseDateDao.migratedOccurrenceKey(703, "date_of_injury", protectedTypes));
     }
 
+    @Test void duplicateHistoryIsExposedWithoutArbitraryAuthoritativeSelection() throws Exception {
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
+        assertTrue(source.contains("conflicts.add(mapped)"));
+        assertTrue(source.contains("result.remove(mapped)"));
+        assertTrue(source.contains("new CaseDateAggregateResult(token, dates, read.conflicts())"));
+        assertFalse(source.contains("Multiple active Case Date occurrences for singleton SystemKey"));
+    }
+
     @Test void effectiveSelectorSqlUsesModernOverlayResetAndOrderingContract() throws Exception {
         String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
         assertTrue(source.contains("ROW_NUMBER() OVER (PARTITION BY t.SystemKey"));

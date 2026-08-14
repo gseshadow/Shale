@@ -273,27 +273,46 @@ public final class CaseDateDao {
      * arbitrary occurrence.
      */
     public Map<MigratedCaseDateKey, CaseDateDto> listMigratedSingletonsForCase(long caseId, int tenant, int actor) {
+        return readMigratedSingletons(caseId, tenant, actor).dates();
+    }
+
+    private SingletonRead readMigratedSingletons(long caseId, int tenant, int actor) {
         List<CaseDateDto> occurrences = listCaseDatesForCase(caseId, tenant, actor);
         Map<Integer, MigratedCaseDateKey> protectedTypeKeys = resolveProtectedTypeKeys(tenant, actor);
         EnumMap<MigratedCaseDateKey, CaseDateDto> result = new EnumMap<>(MigratedCaseDateKey.class);
+        EnumSet<MigratedCaseDateKey> conflicts = EnumSet.noneOf(MigratedCaseDateKey.class);
         for (CaseDateDto occurrence : occurrences) {
             MigratedCaseDateKey mapped = migratedOccurrenceKey(
                     occurrence.caseDateTypeId(), occurrence.typeSystemKey(), protectedTypeKeys);
             if (mapped == null) continue;
+            if (conflicts.contains(mapped)) continue;
             CaseDateDto conflict = result.putIfAbsent(mapped, occurrence);
             if (conflict != null) {
-                throw new IllegalStateException("Multiple active Case Date occurrences for singleton SystemKey: " + mapped.systemKey());
+                result.remove(mapped);
+                conflicts.add(mapped);
             }
         }
-        return Collections.unmodifiableMap(result);
+        return new SingletonRead(Collections.unmodifiableMap(result), Collections.unmodifiableSet(conflicts));
     }
 
     private Map<Integer, MigratedCaseDateKey> resolveProtectedTypeKeys(int tenant, int actor) {
         try (Connection con = db.requireConnection()) {
             verifyTenant(con, tenant); validateActor(con, tenant, actor);
             Map<Integer, MigratedCaseDateKey> result = new HashMap<>();
-            for (CaseDateSemanticRole role : CaseDateSemanticRole.values()) {
-                result.put(CaseDateSemanticRoleResolver.requireEffectiveTypeId(con, tenant, role), migratedKey(role));
+            try (PreparedStatement ps = con.prepareStatement("""
+                    SELECT DISTINCT m.CaseDateTypeId,m.SemanticRoleKey
+                    FROM dbo.CaseDateTypeSemanticRoleMappings m
+                    JOIN dbo.CaseDateTypes t ON t.Id=m.CaseDateTypeId
+                    WHERE (m.ShaleClientId=? OR m.ShaleClientId IS NULL)
+                      AND (t.ShaleClientId=? OR t.ShaleClientId IS NULL)
+                      AND m.SemanticRoleKey IN ('INTAKE','STATUTE_OF_LIMITATIONS','TORT_NOTICE_DEADLINE')
+                    """)) {
+                ps.setInt(1, tenant); ps.setInt(2, tenant);
+                try (ResultSet rs=ps.executeQuery()) { while (rs.next()) {
+                    MigratedCaseDateKey key=migratedKey(CaseDateSemanticRole.require(rs.getString(2)));
+                    MigratedCaseDateKey old=result.putIfAbsent(rs.getInt(1),key);
+                    if(old!=null&&old!=key) throw new IllegalStateException("A Case Date Type has ambiguous protected semantic history.");
+                }}
             }
             return Map.copyOf(result);
         } catch (SQLException e) { throw fail(e); }
@@ -313,11 +332,12 @@ public final class CaseDateDao {
     }
 
     public CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(long caseId, int tenant, int actor) {
-        Map<MigratedCaseDateKey, CompatibilityCaseDateState> dates = listMigratedCompatibilityStateForCase(caseId, tenant, actor);
+        SingletonRead read = readMigratedSingletons(caseId, tenant, actor);
+        Map<MigratedCaseDateKey, CompatibilityCaseDateState> dates = compatibilityStates(caseId, tenant, actor, read.dates());
         byte[] token = dates.values().stream().map(CompatibilityCaseDateState::expectedAbsent)
                 .filter(Objects::nonNull).map(CompatibilityCaseDateMutation.ExpectedAbsent::observedCaseRowVer)
                 .findFirst().orElseGet(() -> loadCaseRowVer(caseId, tenant, actor));
-        return new CaseDateAggregateResult(token, dates);
+        return new CaseDateAggregateResult(token, dates, read.conflicts());
     }
 
     private byte[] loadCaseRowVer(long caseId, int tenant, int actor) {
@@ -339,6 +359,11 @@ public final class CaseDateDao {
      */
     public Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId, int tenant, int actor) {
         Map<MigratedCaseDateKey, CaseDateDto> present = listMigratedSingletonsForCase(caseId, tenant, actor);
+        return compatibilityStates(caseId, tenant, actor, present);
+    }
+
+    private Map<MigratedCaseDateKey, CompatibilityCaseDateState> compatibilityStates(long caseId, int tenant, int actor,
+            Map<MigratedCaseDateKey, CaseDateDto> present) {
         byte[] caseRowVer;
         try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(
                 "SELECT RowVer FROM dbo.Cases WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")) {
@@ -360,6 +385,8 @@ public final class CaseDateDao {
         }
         return Collections.unmodifiableMap(result);
     }
+
+    private record SingletonRead(Map<MigratedCaseDateKey, CaseDateDto> dates, Set<MigratedCaseDateKey> conflicts) {}
 
     /**
      * Connection-accepting aggregate participant. It deliberately performs no
@@ -592,6 +619,7 @@ public final class CaseDateDao {
             TypeRow type = requireSelectableType(con, c.shaleClientId(), c.caseDateTypeId()); validateAllDay(type, c.allDay());
             con.setAutoCommit(false);
             try {
+                requireProtectedSingletonAvailable(con,c.shaleClientId(),c.caseId(),c.caseDateTypeId(),null);
                 long id;
                 try (PreparedStatement ps = con.prepareStatement("""
                         INSERT dbo.CaseDates (ShaleClientId, CaseId, CaseDateTypeId, StartsAt, EndsAt, AllDay, Notes, CreatedAt, CreatedByUserId)
@@ -615,7 +643,7 @@ public final class CaseDateDao {
             String notes=norm(c.notes());
             if(before.typeId==c.caseDateTypeId() && Objects.equals(before.startsAt,c.startsAt()) && Objects.equals(before.endsAt,c.endsAt()) && before.allDay==c.allDay() && Objects.equals(before.notes,notes)) return requireDate(con,c.caseDateId(),c.shaleClientId());
             con.setAutoCommit(false);
-            try { int rows; try(PreparedStatement ps=con.prepareStatement("""
+            try { requireProtectedSingletonAvailable(con,c.shaleClientId(),c.caseId(),c.caseDateTypeId(),c.caseDateId()); int rows; try(PreparedStatement ps=con.prepareStatement("""
                     UPDATE dbo.CaseDates SET CaseDateTypeId=?, StartsAt=?, EndsAt=?, AllDay=?, Notes=?, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=?
                     WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=0 AND RowVer=?
                     """)){ ps.setInt(1,c.caseDateTypeId()); setLdt(ps,2,c.startsAt()); setLdt(ps,3,c.endsAt()); ps.setBoolean(4,c.allDay()); ps.setString(5,notes); ps.setInt(6,c.actorUserId()); ps.setLong(7,c.caseDateId()); ps.setInt(8,c.shaleClientId()); ps.setLong(9,c.caseId()); ps.setBytes(10,c.expectedRowVer()); rows=ps.executeUpdate(); }
@@ -626,7 +654,27 @@ public final class CaseDateDao {
 
     public void deleteCaseDate(DeleteCaseDateCommand c) { mutateDeleted(c.shaleClientId(),c.actorUserId(),c.caseId(),c.caseDateId(),c.expectedRowVer(),false); }
     public CaseDateDto restoreCaseDate(RestoreCaseDateCommand c) { mutateDeleted(c.shaleClientId(),c.actorUserId(),c.caseId(),c.caseDateId(),c.expectedRowVer(),true); try(Connection con=db.requireConnection()){return requireDate(con,c.caseDateId(),c.shaleClientId());} catch(SQLException e){throw fail(e);} }
-    private void mutateDeleted(int t,int a,long caseId,long id,byte[] rv,boolean restore){ try(Connection con=db.requireConnection()){ verifyTenant(con,t); validateActor(con,t,a); validateCase(con,t,caseId); MutationRow before=requireMutationRow(con,t,caseId,id,restore); requireRowVerMatch(before.rowVer,rv); requireHistoricalType(con,t,before.typeId); con.setAutoCommit(false); try{String sql= restore ? "UPDATE dbo.CaseDates SET IsDeleted=0, DeletedAt=NULL, DeletedByUserId=NULL, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=1 AND RowVer=?" : "UPDATE dbo.CaseDates SET IsDeleted=1, DeletedAt=SYSUTCDATETIME(), DeletedByUserId=?, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=0 AND RowVer=?"; int rows; try(PreparedStatement ps=con.prepareStatement(sql)){int i=1; ps.setInt(i++,a); if(!restore) ps.setInt(i++,a); ps.setLong(i++,id); ps.setInt(i++,t); ps.setLong(i++,caseId); ps.setBytes(i,rv); rows=ps.executeUpdate();} if(rows!=1) throw new IllegalStateException("Case date changed."); caseCalendarSynchronizer.fromCaseDate(con,t,id,restore?"RESTORE":"DELETE",false); touchCase(con,caseId,t); audit(con,t,a,caseId,id, restore?EntityActionAuditEvent.Action.ACTIVATED:EntityActionAuditEvent.Action.DELETED); if(!restore) phiAuditService.auditDelete(con,a,"CaseDates","Notes",id,before.notes); con.commit(); }catch(Exception e){con.rollback(); throw e;}finally{con.setAutoCommit(true);} }catch(SQLException e){throw fail(e);} }
+    private void mutateDeleted(int t,int a,long caseId,long id,byte[] rv,boolean restore){ try(Connection con=db.requireConnection()){ verifyTenant(con,t); validateActor(con,t,a); validateCase(con,t,caseId); MutationRow before=requireMutationRow(con,t,caseId,id,restore); requireRowVerMatch(before.rowVer,rv); requireHistoricalType(con,t,before.typeId); con.setAutoCommit(false); try{if(restore)requireProtectedSingletonAvailable(con,t,caseId,before.typeId,id);String sql= restore ? "UPDATE dbo.CaseDates SET IsDeleted=0, DeletedAt=NULL, DeletedByUserId=NULL, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=1 AND RowVer=?" : "UPDATE dbo.CaseDates SET IsDeleted=1, DeletedAt=SYSUTCDATETIME(), DeletedByUserId=?, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=0 AND RowVer=?"; int rows; try(PreparedStatement ps=con.prepareStatement(sql)){int i=1; ps.setInt(i++,a); if(!restore) ps.setInt(i++,a); ps.setLong(i++,id); ps.setInt(i++,t); ps.setLong(i++,caseId); ps.setBytes(i,rv); rows=ps.executeUpdate();} if(rows!=1) throw new IllegalStateException("Case date changed."); caseCalendarSynchronizer.fromCaseDate(con,t,id,restore?"RESTORE":"DELETE",false); touchCase(con,caseId,t); audit(con,t,a,caseId,id, restore?EntityActionAuditEvent.Action.ACTIVATED:EntityActionAuditEvent.Action.DELETED); if(!restore) phiAuditService.auditDelete(con,a,"CaseDates","Notes",id,before.notes); con.commit(); }catch(Exception e){con.rollback(); throw e;}finally{con.setAutoCommit(true);} }catch(SQLException e){throw fail(e);} }
+
+    private static void requireProtectedSingletonAvailable(Connection con,int tenant,long caseId,int typeId,Long excludedId)throws SQLException{
+        String role=null;
+        try(PreparedStatement ps=con.prepareStatement("""
+                SELECT DISTINCT m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
+                JOIN dbo.CaseDateTypes t ON t.Id=m.CaseDateTypeId
+                WHERE m.CaseDateTypeId=? AND (m.ShaleClientId=? OR m.ShaleClientId IS NULL)
+                  AND (t.ShaleClientId=? OR t.ShaleClientId IS NULL)
+                  AND m.SemanticRoleKey IN ('INTAKE','STATUTE_OF_LIMITATIONS','TORT_NOTICE_DEADLINE')
+                """)){ps.setInt(1,typeId);ps.setInt(2,tenant);ps.setInt(3,tenant);try(ResultSet rs=ps.executeQuery()){if(rs.next()){role=rs.getString(1);if(rs.next())throw new IllegalStateException("Case Date Type has ambiguous protected semantic history.");}}}
+        if(role==null)return;
+        try(PreparedStatement ps=con.prepareStatement("""
+                SELECT TOP (1) cd.Id FROM dbo.Cases c WITH (UPDLOCK,HOLDLOCK)
+                JOIN dbo.CaseDates cd WITH (UPDLOCK,HOLDLOCK) ON cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0
+                JOIN dbo.CaseDateTypeSemanticRoleMappings m ON m.CaseDateTypeId=cd.CaseDateTypeId
+                WHERE c.Id=? AND c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0
+                  AND (m.ShaleClientId=? OR m.ShaleClientId IS NULL) AND m.SemanticRoleKey=?
+                  AND (? IS NULL OR cd.Id<>?)
+                """)){ps.setLong(1,caseId);ps.setInt(2,tenant);ps.setInt(3,tenant);ps.setString(4,role);if(excludedId==null){ps.setNull(5,Types.BIGINT);ps.setNull(6,Types.BIGINT);}else{ps.setLong(5,excludedId);ps.setLong(6,excludedId);}try(ResultSet rs=ps.executeQuery()){if(rs.next())throw new IllegalStateException("A protected Case Date with this semantic meaning is already active. Reload and resolve it in Dates.");}}
+    }
 
     static String occurrenceSql(String where) { return """
             SELECT cd.Id, cd.ShaleClientId, cd.CaseId, cd.CaseDateTypeId,
