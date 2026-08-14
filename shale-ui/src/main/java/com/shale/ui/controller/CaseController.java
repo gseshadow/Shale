@@ -4690,6 +4690,9 @@ public class CaseController {
 		if (caseId == null || appState == null || caseService == null || !compatibilityDates.isLoaded()) {
 			showError("Reload authoritative Case Dates before editing."); return;
 		}
+		if (compatibilityDates.hasConflict(key)) {
+			showError("This protected Case Date has conflicting active occurrences. Resolve them in Dates, then reload."); return;
+		}
 		Map<MigratedCaseDateKey, CompatibilityCaseDateEditor.EditedValue> values =
 				new java.util.EnumMap<>(AuthoritativeCaseDateEditor.values(compatibilityDates.states()));
 		CompatibilityCaseDateState old = compatibilityDates.states().get(key);

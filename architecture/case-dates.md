@@ -174,6 +174,35 @@ desktop, and web checks are recorded under **Final verification and sign-off sta
 
 Effective active selector reads remain separate from administration reads. New-occurrence selectors use only `listEffectiveCaseDateTypes`; inactive, deleted, reset-marker, and shadowed rows must not leak into ordinary selectors.
 
+### Manual-QA prerequisites and protected singleton conflicts (2026-08-14)
+
+Deploy `docs/sql/2026-08-12_entity_action_audit_entity_type_constraint.sql` after the
+entity-action audit foundation and all earlier allowlist extensions (including
+`docs/sql/2026-08-10_case_date_semantic_role_admin_phase2.sql`), and before deploying
+the application build that emits `CASE_DATE_TYPE`. The existing migration is the sole
+constraint migration for this change; it preserves every recognized prior allowlist
+value, adds `CASE_DATE_TYPE` with `WITH CHECK`, and verifies one enabled, trusted
+canonical constraint. Do not infer this order from filename sorting alone.
+
+Intake, Statute of Limitations, and Tort Notice Deadline are singleton semantic meanings
+per Case. Create, type-changing update, and restore lock and check active occurrences in
+the owning transaction by tenant-visible semantic-role mapping history and numeric type
+identity, never by type name, label, or date. Removed occurrences do not conflict. A
+conflict rolls back before occurrence, Case touch, audit, timeline, publication, or
+Calendar synchronization can commit. Ordinary types continue to allow multiple
+occurrences.
+
+Historical duplicate rows are not selected arbitrarily. Compatibility hydration omits
+only the conflicted protected slot, marks it as a safe conflict requiring reload, and
+continues to hydrate unaffected slots. The generic Dates manager reads the complete
+active/removed occurrence lists independently, so users can remove the extra row; its
+normal post-commit invalidation then reloads and clears the conflict without reopening
+the Case. Use the read-only
+`docs/sql/2026-08-14_detect_protected_case_date_duplicates.sql` diagnostic to report
+exact tenant, Case, occurrence, type, and semantic-role IDs for separately reviewed
+repair. It performs no cleanup. Final roadmap sign-off remains blocked until both the
+audit migration prerequisite and singleton/read-resilience fixes pass manual QA.
+
 ## Phase 2B Settings date-type administration UI
 
 Phase 2B adds **Settings > Case Date Types** in the established Settings manager surface. It uses the Phase 2A `CaseServicePort` administration APIs and does not call DAOs directly or calculate persistence semantics outside the service.

@@ -84,4 +84,10 @@ final class SettingsCaseDateTypeAdministrationTest {
         assertTrue(CARDS_CSS.contains(".case-date-built-in-card"));
         assertTrue(CARDS_CSS.contains(".case-date-custom-card"));
     }
+    @Test void administrationFailuresAreSanitizedAndFullyLogged(){
+        String error=method("private void showCaseDateTypeError");
+        assertTrue(error.contains("LOG.error"));
+        assertTrue(error.contains("The Case Date Type could not be saved."));
+        assertFalse(error.contains("rootMessage"));
+    }
 }

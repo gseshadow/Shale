@@ -69,4 +69,16 @@ class CaseDateDaoMutationContractTest {
         assertTrue(port.contains("createCaseDateType"));
         assertTrue(port.contains("updateCaseDateType"));
     }
+
+    @Test void protectedSemanticSingletonIsCheckedInsideEveryActivationTransaction() throws Exception {
+        String source = Files.readString(Path.of(DAO));
+        assertTrue(source.contains("requireProtectedSingletonAvailable(con,c.shaleClientId(),c.caseId(),c.caseDateTypeId(),null)"));
+        assertTrue(source.contains("requireProtectedSingletonAvailable(con,t,caseId,before.typeId,id)"));
+        assertTrue(source.contains("WITH (UPDLOCK,HOLDLOCK)"));
+        assertTrue(source.contains("m.SemanticRoleKey IN ('INTAKE','STATUTE_OF_LIMITATIONS','TORT_NOTICE_DEADLINE')"));
+        assertTrue(source.contains("m.CaseDateTypeId=cd.CaseDateTypeId"));
+        assertTrue(source.contains("if(restore)requireProtectedSingletonAvailable"));
+        assertTrue(source.indexOf("requireProtectedSingletonAvailable(con,c.shaleClientId(),c.caseId(),c.caseDateTypeId(),null)")
+                < source.indexOf("INSERT dbo.CaseDates", source.indexOf("public CaseDateDto createCaseDate")));
+    }
 }
