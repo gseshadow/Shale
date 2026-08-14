@@ -971,7 +971,8 @@ class ApiReadControllerTest {
 
         @Override
         public List<com.shale.core.dto.CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
-            return List.of(new com.shale.core.dto.CaseStatusDto(1, "Open", false, 10, "#00AA00", null, "open", null));
+            return List.of(new com.shale.core.dto.CaseStatusDto(
+                    1, "Open", false, 10, "#00AA00", null, "open", null, true, false));
         }
 
         @Override
@@ -1122,6 +1123,16 @@ class ApiReadControllerTest {
         @Override
         public com.shale.core.dto.CaseStatusDto updateCaseStatus(CaseStatusCommand command) {
             throw new AssertionError("updateCaseStatus should not be called");
+        }
+
+        @Override
+        public void removeCaseStatus(StatusLifecycleCommand command) {
+            throw new AssertionError("removeCaseStatus should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseStatusDto restoreCaseStatus(StatusLifecycleCommand command) {
+            throw new AssertionError("restoreCaseStatus should not be called");
         }
 
         @Override
