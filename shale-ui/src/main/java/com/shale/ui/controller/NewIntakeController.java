@@ -886,10 +886,14 @@ public final class NewIntakeController {
 		FormConfigurationDto configuration = loadedDatesConfiguration;
 		long configurationId = configuration == null ? 0 : configuration.id();
 		byte[] configurationRowVer = configuration == null ? null : configuration.rowVer();
+		ConfiguredDateInput intakeInput = intakeCaseDateTypeId == null ? null
+				: configuredDateInputs.values().stream()
+						.filter(input -> input.caseDateTypeId() == intakeCaseDateTypeId.intValue())
+						.findFirst().orElse(null);
 		return new CaseDao.NewIntakeCreateRequest(
 				requireClientId(),
 				safeTrim(caseNameField.getText()),
-				null,
+				intakeInput == null ? null : intakeInput.value(),
 				LocalTime.parse(safeTrim(timeOfIntakeField.getText()), TIME_PARSE_FORMAT),
 				estateCaseCheckBox.isSelected(),
 				selectedPracticeArea.id(),

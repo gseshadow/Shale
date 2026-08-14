@@ -403,6 +403,7 @@ public final class CaseDao {
 			con = db.requireConnection();
 			con.setAutoCommit(false);
 			List<ConfiguredDateValue> configuredDates = validateConfiguredIntakeDates(con, request);
+			int intakeTypeId = requireConfiguredIntakeValue(con, request, configuredDates);
 			System.out.println("[IntakeCreate] start shaleClientId=" + request.shaleClientId()
 					+ " caseName='" + safeLogValue(request.caseName()) + "'");
 			ensureRequiredPartyRolesForTenant(con, request.shaleClientId());
@@ -483,8 +484,10 @@ public final class CaseDao {
 			normalizeCasePartyRelationshipPrimaries(con, caseId, request.shaleClientId());
 			System.out.println("[IntakeCreate] party primary normalization completed caseId=" + caseId);
 			insertCaseStatus(con, caseId, request.statusId(), now);
-			for (ConfiguredDateValue date : configuredDates)
-				insertConfiguredCaseDate(con, request, caseId, date);
+			for (ConfiguredDateValue date : configuredDates) {
+				long caseDateId = insertConfiguredCaseDate(con, request, caseId, date, intakeTypeId);
+				auditCreatedCaseDate(con, request, caseId, caseDateId, date, intakeTypeId);
+			}
 			System.out.println("[IntakeCreate] primary status linked caseId=" + caseId + " statusId=" + request.statusId());
 
 			con.commit();
@@ -652,16 +655,55 @@ public final class CaseDao {
 		return new IntakeConfigurationException("The configured date fields are no longer valid. Reload the form before submitting again.");
 	}
 
-	private static void insertConfiguredCaseDate(Connection con, NewIntakeCreateRequest request, long caseId, ConfiguredDateValue value) throws SQLException {
+	private static int requireConfiguredIntakeValue(Connection con, NewIntakeCreateRequest request,
+			List<ConfiguredDateValue> configuredDates) throws SQLException {
+		if (request.createdByUserId() == null || request.createdByUserId() <= 0)
+			throw new IntakeConfigurationException("An authenticated intake user is required.");
+		int intakeTypeId = CaseDateSemanticRoleResolver.requireEffectiveTypeId(
+				con, request.shaleClientId(), CaseDateSemanticRole.INTAKE);
+		ConfiguredDateValue intake = configuredDates.stream()
+				.filter(value -> value.caseDateTypeId() == intakeTypeId)
+				.findFirst()
+				.orElseThrow(() -> new IntakeConfigurationException(
+						"The Intake date is required. Reload New Intake before submitting again."));
+		if (!Objects.equals(intake.value(), request.intakeDate()))
+			throw new IntakeConfigurationException("The Intake date changed. Reload New Intake before submitting again.");
+		if (request.intakeTime() == null)
+			throw new IntakeConfigurationException("The Intake time is required.");
+		return intakeTypeId;
+	}
+
+	private static long insertConfiguredCaseDate(Connection con, NewIntakeCreateRequest request, long caseId,
+			ConfiguredDateValue value, int intakeTypeId) throws SQLException {
+		boolean intake = value.caseDateTypeId() == intakeTypeId;
+		LocalDateTime startsAt = intake
+				? LocalDateTime.of(value.value(), request.intakeTime())
+				: value.value().atStartOfDay();
 		try (PreparedStatement ps = con.prepareStatement(
-				"INSERT dbo.CaseDates(ShaleClientId,CaseId,CaseDateTypeId,StartsAt,EndsAt,AllDay,CreatedAt,CreatedByUserId) VALUES(?,?,?, ?,NULL,1,SYSUTCDATETIME(),?)")) {
+				"INSERT dbo.CaseDates(ShaleClientId,CaseId,CaseDateTypeId,StartsAt,EndsAt,AllDay,CreatedAt,CreatedByUserId) OUTPUT INSERTED.Id VALUES(?,?,?, ?,NULL,?,SYSUTCDATETIME(),?)")) {
 			ps.setInt(1, request.shaleClientId());
 			ps.setLong(2, caseId);
 			ps.setInt(3, value.caseDateTypeId());
-			ps.setTimestamp(4, Timestamp.valueOf(value.value().atStartOfDay()));
-			ps.setInt(5, request.createdByUserId());
-			ps.executeUpdate();
+			ps.setTimestamp(4, Timestamp.valueOf(startsAt));
+			ps.setBoolean(5, !intake);
+			ps.setInt(6, request.createdByUserId());
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) throw new IllegalStateException("Case date was not created.");
+				return rs.getLong(1);
+			}
 		}
+	}
+
+	private void auditCreatedCaseDate(Connection con, NewIntakeCreateRequest request, long caseId,
+			long caseDateId, ConfiguredDateValue value, int intakeTypeId) throws SQLException {
+		LocalDateTime startsAt = value.caseDateTypeId() == intakeTypeId
+				? LocalDateTime.of(value.value(), request.intakeTime()) : value.value().atStartOfDay();
+		entityActionAuditDao.append(con, EntityActionAuditEvent.now(request.shaleClientId(),
+				request.createdByUserId(), EntityActionAuditEvent.EntityType.CASE_DATE, caseDateId,
+				EntityActionAuditEvent.Action.CREATED, EntityActionAuditEvent.EntityType.CASE, caseId,
+				Map.of(EntityActionAuditEvent.MetadataKey.CASE_ID, caseId,
+						EntityActionAuditEvent.MetadataKey.CASE_DATE_ID, caseDateId)));
+		phiAuditService.auditCreate(con, request.createdByUserId(), "CaseDates", "StartsAt", caseDateId, startsAt);
 	}
 
 	private void ensureRequiredPartyRolesForTenant(Connection con, int shaleClientId) throws SQLException {

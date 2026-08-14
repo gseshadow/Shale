@@ -29,9 +29,9 @@ class NewIntakeConfiguredDatesStep3ContractTest {
         assertTrue(s.contains("validateEffectiveConfiguredDateType"));
         assertTrue(compact.contains("expected.required()&&actual.value()==null"));
         assertTrue(compact.contains("if(actual.value()!=null)result.add(actual)"));
-        assertTrue(s.contains("value.value().atStartOfDay()"));
+        assertTrue(s.contains("LocalDateTime.of(value.value(), request.intakeTime())"));
         assertTrue(s.contains("EndsAt,AllDay"));
-        assertTrue(s.contains("?,NULL,1,SYSUTCDATETIME()"));
+        assertTrue(s.contains("?,NULL,?,SYSUTCDATETIME()"));
     }
 
     @Test void configuredModeDoesNotDualWriteAndMissingConfigurationUsesValidatedEffectiveTypes() throws Exception {
@@ -51,7 +51,7 @@ class NewIntakeConfiguredDatesStep3ContractTest {
     @Test void configuredIntakeHasNoPostCreateDateTransactionAndReportsCommittedDateCount() throws Exception {
         String s=source();
         String create=s.substring(s.indexOf("public NewIntakeCreateResult createIntake"), s.indexOf("public static final class IntakeConfigurationException"));
-        assertEquals(1, create.split("insertConfiguredCaseDate\\(con, request, caseId, date\\)", -1).length - 1);
+        assertEquals(1, create.split("insertConfiguredCaseDate\\(con, request, caseId, date, intakeTypeId\\)", -1).length - 1);
         assertFalse(create.contains("CalendarEvent"));
         assertEquals(1, create.split("db.requireConnection\\(\\)", -1).length - 1);
         assertEquals(1, create.split("con.commit\\(\\)", -1).length - 1);

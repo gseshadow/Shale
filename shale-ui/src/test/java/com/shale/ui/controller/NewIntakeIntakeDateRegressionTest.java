@@ -24,5 +24,7 @@ final class NewIntakeIntakeDateRegressionTest {
         assertTrue(source.contains("resolveEffectiveCaseDateTypeId(tenant, actor, CaseDateSemanticRole.INTAKE)"));
         assertFalse(source.contains("dateOfIntakePicker"));
         assertTrue(source.contains("configuredDateInputs.values().stream().map(input -> new CaseDao.ConfiguredDateValue("));
+        assertTrue(source.contains("filter(input -> input.caseDateTypeId() == intakeCaseDateTypeId.intValue())"));
+        assertTrue(source.contains("intakeInput == null ? null : intakeInput.value()"));
     }
 }
