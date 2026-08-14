@@ -11,16 +11,28 @@ import static org.junit.jupiter.api.Assertions.*;
 
 final class UserManagementCompletionMigrationTest {
     private static String sql() throws Exception { return Files.readString(Path.of("../docs/sql/2026-08-03_users_management_completion.sql")); }
+    private static String finalAuditConstraintSql() throws Exception {
+        return Files.readString(Path.of("../docs/sql/2026-08-12_entity_action_audit_entity_type_constraint.sql"));
+    }
 
     @Test void auditConstraintIsTransactionalTrustedIdempotentAndAcceptsEveryEmittedEntityType() throws Exception {
-        String sql=sql();
+        String sql=finalAuditConstraintSql();
         assertTrue(sql.contains("BEGIN TRANSACTION")); assertTrue(sql.contains("XACT_ABORT ON"));
-        assertTrue(sql.contains("@OldDefinition")); assertTrue(sql.contains("Preserve any older quoted values"));
-        assertTrue(sql.contains("DROP CONSTRAINT CK_EntityActionAuditLog_EntityType"));
-        assertTrue(sql.contains("WITH CHECK ADD CONSTRAINT CK_EntityActionAuditLog_EntityType"));
-        assertTrue(sql.contains("is_not_trusted=0")); assertTrue(sql.contains("definition LIKE N'%USER%'"));
+        assertTrue(sql.contains("Complete current vocabulary and every value known to have been allowed by deployed migrations"));
+        assertTrue(sql.contains("INSERT @Allowed (Value)"));
+        assertTrue(Pattern.compile("(?s)INSERT\\s+@Allowed\\s*\\(Value\\)\\s+SELECT\\s+e\\.Value\\s+FROM\\s+@Extracted")
+                .matcher(sql).find());
+        assertTrue(sql.contains("Existing EntityActionAuditLog rows contain an EntityType outside the resulting allowlist"));
+        assertTrue(sql.contains("QUOTENAME(@AllowlistName)"));
+        assertTrue(sql.contains("WITH CHECK ADD CONSTRAINT"));
+        assertTrue(sql.contains("CHECK CONSTRAINT CK_EntityActionAuditLog_EntityType"));
+        assertTrue(sql.contains("is_disabled = 0 AND is_not_trusted = 0) <> 1"));
+        assertTrue(sql.contains("before_check.ObjectId <> @AllowlistObjectId"));
+        assertTrue(sql.contains("IF XACT_STATE() <> 0 ROLLBACK TRANSACTION"));
         Set<String> emitted=Arrays.stream(EntityActionAuditEvent.EntityType.values()).map(Enum::name).collect(java.util.stream.Collectors.toSet());
-        Matcher m=Pattern.compile("\\(N'([A-Z_]+)'\\)").matcher(sql);Set<String> accepted=new java.util.HashSet<>();while(m.find())accepted.add(m.group(1));
+        int valuesStart=sql.indexOf("INSERT @Allowed (Value) VALUES");
+        int valuesEnd=sql.indexOf(';',valuesStart);
+        Matcher m=Pattern.compile("\\('([A-Z_]+)'\\)").matcher(sql.substring(valuesStart,valuesEnd));Set<String> accepted=new java.util.HashSet<>();while(m.find())accepted.add(m.group(1));
         assertTrue(accepted.containsAll(emitted),"migration must seed every emitted EntityType: "+emitted);
     }
 

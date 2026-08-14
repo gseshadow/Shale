@@ -21,7 +21,8 @@ final class IntakeReconciliationMigrationContractTest {
         assertFalse(sql.matches("(?s).*SUM\\s*\\(\\s*CASE\\s+WHEN\\s+(?:NOT\\s+)?EXISTS\\s*\\(.*"));
         assertTrue(sql.contains("m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL"));
         assertTrue(sql.contains("SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL"));
-        assertTrue(sql.contains("NOT EXISTS(\n    SELECT 1 FROM dbo.CaseDates"));
+        assertTrue(sql.matches("(?s).*#Candidates\\s+x\\s+WHERE\\s+NOT\\s+EXISTS\\s*\\(\\s*"
+                + "SELECT\\s+1\\s+FROM\\s+dbo\\.CaseDates\\s+cd.*"));
         assertTrue(sql.contains("DATETIME2FROMPARTS"));
         assertTrue(sql.contains("CASE WHEN CallerTime IS NULL THEN 1 ELSE 0 END"));
         assertTrue(sql.contains("PreflightReconciliationCount"));
