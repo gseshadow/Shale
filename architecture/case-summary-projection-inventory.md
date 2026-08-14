@@ -8,7 +8,10 @@ This note records the discovery performed before introducing `CaseSummaryProject
 
 Each optional one-to-many relationship is selected by `OUTER APPLY TOP (1)`, so a Case remains present and malformed legacy primaries cannot multiply rows. Current status candidates must have `CaseStatuses.EndDate IS NULL`; selection is primary first, then effective date, update/create timestamps, and row ID descending. Status definitions must be global or owned by the Case tenant. Responsible attorney (role 4) and primary legal assistant (role 11) are selected by `CaseUsers.RoleId`, preferring `IsPrimary`, then update/create timestamps and row ID descending; this preserves an assignment when malformed legacy data has no primary flag. User display hydration additionally requires the Case tenant, while the selected authoritative user ID is retained even if display hydration is unavailable.
 
-The projection contains: Case ID, tenant ID, Case number/name; status ID, `SystemKey`, `LifecycleKey`, name/color; Practice Area ID/name; responsible-attorney ID/name/color; primary-legal-assistant ID/name/color; created/updated timestamps; and deleted state. It intentionally excludes descriptions, summaries, updates, notes, parties/contact details, medical data, deadlines, and `RowVer`. Intake and other Case Dates remain outside this projection until the shared query can consume the authoritative `CaseDates` semantic-role boundary rather than legacy `Cases` convenience dates.
+The base projection contains Case identity, status, Practice Area, assignments, timestamps, and deleted
+state; consumer enrichment supplies authoritative Case Dates where required. The Cases list displays
+and sorts Intake Date from active `CaseDates` through the tenant-effective protected `INTAKE` role.
+It does not consult `Cases.CallerDate` or `CallerTime`, which are legacy reconciliation inputs only.
 
 ## Existing consumer inventory
 
@@ -27,7 +30,7 @@ The projection contains: Case ID, tenant ID, Case number/name; status ID, `Syste
 
 ## Conflicts found
 
-Status selection was not uniform: several card queries prefer `IsPrimary` and recency even when a row has ended, while report and newer queries require `EndDate IS NULL` and use `EffectiveDate`. Assignment queries consistently use IDs and role 4, but some require `IsPrimary = 1`, some admit any team membership for filtering, and older calendar SQL still contains role 1. Date authority also differs: the Cases grid/export use migrated `CaseDates`, while MyShale deliberately retains legacy `Cases` date compatibility. Rich `CaseRow` queries repeatedly join Practice Areas and independently apply status, assignment, party, update, contact, and organization enrichment. Those joins also caused each query to carry its own deletion and tenant details.
+Status selection was not uniform: several card queries prefer `IsPrimary` and recency even when a row has ended, while report and newer queries require `EndDate IS NULL` and use `EffectiveDate`. Assignment queries consistently use IDs and role 4, but some require `IsPrimary = 1`, some admit any team membership for filtering, and older calendar SQL still contains role 1. Migrated list and export date values use `CaseDates`; legacy column references described later are compatibility/history inventory, not Intake authority. Rich `CaseRow` queries repeatedly join Practice Areas and independently apply status, assignment, party, update, contact, and organization enrichment. Those joins also caused each query to carry its own deletion and tenant details.
 
 ## Main active Cases grid cutover
 

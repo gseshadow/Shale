@@ -119,8 +119,8 @@ Primary case table.
 | ------------------------------------ | ------------- | ------------------------------------- |
 | `Id`                                 | int           | Primary key                           |
 | `Name`                               | nvarchar(max) | Case name                             |
-| `CallerTime`                         | time          | Intake/caller time                    |
-| `CallerDate`                         | date          | Intake/caller date                    |
+| `CallerTime`                         | time          | Legacy Intake reconciliation/history input; not runtime authority |
+| `CallerDate`                         | date          | Legacy Intake reconciliation/history input; not runtime authority |
 | `AcceptedDate`                       | date          | Accepted date                         |
 | `ClosedDate`                         | date          | Closed date                           |
 | `DeniedDate`                         | date          | Denied date                           |
@@ -164,7 +164,7 @@ Primary case table.
 | UI Field                    | Source                           |
 | --------------------------- | -------------------------------- |
 | Case Name                   | `dbo.Cases.Name`                 |
-| Intake Date                 | `dbo.Cases.CallerDate`           |
+| Intake Date                 | Tenant-effective protected `INTAKE` occurrence in `dbo.CaseDates` |
 | Description                 | `dbo.Cases.Description`          |
 | Summary                     | `dbo.Cases.Summary`              |
 | Date of Incident            | `dbo.Cases.DateOfInjury`         |
@@ -459,7 +459,7 @@ LEFT JOIN dbo.Users updateUser
 | --------------------------- | ------------------------------------------------------------------------------------------ |
 | Case Name                   | `dbo.Cases.Name`                                                                           |
 | Client                      | `dbo.CaseContacts` Role `1` + `dbo.Contacts` display name                                  |
-| Intake Date                 | `dbo.Cases.CallerDate`                                                                     |
+| Intake Date                 | Active tenant-effective protected `INTAKE` occurrence in `dbo.CaseDates`                   |
 | Case Status                 | No confirmed `dbo.Cases` status FK in live schema. Trace existing app behavior before use. |
 | Opposing Parties            | `dbo.CaseParties` role `party` + side `opposing` + `dbo.Contacts` display names            |
 | Latest Case Update          | Latest non-deleted `dbo.CaseUpdates.NoteText`                                              |
@@ -980,10 +980,19 @@ Strict tenant-owned case occurrence table with `ShaleClientId`, `CaseId`, `CaseD
 
 Ownership: `CaseDates` owns legal/factual case dates. Following the completed Phase 3B backfill and Phase 3C validation, it is the target authoritative runtime representation for the nine migrated fixed-date meanings; their `Cases` columns are retained temporarily for rollback/history only. `CalendarEvents` owns manually created calendar events only. The unified calendar projects from authoritative sources instead of becoming the owner or duplicating domain dates. Unmigrated workflow/lifecycle dates remain separate unless deliberately reclassified. Runtime cutover and later column removal are distinct, independently gated phases.
 
+New Intake persists its displayed or edited Intake date and time as a timed authoritative occurrence
+in the same transaction as Case creation and required PHI/entity-action audits. The Cases list reads
+and sorts that occurrence; `Cases.CallerDate`/`CallerTime` are legacy reconciliation inputs only. The
+forward-only, idempotent 2026-08-14 production reconciliation inserted 21 missing Intake occurrences
+for tenant 7 and created no `CalendarEvents` rows.
+
 ### dbo.CaseDateSemanticRoles / dbo.CaseDateTypeSemanticRoleMappings
 
 `CaseDateSemanticRoles` contains the explicit protected application meanings
-`INTAKE`, `STATUTE_OF_LIMITATIONS`, and `TORT_NOTICE_DEADLINE`.
+`INTAKE`, `STATUTE_OF_LIMITATIONS`, and `TORT_NOTICE_DEADLINE`. Its key column is `RoleKey`; the table
+has `IsProtected` and provenance columns and does not have `SemanticRoleKey`, `IsActive`, or
+`IsDeleted`. Those lifecycle columns and `SemanticRoleKey` belong to
+`CaseDateTypeSemanticRoleMappings`.
 `CaseDateTypeSemanticRoleMappings` associates one active global compatibility type,
 or at most one active tenant-specific type, with each role. The association has its
 own tenant/global scope, active and soft-deleted lifecycle, actor/timestamp provenance,

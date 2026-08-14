@@ -17,6 +17,10 @@ legacy Caller date/time but have no active authoritative Intake occurrence. It r
 administrative visibility, resolves tenant-effective semantic mappings, preserves SQL Server time
 precision, inserts only missing occurrences, reports preflight/per-tenant/postflight counts, and fails
 closed on missing mappings, ambiguous mappings, tenant actor gaps, or verification differences.
+The production execution completed for `ShaleClientId = 7` and inserted 21 missing occurrences. The
+script is forward-only and idempotent, so a repeat execution detects those authoritative occurrences
+and inserts none. `Cases.CallerDate` and `Cases.CallerTime` are now reconciliation/history inputs only,
+not runtime authority.
 
 **Audit compatibility review.** Runtime Intake occurrence creation appends the established `CASE_DATE`
 entity-action event and PHI `CaseDates.StartsAt` write audit on the aggregate connection before commit;
@@ -25,6 +29,12 @@ script writes the same two audit categories in its transaction, identifies entit
 `CASE_DATES_INTAKE_RECONCILIATION` source, and limits entity metadata to Case/Case Date ids. Date/time
 values occur only in the established PHI audit representation, never entity metadata, console output,
 or exception text. No new audit schema or timeline event is introduced.
+
+The Cases list displays and sorts Intake Date from the authoritative `CaseDates` occurrence resolved
+through the protected `INTAKE` semantic role. Neither New Intake nor reconciliation creates a
+`CalendarEvent`; the Calendar projects the occurrence directly. Case creation, the timed Intake
+occurrence, configured-date occurrences, parties/status work, and required audits commit or roll back
+together in the existing aggregate transaction.
 
 Workflow/lifecycle dates remain owned by their established workflow domains and are not inferred from compatibility occurrences.
 

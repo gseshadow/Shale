@@ -21,8 +21,8 @@ BEGIN TRY
   IF SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL
      OR (ISNULL(IS_SRVROLEMEMBER(N'sysadmin'), 0) <> 1 AND ISNULL(IS_MEMBER(N'db_owner'), 0) <> 1)
     THROW 56801, 'All-tenant administrative visibility is required and ShaleClientId session context must be NULL.', 1;
-  IF NOT EXISTS (SELECT 1 FROM dbo.CaseDateSemanticRoles WHERE SemanticRoleKey='INTAKE' AND IsActive=1 AND IsDeleted=0)
-    THROW 56802, 'The active INTAKE semantic role is missing.', 1;
+  IF NOT EXISTS (SELECT 1 FROM dbo.CaseDateSemanticRoles WHERE RoleKey='INTAKE' AND IsProtected=1)
+    THROW 56802, 'The protected INTAKE semantic role is missing.', 1;
 
   /* One safe migration actor per tenant. Prefer the recorded intake taker, then an active admin.
      Actor ids are audit attribution only; Source identifies this system reconciliation. */
@@ -52,7 +52,7 @@ BEGIN TRY
           AND tm.IsActive=1 AND tm.IsDeleted=0 AND tt.ShaleClientId=c.ShaleClientId
           AND tt.IsActive=1 AND tt.IsDeleted=0))
   )
-  SELECT ShaleClientId,CaseId,CallerDate,CallerTime,ActorUserId,CaseDateTypeId,
+  SELECT ShaleClientId,CaseId,CallerDate,CallerTime,ActorUserId,CaseDateTypeId,ScopeCount,
     CASE WHEN CallerTime IS NULL THEN CAST(CallerDate AS datetime2(7))
          ELSE DATETIME2FROMPARTS(YEAR(CallerDate),MONTH(CallerDate),DAY(CallerDate),
            DATEPART(hour,CallerTime),DATEPART(minute,CallerTime),DATEPART(second,CallerTime),
@@ -67,18 +67,20 @@ BEGIN TRY
       AND NOT EXISTS(SELECT 1 FROM #Candidates x WHERE x.ShaleClientId=c.ShaleClientId AND x.CaseId=c.Id))
     THROW 56805, 'At least one legacy Intake value cannot resolve an effective INTAKE semantic mapping.', 1;
 
+  ;WITH CandidateOccurrenceFlags AS (
+    SELECT x.*,
+      CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.CaseDates cd
+      JOIN dbo.CaseDateTypeSemanticRoleMappings im ON im.CaseDateTypeId=cd.CaseDateTypeId
+       AND im.SemanticRoleKey='INTAKE' AND im.IsActive=1 AND im.IsDeleted=0
+       AND (im.ShaleClientId=x.ShaleClientId OR im.ShaleClientId IS NULL)
+      WHERE cd.ShaleClientId=x.ShaleClientId AND cd.CaseId=x.CaseId AND cd.IsDeleted=0)
+      THEN 1 ELSE 0 END AS bit) ExistingOccurrence
+    FROM #Candidates x
+  )
   SELECT COUNT_BIG(*) LegacyIntakeCount,
-    SUM(CASE WHEN EXISTS(SELECT 1 FROM dbo.CaseDates cd
-      JOIN dbo.CaseDateTypeSemanticRoleMappings im ON im.CaseDateTypeId=cd.CaseDateTypeId
-       AND im.SemanticRoleKey='INTAKE' AND im.IsActive=1 AND im.IsDeleted=0
-       AND (im.ShaleClientId=x.ShaleClientId OR im.ShaleClientId IS NULL)
-      WHERE cd.ShaleClientId=x.ShaleClientId AND cd.CaseId=x.CaseId AND cd.IsDeleted=0) THEN 1 ELSE 0 END) ExistingAuthoritativeCount,
-    SUM(CASE WHEN NOT EXISTS(SELECT 1 FROM dbo.CaseDates cd
-      JOIN dbo.CaseDateTypeSemanticRoleMappings im ON im.CaseDateTypeId=cd.CaseDateTypeId
-       AND im.SemanticRoleKey='INTAKE' AND im.IsActive=1 AND im.IsDeleted=0
-       AND (im.ShaleClientId=x.ShaleClientId OR im.ShaleClientId IS NULL)
-      WHERE cd.ShaleClientId=x.ShaleClientId AND cd.CaseId=x.CaseId AND cd.IsDeleted=0) THEN 1 ELSE 0 END) PreflightReconciliationCount
-  FROM #Candidates x;
+    SUM(CAST(ExistingOccurrence AS bigint)) ExistingAuthoritativeCount,
+    SUM(CAST(1-ExistingOccurrence AS bigint)) PreflightReconciliationCount
+  FROM CandidateOccurrenceFlags;
 
   SELECT x.* INTO #Missing FROM #Candidates x WHERE NOT EXISTS(
     SELECT 1 FROM dbo.CaseDates cd
