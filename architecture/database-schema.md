@@ -924,11 +924,11 @@ Phase 6.1 adds a dedicated append-only entity-action audit table because existin
 
 Audit metadata may contain only stable IDs and non-sensitive state markers, including CaseId, CaseLinkId, CaseLinkShareId, ExternalLinkId, LinkTypeId, ContactId, previous/new Primary CaseLinkId, reordered link count, and activation state. It must not contain URLs, descriptions, link notes, share notes, Contact names/emails/phones, credentials, RowVer bytes, raw commands/DTOs, SQL, or exception text. Ordinary application paths insert only and must not update/delete audit history.
 
-Deployed databases must apply the forward-only migration
-`docs/sql/2026-08-12_entity_action_audit_entity_type_constraint.sql` after all earlier audit migrations. It rebuilds the
+Deployed databases must retain the historical `2026-08-12_entity_action_audit_entity_type_constraint.sql` migration unchanged, then apply the forward-only successor
+`docs/sql/2026-08-14_entity_action_audit_entity_type_constraint_case_status.sql` after the Status soft-delete migration and all earlier audit migrations. It rebuilds the
 durable `EntityType` CHECK from authoritative table/column dependency metadata, preserves values allowed by any
-deployed historical EntityType constraint, and adds the complete production vocabulary: `CASE`, `LINK_TYPE`,
-`CASE_LINK`, `CASE_LINK_SHARE`, `CASE_DATE`, `CALENDAR_EVENT`, `CASE_DATE_ROLE_MAPPING`,
+deployed historical EntityType constraint, and adds the complete production vocabulary: `CASE`, `CASE_STATUS`, `LINK_TYPE`,
+`CASE_LINK`, `CASE_LINK_SHARE`, `CASE_DATE`, `CASE_DATE_TYPE`, `CALENDAR_EVENT`, `CASE_DATE_ROLE_MAPPING`,
 `CALENDAR_CASE_DATE_TYPE_MAPPING`, `FORM_CONFIGURATION`, `MATERIAL_TYPE`, `MATERIAL_REQUEST`,
 `MATERIAL_REQUEST_FOLLOW_UP`, `MATERIAL_ITEM`, and `USER`. The migration is transactional, repeatable, and verifies
 that the rebuilt constraint is enabled and trusted; historical migrations must not be edited or rerun to obtain this

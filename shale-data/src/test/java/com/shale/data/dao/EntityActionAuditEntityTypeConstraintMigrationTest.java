@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 
 final class EntityActionAuditEntityTypeConstraintMigrationTest {
     private static final Path MIGRATION = Path.of("..", "docs", "sql",
-            "2026-08-12_entity_action_audit_entity_type_constraint.sql");
+            "2026-08-14_entity_action_audit_entity_type_constraint_case_status.sql");
     private static final Set<String> HISTORICALLY_DEPLOYED = Set.of(
             "CASE", "LINK_TYPE", "CASE_LINK", "CASE_LINK_SHARE", "MATERIAL_TYPE", "MATERIAL_REQUEST",
             "MATERIAL_REQUEST_FOLLOW_UP", "MATERIAL_ITEM", "CASE_DATE", "CASE_DATE_TYPE", "CALENDAR_EVENT",
