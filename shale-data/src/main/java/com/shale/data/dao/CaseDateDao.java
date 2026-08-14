@@ -198,6 +198,7 @@ public final class CaseDateDao {
         String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
         String sql = migratedProjectionSql(placeholders);
         LinkedHashMap<Long, EnumMap<MigratedCaseDateKey, MigratedCaseDateProjectionDto.Slot>> slots = new LinkedHashMap<>();
+        Map<Long, EnumSet<MigratedCaseDateKey>> conflicts = new HashMap<>();
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             int p = 1;
             ps.setInt(p++, tenant); ps.setInt(p++, tenant); ps.setInt(p++, tenant);
@@ -210,10 +211,9 @@ public final class CaseDateDao {
                     String roleKey = rs.getString("SemanticRoleKey");
                     if (roleKey != null) {
                         MigratedCaseDateKey semanticKey = migratedKey(CaseDateSemanticRole.require(roleKey));
-                        MigratedCaseDateProjectionDto.Slot value = MigratedCaseDateProjectionDto.Slot.present(
-                                semanticKey, ldt(rs, "StartsAt"), ldt(rs, "EndsAt"), rs.getBoolean("AllDay"));
-                        if (caseSlots.put(semanticKey, value).present())
-                            throw new IllegalStateException("Multiple active Case Date occurrences for semantic role " + roleKey + ".");
+                        mergeProjectionSlot(caseSlots, conflicts.computeIfAbsent(caseId,
+                                ignored -> EnumSet.noneOf(MigratedCaseDateKey.class)), semanticKey,
+                                ldt(rs, "StartsAt"), ldt(rs, "EndsAt"), rs.getBoolean("AllDay"));
                         continue;
                     }
                     if (systemKey == null) continue;
@@ -223,15 +223,26 @@ public final class CaseDateDao {
                     MigratedCaseDateKey key;
                     try { key = MigratedCaseDateKey.require(systemKey); }
                     catch (IllegalArgumentException notMigrated) { continue; }
-                    MigratedCaseDateProjectionDto.Slot value = MigratedCaseDateProjectionDto.Slot.present(
-                            key, ldt(rs, "StartsAt"), ldt(rs, "EndsAt"), rs.getBoolean("AllDay"));
-                    if (caseSlots.put(key, value).present()) {
-                        throw new IllegalStateException("Multiple active Case Date occurrences for singleton SystemKey: " + key.systemKey());
-                    }
+                    mergeProjectionSlot(caseSlots, conflicts.computeIfAbsent(caseId,
+                            ignored -> EnumSet.noneOf(MigratedCaseDateKey.class)), key,
+                            ldt(rs, "StartsAt"), ldt(rs, "EndsAt"), rs.getBoolean("AllDay"));
                 }
             }
         }
         slots.forEach((caseId, values) -> output.put(caseId, new MigratedCaseDateProjectionDto(caseId, values)));
+    }
+
+    private static void mergeProjectionSlot(
+            EnumMap<MigratedCaseDateKey, MigratedCaseDateProjectionDto.Slot> slots,
+            EnumSet<MigratedCaseDateKey> conflicts, MigratedCaseDateKey key,
+            LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay) {
+        if (conflicts.contains(key)) return;
+        if (slots.get(key).present()) {
+            slots.put(key, MigratedCaseDateProjectionDto.Slot.absent(key));
+            conflicts.add(key);
+            return;
+        }
+        slots.put(key, MigratedCaseDateProjectionDto.Slot.present(key, startsAt, endsAt, allDay));
     }
 
     private static EnumMap<MigratedCaseDateKey, MigratedCaseDateProjectionDto.Slot> emptyProjectionSlots() {
