@@ -15,8 +15,8 @@ final class CaseDaoCaseStatusMappingTest {
     @Test
     void listCaseStatusesMappingKeepsRowsFromStatusLookup() {
         List<CaseDao.StatusRow> lookupRows = List.of(
-                new CaseDao.StatusRow(1, "Prelitigation", 10, "0xFFFFFFFF", "open", "prelitigation"),
-                new CaseDao.StatusRow(2, "Closed", 80, "0xFF333333", "closed", "closed"));
+                new CaseDao.StatusRow(1, "Prelitigation", 10, "0xFFFFFFFF", "open", "prelitigation", true, false),
+                new CaseDao.StatusRow(2, "Closed", 80, "0xFF333333", "closed", "closed", true, false));
 
         List<CaseStatusDto> mapped = CaseDao.toCaseStatusDtos(lookupRows);
 

@@ -5644,7 +5644,7 @@ public class CaseController {
 		CaseDao.StatusRow currentValue = currentOverview == null ? null : options.stream()
 				.filter(v -> Objects.equals(v.id(), currentOverview.getPrimaryStatusId())).findFirst()
 				.orElse(new CaseDao.StatusRow(currentOverview.getPrimaryStatusId(), currentOverview.getCaseStatus(), 0,
-						currentOverview.getPrimaryStatusColor(), null, null));
+						currentOverview.getPrimaryStatusColor(), null, null, true, false));
 		StatusCardFactory cards = new StatusCardFactory(id -> { });
 		showCardChoiceFieldDialog("Edit Case Status", "Case Status", currentValue, options,
 				CaseDao.StatusRow::id, v -> cards.create(new StatusCardModel(v.id(), v.name(), v.sortOrder(), v.color()), StatusCardFactory.Variant.MINI),

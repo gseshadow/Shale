@@ -999,7 +999,8 @@ public final class SettingsController {
 		metadata.getChildren().addAll(
 				metadataPill(row.getClosedState()),
 				metadataPill("Sort " + row.getSortOrder()),
-				metadataPill(row.scopeLabel()));
+				metadataPill(row.scopeLabel()),
+				metadataPill(row.active() && !row.deleted() ? "Active" : "Inactive"));
 		if (!row.getLifecycleKey().isBlank()) metadata.getChildren().add(metadataPill("Lifecycle: " + row.getLifecycleKey()));
 		if (!row.getSystemKey().isBlank()) metadata.getChildren().add(metadataPill("System: " + row.getSystemKey()));
 
@@ -1013,9 +1014,12 @@ public final class SettingsController {
 		Button down = cardButton("Move Down", ControlStyles.Purpose.GHOST);
 		down.setDisable(index >= caseStatusRows.size() - 1);
 		down.setOnAction(event -> { selectCaseStatusRow(row); moveSelectedStatus(1); event.consume(); });
+		Button lifecycle = cardButton(row.active() && !row.deleted() ? "Remove" : "Restore", row.active() && !row.deleted() ? ControlStyles.Purpose.DANGER : ControlStyles.Purpose.SECONDARY);
+		lifecycle.setDisable(row.global());
+		lifecycle.setOnAction(event -> { selectCaseStatusRow(row); if(row.active()&&!row.deleted()) caseService.removeCaseStatus(new CaseServicePort.StatusLifecycleCommand(requireTenantId(),requireActorUserId(),row.id())); else caseService.restoreCaseStatus(new CaseServicePort.StatusLifecycleCommand(requireTenantId(),requireActorUserId(),row.id())); loadCaseStatusesAsync(row.active()&&!row.deleted()?"Case status removed.":"Case status restored."); event.consume(); });
 		Label restriction = new Label(row.global() ? "Global/default status: editing creates a tenant override; reordering requires tenant-specific status." : "Tenant-specific/custom status.");
 		restriction.getStyleClass().add("search-summary-text");
-		actions.getChildren().addAll(edit, up, down, restriction);
+		actions.getChildren().addAll(edit, up, down, lifecycle, restriction);
 
 		card.getChildren().addAll(header, metadata, actions);
 		return card;
@@ -1493,6 +1497,8 @@ public final class SettingsController {
 		public String getSystemKey() { return safe(status.systemKey()); }
 		public String color() { return status.color(); }
 		public boolean global() { return status.shaleClientId() == null; }
+		public boolean active() { return status.active(); }
+		public boolean deleted() { return status.deleted(); }
 		public String scopeLabel() { return global() ? "Global/default" : "Tenant/custom"; }
 		CaseStatusDto status() { return status; }
 	}

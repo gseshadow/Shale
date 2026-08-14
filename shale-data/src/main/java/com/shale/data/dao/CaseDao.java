@@ -4962,7 +4962,9 @@ public final class CaseDao {
 			int sortOrder,
 			String color,
 			String lifecycleKey,
-			String systemKey
+			String systemKey,
+			boolean active,
+			boolean deleted
 	) {
 	}
 
@@ -5330,7 +5332,8 @@ public final class CaseDao {
 				rs.getInt("SortOrder"),
 				rs.getString("Color"),
 				resolveLifecycleKey(rs.getString("LifecycleKey"), rs.getString("Name")),
-				normalizeSystemKey(rs.getString("SystemKey"))
+				normalizeSystemKey(rs.getString("SystemKey")),
+				rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted")
 		);
 	}
 
@@ -5398,7 +5401,7 @@ public final class CaseDao {
 			String lifecycleKeySelect = hasLifecycleKey ? "LifecycleKey" : "NULL AS LifecycleKey";
 			String systemKeySelect = hasSystemKey ? "SystemKey" : "NULL AS SystemKey";
 			String sql = """
-					SELECT Id, Name, SortOrder, Color, %s, %s
+					SELECT Id, Name, SortOrder, Color, %s, %s, IsActive, IsDeleted
 					FROM %s
 					WHERE ShaleClientId = ?
 					ORDER BY SortOrder, Name;
@@ -5412,7 +5415,7 @@ public final class CaseDao {
 						tenantStatuses.add(mapStatusRow(rs));
 					}
 					String globalSql = """
-							SELECT Id, Name, SortOrder, Color, %s, %s
+							SELECT Id, Name, SortOrder, Color, %s, %s, IsActive, IsDeleted
 							FROM %s
 							WHERE ShaleClientId IS NULL
 							ORDER BY SortOrder, Name;
@@ -5423,7 +5426,9 @@ public final class CaseDao {
 						while (globalRs.next()) {
 							globalStatuses.add(mapStatusRow(globalRs));
 						}
-						return resolveEffectiveStatuses(globalStatuses, tenantStatuses);
+						List<StatusRow> effective = resolveEffectiveStatuses(globalStatuses, tenantStatuses);
+						effective.removeIf(status -> !status.active() || status.deleted());
+						return effective;
 					}
 				}
 			}
@@ -5437,14 +5442,16 @@ public final class CaseDao {
 			return List.of();
 		}
 		String sql = """
-				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey
+				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey, IsActive, IsDeleted
 				FROM dbo.Statuses
 				WHERE ShaleClientId = ?
+                  AND (?=1 OR (IsActive=1 AND IsDeleted=0))
 				ORDER BY SortOrder, Name, Id;
 				""";
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setInt(1, shaleClientId);
+            ps.setBoolean(2, includeInactive);
 			try (ResultSet rs = ps.executeQuery()) {
 				List<CaseStatusDto> out = new ArrayList<>();
 				while (rs.next()) {
@@ -5720,10 +5727,18 @@ public final class CaseDao {
 	}
 
 	public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
-		if (shaleClientId <= 0) {
-			return List.of();
-		}
-		return toCaseStatusDtos(listStatusesForTenant(shaleClientId));
+		if (shaleClientId <= 0) return List.of();
+		String sql = "SELECT Id,ShaleClientId,Name,IsClosed,SortOrder,Color,LifecycleKey,SystemKey,IsActive,IsDeleted FROM dbo.Statuses WHERE (ShaleClientId=? OR ShaleClientId IS NULL) ORDER BY SortOrder,Name,Id";
+		try (Connection con=db.requireConnection(); PreparedStatement ps=con.prepareStatement(sql)) {
+			ps.setInt(1,shaleClientId); List<CaseStatusDto> globals=new ArrayList<>(), tenants=new ArrayList<>();
+			try(ResultSet rs=ps.executeQuery()){while(rs.next()){CaseStatusDto dto=mapCaseStatusDto(rs);(dto.shaleClientId()==null?globals:tenants).add(dto);}}
+			return resolveEffectiveCaseStatuses(globals,tenants,includeInactive);
+		} catch(SQLException e){throw new RuntimeException("Failed to list case statuses",e);}
+	}
+
+	static List<CaseStatusDto> resolveEffectiveCaseStatuses(List<CaseStatusDto> globals,List<CaseStatusDto> tenants,boolean includeInactive){
+		Map<String,CaseStatusDto> keyed=new LinkedHashMap<>();List<CaseStatusDto> unkeyed=new ArrayList<>();
+		for(CaseStatusDto d:globals){String k=normalizeSystemKey(d.systemKey());if(k==null)unkeyed.add(d);else keyed.put(k,d);} for(CaseStatusDto d:tenants){String k=normalizeSystemKey(d.systemKey());if(k==null)unkeyed.add(d);else keyed.put(k,d);} List<CaseStatusDto> out=new ArrayList<>(keyed.values());out.addAll(unkeyed);if(!includeInactive)out.removeIf(d->!d.active()||d.deleted());out.sort(java.util.Comparator.comparing((CaseStatusDto d)->d.sortOrder()==null?0:d.sortOrder()).thenComparing(CaseStatusDto::name));return out;
 	}
 
 	static List<CaseStatusDto> toCaseStatusDtos(List<StatusRow> statuses) {
@@ -5743,7 +5758,7 @@ public final class CaseDao {
 					status.color(),
 					status.lifecycleKey(),
 					status.systemKey(),
-					null));
+					null, status.active(), status.deleted()));
 		}
 		return out;
 	}
@@ -5757,8 +5772,8 @@ public final class CaseDao {
 			String normalizedSystemKey = normalizeSystemKey(systemKey);
 			validateCaseStatusUnique(con, shaleClientId, null, normalizedName, normalizedSystemKey);
 			String sql = """
-					INSERT INTO dbo.Statuses (ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey)
-					VALUES (?, ?, ?, ?, ?, ?, ?);
+					INSERT INTO dbo.Statuses (ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey, IsActive, IsDeleted)
+					VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0);
 					""";
 			try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 				ps.setInt(1, shaleClientId);
@@ -5805,7 +5820,7 @@ public final class CaseDao {
 			}
 			String sql = """
 					UPDATE dbo.Statuses
-					SET Name = ?, IsClosed = ?, SortOrder = ?, Color = ?, LifecycleKey = ?, SystemKey = ?
+					SET Name = ?, IsClosed = ?, SortOrder = ?, Color = ?, LifecycleKey = ?, SystemKey = ?, IsActive=1, IsDeleted=0
 					WHERE Id = ? AND ShaleClientId = ?;
 					""";
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -5825,6 +5840,15 @@ public final class CaseDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update case status.", e);
 		}
+	}
+
+	public void removeCaseStatus(int tenant,int actor,int statusId){ mutateCaseStatusLifecycle(tenant,actor,statusId,false); }
+	public CaseStatusDto restoreCaseStatus(int tenant,int actor,int statusId){ mutateCaseStatusLifecycle(tenant,actor,statusId,true); try(Connection c=db.requireConnection()){return findCaseStatusById(c,statusId);}catch(SQLException e){throw new RuntimeException("Failed to reload case status",e);} }
+	private void mutateCaseStatusLifecycle(int tenant,int actor,int statusId,boolean restore){
+		try(Connection con=db.requireConnection()){con.setAutoCommit(false);try{validateAdminActorForTenant(con,tenant,actor);CaseStatusDto status=findCaseStatusById(con,statusId);if(status==null||status.shaleClientId()==null||status.shaleClientId()!=tenant)throw new IllegalArgumentException("Case status is not available for this tenant.");
+			try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.Statuses SET IsActive=?,IsDeleted=? WHERE Id=? AND ShaleClientId=?")){ps.setBoolean(1,restore);ps.setBoolean(2,!restore);ps.setInt(3,statusId);ps.setInt(4,tenant);if(ps.executeUpdate()!=1)throw new IllegalStateException("Case status changed concurrently.");}
+			entityActionAuditDao.append(con,EntityActionAuditEvent.now(tenant,actor,EntityActionAuditEvent.EntityType.CASE_STATUS,statusId,restore?EntityActionAuditEvent.Action.RESTORED:EntityActionAuditEvent.Action.DEACTIVATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.ACTIVE,restore)));con.commit();
+		}catch(Exception e){con.rollback();throw e;}finally{con.setAutoCommit(true);}}catch(SQLException e){throw new RuntimeException("Case status lifecycle change failed.",e);}
 	}
 
 	public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
@@ -5859,12 +5883,12 @@ public final class CaseDao {
 				rs.getString("Color"),
 				resolveLifecycleKey(rs.getString("LifecycleKey"), rs.getString("Name")),
 				normalizeSystemKey(rs.getString("SystemKey")),
-				getNullableInt(rs, "ShaleClientId"));
+				getNullableInt(rs, "ShaleClientId"), rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted"));
 	}
 
 	private CaseStatusDto findCaseStatusById(Connection con, int statusId) throws SQLException {
 		String sql = """
-				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey
+				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey, IsActive, IsDeleted
 				FROM dbo.Statuses
 				WHERE Id = ?;
 				""";

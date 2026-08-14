@@ -320,12 +320,12 @@ class CaseServiceAdapterTest {
 
 		@Override
 		public PracticeAreaDto createPracticeArea(int shaleClientId, String name, String color, boolean active, String systemKey) {
-			return new PracticeAreaDto(2, name, color, active, false, systemKey, shaleClientId);
+			return new PracticeAreaDto(2, name, color, active, false, systemKey, shaleClientId, true, false);
 		}
 
 		@Override
 		public PracticeAreaDto updatePracticeArea(int shaleClientId, int practiceAreaId, String name, String color, boolean active, String systemKey) {
-			return new PracticeAreaDto(practiceAreaId, name, color, active, false, systemKey, shaleClientId);
+			return new PracticeAreaDto(practiceAreaId, name, color, active, false, systemKey, shaleClientId, true, false);
 		}
 
 		@Override
@@ -334,17 +334,17 @@ class CaseServiceAdapterTest {
 
 		@Override
 		public CaseStatusDto createCaseStatus(int shaleClientId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey) {
-			return new CaseStatusDto(1, name, closed, sortOrder, color, lifecycleKey, systemKey, shaleClientId);
+			return new CaseStatusDto(1, name, closed, sortOrder, color, lifecycleKey, systemKey, shaleClientId, true, false);
 		}
 
 		@Override
 		public CaseStatusDto updateCaseStatus(int shaleClientId, int statusId, String name, boolean closed, Integer sortOrder, String color, String lifecycleKey, String systemKey) {
-			return new CaseStatusDto(statusId, name, closed, sortOrder, color, lifecycleKey, systemKey, shaleClientId);
+			return new CaseStatusDto(statusId, name, closed, sortOrder, color, lifecycleKey, systemKey, shaleClientId, true, false);
 		}
 
 		@Override
 		public CaseDao.StatusRow findStatusForTenantById(int shaleClientId, int statusId) {
-			return new CaseDao.StatusRow(statusId, "Open", 10, "#00AA00", null, "open");
+			return new CaseDao.StatusRow(statusId, "Open", 10, "#00AA00", null, "open", true, false);
 		}
 
 		@Override
@@ -358,6 +358,9 @@ class CaseServiceAdapterTest {
 		@Override
 		public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
 		}
+
+		@Override public void removeCaseStatus(int t,int a,int id) { }
+		@Override public CaseStatusDto restoreCaseStatus(int t,int a,int id) { return new CaseStatusDto(id,"Restored",false,10,null,null,null,t,true,false); }
 
 		@Override
 		public void addCaseNote(long caseId, int shaleClientId, String noteText, Integer createdByUserId) {
