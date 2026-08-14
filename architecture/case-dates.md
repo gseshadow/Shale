@@ -2,6 +2,30 @@
 
 > **Current runtime authority:** `CaseDates` is authoritative for migrated data; legacy columns are retained temporarily for rollback/history and explicitly deferred compatibility callers.
 
+## New Intake creation and post-cutover reconciliation (2026-08-14)
+
+New Intake carries its displayed, prepopulated Intake date and explicitly editable time through the
+controller request into the existing `CaseDao.createIntake` aggregate transaction. The DAO resolves
+the effective `INTAKE` semantic-role mapping on that same connection, verifies that the submitted
+configured field is that resolved type, and inserts the timed `CaseDates` occurrence before the case
+transaction commits. It does not derive authority from a numeric type id, mutable label, or the legacy
+`Cases.CallerDate` column. Configured non-Intake dates remain all-day values.
+
+The forward-only reconciliation script
+`docs/sql/2026-08-14_reconcile_missing_intake_case_dates.sql` repairs post-cutover cases that retained a
+legacy Caller date/time but have no active authoritative Intake occurrence. It requires all-tenant
+administrative visibility, resolves tenant-effective semantic mappings, preserves SQL Server time
+precision, inserts only missing occurrences, reports preflight/per-tenant/postflight counts, and fails
+closed on missing mappings, ambiguous mappings, tenant actor gaps, or verification differences.
+
+**Audit compatibility review.** Runtime Intake occurrence creation appends the established `CASE_DATE`
+entity-action event and PHI `CaseDates.StartsAt` write audit on the aggregate connection before commit;
+an audit failure rolls back the Case, parties, status, configured dates, and audits together. The repair
+script writes the same two audit categories in its transaction, identifies entity events with the safe
+`CASE_DATES_INTAKE_RECONCILIATION` source, and limits entity metadata to Case/Case Date ids. Date/time
+values occur only in the established PHI audit representation, never entity metadata, console output,
+or exception text. No new audit schema or timeline event is introduced.
+
 Workflow/lifecycle dates remain owned by their established workflow domains and are not inferred from compatibility occurrences.
 
 *Last updated: 2026-08-10*
