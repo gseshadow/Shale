@@ -4,6 +4,20 @@
 
 This is the Phase 3D inventory and cutover plan. Phase 3B backfill and Phase 3C post-validation are complete: 2,233 eligible source rows reconcile exactly, `BlockerCount = 0`, and 610 flag-set/date-missing rows are intentional historical anomalies. The inventory assumes those deployed results and must not rerun, repair, or reinterpret them.
 
+### Final New Intake authority and reconciliation (2026-08-14)
+
+Desktop New Intake now carries the displayed or edited Intake date/time into the existing aggregate
+transaction and persists it as a timed authoritative `CaseDates` occurrence. The type is resolved by
+the tenant-effective protected `INTAKE` semantic role. Case creation, configured occurrences, parties,
+status work, and required PHI/entity-action audits remain atomic. `Cases.CallerDate` and `CallerTime`
+are legacy reconciliation/history inputs only; the Cases list displays and sorts Intake Date from the
+authoritative occurrence.
+
+The forward-only, idempotent production reconciliation inserted 21 missing Intake occurrences for
+`ShaleClientId = 7`. It created no `CalendarEvent`; Calendar continues to project `CaseDates` directly.
+Earlier statements in this chronological inventory that describe New Intake as deferred are retained
+only as historical gate records and are superseded by this section.
+
 ### Existing-case server and React cutover (2026-08-12)
 
 The existing `GET /api/cases/{id}` and `PATCH /api/cases/{id}/core-details` round trip now carries the established complete nine-slot snapshot. Each slot has its enum key and canonical SystemKey, stored type id, occurrence id/RowVer and value when present, or an explicit absent flag and witnessed `Cases.RowVer`. The server derives tenant and actor from the authenticated runtime session; request identity is never authoritative. The React detail and currently exposed core editor use stable SystemKeys, preserve absent slots without creating them, preserve unedited timed intake values, and display a reload-required conflict without retrying.

@@ -36,6 +36,19 @@ Organizations
 Team
 Settings
 
+## New Intake date authority
+
+New Intake persists the date/time shown or edited by the user as a timed `dbo.CaseDates` occurrence.
+The effective Intake type is selected through the protected, tenant-effective `INTAKE` semantic-role
+mapping rather than a label or fixed type id. Case creation, occurrence persistence, configured dates,
+and required audits are one transaction. The Cases list displays and sorts Intake Date from this
+authoritative occurrence; `dbo.Cases.CallerDate` and `CallerTime` remain only as legacy reconciliation
+and history inputs.
+
+The forward-only, idempotent production reconciliation inserted 21 missing Intake occurrences for
+`ShaleClientId = 7`. New Intake and reconciliation do not create duplicate `CalendarEvents`; Calendar
+projects `CaseDates` directly.
+
 ## Calendar feed source-of-truth rules
 
 The desktop Calendar feed is a unified read model, not a separate scheduling store. `dbo.CalendarEvents` contains persisted scheduled events that users can create and edit. Task due dates are projected directly from `dbo.Tasks.DueAt`; accepted, denied, and closed dates remain lifecycle projections from `dbo.Cases` because they are outside the Case Dates migration; and active authoritative occurrences are projected directly from `dbo.CaseDates`. The former fixed `dbo.Cases` projections for intake, injury, medical-negligence, discovery, deadline, fee-agreement, and non-engagement dates were removed at the Calendar cutover because they duplicated or became stale beside `CaseDates`.

@@ -11,6 +11,14 @@ final class IntakeReconciliationMigrationContractTest {
     @Test void repairIsSemanticTenantSafeIdempotentAuditedAndValuePreserving() throws Exception {
         String sql = Files.readString(Path.of("../docs/sql/2026-08-14_reconcile_missing_intake_case_dates.sql"));
         assertTrue(sql.contains("SemanticRoleKey='INTAKE'"));
+        assertTrue(sql.contains("CaseDateSemanticRoles WHERE RoleKey='INTAKE' AND IsProtected=1"));
+        assertFalse(sql.contains("CaseDateSemanticRoles WHERE SemanticRoleKey"));
+        assertFalse(sql.matches("(?s).*CaseDateSemanticRoles WHERE[^;]*(?:IsActive|IsDeleted).*"));
+        assertTrue(sql.contains("ActorUserId,CaseDateTypeId,ScopeCount,"));
+        assertTrue(sql.indexOf("ActorUserId,CaseDateTypeId,ScopeCount,") < sql.indexOf("#Candidates WHERE ScopeCount<>1"));
+        assertTrue(sql.contains("CandidateOccurrenceFlags"));
+        assertTrue(sql.contains("ExistingOccurrence"));
+        assertFalse(sql.matches("(?s).*SUM\\s*\\(\\s*CASE\\s+WHEN\\s+(?:NOT\\s+)?EXISTS\\s*\\(.*"));
         assertTrue(sql.contains("m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL"));
         assertTrue(sql.contains("SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL"));
         assertTrue(sql.contains("NOT EXISTS(\n    SELECT 1 FROM dbo.CaseDates"));
