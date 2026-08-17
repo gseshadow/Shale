@@ -49,6 +49,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import com.shale.ui.util.PerfLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,6 +100,7 @@ public final class CalendarController {
     private CalendarService calendarService;
     private CalendarFeedDao calendarFeedDao;
     private Consumer<Integer> onOpenCase;
+    private BiConsumer<Integer, Long> onOpenCaseDates;
     private Consumer<Long> onOpenTask;
     private CaseTaskService caseTaskService;
     private CaseSummaryDao caseSummaryDao;
@@ -132,13 +134,15 @@ public final class CalendarController {
     private TaskCardFactory taskCardFactory = new TaskCardFactory(id -> {}, id -> {}, id -> {}, id -> {});
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "calendar-feed-loader"); t.setDaemon(true); return t; });
 
-    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseSummaryDao caseSummaryDao, CaseServicePort caseService, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
+    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseSummaryDao caseSummaryDao, CaseServicePort caseService, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase, BiConsumer<Integer, Long> onOpenCaseDates, Consumer<Long> onOpenTask) {
         this.appState = appState; this.calendarService = calendarService; this.calendarFeedDao = calendarFeedDao;
         this.caseTaskService = caseTaskService;
         this.caseSummaryDao = caseSummaryDao;
         this.caseService = caseService;
         this.runtimeBridge = runtimeBridge;
-        this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase; this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
+        this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase;
+        this.onOpenCaseDates = onOpenCaseDates == null ? (caseId, caseDateId) -> {} : onOpenCaseDates;
+        this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
         resetCalendarOverlayDefaults();
         configureCalendarOverlayControls();
         this.caseCardFactory = new CaseCardFactory(this.onOpenCase);
@@ -1051,16 +1055,36 @@ public final class CalendarController {
         CalendarFeedClickTarget target = CalendarFeedClickTarget.resolve(item);
         if (!target.actionable()) return;
         card.setCursor(Cursor.HAND);
-        card.setOnMouseClicked(evt -> {
+        Runnable activate = () -> {
             switch (target.kind()) {
                 case CALENDAR_EVENT -> openEditEventDialog(Math.toIntExact(target.id()));
                 case TASK -> onOpenTask.accept(target.id());
                 case CASE -> onOpenCase.accept(Math.toIntExact(target.id()));
-                case CASE_DATES -> onOpenCase.accept(Math.toIntExact(target.id()));
+                case CASE_DATES -> onOpenCaseDates.accept(target.caseId(), target.id());
                 case NONE -> { }
             }
-            evt.consume();
+        };
+        card.setFocusTraversable(true);
+        card.setAccessibleText("Open " + safe(item == null ? null : item.title()));
+        card.setOnMouseClicked(evt -> {
+            if (evt.getButton() != javafx.scene.input.MouseButton.PRIMARY || !evt.isStillSincePress() || isEmbeddedAction(evt.getTarget(), card)) return;
+            activate.run(); evt.consume();
         });
+        card.setOnKeyPressed(evt -> {
+            if (evt.getCode() == javafx.scene.input.KeyCode.ENTER || evt.getCode() == javafx.scene.input.KeyCode.SPACE) {
+                activate.run(); evt.consume();
+            }
+        });
+    }
+
+    private static boolean isEmbeddedAction(Object target, Node card) {
+        Node node = target instanceof Node n ? n : null;
+        while (node != null && node != card) {
+            if (node instanceof javafx.scene.control.ButtonBase || node instanceof javafx.scene.control.TextInputControl
+                    || node instanceof javafx.scene.control.ComboBoxBase<?> || node instanceof javafx.scene.control.Hyperlink) return true;
+            node = node.getParent();
+        }
+        return false;
     }
 
     private void openEditEventDialog(int eventId) {
@@ -1090,7 +1114,10 @@ public final class CalendarController {
                 var eventTypes = calendarService.listEffectiveEventTypes(tenantId);
                 PerfLog.logDone("DAO", "calendar edit-event hydrate eventId=" + eventId, loadStart);
                 Platform.runLater(() -> {
-                    if (!dialog.isShowing()) return;
+                    if (!dialog.isShowing() || appState == null || !Objects.equals(appState.getShaleClientId(), tenantId)) {
+                        openingEditDialogEventIds.remove(eventId);
+                        return;
+                    }
                     Node rc = caseRow == null ? null : createRelatedCaseNode(caseRow);
                     Node rt = taskRow == null ? null : createRelatedTaskNode(taskRow);
                     var summary = caseRow == null ? null : caseRow.summary();

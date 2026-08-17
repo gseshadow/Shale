@@ -118,6 +118,8 @@ public final class SceneManager {
 	private final NotificationPreferencesService notificationPreferencesService;
 	private CalendarController calendarController;
 	private Integer pendingCalendarNotificationEventId;
+	private PendingCaseDateRoute pendingCaseDateRoute;
+	private record PendingCaseDateRoute(int caseId, long caseDateId) {}
 	private final DurableNotificationService durableNotificationService;
 	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
 	private final NotificationPollingService notificationPollingService;
@@ -449,6 +451,12 @@ public final class SceneManager {
 		navigateTo(AppRoute.caseProfile(caseId, sectionKey == null ? "OVERVIEW" : sectionKey), true);
 	}
 
+	public void openCaseDates(Integer caseId, Long caseDateId) {
+		if (caseId == null || caseId <= 0 || caseDateId == null || caseDateId <= 0) return;
+		pendingCaseDateRoute = new PendingCaseDateRoute(caseId, caseDateId);
+		openCaseProfile(caseId, "DATES");
+	}
+
 	private void recordCaseSectionNavigation(Integer caseId, String sectionKey) {
 		if (caseId == null || caseId <= 0 || sectionKey == null || sectionKey.isBlank()) {
 			return;
@@ -677,7 +685,7 @@ public final class SceneManager {
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
 			CaseDao caseDao = new CaseDao(dbSessionProvider);
-			c.init(appState, calendarService, calendarFeedDao, caseTaskService, new CaseSummaryDao(dbSessionProvider), new CaseServiceAdapter(caseDao), runtimeBridge, caseId -> openCaseProfile(caseId, "OVERVIEW"), taskId -> openTaskProfile(
+			c.init(appState, calendarService, calendarFeedDao, caseTaskService, new CaseSummaryDao(dbSessionProvider), new CaseServiceAdapter(caseDao), runtimeBridge, caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openCaseDates, taskId -> openTaskProfile(
 					taskId, c::refreshCurrentRange));
 			Integer pendingEventId = pendingCalendarNotificationEventId;
 			if (pendingEventId != null && pendingEventId > 0) {
@@ -775,7 +783,7 @@ public final class SceneManager {
 			{
 				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
 				openCaseProfile(relatedCaseId, "OVERVIEW");
-			}, this::openUserProfile, caseTaskService, phiReadAuditService, calendarService);
+			}, this::openCaseDates, this::openUserProfile, caseTaskService, phiReadAuditService, calendarService);
 			return c;
 		});
 	}
@@ -884,6 +892,11 @@ public final class SceneManager {
 			});
 			c.setOnOpenTask(this::openTaskProfile);
 			c.setOnOpenOrganization(onOpenOrganization);
+			PendingCaseDateRoute requestedDate = pendingCaseDateRoute;
+			if (requestedDate != null && requestedDate.caseId() == caseId) {
+				pendingCaseDateRoute = null;
+				Platform.runLater(() -> c.openAuthoritativeCaseDate(requestedDate.caseDateId()));
+			}
 			return c;
 		});
 	}

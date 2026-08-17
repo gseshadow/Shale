@@ -20,12 +20,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 public final class ScheduleAgendaPane {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("h:mm a");
 
-    public record ClickHandlers(Consumer<Integer> onEvent, Consumer<Long> onTask, Consumer<Integer> onCase) {}
+    public record ClickHandlers(Consumer<Integer> onEvent, Consumer<Long> onTask, Consumer<Integer> onCase,
+                                BiConsumer<Integer, Long> onCaseDates) {}
 
     private final VBox agendaBox;
     private final Label statusLabel;
@@ -34,7 +36,7 @@ public final class ScheduleAgendaPane {
     public ScheduleAgendaPane(VBox agendaBox, Label statusLabel, ClickHandlers handlers) {
         this.agendaBox = Objects.requireNonNull(agendaBox, "agendaBox");
         this.statusLabel = statusLabel;
-        this.handlers = handlers == null ? new ClickHandlers(null, null, null) : handlers;
+        this.handlers = handlers == null ? new ClickHandlers(null, null, null, null) : handlers;
     }
 
     public void showMessage(String message) {
@@ -122,15 +124,18 @@ public final class ScheduleAgendaPane {
         CalendarFeedClickTarget target = CalendarFeedClickTarget.resolve(item);
         if (!target.actionable()) return;
         row.setCursor(Cursor.HAND);
-        row.setOnMouseClicked(e -> {
+        Runnable activate = () -> {
             switch (target.kind()) {
                 case CALENDAR_EVENT -> { if (handlers.onEvent() != null) handlers.onEvent().accept(Math.toIntExact(target.id())); }
                 case TASK -> { if (handlers.onTask() != null) handlers.onTask().accept(target.id()); }
                 case CASE -> { if (handlers.onCase() != null) handlers.onCase().accept(Math.toIntExact(target.id())); }
-                case CASE_DATES -> { if (handlers.onCase() != null) handlers.onCase().accept(Math.toIntExact(target.id())); }
+                case CASE_DATES -> { if (handlers.onCaseDates() != null) handlers.onCaseDates().accept(target.caseId(), target.id()); }
                 case NONE -> { }
             }
-        });
+        };
+        row.setFocusTraversable(true);
+        row.setOnMouseClicked(e -> { if (e.getButton() == javafx.scene.input.MouseButton.PRIMARY && e.isStillSincePress()) { activate.run(); e.consume(); } });
+        row.setOnKeyPressed(e -> { if (e.getCode() == javafx.scene.input.KeyCode.ENTER || e.getCode() == javafx.scene.input.KeyCode.SPACE) { activate.run(); e.consume(); } });
     }
 
     public static LocalDate itemDate(CalendarFeedItem item) {
