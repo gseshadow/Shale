@@ -50,6 +50,30 @@ The linkage/mapping schema, synchronization audit vocabulary, obsolete Settings 
 `CalendarEvents` RLS gap, feed projection identities, and existing edit/click routing remain
 unchanged pending the separately gated schema-retirement release.
 
+## Phase 3 — source-specific Calendar activation and editing (2026-08-17)
+
+Calendar activation is now an explicit typed contract. A `CASE_DATE:<CaseDates.Id>` target retains
+both the occurrence ID and owning Case ID and invokes the dedicated Case Dates navigation callback
+on week/day cards, Month items and drill-down, schedule agendas, and the Case Calendar. The Case
+profile opens its Dates section, reloads the occurrence through `CaseServicePort.getCaseDate`, checks
+the captured tenant, actor, Case, and navigation generation, and then reuses
+`CaseDateOccurrenceDialog` and the existing Case Date mutation/concurrency path. Missing, removed,
+foreign-tenant, inaccessible, wrong-Case, or stale results do not open an editor.
+
+A `CALENDAR_EVENT:<CalendarEventId>` target (with the deployed `EVENT:` spelling accepted only as a
+read-compatibility alias) invokes only the existing Calendar Event editor. It reloads by event ID
+under the captured tenant and continues through `CalendarService`, preserving assignment effects,
+audit and concurrency boundaries, and optional Case association without treating that association
+as Case Date identity. Neither route consults titles, labels, type names, or dates, and neither may
+fall through to the other source's editor or the New Event wizard.
+
+Mouse and Enter/Space activation share the same resolved target. Cards require a primary, stationary
+click, consume successful activation, remain keyboard focusable, and isolate embedded controls.
+Single-flight occurrence/event guards prevent duplicate editors, while open-state, tenant, Case, and
+generation checks reject asynchronous results after navigation or session changes. Feed projection,
+ordering, filtering, LiveBus refresh, the unified New Event wizard, and all database/linkage schema
+remain unchanged.
+
 ## Step 1 — persisted linkage and mutation foundation (complete)
 
 ### Inventory and authority
