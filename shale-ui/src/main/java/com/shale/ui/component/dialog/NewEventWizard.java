@@ -52,8 +52,12 @@ public final class NewEventWizard {
                 .forEach(t -> out.add(new TypeChoice(SourceKind.GENERAL_EVENT, t.calendarEventTypeId(), t.name(), t.colorHex(), true, t.sortOrder())));
         if (cases != null) cases.stream().filter(t -> t.active() && !t.deleted())
                 .forEach(t -> out.add(new TypeChoice(SourceKind.CASE_EVENT, t.id(), t.name(), t.color(), t.supportsTime(), t.sortOrder())));
-        out.sort(Comparator.comparing(TypeChoice::sourceKind).thenComparingInt(TypeChoice::sortOrder)
-                .thenComparing(t -> safe(t.name()).toLowerCase(Locale.ROOT)).thenComparingInt(TypeChoice::authoritativeTypeId));
+        Comparator<TypeChoice> choiceOrder = Comparator
+                .comparing((TypeChoice choice) -> choice.sourceKind())
+                .thenComparingInt(TypeChoice::sortOrder)
+                .thenComparing(choice -> safe(choice.name()).toLowerCase(Locale.ROOT))
+                .thenComparingInt(TypeChoice::authoritativeTypeId);
+        out.sort(choiceOrder);
         return List.copyOf(out);
     }
 

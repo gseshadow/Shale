@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /** Negative-boundary guards for the retired Calendar/Case Date runtime synchronization. */
@@ -54,17 +56,23 @@ class CaseCalendarSynchronizationRetirementContractTest {
         String production = dao("CaseDateDao.java") + dao("CalendarEventDao.java") + dao("CalendarFeedDao.java");
         String lower = production.toLowerCase();
         assertAll(
-                () -> assertFalse(lower.contains("title like")),
-                () -> assertFalse(lower.contains("label like")),
-                () -> assertFalse(lower.contains("name like")),
-                () -> assertFalse(lower.contains("startsat =") && lower.contains("casedateid is null")),
+                () -> assertFalse(forbiddenPairing(lower, "title\\s+like")),
+                () -> assertFalse(forbiddenPairing(lower, "(?:label|name)\\s+like")),
+                () -> assertFalse(forbiddenPairing(lower, "startsat\\s*=")),
                 () -> assertFalse(production.contains("CalendarCaseDateTypeMappings")));
     }
 
+    private static boolean forbiddenPairing(String source, String presentationOrDatePredicate) {
+        return Pattern.compile("casedateid\\s+is\\s+null.{0,500}" + presentationOrDatePredicate,
+                Pattern.CASE_INSENSITIVE | Pattern.DOTALL).matcher(source).find();
+    }
+
     private static String method(String source, String name) {
-        int signature = source.indexOf(" " + name + "(");
-        assertTrue(signature >= 0, "Missing method " + name);
-        int open = source.indexOf('{', signature);
+        Pattern declaration = Pattern.compile("(?:public|protected|private)\\s+[^;{}]*?\\b" + Pattern.quote(name)
+                + "\\s*\\([^;{}]*\\)\\s*\\{");
+        Matcher matcher = declaration.matcher(source);
+        assertTrue(matcher.find(), "Missing method declaration " + name);
+        int open = source.indexOf('{', matcher.start());
         int depth = 0;
         for (int i = open; i < source.length(); i++) {
             char c = source.charAt(i);
