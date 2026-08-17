@@ -27,6 +27,29 @@ Audit compatibility uses the existing schema without migration. Each successful 
 mutation retains exactly its own `CALENDAR_EVENT` or `CASE_DATE` entity-action record in the owning
 transaction; synchronization audit records are no longer emitted.
 
+## Phase 2 — unified Calendar New Event workflow (2026-08-17)
+
+Calendar **New Event** is one modal wizard. Its searchable first step presents active effective
+`CalendarEventTypes` as **General Event** and active tenant-effective `CaseDateTypes` as **Case
+Event**. Each transient choice retains a source-kind discriminator and the authoritative source ID;
+display names and group labels are presentation only, so duplicate names remain separate choices.
+Both catalogs and the Case search are asynchronous and guarded by dialog generation, current step,
+open state, and tenant identity. Back, cancel, Escape, branch changes, and failed saves do not write.
+
+The General Event branch reuses the Calendar event input and `CalendarService` mutation path,
+including optional Case and assignment, and creates exactly one unlinked `CalendarEvent`. The Case
+Event branch requires a Case selected through the searchable mini-card presentation and uses the
+existing `CaseServicePort.CreateCaseDateCommand` boundary, which retains Case touch, authoritative
+Case Date audits, tenant/session enforcement, and transaction behavior; the controller publishes
+the established PHI-free Case Dates LiveBus invalidation only after success. It creates exactly one
+`CaseDate`. Neither branch reads mappings, writes `CalendarEvents.CaseDateId`, creates a counterpart,
+copies notes/descriptions, or invokes the other branch's notifications. Submission revalidates the
+captured tenant and actor, is single-flight, preserves editor state on failure, and permits retry.
+
+The linkage/mapping schema, synchronization audit vocabulary, obsolete Settings guard, known
+`CalendarEvents` RLS gap, feed projection identities, and existing edit/click routing remain
+unchanged pending the separately gated schema-retirement release.
+
 ## Step 1 — persisted linkage and mutation foundation (complete)
 
 ### Inventory and authority
