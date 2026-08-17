@@ -10,6 +10,9 @@ import com.shale.core.model.CalendarOverlaySelection;
 import com.shale.data.dao.CalendarFeedDao;
 import com.shale.data.dao.CaseSummaryDao;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
+import com.shale.ui.component.dialog.NewEventWizard;
+import com.shale.core.service.CaseServicePort;
+import com.shale.core.service.CaseServicePort.CreateCaseDateCommand;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory;
@@ -43,6 +46,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import com.shale.ui.util.PerfLog;
@@ -98,6 +102,7 @@ public final class CalendarController {
     private Consumer<Long> onOpenTask;
     private CaseTaskService caseTaskService;
     private CaseSummaryDao caseSummaryDao;
+    private CaseServicePort caseService;
     private UiRuntimeBridge runtimeBridge;
     private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
     private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
@@ -127,10 +132,11 @@ public final class CalendarController {
     private TaskCardFactory taskCardFactory = new TaskCardFactory(id -> {}, id -> {}, id -> {}, id -> {});
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "calendar-feed-loader"); t.setDaemon(true); return t; });
 
-    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseSummaryDao caseSummaryDao, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
+    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseSummaryDao caseSummaryDao, CaseServicePort caseService, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
         this.appState = appState; this.calendarService = calendarService; this.calendarFeedDao = calendarFeedDao;
         this.caseTaskService = caseTaskService;
         this.caseSummaryDao = caseSummaryDao;
+        this.caseService = caseService;
         this.runtimeBridge = runtimeBridge;
         this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase; this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
         resetCalendarOverlayDefaults();
@@ -423,32 +429,43 @@ public final class CalendarController {
 
     @FXML private void onNewEvent() {
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
-        if (tenantId == null || tenantId <= 0 || calendarService == null) { showError("Calendar is unavailable because no tenant is selected."); return; }
+        Integer actorId = appState == null ? null : appState.getUserId();
+        if (tenantId == null || tenantId <= 0 || actorId == null || actorId <= 0 || calendarService == null || caseService == null) { showError("Calendar is unavailable because no tenant is selected."); return; }
         long dialogStart = PerfLog.start();
         PerfLog.log("DIALOG", "start", "calendar new-event shell");
-        NewCalendarEventDialog.CreateDialogHandle dialog = NewCalendarEventDialog.showCreateDialogAsyncShell(weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), LocalDate.now(), input -> {
-            LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
-            LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
+        NewEventWizard.Handle dialog = NewEventWizard.show(weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), tenantId, LocalDate.now(), () -> caseOptionsForPicker(null), () -> assignedUserOptionsForPicker(tenantId, null), request -> CompletableFuture.supplyAsync(() -> {
+            if (!Objects.equals(appState.getShaleClientId(), tenantId) || !Objects.equals(appState.getUserId(), actorId)) return "Your tenant or session changed. Close this wizard and try again.";
             try {
-                calendarService.createEvent(new com.shale.core.model.CalendarEvent(null, tenantId, input.calendarEventTypeId(), input.caseId(), null, input.title(), input.description(), startsAt, endsAt, input.allDay(), "MANUAL", null, null, input.assignedToUserId(), false, false, appState == null ? null : appState.getUserId(), null, null));
-                showError(null); loadCurrentRange(false); return null;
-            } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; }
-        }, () -> caseOptionsForPicker(null), () -> assignedUserOptionsForPicker(tenantId, null), dbExec);
+                if (request.sourceKind() == NewEventWizard.SourceKind.GENERAL_EVENT) {
+                    var input=request.general(); LocalDateTime startsAt=input.allDay()?input.date().atStartOfDay():input.date().atTime(input.startTime()); LocalDateTime endsAt=input.allDay()?null:startsAt.plusMinutes(input.durationMinutes());
+                    calendarService.createEvent(new com.shale.core.model.CalendarEvent(null,tenantId,input.calendarEventTypeId(),input.caseId(),null,input.title(),input.description(),startsAt,endsAt,input.allDay(),"MANUAL",null,null,input.assignedToUserId(),false,false,actorId,null,null));
+                } else {
+                    var input=request.caseDate();caseService.createCaseDate(new CreateCaseDateCommand(tenantId,actorId,input.caseId(),input.caseDateTypeId(),input.startsAt(),input.endsAt(),input.allDay(),input.notes()));
+                    if(runtimeBridge!=null)runtimeBridge.publishCaseDatesChanged(input.caseId(),tenantId,actorId,LiveUpdateEvents.CHANGE_CREATED);
+                }
+                Platform.runLater(()->{showError(null);loadCurrentRange(false);});return null;
+            } catch(RuntimeException ex){return request.sourceKind()==NewEventWizard.SourceKind.GENERAL_EVENT?"Could not save event. Please check values and try again.":rootMessage(ex);}
+        },dbExec),dbExec);
         PerfLog.logDone("DIALOG", "calendar new-event shell shown", dialogStart);
-        dbExec.submit(() -> {
+        int requestGeneration=dialog.beginTypeLoad(); dbExec.submit(() -> {
             long loadStart = PerfLog.start();
             PerfLog.log("DAO", "start", "calendar new-event types load");
             try {
-                var eventTypes = calendarService.listEffectiveEventTypes(tenantId);
+                var eventTypes = calendarService.listEffectiveEventTypes(tenantId); var caseDateTypes=caseService.listEffectiveCaseDateTypes(tenantId,actorId);
                 PerfLog.logDone("DAO", "calendar new-event types load", loadStart);
-                Platform.runLater(() -> dialog.populateEventTypes(eventTypes));
+                Platform.runLater(() -> { if (Objects.equals(appState.getShaleClientId(),tenantId) && Objects.equals(appState.getUserId(),actorId)) dialog.populateTypes(tenantId,eventTypes,caseDateTypes,requestGeneration); });
             } catch (RuntimeException ex) {
                 log.warn("Unable to load calendar event types for tenantId={}", tenantId, ex);
                 Platform.runLater(() -> {
-                    dialog.showLoadError("Unable to load event types.");
+                    if (Objects.equals(appState.getShaleClientId(),tenantId) && Objects.equals(appState.getUserId(),actorId)) dialog.showTypeLoadError(tenantId,requestGeneration,"Unable to load event types.");
                 });
             }
         });
+    }
+
+    private static String rootMessage(RuntimeException ex) {
+        Throwable current=ex; while(current.getCause()!=null)current=current.getCause();
+        return current.getMessage()==null||current.getMessage().isBlank()?"Could not save Case Event. Please try again.":current.getMessage();
     }
 
     public void refreshCurrentRange() { loadCurrentRange(false); }
