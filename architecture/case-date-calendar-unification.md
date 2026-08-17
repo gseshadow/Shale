@@ -1,5 +1,32 @@
 # Case Date and Calendar unification
 
+## Phase 1 — runtime synchronization retired (2026-08-17)
+
+All runtime Calendar Event ↔ Case Date synchronization is retired. Authoritative Case Date create,
+update, soft-delete, and restore transactions mutate and audit only `CaseDates`; authoritative
+Calendar Event create, update/cancel, and hard-delete transactions mutate and audit only
+`CalendarEvents`. Calendar assignment notifications and Case Date post-commit LiveBus invalidation
+remain at their existing service/controller boundaries. The Calendar feed continues to project active
+Case Dates directly with stable `CASE_DATE:<CaseDates.Id>` source identity and existing case-Dates
+click routing; persisted Calendar Events remain an independent feed source.
+
+Production inventory at retirement contained four active, unlinked tenant-7 Calendar Events, no
+non-null `CalendarEvents.CaseDateId`, mapping, or synchronization-audit rows, and no invalid or
+duplicate relationships. No cleanup or backfill was performed. Existing linked rows, if present in
+another environment or restored history, remain readable and are not unlinked or synchronized.
+
+The linkage and mapping schema documented below remains temporarily deployed for a later,
+forward-only removal phase: `CalendarEvents.CaseDateId`, `CalendarCaseDateTypeMappings`, link
+constraints/indexes, trigger, RLS, and synchronization audit vocabulary are unchanged. Runtime does
+not consult mappings or pair records by title, date, label, type name, or any other heuristic.
+`CalendarEvents` still lacks its own RLS predicate; this separate known gap is not corrected here.
+Application mutations continue to require authenticated SQL session tenant/actor identity and apply
+explicit `ShaleClientId` predicates.
+
+Audit compatibility uses the existing schema without migration. Each successful authoritative
+mutation retains exactly its own `CALENDAR_EVENT` or `CASE_DATE` entity-action record in the owning
+transaction; synchronization audit records are no longer emitted.
+
 ## Step 1 — persisted linkage and mutation foundation (complete)
 
 ### Inventory and authority
