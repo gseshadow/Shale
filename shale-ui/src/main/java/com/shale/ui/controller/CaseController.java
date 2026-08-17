@@ -13,12 +13,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -160,6 +162,8 @@ import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.Node;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
@@ -689,6 +693,9 @@ public class CaseController {
 	private boolean caseDatesStale = true;
 	private boolean showRemovedCaseDates;
 	private int caseDatesLoadGeneration;
+	private int caseDateOpenGeneration;
+	private final AtomicBoolean caseDateOpenInFlight = new AtomicBoolean();
+	private final Set<Integer> openingCaseCalendarEventIds = new HashSet<>();
 
 	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
 		private final java.util.concurrent.atomic.AtomicInteger sequence = new java.util.concurrent.atomic.AtomicInteger();
@@ -1867,15 +1874,18 @@ public class CaseController {
 		CalendarFeedClickTarget target = CalendarFeedClickTarget.resolve(item);
 		if (!target.actionable()) return;
 		row.setCursor(Cursor.HAND);
-		row.setOnMouseClicked(e -> {
+		Runnable activate = () -> {
 			switch (target.kind()) {
 				case CALENDAR_EVENT -> openCaseCalendarEventEditor(Math.toIntExact(target.id()));
 				case TASK -> openTask(target.id());
 				case CASE -> AppDialogs.showInfo(caseCalendarOwner(), "Case Date", "This is a projected case date from the current case. Edit it from Overview or Details.");
-				case CASE_DATES -> showCaseDatesTab();
+				case CASE_DATES -> openAuthoritativeCaseDate(target.id());
 				case NONE -> { }
 			}
-		});
+		};
+		row.setFocusTraversable(true);
+		row.setOnMouseClicked(e -> { if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress()) { activate.run(); e.consume(); } });
+		row.setOnKeyPressed(e -> { if (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) { activate.run(); e.consume(); } });
 	}
 
 	private Comparator<CalendarFeedItem> caseCalendarUpcomingComparator() {
@@ -1942,6 +1952,36 @@ public class CaseController {
 		setPaneVisible(tasksPanel, false);
 		if (!caseDatesLoadedOnce || caseDatesStale) loadCaseDatesAsync(); else renderCaseDates(null);
 		loadCaseUpdatesAsync();
+	}
+
+	public void openAuthoritativeCaseDate(long caseDateId) {
+		if (caseDateId <= 0 || caseService == null || appState == null || caseId == null) return;
+		Integer tenantId = appState.getShaleClientId(), actorId = appState.getUserId();
+		if (tenantId == null || tenantId <= 0 || actorId == null || actorId <= 0 || !caseDateOpenInFlight.compareAndSet(false, true)) return;
+		showCaseDatesTab();
+		final int expectedCaseId = caseId;
+		final int generation = ++caseDateOpenGeneration;
+		caseDateExecutor.submit(() -> {
+			try {
+				Optional<CaseDateDto> loaded = caseService.getCaseDate(caseDateId, tenantId, actorId);
+				Platform.runLater(() -> {
+					caseDateOpenInFlight.set(false);
+					if (generation != caseDateOpenGeneration || caseId == null || caseId != expectedCaseId
+							|| !Objects.equals(appState.getShaleClientId(), tenantId) || !Objects.equals(appState.getUserId(), actorId)) return;
+					if (loaded.isEmpty() || loaded.get().caseId() != expectedCaseId || loaded.get().shaleClientId() != tenantId) {
+						showCaseDatesMessage("This Case Date is no longer available.");
+						return;
+					}
+					openCaseDateDialog(loaded.get());
+				});
+			} catch (RuntimeException ex) {
+				Platform.runLater(() -> {
+					caseDateOpenInFlight.set(false);
+					if (generation == caseDateOpenGeneration && caseId != null && caseId == expectedCaseId
+							&& Objects.equals(appState.getShaleClientId(), tenantId)) showCaseDatesMessage("This Case Date could not be opened.");
+				});
+			}
+		});
 	}
 
 	private void loadCaseDatesAsync() {
@@ -2848,14 +2888,18 @@ public class CaseController {
 	private void openCaseCalendarEventEditor(int eventId) {
 		if (calendarService == null || appState == null) return;
 		Integer tenantId = appState.getShaleClientId();
-		if (tenantId == null || tenantId <= 0) return;
+		if (tenantId == null || tenantId <= 0 || !openingCaseCalendarEventIds.add(eventId)) return;
+		final Integer expectedCaseId = caseId;
 		new Thread(() -> {
 			try {
 				CalendarEvent event = calendarService.getEventById(eventId, tenantId);
-				if (event == null) return;
+				if (event == null) { runOnFx(() -> openingCaseCalendarEventIds.remove(eventId)); return; }
 				var types = calendarService.listEffectiveEventTypes(tenantId);
 				var initial = new NewCalendarEventDialog.CreateCalendarEventInput(event.title(), event.calendarEventTypeId(), event.startsAt().toLocalDate(), event.allDay(), event.allDay() ? null : event.startsAt().toLocalTime(), 60, event.description(), event.caseId(), event.assignedToUserId());
-				runOnFx(() -> NewCalendarEventDialog.showEditDialog(caseCalendarOwner(), types, initial, input -> {
+				runOnFx(() -> {
+					openingCaseCalendarEventIds.remove(eventId);
+					if (!Objects.equals(caseId, expectedCaseId) || !Objects.equals(appState.getShaleClientId(), tenantId)) return;
+					NewCalendarEventDialog.showEditDialog(caseCalendarOwner(), types, initial, input -> {
 					LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
 					LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
 					calendarService.updateEvent(new CalendarEvent(event.calendarEventId(), event.shaleClientId(), input.calendarEventTypeId(), input.caseId(), event.taskId(), input.title(), input.description(), startsAt, endsAt, input.allDay(), event.sourceType(), event.sourceField(), event.sourceId(), input.assignedToUserId(), event.completed(), event.cancelled(), appState.getUserId(), event.createdAt(), event.updatedAt()));
@@ -2865,9 +2909,10 @@ public class CaseController {
 					calendarService.deleteCalendarEvent(event.calendarEventId(), tenantId);
 					refreshCaseCalendar();
 					return null;
-				}, null, null, caseOptionForCurrentCase(), List.of()));
+				}, null, null, caseOptionForCurrentCase(), List.of());
+				});
 			} catch (RuntimeException ex) {
-				runOnFx(() -> showCaseCalendarMessage("Unable to open this event."));
+				runOnFx(() -> { openingCaseCalendarEventIds.remove(eventId); if (Objects.equals(caseId, expectedCaseId)) showCaseCalendarMessage("Unable to open this event."); });
 			}
 		}, "case-calendar-open-event-" + eventId).start();
 	}

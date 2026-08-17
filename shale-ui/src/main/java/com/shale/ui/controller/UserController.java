@@ -213,6 +213,7 @@ public final class UserController {
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private Consumer<Integer> onOpenCase;
+	private java.util.function.BiConsumer<Integer, Long> onOpenCaseDates;
 	private Consumer<Integer> onOpenUser;
 	private CaseTaskService caseTaskService;
 	private PhiReadAuditService phiReadAuditService;
@@ -272,6 +273,7 @@ public final class UserController {
 			AppState appState,
 			UiRuntimeBridge runtimeBridge,
 			Consumer<Integer> onOpenCase,
+			java.util.function.BiConsumer<Integer, Long> onOpenCaseDates,
 			Consumer<Integer> onOpenUser,
 			CaseTaskService caseTaskService,
 			PhiReadAuditService phiReadAuditService,
@@ -281,6 +283,7 @@ public final class UserController {
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.onOpenCase = onOpenCase;
+		this.onOpenCaseDates = onOpenCaseDates;
 		this.onOpenUser = onOpenUser == null ? id ->
 		{
 		} : onOpenUser;
@@ -758,7 +761,7 @@ public final class UserController {
 		setUserCalendarLayerDefaults();
 		if (userCalendarAgendaBox != null) {
 			userScheduleAgendaPane = new ScheduleAgendaPane(userCalendarAgendaBox, userCalendarStatusLabel,
-					new ScheduleAgendaPane.ClickHandlers(this::openUserCalendarEventEditor, this::openTaskFromCalendar, this::openCaseFromCalendar));
+					new ScheduleAgendaPane.ClickHandlers(this::openUserCalendarEventEditor, this::openTaskFromCalendar, this::openCaseFromCalendar, onOpenCaseDates));
 		}
 		List<CheckBox> boxes = List.of(userCalendarEventsLayerCheckBox, userCalendarTasksLayerCheckBox,
 				userCalendarDeadlinesLayerCheckBox, userCalendarCaseDatesLayerCheckBox).stream().filter(Objects::nonNull).toList();

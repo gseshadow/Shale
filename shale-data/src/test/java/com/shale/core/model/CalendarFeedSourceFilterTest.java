@@ -133,12 +133,18 @@ class CalendarFeedSourceFilterTest {
         assertEquals(123L, persistedEventWithTask.id());
 
         CalendarFeedClickTarget caseDate = CalendarFeedClickTarget.resolve(itemWithCaseName("CASE_DATE:107", "SOL", "DEADLINE", null, 7, "PROJECTED", "Case Seven", "STATUTE_OF_LIMITATIONS"));
-        assertEquals(CalendarFeedClickTarget.Kind.CASE, caseDate.kind());
-        assertEquals(7L, caseDate.id());
+        assertEquals(CalendarFeedClickTarget.Kind.CASE_DATES, caseDate.kind());
+        assertEquals(107L, caseDate.id());
+        assertEquals(7, caseDate.caseId());
 
         CalendarFeedClickTarget authoritativeCaseDate = CalendarFeedClickTarget.resolve(itemWithCaseName("CASE_DATE:555", "SOL", "DEADLINE", null, 7, "CASE_DATE", "Case Seven", "CASE_DATE_DEADLINE"));
         assertEquals(CalendarFeedClickTarget.Kind.CASE_DATES, authoritativeCaseDate.kind());
-        assertEquals(7L, authoritativeCaseDate.id());
+        assertEquals(555L, authoritativeCaseDate.id());
+        assertEquals(7, authoritativeCaseDate.caseId());
+
+        CalendarFeedClickTarget explicitEvent = CalendarFeedClickTarget.resolve(itemWithCaseName("CALENDAR_EVENT:321", "Same display", null, null, 7, "MANUAL", "Same case", "MEETING"));
+        assertEquals(CalendarFeedClickTarget.Kind.CALENDAR_EVENT, explicitEvent.kind());
+        assertEquals(321L, explicitEvent.id());
 
         assertFalse(CalendarFeedClickTarget.resolve(itemWithCaseName("BROKEN", "Other", null, null, null, "PROJECTED", null, "OTHER")).actionable());
     }
