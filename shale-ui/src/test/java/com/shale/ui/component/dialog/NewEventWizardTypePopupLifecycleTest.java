@@ -53,6 +53,8 @@ final class NewEventWizardTypePopupLifecycleTest {
             int id = completeIds.get((completeIds.indexOf(firstId) + repetition) % completeIds.size());
             Activation activation = Activation.values()[repetition % Activation.values().length];
             int before = JavaFxTestSupport.runAndWait(handle::typeCommitCountForTest);
+            NewEventWizard.TypeChoice previous = JavaFxTestSupport.runAndWait(handle::selectedTypeForTest);
+            AtomicReference<NewEventWizard.TypeLifecycleState> activationState = new AtomicReference<>();
 
             JavaFxTestSupport.runAndWait(() -> {
                 handle.typeForTest().show();
@@ -62,13 +64,15 @@ final class NewEventWizardTypePopupLifecycleTest {
                 assertTrue(index >= 0, "expected authoritative type id " + id);
                 handle.typeForTest().getSelectionModel().select(index);
                 Event.fireEvent(handle.typeForTest(), activation.event());
+                activationState.set(handle.typeLifecycleStateForTest());
             });
 
             awaitPulses(3);
             JavaFxTestSupport.runAndWait(() -> {
-                assertEquals(before + 1, handle.typeCommitCountForTest(), "one activation must commit exactly once");
-                assertEquals(authority, handle.selectedTypeForTest().sourceKind());
-                assertEquals(id, handle.selectedTypeForTest().authoritativeTypeId());
+                String trace = trace(activation,authority,previous,id,activationState.get(),handle.typeLifecycleStateForTest());
+                assertEquals(before + 1, handle.typeCommitCountForTest(), "one activation must commit exactly once; " + trace);
+                assertEquals(authority, handle.selectedTypeForTest().sourceKind(), trace);
+                assertEquals(id, handle.selectedTypeForTest().authoritativeTypeId(), trace);
                 assertFalse(handle.typeForTest().isShowing());
 
                 handle.typeForTest().show();
@@ -78,6 +82,15 @@ final class NewEventWizardTypePopupLifecycleTest {
             awaitPulses(2);
             assertNull(fxFailure.get(), () -> "uncaught JavaFX failure after repetition " + iteration + ": " + fxFailure.get());
         }
+    }
+
+    private static String trace(Activation activation, NewEventWizard.SourceKind authority,
+            NewEventWizard.TypeChoice previous, int requestedId,
+            NewEventWizard.TypeLifecycleState activationState, NewEventWizard.TypeLifecycleState completedState) {
+        return "activation=" + activation + ", authority=" + authority
+                + ", previousId=" + (previous == null ? null : previous.authoritativeTypeId())
+                + ", requestedId=" + requestedId + ", afterActivation=" + activationState
+                + ", afterCompletion=" + completedState;
     }
 
     private void installFxExceptionCapture() {
@@ -104,7 +117,7 @@ final class NewEventWizardTypePopupLifecycleTest {
         JavaFxTestSupport.runAndWait(handle::openCaseSelectorForTest);
         JavaFxTestSupport.runAndWait(() -> {
             handle.caseResultsForTest().getSelectionModel().selectFirst();
-            Event.fireEvent(handle.caseResultsForTest(), key(KeyCode.ENTER));
+            javafx.event.Event.fireEvent(handle.caseResultsForTest(), key(KeyCode.ENTER));
         });
     }
 
@@ -150,13 +163,13 @@ final class NewEventWizardTypePopupLifecycleTest {
                 true, false, EffectiveCaseDateTypeDto.Origin.TENANT_CREATED, new byte[]{1});
     }
 
+    private static KeyEvent key(KeyCode code) {
+        return new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
+    }
+
     private static MouseEvent mouse() {
         return new MouseEvent(MouseEvent.MOUSE_CLICKED, 4, 4, 4, 4, MouseButton.PRIMARY, 1,
                 false, false, false, false, true, false, false, false, false, true, null);
-    }
-
-    private static KeyEvent key(KeyCode code) {
-        return new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
     }
 
     private enum Activation {
