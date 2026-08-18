@@ -60,15 +60,25 @@ The linkage/mapping schema, synchronization audit vocabulary, obsolete Settings 
 `CalendarEvents` RLS gap, feed projection identities, and existing edit/click routing remain
 unchanged pending the separately gated schema-retirement release.
 
-## Phase 3 — source-specific Calendar activation and editing (2026-08-17)
+## Phase 3 — source-specific Calendar activation and editing (updated 2026-08-18)
 
 Calendar activation is now an explicit typed contract. A `CASE_DATE:<CaseDates.Id>` target retains
-both the occurrence ID and owning Case ID and invokes the dedicated Case Dates navigation callback
-on week/day cards, Month items and drill-down, schedule agendas, and the Case Calendar. The Case
-profile opens its Dates section, reloads the occurrence through `CaseServicePort.getCaseDate`, checks
-the captured tenant, actor, Case, and navigation generation, and then reuses
-`CaseDateOccurrenceDialog` and the existing Case Date mutation/concurrency path. Missing, removed,
-foreign-tenant, inaccessible, wrong-Case, or stale results do not open an editor.
+both the occurrence ID and owning Case ID. On the Calendar, week/day cards, Month items and
+drill-down, and schedule agendas invoke a shared UI-level `CaseDateOccurrenceEditorLauncher` rather
+than Case navigation. The launcher owns `CaseDateOccurrenceDialog` as a modal of the current Calendar
+window, reloads the exact occurrence through `CaseServicePort.getCaseDate`, loads the effective types,
+and checks captured tenant, actor, Case, occurrence, open-window, and request-generation state before
+display or save. Missing, removed, foreign-tenant, inaccessible, wrong-Case, duplicate, or stale
+results fail closed and do not open another editor.
+
+The launcher is also the authoritative occurrence-open path used by Case → Dates; normal Case
+navigation and its add/remove/restore behavior remain unchanged. Updates retain Title and every
+occurrence field, submit the loaded RowVer through `CaseServicePort.updateCaseDate`, and therefore
+retain the established transaction, audit, Case-touch, and concurrency behavior. Each owning
+controller performs only its existing post-success UI effects: the Case Dates LiveBus invalidation is
+published, while Calendar also reloads its current range without changing selected view, date,
+filters, layers, or overlays. Cancel and rejected saves leave the owning surface and dialog state
+unchanged; no Calendar Event counterpart, linkage, persistence route, or synchronization is added.
 
 A `CALENDAR_EVENT:<CalendarEventId>` target (with the deployed `EVENT:` spelling accepted only as a
 read-compatibility alias) invokes only the existing Calendar Event editor. It reloads by event ID

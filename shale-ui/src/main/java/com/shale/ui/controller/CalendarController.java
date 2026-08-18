@@ -100,12 +100,12 @@ public final class CalendarController {
     private CalendarService calendarService;
     private CalendarFeedDao calendarFeedDao;
     private Consumer<Integer> onOpenCase;
-    private BiConsumer<Integer, Long> onOpenCaseDates;
     private Consumer<Long> onOpenTask;
     private CaseTaskService caseTaskService;
     private CaseSummaryDao caseSummaryDao;
     private CaseServicePort caseService;
     private UiRuntimeBridge runtimeBridge;
+    private CaseDateOccurrenceEditorLauncher caseDateEditorLauncher;
     private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
     private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
     private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> entityUpdatedHandler = this::handleEntityUpdated;
@@ -141,13 +141,15 @@ public final class CalendarController {
         this.caseService = caseService;
         this.runtimeBridge = runtimeBridge;
         this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase;
-        this.onOpenCaseDates = onOpenCaseDates == null ? (caseId, caseDateId) -> {} : onOpenCaseDates;
         this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
         resetCalendarOverlayDefaults();
         configureCalendarOverlayControls();
         this.caseCardFactory = new CaseCardFactory(this.onOpenCase);
         this.taskCardFactory = new TaskCardFactory(this.onOpenTask, id -> {}, this.onOpenCase, id -> {});
         if (runtimeBridge != null) runtimeBridge.subscribeEntityUpdated(entityUpdatedHandler);
+        if (caseService != null) caseDateEditorLauncher = new CaseDateOccurrenceEditorLauncher(caseService, dbExec,
+                () -> new CaseDateOccurrenceEditorLauncher.Context(currentTenantId(), currentActorId(), activeCaseDateCaseId, calendarIsOpen()),
+                this::calendarOwner, this::caseDateSaved, message -> AppDialogs.showError(calendarOwner(), "Case Date", message), null);
     }
 
     private void handleEntityUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -1060,7 +1062,7 @@ public final class CalendarController {
                 case CALENDAR_EVENT -> openEditEventDialog(Math.toIntExact(target.id()));
                 case TASK -> onOpenTask.accept(target.id());
                 case CASE -> onOpenCase.accept(Math.toIntExact(target.id()));
-                case CASE_DATES -> onOpenCaseDates.accept(target.caseId(), target.id());
+                case CASE_DATES -> openCaseDateEditor(target.caseId(), target.id());
                 case NONE -> { }
             }
         };
@@ -1075,6 +1077,24 @@ public final class CalendarController {
                 activate.run(); evt.consume();
             }
         });
+    }
+
+    private long activeCaseDateCaseId;
+    private void openCaseDateEditor(int caseId, long caseDateId) {
+        if (caseDateEditorLauncher == null || caseId <= 0 || caseDateId <= 0) return;
+        activeCaseDateCaseId = caseId;
+        caseDateEditorLauncher.open(caseId, caseDateId);
+    }
+
+    private int currentTenantId() { Integer value = appState == null ? null : appState.getShaleClientId(); return value == null ? 0 : value; }
+    private int currentActorId() { Integer value = appState == null ? null : appState.getUserId(); return value == null ? 0 : value; }
+    private boolean calendarIsOpen() { return calendarRowsBox != null && calendarRowsBox.getScene() != null; }
+    private javafx.stage.Window calendarOwner() { return calendarIsOpen() ? calendarRowsBox.getScene().getWindow() : null; }
+    private void caseDateSaved(CaseDateOccurrenceEditorLauncher.SaveResult result) {
+        var context = result.context();
+        if (runtimeBridge != null) runtimeBridge.publishCaseDatesChanged(context.caseId(), context.tenantId(), context.actorId(), LiveUpdateEvents.CHANGE_UPDATED);
+        if (calendarIsOpen() && activeCaseDateCaseId == context.caseId()
+                && currentTenantId() == context.tenantId() && currentActorId() == context.actorId()) loadCurrentRange(false);
     }
 
     private static boolean isEmbeddedAction(Object target, Node card) {
