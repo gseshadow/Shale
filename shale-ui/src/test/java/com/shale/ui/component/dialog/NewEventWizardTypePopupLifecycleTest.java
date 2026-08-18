@@ -63,6 +63,7 @@ final class NewEventWizardTypePopupLifecycleTest {
                 // ComboBox selection/action. Do not dispatch a second synthetic gesture to the owner
                 // after that listener has hidden the popup; that is not a JavaFX user activation.
                 handle.typeForTest().getSelectionModel().select(index);
+                Event.fireEvent(handle.typeForTest(), activation.event());
                 activationState.set(handle.typeLifecycleStateForTest());
             });
 
@@ -164,6 +165,11 @@ final class NewEventWizardTypePopupLifecycleTest {
 
     private static KeyEvent key(KeyCode code) {
         return new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
+    }
+
+    private static MouseEvent mouse() {
+        return new MouseEvent(MouseEvent.MOUSE_CLICKED, 4, 4, 4, 4, MouseButton.PRIMARY, 1,
+                false, false, false, false, true, false, false, false, false, true, null);
     }
 
     private enum Activation {
