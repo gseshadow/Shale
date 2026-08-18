@@ -1,9 +1,11 @@
 package com.shale.ui.controller;
 
 import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.UpdateCaseDateCommand;
 import com.shale.ui.component.dialog.CaseDateOccurrenceDialog;
+import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import javafx.application.Platform;
 import javafx.stage.Window;
 
@@ -30,12 +32,14 @@ final class CaseDateOccurrenceEditorLauncher {
     private final Consumer<SaveResult> onSaved;
     private final Consumer<String> onLoadFailure;
     private final Consumer<Boolean> onDialogState;
+    private final Consumer<Integer> onOpenCase;
     private final AtomicLong generations = new AtomicLong();
     private final Map<Long, Long> opening = new ConcurrentHashMap<>();
 
     CaseDateOccurrenceEditorLauncher(CaseServicePort caseService, Executor executor,
             Supplier<Context> currentContext, Supplier<Window> owner,
-            Consumer<SaveResult> onSaved, Consumer<String> onLoadFailure, Consumer<Boolean> onDialogState) {
+            Consumer<SaveResult> onSaved, Consumer<String> onLoadFailure, Consumer<Boolean> onDialogState,
+            Consumer<Integer> onOpenCase) {
         this.caseService = Objects.requireNonNull(caseService);
         this.executor = Objects.requireNonNull(executor);
         this.currentContext = Objects.requireNonNull(currentContext);
@@ -43,6 +47,7 @@ final class CaseDateOccurrenceEditorLauncher {
         this.onSaved = onSaved == null ? result -> {} : onSaved;
         this.onLoadFailure = onLoadFailure == null ? message -> {} : onLoadFailure;
         this.onDialogState = onDialogState == null ? open -> {} : onDialogState;
+        this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase;
     }
 
     void open(long expectedCaseId, long caseDateId) {
@@ -56,10 +61,12 @@ final class CaseDateOccurrenceEditorLauncher {
     private void load(Context captured, long caseDateId, long generation) {
         try {
             Optional<CaseDateDto> loaded = caseService.getCaseDate(caseDateId, captured.tenantId(), captured.actorId());
+            Optional<CaseOverviewDto> caseOverview = caseService.getCaseOverview(captured.caseId(), captured.tenantId());
             var types = caseService.listEffectiveCaseDateTypes(captured.tenantId(), captured.actorId());
             Platform.runLater(() -> {
                 if (!isCurrent(captured, caseDateId, generation)) { opening.remove(caseDateId, generation); return; }
-                if (loaded.isEmpty() || !matches(loaded.get(), captured, caseDateId)) {
+                if (loaded.isEmpty() || !matches(loaded.get(), captured, caseDateId)
+                        || caseOverview.isEmpty() || caseOverview.get().getCaseId() != captured.caseId()) {
                     opening.remove(caseDateId, generation);
                     onLoadFailure.accept("This Case Date is no longer available.");
                     return;
@@ -67,7 +74,7 @@ final class CaseDateOccurrenceEditorLauncher {
                 CaseDateDto existing = loaded.get();
                 try {
                     onDialogState.accept(true);
-                    CaseDateOccurrenceDialog.show(owner.get(), "Edit Date", types, existing,
+                    CaseDateOccurrenceDialog.show(owner.get(), "Edit Date", types, existing, toCaseCardModel(caseOverview.get()), onOpenCase,
                             input -> save(captured, existing, input),
                             () -> Platform.runLater(() -> { opening.remove(caseDateId, generation); open(captured.caseId(), caseDateId); }));
                 } finally {
@@ -81,6 +88,14 @@ final class CaseDateOccurrenceEditorLauncher {
                 opening.remove(caseDateId, generation);
             });
         }
+    }
+
+    static CaseCardModel toCaseCardModel(CaseOverviewDto overview) {
+        Objects.requireNonNull(overview, "overview");
+        return new CaseCardModel(overview.getCaseId(), overview.getCaseName(), overview.getIntakeDate(),
+                overview.getSolDate(), overview.getTortNoticeDeadline(), overview.getResponsibleAttorney(),
+                overview.getResponsibleAttorneyColor(), false, overview.getCaseStatus(),
+                overview.getPrimaryStatusColor(), overview.getPracticeAreaColor());
     }
 
     private java.util.concurrent.CompletionStage<String> save(Context captured, CaseDateDto existing,
