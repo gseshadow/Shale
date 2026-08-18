@@ -14,6 +14,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -75,6 +76,7 @@ public final class NewEventWizard {
         private final Supplier<List<NewCalendarEventDialog.CaseOption>> caseLoader;
         private final Function<SaveRequest, ? extends CompletionStage<String>> saver;
         private final AtomicBoolean submitting = new AtomicBoolean();
+        private final AtomicBoolean caseActivation = new AtomicBoolean();
         private int typeGeneration;
         private int caseGeneration;
         private final List<TypeChoice> loadedTypes = new ArrayList<>();
@@ -145,15 +147,19 @@ public final class NewEventWizard {
             allDay.setAccessibleText("All Day"); notes.setPrefRowCount(4); notes.setWrapText(true);
             for(Control c:List.of(title,type,startDate,endDate,startTime,duration,allDay,notes,caseSearch)) ControlStyles.formControl(c);
             allDay.selectedProperty().addListener((o,a,b)->updateTimedControls());
-            CaseCardFactory cards = new CaseCardFactory(id -> {});
+            CaseCardFactory cards = new CaseCardFactory(this::commitCaseId);
             caseSearch.setPromptText("Search cases"); caseSearch.setAccessibleText("Search cases");
             caseSearch.textProperty().addListener((o,a,b)->refreshCaseFilter());
             caseList.setAccessibleText("Case search results"); caseList.setPrefHeight(190);
             caseList.setCellFactory(v->new ListCell<>() { @Override protected void updateItem(NewCalendarEventDialog.CaseOption x,boolean empty){
                 super.updateItem(x,empty); setText(null); setGraphic(empty||x==null?null:cards.create(new CaseCardFactory.CaseCardModel(
                         x.caseId(),x.displayName(),null,null,x.responsibleAttorney(),x.responsibleAttorneyColor(),x.nonEngagementLetterSent()),CaseCardFactory.Variant.MINI)); }});
-            caseList.setOnMouseClicked(e->{ if(e.getClickCount()==2) chooseCase(); });
-            caseList.setOnKeyPressed(e->{ if(e.getCode()==KeyCode.ENTER){chooseCase();e.consume();} });
+            caseList.setOnMouseClicked(e->{
+                if(e.getButton()==MouseButton.PRIMARY&&e.isStillSincePress()&&commitSelectedCase())e.consume();
+            });
+            caseList.setOnKeyPressed(e->{
+                if((e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE)&&commitSelectedCase())e.consume();
+            });
             renderCaseField(false);
         }
 
@@ -167,19 +173,40 @@ public final class NewEventWizard {
                 Node card=cards.create(new CaseCardFactory.CaseCardModel(selectedCase.caseId(),selectedCase.displayName(),null,null,
                         selectedCase.responsibleAttorney(),selectedCase.responsibleAttorneyColor(),selectedCase.nonEngagementLetterSent()),CaseCardFactory.Variant.MINI);
                 Button change=ActionButtonFactory.semantic("Change",e->openCaseSelector(),ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);
-                Button remove=ActionButtonFactory.semantic("Remove",e->{selectedCase=null;renderCaseField(false);refreshTypes();},ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);
+                Button remove=ActionButtonFactory.semantic("Remove",e->removeCase(),ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);
                 caseDisplay.getChildren().addAll(card,new HBox(8,change,remove));
             }
             caseField.getChildren().setAll(caseDisplay);
             if(choosing) caseField.getChildren().addAll(caseSearch,caseList);
         }
-        private void openCaseSelector(){ renderCaseField(true); caseSearch.clear(); caseList.setPlaceholder(new Label("Loading cases…")); int request=++caseGeneration;
+        private void openCaseSelector(){ caseActivation.set(false); renderCaseField(true); caseSearch.clear(); caseList.setPlaceholder(new Label("Loading cases…")); int request=++caseGeneration;
             CompletableFuture.supplyAsync(()->caseLoader==null?List.<NewCalendarEventDialog.CaseOption>of():caseLoader.get(),executor)
                     .whenComplete((rows,failure)->Platform.runLater(()->{ if(!acceptCase(tenantId,request)||!caseField.getChildren().contains(caseList))return;
                         if(failure!=null){caseList.setPlaceholder(new Label("Unable to load cases. Try again."));return;}
                         loadedCases.clear();loadedCases.addAll(rows==null?List.of():rows);refreshCaseFilter(); })); }
-        private void chooseCase(){ NewCalendarEventDialog.CaseOption chosen=caseList.getSelectionModel().getSelectedItem(); if(chosen==null)return;
-            selectedCase=chosen; renderCaseField(false); refreshTypes(); }
+        private void commitCaseId(Integer caseId){
+            if(caseId==null)return;
+            caseList.getItems().stream().filter(option->Objects.equals(option.caseId(),caseId)).findFirst().ifPresent(option->{
+                caseList.getSelectionModel().select(option);
+                commitSelectedCase();
+            });
+        }
+        private boolean commitSelectedCase(){
+            NewCalendarEventDialog.CaseOption chosen=caseList.getSelectionModel().getSelectedItem();
+            if(chosen==null||!caseField.getChildren().contains(caseList)||!caseActivation.compareAndSet(false,true))return false;
+            selectedCase=chosen;
+            caseGeneration++;
+            renderCaseField(false);
+            refreshTypes();
+            return true;
+        }
+        private void removeCase(){
+            selectedCase=null;
+            caseGeneration++;
+            caseActivation.set(false);
+            renderCaseField(false);
+            refreshTypes();
+        }
         private void refreshCaseFilter(){ String q=safe(caseSearch.getText()).strip().toLowerCase(Locale.ROOT); caseList.setItems(FXCollections.observableArrayList(
                 loadedCases.stream().filter(c->q.isEmpty()||safe(c.displayName()).toLowerCase(Locale.ROOT).contains(q)||safe(c.responsibleAttorney()).toLowerCase(Locale.ROOT).contains(q)).toList()));
             caseList.setPlaceholder(new Label(loadedCases.isEmpty()?"No active cases are available.":"No cases match this search.")); }
@@ -217,6 +244,20 @@ public final class NewEventWizard {
         private static void add(GridPane grid,int row,String text,Node node){Label label=new Label(text);label.setLabelFor(node);label.setMinWidth(Region.USE_PREF_SIZE);grid.add(label,0,row);grid.add(node,1,row);GridPane.setHgrow(node,Priority.ALWAYS);}
         private static LocalTime parse(String value){if(value==null||value.isBlank())throw new IllegalArgumentException("Start Time is required for a timed event.");try{return LocalTime.parse(value.strip(),TIME);}catch(DateTimeParseException ex){throw new IllegalArgumentException("Start Time must be valid, such as 9:30.");}}
         private static void hide(Node n){n.setVisible(false);n.setManaged(false);}
+
+        Stage stageForTest(){return stage;}
+        ListView<NewCalendarEventDialog.CaseOption> caseResultsForTest(){return caseList;}
+        VBox caseFieldForTest(){return caseField;}
+        NewCalendarEventDialog.CaseOption selectedCaseForTest(){return selectedCase;}
+        ColorCodedComboBox<TypeChoice> typeForTest(){return type;}
+        TextField titleForTest(){return title;}
+        DatePicker startDateForTest(){return startDate;}
+        TextField startTimeForTest(){return startTime;}
+        ComboBox<Integer> durationForTest(){return duration;}
+        CheckBox allDayForTest(){return allDay;}
+        TextArea notesForTest(){return notes;}
+        int caseGenerationForTest(){return caseGeneration;}
+        void openCaseSelectorForTest(){openCaseSelector();}
     }
     private static String safe(String value){return value==null?"":value;}
 }
