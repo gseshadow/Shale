@@ -4,9 +4,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.shale.core.dto.CaseDateDto;
 import com.shale.ui.component.dialog.CaseDateOccurrenceDialog;
+import com.shale.ui.component.TimeDurationInput;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 import org.junit.jupiter.api.Test;
 
@@ -72,7 +75,14 @@ class CaseDatesPhase2CArchitectureTest {
         assertTrue(dialog.contains("ColorCodedComboBox<TypeChoice>"));
         assertTrue(dialog.contains("ControlStyles.formControl"));
         assertTrue(dialog.contains("ActionButtonFactory.semantic"));
-        assertTrue(dialog.contains("LocalDateTime.of(sd.getValue(), parseTime"));
+        assertTrue(dialog.contains("TimeDurationInput timing = new TimeDurationInput()"));
+        assertTrue(dialog.contains("var time=timing.commitTime()"));
+        assertTrue(dialog.contains("start=LocalDateTime.of(sd.getValue(),time)"));
+        assertTrue(dialog.contains("TimeDurationInput.calculateEnd"));
+        LocalDate date = LocalDate.of(2026, 8, 18);
+        LocalTime time = LocalTime.of(9, 30);
+        assertEquals(LocalDateTime.of(2026, 8, 18, 10, 45),
+                TimeDurationInput.calculateEnd(date, null, time, 75));
         assertTrue(dialog.contains("sd.getValue().atStartOfDay()"));
         assertTrue(dialog.contains("End must not be before start"));
         assertFalse(dialog.contains("ZoneId"));
