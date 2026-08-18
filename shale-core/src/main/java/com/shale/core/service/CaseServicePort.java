@@ -197,10 +197,10 @@ public interface CaseServicePort {
 	record SaveCaseDateSemanticRoleMappingCommand(int shaleClientId, int actorUserId, String roleKey, int caseDateTypeId, Long expectedMappingId, byte[] expectedRowVer) { public SaveCaseDateSemanticRoleMappingCommand { expectedRowVer=copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);} }
 	record ResetCaseDateSemanticRoleMappingCommand(int shaleClientId, int actorUserId, String roleKey, long mappingId, byte[] expectedRowVer) { public ResetCaseDateSemanticRoleMappingCommand { expectedRowVer=copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);} }
 
-	record CreateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, int caseDateTypeId, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes) {
+	record CreateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, int caseDateTypeId, String title, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes) {
 	}
 
-	record UpdateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId, int caseDateTypeId, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes, byte[] expectedRowVer) {
+	record UpdateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId, int caseDateTypeId, String title, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes, byte[] expectedRowVer) {
 		public UpdateCaseDateCommand { expectedRowVer = copyRowVer(expectedRowVer); }
 		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
 	}

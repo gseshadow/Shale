@@ -14,6 +14,7 @@ public record CaseDateDto(
         String calendarCategory,
         String color,
         boolean supportsTime,
+        String title,
         LocalDateTime startsAt,
         LocalDateTime endsAt,
         boolean allDay,
@@ -30,4 +31,6 @@ public record CaseDateDto(
     }
 
     @Override public byte[] rowVer() { return rowVer == null ? null : Arrays.copyOf(rowVer, rowVer.length); }
+
+    public String displayTitle() { return title == null || title.isBlank() ? typeName : title; }
 }

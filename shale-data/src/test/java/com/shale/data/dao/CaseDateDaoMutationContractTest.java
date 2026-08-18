@@ -14,7 +14,7 @@ class CaseDateDaoMutationContractTest {
 
     @Test void commandsDefensivelyCopyExpectedRowVersions() {
         byte[] rv = {1, 2, 3};
-        UpdateCaseDateCommand update = new UpdateCaseDateCommand(7, 9, 11, 13, 17, java.time.LocalDateTime.now(), null, true, null, rv);
+        UpdateCaseDateCommand update = new UpdateCaseDateCommand(7, 9, 11, 13, 17, null, java.time.LocalDateTime.now(), null, true, null, rv);
         DeleteCaseDateCommand delete = new DeleteCaseDateCommand(7, 9, 11, 13, rv);
         RestoreCaseDateCommand restore = new RestoreCaseDateCommand(7, 9, 11, 13, rv);
         rv[0] = 99;
