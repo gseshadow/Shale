@@ -12,8 +12,8 @@ final class CaseCalendarLinkSchemaRetirementMigrationTest {
     private static String foundation;
 
     @BeforeAll static void load() throws Exception {
-        sql = Files.readString(Path.of("../docs/sql/2026-08-18_retire_calendar_case_date_link_schema.sql"));
-        foundation = Files.readString(Path.of("../docs/sql/2026-08-11_case_date_calendar_link_foundation_step1.sql"));
+        sql = normalize(Files.readString(Path.of("../docs/sql/2026-08-18_retire_calendar_case_date_link_schema.sql")));
+        foundation = normalize(Files.readString(Path.of("../docs/sql/2026-08-11_case_date_calendar_link_foundation_step1.sql")));
     }
 
     @Test void supportsOnlyCompletePresentAndCompleteAbsentStates() {
@@ -33,6 +33,9 @@ final class CaseCalendarLinkSchemaRetirementMigrationTest {
                 () -> assertTrue(sql.contains("IS_MEMBER(N'db_owner')")),
                 () -> assertTrue(sql.contains("CalendarCaseDateTypeMappings WITH (TABLOCKX,HOLDLOCK)")),
                 () -> assertTrue(sql.contains("CalendarEvents WITH (TABLOCKX,HOLDLOCK)")),
+                () -> assertFalse(sql.contains("TOP (0)")),
+                () -> assertTrue(sql.contains("@MappingLockCount=COUNT_BIG(*)")),
+                () -> assertTrue(sql.contains("@EventLockCount=COUNT_BIG(*)")),
                 () -> assertTrue(sql.indexOf("TABLOCKX,HOLDLOCK") < sql.indexOf("DROP FILTER PREDICATE")));
     }
 
@@ -41,6 +44,7 @@ final class CaseCalendarLinkSchemaRetirementMigrationTest {
                 () -> assertTrue(sql.contains("WHERE CaseDateId IS NOT NULL")),
                 () -> assertTrue(sql.contains("IF EXISTS(SELECT 1 FROM dbo.CalendarCaseDateTypeMappings)")),
                 () -> assertTrue(sql.contains("d.ShaleClientId<>e.ShaleClientId")),
+                () -> assertTrue(sql.contains("e.CaseId IS NULL OR d.CaseId<>e.CaseId")),
                 () -> assertTrue(sql.contains("d.CaseId<>e.CaseId")),
                 () -> assertTrue(sql.contains("GROUP BY ShaleClientId,CaseDateId HAVING COUNT_BIG(*)>1")));
     }
@@ -50,7 +54,9 @@ final class CaseCalendarLinkSchemaRetirementMigrationTest {
                 () -> assertTrue(sql.contains("COUNT(*) FROM sys.security_predicates WHERE target_object_id=@MappingId)<>4")),
                 () -> assertEquals(4, occurrences(sql, "ALTER SECURITY POLICY sec.TenantFilter DROP")),
                 () -> assertTrue(sql.contains("@UnrelatedPredicates")),
-                () -> assertTrue(sql.contains("EXCEPT SELECT predicate_id")),
+                () -> assertTrue(sql.contains("EXCEPT SELECT security_predicate_id")),
+                () -> assertTrue(sql.contains("@UnrelatedPredicates TABLE(security_predicate_id")),
+                () -> assertFalse(sql.matches("(?s).*\\bpredicate_id\\b.*")),
                 () -> assertTrue(sql.contains("object_id=@PolicyId AND is_enabled=1")),
                 () -> assertFalse(sql.matches("(?is).*ALTER SECURITY POLICY.*STATE\s*=\s*OFF.*")));
     }
@@ -62,14 +68,34 @@ final class CaseCalendarLinkSchemaRetirementMigrationTest {
         int mappingIndexes = sql.indexOf("DROP INDEX UX_CalendarCaseDateTypeMappings");
         int mappingTable = sql.indexOf("DROP TABLE dbo.CalendarCaseDateTypeMappings");
         int linkFk = sql.indexOf("DROP CONSTRAINT FK_CalendarEvents_CaseDate_Tenant");
-        int linkIndexes = sql.indexOf("STRING_AGG(N'DROP INDEX '");
+        int linkIndexes = sql.indexOf("DROP INDEX UX_CalendarEvents_ActiveCaseDateLink ON dbo.CalendarEvents");
         int linkColumn = sql.indexOf("DROP COLUMN CaseDateId");
         assertTrue(rls < trigger && trigger < mappingFks && mappingFks < mappingIndexes
                 && mappingIndexes < mappingTable && mappingTable < linkFk && linkFk < linkIndexes && linkIndexes < linkColumn);
         assertAll(
                 () -> assertTrue(sql.contains("sys.indexes i JOIN sys.index_columns ic")),
-                () -> assertTrue(sql.contains("index id 13 is not CalendarEvents.SourceId column id 13")),
+                () -> assertTrue(sql.contains("referencing_minor_id=@LinkIndexId")),
+                () -> assertTrue(sql.contains("index id (13 in the inventory)")),
+                () -> assertTrue(sql.contains("Exactly one CalendarEvents index may involve CaseDateId")),
+                () -> assertTrue(sql.contains("N'ShaleClientId,CaseDateId'")),
+                () -> assertTrue(sql.contains("N'casedateidisnotnull'")),
+                () -> assertTrue(sql.contains("is_included_column=1")),
+                () -> assertFalse(sql.contains("@DropIndexes")),
+                () -> assertFalse(sql.contains("STRING_AGG(N'DROP INDEX '")),
                 () -> assertFalse(sql.matches("(?is).*DROP\s+COLUMN\s+SourceId.*")));
+    }
+
+    @Test void validatesExactForeignKeysMappingObjectsAndExpectedIndexDependency() {
+        assertAll(
+                () -> assertTrue(sql.contains("@ExpectedMappingFks")),
+                () -> assertTrue(sql.contains("OBJECT_NAME(fk.referenced_object_id)<>e.ReferencedTable")),
+                () -> assertTrue(sql.contains("pc.name=e.ParentColumn AND rc.name=e.ReferencedColumn")),
+                () -> assertTrue(sql.contains("N'ShaleClientId>ShaleClientId,CaseDateId>Id'")),
+                () -> assertTrue(sql.contains("REPLACE(d.definition,N' ',N'')=N'((0))'")),
+                () -> assertTrue(sql.contains("CK_CalendarCaseDateTypeMappings_Direction")),
+                () -> assertTrue(sql.contains("@TriggerDefinition NOT LIKE")),
+                () -> assertTrue(sql.contains("NOT (d.referencing_id=OBJECT_ID(N'dbo.CalendarEvents') AND d.referencing_minor_id=@LinkIndexId)")),
+                () -> assertFalse(sql.contains("Unexpected expression dependency targets CalendarEvents.CaseDateId")));
     }
 
     @Test void isAtomicForwardOnlyAndContainsNoBusinessOrAuditDml() {
@@ -99,6 +125,10 @@ final class CaseCalendarLinkSchemaRetirementMigrationTest {
         int count = 0;
         for (int at = 0; (at = value.indexOf(needle, at)) >= 0; at += needle.length()) count++;
         return count;
+    }
+
+    private static String normalize(String value) {
+        return value.replace("\r\n", "\n").replace('\r', '\n');
     }
 
     private static String sha256(String value) {
