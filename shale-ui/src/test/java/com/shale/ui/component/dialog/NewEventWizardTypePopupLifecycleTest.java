@@ -59,11 +59,8 @@ final class NewEventWizardTypePopupLifecycleTest {
                 handle.typeForTest().getSelectionModel().clearSelection();
                 int index = indexOf(id);
                 assertTrue(index >= 0, "expected authoritative type id " + id);
-                // A real popup mouse/Enter/Space activation first commits the highlighted item through
-                // ComboBox selection/action. Do not dispatch a second synthetic gesture to the owner
-                // after that listener has hidden the popup; that is not a JavaFX user activation.
-                handle.typeForTest().getSelectionModel().select(index);
-                Event.fireEvent(handle.typeForTest(), activation.event());
+                handle.highlightTypeForTest(index);
+                handle.activateTypeForTest(activation.keyCode());
                 activationState.set(handle.typeLifecycleStateForTest());
             });
 
@@ -167,12 +164,8 @@ final class NewEventWizardTypePopupLifecycleTest {
         return new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false);
     }
 
-    private static MouseEvent mouse() {
-        return new MouseEvent(MouseEvent.MOUSE_CLICKED, 4, 4, 4, 4, MouseButton.PRIMARY, 1,
-                false, false, false, false, true, false, false, false, false, true, null);
-    }
-
     private enum Activation {
         MOUSE, ENTER, SPACE;
+        KeyCode keyCode() { return this == MOUSE ? null : this == ENTER ? KeyCode.ENTER : KeyCode.SPACE; }
     }
 }

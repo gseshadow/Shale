@@ -157,17 +157,12 @@ public final class NewEventWizard {
                 filterTypes(b);
             }});
             type.getSelectionModel().selectedItemProperty().addListener((o,a,b)-> {
-                if(type.isShowing()&&!updatingTypeControl&&b!=null)popupTypeCandidate=b;
+                if(type.isShowing()&&!updatingTypeControl&&b!=null)capturePopupTypeCandidate(b);
             });
             type.setOnShowing(e->popupTypeCandidate=null);
-            type.setOnAction(e->{ if(!updatingTypeControl){TypeChoice choice=activationTypeChoice();if(choice!=null)requestTypeCommit(choice);} });
+            type.setOnAction(e->activateTypeCandidate());
             type.setOnHidden(e->deferTypeListRestoration());
-            type.addEventFilter(KeyEvent.KEY_PRESSED,e->{
-                if((e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE)&&type.isShowing()){
-                    TypeChoice choice=activationTypeChoice();
-                    if(choice!=null){requestTypeCommit(choice);e.consume();}
-                }
-            });
+            type.addEventFilter(KeyEvent.KEY_PRESSED,this::handleTypeActivationKey);
             allDay.setAccessibleText("All Day"); notes.setPrefRowCount(4); notes.setWrapText(true);
             for(Control c:List.of(title,type,startDate,endDate,allDay,notes,caseSearch)) ControlStyles.formControl(c);
             allDay.selectedProperty().addListener((o,a,b)->updateTimedControls());
@@ -253,6 +248,18 @@ public final class NewEventWizard {
         private TypeChoice activationTypeChoice(){
             return popupTypeCandidate;
         }
+        private void capturePopupTypeCandidate(TypeChoice choice){popupTypeCandidate=choice;}
+        private void activateTypeCandidate(){
+            if(updatingTypeControl)return;
+            TypeChoice choice=activationTypeChoice();
+            if(choice!=null)requestTypeCommit(choice);
+        }
+        private void handleTypeActivationKey(KeyEvent event){
+            if((event.getCode()==KeyCode.ENTER||event.getCode()==KeyCode.SPACE)&&type.isShowing()){
+                activateTypeCandidate();
+                if(pendingTypeCommit!=null)event.consume();
+            }
+        }
         private void requestTypeCommit(TypeChoice choice){
             SourceKind authority=currentTypeAuthority();
             TypeChoice authoritative=loadedTypes.stream().filter(t->sameType(t,choice)&&t.sourceKind()==authority).findFirst().orElse(null);
@@ -332,6 +339,11 @@ public final class NewEventWizard {
             return new TypeLifecycleState(type.isShowing(),typeIdentity(popupTypeCandidate),typeIdentity(pendingTypeCommit),typeIdentity(selectedType),
                     typeIdentity(type.getSelectionModel().getSelectedItem()),typeIdentity(type.getValue()),type.getEditor().getText(),typeGeneration,
                     acceptDeferredTypeWork(currentTypeAuthority(),tenantId,typeGeneration));
+        }
+        void highlightTypeForTest(int index){capturePopupTypeCandidate(type.getItems().get(index));}
+        void activateTypeForTest(KeyCode key){
+            if(key==null)activateTypeCandidate();
+            else handleTypeActivationKey(new KeyEvent(KeyEvent.KEY_PRESSED,"","",key,false,false,false,false));
         }
         void filterTypesForTest(String query){filterTypes(query);}
         void showAllAuthorityTypesForTest(){showAllAuthorityTypes();}
