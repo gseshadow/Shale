@@ -13,16 +13,18 @@ class CaseDateAssociatedCaseDataPathContractTest {
 
     @Test void sharedDialogReusesEstablishedMiniFactoryBeforeEveryOccurrenceField() throws Exception {
         String dialog = source("component/dialog/CaseDateOccurrenceDialog.java");
-        assertTrue(dialog.contains("new CaseCardFactory(id -> {}).create(associatedCase, CaseCardFactory.Variant.MINI)"));
+        assertTrue(dialog.contains("new CaseCardFactory(onOpenCase).create(associatedCase, CaseCardFactory.Variant.MINI)"));
         assertTrue(dialog.contains("new VBox(12, caseSection, grid, error, footer)"));
         assertFalse(dialog.contains("ComboBox<Case"));
         assertFalse(dialog.contains("ChoiceBox<Case"));
+        assertFalse(dialog.contains("associatedCase.name()"));
     }
 
     @Test void caseDatesReuseAlreadyLoadedAuthoritativeOverviewForNewAndEdit() throws Exception {
         String controller = source("controller/CaseController.java");
         assertTrue(controller.contains("currentOverview.getCaseId() != caseId"));
         assertTrue(controller.contains("CaseDateOccurrenceEditorLauncher.toCaseCardModel(currentOverview)"));
+        assertTrue(controller.contains("id -> this.onOpenCase.accept(id)"));
         assertTrue(controller.contains("existing == null ? \"Add Date\" : \"Edit Date\""));
         assertFalse(controller.contains("listActiveForCalendar"));
     }
@@ -37,6 +39,7 @@ class CaseDateAssociatedCaseDataPathContractTest {
         assertFalse(launcher.contains("listActiveForCalendar"));
         assertFalse(launcher.contains("CaseSummaryDao"));
         assertFalse(launcher.contains("CaseDao"));
+        assertTrue(launcher.contains("onOpenCase"));
     }
 
     @Test void cardProjectionPreservesStableIdAndPresentationWithoutSensitiveLogging() throws Exception {

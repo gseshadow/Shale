@@ -149,7 +149,8 @@ public final class CalendarController {
         if (runtimeBridge != null) runtimeBridge.subscribeEntityUpdated(entityUpdatedHandler);
         if (caseService != null) caseDateEditorLauncher = new CaseDateOccurrenceEditorLauncher(caseService, dbExec,
                 () -> new CaseDateOccurrenceEditorLauncher.Context(currentTenantId(), currentActorId(), activeCaseDateCaseId, calendarIsOpen()),
-                this::calendarOwner, this::caseDateSaved, message -> AppDialogs.showError(calendarOwner(), "Case Date", message), null);
+                this::calendarOwner, this::caseDateSaved, message -> AppDialogs.showError(calendarOwner(), "Case Date", message), null,
+                this.onOpenCase);
     }
 
     private void handleEntityUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {

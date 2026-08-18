@@ -32,12 +32,14 @@ final class CaseDateOccurrenceEditorLauncher {
     private final Consumer<SaveResult> onSaved;
     private final Consumer<String> onLoadFailure;
     private final Consumer<Boolean> onDialogState;
+    private final Consumer<Integer> onOpenCase;
     private final AtomicLong generations = new AtomicLong();
     private final Map<Long, Long> opening = new ConcurrentHashMap<>();
 
     CaseDateOccurrenceEditorLauncher(CaseServicePort caseService, Executor executor,
             Supplier<Context> currentContext, Supplier<Window> owner,
-            Consumer<SaveResult> onSaved, Consumer<String> onLoadFailure, Consumer<Boolean> onDialogState) {
+            Consumer<SaveResult> onSaved, Consumer<String> onLoadFailure, Consumer<Boolean> onDialogState,
+            Consumer<Integer> onOpenCase) {
         this.caseService = Objects.requireNonNull(caseService);
         this.executor = Objects.requireNonNull(executor);
         this.currentContext = Objects.requireNonNull(currentContext);
@@ -45,6 +47,7 @@ final class CaseDateOccurrenceEditorLauncher {
         this.onSaved = onSaved == null ? result -> {} : onSaved;
         this.onLoadFailure = onLoadFailure == null ? message -> {} : onLoadFailure;
         this.onDialogState = onDialogState == null ? open -> {} : onDialogState;
+        this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase;
     }
 
     void open(long expectedCaseId, long caseDateId) {
@@ -71,7 +74,7 @@ final class CaseDateOccurrenceEditorLauncher {
                 CaseDateDto existing = loaded.get();
                 try {
                     onDialogState.accept(true);
-                    CaseDateOccurrenceDialog.show(owner.get(), "Edit Date", types, existing, toCaseCardModel(caseOverview.get()),
+                    CaseDateOccurrenceDialog.show(owner.get(), "Edit Date", types, existing, toCaseCardModel(caseOverview.get()), onOpenCase,
                             input -> save(captured, existing, input),
                             () -> Platform.runLater(() -> { opening.remove(caseDateId, generation); open(captured.caseId(), caseDateId); }));
                 } finally {

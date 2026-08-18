@@ -17,6 +17,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
+import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
+import javafx.scene.AccessibleRole;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -43,6 +47,7 @@ public final class CaseDateOccurrenceDialog {
 
     public static void show(Window owner, String title, List<EffectiveCaseDateTypeDto> selectableTypes, CaseDateDto existing,
             CaseCardModel associatedCase,
+            Consumer<Integer> onOpenCase,
             Function<Input, ? extends CompletionStage<String>> onSave, Runnable onReload) {
         Stage stage = AppDialogs.createModalStage(owner, title);
         AtomicBoolean submitting = new AtomicBoolean(false);
@@ -87,6 +92,12 @@ public final class CaseDateOccurrenceDialog {
             timing.setTimedControlsDisabled(!timed);
         };
         typeBox.valueProperty().addListener((o,a,b) -> syncTimeControls.run()); allDay.selectedProperty().addListener((o,a,b) -> syncTimeControls.run()); syncTimeControls.run();
+        AtomicBoolean dirty = new AtomicBoolean(false);
+        typeBox.valueProperty().addListener((o,a,b) -> dirty.set(true)); occurrenceTitle.textProperty().addListener((o,a,b) -> dirty.set(true));
+        startDate.valueProperty().addListener((o,a,b) -> dirty.set(true)); endDate.valueProperty().addListener((o,a,b) -> dirty.set(true));
+        allDay.selectedProperty().addListener((o,a,b) -> dirty.set(true)); notes.textProperty().addListener((o,a,b) -> dirty.set(true));
+        timing.startTimeControl().getEditor().textProperty().addListener((o,a,b) -> dirty.set(true));
+        timing.hoursControl().valueProperty().addListener((o,a,b) -> dirty.set(true)); timing.minutesControl().valueProperty().addListener((o,a,b) -> dirty.set(true));
         save.setOnAction(e -> {
             Optional<Input> input = read(typeBox.getValue(), occurrenceTitle, startDate, timing, endDate, allDay, notes, error, existing);
             if (input.isEmpty() || submitting.getAndSet(true)) return;
@@ -105,26 +116,46 @@ public final class CaseDateOccurrenceDialog {
         stage.getScene();
         GridPane grid = createEditorGrid(typeBox,occurrenceTitle,startDate,timing,endDate,allDay,notes);
         HBox footer = new HBox(8, reload, cancel, save); footer.setAlignment(Pos.CENTER_RIGHT);
-        VBox caseSection = createCaseSection(associatedCase);
+        CaseNavigationGate navigation = new CaseNavigationGate(associatedCase.id(), dirty::get, submitting::get,
+                () -> AppDialogs.showConfirmation(stage, "Discard Changes?", "Discard unsaved changes?",
+                        "Navigating to the Case will discard changes in this Case Date.", "Discard Changes",
+                        AppDialogs.DialogActionKind.DANGER), stage::close, onOpenCase);
+        VBox caseSection = createCaseSection(associatedCase, navigation::activate);
         VBox body = new VBox(12, caseSection, grid, error, footer); body.setPadding(new Insets(16));
         Scene scene = new Scene(AppDialogs.createSecondaryWindowShell(stage, title, () -> { if (!submitting.get()) stage.close(); }, body));
         scene.getStylesheets().add(Objects.requireNonNull(CaseDateOccurrenceDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene); stage.showAndWait();
     }
-    static VBox createCaseSection(CaseCardModel associatedCase) {
+    static VBox createCaseSection(CaseCardModel associatedCase, Consumer<Integer> onOpenCase) {
         if (associatedCase == null || associatedCase.id() <= 0) throw new IllegalArgumentException("Associated Case is required.");
         Label label = new Label("Case");
         label.setId("case-date-associated-case-label");
         label.getStyleClass().add("section-title");
-        Node card = new CaseCardFactory(id -> {}).create(associatedCase, CaseCardFactory.Variant.MINI);
+        Node card = new CaseCardFactory(onOpenCase).create(associatedCase, CaseCardFactory.Variant.MINI);
         card.setId("case-date-associated-case-card");
-        card.setAccessibleText("Associated Case");
-        card.setFocusTraversable(false);
-        card.setMouseTransparent(true);
+        card.setAccessibleText("Open associated Case");
+        card.setAccessibleRole(AccessibleRole.BUTTON);
+        card.setFocusTraversable(true);
         label.setLabelFor(card);
         VBox section = new VBox(6, label, card);
         section.setFillWidth(true);
         return section;
+    }
+    static final class CaseNavigationGate {
+        private final int caseId; private final BooleanSupplier dirty; private final BooleanSupplier saving;
+        private final Supplier<Boolean> confirmDiscard; private final Runnable close; private final Consumer<Integer> navigate;
+        private final AtomicBoolean activated = new AtomicBoolean(false);
+        CaseNavigationGate(long caseId, BooleanSupplier dirty, BooleanSupplier saving, Supplier<Boolean> confirmDiscard,
+                Runnable close, Consumer<Integer> navigate) {
+            this.caseId = Math.toIntExact(caseId); this.dirty = Objects.requireNonNull(dirty); this.saving = Objects.requireNonNull(saving);
+            this.confirmDiscard = Objects.requireNonNull(confirmDiscard); this.close = Objects.requireNonNull(close);
+            this.navigate = navigate == null ? id -> {} : navigate;
+        }
+        void activate(int requestedCaseId) {
+            if (requestedCaseId != caseId || saving.getAsBoolean() || !activated.compareAndSet(false, true)) return;
+            if (dirty.getAsBoolean() && !Boolean.TRUE.equals(confirmDiscard.get())) { activated.set(false); return; }
+            close.run(); navigate.accept(caseId);
+        }
     }
     private static Label addRow(GridPane g,int r,String label,Node n){ Label l=new Label(label); l.setLabelFor(n); g.add(l,0,r); g.add(n,1,r); GridPane.setHgrow(n, Priority.ALWAYS); return l; }
     static TextField createTitleField(CaseDateDto existing){ TextField field=new TextField(existing==null?"":safe(existing.title())); field.setId("case-date-occurrence-title"); field.setAccessibleText("Case date occurrence title"); field.setPromptText("Optional occurrence title"); return field; }
