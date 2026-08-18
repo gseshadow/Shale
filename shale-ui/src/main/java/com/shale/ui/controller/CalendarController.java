@@ -437,14 +437,14 @@ public final class CalendarController {
         if (tenantId == null || tenantId <= 0 || actorId == null || actorId <= 0 || calendarService == null || caseService == null) { showError("Calendar is unavailable because no tenant is selected."); return; }
         long dialogStart = PerfLog.start();
         PerfLog.log("DIALOG", "start", "calendar new-event shell");
-        NewEventWizard.Handle dialog = NewEventWizard.show(weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), tenantId, LocalDate.now(), () -> caseOptionsForPicker(null), () -> assignedUserOptionsForPicker(tenantId, null), request -> CompletableFuture.supplyAsync(() -> {
+        NewEventWizard.Handle dialog = NewEventWizard.show(weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), tenantId, selectedDate, () -> caseOptionsForPicker(null), () -> assignedUserOptionsForPicker(tenantId, null), request -> CompletableFuture.supplyAsync(() -> {
             if (!Objects.equals(appState.getShaleClientId(), tenantId) || !Objects.equals(appState.getUserId(), actorId)) return "Your tenant or session changed. Close this wizard and try again.";
             try {
                 if (request.sourceKind() == NewEventWizard.SourceKind.GENERAL_EVENT) {
-                    var input=request.general(); LocalDateTime startsAt=input.allDay()?input.date().atStartOfDay():input.date().atTime(input.startTime()); LocalDateTime endsAt=input.allDay()?null:startsAt.plusMinutes(input.durationMinutes());
-                    calendarService.createEvent(new com.shale.core.model.CalendarEvent(null,tenantId,input.calendarEventTypeId(),input.caseId(),null,input.title(),input.description(),startsAt,endsAt,input.allDay(),"MANUAL",null,null,input.assignedToUserId(),false,false,actorId,null,null));
+                    var input=request.general();
+                    calendarService.createEvent(new com.shale.core.model.CalendarEvent(null,tenantId,input.calendarEventTypeId(),null,null,input.title(),input.notes(),input.startsAt(),input.endsAt(),input.allDay(),"MANUAL",null,null,null,false,false,actorId,null,null));
                 } else {
-                    var input=request.caseDate();caseService.createCaseDate(new CreateCaseDateCommand(tenantId,actorId,input.caseId(),input.caseDateTypeId(),null,input.startsAt(),input.endsAt(),input.allDay(),input.notes()));
+                    var input=request.caseDate();caseService.createCaseDate(new CreateCaseDateCommand(tenantId,actorId,input.caseId(),input.caseDateTypeId(),input.title(),input.startsAt(),input.endsAt(),input.allDay(),input.notes()));
                     if(runtimeBridge!=null)runtimeBridge.publishCaseDatesChanged(input.caseId(),tenantId,actorId,LiveUpdateEvents.CHANGE_CREATED);
                 }
                 Platform.runLater(()->{showError(null);loadCurrentRange(false);});return null;
