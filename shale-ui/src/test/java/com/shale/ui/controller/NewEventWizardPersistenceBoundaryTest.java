@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -38,10 +39,24 @@ class NewEventWizardPersistenceBoundaryTest {
 	@Test
 	void singleFormHasExactOrderedLabelsAndNoWizardNavigationOrAssignedUser() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/com/shale/ui/component/dialog/NewEventWizard.java"));
-		String labels = "\"Title\",title); add(fields,row++,\"Assign to Case\",caseField); add(fields,row++,\"Type\",type);\n"
-				+ "            add(fields,row++,\"Start Date\",startDate); add(fields,row++,\"End Date\",endDate); add(fields,row++,\"Start Time\",startTime);\n"
-				+ "            add(fields,row++,\"Duration\",duration); add(fields,row++,\"All Day\",allDay); add(fields,row,\"Notes\",notes);";
-		assertTrue(source.contains(labels));
+		String compact = source.replaceAll("\\s+", "");
+		List<String> orderedFields = List.of(
+				"add(fields,row++,\"Title\",title);",
+				"add(fields,row++,\"AssigntoCase\",caseField);",
+				"add(fields,row++,\"Type\",type);",
+				"add(fields,row++,\"StartDate\",startDate);",
+				"add(fields,row++,\"EndDate\",endDate);",
+				"add(fields,row++,\"StartTime\",startTime);",
+				"add(fields,row++,\"Duration\",duration);",
+				"add(fields,row++,\"AllDay\",allDay);",
+				"add(fields,row,\"Notes\",notes);"
+		);
+		int previous = -1;
+		for (String field : orderedFields) {
+			int current = compact.indexOf(field, previous + 1);
+			assertTrue(current > previous, "Missing or out-of-order New Event field: " + field);
+			previous = current;
+		}
 		assertFalse(source.contains("enum Step"));
 		assertFalse(source.contains("\"Back\""));
 		assertFalse(source.contains("\"Next\""));
