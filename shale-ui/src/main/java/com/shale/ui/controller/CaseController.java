@@ -693,8 +693,7 @@ public class CaseController {
 	private boolean caseDatesStale = true;
 	private boolean showRemovedCaseDates;
 	private int caseDatesLoadGeneration;
-	private int caseDateOpenGeneration;
-	private final AtomicBoolean caseDateOpenInFlight = new AtomicBoolean();
+	private CaseDateOccurrenceEditorLauncher caseDateOccurrenceEditorLauncher;
 	private final Set<Integer> openingCaseCalendarEventIds = new HashSet<>();
 
 	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
@@ -913,6 +912,10 @@ public class CaseController {
 		this.calendarService = calendarService;
 		this.calendarFeedDao = calendarFeedDao;
 		this.caseService = caseService;
+		this.caseDateOccurrenceEditorLauncher = caseService == null ? null : new CaseDateOccurrenceEditorLauncher(caseService, caseDateExecutor,
+				() -> new CaseDateOccurrenceEditorLauncher.Context(appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId(), appState == null || appState.getUserId() == null ? 0 : appState.getUserId(), this.caseId == null ? 0 : this.caseId, caseDatesTabPane != null && caseDatesTabPane.getScene() != null),
+				this::caseDatesOwner, result -> { long savedCaseId = result.context().caseId(); synchronizeCaseDatesAfterLocalMutation(savedCaseId, isMigratedCaseDateSystemKey(result.date().typeSystemKey())); if (runtimeBridge != null) runtimeBridge.publishCaseDatesChanged(savedCaseId, result.context().tenantId(), result.context().actorId(), LiveUpdateEvents.CHANGE_UPDATED); },
+				this::showCaseDatesMessage, open -> { caseDateEditorOpen = open; if (!open) applyDeferredCaseDatesRefresh(); });
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
@@ -1955,33 +1958,8 @@ public class CaseController {
 	}
 
 	public void openAuthoritativeCaseDate(long caseDateId) {
-		if (caseDateId <= 0 || caseService == null || appState == null || caseId == null) return;
-		Integer tenantId = appState.getShaleClientId(), actorId = appState.getUserId();
-		if (tenantId == null || tenantId <= 0 || actorId == null || actorId <= 0 || !caseDateOpenInFlight.compareAndSet(false, true)) return;
 		showCaseDatesTab();
-		final int expectedCaseId = caseId;
-		final int generation = ++caseDateOpenGeneration;
-		caseDateExecutor.submit(() -> {
-			try {
-				Optional<CaseDateDto> loaded = caseService.getCaseDate(caseDateId, tenantId, actorId);
-				Platform.runLater(() -> {
-					caseDateOpenInFlight.set(false);
-					if (generation != caseDateOpenGeneration || caseId == null || caseId != expectedCaseId
-							|| !Objects.equals(appState.getShaleClientId(), tenantId) || !Objects.equals(appState.getUserId(), actorId)) return;
-					if (loaded.isEmpty() || loaded.get().caseId() != expectedCaseId || loaded.get().shaleClientId() != tenantId) {
-						showCaseDatesMessage("This Case Date is no longer available.");
-						return;
-					}
-					openCaseDateDialog(loaded.get());
-				});
-			} catch (RuntimeException ex) {
-				Platform.runLater(() -> {
-					caseDateOpenInFlight.set(false);
-					if (generation == caseDateOpenGeneration && caseId != null && caseId == expectedCaseId
-							&& Objects.equals(appState.getShaleClientId(), tenantId)) showCaseDatesMessage("This Case Date could not be opened.");
-				});
-			}
-		});
+		if (caseDateOccurrenceEditorLauncher != null && caseId != null) caseDateOccurrenceEditorLauncher.open(caseId, caseDateId);
 	}
 
 	private void loadCaseDatesAsync() {
