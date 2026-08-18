@@ -2030,7 +2030,7 @@ public class CaseController {
 	}
 
 	private Node createCaseDateCard(CaseDateDto date, boolean removed) {
-		Label title = new Label(safe(date.typeName())); title.setStyle("-fx-font-weight: 700; -fx-font-size: 13px;");
+		Label title = new Label(safe(date.displayTitle())); title.setStyle("-fx-font-weight: 700; -fx-font-size: 13px;");
 		Label when = new Label(formatCaseDateOccurrence(date)); when.setStyle("-fx-opacity: 0.78;");
 		VBox text = new VBox(3, title, when);
 		if (isHistoricalCaseDateType(date)) { Label h = new Label("Historical/inactive type"); h.setStyle("-fx-opacity: 0.65; -fx-font-size: 11px;"); text.getChildren().add(h); }
@@ -2061,9 +2061,9 @@ public class CaseController {
 		return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
 			try {
 				if (existing == null) caseService.createCaseDate(new CreateCaseDateCommand(tenantId, actorId, activeCaseId,
-						input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes()));
+						input.caseDateTypeId(), input.title(), input.startsAt(), input.endsAt(), input.allDay(), input.notes()));
 				else caseService.updateCaseDate(new UpdateCaseDateCommand(tenantId, actorId, activeCaseId, existing.id(),
-						input.caseDateTypeId(), input.startsAt(), input.endsAt(), input.allDay(), input.notes(), existing.rowVer()));
+						input.caseDateTypeId(), input.title(), input.startsAt(), input.endsAt(), input.allDay(), input.notes(), existing.rowVer()));
 				Platform.runLater(() -> { synchronizeCaseDatesAfterLocalMutation(activeCaseId, compatibilityAffected); publishCaseDatesChanged(activeCaseId, existing == null ? LiveUpdateEvents.CHANGE_CREATED : LiveUpdateEvents.CHANGE_UPDATED); });
 				return null;
 			} catch (RuntimeException ex) { return rootMessage(ex); }

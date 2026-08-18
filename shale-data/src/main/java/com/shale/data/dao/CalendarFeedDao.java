@@ -227,7 +227,7 @@ public final class CalendarFeedDao {
     private static String authoritativeCaseDatesBranch(boolean caseFiltered, boolean userScheduleScoped) {
         return """
                     SELECT CONCAT('CASE_DATE:', CAST(cd.Id AS varchar(20))),
-                           CONCAT(typePresentation.Name, N' — ', c.Name),
+                           CONCAT(COALESCE(NULLIF(LTRIM(RTRIM(cd.Title)), N''), typePresentation.Name), N' — ', c.Name),
                            NULL AS Details,
                            cd.StartsAt,
                            cd.EndsAt,
