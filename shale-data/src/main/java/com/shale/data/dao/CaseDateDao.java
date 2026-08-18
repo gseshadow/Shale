@@ -626,17 +626,17 @@ public final class CaseDateDao {
     public CaseDateDto createCaseDate(CreateCaseDateCommand c) {
         try (Connection con = db.requireConnection()) {
             verifyTenant(con, c.shaleClientId()); validateActor(con, c.shaleClientId(), c.actorUserId()); validateCase(con, c.shaleClientId(), c.caseId());
-            TypeRow type = requireSelectableType(con, c.shaleClientId(), c.caseDateTypeId()); validateAllDay(type, c.allDay());
+            TypeRow type = requireSelectableType(con, c.shaleClientId(), c.caseDateTypeId()); validateAllDay(type, c.allDay()); String title=normalizeTitle(c.title());
             con.setAutoCommit(false);
             try {
                 requireProtectedSingletonAvailable(con,c.shaleClientId(),c.caseId(),c.caseDateTypeId(),null);
                 long id;
                 try (PreparedStatement ps = con.prepareStatement("""
-                        INSERT dbo.CaseDates (ShaleClientId, CaseId, CaseDateTypeId, StartsAt, EndsAt, AllDay, Notes, CreatedAt, CreatedByUserId)
+                        INSERT dbo.CaseDates (ShaleClientId, CaseId, CaseDateTypeId, Title, StartsAt, EndsAt, AllDay, Notes, CreatedAt, CreatedByUserId)
                         OUTPUT INSERTED.Id
-                        VALUES (?, ?, ?, ?, ?, ?, ?, SYSUTCDATETIME(), ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, SYSUTCDATETIME(), ?)
                         """)) {
-                    ps.setInt(1, c.shaleClientId()); ps.setLong(2, c.caseId()); ps.setInt(3, c.caseDateTypeId()); setLdt(ps,4,c.startsAt()); setLdt(ps,5,c.endsAt()); ps.setBoolean(6,c.allDay()); ps.setString(7, norm(c.notes())); ps.setInt(8,c.actorUserId());
+                    ps.setInt(1, c.shaleClientId()); ps.setLong(2, c.caseId()); ps.setInt(3, c.caseDateTypeId()); ps.setString(4,title); setLdt(ps,5,c.startsAt()); setLdt(ps,6,c.endsAt()); ps.setBoolean(7,c.allDay()); ps.setString(8, norm(c.notes())); ps.setInt(9,c.actorUserId());
                     try(ResultSet rs=ps.executeQuery()){ if(!rs.next()) throw new IllegalStateException("Case date was not created."); id=rs.getLong(1); }
                 }
                 touchCase(con, c.caseId(), c.shaleClientId()); audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),id,EntityActionAuditEvent.Action.CREATED); phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","StartsAt",id,c.startsAt()); phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","EndsAt",id,c.endsAt()); phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","Notes",id,norm(c.notes()));
@@ -650,13 +650,13 @@ public final class CaseDateDao {
             verifyTenant(con, c.shaleClientId()); validateActor(con, c.shaleClientId(), c.actorUserId()); validateCase(con, c.shaleClientId(), c.caseId());
             MutationRow before = requireMutationRow(con,c.shaleClientId(),c.caseId(),c.caseDateId(),false); requireRowVerMatch(before.rowVer,c.expectedRowVer());
             TypeRow type = c.caseDateTypeId()==before.typeId ? requireHistoricalType(con,c.shaleClientId(),c.caseDateTypeId()) : requireSelectableType(con,c.shaleClientId(),c.caseDateTypeId()); validateAllDay(type,c.allDay());
-            String notes=norm(c.notes());
-            if(before.typeId==c.caseDateTypeId() && Objects.equals(before.startsAt,c.startsAt()) && Objects.equals(before.endsAt,c.endsAt()) && before.allDay==c.allDay() && Objects.equals(before.notes,notes)) return requireDate(con,c.caseDateId(),c.shaleClientId());
+            String notes=norm(c.notes()); String title=normalizeTitle(c.title());
+            if(before.typeId==c.caseDateTypeId() && Objects.equals(before.title,title) && Objects.equals(before.startsAt,c.startsAt()) && Objects.equals(before.endsAt,c.endsAt()) && before.allDay==c.allDay() && Objects.equals(before.notes,notes)) return requireDate(con,c.caseDateId(),c.shaleClientId());
             con.setAutoCommit(false);
             try { requireProtectedSingletonAvailable(con,c.shaleClientId(),c.caseId(),c.caseDateTypeId(),c.caseDateId()); int rows; try(PreparedStatement ps=con.prepareStatement("""
-                    UPDATE dbo.CaseDates SET CaseDateTypeId=?, StartsAt=?, EndsAt=?, AllDay=?, Notes=?, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=?
+                    UPDATE dbo.CaseDates SET CaseDateTypeId=?, Title=?, StartsAt=?, EndsAt=?, AllDay=?, Notes=?, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=?
                     WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=0 AND RowVer=?
-                    """)){ ps.setInt(1,c.caseDateTypeId()); setLdt(ps,2,c.startsAt()); setLdt(ps,3,c.endsAt()); ps.setBoolean(4,c.allDay()); ps.setString(5,notes); ps.setInt(6,c.actorUserId()); ps.setLong(7,c.caseDateId()); ps.setInt(8,c.shaleClientId()); ps.setLong(9,c.caseId()); ps.setBytes(10,c.expectedRowVer()); rows=ps.executeUpdate(); }
+                    """)){ ps.setInt(1,c.caseDateTypeId()); ps.setString(2,title); setLdt(ps,3,c.startsAt()); setLdt(ps,4,c.endsAt()); ps.setBoolean(5,c.allDay()); ps.setString(6,notes); ps.setInt(7,c.actorUserId()); ps.setLong(8,c.caseDateId()); ps.setInt(9,c.shaleClientId()); ps.setLong(10,c.caseId()); ps.setBytes(11,c.expectedRowVer()); rows=ps.executeUpdate(); }
                 if(rows!=1) throw new IllegalStateException("Case date changed."); touchCase(con,c.caseId(),c.shaleClientId()); audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),c.caseDateId(),EntityActionAuditEvent.Action.UPDATED); phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","StartsAt",c.caseDateId(),before.startsAt,c.startsAt()); phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","EndsAt",c.caseDateId(),before.endsAt,c.endsAt()); phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","Notes",c.caseDateId(),before.notes,notes); CaseDateDto dto=requireDate(con,c.caseDateId(),c.shaleClientId()); con.commit(); return dto;
             } catch(Exception e){ con.rollback(); throw e; } finally { con.setAutoCommit(true); }
         } catch (SQLException e) { throw fail(e); }
@@ -694,7 +694,7 @@ public final class CaseDateDao {
                    COALESCE(eff.CalendarCategory, st.CalendarCategory) AS CalendarCategory,
                    COALESCE(eff.Color, st.Color) AS Color,
                    COALESCE(eff.SupportsTime, st.SupportsTime) AS SupportsTime,
-                   cd.StartsAt, cd.EndsAt, cd.AllDay, cd.Notes, cd.CreatedAt, cd.CreatedByUserId,
+                   cd.Title, cd.StartsAt, cd.EndsAt, cd.AllDay, cd.Notes, cd.CreatedAt, cd.CreatedByUserId,
                    COALESCE(NULLIF(LTRIM(RTRIM(COALESCE(cu.name_first, '') + CASE WHEN COALESCE(cu.name_first, '') = '' OR COALESCE(cu.name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(cu.name_last, ''))), ''), CONCAT('User #', cd.CreatedByUserId)) AS CreatedByDisplayName,
                    cd.UpdatedAt, cd.UpdatedByUserId,
                    CASE WHEN cd.UpdatedByUserId IS NULL THEN NULL ELSE COALESCE(NULLIF(LTRIM(RTRIM(COALESCE(uu.name_first, '') + CASE WHEN COALESCE(uu.name_first, '') = '' OR COALESCE(uu.name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(uu.name_last, ''))), ''), CONCAT('User #', cd.UpdatedByUserId)) END AS UpdatedByDisplayName,
@@ -735,8 +735,9 @@ public final class CaseDateDao {
 
     private CaseDateDto requireDate(Connection con,long id,int tenant)throws SQLException{String sql=occurrenceSql("cd.Id = ? AND cd.ShaleClientId = ?");try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setInt(2,tenant);ps.setLong(3,id);ps.setInt(4,tenant);try(ResultSet rs=ps.executeQuery()){if(rs.next())return mapDate(rs);throw new IllegalStateException("Case date is not available.");}}}
     private record TypeRow(int id, boolean supportsTime){}
-    private record MutationRow(long id,int typeId,LocalDateTime startsAt,LocalDateTime endsAt,boolean allDay,String notes,byte[] rowVer){}
+    private record MutationRow(long id,int typeId,String title,LocalDateTime startsAt,LocalDateTime endsAt,boolean allDay,String notes,byte[] rowVer){}
     private static void requireRowVerMatch(byte[] actual, byte[] expected){ if(expected==null||expected.length==0) throw new IllegalArgumentException("expectedRowVer is required"); if(!Arrays.equals(actual, expected)) throw new IllegalStateException("Case date changed."); }
+    private static String normalizeTitle(String value){ String title=norm(value); if(title!=null && title.length()>255) throw new IllegalArgumentException("Case date title must be 255 characters or fewer."); return title; }
     private static void validateAllDay(TypeRow t, boolean allDay){ if(!t.supportsTime && !allDay) throw new IllegalArgumentException("Case date type requires all-day occurrences."); }
     private static String norm(String s){ if(s==null)return null; String t=s.trim(); return t.isEmpty()?null:t; }
     private static void setLdt(PreparedStatement ps,int i,LocalDateTime v)throws SQLException{ if(v==null)ps.setNull(i,Types.TIMESTAMP); else ps.setTimestamp(i,Timestamp.valueOf(v)); }
@@ -745,12 +746,12 @@ public final class CaseDateDao {
             SELECT Id, SupportsTime FROM visible WHERE Id=? AND rn=1 AND IsActive=1 AND IsDeleted=0
             """)){ps.setInt(1,tenant);ps.setInt(2,tenant);ps.setInt(3,tenant);ps.setInt(4,id);try(ResultSet rs=ps.executeQuery()){if(rs.next())return new TypeRow(rs.getInt(1),rs.getBoolean(2));throw new IllegalArgumentException("Case date type is not selectable for this tenant.");}}}
     private static TypeRow requireHistoricalType(Connection con,int tenant,int id)throws SQLException{ try(PreparedStatement ps=con.prepareStatement("SELECT Id, SupportsTime FROM dbo.CaseDateTypes WHERE Id=? AND (ShaleClientId=? OR ShaleClientId IS NULL)")){ps.setInt(1,id);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){if(rs.next())return new TypeRow(rs.getInt(1),rs.getBoolean(2));throw new IllegalArgumentException("Case date type is not available for this tenant.");}}}
-    private static MutationRow requireMutationRow(Connection con,int tenant,long caseId,long id,boolean deleted)throws SQLException{ try(PreparedStatement ps=con.prepareStatement("SELECT Id,CaseDateTypeId,StartsAt,EndsAt,AllDay,Notes,RowVer FROM dbo.CaseDates WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=?")){ps.setLong(1,id);ps.setInt(2,tenant);ps.setLong(3,caseId);ps.setBoolean(4,deleted);try(ResultSet rs=ps.executeQuery()){if(rs.next())return new MutationRow(rs.getLong(1),rs.getInt(2),ldt(rs,"StartsAt"),ldt(rs,"EndsAt"),rs.getBoolean(5),rs.getString(6),rs.getBytes(7));throw new IllegalArgumentException(deleted?"Deleted case date is not available for this case.":"Active case date is not available for this case.");}}}
+    private static MutationRow requireMutationRow(Connection con,int tenant,long caseId,long id,boolean deleted)throws SQLException{ try(PreparedStatement ps=con.prepareStatement("SELECT Id,CaseDateTypeId,Title,StartsAt,EndsAt,AllDay,Notes,RowVer FROM dbo.CaseDates WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=?")){ps.setLong(1,id);ps.setInt(2,tenant);ps.setLong(3,caseId);ps.setBoolean(4,deleted);try(ResultSet rs=ps.executeQuery()){if(rs.next())return new MutationRow(rs.getLong(1),rs.getInt(2),rs.getString(3),ldt(rs,"StartsAt"),ldt(rs,"EndsAt"),rs.getBoolean(6),rs.getString(7),rs.getBytes(8));throw new IllegalArgumentException(deleted?"Deleted case date is not available for this case.":"Active case date is not available for this case.");}}}
     private static void touchCase(Connection con,long caseId,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.Cases SET UpdatedAt=SYSDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){ps.setLong(1,caseId);ps.setInt(2,tenant);if(ps.executeUpdate()!=1)throw new IllegalStateException("Case is not available for this tenant.");}}
     private void audit(Connection con,int tenant,int actor,long caseId,long id,EntityActionAuditEvent.Action action)throws SQLException{entityActionAuditDao.append(con,EntityActionAuditEvent.now(tenant,actor,EntityActionAuditEvent.EntityType.CASE_DATE,id,action,null,null,Map.of(EntityActionAuditEvent.MetadataKey.CASE_ID,caseId,EntityActionAuditEvent.MetadataKey.CASE_DATE_ID,id)));}
 
     private static EffectiveCaseDateTypeDto mapType(ResultSet rs) throws SQLException { return new EffectiveCaseDateTypeDto(rs.getInt(1),(Integer)rs.getObject(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getString(6),rs.getString(7),rs.getBoolean(8),rs.getInt(9),rs.getBoolean(10),rs.getBoolean(11),EffectiveCaseDateTypeDto.Origin.valueOf(rs.getString(12)),rs.getBytes(13)); }
-    private static CaseDateDto mapDate(ResultSet rs) throws SQLException { return new CaseDateDto(rs.getLong("Id"),rs.getInt("ShaleClientId"),rs.getLong("CaseId"),rs.getInt("CaseDateTypeId"),rs.getString("TypeSystemKey"),rs.getString("TypeName"),rs.getString("TypeDescription"),rs.getString("CalendarCategory"),rs.getString("Color"),rs.getBoolean("SupportsTime"),ldt(rs,"StartsAt"),ldt(rs,"EndsAt"),rs.getBoolean("AllDay"),rs.getString("Notes"),ldt(rs,"CreatedAt"),rs.getInt("CreatedByUserId"),rs.getString("CreatedByDisplayName"),ldt(rs,"UpdatedAt"),(Integer)rs.getObject("UpdatedByUserId"),rs.getString("UpdatedByDisplayName"),rs.getBytes("RowVer")); }
+    private static CaseDateDto mapDate(ResultSet rs) throws SQLException { return new CaseDateDto(rs.getLong("Id"),rs.getInt("ShaleClientId"),rs.getLong("CaseId"),rs.getInt("CaseDateTypeId"),rs.getString("TypeSystemKey"),rs.getString("TypeName"),rs.getString("TypeDescription"),rs.getString("CalendarCategory"),rs.getString("Color"),rs.getBoolean("SupportsTime"),rs.getString("Title"),ldt(rs,"StartsAt"),ldt(rs,"EndsAt"),rs.getBoolean("AllDay"),rs.getString("Notes"),ldt(rs,"CreatedAt"),rs.getInt("CreatedByUserId"),rs.getString("CreatedByDisplayName"),ldt(rs,"UpdatedAt"),(Integer)rs.getObject("UpdatedByUserId"),rs.getString("UpdatedByDisplayName"),rs.getBytes("RowVer")); }
     private static LocalDateTime ldt(ResultSet rs, String c) throws SQLException { Timestamp ts = rs.getTimestamp(c); return ts == null ? null : ts.toLocalDateTime(); }
     private static void verifyTenant(Connection con,int t)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT)");ResultSet rs=ps.executeQuery()){if(!rs.next()||rs.getInt(1)!=t)throw new IllegalStateException("ShaleClientId session context mismatch.");}}
     private static void validateAdminActor(Connection con,int t,int u)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0 AND ISNULL(is_admin,0)=1")){ps.setInt(1,u);ps.setInt(2,t);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalArgumentException("Administrator user is not available for this tenant.");}}}
