@@ -27,24 +27,34 @@ Audit compatibility uses the existing schema without migration. Each successful 
 mutation retains exactly its own `CALENDAR_EVENT` or `CASE_DATE` entity-action record in the owning
 transaction; synchronization audit records are no longer emitted.
 
-## Phase 2 — unified Calendar New Event workflow (2026-08-17)
+## Phase 2 — unified Calendar New Event workflow (updated 2026-08-18)
 
-Calendar **New Event** is one modal wizard. Its searchable first step presents active effective
-`CalendarEventTypes` as **General Event** and active tenant-effective `CaseDateTypes` as **Case
-Event**. Each transient choice retains a source-kind discriminator and the authoritative source ID;
-display names and group labels are presentation only, so duplicate names remain separate choices.
-Both catalogs and the Case search are asynchronous and guarded by dialog generation, current step,
-open state, and tenant identity. Back, cancel, Escape, branch changes, and failed saves do not write.
+Calendar **New Event** immediately opens one form, with no choice page or Back/Next workflow. In
+order it contains Title, Assign to Case, Type, Start Date, End Date, Start Time, Duration, All Day,
+Notes, and Save/Cancel. Title, Type, and Start Date are required; Notes and Case are initially
+optional. The supplied Calendar date is the Start Date default. Case selection reuses the searchable
+Case selector loading pattern and `CaseCardFactory` MINI presentation; a selected card has Change
+and Remove actions. Open-state, tenant, and request-generation checks reject stale asynchronous
+results.
 
-The General Event branch reuses the Calendar event input and `CalendarService` mutation path,
-including optional Case and assignment, and creates exactly one unlinked `CalendarEvent`. The Case
-Event branch requires a Case selected through the searchable mini-card presentation and uses the
-existing `CaseServicePort.CreateCaseDateCommand` boundary, which retains Case touch, authoritative
-Case Date audits, tenant/session enforcement, and transaction behavior; the controller publishes
-the established PHI-free Case Dates LiveBus invalidation only after success. It creates exactly one
-`CaseDate`. Neither branch reads mappings, writes `CalendarEvents.CaseDateId`, creates a counterpart,
-copies notes/descriptions, or invokes the other branch's notifications. Submission revalidates the
-captured tenant and actor, is single-flight, preserves editor state on failure, and permits retry.
+Type authority follows Case assignment. Without a Case, the searchable selector exposes only active
+effective `CalendarEventTypes`; with a Case, only active tenant-effective `CaseDateTypes`. Changing
+authority clears an incompatible selection without clearing shared form values. A type is identified
+by source-kind plus authoritative numeric ID, never display text, so duplicate names stay distinct.
+A non-time-supporting Case Date Type forces All Day. Timed values use Start Time plus Duration on
+the selected Start/End dates; all-day values retain the existing local-date-at-start-of-day and
+optional multi-day-end convention, without timezone conversion.
+
+No Case creates exactly one unlinked `CalendarEvent` through `CalendarService`; Title maps to
+`CalendarEvents.Title`, Notes maps to its description, dates map to `StartsAt`/`EndsAt`, and this form
+does not expose assignment. A selected Case requires a Case Event type and creates exactly one
+`CaseDate` through `CaseServicePort.CreateCaseDateCommand`; Title maps to `CaseDates.Title`, the
+selected Case/type IDs map directly, Notes maps to `CaseDates.Notes`, and the controller publishes
+the established PHI-free Case Dates LiveBus invalidation only after success. Both titles are trimmed
+and limited to the authoritative 255 characters. Neither route reads mappings, writes
+`CalendarEvents.CaseDateId`, creates a counterpart, or invokes the other route. Submission
+revalidates captured tenant and actor, is single-flight, preserves form state after failure, and
+permits retry.
 
 The linkage/mapping schema, synchronization audit vocabulary, obsolete Settings guard, known
 `CalendarEvents` RLS gap, feed projection identities, and existing edit/click routing remain
