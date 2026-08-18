@@ -117,19 +117,37 @@ final class CaseCalendarLinkSchemaRetirementMigrationTest {
         assertAll(
                 () -> assertTrue(sql.contains("@ExpectedMappingFks")),
                 () -> assertTrue(sql.contains("ReferencedSchema sysname")),
-                () -> assertTrue(sql.contains("OBJECT_SCHEMA_NAME(fk.referenced_object_id)<>e.ReferencedSchema")),
-                () -> assertTrue(sql.contains("OBJECT_NAME(fk.referenced_object_id)<>e.ReferencedTable")),
-                () -> assertTrue(sql.contains("pc.name=e.ParentColumn AND rc.name=e.ReferencedColumn")),
-                () -> assertTrue(sql.contains("OBJECT_SCHEMA_NAME(fk.parent_object_id)=N'dbo'")),
-                () -> assertTrue(sql.contains("OBJECT_SCHEMA_NAME(fk.referenced_object_id)=N'dbo'")),
+                () -> assertTrue(sql.contains("OBJECT_SCHEMA_NAME(fk.referenced_object_id) COLLATE DATABASE_DEFAULT<>e.ReferencedSchema")),
+                () -> assertTrue(sql.contains("OBJECT_NAME(fk.referenced_object_id) COLLATE DATABASE_DEFAULT<>e.ReferencedTable")),
+                () -> assertTrue(sql.contains("pc.name COLLATE DATABASE_DEFAULT=e.ParentColumn AND rc.name COLLATE DATABASE_DEFAULT=e.ReferencedColumn")),
+                () -> assertTrue(sql.contains("OBJECT_SCHEMA_NAME(fk.parent_object_id) COLLATE DATABASE_DEFAULT=N'dbo'")),
+                () -> assertTrue(sql.contains("OBJECT_SCHEMA_NAME(fk.referenced_object_id) COLLATE DATABASE_DEFAULT=N'dbo'")),
                 () -> assertTrue(sql.contains("constraint_object_id=fk.object_id)=1")),
                 () -> assertTrue(sql.contains("=N'CaseDateId>Id'")),
                 () -> assertFalse(sql.contains("N'ShaleClientId>ShaleClientId,CaseDateId>Id'")),
-                () -> assertTrue(sql.contains("REPLACE(d.definition,N' ',N'')=N'((0))'")),
+                () -> assertTrue(sql.contains("REPLACE(d.definition COLLATE DATABASE_DEFAULT,N' ',N'')=N'((0))'")),
                 () -> assertTrue(sql.contains("CK_CalendarCaseDateTypeMappings_Direction")),
                 () -> assertTrue(sql.contains("@TriggerDefinition NOT LIKE")),
                 () -> assertTrue(sql.contains("NOT (d.referencing_id=OBJECT_ID(N'dbo.CalendarEvents') AND d.referencing_minor_id=@LinkIndexId)")),
                 () -> assertFalse(sql.contains("Unexpected expression dependency targets CalendarEvents.CaseDateId")));
+    }
+
+    @Test void normalizesEveryCatalogTextBoundaryToDatabaseCollation() {
+        assertAll(
+                () -> assertTrue(sql.contains("c.name COLLATE DATABASE_DEFAULT Name,t.name COLLATE DATABASE_DEFAULT TypeName")),
+                () -> assertTrue(sql.contains("fk.name COLLATE DATABASE_DEFAULT=e.Name")),
+                () -> assertTrue(sql.contains("OBJECT_SCHEMA_NAME(fk.referenced_object_id) COLLATE DATABASE_DEFAULT<>e.ReferencedSchema")),
+                () -> assertTrue(sql.contains("OBJECT_NAME(fk.referenced_object_id) COLLATE DATABASE_DEFAULT<>e.ReferencedTable")),
+                () -> assertTrue(sql.contains("pc.name COLLATE DATABASE_DEFAULT=e.ParentColumn")),
+                () -> assertTrue(sql.contains("rc.name COLLATE DATABASE_DEFAULT=e.ReferencedColumn")),
+                () -> assertTrue(sql.contains("p.predicate_type_desc COLLATE DATABASE_DEFAULT")),
+                () -> assertTrue(sql.contains("p.operation_desc COLLATE DATABASE_DEFAULT")),
+                () -> assertTrue(sql.contains("p.predicate_definition COLLATE DATABASE_DEFAULT")),
+                () -> assertTrue(sql.contains("STRING_AGG(c.name COLLATE DATABASE_DEFAULT,N',')")),
+                () -> assertTrue(sql.contains("STRING_AGG((pc.name COLLATE DATABASE_DEFAULT)+N'>'+(rc.name COLLATE DATABASE_DEFAULT),N',')")),
+                () -> assertEquals(2, occurrences(sql, "EXCEPT SELECT security_predicate_id")),
+                () -> assertEquals(3, occurrences(sql, "predicate_definition COLLATE DATABASE_DEFAULT FROM sys.security_predicates")),
+                () -> assertTrue(sql.contains("definition COLLATE DATABASE_DEFAULT FROM @UnrelatedPredicates")));
     }
 
     @Test void isAtomicForwardOnlyAndContainsNoBusinessOrAuditDml() {
