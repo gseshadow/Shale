@@ -62,17 +62,17 @@ BEGIN TRY
     SELECT 1 FROM @ExpectedColumns e FULL JOIN (SELECT c.name,t.name TypeName,c.max_length,c.is_nullable,c.is_identity FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=@MappingId) a
       ON a.name COLLATE DATABASE_DEFAULT=e.Name WHERE e.Name IS NULL OR a.name IS NULL OR a.TypeName<>e.TypeName OR a.max_length<>e.MaxLength OR a.is_nullable<>e.Nullable OR a.is_identity<>e.IdentityFlag)
     THROW 57109, 'CalendarCaseDateTypeMappings column shape is incomplete or incompatible.', 1;
-  DECLARE @ExpectedMappingFks TABLE(Name sysname,ParentColumn sysname,ReferencedTable sysname,ReferencedColumn sysname);
+  DECLARE @ExpectedMappingFks TABLE(Name sysname,ParentColumn sysname,ReferencedSchema sysname,ReferencedTable sysname,ReferencedColumn sysname);
   INSERT @ExpectedMappingFks VALUES
-   (N'FK_CalendarCaseDateTypeMappings_Tenant',N'ShaleClientId',N'ShaleClients',N'Id'),
-   (N'FK_CalendarCaseDateTypeMappings_EventType',N'CalendarEventTypeId',N'CalendarEventTypes',N'CalendarEventTypeId'),
-   (N'FK_CalendarCaseDateTypeMappings_DateType',N'CaseDateTypeId',N'CaseDateTypes',N'Id'),
-   (N'FK_CalendarCaseDateTypeMappings_CreatedBy',N'CreatedByUserId',N'Users',N'id'),
-   (N'FK_CalendarCaseDateTypeMappings_UpdatedBy',N'UpdatedByUserId',N'Users',N'id');
+   (N'FK_CalendarCaseDateTypeMappings_Tenant',N'ShaleClientId',N'dbo',N'ShaleClients',N'Id'),
+   (N'FK_CalendarCaseDateTypeMappings_EventType',N'CalendarEventTypeId',N'dbo',N'CalendarEventTypes',N'CalendarEventTypeId'),
+   (N'FK_CalendarCaseDateTypeMappings_DateType',N'CaseDateTypeId',N'dbo',N'CaseDateTypes',N'Id'),
+   (N'FK_CalendarCaseDateTypeMappings_CreatedBy',N'CreatedByUserId',N'dbo',N'Users',N'id'),
+   (N'FK_CalendarCaseDateTypeMappings_UpdatedBy',N'UpdatedByUserId',N'dbo',N'Users',N'id');
   IF (SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id=@MappingId)<>5 OR EXISTS(
     SELECT 1 FROM @ExpectedMappingFks e LEFT JOIN sys.foreign_keys fk ON fk.parent_object_id=@MappingId AND fk.name=e.Name
     WHERE fk.object_id IS NULL OR fk.is_disabled=1 OR fk.is_not_trusted=1 OR fk.delete_referential_action<>0 OR fk.update_referential_action<>0
-      OR OBJECT_NAME(fk.referenced_object_id)<>e.ReferencedTable
+      OR OBJECT_SCHEMA_NAME(fk.referenced_object_id)<>e.ReferencedSchema OR OBJECT_NAME(fk.referenced_object_id)<>e.ReferencedTable
       OR (SELECT COUNT(*) FROM sys.foreign_key_columns WHERE constraint_object_id=fk.object_id)<>1
       OR NOT EXISTS(SELECT 1 FROM sys.foreign_key_columns fkc JOIN sys.columns pc ON pc.object_id=fkc.parent_object_id AND pc.column_id=fkc.parent_column_id JOIN sys.columns rc ON rc.object_id=fkc.referenced_object_id AND rc.column_id=fkc.referenced_column_id
         WHERE fkc.constraint_object_id=fk.object_id AND pc.name=e.ParentColumn AND rc.name=e.ReferencedColumn))
@@ -108,9 +108,9 @@ BEGIN TRY
   INSERT @UnrelatedPredicates SELECT security_predicate_id,object_id,target_object_id,predicate_type,operation,predicate_definition FROM sys.security_predicates WHERE object_id=@PolicyId AND target_object_id<>@MappingId;
 
   /* Verify link dependency through index metadata (index id 13 is not CalendarEvents.SourceId column id 13). */
-  IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys fk WHERE fk.object_id=OBJECT_ID(N'dbo.FK_CalendarEvents_CaseDate_Tenant') AND fk.parent_object_id=OBJECT_ID(N'dbo.CalendarEvents') AND fk.referenced_object_id=OBJECT_ID(N'dbo.CaseDates') AND fk.is_disabled=0 AND fk.is_not_trusted=0 AND fk.delete_referential_action=0 AND fk.update_referential_action=0
-    AND (SELECT COUNT(*) FROM sys.foreign_key_columns WHERE constraint_object_id=fk.object_id)=2
-    AND (SELECT STRING_AGG(pc.name+N'>'+rc.name,N',') WITHIN GROUP(ORDER BY fkc.constraint_column_id) FROM sys.foreign_key_columns fkc JOIN sys.columns pc ON pc.object_id=fkc.parent_object_id AND pc.column_id=fkc.parent_column_id JOIN sys.columns rc ON rc.object_id=fkc.referenced_object_id AND rc.column_id=fkc.referenced_column_id WHERE fkc.constraint_object_id=fk.object_id)=N'ShaleClientId>ShaleClientId,CaseDateId>Id')
+  IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys fk WHERE fk.object_id=OBJECT_ID(N'dbo.FK_CalendarEvents_CaseDate_Tenant') AND fk.parent_object_id=OBJECT_ID(N'dbo.CalendarEvents') AND OBJECT_SCHEMA_NAME(fk.parent_object_id)=N'dbo' AND fk.referenced_object_id=OBJECT_ID(N'dbo.CaseDates') AND OBJECT_SCHEMA_NAME(fk.referenced_object_id)=N'dbo' AND fk.is_disabled=0 AND fk.is_not_trusted=0 AND fk.delete_referential_action=0 AND fk.update_referential_action=0
+    AND (SELECT COUNT(*) FROM sys.foreign_key_columns WHERE constraint_object_id=fk.object_id)=1
+    AND (SELECT STRING_AGG(pc.name+N'>'+rc.name,N',') WITHIN GROUP(ORDER BY fkc.constraint_column_id) FROM sys.foreign_key_columns fkc JOIN sys.columns pc ON pc.object_id=fkc.parent_object_id AND pc.column_id=fkc.parent_column_id JOIN sys.columns rc ON rc.object_id=fkc.referenced_object_id AND rc.column_id=fkc.referenced_column_id WHERE fkc.constraint_object_id=fk.object_id)=N'CaseDateId>Id')
     THROW 57116, 'CalendarEvents to CaseDates foreign key is missing, disabled, untrusted, or incompatible.', 1;
   IF (SELECT COUNT(*) FROM sys.foreign_key_columns WHERE parent_object_id=OBJECT_ID(N'dbo.CalendarEvents') AND parent_column_id=@LinkColumnId)<>1
     THROW 57116, 'CalendarEvents.CaseDateId has an unexpected foreign key dependency.', 1;

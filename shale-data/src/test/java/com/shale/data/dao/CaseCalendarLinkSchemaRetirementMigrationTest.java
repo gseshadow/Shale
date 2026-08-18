@@ -96,9 +96,15 @@ final class CaseCalendarLinkSchemaRetirementMigrationTest {
     @Test void validatesExactForeignKeysMappingObjectsAndExpectedIndexDependency() {
         assertAll(
                 () -> assertTrue(sql.contains("@ExpectedMappingFks")),
+                () -> assertTrue(sql.contains("ReferencedSchema sysname")),
+                () -> assertTrue(sql.contains("OBJECT_SCHEMA_NAME(fk.referenced_object_id)<>e.ReferencedSchema")),
                 () -> assertTrue(sql.contains("OBJECT_NAME(fk.referenced_object_id)<>e.ReferencedTable")),
                 () -> assertTrue(sql.contains("pc.name=e.ParentColumn AND rc.name=e.ReferencedColumn")),
-                () -> assertTrue(sql.contains("N'ShaleClientId>ShaleClientId,CaseDateId>Id'")),
+                () -> assertTrue(sql.contains("OBJECT_SCHEMA_NAME(fk.parent_object_id)=N'dbo'")),
+                () -> assertTrue(sql.contains("OBJECT_SCHEMA_NAME(fk.referenced_object_id)=N'dbo'")),
+                () -> assertTrue(sql.contains("constraint_object_id=fk.object_id)=1")),
+                () -> assertTrue(sql.contains("=N'CaseDateId>Id'")),
+                () -> assertFalse(sql.contains("N'ShaleClientId>ShaleClientId,CaseDateId>Id'")),
                 () -> assertTrue(sql.contains("REPLACE(d.definition,N' ',N'')=N'((0))'")),
                 () -> assertTrue(sql.contains("CK_CalendarCaseDateTypeMappings_Direction")),
                 () -> assertTrue(sql.contains("@TriggerDefinition NOT LIKE")),
