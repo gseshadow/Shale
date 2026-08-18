@@ -10,22 +10,30 @@ remain at their existing service/controller boundaries. The Calendar feed contin
 Case Dates directly with stable `CASE_DATE:<CaseDates.Id>` source identity and existing case-Dates
 click routing; persisted Calendar Events remain an independent feed source.
 
-Production inventory at retirement contained four active, unlinked tenant-7 Calendar Events, no
-non-null `CalendarEvents.CaseDateId`, mapping, or synchronization-audit rows, and no invalid or
-duplicate relationships. No cleanup or backfill was performed. Existing linked rows, if present in
-another environment or restored history, remain readable and are not unlinked or synchronized.
+The confirmed production-wide retirement inventory contains zero non-null
+`CalendarEvents.CaseDateId` values, zero missing/cross-tenant/cross-Case/duplicate links, zero
+`CalendarCaseDateTypeMappings` rows, zero durable `CALENDAR_CASE_DATE_TYPE_MAPPING` audit rows, and
+zero synchronization/link audit rows. No production DAO, service, controller, Settings UI, or
+mutation path accesses the mapping table or link column. No cleanup or backfill was required.
 
 The linkage and mapping schema documented below remains temporarily deployed for a later,
 forward-only removal phase: `CalendarEvents.CaseDateId`, `CalendarCaseDateTypeMappings`, link
-constraints/indexes, trigger, RLS, and synchronization audit vocabulary are unchanged. Runtime does
-not consult mappings or pair records by title, date, label, type name, or any other heuristic.
+constraints/indexes, trigger, RLS, and deployed audit constraints remain unchanged. This
+application-only cleanup removes the obsolete Java `CALENDAR_CASE_DATE_TYPE_MAPPING` entity and its
+entity/action validation branch, plus the unwritten `CASE_DATE_TO_CALENDAR`,
+`CALENDAR_TO_CASE_DATE`, and `SYNCHRONIZATION_DIRECTION` metadata vocabulary and viewer allowlist
+entries. It does not modify schema, data, migrations, or deployed constraints. Runtime does not
+consult mappings or pair records by title, date, label, type name, or any other heuristic.
 `CalendarEvents` still lacks its own RLS predicate; this separate known gap is not corrected here.
 Application mutations continue to require authenticated SQL session tenant/actor identity and apply
 explicit `ShaleClientId` predicates.
 
-Audit compatibility uses the existing schema without migration. Each successful authoritative
-mutation retains exactly its own `CALENDAR_EVENT` or `CASE_DATE` entity-action record in the owning
-transaction; synchronization audit records are no longer emitted.
+Audit compatibility uses the existing schema without migration. Every active application entity
+type remains readable with an explicit viewer label. Each successful authoritative mutation retains
+exactly its own `CALENDAR_EVENT` or `CASE_DATE` entity-action record in the owning transaction;
+synchronization audit records are no longer emitted. `CASE_DATE`, `CASE_DATE_TYPE`,
+`CASE_DATE_ROLE_MAPPING`, `CALENDAR_EVENT`, and the globally shared `LINKED`/`UNLINKED` actions remain
+active vocabulary.
 
 ## Phase 2 — unified Calendar New Event workflow (updated 2026-08-18)
 

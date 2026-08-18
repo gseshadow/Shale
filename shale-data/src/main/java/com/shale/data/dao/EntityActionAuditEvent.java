@@ -19,7 +19,7 @@ public record EntityActionAuditEvent(
 		String source,
 		Map<MetadataKey, String> metadata) {
 
-	public enum EntityType { CASE, CASE_STATUS, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CASE_DATE_TYPE, CALENDAR_EVENT, CASE_DATE_ROLE_MAPPING, CALENDAR_CASE_DATE_TYPE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER }
+	public enum EntityType { CASE, CASE_STATUS, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CASE_DATE_TYPE, CALENDAR_EVENT, CASE_DATE_ROLE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER }
 
 	public enum Action {
 		CREATED,
@@ -80,10 +80,7 @@ public record EntityActionAuditEvent(
 		CONFIGURED_FIELD_COUNT,
 		INITIAL_CREATION,
 		SEMANTIC_ROLE,
-		CASE_DATE_TYPE_ID,
-		CASE_DATE_TO_CALENDAR,
-		CALENDAR_TO_CASE_DATE
-		,SYNCHRONIZATION_DIRECTION
+		CASE_DATE_TYPE_ID
 	}
 
 	private static final Set<String> PROHIBITED_KEY_FRAGMENTS = Set.of(
@@ -113,7 +110,6 @@ public record EntityActionAuditEvent(
 			case CASE_DATE_TYPE -> action == Action.CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.DELETED || action == Action.RESTORED;
 			case CALENDAR_EVENT -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.RESTORED || action == Action.LINKED || action == Action.UNLINKED;
 			case CASE_DATE_ROLE_MAPPING -> action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.OVERRIDE_RESET;
-			case CALENDAR_CASE_DATE_TYPE_MAPPING -> action == Action.CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.DELETED;
 			case FORM_CONFIGURATION -> action == Action.CREATED || action == Action.UPDATED;
 			case MATERIAL_REQUEST -> action == Action.CREATED || action == Action.UPDATED || action == Action.STATUS_CHANGED || action == Action.FOLLOW_UP_ADDED || action == Action.LINKED || action == Action.DELETED;
 			case MATERIAL_REQUEST_FOLLOW_UP -> action == Action.CREATED || action == Action.FOLLOW_UP_ADDED;
