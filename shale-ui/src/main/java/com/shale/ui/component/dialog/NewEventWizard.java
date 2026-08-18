@@ -264,7 +264,11 @@ public final class NewEventWizard {
             return stage.isShowing()&&tenantId==resultTenantId&&typeGeneration==generation&&currentTypeAuthority()==authority;
         }
         private SourceKind currentTypeAuthority(){return selectedCase==null?SourceKind.GENERAL_EVENT:SourceKind.CASE_EVENT;}
-        private static boolean sameType(TypeChoice left,TypeChoice right){return left.sourceKind()==right.sourceKind()&&left.authoritativeTypeId()==right.authoritativeTypeId();}
+        public static boolean sameTypeIdentity(TypeChoice left,TypeChoice right){
+            return left!=null&&right!=null&&left.sourceKind()==right.sourceKind()
+                    &&left.authoritativeTypeId()==right.authoritativeTypeId();
+        }
+        private static boolean sameType(TypeChoice left,TypeChoice right){return sameTypeIdentity(left,right);}
         private void updateTimeAuthority(){ TypeChoice t=selectedType; boolean forced=t!=null&&!t.supportsTime();
             if(forced&&!forcingAllDay){allDayBeforeForce=allDay.isSelected();forcingAllDay=true;allDay.setSelected(true);}
             else if(!forced&&forcingAllDay){forcingAllDay=false;allDay.setSelected(allDayBeforeForce);}
@@ -303,6 +307,10 @@ public final class NewEventWizard {
         ColorCodedComboBox<TypeChoice> typeForTest(){return type;}
         TypeChoice selectedTypeForTest(){return selectedType;}
         int typeCommitCountForTest(){return typeCommitCount;}
+        TypeLifecycleState typeLifecycleStateForTest(){
+            return new TypeLifecycleState(type.isShowing(),pendingTypeCommit,selectedType,typeGeneration,
+                    acceptDeferredTypeWork(currentTypeAuthority(),tenantId,typeGeneration));
+        }
         void filterTypesForTest(String query){filterTypes(query);}
         void showAllAuthorityTypesForTest(){showAllAuthorityTypes();}
         Optional<SaveRequest> readForTest(){return read();}
@@ -316,5 +324,7 @@ public final class NewEventWizard {
         int caseGenerationForTest(){return caseGeneration;}
         void openCaseSelectorForTest(){openCaseSelector();}
     }
+    record TypeLifecycleState(boolean popupShowing,TypeChoice pendingCommit,TypeChoice selectedType,
+                              int generation,boolean authorityGuardAccepted) {}
     private static String safe(String value){return value==null?"":value;}
 }

@@ -1,5 +1,6 @@
 package com.shale.ui.controller;
 
+import com.shale.ui.component.dialog.NewEventWizard;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
@@ -67,7 +68,14 @@ class NewEventWizardPersistenceBoundaryTest {
 	void assignmentControlsTypeAuthorityAndPreservesStableIdentity() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/com/shale/ui/component/dialog/NewEventWizard.java"));
 		assertTrue(source.contains("selectedCase==null?SourceKind.GENERAL_EVENT:SourceKind.CASE_EVENT"));
-		assertTrue(source.contains("t.authoritativeTypeId()==old.authoritativeTypeId()"));
+		var general12 = new NewEventWizard.TypeChoice(NewEventWizard.SourceKind.GENERAL_EVENT, 12, "Duplicate", "#111111", true, 1);
+		var general13 = new NewEventWizard.TypeChoice(NewEventWizard.SourceKind.GENERAL_EVENT, 13, "Duplicate", "#111111", true, 1);
+		var case12 = new NewEventWizard.TypeChoice(NewEventWizard.SourceKind.CASE_EVENT, 12, "Duplicate", "#111111", true, 1);
+		var renamedGeneral12 = new NewEventWizard.TypeChoice(NewEventWizard.SourceKind.GENERAL_EVENT, 12, "Renamed", "#222222", false, 99);
+		assertAll(
+				() -> assertTrue(NewEventWizard.sameTypeIdentity(general12, renamedGeneral12)),
+				() -> assertFalse(NewEventWizard.sameTypeIdentity(general12, general13), "duplicate names do not establish identity"),
+				() -> assertFalse(NewEventWizard.sameTypeIdentity(general12, case12), "identity is source-qualified"));
 		assertTrue(source.contains("CaseCardFactory.Variant.MINI"));
 		assertTrue(source.contains("\"Change\""));
 		assertTrue(source.contains("\"Remove\""));
