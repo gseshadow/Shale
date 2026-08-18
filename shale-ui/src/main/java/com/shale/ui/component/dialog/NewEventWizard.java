@@ -84,7 +84,9 @@ public final class NewEventWizard {
         private final List<NewCalendarEventDialog.CaseOption> loadedCases = new ArrayList<>();
         private NewCalendarEventDialog.CaseOption selectedCase;
         private TypeChoice selectedType;
+        private TypeChoice pendingTypeCommit;
         private boolean updatingTypeControl;
+        private int typeCommitCount;
 
         private final TextField title = new TextField();
         private final VBox caseField = new VBox(7);
@@ -145,13 +147,13 @@ public final class NewEventWizard {
             title.setPromptText("Event title"); title.setAccessibleText("Title");
             type.setPromptText("Search and select a type"); type.setAccessibleText("Type"); type.setEditable(true);
             type.getEditor().textProperty().addListener((o,a,b)-> { if(type.isShowing()&&!updatingTypeControl) filterTypes(b); });
-            type.getSelectionModel().selectedItemProperty().addListener((o,a,b)-> { if(!updatingTypeControl&&b!=null) commitType(b); });
-            type.setOnAction(e->{ TypeChoice choice=type.getSelectionModel().getSelectedItem(); if(choice!=null)commitType(choice); });
-            type.setOnShowing(e->showAllAuthorityTypes());
+            type.getSelectionModel().selectedItemProperty().addListener((o,a,b)-> { if(!updatingTypeControl&&b!=null) requestTypeCommit(b); });
+            type.setOnAction(e->{ if(!updatingTypeControl){TypeChoice choice=type.getSelectionModel().getSelectedItem();if(choice!=null)requestTypeCommit(choice);} });
+            type.setOnHidden(e->deferTypeListRestoration());
             type.addEventFilter(KeyEvent.KEY_PRESSED,e->{
                 if((e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE)&&type.isShowing()){
                     TypeChoice choice=type.getSelectionModel().getSelectedItem();
-                    if(choice!=null){commitType(choice);e.consume();}
+                    if(choice!=null){requestTypeCommit(choice);e.consume();}
                 }
             });
             duration.getItems().setAll(15,30,45,60,90,120,180,240); duration.setValue(60);
@@ -237,14 +239,33 @@ public final class NewEventWizard {
             type.setValue(selectedType);
             if(editorText!=null)type.getEditor().setText(editorText);
         }finally{updatingTypeControl=false;} }
-        private void commitType(TypeChoice choice){
-            TypeChoice authoritative=loadedTypes.stream().filter(t->sameType(t,choice)&&t.sourceKind()==(selectedCase==null?SourceKind.GENERAL_EVENT:SourceKind.CASE_EVENT)).findFirst().orElse(null);
+        private void requestTypeCommit(TypeChoice choice){
+            SourceKind authority=currentTypeAuthority();
+            TypeChoice authoritative=loadedTypes.stream().filter(t->sameType(t,choice)&&t.sourceKind()==authority).findFirst().orElse(null);
+            if(authoritative==null||pendingTypeCommit!=null)return;
+            pendingTypeCommit=authoritative;
+            int generation=typeGeneration,resultTenantId=tenantId;
+            type.hide();
+            Platform.runLater(()->finishTypeCommit(authoritative,authority,resultTenantId,generation));
+        }
+        private void finishTypeCommit(TypeChoice choice,SourceKind authority,int resultTenantId,int generation){
+            if(!acceptDeferredTypeWork(authority,resultTenantId,generation)||pendingTypeCommit==null||!sameType(pendingTypeCommit,choice)){pendingTypeCommit=null;return;}
+            TypeChoice authoritative=loadedTypes.stream().filter(t->sameType(t,choice)&&t.sourceKind()==authority).findFirst().orElse(null);
+            pendingTypeCommit=null;
             if(authoritative==null)return;
             selectedType=authoritative;
+            typeCommitCount++;
             replaceDisplayedTypes(authorityTypes());
-            type.hide();
             updateTimeAuthority();
         }
+        private void deferTypeListRestoration(){
+            SourceKind authority=currentTypeAuthority();int generation=typeGeneration,resultTenantId=tenantId;
+            Platform.runLater(()->{if(pendingTypeCommit==null&&acceptDeferredTypeWork(authority,resultTenantId,generation))replaceDisplayedTypes(authorityTypes());});
+        }
+        private boolean acceptDeferredTypeWork(SourceKind authority,int resultTenantId,int generation){
+            return stage.isShowing()&&tenantId==resultTenantId&&typeGeneration==generation&&currentTypeAuthority()==authority;
+        }
+        private SourceKind currentTypeAuthority(){return selectedCase==null?SourceKind.GENERAL_EVENT:SourceKind.CASE_EVENT;}
         private static boolean sameType(TypeChoice left,TypeChoice right){return left.sourceKind()==right.sourceKind()&&left.authoritativeTypeId()==right.authoritativeTypeId();}
         private void updateTimeAuthority(){ TypeChoice t=selectedType; boolean forced=t!=null&&!t.supportsTime(); allDay.setDisable(forced); if(forced)allDay.setSelected(true); updateTimedControls(); }
         private void updateTimedControls(){ boolean disabled=allDay.isSelected()||(selectedType!=null&&!selectedType.supportsTime()); startTime.setDisable(disabled);duration.setDisable(disabled); }
@@ -281,6 +302,7 @@ public final class NewEventWizard {
         NewCalendarEventDialog.CaseOption selectedCaseForTest(){return selectedCase;}
         ColorCodedComboBox<TypeChoice> typeForTest(){return type;}
         TypeChoice selectedTypeForTest(){return selectedType;}
+        int typeCommitCountForTest(){return typeCommitCount;}
         void filterTypesForTest(String query){filterTypes(query);}
         void showAllAuthorityTypesForTest(){showAllAuthorityTypes();}
         Optional<SaveRequest> readForTest(){return read();}
