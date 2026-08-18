@@ -38,7 +38,9 @@ public final class CaseDateOccurrenceDialog {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("H:mm");
     private CaseDateOccurrenceDialog() {}
 
-    public record Input(int caseDateTypeId, String title, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes) {}
+    public record Input(int caseDateTypeId, String title, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes) {
+        public Input { title=normalizeTitle(title); if(title!=null&&title.length()>255) throw new IllegalArgumentException("Title must be 255 characters or fewer."); }
+    }
 
     public static void show(Window owner, String title, List<EffectiveCaseDateTypeDto> selectableTypes, CaseDateDto existing,
             Function<Input, ? extends CompletionStage<String>> onSave, Runnable onReload) {
@@ -60,8 +62,7 @@ public final class CaseDateOccurrenceDialog {
                 typeBox.setValue(historical);
             }
         } else if (!choices.isEmpty()) typeBox.setValue(choices.get(0));
-        TextField occurrenceTitle = new TextField(existing == null ? "" : safe(existing.title()));
-        occurrenceTitle.setPromptText("Optional occurrence title");
+        TextField occurrenceTitle = createTitleField(existing);
         DatePicker startDate = new DatePicker(existing == null || existing.startsAt() == null ? LocalDate.now() : existing.startsAt().toLocalDate());
         DatePicker endDate = new DatePicker(existing == null || existing.endsAt() == null ? null : existing.endsAt().toLocalDate());
         TextField startTime = new TextField(existing == null || existing.startsAt() == null || existing.allDay() ? "" : existing.startsAt().toLocalTime().format(TIME_FORMAT));
@@ -97,15 +98,16 @@ public final class CaseDateOccurrenceDialog {
             }));
         });
         stage.getScene();
-        GridPane grid = new GridPane(); grid.setHgap(10); grid.setVgap(8);
-        addRow(grid,0,"Date type",typeBox); addRow(grid,1,"Title",occurrenceTitle); addRow(grid,2,"Start date",startDate); addRow(grid,3,"Start time",startTime); addRow(grid,4,"End date",endDate); addRow(grid,5,"End time",endTime); addRow(grid,6,"",allDay); addRow(grid,7,"Notes",notes);
+        GridPane grid = createEditorGrid(typeBox,occurrenceTitle,startDate,startTime,endDate,endTime,allDay,notes);
         HBox footer = new HBox(8, reload, cancel, save); footer.setAlignment(Pos.CENTER_RIGHT);
         VBox body = new VBox(12, grid, error, footer); body.setPadding(new Insets(16));
         Scene scene = new Scene(AppDialogs.createSecondaryWindowShell(stage, title, () -> { if (!submitting.get()) stage.close(); }, body));
         scene.getStylesheets().add(Objects.requireNonNull(CaseDateOccurrenceDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene); stage.showAndWait();
     }
-    private static void addRow(GridPane g,int r,String label,Node n){ Label l=new Label(label); g.add(l,0,r); g.add(n,1,r); GridPane.setHgrow(n, Priority.ALWAYS); }
+    private static Label addRow(GridPane g,int r,String label,Node n){ Label l=new Label(label); l.setLabelFor(n); g.add(l,0,r); g.add(n,1,r); GridPane.setHgrow(n, Priority.ALWAYS); return l; }
+    static TextField createTitleField(CaseDateDto existing){ TextField field=new TextField(existing==null?"":safe(existing.title())); field.setId("case-date-occurrence-title"); field.setAccessibleText("Case date occurrence title"); field.setPromptText("Optional occurrence title"); return field; }
+    static GridPane createEditorGrid(Node type,TextField title,Node startDate,Node startTime,Node endDate,Node endTime,Node allDay,Node notes){ GridPane grid=new GridPane(); grid.setHgap(10); grid.setVgap(8); addRow(grid,0,"Date type",type); Label titleLabel=addRow(grid,1,"Title",title); titleLabel.setId("case-date-occurrence-title-label"); addRow(grid,2,"Start date",startDate); addRow(grid,3,"Start time",startTime); addRow(grid,4,"End date",endDate); addRow(grid,5,"End time",endTime); addRow(grid,6,"",allDay); addRow(grid,7,"Notes",notes); return grid; }
     private static Optional<Input> read(TypeChoice t, TextField title, DatePicker sd, TextField st, DatePicker ed, TextField et, CheckBox ad, TextArea notes, Label error){
         if(title.getText()!=null && title.getText().trim().length()>255){showError(error,"Title must be 255 characters or fewer.");return Optional.empty();}
         if(t==null){showError(error,"Choose a date type.");return Optional.empty();} if(sd.getValue()==null){showError(error,"Start date is required.");return Optional.empty();}
@@ -113,10 +115,11 @@ public final class CaseDateOccurrenceDialog {
         try { start = allDay ? sd.getValue().atStartOfDay() : LocalDateTime.of(sd.getValue(), parseTime(st.getText(), "Start time", error)); } catch (IllegalArgumentException ex){return Optional.empty();}
         if(ed.getValue()!=null || !blank(et.getText())) { if(ed.getValue()==null){showError(error,"End date is required when an end time is entered.");return Optional.empty();} try { end = allDay ? ed.getValue().atStartOfDay() : LocalDateTime.of(ed.getValue(), parseTime(et.getText(), "End time", error)); } catch (IllegalArgumentException ex){return Optional.empty();} }
         if(end!=null && end.isBefore(start)){showError(error,"End must not be before start.");return Optional.empty();}
-        error.setVisible(false); error.setManaged(false); return Optional.of(new Input(t.id(), title.getText(), start, end, allDay, notes.getText()));
+        error.setVisible(false); error.setManaged(false); return Optional.of(new Input(t.id(), normalizeTitle(title.getText()), start, end, allDay, notes.getText()));
     }
     private static LocalTime parseTime(String value, String label, Label error){ if(blank(value)){showError(error,label+" is required for timed dates."); throw new IllegalArgumentException();} try{return LocalTime.parse(value.trim(), TIME_FORMAT);} catch(DateTimeParseException ex){showError(error,label+" must be a valid time such as 9:30."); throw new IllegalArgumentException();}}
     private static void showError(Label l,String m){ l.setText(m); l.setVisible(true); l.setManaged(true); }
+    static String normalizeTitle(String value){ if(value==null)return null; String normalized=value.trim(); return normalized.isEmpty()?null:normalized; }
     private static boolean blank(String s){ return s==null||s.isBlank(); } private static String safe(String s){return s==null?"":s;}
     private record TypeChoice(int id, String name, String color, boolean supportsTime, String secondaryText) { static TypeChoice effective(EffectiveCaseDateTypeDto d){return new TypeChoice(d.id(), d.name(), d.color(), d.supportsTime(), d.supportsTime()?"Timed or all-day":"All-day only");} static TypeChoice historical(CaseDateDto d){return new TypeChoice(d.caseDateTypeId(), d.typeName(), d.color(), d.supportsTime(), "Historical/inactive — retained unless replaced");} }
 }

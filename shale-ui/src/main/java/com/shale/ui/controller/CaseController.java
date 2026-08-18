@@ -2060,16 +2060,16 @@ public class CaseController {
 				|| (existing != null && isMigratedCaseDateSystemKey(existing.typeSystemKey()));
 		return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
 			try {
-				if (existing == null) caseService.createCaseDate(new CreateCaseDateCommand(tenantId, actorId, activeCaseId,
-						input.caseDateTypeId(), input.title(), input.startsAt(), input.endsAt(), input.allDay(), input.notes()));
-				else caseService.updateCaseDate(new UpdateCaseDateCommand(tenantId, actorId, activeCaseId, existing.id(),
-						input.caseDateTypeId(), input.title(), input.startsAt(), input.endsAt(), input.allDay(), input.notes(), existing.rowVer()));
+				if (existing == null) caseService.createCaseDate(createCaseDateCommand(tenantId, actorId, activeCaseId, input));
+				else caseService.updateCaseDate(updateCaseDateCommand(tenantId, actorId, activeCaseId, existing, input));
 				Platform.runLater(() -> { synchronizeCaseDatesAfterLocalMutation(activeCaseId, compatibilityAffected); publishCaseDatesChanged(activeCaseId, existing == null ? LiveUpdateEvents.CHANGE_CREATED : LiveUpdateEvents.CHANGE_UPDATED); });
 				return null;
 			} catch (RuntimeException ex) { return rootMessage(ex); }
 			finally { caseDateMutationInFlight.set(false); Platform.runLater(this::applyDeferredCaseDatesRefresh); }
 		}, caseDateExecutor);
 	}
+	static CreateCaseDateCommand createCaseDateCommand(int tenantId,int actorId,long caseId,CaseDateOccurrenceDialog.Input input){ return new CreateCaseDateCommand(tenantId,actorId,caseId,input.caseDateTypeId(),input.title(),input.startsAt(),input.endsAt(),input.allDay(),input.notes()); }
+	static UpdateCaseDateCommand updateCaseDateCommand(int tenantId,int actorId,long caseId,CaseDateDto existing,CaseDateOccurrenceDialog.Input input){ return new UpdateCaseDateCommand(tenantId,actorId,caseId,existing.id(),input.caseDateTypeId(),input.title(),input.startsAt(),input.endsAt(),input.allDay(),input.notes(),existing.rowVer()); }
 
 	private void onRemoveCaseDate(CaseDateDto d) {
 		if (d == null || caseService == null || appState == null || caseId == null) return;
