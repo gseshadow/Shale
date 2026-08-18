@@ -42,9 +42,29 @@ final class CaseCalendarLinkSchemaRetirementMigrationTest {
                 () -> assertTrue(sql.contains("CalendarCaseDateTypeMappings WITH (TABLOCKX,HOLDLOCK)")),
                 () -> assertTrue(sql.contains("CalendarEvents WITH (TABLOCKX,HOLDLOCK)")),
                 () -> assertFalse(sql.contains("TOP (0)")),
-                () -> assertTrue(sql.contains("@MappingLockCount=COUNT_BIG(*)")),
-                () -> assertTrue(sql.contains("@EventLockCount=COUNT_BIG(*)")),
+                () -> assertTrue(sql.contains("@MappingLockProbe=CHECKSUM_AGG(BINARY_CHECKSUM(Id))")),
+                () -> assertTrue(sql.contains("@EventLockProbe=CHECKSUM_AGG(BINARY_CHECKSUM(CalendarEventId))")),
                 () -> assertTrue(sql.indexOf("TABLOCKX,HOLDLOCK") < sql.indexOf("DROP FILTER PREDICATE")));
+    }
+
+    @Test void administrativeRolesAreNotTrustedAsRlsBypassAndUnfilteredMappingCheckIsOrdered() {
+        int exactRlsValidation = sql.indexOf("COUNT(*) FROM sys.security_predicates WHERE target_object_id=@MappingId)<>4");
+        int unrelatedSnapshot = sql.indexOf("INSERT @UnrelatedPredicates");
+        int mappingLock = sql.indexOf("CalendarCaseDateTypeMappings WITH (TABLOCKX,HOLDLOCK)");
+        int eventLock = sql.indexOf("CalendarEvents WITH (TABLOCKX,HOLDLOCK)");
+        int filterDrop = sql.indexOf("DROP FILTER PREDICATE ON dbo.CalendarCaseDateTypeMappings");
+        int mappingRows = sql.indexOf("IF EXISTS(SELECT 1 FROM dbo.CalendarCaseDateTypeMappings)");
+        int firstBlockDrop = sql.indexOf("DROP BLOCK PREDICATE ON dbo.CalendarCaseDateTypeMappings AFTER INSERT");
+        int triggerDrop = sql.indexOf("DROP TRIGGER dbo.TR_CalendarCaseDateTypeMappings_Tenant");
+        assertAll(
+                () -> assertTrue(sql.contains("Administrative role membership is a deployment permission requirement, not an RLS bypass")),
+                () -> assertTrue(sql.contains("IF EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.CalendarEvents'))")),
+                () -> assertEquals(1, occurrences(sql, "IF EXISTS(SELECT 1 FROM dbo.CalendarCaseDateTypeMappings)")),
+                () -> assertTrue(exactRlsValidation < unrelatedSnapshot),
+                () -> assertTrue(unrelatedSnapshot < mappingLock && mappingLock < eventLock),
+                () -> assertTrue(eventLock < filterDrop && filterDrop < mappingRows),
+                () -> assertTrue(mappingRows < firstBlockDrop && firstBlockDrop < triggerDrop),
+                () -> assertTrue(sql.contains("CATCH rollback, which restores the predicate atomically")));
     }
 
     @Test void repeatsZeroDataAndLinkAnomalyPreflightsInsideTransaction() {

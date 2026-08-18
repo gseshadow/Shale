@@ -21,6 +21,9 @@ BEGIN TRY
   FROM sys.security_policies WHERE name=N'TenantFilter' AND is_enabled=1;
   IF @PolicyId IS NULL THROW 57103, 'The established TenantFilter security policy must be enabled.', 1;
   IF @PolicyName<>N'[sec].[TenantFilter]' THROW 57103, 'The established TenantFilter policy has an incompatible schema.', 1;
+  /* Administrative role membership is a deployment permission requirement, not an RLS bypass. */
+  IF EXISTS(SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.CalendarEvents'))
+    THROW 57103, 'CalendarEvents unexpectedly has a security predicate; all-row link validation cannot proceed.', 1;
 
   DECLARE @MappingId int=OBJECT_ID(N'dbo.CalendarCaseDateTypeMappings',N'U');
   DECLARE @LinkColumnId int=(SELECT column_id FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.CalendarEvents') AND name=N'CaseDateId');
@@ -128,18 +131,21 @@ BEGIN TRY
     AND NOT (d.referencing_id=OBJECT_ID(N'dbo.CalendarEvents') AND d.referencing_minor_id=@LinkIndexId))
     THROW 57118, 'An unexpected non-index expression dependency targets CalendarEvents.CaseDateId.', 1;
 
-  /* Transaction-owned table locks close the preflight/write race even for non-cooperating writers. */
-  DECLARE @MappingLockCount bigint,@EventLockCount bigint;
-  SELECT @MappingLockCount=COUNT_BIG(*) FROM dbo.CalendarCaseDateTypeMappings WITH (TABLOCKX,HOLDLOCK);
-  SELECT @EventLockCount=COUNT_BIG(*) FROM dbo.CalendarEvents WITH (TABLOCKX,HOLDLOCK);
+  /* Transaction-owned table locks close the preflight/write race even for non-cooperating writers.
+     The mapping probe is deliberately not a row-count assertion because its FILTER predicate is still active. */
+  DECLARE @MappingLockProbe int,@EventLockProbe int;
+  SELECT @MappingLockProbe=CHECKSUM_AGG(BINARY_CHECKSUM(Id)) FROM dbo.CalendarCaseDateTypeMappings WITH (TABLOCKX,HOLDLOCK);
+  SELECT @EventLockProbe=CHECKSUM_AGG(BINARY_CHECKSUM(CalendarEventId)) FROM dbo.CalendarEvents WITH (TABLOCKX,HOLDLOCK);
   IF EXISTS(SELECT 1 FROM dbo.CalendarEvents WHERE CaseDateId IS NOT NULL) THROW 57119, 'CalendarEvents.CaseDateId contains data.', 1;
-  IF EXISTS(SELECT 1 FROM dbo.CalendarCaseDateTypeMappings) THROW 57120, 'CalendarCaseDateTypeMappings contains data.', 1;
   IF EXISTS(SELECT 1 FROM dbo.CalendarEvents e LEFT JOIN dbo.CaseDates d ON d.Id=e.CaseDateId
     WHERE e.CaseDateId IS NOT NULL AND (d.Id IS NULL OR d.ShaleClientId<>e.ShaleClientId OR e.CaseId IS NULL OR d.CaseId<>e.CaseId))
    OR EXISTS(SELECT 1 FROM dbo.CalendarEvents WHERE CaseDateId IS NOT NULL GROUP BY ShaleClientId,CaseDateId HAVING COUNT_BIG(*)>1)
     THROW 57121, 'Calendar/Case Date links contain missing, cross-tenant, cross-Case, or duplicate anomalies.', 1;
 
   ALTER SECURITY POLICY sec.TenantFilter DROP FILTER PREDICATE ON dbo.CalendarCaseDateTypeMappings;
+  /* Authoritative all-row mapping preflight: TABLOCKX remains transaction-owned and the FILTER is now absent.
+     Any THROW reaches the CATCH rollback, which restores the predicate atomically. */
+  IF EXISTS(SELECT 1 FROM dbo.CalendarCaseDateTypeMappings) THROW 57120, 'CalendarCaseDateTypeMappings contains data after removal of its FILTER predicate.', 1;
   ALTER SECURITY POLICY sec.TenantFilter DROP BLOCK PREDICATE ON dbo.CalendarCaseDateTypeMappings AFTER INSERT;
   ALTER SECURITY POLICY sec.TenantFilter DROP BLOCK PREDICATE ON dbo.CalendarCaseDateTypeMappings BEFORE UPDATE;
   ALTER SECURITY POLICY sec.TenantFilter DROP BLOCK PREDICATE ON dbo.CalendarCaseDateTypeMappings AFTER UPDATE;
