@@ -60,6 +60,39 @@ The linkage/mapping schema, synchronization audit vocabulary, obsolete Settings 
 `CalendarEvents` RLS gap, feed projection identities, and existing edit/click routing remain
 unchanged pending the separately gated schema-retirement release.
 
+### Shared local time and duration entry (updated 2026-08-18)
+
+Calendar New Event and the Case Date occurrence editor use the same JavaFX `TimeDurationInput`.
+Start Time is an editable selector whose 48 standard choices cover every half hour from 12:00 AM
+through 11:30 PM. Committed input is parsed centrally and displayed as `h:mm AM/PM`; accepted input
+includes hour-only and hour/minute 24-hour values and case-insensitive 12-hour values with AM/PM
+(for example `9`, `9:15`, `9 AM`, `9:15 AM`, and `14:15`). Invalid mixed-meridiem, out-of-range,
+blank, or otherwise unparseable text is rejected visibly. Display text is never authoritative or
+persisted: the forms produce `LocalTime` and then local `LocalDateTime` values without a timezone
+conversion.
+
+Duration is represented by separately labeled, accessible Hours (0–23) and Minutes (0–59)
+selectors. New timed records default to 1 Hour and 0 Minutes, while 0 Hours and 0 Minutes is invalid.
+The complete minute ranges deliberately preserve nonstandard persisted durations. All Day disables
+all three timed controls without clearing their values; a Case Date Type that does not support time
+forces that state. Returning to a time-supporting timed state therefore restores the last sensible
+values.
+
+Start Date remains required and End Date optional, with End Date prohibited before Start Date. A
+timed start is Start Date plus parsed Start Time. Its end combines the selected End Date (or Start
+Date when absent), the same local clock basis, and duration; day wrap is resolved against the
+selected end calendar date so same-day, cross-midnight, and multi-day persisted timestamps reopen
+and save unchanged. All-day records retain local start-of-day values and the optional multi-day End
+Date convention. This shared calculation is used for both General Event and Case Date requests and
+does not change source identity, Case/type authority, persistence routing, RowVer handling, Case
+touches, auditing, notifications, or LiveBus publication.
+
+**Audit compatibility review.** This is validation and local-value composition at the existing UI
+boundary only. Meaningful mutations continue through the established Calendar Event or Case Date
+transaction and existing entity/PHI audit paths, with tenant, actor, entity, parent/Case, and RowVer
+context unchanged. No new sensitive read or mutation is introduced, no audit payload is assembled
+in UI code, and the existing audit schema is sufficient without migration.
+
 ## Phase 3 — source-specific Calendar activation and editing (updated 2026-08-18)
 
 Calendar activation is now an explicit typed contract. A `CASE_DATE:<CaseDates.Id>` target retains

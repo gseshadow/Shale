@@ -46,8 +46,7 @@ class NewEventWizardPersistenceBoundaryTest {
 				"add(fields,row++,\"Type\",type);",
 				"add(fields,row++,\"StartDate\",startDate);",
 				"add(fields,row++,\"EndDate\",endDate);",
-				"add(fields,row++,\"StartTime\",startTime);",
-				"add(fields,row++,\"Duration\",duration);",
+				"add(fields,row++,\"TimeandDuration\",timing);",
 				"add(fields,row++,\"AllDay\",allDay);",
 				"add(fields,row,\"Notes\",notes);"
 		);
@@ -83,7 +82,7 @@ class NewEventWizardPersistenceBoundaryTest {
 		assertTrue(wizard.contains("String normalized=safe(title.getText()).strip()"));
 		assertTrue(wizard.contains("TITLE_LIMIT = 255"));
 		assertTrue(wizard.contains("End Date must not be before Start Date"));
-		assertTrue(wizard.contains("plusMinutes(minutes)"));
+		assertTrue(wizard.contains("TimeDurationInput.calculateEnd"));
 		assertTrue(wizard.contains("!selected.supportsTime()"));
 		assertTrue(controller.contains("input.caseDateTypeId(),input.title(),input.startsAt()"));
 	}
