@@ -4,11 +4,8 @@ import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.model.CalendarEventType;
 import com.shale.ui.testutil.JavaFxTestSupport;
 import javafx.animation.AnimationTimer;
-import javafx.event.Event;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseButton;
-import javafx.scene.input.MouseEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -62,6 +59,9 @@ final class NewEventWizardTypePopupLifecycleTest {
                 handle.typeForTest().getSelectionModel().clearSelection();
                 int index = indexOf(id);
                 assertTrue(index >= 0, "expected authoritative type id " + id);
+                // A real popup mouse/Enter/Space activation first commits the highlighted item through
+                // ComboBox selection/action. Do not dispatch a second synthetic gesture to the owner
+                // after that listener has hidden the popup; that is not a JavaFX user activation.
                 handle.typeForTest().getSelectionModel().select(index);
                 Event.fireEvent(handle.typeForTest(), activation.event());
                 activationState.set(handle.typeLifecycleStateForTest());
@@ -174,6 +174,5 @@ final class NewEventWizardTypePopupLifecycleTest {
 
     private enum Activation {
         MOUSE, ENTER, SPACE;
-        Event event() { return this == MOUSE ? mouse() : key(this == ENTER ? KeyCode.ENTER : KeyCode.SPACE); }
     }
 }
