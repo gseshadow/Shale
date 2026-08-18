@@ -2,6 +2,31 @@
 
 ## Phase 1 — runtime synchronization retired (2026-08-17)
 
+### Pending schema-retirement deployment (2026-08-18)
+
+The immutable forward-only migration `docs/sql/2026-08-18_retire_calendar_case_date_link_schema.sql`
+is prepared but **has not been executed in production**. Deploy it only after application cleanup
+commit `ba3fafe7` (or a descendant containing that cleanup) is deployed everywhere, the production-wide
+zero-data/anomaly/audit preflight is reconfirmed, all application instances and workers using an
+older build are stopped, a restorable backup is verified, and an exclusive maintenance window is in
+effect. Run the migration once on an all-tenant administrative connection with a null
+`SESSION_CONTEXT('ShaleClientId')`; do not run it through a tenant-filtered runtime connection.
+
+The required order is application cleanup first, then the maintenance-window database migration,
+then application restart and post-deployment verification. The migration accepts only the complete
+expected retired schema or its complete already-absent post-state, locks both retired write surfaces,
+repeats zero-row and link-anomaly checks, and removes only the four mapping-table predicates while leaving
+`TenantFilter` enabled and all unrelated predicates unchanged. Administrative role membership does not
+prove an RLS-unfiltered read: after exact predicate validation and snapshot, the migration holds
+transaction-owned exclusive table locks, removes the mapping FILTER predicate, and only then performs
+the authoritative all-row mapping-table zero check. A row causes `THROW`; transaction rollback restores
+the FILTER predicate before releasing the lock. After a zero result, it removes the three BLOCK predicates and then the mapping table and
+Calendar Event link dependencies. It does not change business or audit rows. `CaseDates`,
+`UX_CaseDates_ShaleClientId_Id`, `CalendarEvents.RowVer`, General Calendar Event schema, direct Case
+Date Calendar projection, and the deployed audit `EntityType` constraint remain. Audit-constraint
+retirement requires a later, separate migration. Until execution is explicitly confirmed, the
+production schema remains recorded as deployed below.
+
 All runtime Calendar Event ↔ Case Date synchronization is retired. Authoritative Case Date create,
 update, soft-delete, and restore transactions mutate and audit only `CaseDates`; authoritative
 Calendar Event create, update/cancel, and hard-delete transactions mutate and audit only
