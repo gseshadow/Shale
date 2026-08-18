@@ -32,7 +32,8 @@ final class EntityActionAuditEntityTypeConstraintMigrationTest {
         assertTrue(seeded.containsAll(emitted), "missing emitted EntityTypes: " + difference(emitted, seeded));
         assertTrue(seeded.containsAll(HISTORICALLY_DEPLOYED),
                 "missing historically deployed EntityTypes: " + difference(HISTORICALLY_DEPLOYED, seeded));
-        assertEquals(emitted, seeded, "the explicit release vocabulary must track production exactly");
+        assertEquals(Set.of("CALENDAR_CASE_DATE_TYPE_MAPPING"), difference(seeded, emitted),
+                "the deployed constraint retains only the retired historical mapping type beyond active writers");
     }
 
     @Test
