@@ -3,6 +3,7 @@ package com.shale.ui.component.dialog;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.model.CalendarEventType;
 import com.shale.ui.component.ColorCodedComboBox;
+import com.shale.ui.component.TimeDurationInput;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ControlStyles;
@@ -23,8 +24,6 @@ import javafx.stage.Window;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -35,7 +34,6 @@ import java.util.function.Supplier;
 
 /** The single-window, non-persisting Calendar creation form for both authoritative domains. */
 public final class NewEventWizard {
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("H:mm");
     private static final int TITLE_LIMIT = 255;
     private NewEventWizard() {}
 
@@ -86,6 +84,8 @@ public final class NewEventWizard {
         private TypeChoice selectedType;
         private TypeChoice pendingTypeCommit;
         private boolean updatingTypeControl;
+        private boolean forcingAllDay;
+        private boolean allDayBeforeForce;
         private int typeCommitCount;
 
         private final TextField title = new TextField();
@@ -96,8 +96,7 @@ public final class NewEventWizard {
         private final ColorCodedComboBox<TypeChoice> type = new ColorCodedComboBox<>(TypeChoice::name, TypeChoice::color, TypeChoice::groupLabel);
         private final DatePicker startDate;
         private final DatePicker endDate = new DatePicker();
-        private final TextField startTime = new TextField("9:00");
-        private final ComboBox<Integer> duration = new ComboBox<>();
+        private final TimeDurationInput timing = new TimeDurationInput();
         private final CheckBox allDay = new CheckBox();
         private final TextArea notes = new TextArea();
         private final Label error = new Label();
@@ -120,8 +119,8 @@ public final class NewEventWizard {
             fields.getColumnConstraints().setAll(labels, controls);
             int row = 0;
             add(fields,row++,"Title",title); add(fields,row++,"Assign to Case",caseField); add(fields,row++,"Type",type);
-            add(fields,row++,"Start Date",startDate); add(fields,row++,"End Date",endDate); add(fields,row++,"Start Time",startTime);
-            add(fields,row++,"Duration",duration); add(fields,row++,"All Day",allDay); add(fields,row,"Notes",notes);
+            add(fields,row++,"Start Date",startDate); add(fields,row++,"End Date",endDate); add(fields,row++,"Time and Duration",timing);
+            add(fields,row++,"All Day",allDay); add(fields,row,"Notes",notes);
             error.getStyleClass().add("form-validation-message"); error.setWrapText(true); hide(error);
             Region spacer = new Region(); HBox.setHgrow(spacer,Priority.ALWAYS);
             HBox actions = new HBox(8,spacer,save,cancel); actions.setAlignment(Pos.CENTER_RIGHT);
@@ -156,9 +155,8 @@ public final class NewEventWizard {
                     if(choice!=null){requestTypeCommit(choice);e.consume();}
                 }
             });
-            duration.getItems().setAll(15,30,45,60,90,120,180,240); duration.setValue(60);
             allDay.setAccessibleText("All Day"); notes.setPrefRowCount(4); notes.setWrapText(true);
-            for(Control c:List.of(title,type,startDate,endDate,startTime,duration,allDay,notes,caseSearch)) ControlStyles.formControl(c);
+            for(Control c:List.of(title,type,startDate,endDate,allDay,notes,caseSearch)) ControlStyles.formControl(c);
             allDay.selectedProperty().addListener((o,a,b)->updateTimedControls());
             CaseCardFactory cards = new CaseCardFactory(this::commitCaseId);
             caseSearch.setPromptText("Search cases"); caseSearch.setAccessibleText("Search cases");
@@ -267,8 +265,11 @@ public final class NewEventWizard {
         }
         private SourceKind currentTypeAuthority(){return selectedCase==null?SourceKind.GENERAL_EVENT:SourceKind.CASE_EVENT;}
         private static boolean sameType(TypeChoice left,TypeChoice right){return left.sourceKind()==right.sourceKind()&&left.authoritativeTypeId()==right.authoritativeTypeId();}
-        private void updateTimeAuthority(){ TypeChoice t=selectedType; boolean forced=t!=null&&!t.supportsTime(); allDay.setDisable(forced); if(forced)allDay.setSelected(true); updateTimedControls(); }
-        private void updateTimedControls(){ boolean disabled=allDay.isSelected()||(selectedType!=null&&!selectedType.supportsTime()); startTime.setDisable(disabled);duration.setDisable(disabled); }
+        private void updateTimeAuthority(){ TypeChoice t=selectedType; boolean forced=t!=null&&!t.supportsTime();
+            if(forced&&!forcingAllDay){allDayBeforeForce=allDay.isSelected();forcingAllDay=true;allDay.setSelected(true);}
+            else if(!forced&&forcingAllDay){forcingAllDay=false;allDay.setSelected(allDayBeforeForce);}
+            allDay.setDisable(forced); updateTimedControls(); }
+        private void updateTimedControls(){ boolean disabled=allDay.isSelected()||(selectedType!=null&&!selectedType.supportsTime()); timing.setTimedControlsDisabled(disabled); }
 
         private void submit(){ if(submitting.get())return; Optional<SaveRequest> request=read();if(request.isEmpty()||!submitting.compareAndSet(false,true))return;
             setBusy(true); CompletionStage<String> result; try{result=saver==null?CompletableFuture.completedFuture("Save is unavailable."):saver.apply(request.get());}
@@ -281,10 +282,10 @@ public final class NewEventWizard {
             if(startDate.getValue()==null){showError("Start Date is required.");return Optional.empty();}
             if(endDate.getValue()!=null&&endDate.getValue().isBefore(startDate.getValue())){showError("End Date must not be before Start Date.");return Optional.empty();}
             boolean ad=allDay.isSelected()||!selected.supportsTime(); LocalTime time=null;
-            if(!ad)try{time=parse(startTime.getText());}catch(IllegalArgumentException ex){showError(ex.getMessage());return Optional.empty();}
-            Integer minutes=duration.getValue();if(!ad&&(minutes==null||minutes<=0)){showError("Duration is required for a timed event.");return Optional.empty();}
+            int minutes=60;
+            if(!ad)try{time=timing.commitTime();minutes=timing.durationMinutes();}catch(IllegalArgumentException ex){showError(ex.getMessage());return Optional.empty();}
             LocalDateTime starts=ad?startDate.getValue().atStartOfDay():startDate.getValue().atTime(time);
-            LocalDateTime ends=ad?(endDate.getValue()==null?null:endDate.getValue().atStartOfDay()):(endDate.getValue()==null?startDate.getValue():endDate.getValue()).atTime(time).plusMinutes(minutes);
+            LocalDateTime ends=ad?(endDate.getValue()==null?null:endDate.getValue().atStartOfDay()):TimeDurationInput.calculateEnd(startDate.getValue(),endDate.getValue(),time,minutes);
             if(selectedCase==null){ if(selected.sourceKind()!=SourceKind.GENERAL_EVENT){showError("Select a General Event type.");return Optional.empty();}
                 return Optional.of(new SaveRequest(SourceKind.GENERAL_EVENT,new GeneralEventInput(selected.authoritativeTypeId(),normalized,starts,ends,ad,notes.getText()),null)); }
             if(selected.sourceKind()!=SourceKind.CASE_EVENT){showError("Select a Case Event type.");return Optional.empty();}
@@ -293,7 +294,6 @@ public final class NewEventWizard {
         private void setBusy(boolean busy){save.setDisable(busy);cancel.setDisable(busy);title.setDisable(busy);type.setDisable(busy);caseField.setDisable(busy);startDate.setDisable(busy);endDate.setDisable(busy);allDay.setDisable(busy||(selectedType!=null&&!selectedType.supportsTime()));updateTimedControls();notes.setDisable(busy);}
         private void showError(String message){error.setText(message);error.setVisible(true);error.setManaged(true);}
         private static void add(GridPane grid,int row,String text,Node node){Label label=new Label(text);label.setLabelFor(node);label.setMinWidth(Region.USE_PREF_SIZE);grid.add(label,0,row);grid.add(node,1,row);GridPane.setHgrow(node,Priority.ALWAYS);}
-        private static LocalTime parse(String value){if(value==null||value.isBlank())throw new IllegalArgumentException("Start Time is required for a timed event.");try{return LocalTime.parse(value.strip(),TIME);}catch(DateTimeParseException ex){throw new IllegalArgumentException("Start Time must be valid, such as 9:30.");}}
         private static void hide(Node n){n.setVisible(false);n.setManaged(false);}
 
         Stage stageForTest(){return stage;}
@@ -308,8 +308,9 @@ public final class NewEventWizard {
         Optional<SaveRequest> readForTest(){return read();}
         TextField titleForTest(){return title;}
         DatePicker startDateForTest(){return startDate;}
-        TextField startTimeForTest(){return startTime;}
-        ComboBox<Integer> durationForTest(){return duration;}
+        ComboBox<String> startTimeForTest(){return timing.startTimeControl();}
+        ComboBox<Integer> durationHoursForTest(){return timing.hoursControl();}
+        ComboBox<Integer> durationMinutesForTest(){return timing.minutesControl();}
         CheckBox allDayForTest(){return allDay;}
         TextArea notesForTest(){return notes;}
         int caseGenerationForTest(){return caseGeneration;}

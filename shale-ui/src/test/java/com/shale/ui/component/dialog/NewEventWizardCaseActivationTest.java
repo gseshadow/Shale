@@ -38,8 +38,9 @@ final class NewEventWizardCaseActivationTest {
         JavaFxTestSupport.runAndWait(() -> {
             handle.titleForTest().setText("Retained title");
             handle.startDateForTest().setValue(LocalDate.of(2026, 8, 21));
-            handle.startTimeForTest().setText("13:15");
-            handle.durationForTest().setValue(90);
+            handle.startTimeForTest().getEditor().setText("13:15");
+            handle.durationHoursForTest().setValue(1);
+            handle.durationMinutesForTest().setValue(30);
             handle.allDayForTest().setSelected(false);
             handle.notesForTest().setText("Retained notes");
             handle.typeForTest().setValue(generalChoice());
@@ -56,8 +57,9 @@ final class NewEventWizardCaseActivationTest {
             assertEquals(List.of(21), handle.typeForTest().getItems().stream().map(NewEventWizard.TypeChoice::authoritativeTypeId).toList());
             assertEquals("Retained title", handle.titleForTest().getText());
             assertEquals(LocalDate.of(2026, 8, 21), handle.startDateForTest().getValue());
-            assertEquals("13:15", handle.startTimeForTest().getText());
-            assertEquals(90, handle.durationForTest().getValue());
+            assertEquals("13:15", handle.startTimeForTest().getEditor().getText());
+            assertEquals(1, handle.durationHoursForTest().getValue());
+            assertEquals(30, handle.durationMinutesForTest().getValue());
             assertFalse(handle.allDayForTest().isSelected());
             assertEquals("Retained notes", handle.notesForTest().getText());
         });

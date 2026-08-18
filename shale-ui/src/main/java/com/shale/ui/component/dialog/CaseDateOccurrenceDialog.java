@@ -3,13 +3,11 @@ package com.shale.ui.component.dialog;
 import com.shale.core.dto.CaseDateDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.ui.component.ColorCodedComboBox;
+import com.shale.ui.component.TimeDurationInput;
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ControlStyles;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -35,7 +33,6 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 
 public final class CaseDateOccurrenceDialog {
-    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("H:mm");
     private CaseDateOccurrenceDialog() {}
 
     public record Input(int caseDateTypeId, String title, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes) {
@@ -65,25 +62,30 @@ public final class CaseDateOccurrenceDialog {
         TextField occurrenceTitle = createTitleField(existing);
         DatePicker startDate = new DatePicker(existing == null || existing.startsAt() == null ? LocalDate.now() : existing.startsAt().toLocalDate());
         DatePicker endDate = new DatePicker(existing == null || existing.endsAt() == null ? null : existing.endsAt().toLocalDate());
-        TextField startTime = new TextField(existing == null || existing.startsAt() == null || existing.allDay() ? "" : existing.startsAt().toLocalTime().format(TIME_FORMAT));
-        TextField endTime = new TextField(existing == null || existing.endsAt() == null || existing.allDay() ? "" : existing.endsAt().toLocalTime().format(TIME_FORMAT));
+        TimeDurationInput timing = new TimeDurationInput();
+        if (existing != null && !existing.allDay()) {
+            TimeDurationInput.TimedValue value = TimeDurationInput.fromTimestamps(existing.startsAt(), existing.endsAt());
+            timing.setTimedValue(value.startTime(), value.durationMinutes());
+        }
         CheckBox allDay = new CheckBox("All day"); allDay.setSelected(existing == null || existing.allDay());
         TextArea notes = new TextArea(existing == null ? "" : safe(existing.notes())); notes.setPrefRowCount(4); notes.setWrapText(true);
-        ControlStyles.formControl(occurrenceTitle); ControlStyles.formControl(startDate); ControlStyles.formControl(endDate); ControlStyles.formControl(startTime); ControlStyles.formControl(endTime); ControlStyles.formControl(notes);
+        ControlStyles.formControl(occurrenceTitle); ControlStyles.formControl(startDate); ControlStyles.formControl(endDate); ControlStyles.formControl(notes);
         Label error = new Label(); error.getStyleClass().add("form-validation-message"); error.setWrapText(true); error.setVisible(false); error.setManaged(false);
         Button save = ActionButtonFactory.semantic("Save", e -> {}, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
         Button cancel = ActionButtonFactory.semantic("Cancel", e -> { if (!submitting.get()) stage.close(); }, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
         Button reload = ActionButtonFactory.semantic("Reload", e -> { if (onReload != null) onReload.run(); stage.close(); }, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
         reload.setVisible(false); reload.setManaged(false);
+        boolean[] forcingAllDay = {false}; boolean[] allDayBeforeForce = {allDay.isSelected()};
         Runnable syncTimeControls = () -> {
             TypeChoice selected = typeBox.getValue(); boolean supports = selected == null || selected.supportsTime();
-            if (!supports) allDay.setSelected(true);
+            if (!supports && !forcingAllDay[0]) { allDayBeforeForce[0]=allDay.isSelected(); forcingAllDay[0]=true; allDay.setSelected(true); }
+            else if (supports && forcingAllDay[0]) { forcingAllDay[0]=false; allDay.setSelected(allDayBeforeForce[0]); }
             allDay.setDisable(!supports); boolean timed = supports && !allDay.isSelected();
-            startTime.setDisable(!timed); endTime.setDisable(!timed);
+            timing.setTimedControlsDisabled(!timed);
         };
         typeBox.valueProperty().addListener((o,a,b) -> syncTimeControls.run()); allDay.selectedProperty().addListener((o,a,b) -> syncTimeControls.run()); syncTimeControls.run();
         save.setOnAction(e -> {
-            Optional<Input> input = read(typeBox.getValue(), occurrenceTitle, startDate, startTime, endDate, endTime, allDay, notes, error);
+            Optional<Input> input = read(typeBox.getValue(), occurrenceTitle, startDate, timing, endDate, allDay, notes, error, existing);
             if (input.isEmpty() || submitting.getAndSet(true)) return;
             save.setDisable(true); cancel.setDisable(true); typeBox.setDisable(true);
             CompletionStage<String> result;
@@ -98,7 +100,7 @@ public final class CaseDateOccurrenceDialog {
             }));
         });
         stage.getScene();
-        GridPane grid = createEditorGrid(typeBox,occurrenceTitle,startDate,startTime,endDate,endTime,allDay,notes);
+        GridPane grid = createEditorGrid(typeBox,occurrenceTitle,startDate,timing,endDate,allDay,notes);
         HBox footer = new HBox(8, reload, cancel, save); footer.setAlignment(Pos.CENTER_RIGHT);
         VBox body = new VBox(12, grid, error, footer); body.setPadding(new Insets(16));
         Scene scene = new Scene(AppDialogs.createSecondaryWindowShell(stage, title, () -> { if (!submitting.get()) stage.close(); }, body));
@@ -107,17 +109,32 @@ public final class CaseDateOccurrenceDialog {
     }
     private static Label addRow(GridPane g,int r,String label,Node n){ Label l=new Label(label); l.setLabelFor(n); g.add(l,0,r); g.add(n,1,r); GridPane.setHgrow(n, Priority.ALWAYS); return l; }
     static TextField createTitleField(CaseDateDto existing){ TextField field=new TextField(existing==null?"":safe(existing.title())); field.setId("case-date-occurrence-title"); field.setAccessibleText("Case date occurrence title"); field.setPromptText("Optional occurrence title"); return field; }
-    static GridPane createEditorGrid(Node type,TextField title,Node startDate,Node startTime,Node endDate,Node endTime,Node allDay,Node notes){ GridPane grid=new GridPane(); grid.setHgap(10); grid.setVgap(8); addRow(grid,0,"Date type",type); Label titleLabel=addRow(grid,1,"Title",title); titleLabel.setId("case-date-occurrence-title-label"); addRow(grid,2,"Start date",startDate); addRow(grid,3,"Start time",startTime); addRow(grid,4,"End date",endDate); addRow(grid,5,"End time",endTime); addRow(grid,6,"",allDay); addRow(grid,7,"Notes",notes); return grid; }
-    private static Optional<Input> read(TypeChoice t, TextField title, DatePicker sd, TextField st, DatePicker ed, TextField et, CheckBox ad, TextArea notes, Label error){
+    static GridPane createEditorGrid(Node type,TextField title,Node startDate,Node timing,Node endDate,Node allDay,Node notes){ GridPane grid=new GridPane(); grid.setHgap(10); grid.setVgap(8); addRow(grid,0,"Date type",type); Label titleLabel=addRow(grid,1,"Title",title); titleLabel.setId("case-date-occurrence-title-label"); addRow(grid,2,"Start date",startDate); addRow(grid,3,"Time and duration",timing); addRow(grid,4,"End date",endDate); addRow(grid,5,"",allDay); addRow(grid,6,"Notes",notes); return grid; }
+    private static Optional<Input> read(TypeChoice t, TextField title, DatePicker sd, TimeDurationInput timing, DatePicker ed, CheckBox ad, TextArea notes, Label error, CaseDateDto existing){
         if(title.getText()!=null && title.getText().trim().length()>255){showError(error,"Title must be 255 characters or fewer.");return Optional.empty();}
         if(t==null){showError(error,"Choose a date type.");return Optional.empty();} if(sd.getValue()==null){showError(error,"Start date is required.");return Optional.empty();}
-        boolean allDay=ad.isSelected(); LocalDateTime start; LocalDateTime end=null;
-        try { start = allDay ? sd.getValue().atStartOfDay() : LocalDateTime.of(sd.getValue(), parseTime(st.getText(), "Start time", error)); } catch (IllegalArgumentException ex){return Optional.empty();}
-        if(ed.getValue()!=null || !blank(et.getText())) { if(ed.getValue()==null){showError(error,"End date is required when an end time is entered.");return Optional.empty();} try { end = allDay ? ed.getValue().atStartOfDay() : LocalDateTime.of(ed.getValue(), parseTime(et.getText(), "End time", error)); } catch (IllegalArgumentException ex){return Optional.empty();} }
+        if(ed.getValue()!=null && ed.getValue().isBefore(sd.getValue())){showError(error,"End date must not be before Start date.");return Optional.empty();}
+        boolean allDay=ad.isSelected(); LocalDateTime start; LocalDateTime end;
+        try {
+            if (allDay) { start=sd.getValue().atStartOfDay(); end=ed.getValue()==null?null:ed.getValue().atStartOfDay(); }
+            else { var time=timing.commitTime(); int duration=timing.durationMinutes(); start=LocalDateTime.of(sd.getValue(),time); end=TimeDurationInput.calculateEnd(sd.getValue(),ed.getValue(),time,duration); }
+        } catch (IllegalArgumentException ex){showError(error,ex.getMessage());return Optional.empty();}
         if(end!=null && end.isBefore(start)){showError(error,"End must not be before start.");return Optional.empty();}
+        if (unchangedTimestamps(existing, sd.getValue(), ed.getValue(), allDay, timing, start)) {
+            start=existing.startsAt(); end=existing.endsAt();
+        }
         error.setVisible(false); error.setManaged(false); return Optional.of(new Input(t.id(), normalizeTitle(title.getText()), start, end, allDay, notes.getText()));
     }
-    private static LocalTime parseTime(String value, String label, Label error){ if(blank(value)){showError(error,label+" is required for timed dates."); throw new IllegalArgumentException();} try{return LocalTime.parse(value.trim(), TIME_FORMAT);} catch(DateTimeParseException ex){showError(error,label+" must be a valid time such as 9:30."); throw new IllegalArgumentException();}}
+    private static boolean unchangedTimestamps(CaseDateDto existing, LocalDate startDate, LocalDate endDate,
+            boolean allDay, TimeDurationInput timing, LocalDateTime parsedStart) {
+        if (existing==null || existing.startsAt()==null || existing.allDay()!=allDay
+                || !existing.startsAt().toLocalDate().equals(startDate)
+                || !Objects.equals(existing.endsAt()==null?null:existing.endsAt().toLocalDate(),endDate)) return false;
+        if (allDay) return true;
+        TimeDurationInput.TimedValue original=TimeDurationInput.fromTimestamps(existing.startsAt(),existing.endsAt());
+        return parsedStart.toLocalTime().equals(original.startTime())
+                && timing.durationMinutes()==original.durationMinutes();
+    }
     private static void showError(Label l,String m){ l.setText(m); l.setVisible(true); l.setManaged(true); }
     static String normalizeTitle(String value){ if(value==null)return null; String normalized=value.trim(); return normalized.isEmpty()?null:normalized; }
     private static boolean blank(String s){ return s==null||s.isBlank(); } private static String safe(String s){return s==null?"":s;}

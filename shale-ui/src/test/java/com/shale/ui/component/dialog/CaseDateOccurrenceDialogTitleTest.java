@@ -2,6 +2,7 @@ package com.shale.ui.component.dialog;
 
 import static org.junit.jupiter.api.Assertions.*;
 import com.shale.core.dto.CaseDateDto;
+import com.shale.ui.component.TimeDurationInput;
 import com.shale.ui.testutil.JavaFxTestSupport;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -12,15 +13,15 @@ class CaseDateOccurrenceDialogTitleTest {
     @Test void productionEditorRendersVisibleAssociatedTitleAndPreservesExistingFields() {
         JavaFxTestSupport.runAndWait(() -> {
             TextField title=CaseDateOccurrenceDialog.createTitleField(date("Scheduling conference"));
-            ComboBox<String> type=new ComboBox<>(); DatePicker start=new DatePicker(); TextField startTime=new TextField();
-            DatePicker end=new DatePicker(); TextField endTime=new TextField(); CheckBox allDay=new CheckBox(); TextArea notes=new TextArea();
-            GridPane grid=CaseDateOccurrenceDialog.createEditorGrid(type,title,start,startTime,end,endTime,allDay,notes);
+            ComboBox<String> type=new ComboBox<>(); DatePicker start=new DatePicker(); TimeDurationInput timing=new TimeDurationInput();
+            DatePicker end=new DatePicker(); CheckBox allDay=new CheckBox(); TextArea notes=new TextArea();
+            GridPane grid=CaseDateOccurrenceDialog.createEditorGrid(type,title,start,timing,end,allDay,notes);
             Scene scene=new Scene(grid); grid.applyCss(); grid.layout();
             Label label=(Label)scene.lookup("#case-date-occurrence-title-label");
             assertAll(() -> assertNotNull(label), () -> assertEquals("Title",label.getText()),
                     () -> assertTrue(label.isVisible()), () -> assertSame(title,label.getLabelFor()),
                     () -> assertEquals("Scheduling conference",title.getText()),
-                    () -> assertTrue(grid.getChildren().containsAll(java.util.List.of(type,start,startTime,end,endTime,allDay,notes))));
+                    () -> assertTrue(grid.getChildren().containsAll(java.util.List.of(type,start,timing,end,allDay,notes))));
         });
     }
 
