@@ -9,10 +9,12 @@ import org.junit.jupiter.api.Test;
 
 final class CaseCalendarLinkSchemaRetirementMigrationTest {
     private static String sql;
+    private static String compactSql;
     private static String foundation;
 
     @BeforeAll static void load() throws Exception {
         sql = normalize(Files.readString(Path.of("../docs/sql/2026-08-18_retire_calendar_case_date_link_schema.sql")));
+        compactSql = sql.replaceAll("\\s+", " ");
         foundation = normalize(Files.readString(Path.of("../docs/sql/2026-08-11_case_date_calendar_link_foundation_step1.sql")));
     }
 
@@ -23,7 +25,13 @@ final class CaseCalendarLinkSchemaRetirementMigrationTest {
                 () -> assertTrue(sql.contains("IF @Present=0 BEGIN")),
                 () -> assertTrue(sql.contains("COMMIT TRANSACTION;\n    RETURN;")),
                 () -> assertTrue(sql.contains("column shape is incomplete or incompatible")),
-                () -> assertTrue(sql.contains("missing, renamed, disabled, untrusted, cascading, or unexpected")));
+                () -> assertTrue(compactSql.contains("(SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id=@MappingId)<>5")),
+                () -> assertTrue(compactSql.contains("fk.is_disabled=1 OR fk.is_not_trusted=1")),
+                () -> assertTrue(compactSql.contains("(SELECT COUNT(*) FROM sys.indexes WHERE object_id=@MappingId AND index_id>0)<>3")),
+                () -> assertTrue(compactSql.contains("(SELECT COUNT(*) FROM sys.default_constraints WHERE parent_object_id=@MappingId)<>4")),
+                () -> assertTrue(compactSql.contains("(SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id=@MappingId)<>1")),
+                () -> assertTrue(compactSql.contains("FROM sys.sql_expression_dependencies d WHERE d.referenced_id=OBJECT_ID(N'dbo.CalendarEvents') AND d.referenced_minor_id=@LinkColumnId")),
+                () -> assertTrue(compactSql.contains("AND NOT (d.referencing_id=OBJECT_ID(N'dbo.CalendarEvents') AND d.referencing_minor_id=@LinkIndexId)")));
     }
 
     @Test void requiresAdministrativeAllTenantVisibilityAndLocksBothWriteSurfaces() {
@@ -73,7 +81,7 @@ final class CaseCalendarLinkSchemaRetirementMigrationTest {
         assertTrue(rls < trigger && trigger < mappingFks && mappingFks < mappingIndexes
                 && mappingIndexes < mappingTable && mappingTable < linkFk && linkFk < linkIndexes && linkIndexes < linkColumn);
         assertAll(
-                () -> assertTrue(sql.contains("sys.indexes i JOIN sys.index_columns ic")),
+                () -> assertTrue(sql.matches("(?is).*FROM\\s+sys\\.indexes\\s+i.*?FROM\\s+sys\\.index_columns\\s+ic\\s+WHERE\\s+ic\\.object_id\\s*=\\s*i\\.object_id\\s+AND\\s+ic\\.index_id\\s*=\\s*i\\.index_id.*")),
                 () -> assertTrue(sql.contains("referencing_minor_id=@LinkIndexId")),
                 () -> assertTrue(sql.contains("index id (13 in the inventory)")),
                 () -> assertTrue(sql.contains("Exactly one CalendarEvents index may involve CaseDateId")),
