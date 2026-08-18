@@ -4,6 +4,8 @@ import com.shale.core.dto.CaseDateDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.ui.component.ColorCodedComboBox;
 import com.shale.ui.component.TimeDurationInput;
+import com.shale.ui.component.factory.CaseCardFactory;
+import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ControlStyles;
 import java.time.LocalDate;
@@ -40,6 +42,7 @@ public final class CaseDateOccurrenceDialog {
     }
 
     public static void show(Window owner, String title, List<EffectiveCaseDateTypeDto> selectableTypes, CaseDateDto existing,
+            CaseCardModel associatedCase,
             Function<Input, ? extends CompletionStage<String>> onSave, Runnable onReload) {
         Stage stage = AppDialogs.createModalStage(owner, title);
         AtomicBoolean submitting = new AtomicBoolean(false);
@@ -102,10 +105,26 @@ public final class CaseDateOccurrenceDialog {
         stage.getScene();
         GridPane grid = createEditorGrid(typeBox,occurrenceTitle,startDate,timing,endDate,allDay,notes);
         HBox footer = new HBox(8, reload, cancel, save); footer.setAlignment(Pos.CENTER_RIGHT);
-        VBox body = new VBox(12, grid, error, footer); body.setPadding(new Insets(16));
+        VBox caseSection = createCaseSection(associatedCase);
+        VBox body = new VBox(12, caseSection, grid, error, footer); body.setPadding(new Insets(16));
         Scene scene = new Scene(AppDialogs.createSecondaryWindowShell(stage, title, () -> { if (!submitting.get()) stage.close(); }, body));
         scene.getStylesheets().add(Objects.requireNonNull(CaseDateOccurrenceDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene); stage.showAndWait();
+    }
+    static VBox createCaseSection(CaseCardModel associatedCase) {
+        if (associatedCase == null || associatedCase.id() <= 0) throw new IllegalArgumentException("Associated Case is required.");
+        Label label = new Label("Case");
+        label.setId("case-date-associated-case-label");
+        label.getStyleClass().add("section-title");
+        Node card = new CaseCardFactory(id -> {}).create(associatedCase, CaseCardFactory.Variant.MINI);
+        card.setId("case-date-associated-case-card");
+        card.setAccessibleText("Associated Case");
+        card.setFocusTraversable(false);
+        card.setMouseTransparent(true);
+        label.setLabelFor(card);
+        VBox section = new VBox(6, label, card);
+        section.setFillWidth(true);
+        return section;
     }
     private static Label addRow(GridPane g,int r,String label,Node n){ Label l=new Label(label); l.setLabelFor(n); g.add(l,0,r); g.add(n,1,r); GridPane.setHgrow(n, Priority.ALWAYS); return l; }
     static TextField createTitleField(CaseDateDto existing){ TextField field=new TextField(existing==null?"":safe(existing.title())); field.setId("case-date-occurrence-title"); field.setAccessibleText("Case date occurrence title"); field.setPromptText("Optional occurrence title"); return field; }
