@@ -27,6 +27,13 @@ Date Calendar projection, and the deployed audit `EntityType` constraint remain.
 retirement requires a later, separate migration. Until execution is explicitly confirmed, the
 production schema remains recorded as deployed below.
 
+Direct production `sys.foreign_key_columns` rows confirm that
+`FK_CalendarEvents_CaseDate_Tenant` is the enabled, trusted, non-cascading two-column foreign key
+from `dbo.CalendarEvents` to `dbo.CaseDates`, ordered as
+`ShaleClientId → ShaleClientId` and `CaseDateId → Id`. This direct two-row evidence supersedes an
+earlier incomplete aggregate inventory result that appeared to contain only the second pair; the
+retirement migration validates the complete ordered pair set before dropping the FK.
+
 All runtime Calendar Event ↔ Case Date synchronization is retired. Authoritative Case Date create,
 update, soft-delete, and restore transactions mutate and audit only `CaseDates`; authoritative
 Calendar Event create, update/cancel, and hard-delete transactions mutate and audit only
@@ -185,8 +192,9 @@ existing calendar lifecycle marker. Calendar had no optimistic token, so this fo
 
 ### Link and cardinality
 
-The nullable `CalendarEvents.CaseDateId` is the sole authoritative link. A composite foreign key
-to `(CaseDates.ShaleClientId, CaseDates.Id)` enforces tenant equality and a filtered unique index
+The nullable `CalendarEvents.CaseDateId` is the sole authoritative link. The directly verified
+composite foreign key maps `(CalendarEvents.ShaleClientId, CalendarEvents.CaseDateId)` in order to
+`(CaseDates.ShaleClientId, CaseDates.Id)`, enforcing tenant equality, and a filtered unique index
 permits at most one Calendar event for a Case Date. Both sides may remain unlinked. There is no
 circular or cascading FK and no historical rows are paired. A missing or hard-deleted Calendar
 event leaves the Case Date intact; a Case Date cannot be hard-deleted while referenced. Soft delete

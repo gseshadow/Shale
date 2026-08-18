@@ -112,8 +112,8 @@ BEGIN TRY
 
   /* Verify link dependency through index metadata (index id 13 is not CalendarEvents.SourceId column id 13). */
   IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys fk WHERE fk.object_id=OBJECT_ID(N'dbo.FK_CalendarEvents_CaseDate_Tenant') AND fk.parent_object_id=OBJECT_ID(N'dbo.CalendarEvents') AND OBJECT_SCHEMA_NAME(fk.parent_object_id) COLLATE DATABASE_DEFAULT=N'dbo' AND fk.referenced_object_id=OBJECT_ID(N'dbo.CaseDates') AND OBJECT_SCHEMA_NAME(fk.referenced_object_id) COLLATE DATABASE_DEFAULT=N'dbo' AND fk.is_disabled=0 AND fk.is_not_trusted=0 AND fk.delete_referential_action=0 AND fk.update_referential_action=0
-    AND (SELECT COUNT(*) FROM sys.foreign_key_columns WHERE constraint_object_id=fk.object_id)=1
-    AND (SELECT STRING_AGG((pc.name COLLATE DATABASE_DEFAULT)+N'>'+(rc.name COLLATE DATABASE_DEFAULT),N',') WITHIN GROUP(ORDER BY fkc.constraint_column_id) FROM sys.foreign_key_columns fkc JOIN sys.columns pc ON pc.object_id=fkc.parent_object_id AND pc.column_id=fkc.parent_column_id JOIN sys.columns rc ON rc.object_id=fkc.referenced_object_id AND rc.column_id=fkc.referenced_column_id WHERE fkc.constraint_object_id=fk.object_id)=N'CaseDateId>Id')
+    AND (SELECT COUNT(*) FROM sys.foreign_key_columns WHERE constraint_object_id=fk.object_id)=2
+    AND (SELECT STRING_AGG((pc.name COLLATE DATABASE_DEFAULT)+N'>'+(rc.name COLLATE DATABASE_DEFAULT),N',') WITHIN GROUP(ORDER BY fkc.constraint_column_id) FROM sys.foreign_key_columns fkc JOIN sys.columns pc ON pc.object_id=fkc.parent_object_id AND pc.column_id=fkc.parent_column_id JOIN sys.columns rc ON rc.object_id=fkc.referenced_object_id AND rc.column_id=fkc.referenced_column_id WHERE fkc.constraint_object_id=fk.object_id)=N'ShaleClientId>ShaleClientId,CaseDateId>Id')
     THROW 57116, 'CalendarEvents to CaseDates foreign key is missing, disabled, untrusted, or incompatible.', 1;
   IF (SELECT COUNT(*) FROM sys.foreign_key_columns WHERE parent_object_id=OBJECT_ID(N'dbo.CalendarEvents') AND parent_column_id=@LinkColumnId)<>1
     THROW 57116, 'CalendarEvents.CaseDateId has an unexpected foreign key dependency.', 1;
