@@ -444,7 +444,7 @@ public final class CalendarController {
                     var input=request.general(); LocalDateTime startsAt=input.allDay()?input.date().atStartOfDay():input.date().atTime(input.startTime()); LocalDateTime endsAt=input.allDay()?null:startsAt.plusMinutes(input.durationMinutes());
                     calendarService.createEvent(new com.shale.core.model.CalendarEvent(null,tenantId,input.calendarEventTypeId(),input.caseId(),null,input.title(),input.description(),startsAt,endsAt,input.allDay(),"MANUAL",null,null,input.assignedToUserId(),false,false,actorId,null,null));
                 } else {
-                    var input=request.caseDate();caseService.createCaseDate(new CreateCaseDateCommand(tenantId,actorId,input.caseId(),input.caseDateTypeId(),input.startsAt(),input.endsAt(),input.allDay(),input.notes()));
+                    var input=request.caseDate();caseService.createCaseDate(new CreateCaseDateCommand(tenantId,actorId,input.caseId(),input.caseDateTypeId(),null,input.startsAt(),input.endsAt(),input.allDay(),input.notes()));
                     if(runtimeBridge!=null)runtimeBridge.publishCaseDatesChanged(input.caseId(),tenantId,actorId,LiveUpdateEvents.CHANGE_CREATED);
                 }
                 Platform.runLater(()->{showError(null);loadCurrentRange(false);});return null;
