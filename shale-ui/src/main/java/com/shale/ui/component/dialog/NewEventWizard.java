@@ -14,6 +14,7 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
@@ -82,6 +83,8 @@ public final class NewEventWizard {
         private final List<TypeChoice> loadedTypes = new ArrayList<>();
         private final List<NewCalendarEventDialog.CaseOption> loadedCases = new ArrayList<>();
         private NewCalendarEventDialog.CaseOption selectedCase;
+        private TypeChoice selectedType;
+        private boolean updatingTypeControl;
 
         private final TextField title = new TextField();
         private final VBox caseField = new VBox(7);
@@ -141,8 +144,16 @@ public final class NewEventWizard {
         private void configureControls(){
             title.setPromptText("Event title"); title.setAccessibleText("Title");
             type.setPromptText("Search and select a type"); type.setAccessibleText("Type"); type.setEditable(true);
-            type.getEditor().textProperty().addListener((o,a,b)-> { if(type.isShowing()) filterTypes(b); });
-            type.valueProperty().addListener((o,a,b)-> updateTimeAuthority());
+            type.getEditor().textProperty().addListener((o,a,b)-> { if(type.isShowing()&&!updatingTypeControl) filterTypes(b); });
+            type.getSelectionModel().selectedItemProperty().addListener((o,a,b)-> { if(!updatingTypeControl&&b!=null) commitType(b); });
+            type.setOnAction(e->{ TypeChoice choice=type.getSelectionModel().getSelectedItem(); if(choice!=null)commitType(choice); });
+            type.setOnShowing(e->showAllAuthorityTypes());
+            type.addEventFilter(KeyEvent.KEY_PRESSED,e->{
+                if((e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE)&&type.isShowing()){
+                    TypeChoice choice=type.getSelectionModel().getSelectedItem();
+                    if(choice!=null){commitType(choice);e.consume();}
+                }
+            });
             duration.getItems().setAll(15,30,45,60,90,120,180,240); duration.setValue(60);
             allDay.setAccessibleText("All Day"); notes.setPrefRowCount(4); notes.setWrapText(true);
             for(Control c:List.of(title,type,startDate,endDate,startTime,duration,allDay,notes,caseSearch)) ControlStyles.formControl(c);
@@ -210,14 +221,33 @@ public final class NewEventWizard {
         private void refreshCaseFilter(){ String q=safe(caseSearch.getText()).strip().toLowerCase(Locale.ROOT); caseList.setItems(FXCollections.observableArrayList(
                 loadedCases.stream().filter(c->q.isEmpty()||safe(c.displayName()).toLowerCase(Locale.ROOT).contains(q)||safe(c.responsibleAttorney()).toLowerCase(Locale.ROOT).contains(q)).toList()));
             caseList.setPlaceholder(new Label(loadedCases.isEmpty()?"No active cases are available.":"No cases match this search.")); }
-        private void refreshTypes(){ TypeChoice old=type.getValue(); SourceKind authority=selectedCase==null?SourceKind.GENERAL_EVENT:SourceKind.CASE_EVENT;
-            List<TypeChoice> available=loadedTypes.stream().filter(t->t.sourceKind()==authority).toList(); type.getItems().setAll(available);
-            if(old==null||old.sourceKind()!=authority||available.stream().noneMatch(t->t.sourceKind()==old.sourceKind()&&t.authoritativeTypeId()==old.authoritativeTypeId())) type.setValue(null);
+        private void refreshTypes(){ SourceKind authority=selectedCase==null?SourceKind.GENERAL_EVENT:SourceKind.CASE_EVENT;
+            List<TypeChoice> available=authorityTypes();
+            if(selectedType!=null&&(selectedType.sourceKind()!=authority||available.stream().noneMatch(t->sameType(t,selectedType)))) selectedType=null;
+            replaceDisplayedTypes(available);
             updateTimeAuthority(); }
         private void filterTypes(String query){ SourceKind authority=selectedCase==null?SourceKind.GENERAL_EVENT:SourceKind.CASE_EVENT; String q=safe(query).strip().toLowerCase(Locale.ROOT);
-            type.setItems(FXCollections.observableArrayList(loadedTypes.stream().filter(t->t.sourceKind()==authority&&(q.isEmpty()||safe(t.name()).toLowerCase(Locale.ROOT).contains(q))).toList())); }
-        private void updateTimeAuthority(){ TypeChoice t=type.getValue(); boolean forced=t!=null&&!t.supportsTime(); allDay.setDisable(forced); if(forced)allDay.setSelected(true); updateTimedControls(); }
-        private void updateTimedControls(){ boolean disabled=allDay.isSelected()||(type.getValue()!=null&&!type.getValue().supportsTime()); startTime.setDisable(disabled);duration.setDisable(disabled); }
+            replaceDisplayedTypes(loadedTypes.stream().filter(t->t.sourceKind()==authority&&(q.isEmpty()||safe(t.name()).toLowerCase(Locale.ROOT).contains(q))).toList(),query); }
+        private List<TypeChoice> authorityTypes(){ SourceKind authority=selectedCase==null?SourceKind.GENERAL_EVENT:SourceKind.CASE_EVENT;
+            return loadedTypes.stream().filter(t->t.sourceKind()==authority).toList(); }
+        private void showAllAuthorityTypes(){ replaceDisplayedTypes(authorityTypes()); }
+        private void replaceDisplayedTypes(List<TypeChoice> displayed){replaceDisplayedTypes(displayed,selectedType==null?null:selectedType.name());}
+        private void replaceDisplayedTypes(List<TypeChoice> displayed,String editorText){ updatingTypeControl=true; try{
+            type.getItems().setAll(displayed);
+            type.setValue(selectedType);
+            if(editorText!=null)type.getEditor().setText(editorText);
+        }finally{updatingTypeControl=false;} }
+        private void commitType(TypeChoice choice){
+            TypeChoice authoritative=loadedTypes.stream().filter(t->sameType(t,choice)&&t.sourceKind()==(selectedCase==null?SourceKind.GENERAL_EVENT:SourceKind.CASE_EVENT)).findFirst().orElse(null);
+            if(authoritative==null)return;
+            selectedType=authoritative;
+            replaceDisplayedTypes(authorityTypes());
+            type.hide();
+            updateTimeAuthority();
+        }
+        private static boolean sameType(TypeChoice left,TypeChoice right){return left.sourceKind()==right.sourceKind()&&left.authoritativeTypeId()==right.authoritativeTypeId();}
+        private void updateTimeAuthority(){ TypeChoice t=selectedType; boolean forced=t!=null&&!t.supportsTime(); allDay.setDisable(forced); if(forced)allDay.setSelected(true); updateTimedControls(); }
+        private void updateTimedControls(){ boolean disabled=allDay.isSelected()||(selectedType!=null&&!selectedType.supportsTime()); startTime.setDisable(disabled);duration.setDisable(disabled); }
 
         private void submit(){ if(submitting.get())return; Optional<SaveRequest> request=read();if(request.isEmpty()||!submitting.compareAndSet(false,true))return;
             setBusy(true); CompletionStage<String> result; try{result=saver==null?CompletableFuture.completedFuture("Save is unavailable."):saver.apply(request.get());}
@@ -226,7 +256,7 @@ public final class NewEventWizard {
         private Optional<SaveRequest> read(){
             String normalized=safe(title.getText()).strip(); if(normalized.isBlank()){showError("Title is required.");return Optional.empty();}
             if(normalized.length()>TITLE_LIMIT){showError("Title must be 255 characters or fewer.");return Optional.empty();}
-            TypeChoice selected=type.getValue(); if(selected==null){showError("Type is required.");return Optional.empty();}
+            TypeChoice selected=selectedType; if(selected==null){showError("Type is required.");return Optional.empty();}
             if(startDate.getValue()==null){showError("Start Date is required.");return Optional.empty();}
             if(endDate.getValue()!=null&&endDate.getValue().isBefore(startDate.getValue())){showError("End Date must not be before Start Date.");return Optional.empty();}
             boolean ad=allDay.isSelected()||!selected.supportsTime(); LocalTime time=null;
@@ -239,7 +269,7 @@ public final class NewEventWizard {
             if(selected.sourceKind()!=SourceKind.CASE_EVENT){showError("Select a Case Event type.");return Optional.empty();}
             return Optional.of(new SaveRequest(SourceKind.CASE_EVENT,null,new CaseDateInput(selected.authoritativeTypeId(),selectedCase.caseId(),normalized,starts,ends,ad,notes.getText())));
         }
-        private void setBusy(boolean busy){save.setDisable(busy);cancel.setDisable(busy);title.setDisable(busy);type.setDisable(busy);caseField.setDisable(busy);startDate.setDisable(busy);endDate.setDisable(busy);allDay.setDisable(busy||(type.getValue()!=null&&!type.getValue().supportsTime()));updateTimedControls();notes.setDisable(busy);}
+        private void setBusy(boolean busy){save.setDisable(busy);cancel.setDisable(busy);title.setDisable(busy);type.setDisable(busy);caseField.setDisable(busy);startDate.setDisable(busy);endDate.setDisable(busy);allDay.setDisable(busy||(selectedType!=null&&!selectedType.supportsTime()));updateTimedControls();notes.setDisable(busy);}
         private void showError(String message){error.setText(message);error.setVisible(true);error.setManaged(true);}
         private static void add(GridPane grid,int row,String text,Node node){Label label=new Label(text);label.setLabelFor(node);label.setMinWidth(Region.USE_PREF_SIZE);grid.add(label,0,row);grid.add(node,1,row);GridPane.setHgrow(node,Priority.ALWAYS);}
         private static LocalTime parse(String value){if(value==null||value.isBlank())throw new IllegalArgumentException("Start Time is required for a timed event.");try{return LocalTime.parse(value.strip(),TIME);}catch(DateTimeParseException ex){throw new IllegalArgumentException("Start Time must be valid, such as 9:30.");}}
@@ -250,6 +280,10 @@ public final class NewEventWizard {
         VBox caseFieldForTest(){return caseField;}
         NewCalendarEventDialog.CaseOption selectedCaseForTest(){return selectedCase;}
         ColorCodedComboBox<TypeChoice> typeForTest(){return type;}
+        TypeChoice selectedTypeForTest(){return selectedType;}
+        void filterTypesForTest(String query){filterTypes(query);}
+        void showAllAuthorityTypesForTest(){showAllAuthorityTypes();}
+        Optional<SaveRequest> readForTest(){return read();}
         TextField titleForTest(){return title;}
         DatePicker startDateForTest(){return startDate;}
         TextField startTimeForTest(){return startTime;}
