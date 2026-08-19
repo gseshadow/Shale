@@ -17,7 +17,6 @@
     </padding>
 
     <children>
-        <Label text="New Intake" style="-fx-font-size: 18px; -fx-font-weight: bold;" />
         <Label fx:id="validationLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
 
         <ScrollPane fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">

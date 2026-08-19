@@ -75,6 +75,7 @@ public final class NewIntakeController {
 	private static final Gson GSON = new Gson();
 	private static final String DRAFTS_DIR = "drafts";
 	private static final String INTAKE_DRAFT_PREFIX = "new-intake";
+	private static final String ESTATE_CASE_NAME_PREFIX = "Estate of ";
 	private static final long PRACTICE_AREA_PREFLIGHT_TIMEOUT_SECONDS = 5;
 
 	@FXML private Label validationLabel;
@@ -246,6 +247,11 @@ public final class NewIntakeController {
 
 		clientFirstNameField.textProperty().addListener((obs, oldVal, newVal) -> autoGenerateCaseName());
 		clientLastNameField.textProperty().addListener((obs, oldVal, newVal) -> autoGenerateCaseName());
+		clientDeceasedCheckBox.selectedProperty().bindBidirectional(estateCaseCheckBox.selectedProperty());
+		estateCaseCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+			caseNameManuallyOverridden = false;
+			autoGenerateCaseName();
+		});
 
 		caseNameField.textProperty().addListener((obs, oldVal, newVal) -> {
 			if (!updatingCaseNameProgrammatically) {
@@ -587,25 +593,28 @@ public final class NewIntakeController {
 		if (caseNameManuallyOverridden) {
 			return;
 		}
-		String generated = buildCaseName(clientFirstNameField.getText(), clientLastNameField.getText());
+		String generated = buildCaseName(clientFirstNameField.getText(), clientLastNameField.getText(),
+				estateCaseCheckBox.isSelected());
 		updatingCaseNameProgrammatically = true;
 		caseNameField.setText(generated);
 		updatingCaseNameProgrammatically = false;
 	}
 
-	private String buildCaseName(String first, String last) {
+	static String buildCaseName(String first, String last, boolean estateCase) {
 		String cleanFirst = safeTrim(first);
 		String cleanLast = safeTrim(last);
 		if (cleanFirst.isEmpty() && cleanLast.isEmpty()) {
 			return "";
 		}
+		String normalName;
 		if (cleanLast.isEmpty()) {
-			return cleanFirst;
+			normalName = cleanFirst;
+		} else if (cleanFirst.isEmpty()) {
+			normalName = cleanLast;
+		} else {
+			normalName = cleanLast + ", " + cleanFirst;
 		}
-		if (cleanFirst.isEmpty()) {
-			return cleanLast;
-		}
-		return cleanLast + ", " + cleanFirst;
+		return estateCase ? ESTATE_CASE_NAME_PREFIX + normalName : normalName;
 	}
 
 	private void applyCallerMode(boolean callerIsClient) {
