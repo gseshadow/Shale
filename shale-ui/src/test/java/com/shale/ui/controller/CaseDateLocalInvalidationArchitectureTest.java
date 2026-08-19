@@ -7,7 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
-class CaseDateLocalSynchronizationArchitectureTest {
+class CaseDateLocalInvalidationArchitectureTest {
     private static final Path CONTROLLER = Path.of("src/main/java/com/shale/ui/controller/CaseController.java");
     private static final Path DIALOG = Path.of("src/main/java/com/shale/ui/component/dialog/CaseDateOccurrenceDialog.java");
 
@@ -23,8 +23,9 @@ class CaseDateLocalSynchronizationArchitectureTest {
 
     @Test void actualOverviewButtonsRouteToAggregateAndInitializeFromAuthoritativeSnapshot() throws Exception {
         String source = Files.readString(CONTROLLER);
-        String handlers = source.substring(source.indexOf("private void onEditIncidentDateField"),
-                source.indexOf("private void showTextFieldDialog"));
+        String handlers = method(source, "onEditIncidentDateField")
+                + method(source, "onEditDateOfMedicalNegligenceField")
+                + method(source, "onEditSolDateField");
         assertTrue(handlers.contains("authoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY)"));
         assertTrue(handlers.contains("saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY, value)"));
         assertTrue(handlers.contains("saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_MEDICAL_NEGLIGENCE, value)"));
@@ -38,10 +39,9 @@ class CaseDateLocalSynchronizationArchitectureTest {
 
     @Test void generalHydrationCannotOverwriteAnyFixedDateControl() throws Exception {
         String source = Files.readString(CONTROLLER);
-        String renderer = source.substring(source.indexOf("private final class CaseOverviewRenderer"),
-                source.indexOf("private final class CaseOverviewSaveCoordinator"));
+        String renderer = block(source, "private final class CaseOverviewRenderer");
         assertFalse(renderer.contains("getDateOfMedicalNegligence()"));
-        String details = source.substring(source.indexOf("private final class CaseDetailsEditor"));
+        String details = block(source, "private final class CaseDetailsEditor");
         for (String field : new String[] {"detCallerDateValue", "detDateOfMedicalNegligenceValue",
                 "detDateMedicalNegligenceWasDiscoveredValue", "detDateOfInjuryValue",
                 "detStatuteOfLimitationsValue", "detTortNoticeDeadlineValue", "detDiscoveryDeadlineValue",
@@ -57,29 +57,27 @@ class CaseDateLocalSynchronizationArchitectureTest {
         assertTrue(source.contains("caseDao.updateCaseDetailsNonMigrated("));
         assertFalse(source.contains("caseDao.updateCase("));
         assertFalse(source.contains("caseDao.updateCaseDetails("));
-        String detailsEditor = source.substring(source.indexOf("private final class CaseDetailsEditor"));
+        String detailsEditor = block(source, "private final class CaseDetailsEditor");
         assertFalse(detailsEditor.contains("LocalDate.now()"), "workflow flags must not fabricate fixed dates");
     }
 
-    @Test void fixedSuccessInvalidatesDatesWithoutIssuingAnotherMutation() throws Exception {
+    @Test void fixedSuccessRefreshesDatesWithoutIssuingAnotherMutation() throws Exception {
         String source = Files.readString(CONTROLLER);
-        String save = source.substring(source.indexOf("private void saveAuthoritativeDate"),
-                source.indexOf("private void refreshOverviewAndDetailsAfterStructuralPatchAsync"));
+        String save = method(source, "saveAuthoritativeValues");
         assertTrue(save.contains("compatibilityDates.replace(result)"));
-        assertTrue(save.contains("synchronizeCaseDatesAfterLocalMutation(activeCaseId, false)"));
+        assertTrue(save.contains("refreshCaseDateViewsAfterLocalMutation(activeCaseId, false)"));
         assertEquals(1, occurrences(save, "mutateMigratedCompatibilityDates(command)"));
         assertFalse(save.contains("loadMigratedCompatibilityDateSnapshot"));
     }
 
-    @Test void allGenericMutationsReloadACompleteSnapshotOnlyForMappedTypes() throws Exception {
+    @Test void genericMutationsReloadACompleteSnapshotOnlyForMappedTypes() throws Exception {
         String source = Files.readString(CONTROLLER);
         assertTrue(source.contains("compatibilityAffected = isMigratedCaseDateType(input.caseDateTypeId())"));
         assertTrue(source.contains("existing != null && isMigratedCaseDateSystemKey(existing.typeSystemKey())"));
         assertEquals(2, occurrences(source, "isMigratedCaseDateSystemKey(d.typeSystemKey())"), "remove and restore");
-        String sync = source.substring(source.indexOf("private void synchronizeCaseDatesAfterLocalMutation"),
-                source.indexOf("private void renderCompatibilityDates"));
-        assertTrue(sync.contains("loadCompatibilityDatesAsync(activeCaseId)"));
-        assertFalse(sync.contains("compatibilityDates.replace"), "generic mutations must not patch visible values/tokens");
+        String refresh = method(source, "refreshCaseDateViewsAfterLocalMutation");
+        assertTrue(refresh.contains("loadCompatibilityDatesAsync(activeCaseId)"));
+        assertFalse(refresh.contains("compatibilityDates.replace"), "generic mutations must not patch visible values/tokens");
     }
 
     @Test void serviceWorkIsOffFxAndResponsesHaveOrderingAndCaseGuards() throws Exception {
@@ -95,15 +93,57 @@ class CaseDateLocalSynchronizationArchitectureTest {
         assertTrue(source.contains("overviewScrollPane.getScene() != null"));
     }
 
-    @Test void synchronizationDoesNotUseLegacyWritersOrWorkflowFabrication() throws Exception {
+    @Test void localRefreshDoesNotUseLegacyWritersOrWorkflowFabrication() throws Exception {
         String source = Files.readString(CONTROLLER);
-        String syncRegion = source.substring(source.indexOf("private void synchronizeCaseDatesAfterLocalMutation"),
-                source.indexOf("private void refreshOverviewAndDetailsAfterStructuralPatchAsync"));
-        assertFalse(syncRegion.contains("updateCase("));
-        assertFalse(syncRegion.contains("updateCaseDetails("));
-        assertFalse(syncRegion.contains("LocalDate.now"));
-        assertFalse(syncRegion.contains("FeeAgreementSigned.setSelected"));
-        assertFalse(syncRegion.contains("NonEngagementLetterSent.setSelected"));
+        String refresh = method(source, "refreshCaseDateViewsAfterLocalMutation");
+        assertFalse(refresh.contains("updateCase("));
+        assertFalse(refresh.contains("updateCaseDetails("));
+        assertFalse(refresh.contains("LocalDate.now"));
+        assertFalse(refresh.contains("FeeAgreementSigned.setSelected"));
+        assertFalse(refresh.contains("NonEngagementLetterSent.setSelected"));
+    }
+
+    private static String method(String source, String name) {
+        return block(source, "private void " + name + "(");
+    }
+
+    private static String block(String source, String marker) {
+        int declaration = source.indexOf(marker);
+        assertTrue(declaration >= 0, "Missing declaration " + marker);
+        int open = source.indexOf('{', declaration);
+        assertTrue(open >= 0, "Missing body " + marker);
+        int depth = 0;
+        boolean quoted = false;
+        boolean characterLiteral = false;
+        boolean escaped = false;
+        boolean lineComment = false;
+        boolean blockComment = false;
+        for (int i = open; i < source.length(); i++) {
+            char character = source.charAt(i);
+            char next = i + 1 < source.length() ? source.charAt(i + 1) : '\0';
+            if (lineComment) {
+                if (character == '\n') lineComment = false;
+                continue;
+            }
+            if (blockComment) {
+                if (character == '*' && next == '/') { blockComment = false; i++; }
+                continue;
+            }
+            if (quoted || characterLiteral) {
+                if (escaped) escaped = false;
+                else if (character == '\\') escaped = true;
+                else if (quoted && character == '"') quoted = false;
+                else if (characterLiteral && character == '\'') characterLiteral = false;
+                continue;
+            }
+            if (character == '/' && next == '/') { lineComment = true; i++; continue; }
+            if (character == '/' && next == '*') { blockComment = true; i++; continue; }
+            if (character == '"') { quoted = true; continue; }
+            if (character == '\'') { characterLiteral = true; continue; }
+            if (character == '{') depth++;
+            else if (character == '}' && --depth == 0) return source.substring(open, i + 1);
+        }
+        return fail("Unclosed body " + marker);
     }
 
     private static int occurrences(String text, String needle) {
