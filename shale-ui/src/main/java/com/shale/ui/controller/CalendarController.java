@@ -21,6 +21,7 @@ import com.shale.ui.services.CalendarService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.ControlStyles;
@@ -70,6 +71,7 @@ public final class CalendarController {
     private static final PseudoClass HALF_HOUR_PSEUDO_CLASS = PseudoClass.getPseudoClass("half-hour");
     private static final CalendarCaseFilterOptions.CaseOption ALL_CASES_OPTION = CalendarCaseFilterOptions.ALL_CASES;
     private static final EventTypeFilterOption ALL_TYPES_OPTION = new EventTypeFilterOption("", "All types");
+    static final String CASE_DATES_LAYER_PREFERENCE = "calendar.layer.case_dates.visible";
 
     @FXML private ToggleButton weekViewButton;
     @FXML private ToggleButton fiveDayViewButton;
@@ -105,6 +107,8 @@ public final class CalendarController {
     private CaseSummaryDao caseSummaryDao;
     private CaseServicePort caseService;
     private UiRuntimeBridge runtimeBridge;
+    private UserPreferencesService userPreferencesService;
+    private boolean suppressLayerPreferenceWrite;
     private CaseDateOccurrenceEditorLauncher caseDateEditorLauncher;
     private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
     private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
@@ -134,14 +138,16 @@ public final class CalendarController {
     private TaskCardFactory taskCardFactory = new TaskCardFactory(id -> {}, id -> {}, id -> {}, id -> {});
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "calendar-feed-loader"); t.setDaemon(true); return t; });
 
-    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseSummaryDao caseSummaryDao, CaseServicePort caseService, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase, BiConsumer<Integer, Long> onOpenCaseDates, Consumer<Long> onOpenTask) {
+    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseSummaryDao caseSummaryDao, CaseServicePort caseService, UiRuntimeBridge runtimeBridge, UserPreferencesService userPreferencesService, Consumer<Integer> onOpenCase, BiConsumer<Integer, Long> onOpenCaseDates, Consumer<Long> onOpenTask) {
         this.appState = appState; this.calendarService = calendarService; this.calendarFeedDao = calendarFeedDao;
         this.caseTaskService = caseTaskService;
         this.caseSummaryDao = caseSummaryDao;
         this.caseService = caseService;
         this.runtimeBridge = runtimeBridge;
+        this.userPreferencesService = userPreferencesService;
         this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase;
         this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
+        applyPersistedCaseDatesLayerPreference();
         resetCalendarOverlayDefaults();
         configureCalendarOverlayControls();
         this.caseCardFactory = new CaseCardFactory(this.onOpenCase);
@@ -269,6 +275,8 @@ public final class CalendarController {
             updateSourceFilterFromControls();
             updateClearFiltersState();
             applyFiltersAndRender();
+            if (checkBox == caseDatesLayerCheckBox && userPreferencesService != null && !suppressLayerPreferenceWrite)
+                userPreferencesService.putBoolean(CASE_DATES_LAYER_PREFERENCE, newValue);
         });
     }
 
@@ -276,8 +284,17 @@ public final class CalendarController {
         if (eventsLayerCheckBox != null) eventsLayerCheckBox.setSelected(true);
         if (tasksLayerCheckBox != null) tasksLayerCheckBox.setSelected(true);
         if (deadlinesLayerCheckBox != null) deadlinesLayerCheckBox.setSelected(true);
-        if (caseDatesLayerCheckBox != null) caseDatesLayerCheckBox.setSelected(false);
+        if (caseDatesLayerCheckBox != null) caseDatesLayerCheckBox.setSelected(true);
         sourceFilter = CalendarFeedSourceFilter.defaults();
+    }
+
+    private void applyPersistedCaseDatesLayerPreference() {
+        if (caseDatesLayerCheckBox == null || userPreferencesService == null) return;
+        boolean selected = userPreferencesService.getBoolean(CASE_DATES_LAYER_PREFERENCE, true);
+        suppressLayerPreferenceWrite = true;
+        try { caseDatesLayerCheckBox.setSelected(selected); }
+        finally { suppressLayerPreferenceWrite = false; }
+        updateSourceFilterFromControls();
     }
 
     private void updateSourceFilterFromControls() {
@@ -1093,7 +1110,7 @@ public final class CalendarController {
     private javafx.stage.Window calendarOwner() { return calendarIsOpen() ? calendarRowsBox.getScene().getWindow() : null; }
     private void caseDateSaved(CaseDateOccurrenceEditorLauncher.SaveResult result) {
         var context = result.context();
-        if (runtimeBridge != null) runtimeBridge.publishCaseDatesChanged(context.caseId(), context.tenantId(), context.actorId(), LiveUpdateEvents.CHANGE_UPDATED);
+        if (runtimeBridge != null) runtimeBridge.publishCaseDatesChanged(context.caseId(), context.tenantId(), context.actorId(), result.removed() ? LiveUpdateEvents.CHANGE_REMOVED : LiveUpdateEvents.CHANGE_UPDATED);
         if (calendarIsOpen() && activeCaseDateCaseId == context.caseId()
                 && currentTenantId() == context.tenantId() && currentActorId() == context.actorId()) loadCurrentRange(false);
     }

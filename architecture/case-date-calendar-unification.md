@@ -153,6 +153,14 @@ published, while Calendar also reloads its current range without changing select
 filters, layers, or overlays. Cancel and rejected saves leave the owning surface and dialog state
 unchanged; no Calendar Event counterpart, linkage, persistence route, or synchronization is added.
 
+Existing occurrences also expose a destructive Remove action in this shared dialog. Confirmation
+explains that the authoritative soft delete removes the occurrence from active Calendar and Case
+views; cancellation leaves the editor untouched. Removal submits the loaded tenant, actor, Case,
+occurrence, and RowVer through `DeleteCaseDateCommand` on the same Case service boundary. Save and
+Remove share one single-flight guard. Success closes the dialog and invokes the same source-owned
+LiveBus/reload effects; failure retains the editor for retry or reload. Creation never exposes Remove,
+and this flow never mutates a Calendar Event or consults `CalendarEvents.CaseDateId`.
+
 A `CALENDAR_EVENT:<CalendarEventId>` target (with the deployed `EVENT:` spelling accepted only as a
 read-compatibility alias) invokes only the existing Calendar Event editor. It reloads by event ID
 under the captured tenant and continues through `CalendarService`, preserving assignment effects,
