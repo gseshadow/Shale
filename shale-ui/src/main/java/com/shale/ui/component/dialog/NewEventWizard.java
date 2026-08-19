@@ -41,6 +41,9 @@ public final class NewEventWizard {
     public record TypeChoice(SourceKind sourceKind, int authoritativeTypeId, String name, String color,
                              boolean supportsTime, int sortOrder) {
         public String groupLabel() { return sourceKind == SourceKind.GENERAL_EVENT ? "General Event" : "Case Event"; }
+        public boolean sameIdentityAs(TypeChoice other) {
+            return other != null && sourceKind == other.sourceKind && authoritativeTypeId == other.authoritativeTypeId;
+        }
         @Override public String toString() { return name; }
     }
     public record CaseDateInput(int caseDateTypeId, long caseId, String title, LocalDateTime startsAt,
@@ -292,11 +295,7 @@ public final class NewEventWizard {
             return stage.isShowing()&&tenantId==resultTenantId&&typeGeneration==generation&&currentTypeAuthority()==authority;
         }
         private SourceKind currentTypeAuthority(){return selectedCase==null?SourceKind.GENERAL_EVENT:SourceKind.CASE_EVENT;}
-        public static boolean sameTypeIdentity(TypeChoice left,TypeChoice right){
-            return left!=null&&right!=null&&left.sourceKind()==right.sourceKind()
-                    &&left.authoritativeTypeId()==right.authoritativeTypeId();
-        }
-        private static boolean sameType(TypeChoice left,TypeChoice right){return sameTypeIdentity(left,right);}
+        private static boolean sameType(TypeChoice left,TypeChoice right){return left!=null&&left.sameIdentityAs(right);}
         private void updateTimeAuthority(){ TypeChoice t=selectedType; boolean forced=t!=null&&!t.supportsTime();
             if(forced&&!forcingAllDay){allDayBeforeForce=allDay.isSelected();forcingAllDay=true;allDay.setSelected(true);}
             else if(!forced&&forcingAllDay){forcingAllDay=false;allDay.setSelected(allDayBeforeForce);}
