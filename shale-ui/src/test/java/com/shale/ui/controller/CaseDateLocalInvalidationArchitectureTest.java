@@ -23,18 +23,24 @@ class CaseDateLocalInvalidationArchitectureTest {
 
     @Test void actualOverviewButtonsRouteToAggregateAndInitializeFromAuthoritativeSnapshot() throws Exception {
         String source = Files.readString(CONTROLLER);
-        String handlers = method(source, "onEditIncidentDateField")
-                + method(source, "onEditDateOfMedicalNegligenceField")
-                + method(source, "onEditSolDateField");
-        assertTrue(handlers.contains("authoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY)"));
-        assertTrue(handlers.contains("saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_INJURY, value)"));
-        assertTrue(handlers.contains("saveAuthoritativeDate(MigratedCaseDateKey.DATE_OF_MEDICAL_NEGLIGENCE, value)"));
-        assertTrue(handlers.contains("saveAuthoritativeDate(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS, value)"));
-        assertTrue(handlers.contains("saveAuthoritativeDate(MigratedCaseDateKey.TORT_NOTICE_DEADLINE, value)"));
-        assertFalse(handlers.contains("saveCoreOverviewField"));
-        assertFalse(handlers.contains("saveDetailDateOverviewField"));
-        assertFalse(handlers.contains("currentOverview.getIncidentDate"));
-        assertFalse(handlers.contains("current.getDateOfMedicalNegligence"));
+        String[][] protectedButtons = {
+                {"onEditIncidentDateField", "DATE_OF_INJURY"},
+                {"onEditDateOfMedicalNegligenceField", "DATE_OF_MEDICAL_NEGLIGENCE"},
+                {"onEditSolDateField", "STATUTE_OF_LIMITATIONS"},
+                {"onEditTortNoticeDeadlineField", "TORT_NOTICE_DEADLINE"}
+        };
+        for (String[] button : protectedButtons) {
+            String handler = method(source, button[0]);
+            String key = "MigratedCaseDateKey." + button[1];
+            assertTrue(handler.contains("authoritativeDate(" + key + ")"),
+                    button[0] + " must read the authoritative snapshot");
+            assertTrue(handler.contains("saveAuthoritativeDate(" + key + ", value)"),
+                    button[0] + " must use the aggregate mutation path");
+            assertFalse(handler.contains("saveCoreOverviewField"), button[0]);
+            assertFalse(handler.contains("saveDetailDateOverviewField"), button[0]);
+            assertFalse(handler.contains("currentOverview"), button[0]);
+            assertFalse(handler.contains("current.get"), button[0]);
+        }
     }
 
     @Test void generalHydrationCannotOverwriteAnyFixedDateControl() throws Exception {
