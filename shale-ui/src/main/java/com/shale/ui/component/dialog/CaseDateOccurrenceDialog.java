@@ -48,7 +48,8 @@ public final class CaseDateOccurrenceDialog {
     public static void show(Window owner, String title, List<EffectiveCaseDateTypeDto> selectableTypes, CaseDateDto existing,
             CaseCardModel associatedCase,
             Consumer<Integer> onOpenCase,
-            Function<Input, ? extends CompletionStage<String>> onSave, Runnable onReload) {
+            Function<Input, ? extends CompletionStage<String>> onSave,
+            Supplier<? extends CompletionStage<String>> onRemove, Runnable onReload) {
         Stage stage = AppDialogs.createModalStage(owner, title);
         AtomicBoolean submitting = new AtomicBoolean(false);
         List<EffectiveCaseDateTypeDto> safeTypes = selectableTypes == null ? List.of() : List.copyOf(selectableTypes);
@@ -80,6 +81,7 @@ public final class CaseDateOccurrenceDialog {
         ControlStyles.formControl(occurrenceTitle); ControlStyles.formControl(startDate); ControlStyles.formControl(endDate); ControlStyles.formControl(notes);
         Label error = new Label(); error.getStyleClass().add("form-validation-message"); error.setWrapText(true); error.setVisible(false); error.setManaged(false);
         Button save = ActionButtonFactory.semantic("Save", e -> {}, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+        Button remove = existing == null ? null : ActionButtonFactory.semantic("Remove", e -> {}, ControlStyles.Purpose.DANGER, ControlStyles.Size.STANDARD);
         Button cancel = ActionButtonFactory.semantic("Cancel", e -> { if (!submitting.get()) stage.close(); }, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
         Button reload = ActionButtonFactory.semantic("Reload", e -> { if (onReload != null) onReload.run(); stage.close(); }, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
         reload.setVisible(false); reload.setManaged(false);
@@ -101,21 +103,37 @@ public final class CaseDateOccurrenceDialog {
         save.setOnAction(e -> {
             Optional<Input> input = read(typeBox.getValue(), occurrenceTitle, startDate, timing, endDate, allDay, notes, error, existing);
             if (input.isEmpty() || submitting.getAndSet(true)) return;
-            save.setDisable(true); cancel.setDisable(true); typeBox.setDisable(true);
+            setMutationControlsDisabled(true, save, remove, cancel, reload, typeBox);
             CompletionStage<String> result;
             try { result = onSave == null ? CompletableFuture.completedFuture("Save is unavailable.") : onSave.apply(input.get()); }
             catch (RuntimeException ex) { result = CompletableFuture.completedFuture("Unable to save this case date."); }
             if (result == null) result = CompletableFuture.completedFuture("Save is unavailable.");
             result.whenComplete((message, failure) -> javafx.application.Platform.runLater(() -> {
                 String displayed = failure == null ? message : "Unable to save this case date.";
-                submitting.set(false); save.setDisable(false); cancel.setDisable(false); typeBox.setDisable(false);
+                submitting.set(false); setMutationControlsDisabled(false, save, remove, cancel, reload, typeBox);
+                if (displayed == null || displayed.isBlank()) stage.close();
+                else { showError(error, displayed); if (displayed.toLowerCase().contains("changed")) { reload.setVisible(true); reload.setManaged(true); } }
+            }));
+        });
+        if (remove != null) remove.setOnAction(e -> {
+            if (!AppDialogs.showConfirmation(stage, "Remove Date", "Remove this case date?",
+                    "This takes the Case Date off active Calendar and Case views. It can be restored later.",
+                    "Remove", AppDialogs.DialogActionKind.DANGER) || submitting.getAndSet(true)) return;
+            setMutationControlsDisabled(true, save, remove, cancel, reload, typeBox);
+            CompletionStage<String> result;
+            try { result = onRemove == null ? CompletableFuture.completedFuture("Remove is unavailable.") : onRemove.get(); }
+            catch (RuntimeException ex) { result = CompletableFuture.completedFuture("Unable to remove this case date."); }
+            if (result == null) result = CompletableFuture.completedFuture("Remove is unavailable.");
+            result.whenComplete((message, failure) -> javafx.application.Platform.runLater(() -> {
+                String displayed = failure == null ? message : "Unable to remove this case date.";
+                submitting.set(false); setMutationControlsDisabled(false, save, remove, cancel, reload, typeBox);
                 if (displayed == null || displayed.isBlank()) stage.close();
                 else { showError(error, displayed); if (displayed.toLowerCase().contains("changed")) { reload.setVisible(true); reload.setManaged(true); } }
             }));
         });
         stage.getScene();
         GridPane grid = createEditorGrid(typeBox,occurrenceTitle,startDate,timing,endDate,allDay,notes);
-        HBox footer = new HBox(8, reload, cancel, save); footer.setAlignment(Pos.CENTER_RIGHT);
+        HBox footer = new HBox(8); if (remove != null) footer.getChildren().add(remove); footer.getChildren().addAll(reload, cancel, save); footer.setAlignment(Pos.CENTER_RIGHT);
         CaseNavigationGate navigation = new CaseNavigationGate(associatedCase.id(), dirty::get, submitting::get,
                 () -> AppDialogs.showConfirmation(stage, "Discard Changes?", "Discard unsaved changes?",
                         "Navigating to the Case will discard changes in this Case Date.", "Discard Changes",
@@ -125,6 +143,11 @@ public final class CaseDateOccurrenceDialog {
         Scene scene = new Scene(AppDialogs.createSecondaryWindowShell(stage, title, () -> { if (!submitting.get()) stage.close(); }, body));
         scene.getStylesheets().add(Objects.requireNonNull(CaseDateOccurrenceDialog.class.getResource("/css/app.css")).toExternalForm());
         stage.setScene(scene); stage.showAndWait();
+    }
+    private static void setMutationControlsDisabled(boolean disabled, Button save, Button remove, Button cancel,
+            Button reload, Node editor) {
+        save.setDisable(disabled); if (remove != null) remove.setDisable(disabled); cancel.setDisable(disabled);
+        reload.setDisable(disabled); editor.setDisable(disabled);
     }
     static VBox createCaseSection(CaseCardModel associatedCase, Consumer<Integer> onOpenCase) {
         if (associatedCase == null || associatedCase.id() <= 0) throw new IllegalArgumentException("Associated Case is required.");

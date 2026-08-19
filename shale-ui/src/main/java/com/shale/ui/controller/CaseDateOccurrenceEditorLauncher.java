@@ -4,6 +4,7 @@ import com.shale.core.dto.CaseDateDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.UpdateCaseDateCommand;
+import com.shale.core.service.CaseServicePort.DeleteCaseDateCommand;
 import com.shale.ui.component.dialog.CaseDateOccurrenceDialog;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import javafx.application.Platform;
@@ -23,7 +24,7 @@ final class CaseDateOccurrenceEditorLauncher {
     record Context(int tenantId, int actorId, long caseId, boolean open) {
         boolean valid() { return tenantId > 0 && actorId > 0 && caseId > 0 && open; }
     }
-    record SaveResult(Context context, CaseDateDto date) {}
+    record SaveResult(Context context, CaseDateDto date, boolean removed) {}
 
     private final CaseServicePort caseService;
     private final Executor executor;
@@ -76,6 +77,7 @@ final class CaseDateOccurrenceEditorLauncher {
                     onDialogState.accept(true);
                     CaseDateOccurrenceDialog.show(owner.get(), "Edit Date", types, existing, toCaseCardModel(caseOverview.get()), onOpenCase,
                             input -> save(captured, existing, input),
+                            () -> remove(captured, existing),
                             () -> Platform.runLater(() -> { opening.remove(caseDateId, generation); open(captured.caseId(), caseDateId); }));
                 } finally {
                     onDialogState.accept(false);
@@ -88,6 +90,21 @@ final class CaseDateOccurrenceEditorLauncher {
                 opening.remove(caseDateId, generation);
             });
         }
+    }
+
+    private java.util.concurrent.CompletionStage<String> remove(Context captured, CaseDateDto existing) {
+        return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            Context now = currentContext.get();
+            if (!sameContext(captured, now) || !matches(existing, captured, existing.id())) return "This Case Date is no longer available.";
+            try {
+                caseService.deleteCaseDate(new DeleteCaseDateCommand(captured.tenantId(), captured.actorId(),
+                        captured.caseId(), existing.id(), existing.rowVer()));
+                Platform.runLater(() -> onSaved.accept(new SaveResult(captured, existing, true)));
+                return null;
+            } catch (RuntimeException ex) {
+                return rootMessage(ex);
+            }
+        }, executor);
     }
 
     static CaseCardModel toCaseCardModel(CaseOverviewDto overview) {
@@ -107,7 +124,7 @@ final class CaseDateOccurrenceEditorLauncher {
                 CaseDateDto saved = caseService.updateCaseDate(new UpdateCaseDateCommand(captured.tenantId(), captured.actorId(),
                         captured.caseId(), existing.id(), input.caseDateTypeId(), input.title(), input.startsAt(),
                         input.endsAt(), input.allDay(), input.notes(), existing.rowVer()));
-                Platform.runLater(() -> onSaved.accept(new SaveResult(captured, saved)));
+                Platform.runLater(() -> onSaved.accept(new SaveResult(captured, saved, false)));
                 return null;
             } catch (RuntimeException ex) {
                 return rootMessage(ex);

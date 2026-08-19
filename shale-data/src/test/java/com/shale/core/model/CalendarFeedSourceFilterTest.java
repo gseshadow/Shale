@@ -19,16 +19,16 @@ class CalendarFeedSourceFilterTest {
     }
 
     @Test
-    void defaultFilterShowsEventsTasksAndDeadlinesButHidesOtherCaseDates() {
+    void defaultFilterShowsEventsTasksDeadlinesAndOtherCaseDates() {
         CalendarFeedSourceFilter filter = CalendarFeedSourceFilter.defaults();
         assertTrue(filter.isEnabled(CalendarFeedCategory.CALENDAR_EVENTS));
         assertTrue(filter.isEnabled(CalendarFeedCategory.TASKS));
         assertTrue(filter.isEnabled(CalendarFeedCategory.CASE_DEADLINES));
-        assertFalse(filter.isEnabled(CalendarFeedCategory.OTHER_CASE_DATES));
+        assertTrue(filter.isEnabled(CalendarFeedCategory.OTHER_CASE_DATES));
         assertTrue(filter.matches(item("EVENT:1", null, null, null, "MANUAL", "Event", 1, "MEETING")));
         assertTrue(filter.matches(item("TASK:1", "DueAt", 1, 1, "PROJECTED", "Task", 1, "TASK_DUE")));
         assertTrue(filter.matches(item("CASE_DATE:101", "DEADLINE", null, 1, "CASE_DATE", "SOL", 1, "STATUTE_OF_LIMITATIONS")));
-        assertFalse(filter.matches(item("CASE_DATE:401", "OTHER", null, 1, "CASE_DATE", "Intake", 1, "CASE_DATE")));
+        assertTrue(filter.matches(item("CASE_DATE:401", "OTHER", null, 1, "CASE_DATE", "Intake", 1, "CASE_DATE")));
     }
     @Test
     void caseCalendarDefaultFilterShowsEventsTasksDeadlinesAndCaseDates() {
