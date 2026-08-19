@@ -111,7 +111,7 @@ public final class CalendarController {
     private boolean suppressLayerPreferenceWrite;
     private CaseDateOccurrenceEditorLauncher caseDateEditorLauncher;
     private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
-    private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
+    private final Set<String> seenDateRefreshEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
     private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> entityUpdatedHandler = this::handleEntityUpdated;
     private int loadGeneration;
     private LocalDate selectedDate;
@@ -174,9 +174,9 @@ public final class CalendarController {
 
     private boolean rememberCaseDatesEvent(String eventId) {
         if (eventId == null || eventId.isBlank()) return true;
-        synchronized (seenCaseDatesEventIds) {
-            if (!seenCaseDatesEventIds.add(eventId)) return false;
-            while (seenCaseDatesEventIds.size() > 256) seenCaseDatesEventIds.remove(seenCaseDatesEventIds.iterator().next());
+        synchronized (seenDateRefreshEventIds) {
+            if (!seenDateRefreshEventIds.add(eventId)) return false;
+            while (seenDateRefreshEventIds.size() > 256) seenDateRefreshEventIds.remove(seenDateRefreshEventIds.iterator().next());
             return true;
         }
     }
