@@ -683,7 +683,7 @@ public class CaseController {
 	});
 	private final AtomicBoolean caseDateMutationInFlight = new AtomicBoolean(false);
 	private final AtomicBoolean remoteCaseDatesRefreshQueued = new AtomicBoolean(false);
-	private final java.util.LinkedHashSet<String> receivedCaseDateEventIds = new java.util.LinkedHashSet<>();
+	private final java.util.LinkedHashSet<String> receivedDateRefreshEventIds = new java.util.LinkedHashSet<>();
 	private boolean caseDateEditorOpen;
 	private boolean remoteCaseDatesRefreshDeferred;
 	private List<CaseDateDto> caseDates = List.of();
@@ -862,7 +862,7 @@ public class CaseController {
 
 	public void init(Integer caseId) {
 		documentGeneration++;
-		synchronized (receivedCaseDateEventIds) { receivedCaseDateEventIds.clear(); }
+		synchronized (receivedDateRefreshEventIds) { receivedDateRefreshEventIds.clear(); }
 		remoteCaseDatesRefreshDeferred = false;
 		compatibilityDates.invalidate();
 		compatibilityDatesGeneration++;
@@ -888,7 +888,7 @@ public class CaseController {
 			CaseSummaryDao caseSummaryDao, CaseDetailService caseDetailService, CaseTaskService caseTaskService, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseServicePort caseService, OrganizationDao organizationDao, ContactDao contactDao,
 			AppState appState, UiRuntimeBridge runtimeBridge, Runnable onCaseDeleted, PhiReadAuditService phiReadAuditService) {
 		documentGeneration++;
-		synchronized (receivedCaseDateEventIds) { receivedCaseDateEventIds.clear(); }
+		synchronized (receivedDateRefreshEventIds) { receivedDateRefreshEventIds.clear(); }
 		remoteCaseDatesRefreshDeferred = false;
 		compatibilityDates.invalidate();
 		compatibilityDatesGeneration++;
@@ -914,7 +914,7 @@ public class CaseController {
 		this.caseService = caseService;
 		this.caseDateOccurrenceEditorLauncher = caseService == null ? null : new CaseDateOccurrenceEditorLauncher(caseService, caseDateExecutor,
 				() -> new CaseDateOccurrenceEditorLauncher.Context(appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId(), appState == null || appState.getUserId() == null ? 0 : appState.getUserId(), this.caseId == null ? 0 : this.caseId, caseDatesTabPane != null && caseDatesTabPane.getScene() != null),
-				this::caseDatesOwner, result -> { long savedCaseId = result.context().caseId(); synchronizeCaseDatesAfterLocalMutation(savedCaseId, isMigratedCaseDateSystemKey(result.date().typeSystemKey())); if (runtimeBridge != null) runtimeBridge.publishCaseDatesChanged(savedCaseId, result.context().tenantId(), result.context().actorId(), result.removed() ? LiveUpdateEvents.CHANGE_REMOVED : LiveUpdateEvents.CHANGE_UPDATED); loadCaseDatesAsync(); },
+				this::caseDatesOwner, result -> { long savedCaseId = result.context().caseId(); refreshCaseDateViewsAfterLocalMutation(savedCaseId, isMigratedCaseDateSystemKey(result.date().typeSystemKey())); if (runtimeBridge != null) runtimeBridge.publishCaseDatesChanged(savedCaseId, result.context().tenantId(), result.context().actorId(), result.removed() ? LiveUpdateEvents.CHANGE_REMOVED : LiveUpdateEvents.CHANGE_UPDATED); loadCaseDatesAsync(); },
 				this::showCaseDatesMessage, open -> { caseDateEditorOpen = open; if (!open) applyDeferredCaseDatesRefresh(); }, id -> this.onOpenCase.accept(id));
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
@@ -2040,7 +2040,7 @@ public class CaseController {
 			try {
 				if (existing == null) caseService.createCaseDate(createCaseDateCommand(tenantId, actorId, activeCaseId, input));
 				else caseService.updateCaseDate(updateCaseDateCommand(tenantId, actorId, activeCaseId, existing, input));
-				Platform.runLater(() -> { synchronizeCaseDatesAfterLocalMutation(activeCaseId, compatibilityAffected); publishCaseDatesChanged(activeCaseId, existing == null ? LiveUpdateEvents.CHANGE_CREATED : LiveUpdateEvents.CHANGE_UPDATED); });
+				Platform.runLater(() -> { refreshCaseDateViewsAfterLocalMutation(activeCaseId, compatibilityAffected); publishCaseDatesChanged(activeCaseId, existing == null ? LiveUpdateEvents.CHANGE_CREATED : LiveUpdateEvents.CHANGE_UPDATED); });
 				return null;
 			} catch (RuntimeException ex) { return rootMessage(ex); }
 			finally { caseDateMutationInFlight.set(false); Platform.runLater(this::applyDeferredCaseDatesRefresh); }
@@ -2055,7 +2055,7 @@ public class CaseController {
 		final long activeCaseId=caseId.longValue();
 		return java.util.concurrent.CompletableFuture.supplyAsync(()->{try{
 			caseService.deleteCaseDate(new DeleteCaseDateCommand(tenantId,actorId,activeCaseId,existing.id(),existing.rowVer()));
-			Platform.runLater(()->{synchronizeCaseDatesAfterLocalMutation(activeCaseId,isMigratedCaseDateSystemKey(existing.typeSystemKey()));publishCaseDatesChanged(activeCaseId,LiveUpdateEvents.CHANGE_REMOVED);loadCaseDatesAsync();});
+			Platform.runLater(()->{refreshCaseDateViewsAfterLocalMutation(activeCaseId,isMigratedCaseDateSystemKey(existing.typeSystemKey()));publishCaseDatesChanged(activeCaseId,LiveUpdateEvents.CHANGE_REMOVED);loadCaseDatesAsync();});
 			return null;
 		}catch(RuntimeException ex){return rootMessage(ex);}finally{caseDateMutationInFlight.set(false);Platform.runLater(this::applyDeferredCaseDatesRefresh);}},caseDateExecutor);
 	}
@@ -2068,7 +2068,7 @@ public class CaseController {
 		final long activeCaseId = caseId.longValue();
 		caseDateExecutor.submit(() -> { try {
 			caseService.deleteCaseDate(new DeleteCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer()));
-			Platform.runLater(() -> { synchronizeCaseDatesAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())); publishCaseDatesChanged(activeCaseId, LiveUpdateEvents.CHANGE_REMOVED); });
+			Platform.runLater(() -> { refreshCaseDateViewsAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())); publishCaseDatesChanged(activeCaseId, LiveUpdateEvents.CHANGE_REMOVED); });
 		} catch (RuntimeException ex) { Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Remove Date", rootMessage(ex))); }
 		finally { caseDateMutationInFlight.set(false); Platform.runLater(this::applyDeferredCaseDatesRefresh); } });
 	}
@@ -2080,7 +2080,7 @@ public class CaseController {
 		final long activeCaseId = caseId.longValue();
 		caseDateExecutor.submit(() -> { try {
 			caseService.restoreCaseDate(new RestoreCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer()));
-			Platform.runLater(() -> { synchronizeCaseDatesAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())); publishCaseDatesChanged(activeCaseId, LiveUpdateEvents.CHANGE_ADDED); });
+			Platform.runLater(() -> { refreshCaseDateViewsAfterLocalMutation(activeCaseId, isMigratedCaseDateSystemKey(d.typeSystemKey())); publishCaseDatesChanged(activeCaseId, LiveUpdateEvents.CHANGE_ADDED); });
 		} catch (RuntimeException ex) { Platform.runLater(() -> AppDialogs.showError(caseDatesOwner(), "Restore Date", rootMessage(ex))); }
 		finally { caseDateMutationInFlight.set(false); Platform.runLater(this::applyDeferredCaseDatesRefresh); } });
 	}
@@ -4637,7 +4637,7 @@ public class CaseController {
 	 * witnesses move forward together.  Fixed aggregate saves already return that
 	 * coherent snapshot, so only the generic list is invalidated in that direction.
 	 */
-	private void synchronizeCaseDatesAfterLocalMutation(long activeCaseId, boolean compatibilityAffected) {
+	private void refreshCaseDateViewsAfterLocalMutation(long activeCaseId, boolean compatibilityAffected) {
 		if (caseId == null || caseId.longValue() != activeCaseId) return;
 		caseDatesStale = true;
 		if ("Dates".equals(activeSectionName)) loadCaseDatesAsync();
@@ -4674,9 +4674,9 @@ public class CaseController {
 
 	private boolean rememberCaseDateEvent(String eventId) {
 		if (eventId == null || eventId.isBlank()) return true;
-		synchronized (receivedCaseDateEventIds) {
-			if (!receivedCaseDateEventIds.add(eventId)) return false;
-			while (receivedCaseDateEventIds.size() > 256) receivedCaseDateEventIds.remove(receivedCaseDateEventIds.iterator().next());
+		synchronized (receivedDateRefreshEventIds) {
+			if (!receivedDateRefreshEventIds.add(eventId)) return false;
+			while (receivedDateRefreshEventIds.size() > 256) receivedDateRefreshEventIds.remove(receivedDateRefreshEventIds.iterator().next());
 			return true;
 		}
 	}
@@ -4772,7 +4772,7 @@ public class CaseController {
 				runOnFx(() -> {
 					if (!isCompatibilityDatesCurrent(activeCaseId, generation)) return;
 					compatibilityDates.replace(result); latestCaseRowVer = result.caseRowVer(); renderCompatibilityDates(); setBusy(false);
-					synchronizeCaseDatesAfterLocalMutation(activeCaseId, false);
+					refreshCaseDateViewsAfterLocalMutation(activeCaseId, false);
 					publishCaseDatesChanged(activeCaseId, LiveUpdateEvents.CHANGE_UPDATED);
 					applyDeferredCaseDatesRefresh();
 				});
