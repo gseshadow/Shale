@@ -73,10 +73,9 @@ class NewEventWizardPersistenceBoundaryTest {
 		var case12 = new NewEventWizard.TypeChoice(NewEventWizard.SourceKind.CASE_EVENT, 12, "Duplicate", "#111111", true, 1);
 		var renamedGeneral12 = new NewEventWizard.TypeChoice(NewEventWizard.SourceKind.GENERAL_EVENT, 12, "Renamed", "#222222", false, 99);
 		assertAll(
-				() -> assertTrue(general12.sameIdentityAs(renamedGeneral12)),
-				() -> assertFalse(general12.sameIdentityAs(general13), "duplicate names do not establish identity"),
-				() -> assertFalse(general12.sameIdentityAs(case12), "identity is source-qualified"),
-				() -> assertFalse(general12.sameIdentityAs(null)));
+				() -> assertTrue(NewEventWizard.Handle.sameTypeIdentity(general12, renamedGeneral12)),
+				() -> assertFalse(NewEventWizard.Handle.sameTypeIdentity(general12, general13), "duplicate names do not establish identity"),
+				() -> assertFalse(NewEventWizard.Handle.sameTypeIdentity(general12, case12), "identity is source-qualified"));
 		assertTrue(source.contains("CaseCardFactory.Variant.MINI"));
 		assertTrue(source.contains("\"Change\""));
 		assertTrue(source.contains("\"Remove\""));
