@@ -51,6 +51,53 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	}
 
 	@Override
+	public List<Definition> getEffectiveContactTypes(int shaleClientId) {
+		return contactGateway.listEffectiveDefinitions("ContactTypes", shaleClientId).stream()
+				.map(ContactServiceAdapter::definition).toList();
+	}
+
+	@Override
+	public List<Definition> getEffectiveSpecialties(int shaleClientId) {
+		return contactGateway.listEffectiveDefinitions("Specialties", shaleClientId).stream()
+				.map(ContactServiceAdapter::definition).toList();
+	}
+
+	@Override
+	public List<CredentialDefinition> getEffectiveCredentialDefinitions(int shaleClientId) {
+		return contactGateway.listEffectiveCredentialDefinitions(shaleClientId).stream()
+				.map(ContactServiceAdapter::credentialDefinition).toList();
+	}
+
+	@Override
+	public Optional<ClassificationProfile> getClassificationProfile(int contactId, int shaleClientId) {
+		return Optional.ofNullable(contactGateway.findClassificationProfile(contactId, shaleClientId))
+				.map(row -> new ClassificationProfile(row.contactId(), row.shaleClientId(),
+						new StructuredName(row.prefix(), row.firstName(), row.middleName(), row.lastName(),
+								row.preferredName(), row.suffix()), row.legacyDisplayName(),
+						row.contactTypes().stream().map(ContactServiceAdapter::assignedDefinition).toList(),
+						row.specialties().stream().map(ContactServiceAdapter::assignedDefinition).toList(),
+						row.credentials().stream().map(ContactServiceAdapter::assignedCredential).toList()));
+	}
+
+	private static Definition definition(ContactDao.DefinitionRow row) {
+		return new Definition(row.id(), row.systemKey(), row.name(), row.description(), row.sortOrder());
+	}
+
+	private static CredentialDefinition credentialDefinition(ContactDao.CredentialDefinitionRow row) {
+		return new CredentialDefinition(row.id(), row.systemKey(), row.name(), row.abbreviation(),
+				row.description(), row.sortOrder());
+	}
+
+	private static AssignedDefinition assignedDefinition(ContactDao.AssignedDefinitionRow row) {
+		return new AssignedDefinition(row.assignmentId(), definition(row.definition()), row.historical());
+	}
+
+	private static AssignedCredential assignedCredential(ContactDao.AssignedCredentialRow row) {
+		return new AssignedCredential(row.assignmentId(), credentialDefinition(row.definition()),
+				row.displayOrder(), row.historical());
+	}
+
+	@Override
 	public int createContact(CreateContactCommand command) {
 		Objects.requireNonNull(command, "command");
 		return contactGateway.createContact(new ContactDao.CreateContactRequest(
@@ -108,6 +155,12 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		boolean updateBasicProfile(ContactDao.ContactProfileUpdateRequest request);
 
 		boolean softDeleteContact(int contactId, int shaleClientId);
+
+		default List<ContactDao.DefinitionRow> listEffectiveDefinitions(String table, int shaleClientId) { return List.of(); }
+
+		default List<ContactDao.CredentialDefinitionRow> listEffectiveCredentialDefinitions(int shaleClientId) { return List.of(); }
+
+		default ContactDao.ClassificationProfileRow findClassificationProfile(int contactId, int shaleClientId) { return null; }
 	}
 
 	private record DaoContactGateway(ContactDao contactDao) implements ContactGateway {
@@ -143,6 +196,16 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		@Override
 		public boolean softDeleteContact(int contactId, int shaleClientId) {
 			return contactDao.softDeleteContact(contactId, shaleClientId);
+		}
+
+		@Override public List<ContactDao.DefinitionRow> listEffectiveDefinitions(String table, int tenant) {
+			return contactDao.listEffectiveDefinitions(table, tenant);
+		}
+		@Override public List<ContactDao.CredentialDefinitionRow> listEffectiveCredentialDefinitions(int tenant) {
+			return contactDao.listEffectiveCredentialDefinitions(tenant);
+		}
+		@Override public ContactDao.ClassificationProfileRow findClassificationProfile(int contactId, int tenant) {
+			return contactDao.findClassificationProfile(contactId, tenant);
 		}
 	}
 }

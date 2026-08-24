@@ -86,8 +86,11 @@ Opposing Counsel, Supporting Counsel, Expert Witness, and Treating Provider are 
 
 1. **Phase 1A (this change):** deploy schema, RLS, conservative Expert seed/backfill, verification,
    and architecture contracts. No runtime reads or writes change.
-2. **Phase 1B — read/domain contracts:** add UI-free DTOs and effective overlay reads; specify name
-   formatting and historical-reference behavior. Continue all legacy reads.
+2. **Phase 1B — read/domain contracts (implemented):** UI-free shared records and tenant-scoped
+   effective-definition/classification-profile reads are exposed through `ContactServicePort`.
+   Definition lists apply the established SystemKey overlay (tenant wins; a deleted tenant override
+   resets to global fallback), and profile reads retain exact historical definition IDs. Current
+   display-name and Expert reads remain legacy-authoritative.
 3. **Phase 1C — transactional administration and assignment writes:** add admin-authorized Settings
    services and Contact assignment services with tenant/actor/definition validation, optimistic
    concurrency, same-transaction entity-action auditing, and `IsExpert` dual-write.
@@ -111,12 +114,16 @@ restore, and update actions in the mutation transaction.
 
 ## Deployment, rollback, and operations
 
-Deployment order is: (1) deploy this application/documentation commit, which remains compatible with
-both schemas; (2) back up and run the migration once using an approved all-tenant migration principal
-with an unset tenant session context; (3) run the read-only verification script with the same
-all-tenant visibility; (4) investigate every nonzero “expect 0” result and confirm all six RLS rows;
-(5) deploy future runtime phases only after verification. The SQL in this repository has **not** been
-executed against a database.
+Phase 1A was deployed to production on 2026-08-24. The migration also completed twice on
+`Shale_Copy`, with complete verification after both runs. Production verification found zero column,
+structured-column, critical-default, lifecycle, actor-FK, tenant, duplicate-key, cross-tenant,
+predicate, required-index, and composite-key semantic violations. It confirmed exactly one compatible
+global Expert definition, zero legacy Expert Contacts and assignments, and exactly one enabled
+TenantFilter policy. Contacts intentionally remain without an RLS predicate. No PHI, credentials, or
+connection information is recorded here.
+
+Phase 1B adds no SQL and assumes that verified deployed contract. Runtime reads explicitly restrict
+Contact and assignment tenant identity on the tenant-context connection; RLS remains defense in depth.
 
 Reruns validate every Phase 1A-owned required column and named index, foreign key, CHECK, default,
 and RLS predicate by its contract. A conflicting object with a Phase 1A name or an incompatible

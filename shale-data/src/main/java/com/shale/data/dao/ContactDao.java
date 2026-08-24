@@ -81,6 +81,27 @@ public final class ContactDao {
     ) {
     }
 
+    public record DefinitionRow(int id, String systemKey, String name, String description,
+            int sortOrder, boolean active, boolean deleted) {
+    }
+
+    public record CredentialDefinitionRow(int id, String systemKey, String name, String abbreviation,
+            String description, int sortOrder, boolean active, boolean deleted) {
+    }
+
+    public record AssignedDefinitionRow(long assignmentId, DefinitionRow definition, boolean historical) {
+    }
+
+    public record AssignedCredentialRow(long assignmentId, CredentialDefinitionRow definition,
+            int displayOrder, boolean historical) {
+    }
+
+    public record ClassificationProfileRow(int contactId, int shaleClientId, String prefix,
+            String firstName, String middleName, String lastName, String preferredName, String suffix,
+            String legacyDisplayName, List<AssignedDefinitionRow> contactTypes,
+            List<AssignedDefinitionRow> specialties, List<AssignedCredentialRow> credentials) {
+    }
+
 
     public record RelatedCaseRow(
             long id,
@@ -416,6 +437,104 @@ public final class ContactDao {
             return row;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load contact by id (id=" + contactId + ")", e);
+        }
+    }
+
+    /**
+     * Loads the selectable overlay for ContactTypes or Specialties. A deleted tenant override is a
+     * reset and permits global fallback; an inactive tenant override still masks its global row.
+     */
+    public List<DefinitionRow> listEffectiveDefinitions(String table, int shaleClientId) {
+        if (!"ContactTypes".equals(table) && !"Specialties".equals(table)) {
+            throw new IllegalArgumentException("Unsupported contact definition table");
+        }
+        validateTenantId(shaleClientId);
+        String sql = """
+                WITH visible AS (
+                  SELECT d.Id,d.SystemKey,d.Name,d.Description,d.SortOrder,d.IsActive,d.IsDeleted,
+                    ROW_NUMBER() OVER (PARTITION BY d.SystemKey
+                      ORDER BY CASE WHEN d.ShaleClientId=? THEN 0 ELSE 1 END,d.Id) rn
+                  FROM dbo.%s d
+                  WHERE (d.ShaleClientId=? OR d.ShaleClientId IS NULL) AND d.IsDeleted=0
+                )
+                SELECT Id,SystemKey,Name,Description,SortOrder,IsActive,IsDeleted
+                FROM visible WHERE rn=1 AND IsActive=1
+                ORDER BY SortOrder,Name,Id;
+                """.formatted(table);
+        try (Connection con = db.requireConnection()) {
+            verifyTenantMatchesSession(con, shaleClientId);
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setInt(1, shaleClientId);
+                ps.setInt(2, shaleClientId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    List<DefinitionRow> rows = new ArrayList<>();
+                    while (rs.next()) rows.add(mapDefinition(rs));
+                    return rows;
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load effective " + table + " (clientId=" + shaleClientId + ")", e);
+        }
+    }
+
+    public List<CredentialDefinitionRow> listEffectiveCredentialDefinitions(int shaleClientId) {
+        validateTenantId(shaleClientId);
+        String sql = """
+                WITH visible AS (
+                  SELECT d.Id,d.SystemKey,d.Name,d.Abbreviation,d.Description,d.SortOrder,d.IsActive,d.IsDeleted,
+                    ROW_NUMBER() OVER (PARTITION BY d.SystemKey
+                      ORDER BY CASE WHEN d.ShaleClientId=? THEN 0 ELSE 1 END,d.Id) rn
+                  FROM dbo.CredentialDefinitions d
+                  WHERE (d.ShaleClientId=? OR d.ShaleClientId IS NULL) AND d.IsDeleted=0
+                )
+                SELECT Id,SystemKey,Name,Abbreviation,Description,SortOrder,IsActive,IsDeleted
+                FROM visible WHERE rn=1 AND IsActive=1
+                ORDER BY SortOrder,Name,Id;
+                """;
+        try (Connection con = db.requireConnection()) {
+            verifyTenantMatchesSession(con, shaleClientId);
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setInt(1, shaleClientId);
+                ps.setInt(2, shaleClientId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    List<CredentialDefinitionRow> rows = new ArrayList<>();
+                    while (rs.next()) rows.add(mapCredentialDefinition(rs));
+                    return rows;
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load effective CredentialDefinitions (clientId=" + shaleClientId + ")", e);
+        }
+    }
+
+    public ClassificationProfileRow findClassificationProfile(int contactId, int shaleClientId) {
+        if (contactId <= 0) throw new IllegalArgumentException("contactId must be > 0");
+        validateTenantId(shaleClientId);
+        try (Connection con = db.requireConnection()) {
+            verifyTenantMatchesSession(con, shaleClientId);
+            String contactSql = """
+                    SELECT c.Id,c.Prefix,c.FirstName,c.MiddleName,c.LastName,c.PreferredName,c.Suffix,
+                           COALESCE(NULLIF(LTRIM(RTRIM(c.Name)),''),NULLIF(LTRIM(RTRIM(c.WorkName)),''),
+                             NULLIF(LTRIM(RTRIM(CONCAT(c.FirstName,' ',c.LastName))),'')) LegacyDisplayName
+                    FROM dbo.Contacts c WHERE c.Id=? AND c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0;
+                    """;
+            try (PreparedStatement ps = con.prepareStatement(contactSql)) {
+                ps.setInt(1, contactId); ps.setInt(2, shaleClientId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) return null;
+                    String prefix=rs.getString("Prefix"), first=rs.getString("FirstName");
+                    String middle=rs.getString("MiddleName"), last=rs.getString("LastName");
+                    String preferred=rs.getString("PreferredName"), suffix=rs.getString("Suffix");
+                    String display=rs.getString("LegacyDisplayName");
+                    List<AssignedDefinitionRow> types = loadAssignedDefinitions(con, "ContactContactTypes", "ContactTypeId", "ContactTypes", contactId, shaleClientId);
+                    List<AssignedDefinitionRow> specialties = loadAssignedDefinitions(con, "ContactSpecialties", "SpecialtyId", "Specialties", contactId, shaleClientId);
+                    List<AssignedCredentialRow> credentials = loadAssignedCredentials(con, contactId, shaleClientId);
+                    return new ClassificationProfileRow(contactId, shaleClientId, prefix, first, middle, last,
+                            preferred, suffix, display, types, specialties, credentials);
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to load Contact classification profile (id=" + contactId + ")", e);
         }
     }
 
@@ -786,6 +905,70 @@ public final class ContactDao {
         int sessionClientId = requireCurrentShaleClientId(con);
         if (sessionClientId != shaleClientId) {
             throw new IllegalStateException("Tenant mismatch. Session clientId=" + sessionClientId + ", requested=" + shaleClientId);
+        }
+    }
+
+    private static void validateTenantId(int shaleClientId) {
+        if (shaleClientId <= 0) throw new IllegalArgumentException("shaleClientId must be > 0");
+    }
+
+    private static DefinitionRow mapDefinition(ResultSet rs) throws SQLException {
+        return new DefinitionRow(rs.getInt("Id"), rs.getString("SystemKey"), rs.getString("Name"),
+                rs.getString("Description"), rs.getInt("SortOrder"), rs.getBoolean("IsActive"),
+                rs.getBoolean("IsDeleted"));
+    }
+
+    private static CredentialDefinitionRow mapCredentialDefinition(ResultSet rs) throws SQLException {
+        return new CredentialDefinitionRow(rs.getInt("Id"), rs.getString("SystemKey"), rs.getString("Name"),
+                rs.getString("Abbreviation"), rs.getString("Description"), rs.getInt("SortOrder"),
+                rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted"));
+    }
+
+    private static List<AssignedDefinitionRow> loadAssignedDefinitions(Connection con, String assignmentTable,
+            String definitionIdColumn, String definitionTable, int contactId, int shaleClientId) throws SQLException {
+        String sql = """
+                SELECT a.Id AssignmentId,d.Id,d.SystemKey,d.Name,d.Description,d.SortOrder,d.IsActive,d.IsDeleted
+                FROM dbo.%s a JOIN dbo.%s d ON d.Id=a.%s
+                  AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)
+                WHERE a.ContactId=? AND a.ShaleClientId=? AND a.IsDeleted=0
+                ORDER BY d.SortOrder,d.Name,d.Id;
+                """.formatted(assignmentTable, definitionTable, definitionIdColumn);
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, contactId); ps.setInt(2, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<AssignedDefinitionRow> rows = new ArrayList<>();
+                while (rs.next()) {
+                    DefinitionRow definition = mapDefinition(rs);
+                    rows.add(new AssignedDefinitionRow(rs.getLong("AssignmentId"), definition,
+                            !definition.active() || definition.deleted()));
+                }
+                return rows;
+            }
+        }
+    }
+
+    private static List<AssignedCredentialRow> loadAssignedCredentials(Connection con, int contactId,
+            int shaleClientId) throws SQLException {
+        String sql = """
+                SELECT a.Id AssignmentId,a.DisplayOrder,d.Id,d.SystemKey,d.Name,d.Abbreviation,
+                       d.Description,d.SortOrder,d.IsActive,d.IsDeleted
+                FROM dbo.ContactCredentials a JOIN dbo.CredentialDefinitions d
+                  ON d.Id=a.CredentialDefinitionId
+                 AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)
+                WHERE a.ContactId=? AND a.ShaleClientId=? AND a.IsDeleted=0
+                ORDER BY a.DisplayOrder,d.SortOrder,d.Name,d.Id;
+                """;
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, contactId); ps.setInt(2, shaleClientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<AssignedCredentialRow> rows = new ArrayList<>();
+                while (rs.next()) {
+                    CredentialDefinitionRow definition = mapCredentialDefinition(rs);
+                    rows.add(new AssignedCredentialRow(rs.getLong("AssignmentId"), definition,
+                            rs.getInt("DisplayOrder"), !definition.active() || definition.deleted()));
+                }
+                return rows;
+            }
         }
     }
 

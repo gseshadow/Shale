@@ -15,6 +15,14 @@ public interface ContactServicePort {
 
 	Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId);
 
+	List<Definition> getEffectiveContactTypes(int shaleClientId);
+
+	List<Definition> getEffectiveSpecialties(int shaleClientId);
+
+	List<CredentialDefinition> getEffectiveCredentialDefinitions(int shaleClientId);
+
+	Optional<ClassificationProfile> getClassificationProfile(int contactId, int shaleClientId);
+
 	int createContact(CreateContactCommand command);
 
 	/**
@@ -41,6 +49,37 @@ public interface ContactServicePort {
 			String condition,
 			boolean deceased,
 			boolean client) {
+	}
+
+	/** A selectable effective Contact Type or Specialty; the id is always the stored definition id. */
+	record Definition(int id, String systemKey, String name, String description, int sortOrder) {
+	}
+
+	/** Professional credentials retain both their full name and abbreviation. */
+	record CredentialDefinition(int id, String systemKey, String name, String abbreviation,
+			String description, int sortOrder) {
+	}
+
+	record StructuredName(String prefix, String firstName, String middleName, String lastName,
+			String preferredName, String suffix) {
+	}
+
+	record AssignedDefinition(long assignmentId, Definition definition, boolean historical) {
+	}
+
+	record AssignedCredential(long assignmentId, CredentialDefinition definition, int displayOrder,
+			boolean historical) {
+	}
+
+	/** Read-only classification aggregate. It deliberately carries the existing display name unchanged. */
+	record ClassificationProfile(int contactId, int shaleClientId, StructuredName structuredName,
+			String legacyDisplayName, List<AssignedDefinition> contactTypes,
+			List<AssignedDefinition> specialties, List<AssignedCredential> credentials) {
+		public ClassificationProfile {
+			contactTypes = List.copyOf(contactTypes);
+			specialties = List.copyOf(specialties);
+			credentials = List.copyOf(credentials);
+		}
 	}
 
 	record CreateContactCommand(
