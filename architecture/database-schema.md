@@ -368,6 +368,25 @@ Contacts table.
 | `ReferredFrom`   | nvarchar(max) | Referral source        |
 | `ReferralType`   | nvarchar(max) | Referral type          |
 | `RowVer`         | timestamp     | Row version            |
+| `Prefix`         | nvarchar(50)  | Additive honorific; Phase 1A does not change display behavior |
+| `MiddleName`     | nvarchar(100) | Additive structured middle name |
+| `PreferredName`  | nvarchar(100) | Additive preferred name |
+| `Suffix`         | nvarchar(50)  | Actual name suffix only; professional credentials are assignments |
+
+### Contact classification foundation (Phase 1A)
+
+`dbo.ContactTypes`, `dbo.Specialties`, and `dbo.CredentialDefinitions` are independent customizable
+global/tenant overlay definition tables. Each stores `Id`, nullable `ShaleClientId`, `SystemKey`,
+`Name`, `Description`, `SortOrder`, `IsActive`, `IsDeleted`, deletion/creation/update actor and time
+metadata, and `RowVer`. Only the authoritative global `expert` Contact Type is initially seeded.
+
+`dbo.ContactContactTypes`, `dbo.ContactSpecialties`, and `dbo.ContactCredentials` are strict
+tenant-owned historical assignment tables with `Id`, `ShaleClientId`, `ContactId`, their definition
+foreign key, lifecycle actor/time metadata, and `RowVer`; credentials additionally have
+`DisplayOrder`. Composite Contact foreign keys enforce Contact tenant ownership, filtered indexes
+prevent duplicate active assignments, and soft-deleted rows retain history. Definition ownership
+(global or same tenant) requires future transactional service validation. See
+[contact-management.md](contact-management.md) for compatibility, RLS, Case role, and rollout rules.
 | `ShaleClientId`  | int           | Tenant id              |
 
 Contact display fallback:
