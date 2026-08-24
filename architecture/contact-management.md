@@ -12,7 +12,8 @@ display-name changes, or structured phone/email/address behavior. Existing `Name
 
 `ContactTypes`, `Specialties`, and `CredentialDefinitions` follow the global/tenant overlay standard.
 Each has a stable lowercase `SystemKey`, presentation fields, selection order, active/deleted state,
-timestamps and actors, deletion metadata, `RowVer`, and nullable tenant ownership. The effective list
+timestamps and actors, deletion metadata, `RowVer`, and nullable tenant ownership. A deleted definition
+must be inactive and have both deletion timestamp and actor; a nondeleted definition has neither. The effective list
 is global plus current tenant, with a same-key tenant definition winning. Inactive definitions cannot
 be newly selected; soft-deleted definitions and assignments remain available for history.
 
@@ -21,25 +22,35 @@ The concepts are deliberately orthogonal:
 * **Contact Type** is contact-wide classification (Expert, Attorney, Provider, Vendor, Witness).
 * **Specialty** is an independent area of practice or expertise. A Contact need not be an Expert to
   have one, and Specialty is not a Contact/Contact Type column.
-* **Credential** is a repeatable professional designation. `ContactCredentials.DisplayOrder` retains
-  explicit presentation order. MD, PhD, Esq., and similar credentials must never be written to
-  `Contacts.Suffix`; that field is reserved for Jr., Sr., II, III, IV, and other name suffixes.
+* **Credential** is a repeatable professional designation. A definition separates its full `Name`
+  (for example, Doctor of Medicine) from its display `Abbreviation` (MD), while `SystemKey`
+  (`doctor_of_medicine`) remains stable identity. Credentials are not name suffixes.
+  `ContactCredentials.DisplayOrder` retains explicit presentation order. Duplicate active instances
+  of one credential are unsupported; a future professional-license/jurisdiction model must be
+  separate. `Contacts.Prefix` is an honorific, while `Contacts.Suffix` is limited to actual suffixes
+  such as Jr., Sr., II, III, and IV.
 
-Only the global `ContactTypes.SystemKey='expert'` definition is seeded. Additional defaults require
-product/domain review; specialties and credentials receive no speculative global seed rows.
+Only the global `ContactTypes.SystemKey='expert'` definition is seeded. Additional global Contact
+Types, Specialties, and Credentials remain intentionally unseeded pending product/domain review.
+Credential definitions are not seeded in Phase 1A.
 
 ## Assignment lifecycle and tenancy
 
 `ContactContactTypes`, `ContactSpecialties`, and `ContactCredentials` are explicit, strict
 tenant-owned many-to-many tables. Each carries `ShaleClientId`, creation/update/deletion metadata,
 soft deletion, and `RowVer`. Filtered unique indexes prohibit duplicate **active** relationships while
-allowing removed relationships to remain and later assignments to be recorded as new history.
+allowing removed relationships to remain. Whether restoration reactivates that row or inserts a new
+historical row is deferred to the audited mutation-service phase; this schema supports either.
 
 The composite `(ShaleClientId, ContactId)` foreign keys make a cross-tenant Contact assignment
 impossible. Definition foreign keys preserve history. Because a definition may be global or tenant
 owned, SQL Server cannot express “definition tenant is NULL or equals assignment tenant” as a foreign
-key. Every future assignment mutation service must validate that rule, plus actor membership and
-lifecycle, on the same tenant-context connection and transaction before insert/restore. The
+key. All creation, update, and deletion actor columns reference authoritative `dbo.Users(id)`; nullable
+creation/update actors support migration provenance, and deletion invariants require a deletion actor.
+Because `Users.ShaleClientId` is nullable, these FKs preserve identity/history but do not authorize.
+Every future assignment mutation service must transactionally validate the global-or-same-tenant
+definition, effective active/nondeleted state, actor tenant authorization, and Contact ownership on the
+same tenant-context connection and transaction before insert/restore. The
 verification script detects inconsistent pre-existing rows. Definitions use
 `sec.fn_FilterByTenantOrGlobal`; assignments use strict `sec.fn_FilterByTenant`, all attached to the
 established enabled `TenantFilter` policy. The migration fails rather than inventing an RLS policy.
@@ -53,8 +64,10 @@ fallback, parsing, credential punctuation, and organization-contact rules before
 
 ## Legacy Expert bridge
 
-The migration creates/fetches the authoritative global `expert` definition, then inserts one active
-assignment for every `Contacts.IsExpert=1` row, including soft-deleted Contacts. Its `NOT EXISTS`
+The observed live baseline has 2,314 tenant-7 and 10 tenant-8 Contacts, no `IsExpert=1` rows,
+so the initial backfill validly inserts zero assignments; these counts are observations, not schema
+logic. The migration creates/fetches the authoritative global `expert` definition, then inserts one
+active assignment for every `Contacts.IsExpert=1` row, including soft-deleted Contacts. Its `NOT EXISTS`
 guard and active filtered unique index make reruns safe. It never changes `IsExpert`, never restores a
 removed assignment, and does not infer the legacy flag from assignments. Before any read cutover, a
 later release must dual-write the legacy flag and authoritative assignment transactionally, reconcile
@@ -63,8 +76,10 @@ drift, deploy assignment reads with compatibility fallback, monitor, and only th
 
 ## Case roles
 
-Opposing Counsel and Supporting Counsel are case-specific roles, not Contact Types. Phase 1A does not
-change runtime case-role behavior. Future work must use authoritative `CaseParties` plus `PartyRoles`
+The existing tenant-7 `PartyRoles.SystemKey=expert` row means Expert Witness in a particular Case;
+the global `ContactTypes.SystemKey=expert` row classifies a Contact across cases. Both are legitimate,
+nonconflicting concepts. Phase 1A modifies neither `PartyRoles`, `CaseParties`, nor `CaseContacts`.
+Opposing Counsel, Supporting Counsel, Expert Witness, and Treating Provider are case-specific roles, not Contact Types. Phase 1A does not change runtime case-role behavior. Future work must use authoritative `CaseParties` plus `PartyRoles`
 (including side where applicable) and must not introduce new reliance on legacy `CaseContacts`.
 
 ## Phased roadmap
@@ -84,6 +99,16 @@ change runtime case-role behavior. Future work must use authoritative `CaseParti
 6. **Phase 4 — retirement:** separately approve retirement of `IsExpert` and any obsolete name paths.
    Preserve assignment/audit history and keep Case roles on `CaseParties`/`PartyRoles`.
 
+## RLS and audit boundary
+
+Live `dbo.Contacts` currently has no TenantFilter predicate. Phase 1A deliberately does not attach
+one; this existing architectural/security condition requires separate review. The six new tables each
+have exactly one FILTER predicate on the enabled established TenantFilter policy. RLS is defense in
+depth, never a substitute for transactional authorization. No mutation path or EntityActionAuditLog
+allowlist change is included. Future mutation work must approve an entity/action vocabulary; restrict
+metadata; record actor and tenant identity; enforce RowVersion concurrency; and audit add, remove,
+restore, and update actions in the mutation transaction.
+
 ## Deployment, rollback, and operations
 
 Deployment order is: (1) deploy this application/documentation commit, which remains compatible with
@@ -102,8 +127,8 @@ the existing RLS predicate semantics, and sufficient log/lock capacity for the a
 ## Open decisions (deferred, not blockers for Phase 1A)
 
 * The reviewed set and presentation of additional global Contact Types and any credential defaults.
-* Exact structured display-name/credential formatting and whether a Contact may intentionally repeat
-  the same credential (the Phase 1A active uniqueness contract says no).
+* Exact structured display-name/credential punctuation (the Phase 1A contract prohibits duplicate
+  active instances of the same credential).
 * Entity-action audit vocabulary/metadata for definition and assignment mutations.
 * Whether assignment restore reactivates a historical row or inserts a new historical row; services
   must choose one consistent approach while preserving removal history.
