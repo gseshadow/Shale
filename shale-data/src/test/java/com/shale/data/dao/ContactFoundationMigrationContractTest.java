@@ -7,7 +7,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ContactFoundationMigrationContractTest {
     private static Path repo(String path) { Path p=Path.of(path); return Files.exists(p)?p:Path.of("..").resolve(path); }
-    private static String read(String path) throws Exception { return Files.readString(repo(path)); }
+    private static String read(String path) throws Exception {
+        return Files.readString(repo(path)).replace("\r\n", "\n").replace('\r', '\n');
+    }
 
     @Test void migrationDefinesTheCompleteAdditiveContract() throws Exception {
         String s=read("docs/sql/2026-08-24_contacts_foundation_phase1a.sql");
@@ -31,7 +33,15 @@ class ContactFoundationMigrationContractTest {
         String s=read("docs/sql/2026-08-24_contacts_foundation_phase1a.sql");
         assertTrue(s.contains("IsDeleted=1 AND IsActive=0 AND DeletedAt IS NOT NULL AND DeletedByUserId IS NOT NULL"));
         assertTrue(s.contains("IsDeleted=1 AND DeletedAt IS NOT NULL AND DeletedByUserId IS NOT NULL"));
-        assertTrue(s.contains("FOREIGN KEY(ShaleClientId,ContactId) REFERENCES dbo.Contacts(ShaleClientId,Id)"));
+        for(String mapping:new String[]{
+                "(N'FK_ContactContactTypes_Contact_Tenant',N'ContactContactTypes',N'ShaleClientId,ContactId',N'Contacts',N'ShaleClientId,Id')",
+                "(N'FK_ContactSpecialties_Contact_Tenant',N'ContactSpecialties',N'ShaleClientId,ContactId',N'Contacts',N'ShaleClientId,Id')",
+                "(N'FK_ContactCredentials_Contact_Tenant',N'ContactCredentials',N'ShaleClientId,ContactId',N'Contacts',N'ShaleClientId,Id')"})
+            assertTrue(s.contains(mapping),mapping);
+        assertTrue(s.contains("DECLARE fk_create CURSOR LOCAL FAST_FORWARD FOR SELECT ConstraintName,ChildTable,ChildColumns,ParentTable,ParentColumns FROM @Fks"));
+        assertTrue(s.contains("FOREIGN KEY('+@cc+N') REFERENCES dbo.'+QUOTENAME(@pt)+N'('+@pc+N')"));
+        assertTrue(s.contains("x.ChildColumns<>e.ChildColumns OR x.ParentColumns<>e.ParentColumns"));
+        assertTrue(s.contains("Required foreign key name exists with incompatible parent/column mapping"));
         assertTrue(s.contains("REFERENCES dbo.Users(id)"));
         for(String actor:new String[]{"CreatedByUserId","UpdatedByUserId","DeletedByUserId"}) assertTrue(s.contains("(N'"+actor+"')"),actor);
         assertTrue(s.contains("DisplayOrder>=0"));
