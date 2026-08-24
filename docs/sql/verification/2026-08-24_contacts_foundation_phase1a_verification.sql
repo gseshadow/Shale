@@ -2,10 +2,14 @@
    Run only through the approved all-tenant migration/administrative connection, never shale_app or
    shale_runtime. NULL session context is mandatory even when the principal can bypass RLS. */
 SET NOCOUNT ON;
+/* Operator must set this to 1 only after independently confirming this database principal sees all tenants. */
+DECLARE @OperatorVerifiedAllTenantVisibility bit=0;
 IF SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL
  THROW 56200, 'Verification requires SESSION_CONTEXT(N''ShaleClientId'') to be NULL; reconnect rather than clearing retained application context.',1;
 IF USER_NAME() IN(N'shale_app',N'shale_runtime') OR (ISNULL(IS_SRVROLEMEMBER(N'sysadmin'),0)<>1 AND ISNULL(IS_MEMBER(N'db_owner'),0)<>1)
- THROW 56201, 'Use the approved all-tenant migration/administrative principal, not an application connection.',1;
+ THROW 56201, 'Use the approved all-tenant migration/administrative database principal, not an application connection.',1;
+IF @OperatorVerifiedAllTenantVisibility<>1
+ THROW 56202, 'Operator-verified all-tenant visibility is required; set the acknowledgement only after independent visibility preflight.',1;
 
 /* Exact column contract, including byte lengths, nullability, identity, and rowversion. */
 DECLARE @Columns TABLE(TableName sysname,ColumnName sysname,TypeName sysname,MaxLength smallint,Nullable bit,IdentityColumn bit,RowVersionColumn bit);
@@ -19,7 +23,7 @@ INSERT @Columns SELECT t,c,ty,l,n,i,r FROM (VALUES
 (N'ContactCredentials',N'Id',N'bigint',8,0,1,0),(N'ContactCredentials',N'ShaleClientId',N'int',4,0,0,0),(N'ContactCredentials',N'ContactId',N'int',4,0,0,0),(N'ContactCredentials',N'CredentialDefinitionId',N'int',4,0,0,0),(N'ContactCredentials',N'DisplayOrder',N'int',4,0,0,0))v(t,c,ty,l,n,i,r);
 INSERT @Columns SELECT t,c,ty,l,n,i,r FROM (SELECT t,v.* FROM (VALUES(N'ContactContactTypes'),(N'ContactSpecialties'),(N'ContactCredentials'))q(t) CROSS APPLY(VALUES(N'IsDeleted',N'bit',1,0,0,0),(N'CreatedAt',N'datetime2',8,0,0,0),(N'CreatedByUserId',N'int',4,1,0,0),(N'UpdatedAt',N'datetime2',8,1,0,0),(N'UpdatedByUserId',N'int',4,1,0,0),(N'DeletedAt',N'datetime2',8,1,0,0),(N'DeletedByUserId',N'int',4,1,0,0),(N'RowVer',N'timestamp',8,0,0,1))v(c,ty,l,n,i,r))x;
 SELECT N'column contract mismatches (expect 0)' CheckName,COUNT_BIG(*) FindingCount FROM @Columns e LEFT JOIN sys.columns c ON c.object_id=OBJECT_ID(N'dbo.'+e.TableName) AND c.name=e.ColumnName LEFT JOIN sys.types y ON y.user_type_id=c.user_type_id WHERE c.column_id IS NULL OR y.name<>e.TypeName OR c.max_length<>e.MaxLength OR c.is_nullable<>e.Nullable OR c.is_identity<>e.IdentityColumn OR (CASE WHEN c.system_type_id=189 THEN 1 ELSE 0 END)<>e.RowVersionColumn;
-SELECT N'unexpected Phase 1A columns (expect 0)' CheckName,COUNT_BIG(*) FindingCount FROM sys.columns c JOIN sys.tables t ON t.object_id=c.object_id WHERE t.name IN(N'ContactTypes',N'Specialties',N'CredentialDefinitions',N'ContactContactTypes',N'ContactSpecialties',N'ContactCredentials') AND NOT EXISTS(SELECT 1 FROM @Columns e WHERE e.TableName=t.name AND e.ColumnName=c.name);
+SELECT N'additional non-Phase-1A columns (allowed; informational)' CheckName,COUNT_BIG(*) FindingCount FROM sys.columns c JOIN sys.tables t ON t.object_id=c.object_id WHERE t.name IN(N'ContactTypes',N'Specialties',N'CredentialDefinitions',N'ContactContactTypes',N'ContactSpecialties',N'ContactCredentials') AND NOT EXISTS(SELECT 1 FROM @Columns e WHERE e.TableName=t.name AND e.ColumnName=c.name);
 SELECT N'structured Contact column contract mismatches (expect 0)' CheckName,COUNT_BIG(*) FindingCount FROM (VALUES(N'Prefix',100),(N'MiddleName',200),(N'PreferredName',200),(N'Suffix',100))e(c,l) LEFT JOIN sys.columns c ON c.object_id=OBJECT_ID(N'dbo.Contacts') AND c.name=e.c WHERE c.column_id IS NULL OR c.system_type_id<>231 OR c.max_length<>e.l OR c.is_nullable<>1;
 
 /* Defaults and CHECK definitions are emitted without row data for manual contract comparison. */

@@ -399,7 +399,7 @@ rules. In particular, `Prefix` is an honorific and `Suffix` is only a true suffi
 IV); current runtime reads, writes, and display behavior remain unchanged. `dbo.Contacts` has no RLS
 predicate and Phase 1A intentionally does not add one. The case-specific tenant `PartyRoles` expert
 role remains separate from the contact-wide global Contact Type, and `PartyRoles`, `CaseParties`, and
-legacy `CaseContacts` are not modified. A later dual-write phase is required before `IsExpert` cutover.
+legacy `CaseContacts` are not modified. A later dual-write phase is required before `IsExpert` cutover. Phase 1A reruns strictly validate required named objects and columns but tolerate unrelated additive columns, indexes, foreign keys, and CHECK constraints introduced by later phases.
 | `ShaleClientId`  | int           | Tenant id              |
 
 Contact display fallback:

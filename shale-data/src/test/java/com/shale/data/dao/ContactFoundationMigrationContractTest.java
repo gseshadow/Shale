@@ -18,7 +18,8 @@ class ContactFoundationMigrationContractTest {
         for(String column:new String[]{"Prefix","MiddleName","PreferredName","Suffix"}) assertTrue(s.contains("Contacts ADD "+column),column);
         assertTrue(s.contains("Abbreviation nvarchar(50) NOT NULL"));
         assertTrue(s.contains("N'CredentialDefinitions',N'Abbreviation',N'nvarchar',100,0,0,0"));
-        assertTrue(s.contains("Unexpected column in a Contacts Phase 1A table"));
+        assertTrue(s.contains("later additive phases may extend these tables"));
+        assertFalse(s.contains("Unexpected column in a Contacts Phase 1A table"));
         assertTrue(s.contains("Critical default constraint is missing or incompatible"));
         assertTrue(s.contains("incompatible keys, uniqueness, includes, or filter"));
         assertTrue(s.contains("incompatible parent/column mapping"));
@@ -40,7 +41,10 @@ class ContactFoundationMigrationContractTest {
     @Test void migrationGuardsAllTenantContextContactsAndExpertCompatibility() throws Exception {
         String s=read("docs/sql/2026-08-24_contacts_foundation_phase1a.sql");
         assertTrue(s.contains("SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL"));
-        assertTrue(s.contains("N'shale_app',N'shale_runtime'"));
+        assertTrue(s.contains("USER_NAME() IN (N'shale_app',N'shale_runtime')"));
+        assertTrue(s.contains("IS_SRVROLEMEMBER(N'sysadmin')"));
+        assertTrue(s.contains("IS_MEMBER(N'db_owner')"));
+        assertTrue(s.contains("@OperatorVerifiedAllTenantVisibility<>1"));
         assertTrue(s.contains("dbo.Contacts.Id must be the NOT NULL int IDENTITY primary key"));
         assertTrue(s.contains("dbo.Contacts.ShaleClientId must be int NOT NULL"));
         assertTrue(s.contains("LEFT JOIN dbo.ShaleClients sc"));
@@ -67,6 +71,8 @@ class ContactFoundationMigrationContractTest {
         String d=read("architecture/database-schema.md");
         for(String phrase:new String[]{"column contract mismatches (expect 0)","critical defaults missing/incompatible (expect 0)","actor FK mapping mismatches (expect 0)","global Expert definitions (expect exactly 1 after migration)","legacy IsExpert=1 Contacts (live baseline observed 0)","missing active Expert assignments (expect 0)","active Expert assignments (live baseline currently expected 0)","duplicate active Expert assignments (expect 0)","cross-tenant Contact assignments (expect 0)","cross-tenant definition assignments (expect 0)","unexpected Phase 1A RLS predicates (expect 0)","dbo.Contacts TenantFilter predicates (existing condition; expect 0 in Phase 1A)"}) assertTrue(v.contains(phrase),phrase);
         assertTrue(v.contains("Abbreviation"));
+        assertTrue(v.contains("additional non-Phase-1A columns (allowed; informational)"));
+        assertTrue(v.contains("@OperatorVerifiedAllTenantVisibility<>1"));
         assertTrue(v.contains("STRING_AGG"));
         assertTrue(a.contains("2,314 tenant-7 and 10 tenant-8 Contacts"));
         assertTrue(a.contains("dual-write"));
@@ -76,6 +82,15 @@ class ContactFoundationMigrationContractTest {
         assertTrue(d.contains("full `Name`"));
         assertTrue(d.contains("current runtime reads, writes, and display behavior remain unchanged"));
         assertTrue(a.contains("has **not** been\nexecuted"));
+    }
+
+    @Test void rerunValidationToleratesUnrelatedLaterAdditiveObjects() throws Exception {
+        String s=read("docs/sql/2026-08-24_contacts_foundation_phase1a.sql");
+        assertFalse(s.contains("NOT EXISTS(SELECT 1 FROM @ExpectedColumns e WHERE e.TableName=t.name AND e.ColumnName=c.name)"));
+        assertTrue(s.contains("Unrelated checks added by later phases are intentionally tolerated"));
+        assertTrue(s.contains("WHERE i.object_id=OBJECT_ID(N'dbo.'+e.TableName) AND i.name=e.IndexName"));
+        assertTrue(s.contains("f.name=e.ConstraintName"));
+        assertTrue(s.contains("c.name=e.ConstraintName"));
     }
 
     @Test void phaseOneADoesNotMutateCaseRoleOrAuditArchitecture() throws Exception {

@@ -118,6 +118,18 @@ all-tenant visibility; (4) investigate every nonzero “expect 0” result and c
 (5) deploy future runtime phases only after verification. The SQL in this repository has **not** been
 executed against a database.
 
+Reruns validate every Phase 1A-owned required column and named index, foreign key, CHECK, default,
+and RLS predicate by its contract. A conflicting object with a Phase 1A name or an incompatible
+required column fails for manual review. Unrelated columns, indexes, foreign keys, and CHECKs added
+by legitimate later additive phases are tolerated, so the foundation remains rerunnable.
+
+The scripts use `USER_NAME()`—the current SQL Server/Azure SQL database principal identity—to reject
+`shale_app` and `shale_runtime`; they do not use an application-name connection-string value. They
+also require NULL `SESSION_CONTEXT(N'ShaleClientId')`, sysadmin or `db_owner` administrative
+membership, and an explicit `@OperatorVerifiedAllTenantVisibility=1` acknowledgement after an
+independent all-tenant visibility preflight. Role membership alone is not treated as proof that an RLS
+predicate grants all-tenant visibility, and neither script changes permissions or principal state.
+
 There is intentionally no destructive down migration. Transactional DDL rolls back on execution
 failure; after a successful deployment, operational rollback is to leave the additive unused objects
 in place and roll back application consumers. Dropping objects would discard assignment history and

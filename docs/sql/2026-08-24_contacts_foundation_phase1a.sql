@@ -3,10 +3,14 @@
    behavior intact. Execute only through the approved all-tenant migration connection. */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
+/* Operator must set this to 1 only after independently confirming this database principal sees all tenants. */
+DECLARE @OperatorVerifiedAllTenantVisibility bit=0;
 IF SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL
  THROW 56100, 'Contacts Phase 1A requires SESSION_CONTEXT ShaleClientId to be NULL; do not clear retained application context automatically.', 1;
 IF USER_NAME() IN (N'shale_app',N'shale_runtime') OR (ISNULL(IS_SRVROLEMEMBER(N'sysadmin'),0)<>1 AND ISNULL(IS_MEMBER(N'db_owner'),0)<>1)
- THROW 56101, 'Use the approved all-tenant migration/administrative principal, never shale_app or shale_runtime.', 1;
+ THROW 56101, 'Use the approved all-tenant migration/administrative database principal, never shale_app or shale_runtime.', 1;
+IF @OperatorVerifiedAllTenantVisibility<>1
+ THROW 56131, 'Operator-verified all-tenant visibility is required; set the acknowledgement only after independent visibility preflight.',1;
 GO
 BEGIN TRY
 BEGIN TRANSACTION;
@@ -100,8 +104,7 @@ IF EXISTS(SELECT 1 FROM sys.columns c JOIN sys.tables t ON t.object_id=c.object_
 IF EXISTS(SELECT 1 FROM sys.identity_columns ic JOIN sys.tables t ON t.object_id=ic.object_id WHERE t.name IN(N'ContactTypes',N'Specialties',N'CredentialDefinitions',N'ContactContactTypes',N'ContactSpecialties',N'ContactCredentials') AND (CONVERT(bigint,ic.seed_value)<>1 OR CONVERT(bigint,ic.increment_value)<>1)) THROW 56126,'Phase 1A identities must be IDENTITY(1,1).',1;
 IF EXISTS(SELECT 1 FROM @ExpectedColumns e LEFT JOIN sys.columns c ON c.object_id=OBJECT_ID(N'dbo.'+e.TableName) AND c.name=e.ColumnName LEFT JOIN sys.types y ON y.user_type_id=c.user_type_id WHERE c.column_id IS NULL OR y.name<>e.TypeName OR c.max_length<>e.MaxLength OR c.is_nullable<>e.IsNullable OR c.is_identity<>e.IsIdentity OR c.is_rowguidcol<>0 OR (CASE WHEN c.system_type_id=189 THEN 1 ELSE 0 END)<>e.IsRowVersion)
  THROW 56108, 'Incompatible Contacts Phase 1A column contract; manual review required.',1;
-IF EXISTS(SELECT 1 FROM sys.columns c JOIN sys.tables t ON t.object_id=c.object_id WHERE SCHEMA_NAME(t.schema_id)=N'dbo' AND t.name IN(N'ContactTypes',N'Specialties',N'CredentialDefinitions',N'ContactContactTypes',N'ContactSpecialties',N'ContactCredentials') AND NOT EXISTS(SELECT 1 FROM @ExpectedColumns e WHERE e.TableName=t.name AND e.ColumnName=c.name))
- THROW 56109, 'Unexpected column in a Contacts Phase 1A table; manual review required.',1;
+/* Deliberately do not reject other columns: later additive phases may extend these tables. */
 
 /* Contacts live-schema and tenant-ownership preflight precedes its composite key and backfill. */
 IF NOT EXISTS(SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.Contacts') AND name=N'Id' AND system_type_id=56 AND is_nullable=0 AND is_identity=1)
@@ -150,8 +153,15 @@ DECLARE @a sysname; OPEN actor_cursor; FETCH NEXT FROM actor_cursor INTO @ct,@a;
 /* Validate critical defaults, checks, indexes and every FK by semantics, not name alone. */
 IF EXISTS(SELECT 1 FROM (VALUES(N'ContactTypes',N'SortOrder',N'((0))'),(N'ContactTypes',N'IsActive',N'((1))'),(N'ContactTypes',N'IsDeleted',N'((0))'),(N'ContactTypes',N'CreatedAt',N'(sysutcdatetime())'),(N'Specialties',N'SortOrder',N'((0))'),(N'Specialties',N'IsActive',N'((1))'),(N'Specialties',N'IsDeleted',N'((0))'),(N'Specialties',N'CreatedAt',N'(sysutcdatetime())'),(N'CredentialDefinitions',N'SortOrder',N'((0))'),(N'CredentialDefinitions',N'IsActive',N'((1))'),(N'CredentialDefinitions',N'IsDeleted',N'((0))'),(N'CredentialDefinitions',N'CreatedAt',N'(sysutcdatetime())'),(N'ContactContactTypes',N'IsDeleted',N'((0))'),(N'ContactContactTypes',N'CreatedAt',N'(sysutcdatetime())'),(N'ContactSpecialties',N'IsDeleted',N'((0))'),(N'ContactSpecialties',N'CreatedAt',N'(sysutcdatetime())'),(N'ContactCredentials',N'IsDeleted',N'((0))'),(N'ContactCredentials',N'CreatedAt',N'(sysutcdatetime())'),(N'ContactCredentials',N'DisplayOrder',N'((0))'))v(t,c,d) LEFT JOIN sys.columns c ON c.object_id=OBJECT_ID(N'dbo.'+v.t) AND c.name=v.c LEFT JOIN sys.default_constraints dc ON dc.object_id=c.default_object_id WHERE LOWER(REPLACE(dc.definition,N' ',N''))<>LOWER(v.d) OR dc.object_id IS NULL)
  THROW 56115,'Critical default constraint is missing or incompatible.',1;
-IF (SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id IN(OBJECT_ID(N'dbo.ContactTypes'),OBJECT_ID(N'dbo.Specialties'),OBJECT_ID(N'dbo.CredentialDefinitions')) AND name LIKE N'CK_%_SystemKey' AND is_disabled=0 AND is_not_trusted=0 AND definition LIKE N'%lower%' AND definition LIKE N'%like%')<>3 OR (SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id IN(OBJECT_ID(N'dbo.ContactTypes'),OBJECT_ID(N'dbo.Specialties'),OBJECT_ID(N'dbo.CredentialDefinitions')) AND name LIKE N'CK_%_DeleteFields' AND is_disabled=0 AND is_not_trusted=0 AND definition LIKE N'%[IsDeleted]%' AND definition LIKE N'%[IsActive]%' AND definition LIKE N'%[DeletedAt]%' AND definition LIKE N'%[DeletedByUserId]%')<>3 OR (SELECT COUNT(*) FROM sys.check_constraints WHERE parent_object_id IN(OBJECT_ID(N'dbo.ContactContactTypes'),OBJECT_ID(N'dbo.ContactSpecialties'),OBJECT_ID(N'dbo.ContactCredentials')) AND name LIKE N'CK_%_DeleteFields' AND is_disabled=0 AND is_not_trusted=0 AND definition LIKE N'%[DeletedAt]%' AND definition LIKE N'%[DeletedByUserId]%')<>3 OR NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE object_id=OBJECT_ID(N'dbo.CK_ContactCredentials_DisplayOrder') AND is_disabled=0 AND is_not_trusted=0 AND definition LIKE N'%[DisplayOrder]%')
- THROW 56116,'Required lifecycle/display CHECK contract is missing.',1;
+DECLARE @ExpectedChecks TABLE(TableName sysname,ConstraintName sysname,RequiredToken1 nvarchar(50),RequiredToken2 nvarchar(50),RequiredToken3 nvarchar(50),RequiredToken4 nvarchar(50));
+INSERT @ExpectedChecks VALUES
+(N'ContactTypes',N'CK_ContactTypes_SystemKey',N'SystemKey',N'lower',N'like',N'ltrim'),(N'Specialties',N'CK_Specialties_SystemKey',N'SystemKey',N'lower',N'like',N'ltrim'),(N'CredentialDefinitions',N'CK_CredentialDefinitions_SystemKey',N'SystemKey',N'lower',N'like',N'ltrim'),
+(N'ContactTypes',N'CK_ContactTypes_DeletedInactive',N'IsDeleted',N'IsActive',NULL,NULL),(N'Specialties',N'CK_Specialties_DeletedInactive',N'IsDeleted',N'IsActive',NULL,NULL),(N'CredentialDefinitions',N'CK_CredentialDefinitions_DeletedInactive',N'IsDeleted',N'IsActive',NULL,NULL),
+(N'ContactTypes',N'CK_ContactTypes_DeleteFields',N'IsDeleted',N'IsActive',N'DeletedAt',N'DeletedByUserId'),(N'Specialties',N'CK_Specialties_DeleteFields',N'IsDeleted',N'IsActive',N'DeletedAt',N'DeletedByUserId'),(N'CredentialDefinitions',N'CK_CredentialDefinitions_DeleteFields',N'IsDeleted',N'IsActive',N'DeletedAt',N'DeletedByUserId'),
+(N'ContactContactTypes',N'CK_ContactContactTypes_DeleteFields',N'IsDeleted',N'DeletedAt',N'DeletedByUserId',NULL),(N'ContactSpecialties',N'CK_ContactSpecialties_DeleteFields',N'IsDeleted',N'DeletedAt',N'DeletedByUserId',NULL),(N'ContactCredentials',N'CK_ContactCredentials_DeleteFields',N'IsDeleted',N'DeletedAt',N'DeletedByUserId',NULL),(N'ContactCredentials',N'CK_ContactCredentials_DisplayOrder',N'DisplayOrder',N'>=',NULL,NULL);
+IF EXISTS(SELECT 1 FROM @ExpectedChecks e LEFT JOIN sys.check_constraints c ON c.parent_object_id=OBJECT_ID(N'dbo.'+e.TableName) AND c.name=e.ConstraintName WHERE c.object_id IS NULL OR c.is_disabled=1 OR c.is_not_trusted=1 OR c.definition NOT LIKE N'%'+e.RequiredToken1+N'%' OR (e.RequiredToken2 IS NOT NULL AND c.definition NOT LIKE N'%'+e.RequiredToken2+N'%') OR (e.RequiredToken3 IS NOT NULL AND c.definition NOT LIKE N'%'+e.RequiredToken3+N'%') OR (e.RequiredToken4 IS NOT NULL AND c.definition NOT LIKE N'%'+e.RequiredToken4+N'%'))
+ THROW 56116,'A required named Phase 1A CHECK constraint is missing or incompatible.',1;
+/* Unrelated checks added by later phases are intentionally tolerated. */
 /* Canonical key lists expose wrong order, includes, uniqueness, or filters even when names match. */
 DECLARE @ExpectedIndexes TABLE(TableName sysname,IndexName sysname,IsUnique bit,Filter nvarchar(100),Keys nvarchar(300),Includes nvarchar(300));
 INSERT @ExpectedIndexes VALUES
