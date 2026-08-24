@@ -378,15 +378,28 @@ Contacts table.
 `dbo.ContactTypes`, `dbo.Specialties`, and `dbo.CredentialDefinitions` are independent customizable
 global/tenant overlay definition tables. Each stores `Id`, nullable `ShaleClientId`, `SystemKey`,
 `Name`, `Description`, `SortOrder`, `IsActive`, `IsDeleted`, deletion/creation/update actor and time
-metadata, and `RowVer`. Only the authoritative global `expert` Contact Type is initially seeded.
+metadata, and `RowVer`. `CredentialDefinitions` additionally separates full `Name` (Doctor of
+Medicine) from required display `Abbreviation` (MD); credentials are not suffixes and `SystemKey` is
+stable identity. Deleted definitions must be inactive and have both deletion fields, while nondeleted
+ones have neither. Only the authoritative global `expert` Contact Type is initially seeded; all other
+global Contact Types, Specialties, and Credentials remain intentionally unseeded.
 
 `dbo.ContactContactTypes`, `dbo.ContactSpecialties`, and `dbo.ContactCredentials` are strict
 tenant-owned historical assignment tables with `Id`, `ShaleClientId`, `ContactId`, their definition
 foreign key, lifecycle actor/time metadata, and `RowVer`; credentials additionally have
 `DisplayOrder`. Composite Contact foreign keys enforce Contact tenant ownership, filtered indexes
-prevent duplicate active assignments, and soft-deleted rows retain history. Definition ownership
+prevent duplicate active assignments (including duplicate MD/RN instances), and valid deletion
+metadata retains history. Professional license/jurisdiction data requires a separate future model;
+restoration semantics are deferred without destructive schema implications. All actor columns
+reference `dbo.Users(id)`, but nullable `Users.ShaleClientId` means services must still validate
+authorization. Definition ownership
 (global or same tenant) requires future transactional service validation. See
-[contact-management.md](contact-management.md) for compatibility, RLS, Case role, and rollout rules.
+[contact-management.md](contact-management.md) for compatibility, RLS, Case role, audit, and rollout
+rules. In particular, `Prefix` is an honorific and `Suffix` is only a true suffix (Jr., Sr., II, III,
+IV); current runtime reads, writes, and display behavior remain unchanged. `dbo.Contacts` has no RLS
+predicate and Phase 1A intentionally does not add one. The case-specific tenant `PartyRoles` expert
+role remains separate from the contact-wide global Contact Type, and `PartyRoles`, `CaseParties`, and
+legacy `CaseContacts` are not modified. A later dual-write phase is required before `IsExpert` cutover. Phase 1A reruns strictly validate required named objects and columns but tolerate unrelated additive columns, indexes, foreign keys, and CHECK constraints introduced by later phases.
 | `ShaleClientId`  | int           | Tenant id              |
 
 Contact display fallback:
