@@ -3,7 +3,9 @@
    behavior intact. Execute only through the approved all-tenant migration connection. */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
-/* Operator must set this to 1 only after independently confirming this database principal sees all tenants. */
+BEGIN TRY
+/* On a disposable execution copy only, set this to 1 after the independent all-tenant
+   visibility preflight confirms that this principal can see every tenant. */
 DECLARE @OperatorVerifiedAllTenantVisibility bit=0;
 IF SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL
  THROW 56100, 'Contacts Phase 1A requires SESSION_CONTEXT ShaleClientId to be NULL; do not clear retained application context automatically.', 1;
@@ -11,8 +13,6 @@ IF USER_NAME() IN (N'shale_app',N'shale_runtime') OR (ISNULL(IS_SRVROLEMEMBER(N'
  THROW 56101, 'Use the approved all-tenant migration/administrative database principal, never shale_app or shale_runtime.', 1;
 IF @OperatorVerifiedAllTenantVisibility<>1
  THROW 56131, 'Operator-verified all-tenant visibility is required; set the acknowledgement only after independent visibility preflight.',1;
-GO
-BEGIN TRY
 BEGIN TRANSACTION;
 
 IF OBJECT_ID(N'dbo.Contacts',N'U') IS NULL THROW 56102, 'Required table dbo.Contacts is missing.', 1;
@@ -194,7 +194,13 @@ WHILE @@FETCH_STATUS=0 BEGIN IF NOT EXISTS(SELECT 1 FROM sys.security_predicates
  SET @sql=N'ALTER SECURITY POLICY '+@PolicyQualified+N' ADD FILTER PREDICATE sec.'+QUOTENAME(@p)+N'(ShaleClientId) ON dbo.'+QUOTENAME(@t)+N';'; EXEC sys.sp_executesql @sql; END
  FETCH NEXT FROM rls_cursor INTO @t,@p; END CLOSE rls_cursor; DEALLOCATE rls_cursor;
 
-IF EXISTS(SELECT 1 FROM (VALUES(N'ContactTypes',N'fn_FilterByTenantOrGlobal'),(N'Specialties',N'fn_FilterByTenantOrGlobal'),(N'CredentialDefinitions',N'fn_FilterByTenantOrGlobal'),(N'ContactContactTypes',N'fn_FilterByTenant'),(N'ContactSpecialties',N'fn_FilterByTenant'),(N'ContactCredentials',N'fn_FilterByTenant'))e(t,p) OUTER APPLY(SELECT COUNT(*) n,MAX(OBJECT_SCHEMA_NAME(sp.predicate_object_id)+N'.'+OBJECT_NAME(sp.predicate_object_id)) fn,MAX(sp.predicate_definition) predicate_definition FROM sys.security_predicates sp WHERE sp.object_id=@PolicyId AND sp.target_object_id=OBJECT_ID(N'dbo.'+e.t) AND sp.predicate_type_desc=N'FILTER')x WHERE x.n<>1 OR x.fn<>N'sec.'+e.p OR x.predicate_definition NOT LIKE N'%([ShaleClientId])%')
+IF EXISTS(SELECT 1 FROM (VALUES
+ (N'ContactTypes',N'sec.fn_filterbytenantorglobalshaleclientid'),(N'Specialties',N'sec.fn_filterbytenantorglobalshaleclientid'),(N'CredentialDefinitions',N'sec.fn_filterbytenantorglobalshaleclientid'),
+ (N'ContactContactTypes',N'sec.fn_filterbytenantshaleclientid'),(N'ContactSpecialties',N'sec.fn_filterbytenantshaleclientid'),(N'ContactCredentials',N'sec.fn_filterbytenantshaleclientid'))e(t,ExpectedDefinition)
+ OUTER APPLY(SELECT COUNT(*) n,MAX(LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(sp.predicate_definition,N'[',N''),N']',N''),N' ',N''),NCHAR(9),N''),NCHAR(10),N''),NCHAR(13),N''),N'(',N''),N')',N''))) NormalizedDefinition,
+ MAX(CASE WHEN sp.operation IS NULL AND sp.operation_desc IS NULL THEN 0 ELSE 1 END) WrongOperation
+ FROM sys.security_predicates sp WHERE sp.object_id=@PolicyId AND sp.target_object_id=OBJECT_ID(N'dbo.'+e.t) AND sp.predicate_type_desc=N'FILTER')x
+ WHERE x.n<>1 OR x.WrongOperation<>0 OR x.NormalizedDefinition<>e.ExpectedDefinition)
  THROW 56124,'Each Phase 1A table requires exactly one expected FILTER function on enabled TenantFilter.',1;
 
 COMMIT TRANSACTION;
