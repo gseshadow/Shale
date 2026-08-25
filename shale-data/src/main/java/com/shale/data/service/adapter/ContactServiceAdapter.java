@@ -69,6 +69,33 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	}
 
 	@Override
+	public List<AdministrationDefinition> listDefinitionsForAdministration(DefinitionCategory category,
+			int shaleClientId, int actorUserId) {
+		List<ContactDao.AdministrationDefinitionRow> rows = contactGateway
+				.listDefinitionsForAdministration(category, shaleClientId, actorUserId);
+		var globals = rows.stream().filter(r -> r.shaleClientId() == null)
+				.collect(java.util.stream.Collectors.toMap(ContactDao.AdministrationDefinitionRow::systemKey,
+						java.util.function.Function.identity(), (a, b) -> a));
+		var tenants = rows.stream().filter(r -> r.shaleClientId() != null)
+				.collect(java.util.stream.Collectors.toMap(ContactDao.AdministrationDefinitionRow::systemKey,
+						java.util.function.Function.identity(), (a, b) -> a));
+		return rows.stream().map(r -> {
+			var global = globals.get(r.systemKey()); var tenant = tenants.get(r.systemKey());
+			DefinitionOrigin origin = r.shaleClientId() == null ? DefinitionOrigin.GLOBAL
+					: global == null ? DefinitionOrigin.CUSTOM : DefinitionOrigin.OVERRIDE;
+			DefinitionOverlayState state;
+			if (origin == DefinitionOrigin.GLOBAL) {
+				state = tenant == null ? (r.active() && !r.deleted() ? DefinitionOverlayState.EFFECTIVE : DefinitionOverlayState.INEFFECTIVE)
+						: tenant.deleted() ? DefinitionOverlayState.GLOBAL_FALLBACK
+						: tenant.active() ? DefinitionOverlayState.OVERRIDDEN : DefinitionOverlayState.MASKED_GLOBAL;
+			} else state = !r.deleted() && r.active() ? DefinitionOverlayState.EFFECTIVE : DefinitionOverlayState.INEFFECTIVE;
+			return new AdministrationDefinition(r.category(), r.id(), r.shaleClientId(), r.systemKey(),
+					r.name(), r.abbreviation(), r.description(), r.sortOrder(), r.active(), r.deleted(),
+					origin, global == null ? null : global.id(), state, r.rowVer());
+		}).toList();
+	}
+
+	@Override
 	public Optional<ClassificationProfile> getClassificationProfile(int contactId, int shaleClientId) {
 		return Optional.ofNullable(contactGateway.findClassificationProfile(contactId, shaleClientId))
 				.map(row -> new ClassificationProfile(row.contactId(), row.shaleClientId(),
@@ -169,6 +196,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		default List<ContactDao.DefinitionRow> listEffectiveDefinitions(String table, int shaleClientId) { return List.of(); }
 
 		default List<ContactDao.CredentialDefinitionRow> listEffectiveCredentialDefinitions(int shaleClientId) { return List.of(); }
+		default List<ContactDao.AdministrationDefinitionRow> listDefinitionsForAdministration(DefinitionCategory category, int tenant, int actor) { return List.of(); }
 
 		default ContactDao.ClassificationProfileRow findClassificationProfile(int contactId, int shaleClientId) { return null; }
 		default DefinitionMutationResult createDefinition(CreateDefinitionCommand c){ throw new UnsupportedOperationException(); }
@@ -222,6 +250,9 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		}
 		@Override public List<ContactDao.CredentialDefinitionRow> listEffectiveCredentialDefinitions(int tenant) {
 			return contactDao.listEffectiveCredentialDefinitions(tenant);
+		}
+		@Override public List<ContactDao.AdministrationDefinitionRow> listDefinitionsForAdministration(DefinitionCategory category, int tenant, int actor) {
+			return contactDao.listDefinitionsForAdministration(category, tenant, actor);
 		}
 		@Override public ContactDao.ClassificationProfileRow findClassificationProfile(int contactId, int tenant) {
 			return contactDao.findClassificationProfile(contactId, tenant);
