@@ -10,6 +10,7 @@ import com.shale.core.service.ContactServicePort;
 import com.shale.ui.state.AppState;
 import com.shale.ui.testutil.JavaFxTestSupport;
 
+import javafx.scene.control.Button;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
@@ -43,6 +44,10 @@ class ContactClassificationAdminPaneTest {
             assertEquals("Specialties", tabs.getTabs().get(1).getText());
             assertEquals("Credentials", tabs.getTabs().get(2).getText());
             assertTrue(tabs.getStyleClass().contains("contact-classification-tabs"));
+            Button refresh = (Button) root.lookup("#contact-classification-refresh");
+            assertNotNull(refresh);
+            assertTrue(refresh.getStyleClass().contains("shale-control-secondary"));
+            assertFalse(refresh.getStyleClass().contains("shale-control-ghost"));
             pane.dispose();
         });
     }

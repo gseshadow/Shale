@@ -2642,13 +2642,8 @@
 }
 .status-timeline--compact .scroll-bar:horizontal .track { -fx-background-color: rgba(91,103,124,0.10); }
 .status-timeline--compact .scroll-bar:horizontal .thumb { -fx-background-color: rgba(91,103,124,0.38); }
-/* Contact classification administration: a compact Settings surface using the
-   existing Shale card, form, and semantic-control foundations. */
-.contact-classification-settings {
-    -fx-max-width: 1040px;
-    -fx-padding: 18px;
-    -fx-spacing: 10px;
-}
+/* Contact classification administration uses the shared strong-panel Settings
+   surface; only its internal layout needs Contact-specific styling. */
 .contact-classification-admin { -fx-spacing: 14px; }
 .contact-classification-tabs {
     -fx-tab-min-height: 38px;
