@@ -19,7 +19,7 @@ public record EntityActionAuditEvent(
 		String source,
 		Map<MetadataKey, String> metadata) {
 
-	public enum EntityType { CASE, CASE_STATUS, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CASE_DATE_TYPE, CALENDAR_EVENT, CASE_DATE_ROLE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER }
+	public enum EntityType { CASE, CASE_STATUS, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CASE_DATE_TYPE, CALENDAR_EVENT, CASE_DATE_ROLE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER, CONTACT_TYPE, SPECIALTY, CREDENTIAL_DEFINITION, CONTACT_CONTACT_TYPE, CONTACT_SPECIALTY, CONTACT_CREDENTIAL }
 
 	public enum Action {
 		CREATED,
@@ -80,7 +80,9 @@ public record EntityActionAuditEvent(
 		CONFIGURED_FIELD_COUNT,
 		INITIAL_CREATION,
 		SEMANTIC_ROLE,
-		CASE_DATE_TYPE_ID
+		CASE_DATE_TYPE_ID,
+		DEFINITION_ID,
+		ORDERING_COUNT
 	}
 
 	private static final Set<String> PROHIBITED_KEY_FRAGMENTS = Set.of(
@@ -115,6 +117,9 @@ public record EntityActionAuditEvent(
 			case MATERIAL_REQUEST_FOLLOW_UP -> action == Action.CREATED || action == Action.FOLLOW_UP_ADDED;
 			case USER -> action == Action.CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.REMOVED;
 			case MATERIAL_ITEM -> action == Action.CREATED || action == Action.UPDATED || action == Action.LINKED || action == Action.UNLINKED || action == Action.LOCATION_UPDATED || action == Action.RELEASED || action == Action.DELETED;
+			case CONTACT_TYPE, SPECIALTY, CREDENTIAL_DEFINITION -> action == Action.CREATED || action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.REMOVED || action == Action.RESTORED;
+			case CONTACT_CONTACT_TYPE, CONTACT_SPECIALTY -> action == Action.ADDED || action == Action.REMOVED || action == Action.RESTORED;
+			case CONTACT_CREDENTIAL -> action == Action.ADDED || action == Action.REMOVED || action == Action.RESTORED || action == Action.REORDERED;
 		};
 	}
 

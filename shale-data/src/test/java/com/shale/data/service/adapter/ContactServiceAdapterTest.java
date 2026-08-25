@@ -77,6 +77,18 @@ class ContactServiceAdapterTest {
 		assertEquals(4, profile.credentials().get(0).displayOrder());
 	}
 
+	@Test
+	void phase1cMutationCommandsRemainOnSharedPortAndDelegateUnchanged() {
+		FakeContactGateway gateway = new FakeContactGateway(List.of());
+		var command = new com.shale.core.service.ContactServicePort.AssignClassificationCommand(
+				com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 42, 7, 5, 91, null);
+		var expected = new com.shale.core.service.ContactServicePort.AssignmentMutationResult(
+				command.category(), 1001, 5, 91, null, false, new byte[] { 1 });
+		gateway.assignmentResult = expected;
+		assertEquals(expected, new ContactServiceAdapter(gateway).assignClassification(command));
+		assertEquals(command, gateway.assignmentCommand);
+	}
+
 	private static final class FakeContactGateway implements ContactServiceAdapter.ContactGateway {
 		private final List<ContactDao.DirectoryContactRow> rows;
 		private int lastSearchShaleClientId;
@@ -85,6 +97,8 @@ class ContactServiceAdapterTest {
 		private int lastDetailShaleClientId;
 		private boolean fullDetailLookupCalled;
 		private ContactDao.ClassificationProfileRow profile;
+		private com.shale.core.service.ContactServicePort.AssignClassificationCommand assignmentCommand;
+		private com.shale.core.service.ContactServicePort.AssignmentMutationResult assignmentResult;
 
 		private FakeContactGateway(List<ContactDao.DirectoryContactRow> rows) {
 			this.rows = rows;
@@ -132,6 +146,11 @@ class ContactServiceAdapterTest {
 
 		@Override public ContactDao.ClassificationProfileRow findClassificationProfile(int contactId, int shaleClientId) {
 			return profile;
+		}
+
+		@Override public com.shale.core.service.ContactServicePort.AssignmentMutationResult assignClassification(
+				com.shale.core.service.ContactServicePort.AssignClassificationCommand command) {
+			assignmentCommand = command; return assignmentResult;
 		}
 
 		@SuppressWarnings("unused")

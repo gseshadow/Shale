@@ -32,6 +32,24 @@ public interface ContactServicePort {
 
 	boolean softDeleteContact(int contactId, int shaleClientId, int actorUserId);
 
+	DefinitionMutationResult createDefinition(CreateDefinitionCommand command);
+
+	DefinitionMutationResult updateDefinition(UpdateDefinitionCommand command);
+
+	DefinitionMutationResult setDefinitionActive(DefinitionLifecycleCommand command);
+
+	DefinitionMutationResult removeDefinition(DefinitionLifecycleCommand command);
+
+	DefinitionMutationResult restoreDefinition(DefinitionLifecycleCommand command);
+
+	AssignmentMutationResult assignClassification(AssignClassificationCommand command);
+
+	AssignmentMutationResult removeClassification(AssignmentLifecycleCommand command);
+
+	AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand command);
+
+	List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand command);
+
 	record ContactSummary(int id, String displayName, String email, String phone) {
 	}
 
@@ -110,4 +128,57 @@ public interface ContactServicePort {
 			String condition,
 			Boolean deceased) {
 	}
+
+	enum DefinitionCategory { CONTACT_TYPE, SPECIALTY, CREDENTIAL }
+
+	record CreateDefinitionCommand(DefinitionCategory category, int shaleClientId, int actorUserId,
+			String systemKey, Integer globalDefinitionId, String name, String abbreviation,
+			String description, int sortOrder, boolean active) { }
+
+	record UpdateDefinitionCommand(DefinitionCategory category, int definitionId, int shaleClientId,
+			int actorUserId, String name, String abbreviation, String description, int sortOrder,
+			byte[] expectedRowVer) {
+		public UpdateDefinitionCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record DefinitionLifecycleCommand(DefinitionCategory category, int definitionId, int shaleClientId,
+			int actorUserId, boolean active, byte[] expectedRowVer) {
+		public DefinitionLifecycleCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record DefinitionMutationResult(DefinitionCategory category, int definitionId, String systemKey,
+			boolean active, boolean deleted, byte[] rowVer) {
+		public DefinitionMutationResult { rowVer = copyRowVer(rowVer); }
+		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
+	}
+
+	record AssignClassificationCommand(DefinitionCategory category, int shaleClientId, int actorUserId,
+			int contactId, int definitionId, Integer displayOrder) { }
+
+	record AssignmentLifecycleCommand(DefinitionCategory category, int shaleClientId, int actorUserId,
+			int contactId, long assignmentId, byte[] expectedRowVer) {
+		public AssignmentLifecycleCommand { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record AssignmentMutationResult(DefinitionCategory category, long assignmentId, int contactId,
+			int definitionId, Integer displayOrder, boolean deleted, byte[] rowVer) {
+		public AssignmentMutationResult { rowVer = copyRowVer(rowVer); }
+		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
+	}
+
+	record CredentialOrderItem(long assignmentId, byte[] expectedRowVer) {
+		public CredentialOrderItem { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record ReorderCredentialsCommand(int shaleClientId, int actorUserId, int contactId,
+			List<CredentialOrderItem> orderedAssignments) {
+		public ReorderCredentialsCommand { orderedAssignments = orderedAssignments == null ? List.of() : List.copyOf(orderedAssignments); }
+	}
+
+	private static byte[] copyRowVer(byte[] value) { return value == null ? null : value.clone(); }
+
 }

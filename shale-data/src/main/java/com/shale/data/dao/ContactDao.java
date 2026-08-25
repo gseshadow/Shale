@@ -140,10 +140,12 @@ public final class ContactDao {
 
     private final DbSessionProvider db;
     private final PhiAuditService phiAuditService;
+    private final ContactMutationDao mutationDao;
 
     public ContactDao(DbSessionProvider db) {
         this.db = Objects.requireNonNull(db, "db");
         this.phiAuditService = new PhiAuditService(new AuditLogDao(this.db));
+        this.mutationDao = new ContactMutationDao(this.db);
     }
 
     public List<DirectoryContactRow> listContactsForTenant(int shaleClientId) {
@@ -1381,4 +1383,15 @@ public final class ContactDao {
                 .withZone(ZoneId.systemDefault())
                 .format(timestamp);
     }
+
+    public com.shale.core.service.ContactServicePort.DefinitionMutationResult createDefinition(com.shale.core.service.ContactServicePort.CreateDefinitionCommand c){return mutationDao.create(c);}
+    public com.shale.core.service.ContactServicePort.DefinitionMutationResult updateDefinition(com.shale.core.service.ContactServicePort.UpdateDefinitionCommand c){return mutationDao.update(c);}
+    public com.shale.core.service.ContactServicePort.DefinitionMutationResult setDefinitionActive(com.shale.core.service.ContactServicePort.DefinitionLifecycleCommand c){return mutationDao.lifecycle(c,"active");}
+    public com.shale.core.service.ContactServicePort.DefinitionMutationResult removeDefinition(com.shale.core.service.ContactServicePort.DefinitionLifecycleCommand c){return mutationDao.lifecycle(c,"remove");}
+    public com.shale.core.service.ContactServicePort.DefinitionMutationResult restoreDefinition(com.shale.core.service.ContactServicePort.DefinitionLifecycleCommand c){return mutationDao.lifecycle(c,"restore");}
+    public com.shale.core.service.ContactServicePort.AssignmentMutationResult assignClassification(com.shale.core.service.ContactServicePort.AssignClassificationCommand c){return mutationDao.assign(c);}
+    public com.shale.core.service.ContactServicePort.AssignmentMutationResult removeClassification(com.shale.core.service.ContactServicePort.AssignmentLifecycleCommand c){return mutationDao.lifecycle(c,false);}
+    public com.shale.core.service.ContactServicePort.AssignmentMutationResult restoreClassification(com.shale.core.service.ContactServicePort.AssignmentLifecycleCommand c){return mutationDao.lifecycle(c,true);}
+    public java.util.List<com.shale.core.service.ContactServicePort.AssignmentMutationResult> reorderCredentials(com.shale.core.service.ContactServicePort.ReorderCredentialsCommand c){return mutationDao.reorder(c);}
+
 }
