@@ -19,7 +19,7 @@ public record EntityActionAuditEvent(
 		String source,
 		Map<MetadataKey, String> metadata) {
 
-	public enum EntityType { CASE, CASE_STATUS, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CASE_DATE_TYPE, CALENDAR_EVENT, CASE_DATE_ROLE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER }
+	public enum EntityType { CASE, CASE_STATUS, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CASE_DATE_TYPE, CALENDAR_EVENT, CASE_DATE_ROLE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER, CONTACT_TYPE, SPECIALTY, CREDENTIAL_DEFINITION, CONTACT_CONTACT_TYPE, CONTACT_SPECIALTY, CONTACT_CREDENTIAL }
 
 	public enum Action {
 		CREATED,
@@ -80,7 +80,9 @@ public record EntityActionAuditEvent(
 		CONFIGURED_FIELD_COUNT,
 		INITIAL_CREATION,
 		SEMANTIC_ROLE,
-		CASE_DATE_TYPE_ID
+		CASE_DATE_TYPE_ID,
+		DEFINITION_ID,
+		ORDERING_COUNT
 	}
 
 	private static final Set<String> PROHIBITED_KEY_FRAGMENTS = Set.of(
@@ -94,9 +96,30 @@ public record EntityActionAuditEvent(
 		Objects.requireNonNull(action, "action");
 		if (!isAllowedCombination(entityType, action)) throw new IllegalArgumentException("entity/action combination is not allowed for audit");
 		occurredAtUtc = occurredAtUtc == null ? Instant.now() : occurredAtUtc;
-		if (parentEntityId != null && parentEntityId <= 0) throw new IllegalArgumentException("parentEntityId must be > 0 when present");
-		if (parentEntityId != null) Objects.requireNonNull(parentEntityType, "parentEntityType");
-		metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
+		if ((parentEntityType == null) != (parentEntityId == null))
+			throw new IllegalArgumentException("parentEntityType and parentEntityId must be supplied together");
+		if (parentEntityId != null && parentEntityId <= 0)
+			throw new IllegalArgumentException("parentEntityId must be > 0 when present");
+		metadata = validateMetadata(metadata);
+	}
+
+	private static Map<MetadataKey, String> validateMetadata(Map<MetadataKey, String> source) {
+		if (source == null || source.isEmpty()) return Map.of();
+		var copy = new java.util.EnumMap<MetadataKey, String>(MetadataKey.class);
+		for (Map.Entry<MetadataKey, String> entry : source.entrySet()) {
+			if (entry.getKey() == null) throw new IllegalArgumentException("metadata key must not be null");
+			if (entry.getValue() == null) throw new IllegalArgumentException("metadata value must not be null");
+			validateSafeKey(entry.getKey());
+			if (entry.getValue().length() > 128) throw new IllegalArgumentException("metadata value is too long");
+			copy.put(entry.getKey(), entry.getValue());
+		}
+		return Map.copyOf(copy);
+	}
+
+	private static void validateSafeKey(MetadataKey key) {
+		String keyText = key.name().toLowerCase(java.util.Locale.ROOT);
+		for (String prohibited : PROHIBITED_KEY_FRAGMENTS)
+			if (keyText.contains(prohibited)) throw new IllegalArgumentException("metadata key is not safe for audit");
 	}
 
 	private static boolean isAllowedCombination(EntityType entityType, Action action) {
@@ -115,6 +138,9 @@ public record EntityActionAuditEvent(
 			case MATERIAL_REQUEST_FOLLOW_UP -> action == Action.CREATED || action == Action.FOLLOW_UP_ADDED;
 			case USER -> action == Action.CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.REMOVED;
 			case MATERIAL_ITEM -> action == Action.CREATED || action == Action.UPDATED || action == Action.LINKED || action == Action.UNLINKED || action == Action.LOCATION_UPDATED || action == Action.RELEASED || action == Action.DELETED;
+			case CONTACT_TYPE, SPECIALTY, CREDENTIAL_DEFINITION -> action == Action.CREATED || action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.REMOVED || action == Action.RESTORED;
+			case CONTACT_CONTACT_TYPE, CONTACT_SPECIALTY -> action == Action.ADDED || action == Action.REMOVED || action == Action.RESTORED;
+			case CONTACT_CREDENTIAL -> action == Action.ADDED || action == Action.REMOVED || action == Action.RESTORED || action == Action.REORDERED;
 		};
 	}
 
@@ -128,12 +154,9 @@ public record EntityActionAuditEvent(
 		java.util.EnumMap<MetadataKey, String> out = new java.util.EnumMap<>(MetadataKey.class);
 		for (Map.Entry<MetadataKey, ?> entry : source.entrySet()) {
 			MetadataKey key = Objects.requireNonNull(entry.getKey(), "metadata key");
-			String keyText = key.name().toLowerCase(java.util.Locale.ROOT);
-			for (String prohibited : PROHIBITED_KEY_FRAGMENTS) {
-				if (keyText.contains(prohibited)) throw new IllegalArgumentException("metadata key is not safe for audit");
-			}
+			validateSafeKey(key);
 			Object value = entry.getValue();
-			if (value == null) continue;
+			if (value == null) throw new IllegalArgumentException("metadata value must not be null");
 			if (!(value instanceof Number || value instanceof Boolean || value instanceof String)) {
 				throw new IllegalArgumentException("metadata value must be a safe scalar");
 			}

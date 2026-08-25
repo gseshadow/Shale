@@ -143,6 +143,16 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		return contactGateway.softDeleteContact(contactId, shaleClientId);
 	}
 
+	@Override public DefinitionMutationResult createDefinition(CreateDefinitionCommand c) { return contactGateway.createDefinition(c); }
+	@Override public DefinitionMutationResult updateDefinition(UpdateDefinitionCommand c) { return contactGateway.updateDefinition(c); }
+	@Override public DefinitionMutationResult setDefinitionActive(DefinitionLifecycleCommand c) { return contactGateway.setDefinitionActive(c); }
+	@Override public DefinitionMutationResult removeDefinition(DefinitionLifecycleCommand c) { return contactGateway.removeDefinition(c); }
+	@Override public DefinitionMutationResult restoreDefinition(DefinitionLifecycleCommand c) { return contactGateway.restoreDefinition(c); }
+	@Override public AssignmentMutationResult assignClassification(AssignClassificationCommand c) { return contactGateway.assignClassification(c); }
+	@Override public AssignmentMutationResult removeClassification(AssignmentLifecycleCommand c) { return contactGateway.removeClassification(c); }
+	@Override public AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand c) { return contactGateway.restoreClassification(c); }
+	@Override public List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand c) { return contactGateway.reorderCredentials(c); }
+
 	interface ContactGateway {
 		List<ContactDao.DirectoryContactRow> searchContacts(int shaleClientId, String query);
 
@@ -161,6 +171,15 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		default List<ContactDao.CredentialDefinitionRow> listEffectiveCredentialDefinitions(int shaleClientId) { return List.of(); }
 
 		default ContactDao.ClassificationProfileRow findClassificationProfile(int contactId, int shaleClientId) { return null; }
+		default DefinitionMutationResult createDefinition(CreateDefinitionCommand c){ throw new UnsupportedOperationException(); }
+		default DefinitionMutationResult updateDefinition(UpdateDefinitionCommand c){ throw new UnsupportedOperationException(); }
+		default DefinitionMutationResult setDefinitionActive(DefinitionLifecycleCommand c){ throw new UnsupportedOperationException(); }
+		default DefinitionMutationResult removeDefinition(DefinitionLifecycleCommand c){ throw new UnsupportedOperationException(); }
+		default DefinitionMutationResult restoreDefinition(DefinitionLifecycleCommand c){ throw new UnsupportedOperationException(); }
+		default AssignmentMutationResult assignClassification(AssignClassificationCommand c){ throw new UnsupportedOperationException(); }
+		default AssignmentMutationResult removeClassification(AssignmentLifecycleCommand c){ throw new UnsupportedOperationException(); }
+		default AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand c){ throw new UnsupportedOperationException(); }
+		default List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand c){ throw new UnsupportedOperationException(); }
 	}
 
 	private record DaoContactGateway(ContactDao contactDao) implements ContactGateway {
@@ -207,5 +226,14 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		@Override public ContactDao.ClassificationProfileRow findClassificationProfile(int contactId, int tenant) {
 			return contactDao.findClassificationProfile(contactId, tenant);
 		}
+		@Override public DefinitionMutationResult createDefinition(CreateDefinitionCommand c){return contactDao.createDefinition(c);}
+		@Override public DefinitionMutationResult updateDefinition(UpdateDefinitionCommand c){return contactDao.updateDefinition(c);}
+		@Override public DefinitionMutationResult setDefinitionActive(DefinitionLifecycleCommand c){return contactDao.setDefinitionActive(c);}
+		@Override public DefinitionMutationResult removeDefinition(DefinitionLifecycleCommand c){return contactDao.removeDefinition(c);}
+		@Override public DefinitionMutationResult restoreDefinition(DefinitionLifecycleCommand c){return contactDao.restoreDefinition(c);}
+		@Override public AssignmentMutationResult assignClassification(AssignClassificationCommand c){return contactDao.assignClassification(c);}
+		@Override public AssignmentMutationResult removeClassification(AssignmentLifecycleCommand c){return contactDao.removeClassification(c);}
+		@Override public AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand c){return contactDao.restoreClassification(c);}
+		@Override public List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand c){return contactDao.reorderCredentials(c);}
 	}
 }

@@ -12,16 +12,18 @@ import static org.junit.jupiter.api.Assertions.*;
 final class UserManagementCompletionMigrationTest {
     private static String sql() throws Exception { return Files.readString(Path.of("../docs/sql/2026-08-03_users_management_completion.sql")); }
     private static String finalAuditConstraintSql() throws Exception {
-        return Files.readString(Path.of("../docs/sql/2026-08-14_entity_action_audit_entity_type_constraint_case_status.sql"));
+        return AuditEntityTypeMigrationChain.read(AuditEntityTypeMigrationChain.PHASE_1C);
     }
 
-    @Test void auditConstraintIsTransactionalTrustedIdempotentAndAcceptsEveryEmittedEntityType() throws Exception {
+    @Test void latestAuditConstraintIsGuardedTransactionalTrustedAndComplete() throws Exception {
         String sql=finalAuditConstraintSql();
+        assertTrue(sql.contains("DECLARE @OperatorVerifiedAllTenantVisibility bit = 0"));
+        assertTrue(sql.contains("SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL"));
+        assertTrue(sql.contains("USER_NAME() IN (N'shale_app', N'shale_runtime')"));
         assertTrue(sql.contains("BEGIN TRANSACTION")); assertTrue(sql.contains("XACT_ABORT ON"));
-        assertTrue(sql.contains("Complete current vocabulary and every value known to have been allowed by deployed migrations"));
-        assertTrue(sql.contains("INSERT @Allowed (Value)"));
-        assertTrue(Pattern.compile("(?s)INSERT\\s+@Allowed\\s*\\(Value\\)\\s+SELECT\\s+e\\.Value\\s+FROM\\s+@Extracted")
-                .matcher(sql).find());
+        assertTrue(sql.contains("IsPositiveAllowlist"));
+        assertTrue(sql.contains("COUNT(*) FROM @Checks WHERE IsPositiveAllowlist = 1) <> 1"));
+        assertTrue(sql.contains("unexpected token; no constraints were changed"));
         assertTrue(sql.contains("Existing EntityActionAuditLog rows contain an EntityType outside the resulting allowlist"));
         assertTrue(sql.contains("QUOTENAME(@AllowlistName)"));
         assertTrue(sql.contains("WITH CHECK ADD CONSTRAINT"));
@@ -30,10 +32,10 @@ final class UserManagementCompletionMigrationTest {
         assertTrue(sql.contains("before_check.ObjectId <> @AllowlistObjectId"));
         assertTrue(sql.contains("IF XACT_STATE() <> 0 ROLLBACK TRANSACTION"));
         Set<String> emitted=Arrays.stream(EntityActionAuditEvent.EntityType.values()).map(Enum::name).collect(java.util.stream.Collectors.toSet());
-        int valuesStart=sql.indexOf("INSERT @Allowed (Value) VALUES");
-        int valuesEnd=sql.indexOf(';',valuesStart);
-        Matcher m=Pattern.compile("\\('([A-Z_]+)'\\)").matcher(sql.substring(valuesStart,valuesEnd));Set<String> accepted=new java.util.HashSet<>();while(m.find())accepted.add(m.group(1));
-        assertTrue(accepted.containsAll(emitted),"migration must seed every emitted EntityType: "+emitted);
+        Set<String> accepted=AuditEntityTypeMigrationChain.declaredAllowlist(sql);
+        assertTrue(accepted.containsAll(emitted),"latest migration must seed every emitted EntityType: "+emitted);
+        assertTrue(accepted.containsAll(AuditEntityTypeMigrationChain.HISTORICAL_AT_AUGUST_14));
+        assertEquals(Set.of("CALENDAR_CASE_DATE_TYPE_MAPPING"), accepted.stream().filter(v -> !emitted.contains(v)).collect(java.util.stream.Collectors.toSet()));
     }
 
     @Test void removalSchemaIsCompleteAndUsesDynamicSqlAfterColumnAdds() throws Exception {
