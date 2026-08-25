@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import com.shale.core.service.ContactServicePort.ContactDetail;
 import com.shale.core.service.ContactServicePort.ContactSummary;
+import com.shale.core.service.ContactServicePort.ClassificationProfile;
 import com.shale.data.dao.ContactDao;
 
 class ContactServiceAdapterTest {
@@ -55,6 +56,27 @@ class ContactServiceAdapterTest {
 		assertTrue(gateway.fullDetailLookupCalled);
 	}
 
+	@Test
+	void classificationReadsCarryStructuredNamesHistoricalStateAndAuthoritativeIds() {
+		FakeContactGateway gateway = new FakeContactGateway(List.of());
+		ContactDao.DefinitionRow historical = new ContactDao.DefinitionRow(91, "expert", "Expert", null, 2, false, true);
+		ContactDao.CredentialDefinitionRow credential = new ContactDao.CredentialDefinitionRow(
+				73, "doctor_of_medicine", "Doctor of Medicine", "MD", null, 1, true, false);
+		gateway.profile = new ContactDao.ClassificationProfileRow(5, 42, "Dr.", "Ada", "Byron", "Lovelace",
+				"Ada", "III", "Ada Lovelace", List.of(new ContactDao.AssignedDefinitionRow(1001, historical, true)),
+				List.of(), List.of(new ContactDao.AssignedCredentialRow(1002, credential, 4, false)));
+
+		ClassificationProfile profile = new ContactServiceAdapter(gateway).getClassificationProfile(5, 42).orElseThrow();
+
+		assertEquals("Ada Lovelace", profile.legacyDisplayName());
+		assertEquals("III", profile.structuredName().suffix());
+		assertEquals(91, profile.contactTypes().get(0).definition().id());
+		assertTrue(profile.contactTypes().get(0).historical());
+		assertEquals("Doctor of Medicine", profile.credentials().get(0).definition().name());
+		assertEquals("MD", profile.credentials().get(0).definition().abbreviation());
+		assertEquals(4, profile.credentials().get(0).displayOrder());
+	}
+
 	private static final class FakeContactGateway implements ContactServiceAdapter.ContactGateway {
 		private final List<ContactDao.DirectoryContactRow> rows;
 		private int lastSearchShaleClientId;
@@ -62,6 +84,7 @@ class ContactServiceAdapterTest {
 		private int lastDetailContactId;
 		private int lastDetailShaleClientId;
 		private boolean fullDetailLookupCalled;
+		private ContactDao.ClassificationProfileRow profile;
 
 		private FakeContactGateway(List<ContactDao.DirectoryContactRow> rows) {
 			this.rows = rows;
@@ -105,6 +128,10 @@ class ContactServiceAdapterTest {
 		@Override
 		public boolean softDeleteContact(int contactId, int shaleClientId) {
 			return false;
+		}
+
+		@Override public ContactDao.ClassificationProfileRow findClassificationProfile(int contactId, int shaleClientId) {
+			return profile;
 		}
 
 		@SuppressWarnings("unused")
