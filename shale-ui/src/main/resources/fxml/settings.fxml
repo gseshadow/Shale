@@ -161,7 +161,7 @@
             </VBox>
 
 
-			<VBox fx:id="contactClassificationAdministrationSection" spacing="8" styleClass="strong-panel contact-classification-settings">
+			<VBox fx:id="contactClassificationAdministrationSection" spacing="8" styleClass="strong-panel">
 				<padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
 				<Label text="Contact Classifications" styleClass="search-section-title"/>
 				<Label text="Manage Contact Types, Specialties, and professional Credential Definitions for this organization. Global definitions are read-only and can be customized locally."

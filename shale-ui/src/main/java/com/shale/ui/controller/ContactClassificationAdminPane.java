@@ -38,7 +38,7 @@ public final class ContactClassificationAdminPane {
     private final CheckBox showRemoved = new CheckBox("Show removed");
     private final Label status = new Label();
     private final Button add = button("Add", ControlStyles.Purpose.PRIMARY);
-    private final Button refresh = button("Refresh", ControlStyles.Purpose.GHOST);
+    private final Button refresh = button("Refresh", ControlStyles.Purpose.SECONDARY);
     private final VBox list = new VBox(12);
     private final VBox root = new VBox(14);
     private volatile List<AdministrationDefinition> rows = List.of();
