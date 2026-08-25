@@ -2642,3 +2642,9 @@
 }
 .status-timeline--compact .scroll-bar:horizontal .track { -fx-background-color: rgba(91,103,124,0.10); }
 .status-timeline--compact .scroll-bar:horizontal .thumb { -fx-background-color: rgba(91,103,124,0.38); }
+.contact-classification-settings .tab-pane {
+    -fx-tab-min-height: 34px;
+}
+.contact-classification-card {
+    -fx-alignment: center-left;
+}

@@ -152,6 +152,21 @@ the existing RLS predicate semantics, and sufficient log/lock capacity for the a
 * Whether assignment restore reactivates a historical row or inserts a new historical row; services
   must choose one consistent approach while preserving removal history.
 
+## Phase 2A Settings administration
+
+The administrator-only Contact Classifications Settings page manages Contact Types, Specialties, and
+Credential Definitions through `ContactServicePort`. A bounded per-category administration read
+returns global and current-tenant rows, including inactive and removed tenant rows and exact RowVer.
+It validates the tenant session and active same-tenant administrator before reading. Java mapping
+classifies custom rows and overrides by stable SystemKey and represents effective, overridden,
+masked-global, and deleted-override global-fallback states without changing Phase 1B selectors.
+
+Global definitions remain read-only. Administrators create custom definitions, customize globals with
+their exact SystemKey, edit tenant presentation, activate/deactivate, remove or reset, and restore the
+same authoritative row. SystemKey is generated for initial creation and immutable afterward. All
+service work runs off the JavaFX thread, mutations forward the loaded RowVer, and stale failures keep
+entered editor values. Definition lifecycle never deletes or changes Contact assignments.
+
 ## Phase 1C transactional mutation boundary (implemented)
 
 Phase 1C reuses, rather than replaces, the established mutation conventions: `DbSessionProvider` supplies one tenant-context connection; `SESSION_CONTEXT(N'ShaleClientId')` is compared explicitly; `dbo.Users.id`, `ShaleClientId`, `is_deleted`, `IsRemoved`, and `is_admin` are the actor authorities; JDBC `autoCommit=false` encloses validation, mutation, `EntityActionAuditDao.append`, commit, and rollback; and `UPDATE ... WHERE RowVer=?` is the optimistic-concurrency guard. Immutable shared-port commands defensively copy RowVer bytes. SQL-generated authoritative IDs and the post-mutation RowVer are returned. These are the same tenant/actor, transaction, audit, and RowVer patterns used by Case Date Type and User administration.

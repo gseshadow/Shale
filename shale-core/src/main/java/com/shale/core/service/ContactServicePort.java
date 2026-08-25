@@ -21,6 +21,12 @@ public interface ContactServicePort {
 
 	List<CredentialDefinition> getEffectiveCredentialDefinitions(int shaleClientId);
 
+	/** Administrator-only lifecycle view of one closed definition category. */
+	default List<AdministrationDefinition> listDefinitionsForAdministration(
+			DefinitionCategory category, int shaleClientId, int actorUserId) {
+		throw new UnsupportedOperationException("Contact definition administration is not configured.");
+	}
+
 	Optional<ClassificationProfile> getClassificationProfile(int contactId, int shaleClientId);
 
 	int createContact(CreateContactCommand command);
@@ -76,6 +82,20 @@ public interface ContactServicePort {
 	/** Professional credentials retain both their full name and abbreviation. */
 	record CredentialDefinition(int id, String systemKey, String name, String abbreviation,
 			String description, int sortOrder) {
+	}
+
+	enum DefinitionOrigin { GLOBAL, CUSTOM, OVERRIDE }
+	enum DefinitionOverlayState { EFFECTIVE, OVERRIDDEN, MASKED_GLOBAL, GLOBAL_FALLBACK, INEFFECTIVE }
+
+	record AdministrationDefinition(DefinitionCategory category, int id, Integer shaleClientId,
+			String systemKey, String name, String abbreviation, String description, int sortOrder,
+			boolean active, boolean deleted, DefinitionOrigin origin, Integer relatedGlobalDefinitionId,
+			DefinitionOverlayState overlayState, byte[] rowVer) {
+		public AdministrationDefinition { rowVer = copyRowVer(rowVer); }
+		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
+		public boolean global() { return origin == DefinitionOrigin.GLOBAL; }
+		public boolean effective() { return overlayState == DefinitionOverlayState.EFFECTIVE
+				|| overlayState == DefinitionOverlayState.GLOBAL_FALLBACK; }
 	}
 
 	record StructuredName(String prefix, String firstName, String middleName, String lastName,

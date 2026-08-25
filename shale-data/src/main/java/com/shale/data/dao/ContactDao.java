@@ -1,6 +1,7 @@
 package com.shale.data.dao;
 
 import com.shale.core.semantics.RoleSemantics;
+import com.shale.core.service.ContactServicePort.DefinitionCategory;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.util.PerformanceLogging;
 
@@ -87,6 +88,13 @@ public final class ContactDao {
 
     public record CredentialDefinitionRow(int id, String systemKey, String name, String abbreviation,
             String description, int sortOrder, boolean active, boolean deleted) {
+    }
+
+    public record AdministrationDefinitionRow(DefinitionCategory category, int id, Integer shaleClientId,
+            String systemKey, String name, String abbreviation, String description, int sortOrder,
+            boolean active, boolean deleted, byte[] rowVer) {
+        public AdministrationDefinitionRow { rowVer = rowVer == null ? null : rowVer.clone(); }
+        @Override public byte[] rowVer() { return rowVer == null ? null : rowVer.clone(); }
     }
 
     public record AssignedDefinitionRow(long assignmentId, DefinitionRow definition, boolean historical) {
@@ -506,6 +514,52 @@ public final class ContactDao {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load effective CredentialDefinitions (clientId=" + shaleClientId + ")", e);
+        }
+    }
+
+    /** Bounded Settings read; identifiers are selected only by the closed category switch. */
+    public List<AdministrationDefinitionRow> listDefinitionsForAdministration(
+            DefinitionCategory category, int shaleClientId, int actorUserId) {
+        Objects.requireNonNull(category, "category");
+        validateTenantId(shaleClientId);
+        if (actorUserId <= 0) throw new IllegalArgumentException("actorUserId must be > 0");
+        String table = switch (category) {
+            case CONTACT_TYPE -> "ContactTypes";
+            case SPECIALTY -> "Specialties";
+            case CREDENTIAL -> "CredentialDefinitions";
+        };
+        String abbreviation = category == DefinitionCategory.CREDENTIAL
+                ? "d.Abbreviation" : "CAST(NULL AS nvarchar(50))";
+        String sql = "SELECT d.Id,d.ShaleClientId,d.SystemKey,d.Name," + abbreviation
+                + " Abbreviation,d.Description,d.SortOrder,d.IsActive,d.IsDeleted,d.RowVer "
+                + "FROM dbo." + table + " d WHERE d.ShaleClientId IS NULL OR d.ShaleClientId=? "
+                + "ORDER BY d.SortOrder,d.Name,d.Id";
+        try (Connection con = db.requireConnection()) {
+            verifyTenantMatchesSession(con, shaleClientId);
+            try (PreparedStatement actor = con.prepareStatement("""
+                    SELECT 1 FROM dbo.Users
+                    WHERE id=? AND ShaleClientId=? AND ISNULL(is_admin,0)=1
+                      AND ISNULL(is_deleted,0)=0 AND ISNULL(IsRemoved,0)=0
+                    """)) {
+                actor.setInt(1, actorUserId); actor.setInt(2, shaleClientId);
+                try (ResultSet rs = actor.executeQuery()) {
+                    if (!rs.next()) throw new SecurityException("An active tenant administrator is required.");
+                }
+            }
+            try (PreparedStatement ps = con.prepareStatement(sql)) {
+                ps.setInt(1, shaleClientId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    List<AdministrationDefinitionRow> rows = new ArrayList<>();
+                    while (rs.next()) rows.add(new AdministrationDefinitionRow(category, rs.getInt("Id"),
+                            (Integer) rs.getObject("ShaleClientId"), rs.getString("SystemKey"),
+                            rs.getString("Name"), rs.getString("Abbreviation"), rs.getString("Description"),
+                            rs.getInt("SortOrder"), rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted"),
+                            rs.getBytes("RowVer")));
+                    return List.copyOf(rows);
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to load Contact definition administration list.", e);
         }
     }
 

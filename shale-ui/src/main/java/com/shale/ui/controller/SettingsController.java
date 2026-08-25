@@ -1,5 +1,7 @@
 package com.shale.ui.controller;
 
+import static com.shale.core.service.ContactServicePort.*;
+
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.dto.LinkTypeDto;
@@ -10,6 +12,7 @@ import com.shale.core.dto.RequestMethodDto;
 import com.shale.core.dto.RequestStatusDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.MaterialRequestServicePort;
+import com.shale.core.service.ContactServicePort;
 import com.shale.data.dao.UserDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.UserCard;
@@ -146,6 +149,8 @@ public final class SettingsController {
 	@FXML private VBox requestStatusCardsContainer;
 	@FXML private HBox requestStatusActionRow;
 	@FXML private Label requestStatusSettingsStatusLabel;
+	@FXML private VBox contactClassificationAdministrationSection;
+	@FXML private VBox contactClassificationContent;
 	@FXML
 	private TableView<UserManagementViewRow> userManagementTable;
 	@FXML
@@ -178,6 +183,7 @@ public final class SettingsController {
 	private AppState appState;
 	private CaseServicePort caseService;
 	private MaterialRequestServicePort materialRequestService;
+	private ContactServicePort contactService;
 	private UserDao userDao;
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
@@ -223,6 +229,7 @@ public final class SettingsController {
 		configureUserManagementSemanticButtons();
 		configureLookupActionRows();
 		configureUserManagementTable();
+		configureContactClassifications();
 		updateAdminControlsVisibility();
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
@@ -246,7 +253,7 @@ public final class SettingsController {
 		ControlStyles.apply(removeUserButton, ControlStyles.Purpose.DANGER, ControlStyles.Size.STANDARD);
 	}
 
-	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService, ContactServicePort contactService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
 		this.notificationPreferencesService = Objects.requireNonNull(notificationPreferencesService, "notificationPreferencesService");
 		this.appState = Objects.requireNonNull(appState, "appState");
 		this.onOpenAuditLog = Objects.requireNonNull(onOpenAuditLog, "onOpenAuditLog");
@@ -254,12 +261,29 @@ public final class SettingsController {
 		if (this.runtimeBridge != null) this.runtimeBridge.subscribeEntityUpdated(linkTypeLiveHandler);
 		this.caseService = Objects.requireNonNull(caseService, "caseService");
 		this.materialRequestService = Objects.requireNonNull(materialRequestService, "materialRequestService");
+		this.contactService = Objects.requireNonNull(contactService, "contactService");
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
 		if (fxmlReady) {
+			configureContactClassifications();
 			loadFromPreferences();
 			updateAdminControlsVisibility();
 			loadAdminSectionsAsync();
 		}
+	}
+
+	private void configureContactClassifications() {
+		if (contactClassificationContent != null && contactService != null && appState != null
+				&& contactClassificationContent.getChildren().isEmpty()) {
+			contactClassificationContent.getChildren().setAll(new ContactClassificationAdminPane(contactService, appState).node());
+		}
+	}
+
+	/** Compatibility overload for existing embedders that do not yet supply Contact administration. */
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState,
+			Runnable onOpenAuditLog, CaseServicePort caseService, MaterialRequestServicePort materialRequestService,
+			UserDao userDao, UiRuntimeBridge runtimeBridge) {
+		init(notificationPreferencesService, appState, onOpenAuditLog, caseService, materialRequestService,
+				noOpContactService(), userDao, runtimeBridge);
 	}
 
 	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService, UserDao userDao, UiRuntimeBridge runtimeBridge) {
@@ -272,7 +296,31 @@ public final class SettingsController {
 			@Override public List<com.shale.core.dto.MaterialRequestFollowUpDto> listFollowUps(long caseId, long materialRequestId, int tenantId, int actorUserId) { return List.of(); }
 			@Override public com.shale.core.dto.MaterialRequestDetailDto createMaterialRequest(CreateMaterialRequestCommand command) { throw new UnsupportedOperationException(); }
 			@Override public com.shale.core.dto.MaterialRequestDetailDto updateMaterialRequest(UpdateMaterialRequestCommand command) { throw new UnsupportedOperationException(); }
-		}, userDao, runtimeBridge);
+		}, noOpContactService(), userDao, runtimeBridge);
+	}
+
+	private static ContactServicePort noOpContactService() {
+		return new ContactServicePort() {
+			@Override public List<ContactSummary> searchContacts(int t,String q,int l){return List.of();}
+			@Override public Optional<ContactDetail> getContactDetail(int c,int t){return Optional.empty();}
+			@Override public List<Definition> getEffectiveContactTypes(int t){return List.of();}
+			@Override public List<Definition> getEffectiveSpecialties(int t){return List.of();}
+			@Override public List<CredentialDefinition> getEffectiveCredentialDefinitions(int t){return List.of();}
+			@Override public List<AdministrationDefinition> listDefinitionsForAdministration(DefinitionCategory c,int t,int a){return List.of();}
+			@Override public Optional<ClassificationProfile> getClassificationProfile(int c,int t){return Optional.empty();}
+			@Override public int createContact(CreateContactCommand c){throw new UnsupportedOperationException();}
+			@Override public boolean updateContact(UpdateContactCommand c){return false;}
+			@Override public boolean softDeleteContact(int c,int t,int a){return false;}
+			@Override public DefinitionMutationResult createDefinition(CreateDefinitionCommand c){throw new UnsupportedOperationException();}
+			@Override public DefinitionMutationResult updateDefinition(UpdateDefinitionCommand c){throw new UnsupportedOperationException();}
+			@Override public DefinitionMutationResult setDefinitionActive(DefinitionLifecycleCommand c){throw new UnsupportedOperationException();}
+			@Override public DefinitionMutationResult removeDefinition(DefinitionLifecycleCommand c){throw new UnsupportedOperationException();}
+			@Override public DefinitionMutationResult restoreDefinition(DefinitionLifecycleCommand c){throw new UnsupportedOperationException();}
+			@Override public AssignmentMutationResult assignClassification(AssignClassificationCommand c){throw new UnsupportedOperationException();}
+			@Override public AssignmentMutationResult removeClassification(AssignmentLifecycleCommand c){throw new UnsupportedOperationException();}
+			@Override public AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand c){throw new UnsupportedOperationException();}
+			@Override public List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand c){return List.of();}
+		};
 	}
 
 	@FXML
@@ -1680,7 +1728,12 @@ public final class SettingsController {
 		if (requestAdministrationSection != null) {
 			requestAdministrationSection.setVisible(visible);
 			requestAdministrationSection.setManaged(visible);
-		}		if (userAdministrationSection != null) {
+		}
+		if (contactClassificationAdministrationSection != null) {
+			contactClassificationAdministrationSection.setVisible(visible);
+			contactClassificationAdministrationSection.setManaged(visible);
+		}
+		if (userAdministrationSection != null) {
 			userAdministrationSection.setVisible(visible);
 			userAdministrationSection.setManaged(visible);
 		}
