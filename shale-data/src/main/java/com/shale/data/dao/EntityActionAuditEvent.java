@@ -96,9 +96,30 @@ public record EntityActionAuditEvent(
 		Objects.requireNonNull(action, "action");
 		if (!isAllowedCombination(entityType, action)) throw new IllegalArgumentException("entity/action combination is not allowed for audit");
 		occurredAtUtc = occurredAtUtc == null ? Instant.now() : occurredAtUtc;
-		if (parentEntityId != null && parentEntityId <= 0) throw new IllegalArgumentException("parentEntityId must be > 0 when present");
-		if (parentEntityId != null) Objects.requireNonNull(parentEntityType, "parentEntityType");
-		metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
+		if ((parentEntityType == null) != (parentEntityId == null))
+			throw new IllegalArgumentException("parentEntityType and parentEntityId must be supplied together");
+		if (parentEntityId != null && parentEntityId <= 0)
+			throw new IllegalArgumentException("parentEntityId must be > 0 when present");
+		metadata = validateMetadata(metadata);
+	}
+
+	private static Map<MetadataKey, String> validateMetadata(Map<MetadataKey, String> source) {
+		if (source == null || source.isEmpty()) return Map.of();
+		var copy = new java.util.EnumMap<MetadataKey, String>(MetadataKey.class);
+		for (Map.Entry<MetadataKey, String> entry : source.entrySet()) {
+			if (entry.getKey() == null) throw new IllegalArgumentException("metadata key must not be null");
+			if (entry.getValue() == null) throw new IllegalArgumentException("metadata value must not be null");
+			validateSafeKey(entry.getKey());
+			if (entry.getValue().length() > 128) throw new IllegalArgumentException("metadata value is too long");
+			copy.put(entry.getKey(), entry.getValue());
+		}
+		return Map.copyOf(copy);
+	}
+
+	private static void validateSafeKey(MetadataKey key) {
+		String keyText = key.name().toLowerCase(java.util.Locale.ROOT);
+		for (String prohibited : PROHIBITED_KEY_FRAGMENTS)
+			if (keyText.contains(prohibited)) throw new IllegalArgumentException("metadata key is not safe for audit");
 	}
 
 	private static boolean isAllowedCombination(EntityType entityType, Action action) {
@@ -133,12 +154,9 @@ public record EntityActionAuditEvent(
 		java.util.EnumMap<MetadataKey, String> out = new java.util.EnumMap<>(MetadataKey.class);
 		for (Map.Entry<MetadataKey, ?> entry : source.entrySet()) {
 			MetadataKey key = Objects.requireNonNull(entry.getKey(), "metadata key");
-			String keyText = key.name().toLowerCase(java.util.Locale.ROOT);
-			for (String prohibited : PROHIBITED_KEY_FRAGMENTS) {
-				if (keyText.contains(prohibited)) throw new IllegalArgumentException("metadata key is not safe for audit");
-			}
+			validateSafeKey(key);
 			Object value = entry.getValue();
-			if (value == null) continue;
+			if (value == null) throw new IllegalArgumentException("metadata value must not be null");
 			if (!(value instanceof Number || value instanceof Boolean || value instanceof String)) {
 				throw new IllegalArgumentException("metadata value must be a safe scalar");
 			}
