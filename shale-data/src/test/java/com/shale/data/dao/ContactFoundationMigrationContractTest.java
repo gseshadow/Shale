@@ -140,7 +140,8 @@ class ContactFoundationMigrationContractTest {
         assertTrue(a.contains("audit entity/action vocabulary") || a.contains("entity/action vocabulary"));
         assertTrue(d.contains("full `Name`"));
         assertTrue(d.contains("current runtime reads, writes, and display behavior remain unchanged"));
-        assertTrue(a.contains("has **not** been\nexecuted"));
+        assertTrue(a.contains("Phase 1A was deployed to production on 2026-08-24"));
+        assertTrue(a.contains("Production verification found zero"));
     }
 
     @Test void rerunValidationToleratesUnrelatedLaterAdditiveObjects() throws Exception {
