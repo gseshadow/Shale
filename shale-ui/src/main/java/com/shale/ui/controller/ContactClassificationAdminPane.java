@@ -18,7 +18,7 @@ import com.shale.ui.state.AppState;
 import com.shale.ui.util.ControlStyles;
 
 import javafx.application.Platform;
-import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -39,8 +39,8 @@ public final class ContactClassificationAdminPane {
     private final Label status = new Label();
     private final Button add = button("Add", ControlStyles.Purpose.PRIMARY);
     private final Button refresh = button("Refresh", ControlStyles.Purpose.GHOST);
-    private final VBox list = new VBox(8);
-    private final VBox root = new VBox(10);
+    private final VBox list = new VBox(12);
+    private final VBox root = new VBox(14);
     private volatile List<AdministrationDefinition> rows = List.of();
 
     public ContactClassificationAdminPane(ContactServicePort service, AppState state) {
@@ -48,20 +48,34 @@ public final class ContactClassificationAdminPane {
         tabs.getTabs().setAll(tab("Contact Types", DefinitionCategory.CONTACT_TYPE),
                 tab("Specialties", DefinitionCategory.SPECIALTY), tab("Credentials", DefinitionCategory.CREDENTIAL));
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        tabs.setId("contact-classification-tabs");
+        tabs.getStyleClass().add("contact-classification-tabs");
         tabs.getSelectionModel().selectedItemProperty().addListener((o,a,b) -> requestLoad());
+        showRemoved.setId("contact-classification-show-removed");
+        showRemoved.getStyleClass().add("contact-classification-toggle");
         showRemoved.setAccessibleText("Show removed Contact classification definitions");
         showRemoved.selectedProperty().addListener((o,a,b) -> render());
+        add.setId("contact-classification-add");
         add.setAccessibleText("Add definition to selected Contact classification category");
+        add.setTooltip(new Tooltip("Create a definition in the selected category"));
+        refresh.setId("contact-classification-refresh");
         refresh.setAccessibleText("Refresh Contact classifications");
+        refresh.setTooltip(new Tooltip("Reload the selected category"));
         add.setOnAction(e -> openEditor(null)); refresh.setOnAction(e -> requestLoad());
-        status.getStyleClass().add("search-summary-text"); status.setWrapText(true);
-        HBox actions = new HBox(8, add, refresh, showRemoved, status);
-        root.getChildren().setAll(tabs, actions, list);
+        status.setId("contact-classification-status");
+        status.getStyleClass().addAll("search-summary-text", "contact-classification-status"); status.setWrapText(true);
+        FlowPane actions = new FlowPane(Orientation.HORIZONTAL, 8, 8, add, refresh, showRemoved);
+        actions.getStyleClass().add("contact-classification-toolbar");
+        list.setId("contact-classification-list");
+        list.getStyleClass().add("contact-classification-list");
+        root.getStyleClass().add("contact-classification-admin");
+        root.getChildren().setAll(tabs, actions, status, list);
         root.sceneProperty().addListener((observable, oldScene, newScene) -> {
             if (oldScene != null && newScene == null) dispose();
         });
         if (!state.isAdmin()) {
-            root.setVisible(false); root.setManaged(false); status.setText("Administrator access is required.");
+            tabs.setDisable(true); actions.setDisable(true);
+            setStatus("Access restricted — administrator access is required.", "error");
         } else requestLoad();
     }
 
@@ -78,7 +92,8 @@ public final class ContactClassificationAdminPane {
     private void loadLatest() {
         if (disposed.get() || !state.isAdmin() || !loading.compareAndSet(false, true)) return;
         int generation = loadGeneration.get();
-        int tenant = tenant(), actor = actor(); setBusy(true); status.setText("Loading classifications…");
+        int tenant = tenant(), actor = actor(); setBusy(true);
+        setStatus(rows.isEmpty() ? "Loading classifications…" : "Refreshing classifications…", "loading");
         DefinitionCategory category = selectedCategory();
         worker.submit(() -> {
             try {
@@ -100,31 +115,53 @@ public final class ContactClassificationAdminPane {
             return;
         }
         setBusy(false);
-        if (failure == null) { rows = loaded; status.setText(""); render(); }
-        else status.setText("Classifications could not be loaded. Refresh to try again.");
+        if (failure == null) { rows = loaded; setStatus("", "ready"); render(); }
+        else setStatus("Load failed — classifications could not be loaded. Choose Refresh to try again.", "error");
     }
 
     private void render() {
         List<AdministrationDefinition> visible = rows.stream().filter(r -> showRemoved.isSelected() || !r.deleted()).toList();
-        if (visible.isEmpty()) { list.getChildren().setAll(new Label("No definitions to display.")); return; }
+        if (visible.isEmpty()) {
+            Label empty = new Label(showRemoved.isSelected()
+                    ? "No definitions — this category does not contain any definitions."
+                    : "No active definitions to display. Turn on Show removed to include removed definitions.");
+            empty.setWrapText(true);
+            empty.getStyleClass().addAll("contact-classification-empty", "contact-classification-state-message");
+            list.getChildren().setAll(empty); return;
+        }
         list.getChildren().setAll(visible.stream().map(this::card).toList());
     }
 
     private Node card(AdministrationDefinition row) {
-        Label title = new Label(row.name() + (row.abbreviation() == null ? "" : " (" + row.abbreviation() + ")"));
-        title.getStyleClass().add("search-section-title");
+        Label title = new Label(row.name());
+        title.setWrapText(true); title.getStyleClass().add("contact-classification-card-title");
+        HBox heading = new HBox(8, title);
+        if (row.abbreviation() != null && !row.abbreviation().isBlank()) {
+            Label abbreviation = new Label(row.abbreviation());
+            abbreviation.getStyleClass().add("contact-classification-abbreviation");
+            heading.getChildren().add(abbreviation);
+        }
         Label detail = new Label("Internal key: " + row.systemKey() + "  •  Sort order: " + row.sortOrder());
-        detail.getStyleClass().add("search-summary-text");
-        HBox badges = new HBox(6);
-        badges.getChildren().setAll(badge(origin(row)), badge(stateLabel(row)));
-        if (!row.active() && !row.deleted()) badges.getChildren().add(badge("Inactive"));
-        if (row.deleted()) badges.getChildren().add(badge("Removed"));
-        VBox text = new VBox(3, title, detail, badges);
-        if (row.description() != null && !row.description().isBlank()) text.getChildren().add(new Label(row.description()));
-        HBox actions = new HBox(6); actions.getChildren().setAll(actions(row));
-        Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox card = new HBox(12, text, spacer, actions); card.setPadding(new Insets(10));
-        card.getStyleClass().addAll("strong-panel", "contact-classification-card");
+        detail.setWrapText(true); detail.getStyleClass().add("contact-classification-metadata");
+        FlowPane badges = new FlowPane(Orientation.HORIZONTAL, 6, 6);
+        badges.getStyleClass().add("contact-classification-badges");
+        badges.getChildren().setAll(badge(origin(row), "origin-" + origin(row).toLowerCase(Locale.ROOT)),
+                badge(stateLabel(row), "state-" + stateSlug(row)));
+        if (!row.active() && !row.deleted()) badges.getChildren().add(badge("Inactive", "state-inactive"));
+        if (row.deleted()) badges.getChildren().add(badge("Removed", "state-removed"));
+        String descriptionText = row.description() == null || row.description().isBlank()
+                ? "No description provided." : row.description();
+        Label description = new Label(descriptionText);
+        description.setWrapText(true); description.setMaxWidth(Double.MAX_VALUE);
+        description.getStyleClass().add(row.description() == null || row.description().isBlank()
+                ? "contact-classification-description-missing" : "contact-classification-description");
+        FlowPane actions = new FlowPane(Orientation.HORIZONTAL, 6, 6);
+        actions.getStyleClass().add("contact-classification-card-actions");
+        actions.getChildren().setAll(actions(row));
+        VBox card = new VBox(8, heading, detail, badges, description, actions);
+        card.setFillWidth(true); card.setMaxWidth(Double.MAX_VALUE);
+        card.getStyleClass().addAll("shale-card-surface", "contact-classification-card");
+        if (!row.active() || row.deleted()) card.getStyleClass().add("contact-classification-card-subdued");
         return card;
     }
 
@@ -161,9 +198,9 @@ public final class ContactClassificationAdminPane {
             case "remove" -> service.removeDefinition(command);
             case "restore" -> service.restoreDefinition(command);
             default -> throw new IllegalArgumentException("Unknown lifecycle action");
-        }, failure -> status.setText(stale(failure)
-                ? "This definition changed. Refresh before trying the lifecycle action again."
-                : friendly(failure)));
+        }, failure -> setStatus(stale(failure)
+                ? "Stale definition — this definition changed. Choose Refresh before trying the lifecycle action again."
+                : "Change failed — " + friendly(failure), stale(failure) ? "stale" : "error"));
     }
 
     private void openEditor(AdministrationDefinition existing) {
@@ -171,26 +208,46 @@ public final class ContactClassificationAdminPane {
         boolean override = existing != null && existing.global();
         Dialog<Void> dialog = new Dialog<>();
         String heading = existing == null ? "Add " + categoryName(editorCategory) : override ? "Customize Global Definition" : "Edit Definition";
-        dialog.setTitle(heading); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
-        TextField name = new TextField(existing == null ? "" : existing.name());
-        TextField abbreviation = new TextField(existing == null || existing.abbreviation() == null ? "" : existing.abbreviation());
-        TextArea description = new TextArea(existing == null || existing.description() == null ? "" : existing.description()); description.setPrefRowCount(3);
-        TextField order = new TextField(existing == null ? "0" : Integer.toString(existing.sortOrder()));
-        TextField key = new TextField(existing == null ? "" : existing.systemKey());
-        key.setEditable(existing == null); key.setPromptText("lowercase_snake_case");
-        Label error = new Label(override ? "This customization applies only to the current organization." : ""); error.setWrapText(true);
+        dialog.setTitle(heading);
+        if (root.getScene() != null) dialog.initOwner(root.getScene().getWindow());
+        DialogPane pane = dialog.getDialogPane();
+        pane.getStyleClass().addAll("secondary-window-shell", "contact-classification-dialog");
+        pane.getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
+        TextField name = field(existing == null ? "" : existing.name(), "definition-name");
+        TextField abbreviation = field(existing == null || existing.abbreviation() == null ? "" : existing.abbreviation(), "definition-abbreviation");
+        TextArea description = new TextArea(existing == null || existing.description() == null ? "" : existing.description());
+        configureDescription(description);
+        TextField order = field(existing == null ? "0" : Integer.toString(existing.sortOrder()), "definition-sort-order");
+        TextField key = field(existing == null ? "" : existing.systemKey(), "definition-internal-key");
+        configureInternalKey(key, existing == null);
+        Label keyHelp = new Label(existing == null ? "Used as the stable system identifier."
+                : "Read-only: the stable Internal Key cannot be changed after creation.");
+        keyHelp.setWrapText(true); keyHelp.getStyleClass().add("contact-classification-field-help");
+        Label context = new Label(override
+                ? "This creates an organization-specific override; the global definition remains unchanged."
+                : "Required fields are marked with an asterisk (*).");
+        context.setWrapText(true); context.getStyleClass().add("contact-classification-dialog-context");
+        Label error = new Label(); error.setId("definition-editor-error"); error.setWrapText(true);
+        error.getStyleClass().add("contact-classification-editor-error");
         Button reload = button("Reload list", ControlStyles.Purpose.SECONDARY);
         reload.setVisible(false); reload.setManaged(false);
         reload.setAccessibleText("Close editor and reload Contact classifications");
         reload.setOnAction(event -> { dialog.close(); requestLoad(); });
         if (existing == null) name.textProperty().addListener((o,a,b) -> { if (key.getText().isBlank() || key.getText().equals(systemKeyFromName(a))) key.setText(systemKeyFromName(b)); });
-        GridPane form = new GridPane(); form.setHgap(10); form.setVgap(8);
+        GridPane form = new GridPane(); form.setHgap(12); form.setVgap(10);
+        form.getStyleClass().add("contact-classification-form");
+        ColumnConstraints labels = new ColumnConstraints(); labels.setMinWidth(105);
+        ColumnConstraints controls = new ColumnConstraints(); controls.setHgrow(Priority.ALWAYS); controls.setFillWidth(true);
+        form.getColumnConstraints().setAll(labels, controls);
         int line=0; form.addRow(line++, new Label(editorCategory==DefinitionCategory.CREDENTIAL?"Full Name *":"Name *"), name);
         if (editorCategory==DefinitionCategory.CREDENTIAL) form.addRow(line++, new Label("Abbreviation *"), abbreviation);
         form.addRow(line++, new Label("Description"), description); form.addRow(line++, new Label("Sort Order"), order);
-        form.addRow(line++, new Label("Internal key"), key); form.add(new VBox(6, error, reload), 1, line);
-        dialog.getDialogPane().setContent(form);
-        Button save = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK); save.setText("Save");
+        form.addRow(line++, new Label("Internal Key *"), new VBox(4, key, keyHelp));
+        VBox body = new VBox(12, context, form, error, reload);
+        body.getStyleClass().add("contact-classification-dialog-body");
+        pane.setContent(body);
+        Button save = (Button) pane.lookupButton(ButtonType.OK); save.setText("Save"); ControlStyles.apply(save, ControlStyles.Purpose.PRIMARY);
+        Button cancel = (Button) pane.lookupButton(ButtonType.CANCEL); ControlStyles.apply(cancel, ControlStyles.Purpose.SECONDARY);
         save.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
             event.consume();
             String validation = validate(name.getText(), abbreviation.getText(), order.getText(), key.getText(), editorCategory);
@@ -202,7 +259,7 @@ public final class ContactClassificationAdminPane {
                     description.getText(), sort, true));
             else mutation = () -> service.updateDefinition(new UpdateDefinitionCommand(existing.category(), existing.id(), tenant(), actor(),
                     name.getText(), abbreviation.getText(), description.getText(), sort, existing.rowVer()));
-            save.setDisable(true);
+            save.setDisable(true); error.setText("Saving changes…");
             mutate(mutation, failure -> {
                 boolean staleData = stale(failure);
                 save.setDisable(staleData);
@@ -218,8 +275,9 @@ public final class ContactClassificationAdminPane {
     private void mutate(Supplier<DefinitionMutationResult> operation, java.util.function.Consumer<RuntimeException> failure) { mutate(operation, failure, null); }
     private void mutate(Supplier<DefinitionMutationResult> operation, java.util.function.Consumer<RuntimeException> failure, Runnable success) {
         if (disposed.get() || !mutating.compareAndSet(false, true)) return; setBusy(true);
+        setStatus("Applying classification change…", "loading");
         worker.submit(() -> { try { operation.get(); Platform.runLater(() -> { mutating.set(false); if (disposed.get()) return; setBusy(false); if(success!=null)success.run(); requestLoad(); }); }
-            catch (RuntimeException ex) { Platform.runLater(() -> { mutating.set(false); if (disposed.get()) return; setBusy(false); if(failure!=null)failure.accept(ex); else status.setText(friendly(ex)); }); } });
+            catch (RuntimeException ex) { Platform.runLater(() -> { mutating.set(false); if (disposed.get()) return; setBusy(false); if(failure!=null)failure.accept(ex); else setStatus("Change failed — " + friendly(ex), "error"); }); } });
     }
 
     void dispose() {
@@ -229,15 +287,37 @@ public final class ContactClassificationAdminPane {
     private void setBusy(boolean busy) { add.setDisable(busy); refresh.setDisable(busy); showRemoved.setDisable(busy); list.setDisable(busy); }
     private int tenant() { Integer id=state.getShaleClientId(); if(id==null||id<=0)throw new SecurityException("A tenant session is required."); return id; }
     private int actor() { Integer id=state.getUserId(); if(id==null||id<=0)throw new SecurityException("An authenticated administrator is required."); return id; }
+    private static TextField field(String value, String id) { TextField field=new TextField(value); field.setId(id); ControlStyles.formControl(field); field.setMaxWidth(Double.MAX_VALUE); return field; }
+    static void configureDescription(TextArea description) {
+        description.setId("definition-description"); description.setPrefRowCount(5); description.setWrapText(true);
+        ControlStyles.formControl(description);
+    }
+    static void configureInternalKey(TextField key, boolean creatingCustomDefinition) {
+        key.setEditable(creatingCustomDefinition); key.setPromptText("lowercase_snake_case");
+        if (!creatingCustomDefinition) key.getStyleClass().add("contact-classification-readonly");
+    }
     private static Button button(String text, ControlStyles.Purpose purpose) { Button b=new Button(text); ControlStyles.apply(b,purpose,ControlStyles.Size.STANDARD); return b; }
-    private Button action(String text, Runnable run) { Button b=button(text, text.equals("Remove")||text.equals("Reset to Global")||text.equals("Deactivate")?ControlStyles.Purpose.DANGER:ControlStyles.Purpose.SECONDARY); b.setAccessibleText(text+" definition"); b.setOnAction(e->run.run()); return b; }
-    private static Label badge(String text) { Label l=new Label(text); l.getStyleClass().add("metadata-chip"); return l; }
+    private Button action(String text, Runnable run) {
+        ControlStyles.Purpose purpose = text.equals("Remove") ? ControlStyles.Purpose.DANGER
+                : text.equals("Deactivate") || text.equals("Reset to Global") ? ControlStyles.Purpose.GHOST
+                : ControlStyles.Purpose.SECONDARY;
+        Button b=button(text, purpose); b.getStyleClass().add(text.equals("Deactivate") || text.equals("Reset to Global") ? "contact-classification-caution" : "contact-classification-action");
+        b.setAccessibleText(text+" definition"); b.setTooltip(new Tooltip(text+" this Contact classification definition")); b.setOnAction(e->run.run()); return b;
+    }
+    private static Label badge(String text, String semanticClass) { Label l=new Label(text); l.getStyleClass().addAll("metadata-chip", "contact-classification-badge", semanticClass); return l; }
     private static String origin(AdministrationDefinition r) { return switch(r.origin()){case GLOBAL->"Global";case CUSTOM->"Custom";case OVERRIDE->"Override";}; }
     private static String stateLabel(AdministrationDefinition r) { return switch(r.overlayState()){case EFFECTIVE->"Effective";case OVERRIDDEN->"Overridden";case MASKED_GLOBAL->"Global masked";case GLOBAL_FALLBACK->"Global fallback";case INEFFECTIVE->"Not effective";}; }
+    private static String stateSlug(AdministrationDefinition r) { return switch(r.overlayState()){case EFFECTIVE->"effective";case OVERRIDDEN->"overridden";case MASKED_GLOBAL->"global-masked";case GLOBAL_FALLBACK->"global-fallback";case INEFFECTIVE->"ineffective";}; }
     private static String categoryName(DefinitionCategory c) { return switch(c){case CONTACT_TYPE->"Contact Type";case SPECIALTY->"Specialty";case CREDENTIAL->"Credential";}; }
     public static String systemKeyFromName(String value) { if(value==null)return ""; String s=Normalizer.normalize(value,Normalizer.Form.NFD).replaceAll("\\p{M}","").toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+","_").replaceAll("^_+|_+$",""); return s; }
     public static boolean validSystemKey(String value) { return value!=null && value.length()<=64 && value.matches("[a-z][a-z0-9]*(?:_[a-z0-9]+)*"); }
     private static String validate(String name,String abbreviation,String order,String key,DefinitionCategory category) { if(name==null||name.isBlank())return "Name is required."; if(name.trim().length()>100)return "Name must be at most 100 characters."; if(category==DefinitionCategory.CREDENTIAL&&(abbreviation==null||abbreviation.isBlank()))return "Abbreviation is required."; try{if(Integer.parseInt(order)<0)return "Sort Order must be a nonnegative integer.";}catch(Exception e){return "Sort Order must be a nonnegative integer.";} if(!validSystemKey(key))return "Internal key must be lowercase snake_case and at most 64 characters."; return null; }
     private static boolean stale(Throwable ex) { for(Throwable x=ex;x!=null;x=x.getCause())if(x.getMessage()!=null&&(x.getMessage().contains("changed")||x.getMessage().contains("reload")))return true; return false; }
     private static String friendly(Throwable ex) { String m=ex.getMessage(); if(m!=null&&(m.contains("SystemKey")||m.contains("already uses")||m.contains("shadow")))return m; return "The definition could not be saved. Your values have been kept."; }
+    private void setStatus(String message, String stateName) {
+        status.setText(message);
+        status.getStyleClass().removeIf(style -> style.startsWith("contact-classification-status-"));
+        status.getStyleClass().add("contact-classification-status-" + stateName);
+        status.setVisible(!message.isBlank()); status.setManaged(!message.isBlank());
+    }
 }
