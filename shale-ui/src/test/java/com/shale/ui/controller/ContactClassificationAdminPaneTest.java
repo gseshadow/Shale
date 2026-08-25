@@ -7,6 +7,8 @@ class ContactClassificationAdminPaneTest {
     @Test void generatesDeterministicSnakeCaseWithoutCollisionSuffixes() {
         assertEquals("doctor_of_medicine", ContactClassificationAdminPane.systemKeyFromName("Doctor of Medicine"));
         assertEquals("ete_specialty", ContactClassificationAdminPane.systemKeyFromName("Été Specialty"));
+		assertEquals("doctor_of_medicine", ContactClassificationAdminPane.systemKeyFromName("  Doctor---of...Medicine  "));
+		assertEquals("", ContactClassificationAdminPane.systemKeyFromName(" --!? "));
         assertFalse(ContactClassificationAdminPane.systemKeyFromName("Expert").matches("expert_[0-9]+"));
     }
 

@@ -306,7 +306,7 @@ public final class SettingsController {
 			@Override public List<Definition> getEffectiveContactTypes(int t){return List.of();}
 			@Override public List<Definition> getEffectiveSpecialties(int t){return List.of();}
 			@Override public List<CredentialDefinition> getEffectiveCredentialDefinitions(int t){return List.of();}
-			@Override public List<AdministrationDefinition> listDefinitionsForAdministration(DefinitionCategory c,int t,int a){return List.of();}
+			@Override public List<AdministrationDefinition> listDefinitionsForAdministration(DefinitionCategory c,int t,int a){throw new UnsupportedOperationException("Contact classification administration service is not configured.");}
 			@Override public Optional<ClassificationProfile> getClassificationProfile(int c,int t){return Optional.empty();}
 			@Override public int createContact(CreateContactCommand c){throw new UnsupportedOperationException();}
 			@Override public boolean updateContact(UpdateContactCommand c){return false;}

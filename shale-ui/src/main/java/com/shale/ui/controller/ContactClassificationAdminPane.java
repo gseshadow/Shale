@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import com.shale.core.service.ContactServicePort;
@@ -31,6 +32,8 @@ public final class ContactClassificationAdminPane {
     });
     private final AtomicBoolean loading = new AtomicBoolean();
     private final AtomicBoolean mutating = new AtomicBoolean();
+    private final AtomicBoolean disposed = new AtomicBoolean();
+    private final AtomicInteger loadGeneration = new AtomicInteger();
     private final TabPane tabs = new TabPane();
     private final CheckBox showRemoved = new CheckBox("Show removed");
     private final Label status = new Label();
@@ -45,18 +48,21 @@ public final class ContactClassificationAdminPane {
         tabs.getTabs().setAll(tab("Contact Types", DefinitionCategory.CONTACT_TYPE),
                 tab("Specialties", DefinitionCategory.SPECIALTY), tab("Credentials", DefinitionCategory.CREDENTIAL));
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabs.getSelectionModel().selectedItemProperty().addListener((o,a,b) -> load());
+        tabs.getSelectionModel().selectedItemProperty().addListener((o,a,b) -> requestLoad());
         showRemoved.setAccessibleText("Show removed Contact classification definitions");
         showRemoved.selectedProperty().addListener((o,a,b) -> render());
         add.setAccessibleText("Add definition to selected Contact classification category");
         refresh.setAccessibleText("Refresh Contact classifications");
-        add.setOnAction(e -> openEditor(null)); refresh.setOnAction(e -> load());
+        add.setOnAction(e -> openEditor(null)); refresh.setOnAction(e -> requestLoad());
         status.getStyleClass().add("search-summary-text"); status.setWrapText(true);
         HBox actions = new HBox(8, add, refresh, showRemoved, status);
         root.getChildren().setAll(tabs, actions, list);
+        root.sceneProperty().addListener((observable, oldScene, newScene) -> {
+            if (oldScene != null && newScene == null) dispose();
+        });
         if (!state.isAdmin()) {
             root.setVisible(false); root.setManaged(false); status.setText("Administrator access is required.");
-        } else load();
+        } else requestLoad();
     }
 
     public Node node() { return root; }
@@ -64,19 +70,38 @@ public final class ContactClassificationAdminPane {
 
     private Tab tab(String text, DefinitionCategory category) { Tab t = new Tab(text); t.setUserData(category); return t; }
 
-    private void load() {
-        if (!state.isAdmin() || !loading.compareAndSet(false, true)) return;
+    private void requestLoad() {
+        loadGeneration.incrementAndGet();
+        loadLatest();
+    }
+
+    private void loadLatest() {
+        if (disposed.get() || !state.isAdmin() || !loading.compareAndSet(false, true)) return;
+        int generation = loadGeneration.get();
         int tenant = tenant(), actor = actor(); setBusy(true); status.setText("Loading classifications…");
         DefinitionCategory category = selectedCategory();
         worker.submit(() -> {
             try {
                 if (Platform.isFxApplicationThread()) throw new IllegalStateException("Settings reads must run off the JavaFX thread.");
                 List<AdministrationDefinition> loaded = service.listDefinitionsForAdministration(category, tenant, actor);
-                Platform.runLater(() -> { rows = loaded; loading.set(false); setBusy(false); status.setText(""); render(); });
+                Platform.runLater(() -> finishLoad(generation, category, loaded, null));
             } catch (RuntimeException ex) {
-                Platform.runLater(() -> { loading.set(false); setBusy(false); status.setText("Classifications could not be loaded. Refresh to try again."); });
+                Platform.runLater(() -> finishLoad(generation, category, null, ex));
             }
         });
+    }
+
+    private void finishLoad(int generation, DefinitionCategory category,
+            List<AdministrationDefinition> loaded, RuntimeException failure) {
+        loading.set(false);
+        if (disposed.get()) return;
+        if (generation != loadGeneration.get() || category != selectedCategory()) {
+            loadLatest();
+            return;
+        }
+        setBusy(false);
+        if (failure == null) { rows = loaded; status.setText(""); render(); }
+        else status.setText("Classifications could not be loaded. Refresh to try again.");
     }
 
     private void render() {
@@ -136,13 +161,16 @@ public final class ContactClassificationAdminPane {
             case "remove" -> service.removeDefinition(command);
             case "restore" -> service.restoreDefinition(command);
             default -> throw new IllegalArgumentException("Unknown lifecycle action");
-        }, null);
+        }, failure -> status.setText(stale(failure)
+                ? "This definition changed. Refresh before trying the lifecycle action again."
+                : friendly(failure)));
     }
 
     private void openEditor(AdministrationDefinition existing) {
+        DefinitionCategory editorCategory = existing == null ? selectedCategory() : existing.category();
         boolean override = existing != null && existing.global();
         Dialog<Void> dialog = new Dialog<>();
-        String heading = existing == null ? "Add " + categoryName(selectedCategory()) : override ? "Customize Global Definition" : "Edit Definition";
+        String heading = existing == null ? "Add " + categoryName(editorCategory) : override ? "Customize Global Definition" : "Edit Definition";
         dialog.setTitle(heading); dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
         TextField name = new TextField(existing == null ? "" : existing.name());
         TextField abbreviation = new TextField(existing == null || existing.abbreviation() == null ? "" : existing.abbreviation());
@@ -151,38 +179,51 @@ public final class ContactClassificationAdminPane {
         TextField key = new TextField(existing == null ? "" : existing.systemKey());
         key.setEditable(existing == null); key.setPromptText("lowercase_snake_case");
         Label error = new Label(override ? "This customization applies only to the current organization." : ""); error.setWrapText(true);
+        Button reload = button("Reload list", ControlStyles.Purpose.SECONDARY);
+        reload.setVisible(false); reload.setManaged(false);
+        reload.setAccessibleText("Close editor and reload Contact classifications");
+        reload.setOnAction(event -> { dialog.close(); requestLoad(); });
         if (existing == null) name.textProperty().addListener((o,a,b) -> { if (key.getText().isBlank() || key.getText().equals(systemKeyFromName(a))) key.setText(systemKeyFromName(b)); });
         GridPane form = new GridPane(); form.setHgap(10); form.setVgap(8);
-        int line=0; form.addRow(line++, new Label(selectedCategory()==DefinitionCategory.CREDENTIAL?"Full Name *":"Name *"), name);
-        if (selectedCategory()==DefinitionCategory.CREDENTIAL) form.addRow(line++, new Label("Abbreviation *"), abbreviation);
+        int line=0; form.addRow(line++, new Label(editorCategory==DefinitionCategory.CREDENTIAL?"Full Name *":"Name *"), name);
+        if (editorCategory==DefinitionCategory.CREDENTIAL) form.addRow(line++, new Label("Abbreviation *"), abbreviation);
         form.addRow(line++, new Label("Description"), description); form.addRow(line++, new Label("Sort Order"), order);
-        form.addRow(line++, new Label("Internal key"), key); form.add(error, 1, line);
+        form.addRow(line++, new Label("Internal key"), key); form.add(new VBox(6, error, reload), 1, line);
         dialog.getDialogPane().setContent(form);
         Button save = (Button) dialog.getDialogPane().lookupButton(ButtonType.OK); save.setText("Save");
         save.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
             event.consume();
-            String validation = validate(name.getText(), abbreviation.getText(), order.getText(), key.getText(), selectedCategory());
+            String validation = validate(name.getText(), abbreviation.getText(), order.getText(), key.getText(), editorCategory);
             if (validation != null) { error.setText(validation); return; }
             int sort = Integer.parseInt(order.getText());
             Supplier<DefinitionMutationResult> mutation;
-            if (existing == null || override) mutation = () -> service.createDefinition(new CreateDefinitionCommand(selectedCategory(), tenant(), actor(),
+            if (existing == null || override) mutation = () -> service.createDefinition(new CreateDefinitionCommand(editorCategory, tenant(), actor(),
                     override ? existing.systemKey() : key.getText(), override ? existing.id() : null, name.getText(), abbreviation.getText(),
                     description.getText(), sort, true));
             else mutation = () -> service.updateDefinition(new UpdateDefinitionCommand(existing.category(), existing.id(), tenant(), actor(),
                     name.getText(), abbreviation.getText(), description.getText(), sort, existing.rowVer()));
             save.setDisable(true);
-            mutate(mutation, failure -> { save.setDisable(false); error.setText(stale(failure)
-                    ? "This definition changed while you were editing. Your values are preserved; cancel and Refresh or Reload before saving again."
-                    : friendly(failure)); }, () -> dialog.close());
+            mutate(mutation, failure -> {
+                boolean staleData = stale(failure);
+                save.setDisable(staleData);
+                reload.setVisible(staleData); reload.setManaged(staleData);
+                error.setText(staleData
+                        ? "This definition changed while you were editing. Your values are preserved. Reload the list before editing again."
+                        : friendly(failure));
+            }, () -> dialog.close());
         });
         dialog.show();
     }
 
     private void mutate(Supplier<DefinitionMutationResult> operation, java.util.function.Consumer<RuntimeException> failure) { mutate(operation, failure, null); }
     private void mutate(Supplier<DefinitionMutationResult> operation, java.util.function.Consumer<RuntimeException> failure, Runnable success) {
-        if (!mutating.compareAndSet(false, true)) return; setBusy(true);
-        worker.submit(() -> { try { operation.get(); Platform.runLater(() -> { mutating.set(false); setBusy(false); if(success!=null)success.run(); load(); }); }
-            catch (RuntimeException ex) { Platform.runLater(() -> { mutating.set(false); setBusy(false); if(failure!=null)failure.accept(ex); else status.setText(friendly(ex)); }); } });
+        if (disposed.get() || !mutating.compareAndSet(false, true)) return; setBusy(true);
+        worker.submit(() -> { try { operation.get(); Platform.runLater(() -> { mutating.set(false); if (disposed.get()) return; setBusy(false); if(success!=null)success.run(); requestLoad(); }); }
+            catch (RuntimeException ex) { Platform.runLater(() -> { mutating.set(false); if (disposed.get()) return; setBusy(false); if(failure!=null)failure.accept(ex); else status.setText(friendly(ex)); }); } });
+    }
+
+    void dispose() {
+        if (disposed.compareAndSet(false, true)) worker.shutdownNow();
     }
 
     private void setBusy(boolean busy) { add.setDisable(busy); refresh.setDisable(busy); showRemoved.setDisable(busy); list.setDisable(busy); }
