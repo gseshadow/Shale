@@ -22,10 +22,8 @@ public interface ContactServicePort {
 	List<CredentialDefinition> getEffectiveCredentialDefinitions(int shaleClientId);
 
 	/** Administrator-only lifecycle view of one closed definition category. */
-	default List<AdministrationDefinition> listDefinitionsForAdministration(
-			DefinitionCategory category, int shaleClientId, int actorUserId) {
-		throw new UnsupportedOperationException("Contact definition administration is not configured.");
-	}
+	List<AdministrationDefinition> listDefinitionsForAdministration(
+			DefinitionCategory category, int shaleClientId, int actorUserId);
 
 	Optional<ClassificationProfile> getClassificationProfile(int contactId, int shaleClientId);
 

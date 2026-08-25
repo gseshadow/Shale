@@ -1343,6 +1343,15 @@ class ApiReadControllerTest {
                     "Ada Lovelace", "ada@example.test", "555-0100", "123 Main", "1980-01-02", "Notes", false, true));
         }
 
+		@Override public List<Definition> getEffectiveContactTypes(int shaleClientId) { return List.of(); }
+		@Override public List<Definition> getEffectiveSpecialties(int shaleClientId) { return List.of(); }
+		@Override public List<CredentialDefinition> getEffectiveCredentialDefinitions(int shaleClientId) { return List.of(); }
+		@Override public List<AdministrationDefinition> listDefinitionsForAdministration(
+				DefinitionCategory category, int shaleClientId, int actorUserId) { return List.of(); }
+		@Override public Optional<ClassificationProfile> getClassificationProfile(int contactId, int shaleClientId) {
+			return Optional.empty();
+		}
+
         @Override
         public int createContact(CreateContactCommand command) {
             this.createdCommand = command;
@@ -1358,6 +1367,20 @@ class ApiReadControllerTest {
         public boolean softDeleteContact(int contactId, int shaleClientId, int actorUserId) {
             throw new AssertionError("softDeleteContact should not be called");
         }
+
+		@Override public DefinitionMutationResult createDefinition(CreateDefinitionCommand command) { throw unused(); }
+		@Override public DefinitionMutationResult updateDefinition(UpdateDefinitionCommand command) { throw unused(); }
+		@Override public DefinitionMutationResult setDefinitionActive(DefinitionLifecycleCommand command) { throw unused(); }
+		@Override public DefinitionMutationResult removeDefinition(DefinitionLifecycleCommand command) { throw unused(); }
+		@Override public DefinitionMutationResult restoreDefinition(DefinitionLifecycleCommand command) { throw unused(); }
+		@Override public AssignmentMutationResult assignClassification(AssignClassificationCommand command) { throw unused(); }
+		@Override public AssignmentMutationResult removeClassification(AssignmentLifecycleCommand command) { throw unused(); }
+		@Override public AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand command) { throw unused(); }
+		@Override public List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand command) { return List.of(); }
+
+		private static UnsupportedOperationException unused() {
+			return new UnsupportedOperationException("Contact classification mutations are outside this API read test double.");
+		}
     }
 
 	private static final class RecordingNotificationServicePort implements NotificationServicePort {
