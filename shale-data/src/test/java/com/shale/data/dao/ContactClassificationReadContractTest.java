@@ -5,12 +5,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
 class ContactClassificationReadContractTest {
     private static String source() throws Exception {
-        return Files.readString(Path.of("src/main/java/com/shale/data/dao/ContactDao.java"));
+        return Files.readString(Path.of("src/main/java/com/shale/data/dao/ContactDao.java"))
+                .replace("\r\n", "\n").replace('\r', '\n');
+    }
+
+    private static String methodBody(String source, String signature) {
+        int signatureStart = source.indexOf(signature);
+        assertTrue(signatureStart >= 0, "method signature not found: " + signature);
+        int openingBrace = source.indexOf('{', signatureStart + signature.length());
+        assertTrue(openingBrace >= 0, "opening brace not found: " + signature);
+        int depth = 0;
+        for (int index = openingBrace; index < source.length(); index++) {
+            char current = source.charAt(index);
+            if (current == '{') depth++;
+            if (current == '}' && --depth == 0) return source.substring(openingBrace, index + 1);
+        }
+        throw new AssertionError("unbalanced method body: " + signature);
     }
 
     @Test
@@ -38,12 +54,22 @@ class ContactClassificationReadContractTest {
     @Test
     void compatibilityBoundariesRemainReadOnlyAndLegacyAuthoritative() throws Exception {
         String source = source();
-        assertTrue(source.contains("LegacyDisplayName"));
-        assertTrue(source.contains("c.Prefix,c.FirstName,c.MiddleName,c.LastName,c.PreferredName,c.Suffix"));
-        assertFalse(source.contains("UPDATE dbo.ContactContactTypes"));
-        assertFalse(source.contains("INSERT dbo.ContactContactTypes"));
-        assertFalse(source.contains("PartyRoles"));
-        assertFalse(source.contains("CaseParties"));
-        assertFalse(source.contains("CaseContacts"));
+        String phaseOneBReads = String.join("\n",
+                methodBody(source, "public List<DefinitionRow> listEffectiveDefinitions("),
+                methodBody(source, "public List<CredentialDefinitionRow> listEffectiveCredentialDefinitions("),
+                methodBody(source, "public ClassificationProfileRow findClassificationProfile("),
+                methodBody(source, "private static List<AssignedDefinitionRow> loadAssignedDefinitions("),
+                methodBody(source, "private static List<AssignedCredentialRow> loadAssignedCredentials("));
+
+        assertTrue(phaseOneBReads.contains("LegacyDisplayName"));
+        assertTrue(phaseOneBReads.contains("c.Prefix,c.FirstName,c.MiddleName,c.LastName,c.PreferredName,c.Suffix"));
+        assertTrue(phaseOneBReads.contains("SELECT ") || phaseOneBReads.contains("WITH visible AS"));
+        assertTrue(phaseOneBReads.contains("executeQuery()"));
+        assertFalse(phaseOneBReads.contains("executeUpdate"));
+        assertFalse(Pattern.compile("(?i)\\b(?:INSERT|UPDATE|DELETE|MERGE)\\s+(?:INTO\\s+)?dbo\\.")
+                .matcher(phaseOneBReads).find(), "Phase 1B methods must contain no mutation SQL");
+        assertFalse(phaseOneBReads.contains("PartyRoles"));
+        assertFalse(phaseOneBReads.contains("CaseParties"));
+        assertFalse(phaseOneBReads.contains("CaseContacts"));
     }
 }
