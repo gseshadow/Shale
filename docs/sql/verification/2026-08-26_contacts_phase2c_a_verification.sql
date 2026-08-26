@@ -14,8 +14,13 @@ SELECT OBJECT_NAME(o.parent_object_id) TableName,o.name ConstraintName,o.type_de
 SELECT OBJECT_NAME(i.object_id) TableName,i.name,i.is_unique,i.is_disabled,i.filter_definition,STRING_AGG(c.name,N',') WITHIN GROUP(ORDER BY ic.index_column_id) Columns
  FROM sys.indexes i JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id
  WHERE i.object_id IN(OBJECT_ID(N'dbo.ContactPhoneNumbers'),OBJECT_ID(N'dbo.ContactEmailAddresses'),OBJECT_ID(N'dbo.ContactAddresses')) GROUP BY i.object_id,i.name,i.is_unique,i.is_disabled,i.filter_definition ORDER BY TableName,i.name;
-SELECT OBJECT_NAME(sp.target_object_id) TableName,SCHEMA_NAME(p.schema_id)+N'.'+p.name PolicyName,p.is_enabled,sp.predicate_type_desc,sp.predicate_definition
- FROM sys.security_predicates sp JOIN sys.security_policies p ON p.object_id=sp.security_policy_id WHERE sp.target_object_id IN(OBJECT_ID(N'dbo.ContactPhoneNumbers'),OBJECT_ID(N'dbo.ContactEmailAddresses'),OBJECT_ID(N'dbo.ContactAddresses'),OBJECT_ID(N'dbo.Contacts')) ORDER BY TableName;
+SELECT OBJECT_NAME(spr.target_object_id) TableName,SCHEMA_NAME(sp.schema_id)+N'.'+sp.name PolicyName,sp.is_enabled,spr.predicate_type_desc,spr.operation_desc,spr.predicate_definition,
+ LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(spr.predicate_definition,N'[',N''),N']',N''),N' ',N''),NCHAR(9),N''),NCHAR(10),N''),NCHAR(13),N''),N'(',N''),N')',N'')) NormalizedPredicateDefinition
+ FROM sys.security_predicates spr JOIN sys.security_policies sp ON spr.object_id=sp.object_id WHERE spr.target_object_id IN(OBJECT_ID(N'dbo.ContactPhoneNumbers'),OBJECT_ID(N'dbo.ContactEmailAddresses'),OBJECT_ID(N'dbo.ContactAddresses'),OBJECT_ID(N'dbo.Contacts')) ORDER BY TableName;
+SELECT e.TableName,COUNT(spr.object_id) PredicateCount,
+ SUM(CASE WHEN sp.name=N'TenantFilter' AND sp.is_enabled=1 AND spr.predicate_type_desc=N'FILTER' AND spr.operation_desc IS NULL AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(spr.predicate_definition,N'[',N''),N']',N''),N' ',N''),NCHAR(9),N''),NCHAR(10),N''),NCHAR(13),N''),N'(',N''),N')',N''))=N'sec.fn_filterbytenantshaleclientid' THEN 1 ELSE 0 END) ExpectedStrictPredicateCount
+ FROM(VALUES(N'ContactPhoneNumbers'),(N'ContactEmailAddresses'),(N'ContactAddresses'))e(TableName)
+ LEFT JOIN sys.security_predicates spr ON spr.target_object_id=OBJECT_ID(N'dbo.'+e.TableName) LEFT JOIN sys.security_policies sp ON spr.object_id=sp.object_id GROUP BY e.TableName ORDER BY e.TableName;
 
 SELECT N'ContactPhoneNumbers' TableName,ShaleClientId,Kind,IsDeleted,IsPrimary,COUNT_BIG(*) RowCount FROM dbo.ContactPhoneNumbers GROUP BY ShaleClientId,Kind,IsDeleted,IsPrimary
 UNION ALL SELECT N'ContactEmailAddresses',ShaleClientId,Kind,IsDeleted,IsPrimary,COUNT_BIG(*) FROM dbo.ContactEmailAddresses GROUP BY ShaleClientId,Kind,IsDeleted,IsPrimary

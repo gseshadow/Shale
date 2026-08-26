@@ -147,11 +147,11 @@ WHERE NOT EXISTS(SELECT 1 FROM dbo.ContactAddresses a WHERE a.ShaleClientId=s.Sh
 /* Attach exactly the established strict FILTER predicate; dbo.Contacts remains untouched. */
 DECLARE r CURSOR LOCAL FAST_FORWARD FOR SELECT t FROM(VALUES(N'ContactPhoneNumbers'),(N'ContactEmailAddresses'),(N'ContactAddresses'))x(t);
 OPEN r; FETCH NEXT FROM r INTO @Child; WHILE @@FETCH_STATUS=0 BEGIN
- IF NOT EXISTS(SELECT 1 FROM sys.security_predicates WHERE security_policy_id=@PolicyId AND target_object_id=OBJECT_ID(N'dbo.'+@Child) AND predicate_type_desc=N'FILTER') BEGIN SET @sql=N'ALTER SECURITY POLICY '+@PolicyQualified+N' ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.'+QUOTENAME(@Child)+N';'; EXEC(@sql); END
+ IF NOT EXISTS(SELECT 1 FROM sys.security_predicates spr JOIN sys.security_policies sp ON spr.object_id=sp.object_id WHERE sp.object_id=@PolicyId AND spr.target_object_id=OBJECT_ID(N'dbo.'+@Child) AND spr.predicate_type_desc=N'FILTER') BEGIN SET @sql=N'ALTER SECURITY POLICY '+@PolicyQualified+N' ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.'+QUOTENAME(@Child)+N';'; EXEC(@sql); END
  FETCH NEXT FROM r INTO @Child; END CLOSE r; DEALLOCATE r;
-IF EXISTS(SELECT 1 FROM(VALUES(N'ContactPhoneNumbers'),(N'ContactEmailAddresses'),(N'ContactAddresses'))e(t) OUTER APPLY(SELECT COUNT(*) n,MIN(LOWER(REPLACE(REPLACE(REPLACE(REPLACE(sp.predicate_definition,N'[',N''),N']',N''),NCHAR(9),N''),N' ',N''))) d FROM sys.security_predicates sp WHERE sp.security_policy_id=@PolicyId AND sp.target_object_id=OBJECT_ID(N'dbo.'+e.t) AND sp.predicate_type_desc=N'FILTER')x WHERE x.n<>1 OR x.d NOT LIKE N'%fn_filterbytenant(shaleclientid)%')
+IF EXISTS(SELECT 1 FROM(VALUES(N'ContactPhoneNumbers'),(N'ContactEmailAddresses'),(N'ContactAddresses'))e(t) OUTER APPLY(SELECT COUNT(*) n,MAX(LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(spr.predicate_definition,N'[',N''),N']',N''),N' ',N''),NCHAR(9),N''),NCHAR(10),N''),NCHAR(13),N''),N'(',N''),N')',N''))) d,MAX(CASE WHEN sp.object_id=@PolicyId AND sp.is_enabled=1 AND spr.predicate_type_desc=N'FILTER' AND spr.operation_desc IS NULL THEN 0 ELSE 1 END) unexpected FROM sys.security_predicates spr JOIN sys.security_policies sp ON spr.object_id=sp.object_id WHERE spr.target_object_id=OBJECT_ID(N'dbo.'+e.t))x WHERE x.n<>1 OR x.unexpected<>0 OR x.d<>N'sec.fn_filterbytenantshaleclientid')
  THROW 56415,'Each child table must have exactly the strict tenant FILTER predicate.',1;
-IF EXISTS(SELECT 1 FROM sys.security_predicates WHERE security_policy_id=@PolicyId AND target_object_id=OBJECT_ID(N'dbo.Contacts'))
+IF EXISTS(SELECT 1 FROM sys.security_predicates spr JOIN sys.security_policies sp ON spr.object_id=sp.object_id WHERE sp.object_id=@PolicyId AND spr.target_object_id=OBJECT_ID(N'dbo.Contacts'))
  THROW 56416,'Phase 2C-A must not add RLS to dbo.Contacts.',1;
 COMMIT TRANSACTION;
 END TRY BEGIN CATCH IF @@TRANCOUNT>0 ROLLBACK TRANSACTION; THROW; END CATCH;

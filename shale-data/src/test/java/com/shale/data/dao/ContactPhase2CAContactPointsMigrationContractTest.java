@@ -60,8 +60,20 @@ class ContactPhase2CAContactPointsMigrationContractTest {
 
     @Test void rlsIsStrictAndContactsIsDeliberatelyUnchanged() throws Exception {
         String sql = read("docs/sql/2026-08-26_contacts_phase2c_a_contact_points.sql");
+        String verify = read("docs/sql/verification/2026-08-26_contacts_phase2c_a_verification.sql");
+        for (String file : new String[]{sql, verify}) {
+            assertFalse(file.contains("security_policy_id"));
+            assertTrue(file.contains("spr.object_id=sp.object_id"));
+            assertTrue(file.contains("sys.security_predicates spr"));
+            assertTrue(file.contains("sys.security_policies sp"));
+            assertTrue(file.contains("sec.fn_filterbytenantshaleclientid"));
+            for (String table : new String[]{"ContactPhoneNumbers", "ContactEmailAddresses", "ContactAddresses"})
+                assertTrue(file.contains("N'" + table + "'"), table);
+        }
         assertTrue(sql.contains("ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId)"));
         assertTrue(sql.contains("exactly the strict tenant FILTER predicate"));
+        assertTrue(sql.contains("x.n<>1 OR x.unexpected<>0"));
+        assertTrue(sql.contains("sp.is_enabled=1"));
         assertTrue(sql.contains("target_object_id=OBJECT_ID(N'dbo.Contacts')"));
         assertFalse(sql.contains("ON dbo.Contacts ADD FILTER"));
         assertFalse(sql.contains("fn_FilterByTenantOrGlobal"));
@@ -98,6 +110,8 @@ class ContactPhase2CAContactPointsMigrationContractTest {
             assertTrue(verify.contains(required), required);
         assertTrue(verify.trim().endsWith("END TRY BEGIN CATCH THROW; END CATCH;"));
         assertFalse(GO.matcher(verify).find());
+        assertTrue(verify.indexOf("@OperatorVerifiedAllTenantVisibility<>1")
+                < verify.indexOf("SELECT t.name TableName"), "a failed guard precedes every reporting statement");
     }
 
     @Test void caseRolesRuntimeAndPresentationRemainOutsideTheMigration() throws Exception {
