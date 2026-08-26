@@ -231,3 +231,48 @@ operator acknowledgement at `0` until independently confirmed.
 Phase 2C remains explicitly deferred: structured or multiple phone/email/address storage, normalization,
 click-to-call, `mailto`, Maps links, directory classification filtering, global `IsExpert` retirement, and
 case-role editing are not part of Phase 2B.
+
+## Phase 2C-A structured contact-point foundation
+
+Phase 2C-A adds three strict tenant-owned children: `ContactPhoneNumbers`, `ContactEmailAddresses`,
+and `ContactAddresses`. Their composite `(ShaleClientId, ContactId)` relationship targets the existing
+unique tenant Contact key, so a value cannot be attached across tenants. Contact removal does not
+cascade; child history and lifecycle actors remain intact. Each child uses the strict tenant RLS
+predicate. This phase deliberately does not add a predicate to `Contacts`.
+
+Kinds are closed system vocabulary: phone `MOBILE`, `HOME`, `WORK`, `FAX`, `OTHER`; email
+`PERSONAL`, `WORK`, `OTHER`; and address `HOME`, `WORK`, `OTHER`. They are CHECK-constrained values,
+not administrator definitions. Consequently they have no colors. If product requirements later make
+them customizable, they must move to the established customizable-definition/tenant-overlay
+architecture and carry the required uppercase `#RRGGBB` color rather than growing ad-hoc labels.
+
+The legacy Contact columns remain unchanged and authoritative for every runtime read, write, search,
+and display. Backfill stores phone text byte-for-character in `DisplayNumber`, email text in
+`EmailAddress`, and the complete free-form address in `LegacyAddressText`. Address components are all
+null: Phase 2C-A does not guess geography. A phone normalization is populated only when the original is
+already a canonical `+` followed by 7–15 digits; email normalization is lowercase only for a trimmed,
+space-free, single-`@`, minimally shaped value. Everything else remains nullable and preserved rather
+than rejected or rewritten.
+
+Backfill precedence is deterministic and zero-based: phone MOBILE, HOME, WORK; email PERSONAL, WORK,
+OTHER; address HOME, WORK, OTHER. The first populated value becomes primary unless an active primary
+already exists. A filtered unique index permits at most one active primary per Contact/category.
+Historical rows can coexist, deleted rows cannot remain primary, and `SortOrder` is nonnegative. A
+future restore service must clear or replace an existing active primary transactionally and use RowVer;
+it must restore the same historical row when that behavior is selected, never erase history.
+
+Phase 2C-B is the explicit dual-write boundary. It must define validation and user-facing formatting,
+transactionally synchronize authoritative legacy columns and structured rows, authorize tenant and
+actor on the same connection, apply RowVer concurrency, reconcile drift, and add PHI-safe entity-action
+audit entity/action vocabulary for create, update, reorder, primary change, remove, and restore. It must
+also decide extension editing and international normalization. Maps URLs are generated at runtime from
+the selected address and are never persisted. Phase 2C-A does not change Contact View, Settings,
+Java/FXML/CSS, case-role tables, or globally retire `IsExpert`.
+
+Deployment is migration, read-only verification, then the unchanged application. The operator guard is
+off by default and requires a null tenant context, approved non-application administrative principal,
+and independently established all-tenant visibility. The migration is a single XACT_ABORT transaction;
+failure rolls back and rethrows. There is no destructive down script. Before application consumers exist,
+rollback means leaving the additive unused schema/history in place. After Phase 2C-B, rollback must follow
+its future dual-write reconciliation plan. Neither the migration nor verification may print contact-point
+values, Contact names, or PHI.
