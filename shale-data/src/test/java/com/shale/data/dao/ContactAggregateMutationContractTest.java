@@ -68,6 +68,16 @@ final class ContactAggregateMutationContractTest {
         }) {
             assertTrue(update.contains(field), "structured Contact update must include " + field);
         }
+        assertFalse(update.contains("UpdatedByUserId"),
+                "dbo.Contacts does not own UpdatedByUserId");
+        assertFalse(update.contains("c.actorUserId()"),
+                "the removed UpdatedByUserId placeholder must not retain an actor binding");
+        assertEquals(10, occurrences(update, "=?"),
+                "non-null concurrency SQL must have seven fields, two scope IDs, and one timestamp parameter");
+        assertEquals(7, occurrences(update, "setString(p,i++"),
+                "the seven Contact fields must be bound first and in SQL order");
+        assertTrue(update.contains("p.setInt(i++,c.contactId());\n            p.setInt(i++,c.shaleClientId())"),
+                "Contact and tenant bindings must immediately follow the seven field bindings");
         assertTrue(update.contains("WHERE Id=? AND ShaleClientId=?"),
                 "Contact update must scope by authoritative Contact and tenant IDs");
         assertTrue(update.contains("ISNULL(IsDeleted,0)=0"), "Contact update must exclude deleted Contacts");

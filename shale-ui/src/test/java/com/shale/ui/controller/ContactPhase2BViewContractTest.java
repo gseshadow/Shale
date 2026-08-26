@@ -2,6 +2,7 @@ package com.shale.ui.controller;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.*;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +53,27 @@ final class ContactPhase2BViewContractTest {
         assertTrue(source.contains("contact-editor-color-swatch"));
         assertTrue(source.contains("void updateButtons()"));
         assertFalse(source.contains("new javafx.scene.control.TabPane"));
+    }
+
+    @Test void aggregateSaveFailuresAreLoggedWithoutPhiAndKeepUserSafeMessages() throws Exception {
+        String source=Files.readString(Path.of("src/main/java/com/shale/ui/controller/ContactViewController.java"));
+        String logger=extractMethod(source,"private static void logAggregateSaveFailure(");
+        assertTrue(logger.contains("operation=contact.aggregate-save"));
+        assertTrue(logger.contains("tenantId=%d contactId=%d actorId=%d exceptionClass=%s"));
+        assertTrue(logger.contains("failure.getClass().getName()"));
+        assertTrue(logger.contains(",failure)"),"logger must retain the underlying exception and stack trace");
+        for(String prohibited:List.of("displayName","structuredName","classification","email","phone","address","rowVer","expectedContactUpdatedAt","sql","command.toString"))
+            assertFalse(logger.toLowerCase().contains(prohibited.toLowerCase()),"PHI-safe logger must exclude "+prohibited);
+        assertTrue(source.contains("Save failed and was rolled back. Your values are retained."));
+        assertTrue(source.contains("This Contact changed elsewhere. Your values are retained; choose Reload before saving again."));
+        assertTrue(source.contains("catch(RuntimeException ex){logAggregateSaveFailure(cmd,ex);"),
+                "aggregate save exceptions must not be silently swallowed");
+    }
+
+    private static String extractMethod(String source,String signature){
+        int start=source.indexOf(signature);assertTrue(start>=0,"missing "+signature);int open=source.indexOf('{',start),depth=0;
+        for(int i=open;i<source.length();i++){char c=source.charAt(i);if(c=='{')depth++;else if(c=='}'&&--depth==0)return source.substring(start,i+1);}
+        fail("unbalanced "+signature);return "";
     }
 
     private static int occurrences(String text,String token) {
