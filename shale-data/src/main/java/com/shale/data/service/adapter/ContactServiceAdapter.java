@@ -103,7 +103,10 @@ public final class ContactServiceAdapter implements ContactServicePort {
 						row.preferredName(), row.suffix()), row.legacyDisplayName(), row.contactUpdatedAt(),
 						row.contactTypes().stream().map(ContactServiceAdapter::assignedDefinition).toList(),
 						row.specialties().stream().map(ContactServiceAdapter::assignedDefinition).toList(),
-						row.credentials().stream().map(ContactServiceAdapter::assignedCredential).toList()));
+						row.credentials().stream().map(ContactServiceAdapter::assignedCredential).toList(),
+						row.phoneNumbers().stream().map(x->new ContactPhoneNumber(x.id(),x.kind(),x.displayNumber(),x.normalizedNumber(),x.extension(),x.primary(),x.sortOrder(),x.deleted(),x.createdAt(),x.updatedAt(),x.rowVer())).toList(),
+						row.emailAddresses().stream().map(x->new ContactEmailAddress(x.id(),x.kind(),x.emailAddress(),x.normalizedEmail(),x.primary(),x.sortOrder(),x.deleted(),x.createdAt(),x.updatedAt(),x.rowVer())).toList(),
+						row.addresses().stream().map(x->new ContactAddress(x.id(),x.kind(),x.addressLine1(),x.addressLine2(),x.city(),x.stateOrProvince(),x.postalCode(),x.countryCode(),x.legacyAddressText(),x.primary(),x.sortOrder(),x.deleted(),x.createdAt(),x.updatedAt(),x.rowVer())).toList()));
 	}
 
 	private static Definition definition(ContactDao.DefinitionRow row) {

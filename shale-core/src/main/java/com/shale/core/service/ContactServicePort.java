@@ -116,12 +116,37 @@ public interface ContactServicePort {
 	/** Read-only classification aggregate. It deliberately carries the existing display name unchanged. */
 	record ClassificationProfile(int contactId, int shaleClientId, StructuredName structuredName,
 			String legacyDisplayName, java.time.Instant contactUpdatedAt, List<AssignedDefinition> contactTypes,
-			List<AssignedDefinition> specialties, List<AssignedCredential> credentials) {
+			List<AssignedDefinition> specialties, List<AssignedCredential> credentials,
+			List<ContactPhoneNumber> phoneNumbers, List<ContactEmailAddress> emailAddresses,
+			List<ContactAddress> addresses) {
 		public ClassificationProfile {
 			contactTypes = List.copyOf(contactTypes);
 			specialties = List.copyOf(specialties);
 			credentials = List.copyOf(credentials);
+			phoneNumbers = List.copyOf(phoneNumbers);
+			emailAddresses = List.copyOf(emailAddresses);
+			addresses = List.copyOf(addresses);
 		}
+	}
+
+	record ContactPhoneNumber(long id, String kind, String displayNumber, String normalizedNumber,
+			String extension, boolean primary, int sortOrder, boolean deleted,
+			java.time.Instant createdAt, java.time.Instant updatedAt, byte[] rowVer) {
+		public ContactPhoneNumber { rowVer=copyRowVer(rowVer); }
+		@Override public byte[] rowVer(){return copyRowVer(rowVer);}
+	}
+	record ContactEmailAddress(long id, String kind, String emailAddress, String normalizedEmail,
+			boolean primary, int sortOrder, boolean deleted, java.time.Instant createdAt,
+			java.time.Instant updatedAt, byte[] rowVer) {
+		public ContactEmailAddress { rowVer=copyRowVer(rowVer); }
+		@Override public byte[] rowVer(){return copyRowVer(rowVer);}
+	}
+	record ContactAddress(long id, String kind, String addressLine1, String addressLine2, String city,
+			String stateOrProvince, String postalCode, String countryCode, String legacyAddressText,
+			boolean primary, int sortOrder, boolean deleted, java.time.Instant createdAt,
+			java.time.Instant updatedAt, byte[] rowVer) {
+		public ContactAddress { rowVer=copyRowVer(rowVer); }
+		@Override public byte[] rowVer(){return copyRowVer(rowVer);}
 	}
 
 	record CreateContactCommand(
@@ -212,13 +237,40 @@ public interface ContactServicePort {
 	record UpdateContactProfileCommand(int contactId, int shaleClientId, int actorUserId,
 			String displayName, StructuredName structuredName, java.time.Instant expectedContactUpdatedAt,
 			List<IntendedAssignment> contactTypes, List<IntendedAssignment> specialties,
-			List<IntendedAssignment> credentials) {
+			List<IntendedAssignment> credentials, List<IntendedPhoneNumber> phoneNumbers,
+			List<IntendedEmailAddress> emailAddresses, List<IntendedAddress> addresses) {
 		public UpdateContactProfileCommand {
 			structuredName = java.util.Objects.requireNonNull(structuredName, "structuredName");
 			contactTypes = contactTypes == null ? List.of() : List.copyOf(contactTypes);
 			specialties = specialties == null ? List.of() : List.copyOf(specialties);
 			credentials = credentials == null ? List.of() : List.copyOf(credentials);
+			phoneNumbers = phoneNumbers == null ? List.of() : List.copyOf(phoneNumbers);
+			emailAddresses = emailAddresses == null ? List.of() : List.copyOf(emailAddresses);
+			addresses = addresses == null ? List.of() : List.copyOf(addresses);
 		}
+		/** Phase 2B source-compatible constructor; callers that edit contact points use the complete constructor. */
+		public UpdateContactProfileCommand(int contactId,int shaleClientId,int actorUserId,String displayName,
+				StructuredName structuredName,java.time.Instant expectedContactUpdatedAt,List<IntendedAssignment> contactTypes,
+				List<IntendedAssignment> specialties,List<IntendedAssignment> credentials){
+			this(contactId,shaleClientId,actorUserId,displayName,structuredName,expectedContactUpdatedAt,contactTypes,specialties,credentials,List.of(),List.of(),List.of());
+		}
+	}
+
+	record IntendedPhoneNumber(Long id, byte[] expectedRowVer, String kind, String displayNumber,
+			String extension, boolean primary, boolean deleted, int sortOrder) {
+		public IntendedPhoneNumber { expectedRowVer=copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);}
+	}
+	record IntendedEmailAddress(Long id, byte[] expectedRowVer, String kind, String emailAddress,
+			boolean primary, boolean deleted, int sortOrder) {
+		public IntendedEmailAddress { expectedRowVer=copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);}
+	}
+	record IntendedAddress(Long id, byte[] expectedRowVer, String kind, String addressLine1,
+			String addressLine2, String city, String stateOrProvince, String postalCode, String countryCode,
+			String legacyAddressText, boolean valuesEdited, boolean primary, boolean deleted, int sortOrder) {
+		public IntendedAddress { expectedRowVer=copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);}
 	}
 
 	record ContactProfileMutationResult(ClassificationProfile profile, java.time.Instant contactUpdatedAt) { }
