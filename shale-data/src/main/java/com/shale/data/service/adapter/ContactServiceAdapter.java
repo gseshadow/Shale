@@ -100,7 +100,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		return Optional.ofNullable(contactGateway.findClassificationProfile(contactId, shaleClientId))
 				.map(row -> new ClassificationProfile(row.contactId(), row.shaleClientId(),
 						new StructuredName(row.prefix(), row.firstName(), row.middleName(), row.lastName(),
-								row.preferredName(), row.suffix()), row.legacyDisplayName(),
+						row.preferredName(), row.suffix()), row.legacyDisplayName(), row.contactUpdatedAt(),
 						row.contactTypes().stream().map(ContactServiceAdapter::assignedDefinition).toList(),
 						row.specialties().stream().map(ContactServiceAdapter::assignedDefinition).toList(),
 						row.credentials().stream().map(ContactServiceAdapter::assignedCredential).toList()));
@@ -116,12 +116,12 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	}
 
 	private static AssignedDefinition assignedDefinition(ContactDao.AssignedDefinitionRow row) {
-		return new AssignedDefinition(row.assignmentId(), definition(row.definition()), row.historical());
+		return new AssignedDefinition(row.assignmentId(), definition(row.definition()), row.historical(),row.rowVer());
 	}
 
 	private static AssignedCredential assignedCredential(ContactDao.AssignedCredentialRow row) {
 		return new AssignedCredential(row.assignmentId(), credentialDefinition(row.definition()),
-				row.displayOrder(), row.historical());
+				row.displayOrder(), row.historical(),row.rowVer());
 	}
 
 	@Override
@@ -179,6 +179,12 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	@Override public AssignmentMutationResult removeClassification(AssignmentLifecycleCommand c) { return contactGateway.removeClassification(c); }
 	@Override public AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand c) { return contactGateway.restoreClassification(c); }
 	@Override public List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand c) { return contactGateway.reorderCredentials(c); }
+	@Override public ContactProfileMutationResult updateContactProfile(UpdateContactProfileCommand c) {
+		contactGateway.updateContactProfile(c);
+		ClassificationProfile profile=getClassificationProfile(c.contactId(),c.shaleClientId())
+				.orElseThrow(()->new IllegalStateException("Updated Contact profile could not be reloaded."));
+		return new ContactProfileMutationResult(profile,profile.contactUpdatedAt());
+	}
 
 	interface ContactGateway {
 		List<ContactDao.DirectoryContactRow> searchContacts(int shaleClientId, String query);
@@ -208,6 +214,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		default AssignmentMutationResult removeClassification(AssignmentLifecycleCommand c){ throw new UnsupportedOperationException(); }
 		default AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand c){ throw new UnsupportedOperationException(); }
 		default List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand c){ throw new UnsupportedOperationException(); }
+		void updateContactProfile(UpdateContactProfileCommand c);
 	}
 
 	private record DaoContactGateway(ContactDao contactDao) implements ContactGateway {
@@ -266,5 +273,6 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		@Override public AssignmentMutationResult removeClassification(AssignmentLifecycleCommand c){return contactDao.removeClassification(c);}
 		@Override public AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand c){return contactDao.restoreClassification(c);}
 		@Override public List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand c){return contactDao.reorderCredentials(c);}
+		@Override public void updateContactProfile(UpdateContactProfileCommand c){contactDao.updateContactProfile(c);}
 	}
 }

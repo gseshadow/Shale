@@ -18,7 +18,7 @@
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane xmlns="http://javafx.com/javafx/21"
+<BorderPane fx:id="rootPane" xmlns="http://javafx.com/javafx/21"
     xmlns:fx="http://javafx.com/fxml/1"
     fx:controller="com.shale.ui.controller.ContactViewController" styleClass="app-shell">
 
@@ -65,7 +65,7 @@
             </padding>
 
             <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll">
-                <GridPane hgap="16" maxWidth="1240" alignment="TOP_LEFT">
+                <GridPane fx:id="profileGrid" hgap="16" alignment="TOP_LEFT">
                     <columnConstraints>
                         <ColumnConstraints percentWidth="63" hgrow="ALWAYS" fillWidth="true" />
                         <ColumnConstraints percentWidth="37" hgrow="ALWAYS" fillWidth="true" />
@@ -134,14 +134,14 @@
                     <VBox spacing="10" styleClass="secondary-panel contact-classifications-panel" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0" GridPane.rowIndex="1">
                         <Label text="Classifications" styleClass="contact-section-title" />
                         <Label text="Contact Types" styleClass="contact-group-label" />
-                        <FlowPane hgap="6" vgap="6"><Label text="No assigned contact types" styleClass="contact-empty-value" /></FlowPane>
+                        <FlowPane fx:id="contactTypeChips" hgap="6" vgap="6" />
                         <Label text="Specialties" styleClass="contact-group-label" />
-                        <FlowPane hgap="6" vgap="6"><Label text="No assigned specialties" styleClass="contact-empty-value" /></FlowPane>
+                        <FlowPane fx:id="specialtyChips" hgap="6" vgap="6" />
                         <Label text="Credentials" styleClass="contact-group-label" />
-                        <FlowPane hgap="6" vgap="6"><Label text="No assigned credentials" styleClass="contact-empty-value" /></FlowPane>
+                        <FlowPane fx:id="credentialChips" hgap="6" vgap="6" />
                     </VBox>
 
-                    <VBox minWidth="430" prefWidth="460" maxWidth="520" spacing="16" GridPane.columnIndex="1">
+                    <VBox fx:id="relatedSidebar" spacing="16" GridPane.columnIndex="1">
                         <VBox spacing="8" styleClass="secondary-panel" maxWidth="1.7976931348623157E308">
                             <HBox spacing="8" alignment="CENTER_LEFT">
                                 <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />

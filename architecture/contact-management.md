@@ -207,13 +207,18 @@ are neither appended to Display Name nor stored in Suffix. Prefix and Suffix pre
 values and all fields are validated to deployed schema lengths.
 
 One aggregate command is the mutation boundary. Its DAO transaction starts before authorization and
-validation, verifies the tenant session, active actor and Contact, exact Contact and assignment RowVers,
+validation, verifies the tenant session, active actor and Contact, exact Contact concurrency token and assignment RowVers,
 and the complete intended effective-definition ID set before mutation. It restores the same removed
 assignment row, soft-removes deselections, writes credential order as contiguous zero-based positions,
 and recomputes `Contacts.IsExpert` solely from active authoritative Contact Type assignments whose
 `SystemKey='expert'`. Structured-name and assignment changes, PHI-safe audits, and the final profile read
 commit or roll back together; stale input is never retried or merged and the editor remains open until an
 explicit reload.
+
+The legacy `Contacts` table has no `rowversion` column in the deployed Contact foundation; its established
+`UpdatedAt` value is therefore carried as the exact Contact concurrency token and included in the guarded
+profile update predicate. Assignment tables continue to use their native `RowVer`. A null legacy
+`UpdatedAt` is matched only by `IS NULL`, then the successful aggregate update establishes a UTC value.
 
 The entity-action audit vocabulary adds only `CONTACT/UPDATED`. Its metadata is limited to authoritative
 Contact ID and bounded counts—never names, credentials, descriptions, DOB, condition, contact details,

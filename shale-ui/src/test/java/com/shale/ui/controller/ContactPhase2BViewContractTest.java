@@ -23,6 +23,18 @@ final class ContactPhase2BViewContractTest {
         assertTrue(fxml.contains("ScrollPane fitToWidth=\"true\" hbarPolicy=\"NEVER\""));
     }
 
+    @Test void controllerRendersAuthoritativeColoredHistoricalChipsAndAccessibleCredentials() throws Exception {
+        String source=Files.readString(Path.of("src/main/java/com/shale/ui/controller/ContactViewController.java"));
+        assertTrue(source.contains("a.definition().color()"));
+        assertTrue(source.contains("· Historical"));
+        assertTrue(source.contains("setAccessibleText(a.definition().name()"));
+        assertTrue(source.contains("Move Up"));
+        assertTrue(source.contains("Move Down"));
+        assertTrue(source.contains("saveInFlight"));
+        assertTrue(source.contains("generation != detailLoadGeneration"));
+        assertTrue(source.contains("void dispose()"));
+    }
+
     private static int occurrences(String text,String token) {
         int count=0,at=0; while((at=text.indexOf(token,at))>=0){count++;at+=token.length();} return count;
     }
