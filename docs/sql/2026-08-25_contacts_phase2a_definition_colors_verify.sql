@@ -15,4 +15,20 @@ SELECT Id AuthoritativeDefinitionId,Color FROM dbo.ContactTypes WHERE ShaleClien
 SELECT N'ContactContactTypes' AssignmentTable,COUNT_BIG(*) AssignmentCount,COUNT_BIG(DISTINCT ContactTypeId) ReferencedDefinitionCount FROM dbo.ContactContactTypes
 UNION ALL SELECT N'ContactSpecialties',COUNT_BIG(*),COUNT_BIG(DISTINCT SpecialtyId) FROM dbo.ContactSpecialties
 UNION ALL SELECT N'ContactCredentials',COUNT_BIG(*),COUNT_BIG(DISTINCT CredentialDefinitionId) FROM dbo.ContactCredentials;
-SELECT sp.name PolicyName,sp.is_enabled,OBJECT_NAME(spr.target_object_id) TargetTable,OBJECT_NAME(spr.predicate_id) PredicateFunction FROM sys.security_policies sp JOIN sys.security_predicates spr ON spr.object_id=sp.object_id WHERE OBJECT_NAME(spr.target_object_id) IN(N'ContactTypes',N'Specialties',N'CredentialDefinitions') ORDER BY TargetTable;
+SELECT
+    sp.name AS PolicyName,
+    sp.is_enabled,
+    OBJECT_SCHEMA_NAME(spr.target_object_id) + N'.' +
+        OBJECT_NAME(spr.target_object_id) AS TargetTable,
+    spr.predicate_type_desc,
+    spr.predicate_definition
+FROM sys.security_policies sp
+JOIN sys.security_predicates spr
+    ON spr.object_id = sp.object_id
+WHERE spr.target_object_id IN
+(
+    OBJECT_ID(N'dbo.ContactTypes'),
+    OBJECT_ID(N'dbo.Specialties'),
+    OBJECT_ID(N'dbo.CredentialDefinitions')
+)
+ORDER BY TargetTable, spr.predicate_type_desc;
