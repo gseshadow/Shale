@@ -97,16 +97,20 @@ public final class ContactDao {
         @Override public byte[] rowVer() { return rowVer == null ? null : rowVer.clone(); }
     }
 
-    public record AssignedDefinitionRow(long assignmentId, DefinitionRow definition, boolean historical) {
+    public record AssignedDefinitionRow(long assignmentId, DefinitionRow definition, boolean historical, byte[] rowVer) {
+        public AssignedDefinitionRow { rowVer=rowVer==null?null:rowVer.clone(); }
+        @Override public byte[] rowVer(){return rowVer==null?null:rowVer.clone();}
     }
 
     public record AssignedCredentialRow(long assignmentId, CredentialDefinitionRow definition,
-            int displayOrder, boolean historical) {
+            int displayOrder, boolean historical, byte[] rowVer) {
+        public AssignedCredentialRow { rowVer=rowVer==null?null:rowVer.clone(); }
+        @Override public byte[] rowVer(){return rowVer==null?null:rowVer.clone();}
     }
 
     public record ClassificationProfileRow(int contactId, int shaleClientId, String prefix,
             String firstName, String middleName, String lastName, String preferredName, String suffix,
-            String legacyDisplayName, List<AssignedDefinitionRow> contactTypes,
+            String legacyDisplayName, Instant contactUpdatedAt, List<AssignedDefinitionRow> contactTypes,
             List<AssignedDefinitionRow> specialties, List<AssignedCredentialRow> credentials) {
     }
 
@@ -571,7 +575,7 @@ public final class ContactDao {
             String contactSql = """
                     SELECT c.Id,c.Prefix,c.FirstName,c.MiddleName,c.LastName,c.PreferredName,c.Suffix,
                            COALESCE(NULLIF(LTRIM(RTRIM(c.Name)),''),NULLIF(LTRIM(RTRIM(c.WorkName)),''),
-                             NULLIF(LTRIM(RTRIM(CONCAT(c.FirstName,' ',c.LastName))),'')) LegacyDisplayName
+                             NULLIF(LTRIM(RTRIM(CONCAT(c.FirstName,' ',c.LastName))),'')) LegacyDisplayName,c.UpdatedAt
                     FROM dbo.Contacts c WHERE c.Id=? AND c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0;
                     """;
             try (PreparedStatement ps = con.prepareStatement(contactSql)) {
@@ -586,7 +590,7 @@ public final class ContactDao {
                     List<AssignedDefinitionRow> specialties = loadAssignedDefinitions(con, "ContactSpecialties", "SpecialtyId", "Specialties", contactId, shaleClientId);
                     List<AssignedCredentialRow> credentials = loadAssignedCredentials(con, contactId, shaleClientId);
                     return new ClassificationProfileRow(contactId, shaleClientId, prefix, first, middle, last,
-                            preferred, suffix, display, types, specialties, credentials);
+                            preferred, suffix, display, rs.getTimestamp("UpdatedAt")==null?null:rs.getTimestamp("UpdatedAt").toInstant(), types, specialties, credentials);
                 }
             }
         } catch (SQLException e) {
@@ -983,7 +987,7 @@ public final class ContactDao {
     private static List<AssignedDefinitionRow> loadAssignedDefinitions(Connection con, String assignmentTable,
             String definitionIdColumn, String definitionTable, int contactId, int shaleClientId) throws SQLException {
         String sql = """
-                SELECT a.Id AssignmentId,d.Id,d.SystemKey,d.Name,d.Description,d.Color,d.SortOrder,d.IsActive,d.IsDeleted
+                SELECT a.Id AssignmentId,a.RowVer,d.Id,d.SystemKey,d.Name,d.Description,d.Color,d.SortOrder,d.IsActive,d.IsDeleted
                 FROM dbo.%s a JOIN dbo.%s d ON d.Id=a.%s
                   AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)
                 WHERE a.ContactId=? AND a.ShaleClientId=? AND a.IsDeleted=0
@@ -996,7 +1000,7 @@ public final class ContactDao {
                 while (rs.next()) {
                     DefinitionRow definition = mapDefinition(rs);
                     rows.add(new AssignedDefinitionRow(rs.getLong("AssignmentId"), definition,
-                            !definition.active() || definition.deleted()));
+                            !definition.active() || definition.deleted(),rs.getBytes("RowVer")));
                 }
                 return rows;
             }
@@ -1006,7 +1010,7 @@ public final class ContactDao {
     private static List<AssignedCredentialRow> loadAssignedCredentials(Connection con, int contactId,
             int shaleClientId) throws SQLException {
         String sql = """
-                SELECT a.Id AssignmentId,a.DisplayOrder,d.Id,d.SystemKey,d.Name,d.Abbreviation,
+                SELECT a.Id AssignmentId,a.DisplayOrder,a.RowVer,d.Id,d.SystemKey,d.Name,d.Abbreviation,
                        d.Description,d.Color,d.SortOrder,d.IsActive,d.IsDeleted
                 FROM dbo.ContactCredentials a JOIN dbo.CredentialDefinitions d
                   ON d.Id=a.CredentialDefinitionId
@@ -1021,7 +1025,7 @@ public final class ContactDao {
                 while (rs.next()) {
                     CredentialDefinitionRow definition = mapCredentialDefinition(rs);
                     rows.add(new AssignedCredentialRow(rs.getLong("AssignmentId"), definition,
-                            rs.getInt("DisplayOrder"), !definition.active() || definition.deleted()));
+                            rs.getInt("DisplayOrder"), !definition.active() || definition.deleted(),rs.getBytes("RowVer")));
                 }
                 return rows;
             }
@@ -1447,5 +1451,6 @@ public final class ContactDao {
     public com.shale.core.service.ContactServicePort.AssignmentMutationResult removeClassification(com.shale.core.service.ContactServicePort.AssignmentLifecycleCommand c){return mutationDao.lifecycle(c,false);}
     public com.shale.core.service.ContactServicePort.AssignmentMutationResult restoreClassification(com.shale.core.service.ContactServicePort.AssignmentLifecycleCommand c){return mutationDao.lifecycle(c,true);}
     public java.util.List<com.shale.core.service.ContactServicePort.AssignmentMutationResult> reorderCredentials(com.shale.core.service.ContactServicePort.ReorderCredentialsCommand c){return mutationDao.reorder(c);}
+    public void updateContactProfile(com.shale.core.service.ContactServicePort.UpdateContactProfileCommand c){mutationDao.aggregate(c);}
 
 }

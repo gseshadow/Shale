@@ -12,12 +12,13 @@
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
-<BorderPane xmlns="http://javafx.com/javafx/21"
+<BorderPane fx:id="rootPane" xmlns="http://javafx.com/javafx/21"
     xmlns:fx="http://javafx.com/fxml/1"
     fx:controller="com.shale.ui.controller.ContactViewController" styleClass="app-shell">
 
@@ -31,6 +32,7 @@
                 <Label fx:id="contactTitleLabel" text="Contact"
                     style="-fx-font-size: 18px; -fx-font-weight: bold;" />
                 <Region HBox.hgrow="ALWAYS" />
+                <Button fx:id="editButton" text="Edit Contact" visible="false" managed="false" />
                 <Button fx:id="saveButton" text="Save" visible="false" managed="false">
                     <styleClass>
                         <String fx:value="button" />
@@ -63,7 +65,7 @@
             </padding>
 
             <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll">
-                <GridPane hgap="16" maxWidth="1240" alignment="TOP_LEFT">
+                <GridPane fx:id="profileGrid" hgap="16" alignment="TOP_LEFT">
                     <columnConstraints>
                         <ColumnConstraints percentWidth="63" hgrow="ALWAYS" fillWidth="true" />
                         <ColumnConstraints percentWidth="37" hgrow="ALWAYS" fillWidth="true" />
@@ -72,10 +74,12 @@
                         <Insets top="12" right="12" bottom="12" left="12" />
                     </padding>
 
-                    <VBox spacing="10" styleClass="case-main-surface" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0">
+                    <VBox spacing="10" styleClass="case-main-surface contact-profile-panel" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0">
                         <padding>
                             <Insets top="12" right="12" bottom="12" left="12" />
                         </padding>
+
+                        <Label text="Contact Information" styleClass="contact-section-title" />
 
                         <Label fx:id="errorLabel" styleClass="dialog-error-text" wrapText="true" visible="false" managed="false" />
 
@@ -88,56 +92,56 @@
 
                             <Label text="Display Name" styleClass="case-overview-row-label" GridPane.rowIndex="0" />
                             <Label fx:id="displayNameValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-                            <Button fx:id="editDisplayNameButton" text="✎" GridPane.rowIndex="0" GridPane.columnIndex="2" />
 
                             <Label text="Name" styleClass="case-overview-row-label" GridPane.rowIndex="1" />
                             <Label fx:id="nameValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="1" GridPane.columnIndex="1" />
                             <TextField fx:id="nameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-                            <Button fx:id="editNameButton" text="✎" GridPane.rowIndex="1" GridPane.columnIndex="2" />
 
                             <Label text="First Name" styleClass="case-overview-row-label" GridPane.rowIndex="2" />
                             <Label fx:id="firstNameValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="2" GridPane.columnIndex="1" />
                             <TextField fx:id="firstNameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-                            <Button fx:id="editFirstNameButton" text="✎" GridPane.rowIndex="2" GridPane.columnIndex="2" />
 
                             <Label text="Last Name" styleClass="case-overview-row-label" GridPane.rowIndex="3" />
                             <Label fx:id="lastNameValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="3" GridPane.columnIndex="1" />
                             <TextField fx:id="lastNameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-                            <Button fx:id="editLastNameButton" text="✎" GridPane.rowIndex="3" GridPane.columnIndex="2" />
 
                             <Label text="Email" styleClass="case-overview-row-label" GridPane.rowIndex="4" />
                             <Label fx:id="emailValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="4" GridPane.columnIndex="1" />
                             <TextField fx:id="emailEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="4" GridPane.columnIndex="1" />
-                            <Button fx:id="editEmailButton" text="✎" GridPane.rowIndex="4" GridPane.columnIndex="2" />
 
                             <Label text="Phone" styleClass="case-overview-row-label" GridPane.rowIndex="5" />
                             <Label fx:id="phoneValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="5" GridPane.columnIndex="1" />
                             <TextField fx:id="phoneEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="5" GridPane.columnIndex="1" />
-                            <Button fx:id="editPhoneButton" text="✎" GridPane.rowIndex="5" GridPane.columnIndex="2" />
 
                             <Label text="Home Address" styleClass="case-overview-row-label" GridPane.rowIndex="6" />
                             <Label fx:id="addressHomeValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="6" GridPane.columnIndex="1" />
                             <TextArea fx:id="addressHomeEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="3" wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="1" />
-                            <Button fx:id="editAddressHomeButton" text="✎" GridPane.rowIndex="6" GridPane.columnIndex="2" />
 
                             <Label text="Date of Birth" styleClass="case-overview-row-label" GridPane.rowIndex="7" />
                             <Label fx:id="dateOfBirthValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="7" GridPane.columnIndex="1" />
                             <DatePicker fx:id="dateOfBirthEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="7" GridPane.columnIndex="1" />
-                            <Button fx:id="editDateOfBirthButton" text="✎" GridPane.rowIndex="7" GridPane.columnIndex="2" />
 
                             <Label text="Condition" styleClass="case-overview-row-label" GridPane.rowIndex="8" />
                             <Label fx:id="conditionValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="8" GridPane.columnIndex="1" />
                             <TextArea fx:id="conditionEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="4" wrapText="true" GridPane.rowIndex="8" GridPane.columnIndex="1" />
-                            <Button fx:id="editConditionButton" text="✎" GridPane.rowIndex="8" GridPane.columnIndex="2" />
 
                             <Label text="Deceased" styleClass="case-overview-row-label" GridPane.rowIndex="9" />
                             <Label fx:id="deceasedValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="9" GridPane.columnIndex="1" />
                             <CheckBox fx:id="deceasedEditor" text="Is Deceased" visible="false" managed="false" GridPane.rowIndex="9" GridPane.columnIndex="1" />
-                            <Button fx:id="editDeceasedButton" text="✎" GridPane.rowIndex="9" GridPane.columnIndex="2" />
                         </GridPane>
                     </VBox>
 
-                    <VBox minWidth="430" prefWidth="460" maxWidth="520" spacing="16" GridPane.columnIndex="1">
+                    <VBox spacing="10" styleClass="secondary-panel contact-classifications-panel" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                        <Label text="Classifications" styleClass="contact-section-title" />
+                        <Label text="Contact Types" styleClass="contact-group-label" />
+                        <FlowPane fx:id="contactTypeChips" hgap="6" vgap="6" />
+                        <Label text="Specialties" styleClass="contact-group-label" />
+                        <FlowPane fx:id="specialtyChips" hgap="6" vgap="6" />
+                        <Label text="Credentials" styleClass="contact-group-label" />
+                        <FlowPane fx:id="credentialChips" hgap="6" vgap="6" />
+                    </VBox>
+
+                    <VBox fx:id="relatedSidebar" spacing="16" GridPane.columnIndex="1">
                         <VBox spacing="8" styleClass="secondary-panel" maxWidth="1.7976931348623157E308">
                             <HBox spacing="8" alignment="CENTER_LEFT">
                                 <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />

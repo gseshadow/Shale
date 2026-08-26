@@ -87,4 +87,6 @@ public final class ContactDetailService {
     private void invalidate(int contactId, int shaleClientId) {
         sessionCache.remove(new CacheKey(contactId, shaleClientId));
     }
+
+    public void invalidateContact(int contactId,int shaleClientId){invalidate(contactId,shaleClientId);}
 }
