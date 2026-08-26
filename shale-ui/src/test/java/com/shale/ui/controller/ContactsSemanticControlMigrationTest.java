@@ -81,6 +81,9 @@ final class ContactsSemanticControlMigrationTest {
                     inspect("/fxml/contacts.fxml", 1280, 800);
                     inspect("/fxml/contacts.fxml", 560, 700);
                     Parent detail = inspect("/fxml/contact.fxml", 1280, 800);
+                    inspect("/fxml/contact.fxml", 700, 760);
+                    requireStyles(detail, "contact-profile-panel", "case-main-surface", "contact-profile-panel");
+                    requireStyles(detail, "contact-classifications-panel", "secondary-panel", "contact-classifications-panel");
                     requireStyle(detail, "editButton", Button.class, "shale-control-secondary");
                     requireStyle(detail, "saveButton", Button.class, "shale-control-primary");
                     requireStyle(detail, "cancelButton", Button.class, "shale-control-secondary");
@@ -121,6 +124,11 @@ final class ContactsSemanticControlMigrationTest {
         private static <T extends Control> void requireStyle(Parent root, String id, Class<T> type, String styleClass) {
             T control = requireControl(root, id, type);
             require(control.getStyleClass().contains(styleClass), "#" + id + " must use " + styleClass);
+        }
+        private static void requireStyles(Parent root, String lookupClass, String... expected) {
+            Node node = root.lookup("." + lookupClass);
+            require(node != null, "Missing required semantic surface ." + lookupClass);
+            for (String styleClass : expected) require(node.getStyleClass().contains(styleClass), "." + lookupClass + " must use " + styleClass);
         }
         private static void require(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
     }

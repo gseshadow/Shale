@@ -74,7 +74,11 @@
                         <Insets top="12" right="12" bottom="12" left="12" />
                     </padding>
 
-                    <VBox spacing="10" styleClass="case-main-surface contact-profile-panel" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0">
+                    <VBox spacing="12" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0">
+                        <styleClass>
+                            <String fx:value="case-main-surface" />
+                            <String fx:value="contact-profile-panel" />
+                        </styleClass>
                         <padding>
                             <Insets top="12" right="12" bottom="12" left="12" />
                         </padding>
@@ -83,7 +87,7 @@
 
                         <Label fx:id="errorLabel" styleClass="dialog-error-text" wrapText="true" visible="false" managed="false" />
 
-                        <GridPane hgap="14" vgap="0" styleClass="case-overview-rows">
+                        <GridPane hgap="14" vgap="4" styleClass="case-overview-rows contact-information-rows">
                             <columnConstraints>
                                 <ColumnConstraints minWidth="160" prefWidth="180" />
                                 <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
@@ -131,7 +135,14 @@
                         </GridPane>
                     </VBox>
 
-                    <VBox spacing="10" styleClass="secondary-panel contact-classifications-panel" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                    <VBox spacing="10" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                        <styleClass>
+                            <String fx:value="secondary-panel" />
+                            <String fx:value="contact-classifications-panel" />
+                        </styleClass>
+                        <padding>
+                            <Insets top="14" right="14" bottom="14" left="14" />
+                        </padding>
                         <Label text="Classifications" styleClass="contact-section-title" />
                         <Label text="Contact Types" styleClass="contact-group-label" />
                         <FlowPane fx:id="contactTypeChips" hgap="6" vgap="6" />
