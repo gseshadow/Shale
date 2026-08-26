@@ -320,6 +320,7 @@ public final class SettingsController {
 			@Override public AssignmentMutationResult removeClassification(AssignmentLifecycleCommand c){throw new UnsupportedOperationException();}
 			@Override public AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand c){throw new UnsupportedOperationException();}
 			@Override public List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand c){return List.of();}
+			@Override public ContactProfileMutationResult updateContactProfile(UpdateContactProfileCommand c){throw new UnsupportedOperationException();}
 		};
 	}
 
