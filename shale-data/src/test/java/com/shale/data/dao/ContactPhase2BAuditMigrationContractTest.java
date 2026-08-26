@@ -3,11 +3,10 @@ package com.shale.data.dao;
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.*;
 import java.util.*;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 final class ContactPhase2BAuditMigrationContractTest {
-    private static final Path MIGRATION=Path.of("..","docs","sql","2026-08-26_contacts_phase2b_audit_allowlist.sql");
+    private static final Path MIGRATION=AuditEntityTypeMigrationChain.CURRENT;
     private static final Path VERIFY=Path.of("..","docs","sql","verification","2026-08-26_contacts_phase2b_audit_allowlist_verification.sql");
 
     @Test void contactUpdatedIsTheOnlyContactEntityAction() {
@@ -21,13 +20,21 @@ final class ContactPhase2BAuditMigrationContractTest {
 
     @Test void successorPreservesAllTokensAndAddsExactlyContact() throws Exception {
         String sql=Files.readString(MIGRATION);
-        Set<String> expected=Arrays.stream(EntityActionAuditEvent.EntityType.values()).map(Enum::name).collect(Collectors.toSet());
-        expected.add("CALENDAR_CASE_DATE_TYPE_MAPPING");
-        assertEquals(expected,AuditEntityTypeMigrationChain.declaredAllowlist(sql));
+        Set<String> expected=AuditEntityTypeMigrationChain.currentlyRequiredVocabulary();
+        List<String> currentTokens=AuditEntityTypeMigrationChain.declaredAllowlistTokens(sql);
+        assertEquals(expected,Set.copyOf(currentTokens));
+        assertEquals(currentTokens.size(),Set.copyOf(currentTokens).size(),
+                "the current authoritative allowlist must not contain duplicate tokens");
+        assertEquals(1,currentTokens.stream().filter("CONTACT"::equals).count(),
+                "the Phase 2B successor must add CONTACT exactly once");
         Set<String> predecessor=AuditEntityTypeMigrationChain.declaredAllowlist(
                 AuditEntityTypeMigrationChain.read(AuditEntityTypeMigrationChain.PHASE_1C));
         Set<String> additions=new HashSet<>(expected); additions.removeAll(predecessor);
         assertEquals(Set.of("CONTACT"),additions);
+        Set<String> removed=new HashSet<>(predecessor); removed.removeAll(expected);
+        assertTrue(removed.isEmpty(),"the current successor must preserve every historical EntityType");
+        Set<String> unexpected=new HashSet<>(Set.copyOf(currentTokens)); unexpected.removeAll(expected);
+        assertTrue(unexpected.isEmpty(),"the current successor must accept no unexpected EntityTypes");
     }
 
     @Test void scriptsAreGuardedTransactionalAndVerificationIsReadOnly() throws Exception {
@@ -40,7 +47,12 @@ final class ContactPhase2BAuditMigrationContractTest {
             assertFalse(sql.contains("\nGO\n"));
         }
         assertTrue(migration.contains("WITH CHECK ADD CONSTRAINT"));
+        assertTrue(migration.contains("CHECK CONSTRAINT CK_EntityActionAuditLog_EntityType"));
+        assertTrue(migration.contains("is_disabled = 0 AND is_not_trusted = 0) <> 1"));
         assertTrue(migration.contains("before_check.ObjectId <> @AllowlistObjectId"));
+        assertTrue(migration.contains("after_check.definition = before_check.ConstraintDefinition"));
+        assertTrue(migration.contains("COMMIT TRANSACTION"));
+        assertTrue(migration.contains("THROW;"));
         assertTrue(verify.contains("Phase 2B CONTACT EntityType accepted (expect 1)"));
         String upper=verify.toUpperCase(Locale.ROOT);
         assertFalse(upper.matches("(?s).*ALTER\\s+TABLE.*"));
