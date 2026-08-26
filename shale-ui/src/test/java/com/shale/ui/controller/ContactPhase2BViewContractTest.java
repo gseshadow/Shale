@@ -2,6 +2,7 @@ package com.shale.ui.controller;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.*;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 final class ContactPhase2BViewContractTest {
@@ -33,6 +34,24 @@ final class ContactPhase2BViewContractTest {
         assertTrue(source.contains("saveInFlight"));
         assertTrue(source.contains("generation != detailLoadGeneration"));
         assertTrue(source.contains("void dispose()"));
+    }
+
+    @Test void profilePanelsApplyBothSemanticSurfaceClasses() throws Exception {
+        String fxml=view();
+        assertTrue(Pattern.compile("<String fx:value=\"case-main-surface\"\\s*/>\\s*<String fx:value=\"contact-profile-panel\"",Pattern.DOTALL).matcher(fxml).find());
+        assertTrue(Pattern.compile("<String fx:value=\"secondary-panel\"\\s*/>\\s*<String fx:value=\"contact-classifications-panel\"",Pattern.DOTALL).matcher(fxml).find());
+        assertFalse(fxml.contains("styleClass=\"case-main-surface contact-profile-panel\""));
+    }
+
+    @Test void aggregateEditorUsesSegmentedNavigationAndStyledCompactRows() throws Exception {
+        String source=Files.readString(Path.of("src/main/java/com/shale/ui/controller/ContactViewController.java"));
+        assertTrue(source.contains("ToggleGroup navigationGroup"));
+        assertTrue(source.contains("String[] sectionNames={\"Name\",\"Contact Types\",\"Specialties\",\"Credentials\"}"));
+        assertTrue(source.contains("contact-editor-name-preview"));
+        assertTrue(source.contains("contact-editor-choice-row"));
+        assertTrue(source.contains("contact-editor-color-swatch"));
+        assertTrue(source.contains("void updateButtons()"));
+        assertFalse(source.contains("new javafx.scene.control.TabPane"));
     }
 
     private static int occurrences(String text,String token) {

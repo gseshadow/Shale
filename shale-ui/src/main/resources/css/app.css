@@ -2776,16 +2776,97 @@
     -fx-opacity: 0.72;
 }
 
-/* Phase 2B Contact profile */
-.contact-profile-panel, .contact-classifications-panel {
+/* Phase 2B Contact profile and aggregate editor */
+.contact-profile-panel,
+.contact-classifications-panel {
     -fx-background-radius: 12px;
     -fx-border-radius: 12px;
-    -fx-border-color: -color-border-default;
+    -fx-border-color: -shale-color-strong-panel-border;
+    -fx-border-width: 1px;
 }
-.contact-section-title { -fx-font-size: 16px; -fx-font-weight: 700; }
-.contact-group-label { -fx-font-size: 11px; -fx-font-weight: 700; -fx-opacity: .72; }
-.contact-empty-value { -fx-font-style: italic; -fx-opacity: .62; }
+.contact-profile-panel { -fx-padding: 14px; }
+.contact-classifications-panel { -fx-background-color: -shale-color-dialog-surface; }
+.contact-section-title { -fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
+.contact-group-label { -fx-font-size: 11px; -fx-font-weight: 800; -fx-text-fill: rgba(17,37,66,.72); }
+.contact-information-rows .case-overview-row-label { -fx-text-fill: rgba(17,37,66,.72); -fx-font-weight: 700; -fx-padding: 6px 0; }
+.contact-information-rows .case-overview-row-value { -fx-text-fill: -shale-color-text-primary; -fx-padding: 6px 0; }
+.contact-empty-state {
+    -fx-background-color: rgba(248,250,252,.88);
+    -fx-background-radius: 7px;
+    -fx-border-color: rgba(17,37,66,.15);
+    -fx-border-radius: 7px;
+    -fx-padding: 7px 10px;
+    -fx-text-fill: rgba(17,37,66,.72);
+}
 .contact-classification-chip {
     -fx-background-radius: 999px; -fx-border-radius: 999px;
-    -fx-padding: 4px 9px; -fx-border-width: 1px; -fx-font-weight: 600;
+    -fx-padding: 4px 9px; -fx-border-width: 1px; -fx-font-weight: 700;
+    -fx-text-fill: -shale-color-text-primary;
 }
+.dialog-pane.contact-editor-dialog > .content { -fx-padding: 0 18px 14px 18px; }
+.contact-editor-surface {
+    -fx-background-color: -shale-color-dialog-surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -shale-color-strong-panel-border;
+    -fx-border-radius: 12px;
+    -fx-border-width: 1px;
+    -fx-padding: 14px;
+}
+.contact-editor-navigation {
+    -fx-background-color: rgba(232,241,251,.72);
+    -fx-background-radius: 9px;
+    -fx-padding: 4px;
+}
+.contact-editor-navigation-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 7px;
+    -fx-border-color: transparent;
+    -fx-border-radius: 7px;
+    -fx-padding: 8px 10px;
+    -fx-text-fill: rgba(17,37,66,.76);
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+}
+.contact-editor-navigation-button:hover { -fx-background-color: rgba(255,255,255,.72); }
+.contact-editor-navigation-button:selected { -fx-background-color: white; -fx-text-fill: -shale-color-text-primary; -fx-effect: dropshadow(gaussian, rgba(17,37,66,.16), 7, .12, 0, 1); }
+.contact-editor-navigation-button:focused { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 8, .18, 0, 0); }
+.contact-editor-content { -fx-min-height: 390px; }
+.contact-editor-section-scroll,
+.contact-editor-section-scroll > .viewport { -fx-background-color: transparent; }
+.contact-editor-section-scroll { -fx-border-color: transparent; -fx-padding: 2px; }
+.contact-editor-name-form { -fx-padding: 8px 4px; }
+.contact-editor-field-label { -fx-text-fill: rgba(17,37,66,.76); -fx-font-weight: 700; }
+.contact-editor-name-field { -fx-pref-width: 100000px; }
+.contact-editor-name-preview {
+    -fx-background-color: rgba(232,241,251,.58);
+    -fx-background-radius: 8px;
+    -fx-border-color: rgba(17,37,66,.14);
+    -fx-border-radius: 8px;
+    -fx-padding: 11px 12px;
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-font-weight: 600;
+}
+.contact-editor-choice-row,
+.contact-editor-credential-row {
+    -fx-background-color: rgba(248,250,252,.9);
+    -fx-background-radius: 8px;
+    -fx-border-color: rgba(17,37,66,.15);
+    -fx-border-radius: 8px;
+    -fx-padding: 8px 10px;
+}
+.contact-editor-choice-row:hover,
+.contact-editor-credential-row:hover { -fx-background-color: rgba(237,244,251,.96); -fx-border-color: -shale-control-border-hover; }
+.contact-editor-color-swatch { -fx-min-width: 16px; -fx-pref-width: 16px; -fx-max-width: 16px; -fx-min-height: 16px; -fx-pref-height: 16px; -fx-max-height: 16px; -fx-background-radius: 4px; -fx-border-radius: 4px; -fx-border-width: 2px; }
+.contact-editor-choice-checkbox { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 600; -fx-cursor: hand; }
+.contact-editor-choice-checkbox > .box { -fx-background-color: white; -fx-border-color: rgba(17,37,66,.38); -fx-border-radius: 4px; -fx-background-radius: 4px; }
+.contact-editor-choice-checkbox:hover > .box { -fx-border-color: -shale-control-border-hover; }
+.contact-editor-choice-checkbox:focused > .box { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 7, .16, 0, 0); }
+.contact-editor-choice-checkbox:selected > .box { -fx-background-color: -shale-button-dialog-primary-background; -fx-border-color: -shale-button-dialog-primary-background; }
+.contact-editor-choice-checkbox:selected > .box > .mark { -fx-background-color: white; }
+.contact-editor-choice-checkbox:disabled { -fx-opacity: .58; }
+.contact-editor-choice-historical { -fx-font-style: italic; }
+.contact-editor-credential-row > .contact-editor-choice-row { -fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 0; }
+.contact-editor-credential-row .shale-control-small:disabled { -fx-opacity: .45; }
+.contact-editor-surface .shale-loading-placeholder,
+.contact-editor-surface .shale-empty-state { -fx-background-color: rgba(248,250,252,.88); -fx-background-radius: 8px; }
+.contact-editor-surface .dialog-error-text { -fx-background-color: rgba(255,242,240,.92); -fx-padding: 8px; }
