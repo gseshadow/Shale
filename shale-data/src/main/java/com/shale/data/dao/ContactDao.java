@@ -82,16 +82,16 @@ public final class ContactDao {
     ) {
     }
 
-    public record DefinitionRow(int id, String systemKey, String name, String description,
+    public record DefinitionRow(int id, String systemKey, String name, String description, String color,
             int sortOrder, boolean active, boolean deleted) {
     }
 
     public record CredentialDefinitionRow(int id, String systemKey, String name, String abbreviation,
-            String description, int sortOrder, boolean active, boolean deleted) {
+            String description, String color, int sortOrder, boolean active, boolean deleted) {
     }
 
     public record AdministrationDefinitionRow(DefinitionCategory category, int id, Integer shaleClientId,
-            String systemKey, String name, String abbreviation, String description, int sortOrder,
+            String systemKey, String name, String abbreviation, String description, String color, int sortOrder,
             boolean active, boolean deleted, byte[] rowVer) {
         public AdministrationDefinitionRow { rowVer = rowVer == null ? null : rowVer.clone(); }
         @Override public byte[] rowVer() { return rowVer == null ? null : rowVer.clone(); }
@@ -461,13 +461,13 @@ public final class ContactDao {
         validateTenantId(shaleClientId);
         String sql = """
                 WITH visible AS (
-                  SELECT d.Id,d.SystemKey,d.Name,d.Description,d.SortOrder,d.IsActive,d.IsDeleted,
+                  SELECT d.Id,d.SystemKey,d.Name,d.Description,d.Color,d.SortOrder,d.IsActive,d.IsDeleted,
                     ROW_NUMBER() OVER (PARTITION BY d.SystemKey
                       ORDER BY CASE WHEN d.ShaleClientId=? THEN 0 ELSE 1 END,d.Id) rn
                   FROM dbo.%s d
                   WHERE (d.ShaleClientId=? OR d.ShaleClientId IS NULL) AND d.IsDeleted=0
                 )
-                SELECT Id,SystemKey,Name,Description,SortOrder,IsActive,IsDeleted
+                SELECT Id,SystemKey,Name,Description,Color,SortOrder,IsActive,IsDeleted
                 FROM visible WHERE rn=1 AND IsActive=1
                 ORDER BY SortOrder,Name,Id;
                 """.formatted(table);
@@ -491,13 +491,13 @@ public final class ContactDao {
         validateTenantId(shaleClientId);
         String sql = """
                 WITH visible AS (
-                  SELECT d.Id,d.SystemKey,d.Name,d.Abbreviation,d.Description,d.SortOrder,d.IsActive,d.IsDeleted,
+                  SELECT d.Id,d.SystemKey,d.Name,d.Abbreviation,d.Description,d.Color,d.SortOrder,d.IsActive,d.IsDeleted,
                     ROW_NUMBER() OVER (PARTITION BY d.SystemKey
                       ORDER BY CASE WHEN d.ShaleClientId=? THEN 0 ELSE 1 END,d.Id) rn
                   FROM dbo.CredentialDefinitions d
                   WHERE (d.ShaleClientId=? OR d.ShaleClientId IS NULL) AND d.IsDeleted=0
                 )
-                SELECT Id,SystemKey,Name,Abbreviation,Description,SortOrder,IsActive,IsDeleted
+                SELECT Id,SystemKey,Name,Abbreviation,Description,Color,SortOrder,IsActive,IsDeleted
                 FROM visible WHERE rn=1 AND IsActive=1
                 ORDER BY SortOrder,Name,Id;
                 """;
@@ -531,7 +531,7 @@ public final class ContactDao {
         String abbreviation = category == DefinitionCategory.CREDENTIAL
                 ? "d.Abbreviation" : "CAST(NULL AS nvarchar(50))";
         String sql = "SELECT d.Id,d.ShaleClientId,d.SystemKey,d.Name," + abbreviation
-                + " Abbreviation,d.Description,d.SortOrder,d.IsActive,d.IsDeleted,d.RowVer "
+                + " Abbreviation,d.Description,d.Color,d.SortOrder,d.IsActive,d.IsDeleted,d.RowVer "
                 + "FROM dbo." + table + " d WHERE d.ShaleClientId IS NULL OR d.ShaleClientId=? "
                 + "ORDER BY d.SortOrder,d.Name,d.Id";
         try (Connection con = db.requireConnection()) {
@@ -553,7 +553,7 @@ public final class ContactDao {
                     while (rs.next()) rows.add(new AdministrationDefinitionRow(category, rs.getInt("Id"),
                             (Integer) rs.getObject("ShaleClientId"), rs.getString("SystemKey"),
                             rs.getString("Name"), rs.getString("Abbreviation"), rs.getString("Description"),
-                            rs.getInt("SortOrder"), rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted"),
+                            rs.getString("Color"), rs.getInt("SortOrder"), rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted"),
                             rs.getBytes("RowVer")));
                     return List.copyOf(rows);
                 }
@@ -970,20 +970,20 @@ public final class ContactDao {
 
     private static DefinitionRow mapDefinition(ResultSet rs) throws SQLException {
         return new DefinitionRow(rs.getInt("Id"), rs.getString("SystemKey"), rs.getString("Name"),
-                rs.getString("Description"), rs.getInt("SortOrder"), rs.getBoolean("IsActive"),
+                rs.getString("Description"), rs.getString("Color"), rs.getInt("SortOrder"), rs.getBoolean("IsActive"),
                 rs.getBoolean("IsDeleted"));
     }
 
     private static CredentialDefinitionRow mapCredentialDefinition(ResultSet rs) throws SQLException {
         return new CredentialDefinitionRow(rs.getInt("Id"), rs.getString("SystemKey"), rs.getString("Name"),
-                rs.getString("Abbreviation"), rs.getString("Description"), rs.getInt("SortOrder"),
+                rs.getString("Abbreviation"), rs.getString("Description"), rs.getString("Color"), rs.getInt("SortOrder"),
                 rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted"));
     }
 
     private static List<AssignedDefinitionRow> loadAssignedDefinitions(Connection con, String assignmentTable,
             String definitionIdColumn, String definitionTable, int contactId, int shaleClientId) throws SQLException {
         String sql = """
-                SELECT a.Id AssignmentId,d.Id,d.SystemKey,d.Name,d.Description,d.SortOrder,d.IsActive,d.IsDeleted
+                SELECT a.Id AssignmentId,d.Id,d.SystemKey,d.Name,d.Description,d.Color,d.SortOrder,d.IsActive,d.IsDeleted
                 FROM dbo.%s a JOIN dbo.%s d ON d.Id=a.%s
                   AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)
                 WHERE a.ContactId=? AND a.ShaleClientId=? AND a.IsDeleted=0
@@ -1007,7 +1007,7 @@ public final class ContactDao {
             int shaleClientId) throws SQLException {
         String sql = """
                 SELECT a.Id AssignmentId,a.DisplayOrder,d.Id,d.SystemKey,d.Name,d.Abbreviation,
-                       d.Description,d.SortOrder,d.IsActive,d.IsDeleted
+                       d.Description,d.Color,d.SortOrder,d.IsActive,d.IsDeleted
                 FROM dbo.ContactCredentials a JOIN dbo.CredentialDefinitions d
                   ON d.Id=a.CredentialDefinitionId
                  AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)

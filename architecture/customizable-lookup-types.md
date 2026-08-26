@@ -344,3 +344,9 @@ SELECT Id, ShaleClientId, SystemKey, Name, IsActive, IsDeleted
 FROM dbo.<Table>
 WHERE IsDeleted = 1 AND IsActive = 1;
 ```
+
+## Required color convention
+
+Every administrator-customizable definition or lookup type in Shale requires a configurable color. Persist colors as uppercase `#RRGGBB` in `nvarchar(20) NOT NULL`; validate the six hexadecimal digits in both SQL and Java, normalize before persistence, and use neutral `#6C757D` for legacy backfills and new-editor defaults. Settings editors reuse JavaFX `ColorPicker`, and cards/chips use the shared compact swatch/accent conventions with a contrasting border so both near-white and near-black colors remain identifiable.
+
+Color is presentation data owned by the authoritative definition, never by an assignment. Tenant overrides may customize it independently; Customize begins with the global color, deleted-override fallback exposes the global color, and inactive masking retains both the override and global projection colors. Reads for historical assignments resolve the current definition color using the stored authoritative definition ID rather than remapping by name, key, or color.

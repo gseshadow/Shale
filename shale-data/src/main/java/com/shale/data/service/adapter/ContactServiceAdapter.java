@@ -90,7 +90,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 						: tenant.active() ? DefinitionOverlayState.OVERRIDDEN : DefinitionOverlayState.MASKED_GLOBAL;
 			} else state = !r.deleted() && r.active() ? DefinitionOverlayState.EFFECTIVE : DefinitionOverlayState.INEFFECTIVE;
 			return new AdministrationDefinition(r.category(), r.id(), r.shaleClientId(), r.systemKey(),
-					r.name(), r.abbreviation(), r.description(), r.sortOrder(), r.active(), r.deleted(),
+					r.name(), r.abbreviation(), r.description(), r.color(), r.sortOrder(), r.active(), r.deleted(),
 					origin, global == null ? null : global.id(), state, r.rowVer());
 		}).toList();
 	}
@@ -107,12 +107,12 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	}
 
 	private static Definition definition(ContactDao.DefinitionRow row) {
-		return new Definition(row.id(), row.systemKey(), row.name(), row.description(), row.sortOrder());
+		return new Definition(row.id(), row.systemKey(), row.name(), row.description(), row.color(), row.sortOrder());
 	}
 
 	private static CredentialDefinition credentialDefinition(ContactDao.CredentialDefinitionRow row) {
 		return new CredentialDefinition(row.id(), row.systemKey(), row.name(), row.abbreviation(),
-				row.description(), row.sortOrder());
+				row.description(), row.color(), row.sortOrder());
 	}
 
 	private static AssignedDefinition assignedDefinition(ContactDao.AssignedDefinitionRow row) {
