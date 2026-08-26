@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -14,6 +15,7 @@ import java.util.logging.Logger;
 import com.shale.core.dto.ContactSharedCaseLinkDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.service.CaseServicePort;
+import com.shale.core.service.ContactServicePort;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.ContactDao.ContactDetailRow;
 import com.shale.data.dao.ContactDao.ContactProfileUpdateRequest;
@@ -47,9 +49,11 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.FlowPane;
 import javafx.stage.Window;
 
 public final class ContactViewController {
@@ -68,6 +72,12 @@ public final class ContactViewController {
     @FXML private Label relatedCasesEmptyLabel;
     @FXML private VBox sharedLinksContainer;
     @FXML private Label sharedLinksStatusLabel;
+    @FXML private FlowPane contactTypeChips;
+    @FXML private FlowPane specialtyChips;
+    @FXML private FlowPane credentialChips;
+    @FXML private BorderPane rootPane;
+    @FXML private javafx.scene.layout.GridPane profileGrid;
+    @FXML private VBox relatedSidebar;
 
     @FXML private Label displayNameValue;
     @FXML private Label nameValue;
@@ -120,6 +130,11 @@ public final class ContactViewController {
     private final CaseLinkCardFactory caseLinkCardFactory = new CaseLinkCardFactory();
     private ExternalBrowserHelper externalBrowserHelper = new ExternalBrowserHelper();
     private boolean initialized;
+    private ContactServicePort contactService;
+    private ContactServicePort.ClassificationProfile classificationProfile;
+    private List<ContactServicePort.Definition> effectiveTypes=List.of(),effectiveSpecialties=List.of();
+    private List<ContactServicePort.CredentialDefinition> effectiveCredentials=List.of();
+    private boolean saveInFlight,disposed;
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "contact-view-loader");
@@ -165,6 +180,8 @@ public final class ContactViewController {
         }
     }
 
+    public void setContactService(ContactServicePort service){this.contactService=Objects.requireNonNull(service);}
+
     private void handleSharedLinksLiveEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
         if (event == null || appState == null || !LiveUpdateEvents.ENTITY_CASE_LINK_SHARE.equals(event.entityType())) return;
         Integer tenantId = appState.getShaleClientId();
@@ -191,7 +208,6 @@ public final class ContactViewController {
             editButton.setOnAction(e -> onEdit());
             setVisibleManaged(editButton, false);
         }
-        initializeInlineEditButtons();
         if (saveButton != null) {
             ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
             saveButton.setOnAction(e -> onSave());
@@ -207,8 +223,11 @@ public final class ContactViewController {
         }
 
         initialized = true;
-        for (javafx.scene.control.Control editor : List.of(nameEditor, firstNameEditor, lastNameEditor,
-                emailEditor, phoneEditor, addressHomeEditor, dateOfBirthEditor, conditionEditor, deceasedEditor)) {
+        if(rootPane!=null)rootPane.sceneProperty().addListener((o,oldScene,newScene)->{if(oldScene!=null&&newScene==null)dispose();});
+        if(profileGrid!=null)profileGrid.widthProperty().addListener((o,a,width)->applyResponsiveLayout(width.doubleValue()));
+        for (javafx.scene.control.Control editor : java.util.stream.Stream.of(nameEditor, firstNameEditor, lastNameEditor,
+                emailEditor, phoneEditor, addressHomeEditor, dateOfBirthEditor, conditionEditor, deceasedEditor)
+                .filter(Objects::nonNull).toList()) {
             ControlStyles.formControl(editor);
         }
         setEditMode(false);
@@ -216,6 +235,9 @@ public final class ContactViewController {
         resetSharedLinksState();
         Platform.runLater(() -> { loadContact(); loadSharedLinks(); });
     }
+
+    public void dispose(){if(disposed)return;disposed=true;detailLoadGeneration++;sharedLinksLoadGeneration++;if(runtimeBridge!=null)runtimeBridge.unsubscribeEntityUpdated(sharedLinksLiveHandler);dbExec.shutdownNow();}
+    private void applyResponsiveLayout(double width){if(relatedSidebar==null||profileGrid.getColumnConstraints().size()<2)return;boolean narrow=width<860;profileGrid.getColumnConstraints().get(0).setPercentWidth(narrow?100:63);profileGrid.getColumnConstraints().get(1).setPercentWidth(narrow?0:37);javafx.scene.layout.GridPane.setColumnIndex(relatedSidebar,narrow?0:1);javafx.scene.layout.GridPane.setRowIndex(relatedSidebar,narrow?2:0);javafx.scene.layout.GridPane.setRowSpan(relatedSidebar,narrow?1:2);}
 
     private void initializeInlineEditButtons() {
         configureInlineEditButton(editDisplayNameButton, "Display Name",
@@ -275,6 +297,9 @@ public final class ContactViewController {
     }
 
     private void loadContact() {
+        if (disposed) {
+            return;
+        }
         final int generation = ++detailLoadGeneration;
         final int requestedContactId = contactId;
         final long loadStarted = PerfLog.start();
@@ -290,9 +315,13 @@ public final class ContactViewController {
             try {
                 ContactDetailService.ContactDetailSnapshot snapshot = contactDetailService.loadSnapshot(requestedContactId, tenantId);
                 ContactDetailRow row = snapshot.contact();
+                ContactServicePort.ClassificationProfile profile=contactService==null?null:contactService.getClassificationProfile(requestedContactId,tenantId).orElse(null);
+                List<ContactServicePort.Definition> types=contactService==null?List.of():contactService.getEffectiveContactTypes(tenantId);
+                List<ContactServicePort.Definition> specialties=contactService==null?List.of():contactService.getEffectiveSpecialties(tenantId);
+                List<ContactServicePort.CredentialDefinition> credentials=contactService==null?List.of():contactService.getEffectiveCredentialDefinitions(tenantId);
                 List<RelatedCaseRow> loadedRelatedCases = snapshot.relatedCases();
                 Platform.runLater(() -> {
-                    if (generation != detailLoadGeneration || contactId != requestedContactId) {
+                    if (disposed||generation != detailLoadGeneration || contactId != requestedContactId) {
                         PerfLog.logDone("contacts.detail", "phase=discard generation=" + generation + " reason=stale", loadStarted);
                         return;
                     }
@@ -306,10 +335,12 @@ public final class ContactViewController {
                         return;
                     }
                     currentContact = row;
+                    classificationProfile=profile;effectiveTypes=types;effectiveSpecialties=specialties;effectiveCredentials=credentials;
                     relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
                     long renderStarted = PerfLog.start();
                     renderFromCurrent();
                     renderRelatedCases();
+                    renderClassifications();
                     loadSharedLinks();
                     setEditMode(false);
                     clearError();
@@ -318,14 +349,11 @@ public final class ContactViewController {
                 });
             } catch (RuntimeException ex) {
                 Platform.runLater(() -> {
-                    if (generation != detailLoadGeneration || contactId != requestedContactId) {
+                    if (disposed||generation != detailLoadGeneration || contactId != requestedContactId) {
                         return;
                     }
                     setBusy(false);
-                    currentContact = null;
-                    relatedCases = List.of();
-                    renderRelatedCases();
-                    refreshDeleteAction();
+                    if(currentContact==null){relatedCases=List.of();renderRelatedCases();refreshDeleteAction();}
                     setError("Unable to load this contact.");
                 });
             }
@@ -341,10 +369,50 @@ public final class ContactViewController {
             setError("Contact details are unavailable.");
             return;
         }
-        writeEditorsFromCurrent();
-        setEditMode(true);
-        clearError();
+        if(classificationProfile==null){setError("Classifications are still loading. Refresh and try again.");return;}
+        showProfileEditor();
     }
+
+    private void renderClassifications(){
+        if(classificationProfile!=null&&nameValue!=null){var n=classificationProfile.structuredName();String structured=structuredPreview(n.prefix(),n.firstName(),n.middleName(),n.lastName(),n.preferredName(),n.suffix());nameValue.setText(structured.isBlank()?"—":structured);}
+        renderDefinitionChips(contactTypeChips,classificationProfile==null?List.of():classificationProfile.contactTypes(),"No assigned contact types");
+        renderDefinitionChips(specialtyChips,classificationProfile==null?List.of():classificationProfile.specialties(),"No assigned specialties");
+        if(credentialChips==null)return;credentialChips.getChildren().clear();
+        List<ContactServicePort.AssignedCredential> values=classificationProfile==null?List.of():classificationProfile.credentials();
+        if(values.isEmpty()){credentialChips.getChildren().add(emptyChip("No assigned credentials"));return;}
+        values.stream().sorted(Comparator.comparingInt(ContactServicePort.AssignedCredential::displayOrder).thenComparingLong(ContactServicePort.AssignedCredential::assignmentId)).forEach(a->{Label l=chip(a.definition().abbreviation(),a.definition().color(),a.historical());l.setAccessibleText(a.definition().name()+(a.historical()?" historical":""));l.setTooltip(new Tooltip(a.definition().name()));credentialChips.getChildren().add(l);});
+    }
+    private void renderDefinitionChips(FlowPane pane,List<ContactServicePort.AssignedDefinition> values,String empty){if(pane==null)return;pane.getChildren().clear();if(values.isEmpty()){pane.getChildren().add(emptyChip(empty));return;}values.stream().sorted(Comparator.comparingInt((ContactServicePort.AssignedDefinition a)->a.definition().sortOrder())).forEach(a->pane.getChildren().add(chip(a.definition().name(),a.definition().color(),a.historical())));}
+    private static Label emptyChip(String text){Label l=new Label(text);l.getStyleClass().add("contact-empty-value");return l;}
+    private static Label chip(String text,String color,boolean historical){Label l=new Label(text+(historical?" · Historical":""));l.getStyleClass().add("contact-classification-chip");String c=color!=null&&color.matches("#[0-9A-Fa-f]{6}")?color:"#6C757D";int rgb=Integer.parseInt(c.substring(1),16);int r=rgb>>16,g=(rgb>>8)&255,b=rgb&255;String border=(r*299+g*587+b*114)/1000>150?"#425466":"#DCE5EE";l.setStyle("-fx-background-color:"+c+"22;-fx-border-color:"+border+";");return l;}
+
+    private void showProfileEditor(){
+        Dialog<Void> dialog=new Dialog<>();AppDialogs.applySecondaryDialogShell(dialog,"Edit Contact");dialog.initOwner(dialogOwner(editButton));
+        ButtonType save=new ButtonType("Save",ButtonData.OK_DONE),reload=new ButtonType("Reload",ButtonData.OTHER);dialog.getDialogPane().getButtonTypes().addAll(save,reload,ButtonType.CANCEL);
+        var p=classificationProfile;var sn=p.structuredName();
+        TextField display=new TextField(p.legacyDisplayName()),prefix=new TextField(safe(sn.prefix())),first=new TextField(safe(sn.firstName())),middle=new TextField(safe(sn.middleName())),last=new TextField(safe(sn.lastName())),preferred=new TextField(safe(sn.preferredName())),suffix=new TextField(safe(sn.suffix()));
+        Label preview=new Label();Runnable previewer=()->preview.setText("Structured-name preview: "+structuredPreview(prefix.getText(),first.getText(),middle.getText(),last.getText(),preferred.getText(),suffix.getText()));
+        for(TextField f:List.of(prefix,first,middle,last,preferred,suffix))f.textProperty().addListener((o,a,b)->previewer.run());previewer.run();
+        javafx.scene.layout.GridPane names=new javafx.scene.layout.GridPane();names.setHgap(10);names.setVgap(8);String[] labels={"Display Name","Prefix","First Name","Middle Name","Last Name","Preferred Name","Suffix"};TextField[] fields={display,prefix,first,middle,last,preferred,suffix};for(int i=0;i<fields.length;i++){names.add(new Label(labels[i]),0,i);names.add(fields[i],1,i);}names.add(preview,0,7,2,1);
+        SelectionEditor<ContactServicePort.Definition> types=new SelectionEditor<>(effectiveTypes,p.contactTypes(),ContactServicePort.Definition::id,ContactServicePort.Definition::name,ContactServicePort.Definition::color);
+        SelectionEditor<ContactServicePort.Definition> specs=new SelectionEditor<>(effectiveSpecialties,p.specialties(),ContactServicePort.Definition::id,ContactServicePort.Definition::name,ContactServicePort.Definition::color);
+        CredentialEditor creds=new CredentialEditor(effectiveCredentials,p.credentials());
+        javafx.scene.control.TabPane tabs=new javafx.scene.control.TabPane(tab("Name",names),tab("Contact Types",types.box),tab("Specialties",specs.box),tab("Credentials",creds.box));tabs.setTabClosingPolicy(javafx.scene.control.TabPane.TabClosingPolicy.UNAVAILABLE);dialog.getDialogPane().setContent(tabs);dialog.getDialogPane().setPrefSize(720,600);
+        Node saveNode=dialog.getDialogPane().lookupButton(save);saveNode.addEventFilter(javafx.event.ActionEvent.ACTION,e->{e.consume();if(saveInFlight)return;ContactServicePort.UpdateContactProfileCommand cmd=new ContactServicePort.UpdateContactProfileCommand(contactId,currentContact.shaleClientId(),appState.getUserId(),display.getText(),new ContactServicePort.StructuredName(prefix.getText(),first.getText(),middle.getText(),last.getText(),preferred.getText(),suffix.getText()),p.contactUpdatedAt(),types.intent(),specs.intent(),creds.intent());saveInFlight=true;saveNode.setDisable(true);dbExec.submit(()->{try{var result=contactService.updateContactProfile(cmd);Platform.runLater(()->{if(disposed)return;saveInFlight=false;classificationProfile=result.profile();renderClassifications();contactDetailService.invalidateContact(contactId,currentContact.shaleClientId());dialog.setResult(null);dialog.close();loadContact();});}catch(RuntimeException ex){Platform.runLater(()->{if(disposed)return;saveInFlight=false;boolean stale=ex.getMessage()!=null&&ex.getMessage().toLowerCase(Locale.ROOT).contains("reload");saveNode.setDisable(stale);setError(stale?"This Contact changed elsewhere. Your values are retained; choose Reload before saving again.":"Save failed and was rolled back. Your values are retained.");});}});});
+        dialog.getDialogPane().lookupButton(reload).addEventFilter(javafx.event.ActionEvent.ACTION,e->{e.consume();dialog.close();loadContact();});dialog.showAndWait();
+    }
+    private static javafx.scene.control.Tab tab(String text,Node n){return new javafx.scene.control.Tab(text,new javafx.scene.control.ScrollPane(n));}
+    private static String structuredPreview(String...v){return java.util.Arrays.stream(v).map(ContactViewController::safeText).filter(Objects::nonNull).collect(java.util.stream.Collectors.joining(" "));}
+
+    private static final class SelectionEditor<T>{final VBox box=new VBox(7);final List<Entry> entries=new java.util.ArrayList<>();record Entry(long assignment,int definition,byte[] rowVer,CheckBox selected){}
+        SelectionEditor(List<T> effective,List<ContactServicePort.AssignedDefinition> assigned,java.util.function.ToIntFunction<T> id,java.util.function.Function<T,String> name,java.util.function.Function<T,String> color){Map<Integer,ContactServicePort.AssignedDefinition> current=assigned.stream().collect(java.util.stream.Collectors.toMap(a->a.definition().id(),a->a));for(T d:effective){int did=id.applyAsInt(d);var a=current.remove(did);CheckBox cb=new CheckBox(name.apply(d));applyDefinitionColor(cb,color.apply(d));cb.setSelected(a!=null);box.getChildren().add(cb);entries.add(new Entry(a==null?0:a.assignmentId(),did,a==null?null:a.rowVer(),cb));}for(var a:current.values()){CheckBox cb=new CheckBox(a.definition().name()+" · Historical");applyDefinitionColor(cb,a.definition().color());cb.setSelected(true);box.getChildren().add(cb);entries.add(new Entry(a.assignmentId(),a.definition().id(),a.rowVer(),cb));}}
+        List<ContactServicePort.IntendedAssignment> intent(){return entries.stream().map(e->new ContactServicePort.IntendedAssignment(e.assignment,e.definition,e.selected.isSelected(),e.rowVer)).toList();}
+        static void applyDefinitionColor(CheckBox cb,String color){String c=color!=null&&color.matches("#[0-9A-Fa-f]{6}")?color:"#6C757D";cb.setStyle("-fx-border-color:"+c+";-fx-border-width:0 0 0 4;-fx-padding:5;");}}
+    private static final class CredentialEditor{final VBox box=new VBox(7);final List<CEntry> entries=new java.util.ArrayList<>();record CEntry(long assignment,int definition,byte[] rowVer,CheckBox selected,String label){}
+        CredentialEditor(List<ContactServicePort.CredentialDefinition> effective,List<ContactServicePort.AssignedCredential> assigned){Map<Integer,ContactServicePort.AssignedCredential> current=assigned.stream().collect(java.util.stream.Collectors.toMap(a->a.definition().id(),a->a));for(var d:effective){var a=current.remove(d.id());add(a==null?0:a.assignmentId(),d.id(),a==null?null:a.rowVer(),a!=null,d.abbreviation()+" — "+d.name(),d.color());}for(var a:current.values())add(a.assignmentId(),a.definition().id(),a.rowVer(),true,a.definition().abbreviation()+" — "+a.definition().name()+" · Historical",a.definition().color());}
+        void add(long aid,int did,byte[]rv,boolean selected,String label,String color){CheckBox cb=new CheckBox(label);SelectionEditor.applyDefinitionColor(cb,color);cb.setSelected(selected);Button up=new Button("Move Up"),down=new Button("Move Down");CEntry e=new CEntry(aid,did,rv,cb,label);entries.add(e);HBox row=new HBox(6,cb,up,down);box.getChildren().add(row);up.setOnAction(x->move(row,-1));down.setOnAction(x->move(row,1));}
+        void move(HBox row,int delta){int i=box.getChildren().indexOf(row),j=i+delta;if(j<0||j>=box.getChildren().size())return;box.getChildren().remove(i);box.getChildren().add(j,row);CEntry e=entries.remove(i);entries.add(j,e);}
+        List<ContactServicePort.IntendedAssignment> intent(){return entries.stream().map(e->new ContactServicePort.IntendedAssignment(e.assignment,e.definition,e.selected.isSelected(),e.rowVer)).toList();}}
 
     private void onCancel() {
         if (currentContact != null) {
@@ -755,6 +823,9 @@ public final class ContactViewController {
     }
 
     private void loadSharedLinks() {
+        if (disposed) {
+            return;
+        }
         final int generation = ++sharedLinksLoadGeneration;
         final int requestedContactId = contactId;
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
@@ -939,7 +1010,7 @@ public final class ContactViewController {
     private void setEditMode(boolean enabled) {
         this.editMode = enabled && canEditContact();
 
-        setVisibleManaged(editButton, false);
+        setVisibleManaged(editButton, canEditContact() && !editMode && currentContact != null);
         setVisibleManaged(saveButton, canEditContact() && editMode);
         setVisibleManaged(cancelButton, canEditContact() && editMode);
         refreshDeleteAction();
@@ -973,9 +1044,9 @@ public final class ContactViewController {
     }
 
     private void setInlineEditButtonsDisabled(boolean disabled) {
-        for (Button button : List.of(editDisplayNameButton, editNameButton, editFirstNameButton, editLastNameButton,
+        for (Button button : java.util.stream.Stream.of(editDisplayNameButton, editNameButton, editFirstNameButton, editLastNameButton,
                 editEmailButton, editPhoneButton, editAddressHomeButton, editDateOfBirthButton, editConditionButton,
-                editDeceasedButton)) {
+                editDeceasedButton).filter(Objects::nonNull).toList()) {
             if (button != null) {
                 button.setDisable(disabled);
             }
@@ -988,7 +1059,8 @@ public final class ContactViewController {
     }
 
     private boolean canEditContact() {
-        return appState != null && appState.getUserId() > 0;
+        Integer userId = appState == null ? null : appState.getUserId();
+        return userId != null && userId > 0;
     }
 
     private boolean isAdminUser() {
