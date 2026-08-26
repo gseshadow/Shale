@@ -11,7 +11,8 @@ import com.shale.core.runtime.DbSessionProvider;
 final class ContactMutationDao {
     private final DbSessionProvider db;
     private final EntityActionAuditDao audit = new EntityActionAuditDao();
-    ContactMutationDao(DbSessionProvider db) { this.db=Objects.requireNonNull(db); }
+    private final PhiAuditService phi;
+    ContactMutationDao(DbSessionProvider db) { this.db=Objects.requireNonNull(db); this.phi=new PhiAuditService(new AuditLogDao(db)); }
 
     DefinitionMutationResult create(CreateDefinitionCommand c){return tx(c.shaleClientId(),c.actorUserId(),true,con->{
         validateDefinitionValues(c.category(),c.systemKey(),c.name(),c.abbreviation(),c.description(),c.color(),c.sortOrder());
@@ -54,6 +55,7 @@ final class ContactMutationDao {
         validateName(c.structuredName().prefix(),50,"Prefix"); validateName(c.structuredName().firstName(),100,"First Name");
         validateName(c.structuredName().middleName(),100,"Middle Name"); validateName(c.structuredName().lastName(),100,"Last Name");
         validateName(c.structuredName().preferredName(),100,"Preferred Name"); validateName(c.structuredName().suffix(),50,"Suffix");
+		if(c.dateOfBirth()!=null&&c.dateOfBirth().isAfter(java.time.LocalDate.now()))throw new IllegalArgumentException("Date of Birth cannot be in the future.");
         if(blank(c.displayName())&&blank(c.structuredName().firstName())&&blank(c.structuredName().lastName()))throw new IllegalArgumentException("Display Name, First Name, or Last Name is required.");
         prevalidateIntent(con,c,DefinitionCategory.CONTACT_TYPE,c.contactTypes());
         prevalidateIntent(con,c,DefinitionCategory.SPECIALTY,c.specialties());
@@ -114,8 +116,9 @@ final class ContactMutationDao {
     }
     private void mutateAssignment(Connection con,UpdateContactProfileCommand c,DefinitionCategory k,long id,boolean restore,byte[] rv)throws SQLException{String sql="UPDATE dbo."+assignmentTable(k)+" SET IsDeleted=?,DeletedAt="+(restore?"NULL":"SYSUTCDATETIME()")+",DeletedByUserId="+(restore?"NULL":"?")+",UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND ContactId=? AND RowVer=?";try(PreparedStatement p=con.prepareStatement(sql)){int i=1;p.setBoolean(i++,!restore);if(!restore)p.setInt(i++,c.actorUserId());p.setInt(i++,c.actorUserId());p.setLong(i++,id);p.setInt(i++,c.shaleClientId());p.setInt(i++,c.contactId());p.setBytes(i,rv);stale(p.executeUpdate());}AssignmentMutationResult a=assignmentResult(con,k,id);auditAssignment(con,c.shaleClientId(),c.actorUserId(),a,restore?EntityActionAuditEvent.Action.RESTORED:EntityActionAuditEvent.Action.REMOVED);}
     private void insertAssignment(Connection con,UpdateContactProfileCommand c,DefinitionCategory k,int def)throws SQLException{requireSelectable(con,k,c.shaleClientId(),def);String sql="INSERT dbo."+assignmentTable(k)+" (ShaleClientId,ContactId,"+fk(k)+","+(k==DefinitionCategory.CREDENTIAL?"DisplayOrder,":"")+"CreatedByUserId) OUTPUT INSERTED.Id VALUES (?,?,?,"+(k==DefinitionCategory.CREDENTIAL?"0,":"")+"?)";try(PreparedStatement p=con.prepareStatement(sql)){p.setInt(1,c.shaleClientId());p.setInt(2,c.contactId());p.setInt(3,def);p.setInt(4,c.actorUserId());try(ResultSet r=p.executeQuery()){r.next();auditAssignment(con,c.shaleClientId(),c.actorUserId(),assignmentResult(con,k,r.getLong(1)),EntityActionAuditEvent.Action.ADDED);}}}
-    private static void updateStructuredContact(Connection con,UpdateContactProfileCommand c)throws SQLException{
-        String sql="UPDATE dbo.Contacts SET Name=?,Prefix=?,FirstName=?,MiddleName=?,LastName=?,PreferredName=?,Suffix=?,UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0 AND "+(c.expectedContactUpdatedAt()==null?"UpdatedAt IS NULL":"UpdatedAt=?");
+    private void updateStructuredContact(Connection con,UpdateContactProfileCommand c)throws SQLException{
+        String oldCondition=null;try(PreparedStatement old=con.prepareStatement("SELECT Condition FROM dbo.Contacts WHERE Id=? AND ShaleClientId=?")){old.setInt(1,c.contactId());old.setInt(2,c.shaleClientId());try(ResultSet r=old.executeQuery()){if(r.next())oldCondition=r.getString(1);}}
+        String sql="UPDATE dbo.Contacts SET Name=?,Prefix=?,FirstName=?,MiddleName=?,LastName=?,PreferredName=?,Suffix=?,DateOfBirth=?,Condition=?,IsDeceased=?,UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0 AND "+(c.expectedContactUpdatedAt()==null?"UpdatedAt IS NULL":"UpdatedAt=?");
         try(PreparedStatement p=con.prepareStatement(sql)){
             int i=1;
             setString(p,i++,c.displayName());
@@ -125,11 +128,14 @@ final class ContactMutationDao {
             setString(p,i++,c.structuredName().lastName());
             setString(p,i++,c.structuredName().preferredName());
             setString(p,i++,c.structuredName().suffix());
+			if(c.dateOfBirth()==null)p.setNull(i++,Types.DATE);else p.setDate(i++,java.sql.Date.valueOf(c.dateOfBirth()));
+			setString(p,i++,c.condition());p.setBoolean(i++,c.deceased());
             p.setInt(i++,c.contactId());
             p.setInt(i++,c.shaleClientId());
             if(c.expectedContactUpdatedAt()!=null)p.setTimestamp(i,Timestamp.from(c.expectedContactUpdatedAt()));
             stale(p.executeUpdate());
         }
+		phi.auditUpdate(con,c.actorUserId(),"Contacts","Condition",(long)c.contactId(),oldCondition,c.condition());
     }
     private static Set<Long> activeAssignmentIds(Connection c,DefinitionCategory k,int t,int contact)throws SQLException{Set<Long>s=new HashSet<>();try(PreparedStatement p=c.prepareStatement("SELECT Id FROM dbo."+assignmentTable(k)+" WHERE ShaleClientId=? AND ContactId=? AND IsDeleted=0")){p.setInt(1,t);p.setInt(2,contact);try(ResultSet r=p.executeQuery()){while(r.next())s.add(r.getLong(1));}}return s;}
     private static long activeAssignmentId(Connection c,DefinitionCategory k,int t,int contact,int def)throws SQLException{try(PreparedStatement p=c.prepareStatement("SELECT Id FROM dbo."+assignmentTable(k)+" WHERE ShaleClientId=? AND ContactId=? AND "+fk(k)+"=? AND IsDeleted=0")){p.setInt(1,t);p.setInt(2,contact);p.setInt(3,def);try(ResultSet r=p.executeQuery()){if(!r.next())throw new IllegalStateException("New assignment result missing.");return r.getLong(1);}}}

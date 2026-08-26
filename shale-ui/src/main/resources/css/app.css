@@ -2870,3 +2870,11 @@
 .contact-editor-surface .shale-loading-placeholder,
 .contact-editor-surface .shale-empty-state { -fx-background-color: rgba(248,250,252,.88); -fx-background-radius: 8px; }
 .contact-editor-surface .dialog-error-text { -fx-background-color: rgba(255,242,240,.92); -fx-padding: 8px; }
+.contact-point-card { -fx-background-color: rgba(248,250,252,.96); -fx-background-radius: 9px; -fx-border-color: rgba(17,37,66,.16); -fx-border-radius: 9px; -fx-padding: 10px; }
+.contact-point-card.removed { -fx-opacity: .68; -fx-border-style: segments(5px,4px); }
+.contact-point-value { -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; }
+.contact-point-badge { -fx-background-color: rgba(220,232,245,.9); -fx-background-radius: 999px; -fx-padding: 3px 7px; -fx-font-size: 10px; -fx-font-weight: 800; }
+.contact-point-primary { -fx-background-color: rgba(211,240,222,.95); }
+.contact-point-legacy { -fx-background-color: rgba(255,236,194,.95); }
+.contact-editor-section-heading { -fx-font-size: 15px; -fx-font-weight: 800; }
+.contact-editor-toolbar { -fx-padding: 2px 0 8px 0; }

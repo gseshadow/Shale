@@ -110,11 +110,12 @@ public final class ContactDao {
 
     public record ClassificationProfileRow(int contactId, int shaleClientId, String prefix,
             String firstName, String middleName, String lastName, String preferredName, String suffix,
-            String legacyDisplayName, Instant contactUpdatedAt, List<AssignedDefinitionRow> contactTypes,
+            String legacyDisplayName, java.time.LocalDate dateOfBirth, String condition, boolean deceased,
+            Instant contactUpdatedAt, List<AssignedDefinitionRow> contactTypes,
             List<AssignedDefinitionRow> specialties, List<AssignedCredentialRow> credentials,
             List<ContactPhoneNumberRow> phoneNumbers, List<ContactEmailAddressRow> emailAddresses,
             List<ContactAddressRow> addresses) {
-		public ClassificationProfileRow(int contactId,int shaleClientId,String prefix,String firstName,String middleName,String lastName,String preferredName,String suffix,String legacyDisplayName,Instant contactUpdatedAt,List<AssignedDefinitionRow> contactTypes,List<AssignedDefinitionRow> specialties,List<AssignedCredentialRow> credentials){this(contactId,shaleClientId,prefix,firstName,middleName,lastName,preferredName,suffix,legacyDisplayName,contactUpdatedAt,contactTypes,specialties,credentials,List.of(),List.of(),List.of());}
+		public ClassificationProfileRow(int contactId,int shaleClientId,String prefix,String firstName,String middleName,String lastName,String preferredName,String suffix,String legacyDisplayName,Instant contactUpdatedAt,List<AssignedDefinitionRow> contactTypes,List<AssignedDefinitionRow> specialties,List<AssignedCredentialRow> credentials){this(contactId,shaleClientId,prefix,firstName,middleName,lastName,preferredName,suffix,legacyDisplayName,null,null,false,contactUpdatedAt,contactTypes,specialties,credentials,List.of(),List.of(),List.of());}
     }
 
     public record ContactPhoneNumberRow(long id,String kind,String displayNumber,String normalizedNumber,
@@ -589,7 +590,8 @@ public final class ContactDao {
             String contactSql = """
                     SELECT c.Id,c.Prefix,c.FirstName,c.MiddleName,c.LastName,c.PreferredName,c.Suffix,
                            COALESCE(NULLIF(LTRIM(RTRIM(c.Name)),''),NULLIF(LTRIM(RTRIM(c.WorkName)),''),
-                             NULLIF(LTRIM(RTRIM(CONCAT(c.FirstName,' ',c.LastName))),'')) LegacyDisplayName,c.UpdatedAt
+                             NULLIF(LTRIM(RTRIM(CONCAT(c.FirstName,' ',c.LastName))),'')) LegacyDisplayName,
+                           c.DateOfBirth,c.Condition,c.IsDeceased,c.UpdatedAt
                     FROM dbo.Contacts c WHERE c.Id=? AND c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0;
                     """;
             try (PreparedStatement ps = con.prepareStatement(contactSql)) {
@@ -607,7 +609,8 @@ public final class ContactDao {
                     List<ContactEmailAddressRow> emails=loadEmails(con,contactId,shaleClientId);
                     List<ContactAddressRow> addresses=loadAddresses(con,contactId,shaleClientId);
                     return new ClassificationProfileRow(contactId, shaleClientId, prefix, first, middle, last,
-                            preferred, suffix, display, rs.getTimestamp("UpdatedAt")==null?null:rs.getTimestamp("UpdatedAt").toInstant(), types, specialties, credentials,phones,emails,addresses);
+                            preferred, suffix, display, rs.getDate("DateOfBirth")==null?null:rs.getDate("DateOfBirth").toLocalDate(),
+                            rs.getString("Condition"),rs.getBoolean("IsDeceased"),rs.getTimestamp("UpdatedAt")==null?null:rs.getTimestamp("UpdatedAt").toInstant(), types, specialties, credentials,phones,emails,addresses);
                 }
             }
         } catch (SQLException e) {

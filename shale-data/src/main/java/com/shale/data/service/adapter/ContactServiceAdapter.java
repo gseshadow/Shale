@@ -100,7 +100,8 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		return Optional.ofNullable(contactGateway.findClassificationProfile(contactId, shaleClientId))
 				.map(row -> new ClassificationProfile(row.contactId(), row.shaleClientId(),
 						new StructuredName(row.prefix(), row.firstName(), row.middleName(), row.lastName(),
-						row.preferredName(), row.suffix()), row.legacyDisplayName(), row.contactUpdatedAt(),
+						row.preferredName(), row.suffix()), row.legacyDisplayName(), row.dateOfBirth(), row.condition(),
+						row.deceased(), row.contactUpdatedAt(),
 						row.contactTypes().stream().map(ContactServiceAdapter::assignedDefinition).toList(),
 						row.specialties().stream().map(ContactServiceAdapter::assignedDefinition).toList(),
 						row.credentials().stream().map(ContactServiceAdapter::assignedCredential).toList(),
