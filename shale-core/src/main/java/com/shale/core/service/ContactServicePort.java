@@ -74,19 +74,19 @@ public interface ContactServicePort {
 	}
 
 	/** A selectable effective Contact Type or Specialty; the id is always the stored definition id. */
-	record Definition(int id, String systemKey, String name, String description, int sortOrder) {
+	record Definition(int id, String systemKey, String name, String description, String color, int sortOrder) {
 	}
 
 	/** Professional credentials retain both their full name and abbreviation. */
 	record CredentialDefinition(int id, String systemKey, String name, String abbreviation,
-			String description, int sortOrder) {
+			String description, String color, int sortOrder) {
 	}
 
 	enum DefinitionOrigin { GLOBAL, CUSTOM, OVERRIDE }
 	enum DefinitionOverlayState { EFFECTIVE, OVERRIDDEN, MASKED_GLOBAL, GLOBAL_FALLBACK, INEFFECTIVE }
 
 	record AdministrationDefinition(DefinitionCategory category, int id, Integer shaleClientId,
-			String systemKey, String name, String abbreviation, String description, int sortOrder,
+			String systemKey, String name, String abbreviation, String description, String color, int sortOrder,
 			boolean active, boolean deleted, DefinitionOrigin origin, Integer relatedGlobalDefinitionId,
 			DefinitionOverlayState overlayState, byte[] rowVer) {
 		public AdministrationDefinition { rowVer = copyRowVer(rowVer); }
@@ -151,10 +151,10 @@ public interface ContactServicePort {
 
 	record CreateDefinitionCommand(DefinitionCategory category, int shaleClientId, int actorUserId,
 			String systemKey, Integer globalDefinitionId, String name, String abbreviation,
-			String description, int sortOrder, boolean active) { }
+			String description, String color, int sortOrder, boolean active) { }
 
 	record UpdateDefinitionCommand(DefinitionCategory category, int definitionId, int shaleClientId,
-			int actorUserId, String name, String abbreviation, String description, int sortOrder,
+			int actorUserId, String name, String abbreviation, String description, String color, int sortOrder,
 			byte[] expectedRowVer) {
 		public UpdateDefinitionCommand { expectedRowVer = copyRowVer(expectedRowVer); }
 		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
@@ -166,7 +166,7 @@ public interface ContactServicePort {
 		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
 	}
 
-	record DefinitionMutationResult(DefinitionCategory category, int definitionId, String systemKey,
+	record DefinitionMutationResult(DefinitionCategory category, int definitionId, String systemKey, String color,
 			boolean active, boolean deleted, byte[] rowVer) {
 		public DefinitionMutationResult { rowVer = copyRowVer(rowVer); }
 		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
