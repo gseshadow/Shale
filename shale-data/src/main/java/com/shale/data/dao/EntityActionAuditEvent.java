@@ -19,7 +19,7 @@ public record EntityActionAuditEvent(
 		String source,
 		Map<MetadataKey, String> metadata) {
 
-	public enum EntityType { CONTACT, CASE, CASE_STATUS, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CASE_DATE_TYPE, CALENDAR_EVENT, CASE_DATE_ROLE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER, CONTACT_TYPE, SPECIALTY, CREDENTIAL_DEFINITION, CONTACT_CONTACT_TYPE, CONTACT_SPECIALTY, CONTACT_CREDENTIAL }
+	public enum EntityType { CONTACT, CONTACT_PHONE_NUMBER, CONTACT_EMAIL_ADDRESS, CONTACT_ADDRESS, CASE, CASE_STATUS, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CASE_DATE_TYPE, CALENDAR_EVENT, CASE_DATE_ROLE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER, CONTACT_TYPE, SPECIALTY, CREDENTIAL_DEFINITION, CONTACT_CONTACT_TYPE, CONTACT_SPECIALTY, CONTACT_CREDENTIAL }
 
 	public enum Action {
 		CREATED,
@@ -82,7 +82,9 @@ public record EntityActionAuditEvent(
 		SEMANTIC_ROLE,
 		CASE_DATE_TYPE_ID,
 		DEFINITION_ID,
-		ORDERING_COUNT
+		ORDERING_COUNT,
+		KIND,
+		PRIMARY
 	}
 
 	private static final Set<String> PROHIBITED_KEY_FRAGMENTS = Set.of(
@@ -125,6 +127,7 @@ public record EntityActionAuditEvent(
 	private static boolean isAllowedCombination(EntityType entityType, Action action) {
 		return switch (entityType) {
 			case CONTACT -> action == Action.UPDATED;
+			case CONTACT_PHONE_NUMBER, CONTACT_EMAIL_ADDRESS, CONTACT_ADDRESS -> action == Action.CREATED || action == Action.UPDATED || action == Action.REMOVED || action == Action.RESTORED || action == Action.REORDERED;
 			case CASE -> action == Action.DELETED || action == Action.RESTORED;
 			case CASE_STATUS -> action == Action.DEACTIVATED || action == Action.RESTORED;
 			case LINK_TYPE, MATERIAL_TYPE -> action == Action.CREATED || action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.OVERRIDE_RESET || action == Action.DELETED || action == Action.REMOVED;

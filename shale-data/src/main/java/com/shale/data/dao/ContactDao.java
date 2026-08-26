@@ -111,8 +111,22 @@ public final class ContactDao {
     public record ClassificationProfileRow(int contactId, int shaleClientId, String prefix,
             String firstName, String middleName, String lastName, String preferredName, String suffix,
             String legacyDisplayName, Instant contactUpdatedAt, List<AssignedDefinitionRow> contactTypes,
-            List<AssignedDefinitionRow> specialties, List<AssignedCredentialRow> credentials) {
+            List<AssignedDefinitionRow> specialties, List<AssignedCredentialRow> credentials,
+            List<ContactPhoneNumberRow> phoneNumbers, List<ContactEmailAddressRow> emailAddresses,
+            List<ContactAddressRow> addresses) {
+		public ClassificationProfileRow(int contactId,int shaleClientId,String prefix,String firstName,String middleName,String lastName,String preferredName,String suffix,String legacyDisplayName,Instant contactUpdatedAt,List<AssignedDefinitionRow> contactTypes,List<AssignedDefinitionRow> specialties,List<AssignedCredentialRow> credentials){this(contactId,shaleClientId,prefix,firstName,middleName,lastName,preferredName,suffix,legacyDisplayName,contactUpdatedAt,contactTypes,specialties,credentials,List.of(),List.of(),List.of());}
     }
+
+    public record ContactPhoneNumberRow(long id,String kind,String displayNumber,String normalizedNumber,
+            String extension,boolean primary,int sortOrder,boolean deleted,Instant createdAt,Instant updatedAt,byte[] rowVer){
+        public ContactPhoneNumberRow{rowVer=rowVer==null?null:rowVer.clone();}@Override public byte[] rowVer(){return rowVer==null?null:rowVer.clone();}}
+    public record ContactEmailAddressRow(long id,String kind,String emailAddress,String normalizedEmail,
+            boolean primary,int sortOrder,boolean deleted,Instant createdAt,Instant updatedAt,byte[] rowVer){
+        public ContactEmailAddressRow{rowVer=rowVer==null?null:rowVer.clone();}@Override public byte[] rowVer(){return rowVer==null?null:rowVer.clone();}}
+    public record ContactAddressRow(long id,String kind,String addressLine1,String addressLine2,String city,
+            String stateOrProvince,String postalCode,String countryCode,String legacyAddressText,boolean primary,
+            int sortOrder,boolean deleted,Instant createdAt,Instant updatedAt,byte[] rowVer){
+        public ContactAddressRow{rowVer=rowVer==null?null:rowVer.clone();}@Override public byte[] rowVer(){return rowVer==null?null:rowVer.clone();}}
 
 
     public record RelatedCaseRow(
@@ -589,14 +603,22 @@ public final class ContactDao {
                     List<AssignedDefinitionRow> types = loadAssignedDefinitions(con, "ContactContactTypes", "ContactTypeId", "ContactTypes", contactId, shaleClientId);
                     List<AssignedDefinitionRow> specialties = loadAssignedDefinitions(con, "ContactSpecialties", "SpecialtyId", "Specialties", contactId, shaleClientId);
                     List<AssignedCredentialRow> credentials = loadAssignedCredentials(con, contactId, shaleClientId);
+                    List<ContactPhoneNumberRow> phones=loadPhones(con,contactId,shaleClientId);
+                    List<ContactEmailAddressRow> emails=loadEmails(con,contactId,shaleClientId);
+                    List<ContactAddressRow> addresses=loadAddresses(con,contactId,shaleClientId);
                     return new ClassificationProfileRow(contactId, shaleClientId, prefix, first, middle, last,
-                            preferred, suffix, display, rs.getTimestamp("UpdatedAt")==null?null:rs.getTimestamp("UpdatedAt").toInstant(), types, specialties, credentials);
+                            preferred, suffix, display, rs.getTimestamp("UpdatedAt")==null?null:rs.getTimestamp("UpdatedAt").toInstant(), types, specialties, credentials,phones,emails,addresses);
                 }
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load Contact classification profile (id=" + contactId + ")", e);
         }
     }
+
+    private static Instant instant(ResultSet r,String c)throws SQLException{Timestamp t=r.getTimestamp(c);return t==null?null:t.toInstant();}
+    private static List<ContactPhoneNumberRow> loadPhones(Connection c,int contact,int tenant)throws SQLException{var out=new ArrayList<ContactPhoneNumberRow>();try(var p=c.prepareStatement("SELECT Id,Kind,DisplayNumber,NormalizedNumber,Extension,IsPrimary,SortOrder,IsDeleted,CreatedAt,UpdatedAt,RowVer FROM dbo.ContactPhoneNumbers WHERE ContactId=? AND ShaleClientId=? ORDER BY IsDeleted,IsPrimary DESC,SortOrder,Id")){p.setInt(1,contact);p.setInt(2,tenant);try(var r=p.executeQuery()){while(r.next())out.add(new ContactPhoneNumberRow(r.getLong(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getBoolean(6),r.getInt(7),r.getBoolean(8),instant(r,"CreatedAt"),instant(r,"UpdatedAt"),r.getBytes(11)));}}return List.copyOf(out);}
+    private static List<ContactEmailAddressRow> loadEmails(Connection c,int contact,int tenant)throws SQLException{var out=new ArrayList<ContactEmailAddressRow>();try(var p=c.prepareStatement("SELECT Id,Kind,EmailAddress,NormalizedEmail,IsPrimary,SortOrder,IsDeleted,CreatedAt,UpdatedAt,RowVer FROM dbo.ContactEmailAddresses WHERE ContactId=? AND ShaleClientId=? ORDER BY IsDeleted,IsPrimary DESC,SortOrder,Id")){p.setInt(1,contact);p.setInt(2,tenant);try(var r=p.executeQuery()){while(r.next())out.add(new ContactEmailAddressRow(r.getLong(1),r.getString(2),r.getString(3),r.getString(4),r.getBoolean(5),r.getInt(6),r.getBoolean(7),instant(r,"CreatedAt"),instant(r,"UpdatedAt"),r.getBytes(10)));}}return List.copyOf(out);}
+    private static List<ContactAddressRow> loadAddresses(Connection c,int contact,int tenant)throws SQLException{var out=new ArrayList<ContactAddressRow>();try(var p=c.prepareStatement("SELECT Id,Kind,AddressLine1,AddressLine2,City,StateOrProvince,PostalCode,CountryCode,LegacyAddressText,IsPrimary,SortOrder,IsDeleted,CreatedAt,UpdatedAt,RowVer FROM dbo.ContactAddresses WHERE ContactId=? AND ShaleClientId=? ORDER BY IsDeleted,IsPrimary DESC,SortOrder,Id")){p.setInt(1,contact);p.setInt(2,tenant);try(var r=p.executeQuery()){while(r.next())out.add(new ContactAddressRow(r.getLong(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7),r.getString(8),r.getString(9),r.getBoolean(10),r.getInt(11),r.getBoolean(12),instant(r,"CreatedAt"),instant(r,"UpdatedAt"),r.getBytes(15)));}}return List.copyOf(out);}
 
     public boolean updateBasicProfile(ContactProfileUpdateRequest request) {
         long started = System.nanoTime();
