@@ -133,6 +133,14 @@
                             <Label fx:id="deceasedValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="9" GridPane.columnIndex="1" />
                             <CheckBox fx:id="deceasedEditor" text="Is Deceased" visible="false" managed="false" GridPane.rowIndex="9" GridPane.columnIndex="1" />
                         </GridPane>
+                        <VBox spacing="8">
+                            <Label text="Phone Numbers" styleClass="contact-group-label" />
+                            <VBox fx:id="phoneCards" spacing="8" />
+                            <Label text="Email Addresses" styleClass="contact-group-label" />
+                            <VBox fx:id="emailCards" spacing="8" />
+                            <Label text="Addresses" styleClass="contact-group-label" />
+                            <VBox fx:id="addressCards" spacing="8" />
+                        </VBox>
                     </VBox>
 
                     <VBox spacing="10" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0" GridPane.rowIndex="1">

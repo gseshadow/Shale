@@ -115,7 +115,8 @@ public interface ContactServicePort {
 
 	/** Read-only classification aggregate. It deliberately carries the existing display name unchanged. */
 	record ClassificationProfile(int contactId, int shaleClientId, StructuredName structuredName,
-			String legacyDisplayName, java.time.Instant contactUpdatedAt, List<AssignedDefinition> contactTypes,
+			String legacyDisplayName, java.time.LocalDate dateOfBirth, String condition, boolean deceased,
+			java.time.Instant contactUpdatedAt, List<AssignedDefinition> contactTypes,
 			List<AssignedDefinition> specialties, List<AssignedCredential> credentials,
 			List<ContactPhoneNumber> phoneNumbers, List<ContactEmailAddress> emailAddresses,
 			List<ContactAddress> addresses) {
@@ -126,6 +127,11 @@ public interface ContactServicePort {
 			phoneNumbers = List.copyOf(phoneNumbers);
 			emailAddresses = List.copyOf(emailAddresses);
 			addresses = List.copyOf(addresses);
+		}
+		public ClassificationProfile(int contactId,int shaleClientId,StructuredName structuredName,String legacyDisplayName,
+				java.time.Instant contactUpdatedAt,List<AssignedDefinition> contactTypes,List<AssignedDefinition> specialties,
+				List<AssignedCredential> credentials,List<ContactPhoneNumber> phones,List<ContactEmailAddress> emails,List<ContactAddress> addresses){
+			this(contactId,shaleClientId,structuredName,legacyDisplayName,null,null,false,contactUpdatedAt,contactTypes,specialties,credentials,phones,emails,addresses);
 		}
 	}
 
@@ -235,7 +241,8 @@ public interface ContactServicePort {
 	}
 
 	record UpdateContactProfileCommand(int contactId, int shaleClientId, int actorUserId,
-			String displayName, StructuredName structuredName, java.time.Instant expectedContactUpdatedAt,
+			String displayName, StructuredName structuredName, java.time.LocalDate dateOfBirth,
+			String condition, boolean deceased, java.time.Instant expectedContactUpdatedAt,
 			List<IntendedAssignment> contactTypes, List<IntendedAssignment> specialties,
 			List<IntendedAssignment> credentials, List<IntendedPhoneNumber> phoneNumbers,
 			List<IntendedEmailAddress> emailAddresses, List<IntendedAddress> addresses) {
@@ -248,11 +255,18 @@ public interface ContactServicePort {
 			emailAddresses = emailAddresses == null ? List.of() : List.copyOf(emailAddresses);
 			addresses = addresses == null ? List.of() : List.copyOf(addresses);
 		}
-		/** Phase 2B source-compatible constructor; callers that edit contact points use the complete constructor. */
+		/** Phase 2B source-compatible constructor. */
 		public UpdateContactProfileCommand(int contactId,int shaleClientId,int actorUserId,String displayName,
 				StructuredName structuredName,java.time.Instant expectedContactUpdatedAt,List<IntendedAssignment> contactTypes,
 				List<IntendedAssignment> specialties,List<IntendedAssignment> credentials){
-			this(contactId,shaleClientId,actorUserId,displayName,structuredName,expectedContactUpdatedAt,contactTypes,specialties,credentials,List.of(),List.of(),List.of());
+			this(contactId,shaleClientId,actorUserId,displayName,structuredName,null,null,false,expectedContactUpdatedAt,contactTypes,specialties,credentials,List.of(),List.of(),List.of());
+		}
+		public UpdateContactProfileCommand(int contactId,int shaleClientId,int actorUserId,String displayName,
+				StructuredName structuredName,java.time.Instant expectedContactUpdatedAt,List<IntendedAssignment> contactTypes,
+				List<IntendedAssignment> specialties,List<IntendedAssignment> credentials,List<IntendedPhoneNumber> phones,
+				List<IntendedEmailAddress> emails,List<IntendedAddress> addresses){
+			this(contactId,shaleClientId,actorUserId,displayName,structuredName,null,null,false,expectedContactUpdatedAt,
+					contactTypes,specialties,credentials,phones,emails,addresses);
 		}
 	}
 
