@@ -1043,3 +1043,17 @@ neither existing id is rewritten by the semantic-role foundation.
 Every administrator-customizable Shale definition/type must own a required configurable `Color`; assignments reference the authoritative definition ID and never copy presentation fields. The database representation is `nvarchar(20) NOT NULL`, normalized uppercase `#RRGGBB`, constrained to six hexadecimal digits, with the established neutral default `#6C757D`. Tenant overrides may change color without changing the global definition. Reset fallback uses the global definition's color, and historical assignment queries continue to return presentation data from the stored authoritative definition.
 
 For Contact Types, Specialties, and Credential Definitions, deploy `2026-08-25_contacts_phase2a_definition_colors.sql`, then run `2026-08-25_contacts_phase2a_definition_colors_verify.sql`, then deploy the matching application. Validate this sequence on `Shale_Copy` before production; the migration is guarded, all-tenant, forward-only, and rerunnable.
+## Structured Contact points (Phase 2C-A)
+
+`ContactPhoneNumbers`, `ContactEmailAddresses`, and `ContactAddresses` are additive `bigint` identity
+children of the tenant Contact key. They use fixed uppercase kinds, nullable conservative normalized
+forms, one filtered active-primary index per category, zero-based/nonnegative presentation ordering,
+soft-deletion metadata, actor foreign keys to `Users(id)`, and `rowversion`. Their composite Contact
+foreign keys include `ShaleClientId`, use no delete cascade, and each table has the established strict
+tenant filter. `Contacts` itself receives no RLS change.
+
+Phase 2C-A copies all populated legacy phone, email, and address values—including values on deleted
+Contacts—without changing the source columns. Free-form addresses populate only `LegacyAddressText`.
+The legacy columns remain the runtime authority until Phase 2C-B introduces audited transactional
+dual-write and reconciliation. See `architecture/contact-management.md` for precedence, normalization,
+lifecycle, deployment, and retirement boundaries.
