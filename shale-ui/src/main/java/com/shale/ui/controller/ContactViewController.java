@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -48,6 +49,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -295,6 +297,9 @@ public final class ContactViewController {
     }
 
     private void loadContact() {
+        if (disposed) {
+            return;
+        }
         final int generation = ++detailLoadGeneration;
         final int requestedContactId = contactId;
         final long loadStarted = PerfLog.start();
@@ -818,6 +823,9 @@ public final class ContactViewController {
     }
 
     private void loadSharedLinks() {
+        if (disposed) {
+            return;
+        }
         final int generation = ++sharedLinksLoadGeneration;
         final int requestedContactId = contactId;
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
@@ -1051,7 +1059,8 @@ public final class ContactViewController {
     }
 
     private boolean canEditContact() {
-        return appState != null && appState.getUserId() > 0;
+        Integer userId = appState == null ? null : appState.getUserId();
+        return userId != null && userId > 0;
     }
 
     private boolean isAdminUser() {
