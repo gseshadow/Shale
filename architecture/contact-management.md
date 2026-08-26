@@ -188,3 +188,41 @@ Phase 1C contains no Contact View or Settings UI and changes no JavaFX, FXML, or
 Contact Types, Specialties, and Credential Definitions follow Shale's cross-cutting customizable-definition color contract. `Color` is required definition presentation data, stored as normalized uppercase CSS `#RRGGBB` in `nvarchar(20)`, with `#6C757D` as the safe legacy/default value. Color belongs only to the authoritative definition: assignment tables do not duplicate it, and historical assignment reads join by the stored definition ID so they retain that definition's current presentation even when inactive or removed.
 
 Tenant-created definitions and overrides may choose colors independently. **Customize** initially copies the selected global definition's color; deleting/resetting an override exposes the global definition and its color, while an inactive override continues to mask the global row and both colors remain available in the administration projection. Deployment order is: deploy the Phase 2A color migration, run its read-only verification, deploy the application, then perform Settings smoke tests. Repeat this order in `Shale_Copy` before production. Phase 2B Contact View work is intentionally excluded.
+
+## Phase 2B Contact profile and aggregate editor
+
+Phase 2B replaces per-field pencil actions with a Shale profile header, grouped Contact Information,
+colored classification chips, and one **Edit Contact** entry point. Related Cases and Links Shared With
+This Contact retain their existing authoritative navigation, role labels, metadata, and loading paths;
+Contact classifications never substitute for case-specific `CaseParties`/`PartyRoles` authority. The
+responsive scroll surface wraps values and chips and places classifications independently of shared links.
+Inactive or removed definitions remain visible on their exact stored assignment as **Historical**, using
+the joined authoritative definition color; only effective active definitions are offered as new choices.
+Credential abbreviations expose the full definition name and remain separate from names.
+
+The editor treats `Contacts.Name`/Display Name as the compatibility value used by directory search,
+headers, and integrations. A structured preview may combine Prefix, FirstName, MiddleName, LastName,
+PreferredName, and a true generational Suffix, but never overwrites a customized Display Name. Credentials
+are neither appended to Display Name nor stored in Suffix. Prefix and Suffix preserve unrecognized existing
+values and all fields are validated to deployed schema lengths.
+
+One aggregate command is the mutation boundary. Its DAO transaction starts before authorization and
+validation, verifies the tenant session, active actor and Contact, exact Contact and assignment RowVers,
+and the complete intended effective-definition ID set before mutation. It restores the same removed
+assignment row, soft-removes deselections, writes credential order as contiguous zero-based positions,
+and recomputes `Contacts.IsExpert` solely from active authoritative Contact Type assignments whose
+`SystemKey='expert'`. Structured-name and assignment changes, PHI-safe audits, and the final profile read
+commit or roll back together; stale input is never retried or merged and the editor remains open until an
+explicit reload.
+
+The entity-action audit vocabulary adds only `CONTACT/UPDATED`. Its metadata is limited to authoritative
+Contact ID and bounded counts—never names, credentials, descriptions, DOB, condition, contact details,
+or RowVer. **Deploy `2026-08-26_contacts_phase2b_audit_allowlist.sql` and run its read-only verification
+before deploying the Phase 2B application build.** Both scripts retain the validated positive-allowlist
+discovery, reject ambiguous or incompatible constraints before DDL, preserve unrelated checks and all
+historical tokens, require NULL tenant context plus an approved administrative principal, and leave the
+operator acknowledgement at `0` until independently confirmed.
+
+Phase 2C remains explicitly deferred: structured or multiple phone/email/address storage, normalization,
+click-to-call, `mailto`, Maps links, directory classification filtering, global `IsExpert` retirement, and
+case-role editing are not part of Phase 2B.

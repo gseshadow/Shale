@@ -191,7 +191,6 @@ public final class ContactViewController {
             editButton.setOnAction(e -> onEdit());
             setVisibleManaged(editButton, false);
         }
-        initializeInlineEditButtons();
         if (saveButton != null) {
             ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
             saveButton.setOnAction(e -> onSave());
@@ -207,8 +206,9 @@ public final class ContactViewController {
         }
 
         initialized = true;
-        for (javafx.scene.control.Control editor : List.of(nameEditor, firstNameEditor, lastNameEditor,
-                emailEditor, phoneEditor, addressHomeEditor, dateOfBirthEditor, conditionEditor, deceasedEditor)) {
+        for (javafx.scene.control.Control editor : java.util.stream.Stream.of(nameEditor, firstNameEditor, lastNameEditor,
+                emailEditor, phoneEditor, addressHomeEditor, dateOfBirthEditor, conditionEditor, deceasedEditor)
+                .filter(Objects::nonNull).toList()) {
             ControlStyles.formControl(editor);
         }
         setEditMode(false);
@@ -939,7 +939,7 @@ public final class ContactViewController {
     private void setEditMode(boolean enabled) {
         this.editMode = enabled && canEditContact();
 
-        setVisibleManaged(editButton, false);
+        setVisibleManaged(editButton, canEditContact() && !editMode && currentContact != null);
         setVisibleManaged(saveButton, canEditContact() && editMode);
         setVisibleManaged(cancelButton, canEditContact() && editMode);
         refreshDeleteAction();
@@ -973,9 +973,9 @@ public final class ContactViewController {
     }
 
     private void setInlineEditButtonsDisabled(boolean disabled) {
-        for (Button button : List.of(editDisplayNameButton, editNameButton, editFirstNameButton, editLastNameButton,
+        for (Button button : java.util.stream.Stream.of(editDisplayNameButton, editNameButton, editFirstNameButton, editLastNameButton,
                 editEmailButton, editPhoneButton, editAddressHomeButton, editDateOfBirthButton, editConditionButton,
-                editDeceasedButton)) {
+                editDeceasedButton).filter(Objects::nonNull).toList()) {
             if (button != null) {
                 button.setDisable(disabled);
             }
