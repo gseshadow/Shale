@@ -59,9 +59,9 @@ class ContactServiceAdapterTest {
 	@Test
 	void classificationReadsCarryStructuredNamesHistoricalStateAndAuthoritativeIds() {
 		FakeContactGateway gateway = new FakeContactGateway(List.of());
-		ContactDao.DefinitionRow historical = new ContactDao.DefinitionRow(91, "expert", "Expert", null, 2, false, true);
+		ContactDao.DefinitionRow historical = new ContactDao.DefinitionRow(91, "expert", "Expert", null, "#112233", 2, false, true);
 		ContactDao.CredentialDefinitionRow credential = new ContactDao.CredentialDefinitionRow(
-				73, "doctor_of_medicine", "Doctor of Medicine", "MD", null, 1, true, false);
+				73, "doctor_of_medicine", "Doctor of Medicine", "MD", null, "#445566", 1, true, false);
 		gateway.profile = new ContactDao.ClassificationProfileRow(5, 42, "Dr.", "Ada", "Byron", "Lovelace",
 				"Ada", "III", "Ada Lovelace", List.of(new ContactDao.AssignedDefinitionRow(1001, historical, true)),
 				List.of(), List.of(new ContactDao.AssignedCredentialRow(1002, credential, 4, false)));
@@ -72,8 +72,10 @@ class ContactServiceAdapterTest {
 		assertEquals("III", profile.structuredName().suffix());
 		assertEquals(91, profile.contactTypes().get(0).definition().id());
 		assertTrue(profile.contactTypes().get(0).historical());
+		assertEquals("#112233", profile.contactTypes().get(0).definition().color());
 		assertEquals("Doctor of Medicine", profile.credentials().get(0).definition().name());
 		assertEquals("MD", profile.credentials().get(0).definition().abbreviation());
+		assertEquals("#445566", profile.credentials().get(0).definition().color());
 		assertEquals(4, profile.credentials().get(0).displayOrder());
 	}
 
@@ -93,16 +95,18 @@ class ContactServiceAdapterTest {
 	void administrationProjectionDistinguishesOverrideMaskFallbackAndCustomRows() {
 		FakeContactGateway gateway = new FakeContactGateway(List.of());
 		gateway.adminRows = List.of(
-				new ContactDao.AdministrationDefinitionRow(com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 1, null, "expert", "Expert", null, null, 0, true, false, new byte[]{1}),
-				new ContactDao.AdministrationDefinitionRow(com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 2, 42, "expert", "Local Expert", null, null, 0, false, false, new byte[]{2}),
-				new ContactDao.AdministrationDefinitionRow(com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 3, null, "provider", "Provider", null, null, 1, true, false, new byte[]{3}),
-				new ContactDao.AdministrationDefinitionRow(com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 4, 42, "provider", "Local Provider", null, null, 1, false, true, new byte[]{4}),
-				new ContactDao.AdministrationDefinitionRow(com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 5, 42, "vendor", "Vendor", null, null, 2, true, false, new byte[]{5}));
+				new ContactDao.AdministrationDefinitionRow(com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 1, null, "expert", "Expert", null, null, "#111111", 0, true, false, new byte[]{1}),
+				new ContactDao.AdministrationDefinitionRow(com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 2, 42, "expert", "Local Expert", null, null, "#222222", 0, false, false, new byte[]{2}),
+				new ContactDao.AdministrationDefinitionRow(com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 3, null, "provider", "Provider", null, null, "#333333", 1, true, false, new byte[]{3}),
+				new ContactDao.AdministrationDefinitionRow(com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 4, 42, "provider", "Local Provider", null, null, "#444444", 1, false, true, new byte[]{4}),
+				new ContactDao.AdministrationDefinitionRow(com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 5, 42, "vendor", "Vendor", null, null, "#555555", 2, true, false, new byte[]{5}));
 		var result = new ContactServiceAdapter(gateway).listDefinitionsForAdministration(
 				com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE, 42, 7);
 		assertEquals(com.shale.core.service.ContactServicePort.DefinitionOverlayState.MASKED_GLOBAL, result.get(0).overlayState());
 		assertEquals(com.shale.core.service.ContactServicePort.DefinitionOrigin.OVERRIDE, result.get(1).origin());
 		assertEquals(Integer.valueOf(1), result.get(1).relatedGlobalDefinitionId());
+		assertEquals("#111111", result.get(0).color());
+		assertEquals("#222222", result.get(1).color());
 		assertEquals(com.shale.core.service.ContactServicePort.DefinitionOverlayState.GLOBAL_FALLBACK, result.get(2).overlayState());
 		assertEquals(com.shale.core.service.ContactServicePort.DefinitionOrigin.CUSTOM, result.get(4).origin());
 		byte[] bytes=result.get(4).rowVer(); bytes[0]=9; assertEquals(5,result.get(4).rowVer()[0]);

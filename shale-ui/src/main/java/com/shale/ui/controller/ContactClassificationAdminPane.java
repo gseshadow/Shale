@@ -16,6 +16,8 @@ import com.shale.core.service.ContactServicePort;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ControlStyles;
+import com.shale.ui.util.ColorUtil;
+import javafx.scene.paint.Color;
 
 import javafx.application.Platform;
 import javafx.geometry.Orientation;
@@ -135,7 +137,13 @@ public final class ContactClassificationAdminPane {
     private Node card(AdministrationDefinition row) {
         Label title = new Label(row.name());
         title.setWrapText(true); title.getStyleClass().add("contact-classification-card-title");
-        HBox heading = new HBox(8, title);
+        Region swatch = new Region();
+        swatch.setId("definition-color-swatch-" + row.id());
+        swatch.setAccessibleText("Definition color " + row.color());
+        swatch.getStyleClass().add("contact-classification-color-swatch");
+        String swatchColor = ColorUtil.toCssBackgroundColorOrNull(row.color());
+        if (swatchColor != null) swatch.setStyle("-fx-background-color: " + swatchColor + ";");
+        HBox heading = new HBox(8, swatch, title);
         if (row.abbreviation() != null && !row.abbreviation().isBlank()) {
             Label abbreviation = new Label(row.abbreviation());
             abbreviation.getStyleClass().add("contact-classification-abbreviation");
@@ -218,6 +226,8 @@ public final class ContactClassificationAdminPane {
         TextArea description = new TextArea(existing == null || existing.description() == null ? "" : existing.description());
         configureDescription(description);
         TextField order = field(existing == null ? "0" : Integer.toString(existing.sortOrder()), "definition-sort-order");
+        ColorPicker color = new ColorPicker(existing == null ? Color.rgb(108,117,125) : Color.web(existing.color()));
+        color.setId("definition-color"); color.setAccessibleText("Required definition color"); ControlStyles.formControl(color);
         TextField key = field(existing == null ? "" : existing.systemKey(), "definition-internal-key");
         configureInternalKey(key, existing == null);
         Label keyHelp = new Label(existing == null ? "Used as the stable system identifier."
@@ -241,7 +251,8 @@ public final class ContactClassificationAdminPane {
         form.getColumnConstraints().setAll(labels, controls);
         int line=0; form.addRow(line++, new Label(editorCategory==DefinitionCategory.CREDENTIAL?"Full Name *":"Name *"), name);
         if (editorCategory==DefinitionCategory.CREDENTIAL) form.addRow(line++, new Label("Abbreviation *"), abbreviation);
-        form.addRow(line++, new Label("Description"), description); form.addRow(line++, new Label("Sort Order"), order);
+        form.addRow(line++, new Label("Description"), description);
+        form.addRow(line++, new Label("Color *"), color); form.addRow(line++, new Label("Sort Order"), order);
         form.addRow(line++, new Label("Internal Key *"), new VBox(4, key, keyHelp));
         VBox body = new VBox(12, context, form, error, reload);
         body.getStyleClass().add("contact-classification-dialog-body");
@@ -250,15 +261,15 @@ public final class ContactClassificationAdminPane {
         Button cancel = (Button) pane.lookupButton(ButtonType.CANCEL); ControlStyles.apply(cancel, ControlStyles.Purpose.SECONDARY);
         save.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
             event.consume();
-            String validation = validate(name.getText(), abbreviation.getText(), order.getText(), key.getText(), editorCategory);
+            String validation = validate(name.getText(), abbreviation.getText(), ColorUtil.toStoredColor(color.getValue()), order.getText(), key.getText(), editorCategory);
             if (validation != null) { error.setText(validation); return; }
             int sort = Integer.parseInt(order.getText());
             Supplier<DefinitionMutationResult> mutation;
             if (existing == null || override) mutation = () -> service.createDefinition(new CreateDefinitionCommand(editorCategory, tenant(), actor(),
                     override ? existing.systemKey() : key.getText(), override ? existing.id() : null, name.getText(), abbreviation.getText(),
-                    description.getText(), sort, true));
+                    description.getText(), toDatabaseColor(color.getValue()), sort, true));
             else mutation = () -> service.updateDefinition(new UpdateDefinitionCommand(existing.category(), existing.id(), tenant(), actor(),
-                    name.getText(), abbreviation.getText(), description.getText(), sort, existing.rowVer()));
+                    name.getText(), abbreviation.getText(), description.getText(), toDatabaseColor(color.getValue()), sort, existing.rowVer()));
             save.setDisable(true); error.setText("Saving changes…");
             mutate(mutation, failure -> {
                 boolean staleData = stale(failure);
@@ -311,7 +322,8 @@ public final class ContactClassificationAdminPane {
     private static String categoryName(DefinitionCategory c) { return switch(c){case CONTACT_TYPE->"Contact Type";case SPECIALTY->"Specialty";case CREDENTIAL->"Credential";}; }
     public static String systemKeyFromName(String value) { if(value==null)return ""; String s=Normalizer.normalize(value,Normalizer.Form.NFD).replaceAll("\\p{M}","").toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+","_").replaceAll("^_+|_+$",""); return s; }
     public static boolean validSystemKey(String value) { return value!=null && value.length()<=64 && value.matches("[a-z][a-z0-9]*(?:_[a-z0-9]+)*"); }
-    private static String validate(String name,String abbreviation,String order,String key,DefinitionCategory category) { if(name==null||name.isBlank())return "Name is required."; if(name.trim().length()>100)return "Name must be at most 100 characters."; if(category==DefinitionCategory.CREDENTIAL&&(abbreviation==null||abbreviation.isBlank()))return "Abbreviation is required."; try{if(Integer.parseInt(order)<0)return "Sort Order must be a nonnegative integer.";}catch(Exception e){return "Sort Order must be a nonnegative integer.";} if(!validSystemKey(key))return "Internal key must be lowercase snake_case and at most 64 characters."; return null; }
+    private static String validate(String name,String abbreviation,String color,String order,String key,DefinitionCategory category) { if(color==null||!color.matches("[0-9A-F]{8}"))return "Color is required and must be a valid color."; if(name==null||name.isBlank())return "Name is required."; if(name.trim().length()>100)return "Name must be at most 100 characters."; if(category==DefinitionCategory.CREDENTIAL&&(abbreviation==null||abbreviation.isBlank()))return "Abbreviation is required."; try{if(Integer.parseInt(order)<0)return "Sort Order must be a nonnegative integer.";}catch(Exception e){return "Sort Order must be a nonnegative integer.";} if(!validSystemKey(key))return "Internal key must be lowercase snake_case and at most 64 characters."; return null; }
+    static String toDatabaseColor(Color color) { String stored=ColorUtil.toStoredColor(color); return stored==null?null:"#"+stored.substring(0,6); }
     private static boolean stale(Throwable ex) { for(Throwable x=ex;x!=null;x=x.getCause())if(x.getMessage()!=null&&(x.getMessage().contains("changed")||x.getMessage().contains("reload")))return true; return false; }
     private static String friendly(Throwable ex) { String m=ex.getMessage(); if(m!=null&&(m.contains("SystemKey")||m.contains("already uses")||m.contains("shadow")))return m; return "The definition could not be saved. Your values have been kept."; }
     private void setStatus(String message, String stateName) {

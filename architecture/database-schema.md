@@ -1037,3 +1037,9 @@ own tenant/global scope, active and soft-deleted lifecycle, actor/timestamp prov
 `RowVer`, foreign keys, filtered singleton indexes, and tenant-or-global RLS. Type
 presentation and occurrence identity remain in `CaseDateTypes` and `CaseDates`;
 neither existing id is rewritten by the semantic-role foundation.
+
+### Administrator-customizable definition colors
+
+Every administrator-customizable Shale definition/type must own a required configurable `Color`; assignments reference the authoritative definition ID and never copy presentation fields. The database representation is `nvarchar(20) NOT NULL`, normalized uppercase `#RRGGBB`, constrained to six hexadecimal digits, with the established neutral default `#6C757D`. Tenant overrides may change color without changing the global definition. Reset fallback uses the global definition's color, and historical assignment queries continue to return presentation data from the stored authoritative definition.
+
+For Contact Types, Specialties, and Credential Definitions, deploy `2026-08-25_contacts_phase2a_definition_colors.sql`, then run `2026-08-25_contacts_phase2a_definition_colors_verify.sql`, then deploy the matching application. Validate this sequence on `Shale_Copy` before production; the migration is guarded, all-tenant, forward-only, and rerunnable.

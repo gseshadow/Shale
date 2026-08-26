@@ -8,7 +8,7 @@ class ContactAdministrationDefinitionTest {
     @Test void defensivelyCopiesAdministrationRowVersion() {
         byte[] rowVer={1,2};
         AdministrationDefinition d=new AdministrationDefinition(DefinitionCategory.CREDENTIAL, 8, 7,
-                "doctor_of_medicine", "Doctor of Medicine", "MD", null, 0, true, false,
+                "doctor_of_medicine", "Doctor of Medicine", "MD", null, "#6C757D", 0, true, false,
                 DefinitionOrigin.CUSTOM, null, DefinitionOverlayState.EFFECTIVE, rowVer);
         rowVer[0]=9;
         assertArrayEquals(new byte[]{1,2},d.rowVer());

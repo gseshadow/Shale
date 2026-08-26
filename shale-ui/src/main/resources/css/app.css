@@ -2759,3 +2759,19 @@
 }
 .contact-classification-field-help { -fx-font-size: 10px; -fx-text-fill: rgba(17,37,66,0.62); }
 .contact-classification-editor-error { -fx-text-fill: #8b2525; -fx-font-weight: 700; }
+
+.contact-classification-color-swatch {
+    -fx-min-width: 16px;
+    -fx-pref-width: 16px;
+    -fx-max-width: 16px;
+    -fx-min-height: 16px;
+    -fx-pref-height: 16px;
+    -fx-max-height: 16px;
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+    -fx-border-width: 2px;
+    -fx-border-color: rgba(16, 34, 62, 0.58);
+}
+.contact-classification-card-subdued .contact-classification-color-swatch {
+    -fx-opacity: 0.72;
+}
