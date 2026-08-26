@@ -14,6 +14,7 @@ final class ContactPhase1CAuditMigrationContractTest {
     @Test void latestConstraintIsExactChronologicalEffectiveVocabulary() throws Exception {
         String sql=AuditEntityTypeMigrationChain.read(AuditEntityTypeMigrationChain.PHASE_1C);
         Set<String> expected=Arrays.stream(EntityActionAuditEvent.EntityType.values()).map(Enum::name).collect(Collectors.toSet());
+        expected.remove("CONTACT"); // introduced by the forward-only Phase 2B successor
         expected.add("CALENDAR_CASE_DATE_TYPE_MAPPING");
         assertEquals(expected,AuditEntityTypeMigrationChain.declaredAllowlist(sql));
         assertEquals(AuditEntityTypeMigrationChain.PHASE_1C_ADDITIONS.stream().filter(sql::contains).count(),6);

@@ -54,6 +54,8 @@ public interface ContactServicePort {
 
 	List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand command);
 
+	ContactProfileMutationResult updateContactProfile(UpdateContactProfileCommand command);
+
 	record ContactSummary(int id, String displayName, String email, String phone) {
 	}
 
@@ -100,16 +102,20 @@ public interface ContactServicePort {
 			String preferredName, String suffix) {
 	}
 
-	record AssignedDefinition(long assignmentId, Definition definition, boolean historical) {
+	record AssignedDefinition(long assignmentId, Definition definition, boolean historical, byte[] rowVer) {
+		public AssignedDefinition { rowVer = copyRowVer(rowVer); }
+		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
 	}
 
 	record AssignedCredential(long assignmentId, CredentialDefinition definition, int displayOrder,
-			boolean historical) {
+			boolean historical, byte[] rowVer) {
+		public AssignedCredential { rowVer = copyRowVer(rowVer); }
+		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
 	}
 
 	/** Read-only classification aggregate. It deliberately carries the existing display name unchanged. */
 	record ClassificationProfile(int contactId, int shaleClientId, StructuredName structuredName,
-			String legacyDisplayName, List<AssignedDefinition> contactTypes,
+			String legacyDisplayName, java.time.Instant contactUpdatedAt, List<AssignedDefinition> contactTypes,
 			List<AssignedDefinition> specialties, List<AssignedCredential> credentials) {
 		public ClassificationProfile {
 			contactTypes = List.copyOf(contactTypes);
@@ -196,6 +202,26 @@ public interface ContactServicePort {
 			List<CredentialOrderItem> orderedAssignments) {
 		public ReorderCredentialsCommand { orderedAssignments = orderedAssignments == null ? List.of() : List.copyOf(orderedAssignments); }
 	}
+
+	record IntendedAssignment(long assignmentId, int definitionId, boolean selected, byte[] expectedRowVer) {
+		public IntendedAssignment { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+		public boolean existing() { return assignmentId > 0; }
+	}
+
+	record UpdateContactProfileCommand(int contactId, int shaleClientId, int actorUserId,
+			String displayName, StructuredName structuredName, java.time.Instant expectedContactUpdatedAt,
+			List<IntendedAssignment> contactTypes, List<IntendedAssignment> specialties,
+			List<IntendedAssignment> credentials) {
+		public UpdateContactProfileCommand {
+			structuredName = java.util.Objects.requireNonNull(structuredName, "structuredName");
+			contactTypes = contactTypes == null ? List.of() : List.copyOf(contactTypes);
+			specialties = specialties == null ? List.of() : List.copyOf(specialties);
+			credentials = credentials == null ? List.of() : List.copyOf(credentials);
+		}
+	}
+
+	record ContactProfileMutationResult(ClassificationProfile profile, java.time.Instant contactUpdatedAt) { }
 
 	private static byte[] copyRowVer(byte[] value) { return value == null ? null : value.clone(); }
 

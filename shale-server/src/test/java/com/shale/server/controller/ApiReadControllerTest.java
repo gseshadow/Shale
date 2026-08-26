@@ -1377,6 +1377,7 @@ class ApiReadControllerTest {
 		@Override public AssignmentMutationResult removeClassification(AssignmentLifecycleCommand command) { throw unused(); }
 		@Override public AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand command) { throw unused(); }
 		@Override public List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand command) { return List.of(); }
+		@Override public ContactProfileMutationResult updateContactProfile(UpdateContactProfileCommand command) { throw unused(); }
 
 		private static UnsupportedOperationException unused() {
 			return new UnsupportedOperationException("Contact classification mutations are outside this API read test double.");
