@@ -3,6 +3,7 @@ package com.shale.ui.controller;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.ContactServicePort.ContactCardSummary;
 import com.shale.ui.component.ScrollableListRegion;
+import com.shale.ui.component.ShaleFilterMenu;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
 import com.shale.ui.state.AppState;
@@ -19,8 +20,6 @@ import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
-import javafx.scene.control.MenuButton;
-import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.Button;
 import javafx.scene.layout.FlowPane;
 import javafx.util.Duration;
@@ -55,7 +54,7 @@ public final class ContactsController {
     private Label contactsEmptyStateLabel;
     @FXML
     private Label contactsLoadingStateLabel;
-    @FXML private MenuButton contactTypeFilter, specialtyFilter, credentialFilter;
+    @FXML private ShaleFilterMenu contactTypeFilter, specialtyFilter, credentialFilter;
     @FXML private FlowPane selectedFilterChips;
     @FXML private Label activeFilterCount;
     @FXML private Button clearFiltersButton;
@@ -105,12 +104,13 @@ public final class ContactsController {
     }
 
     private void rebuildFilterMenus(){
+        contactTypeFilter.setCaption("Contact Type"); specialtyFilter.setCaption("Specialty"); credentialFilter.setCaption("Credential");
         buildDefinitionMenu(contactTypeFilter,typeOptions,selectedContactTypes);
         buildDefinitionMenu(specialtyFilter,specialtyOptions,selectedSpecialties);
-        if(credentialFilter!=null){credentialFilter.getItems().clear();for(var d:credentialOptions){var i=new CheckMenuItem(d.abbreviation()+" — "+d.name());i.getStyleClass().add("contact-filter-option");i.setSelected(selectedCredentials.contains(d.id()));i.setOnAction(e->{toggle(selectedCredentials,d.id(),i.isSelected());});credentialFilter.getItems().add(i);}}
+        credentialFilter.setOptions(credentialOptions.stream().map(d->new ShaleFilterMenu.Option(d.id(),d.abbreviation()+" — "+d.name(),d.color())).toList(), selectedCredentials, (id,on)->toggle(selectedCredentials,id,on));
         renderFilterState();
     }
-    private void buildDefinitionMenu(MenuButton menu,List<ContactServicePort.Definition> options,Set<Integer> selected){if(menu==null)return;menu.getItems().clear();for(var d:options){var i=new CheckMenuItem(d.name());i.getStyleClass().add("contact-filter-option");i.setSelected(selected.contains(d.id()));i.setOnAction(e->toggle(selected,d.id(),i.isSelected()));menu.getItems().add(i);}}
+    private void buildDefinitionMenu(ShaleFilterMenu menu,List<ContactServicePort.Definition> options,Set<Integer> selected){menu.setOptions(options.stream().map(d->new ShaleFilterMenu.Option(d.id(),d.name(),d.color())).toList(),selected,(id,on)->toggle(selected,id,on));}
     private void toggle(Set<Integer> selected,int id,boolean on){if(on)selected.add(id);else selected.remove(id);renderFilterState();loadFirstPage();}
     @FXML private void clearFilters(){selectedContactTypes.clear();selectedSpecialties.clear();selectedCredentials.clear();rebuildFilterMenus();loadFirstPage();}
     private void renderFilterState(){int count=selectedContactTypes.size()+selectedSpecialties.size()+selectedCredentials.size();if(activeFilterCount!=null)activeFilterCount.setText(count+" filter"+(count==1?"":"s"));if(clearFiltersButton!=null)clearFiltersButton.setDisable(count==0);if(selectedFilterChips!=null){selectedFilterChips.getChildren().clear();typeOptions.forEach(d->chip(d.id(),d.name(),d.color(),selectedContactTypes));specialtyOptions.forEach(d->chip(d.id(),d.name(),d.color(),selectedSpecialties));credentialOptions.forEach(d->chip(d.id(),d.abbreviation(),d.color(),selectedCredentials));}}

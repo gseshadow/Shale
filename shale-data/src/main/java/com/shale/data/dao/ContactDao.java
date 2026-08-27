@@ -393,7 +393,7 @@ public final class ContactDao {
                 return new PagedResult<>(List.of(), page, pageSize, 0);
             }
 
-            String searchClause = structuredDirectoryPredicate(filters);
+            String searchClause = structuredDirectoryPredicate(schema, filters);
             String displayName = lightweightDisplayNameExpression(schema, "c");
             String sql = """
                     SELECT
@@ -1088,9 +1088,9 @@ public final class ContactDao {
 
     /** A correlated projection keeps directory loading bounded to its existing query. */
     private static String credentialAbbreviationsExpression(String contactAlias, String tenantColumn) {
-        // FOR XML PATH is supported by every Azure SQL compatibility level used by Shale.
-        // The previous ordered STRING_AGG failed at runtime on databases below level 110.
-        return "STUFF((SELECT NCHAR(31)+d.Abbreviation "
+        return "(SELECT STRING_AGG(CONVERT(nvarchar(max), x.Abbreviation), NCHAR(31)) "
+                + "WITHIN GROUP (ORDER BY x.DisplayOrder, x.SortOrder, x.Name, x.Id) FROM ("
+                + "SELECT d.Abbreviation,a.DisplayOrder,d.SortOrder,d.Name,d.Id "
                 + "FROM dbo.ContactCredentials a JOIN dbo.CredentialDefinitions d "
                 + "ON d.Id=a.CredentialDefinitionId AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL) "
                 + "WHERE a.ContactId=" + contactAlias + ".Id AND a.ShaleClientId=" + contactAlias + "." + tenantColumn + " "
@@ -1098,8 +1098,7 @@ public final class ContactDao {
                 // matches loadAssignedCredentials, including tenant-owned and global definitions.
                 + "AND a.IsDeleted=0 "
                 + "AND NULLIF(LTRIM(RTRIM(d.Abbreviation)),N'') IS NOT NULL "
-                + "ORDER BY a.DisplayOrder,d.SortOrder,d.Name,d.Id "
-                + "FOR XML PATH(''),TYPE).value('.','nvarchar(max)'),1,1,N'')";
+                + ") x)";
     }
 
     private static List<String> splitCredentialAbbreviations(String value) {
@@ -1333,7 +1332,7 @@ public final class ContactDao {
                 displayNameExpression(schema, "c"),
                 schema.tenantColumn(),
                 activeFilter(schema.deletedColumn(), "c"),
-                structuredDirectoryPredicate(filters));
+                structuredDirectoryPredicate(schema, filters));
 
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             bindStructuredDirectoryQuery(ps, 1, shaleClientId, actorUserId, searchQuery, filters);
@@ -1347,10 +1346,13 @@ public final class ContactDao {
     }
 
     /** One predicate/query for names, active assignments and active structured contact points. */
-    private static String structuredDirectoryPredicate(DirectoryFilters filters) {
+    private static String structuredDirectoryPredicate(ContactSchema schema, DirectoryFilters filters) {
+        // DisplayName is not present in every supported Contacts schema (older production
+        // tenants use Name/FullName).  Keep this expression schema-aware just like the
+        // projection; a literal c.DisplayName here caused the count to fail before paging.
         StringBuilder sql = new StringBuilder("""
               AND (? = '' OR
-                LOWER(COALESCE(c.DisplayName,N'')) LIKE ? ESCAPE N'\\' OR LOWER(COALESCE(c.Prefix,N'')) LIKE ? ESCAPE N'\\' OR
+                LOWER(COALESCE(%s,N'')) LIKE ? ESCAPE N'\\' OR LOWER(COALESCE(c.Prefix,N'')) LIKE ? ESCAPE N'\\' OR
                 LOWER(COALESCE(c.FirstName,N'')) LIKE ? ESCAPE N'\\' OR LOWER(COALESCE(c.MiddleName,N'')) LIKE ? ESCAPE N'\\' OR
                 LOWER(COALESCE(c.LastName,N'')) LIKE ? ESCAPE N'\\' OR LOWER(COALESCE(c.PreferredName,N'')) LIKE ? ESCAPE N'\\' OR
                 LOWER(COALESCE(c.Suffix,N'')) LIKE ? ESCAPE N'\\' OR
@@ -1367,7 +1369,7 @@ public final class ContactDao {
                     AND (LOWER(e.EmailAddress) LIKE ? ESCAPE N'\\' OR LOWER(e.NormalizedEmail) LIKE ? ESCAPE N'\\')) OR
                 EXISTS(SELECT 1 FROM dbo.ContactAddresses a WHERE a.ContactId=c.Id AND a.ShaleClientId=c.ShaleClientId AND a.IsDeleted=0 AND
                     LOWER(CONCAT(a.AddressLine1,N' ',a.AddressLine2,N' ',a.City,N' ',a.StateOrProvince,N' ',a.PostalCode,N' ',a.CountryCode,N' ',a.LegacyAddressText)) LIKE ? ESCAPE N'\\'))
-            """);
+            """.formatted(lightweightDisplayNameExpression(schema, "c")));
         appendIdFilter(sql, filters.contactTypeIds(), "ContactContactTypes", "ContactTypeId");
         appendIdFilter(sql, filters.specialtyIds(), "ContactSpecialties", "SpecialtyId");
         appendIdFilter(sql, filters.credentialIds(), "ContactCredentials", "CredentialDefinitionId");
