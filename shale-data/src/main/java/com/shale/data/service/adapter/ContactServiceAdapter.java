@@ -52,9 +52,8 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	}
 
 	private String presentationName(ContactDao.DirectoryContactRow row, int shaleClientId) {
-		ContactDao.ClassificationProfileRow profile = contactGateway.findClassificationProfile(row.id(), shaleClientId);
-		if (profile == null) return row.displayName();
-		return presentationName(profile);
+		return ContactNamePresentation.effectiveDisplayNameFromAbbreviations(
+				row.displayName(), row.credentialAbbreviations());
 	}
 
 	private String presentationName(ContactDao.ContactDetailRow row, int shaleClientId) {

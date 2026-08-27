@@ -2,7 +2,6 @@ package com.shale.ui.services;
 
 import com.shale.core.model.Organization;
 import com.shale.core.service.ContactNamePresentation;
-import com.shale.core.service.ContactServicePort;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.ContactDao;
@@ -72,7 +71,7 @@ public final class SearchService {
 		List<ProviderFailure> failures = new java.util.ArrayList<>();
 		List<CaseSummaryDao.SearchCaseRow> cases = provider("cases", failures, () -> sortResults(caseSummaryDao.searchActiveByName(shaleClientId, searchQuery.rawQuery()), row -> scoreCase(row, searchQuery), row -> row.summary().caseName(), row -> Long.toString(row.summary().caseId())));
 		List<CaseSummaryDao.DeletedCaseRow> deletedCases = includeDeletedCases ? provider("deletedCases", failures, () -> sortResults(caseSummaryDao.searchDeletedByName(shaleClientId, searchQuery.rawQuery()), row -> scoreDeletedCase(row, searchQuery), row -> row.summary().caseName(), row -> Long.toString(row.summary().caseId()))) : List.of();
-		List<ContactDao.DirectoryContactRow> contacts = provider("contacts", failures, () -> sortResults(contactDao.searchContacts(shaleClientId, searchQuery.rawQuery()).stream().map(row -> credentialAware(row, shaleClientId)).toList(), row -> scoreContact(row, searchQuery), ContactDao.DirectoryContactRow::displayName, row -> Integer.toString(row.id())));
+		List<ContactDao.DirectoryContactRow> contacts = provider("contacts", failures, () -> sortResults(contactDao.searchContacts(shaleClientId, searchQuery.rawQuery()).stream().map(this::credentialAware).toList(), row -> scoreContact(row, searchQuery), ContactDao.DirectoryContactRow::displayName, row -> Integer.toString(row.id())));
 		List<Organization> organizations = provider("organizations", failures, () -> sortResults(organizationDao.searchOrganizations(searchQuery.rawQuery()), row -> scoreOrganization(row, searchQuery), Organization::getName, row -> Integer.toString(Objects.requireNonNullElse(row.getId(), 0))));
 		List<UserDao.DirectoryUserRow> users = provider("users", failures, () -> sortResults(userDao.searchUsers(shaleClientId, searchQuery.rawQuery()), row -> scoreUser(row, searchQuery), UserDao.DirectoryUserRow::displayName, row -> Integer.toString(row.id())));
 		List<TaskDao.GlobalSearchTaskRow> tasks = provider("tasks", failures, () -> sortResults(taskDao.searchTasks(shaleClientId, searchQuery.rawQuery()), row -> weightedTextScore(searchQuery, row.title(), CASE_NAME_WEIGHT), TaskDao.GlobalSearchTaskRow::title, row -> Long.toString(row.taskId())));
@@ -80,16 +79,10 @@ public final class SearchService {
 		return new SearchResults(searchQuery.rawQuery(), cases, deletedCases, contacts, organizations, users, tasks, calendarEvents, failures);
 	}
 
-	private ContactDao.DirectoryContactRow credentialAware(ContactDao.DirectoryContactRow row, int shaleClientId) {
-		ContactDao.ClassificationProfileRow profile = contactDao.findClassificationProfile(row.id(), shaleClientId);
-		if (profile == null) return row;
-		var credentials = profile.credentials().stream().map(c -> new ContactServicePort.AssignedCredential(
-				c.assignmentId(), new ContactServicePort.CredentialDefinition(c.definition().id(),
-						c.definition().systemKey(), c.definition().name(), c.definition().abbreviation(),
-						c.definition().description(), c.definition().color(), c.definition().sortOrder()),
-				c.displayOrder(), c.historical(), c.rowVer())).toList();
+	private ContactDao.DirectoryContactRow credentialAware(ContactDao.DirectoryContactRow row) {
 		return new ContactDao.DirectoryContactRow(row.id(), row.firstName(), row.lastName(),
-				ContactNamePresentation.effectiveDisplayName(profile.legacyDisplayName(), credentials), row.email(), row.phone());
+				ContactNamePresentation.effectiveDisplayNameFromAbbreviations(row.displayName(), row.credentialAbbreviations()),
+				row.email(), row.phone(), row.credentialAbbreviations());
 	}
 
 	private static <T> List<T> provider(String provider, List<ProviderFailure> failures, java.util.function.Supplier<List<T>> loader) {
