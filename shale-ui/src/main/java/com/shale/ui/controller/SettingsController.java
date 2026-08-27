@@ -462,7 +462,7 @@ public final class SettingsController {
 			}
 
 			@Override
-			public DirectoryPage getContactDirectoryPage(int shaleClientId, int page, int pageSize, String query) {
+			public DirectoryPage getContactDirectoryPage(int shaleClientId, int actorUserId, int page, int pageSize, String query, ContactServicePort.DirectoryFilters filters) {
 				// TODO Auto-generated method stub
 				return null;
 			}

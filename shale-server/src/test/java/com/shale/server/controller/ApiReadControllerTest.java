@@ -1333,7 +1333,7 @@ class ApiReadControllerTest {
         }
 
         @Override
-        public DirectoryPage getContactDirectoryPage(int shaleClientId, int page, int pageSize, String query) {
+        public DirectoryPage getContactDirectoryPage(int shaleClientId, int actorUserId, int page, int pageSize, String query, ContactServicePort.DirectoryFilters filters) {
             return new DirectoryPage(List.of(), page, pageSize, 0);
         }
 

@@ -2,6 +2,7 @@ package com.shale.data.dao;
 
 import com.shale.core.semantics.RoleSemantics;
 import com.shale.core.service.ContactServicePort.DefinitionCategory;
+import com.shale.core.service.ContactServicePort.DirectoryFilters;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.util.PerformanceLogging;
 
@@ -363,7 +364,8 @@ public final class ContactDao {
         }
     }
 
-    public PagedResult<ContactCardSummaryRow> findDirectoryContactsPage(int shaleClientId, int page, int pageSize, String searchQuery) {
+    public PagedResult<ContactCardSummaryRow> findDirectoryContactsPage(int shaleClientId, int actorUserId,
+            int page, int pageSize, String searchQuery, DirectoryFilters filters) {
         long started = System.nanoTime();
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
@@ -374,6 +376,8 @@ public final class ContactDao {
         if (pageSize <= 0) {
             throw new IllegalArgumentException("pageSize must be > 0");
         }
+        if (actorUserId <= 0) throw new IllegalArgumentException("actorUserId must be > 0");
+        Objects.requireNonNull(filters, "filters");
 
         try (Connection con = db.requireConnection()) {
             verifyTenantMatchesSession(con, shaleClientId);
@@ -382,43 +386,49 @@ public final class ContactDao {
             logDetectedCoreColumns(schema);
 
             long countStarted = System.nanoTime();
-            long total = countDirectoryContacts(con, schema, shaleClientId, searchQuery);
+            long total = countDirectoryContacts(con, schema, shaleClientId, actorUserId, searchQuery, filters);
             logPerf("contacts.directory.count", "tenantId=" + shaleClientId + " page=" + page + " queryLength=" + normalizedQueryLength(searchQuery) + " total=" + total, countStarted);
             if (total == 0) {
                 logPerf("contacts.directory.lightweightPage", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedQueryLength(searchQuery) + " rows=0 total=0 fullDetailHydration=false selectedFields=id,displayName,email,phone,credentialAbbreviations", started);
                 return new PagedResult<>(List.of(), page, pageSize, 0);
             }
 
-            String searchClause = lightweightSearchClause(schema, "c");
+            String searchClause = structuredDirectoryPredicate(filters);
             String displayName = lightweightDisplayNameExpression(schema, "c");
             String sql = """
                     SELECT
                       c.Id,
                       %s AS DisplayName,
-                      %s AS Email,
-                      %s AS Phone,
+                      (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e
+                       WHERE e.ContactId=c.Id AND e.ShaleClientId=c.%s AND e.IsDeleted=0
+                       ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) AS Email,
+                      (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p
+                       WHERE p.ContactId=c.Id AND p.ShaleClientId=c.%s AND p.IsDeleted=0
+                       ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone,
                       %s AS CredentialAbbreviations
                     FROM dbo.Contacts c
                     WHERE c.%s = ?
                       AND %s IS NOT NULL
+                      AND EXISTS (SELECT 1 FROM dbo.Users u WHERE u.Id=? AND u.ShaleClientId=c.%s
+                                  AND COALESCE(u.is_deleted,0)=0 AND COALESCE(u.IsRemoved,0)=0)
                     %s
                     %s
                     ORDER BY DisplayName ASC, c.Id ASC
                     OFFSET ? ROWS FETCH NEXT ? ROWS ONLY;
                     """.formatted(
                     displayName,
-                    lightweightColumnExpression(schema.emailColumn(), "c"),
-                    lightweightColumnExpression(schema.phoneColumn(), "c"),
+                    schema.tenantColumn(), schema.tenantColumn(),
                     credentialAbbreviationsExpression("c", schema.tenantColumn()),
                     schema.tenantColumn(),
                     displayName,
+                    schema.tenantColumn(),
                     activeFilter(schema.deletedColumn(), "c"),
                     searchClause);
 
             List<ContactCardSummaryRow> out = new ArrayList<>(pageSize);
             try (PreparedStatement ps = con.prepareStatement(sql)) {
                 int idx = 1;
-                idx = bindDirectoryQuery(ps, idx, shaleClientId, schema, searchQuery);
+                idx = bindStructuredDirectoryQuery(ps, idx, shaleClientId, actorUserId, searchQuery, filters);
                 ps.setInt(idx++, page * pageSize);
                 ps.setInt(idx, pageSize);
 
@@ -450,7 +460,8 @@ public final class ContactDao {
             verifyTenantMatchesSession(con, shaleClientId);
             ContactSchema schema = ContactSchema.load(con);
             logDetectedCoreColumns(schema);
-            return countDirectoryContacts(con, schema, shaleClientId, searchQuery);
+            return countDirectoryContacts(con, schema, shaleClientId, requireCurrentPrincipalUserId(con),
+                    searchQuery, DirectoryFilters.EMPTY);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to count contacts for tenant (clientId=" + shaleClientId + ")", e);
         }
@@ -1105,6 +1116,14 @@ public final class ContactDao {
         }
     }
 
+    private static int requireCurrentPrincipalUserId(Connection con) throws SQLException {
+        try (PreparedStatement ps=con.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'PrincipalUserId') AS INT)");
+             ResultSet rs=ps.executeQuery()) {
+            if (!rs.next() || rs.getInt(1)<=0) throw new IllegalStateException("PrincipalUserId session context is missing.");
+            return rs.getInt(1);
+        }
+    }
+
     private static String displayNameExpression(ContactSchema schema, String alias) {
         String first = coreTextExpression(schema.firstNameColumn(), alias);
         String last = coreTextExpression(schema.lastNameColumn(), alias);
@@ -1163,9 +1182,8 @@ public final class ContactDao {
         String first = lightweightColumnExpression(schema.firstNameColumn(), alias);
         String last = lightweightColumnExpression(schema.lastNameColumn(), alias);
         String name = lightweightColumnExpression(schema.nameColumn(), alias);
-        return "NULLIF(LTRIM(RTRIM(CASE WHEN (" + first + " IS NOT NULL) OR (" + last + " IS NOT NULL) THEN "
-                + "COALESCE(" + first + ", '') + CASE WHEN COALESCE(" + first + ", '') = '' OR COALESCE(" + last + ", '') = '' THEN '' ELSE ' ' END + COALESCE(" + last + ", '') "
-                + "ELSE COALESCE(" + name + ", '') END)), '')";
+        return "COALESCE(NULLIF(LTRIM(RTRIM(" + name + ")),''),NULLIF(LTRIM(RTRIM("
+                + "COALESCE(" + first + ", '') + CASE WHEN COALESCE(" + first + ", '') = '' OR COALESCE(" + last + ", '') = '' THEN '' ELSE ' ' END + COALESCE(" + last + ", '')" + ")),''))";
     }
 
     private static String phoneDigitsExpression(String column, String alias) {
@@ -1295,25 +1313,26 @@ public final class ContactDao {
         return idx;
     }
 
-    private static long countDirectoryContacts(Connection con,
-                                               ContactSchema schema,
-                                               int shaleClientId,
-                                               String searchQuery) throws SQLException {
+    private static long countDirectoryContacts(Connection con, ContactSchema schema, int shaleClientId,
+                                               int actorUserId, String searchQuery, DirectoryFilters filters) throws SQLException {
         String sql = """
                 SELECT COUNT_BIG(*)
                 FROM dbo.Contacts c
                 WHERE c.%s = ?
                   AND NULLIF(LTRIM(RTRIM(%s)), '') IS NOT NULL
+                  AND EXISTS (SELECT 1 FROM dbo.Users u WHERE u.Id=? AND u.ShaleClientId=c.%s
+                              AND COALESCE(u.is_deleted,0)=0 AND COALESCE(u.IsRemoved,0)=0)
                 %s
                 %s;
                 """.formatted(
                 schema.tenantColumn(),
                 displayNameExpression(schema, "c"),
+                schema.tenantColumn(),
                 activeFilter(schema.deletedColumn(), "c"),
-                searchClause(schema, "c"));
+                structuredDirectoryPredicate(filters));
 
         try (PreparedStatement ps = con.prepareStatement(sql)) {
-            bindDirectoryQuery(ps, 1, shaleClientId, schema, searchQuery);
+            bindStructuredDirectoryQuery(ps, 1, shaleClientId, actorUserId, searchQuery, filters);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
                     return 0;
@@ -1322,6 +1341,58 @@ public final class ContactDao {
             }
         }
     }
+
+    /** One predicate/query for names, active assignments and active structured contact points. */
+    private static String structuredDirectoryPredicate(DirectoryFilters filters) {
+        StringBuilder sql = new StringBuilder("""
+              AND (? = '' OR
+                LOWER(COALESCE(c.DisplayName,N'')) LIKE ? ESCAPE N'\\' OR LOWER(COALESCE(c.Prefix,N'')) LIKE ? ESCAPE N'\\' OR
+                LOWER(COALESCE(c.FirstName,N'')) LIKE ? ESCAPE N'\\' OR LOWER(COALESCE(c.MiddleName,N'')) LIKE ? ESCAPE N'\\' OR
+                LOWER(COALESCE(c.LastName,N'')) LIKE ? ESCAPE N'\\' OR LOWER(COALESCE(c.PreferredName,N'')) LIKE ? ESCAPE N'\\' OR
+                LOWER(COALESCE(c.Suffix,N'')) LIKE ? ESCAPE N'\\' OR
+                EXISTS(SELECT 1 FROM dbo.ContactContactTypes a JOIN dbo.ContactTypes d ON d.Id=a.ContactTypeId
+                  WHERE a.ContactId=c.Id AND a.ShaleClientId=c.ShaleClientId AND a.IsDeleted=0 AND d.IsActive=1 AND d.IsDeleted=0 AND LOWER(d.Name) LIKE ? ESCAPE N'\\') OR
+                EXISTS(SELECT 1 FROM dbo.ContactSpecialties a JOIN dbo.Specialties d ON d.Id=a.SpecialtyId
+                  WHERE a.ContactId=c.Id AND a.ShaleClientId=c.ShaleClientId AND a.IsDeleted=0 AND d.IsActive=1 AND d.IsDeleted=0 AND LOWER(d.Name) LIKE ? ESCAPE N'\\') OR
+                EXISTS(SELECT 1 FROM dbo.ContactCredentials a JOIN dbo.CredentialDefinitions d ON d.Id=a.CredentialDefinitionId
+                  WHERE a.ContactId=c.Id AND a.ShaleClientId=c.ShaleClientId AND a.IsDeleted=0 AND d.IsActive=1 AND d.IsDeleted=0
+                    AND (LOWER(d.Name) LIKE ? ESCAPE N'\\' OR LOWER(d.Abbreviation) LIKE ? ESCAPE N'\\')) OR
+                EXISTS(SELECT 1 FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=c.Id AND p.ShaleClientId=c.ShaleClientId AND p.IsDeleted=0
+                    AND (LOWER(p.DisplayNumber) LIKE ? ESCAPE N'\\' OR (?<>'' AND p.NormalizedNumber LIKE ? ESCAPE N'\\'))) OR
+                EXISTS(SELECT 1 FROM dbo.ContactEmailAddresses e WHERE e.ContactId=c.Id AND e.ShaleClientId=c.ShaleClientId AND e.IsDeleted=0
+                    AND (LOWER(e.EmailAddress) LIKE ? ESCAPE N'\\' OR LOWER(e.NormalizedEmail) LIKE ? ESCAPE N'\\')) OR
+                EXISTS(SELECT 1 FROM dbo.ContactAddresses a WHERE a.ContactId=c.Id AND a.ShaleClientId=c.ShaleClientId AND a.IsDeleted=0 AND
+                    LOWER(CONCAT(a.AddressLine1,N' ',a.AddressLine2,N' ',a.City,N' ',a.StateOrProvince,N' ',a.PostalCode,N' ',a.CountryCode,N' ',a.LegacyAddressText)) LIKE ? ESCAPE N'\\'))
+            """);
+        appendIdFilter(sql, filters.contactTypeIds(), "ContactContactTypes", "ContactTypeId");
+        appendIdFilter(sql, filters.specialtyIds(), "ContactSpecialties", "SpecialtyId");
+        appendIdFilter(sql, filters.credentialIds(), "ContactCredentials", "CredentialDefinitionId");
+        return sql.toString();
+    }
+
+    private static void appendIdFilter(StringBuilder sql, List<Integer> ids, String table, String column) {
+        if (ids.isEmpty()) return;
+        sql.append(" AND EXISTS(SELECT 1 FROM dbo.").append(table).append(" f WHERE f.ContactId=c.Id AND f.ShaleClientId=c.ShaleClientId AND f.IsDeleted=0 AND f.")
+                .append(column).append(" IN (").append(String.join(",", java.util.Collections.nCopies(ids.size(), "?"))).append("))");
+    }
+
+    private static int bindStructuredDirectoryQuery(PreparedStatement ps, int idx, int tenant, int actor,
+            String query, DirectoryFilters filters) throws SQLException {
+        ps.setInt(idx++, tenant); ps.setInt(idx++, actor);
+        String normalized = normalizeSearchQuery(query);
+        String like = likeParameter(escapeLike(normalized));
+        ps.setString(idx++, normalized);
+        for (int i=0;i<12;i++) ps.setString(idx++, like);
+        String digits=normalizePhoneDigits(query);
+        ps.setString(idx++, digits); ps.setString(idx++, likeParameter(escapeLike(digits)));
+        for (int i=0;i<3;i++) ps.setString(idx++, like);
+        for (Integer id : filters.contactTypeIds()) ps.setInt(idx++, id);
+        for (Integer id : filters.specialtyIds()) ps.setInt(idx++, id);
+        for (Integer id : filters.credentialIds()) ps.setInt(idx++, id);
+        return idx;
+    }
+
+    static String escapeLike(String value) { return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_").replace("[", "\\["); }
 
     private static String normalizeSearchQuery(String value) {
         if (value == null) {
@@ -1456,7 +1527,7 @@ public final class ContactDao {
         private static ContactSchema load(Connection con) throws SQLException {
             return new ContactSchema(
                     requiredColumn(con, "Contacts", List.of("ShaleClientId", "shale_client_id", "ClientId", "client_id")),
-                    existingColumn(con, "Contacts", List.of("Name", "FullName", "DisplayName", "name")),
+                    existingColumn(con, "Contacts", List.of("DisplayName", "Name", "FullName", "name")),
                     existingColumn(con, "Contacts", List.of("FirstName", "NameFirst", "name_first", "first_name")),
                     existingColumn(con, "Contacts", List.of("LastName", "NameLast", "name_last", "last_name")),
                     existingColumn(con, "Contacts", List.of("Email", "EmailPersonal", "email_personal", "email")),

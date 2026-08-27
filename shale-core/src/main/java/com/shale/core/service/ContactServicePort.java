@@ -13,7 +13,8 @@ public interface ContactServicePort {
 
 	List<ContactSummary> searchContacts(int shaleClientId, String query, int limit);
 
-	DirectoryPage getContactDirectoryPage(int shaleClientId, int page, int pageSize, String query);
+	DirectoryPage getContactDirectoryPage(int shaleClientId, int actorUserId, int page, int pageSize,
+			String query, DirectoryFilters filters);
 
 	Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId);
 
@@ -70,6 +71,18 @@ public interface ContactServicePort {
 
 	record DirectoryPage(List<ContactCardSummary> items, int page, int pageSize, long total) {
 		public DirectoryPage { items = List.copyOf(items); }
+	}
+
+	/** Authoritative definition identities selected in the directory. */
+	record DirectoryFilters(List<Integer> contactTypeIds, List<Integer> specialtyIds,
+			List<Integer> credentialIds) {
+		public static final DirectoryFilters EMPTY = new DirectoryFilters(List.of(), List.of(), List.of());
+		public DirectoryFilters {
+			contactTypeIds = List.copyOf(contactTypeIds);
+			specialtyIds = List.copyOf(specialtyIds);
+			credentialIds = List.copyOf(credentialIds);
+		}
+		public int activeCount() { return contactTypeIds.size() + specialtyIds.size() + credentialIds.size(); }
 	}
 
 	record ContactDetail(

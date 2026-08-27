@@ -2883,3 +2883,4 @@
 .contact-point-legacy { -fx-background-color: rgba(255,236,194,.95); }
 .contact-editor-section-heading { -fx-font-size: 15px; -fx-font-weight: 800; }
 .contact-editor-toolbar { -fx-padding: 2px 0 8px 0; }
+.contact-filter-chip { -fx-background-radius: 999px; -fx-border-radius: 999px; -fx-border-width: 1px; -fx-padding: 4px 9px; -fx-font-size: 11px; -fx-font-weight: 700; -fx-cursor: hand; }
