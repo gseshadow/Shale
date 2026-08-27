@@ -32,8 +32,11 @@ import java.util.concurrent.Executors;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ContactsController {
+    private static final Logger LOG = LoggerFactory.getLogger(ContactsController.class);
 
     private static final ContactCardFactory.Variant CONTACTS_CARD_VARIANT = ContactCardFactory.Variant.FULL;
     private static final double CONTACT_CARD_WIDTH = 340;
@@ -95,18 +98,19 @@ public final class ContactsController {
     private void loadFilterOptions() {
         Integer tenant=appState==null?null:appState.getShaleClientId();
         if(contactService==null||tenant==null||tenant<=0)return;
-        dbExec.submit(()->{ var types=contactService.getEffectiveContactTypes(tenant); var specs=contactService.getEffectiveSpecialties(tenant);
+        dbExec.submit(()->{ try { var types=contactService.getEffectiveContactTypes(tenant); var specs=contactService.getEffectiveSpecialties(tenant);
             var creds=contactService.getEffectiveCredentialDefinitions(tenant);
-            Platform.runLater(()->{typeOptions=types;specialtyOptions=specs;credentialOptions=creds; rebuildFilterMenus();}); });
+            Platform.runLater(()->{typeOptions=types;specialtyOptions=specs;credentialOptions=creds; rebuildFilterMenus();});
+        } catch (RuntimeException ex) { LOG.error("Unable to load Contact directory filter definitions for tenant {}", tenant, ex); } });
     }
 
     private void rebuildFilterMenus(){
         buildDefinitionMenu(contactTypeFilter,typeOptions,selectedContactTypes);
         buildDefinitionMenu(specialtyFilter,specialtyOptions,selectedSpecialties);
-        if(credentialFilter!=null){credentialFilter.getItems().clear();for(var d:credentialOptions){var i=new CheckMenuItem(d.abbreviation()+" — "+d.name());i.setSelected(selectedCredentials.contains(d.id()));i.setOnAction(e->{toggle(selectedCredentials,d.id(),i.isSelected());});credentialFilter.getItems().add(i);}}
+        if(credentialFilter!=null){credentialFilter.getItems().clear();for(var d:credentialOptions){var i=new CheckMenuItem(d.abbreviation()+" — "+d.name());i.getStyleClass().add("contact-filter-option");i.setSelected(selectedCredentials.contains(d.id()));i.setOnAction(e->{toggle(selectedCredentials,d.id(),i.isSelected());});credentialFilter.getItems().add(i);}}
         renderFilterState();
     }
-    private void buildDefinitionMenu(MenuButton menu,List<ContactServicePort.Definition> options,Set<Integer> selected){if(menu==null)return;menu.getItems().clear();for(var d:options){var i=new CheckMenuItem(d.name());i.setSelected(selected.contains(d.id()));i.setOnAction(e->toggle(selected,d.id(),i.isSelected()));menu.getItems().add(i);}}
+    private void buildDefinitionMenu(MenuButton menu,List<ContactServicePort.Definition> options,Set<Integer> selected){if(menu==null)return;menu.getItems().clear();for(var d:options){var i=new CheckMenuItem(d.name());i.getStyleClass().add("contact-filter-option");i.setSelected(selected.contains(d.id()));i.setOnAction(e->toggle(selected,d.id(),i.isSelected()));menu.getItems().add(i);}}
     private void toggle(Set<Integer> selected,int id,boolean on){if(on)selected.add(id);else selected.remove(id);renderFilterState();loadFirstPage();}
     @FXML private void clearFilters(){selectedContactTypes.clear();selectedSpecialties.clear();selectedCredentials.clear();rebuildFilterMenus();loadFirstPage();}
     private void renderFilterState(){int count=selectedContactTypes.size()+selectedSpecialties.size()+selectedCredentials.size();if(activeFilterCount!=null)activeFilterCount.setText(count+" filter"+(count==1?"":"s"));if(clearFiltersButton!=null)clearFiltersButton.setDisable(count==0);if(selectedFilterChips!=null){selectedFilterChips.getChildren().clear();typeOptions.forEach(d->chip(d.id(),d.name(),d.color(),selectedContactTypes));specialtyOptions.forEach(d->chip(d.id(),d.name(),d.color(),selectedSpecialties));credentialOptions.forEach(d->chip(d.id(),d.abbreviation(),d.color(),selectedCredentials));}}
@@ -244,6 +248,7 @@ public final class ContactsController {
                     if (pageToLoad == 0) { PerfLog.logDone("contacts.page", "phase=initialLoad generation=" + generationAtSubmit + " rows=" + loadedContacts.size(), pageLoadStartedNanos); }
                 });
             } catch (RuntimeException ex) {
+                LOG.error("Unable to load Contact directory page {} for tenant {}", pageToLoad, tenantId, ex);
                 Platform.runLater(() -> {
                     if (generationAtSubmit != loadGeneration) {
                         return;

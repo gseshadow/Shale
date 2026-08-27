@@ -24,26 +24,26 @@ class ContactCardCredentialProductionPathTest {
         assertTrue(projection.contains("a.IsDeleted=0"));
         assertTrue(projection.contains("d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL"));
         assertFalse(projection.contains("d.IsActive=1 AND d.IsDeleted=0"));
-        assertTrue(projection.contains("ORDER BY x.DisplayOrder"));
+        assertTrue(projection.contains("ORDER BY a.DisplayOrder,d.SortOrder,d.Name,d.Id"));
+        assertTrue(projection.contains("FOR XML PATH(''),TYPE"));
         assertFalse(method.contains("findClassificationProfile"));
     }
 
     @Test void controllerPassesAdapterEffectiveNameToCardModel() {
-        var summary = new ContactCardSummary(101, "Example Doctor M.D.", null, null, List.of("M.D."));
+        var summary = new ContactCardSummary(101, "Dr. Example Doctor M.D.", null, null, List.of("M.D."));
         assertEquals(1, summary.credentialAbbreviations().size(), "number received by ContactsController");
         var model = ContactsController.cardModel(summary);
-        assertEquals("Example Doctor M.D.", model.displayName());
-        assertEquals(19, model.displayName().length(), "final effective-name length passed to the card");
+        assertEquals("Dr. Example Doctor M.D.", model.displayName());
     }
 
     @Test void actualJavaFxCardNameLabelRendersEffectiveName() {
         JavaFxTestSupport.runAndWait(() -> {
             var card = new ContactCardFactory(id -> {}).create(
-                    new ContactCardFactory.ContactCardModel(101, "Example Doctor M.D.", null, null, null),
+                    new ContactCardFactory.ContactCardModel(101, "Dr. Example Doctor M.D.", null, null, null),
                     ContactCardFactory.Variant.FULL);
             Label name = (Label) card.lookup("#contact-card-name-label");
             assertNotNull(name);
-            assertEquals("Example Doctor M.D.", name.getText());
+            assertEquals("Dr. Example Doctor M.D.", name.getText());
         });
     }
 

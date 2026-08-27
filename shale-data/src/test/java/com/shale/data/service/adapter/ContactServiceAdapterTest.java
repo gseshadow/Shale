@@ -37,7 +37,7 @@ class ContactServiceAdapterTest {
 	void directoryCardProjectionCarriesAuthoritativeOrderedCredentialsInOneGatewayCall() {
 		FakeContactGateway gateway = new FakeContactGateway(List.of());
 		gateway.directoryPage = new ContactDao.PagedResult<>(List.of(
-				new ContactDao.ContactCardSummaryRow(1, "Example Doctor", "doctor@example.test", "555", List.of("M.D.", "Ph.D.")),
+				new ContactDao.ContactCardSummaryRow(1, "Dr. Example Doctor", "doctor@example.test", "555", List.of("M.D.", "Ph.D.")),
 				new ContactDao.ContactCardSummaryRow(2, "No Credentials", null, null, List.of())), 0, 100, 2);
 
 		var page = new ContactServiceAdapter(gateway).getContactDirectoryPage(42, 9, 0, 100, "doctor", ContactServicePort.DirectoryFilters.EMPTY);
@@ -45,7 +45,7 @@ class ContactServiceAdapterTest {
 		assertEquals(1, gateway.directoryPageCalls, "the complete page uses one bounded gateway query, not one query per card");
 		assertEquals(42, gateway.directoryTenant);
 		assertEquals(List.of("M.D.", "Ph.D."), page.items().get(0).credentialAbbreviations());
-		assertEquals("Example Doctor M.D., Ph.D.", page.items().get(0).displayName());
+		assertEquals("Dr. Example Doctor M.D., Ph.D.", page.items().get(0).displayName());
 		assertEquals("No Credentials", page.items().get(1).displayName());
 	}
 
