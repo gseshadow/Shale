@@ -642,7 +642,7 @@ public final class SceneManager {
 		{
 			ContactsController c = (ContactsController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
-			c.init(appState, contactDao, onOpenContact);
+			c.init(appState, new ContactServiceAdapter(contactDao), runtimeBridge, onOpenContact);
 			return c;
 		});
 	}

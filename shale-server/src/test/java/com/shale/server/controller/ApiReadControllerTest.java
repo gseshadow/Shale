@@ -1333,6 +1333,11 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public DirectoryPage getContactDirectoryPage(int shaleClientId, int page, int pageSize, String query) {
+            return new DirectoryPage(List.of(), page, pageSize, 0);
+        }
+
+        @Override
         public Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId) {
             this.contactId = contactId;
             this.detailShaleClientId = shaleClientId;

@@ -33,6 +33,15 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	}
 
 	@Override
+	public DirectoryPage getContactDirectoryPage(int shaleClientId, int page, int pageSize, String query) {
+		ContactDao.PagedResult<ContactDao.ContactCardSummaryRow> result =
+				contactGateway.findDirectoryContactsPage(shaleClientId, page, pageSize, query);
+		return new DirectoryPage(result.items().stream().map(row -> new ContactCardSummary(
+				row.id(), row.displayName(), row.email(), row.phone(), row.credentialAbbreviations())).toList(),
+				result.page(), result.pageSize(), result.total());
+	}
+
+	@Override
 	public Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId) {
 		return Optional.ofNullable(contactGateway.findById(contactId, shaleClientId))
 				.map(row -> new ContactDetail(
@@ -212,6 +221,9 @@ public final class ContactServiceAdapter implements ContactServicePort {
 
 		ContactDao.DirectoryContactRow findDirectoryContactById(int contactId, int shaleClientId);
 
+		ContactDao.PagedResult<ContactDao.ContactCardSummaryRow> findDirectoryContactsPage(
+				int shaleClientId, int page, int pageSize, String query);
+
 		ContactDao.ContactDetailRow findById(int contactId, int shaleClientId);
 
 		int createContact(ContactDao.CreateContactRequest request);
@@ -246,6 +258,12 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		@Override
 		public List<ContactDao.DirectoryContactRow> searchContacts(int shaleClientId, String query) {
 			return contactDao.searchContacts(shaleClientId, query);
+		}
+
+		@Override
+		public ContactDao.PagedResult<ContactDao.ContactCardSummaryRow> findDirectoryContactsPage(
+				int shaleClientId, int page, int pageSize, String query) {
+			return contactDao.findDirectoryContactsPage(shaleClientId, page, pageSize, query);
 		}
 
 		@Override

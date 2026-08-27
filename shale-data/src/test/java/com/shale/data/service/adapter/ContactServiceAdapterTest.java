@@ -33,6 +33,26 @@ class ContactServiceAdapterTest {
 	}
 
 	@Test
+	void directoryCardProjectionCarriesAuthoritativeOrderedCredentialsInOneGatewayCall() {
+		FakeContactGateway gateway = new FakeContactGateway(List.of());
+		gateway.directoryPage = new ContactDao.PagedResult<>(List.of(
+				new ContactDao.ContactCardSummaryRow(1, "Example Doctor", "doctor@example.test", "555", List.of("M.D.", "Ph.D.")),
+				new ContactDao.ContactCardSummaryRow(2, "No Credentials", null, null, List.of())), 0, 100, 2);
+
+		var page = new ContactServiceAdapter(gateway).getContactDirectoryPage(42, 0, 100, "doctor");
+
+		assertEquals(1, gateway.directoryPageCalls, "the complete page uses one bounded gateway query, not one query per card");
+		assertEquals(42, gateway.directoryTenant);
+		assertEquals(List.of("M.D.", "Ph.D."), page.items().get(0).credentialAbbreviations());
+		assertEquals("Example Doctor M.D., Ph.D.",
+				com.shale.core.service.ContactNamePresentation.effectiveDisplayNameFromAbbreviations(
+						page.items().get(0).displayName(), page.items().get(0).credentialAbbreviations()));
+		assertEquals("No Credentials",
+				com.shale.core.service.ContactNamePresentation.effectiveDisplayNameFromAbbreviations(
+						page.items().get(1).displayName(), page.items().get(1).credentialAbbreviations()));
+	}
+
+	@Test
 	void getContactDetailReturnsEmptyWhenDelegateCannotFindContact() {
 		ContactServiceAdapter adapter = new ContactServiceAdapter(new FakeContactGateway(List.of()));
 
@@ -218,6 +238,10 @@ class ContactServiceAdapterTest {
 		private List<ContactDao.AdministrationDefinitionRow> adminRows = List.of();
 		private com.shale.core.service.ContactServicePort.UpdateContactProfileCommand aggregateCommand;
 		private ContactDao.ClassificationProfileRow aggregateReloadProfile;
+		private ContactDao.PagedResult<ContactDao.ContactCardSummaryRow> directoryPage =
+				new ContactDao.PagedResult<>(List.of(), 0, 100, 0);
+		private int directoryPageCalls;
+		private int directoryTenant;
 
 		private FakeContactGateway(List<ContactDao.DirectoryContactRow> rows) {
 			this.rows = rows;
@@ -228,6 +252,14 @@ class ContactServiceAdapterTest {
 			lastSearchShaleClientId = shaleClientId;
 			lastSearchQuery = query;
 			return rows;
+		}
+
+		@Override
+		public ContactDao.PagedResult<ContactDao.ContactCardSummaryRow> findDirectoryContactsPage(
+				int shaleClientId, int page, int pageSize, String query) {
+			directoryPageCalls++;
+			directoryTenant = shaleClientId;
+			return directoryPage;
 		}
 
 		@Override
