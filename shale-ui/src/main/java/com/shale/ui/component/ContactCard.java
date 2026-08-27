@@ -32,6 +32,7 @@ public class ContactCard extends HBox {
     private boolean interactive = true;
 
     public ContactCard() {
+        nameLabel.setId("contact-card-name-label");
         buildUiMiniDefaults();
         wireEvents();
     }

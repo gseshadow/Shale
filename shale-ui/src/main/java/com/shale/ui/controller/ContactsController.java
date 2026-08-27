@@ -295,18 +295,17 @@ public final class ContactsController {
     }
 
     private Node buildCard(ContactCardSummary row) {
-        String displayName = safe(row.displayName()).isBlank() ? "—" : safe(row.displayName());
-        var card = contactCardFactory.create(new ContactCardModel(
-                row.id(),
-                displayName,
-                null,
-                row.email(),
-                row.phone()), CONTACTS_CARD_VARIANT);
+        var card = contactCardFactory.create(cardModel(row), CONTACTS_CARD_VARIANT);
         card.setMinHeight(CONTACT_CARD_HEIGHT);
         card.setPrefHeight(CONTACT_CARD_HEIGHT);
         card.setPrefWidth(CONTACT_CARD_WIDTH);
         card.setMaxWidth(CONTACT_CARD_WIDTH);
         return card;
+    }
+
+    static ContactCardModel cardModel(ContactCardSummary row) {
+        String displayName = safe(row.displayName()).isBlank() ? "—" : safe(row.displayName());
+        return new ContactCardModel(row.id(), displayName, null, row.email(), row.phone());
     }
 
     private Node buildLoadingMoreNode() {
