@@ -83,15 +83,13 @@ public final class SearchService {
 	private ContactDao.DirectoryContactRow credentialAware(ContactDao.DirectoryContactRow row, int shaleClientId) {
 		ContactDao.ClassificationProfileRow profile = contactDao.findClassificationProfile(row.id(), shaleClientId);
 		if (profile == null) return row;
-		var name = new ContactServicePort.StructuredName(profile.prefix(), profile.firstName(), profile.middleName(),
-				profile.lastName(), profile.preferredName(), profile.suffix());
 		var credentials = profile.credentials().stream().map(c -> new ContactServicePort.AssignedCredential(
 				c.assignmentId(), new ContactServicePort.CredentialDefinition(c.definition().id(),
 						c.definition().systemKey(), c.definition().name(), c.definition().abbreviation(),
 						c.definition().description(), c.definition().color(), c.definition().sortOrder()),
 				c.displayOrder(), c.historical(), c.rowVer())).toList();
 		return new ContactDao.DirectoryContactRow(row.id(), row.firstName(), row.lastName(),
-				ContactNamePresentation.compose(name, profile.legacyDisplayName(), credentials), row.email(), row.phone());
+				ContactNamePresentation.effectiveDisplayName(profile.legacyDisplayName(), credentials), row.email(), row.phone());
 	}
 
 	private static <T> List<T> provider(String provider, List<ProviderFailure> failures, java.util.function.Supplier<List<T>> loader) {

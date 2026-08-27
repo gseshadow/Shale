@@ -10,11 +10,20 @@ import com.shale.core.service.ContactServicePort.StructuredName;
 public final class ContactNamePresentation {
 	private ContactNamePresentation() {}
 
-	public static String compose(StructuredName name, String legacyDisplayName,
-			List<AssignedCredential> credentials) {
+	/** Composes the editable, stored display-name base with live credentials. */
+	public static String effectiveDisplayName(String storedDisplayName, List<AssignedCredential> credentials) {
+		return appendCredentials(clean(storedDisplayName), credentials);
+	}
+
+	/** Composes structured name fields independently from the editable display-name base. */
+	public static String structuredFullName(StructuredName name, List<AssignedCredential> credentials) {
 		String structured = name == null ? "" : join(name.prefix(), name.firstName(), name.middleName(),
 				name.lastName(), name.suffix());
-		String result = structured.isBlank() ? clean(legacyDisplayName) : structured;
+		return appendCredentials(structured, credentials);
+	}
+
+	private static String appendCredentials(String base, List<AssignedCredential> credentials) {
+		String result = base;
 		if (credentials == null || credentials.isEmpty()) return result;
 
 		List<String> abbreviations = credentials.stream()

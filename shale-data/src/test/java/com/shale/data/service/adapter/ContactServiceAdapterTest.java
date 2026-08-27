@@ -157,6 +157,8 @@ class ContactServiceAdapterTest {
 		assertArrayEquals(new byte[] { 7, 8 }, gateway.aggregateCommand.credentials().get(1).expectedRowVer());
 		assertEquals(authoritativeUpdatedAt, result.contactUpdatedAt());
 		assertEquals("Countess Lovelace", result.profile().legacyDisplayName());
+		assertEquals("Countess Lovelace", gateway.aggregateCommand.displayName(),
+				"the editable stored DisplayName must remain the uncomposed base value");
 		assertEquals(0, result.profile().credentials().get(0).displayOrder());
 		assertEquals("#112233", result.profile().contactTypes().get(0).definition().color());
 		assertFalse(result.profile().contactTypes().get(0).historical());

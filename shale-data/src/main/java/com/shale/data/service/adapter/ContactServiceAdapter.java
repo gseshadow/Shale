@@ -64,8 +64,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	}
 
 	private static String presentationName(ContactDao.ClassificationProfileRow row) {
-		return ContactNamePresentation.compose(new StructuredName(row.prefix(), row.firstName(), row.middleName(),
-				row.lastName(), row.preferredName(), row.suffix()), row.legacyDisplayName(),
+		return ContactNamePresentation.effectiveDisplayName(row.legacyDisplayName(),
 				row.credentials().stream().map(ContactServiceAdapter::assignedCredential).toList());
 	}
 

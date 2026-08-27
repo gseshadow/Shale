@@ -6,27 +6,49 @@ import org.junit.jupiter.api.Test;
 import com.shale.core.service.ContactServicePort.*;
 
 class ContactNamePresentationTest {
-	private static final StructuredName NAME = new StructuredName(null, "Example", null, "Doctor", null, null);
+	private static final StructuredName STRUCTURED = new StructuredName("Dr.", "Example", null, "Doctor", null, null);
 
-	@Test void composesWithoutCredentials() { assertEquals("Example Doctor", compose(NAME)); }
-	@Test void appendsOneCredentialByAbbreviation() { assertEquals("Example Doctor M.D.", compose(NAME, credential(1, 9, "Medical Doctor", "M.D.", false))); }
-	@Test void appendsMultipleCredentialsInAuthoritativeOrder() {
-		assertEquals("Example Doctor M.D., Ph.D.", compose(NAME, credential(2, 20, "Doctor of Philosophy", "Ph.D.", false), credential(1, 10, "Medical Doctor", "M.D.", false)));
-	}
-	@Test void includesPrefixAndSuffixBeforeCredentials() {
-		var name = new StructuredName("Dr.", "Example", "Q.", "Doctor", null, "Jr.");
-		assertEquals("Dr. Example Q. Doctor Jr. M.D.", compose(name, credential(1, 0, "Medical Doctor", "M.D.", false)));
-	}
-	@Test void ignoresRemovedOrInactiveCredentials() { assertEquals("Example Doctor", compose(NAME, credential(1, 0, "Medical Doctor", "M.D.", true))); }
-	@Test void ignoresBlankAbbreviations() { assertEquals("Example Doctor", compose(NAME, credential(1, 0, "Medical Doctor", "  ", false))); }
-	@Test void suppressesCredentialAlreadyAtEndOfLegacyDisplayName() {
-		assertEquals("Example Doctor M.D.", ContactNamePresentation.compose(null, "Example Doctor M.D.", List.of(credential(1, 0, "Medical Doctor", "M.D.", false))));
+	@Test void noCredentialsPreserveStoredDisplayName() {
+		assertEquals("Example Doctor", display("Example Doctor"));
 	}
 
-	private static String compose(StructuredName name, AssignedCredential... credentials) {
-		return ContactNamePresentation.compose(name, "Legacy compatibility value", List.of(credentials));
+	@Test void effectiveDisplayNameUsesAbbreviationsInAssignmentOrder() {
+		assertEquals("Jane Smith R.N., B.S.N.", display("Jane Smith",
+				credential(2, 20, "Bachelor of Science in Nursing", "B.S.N.", false),
+				credential(1, 10, "Registered Nurse", "R.N.", false)));
 	}
-	private static AssignedCredential credential(long id, int order, String descriptiveName, String abbreviation, boolean historical) {
-		return new AssignedCredential(id, new CredentialDefinition((int) id, "key" + id, descriptiveName, abbreviation, null, null, order), order, historical, null);
+
+	@Test void removingCredentialRemovesItsAbbreviation() {
+		assertEquals("Example Doctor", display("Example Doctor",
+				credential(1, 0, "Medical Doctor", "M.D.", true)));
+	}
+
+	@Test void reorderingCredentialsChangesPresentationOrder() {
+		assertEquals("Example Doctor Ph.D., M.D.", display("Example Doctor",
+				credential(1, 20, "Medical Doctor", "M.D.", false),
+				credential(2, 10, "Doctor of Philosophy", "Ph.D.", false)));
+	}
+
+	@Test void blankAbbreviationsAreIgnored() {
+		assertEquals("Example Doctor", display("Example Doctor", credential(1, 0, "Medical Doctor", " ", false)));
+	}
+
+	@Test void legacyDisplayNameEndingInCredentialDoesNotDuplicateIt() {
+		assertEquals("Example Doctor M.D.", display("Example Doctor M.D.", credential(1, 0, "Medical Doctor", "M.D.", false)));
+	}
+
+	@Test void structuredAndDisplayNameRemainDistinctCompositions() {
+		var credentials = List.of(credential(1, 0, "Medical Doctor", "M.D.", false));
+		assertEquals("Example Doctor M.D.", ContactNamePresentation.effectiveDisplayName("Example Doctor", credentials));
+		assertEquals("Dr. Example Doctor M.D.", ContactNamePresentation.structuredFullName(STRUCTURED, credentials));
+	}
+
+	private static String display(String base, AssignedCredential... credentials) {
+		return ContactNamePresentation.effectiveDisplayName(base, List.of(credentials));
+	}
+
+	private static AssignedCredential credential(long id, int order, String name, String abbreviation, boolean historical) {
+		return new AssignedCredential(id, new CredentialDefinition((int) id, "key" + id, name,
+				abbreviation, null, null, order), order, historical, null);
 	}
 }
