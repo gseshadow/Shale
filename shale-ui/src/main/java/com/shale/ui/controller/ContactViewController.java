@@ -18,7 +18,6 @@ import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.ContactDao.ContactDetailRow;
-import com.shale.data.dao.ContactDao.ContactProfileUpdateRequest;
 import com.shale.data.dao.CaseSummaryDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.util.ControlStyles;
@@ -33,7 +32,6 @@ import com.shale.ui.util.ExternalBrowserHelper;
 import com.shale.ui.util.ContactExternalActions;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.state.AppState;
-import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -47,7 +45,6 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
@@ -62,6 +59,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.TilePane;
 import javafx.stage.Window;
 
 public final class ContactViewController {
@@ -73,8 +71,6 @@ public final class ContactViewController {
     @FXML private Label lastUpdatedLabel;
     @FXML private Label errorLabel;
     @FXML private Button editButton;
-    @FXML private Button saveButton;
-    @FXML private Button cancelButton;
     @FXML private Button deleteContactButton;
     @FXML private VBox relatedCasesContainer;
     @FXML private Label relatedCasesEmptyLabel;
@@ -84,37 +80,22 @@ public final class ContactViewController {
     @FXML private FlowPane specialtyChips;
     @FXML private FlowPane credentialChips;
     @FXML private BorderPane rootPane;
-    @FXML private javafx.scene.layout.GridPane profileGrid;
+    @FXML private GridPane profileGrid;
     @FXML private VBox relatedSidebar;
-    @FXML private VBox phoneCards;
-    @FXML private VBox emailCards;
+    @FXML private TilePane phoneCards;
+    @FXML private TilePane emailCards;
     @FXML private VBox addressCards;
-
-    @FXML private Label displayNameValue;
-    @FXML private Label nameValue;
-    @FXML private TextField nameEditor;
-    @FXML private Label firstNameValue;
-    @FXML private TextField firstNameEditor;
-    @FXML private Label lastNameValue;
-    @FXML private TextField lastNameEditor;
-    @FXML private Label emailValue;
-    @FXML private TextField emailEditor;
-    @FXML private Label phoneValue;
-    @FXML private TextField phoneEditor;
-    @FXML private Label addressHomeValue;
-    @FXML private TextArea addressHomeEditor;
+    @FXML private Label structuredFullNameValue;
+    @FXML private Label preferredNameLabel;
+    @FXML private Label preferredNameValue;
     @FXML private Label dateOfBirthValue;
-    @FXML private DatePicker dateOfBirthEditor;
     @FXML private Label conditionValue;
-    @FXML private TextArea conditionEditor;
     @FXML private Label deceasedValue;
-    @FXML private CheckBox deceasedEditor;
 
     private int contactId;
     private ContactDetailService contactDetailService;
     private AppState appState;
     private ContactDetailRow currentContact;
-    private boolean editMode;
     private Consumer<Integer> onOpenCase;
     private Consumer<Integer> onOpenContact;
     private Runnable onContactDeleted;
@@ -210,14 +191,6 @@ public final class ContactViewController {
             editButton.setOnAction(e -> onEdit());
             setVisibleManaged(editButton, false);
         }
-        if (saveButton != null) {
-            ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
-            saveButton.setOnAction(e -> onSave());
-        }
-        if (cancelButton != null) {
-            ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
-            cancelButton.setOnAction(e -> onCancel());
-        }
         if (deleteContactButton != null) {
             ControlStyles.apply(deleteContactButton, ControlStyles.Purpose.DANGER);
             deleteContactButton.setOnAction(e -> onDeleteContact());
@@ -227,19 +200,38 @@ public final class ContactViewController {
         initialized = true;
         if(rootPane!=null)rootPane.sceneProperty().addListener((o,oldScene,newScene)->{if(oldScene!=null&&newScene==null)dispose();});
         if(profileGrid!=null)profileGrid.widthProperty().addListener((o,a,width)->applyResponsiveLayout(width.doubleValue()));
-        for (javafx.scene.control.Control editor : java.util.stream.Stream.of(nameEditor, firstNameEditor, lastNameEditor,
-                emailEditor, phoneEditor, addressHomeEditor, dateOfBirthEditor, conditionEditor, deceasedEditor)
-                .filter(Objects::nonNull).toList()) {
-            ControlStyles.formControl(editor);
-        }
-        setEditMode(false);
+        if(phoneCards!=null)phoneCards.widthProperty().addListener((o,a,width)->configureCardTiles(phoneCards));
+        if(emailCards!=null)emailCards.widthProperty().addListener((o,a,width)->configureCardTiles(emailCards));
+        refreshContactActions();
         renderRelatedCases();
         resetSharedLinksState();
         Platform.runLater(() -> { loadContact(); loadSharedLinks(); });
     }
 
     public void dispose(){if(disposed)return;disposed=true;detailLoadGeneration++;sharedLinksLoadGeneration++;if(runtimeBridge!=null)runtimeBridge.unsubscribeEntityUpdated(sharedLinksLiveHandler);dbExec.shutdownNow();}
-    private void applyResponsiveLayout(double width){if(relatedSidebar==null||profileGrid.getColumnConstraints().size()<2)return;boolean narrow=width<860;profileGrid.getColumnConstraints().get(0).setPercentWidth(narrow?100:63);profileGrid.getColumnConstraints().get(1).setPercentWidth(narrow?0:37);javafx.scene.layout.GridPane.setColumnIndex(relatedSidebar,narrow?0:1);javafx.scene.layout.GridPane.setRowIndex(relatedSidebar,narrow?2:0);javafx.scene.layout.GridPane.setRowSpan(relatedSidebar,narrow?1:2);}
+    private void applyResponsiveLayout(double width) {
+        if (relatedSidebar == null || profileGrid.getColumnConstraints().size() < 2) return;
+        boolean narrow = width < 900;
+        profileGrid.getColumnConstraints().get(0).setPercentWidth(narrow ? 100 : 63);
+        profileGrid.getColumnConstraints().get(1).setPercentWidth(narrow ? 0 : 37);
+        GridPane.setColumnIndex(relatedSidebar, narrow ? 0 : 1);
+        GridPane.setRowIndex(relatedSidebar, narrow ? 2 : 0);
+        GridPane.setRowSpan(relatedSidebar, narrow ? 1 : 2);
+        Platform.runLater(this::updateContactMethodColumns);
+    }
+
+    private void updateContactMethodColumns() {
+        configureCardTiles(phoneCards);
+        configureCardTiles(emailCards);
+    }
+
+    private static void configureCardTiles(TilePane pane) {
+        if (pane == null) return;
+        double width = pane.getWidth();
+        boolean twoColumns = width >= 600;
+        pane.setPrefColumns(twoColumns ? 2 : 1);
+        pane.setPrefTileWidth(twoColumns ? Math.max(250, (width - pane.getHgap()) / 2) : Math.max(250, width));
+    }
 
     private void loadContact() {
         if (disposed) {
@@ -288,7 +280,7 @@ public final class ContactViewController {
                     renderClassifications();
                     renderContactPoints();
                     loadSharedLinks();
-                    setEditMode(false);
+                    refreshContactActions();
                     clearError();
                     PerfLog.logDone("contacts.detail.render", "contactId=" + contactId + " relatedCases=" + relatedCases.size() + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
                     PerfLog.logDone("contacts.detail", "phase=apply generation=" + generation + " contactId=" + contactId + " relatedCases=" + relatedCases.size(), loadStarted);
@@ -320,7 +312,6 @@ public final class ContactViewController {
     }
 
     private void renderClassifications(){
-        if(classificationProfile!=null&&nameValue!=null){var n=classificationProfile.structuredName();String structured=structuredPreview(n.prefix(),n.firstName(),n.middleName(),n.lastName(),n.preferredName(),n.suffix());nameValue.setText(structured.isBlank()?"—":structured);}
         renderDefinitionChips(contactTypeChips,classificationProfile==null?List.of():classificationProfile.contactTypes(),"No assigned contact types");
         renderDefinitionChips(specialtyChips,classificationProfile==null?List.of():classificationProfile.specialties(),"No assigned specialties");
         if(credentialChips==null)return;credentialChips.getChildren().clear();
@@ -339,6 +330,7 @@ public final class ContactViewController {
         if(phoneCards.getChildren().isEmpty())phoneCards.getChildren().add(emptyChip("No phone numbers"));
         if(emailCards.getChildren().isEmpty())emailCards.getChildren().add(emptyChip("No email addresses"));
         if(addressCards.getChildren().isEmpty())addressCards.getChildren().add(emptyChip("No addresses"));
+        updateContactMethodColumns();
     }
     private Node viewPointCard(String value,String kind,boolean primary,String action,Runnable run){Label v=new Label(fallback(value));v.setWrapText(true);v.getStyleClass().add("contact-point-value");Label k=badge(kind,false),p=badge("Primary",true);Button b=new Button(action);ControlStyles.apply(b,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);b.setOnAction(e->run.run());HBox top=new HBox(6,k);if(primary)top.getChildren().add(p);Region spacer=new Region();HBox.setHgrow(spacer,Priority.ALWAYS);top.getChildren().addAll(spacer,b);VBox card=new VBox(7,top,v);card.getStyleClass().add("contact-point-card");return card;}
     private static Label badge(String text,boolean primary){Label l=new Label(text);l.getStyleClass().add("contact-point-badge");if(primary)l.getStyleClass().add("contact-point-primary");return l;}
@@ -413,93 +405,6 @@ public final class ContactViewController {
         void updateButtons(){List<CEntry> selected=entries.stream().filter(e->e.selected.isSelected()).toList();for(CEntry e:entries){int index=selected.indexOf(e);e.up.setDisable(index<=0);e.down.setDisable(index<0||index==selected.size()-1);}}
         List<ContactServicePort.IntendedAssignment> intent(){return entries.stream().map(e->new ContactServicePort.IntendedAssignment(e.assignment,e.definition,e.selected.isSelected(),e.rowVer)).toList();}}
 
-    private void onCancel() {
-        if (currentContact != null) {
-            writeEditorsFromCurrent();
-            renderFromCurrent();
-        }
-        setEditMode(false);
-        clearError();
-    }
-
-    private void onSave() {
-        if (!canEditContact()) {
-            setError("You do not have permission to save this contact.");
-            return;
-        }
-        if (currentContact == null || contactDetailService == null) {
-            setError("Contact details are unavailable.");
-            return;
-        }
-
-        ContactProfileUpdateRequest request = new ContactProfileUpdateRequest(
-                currentContact.id(),
-                currentContact.shaleClientId(),
-                appState == null ? null : appState.getUserId(),
-                safeText(nameEditor == null ? null : nameEditor.getText()),
-                safeText(firstNameEditor == null ? null : firstNameEditor.getText()),
-                safeText(lastNameEditor == null ? null : lastNameEditor.getText()),
-                safeText(emailEditor == null ? null : emailEditor.getText()),
-                safeText(phoneEditor == null ? null : phoneEditor.getText()),
-                safeText(addressHomeEditor == null ? null : addressHomeEditor.getText()),
-                dateOfBirthEditor == null ? null : dateOfBirthEditor.getValue(),
-                safeText(conditionEditor == null ? null : conditionEditor.getText()),
-                deceasedEditor != null && deceasedEditor.isSelected(),
-                currentContact.client());
-        saveContactProfile(request);
-    }
-
-    private void saveContactProfile(ContactProfileUpdateRequest request) {
-        if (!canEditContact()) {
-            setError("You do not have permission to save this contact.");
-            return;
-        }
-        if (request == null || contactDetailService == null) {
-            setError("Contact details are unavailable.");
-            return;
-        }
-
-        long saveStarted = PerfLog.start();
-        PerfLog.log("contacts.save", "start", "contactId=" + request.contactId() + " tenantId=" + request.shaleClientId());
-        setBusy(true);
-        dbExec.submit(() -> {
-            try {
-                boolean updated = contactDetailService.updateBasicProfile(request);
-                if (!updated) {
-                    Platform.runLater(() -> {
-                        setBusy(false);
-                        setError("Contact could not be saved.");
-                    });
-                    return;
-                }
-
-                ContactDetailService.ContactDetailSnapshot reloadedSnapshot = contactDetailService.loadSnapshot(request.contactId(), request.shaleClientId());
-                ContactDetailRow reloaded = reloadedSnapshot.contact();
-                List<RelatedCaseRow> reloadedRelatedCases = reloadedSnapshot.relatedCases();
-                Platform.runLater(() -> {
-                    setBusy(false);
-                    if (reloaded == null) {
-                        setError("Contact could not be reloaded after save.");
-                        return;
-                    }
-                    currentContact = reloaded;
-                    relatedCases = reloadedRelatedCases == null ? List.of() : reloadedRelatedCases;
-                    renderFromCurrent();
-                    renderRelatedCases();
-                    loadSharedLinks();
-                    setEditMode(false);
-                    clearError();
-                    PerfLog.logDone("contacts.save", "phase=apply contactId=" + currentContact.id() + " relatedCases=" + relatedCases.size(), saveStarted);
-                });
-            } catch (RuntimeException ex) {
-                Platform.runLater(() -> {
-                    setBusy(false);
-                    setError("Failed to save contact.");
-                });
-            }
-        });
-    }
-
     private void onDeleteContact() {
         if (contactDetailService == null || currentContact == null) {
             setError("Contact details are unavailable.");
@@ -572,87 +477,32 @@ public final class ContactViewController {
     }
 
     private void renderFromCurrent() {
-        if (currentContact == null) {
-            return;
-        }
+        if (currentContact == null) return;
+        if (contactTitleLabel != null) contactTitleLabel.setText(fallback(currentContact.displayName(), "Contact"));
+        if (contactSubtitleLabel != null) contactSubtitleLabel.setText("Contact #" + currentContact.id());
+        if (lastUpdatedLabel != null) lastUpdatedLabel.setText("Last updated: " + ContactDao.formatTimestamp(currentContact.updatedAt()));
 
-        if (contactTitleLabel != null) {
-            contactTitleLabel.setText(fallback(currentContact.displayName(), "Contact"));
-        }
-        if (contactSubtitleLabel != null) {
-            contactSubtitleLabel.setText("Contact #" + currentContact.id());
-        }
-        if (lastUpdatedLabel != null) {
-            lastUpdatedLabel.setText("Last updated: " + ContactDao.formatTimestamp(currentContact.updatedAt()));
-        }
+        ContactServicePort.ClassificationProfile profile = classificationProfile;
+        String fullName = profile == null ? structuredPreview(currentContact.firstName(), currentContact.lastName())
+                : structuredPreview(profile.structuredName().prefix(), profile.structuredName().firstName(),
+                        profile.structuredName().middleName(), profile.structuredName().lastName(),
+                        profile.structuredName().suffix());
+        if (structuredFullNameValue != null) structuredFullNameValue.setText(fallback(fullName));
 
-        if (displayNameValue != null) {
-            displayNameValue.setText(fallback(currentContact.displayName()));
-        }
-        if (nameValue != null) {
-            nameValue.setText(fallback(currentContact.name()));
-        }
-        if (firstNameValue != null) {
-            firstNameValue.setText(fallback(currentContact.firstName()));
-        }
-        if (lastNameValue != null) {
-            lastNameValue.setText(fallback(currentContact.lastName()));
-        }
-        if (emailValue != null) {
-            emailValue.setText(fallback(currentContact.email()));
-        }
-        if (phoneValue != null) {
-            phoneValue.setText(fallback(currentContact.phone()));
-        }
-        if (addressHomeValue != null) {
-            addressHomeValue.setText(fallback(currentContact.addressHome()));
-        }
-        if (dateOfBirthValue != null) {
-            dateOfBirthValue.setText(formatDate(currentContact.dateOfBirth()));
-        }
-        if (conditionValue != null) {
-            conditionValue.setText(fallback(currentContact.condition()));
-        }
-        if (deceasedValue != null) {
-            deceasedValue.setText(booleanLabel(currentContact.deceased()));
-        }
+        String preferred = profile == null ? null : safeText(profile.structuredName().preferredName());
+        boolean showPreferred = preferred != null && !preferred.equalsIgnoreCase(fullName)
+                && !preferred.equalsIgnoreCase(safe(currentContact.displayName()).trim());
+        setVisibleManaged(preferredNameLabel, showPreferred);
+        setVisibleManaged(preferredNameValue, showPreferred);
+        if (preferredNameValue != null) preferredNameValue.setText(showPreferred ? preferred : "");
 
-        writeEditorsFromCurrent();
+        LocalDate birth = profile == null ? currentContact.dateOfBirth() : profile.dateOfBirth();
+        String condition = profile == null ? currentContact.condition() : profile.condition();
+        boolean deceased = profile == null ? currentContact.deceased() : profile.deceased();
+        if (dateOfBirthValue != null) dateOfBirthValue.setText(formatDate(birth));
+        if (conditionValue != null) conditionValue.setText(fallback(condition));
+        if (deceasedValue != null) deceasedValue.setText(booleanLabel(deceased));
     }
-
-    private void writeEditorsFromCurrent() {
-        if (currentContact == null) {
-            return;
-        }
-        if (nameEditor != null) {
-            nameEditor.setText(safe(currentContact.name()));
-        }
-        if (firstNameEditor != null) {
-            firstNameEditor.setText(safe(currentContact.firstName()));
-        }
-        if (lastNameEditor != null) {
-            lastNameEditor.setText(safe(currentContact.lastName()));
-        }
-        if (emailEditor != null) {
-            emailEditor.setText(safe(currentContact.email()));
-        }
-        if (phoneEditor != null) {
-            phoneEditor.setText(safe(currentContact.phone()));
-        }
-        if (addressHomeEditor != null) {
-            addressHomeEditor.setText(safe(currentContact.addressHome()));
-        }
-        if (dateOfBirthEditor != null) {
-            dateOfBirthEditor.setValue(currentContact.dateOfBirth());
-        }
-        if (conditionEditor != null) {
-            conditionEditor.setText(safe(currentContact.condition()));
-        }
-        if (deceasedEditor != null) {
-            deceasedEditor.setSelected(currentContact.deceased());
-        }
-    }
-
 
     private void resetSharedLinksState() {
         sharedLinks = List.of();
@@ -845,34 +695,14 @@ public final class ContactViewController {
         return primary ? role + " • " + sideLabel + " • primary" : role + " • " + sideLabel;
     }
 
-    private void setEditMode(boolean enabled) {
-        this.editMode = enabled && canEditContact();
-
-        setVisibleManaged(editButton, canEditContact() && !editMode && currentContact != null);
-        setVisibleManaged(saveButton, canEditContact() && editMode);
-        setVisibleManaged(cancelButton, canEditContact() && editMode);
+    private void refreshContactActions() {
+        setVisibleManaged(editButton, canEditContact() && currentContact != null);
         refreshDeleteAction();
-
-        toggleField(nameValue, nameEditor, editMode);
-        toggleField(firstNameValue, firstNameEditor, editMode);
-        toggleField(lastNameValue, lastNameEditor, editMode);
-        toggleField(emailValue, emailEditor, editMode);
-        toggleField(phoneValue, phoneEditor, editMode);
-        toggleField(addressHomeValue, addressHomeEditor, editMode);
-        toggleField(dateOfBirthValue, dateOfBirthEditor, editMode);
-        toggleField(conditionValue, conditionEditor, editMode);
-        toggleField(deceasedValue, deceasedEditor, editMode);
     }
 
     private void setBusy(boolean busy) {
         if (editButton != null) {
             editButton.setDisable(busy);
-        }
-        if (saveButton != null) {
-            saveButton.setDisable(busy);
-        }
-        if (cancelButton != null) {
-            cancelButton.setDisable(busy);
         }
         if (deleteContactButton != null) {
             deleteContactButton.setDisable(busy);
@@ -880,7 +710,7 @@ public final class ContactViewController {
     }
 
     private void refreshDeleteAction() {
-        boolean showDelete = isAdminUser() && !editMode && currentContact != null;
+        boolean showDelete = isAdminUser() && currentContact != null;
         setVisibleManaged(deleteContactButton, showDelete);
     }
 
@@ -963,15 +793,5 @@ public final class ContactViewController {
         node.setManaged(visible);
     }
 
-    private static void toggleField(Node readOnlyNode, Node editorNode, boolean editing) {
-        if (editorNode instanceof TextInputControl textInput) {
-            setVisibleManaged(readOnlyNode, false);
-            setVisibleManaged(editorNode, true);
-            ReadOnlyTextDisplaySupport.apply(textInput, editing);
-            return;
-        }
-        setVisibleManaged(readOnlyNode, !editing);
-        setVisibleManaged(editorNode, editing);
-    }
 
 }

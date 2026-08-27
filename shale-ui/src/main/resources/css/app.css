@@ -2870,9 +2870,14 @@
 .contact-editor-surface .shale-loading-placeholder,
 .contact-editor-surface .shale-empty-state { -fx-background-color: rgba(248,250,252,.88); -fx-background-radius: 8px; }
 .contact-editor-surface .dialog-error-text { -fx-background-color: rgba(255,242,240,.92); -fx-padding: 8px; }
-.contact-point-card { -fx-background-color: rgba(248,250,252,.96); -fx-background-radius: 9px; -fx-border-color: rgba(17,37,66,.16); -fx-border-radius: 9px; -fx-padding: 10px; }
+.contact-personal-details,
+.contact-methods-surface { -fx-background-color: rgba(255,255,255,.58); -fx-background-radius: 10px; -fx-border-color: rgba(17,37,66,.12); -fx-border-radius: 10px; -fx-padding: 12px; }
+.contact-subsection-title { -fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
+.contact-method-category { -fx-padding: 5px 0 0 0; }
+.contact-condition-value { -fx-padding: 6px 0; }
+.contact-point-card { -fx-background-color: rgba(248,250,252,.96); -fx-background-radius: 9px; -fx-border-color: rgba(17,37,66,.16); -fx-border-radius: 9px; -fx-padding: 10px 11px; -fx-max-width: 100000px; }
 .contact-point-card.removed { -fx-opacity: .68; -fx-border-style: segments(5px,4px); }
-.contact-point-value { -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; }
+.contact-point-value { -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; -fx-wrap-text: true; }
 .contact-point-badge { -fx-background-color: rgba(220,232,245,.9); -fx-background-radius: 999px; -fx-padding: 3px 7px; -fx-font-size: 10px; -fx-font-weight: 800; }
 .contact-point-primary { -fx-background-color: rgba(211,240,222,.95); }
 .contact-point-legacy { -fx-background-color: rgba(255,236,194,.95); }

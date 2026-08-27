@@ -7,7 +7,6 @@ import javafx.scene.Scene;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Control;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import org.junit.jupiter.api.Test;
 
@@ -32,9 +31,8 @@ final class ContactsSemanticControlMigrationTest {
         String fxml = read("src/main/resources/fxml/contact.fxml");
 
         assertTrue(list.contains("ControlStyles.formControl(contactsSearchField)"));
-        assertTrue(detail.contains("ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY)"));
+        assertTrue(detail.contains("ControlStyles.apply(saveButton,ControlStyles.Purpose.PRIMARY)"));
         assertTrue(detail.contains("ControlStyles.apply(editButton, ControlStyles.Purpose.SECONDARY)"));
-        assertTrue(detail.contains("ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY)"));
         assertTrue(detail.contains("ControlStyles.apply(deleteContactButton, ControlStyles.Purpose.DANGER)"));
         assertTrue(detail.contains("ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL"));
         assertTrue(create.contains("ControlStyles.apply(createButton, ControlStyles.Purpose.PRIMARY)"));
@@ -85,11 +83,8 @@ final class ContactsSemanticControlMigrationTest {
                     requireStyles(detail, "contact-profile-panel", "case-main-surface", "contact-profile-panel");
                     requireStyles(detail, "contact-classifications-panel", "secondary-panel", "contact-classifications-panel");
                     requireStyle(detail, "editButton", Button.class, "shale-control-secondary");
-                    requireStyle(detail, "saveButton", Button.class, "shale-control-primary");
-                    requireStyle(detail, "cancelButton", Button.class, "shale-control-secondary");
                     requireStyle(detail, "deleteContactButton", Button.class, "shale-control-danger");
-                    TextArea condition = requireControl(detail, "conditionEditor", TextArea.class);
-                    require(condition.getPrefRowCount() == 4, "conditionEditor must retain four-row multiline geometry");
+                    requireControl(detail, "conditionValue", javafx.scene.control.Label.class);
                 } catch (Throwable thrown) { failure.set(thrown); }
                 finally { finished.countDown(); }
             });

@@ -46,8 +46,8 @@ final class ContactPhase2BViewContractTest {
 
     @Test void aggregateEditorUsesSegmentedNavigationAndStyledCompactRows() throws Exception {
         String source=Files.readString(Path.of("src/main/java/com/shale/ui/controller/ContactViewController.java"));
-        assertTrue(source.contains("ToggleGroup navigationGroup"));
-        assertTrue(source.contains("String[] sectionNames={\"Name\",\"Contact Types\",\"Specialties\",\"Credentials\"}"));
+        assertTrue(source.contains("ToggleGroup group"));
+        assertTrue(source.contains("String[] names={\"Details\",\"Phones\",\"Emails\",\"Addresses\",\"Classifications\"}"));
         assertTrue(source.contains("contact-editor-name-preview"));
         assertTrue(source.contains("contact-editor-choice-row"));
         assertTrue(source.contains("contact-editor-color-swatch"));
@@ -65,7 +65,7 @@ final class ContactPhase2BViewContractTest {
         for(String prohibited:List.of("displayName","structuredName","classification","email","phone","address","rowVer","expectedContactUpdatedAt","sql","command.toString"))
             assertFalse(logger.toLowerCase().contains(prohibited.toLowerCase()),"PHI-safe logger must exclude "+prohibited);
         assertTrue(source.contains("Save failed and was rolled back. Your values are retained."));
-        assertTrue(source.contains("This Contact changed elsewhere. Your values are retained; choose Reload before saving again."));
+        assertTrue(source.contains("Another update occurred. Your values are retained; choose Reload before saving."));
         assertTrue(source.contains("catch(RuntimeException ex){logAggregateSaveFailure(cmd,ex);"),
                 "aggregate save exceptions must not be silently swallowed");
     }
