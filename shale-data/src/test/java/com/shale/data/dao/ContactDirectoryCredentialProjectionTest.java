@@ -24,6 +24,9 @@ class ContactDirectoryCredentialProjectionTest {
         assertEquals(101, row.id(), "contact ID");
         assertEquals(1, row.credentialAbbreviations().size(), "number of abbreviations returned by the DAO");
         assertEquals(List.of("M.D."), row.credentialAbbreviations());
+        assertNotNull(directorySql.get(), "the real page query must execute");
+        assertTrue(directorySql.get().contains("FOR XML PATH(''),TYPE"), "Azure-compatible ordered aggregation");
+        assertTrue(directorySql.get().contains("ORDER BY a.DisplayOrder,d.SortOrder,d.Name,d.Id"));
         assertTrue(directorySql.get().contains("(d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)"));
         assertFalse(directorySql.get().contains("d.IsActive=1 AND d.IsDeleted=0"));
     }
@@ -65,12 +68,15 @@ class ContactDirectoryCredentialProjectionTest {
 
     private static ResultSet result(List<Map<String, Object>> rows) {
         int[] index = {-1};
+        boolean[] wasNull = {false};
         return proxy(ResultSet.class, (method, args) -> {
             if (method.equals("next")) return ++index[0] < rows.size();
+            if (method.equals("wasNull")) return wasNull[0];
             Object value = args == null ? null : rows.get(index[0]).get(String.valueOf(args[0]));
+            if (method.startsWith("get")) wasNull[0] = value == null;
             if (method.equals("getString")) return (String) value;
-            if (method.equals("getInt")) return ((Number) value).intValue();
-            if (method.equals("getLong")) return ((Number) value).longValue();
+            if (method.equals("getInt")) return value == null ? 0 : ((Number) value).intValue();
+            if (method.equals("getLong")) return value == null ? 0L : ((Number) value).longValue();
             return defaultValue(method);
         });
     }
@@ -78,9 +84,24 @@ class ContactDirectoryCredentialProjectionTest {
     @SuppressWarnings("unchecked")
     private static <T> T proxy(Class<T> type, Invocation invocation) {
         return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type},
-                (ignored, method, args) -> invocation.call(method.getName(), args));
+                (ignored, method, args) -> {
+                    Object value = invocation.call(method.getName(), args);
+                    return value == null && method.getReturnType().isPrimitive()
+                            ? primitiveDefault(method.getReturnType()) : value;
+                });
     }
 
     private static Object defaultValue(String method) { return method.equals("isClosed") ? false : null; }
+    private static Object primitiveDefault(Class<?> type) {
+        if (type == boolean.class) return false;
+        if (type == byte.class) return (byte) 0;
+        if (type == short.class) return (short) 0;
+        if (type == int.class) return 0;
+        if (type == long.class) return 0L;
+        if (type == float.class) return 0F;
+        if (type == double.class) return 0D;
+        if (type == char.class) return '\0';
+        throw new AssertionError("Unhandled primitive return type: " + type);
+    }
     @FunctionalInterface private interface Invocation { Object call(String method, Object[] args) throws Throwable; }
 }

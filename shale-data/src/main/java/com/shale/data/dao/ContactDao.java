@@ -1088,16 +1088,18 @@ public final class ContactDao {
 
     /** A correlated projection keeps directory loading bounded to its existing query. */
     private static String credentialAbbreviationsExpression(String contactAlias, String tenantColumn) {
-        return "(SELECT STRING_AGG(CONVERT(nvarchar(max), x.Abbreviation), NCHAR(31)) "
-                + "WITHIN GROUP (ORDER BY x.DisplayOrder, x.SortOrder, x.Name, x.Id) FROM ("
-                + "SELECT d.Abbreviation,a.DisplayOrder,d.SortOrder,d.Name,d.Id "
+        // FOR XML PATH is supported by every Azure SQL compatibility level used by Shale.
+        // The previous ordered STRING_AGG failed at runtime on databases below level 110.
+        return "STUFF((SELECT NCHAR(31)+d.Abbreviation "
                 + "FROM dbo.ContactCredentials a JOIN dbo.CredentialDefinitions d "
                 + "ON d.Id=a.CredentialDefinitionId AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL) "
                 + "WHERE a.ContactId=" + contactAlias + ".Id AND a.ShaleClientId=" + contactAlias + "." + tenantColumn + " "
                 // Definition lifecycle does not hide an existing assignment. This deliberately
                 // matches loadAssignedCredentials, including tenant-owned and global definitions.
                 + "AND a.IsDeleted=0 "
-                + "AND NULLIF(LTRIM(RTRIM(d.Abbreviation)),N'') IS NOT NULL) x)";
+                + "AND NULLIF(LTRIM(RTRIM(d.Abbreviation)),N'') IS NOT NULL "
+                + "ORDER BY a.DisplayOrder,d.SortOrder,d.Name,d.Id "
+                + "FOR XML PATH(''),TYPE).value('.','nvarchar(max)'),1,1,N'')";
     }
 
     private static List<String> splitCredentialAbbreviations(String value) {

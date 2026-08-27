@@ -2883,4 +2883,30 @@
 .contact-point-legacy { -fx-background-color: rgba(255,236,194,.95); }
 .contact-editor-section-heading { -fx-font-size: 15px; -fx-font-weight: 800; }
 .contact-editor-toolbar { -fx-padding: 2px 0 8px 0; }
-.contact-filter-chip { -fx-background-radius: 999px; -fx-border-radius: 999px; -fx-border-width: 1px; -fx-padding: 4px 9px; -fx-font-size: 11px; -fx-font-weight: 700; -fx-cursor: hand; }
+.contact-filter-controls { -fx-alignment: center-left; -fx-padding: 2px; }
+.contact-filter-menu {
+    -fx-background-color: -shale-color-dialog-surface; -fx-background-radius: 8px;
+    -fx-border-color: -shale-control-border; -fx-border-radius: 8px; -fx-border-width: 1px;
+    -fx-padding: 1px 2px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; -fx-cursor: hand;
+}
+.contact-filter-menu:hover { -fx-background-color: rgba(232,241,251,.9); -fx-border-color: -shale-control-border-hover; }
+.contact-filter-menu:focused, .contact-filter-menu:showing { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 7, .14, 0, 0); }
+.contact-filter-menu > .arrow-button { -fx-padding: 0 7px; }
+.contact-filter-menu > .arrow-button > .arrow { -fx-background-color: -shale-color-text-primary; -fx-shape: "M 0 0 L 4 4 L 8 0 Z"; }
+.contact-filter-menu .context-menu { -fx-background-color: -shale-color-dialog-surface; -fx-background-radius: 9px; -fx-border-color: -shale-color-strong-panel-border; -fx-border-radius: 9px; -fx-padding: 6px; -fx-effect: dropshadow(gaussian, rgba(17,37,66,.2), 14, .12, 0, 4); }
+.contact-filter-menu .menu-item { -fx-background-radius: 6px; -fx-padding: 7px 10px; }
+.contact-filter-menu .menu-item:focused { -fx-background-color: rgba(220,232,245,.92); }
+.contact-filter-menu .menu-item > .label { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 600; }
+.contact-filter-menu .check-menu-item:checked > .left-container > .check { -fx-background-color: -shale-button-dialog-primary-background; }
+.contact-filter-count { -fx-background-color: rgba(220,232,245,.72); -fx-background-radius: 999px; -fx-padding: 5px 9px; -fx-text-fill: -shale-color-text-primary; -fx-font-size: 11px; -fx-font-weight: 800; }
+.contact-filter-clear { -fx-background-color: transparent; -fx-border-color: transparent; -fx-text-fill: -shale-button-dialog-primary-background; -fx-font-weight: 800; -fx-cursor: hand; }
+.contact-filter-clear:hover { -fx-background-color: rgba(220,232,245,.68); -fx-background-radius: 7px; }
+.contact-filter-clear:focused { -fx-border-color: -shale-control-focus-border; -fx-border-radius: 7px; }
+.contact-filter-clear:disabled { -fx-opacity: .42; }
+.contact-filter-chip { -fx-background-radius: 999px; -fx-border-radius: 999px; -fx-border-width: 1px; -fx-padding: 4px 9px; -fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; -fx-cursor: hand; }
+.contact-filter-chip:hover { -fx-opacity: .82; -fx-effect: dropshadow(gaussian, rgba(17,37,66,.14), 5, .1, 0, 1); }
+.contact-filter-chip:focused { -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 7, .16, 0, 0); }
+.contact-filter-option { -fx-background-radius: 6px; -fx-padding: 7px 10px; }
+.contact-filter-option:focused { -fx-background-color: rgba(220,232,245,.92); }
+.contact-filter-option > .label { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 600; }
+.contact-filter-option:checked > .left-container > .check { -fx-background-color: -shale-button-dialog-primary-background; }

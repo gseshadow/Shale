@@ -18,14 +18,14 @@
     <top>
         <FilterPanel>
             <left>
-                <HBox spacing="8">
+                <FlowPane hgap="8" vgap="8" styleClass="contact-filter-controls">
                     <TextField fx:id="contactsSearchField" promptText="Search contacts…" />
-                    <MenuButton fx:id="contactTypeFilter" text="Contact Type" />
-                    <MenuButton fx:id="specialtyFilter" text="Specialty" />
-                    <MenuButton fx:id="credentialFilter" text="Credential" />
-                    <Label fx:id="activeFilterCount" text="0 filters" styleClass="muted-text" />
-                    <Button fx:id="clearFiltersButton" text="Clear All" onAction="#clearFilters" />
-                </HBox>
+                    <MenuButton fx:id="contactTypeFilter" text="Contact Type" styleClass="contact-filter-menu" />
+                    <MenuButton fx:id="specialtyFilter" text="Specialty" styleClass="contact-filter-menu" />
+                    <MenuButton fx:id="credentialFilter" text="Credential" styleClass="contact-filter-menu" />
+                    <Label fx:id="activeFilterCount" text="0 filters" styleClass="contact-filter-count" />
+                    <Button fx:id="clearFiltersButton" text="Clear All" onAction="#clearFilters" styleClass="contact-filter-clear" />
+                </FlowPane>
             </left>
             <right><FlowPane fx:id="selectedFilterChips" hgap="6" vgap="6" /></right>
         </FilterPanel>
