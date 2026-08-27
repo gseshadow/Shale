@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.shale.core.service.ContactServicePort;
+import com.shale.core.service.ContactNamePresentation;
 import com.shale.data.dao.ContactDao;
 
 /**
@@ -27,7 +28,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		int resolvedLimit = limit <= 0 ? 25 : limit;
 		return contactGateway.searchContacts(shaleClientId, query).stream()
 				.limit(resolvedLimit)
-				.map(row -> new ContactSummary(row.id(), row.displayName(), row.email(), row.phone()))
+				.map(row -> new ContactSummary(row.id(), presentationName(row, shaleClientId), row.email(), row.phone()))
 				.toList();
 	}
 
@@ -40,7 +41,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 						row.name(),
 						row.firstName(),
 						row.lastName(),
-						row.displayName(),
+						presentationName(row, shaleClientId),
 						row.email(),
 						row.phone(),
 						row.addressHome(),
@@ -48,6 +49,24 @@ public final class ContactServiceAdapter implements ContactServicePort {
 						row.condition(),
 						row.deceased(),
 						row.client()));
+	}
+
+	private String presentationName(ContactDao.DirectoryContactRow row, int shaleClientId) {
+		ContactDao.ClassificationProfileRow profile = contactGateway.findClassificationProfile(row.id(), shaleClientId);
+		if (profile == null) return row.displayName();
+		return presentationName(profile);
+	}
+
+	private String presentationName(ContactDao.ContactDetailRow row, int shaleClientId) {
+		ContactDao.ClassificationProfileRow profile = contactGateway.findClassificationProfile(row.id(), shaleClientId);
+		if (profile == null) return row.displayName();
+		return presentationName(profile);
+	}
+
+	private static String presentationName(ContactDao.ClassificationProfileRow row) {
+		return ContactNamePresentation.compose(new StructuredName(row.prefix(), row.firstName(), row.middleName(),
+				row.lastName(), row.preferredName(), row.suffix()), row.legacyDisplayName(),
+				row.credentials().stream().map(ContactServiceAdapter::assignedCredential).toList());
 	}
 
 	@Override
