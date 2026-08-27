@@ -484,9 +484,8 @@ public final class ContactViewController {
 
         ContactServicePort.ClassificationProfile profile = classificationProfile;
         String fullName = profile == null ? structuredPreview(currentContact.firstName(), currentContact.lastName())
-                : structuredPreview(profile.structuredName().prefix(), profile.structuredName().firstName(),
-                        profile.structuredName().middleName(), profile.structuredName().lastName(),
-                        profile.structuredName().suffix());
+                : com.shale.core.service.ContactNamePresentation.compose(profile.structuredName(),
+                        profile.legacyDisplayName(), profile.credentials());
         if (structuredFullNameValue != null) structuredFullNameValue.setText(fallback(fullName));
 
         String preferred = profile == null ? null : safeText(profile.structuredName().preferredName());
