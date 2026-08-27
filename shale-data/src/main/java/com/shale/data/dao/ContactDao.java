@@ -1094,7 +1094,9 @@ public final class ContactDao {
                 + "FROM dbo.ContactCredentials a JOIN dbo.CredentialDefinitions d "
                 + "ON d.Id=a.CredentialDefinitionId AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL) "
                 + "WHERE a.ContactId=" + contactAlias + ".Id AND a.ShaleClientId=" + contactAlias + "." + tenantColumn + " "
-                + "AND a.IsDeleted=0 AND d.IsActive=1 AND d.IsDeleted=0 "
+                // Definition lifecycle does not hide an existing assignment. This deliberately
+                // matches loadAssignedCredentials, including tenant-owned and global definitions.
+                + "AND a.IsDeleted=0 "
                 + "AND NULLIF(LTRIM(RTRIM(d.Abbreviation)),N'') IS NOT NULL) x)";
     }
 
