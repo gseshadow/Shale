@@ -49,8 +49,10 @@ public final class ContactDao {
             int id,
             String displayName,
             String email,
-            String phone
+            String phone,
+            List<String> credentialAbbreviations
     ) {
+        public ContactCardSummaryRow { credentialAbbreviations = List.copyOf(credentialAbbreviations); }
     }
 
     public record ContactDetailRow(
@@ -383,7 +385,7 @@ public final class ContactDao {
             long total = countDirectoryContacts(con, schema, shaleClientId, searchQuery);
             logPerf("contacts.directory.count", "tenantId=" + shaleClientId + " page=" + page + " queryLength=" + normalizedQueryLength(searchQuery) + " total=" + total, countStarted);
             if (total == 0) {
-                logPerf("contacts.directory.lightweightPage", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedQueryLength(searchQuery) + " rows=0 total=0 fullDetailHydration=false selectedFields=id,displayName,email,phone", started);
+                logPerf("contacts.directory.lightweightPage", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedQueryLength(searchQuery) + " rows=0 total=0 fullDetailHydration=false selectedFields=id,displayName,email,phone,credentialAbbreviations", started);
                 return new PagedResult<>(List.of(), page, pageSize, 0);
             }
 
@@ -394,7 +396,8 @@ public final class ContactDao {
                       c.Id,
                       %s AS DisplayName,
                       %s AS Email,
-                      %s AS Phone
+                      %s AS Phone,
+                      %s AS CredentialAbbreviations
                     FROM dbo.Contacts c
                     WHERE c.%s = ?
                       AND %s IS NOT NULL
@@ -406,6 +409,7 @@ public final class ContactDao {
                     displayName,
                     lightweightColumnExpression(schema.emailColumn(), "c"),
                     lightweightColumnExpression(schema.phoneColumn(), "c"),
+                    credentialAbbreviationsExpression("c", schema.tenantColumn()),
                     schema.tenantColumn(),
                     displayName,
                     activeFilter(schema.deletedColumn(), "c"),
@@ -424,12 +428,13 @@ public final class ContactDao {
                                 rs.getInt("Id"),
                                 rs.getString("DisplayName"),
                                 rs.getString("Email"),
-                                rs.getString("Phone")));
+                                rs.getString("Phone"),
+                                splitCredentialAbbreviations(rs.getString("CredentialAbbreviations"))));
                     }
                 }
             }
             PagedResult<ContactCardSummaryRow> result = new PagedResult<>(List.copyOf(out), page, pageSize, total);
-            logPerf("contacts.directory.lightweightPage", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedQueryLength(searchQuery) + " rows=" + out.size() + " total=" + total + " fullDetailHydration=false selectedFields=id,displayName,email,phone", started);
+            logPerf("contacts.directory.lightweightPage", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedQueryLength(searchQuery) + " rows=" + out.size() + " total=" + total + " fullDetailHydration=false selectedFields=id,displayName,email,phone,credentialAbbreviations", started);
             return result;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load contacts page for tenant (clientId=" + shaleClientId + ", page=" + page + ")", e);

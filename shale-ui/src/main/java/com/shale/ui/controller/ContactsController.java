@@ -1,11 +1,14 @@
 package com.shale.ui.controller;
 
-import com.shale.data.dao.ContactDao;
-import com.shale.data.dao.ContactDao.ContactCardSummaryRow;
+import com.shale.core.service.ContactNamePresentation;
+import com.shale.core.service.ContactServicePort;
+import com.shale.core.service.ContactServicePort.ContactCardSummary;
 import com.shale.ui.component.ScrollableListRegion;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
 import com.shale.ui.state.AppState;
+import com.shale.ui.services.LiveUpdateEvents;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.UiStateLabels;
 import com.shale.ui.util.ControlStyles;
@@ -47,9 +50,10 @@ public final class ContactsController {
     private Label contactsLoadingStateLabel;
 
     private AppState appState;
-    private ContactDao contactDao;
+    private ContactServicePort contactService;
+    private UiRuntimeBridge runtimeBridge;
     private ContactCardFactory contactCardFactory;
-    private final List<ContactCardSummaryRow> loadedContacts = new ArrayList<>();
+    private final List<ContactCardSummary> loadedContacts = new ArrayList<>();
     private String emptyStateMessage = "No contacts to display yet.";
     private String loadingStateMessage = "Loading contacts…";
     private PauseTransition searchDebounce;
@@ -67,9 +71,11 @@ public final class ContactsController {
         return t;
     });
 
-    public void init(AppState appState, ContactDao contactDao, Consumer<Integer> onOpenContact) {
+    public void init(AppState appState, ContactServicePort contactService, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenContact) {
         this.appState = appState;
-        this.contactDao = contactDao;
+        this.contactService = contactService;
+        this.runtimeBridge = runtimeBridge;
+        if (runtimeBridge != null) runtimeBridge.subscribeEntityUpdated(this::handleContactUpdated);
         this.contactCardFactory = new ContactCardFactory(onOpenContact == null ? id -> {
         } : onOpenContact);
     }
@@ -148,7 +154,7 @@ public final class ContactsController {
 
         final int generationAtSubmit = loadGeneration;
 
-        if (contactDao == null) {
+        if (contactService == null) {
             loadedContacts.clear();
             setEmptyStateMessage("Contacts are unavailable right now.");
             showEmptyState();
@@ -185,7 +191,7 @@ public final class ContactsController {
                 }
                 long daoStarted = PerfLog.start();
                 PerfLog.log("contacts.search.dao", "start", "generation=" + generationAtSubmit + " page=" + pageToLoad + " tenantId=" + tenantId + " queryLength=" + queryAtSubmit.length());
-                var page = contactDao.findDirectoryContactsPage(tenantId, pageToLoad, pageSize, queryAtSubmit);
+                var page = contactService.getContactDirectoryPage(tenantId, pageToLoad, pageSize, queryAtSubmit);
                 PerfLog.logDone("contacts.search.dao", "generation=" + generationAtSubmit + " page=" + pageToLoad + " tenantId=" + tenantId + " rows=" + page.items().size() + " total=" + page.total(), daoStarted);
 
                 Platform.runLater(() -> {
@@ -216,6 +222,13 @@ public final class ContactsController {
         });
     }
 
+    private void handleContactUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
+        if (event == null || !LiveUpdateEvents.ENTITY_CONTACT.equals(event.entityType()) || appState == null) return;
+        Integer tenantId = appState.getShaleClientId();
+        if (tenantId == null || event.shaleClientId() != tenantId) return;
+        Platform.runLater(this::loadFirstPage);
+    }
+
     private void rerender() {
         long renderStarted = PerfLog.start();
         if (contactsFlow == null) {
@@ -244,8 +257,10 @@ public final class ContactsController {
         PerfLog.logDone("contacts.render", "cards=" + cards.size() + " loaded=" + loadedContacts.size() + " loading=" + loading + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
     }
 
-    private Node buildCard(ContactCardSummaryRow row) {
-        String displayName = safe(row.displayName()).isBlank() ? "—" : safe(row.displayName());
+    private Node buildCard(ContactCardSummary row) {
+        String effectiveName = ContactNamePresentation.effectiveDisplayNameFromAbbreviations(
+                row.displayName(), row.credentialAbbreviations());
+        String displayName = safe(effectiveName).isBlank() ? "—" : safe(effectiveName);
         var card = contactCardFactory.create(new ContactCardModel(
                 row.id(),
                 displayName,

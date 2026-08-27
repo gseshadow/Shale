@@ -6,6 +6,7 @@ package com.shale.ui.services;
  * descriptions, notes, Contact PII, RowVer, raw metadata, SQL, exceptions, or DTOs.
  */
 public final class LiveUpdateEvents {
+    public static final String ENTITY_CONTACT = "Contact";
     public static final String ENTITY_CASE_LINK = "CaseLink";
     public static final String ENTITY_CASE_LINK_SHARE = "CaseLinkShare";
     public static final String ENTITY_LINK_TYPE = "LinkType";

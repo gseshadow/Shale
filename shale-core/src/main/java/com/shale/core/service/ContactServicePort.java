@@ -13,6 +13,8 @@ public interface ContactServicePort {
 
 	List<ContactSummary> searchContacts(int shaleClientId, String query, int limit);
 
+	DirectoryPage getContactDirectoryPage(int shaleClientId, int page, int pageSize, String query);
+
 	Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId);
 
 	List<Definition> getEffectiveContactTypes(int shaleClientId);
@@ -57,6 +59,17 @@ public interface ContactServicePort {
 	ContactProfileMutationResult updateContactProfile(UpdateContactProfileCommand command);
 
 	record ContactSummary(int id, String displayName, String email, String phone) {
+	}
+
+	record ContactCardSummary(int id, String displayName, String email, String phone,
+			List<String> credentialAbbreviations) {
+		public ContactCardSummary {
+			credentialAbbreviations = List.copyOf(credentialAbbreviations);
+		}
+	}
+
+	record DirectoryPage(List<ContactCardSummary> items, int page, int pageSize, long total) {
+		public DirectoryPage { items = List.copyOf(items); }
 	}
 
 	record ContactDetail(
