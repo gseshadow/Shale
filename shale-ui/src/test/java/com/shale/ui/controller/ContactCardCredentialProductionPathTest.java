@@ -24,8 +24,8 @@ class ContactCardCredentialProductionPathTest {
         assertTrue(projection.contains("a.IsDeleted=0"));
         assertTrue(projection.contains("d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL"));
         assertFalse(projection.contains("d.IsActive=1 AND d.IsDeleted=0"));
-        assertTrue(projection.contains("ORDER BY a.DisplayOrder,d.SortOrder,d.Name,d.Id"));
-        assertTrue(projection.contains("FOR XML PATH(''),TYPE"));
+        assertTrue(projection.contains("WITHIN GROUP (ORDER BY x.DisplayOrder, x.SortOrder, x.Name, x.Id)"));
+        assertTrue(projection.contains("STRING_AGG"));
         assertFalse(method.contains("findClassificationProfile"));
     }
 

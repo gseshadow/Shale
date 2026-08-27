@@ -25,8 +25,8 @@ class ContactDirectoryCredentialProjectionTest {
         assertEquals(1, row.credentialAbbreviations().size(), "number of abbreviations returned by the DAO");
         assertEquals(List.of("M.D."), row.credentialAbbreviations());
         assertNotNull(directorySql.get(), "the real page query must execute");
-        assertTrue(directorySql.get().contains("FOR XML PATH(''),TYPE"), "Azure-compatible ordered aggregation");
-        assertTrue(directorySql.get().contains("ORDER BY a.DisplayOrder,d.SortOrder,d.Name,d.Id"));
+        assertTrue(directorySql.get().contains("STRING_AGG"), "ordered aggregation");
+        assertTrue(directorySql.get().contains("WITHIN GROUP (ORDER BY x.DisplayOrder, x.SortOrder, x.Name, x.Id)"));
         assertTrue(directorySql.get().contains("(d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)"));
         assertFalse(directorySql.get().contains("d.IsActive=1 AND d.IsDeleted=0"));
     }

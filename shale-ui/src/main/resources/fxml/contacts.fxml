@@ -3,12 +3,12 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.TextField?>
-<?import javafx.scene.control.MenuButton?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.FlowPane?>
 <?import com.shale.ui.component.FilterPanel?>
+<?import com.shale.ui.component.ShaleFilterMenu?>
 <?import com.shale.ui.component.ScrollableListRegion?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
@@ -20,9 +20,9 @@
             <left>
                 <FlowPane hgap="8" vgap="8" styleClass="contact-filter-controls">
                     <TextField fx:id="contactsSearchField" promptText="Search contacts…" />
-                    <MenuButton fx:id="contactTypeFilter" text="Contact Type" styleClass="contact-filter-menu" />
-                    <MenuButton fx:id="specialtyFilter" text="Specialty" styleClass="contact-filter-menu" />
-                    <MenuButton fx:id="credentialFilter" text="Credential" styleClass="contact-filter-menu" />
+                    <ShaleFilterMenu fx:id="contactTypeFilter" />
+                    <ShaleFilterMenu fx:id="specialtyFilter" />
+                    <ShaleFilterMenu fx:id="credentialFilter" />
                     <Label fx:id="activeFilterCount" text="0 filters" styleClass="contact-filter-count" />
                     <Button fx:id="clearFiltersButton" text="Clear All" onAction="#clearFilters" styleClass="contact-filter-clear" />
                 </FlowPane>
