@@ -41,6 +41,18 @@ final class ContactStructuredPresentationTest {
         assertTrue(source.contains("setPrefColumns(twoColumns ? 2 : 1)"));
     }
 
+    @Test void titleAndEditorPreviewUseLiveEffectiveDisplayName() throws Exception {
+        String source=controller();
+        assertTrue(source.contains("contactTitleLabel.setText(fallback(effectiveDisplayName"));
+        assertTrue(source.contains("ContactNamePresentation.effectiveDisplayName("));
+        assertTrue(source.contains("Displayed as: "));
+        assertTrue(source.contains("display.getText(),selected"));
+        assertTrue(source.contains("cb.selectedProperty().addListener"));
+        assertTrue(source.contains("changed.run();"));
+        assertTrue(source.contains("previewCredentials()"));
+        assertTrue(source.contains("ContactNamePresentation.structuredFullName("));
+    }
+
     @Test void everyFxmlIdHasAControllerField() throws Exception {
         Set<String> ids=matches(fxml(),Pattern.compile("fx:id=\\\"([^\\\"]+)\\\""));
         Set<String> fields=matches(controller(),Pattern.compile("@FXML\\s+private\\s+[\\w.<>]+\\s+(\\w+)\\s*;"));
