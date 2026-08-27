@@ -12,6 +12,16 @@ class ContactNamePresentationTest {
 		assertEquals("Example Doctor", display("Example Doctor"));
 	}
 
+	@Test void baseDisplayNameUsesStructuredFieldsButNotPreferredName() {
+		assertEquals("Dr. Jane Mary Smith Jr.", ContactNamePresentation.baseDisplayName(
+				new StructuredName(" Dr. ", "Jane", "Mary", "Smith", "Janey", "Jr.")));
+	}
+
+	@Test void baseDisplayNameIgnoresBlankComponentsAndNormalizesWhitespace() {
+		assertEquals("Jane Smith", ContactNamePresentation.baseDisplayName(
+				new StructuredName(" ", " Jane ", null, " Smith ", "Preferred", "")));
+	}
+
 	@Test void effectiveDisplayNameUsesAbbreviationsInAssignmentOrder() {
 		assertEquals("Jane Smith R.N., B.S.N.", display("Jane Smith",
 				credential(2, 20, "Bachelor of Science in Nursing", "B.S.N.", false),

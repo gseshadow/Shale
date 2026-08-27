@@ -34,8 +34,15 @@ public final class ContactDao {
             String lastName,
             String displayName,
             String email,
-            String phone
+            String phone,
+            List<String> credentialAbbreviations
     ) {
+        public DirectoryContactRow {
+            credentialAbbreviations = credentialAbbreviations == null ? List.of() : List.copyOf(credentialAbbreviations);
+        }
+        public DirectoryContactRow(int id, String firstName, String lastName, String displayName, String email, String phone) {
+            this(id, firstName, lastName, displayName, email, phone, List.of());
+        }
     }
 
     public record ContactCardSummaryRow(
@@ -192,7 +199,8 @@ public final class ContactDao {
                       %s,
                       %s AS DisplayName,
                       %s,
-                      %s
+                      %s,
+                      %s AS CredentialAbbreviations
                     FROM dbo.Contacts c
                     WHERE c.%s = ?
                       AND NULLIF(LTRIM(RTRIM(%s)), '') IS NOT NULL
@@ -204,6 +212,7 @@ public final class ContactDao {
                     displayNameExpression(schema, "c"),
                     optionalColumnExpression(schema.emailColumn(), "c", "Email"),
                     optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
+                    credentialAbbreviationsExpression("c", schema.tenantColumn()),
                     schema.tenantColumn(),
                     displayNameExpression(schema, "c"),
                     activeFilter(schema.deletedColumn(), "c"));
@@ -219,7 +228,7 @@ public final class ContactDao {
                                 rs.getString("LastName"),
                                 rs.getString("DisplayName"),
                                 rs.getString("Email"),
-                                rs.getString("Phone")));
+                                rs.getString("Phone"), splitCredentialAbbreviations(rs.getString("CredentialAbbreviations"))));
                     }
                     return out;
                 }
@@ -247,7 +256,8 @@ public final class ContactDao {
                       %s,
                       %s AS DisplayName,
                       %s,
-                      %s
+                      %s,
+                      %s AS CredentialAbbreviations
                     FROM dbo.Contacts c
                     WHERE c.%s = ?
                       AND NULLIF(LTRIM(RTRIM(%s)), '') IS NOT NULL
@@ -260,6 +270,7 @@ public final class ContactDao {
                     displayNameExpression(schema, "c"),
                     optionalColumnExpression(schema.emailColumn(), "c", "Email"),
                     optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
+                    credentialAbbreviationsExpression("c", schema.tenantColumn()),
                     schema.tenantColumn(),
                     displayNameExpression(schema, "c"),
                     activeFilter(schema.deletedColumn(), "c"),
@@ -276,7 +287,7 @@ public final class ContactDao {
                                 rs.getString("LastName"),
                                 rs.getString("DisplayName"),
                                 rs.getString("Email"),
-                                rs.getString("Phone")));
+                                rs.getString("Phone"), splitCredentialAbbreviations(rs.getString("CredentialAbbreviations"))));
                     }
                     return out;
                 }
@@ -308,7 +319,8 @@ public final class ContactDao {
                       %s,
                       %s AS DisplayName,
                       %s,
-                      %s
+                      %s,
+                      %s AS CredentialAbbreviations
                     FROM dbo.Contacts c
                     WHERE c.Id = ?
                       AND c.%s = ?
@@ -320,6 +332,7 @@ public final class ContactDao {
                     displayNameExpression(schema, "c"),
                     optionalColumnExpression(schema.emailColumn(), "c", "Email"),
                     optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
+                    credentialAbbreviationsExpression("c", schema.tenantColumn()),
                     schema.tenantColumn(),
                     displayNameExpression(schema, "c"),
                     activeFilter(schema.deletedColumn(), "c"));
@@ -338,7 +351,7 @@ public final class ContactDao {
                             rs.getString("LastName"),
                             rs.getString("DisplayName"),
                             rs.getString("Email"),
-                            rs.getString("Phone"));
+                            rs.getString("Phone"), splitCredentialAbbreviations(rs.getString("CredentialAbbreviations")));
                     logPerf("contacts.directory.detail.query", "contactId=" + contactId + " tenantId=" + shaleClientId + " found=true", started);
                     return row;
                 }
@@ -1055,6 +1068,22 @@ public final class ContactDao {
                 return rows;
             }
         }
+    }
+
+    /** A correlated projection keeps directory loading bounded to its existing query. */
+    private static String credentialAbbreviationsExpression(String contactAlias, String tenantColumn) {
+        return "(SELECT STRING_AGG(CONVERT(nvarchar(max), x.Abbreviation), NCHAR(31)) "
+                + "WITHIN GROUP (ORDER BY x.DisplayOrder, x.SortOrder, x.Name, x.Id) FROM ("
+                + "SELECT d.Abbreviation,a.DisplayOrder,d.SortOrder,d.Name,d.Id "
+                + "FROM dbo.ContactCredentials a JOIN dbo.CredentialDefinitions d "
+                + "ON d.Id=a.CredentialDefinitionId AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL) "
+                + "WHERE a.ContactId=" + contactAlias + ".Id AND a.ShaleClientId=" + contactAlias + "." + tenantColumn + " "
+                + "AND a.IsDeleted=0 AND d.IsActive=1 AND d.IsDeleted=0 "
+                + "AND NULLIF(LTRIM(RTRIM(d.Abbreviation)),N'') IS NOT NULL) x)";
+    }
+
+    private static List<String> splitCredentialAbbreviations(String value) {
+        return value == null || value.isBlank() ? List.of() : List.of(value.split("\\u001f", -1));
     }
 
     private static int requireCurrentShaleClientId(Connection con) throws SQLException {

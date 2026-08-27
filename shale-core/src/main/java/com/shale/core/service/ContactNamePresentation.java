@@ -15,10 +15,19 @@ public final class ContactNamePresentation {
 		return appendCredentials(clean(storedDisplayName), credentials);
 	}
 
+	/** Composes the persisted base value from the editable structured-name fields. */
+	public static String baseDisplayName(StructuredName name) {
+		return name == null ? "" : join(name.prefix(), name.firstName(), name.middleName(), name.lastName(), name.suffix());
+	}
+
+	/** Directory projection variant, for already filtered and authoritatively ordered abbreviations. */
+	public static String effectiveDisplayNameFromAbbreviations(String storedDisplayName, List<String> abbreviations) {
+		return appendAbbreviations(clean(storedDisplayName), abbreviations);
+	}
+
 	/** Composes structured name fields independently from the editable display-name base. */
 	public static String structuredFullName(StructuredName name, List<AssignedCredential> credentials) {
-		String structured = name == null ? "" : join(name.prefix(), name.firstName(), name.middleName(),
-				name.lastName(), name.suffix());
+		String structured = baseDisplayName(name);
 		return appendCredentials(structured, credentials);
 	}
 
@@ -32,8 +41,16 @@ public final class ContactNamePresentation {
 				.map(c -> clean(c.definition().abbreviation()))
 				.filter(s -> !s.isEmpty())
 				.toList();
+		return appendAbbreviations(base, abbreviations);
+	}
+
+	private static String appendAbbreviations(String base, List<String> abbreviations) {
+		String result = base;
+		if (abbreviations == null || abbreviations.isEmpty()) return result;
 		boolean appendedCredential = false;
-		for (String abbreviation : abbreviations) {
+		for (String rawAbbreviation : abbreviations) {
+			String abbreviation = clean(rawAbbreviation);
+			if (abbreviation.isEmpty()) continue;
 			if (endsWithCredential(result, abbreviation)) {
 				appendedCredential = true;
 				continue;
