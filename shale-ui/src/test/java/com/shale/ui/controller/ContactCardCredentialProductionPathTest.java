@@ -25,8 +25,9 @@ class ContactCardCredentialProductionPathTest {
     @Test void cardRendererComposesEffectiveNameAndCredentialSaveRefreshesDirectory() throws Exception {
         String cards = Files.readString(Path.of("src/main/java/com/shale/ui/controller/ContactsController.java"));
         String renderer = cards.substring(cards.indexOf("private Node buildCard"), cards.indexOf("private Node buildLoadingMoreNode"));
-        assertTrue(renderer.contains("ContactNamePresentation.effectiveDisplayNameFromAbbreviations"));
-        assertTrue(renderer.contains("row.credentialAbbreviations()"));
+        String adapter = Files.readString(Path.of("../shale-data/src/main/java/com/shale/data/service/adapter/ContactServiceAdapter.java"));
+        assertTrue(adapter.contains("ContactNamePresentation.effectiveDisplayNameFromAbbreviations"));
+        assertTrue(renderer.contains("row.displayName()"));
         assertFalse(renderer.contains("String displayName = safe(row.displayName())"));
         assertTrue(cards.contains("LiveUpdateEvents.ENTITY_CONTACT"));
         assertTrue(cards.contains("Platform.runLater(this::loadFirstPage)"));

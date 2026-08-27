@@ -13,6 +13,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import com.shale.core.service.ContactServicePort.ContactDetail;
+import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.ContactServicePort.ContactSummary;
 import com.shale.core.service.ContactServicePort.ClassificationProfile;
 import com.shale.data.dao.ContactDao;
@@ -39,17 +40,13 @@ class ContactServiceAdapterTest {
 				new ContactDao.ContactCardSummaryRow(1, "Example Doctor", "doctor@example.test", "555", List.of("M.D.", "Ph.D.")),
 				new ContactDao.ContactCardSummaryRow(2, "No Credentials", null, null, List.of())), 0, 100, 2);
 
-		var page = new ContactServiceAdapter(gateway).getContactDirectoryPage(42, 0, 100, "doctor");
+		var page = new ContactServiceAdapter(gateway).getContactDirectoryPage(42, 9, 0, 100, "doctor", ContactServicePort.DirectoryFilters.EMPTY);
 
 		assertEquals(1, gateway.directoryPageCalls, "the complete page uses one bounded gateway query, not one query per card");
 		assertEquals(42, gateway.directoryTenant);
 		assertEquals(List.of("M.D.", "Ph.D."), page.items().get(0).credentialAbbreviations());
-		assertEquals("Example Doctor M.D., Ph.D.",
-				com.shale.core.service.ContactNamePresentation.effectiveDisplayNameFromAbbreviations(
-						page.items().get(0).displayName(), page.items().get(0).credentialAbbreviations()));
-		assertEquals("No Credentials",
-				com.shale.core.service.ContactNamePresentation.effectiveDisplayNameFromAbbreviations(
-						page.items().get(1).displayName(), page.items().get(1).credentialAbbreviations()));
+		assertEquals("Example Doctor M.D., Ph.D.", page.items().get(0).displayName());
+		assertEquals("No Credentials", page.items().get(1).displayName());
 	}
 
 	@Test
@@ -256,7 +253,7 @@ class ContactServiceAdapterTest {
 
 		@Override
 		public ContactDao.PagedResult<ContactDao.ContactCardSummaryRow> findDirectoryContactsPage(
-				int shaleClientId, int page, int pageSize, String query) {
+				int shaleClientId, int actorUserId, int page, int pageSize, String query, ContactServicePort.DirectoryFilters filters) {
 			directoryPageCalls++;
 			directoryTenant = shaleClientId;
 			return directoryPage;

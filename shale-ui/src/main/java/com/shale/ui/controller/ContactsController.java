@@ -1,6 +1,5 @@
 package com.shale.ui.controller;
 
-import com.shale.core.service.ContactNamePresentation;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.ContactServicePort.ContactCardSummary;
 import com.shale.ui.component.ScrollableListRegion;
@@ -20,6 +19,9 @@ import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.CheckMenuItem;
+import javafx.scene.control.Button;
 import javafx.scene.layout.FlowPane;
 import javafx.util.Duration;
 
@@ -27,6 +29,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.function.Consumer;
 
 public final class ContactsController {
@@ -48,6 +52,10 @@ public final class ContactsController {
     private Label contactsEmptyStateLabel;
     @FXML
     private Label contactsLoadingStateLabel;
+    @FXML private MenuButton contactTypeFilter, specialtyFilter, credentialFilter;
+    @FXML private FlowPane selectedFilterChips;
+    @FXML private Label activeFilterCount;
+    @FXML private Button clearFiltersButton;
 
     private AppState appState;
     private ContactServicePort contactService;
@@ -63,6 +71,9 @@ public final class ContactsController {
     private final int pageSize = 100;
     private boolean loading = false;
     private boolean hasMore = true;
+    private final Set<Integer> selectedContactTypes=new LinkedHashSet<>(), selectedSpecialties=new LinkedHashSet<>(), selectedCredentials=new LinkedHashSet<>();
+    private List<ContactServicePort.Definition> typeOptions=List.of(), specialtyOptions=List.of();
+    private List<ContactServicePort.CredentialDefinition> credentialOptions=List.of();
     private long pageLoadStartedNanos;
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
@@ -78,7 +89,29 @@ public final class ContactsController {
         if (runtimeBridge != null) runtimeBridge.subscribeEntityUpdated(this::handleContactUpdated);
         this.contactCardFactory = new ContactCardFactory(onOpenContact == null ? id -> {
         } : onOpenContact);
+        loadFilterOptions();
     }
+
+    private void loadFilterOptions() {
+        Integer tenant=appState==null?null:appState.getShaleClientId();
+        if(contactService==null||tenant==null||tenant<=0)return;
+        dbExec.submit(()->{ var types=contactService.getEffectiveContactTypes(tenant); var specs=contactService.getEffectiveSpecialties(tenant);
+            var creds=contactService.getEffectiveCredentialDefinitions(tenant);
+            Platform.runLater(()->{typeOptions=types;specialtyOptions=specs;credentialOptions=creds; rebuildFilterMenus();}); });
+    }
+
+    private void rebuildFilterMenus(){
+        buildDefinitionMenu(contactTypeFilter,typeOptions,selectedContactTypes);
+        buildDefinitionMenu(specialtyFilter,specialtyOptions,selectedSpecialties);
+        if(credentialFilter!=null){credentialFilter.getItems().clear();for(var d:credentialOptions){var i=new CheckMenuItem(d.abbreviation()+" — "+d.name());i.setSelected(selectedCredentials.contains(d.id()));i.setOnAction(e->{toggle(selectedCredentials,d.id(),i.isSelected());});credentialFilter.getItems().add(i);}}
+        renderFilterState();
+    }
+    private void buildDefinitionMenu(MenuButton menu,List<ContactServicePort.Definition> options,Set<Integer> selected){if(menu==null)return;menu.getItems().clear();for(var d:options){var i=new CheckMenuItem(d.name());i.setSelected(selected.contains(d.id()));i.setOnAction(e->toggle(selected,d.id(),i.isSelected()));menu.getItems().add(i);}}
+    private void toggle(Set<Integer> selected,int id,boolean on){if(on)selected.add(id);else selected.remove(id);renderFilterState();loadFirstPage();}
+    @FXML private void clearFilters(){selectedContactTypes.clear();selectedSpecialties.clear();selectedCredentials.clear();rebuildFilterMenus();loadFirstPage();}
+    private void renderFilterState(){int count=selectedContactTypes.size()+selectedSpecialties.size()+selectedCredentials.size();if(activeFilterCount!=null)activeFilterCount.setText(count+" filter"+(count==1?"":"s"));if(clearFiltersButton!=null)clearFiltersButton.setDisable(count==0);if(selectedFilterChips!=null){selectedFilterChips.getChildren().clear();typeOptions.forEach(d->chip(d.id(),d.name(),d.color(),selectedContactTypes));specialtyOptions.forEach(d->chip(d.id(),d.name(),d.color(),selectedSpecialties));credentialOptions.forEach(d->chip(d.id(),d.abbreviation(),d.color(),selectedCredentials));}}
+    private void chip(int id,String text,String color,Set<Integer> selected){if(!selected.contains(id))return;Button b=new Button(text+"  ×");b.getStyleClass().add("contact-filter-chip");if(color!=null&&color.matches("#[0-9a-fA-F]{6}"))b.setStyle("-fx-border-color: "+color+"; -fx-background-color: "+color+"22;");b.setOnAction(e->{selected.remove(id);rebuildFilterMenus();loadFirstPage();});selectedFilterChips.getChildren().add(b);}
+    private ContactServicePort.DirectoryFilters filters(){return new ContactServicePort.DirectoryFilters(List.copyOf(selectedContactTypes),List.copyOf(selectedSpecialties),List.copyOf(selectedCredentials));}
 
     @FXML
     private void initialize() {
@@ -162,7 +195,8 @@ public final class ContactsController {
         }
 
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
-        if (tenantId == null || tenantId <= 0) {
+        Integer actorId = appState == null ? null : appState.getUserId();
+        if (tenantId == null || tenantId <= 0 || actorId == null || actorId <= 0) {
             loadedContacts.clear();
             setEmptyStateMessage("No tenant is selected.");
             showEmptyState();
@@ -172,6 +206,7 @@ public final class ContactsController {
         loading = true;
         final int pageToLoad = currentPage;
         final String queryAtSubmit = normalizedQuery();
+        final ContactServicePort.DirectoryFilters filtersAtSubmit=filters();
         latestRequestedQuery = queryAtSubmit;
         final long queryStarted = PerfLog.start();
         if (pageToLoad == 0) { pageLoadStartedNanos = queryStarted; }
@@ -191,7 +226,7 @@ public final class ContactsController {
                 }
                 long daoStarted = PerfLog.start();
                 PerfLog.log("contacts.search.dao", "start", "generation=" + generationAtSubmit + " page=" + pageToLoad + " tenantId=" + tenantId + " queryLength=" + queryAtSubmit.length());
-                var page = contactService.getContactDirectoryPage(tenantId, pageToLoad, pageSize, queryAtSubmit);
+                var page = contactService.getContactDirectoryPage(tenantId, actorId, pageToLoad, pageSize, queryAtSubmit, filtersAtSubmit);
                 PerfLog.logDone("contacts.search.dao", "generation=" + generationAtSubmit + " page=" + pageToLoad + " tenantId=" + tenantId + " rows=" + page.items().size() + " total=" + page.total(), daoStarted);
 
                 Platform.runLater(() -> {
@@ -247,7 +282,9 @@ public final class ContactsController {
 
         boolean empty = loadedContacts.isEmpty();
         String query = normalizedQuery();
-        if (empty && !query.isBlank()) {
+        if (empty && filters().activeCount()>0) {
+            setEmptyStateMessage("No contacts match the selected filters.");
+        } else if (empty && !query.isBlank()) {
             setEmptyStateMessage("No contacts match your search.");
         } else if (empty) {
             setEmptyStateMessage(emptyStateMessage);
@@ -258,9 +295,7 @@ public final class ContactsController {
     }
 
     private Node buildCard(ContactCardSummary row) {
-        String effectiveName = ContactNamePresentation.effectiveDisplayNameFromAbbreviations(
-                row.displayName(), row.credentialAbbreviations());
-        String displayName = safe(effectiveName).isBlank() ? "—" : safe(effectiveName);
+        String displayName = safe(row.displayName()).isBlank() ? "—" : safe(row.displayName());
         var card = contactCardFactory.create(new ContactCardModel(
                 row.id(),
                 displayName,

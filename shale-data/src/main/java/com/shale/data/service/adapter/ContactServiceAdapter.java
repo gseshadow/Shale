@@ -33,11 +33,14 @@ public final class ContactServiceAdapter implements ContactServicePort {
 	}
 
 	@Override
-	public DirectoryPage getContactDirectoryPage(int shaleClientId, int page, int pageSize, String query) {
+	public DirectoryPage getContactDirectoryPage(int shaleClientId, int actorUserId, int page, int pageSize,
+			String query, DirectoryFilters filters) {
+		Objects.requireNonNull(filters, "filters");
 		ContactDao.PagedResult<ContactDao.ContactCardSummaryRow> result =
-				contactGateway.findDirectoryContactsPage(shaleClientId, page, pageSize, query);
+				contactGateway.findDirectoryContactsPage(shaleClientId, actorUserId, page, pageSize, query, filters);
 		return new DirectoryPage(result.items().stream().map(row -> new ContactCardSummary(
-				row.id(), row.displayName(), row.email(), row.phone(), row.credentialAbbreviations())).toList(),
+				row.id(), ContactNamePresentation.effectiveDisplayNameFromAbbreviations(row.displayName(), row.credentialAbbreviations()),
+				row.email(), row.phone(), row.credentialAbbreviations())).toList(),
 				result.page(), result.pageSize(), result.total());
 	}
 
@@ -222,7 +225,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		ContactDao.DirectoryContactRow findDirectoryContactById(int contactId, int shaleClientId);
 
 		ContactDao.PagedResult<ContactDao.ContactCardSummaryRow> findDirectoryContactsPage(
-				int shaleClientId, int page, int pageSize, String query);
+				int shaleClientId, int actorUserId, int page, int pageSize, String query, DirectoryFilters filters);
 
 		ContactDao.ContactDetailRow findById(int contactId, int shaleClientId);
 
@@ -262,8 +265,8 @@ public final class ContactServiceAdapter implements ContactServicePort {
 
 		@Override
 		public ContactDao.PagedResult<ContactDao.ContactCardSummaryRow> findDirectoryContactsPage(
-				int shaleClientId, int page, int pageSize, String query) {
-			return contactDao.findDirectoryContactsPage(shaleClientId, page, pageSize, query);
+				int shaleClientId, int actorUserId, int page, int pageSize, String query, DirectoryFilters filters) {
+			return contactDao.findDirectoryContactsPage(shaleClientId, actorUserId, page, pageSize, query, filters);
 		}
 
 		@Override
