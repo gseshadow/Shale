@@ -101,7 +101,10 @@ BEGIN
  UNION ALL SELECT 'PHONE_BLANK_DISPLAY',ContactId,1 FROM dbo.ContactPhoneNumbers WHERE ShaleClientId=@ExpectedShaleClientId AND NULLIF(LTRIM(RTRIM(DisplayNumber)),N'') IS NULL
  UNION ALL SELECT 'EMAIL_BLANK_PRESENTATION',ContactId,1 FROM dbo.ContactEmailAddresses WHERE ShaleClientId=@ExpectedShaleClientId AND NULLIF(LTRIM(RTRIM(EmailAddress)),N'') IS NULL
  UNION ALL SELECT 'ADDRESS_BLANK_PRESENTATION',ContactId,1 FROM dbo.ContactAddresses WHERE ShaleClientId=@ExpectedShaleClientId AND AddressLine1 IS NULL AND AddressLine2 IS NULL AND City IS NULL AND StateOrProvince IS NULL AND PostalCode IS NULL AND CountryCode IS NULL AND LegacyAddressText IS NULL
- UNION ALL SELECT 'PHONE_INVALID_NORMALIZED',ContactId,1 FROM dbo.ContactPhoneNumbers WHERE ShaleClientId=@ExpectedShaleClientId AND (NormalizedNumber IS NOT NULL AND (NormalizedNumber NOT LIKE N'+%' OR SUBSTRING(NormalizedNumber,2,32) LIKE N'%[^0-9]%'))
+ UNION ALL SELECT 'PHONE_INVALID_NORMALIZED',ContactId,1 FROM dbo.ContactPhoneNumbers WHERE ShaleClientId=@ExpectedShaleClientId AND NormalizedNumber IS NOT NULL AND
+   (NormalizedNumber=N''
+    OR (LEFT(NormalizedNumber,1)=N'+' AND (DATALENGTH(NormalizedNumber)<=2 OR SUBSTRING(NormalizedNumber,2,4000) COLLATE Latin1_General_100_BIN2 LIKE N'%[^0-9]%'))
+    OR (LEFT(NormalizedNumber,1)<>N'+' AND NormalizedNumber COLLATE Latin1_General_100_BIN2 LIKE N'%[^0-9]%'))
  UNION ALL SELECT 'EMAIL_INVALID_NORMALIZED',ContactId,1 FROM dbo.ContactEmailAddresses WHERE ShaleClientId=@ExpectedShaleClientId AND (NormalizedEmail IS NOT NULL AND (NormalizedEmail<>LOWER(EmailAddress) OR EmailAddress LIKE N'% %'))
  UNION ALL SELECT 'CONTACT_POINT_INVALID_SORT_ORDER',ContactId,1 FROM dbo.ContactPhoneNumbers WHERE ShaleClientId=@ExpectedShaleClientId AND SortOrder<0
  UNION ALL SELECT 'CONTACT_POINT_INVALID_SORT_ORDER',ContactId,1 FROM dbo.ContactEmailAddresses WHERE ShaleClientId=@ExpectedShaleClientId AND SortOrder<0

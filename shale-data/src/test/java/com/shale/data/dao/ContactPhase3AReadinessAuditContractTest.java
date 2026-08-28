@@ -104,6 +104,21 @@ class ContactPhase3AReadinessAuditContractTest {
         assertFalse(hasExactlyOneStrictTenantFilter(List.of(azure,azure)));
     }
 
+    @Test void phoneNormalizedIntegrityAcceptsDigitsWithOptionalSingleLeadingPlus() throws Exception {
+        String audit=sql();
+        assertTrue(audit.contains("NormalizedNumber=N''"));
+        assertTrue(audit.contains("LEFT(NormalizedNumber,1)=N'+'"));
+        assertTrue(audit.contains("DATALENGTH(NormalizedNumber)<=2"));
+        assertTrue(audit.contains("SUBSTRING(NormalizedNumber,2,4000) COLLATE Latin1_General_100_BIN2 LIKE N'%[^0-9]%'"));
+        assertTrue(audit.contains("LEFT(NormalizedNumber,1)<>N'+' AND NormalizedNumber COLLATE Latin1_General_100_BIN2 LIKE N'%[^0-9]%'"));
+        assertTrue(isValidNormalizedPhone(null)); // Phase 2C-A intentionally permits NULL.
+        for(String valid:List.of("0","5051234567","+1","+15051234567"))
+            assertTrue(isValidNormalizedPhone(valid),valid);
+        for(String invalid:List.of("","+","++1","1+2"," 5051234567","505 123 4567",
+            "505-123-4567","(505)1234567","505.123.4567","phone","１２３"))
+            assertFalse(isValidNormalizedPhone(invalid),invalid);
+    }
+
     private record PredicateMetadata(boolean policyEnabled,String predicateType,String operation,String definition) {}
 
     private static boolean hasExactlyOneStrictTenantFilter(List<PredicateMetadata> predicates) {
@@ -114,6 +129,10 @@ class ContactPhase3AReadinessAuditContractTest {
 
     private static String normalizePredicate(String value) {
         return Objects.requireNonNull(value).replaceAll("[\\[\\]\\s()]","").toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean isValidNormalizedPhone(String value) {
+        return value==null || value.matches("\\+?[0-9]+");
     }
 
     private static String stripCommentsAndStrings(String source) {
