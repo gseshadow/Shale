@@ -215,8 +215,8 @@ public final class ContactDao {
                     optionalColumnExpression(schema.firstNameColumn(), "c", "FirstName"),
                     optionalColumnExpression(schema.lastNameColumn(), "c", "LastName"),
                     displayNameExpression(schema, "c"),
-                    optionalColumnExpression(schema.emailColumn(), "c", "Email"),
-                    optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
+                    currentEmailExpression("c", schema.tenantColumn()),
+                    currentPhoneExpression("c", schema.tenantColumn()),
                     credentialAbbreviationsExpression("c", schema.tenantColumn()),
                     schema.tenantColumn(),
                     displayNameExpression(schema, "c"),
@@ -273,8 +273,8 @@ public final class ContactDao {
                     optionalColumnExpression(schema.firstNameColumn(), "c", "FirstName"),
                     optionalColumnExpression(schema.lastNameColumn(), "c", "LastName"),
                     displayNameExpression(schema, "c"),
-                    optionalColumnExpression(schema.emailColumn(), "c", "Email"),
-                    optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
+                    currentEmailExpression("c", schema.tenantColumn()),
+                    currentPhoneExpression("c", schema.tenantColumn()),
                     credentialAbbreviationsExpression("c", schema.tenantColumn()),
                     schema.tenantColumn(),
                     displayNameExpression(schema, "c"),
@@ -335,8 +335,8 @@ public final class ContactDao {
                     optionalColumnExpression(schema.firstNameColumn(), "c", "FirstName"),
                     optionalColumnExpression(schema.lastNameColumn(), "c", "LastName"),
                     displayNameExpression(schema, "c"),
-                    optionalColumnExpression(schema.emailColumn(), "c", "Email"),
-                    optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
+                    currentEmailExpression("c", schema.tenantColumn()),
+                    currentPhoneExpression("c", schema.tenantColumn()),
                     credentialAbbreviationsExpression("c", schema.tenantColumn()),
                     schema.tenantColumn(),
                     displayNameExpression(schema, "c"),
@@ -1007,9 +1007,9 @@ public final class ContactDao {
                 optionalColumnExpression(schema.firstNameColumn(), "c", "FirstName"),
                 optionalColumnExpression(schema.lastNameColumn(), "c", "LastName"),
                 displayNameExpression(schema, "c"),
-                optionalColumnExpression(schema.emailColumn(), "c", "Email"),
-                optionalColumnExpression(schema.phoneColumn(), "c", "Phone"),
-                optionalColumnExpression(schema.addressHomeColumn(), "c", "AddressHome"),
+                currentEmailExpression("c", schema.tenantColumn()),
+                currentPhoneExpression("c", schema.tenantColumn()),
+                currentAddressExpression("c", schema.tenantColumn()),
                 optionalDateColumnExpression(schema.dateOfBirthColumn(), "c", "DateOfBirth"),
                 optionalColumnExpression(schema.conditionColumn(), "c", "Condition"),
                 optionalBooleanExpression(schema.deceasedColumn(), "c", "IsDeceased"),
@@ -1266,64 +1266,34 @@ public final class ContactDao {
         return alias + "." + column + " AS UpdatedAt";
     }
 
-    private static String searchClause(ContactSchema schema, String alias) {
-        return """
-                  AND (
-                    ? = ''
-                    OR LOWER(%s) LIKE ?
-                    OR LOWER(%s) LIKE ?
-                    OR LOWER(%s) LIKE ?
-                    OR LOWER(%s) LIKE ?
-                    OR LOWER(%s) LIKE ?
-                    OR LOWER(%s) LIKE ?
-                  )
-                """.formatted(
-                coreTextExpression(schema.nameColumn(), alias),
-                coreTextExpression(schema.firstNameColumn(), alias),
-                coreTextExpression(schema.lastNameColumn(), alias),
-                displayNameExpression(schema, alias),
-                coreTextExpression(schema.emailColumn(), alias),
-                coreTextExpression(schema.phoneColumn(), alias));
+    /**
+     * Authoritative current contact-point projections.  These deliberately have no
+     * scalar Contacts-column fallback: an empty structured aggregate is an empty
+     * current value.  Id is the final tie-breaker so corrupt/pre-constraint data is
+     * still presented deterministically.
+     */
+    private static String currentPhoneExpression(String alias, String tenantColumn) {
+        return "(SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p "
+                + "WHERE p.ContactId=" + alias + ".Id AND p.ShaleClientId=" + alias + "." + tenantColumn
+                + " AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone";
     }
 
-    private static String lightweightSearchClause(ContactSchema schema, String alias) {
-        return """
-                  AND (
-                    ? = ''
-                    OR LOWER(%s) LIKE ?
-                    OR LOWER(%s) LIKE ?
-                    OR LOWER(%s) LIKE ?
-                    OR LOWER(%s) LIKE ?
-                    OR LOWER(%s) LIKE ?
-                    OR LOWER(%s) LIKE ?
-                  )
-                """.formatted(
-                lightweightColumnExpression(schema.nameColumn(), alias),
-                lightweightColumnExpression(schema.firstNameColumn(), alias),
-                lightweightColumnExpression(schema.lastNameColumn(), alias),
-                lightweightDisplayNameExpression(schema, alias),
-                lightweightColumnExpression(schema.emailColumn(), alias),
-                lightweightColumnExpression(schema.phoneColumn(), alias));
+    private static String currentEmailExpression(String alias, String tenantColumn) {
+        return "(SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e "
+                + "WHERE e.ContactId=" + alias + ".Id AND e.ShaleClientId=" + alias + "." + tenantColumn
+                + " AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) AS Email";
     }
 
-    private static int bindDirectoryQuery(PreparedStatement ps,
-                                          int idx,
-                                          int shaleClientId,
-                                          ContactSchema schema,
-                                          String searchQuery) throws SQLException {
-        ps.setInt(idx++, shaleClientId);
-        String normalizedSearch = normalizeSearchQuery(searchQuery);
-        String likeValue = likeParameter(normalizedSearch);
-        ps.setString(idx++, normalizedSearch);
-        ps.setString(idx++, likeValue);
-        ps.setString(idx++, likeValue);
-        ps.setString(idx++, likeValue);
-        ps.setString(idx++, likeValue);
-        ps.setString(idx++, likeValue);
-        ps.setString(idx++, likeValue);
-        return idx;
+    private static String currentAddressExpression(String alias, String tenantColumn) {
+        return "(SELECT TOP(1) COALESCE(NULLIF(LTRIM(RTRIM(a.LegacyAddressText)),N''),"
+                + "NULLIF(LTRIM(RTRIM(CONCAT(a.AddressLine1,CASE WHEN NULLIF(a.AddressLine2,N'') IS NULL THEN N'' ELSE N', '+a.AddressLine2 END,"
+                + "CASE WHEN NULLIF(a.City,N'') IS NULL THEN N'' ELSE N', '+a.City END,"
+                + "CASE WHEN NULLIF(a.StateOrProvince,N'') IS NULL THEN N'' ELSE N', '+a.StateOrProvince END,"
+                + "CASE WHEN NULLIF(a.PostalCode,N'') IS NULL THEN N'' ELSE N' '+a.PostalCode END,"
+                + "CASE WHEN NULLIF(a.CountryCode,N'') IS NULL THEN N'' ELSE N', '+a.CountryCode END))),N'')) "
+                + "FROM dbo.ContactAddresses a WHERE a.ContactId=" + alias + ".Id AND a.ShaleClientId=" + alias + "." + tenantColumn
+                + " AND a.IsDeleted=0 ORDER BY a.IsPrimary DESC,a.SortOrder,a.Id) AS AddressHome";
     }
-
 
     private static String globalSearchClause(ContactSchema schema, String alias) {
         return """
@@ -1339,8 +1309,8 @@ public final class ContactDao {
                 coreTextExpression(schema.firstNameColumn(), alias),
                 coreTextExpression(schema.lastNameColumn(), alias),
                 displayNameExpression(schema, alias),
-                coreTextExpression(schema.emailColumn(), alias),
-                phoneDigitsExpression(schema.phoneColumn(), alias));
+                "COALESCE((SELECT TOP(1) e.NormalizedEmail FROM dbo.ContactEmailAddresses e WHERE e.ContactId=" + alias + ".Id AND e.ShaleClientId=" + alias + "." + schema.tenantColumn() + " AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id),N'')",
+                "COALESCE((SELECT TOP(1) p.NormalizedNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=" + alias + ".Id AND p.ShaleClientId=" + alias + "." + schema.tenantColumn() + " AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id),N'')");
     }
 
     private static int bindGlobalSearchQuery(PreparedStatement ps,
