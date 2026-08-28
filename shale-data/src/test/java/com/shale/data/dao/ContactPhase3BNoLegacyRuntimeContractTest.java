@@ -53,4 +53,17 @@ class ContactPhase3BNoLegacyRuntimeContractTest {
                 () -> assertFalse(source.contains("projectLegacy")),
                 () -> RETIRING.forEach(column -> assertFalse(Pattern.compile("\\b" + column + "\\b").matcher(source).find())));
     }
+
+    @Test void deploymentBoundaryPreservesPhase3aAndRequiresAParityIndependentPhase3cAudit() throws Exception {
+        String inventory = Files.readString(Path.of("../architecture/contacts-phase-3b-legacy-reference-inventory.md"));
+        assertAll(
+                () -> assertTrue(inventory.contains("immutable pre-cutover baseline")),
+                () -> assertTrue(inventory.contains("must not be rerun as a post-Phase-3B parity gate")),
+                () -> assertTrue(inventory.contains("new, separately reviewed Phase 3C pre-drop audit")),
+                () -> assertTrue(inventory.contains("must not require equality between authoritative structured values")),
+                () -> assertTrue(inventory.contains("all ten retiring columns are still present before the drop")),
+                () -> assertTrue(inventory.contains("results remain tenant-scoped and PHI-safe")),
+                () -> assertTrue(inventory.contains("structured-to-legacy reconciliation procedure")),
+                () -> assertFalse(inventory.contains("Rerun the unchanged Phase 3A readiness")));
+    }
 }

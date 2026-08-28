@@ -1,7 +1,10 @@
 # Contacts Phase 3B legacy-column inventory
 
 The unchanged Phase 3A production audit result for tenant 7, `PASS_READY_FOR_PHASE_3B`, is the
-pre-Phase-3B baseline. Phase 3B did not access any database and does not change or add SQL migrations.
+immutable pre-cutover baseline proving that structured data was complete and consistent when
+compatibility writes stopped. It must not be rerun as a post-Phase-3B parity gate: valid structured-only
+mutations can make legacy scalar values stale by design. Phase 3B did not access any database and does
+not change or add SQL migrations.
 `Contacts.DisplayName` remains the stored base current name. `ContactAddresses.LegacyAddressText`
 remains part of the authoritative structured-address record.
 
@@ -22,14 +25,34 @@ contracts. Every resulting group has the following disposition.
 
 ## Deployment boundary
 
-1. Merge and release Phase 3B.
-2. Deploy it to every desktop, server, scheduled process, importer, and integration that can mutate Contacts.
-3. Confirm every producer has adopted it.
-4. Prevent unsupported older clients from mutating Contacts.
-5. Observe the separately agreed adoption/stability window.
-6. Rerun the unchanged Phase 3A readiness and dependency audit.
-7. Confirm backups, rollback plan, deployment evidence, and operator approval.
-8. Only then begin a separately reviewed final retirement migration.
+1. Merge and release the tested Phase 3B application.
+2. Deploy it to every Contact-writing desktop, server, scheduled task, importer, integration, and
+   administrative utility.
+3. Block or retire unsupported older writers.
+4. Observe the approved stability/adoption window.
+5. Run a new, separately reviewed Phase 3C pre-drop audit.
+6. Only after that audit passes may the physical retirement migration be prepared and reviewed.
+
+The Phase 3C pre-drop audit has a different purpose from Phase 3A. It must fail closed unless:
+
+- every Contact-writing producer has adopted the no-legacy-write application;
+- no runtime application SQL reads or writes any of the ten retiring columns;
+- no database module, trigger, view, function, procedure, computed column, constraint, index, foreign
+  key, or security predicate depends on them;
+- structured Contact tables satisfy tenant, ownership, lifecycle, primary, normalization, ordering,
+  and classification integrity rules;
+- required schema and RLS protection remain valid;
+- all ten retiring columns are still present before the drop, with partial retirement rejected;
+- backups, a rollback procedure, adoption evidence, and operator approval are present; and
+- results remain tenant-scoped and PHI-safe.
+
+The Phase 3C audit must not require equality between authoritative structured values and intentionally
+stale legacy scalar values. The existing Phase 3A audit remains unchanged as immutable pre-cutover
+evidence; Phase 3C must introduce a new, separately reviewed audit rather than weakening or rewriting it.
+
+Rolling back to a pre-Phase-3B application after any structured-only mutation has occurred is unsafe
+without a separately reviewed structured-to-legacy reconciliation procedure. Phase 3B does not create
+or authorize that reconciliation SQL.
 
 Do not rerun the Phase 2C-A backfill after Phase 3B is authoritative unless a separately reviewed
 recovery procedure explicitly requires it. Phase 3C remains the separately reviewed physical-column
