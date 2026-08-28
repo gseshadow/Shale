@@ -10,12 +10,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 class ContactDirectoryCredentialProjectionTest {
     @Test void realDirectoryReadRetainsGlobalHistoricalCredentialDefinition() {
         AtomicReference<String> directorySql = new AtomicReference<>();
-        ContactDao dao = new ContactDao(() -> connection(directorySql));
+        AtomicBoolean connectionClosed = new AtomicBoolean();
+        AtomicBoolean statementClosed = new AtomicBoolean();
+        AtomicBoolean resultSetClosed = new AtomicBoolean();
+        ContactDao dao = new ContactDao(() -> connection(directorySql, connectionClosed, statementClosed, resultSetClosed));
 
         var page = dao.findDirectoryContactsPage(42, 7, 0, 25, "", com.shale.core.service.ContactServicePort.DirectoryFilters.EMPTY);
 
@@ -29,49 +33,56 @@ class ContactDirectoryCredentialProjectionTest {
         assertTrue(directorySql.get().contains("ORDER BY a.ContactId,a.DisplayOrder,d.SortOrder,d.Name,d.Id,a.Id"));
         assertTrue(directorySql.get().contains("(d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)"));
         assertFalse(directorySql.get().contains("d.IsActive=1 AND d.IsDeleted=0"));
+        assertTrue(resultSetClosed.get(), "ResultSet.close must complete");
+        assertTrue(statementClosed.get(), "PreparedStatement.close must complete");
+        assertTrue(connectionClosed.get(), "Connection.close must complete");
     }
 
-    private static Connection connection(AtomicReference<String> directorySql) {
+    private static Connection connection(AtomicReference<String> directorySql, AtomicBoolean connectionClosed,
+            AtomicBoolean statementClosed, AtomicBoolean resultSetClosed) {
         return proxy(Connection.class, (method, args) -> {
+            if (method.equals("close")) { connectionClosed.set(true); return null; }
             if (method.equals("prepareStatement")) {
                 String sql = (String) args[0];
                 if (sql.contains("FROM dbo.ContactCredentials a")) directorySql.set(sql);
-                return statement(sql);
+                return statement(sql, statementClosed, resultSetClosed);
             }
             return defaultValue(method);
         });
     }
 
-    private static PreparedStatement statement(String sql) {
+    private static PreparedStatement statement(String sql, AtomicBoolean statementClosed, AtomicBoolean resultSetClosed) {
         Map<Integer, Object> parameters = new HashMap<>();
         return proxy(PreparedStatement.class, (method, args) -> {
+            if (method.equals("close")) { statementClosed.set(true); return null; }
             if (method.startsWith("set") && args != null && args.length >= 2) {
                 parameters.put((Integer) args[0], args[1]);
                 return null;
             }
             if (method.equals("executeQuery")) {
-                if (sql.contains("SESSION_CONTEXT")) return result(List.of(Map.of("1", 42)));
+                if (sql.contains("SESSION_CONTEXT")) return result(List.of(Map.of("1", 42)), resultSetClosed);
                 if (sql.contains("INFORMATION_SCHEMA.COLUMNS")) {
                     String column = String.valueOf(parameters.get(2));
                     boolean exists = List.of("ShaleClientId", "DisplayName", "FirstName", "LastName", "IsDeleted").contains(column);
-                    return result(exists ? List.of(Map.of("1", 1)) : List.of());
+                    return result(exists ? List.of(Map.of("1", 1)) : List.of(), resultSetClosed);
                 }
-                if (sql.contains("COUNT_BIG")) return result(List.of(Map.of("1", 1L)));
+                if (sql.contains("COUNT_BIG")) return result(List.of(Map.of("1", 1L)), resultSetClosed);
                 if (sql.contains("OFFSET ? ROWS")) return result(List.of(Map.of(
                         "Id", 101, "DisplayName", "Example Doctor", "Email", "doctor@example.test",
-                        "Phone", "555")));
+                        "Phone", "555")), resultSetClosed);
                 if (sql.contains("FROM dbo.ContactCredentials a")) return result(List.of(Map.of(
-                        "ContactId", 101, "Abbreviation", "M.D.")));
+                        "ContactId", 101, "Abbreviation", "M.D.")), resultSetClosed);
                 throw new AssertionError("Unexpected SQL: " + sql);
             }
             return defaultValue(method);
         });
     }
 
-    private static ResultSet result(List<Map<String, Object>> rows) {
+    private static ResultSet result(List<Map<String, Object>> rows, AtomicBoolean resultSetClosed) {
         int[] index = {-1};
         boolean[] wasNull = {false};
         return proxy(ResultSet.class, (method, args) -> {
+            if (method.equals("close")) { resultSetClosed.set(true); return null; }
             if (method.equals("next")) return ++index[0] < rows.size();
             if (method.equals("wasNull")) return wasNull[0];
             Object value = args == null ? null : rows.get(index[0]).get(String.valueOf(args[0]));
@@ -88,6 +99,7 @@ class ContactDirectoryCredentialProjectionTest {
         return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type},
                 (ignored, method, args) -> {
                     Object value = invocation.call(method.getName(), args);
+                    if (method.getReturnType() == void.class) return null;
                     return value == null && method.getReturnType().isPrimitive()
                             ? primitiveDefault(method.getReturnType()) : value;
                 });

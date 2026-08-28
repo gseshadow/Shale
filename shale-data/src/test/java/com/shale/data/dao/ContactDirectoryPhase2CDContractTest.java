@@ -21,9 +21,10 @@ class ContactDirectoryPhase2CDContractTest {
     @Test void searchCoversStructuredNamesClassificationsAndContactPoints() throws Exception {
         String s=source(), p=s.substring(s.indexOf("private static String structuredDirectoryPredicate"),s.indexOf("private static int bindStructuredDirectoryQuery"));
         assertTrue(p.contains("lightweightDisplayNameExpression(schema, \"c\")"));
-        assertFalse(p.contains("c.DisplayName"), "search must not name a column absent from legacy production schemas");
+        assertFalse(p.contains("COALESCE(c.DisplayName"), "search must not use the former invalid DisplayName alias");
         for(String value:new String[]{"Prefix","FirstName","MiddleName","LastName","PreferredName","Suffix","ContactContactTypes","ContactSpecialties","ContactCredentials","CredentialDefinitions","DisplayNumber","NormalizedNumber","EmailAddress","NormalizedEmail","AddressLine1","AddressLine2","City","StateOrProvince","PostalCode","CountryCode","LegacyAddressText"}) assertTrue(p.contains(value),value);
         assertTrue(p.contains("IsDeleted=0")); assertTrue(p.contains(" IN (")); assertTrue(p.contains("ContactTypeId")); assertTrue(p.contains("SpecialtyId")); assertTrue(p.contains("CredentialDefinitionId"));
+        for(String legacyScalar:new String[]{"c.PhoneCell","c.PhoneHome","c.PhoneWork","c.EmailPersonal","c.EmailWork","c.EmailOther","c.AddressHome","c.AddressWork","c.AddressOther"}) assertFalse(p.contains(legacyScalar),legacyScalar);
     }
 
     @Test void wildcardEscapingIsExplicit() throws Exception {

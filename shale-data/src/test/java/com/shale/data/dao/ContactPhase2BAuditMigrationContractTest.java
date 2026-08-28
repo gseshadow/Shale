@@ -6,7 +6,7 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 
 final class ContactPhase2BAuditMigrationContractTest {
-    private static final Path MIGRATION=AuditEntityTypeMigrationChain.CURRENT;
+    private static final Path MIGRATION=AuditEntityTypeMigrationChain.PHASE_2B;
     private static final Path VERIFY=Path.of("..","docs","sql","verification","2026-08-26_contacts_phase2b_audit_allowlist_verification.sql");
 
     @Test void contactUpdatedIsTheOnlyContactEntityAction() {
@@ -20,21 +20,38 @@ final class ContactPhase2BAuditMigrationContractTest {
 
     @Test void successorPreservesAllTokensAndAddsExactlyContact() throws Exception {
         String sql=Files.readString(MIGRATION);
-        Set<String> expected=AuditEntityTypeMigrationChain.currentlyRequiredVocabulary();
+        Set<String> predecessor=AuditEntityTypeMigrationChain.declaredAllowlist(
+                AuditEntityTypeMigrationChain.read(AuditEntityTypeMigrationChain.PHASE_1C));
+        Set<String> expected=new HashSet<>(predecessor); expected.add("CONTACT");
         List<String> currentTokens=AuditEntityTypeMigrationChain.declaredAllowlistTokens(sql);
         assertEquals(expected,Set.copyOf(currentTokens));
         assertEquals(currentTokens.size(),Set.copyOf(currentTokens).size(),
                 "the current authoritative allowlist must not contain duplicate tokens");
         assertEquals(1,currentTokens.stream().filter("CONTACT"::equals).count(),
                 "the Phase 2B successor must add CONTACT exactly once");
-        Set<String> predecessor=AuditEntityTypeMigrationChain.declaredAllowlist(
-                AuditEntityTypeMigrationChain.read(AuditEntityTypeMigrationChain.PHASE_1C));
         Set<String> additions=new HashSet<>(expected); additions.removeAll(predecessor);
         assertEquals(Set.of("CONTACT"),additions);
         Set<String> removed=new HashSet<>(predecessor); removed.removeAll(expected);
         assertTrue(removed.isEmpty(),"the current successor must preserve every historical EntityType");
         Set<String> unexpected=new HashSet<>(Set.copyOf(currentTokens)); unexpected.removeAll(expected);
         assertTrue(unexpected.isEmpty(),"the current successor must accept no unexpected EntityTypes");
+    }
+
+    @Test void laterSuccessorAddsContactPointVocabularyWithoutLosingPhase2BTokens() throws Exception {
+        Set<String> phase2b=AuditEntityTypeMigrationChain.declaredAllowlist(Files.readString(MIGRATION));
+        List<String> finalTokens=AuditEntityTypeMigrationChain.declaredAllowlistTokens(
+                Files.readString(AuditEntityTypeMigrationChain.PHASE_2C_B));
+        Set<String> finalVocabulary=Set.copyOf(finalTokens);
+        Set<String> additions=new HashSet<>(finalVocabulary); additions.removeAll(phase2b);
+        Set<String> removed=new HashSet<>(phase2b); removed.removeAll(finalVocabulary);
+
+        assertEquals(Set.of("CONTACT_ADDRESS", "CONTACT_PHONE_NUMBER", "CONTACT_EMAIL_ADDRESS"), additions);
+        assertTrue(removed.isEmpty(), "the later successor must preserve CONTACT and every earlier audit token");
+        assertEquals(AuditEntityTypeMigrationChain.currentlyRequiredVocabulary(), finalVocabulary);
+        assertEquals(finalTokens.size(), finalVocabulary.size(), "the final ordered declaration must contain no duplicates");
+        assertEquals(List.of(AuditEntityTypeMigrationChain.PHASE_1C, AuditEntityTypeMigrationChain.PHASE_2B,
+                AuditEntityTypeMigrationChain.PHASE_2C_B), List.of(
+                AuditEntityTypeMigrationChain.PHASE_1C, MIGRATION, AuditEntityTypeMigrationChain.CURRENT));
     }
 
     @Test void scriptsAreGuardedTransactionalAndVerificationIsReadOnly() throws Exception {
