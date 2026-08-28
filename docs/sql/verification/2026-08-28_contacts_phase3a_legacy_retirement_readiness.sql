@@ -58,7 +58,9 @@ INSERT @RlsTargets VALUES(N'ContactPhoneNumbers'),(N'ContactEmailAddresses'),(N'
 INSERT @Schema
 SELECT N'RLS_'+r.TableName,IIF(x.n=1 AND x.bad=0,1,0),N'Exactly one enabled strict tenant FILTER predicate: dbo.'+r.TableName
 FROM @RlsTargets r OUTER APPLY(SELECT COUNT(*) n,SUM(CASE WHEN sp.is_enabled=1 AND spr.predicate_type_desc=N'FILTER' AND spr.operation_desc IS NULL
- AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(spr.predicate_definition,N'[',N''),N']',N''),N' ',N''),N'()',N'')) IN(N'sec.fn_filterbytenant(shaleclientid)',N'sec.fn_filterbytenantshaleclientid') THEN 0 ELSE 1 END) bad
+ AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(spr.predicate_definition,
+     N'[',N''),N']',N''),N' ',N''),NCHAR(9),N''),NCHAR(10),N''),NCHAR(13),N''),N'(',N''),N')',N''))
+     =N'sec.fn_filterbytenantshaleclientid' THEN 0 ELSE 1 END) bad
  FROM sys.security_predicates spr JOIN sys.security_policies sp ON sp.object_id=spr.object_id WHERE spr.target_object_id=OBJECT_ID(N'dbo.'+r.TableName))x;
 
 /* Static parity is intentionally entered only for the complete pre-retirement shape. The

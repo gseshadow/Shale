@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
@@ -75,6 +76,44 @@ class ContactPhase3AReadinessAuditContractTest {
         String u=stripCommentsAndStrings(w).toUpperCase(Locale.ROOT);
         for(String mutation:List.of("INSERT ","UPDATE ","DELETE ","MERGE ","ALTER ","DROP ","TRUNCATE ","CREATE ")) assertFalse(u.contains(mutation),mutation);
         assertFalse(w.contains("DisplayNumber")); assertFalse(w.contains("EmailAddress")); assertFalse(w.contains("LegacyAddressText"));
+    }
+
+    @Test void rlsMatcherAcceptsAzureFormattingButRejectsAnyContractDrift() throws Exception {
+        String audit=sql();
+        assertTrue(audit.contains("N'sec.fn_filterbytenantshaleclientid'"));
+        assertTrue(audit.contains("N'(',N''),N')',N''"));
+        assertTrue(audit.contains("IIF(x.n=1 AND x.bad=0,1,0)"));
+        assertTrue(audit.contains("sp.is_enabled=1"));
+        assertTrue(audit.contains("spr.predicate_type_desc=N'FILTER'"));
+        assertTrue(audit.contains("spr.operation_desc IS NULL"));
+
+        PredicateMetadata azure=new PredicateMetadata(true,"FILTER",null,
+            "([sec].[fn_FilterByTenant]([ShaleClientId]))");
+        assertTrue(hasExactlyOneStrictTenantFilter(List.of(azure)));
+        assertFalse(hasExactlyOneStrictTenantFilter(List.of(new PredicateMetadata(true,"FILTER",null,
+            "([sec].[fn_FilterByTenantOrGlobal]([ShaleClientId]))"))));
+        assertFalse(hasExactlyOneStrictTenantFilter(List.of(new PredicateMetadata(true,"FILTER",null,
+            "([dbo].[fn_FilterByTenant]([ShaleClientId]))"))));
+        assertFalse(hasExactlyOneStrictTenantFilter(List.of(new PredicateMetadata(true,"FILTER",null,
+            "([sec].[fn_FilterByTenant]([TenantId]))"))));
+        assertFalse(hasExactlyOneStrictTenantFilter(List.of(new PredicateMetadata(false,"FILTER",null,
+            "([sec].[fn_FilterByTenant]([ShaleClientId]))"))));
+        assertFalse(hasExactlyOneStrictTenantFilter(List.of(new PredicateMetadata(true,"BLOCK","INSERT",
+            "([sec].[fn_FilterByTenant]([ShaleClientId]))"))));
+        assertFalse(hasExactlyOneStrictTenantFilter(List.of()));
+        assertFalse(hasExactlyOneStrictTenantFilter(List.of(azure,azure)));
+    }
+
+    private record PredicateMetadata(boolean policyEnabled,String predicateType,String operation,String definition) {}
+
+    private static boolean hasExactlyOneStrictTenantFilter(List<PredicateMetadata> predicates) {
+        return predicates.size()==1 && predicates.stream().allMatch(p -> p.policyEnabled()
+            && p.predicateType().equals("FILTER") && p.operation()==null
+            && normalizePredicate(p.definition()).equals("sec.fn_filterbytenantshaleclientid"));
+    }
+
+    private static String normalizePredicate(String value) {
+        return Objects.requireNonNull(value).replaceAll("[\\[\\]\\s()]","").toLowerCase(Locale.ROOT);
     }
 
     private static String stripCommentsAndStrings(String source) {
