@@ -3096,16 +3096,8 @@ public final class CaseDao {
 				  NULLIF(LTRIM(RTRIM(COALESCE(pr.Name, ''))), '') AS RoleName,
 				  NULLIF(LTRIM(RTRIM(COALESCE(cp.Side, ''))), '') AS Side,
 				  COALESCE(cp.IsPrimary, 0) AS IsPrimary,
-				  COALESCE(
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), ''),
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailWork, ''))), ''),
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailOther, ''))), '')
-				  ) AS Email,
-				  COALESCE(
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), ''),
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneHome, ''))), ''),
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneWork, ''))), '')
-				  ) AS Phone
+				  (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) AS Email,
+				  (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone
 				FROM dbo.CaseParties cp
 				INNER JOIN dbo.Cases c
 				  ON c.Id = cp.CaseId
@@ -3176,8 +3168,8 @@ public final class CaseDao {
 				  NULLIF(LTRIM(RTRIM(COALESCE(r.Name, ''))), '') AS RoleName,
 				  NULLIF(LTRIM(RTRIM(COALESCE(cc.Side, ''))), '') AS Side,
 				  COALESCE(cc.IsPrimary, 0) AS IsPrimary,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
+				  (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) AS Email,
+				  (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone
 				FROM dbo.CaseContacts cc
 				INNER JOIN dbo.Cases c
 				  ON c.Id = cc.CaseId
@@ -3294,8 +3286,8 @@ public final class CaseDao {
 				        COALESCE(ct.Name, '')
 				    END
 				  )) AS DisplayName,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
+				  (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) AS Email,
+				  (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone
 				FROM dbo.Contacts ct
 				WHERE ct.ShaleClientId = ?
 				  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
@@ -3368,8 +3360,8 @@ public final class CaseDao {
 				        COALESCE(ct.Name, '')
 				    END
 				  )) AS DisplayName,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
+				  (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) AS Email,
+				  (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone
 				FROM dbo.Contacts ct
 				WHERE ct.ShaleClientId = ?
 				  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
@@ -3772,20 +3764,12 @@ public final class CaseDao {
 					  ) AS DisplayName,
 					  CASE
 					    WHEN cp.ContactId IS NOT NULL THEN
-					      COALESCE(
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), ''),
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailWork, ''))), ''),
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailOther, ''))), '')
-					      )
+					      (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id)
 					    ELSE NULLIF(LTRIM(RTRIM(COALESCE(o.Email, ''))), '')
 					  END AS Email,
 					  CASE
 					    WHEN cp.ContactId IS NOT NULL THEN
-					      COALESCE(
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), ''),
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneHome, ''))), ''),
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneWork, ''))), '')
-					      )
+					      (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id)
 					    ELSE NULLIF(LTRIM(RTRIM(COALESCE(o.Phone, ''))), '')
 					  END AS Phone,
 					  CASE WHEN cp.ContactId IS NOT NULL THEN
@@ -7276,7 +7260,7 @@ public final class CaseDao {
 				FROM dbo.Contacts ct
 				WHERE ct.ShaleClientId = ? AND ISNULL(ct.IsDeleted, 0) = 0
 				  AND %s IS NOT NULL
-				  AND (? = '' OR LOWER(COALESCE(ct.Name,'') + ' ' + COALESCE(ct.FirstName,'') + ' ' + COALESCE(ct.LastName,'') + ' ' + COALESCE(ct.WorkName,'') + ' ' + COALESCE(ct.EmailPersonal,'') + ' ' + COALESCE(ct.EmailWork,'') + ' ' + COALESCE(ct.EmailOther,'')) LIKE ?)
+				  AND (? = '' OR LOWER(COALESCE(ct.Name,'') + ' ' + COALESCE(ct.FirstName,'') + ' ' + COALESCE(ct.LastName,'') + ' ' + COALESCE(ct.WorkName,'') + ' ' + COALESCE((SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id),'')) LIKE ?)
 				ORDER BY DisplayName ASC, ct.Id ASC
 				"""
 				.formatted(caseLinkShareContactDisplayNameExpression("ct"), caseLinkShareContactDisplayNameExpression("ct"));
@@ -7350,8 +7334,8 @@ public final class CaseDao {
 				SELECT EntityType, EntityId, DisplayName, Email, Phone, OrganizationTypeName
 				FROM (
 				  SELECT 'contact' EntityType, ct.Id EntityId, %s DisplayName,
-				         COALESCE(ct.EmailPersonal,ct.EmailWork,ct.EmailOther) Email,
-				         NULLIF(LTRIM(RTRIM(ct.PhoneCell)),'') Phone,
+				         (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) Email,
+				         (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) Phone,
 				         CAST(NULL AS nvarchar(255)) OrganizationTypeName
 				  FROM dbo.CaseParties cp JOIN dbo.Cases c ON c.Id=cp.CaseId
 				  JOIN dbo.Contacts ct ON ct.Id=cp.ContactId

@@ -67,7 +67,7 @@ public final class ContactDao {
             String displayName,
             String email,
             String phone,
-            String addressHome,
+            String address,
             LocalDate dateOfBirth,
             String condition,
             boolean deceased,
@@ -86,7 +86,7 @@ public final class ContactDao {
             String lastName,
             String email,
             String phone,
-            String addressHome,
+            String address,
             LocalDate dateOfBirth,
             String condition,
             boolean deceased,
@@ -169,7 +169,7 @@ public final class ContactDao {
             String lastName,
             String email,
             String phone,
-            String addressHome,
+            String address,
             LocalDate dateOfBirth,
             String condition,
             boolean deceased,
@@ -723,9 +723,6 @@ public final class ContactDao {
             hasAssignments = appendAssignment(sql, hasAssignments, schema.nameColumn());
             hasAssignments = appendAssignment(sql, hasAssignments, schema.firstNameColumn());
             hasAssignments = appendAssignment(sql, hasAssignments, schema.lastNameColumn());
-            hasAssignments = appendAssignment(sql, hasAssignments, schema.emailColumn());
-            hasAssignments = appendAssignment(sql, hasAssignments, schema.phoneColumn());
-            hasAssignments = appendAssignment(sql, hasAssignments, schema.addressHomeColumn());
             hasAssignments = appendAssignment(sql, hasAssignments, schema.dateOfBirthColumn());
             hasAssignments = appendAssignment(sql, hasAssignments, schema.conditionColumn());
             hasAssignments = appendAssignment(sql, hasAssignments, schema.deceasedColumn());
@@ -749,15 +746,6 @@ public final class ContactDao {
                 if (schema.lastNameColumn() != null) {
                     setNullableString(ps, idx++, request.lastName());
                 }
-                if (schema.emailColumn() != null) {
-                    setNullableString(ps, idx++, request.email());
-                }
-                if (schema.phoneColumn() != null) {
-                    setNullableString(ps, idx++, request.phone());
-                }
-                if (schema.addressHomeColumn() != null) {
-                    setNullableString(ps, idx++, request.addressHome());
-                }
                 if (schema.dateOfBirthColumn() != null) {
                     setNullableDate(ps, idx++, request.dateOfBirth());
                 }
@@ -777,6 +765,8 @@ public final class ContactDao {
                 ps.setInt(idx++, request.shaleClientId());
                 boolean updated = ps.executeUpdate() > 0;
                 if (updated) {
+                    replaceBasicStructuredPoints(con, request.contactId(), request.shaleClientId(), request.actorUserId(),
+                            request.email(), request.phone(), request.address());
                     ContactDetailRow after = findById(request.contactId(), request.shaleClientId());
                     if (before != null && after != null) {
                         phiAuditService.auditUpdate(
@@ -827,18 +817,6 @@ public final class ContactDao {
             if (schema.lastNameColumn() != null) {
                 columns.add(schema.lastNameColumn());
                 values.add(normalizedLastName);
-            }
-            if (schema.emailColumn() != null) {
-                columns.add(schema.emailColumn());
-                values.add(normalizeOptional(request.email()));
-            }
-            if (schema.phoneColumn() != null) {
-                columns.add(schema.phoneColumn());
-                values.add(normalizeOptional(request.phone()));
-            }
-            if (schema.addressHomeColumn() != null) {
-                columns.add(schema.addressHomeColumn());
-                values.add(normalizeOptional(request.addressHome()));
             }
             if (schema.dateOfBirthColumn() != null) {
                 columns.add(schema.dateOfBirthColumn());
@@ -892,6 +870,8 @@ public final class ContactDao {
                         throw new RuntimeException("Failed to create contact.");
                     }
                     int contactId = rs.getInt(1);
+                    replaceBasicStructuredPoints(con, contactId, request.shaleClientId(), request.actorUserId(),
+                            request.email(), request.phone(), request.address());
                     if (normalizeOptional(request.condition()) != null) {
                         phiAuditService.auditUpdate(
                                 request.actorUserId(),
@@ -906,6 +886,46 @@ public final class ContactDao {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create contact", e);
+        }
+    }
+
+    /**
+     * Transitional basic-profile callers still supply one current value per category, but those
+     * values are authoritative structured rows. This method deliberately has no dbo.Contacts
+     * projection or column discovery.
+     */
+    private static void replaceBasicStructuredPoints(Connection con, int contactId, int tenantId,
+            Integer actorUserId, String email, String phone, String address) throws SQLException {
+        replaceBasicStructuredPoint(con, "ContactEmailAddresses", "EmailAddress,NormalizedEmail", contactId,
+                tenantId, actorUserId, "PERSONAL", normalizeOptional(email),
+                normalizeOptional(email) == null ? null : normalizeOptional(email).toLowerCase(Locale.ROOT));
+        String normalizedPhone = normalizeOptional(phone) == null ? null
+                : normalizeOptional(phone).replaceAll("[^0-9+]", "");
+        replaceBasicStructuredPoint(con, "ContactPhoneNumbers", "DisplayNumber,NormalizedNumber", contactId,
+                tenantId, actorUserId, "MOBILE", normalizeOptional(phone), normalizedPhone);
+        replaceBasicStructuredPoint(con, "ContactAddresses", "LegacyAddressText", contactId,
+                tenantId, actorUserId, "HOME", normalizeOptional(address));
+    }
+
+    private static void replaceBasicStructuredPoint(Connection con, String table, String valueColumns,
+            int contactId, int tenantId, Integer actorUserId, String kind, String... values) throws SQLException {
+        String remove = "UPDATE dbo." + table + " SET IsDeleted=1,IsPrimary=0,DeletedAt=SYSUTCDATETIME(),"
+                + "DeletedByUserId=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? "
+                + "WHERE ContactId=? AND ShaleClientId=? AND Kind=? AND IsDeleted=0";
+        try (PreparedStatement ps = con.prepareStatement(remove)) {
+            if (actorUserId == null) { ps.setNull(1, Types.INTEGER); ps.setNull(2, Types.INTEGER); }
+            else { ps.setInt(1, actorUserId); ps.setInt(2, actorUserId); }
+            ps.setInt(3, contactId); ps.setInt(4, tenantId); ps.setString(5, kind); ps.executeUpdate();
+        }
+        if (values.length == 0 || values[0] == null) return;
+        String placeholders = String.join(",", Collections.nCopies(values.length, "?"));
+        String insert = "INSERT dbo." + table + " (ShaleClientId,ContactId,Kind," + valueColumns
+                + ",IsPrimary,SortOrder,CreatedByUserId) VALUES (?,?,?," + placeholders + ",1,0,?)";
+        try (PreparedStatement ps = con.prepareStatement(insert)) {
+            int i=1; ps.setInt(i++,tenantId); ps.setInt(i++,contactId); ps.setString(i++,kind);
+            for (String value : values) ps.setString(i++, value);
+            if (actorUserId == null) ps.setNull(i, Types.INTEGER); else ps.setInt(i, actorUserId);
+            ps.executeUpdate();
         }
     }
 
@@ -1038,7 +1058,7 @@ public final class ContactDao {
                         rs.getString("DisplayName"),
                         rs.getString("Email"),
                         rs.getString("Phone"),
-                        rs.getString("AddressHome"),
+                        rs.getString("Address"),
                         dob == null ? null : dob.toLocalDate(),
                         rs.getString("Condition"),
                         rs.getBoolean("IsDeceased"),
@@ -1292,7 +1312,7 @@ public final class ContactDao {
                 + "CASE WHEN NULLIF(a.PostalCode,N'') IS NULL THEN N'' ELSE N' '+a.PostalCode END,"
                 + "CASE WHEN NULLIF(a.CountryCode,N'') IS NULL THEN N'' ELSE N', '+a.CountryCode END))),N'')) "
                 + "FROM dbo.ContactAddresses a WHERE a.ContactId=" + alias + ".Id AND a.ShaleClientId=" + alias + "." + tenantColumn
-                + " AND a.IsDeleted=0 ORDER BY a.IsPrimary DESC,a.SortOrder,a.Id) AS AddressHome";
+                + " AND a.IsDeleted=0 ORDER BY a.IsPrimary DESC,a.SortOrder,a.Id) AS Address";
     }
 
     private static String globalSearchClause(ContactSchema schema, String alias) {
@@ -1536,9 +1556,6 @@ public final class ContactDao {
             String nameColumn,
             String firstNameColumn,
             String lastNameColumn,
-            String emailColumn,
-            String phoneColumn,
-            String addressHomeColumn,
             String dateOfBirthColumn,
             String conditionColumn,
             String deceasedColumn,
@@ -1553,9 +1570,6 @@ public final class ContactDao {
                     existingColumn(con, "Contacts", List.of("DisplayName", "Name", "FullName", "name")),
                     existingColumn(con, "Contacts", List.of("FirstName", "NameFirst", "name_first", "first_name")),
                     existingColumn(con, "Contacts", List.of("LastName", "NameLast", "name_last", "last_name")),
-                    existingColumn(con, "Contacts", List.of("Email", "EmailPersonal", "email_personal", "email")),
-                    existingColumn(con, "Contacts", List.of("Phone", "PhoneCell", "phone_cell", "PhoneNumber", "phone", "phone_number")),
-                    existingColumn(con, "Contacts", List.of("AddressHome", "address_home", "Address", "HomeAddress")),
                     existingColumn(con, "Contacts", List.of("DateOfBirth", "date_of_birth")),
                     existingColumn(con, "Contacts", List.of("Condition", "condition")),
                     existingColumn(con, "Contacts", List.of("IsDeceased", "is_deceased")),

@@ -94,7 +94,7 @@ public interface ContactServicePort {
 			String displayName,
 			String email,
 			String phone,
-			String addressHome,
+			String address,
 			String dateOfBirth,
 			String condition,
 			boolean deceased,
@@ -189,7 +189,7 @@ public interface ContactServicePort {
 			String lastName,
 			String email,
 			String phone,
-			String addressHome,
+			String address,
 			String dateOfBirth,
 			String condition,
 			Boolean deceased) {
@@ -204,7 +204,7 @@ public interface ContactServicePort {
 			String lastName,
 			String email,
 			String phone,
-			String addressHome,
+			String address,
 			String dateOfBirth,
 			String condition,
 			Boolean deceased) {
