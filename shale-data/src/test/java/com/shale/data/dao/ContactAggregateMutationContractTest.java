@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 final class ContactAggregateMutationContractTest {
     private static final String AGGREGATE_SIGNATURE = "void aggregate(UpdateContactProfileCommand c)";
     private static final String CONTACT_UPDATE_SIGNATURE =
-            "private static void updateStructuredContact(Connection con,UpdateContactProfileCommand c)";
+            "private void updateStructuredContact(Connection con,UpdateContactProfileCommand c)";
 
     private static String source() throws Exception {
         return normalizeLineEndings(Files.readString(
@@ -62,20 +62,24 @@ final class ContactAggregateMutationContractTest {
     @Test
     void structuredContactUpdateUsesExactContactConcurrencyGuard() throws Exception {
         String update = extractMethod(source(), CONTACT_UPDATE_SIGNATURE);
+        int updateSqlStart = update.indexOf("String sql=");
+        String updateSql = update.substring(updateSqlStart, update.indexOf(';', updateSqlStart));
+        String mutation = update.substring(updateSqlStart, update.indexOf("stale(p.executeUpdate())"));
 
         for (String field : new String[] {
-                "Name=?", "Prefix=?", "FirstName=?", "MiddleName=?", "LastName=?", "PreferredName=?", "Suffix=?"
+                "Name=?", "Prefix=?", "FirstName=?", "MiddleName=?", "LastName=?", "PreferredName=?", "Suffix=?",
+                "DateOfBirth=?", "Condition=?", "IsDeceased=?"
         }) {
-            assertTrue(update.contains(field), "structured Contact update must include " + field);
+            assertTrue(updateSql.contains(field), "structured Contact update must include " + field);
         }
-        assertFalse(update.contains("UpdatedByUserId"),
+        assertFalse(updateSql.contains("UpdatedByUserId"),
                 "dbo.Contacts does not own UpdatedByUserId");
-        assertFalse(update.contains("c.actorUserId()"),
+        assertFalse(mutation.contains("c.actorUserId()"),
                 "the removed UpdatedByUserId placeholder must not retain an actor binding");
-        assertEquals(10, occurrences(update, "=?"),
-                "non-null concurrency SQL must have seven fields, two scope IDs, and one timestamp parameter");
-        assertEquals(7, occurrences(update, "setString(p,i++"),
-                "the seven Contact fields must be bound first and in SQL order");
+        assertEquals(13, occurrences(updateSql, "=?"),
+                "non-null concurrency SQL must have ten fields, two scope IDs, and one timestamp parameter");
+        assertEquals(8, occurrences(update, "setString(p,i++"),
+                "the seven name fields and Condition must be bound in SQL order");
         assertTrue(update.contains("p.setInt(i++,c.contactId());\n            p.setInt(i++,c.shaleClientId())"),
                 "Contact and tenant bindings must immediately follow the seven field bindings");
         assertTrue(update.contains("WHERE Id=? AND ShaleClientId=?"),
