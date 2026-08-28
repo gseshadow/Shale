@@ -110,7 +110,7 @@ public final class ApiReadController {
             String lastName,
             String email,
             String phone,
-            String addressHome,
+            String address,
             String dateOfBirth,
             String condition,
             Boolean deceased) {
@@ -122,7 +122,7 @@ public final class ApiReadController {
             String lastName,
             String email,
             String phone,
-            String addressHome,
+            String address,
             String dateOfBirth,
             String condition,
             Boolean deceased) {
@@ -492,11 +492,11 @@ public final class ApiReadController {
         }
         String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
         String phone = ApiValidation.optionalContactText(request == null ? null : request.phone(), "Phone", 100);
-        String addressHome = ApiValidation.optionalContactText(request == null ? null : request.addressHome(), "Address", 2000);
+        String address = ApiValidation.optionalContactText(request == null ? null : request.address(), "Address", 2000);
         String dateOfBirth = ApiValidation.optionalDateText(request == null ? null : request.dateOfBirth(), "Date of birth");
         String condition = ApiValidation.optionalContactText(request == null ? null : request.condition(), "Notes", 10000);
         int contactId = contactServicePort.createContact(new ContactServicePort.CreateContactCommand(
-                shaleClientId, userId, displayName, firstName, lastName, email, phone, addressHome, dateOfBirth, condition, request == null ? null : request.deceased()));
+                shaleClientId, userId, displayName, firstName, lastName, email, phone, address, dateOfBirth, condition, request == null ? null : request.deceased()));
         return contactServicePort.getContactDetail(contactId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found."));
     }
@@ -525,11 +525,11 @@ public final class ApiReadController {
         }
         String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
         String phone = ApiValidation.optionalContactText(request == null ? null : request.phone(), "Phone", 100);
-        String addressHome = ApiValidation.optionalContactText(request == null ? null : request.addressHome(), "Address", 2000);
+        String address = ApiValidation.optionalContactText(request == null ? null : request.address(), "Address", 2000);
         String dateOfBirth = ApiValidation.optionalDateText(request == null ? null : request.dateOfBirth(), "Date of birth");
         String condition = ApiValidation.optionalContactText(request == null ? null : request.condition(), "Notes", 10000);
         boolean updated = contactServicePort.updateContact(new ContactServicePort.UpdateContactCommand(
-                safeContactId, shaleClientId, userId, displayName, firstName, lastName, email, phone, addressHome, dateOfBirth, condition, request == null ? null : request.deceased()));
+                safeContactId, shaleClientId, userId, displayName, firstName, lastName, email, phone, address, dateOfBirth, condition, request == null ? null : request.deceased()));
         if (!updated) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found.");
         }

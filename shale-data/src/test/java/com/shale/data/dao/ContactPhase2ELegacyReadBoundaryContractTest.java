@@ -26,16 +26,15 @@ class ContactPhase2ELegacyReadBoundaryContractTest {
         assertTrue(source.contains("ORDER BY a.IsPrimary DESC,a.SortOrder,a.Id"));
         assertFalse(source.contains("optionalColumnExpression(schema.emailColumn(), \"c\", \"Email\")"));
         assertFalse(source.contains("optionalColumnExpression(schema.phoneColumn(), \"c\", \"Phone\")"));
-        assertFalse(source.contains("optionalColumnExpression(schema.addressHomeColumn(), \"c\", \"AddressHome\")"));
+        assertFalse(source.contains("optionalColumnExpression(schema.addressColumn(), \"c\", \"Address\")"));
     }
 
-    @Test void expertScalarIsOnlyACompatibilityWriteInProductionJava() throws Exception {
+    @Test void expertScalarHasNoRuntimeDependency() throws Exception {
         String dao = contactDao();
         String mutation = Files.readString(Path.of("src/main/java/com/shale/data/dao/ContactMutationDao.java"));
         assertFalse(dao.contains("IsExpert"));
-        assertTrue(mutation.contains("SET IsExpert="));
+        assertFalse(mutation.contains("IsExpert"));
         assertFalse(mutation.contains("SELECT IsExpert"));
-        assertTrue(mutation.contains("d.SystemKey=N'expert'"));
     }
 
     @Test void everyProductionLegacyReferenceHasAnExplicitNarrowClassification() throws Exception {
@@ -59,11 +58,8 @@ class ContactPhase2ELegacyReadBoundaryContractTest {
     }
 
     private static boolean isAllowlisted(String file,String column,String line) {
-        if(file.equals("com/shale/data/dao/ContactMutationDao.java"))
-            return line.contains("columns={") || line.contains("SET IsExpert="); // compatibility writes only
-        if(file.equals("com/shale/data/dao/ContactDao.java"))
-            return (column.equals("AddressHome") && (line.contains("getString") || line.contains(" AS AddressHome")))
-                || line.contains("existingColumn(con, \"Contacts\""); // structured alias or schema discovery
+        if(file.equals("com/shale/data/dao/ContactMutationDao.java") || file.equals("com/shale/data/dao/ContactDao.java"))
+            return false;
         if(file.equals("com/shale/data/dao/CaseDao.java"))
             return !column.equals("IsExpert") && (line.contains("ct.") || line.equals(column+",")); // documented immutable Case snapshots
         if(file.equals("com/shale/data/dao/UserDao.java"))
