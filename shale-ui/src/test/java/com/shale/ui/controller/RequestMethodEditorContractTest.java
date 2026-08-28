@@ -14,17 +14,17 @@ final class RequestMethodEditorContractTest {
 
     @Test void requestMethodUsesSharedColorPickerWithoutEditableSortOrder() {
         String dialog = method("showRequestLookupDialog");
-        assertTrue(dialog.contains("new ColorPicker(dbColorToFx(existing==null?null:existing.color()))"));
-        assertTrue(dialog.contains("grid.add(new Label(\"Color\")"));
-        assertTrue(dialog.contains("if(kind!=RequestLookupKind.REQUEST_METHOD){grid.add(new Label(\"Sort Order\")"));
-        assertTrue(dialog.contains("grid.add(active"));
-        assertTrue(dialog.contains("new Label(\"System Key\")"));
+        assertTrue(containsCode(dialog, "new ColorPicker(dbColorToFx(existing==null?null:existing.color()))"));
+        assertTrue(containsCode(dialog, "grid.add(new Label(\"Color\")"));
+        assertTrue(containsCode(dialog, "if(kind!=RequestLookupKind.REQUEST_METHOD){grid.add(new Label(\"Sort Order\")"));
+        assertTrue(containsCode(dialog, "grid.add(active"));
+        assertTrue(containsCode(dialog, "new Label(\"System Key\")"));
     }
 
     @Test void settingsPreservesEditOrderAndLetsDaoAssignCreateOrder() {
         assertTrue(method("addRequestLookup").contains("input.systemKey(),null,null"));
         assertTrue(method("editRequestLookup").contains("row.systemKey(),row.sortOrder(),row.rowVer()"));
-        assertTrue(SETTINGS.contains("safe(d.color())"));
+        assertTrue(containsCode(SETTINGS, "safe(d.color())"));
     }
 
     @Test void requestMethodColorIsUsedByMaterialRequestSelectorsWhileValueContractStaysTextBased() {
@@ -38,15 +38,15 @@ final class RequestMethodEditorContractTest {
 
         assertTrue(card.replace(" ", "").contains(("header.getChildren().addAll(dot, name, spacer, " + pill + ")").replace(" ", "")),
                 "The common row header must place the shared name/color pill after its growing spacer.");
-        assertFalse(card.contains("kind != RequestLookupKind.REQUEST_METHOD"),
+        assertFalse(containsCode(card, "kind != RequestLookupKind.REQUEST_METHOD"),
                 "Request Methods must not be excluded from the pill shared with Request Statuses.");
-        assertTrue(card.contains("row.active() ? \"Active\" : \"Inactive\""));
-        assertTrue(card.contains("metadataPill(row.scopeLabel())"));
-        assertTrue(card.contains("metadataPill(\"System: \" + row.systemKey())"));
-        assertTrue(card.contains("metadataPill(row.color())"));
-        assertTrue(card.contains("row.global() ? \"Customize\" : \"Edit\""));
-        assertTrue(card.contains("row.active() ? \"Deactivate\" : \"Activate\""));
-        assertTrue(card.contains("row.custom() ? \"Remove\" : \"Reset to Default\""));
+        assertTrue(containsCode(card, "row.active() ? \"Active\" : \"Inactive\""));
+        assertTrue(containsCode(card, "metadataPill(row.scopeLabel())"));
+        assertTrue(containsCode(card, "metadataPill(\"System: \" + row.systemKey())"));
+        assertTrue(containsCode(card, "metadataPill(row.color())"));
+        assertTrue(containsCode(card, "row.global() ? \"Customize\" : \"Edit\""));
+        assertTrue(containsCode(card, "row.active() ? \"Deactivate\" : \"Activate\""));
+        assertTrue(containsCode(card, "row.custom() ? \"Remove\" : \"Reset to Default\""));
     }
 
     @Test void lookupNamePillRetainsSharedReadableTextAndInvalidColorFallback() {
@@ -86,5 +86,9 @@ final class RequestMethodEditorContractTest {
     private static String read(String path) {
         try { return Files.readString(Path.of(path)); }
         catch (Exception e) { throw new AssertionError(e); }
+    }
+
+    private static boolean containsCode(String source, String expected) {
+        return source.replaceAll("\\s+", "").contains(expected.replaceAll("\\s+", ""));
     }
 }

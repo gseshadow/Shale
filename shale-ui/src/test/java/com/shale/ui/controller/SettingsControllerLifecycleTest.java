@@ -28,38 +28,38 @@ final class SettingsControllerLifecycleTest {
         String initialize = methodSource(source, "initialize");
         String loadAdminSections = methodSource(source, "loadAdminSectionsAsync");
 
-        assertTrue(initialize.contains("loadAdminSectionsAsync();"),
+        assertTrue(containsCode(initialize, "loadAdminSectionsAsync();"),
                 "SceneManager injects SettingsController dependencies through the controller factory before FXML initialize(); initialize should start non-blocking section hydration.");
-        assertTrue(loadAdminSections.contains("if (!fxmlReady || !isAdminUser()) return;"),
+        assertTrue(containsCode(loadAdminSections, "if (!fxmlReady || !isAdminUser()) return;"),
                 "Settings async hydration must preserve admin-only lookup-management visibility and service access.");
-        assertTrue(loadAdminSections.contains("loadCaseStatusesAsync(null);"),
+        assertTrue(containsCode(loadAdminSections, "loadCaseStatusesAsync(null);"),
                 "SettingsController.initialize() should asynchronously populate Settings > Case Statuses for admins when service injection already happened.");
-        assertTrue(loadAdminSections.contains("loadPracticeAreasAsync(null);"),
+        assertTrue(containsCode(loadAdminSections, "loadPracticeAreasAsync(null);"),
                 "SettingsController.initialize() should asynchronously populate Settings > Practice Areas for admins when service injection already happened.");
-        assertTrue(loadAdminSections.contains("loadLinkTypesAsync(null);"),
+        assertTrue(containsCode(loadAdminSections, "loadLinkTypesAsync(null);"),
                 "SettingsController.initialize() should asynchronously populate Settings > Link Types for admins when service injection already happened.");
-        assertTrue(loadAdminSections.contains("loadManagedUsersAsync(null);"),
+        assertTrue(containsCode(loadAdminSections, "loadManagedUsersAsync(null);"),
                 "SettingsController.initialize() should asynchronously populate Settings > User Management for admins when service injection already happened.");
     }
     @Test
     void settingsSectionHydrationUsesBackgroundExecutorAndStaleResultGuards() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
 
-        assertTrue(source.contains("Executors.newFixedThreadPool(4"),
+        assertTrue(containsCode(source, "Executors.newFixedThreadPool(4"),
                 "Independent Settings sections should hydrate on a background executor instead of the JavaFX application thread.");
-        assertTrue(source.contains("settingsLoadExecutor.submit"),
+        assertTrue(containsCode(source, "settingsLoadExecutor.submit"),
                 "Settings service/DAO calls should be submitted to the background executor.");
-        assertTrue(source.contains("Platform.runLater(() -> applyCaseStatusRows"),
+        assertTrue(containsCode(source, "Platform.runLater(() -> applyCaseStatusRows"),
                 "Case Status UI application must happen on the JavaFX application thread.");
-        assertTrue(source.contains("Platform.runLater(() -> applyPracticeAreaRows"),
+        assertTrue(containsCode(source, "Platform.runLater(() -> applyPracticeAreaRows"),
                 "Practice Area UI application must happen on the JavaFX application thread.");
-        assertTrue(source.contains("Platform.runLater(() -> {"),
+        assertTrue(containsCode(source, "Platform.runLater(() -> {"),
                 "User-management UI application must happen on the JavaFX application thread.");
-        assertTrue(source.contains("if (generation != caseStatusLoadGeneration) return;"),
+        assertTrue(containsCode(source, "if (generation != caseStatusLoadGeneration) return;"),
                 "Case Status async results need stale-result protection.");
-        assertTrue(source.contains("if (generation != practiceAreaLoadGeneration) return;"),
+        assertTrue(containsCode(source, "if (generation != practiceAreaLoadGeneration) return;"),
                 "Practice Area async results need stale-result protection.");
-        assertTrue(source.contains("if (generation != userManagementLoadGeneration) return;"),
+        assertTrue(containsCode(source, "if (generation != userManagementLoadGeneration) return;"),
                 "User Management async results need stale-result protection.");
     }
 
@@ -103,9 +103,9 @@ final class SettingsControllerLifecycleTest {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
         String method = methodSource(source, "showCaseStatusDialog");
 
-        assertTrue(method.contains("AppDialogs.applySecondaryDialogShell"),
+        assertTrue(containsCode(method, "AppDialogs.applySecondaryDialogShell"),
                 "Case status dialogs should use the same secondary dialog shell as existing Shale dialogs instead of the default JavaFX window chrome/icon.");
-        assertTrue(!method.contains("new Label(\"Sort Order\")"),
+        assertTrue(!containsCode(method, "new Label(\"Sort Order\")"),
                 "Sort Order should remain table/reorder-button driven and not be a manual dialog field.");
     }
 
@@ -121,28 +121,28 @@ final class SettingsControllerLifecycleTest {
         assertTrue(fxml.contains("fx:id=\"taskAssignedToMeCheck\""));
         assertTrue(fxml.contains("fx:id=\"notificationSettingsStatusLabel\""),
                 "General notification settings should remain present for non-admin Settings users.");
-        assertTrue(source.contains("caseStatusAdministrationSection.setVisible(visible)"));
-        assertTrue(source.contains("caseStatusAdministrationSection.setManaged(visible)"));
-        assertTrue(source.contains("practiceAreaAdministrationSection.setVisible(visible)"));
-        assertTrue(source.contains("practiceAreaAdministrationSection.setManaged(visible)"));
+        assertTrue(containsCode(source, "caseStatusAdministrationSection.setVisible(visible)"));
+        assertTrue(containsCode(source, "caseStatusAdministrationSection.setManaged(visible)"));
+        assertTrue(containsCode(source, "practiceAreaAdministrationSection.setVisible(visible)"));
+        assertTrue(containsCode(source, "practiceAreaAdministrationSection.setManaged(visible)"));
     }
 
     @Test
     void lookupManagementLoadsAndActionsRequireAdmin() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
 
-        assertTrue(source.contains("private boolean requireAdminLookupManagement"),
+        assertTrue(containsCode(source, "private boolean requireAdminLookupManagement"),
                 "Lookup-management controller paths should share an admin authorization guard.");
-        assertTrue(source.contains("if (!requireAdminLookupManagement(\"Case Statuses\"))"),
+        assertTrue(containsCode(source, "if (!requireAdminLookupManagement(\"Case Statuses\"))"),
                 "Case status load/edit paths must reject non-admins before service calls.");
-        assertTrue(source.contains("if (!requireAdminLookupManagement(\"Practice Areas\"))"),
+        assertTrue(containsCode(source, "if (!requireAdminLookupManagement(\"Practice Areas\"))"),
                 "Practice area load/edit paths must reject non-admins before service calls.");
-        assertTrue(source.contains("caseService.createCaseStatus"));
-        assertTrue(source.contains("caseService.updateCaseStatus"));
-        assertTrue(source.contains("caseService.reorderCaseStatuses"));
-        assertTrue(source.contains("caseService.createPracticeArea"));
-        assertTrue(source.contains("caseService.updatePracticeArea"));
-        assertTrue(source.contains("caseService.deactivatePracticeArea"));
+        assertTrue(containsCode(source, "caseService.createCaseStatus"));
+        assertTrue(containsCode(source, "caseService.updateCaseStatus"));
+        assertTrue(containsCode(source, "caseService.reorderCaseStatuses"));
+        assertTrue(containsCode(source, "caseService.createPracticeArea"));
+        assertTrue(containsCode(source, "caseService.updatePracticeArea"));
+        assertTrue(containsCode(source, "caseService.deactivatePracticeArea"));
     }
 
 
@@ -153,14 +153,14 @@ final class SettingsControllerLifecycleTest {
 
         assertTrue(fxml.contains("fx:id=\"userAdministrationSection\""));
         assertTrue(fxml.contains("text=\"Add User\""));
-        assertTrue(source.contains("if (!isAdminUser())"),
+        assertTrue(containsCode(source, "if (!isAdminUser())"),
                 "Settings Add User handler must block non-admin users before opening or saving the dialog.");
-        assertTrue(source.contains("new UserDao.UserCreateRequest("));
-        assertTrue(!source.contains("shaleClientId,"),
+        assertTrue(containsCode(source, "new UserDao.UserCreateRequest("));
+        assertTrue(!containsCode(source, "shaleClientId,"),
                 "The Add User form must not provide a ShaleClientId value; UserDao derives it from session context.");
-        assertTrue(!source.contains("Default Organization"),
+        assertTrue(!containsCode(source, "Default Organization"),
                 "The Add User form should not expose organization fields until user organization editing is supported in the UI.");
-        assertTrue(!source.contains("new Label(\"Organization\")"),
+        assertTrue(!containsCode(source, "new Label(\"Organization\")"),
                 "The Add User form should not expose raw organization ids.");
     }
 
@@ -175,9 +175,9 @@ final class SettingsControllerLifecycleTest {
         assertTrue(fxml.contains("onAction=\"#onDeactivateUser\""));
         assertTrue(fxml.contains("onAction=\"#onReactivateUser\""));
         assertTrue(fxml.contains("onAction=\"#onResetUserPassword\""));
-        assertTrue(source.contains("focusedProperty().addListener"),
+        assertTrue(containsCode(source, "focusedProperty().addListener"),
                 "Email duplicate validation should run when the Add User email field loses focus.");
-        assertTrue(source.contains("findExistingEmailForCurrentTenant"),
+        assertTrue(containsCode(source, "findExistingEmailForCurrentTenant"),
                 "UI duplicate validation should use the DAO normalization/tenant-aware lookup.");
     }
 
@@ -191,9 +191,9 @@ final class SettingsControllerLifecycleTest {
         assertEquals("Confirm password is required.", SettingsController.resetPasswordValidationMessage("newPassword1", ""));
         assertEquals("Passwords do not match.", SettingsController.resetPasswordValidationMessage("newPassword1", "differentPassword1"));
         assertEquals("", SettingsController.resetPasswordValidationMessage("newPassword1", "newPassword1"));
-        assertTrue(method.contains("addEventFilter(javafx.event.ActionEvent.ACTION"));
-        assertTrue(method.contains("event.consume()"));
-        assertTrue(!method.contains("throw new IllegalArgumentException(\"Passwords"),
+        assertTrue(containsCode(method, "addEventFilter(javafx.event.ActionEvent.ACTION"));
+        assertTrue(containsCode(method, "event.consume()"));
+        assertTrue(!containsCode(method, "throw new IllegalArgumentException(\"Passwords"),
                 "Reset password validation failures should keep the dialog open with inline feedback, not throw from the result converter.");
     }
 
@@ -211,11 +211,11 @@ final class SettingsControllerLifecycleTest {
         assertEquals(void.class, handler.getReturnType());
         assertTrue(handler.isAnnotationPresent(FXML.class),
                 "FXML action handlers declared private must be annotated and accept the JavaFX action event.");
-        assertTrue(method.contains("if (!isAdminUser() || onOpenAuditLog == null)"),
+        assertTrue(containsCode(method, "if (!isAdminUser() || onOpenAuditLog == null)"),
                 "Settings audit-log navigation must preserve the existing admin permission guard.");
-        assertTrue(method.contains("onOpenAuditLog.run();"),
+        assertTrue(containsCode(method, "onOpenAuditLog.run();"),
                 "Settings audit-log action should route through the SceneManager-supplied navigation callback.");
-        assertTrue(method.contains("AppDialogs.showError"),
+        assertTrue(containsCode(method, "AppDialogs.showError"),
                 "Audit-log navigation failures should be shown as sanitized user-facing errors.");
     }
 
@@ -242,4 +242,8 @@ final class SettingsControllerLifecycleTest {
         return fail("Expected SettingsController method '" + methodName + "' to have a complete brace-delimited body.");
     }
 
+
+    private static boolean containsCode(String source, String expected) {
+        return source.replaceAll("\\s+", "").contains(expected.replaceAll("\\s+", ""));
+    }
 }

@@ -32,15 +32,15 @@ final class SettingsLinkTypeAdministrationTest {
 		String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
 
 		assertTrue(fxml.contains("fx:id=\"linkTypeAdministrationSection\""));
-		assertTrue(source.contains("linkTypeAdministrationSection.setVisible(visible)"));
-		assertTrue(source.contains("loadLinkTypesAsync(null);"));
-		assertTrue(source.contains("caseService.listLinkTypesForAdministration(tenantId, actorUserId)"));
-		assertTrue(source.contains("settingsLoadExecutor.submit"));
-		assertTrue(source.contains("Platform.runLater(() -> applyLinkTypeRows"));
-		assertTrue(source.contains("if (generation != linkTypeLoadGeneration) return;"));
-		assertTrue(source.contains("appState.getShaleClientId()"));
-		assertTrue(source.contains("appState.getUserId()"));
-		assertTrue(source.contains("selected.rowVer()"));
+		assertTrue(containsCode(source, "linkTypeAdministrationSection.setVisible(visible)"));
+		assertTrue(containsCode(source, "loadLinkTypesAsync(null);"));
+		assertTrue(containsCode(source, "caseService.listLinkTypesForAdministration(tenantId, actorUserId)"));
+		assertTrue(containsCode(source, "settingsLoadExecutor.submit"));
+		assertTrue(containsCode(source, "Platform.runLater(() -> applyLinkTypeRows"));
+		assertTrue(containsCode(source, "if (generation != linkTypeLoadGeneration) return;"));
+		assertTrue(containsCode(source, "appState.getShaleClientId()"));
+		assertTrue(containsCode(source, "appState.getUserId()"));
+		assertTrue(containsCode(source, "selected.rowVer()"));
 	}
 
 	@Test
@@ -50,4 +50,8 @@ final class SettingsLinkTypeAdministrationTest {
 		assertEquals(0xEB / 255.0, SettingsController.dbColorToFx("#2563EB").getBlue(), 0.0001);
 		assertEquals(0x28 / 255.0, SettingsController.dbColorToFx("0x28A745FF").getRed(), 0.0001);
 	}
+
+    private static boolean containsCode(String source, String expected) {
+        return source.replaceAll("\\s+", "").contains(expected.replaceAll("\\s+", ""));
+    }
 }
