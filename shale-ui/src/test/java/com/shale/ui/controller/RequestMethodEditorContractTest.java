@@ -2,6 +2,8 @@ package com.shale.ui.controller;
 
 import org.junit.jupiter.api.Test;
 
+import com.shale.core.service.MaterialRequestServicePort;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -22,8 +24,33 @@ final class RequestMethodEditorContractTest {
     }
 
     @Test void settingsPreservesEditOrderAndLetsDaoAssignCreateOrder() {
-        assertTrue(method("addRequestLookup").contains("input.systemKey(),null,null"));
-        assertTrue(method("editRequestLookup").contains("row.systemKey(),row.sortOrder(),row.rowVer()"));
+        MaterialRequestServicePort.RequestMethodCommand create = SettingsController.requestMethodCreateCommand(
+                41, 73, "Email", "#123456", true, "email");
+        assertNull(create.id());
+        assertEquals(41, create.shaleClientId());
+        assertEquals(73, create.actorUserId());
+        assertEquals("Email", create.name());
+        assertEquals("#123456", create.color());
+        assertTrue(create.active());
+        assertEquals("email", create.systemKey());
+        assertNull(create.sortOrder(), "Create must leave append ordering to the DAO.");
+        assertNull(create.expectedRowVer());
+
+        byte[] rowVer = { 1, 2, 3 };
+        MaterialRequestServicePort.RequestMethodCommand edit = SettingsController.requestMethodEditCommand(
+                19, 41, 73, "Secure Email", "#654321", false, "email", 27, rowVer);
+        assertEquals(19, edit.id());
+        assertEquals(41, edit.shaleClientId());
+        assertEquals(73, edit.actorUserId());
+        assertEquals("Secure Email", edit.name());
+        assertEquals("#654321", edit.color());
+        assertFalse(edit.active());
+        assertEquals("email", edit.systemKey());
+        assertEquals(27, edit.sortOrder(), "Edit must retain the selected row's authoritative order.");
+        assertSame(rowVer, edit.expectedRowVer());
+        assertTrue(containsCode(method("showRequestLookupDialog"),
+                "Integer sortOrder = kind == RequestLookupKind.REQUEST_METHOD ? null"),
+                "The hidden Request Method form state must not invent a create order.");
         assertTrue(containsCode(SETTINGS, "safe(d.color())"));
     }
 
