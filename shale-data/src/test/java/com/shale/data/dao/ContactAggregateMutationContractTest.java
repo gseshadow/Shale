@@ -21,7 +21,8 @@ final class ContactAggregateMutationContractTest {
 
     @Test
     void ownsOneTransactionAndPrevalidatesBeforeStructuredMutation() throws Exception {
-        String aggregate = extractMethod(source(), AGGREGATE_SIGNATURE);
+    	String mutationSource = source();
+    	String aggregate = extractMethod(mutationSource, AGGREGATE_SIGNATURE);
 
         assertEquals(1, occurrences(aggregate, "tx(c.shaleClientId(),c.actorUserId(),false"),
                 "aggregate must own exactly one transaction boundary");
@@ -50,7 +51,14 @@ final class ContactAggregateMutationContractTest {
 
         assertTrue(aggregate.contains("DisplayOrder=?"), "credential ordering must remain in aggregate transaction");
         assertTrue(aggregate.contains("RowVer=?"), "credential ordering must retain its RowVer guard");
-        assertTrue(aggregate.contains("recomputeExpert(con"), "Expert recomputation must remain in aggregate transaction");
+        assertFalse(mutationSource.contains("recomputeExpert("),
+                "Phase 3B must remove Expert scalar recomputation");
+
+        assertFalse(mutationSource.contains("setExpert("),
+                "Phase 3B must remove Expert scalar synchronization");
+
+        assertFalse(mutationSource.contains("IsExpert"),
+                "Phase 3B Contact mutations must not reference Contacts.IsExpert");
         assertTrue(aggregate.contains("EntityType.CONTACT_CREDENTIAL"),
                 "Credential assignment reorder audit must remain in aggregate transaction");
         assertTrue(aggregate.contains("EntityActionAuditEvent.Action.REORDERED"),
