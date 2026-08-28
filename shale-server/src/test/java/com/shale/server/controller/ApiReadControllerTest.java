@@ -661,7 +661,7 @@ class ApiReadControllerTest {
                           "lastName":" Lovelace ",
                           "email":" ada@example.test ",
                           "phone":" 555-0100 ",
-                          "addressHome":" 123 Main ",
+                          "address":" 123 Main ",
                           "dateOfBirth":"1980-01-02",
                           "condition":" Notes ",
                           "deceased":false
@@ -679,7 +679,7 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals("Lovelace", contactServicePort.createdCommand.lastName());
         org.junit.jupiter.api.Assertions.assertEquals("ada@example.test", contactServicePort.createdCommand.email());
         org.junit.jupiter.api.Assertions.assertEquals("555-0100", contactServicePort.createdCommand.phone());
-        org.junit.jupiter.api.Assertions.assertEquals("123 Main", contactServicePort.createdCommand.addressHome());
+        org.junit.jupiter.api.Assertions.assertEquals("123 Main", contactServicePort.createdCommand.address());
         org.junit.jupiter.api.Assertions.assertEquals("1980-01-02", contactServicePort.createdCommand.dateOfBirth());
         org.junit.jupiter.api.Assertions.assertEquals("Notes", contactServicePort.createdCommand.condition());
     }

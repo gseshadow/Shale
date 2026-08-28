@@ -22,8 +22,11 @@ class ContactMutationContractTest {
     @Test void credentialReorderRequiresCompleteSetAndWritesContiguousOrder() throws Exception {
         String s=source(); assertAll(()->assertTrue(s.contains("active.keySet().equals(expected.keySet())")),()->assertTrue(s.contains("Duplicate credential assignment ID")),()->assertTrue(s.contains("DisplayOrder=?")),()->assertTrue(s.contains("ORDERING_COUNT")));
     }
-    @Test void expertBridgeUsesSystemKeyAndRemainsLegacyWriteAuthority() throws Exception {
-        String s=source(); assertAll(()->assertTrue(s.contains("\"expert\".equals(d.key())")),()->assertTrue(s.contains("SET IsExpert=?")),()->assertTrue(s.contains("d.SystemKey=N'expert'")),()->assertFalse(s.contains("PartyRoles")),()->assertFalse(s.contains("CaseParties")),()->assertFalse(s.contains("CaseContacts")));
+    @Test void expertAssignmentsDoNotProjectToTheRetiringScalar() throws Exception {
+        String s=source(); assertAll(()->assertTrue(s.contains("ContactContactTypes")),
+                ()->assertFalse(s.contains("IsExpert")),()->assertFalse(s.contains("setExpert")),
+                ()->assertFalse(s.contains("recomputeExpert")),()->assertFalse(s.contains("PartyRoles")),
+                ()->assertFalse(s.contains("CaseParties")),()->assertFalse(s.contains("CaseContacts")));
     }
     @Test void auditVocabularyAcceptsOnlyPhase1cCombinationsAndSafeMetadata() {
         assertDoesNotThrow(() -> EntityActionAuditEvent.now(7, 9,
