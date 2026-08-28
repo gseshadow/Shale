@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /** Guards the Phase 2E live-read boundary; migrations and compatibility writes are intentionally out of scope. */
@@ -33,5 +36,38 @@ class ContactPhase2ELegacyReadBoundaryContractTest {
         assertTrue(mutation.contains("SET IsExpert="));
         assertFalse(mutation.contains("SELECT IsExpert"));
         assertTrue(mutation.contains("d.SystemKey=N'expert'"));
+    }
+
+    @Test void everyProductionLegacyReferenceHasAnExplicitNarrowClassification() throws Exception {
+        List<String> legacy=List.of("PhoneCell","PhoneHome","PhoneWork","EmailPersonal","EmailWork","EmailOther","AddressHome","AddressWork","AddressOther","IsExpert");
+        Path root=Path.of("src/main/java");
+        try(var files=Files.walk(root)) {
+            for(Path file:files.filter(p->p.toString().endsWith(".java")).toList()) {
+                String source=Files.readString(file);
+                for(String column:legacy) {
+                    Matcher matches=Pattern.compile("\\b"+column+"\\b").matcher(source);
+                    while(matches.find()) {
+                        String relative=root.relativize(file).toString().replace('\\','/');
+                        String line=source.substring(source.lastIndexOf('\n',matches.start())+1,
+                            source.indexOf('\n',matches.end())<0?source.length():source.indexOf('\n',matches.end())).trim();
+                        assertTrue(isAllowlisted(relative,column,line),
+                            ()->"Unclassified Contact legacy dependency: "+relative+" :: "+line);
+                    }
+                }
+            }
+        }
+    }
+
+    private static boolean isAllowlisted(String file,String column,String line) {
+        if(file.equals("com/shale/data/dao/ContactMutationDao.java"))
+            return line.contains("columns={") || line.contains("SET IsExpert="); // compatibility writes only
+        if(file.equals("com/shale/data/dao/ContactDao.java"))
+            return (column.equals("AddressHome") && (line.contains("getString") || line.contains(" AS AddressHome")))
+                || line.contains("existingColumn(con, \"Contacts\""); // structured alias or schema discovery
+        if(file.equals("com/shale/data/dao/CaseDao.java"))
+            return !column.equals("IsExpert") && (line.contains("ct.") || line.equals(column+",")); // documented immutable Case snapshots
+        if(file.equals("com/shale/data/dao/UserDao.java"))
+            return column.equals("PhoneCell") && line.contains("List.of"); // User schema, not Contact
+        return false;
     }
 }
