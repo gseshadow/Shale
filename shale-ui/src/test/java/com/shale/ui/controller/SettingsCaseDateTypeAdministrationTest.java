@@ -15,45 +15,45 @@ final class SettingsCaseDateTypeAdministrationTest {
     @Test void settingsNavigationContainsCaseDateTypesManager(){
         assertTrue(FXML.contains("caseDateTypeAdministrationSection"));
         assertTrue(FXML.contains("Case Date Types"));
-        assertTrue(SOURCE.contains("loadCaseDateTypesAsync(null);"));
-        assertTrue(SOURCE.contains("caseService.listCaseDateTypesForAdministration(tenantId,actorUserId)"));
+        assertTrue(containsCode(SOURCE, "loadCaseDateTypesAsync(null);"));
+        assertTrue(containsCode(SOURCE, "caseService.listCaseDateTypesForAdministration(tenantId,actorUserId)"));
     }
     @Test void mutationsUseServiceBoundaryAndSemanticControls(){
-        assertTrue(SOURCE.contains("caseService.createCaseDateType"));
-        assertTrue(SOURCE.contains("caseService.updateCaseDateType"));
-        assertTrue(SOURCE.contains("caseService.setCaseDateTypeActive"));
-        assertTrue(SOURCE.contains("caseService.resetCaseDateTypeOverride"));
-        assertTrue(SOURCE.contains("configureCaseDateTypeActionRow()"));
-        assertTrue(SOURCE.contains("AppDialogs.showConfirmation"));
-        assertFalse(SOURCE.contains("new CaseDateDao"));
-        assertFalse(SOURCE.contains("Protected system type"));
-        assertTrue(SOURCE.contains("updateCaseDateTypeActionState(null)"));
-        assertTrue(SOURCE.contains("editCaseDateTypeButton.setDisable(!editable)"));
-        assertTrue(SOURCE.contains("toggleCaseDateTypeButton.setDisable(!toggle)"));
-        assertTrue(SOURCE.contains("removeCaseDateTypeButton.setDisable(!remove)"));
-        assertTrue(SOURCE.contains("row.active()?\"Deactivate\":\"Activate\""));
-        assertTrue(SOURCE.contains("selected.id(),selected.rowVer()"));
-        assertTrue(SOURCE.contains("publishCaseDateTypeChanged"));
+        assertTrue(containsCode(SOURCE, "caseService.createCaseDateType"));
+        assertTrue(containsCode(SOURCE, "caseService.updateCaseDateType"));
+        assertTrue(containsCode(SOURCE, "caseService.setCaseDateTypeActive"));
+        assertTrue(containsCode(SOURCE, "caseService.resetCaseDateTypeOverride"));
+        assertTrue(containsCode(SOURCE, "configureCaseDateTypeActionRow()"));
+        assertTrue(containsCode(SOURCE, "AppDialogs.showConfirmation"));
+        assertFalse(containsCode(SOURCE, "new CaseDateDao"));
+        assertFalse(containsCode(SOURCE, "Protected system type"));
+        assertTrue(containsCode(SOURCE, "updateCaseDateTypeActionState(null)"));
+        assertTrue(containsCode(SOURCE, "editCaseDateTypeButton.setDisable(!editable)"));
+        assertTrue(containsCode(SOURCE, "toggleCaseDateTypeButton.setDisable(!toggle)"));
+        assertTrue(containsCode(SOURCE, "removeCaseDateTypeButton.setDisable(!remove)"));
+        assertTrue(containsCode(SOURCE, "row.active()?\"Deactivate\":\"Activate\""));
+        assertTrue(containsCode(SOURCE, "selected.id(),selected.rowVer()"));
+        assertTrue(containsCode(SOURCE, "publishCaseDateTypeChanged"));
     }
     @Test void selectionUsesSharedPseudoClassAndAuthoritativeIdentity(){
-        assertTrue(SOURCE.contains("card.setUserData(row)"));
-        assertTrue(SOURCE.contains("card.pseudoClassStateChanged(SELECTED_CARD,selectedCaseDateTypeRow!=null&&selectedCaseDateTypeRow.id()==row.id())"));
-        assertTrue(SOURCE.contains("updateSelectionStyles(caseDateTypeCardsContainer,row.id())"));
-        assertTrue(SOURCE.contains("value instanceof CaseDateTypeViewRow row ? row.id()"));
-        assertTrue(SOURCE.contains("card.setFocusTraversable(true)"));
-        assertTrue(SOURCE.contains("e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE"));
-        assertFalse(SOURCE.contains("selectCaseDateTypeRow(row);loadCaseDateTypesAsync"));
+        assertTrue(containsCode(SOURCE, "card.setUserData(row)"));
+        assertTrue(containsCode(SOURCE, "card.pseudoClassStateChanged(SELECTED_CARD,selectedCaseDateTypeRow!=null&&selectedCaseDateTypeRow.id()==row.id())"));
+        assertTrue(containsCode(SOURCE, "updateSelectionStyles(caseDateTypeCardsContainer,row.id())"));
+        assertTrue(containsCode(SOURCE, "value instanceof CaseDateTypeViewRow row ? row.id()"));
+        assertTrue(containsCode(SOURCE, "card.setFocusTraversable(true)"));
+        assertTrue(containsCode(SOURCE, "e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE"));
+        assertFalse(containsCode(SOURCE, "selectCaseDateTypeRow(row);loadCaseDateTypesAsync"));
         assertTrue(CARDS_CSS.contains(".shale-entity-card-selectable:selected"));
         assertTrue(CARDS_CSS.contains("-fx-border-color: -shale-color-primary-accent"));
         String card = method("private VBox buildCaseDateTypeCard");
-        assertFalse(card.contains("cardButton("), "Case Date Types uses one coherent bottom action surface");
-        assertFalse(card.contains("loadCaseDateTypesAsync("), "selection must not reload cards");
+        assertFalse(containsCode(card, "cardButton("), "Case Date Types uses one coherent bottom action surface");
+        assertFalse(containsCode(card, "loadCaseDateTypesAsync("), "selection must not reload cards");
     }
     @Test void refreshPreservesOnlyMatchingIdAndRejectsStaleResults(){
-        assertTrue(SOURCE.contains("if(generation!=caseDateTypeLoadGeneration)return"));
-        assertTrue(SOURCE.contains("preserveCaseDateTypeSelection(rows,selectedId)"));
-        assertTrue(SOURCE.contains("findFirst().orElse(null)"));
-        assertTrue(SOURCE.contains("applyCaseDateTypeRows(generation,rows,successMessage)"));
+        assertTrue(containsCode(SOURCE, "if(generation!=caseDateTypeLoadGeneration)return"));
+        assertTrue(containsCode(SOURCE, "preserveCaseDateTypeSelection(rows,selectedId)"));
+        assertTrue(containsCode(SOURCE, "findFirst().orElse(null)"));
+        assertTrue(containsCode(SOURCE, "applyCaseDateTypeRows(generation,rows,successMessage)"));
     }
     @Test void onlyTenantOwnedRowsBuildAsCustomCards(){
         var global = new EffectiveCaseDateTypeDto(1,null,"trial","Trial",null,"TRIAL","#111111",true,10,true,false,EffectiveCaseDateTypeDto.Origin.GLOBAL,new byte[]{1});
@@ -71,16 +71,16 @@ final class SettingsCaseDateTypeAdministrationTest {
         assertEquals(4, SettingsController.preserveCaseDateTypeSelection(duplicateNames,4).id(), "selection must use authoritative id, not display name or index");
         var customRow = rows.stream().filter(SettingsController.CaseDateTypeViewRow::custom).findFirst().orElseThrow();
         assertTrue(customRow.canEdit()); assertTrue(customRow.canToggleActive()); assertTrue(customRow.canRemove()); assertFalse(customRow.canReset());
-        assertFalse(SOURCE.contains("Global/default") && method("private VBox buildCaseDateTypeCard").contains("Global/default"));
+        assertFalse(containsCode(SOURCE, "Global/default") && method("private VBox buildCaseDateTypeCard").contains("Global/default"));
         assertTrue(method("private VBox buildCaseDateTypeCard").contains("metadataPill(\"Custom\")"));
     }
 
     @Test void globalAndSystemKeyAloneNeverCreateBuiltInCards(){
         var global = new EffectiveCaseDateTypeDto(1,null,"trial","Trial",null,"TRIAL",null,true,1,true,false,EffectiveCaseDateTypeDto.Origin.GLOBAL,new byte[]{1});
         assertTrue(SettingsController.buildCaseDateTypeRows(List.of(global),7).isEmpty());
-        assertTrue(SOURCE.contains("case-date-built-in-card"));
-        assertTrue(SOURCE.contains("metadataPill(\"Built-in\")"));
-        assertTrue(SOURCE.contains("metadataPill(\"Required\")"));
+        assertTrue(containsCode(SOURCE, "case-date-built-in-card"));
+        assertTrue(containsCode(SOURCE, "metadataPill(\"Built-in\")"));
+        assertTrue(containsCode(SOURCE, "metadataPill(\"Required\")"));
         assertTrue(CARDS_CSS.contains(".case-date-built-in-card"));
         assertTrue(CARDS_CSS.contains(".case-date-custom-card"));
     }
@@ -89,5 +89,9 @@ final class SettingsCaseDateTypeAdministrationTest {
         assertTrue(error.contains("LOG.error"));
         assertTrue(error.contains("The Case Date Type could not be saved."));
         assertFalse(error.contains("rootMessage"));
+    }
+
+    private static boolean containsCode(String source, String expected) {
+        return source.replaceAll("\\s+", "").contains(expected.replaceAll("\\s+", ""));
     }
 }

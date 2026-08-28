@@ -16,8 +16,9 @@ class ContactCardCredentialProductionPathTest {
         String dao = Files.readString(Path.of("../shale-data/src/main/java/com/shale/data/dao/ContactDao.java"));
         String method = dao.substring(dao.indexOf("public PagedResult<ContactCardSummaryRow> findDirectoryContactsPage"),
                 dao.indexOf("public long countDirectoryContacts", dao.indexOf("public PagedResult<ContactCardSummaryRow> findDirectoryContactsPage")));
-        assertTrue(method.contains("loadCredentialAbbreviations(con, shaleClientId"));
-        assertTrue(method.indexOf("selected.stream().map(PageRow::id)") < method.indexOf("loadCredentialAbbreviations(con"));
+        assertTrue(method.contains("OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"), "the directory page query must remain bounded");
+        assertTrue(containsCode(method, "loadCredentialAbbreviations(con, shaleClientId, selected.stream().map(PageRow::id).toList())"),
+                "credential enrichment must be one query bounded to IDs selected by the page query");
         String projection = dao.substring(dao.indexOf("private static Map<Integer, List<String>> loadCredentialAbbreviations"),
                 dao.indexOf("public long countDirectoryContacts", dao.indexOf("private static Map<Integer, List<String>> loadCredentialAbbreviations")));
         assertTrue(projection.contains("a.ContactId IN (%s)"));
@@ -76,5 +77,8 @@ class ContactCardCredentialProductionPathTest {
         assertTrue(cards.contains("Platform.runLater(this::loadFirstPage)"));
         String editor = Files.readString(Path.of("src/main/java/com/shale/ui/controller/ContactViewController.java"));
         assertTrue(editor.contains("publishEntityUpdated(LiveUpdateEvents.ENTITY_CONTACT"));
+    }
+    private static boolean containsCode(String source, String expected) {
+        return source.replaceAll("\\s+", "").contains(expected.replaceAll("\\s+", ""));
     }
 }
