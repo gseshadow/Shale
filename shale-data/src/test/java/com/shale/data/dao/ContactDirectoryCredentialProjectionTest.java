@@ -25,8 +25,8 @@ class ContactDirectoryCredentialProjectionTest {
         assertEquals(1, row.credentialAbbreviations().size(), "number of abbreviations returned by the DAO");
         assertEquals(List.of("M.D."), row.credentialAbbreviations());
         assertNotNull(directorySql.get(), "the real page query must execute");
-        assertTrue(directorySql.get().contains("STRING_AGG"), "ordered aggregation");
-        assertTrue(directorySql.get().contains("WITHIN GROUP (ORDER BY x.DisplayOrder, x.SortOrder, x.Name, x.Id)"));
+        assertTrue(directorySql.get().contains("a.ContactId IN (?)"), "bounded page enrichment");
+        assertTrue(directorySql.get().contains("ORDER BY a.ContactId,a.DisplayOrder,d.SortOrder,d.Name,d.Id,a.Id"));
         assertTrue(directorySql.get().contains("(d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)"));
         assertFalse(directorySql.get().contains("d.IsActive=1 AND d.IsDeleted=0"));
     }
@@ -35,7 +35,7 @@ class ContactDirectoryCredentialProjectionTest {
         return proxy(Connection.class, (method, args) -> {
             if (method.equals("prepareStatement")) {
                 String sql = (String) args[0];
-                if (sql.contains("AS CredentialAbbreviations")) directorySql.set(sql);
+                if (sql.contains("FROM dbo.ContactCredentials a")) directorySql.set(sql);
                 return statement(sql);
             }
             return defaultValue(method);
@@ -57,9 +57,11 @@ class ContactDirectoryCredentialProjectionTest {
                     return result(exists ? List.of(Map.of("1", 1)) : List.of());
                 }
                 if (sql.contains("COUNT_BIG")) return result(List.of(Map.of("1", 1L)));
-                if (sql.contains("AS CredentialAbbreviations")) return result(List.of(Map.of(
+                if (sql.contains("OFFSET ? ROWS")) return result(List.of(Map.of(
                         "Id", 101, "DisplayName", "Example Doctor", "Email", "doctor@example.test",
-                        "Phone", "555", "CredentialAbbreviations", "M.D.")));
+                        "Phone", "555")));
+                if (sql.contains("FROM dbo.ContactCredentials a")) return result(List.of(Map.of(
+                        "ContactId", 101, "Abbreviation", "M.D.")));
                 throw new AssertionError("Unexpected SQL: " + sql);
             }
             return defaultValue(method);

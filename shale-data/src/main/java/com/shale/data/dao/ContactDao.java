@@ -17,7 +17,9 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -379,11 +381,12 @@ public final class ContactDao {
         if (actorUserId <= 0) throw new IllegalArgumentException("actorUserId must be > 0");
         Objects.requireNonNull(filters, "filters");
 
+        long validationStarted = System.nanoTime();
         try (Connection con = db.requireConnection()) {
             verifyTenantMatchesSession(con, shaleClientId);
-
             ContactSchema schema = ContactSchema.load(con);
             logDetectedCoreColumns(schema);
+            logPerf("contacts.directory.phase.validation", "tenantId=" + shaleClientId + " actorValidated=true", validationStarted);
 
             long countStarted = System.nanoTime();
             long total = countDirectoryContacts(con, schema, shaleClientId, actorUserId, searchQuery, filters);
@@ -404,8 +407,7 @@ public final class ContactDao {
                        ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) AS Email,
                       (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p
                        WHERE p.ContactId=c.Id AND p.ShaleClientId=c.%s AND p.IsDeleted=0
-                       ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone,
-                      %s AS CredentialAbbreviations
+                       ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone
                     FROM dbo.Contacts c
                     WHERE c.%s = ?
                       AND %s IS NOT NULL
@@ -418,14 +420,15 @@ public final class ContactDao {
                     """.formatted(
                     displayName,
                     schema.tenantColumn(), schema.tenantColumn(),
-                    credentialAbbreviationsExpression("c", schema.tenantColumn()),
                     schema.tenantColumn(),
                     displayName,
                     schema.tenantColumn(),
                     activeFilter(schema.deletedColumn(), "c"),
                     searchClause);
 
-            List<ContactCardSummaryRow> out = new ArrayList<>(pageSize);
+            record PageRow(int id, String displayName, String email, String phone) {}
+            List<PageRow> selected = new ArrayList<>(pageSize);
+            long selectionStarted = System.nanoTime();
             try (PreparedStatement ps = con.prepareStatement(sql)) {
                 int idx = 1;
                 idx = bindStructuredDirectoryQuery(ps, idx, shaleClientId, actorUserId, searchQuery, filters);
@@ -434,21 +437,65 @@ public final class ContactDao {
 
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        out.add(new ContactCardSummaryRow(
+                        selected.add(new PageRow(
                                 rs.getInt("Id"),
                                 rs.getString("DisplayName"),
                                 rs.getString("Email"),
-                                rs.getString("Phone"),
-                                splitCredentialAbbreviations(rs.getString("CredentialAbbreviations"))));
+                                rs.getString("Phone")));
                     }
                 }
             }
+            logPerf("contacts.directory.phase.pageSelection", "tenantId=" + shaleClientId + " page=" + page
+                    + " pageSize=" + pageSize + " rows=" + selected.size(), selectionStarted);
+
+            long enrichmentStarted = System.nanoTime();
+            Map<Integer, List<String>> credentialsByContact = loadCredentialAbbreviations(con, shaleClientId,
+                    selected.stream().map(PageRow::id).toList());
+            logPerf("contacts.directory.phase.credentialEnrichment", "tenantId=" + shaleClientId
+                    + " contactIds=" + selected.size(), enrichmentStarted);
+
+            long mappingStarted = System.nanoTime();
+            List<ContactCardSummaryRow> out = selected.stream()
+                    .map(row -> new ContactCardSummaryRow(row.id(), row.displayName(), row.email(), row.phone(),
+                            credentialsByContact.getOrDefault(row.id(), List.of())))
+                    .toList();
+            logPerf("contacts.directory.phase.resultMapping", "tenantId=" + shaleClientId + " rows=" + out.size(), mappingStarted);
             PagedResult<ContactCardSummaryRow> result = new PagedResult<>(List.copyOf(out), page, pageSize, total);
             logPerf("contacts.directory.lightweightPage", "tenantId=" + shaleClientId + " page=" + page + " pageSize=" + pageSize + " queryLength=" + normalizedQueryLength(searchQuery) + " rows=" + out.size() + " total=" + total + " fullDetailHydration=false selectedFields=id,displayName,email,phone,credentialAbbreviations", started);
             return result;
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load contacts page for tenant (clientId=" + shaleClientId + ", page=" + page + ")", e);
         }
+    }
+
+    /** Enriches only the selected page, in one tenant-scoped query (never one query per card). */
+    private static Map<Integer, List<String>> loadCredentialAbbreviations(Connection con, int shaleClientId,
+            List<Integer> contactIds) throws SQLException {
+        if (contactIds.isEmpty()) return Map.of();
+        String placeholders = String.join(",", java.util.Collections.nCopies(contactIds.size(), "?"));
+        String sql = """
+                SELECT a.ContactId,d.Abbreviation
+                FROM dbo.ContactCredentials a
+                JOIN dbo.CredentialDefinitions d ON d.Id=a.CredentialDefinitionId
+                  AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)
+                WHERE a.ShaleClientId=? AND a.IsDeleted=0
+                  AND a.ContactId IN (%s)
+                  AND NULLIF(LTRIM(RTRIM(d.Abbreviation)),N'') IS NOT NULL
+                ORDER BY a.ContactId,a.DisplayOrder,d.SortOrder,d.Name,d.Id,a.Id
+                """.formatted(placeholders);
+        Map<Integer, List<String>> mutable = new LinkedHashMap<>();
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            int index = 1;
+            ps.setInt(index++, shaleClientId);
+            for (Integer contactId : contactIds) ps.setInt(index++, contactId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) mutable.computeIfAbsent(rs.getInt("ContactId"), ignored -> new ArrayList<>())
+                        .add(rs.getString("Abbreviation"));
+            }
+        }
+        Map<Integer, List<String>> result = new LinkedHashMap<>();
+        mutable.forEach((id, values) -> result.put(id, List.copyOf(values)));
+        return Map.copyOf(result);
     }
 
     public long countDirectoryContacts(int shaleClientId, String searchQuery) {

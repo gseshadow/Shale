@@ -2886,17 +2886,19 @@
 .contact-filter-controls { -fx-alignment: center-left; -fx-padding: 0; }
 .shale-filter-trigger {
     -fx-min-height: 32px; -fx-pref-height: 32px; -fx-padding: 0 11px;
-    -fx-background-color: -shale-color-control-surface; -fx-background-radius: 8px;
+    -fx-background-color: -shale-control-surface; -fx-background-radius: 8px;
     -fx-border-color: -shale-control-border; -fx-border-radius: 8px;
     -fx-text-fill: -shale-color-text-primary; -fx-cursor: hand;
 }
-.shale-filter-trigger:hover { -fx-background-color: -shale-color-control-hover; -fx-border-color: -shale-control-border-hover; }
+.shale-filter-trigger:hover { -fx-background-color: -shale-control-surface-hover; -fx-border-color: -shale-control-border-hover; }
+.shale-filter-trigger:armed, .shale-filter-trigger:showing { -fx-background-color: -shale-control-surface-pressed; -fx-border-color: -shale-control-focus-border; }
 .shale-filter-trigger:focused { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 7, .14, 0, 0); }
+.shale-filter-trigger:disabled { -fx-opacity: .58; }
 .shale-filter-trigger-content > .label { -fx-text-fill: -shale-color-text-primary; -fx-font-size: 12px; -fx-font-weight: 700; }
 .shale-filter-popup { -fx-min-width: 210px; -fx-padding: 7px; -fx-background-color: -shale-color-dialog-surface; -fx-background-radius: 10px; -fx-border-color: -shale-color-strong-panel-border; -fx-border-radius: 10px; -fx-effect: dropshadow(gaussian, rgba(17,37,66,.24), 16, .14, 0, 5); }
 .shale-filter-option { -fx-alignment: center-left; -fx-padding: 8px 10px; -fx-background-color: transparent; -fx-background-radius: 7px; -fx-border-color: transparent transparent transparent -shale-definition-color; -fx-border-width: 0 0 0 3px; -fx-border-radius: 7px; -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 600; -fx-cursor: hand; }
-.shale-filter-option:hover, .shale-filter-option:focused { -fx-background-color: -shale-color-control-hover; }
-.shale-filter-option:selected { -fx-background-color: derive(-shale-color-control-hover, -3%); -fx-font-weight: 800; }
+.shale-filter-option:hover, .shale-filter-option:focused { -fx-background-color: -shale-control-surface-hover; }
+.shale-filter-option:selected { -fx-background-color: derive(-shale-control-surface-hover, -3%); -fx-font-weight: 800; }
 .contact-filter-menu {
     -fx-background-color: -shale-color-dialog-surface; -fx-background-radius: 8px;
     -fx-border-color: -shale-control-border; -fx-border-radius: 8px; -fx-border-width: 1px;

@@ -46,6 +46,7 @@ import com.shale.core.service.CaseServicePort.CaseLinkShareDraft;
 import com.shale.core.service.CaseServicePort.CaseLinkShareUpdate;
 import com.shale.core.service.CaseServicePort.CaseLinkShareRemoval;
 import com.shale.core.service.CaseServicePort;
+import com.shale.core.service.ContactNamePresentation;
 
 public final class CaseDao {
 
@@ -3786,16 +3787,29 @@ public final class CaseDao {
 					        NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneWork, ''))), '')
 					      )
 					    ELSE NULLIF(LTRIM(RTRIM(COALESCE(o.Phone, ''))), '')
-					  END AS Phone
+					  END AS Phone,
+					  CASE WHEN cp.ContactId IS NOT NULL THEN
+					    (SELECT STRING_AGG(CONVERT(nvarchar(max), credentials.Abbreviation), NCHAR(31))
+					       WITHIN GROUP (ORDER BY credentials.DisplayOrder, credentials.SortOrder,
+					                              credentials.Name, credentials.DefinitionId, credentials.AssignmentId)
+					     FROM (SELECT cc.Id AS AssignmentId, cc.DisplayOrder, cd.SortOrder, cd.Name,
+					                  cd.Id AS DefinitionId, cd.Abbreviation
+					             FROM dbo.ContactCredentials cc
+					             JOIN dbo.CredentialDefinitions cd ON cd.Id=cc.CredentialDefinitionId
+					              AND (cd.ShaleClientId=cc.ShaleClientId OR cd.ShaleClientId IS NULL)
+					            WHERE cc.ContactId=cp.ContactId AND cc.ShaleClientId=c.ShaleClientId
+					              AND cc.IsDeleted=0
+					              AND NULLIF(LTRIM(RTRIM(cd.Abbreviation)), N'') IS NOT NULL) credentials)
+					  END AS CredentialAbbreviations
 					FROM dbo.CaseParties cp
 					INNER JOIN dbo.Cases c
 					  ON c.Id = cp.CaseId
 					INNER JOIN dbo.PartyRoles pr
 					  ON pr.Id = cp.PartyRoleId
 					LEFT JOIN dbo.Contacts ct
-					  ON ct.Id = cp.ContactId
+					  ON ct.Id = cp.ContactId AND ct.ShaleClientId = c.ShaleClientId
 					LEFT JOIN dbo.Organizations o
-					  ON o.Id = cp.OrganizationId
+					  ON o.Id = cp.OrganizationId AND o.ShaleClientId = c.ShaleClientId
 					WHERE cp.CaseId = ?
 					  AND c.ShaleClientId = ?
 					  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
@@ -3842,6 +3856,11 @@ public final class CaseDao {
 				List<CasePartyDto> out = new ArrayList<>();
 				try (ResultSet rs = ps.executeQuery()) {
 					while (rs.next()) {
+						String displayName = rs.getString("DisplayName");
+						if (rs.getLong("ContactId") > 0 && !rs.wasNull()) {
+							displayName = ContactNamePresentation.effectiveDisplayNameFromAbbreviations(
+									displayName, splitCredentialAbbreviations(rs.getString("CredentialAbbreviations")));
+						}
 						out.add(new CasePartyDto(
 								rs.getLong("Id"),
 								rs.getLong("CaseId"),
@@ -3856,7 +3875,7 @@ public final class CaseDao {
 								toLocalDateTime(rs.getTimestamp("CreatedAt")),
 								toLocalDateTime(rs.getTimestamp("UpdatedAt")),
 								rs.getString("EntityType"),
-								rs.getString("DisplayName"),
+								displayName,
 								rs.getString("Email"),
 								rs.getString("Phone")
 						));
@@ -3867,6 +3886,10 @@ public final class CaseDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list case parties (caseId=" + caseId + ")", e);
 		}
+	}
+
+	private static List<String> splitCredentialAbbreviations(String value) {
+		return value == null || value.isBlank() ? List.of() : List.of(value.split("\\u001f", -1));
 	}
 
 	public long addCaseParty(long caseId, Long contactId, Long organizationId, long partyRoleId, String side, boolean primary, String notes) {

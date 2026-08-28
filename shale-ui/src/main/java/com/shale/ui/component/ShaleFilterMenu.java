@@ -10,10 +10,12 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.css.PseudoClass;
 import javafx.stage.Popup;
 
 /** A Shale-owned multi-select filter: both trigger and popup avoid native menu chrome. */
 public final class ShaleFilterMenu extends Button {
+    private static final PseudoClass SHOWING = PseudoClass.getPseudoClass("showing");
     public record Option(int id, String label, String color) {}
 
     private final Popup popup = new Popup();
@@ -29,6 +31,8 @@ public final class ShaleFilterMenu extends Button {
         optionRows.getStyleClass().add("shale-filter-popup");
         popup.getContent().add(optionRows);
         popup.setAutoHide(true);
+        popup.setOnShown(event -> pseudoClassStateChanged(SHOWING, true));
+        popup.setOnHidden(event -> pseudoClassStateChanged(SHOWING, false));
         setOnAction(event -> {
             if (popup.isShowing()) popup.hide();
             else {
