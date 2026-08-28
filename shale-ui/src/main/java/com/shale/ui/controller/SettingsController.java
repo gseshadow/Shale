@@ -2890,8 +2890,8 @@ public final class SettingsController {
 			switch (kind) {
 			case MATERIAL_TYPE -> materialRequestService.createMaterialType(new MaterialRequestServicePort.MaterialTypeCommand(null, requireTenantId(), requireActorUserId(), input
 					.name(), input.description(), input.color(), input.active(), input.systemKey(), input.sortOrder(), null));
-			case REQUEST_METHOD -> materialRequestService.createRequestMethod(new MaterialRequestServicePort.RequestMethodCommand(null, requireTenantId(), requireActorUserId(),
-					input.name(), input.color(), input.active(), input.systemKey(), null, null));
+			case REQUEST_METHOD -> materialRequestService.createRequestMethod(requestMethodCreateCommand(requireTenantId(), requireActorUserId(), input.name(), input.color(),
+					input.active(), input.systemKey()));
 			case REQUEST_STATUS -> materialRequestService.createRequestStatus(new MaterialRequestServicePort.RequestStatusCommand(null, requireTenantId(), requireActorUserId(),
 					input.name(), input.color(), input.active(), input.systemKey(), input.sortOrder(), null));
 			}
@@ -2912,12 +2912,22 @@ public final class SettingsController {
 			case MATERIAL_TYPE -> materialRequestService.updateMaterialType(new MaterialRequestServicePort.MaterialTypeCommand(row.id(), requireTenantId(), requireActorUserId(),
 					input.name(), input.description(), input.color(), input.active(), row.systemKey().isBlank() ? input.systemKey() : row.systemKey(), input.sortOrder(), row
 							.rowVer()));
-			case REQUEST_METHOD -> materialRequestService.updateRequestMethod(new MaterialRequestServicePort.RequestMethodCommand(row.id(), requireTenantId(), requireActorUserId(),
-					input.name(), input.color(), input.active(), row.systemKey().isBlank() ? input.systemKey() : row.systemKey(), row.sortOrder(), row.rowVer()));
+			case REQUEST_METHOD -> materialRequestService.updateRequestMethod(requestMethodEditCommand(row.id(), requireTenantId(), requireActorUserId(), input.name(), input.color(),
+					input.active(), row.systemKey().isBlank() ? input.systemKey() : row.systemKey(), row.sortOrder(), row.rowVer()));
 			case REQUEST_STATUS -> materialRequestService.updateRequestStatus(new MaterialRequestServicePort.RequestStatusCommand(row.id(), requireTenantId(), requireActorUserId(),
 					input.name(), input.color(), input.active(), row.systemKey().isBlank() ? input.systemKey() : row.systemKey(), input.sortOrder(), row.rowVer()));
 			}
 		}, row.global() ? "Tenant override saved." : label(kind) + " updated."));
+	}
+
+	static MaterialRequestServicePort.RequestMethodCommand requestMethodCreateCommand(int tenantId, int actorUserId, String name, String color, boolean active,
+			String systemKey) {
+		return new MaterialRequestServicePort.RequestMethodCommand(null, tenantId, actorUserId, name, color, active, systemKey, null, null);
+	}
+
+	static MaterialRequestServicePort.RequestMethodCommand requestMethodEditCommand(int id, int tenantId, int actorUserId, String name, String color, boolean active,
+			String systemKey, int authoritativeSortOrder, byte[] rowVer) {
+		return new MaterialRequestServicePort.RequestMethodCommand(id, tenantId, actorUserId, name, color, active, systemKey, authoritativeSortOrder, rowVer);
 	}
 
 	private void toggleRequestLookup(RequestLookupKind kind) {
@@ -3006,7 +3016,7 @@ public final class SettingsController {
 			String nm = trim(name.getText());
 			if (nm.isBlank())
 				throw new IllegalArgumentException("Name is required.");
-			int sortOrder = existing == null ? 0 : existing.sortOrder();
+			Integer sortOrder = kind == RequestLookupKind.REQUEST_METHOD ? null : existing == null ? 0 : existing.sortOrder();
 			if (kind != RequestLookupKind.REQUEST_METHOD) {
 				try {
 					sortOrder = Integer.parseInt(trim(sort.getText()).isBlank() ? "0" : trim(sort.getText()));
@@ -3158,7 +3168,7 @@ public final class SettingsController {
 		return List.copyOf(out);
 	}
 
-	private record RequestLookupInput(String name, String description, String color, boolean active, String systemKey, int sortOrder) {
+	private record RequestLookupInput(String name, String description, String color, boolean active, String systemKey, Integer sortOrder) {
 	}
 
 	private record RequestLookupSelection(int id, String name, String description, String color, String systemKey, int sortOrder, boolean active, boolean global, byte[] rowVer) {

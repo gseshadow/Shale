@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -150,17 +151,23 @@ final class SettingsControllerLifecycleTest {
     void addUserFlowIsAdminOnlyAndUsesUserDaoCreateRequestWithoutTenantField() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
         String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
+        String addHandler = methodSource(source, "onAddUser");
+        String addDialog = methodSource(source, "showAddUserDialog");
 
         assertTrue(fxml.contains("fx:id=\"userAdministrationSection\""));
         assertTrue(fxml.contains("text=\"Add User\""));
-        assertTrue(containsCode(source, "if (!isAdminUser())"),
+        assertTrue(containsCode(addHandler, "if (!isAdminUser())"),
                 "Settings Add User handler must block non-admin users before opening or saving the dialog.");
-        assertTrue(containsCode(source, "new UserDao.UserCreateRequest("));
-        assertTrue(!containsCode(source, "shaleClientId,"),
-                "The Add User form must not provide a ShaleClientId value; UserDao derives it from session context.");
-        assertTrue(!containsCode(source, "Default Organization"),
+        assertTrue(containsCode(addHandler, "userDao.createUser(request)"));
+        assertTrue(containsCode(addDialog, "new UserDao.UserCreateRequest("));
+        assertTrue(Arrays.stream(com.shale.data.dao.UserDao.UserCreateRequest.class.getRecordComponents())
+                .noneMatch(component -> component.getName().equalsIgnoreCase("shaleClientId")),
+                "The request type itself must make a client-controlled tenant ID impossible.");
+        assertTrue(!containsCode(addDialog, "ShaleClientId"),
+                "The Add User dialog must not expose or provide a ShaleClientId value.");
+        assertTrue(!containsCode(addDialog, "Default Organization"),
                 "The Add User form should not expose organization fields until user organization editing is supported in the UI.");
-        assertTrue(!containsCode(source, "new Label(\"Organization\")"),
+        assertTrue(!containsCode(addDialog, "new Label(\"Organization\")"),
                 "The Add User form should not expose raw organization ids.");
     }
 
