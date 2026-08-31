@@ -66,6 +66,11 @@
 }
 .enhanced-text-area-dialog-content { -fx-padding: 4px; }
 .enhanced-text-area-dialog-editor.text-area { -fx-pref-height: 420px; }
+.enhanced-text-area-editor:formatted-preview { -fx-opacity: 0.92; }
+.rich-text-expanded-editor { -fx-spacing: 8px; }
+.narrative-editor-toolbar { -fx-padding: 4px; -fx-background-color: -shale-surface-subtle; }
+.narrative-toolbar-button { -fx-min-height: 28px; -fx-padding: 3px 9px; }
+.narrative-editor-area { -fx-background-color: -shale-surface; -fx-border-color: -shale-border; -fx-border-radius: 4px; -fx-padding: 10px; }
 .date-picker.shale-form-control > .text-field { -fx-background-color: transparent; -fx-border-color: transparent; }
 
 .shale-search-field,
