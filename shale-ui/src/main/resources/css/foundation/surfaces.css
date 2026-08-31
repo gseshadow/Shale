@@ -55,6 +55,7 @@
     -fx-border-width: 1;
 }
 
+.primary-content-surface,
 .content-surface {
     -fx-background-color: -shale-color-functional-content-surface;
     -fx-background-radius: 12;
@@ -63,13 +64,9 @@
     -fx-border-width: 1;
 }
 
-.data-surface,
-.data-surface.cases-content-surface {
-    -fx-background-color: -shale-color-data-surface;
-    -fx-background-radius: 12;
-    -fx-border-radius: 12;
-    -fx-border-color: -shale-color-border;
-    -fx-border-width: 1;
+.primary-content-surface .section-title {
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-font-weight: 800;
 }
 
 .page-header-surface .page-heading,
