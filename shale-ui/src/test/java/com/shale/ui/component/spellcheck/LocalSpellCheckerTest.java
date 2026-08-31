@@ -2,13 +2,50 @@ package com.shale.ui.component.spellcheck;
 
 import org.junit.jupiter.api.Test;
 import java.util.List;
+import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LocalSpellCheckerTest {
+    private static final List<String> BASIC_WORDS = List.of(
+            "heal", "heart", "harm", "have", "help", "hem", "house", "home", "work", "working",
+            "person", "people", "medical", "doctor", "patient", "case", "legal", "description", "summary");
+
     @Test void bundledDictionaryAcceptsOrdinaryEnglishAndRejectsNonsense() {
         LocalSpellChecker checker = ShaleDictionary.create();
         assertEquals(List.of(), checker.misspellings("This is a test of the spell checking detection."));
         assertEquals(List.of("asdfasdf", "tset"), checker.misspellings("asdfasdf tset"));
+    }
+
+    @Test void bundledDictionaryContainsRepresentativeBasicEnglish() {
+        LocalSpellChecker checker = ShaleDictionary.create();
+        BASIC_WORDS.forEach(word -> {
+            assertEquals(word, LocalSpellChecker.normalize("  " + Character.toUpperCase(word.charAt(0)) + word.substring(1)));
+            assertTrue(ShaleDictionary.baseWords().contains(word), () -> "missing base word: " + word);
+            assertFalse(checker.isMisspelled(word), () -> "incorrectly rejected: " + word);
+        });
+        List.of("asdfasdf", "qwerqwer", "hartt", "tset").forEach(word ->
+                assertTrue(checker.isMisspelled(word), () -> "incorrectly accepted: " + word));
+    }
+
+    @Test void exactReportedSentenceHasOnlyGenuineMisspellings() {
+        LocalSpellChecker checker = ShaleDictionary.create();
+        assertEquals(List.of(), checker.misspellings(
+                "heal heart harm have help hem This is a test of the spell checking"));
+        assertEquals(List.of("hartt", "tset"), checker.misspellings(
+                "heal hartt harm have help hem This is a tset of the spell checking"));
+    }
+
+    @Test void dictionaryLayersAreAdditiveAndSuggestionIndexDoesNotControlCorrectness() {
+        LocalSpellChecker checker = new LocalSpellChecker(List.of("heart"));
+        checker.addDictionaryLayer(List.of("physician"));
+        assertFalse(checker.isMisspelled("heart"));
+        assertFalse(checker.isMisspelled("physician"));
+        assertTrue(checker.isMisspelled("hartt"));
+    }
+
+    @Test void resourceParserHandlesHunspellMetadataCommentsWhitespaceAndBom() {
+        assertEquals(Set.of("heart", "heal", "hem", "can't"),
+                ShaleDictionary.load("/spellcheck/parser-fixture.dic"));
     }
 
     @Test void acceptsCommonWordFormsAndIgnoresNonWordValues() {
