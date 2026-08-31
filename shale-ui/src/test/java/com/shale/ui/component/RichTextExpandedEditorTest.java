@@ -5,40 +5,22 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class RichTextExpandedEditorTest {
-    @Test void defaultRichTextManagerUndoesAndRedoesTextAndFormatting() {
+    @Test void spellingDecorationUpdatesWithinTheSameEditorSession() {
         RichTextExpandedEditor editor = new RichTextExpandedEditor(
-                "abc", new LocalSpellChecker(List.of("abc", "d")), false);
+                "This is a test", new LocalSpellChecker(List.of("this", "is", "a", "test")), true);
 
-        editor.area().appendText("d");
-        editor.area().undo();
-        assertEquals("abc", editor.area().getText());
-        editor.area().redo();
-        assertEquals("abcd", editor.area().getText());
+        assertFalse(editor.area().getStyleOfChar(10).contains("underline-color"));
 
-        editor.area().setStyle(0, 3, "-fx-font-weight: bold;");
-        editor.area().undo();
-        assertFalse(editor.area().getStyleOfChar(0).contains("font-weight: bold"));
-        editor.area().redo();
-        assertTrue(editor.area().getStyleOfChar(0).contains("font-weight: bold"));
-    }
-
-    @Test void spellingRefreshDoesNotConsumeOrClearRedoHistory() {
-        RichTextExpandedEditor editor = new RichTextExpandedEditor(
-                "", new LocalSpellChecker(List.of("valid")), true);
-
-        editor.area().replaceText("asdf");
+        editor.area().replaceText("This is a tset");
         editor.refreshSpelling();
-        editor.area().undo();
-        assertEquals("", editor.area().getText());
+        assertTrue(editor.area().getStyleOfChar(10).contains("underline-color"));
 
+        editor.area().replaceText("This is a test");
         editor.refreshSpelling();
-        assertTrue(editor.area().isRedoAvailable());
-        editor.area().redo();
-        assertEquals("asdf", editor.area().getText());
+        assertFalse(editor.area().getStyleOfChar(10).contains("underline-color"));
     }
 }

@@ -3,9 +3,7 @@ package com.shale.ui.component;
 import com.shale.ui.component.richtext.NarrativeDocument;
 import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.component.spellcheck.LocalSpellChecker;
-import com.shale.ui.util.ControlStyles;
 import javafx.animation.PauseTransition;
-import javafx.beans.binding.Bindings;
 import javafx.geometry.Orientation;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
@@ -27,7 +25,6 @@ final class RichTextExpandedEditor extends VBox {
     private final LocalSpellChecker checker;
     private final PauseTransition spellDelay = new PauseTransition(Duration.millis(350));
     private final boolean spellCheck;
-    private boolean refreshingSpelling;
     private List<LocalSpellChecker.Misspelling> misspellings = List.of();
 
     RichTextExpandedEditor(String markdown, LocalSpellChecker checker, boolean spellCheck) {
@@ -39,20 +36,13 @@ final class RichTextExpandedEditor extends VBox {
         ToggleButton underline = formatToggle("U", "Underline", "Underline (Ctrl+U)", () -> toggleFormat(NarrativeDocument.Format.UNDERLINE));
         ToggleButton bullets = iconToggle("M2 3h2v2H2V3m4 0h10v2H6V3M2 7h2v2H2V7m4 0h10v2H6V7m-4 4h2v2H2v-2m4 0h10v2H6v-2", "Bulleted list", () -> toggleList(false));
         ToggleButton numbers = iconToggle("M2 3h1v2H2v1h3V5H4V2H2v1m4 0h10v2H6V3M2 8h2v1H2v3h3v-1H3l2-2V7H2v1m4-1h10v2H6V7m-4 5h2v1H2v1h3v-5H2v1h2v1H2v1m4-1h10v2H6v-2", "Numbered list", () -> toggleList(true));
-        Button undo = iconButton("M7 4 2 8l5 4V9h3c2.8 0 4.7 1.4 5.8 4-0.2-4.5-2.5-7-6.3-7H7V4", "Undo", "Undo (Ctrl+Z)", area::undo);
-        Button redo = iconButton("M11 4l5 4-5 4V9H8c-2.8 0-4.7 1.4-5.8 4C2.4 8.5 4.7 6 8.5 6H11V4", "Redo", "Redo (Ctrl+Y, Ctrl+Shift+Z)", area::redo);
-        toolbar.getItems().addAll(bold, italic, underline, new Separator(Orientation.VERTICAL), bullets, numbers,
-                new Separator(Orientation.VERTICAL), undo, redo);
+        toolbar.getItems().addAll(bold, italic, underline, new Separator(Orientation.VERTICAL), bullets, numbers);
         area.setWrapText(true); area.getStyleClass().add("narrative-editor-area");
         VBox.setVgrow(area, Priority.ALWAYS); getChildren().addAll(toolbar, area);
         load(NarrativeMarkdownCodec.decode(markdown));
         area.textProperty().addListener((o, old, value) -> { if (spellCheck) spellDelay.playFromStart(); });
         spellDelay.setOnFinished(e -> refreshSpelling());
         installKeys(); installContextMenu();
-        undo.disableProperty().bind(Bindings.createBooleanBinding(
-                () -> !area.isUndoAvailable(), area.undoAvailableProperty()));
-        redo.disableProperty().bind(Bindings.createBooleanBinding(
-                () -> !area.isRedoAvailable(), area.redoAvailableProperty()));
         Runnable state = () -> updateToolbarState(bold, italic, underline, bullets, numbers);
         area.caretPositionProperty().addListener((o, a, b) -> state.run());
         area.selectionProperty().addListener((o, a, b) -> state.run());
@@ -114,8 +104,6 @@ final class RichTextExpandedEditor extends VBox {
             if (new KeyCodeCombination(KeyCode.B, KeyCombination.CONTROL_DOWN).match(e)) { toggleFormat(NarrativeDocument.Format.BOLD); e.consume(); }
             else if (new KeyCodeCombination(KeyCode.I, KeyCombination.CONTROL_DOWN).match(e)) { toggleFormat(NarrativeDocument.Format.ITALIC); e.consume(); }
             else if (new KeyCodeCombination(KeyCode.U, KeyCombination.CONTROL_DOWN).match(e)) { toggleFormat(NarrativeDocument.Format.UNDERLINE); e.consume(); }
-            else if (new KeyCodeCombination(KeyCode.Y, KeyCombination.CONTROL_DOWN).match(e)) { area.redo(); e.consume(); }
-            else if (new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN).match(e)) { area.redo(); e.consume(); }
             else if (e.getCode() == KeyCode.ENTER && continueList()) e.consume();
         });
     }
@@ -131,13 +119,6 @@ final class RichTextExpandedEditor extends VBox {
 
     void refreshSpelling() {
         misspellings = spellCheck ? checker.misspellingRanges(area.getText()) : List.of();
-        /*
-         * InlineCssTextArea's supported default rich-text undo manager records style
-         * changes. Do not mutate document styles while a user history branch exists:
-         * in particular, a delayed refresh after Undo must not clear Redo. Ranges and
-         * context-menu suggestions still refresh; decoration waits for a clean draft.
-         */
-        if (area.isUndoAvailable() || area.isRedoAvailable()) return;
         StyleSpansBuilder<String> styles = new StyleSpansBuilder<>();
         for (int i = 0; i < area.getLength(); i++) styles.add(css(formatsAt(i), isMisspelled(i)), 1);
         if (area.getLength() > 0) area.setStyleSpans(0, styles.create());
@@ -197,11 +178,6 @@ final class RichTextExpandedEditor extends VBox {
     private static ToggleButton baseToggle(String accessible, String tooltip, Runnable action) {
         ToggleButton button = new ToggleButton(); button.setTooltip(new Tooltip(tooltip)); button.setAccessibleText(accessible);
         button.setOnAction(e -> action.run()); button.getStyleClass().add("narrative-toolbar-button"); return button;
-    }
-    private static Button iconButton(String path, String accessible, String tooltip, Runnable action) {
-        Button button = new Button(); button.setGraphic(icon(path)); button.setTooltip(new Tooltip(tooltip)); button.setAccessibleText(accessible);
-        button.setOnAction(e -> action.run()); ControlStyles.apply(button, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
-        button.getStyleClass().add("narrative-toolbar-button"); return button;
     }
     private static SVGPath icon(String content) { SVGPath icon = new SVGPath(); icon.setContent(content); icon.getStyleClass().add("narrative-toolbar-icon"); return icon; }
 }
