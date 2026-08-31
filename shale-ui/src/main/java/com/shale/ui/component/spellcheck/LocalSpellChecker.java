@@ -28,9 +28,6 @@ public final class LocalSpellChecker {
     /** Adds another application dictionary layer (for example legal or medical terms). */
     public void addDictionaryLayer(Collection<String> words) { addWords(words); }
 
-    /** Adds another application dictionary layer (for example legal or medical terms). */
-    public void addDictionaryLayer(Collection<String> words) { addNormalized(dictionary, words); }
-
     public boolean isMisspelled(String word) {
         String normalized = normalize(word);
         return normalized.length() > 1 && !dictionary.contains(normalized)
@@ -84,8 +81,9 @@ public final class LocalSpellChecker {
         suggestionsByLength.computeIfAbsent(word.length(), ignored -> new LinkedHashSet<>()).add(word);
     }
 
-    private static String normalize(String word) {
-        return word == null ? "" : word.replace('\u2019', '\'').toLowerCase(Locale.ROOT);
+    static String normalize(String word) {
+        return word == null ? "" : word.strip().replace("\uFEFF", "")
+                .replace('\u2019', '\'').toLowerCase(Locale.ROOT);
     }
 
     private static List<int[]> excludedRanges(String text) {
