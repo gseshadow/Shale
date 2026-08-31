@@ -19,4 +19,12 @@ class LocalSpellCheckerTest {
         assertFalse(checker.isMisspelled("fibromyalgia"));
         assertTrue(checker.customDictionary().contains("fibromyalgia"));
     }
+
+    @Test void reportsExactRangesAndIgnoreAndCustomDictionary() {
+        LocalSpellChecker checker = new LocalSpellChecker(List.of("the", "client"));
+        var range = checker.misspellingRanges("the physcian").getFirst();
+        assertEquals(4, range.start()); assertEquals(12, range.end());
+        checker.ignore("physcian"); assertTrue(checker.misspellingRanges("physcian").isEmpty());
+        checker.addToCustomDictionary("counselname"); assertFalse(checker.isMisspelled("CounselName"));
+    }
 }

@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 
 /** A deliberately local, dependency-free dictionary spell checker. */
 public final class LocalSpellChecker {
+    public record Misspelling(int start, int end, String word) { }
     private static final Pattern WORD = Pattern.compile("[\\p{L}][\\p{L}'’-]*");
     private final Set<String> dictionary = new LinkedHashSet<>();
     private final Set<String> ignored = new LinkedHashSet<>();
@@ -27,6 +28,13 @@ public final class LocalSpellChecker {
         LinkedHashSet<String> result = new LinkedHashSet<>();
         Matcher matcher = WORD.matcher(text == null ? "" : text);
         while (matcher.find()) if (isMisspelled(matcher.group())) result.add(matcher.group());
+        return List.copyOf(result);
+    }
+
+    public List<Misspelling> misspellingRanges(String text) {
+        List<Misspelling> result = new java.util.ArrayList<>();
+        Matcher matcher = WORD.matcher(text == null ? "" : text);
+        while (matcher.find()) if (isMisspelled(matcher.group())) result.add(new Misspelling(matcher.start(), matcher.end(), matcher.group()));
         return List.copyOf(result);
     }
 

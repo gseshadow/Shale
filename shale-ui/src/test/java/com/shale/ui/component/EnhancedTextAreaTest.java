@@ -13,6 +13,8 @@ class EnhancedTextAreaTest {
         assertEquals("initial", area.getText());
         area.setText("plain <not-markup> text");
         assertEquals("plain <not-markup> text", model.get());
+        area.setText("**persisted** narrative");
+        assertEquals("**persisted** narrative", model.get(), "projection must never replace the persisted Markdown property");
     }
 
     @Test void titleIsConfigurableWithSensibleFallback() {

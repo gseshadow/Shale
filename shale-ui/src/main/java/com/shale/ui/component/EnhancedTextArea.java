@@ -3,6 +3,7 @@ package com.shale.ui.component;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.spellcheck.LocalSpellChecker;
 import com.shale.ui.component.spellcheck.ShaleDictionary;
+import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.util.ControlStyles;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
@@ -38,6 +39,9 @@ public class EnhancedTextArea extends VBox {
     private final TextArea editor = new TextArea();
     private final Button expandButton = new Button();
     private final LocalSpellChecker spellChecker;
+    private final StringProperty text = new SimpleStringProperty(this, "text", "");
+    private final BooleanProperty editable = new javafx.beans.property.SimpleBooleanProperty(this, "editable", true);
+    private boolean updatingProjection;
 
     public EnhancedTextArea() { this(ShaleDictionary.create()); }
 
@@ -66,24 +70,26 @@ public class EnhancedTextArea extends VBox {
         StackPane.setMargin(expandButton, new javafx.geometry.Insets(6, 7, 0, 0));
         VBox.setVgrow(editorChrome, Priority.ALWAYS);
         getChildren().add(editorChrome);
-        editor.textProperty().addListener((obs, oldValue, newValue) -> refreshSpellCheck());
+        text.addListener((obs, oldValue, newValue) -> updateInlineProjection());
+        editor.textProperty().addListener((obs, oldValue, newValue) -> { if (!updatingProjection && editor.isEditable() && !java.util.Objects.equals(text.get(), newValue)) text.set(newValue); refreshSpellCheck(); });
         editor.setContextMenu(spellingMenu());
         expandableProperty().addListener((obs, oldValue, value) -> updateExpandVisibility());
-        editableProperty().addListener((obs, oldValue, value) -> updateExpandVisibility());
+        editableProperty().addListener((obs, oldValue, value) -> updateInlineProjection());
         disabledProperty().addListener((obs, oldValue, value) -> updateExpandVisibility());
         spellCheckEnabledProperty().addListener((obs, oldValue, value) -> refreshSpellCheck());
         updateExpandVisibility();
+        updateInlineProjection();
     }
 
-    public final StringProperty textProperty() { return editor.textProperty(); }
-    public final String getText() { return editor.getText(); }
-    public final void setText(String text) { editor.setText(text); }
+    public final StringProperty textProperty() { return text; }
+    public final String getText() { return text.get(); }
+    public final void setText(String text) { this.text.set(text == null ? "" : text); }
     public final StringProperty promptTextProperty() { return editor.promptTextProperty(); }
     public final String getPromptText() { return editor.getPromptText(); }
     public final void setPromptText(String text) { editor.setPromptText(text); }
-    public final BooleanProperty editableProperty() { return editor.editableProperty(); }
-    public final boolean isEditable() { return editor.isEditable(); }
-    public final void setEditable(boolean editable) { editor.setEditable(editable); }
+    public final BooleanProperty editableProperty() { return editable; }
+    public final boolean isEditable() { return editable.get(); }
+    public final void setEditable(boolean editable) { this.editable.set(editable); }
     public final IntegerProperty prefRowCountProperty() { return editor.prefRowCountProperty(); }
     public final int getPrefRowCount() { return editor.getPrefRowCount(); }
     public final void setPrefRowCount(int rows) { editor.setPrefRowCount(rows); }
@@ -115,6 +121,18 @@ public class EnhancedTextArea extends VBox {
         expandButton.setDisable(!isEditable() || isDisabled());
     }
 
+    private void updateInlineProjection() {
+        boolean formatted = NarrativeMarkdownCodec.containsFormatting(getText());
+        String visible = formatted ? NarrativeMarkdownCodec.plainText(getText()) : getText();
+        updatingProjection = true;
+        try { if (!java.util.Objects.equals(editor.getText(), visible)) editor.setText(visible); }
+        finally { updatingProjection = false; }
+        editor.setEditable(isEditable() && !formatted);
+        editor.setTooltip(formatted ? new Tooltip("Formatted narrative — open the expanded editor to edit") : null);
+        editor.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("formatted-preview"), formatted);
+        updateExpandVisibility();
+    }
+
     private void showExpandedEditor() {
         if (!canExpand()) return;
         ExpandedTextEdit edit = createExpandedEdit();
@@ -124,10 +142,8 @@ public class EnhancedTextArea extends VBox {
         String title = expandedDialogTitle();
         dialog.setTitle(title);
         AppDialogs.applySecondaryDialogShell(dialog, title);
-        TextArea expanded = new TextArea(edit.draft());
-        expanded.setWrapText(true); expanded.setPrefRowCount(18); expanded.setPrefColumnCount(80);
-        expanded.getStyleClass().addAll("enhanced-text-area-editor", "enhanced-text-area-dialog-editor");
-        ControlStyles.formControl(expanded);
+        RichTextExpandedEditor expanded = new RichTextExpandedEditor(edit.draft(), spellChecker, isSpellCheckEnabled());
+        expanded.setPrefSize(760, 440);
         Label shortcutHint = new Label("Ctrl+Enter to Apply");
         shortcutHint.getStyleClass().add("enhanced-text-area-dialog-hint");
         shortcutHint.setMaxWidth(Double.MAX_VALUE);
@@ -140,11 +156,11 @@ public class EnhancedTextArea extends VBox {
         Button apply = (Button) dialog.getDialogPane().lookupButton(APPLY);
         ControlStyles.apply(apply, ControlStyles.Purpose.PRIMARY);
         ControlStyles.apply((Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
-        expanded.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+        expanded.area().addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
             if (new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN).match(event)) { apply.fire(); event.consume(); }
         });
-        dialog.setResultConverter(button -> button == APPLY ? expanded.getText() : null);
-        dialog.setOnShown(event -> Platform.runLater(expanded::requestFocus));
+        dialog.setResultConverter(button -> button == APPLY ? expanded.markdown() : null);
+        dialog.setOnShown(event -> Platform.runLater(() -> expanded.area().requestFocus()));
         Optional<String> result = dialog.showAndWait();
         result.ifPresent(value -> { edit.setDraft(value); applyExpandedEdit(edit); });
     }
@@ -180,7 +196,7 @@ public class EnhancedTextArea extends VBox {
     }
 
     private void refreshSpellCheck() {
-        var words = isSpellCheckEnabled() ? spellChecker.misspellings(getText()) : java.util.List.<String>of();
+        var words = isSpellCheckEnabled() ? spellChecker.misspellings(editor.getText()) : java.util.List.<String>of();
         editor.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("has-spelling-issues"), !words.isEmpty());
     }
 
