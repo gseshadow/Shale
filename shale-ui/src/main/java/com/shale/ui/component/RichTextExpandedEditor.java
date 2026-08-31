@@ -11,6 +11,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
+import org.fxmisc.richtext.CharacterHit;
 import org.fxmisc.richtext.InlineCssTextArea;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 
@@ -26,6 +27,7 @@ final class RichTextExpandedEditor extends VBox {
     private final PauseTransition spellDelay = new PauseTransition(Duration.millis(350));
     private final boolean spellCheck;
     private List<LocalSpellChecker.Misspelling> misspellings = List.of();
+    private int contextMenuPosition = -1;
 
     RichTextExpandedEditor(String markdown, LocalSpellChecker checker, boolean spellCheck) {
         this.checker = checker; this.spellCheck = spellCheck;
@@ -126,18 +128,42 @@ final class RichTextExpandedEditor extends VBox {
 
     private void installContextMenu() {
         ContextMenu menu = new ContextMenu(); area.setContextMenu(menu);
-        menu.setOnShowing(e -> {
-            menu.getItems().clear(); int caret = area.getCaretPosition();
-            LocalSpellChecker.Misspelling hit = misspellings.stream().filter(m -> caret >= m.start() && caret < m.end()).findFirst().orElse(null);
-            if (hit != null) {
-                for (String suggestion : checker.suggestions(hit.word(), 5)) { MenuItem item = new MenuItem(suggestion); item.setOnAction(x -> area.replaceText(hit.start(), hit.end(), suggestion)); menu.getItems().add(item); }
-                MenuItem ignore = new MenuItem("Ignore “" + hit.word() + "”"); ignore.setOnAction(x -> { checker.ignore(hit.word()); refreshSpelling(); });
-                MenuItem add = new MenuItem("Add “" + hit.word() + "” to dictionary"); add.setOnAction(x -> { checker.addToCustomDictionary(hit.word()); refreshSpelling(); });
-                menu.getItems().addAll(ignore, add, new SeparatorMenuItem());
-            }
-            MenuItem cut = new MenuItem("Cut"); cut.setOnAction(x -> area.cut()); MenuItem copy = new MenuItem("Copy"); copy.setOnAction(x -> area.copy()); MenuItem paste = new MenuItem("Paste"); paste.setOnAction(x -> area.paste());
-            menu.getItems().addAll(cut, copy, paste);
+        // RichTextFX does not promise to move the caret for a secondary click. Resolve the
+        // character beneath the pointer directly, before JavaFX asks the menu to show.
+        area.addEventFilter(ContextMenuEvent.CONTEXT_MENU_REQUESTED, event -> {
+            refreshSpelling();
+            CharacterHit hit = area.hit(event.getX(), event.getY());
+            contextMenuPosition = hit.getCharacterIndex().orElse(hit.getInsertionIndex());
         });
+        menu.setOnShowing(e -> {
+            menu.getItems().clear();
+            LocalSpellChecker.Misspelling hit = misspellingAt(misspellings, contextMenuPosition);
+            if (hit != null) {
+                List<String> suggestions = checker.suggestions(hit.word(), 5);
+                if (suggestions.isEmpty()) { MenuItem none = new MenuItem("No suggestions"); none.setDisable(true); menu.getItems().add(none); }
+                else for (String suggestion : suggestions) { MenuItem item = new MenuItem(suggestion); item.setOnAction(x -> replaceMisspelling(hit, suggestion)); menu.getItems().add(item); }
+                MenuItem ignore = new MenuItem("Ignore"); ignore.setOnAction(x -> { checker.ignore(hit.word()); refreshSpelling(); });
+                MenuItem add = new MenuItem("Add to dictionary"); add.setOnAction(x -> { checker.addToCustomDictionary(hit.word()); refreshSpelling(); });
+                menu.getItems().addAll(new SeparatorMenuItem(), ignore, add, new SeparatorMenuItem());
+            }
+            MenuItem cut = new MenuItem("Cut"); cut.setDisable(area.getSelection().getLength() == 0); cut.setOnAction(x -> area.cut());
+            MenuItem copy = new MenuItem("Copy"); copy.setDisable(area.getSelection().getLength() == 0); copy.setOnAction(x -> area.copy());
+            MenuItem paste = new MenuItem("Paste"); paste.setDisable(!Clipboard.getSystemClipboard().hasString()); paste.setOnAction(x -> area.paste());
+            MenuItem selectAll = new MenuItem("Select All"); selectAll.setDisable(area.getLength() == 0); selectAll.setOnAction(x -> area.selectAll());
+            menu.getItems().addAll(cut, copy, paste, selectAll);
+        });
+    }
+
+    private void replaceMisspelling(LocalSpellChecker.Misspelling misspelling, String suggestion) {
+        EnumSet<NarrativeDocument.Format> formatting = formatsAt(misspelling.start());
+        area.replaceText(misspelling.start(), misspelling.end(), suggestion);
+        for (int i = misspelling.start(); i < misspelling.start() + suggestion.length(); i++)
+            area.setStyle(i, i + 1, css(formatting, false));
+        refreshSpelling();
+    }
+
+    static LocalSpellChecker.Misspelling misspellingAt(List<LocalSpellChecker.Misspelling> ranges, int characterIndex) {
+        return ranges.stream().filter(m -> characterIndex >= m.start() && characterIndex < m.end()).findFirst().orElse(null);
     }
 
     private EnumSet<NarrativeDocument.Format> formatsAt(int i) {
