@@ -5,6 +5,7 @@ import com.shale.core.platform.AppPaths;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.EnhancedTextArea;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.StatusCardFactory;
@@ -32,7 +33,6 @@ import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
@@ -91,7 +91,7 @@ public final class NewIntakeController {
 	@FXML private TextField clientEmailField;
 	@FXML private DatePicker clientDateOfBirthPicker;
 	@FXML private CheckBox clientDeceasedCheckBox;
-	@FXML private TextArea clientConditionArea;
+	@FXML private EnhancedTextArea clientConditionArea;
 
 	@FXML private CheckBox callerIsClientCheckBox;
 	@FXML private Label callerReuseLabel;
@@ -109,8 +109,8 @@ public final class NewIntakeController {
 	@FXML private Button selectPracticeAreaButton;
 	@FXML private StackPane statusHost;
 	@FXML private Button selectStatusButton;
-	@FXML private TextArea descriptionArea;
-	@FXML private TextArea summaryArea;
+	@FXML private EnhancedTextArea descriptionArea;
+	@FXML private EnhancedTextArea summaryArea;
 	@FXML private DatePicker dateMedicalNegligencePicker;
 	@FXML private DatePicker dateMedicalNegligenceDiscoveredPicker;
 	@FXML private DatePicker dateOfInjuryPicker;
