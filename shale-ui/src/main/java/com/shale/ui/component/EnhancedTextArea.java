@@ -7,6 +7,9 @@ import com.shale.ui.util.ControlStyles;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.StringProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.application.Platform;
+import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
@@ -16,13 +19,15 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.SVGPath;
 import javafx.stage.Window;
 
 import java.util.Optional;
@@ -31,8 +36,7 @@ import java.util.Optional;
 public class EnhancedTextArea extends VBox {
     private static final ButtonType APPLY = new ButtonType("Apply", ButtonBar.ButtonData.APPLY);
     private final TextArea editor = new TextArea();
-    private final Button expandButton = new Button("Expand");
-    private final Label spellingStatus = new Label();
+    private final Button expandButton = new Button();
     private final LocalSpellChecker spellChecker;
 
     public EnhancedTextArea() { this(ShaleDictionary.create()); }
@@ -45,17 +49,23 @@ public class EnhancedTextArea extends VBox {
         editor.setWrapText(true);
         editor.setPrefRowCount(3);
         editor.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(editor, Priority.ALWAYS);
         ControlStyles.apply(expandButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        ControlStyles.iconOnly(expandButton);
         expandButton.getStyleClass().add("enhanced-text-area-expand");
-        expandButton.setFocusTraversable(false);
+        SVGPath expandIcon = new SVGPath();
+        expandIcon.setContent("M 4 5 L 4 16 L 15 16 L 15 12 M 10 4 L 16 4 L 16 10 M 16 4 L 9 11");
+        expandIcon.getStyleClass().add("enhanced-text-area-expand-icon");
+        expandButton.setGraphic(expandIcon);
+        expandButton.setTooltip(new Tooltip("Open expanded editor"));
+        expandButton.setAccessibleText("Open expanded editor");
+        expandButton.setMinSize(32, 32); expandButton.setPrefSize(32, 32); expandButton.setMaxSize(32, 32);
         expandButton.setOnAction(event -> showExpandedEditor());
-        HBox row = new HBox(editor, expandButton);
-        row.getStyleClass().add("enhanced-text-area-row");
-        HBox.setHgrow(editor, Priority.ALWAYS);
-        spellingStatus.getStyleClass().add("enhanced-text-area-spelling");
-        spellingStatus.setVisible(false); spellingStatus.setManaged(false);
-        getChildren().addAll(row, spellingStatus);
+        StackPane editorChrome = new StackPane(editor, expandButton);
+        editorChrome.getStyleClass().add("enhanced-text-area-chrome");
+        StackPane.setAlignment(expandButton, Pos.TOP_RIGHT);
+        StackPane.setMargin(expandButton, new javafx.geometry.Insets(6, 7, 0, 0));
+        VBox.setVgrow(editorChrome, Priority.ALWAYS);
+        getChildren().add(editorChrome);
         editor.textProperty().addListener((obs, oldValue, newValue) -> refreshSpellCheck());
         editor.setContextMenu(spellingMenu());
         expandableProperty().addListener((obs, oldValue, value) -> updateExpandVisibility());
@@ -78,6 +88,11 @@ public class EnhancedTextArea extends VBox {
     public final int getPrefRowCount() { return editor.getPrefRowCount(); }
     public final void setPrefRowCount(int rows) { editor.setPrefRowCount(rows); }
 
+    private final StringProperty editorTitle = new SimpleStringProperty(this, "editorTitle", "");
+    public final StringProperty editorTitleProperty() { return editorTitle; }
+    public final String getEditorTitle() { return editorTitle.get(); }
+    public final void setEditorTitle(String title) { editorTitle.set(title == null ? "" : title); }
+
     private final BooleanProperty expandable = new javafx.beans.property.SimpleBooleanProperty(this, "expandable", true);
     public final BooleanProperty expandableProperty() { return expandable; }
     public final boolean isExpandable() { return expandable.get(); }
@@ -89,7 +104,7 @@ public class EnhancedTextArea extends VBox {
     public final void setSpellCheckEnabled(boolean value) { spellCheckEnabled.set(value); }
 
     public ExpandedTextEdit createExpandedEdit() { return new ExpandedTextEdit(getText()); }
-    public void applyExpandedEdit(ExpandedTextEdit edit) { if (edit != null && isEditable()) setText(edit.draft()); }
+    public void applyExpandedEdit(ExpandedTextEdit edit) { if (edit != null && canExpand()) setText(edit.draft()); }
     /** Adds a session/user supplied term without altering the bundled dictionary. */
     public void addToCustomDictionary(String word) { spellChecker.addToCustomDictionary(word); refreshSpellCheck(); }
     /** Ignores a term for this checker session. */
@@ -101,18 +116,25 @@ public class EnhancedTextArea extends VBox {
     }
 
     private void showExpandedEditor() {
-        if (!isExpandable() || !isEditable() || isDisabled()) return;
+        if (!canExpand()) return;
         ExpandedTextEdit edit = createExpandedEdit();
         Dialog<String> dialog = new Dialog<>();
         Window owner = getScene() == null ? null : getScene().getWindow();
         if (owner != null) dialog.initOwner(owner);
-        dialog.setTitle("Expanded text editor");
-        AppDialogs.applySecondaryDialogShell(dialog, "Expanded text editor");
+        String title = expandedDialogTitle();
+        dialog.setTitle(title);
+        AppDialogs.applySecondaryDialogShell(dialog, title);
         TextArea expanded = new TextArea(edit.draft());
         expanded.setWrapText(true); expanded.setPrefRowCount(18); expanded.setPrefColumnCount(80);
         expanded.getStyleClass().addAll("enhanced-text-area-editor", "enhanced-text-area-dialog-editor");
         ControlStyles.formControl(expanded);
-        dialog.getDialogPane().setContent(expanded);
+        Label shortcutHint = new Label("Ctrl+Enter to Apply");
+        shortcutHint.getStyleClass().add("enhanced-text-area-dialog-hint");
+        shortcutHint.setMaxWidth(Double.MAX_VALUE);
+        VBox.setVgrow(expanded, Priority.ALWAYS);
+        VBox content = new VBox(8, expanded, shortcutHint);
+        content.getStyleClass().add("enhanced-text-area-dialog-content");
+        dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(APPLY, ButtonType.CANCEL);
         dialog.getDialogPane().setMinSize(720, 520);
         Button apply = (Button) dialog.getDialogPane().lookupButton(APPLY);
@@ -122,6 +144,7 @@ public class EnhancedTextArea extends VBox {
             if (new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN).match(event)) { apply.fire(); event.consume(); }
         });
         dialog.setResultConverter(button -> button == APPLY ? expanded.getText() : null);
+        dialog.setOnShown(event -> Platform.runLater(expanded::requestFocus));
         Optional<String> result = dialog.showAndWait();
         result.ifPresent(value -> { edit.setDraft(value); applyExpandedEdit(edit); });
     }
@@ -130,15 +153,17 @@ public class EnhancedTextArea extends VBox {
         ContextMenu menu = new ContextMenu();
         menu.setOnShowing(event -> {
             menu.getItems().clear();
-            String selected = editor.getSelectedText();
-            if (isSpellCheckEnabled() && selected != null && !selected.isBlank() && spellChecker.isMisspelled(selected.trim())) {
-                for (String suggestion : spellChecker.suggestions(selected.trim(), 5)) {
+            WordRange target = selectedOrCaretWord();
+            if (isSpellCheckEnabled() && target != null && spellChecker.isMisspelled(target.word())) {
+                for (String suggestion : spellChecker.suggestions(target.word(), 5)) {
                     MenuItem item = new MenuItem(suggestion);
-                    item.setOnAction(e -> editor.replaceSelection(suggestion)); menu.getItems().add(item);
+                    item.setOnAction(e -> editor.replaceText(target.start(), target.end(), suggestion)); menu.getItems().add(item);
                 }
-                MenuItem ignore = new MenuItem("Ignore “" + selected.trim() + "”");
-                ignore.setOnAction(e -> { spellChecker.ignore(selected.trim()); refreshSpellCheck(); });
-                menu.getItems().addAll(ignore, new SeparatorMenuItem());
+                MenuItem ignore = new MenuItem("Ignore “" + target.word() + "”");
+                ignore.setOnAction(e -> { spellChecker.ignore(target.word()); refreshSpellCheck(); });
+                MenuItem add = new MenuItem("Add “" + target.word() + "” to dictionary");
+                add.setOnAction(e -> addToCustomDictionary(target.word()));
+                menu.getItems().addAll(ignore, add, new SeparatorMenuItem());
             }
             MenuItem undo = item("Undo", editor::undo, editor.isUndoable());
             MenuItem redo = item("Redo", editor::redo, editor.isRedoable());
@@ -156,7 +181,37 @@ public class EnhancedTextArea extends VBox {
 
     private void refreshSpellCheck() {
         var words = isSpellCheckEnabled() ? spellChecker.misspellings(getText()) : java.util.List.<String>of();
-        spellingStatus.setText(words.isEmpty() ? "" : "Check spelling: " + String.join(", ", words.stream().limit(5).toList()));
-        spellingStatus.setVisible(!words.isEmpty()); spellingStatus.setManaged(!words.isEmpty());
+        editor.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("has-spelling-issues"), !words.isEmpty());
     }
+
+    public boolean canExpand() { return isExpandable() && isEditable() && !isDisabled(); }
+
+    public String expandedDialogTitle() {
+        String configured = getEditorTitle() == null ? "" : getEditorTitle().trim();
+        return configured.isEmpty() ? "Edit text" : "Edit " + configured;
+    }
+
+    private WordRange selectedOrCaretWord() {
+        if (!editor.getSelectedText().isBlank()) {
+            return new WordRange(editor.getSelection().getStart(), editor.getSelection().getEnd(), editor.getSelectedText().trim());
+        }
+        return wordAt(editor.getText(), editor.getCaretPosition());
+    }
+
+    static WordRange wordAt(String text, int caret) {
+        if (text == null || text.isEmpty()) return null;
+        int position = Math.max(0, Math.min(caret, text.length()));
+        if (position == text.length()) position--;
+        if (position < 0 || !isWordCharacter(text.charAt(position))) return null;
+        int start = position, end = position + 1;
+        while (start > 0 && isWordCharacter(text.charAt(start - 1))) start--;
+        while (end < text.length() && isWordCharacter(text.charAt(end))) end++;
+        return new WordRange(start, end, text.substring(start, end));
+    }
+
+    private static boolean isWordCharacter(char value) {
+        return Character.isLetter(value) || value == '\'' || value == '’' || value == '-';
+    }
+
+    record WordRange(int start, int end, String word) { }
 }
