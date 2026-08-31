@@ -35,7 +35,7 @@
         <ScrollableListRegion fx:id="contactsListRegion">
             <content>
                 <FlowPane fx:id="contactsFlow" hgap="16" vgap="16"
-                    prefWrapLength="1040" styleClass="cases-content-surface glass-panel">
+                    prefWrapLength="1040" styleClass="cases-content-surface glass-panel data-surface">
                     <padding>
                         <Insets top="16" right="16" bottom="16" left="16" />
                     </padding>

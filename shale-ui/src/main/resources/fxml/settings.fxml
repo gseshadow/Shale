@@ -20,7 +20,7 @@
             vbarPolicy="AS_NEEDED"
             styleClass="surface-scroll">
     <content>
-        <VBox spacing="14" styleClass="cases-content-surface glass-panel">
+        <VBox spacing="14" styleClass="cases-content-surface glass-panel data-surface">
             <padding>
                 <Insets top="16" right="16" bottom="16" left="16"/>
             </padding>

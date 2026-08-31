@@ -42,6 +42,60 @@
     -fx-border-width: 1;
 }
 
+/*
+ * Functional surfaces keep text and controls independent from the decorative
+ * application gradient. They are intentionally translucent so the shell still
+ * reads around and between working regions.
+ */
+.page-header-surface {
+    -fx-background-color: -shale-color-page-header-surface;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: -shale-color-border;
+    -fx-border-width: 1;
+}
+
+.content-surface {
+    -fx-background-color: -shale-color-functional-content-surface;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: -shale-color-border;
+    -fx-border-width: 1;
+}
+
+.data-surface,
+.data-surface.cases-content-surface {
+    -fx-background-color: -shale-color-data-surface;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: -shale-color-border;
+    -fx-border-width: 1;
+}
+
+.page-header-surface .page-heading,
+.page-header-surface .functional-heading {
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-font-weight: 800;
+}
+
+.page-header-surface .functional-heading {
+    -fx-font-size: 18px;
+}
+
+.page-header-surface .functional-metadata {
+    -fx-text-fill: -shale-color-text-secondary;
+}
+
+/* ScrollPane skins paint their viewport separately from the control shell. */
+.page-header-surface.app-section-tabs-scroll,
+.page-header-surface.app-section-tabs-scroll > .viewport {
+    -fx-background-color: -shale-color-page-header-surface;
+}
+
+.page-header-surface.app-section-tabs-scroll {
+    -fx-padding: 6 8 6 8;
+}
+
 /* 5. Section Surface: grouped section panel. */
 .shale-surface-section {
     -fx-background-color: -shale-color-section-surface;
