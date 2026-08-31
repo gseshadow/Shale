@@ -4,7 +4,9 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -19,8 +21,12 @@ public final class LocalSpellChecker {
     private final Set<String> dictionary = new LinkedHashSet<>();
     private final Set<String> ignored = new LinkedHashSet<>();
     private final Set<String> custom = new LinkedHashSet<>();
+    private final Map<Integer, Set<String>> suggestionsByLength = new HashMap<>();
 
-    public LocalSpellChecker(Collection<String> words) { addNormalized(dictionary, words); }
+    public LocalSpellChecker(Collection<String> words) { addWords(words); }
+
+    /** Adds another application dictionary layer (for example legal or medical terms). */
+    public void addDictionaryLayer(Collection<String> words) { addWords(words); }
 
     /** Adds another application dictionary layer (for example legal or medical terms). */
     public void addDictionaryLayer(Collection<String> words) { addNormalized(dictionary, words); }
@@ -49,18 +55,33 @@ public final class LocalSpellChecker {
 
     public List<String> suggestions(String word, int limit) {
         String target = normalize(word);
-        return java.util.stream.Stream.concat(dictionary.stream(), custom.stream())
-                .filter(candidate -> Math.abs(candidate.length() - target.length()) <= 2)
+        return java.util.stream.IntStream.rangeClosed(Math.max(1, target.length() - 2), target.length() + 2)
+                .mapToObj(length -> suggestionsByLength.getOrDefault(length, Set.of()).stream())
+                .flatMap(stream -> stream)
+                .filter(candidate -> target.isEmpty() || candidate.charAt(0) == target.charAt(0))
                 .sorted(java.util.Comparator.comparingInt(candidate -> distance(target, candidate)))
                 .limit(Math.max(0, limit)).toList();
     }
 
     public void ignore(String word) { ignored.add(normalize(word)); }
-    public void addToCustomDictionary(String word) { custom.add(normalize(word)); }
+    public void addToCustomDictionary(String word) {
+        String normalized = normalize(word);
+        if (!normalized.isBlank() && custom.add(normalized)) index(normalized);
+    }
     public Set<String> customDictionary() { return Set.copyOf(custom); }
 
     private static void addNormalized(Set<String> target, Collection<String> words) {
         if (words != null) words.stream().map(LocalSpellChecker::normalize).filter(s -> !s.isBlank()).forEach(target::add);
+    }
+
+    private void addWords(Collection<String> words) {
+        int previousSize = dictionary.size();
+        addNormalized(dictionary, words);
+        if (dictionary.size() != previousSize) dictionary.forEach(this::index);
+    }
+
+    private void index(String word) {
+        suggestionsByLength.computeIfAbsent(word.length(), ignored -> new LinkedHashSet<>()).add(word);
     }
 
     private static String normalize(String word) {

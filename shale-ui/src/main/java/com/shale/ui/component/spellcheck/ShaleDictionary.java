@@ -8,12 +8,15 @@ import java.util.List;
 
 /** Loads the bundled offline dictionary. No text or telemetry leaves the application. */
 public final class ShaleDictionary {
+    private static final List<String> ENGLISH = load("/spellcheck/en_US.txt");
+    private static final List<String> LEGAL = load("/spellcheck/shale-legal.txt");
+    private static final List<String> MEDICAL = load("/spellcheck/shale-medical.txt");
     private ShaleDictionary() { }
 
     public static LocalSpellChecker create() {
-        LocalSpellChecker checker = new LocalSpellChecker(load("/spellcheck/en_US.txt"));
-        checker.addDictionaryLayer(load("/spellcheck/shale-legal.txt"));
-        checker.addDictionaryLayer(load("/spellcheck/shale-medical.txt"));
+        LocalSpellChecker checker = new LocalSpellChecker(ENGLISH);
+        checker.addDictionaryLayer(LEGAL);
+        checker.addDictionaryLayer(MEDICAL);
         return checker;
     }
 
