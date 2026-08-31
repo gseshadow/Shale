@@ -38,6 +38,24 @@
 .text-area.shale-form-control > .scroll-pane,
 .text-area.shale-form-control > .scroll-pane > .viewport,
 .text-area.shale-form-control > .scroll-pane > .content { -fx-background-color: transparent; }
+
+/* Plain-text narrative editor: delegates input behavior to the native TextArea. */
+.enhanced-text-area { -fx-spacing: 5px; }
+.enhanced-text-area-row { -fx-alignment: top-right; -fx-spacing: 6px; }
+.enhanced-text-area-editor.text-area.shale-form-control {
+    -fx-padding: 2px;
+    -fx-font-size: 13px;
+    -fx-line-spacing: 3px;
+}
+.enhanced-text-area-editor.text-area .content { -fx-padding: 10px 12px; }
+.enhanced-text-area-expand { -fx-padding: 6px 9px; -fx-opacity: 0.82; }
+.enhanced-text-area-expand:hover { -fx-opacity: 1; }
+.enhanced-text-area-spelling {
+    -fx-font-size: 11px;
+    -fx-text-fill: -shale-color-text-secondary;
+    -fx-padding: 0 3px;
+}
+.enhanced-text-area-dialog-editor.text-area { -fx-pref-height: 420px; }
 .date-picker.shale-form-control > .text-field { -fx-background-color: transparent; -fx-border-color: transparent; }
 
 .shale-search-field,
