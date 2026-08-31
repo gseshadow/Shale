@@ -68,9 +68,30 @@
 .enhanced-text-area-dialog-editor.text-area { -fx-pref-height: 420px; }
 .enhanced-text-area-editor:formatted-preview { -fx-opacity: 0.92; }
 .rich-text-expanded-editor { -fx-spacing: 8px; }
-.narrative-editor-toolbar { -fx-padding: 4px; -fx-background-color: -shale-surface-subtle; }
-.narrative-toolbar-button { -fx-min-height: 28px; -fx-padding: 3px 9px; }
-.narrative-editor-area { -fx-background-color: -shale-surface; -fx-border-color: -shale-border; -fx-border-radius: 4px; -fx-padding: 10px; }
+.narrative-editor-toolbar {
+    -fx-padding: 4px; -fx-background-color: -shale-control-surface;
+    -fx-spacing: 3px; -fx-background-radius: 8px;
+}
+.narrative-editor-toolbar .separator { -fx-padding: 3px 4px; }
+.button.narrative-toolbar-button, .toggle-button.narrative-toolbar-button {
+    -fx-min-width: 28px; -fx-pref-width: 28px; -fx-max-width: 28px;
+    -fx-min-height: 28px; -fx-pref-height: 28px; -fx-max-height: 28px;
+    -fx-padding: 0; -fx-background-radius: 6px; -fx-border-radius: 6px;
+    -fx-background-color: transparent; -fx-border-color: transparent;
+    -fx-text-fill: -shale-color-text-primary; -fx-cursor: hand;
+}
+.button.narrative-toolbar-button:hover, .toggle-button.narrative-toolbar-button:hover { -fx-background-color: -shale-button-ghost-hover-background; }
+.button.narrative-toolbar-button:pressed, .toggle-button.narrative-toolbar-button:pressed { -fx-background-color: -shale-button-ghost-pressed-background; }
+.toggle-button.narrative-toolbar-button:selected { -fx-background-color: -shale-control-surface-pressed; -fx-border-color: -shale-control-focus-border; }
+.button.narrative-toolbar-button:focused, .toggle-button.narrative-toolbar-button:focused { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 7, 0.15, 0, 0); }
+.narrative-format-bold { -fx-font-weight: bold; }
+.narrative-format-italic { -fx-font-style: italic; }
+.narrative-format-underline { -fx-underline: true; }
+.narrative-toolbar-icon { -fx-fill: -shale-color-text-primary; }
+.narrative-editor-area {
+    -fx-background-color: -shale-control-surface; -fx-border-color: -shale-control-border;
+    -fx-border-radius: 4px; -fx-padding: 10px;
+}
 .date-picker.shale-form-control > .text-field { -fx-background-color: transparent; -fx-border-color: transparent; }
 
 .shale-search-field,

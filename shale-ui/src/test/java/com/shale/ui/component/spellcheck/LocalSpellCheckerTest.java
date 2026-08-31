@@ -27,4 +27,26 @@ class LocalSpellCheckerTest {
         checker.ignore("physcian"); assertTrue(checker.misspellingRanges("physcian").isEmpty());
         checker.addToCustomDictionary("counselname"); assertFalse(checker.isMisspelled("CounselName"));
     }
+
+    @Test void rangesExcludeWhitespacePunctuationAndRemainIndependent() {
+        LocalSpellChecker checker = new LocalSpellChecker(List.of("this", "is", "valid", "works"));
+        assertRanges(checker, "asdf this is valid", new int[][]{{0, 4}});
+        assertRanges(checker, "this asdf works", new int[][]{{5, 9}});
+        assertRanges(checker, "this asdf, works", new int[][]{{5, 9}});
+        assertRanges(checker, "asdf valid qwer", new int[][]{{0, 4}, {11, 15}});
+    }
+
+    @Test void rangesUseDocumentOffsetsAcrossNewlines() {
+        LocalSpellChecker checker = new LocalSpellChecker(List.of("valid", "line", "here"));
+        assertRanges(checker, "valid line\nasdf here", new int[][]{{11, 15}});
+    }
+
+    private static void assertRanges(LocalSpellChecker checker, String text, int[][] expected) {
+        var actual = checker.misspellingRanges(text);
+        assertEquals(expected.length, actual.size());
+        for (int i = 0; i < expected.length; i++) {
+            assertEquals(expected[i][0], actual.get(i).start());
+            assertEquals(expected[i][1], actual.get(i).end());
+        }
+    }
 }

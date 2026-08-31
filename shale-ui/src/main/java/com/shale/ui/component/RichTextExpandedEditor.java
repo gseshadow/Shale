@@ -5,13 +5,17 @@ import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.component.spellcheck.LocalSpellChecker;
 import com.shale.ui.util.ControlStyles;
 import javafx.animation.PauseTransition;
+import javafx.beans.binding.Bindings;
 import javafx.geometry.Orientation;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
 import org.fxmisc.richtext.InlineCssTextArea;
+import org.fxmisc.richtext.model.StyleSpansBuilder;
+import org.fxmisc.undo.UndoManagerFactory;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -19,24 +23,26 @@ import java.util.List;
 
 /** RichTextFX-backed draft surface. It never writes persistence itself. */
 final class RichTextExpandedEditor extends VBox {
-    private static final String SPELLING = "-rtfx-underline-color: #d32f2f; -rtfx-underline-width: 1.2; -rtfx-underline-dash-array: 2 2;";
+    private static final String SPELLING = "-rtfx-underline-color: #d32f2f; -rtfx-underline-width: 1.1; -rtfx-underline-dash-array: 1 2;";
     private final InlineCssTextArea area = new InlineCssTextArea();
     private final LocalSpellChecker checker;
     private final PauseTransition spellDelay = new PauseTransition(Duration.millis(350));
     private final boolean spellCheck;
+    private boolean refreshingSpelling;
     private List<LocalSpellChecker.Misspelling> misspellings = List.of();
 
     RichTextExpandedEditor(String markdown, LocalSpellChecker checker, boolean spellCheck) {
         this.checker = checker; this.spellCheck = spellCheck;
+        installUndoManager();
         getStyleClass().add("rich-text-expanded-editor");
         ToolBar toolbar = new ToolBar(); toolbar.getStyleClass().add("narrative-editor-toolbar");
-        ToggleButton bold = toggle("Bold", "Ctrl+B", () -> toggleFormat(NarrativeDocument.Format.BOLD));
-        ToggleButton italic = toggle("Italic", "Ctrl+I", () -> toggleFormat(NarrativeDocument.Format.ITALIC));
-        ToggleButton underline = toggle("Underline", "Ctrl+U", () -> toggleFormat(NarrativeDocument.Format.UNDERLINE));
-        Button bullets = button("• List", "Bulleted list", () -> toggleList(false));
-        Button numbers = button("1. List", "Numbered list", () -> toggleList(true));
-        Button undo = button("↶", "Undo (Ctrl+Z)", area::undo);
-        Button redo = button("↷", "Redo (Ctrl+Y)", area::redo);
+        ToggleButton bold = formatToggle("B", "Bold", "Bold (Ctrl+B)", () -> toggleFormat(NarrativeDocument.Format.BOLD));
+        ToggleButton italic = formatToggle("I", "Italic", "Italic (Ctrl+I)", () -> toggleFormat(NarrativeDocument.Format.ITALIC));
+        ToggleButton underline = formatToggle("U", "Underline", "Underline (Ctrl+U)", () -> toggleFormat(NarrativeDocument.Format.UNDERLINE));
+        ToggleButton bullets = iconToggle("M2 3h2v2H2V3m4 0h10v2H6V3M2 7h2v2H2V7m4 0h10v2H6V7m-4 4h2v2H2v-2m4 0h10v2H6v-2", "Bulleted list", () -> toggleList(false));
+        ToggleButton numbers = iconToggle("M2 3h1v2H2v1h3V5H4V2H2v1m4 0h10v2H6V3M2 8h2v1H2v3h3v-1H3l2-2V7H2v1m4-1h10v2H6V7m-4 5h2v1H2v1h3v-5H2v1h2v1H2v1m4-1h10v2H6v-2", "Numbered list", () -> toggleList(true));
+        Button undo = iconButton("M7 4 2 8l5 4V9h3c2.8 0 4.7 1.4 5.8 4-0.2-4.5-2.5-7-6.3-7H7V4", "Undo", "Undo (Ctrl+Z)", area::undo);
+        Button redo = iconButton("M11 4l5 4-5 4V9H8c-2.8 0-4.7 1.4-5.8 4C2.4 8.5 4.7 6 8.5 6H11V4", "Redo", "Redo (Ctrl+Y, Ctrl+Shift+Z)", area::redo);
         toolbar.getItems().addAll(bold, italic, underline, new Separator(Orientation.VERTICAL), bullets, numbers,
                 new Separator(Orientation.VERTICAL), undo, redo);
         area.setWrapText(true); area.getStyleClass().add("narrative-editor-area");
@@ -45,9 +51,30 @@ final class RichTextExpandedEditor extends VBox {
         area.textProperty().addListener((o, old, value) -> { if (spellCheck) spellDelay.playFromStart(); });
         spellDelay.setOnFinished(e -> refreshSpelling());
         installKeys(); installContextMenu(); refreshSpelling();
+        undo.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> !area.isUndoAvailable(), area.undoAvailableProperty()));
+        redo.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> !area.isRedoAvailable(), area.redoAvailableProperty()));
+        Runnable state = () -> updateToolbarState(bold, italic, underline, bullets, numbers);
+        area.caretPositionProperty().addListener((o, a, b) -> state.run());
+        area.selectionProperty().addListener((o, a, b) -> state.run());
+        state.run();
     }
 
     InlineCssTextArea area() { return area; }
+
+    private void installUndoManager() {
+        /*
+         * RichTextFX's default rich-text manager observes every rich change, including
+         * derived spelling styles. Filter those changes at the observation boundary;
+         * semantic style and text changes continue through the same UndoFX manager.
+         */
+        area.setUndoManager(UndoManagerFactory.unlimitedHistoryUndoManager(
+                area.richChanges().filter(change -> !refreshingSpelling),
+                change -> change.invert(),
+                change -> area.replace(change.getPosition(), change.getRemovalEnd(), change.getInserted()),
+                (first, second) -> first.mergeWith(second)));
+    }
 
     String markdown() {
         List<EnumSet<NarrativeDocument.Format>> formats = new ArrayList<>();
@@ -72,10 +99,12 @@ final class RichTextExpandedEditor extends VBox {
         IndexRange selection = area.getSelection(); if (selection.getLength() == 0) return;
         boolean remove = true;
         for (int i = selection.getStart(); i < selection.getEnd(); i++) if (!formatsAt(i).contains(format)) { remove = false; break; }
+        StyleSpansBuilder<String> styles = new StyleSpansBuilder<>();
         for (int i = selection.getStart(); i < selection.getEnd(); i++) {
             EnumSet<NarrativeDocument.Format> formats = formatsAt(i); if (remove) formats.remove(format); else formats.add(format);
-            area.setStyle(i, i + 1, css(formats, isMisspelled(i)));
+            styles.add(css(formats, isMisspelled(i)), 1);
         }
+        area.setStyleSpans(selection.getStart(), styles.create());
     }
 
     private void toggleList(boolean ordered) {
@@ -113,16 +142,25 @@ final class RichTextExpandedEditor extends VBox {
         return false;
     }
 
-    private void refreshSpelling() {
+    void refreshSpelling() {
         misspellings = spellCheck ? checker.misspellingRanges(area.getText()) : List.of();
-        for (int i = 0; i < area.getLength(); i++) area.setStyle(i, i + 1, css(formatsAt(i), isMisspelled(i)));
+        // Decoration is derived UI state. The filtered UndoFX stream installed above
+        // deliberately excludes these synchronous style-only changes.
+        refreshingSpelling = true;
+        try {
+            StyleSpansBuilder<String> styles = new StyleSpansBuilder<>();
+            for (int i = 0; i < area.getLength(); i++) styles.add(css(formatsAt(i), isMisspelled(i)), 1);
+            if (area.getLength() > 0) area.setStyleSpans(0, styles.create());
+        } finally {
+            refreshingSpelling = false;
+        }
     }
 
     private void installContextMenu() {
         ContextMenu menu = new ContextMenu(); area.setContextMenu(menu);
         menu.setOnShowing(e -> {
             menu.getItems().clear(); int caret = area.getCaretPosition();
-            LocalSpellChecker.Misspelling hit = misspellings.stream().filter(m -> caret >= m.start() && caret <= m.end()).findFirst().orElse(null);
+            LocalSpellChecker.Misspelling hit = misspellings.stream().filter(m -> caret >= m.start() && caret < m.end()).findFirst().orElse(null);
             if (hit != null) {
                 for (String suggestion : checker.suggestions(hit.word(), 5)) { MenuItem item = new MenuItem(suggestion); item.setOnAction(x -> area.replaceText(hit.start(), hit.end(), suggestion)); menu.getItems().add(item); }
                 MenuItem ignore = new MenuItem("Ignore “" + hit.word() + "”"); ignore.setOnAction(x -> { checker.ignore(hit.word()); refreshSpelling(); });
@@ -140,6 +178,43 @@ final class RichTextExpandedEditor extends VBox {
     }
     private boolean isMisspelled(int i) { return misspellings.stream().anyMatch(m -> i >= m.start() && i < m.end()); }
     private static String css(EnumSet<NarrativeDocument.Format> formats, boolean spelling) { return (formats.contains(NarrativeDocument.Format.BOLD) ? "-fx-font-weight: bold;" : "") + (formats.contains(NarrativeDocument.Format.ITALIC) ? "-fx-font-style: italic;" : "") + (formats.contains(NarrativeDocument.Format.UNDERLINE) ? "-fx-underline: true;" : "") + (spelling ? SPELLING : ""); }
-    private static ToggleButton toggle(String label, String tooltip, Runnable action) { ToggleButton b = new ToggleButton(label); b.setTooltip(new Tooltip(tooltip)); b.setAccessibleText(label); b.setOnAction(e -> action.run()); b.getStyleClass().add("narrative-toolbar-button"); return b; }
-    private static Button button(String label, String tooltip, Runnable action) { Button b = new Button(label); b.setTooltip(new Tooltip(tooltip)); b.setAccessibleText(tooltip); b.setOnAction(e -> action.run()); ControlStyles.apply(b, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL); b.getStyleClass().add("narrative-toolbar-button"); return b; }
+    private void updateToolbarState(ToggleButton bold, ToggleButton italic, ToggleButton underline, ToggleButton bullets, ToggleButton numbers) {
+        IndexRange selection = area.getSelection();
+        int from = selection.getLength() == 0 ? Math.max(0, area.getCaretPosition() - 1) : selection.getStart();
+        int to = selection.getLength() == 0 ? Math.min(area.getLength(), from + 1) : selection.getEnd();
+        bold.setSelected(uniformFormat(NarrativeDocument.Format.BOLD, from, to));
+        italic.setSelected(uniformFormat(NarrativeDocument.Format.ITALIC, from, to));
+        underline.setSelected(uniformFormat(NarrativeDocument.Format.UNDERLINE, from, to));
+        String line = currentLine(); bullets.setSelected(line.startsWith("• ")); numbers.setSelected(line.matches("\\d+\\. .*"));
+    }
+
+    private boolean uniformFormat(NarrativeDocument.Format format, int from, int to) {
+        if (from >= to) return false;
+        for (int i = from; i < to; i++) if (!formatsAt(i).contains(format)) return false;
+        return true;
+    }
+
+    private String currentLine() {
+        String text = area.getText(); int caret = area.getCaretPosition();
+        int start = text.lastIndexOf('\n', Math.max(0, caret - 1)) + 1;
+        int end = text.indexOf('\n', caret); return text.substring(start, end < 0 ? text.length() : end);
+    }
+
+    private static ToggleButton formatToggle(String glyph, String accessible, String tooltip, Runnable action) {
+        ToggleButton button = baseToggle(accessible, tooltip, action); button.setText(glyph);
+        button.getStyleClass().add("narrative-format-" + accessible.toLowerCase()); return button;
+    }
+    private static ToggleButton iconToggle(String path, String accessible, Runnable action) {
+        ToggleButton button = baseToggle(accessible, accessible, action); button.setGraphic(icon(path)); return button;
+    }
+    private static ToggleButton baseToggle(String accessible, String tooltip, Runnable action) {
+        ToggleButton button = new ToggleButton(); button.setTooltip(new Tooltip(tooltip)); button.setAccessibleText(accessible);
+        button.setOnAction(e -> action.run()); button.getStyleClass().add("narrative-toolbar-button"); return button;
+    }
+    private static Button iconButton(String path, String accessible, String tooltip, Runnable action) {
+        Button button = new Button(); button.setGraphic(icon(path)); button.setTooltip(new Tooltip(tooltip)); button.setAccessibleText(accessible);
+        button.setOnAction(e -> action.run()); ControlStyles.apply(button, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+        button.getStyleClass().add("narrative-toolbar-button"); return button;
+    }
+    private static SVGPath icon(String content) { SVGPath icon = new SVGPath(); icon.setContent(content); icon.getStyleClass().add("narrative-toolbar-icon"); return icon; }
 }
