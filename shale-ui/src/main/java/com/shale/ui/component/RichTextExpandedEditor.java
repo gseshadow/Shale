@@ -69,7 +69,7 @@ final class RichTextExpandedEditor extends VBox {
          * derived spelling styles. Filter those changes at the observation boundary;
          * semantic style and text changes continue through the same UndoFX manager.
          */
-        area.setUndoManager(UndoManagerFactory.unlimitedHistoryFactory().create(
+        area.setUndoManager(UndoManagerFactory.unlimitedHistoryUndoManager(
                 area.richChanges().filter(change -> !refreshingSpelling),
                 change -> change.invert(),
                 change -> area.replace(change.getPosition(), change.getRemovalEnd(), change.getInserted()),
