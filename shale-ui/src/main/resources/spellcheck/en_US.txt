@@ -1,4 +1,4 @@
-# Compact bundled baseline dictionary. Extend or replace through the spell-check service without changing stored text.
+# Offline English dictionary. Application and session dictionaries are layered without changing stored text.
 a
 about
 after
@@ -25,6 +25,7 @@ could
 date
 day
 description
+detection
 did
 do
 doctor
@@ -67,8 +68,13 @@ requested
 said
 she
 should
+spell
 summary
 task
+test
+tested
+testing
+tests
 that
 the
 their
@@ -78,6 +84,7 @@ this
 time
 to
 treatment
+checking
 was
 were
 when

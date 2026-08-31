@@ -11,13 +11,18 @@ public final class ShaleDictionary {
     private ShaleDictionary() { }
 
     public static LocalSpellChecker create() {
-        try (var stream = ShaleDictionary.class.getResourceAsStream("/spellcheck/en_US.txt")) {
-            if (stream == null) return new LocalSpellChecker(List.of());
+        LocalSpellChecker checker = new LocalSpellChecker(load("/spellcheck/en_US.txt"));
+        checker.addDictionaryLayer(load("/spellcheck/shale-legal.txt"));
+        checker.addDictionaryLayer(load("/spellcheck/shale-medical.txt"));
+        return checker;
+    }
+
+    private static List<String> load(String resource) {
+        try (var stream = ShaleDictionary.class.getResourceAsStream(resource)) {
+            if (stream == null) return List.of();
             try (var reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-                return new LocalSpellChecker(reader.lines().filter(line -> !line.isBlank() && !line.startsWith("#")).toList());
+                return reader.lines().filter(line -> !line.isBlank() && !line.startsWith("#")).toList();
             }
-        } catch (IOException exception) {
-            return new LocalSpellChecker(List.of());
-        }
+        } catch (IOException exception) { return List.of(); }
     }
 }
