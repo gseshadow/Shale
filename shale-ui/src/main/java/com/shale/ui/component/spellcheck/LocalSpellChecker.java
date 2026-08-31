@@ -19,18 +19,20 @@ public final class LocalSpellChecker {
                     + "|\\b\\d+(?:[/:.-]\\d+)+\\b|\\b\\d+\\b"
                     + "|\\b(?=[\\p{L}\\d-]*\\d)[\\p{L}\\d]+(?:-[\\p{L}\\d]+)+\\b");
     private final Set<String> dictionary = new LinkedHashSet<>();
+    private final HunspellDictionary hunspell;
     private final Set<String> ignored = new LinkedHashSet<>();
     private final Set<String> custom = new LinkedHashSet<>();
     private final Map<Integer, Set<String>> suggestionsByLength = new HashMap<>();
 
-    public LocalSpellChecker(Collection<String> words) { addWords(words); }
+    public LocalSpellChecker(Collection<String> words) { this((HunspellDictionary) null); addWords(words); }
+    LocalSpellChecker(HunspellDictionary hunspell) { this.hunspell = hunspell; }
 
     /** Adds another application dictionary layer (for example legal or medical terms). */
     public void addDictionaryLayer(Collection<String> words) { addWords(words); }
 
     public boolean isMisspelled(String word) {
         String normalized = normalize(word);
-        return normalized.length() > 1 && !dictionary.contains(normalized)
+        return normalized.length() > 1 && (hunspell == null || !hunspell.contains(normalized)) && !dictionary.contains(normalized)
                 && !custom.contains(normalized) && !ignored.contains(normalized);
     }
 
@@ -52,6 +54,15 @@ public final class LocalSpellChecker {
 
     public List<String> suggestions(String word, int limit) {
         String target = normalize(word);
+        if (hunspell != null) {
+            LinkedHashSet<String> result = new LinkedHashSet<>(hunspell.suggestions(target, limit));
+            layerSuggestions(target, limit).forEach(result::add);
+            return result.stream().limit(Math.max(0, limit)).toList();
+        }
+        return layerSuggestions(target, limit);
+    }
+
+    private List<String> layerSuggestions(String target, int limit) {
         return java.util.stream.IntStream.rangeClosed(Math.max(1, target.length() - 2), target.length() + 2)
                 .mapToObj(length -> suggestionsByLength.getOrDefault(length, Set.of()).stream())
                 .flatMap(stream -> stream)
@@ -98,12 +109,19 @@ public final class LocalSpellChecker {
     }
 
     static int distance(String left, String right) {
+        int[] previousPrevious = null;
         int[] previous = new int[right.length() + 1];
         for (int j = 0; j <= right.length(); j++) previous[j] = j;
         for (int i = 1; i <= left.length(); i++) {
             int[] current = new int[right.length() + 1]; current[0] = i;
-            for (int j = 1; j <= right.length(); j++) current[j] = Math.min(Math.min(
-                    current[j - 1] + 1, previous[j] + 1), previous[j - 1] + (left.charAt(i - 1) == right.charAt(j - 1) ? 0 : 1));
+            for (int j = 1; j <= right.length(); j++) {
+                current[j] = Math.min(Math.min(current[j - 1] + 1, previous[j] + 1),
+                        previous[j - 1] + (left.charAt(i - 1) == right.charAt(j - 1) ? 0 : 1));
+                if (previousPrevious != null && j > 1 && left.charAt(i - 1) == right.charAt(j - 2)
+                        && left.charAt(i - 2) == right.charAt(j - 1))
+                    current[j] = Math.min(current[j], previousPrevious[j - 2] + 1);
+            }
+            previousPrevious = previous;
             previous = current;
         }
         return previous[right.length()];

@@ -14,9 +14,14 @@ Ctrl+Enter applies. The dialog uses `AppDialogs` ownership and secondary-window
 styling.
 
 Spell checking is offline and dictionary based. The bundled baseline dictionary
-is loaded from `spellcheck/en_US.txt`; callers can add session/user dictionary
+is compiled once from `spellcheck/en_US.dic` and `spellcheck/en_US.aff`, honoring
+Hunspell affix morphology; callers can add session/user dictionary
 terms through `addToCustomDictionary`. A future settings-backed implementation
 can persist those terms without changing the component's text contract.
+
+The English resources are from `wooorm/dictionaries`, package `dictionaries/en`
+(SCOWL-derived en_US Hunspell dictionary). Their complete third-party notice is
+packaged at `spellcheck/LICENSE-dictionary-en.txt`.
 
 The compact control remains a native `TextArea`. Plain values are directly editable.
 When supported formatting is present it becomes a read-only, syntax-free preview;

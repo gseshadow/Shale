@@ -54,6 +54,17 @@ class LocalSpellCheckerTest {
                 "test tests tested testing 2026 8/31/2026 12:30 john@example.com https://example.com"));
     }
 
+    @Test void hunspellAffixRulesProvideMorphologyWithoutHandwrittenForms() {
+        LocalSpellChecker checker = ShaleDictionary.create();
+        assertEquals(List.of(), checker.misspellings("check checking checked work working worked "
+                + "spell spelling spelled underline underlining underlined test testing tested"));
+    }
+
+    @Test void bundledHunspellHandlesCommonContractionsAndPossessives() {
+        LocalSpellChecker checker = ShaleDictionary.create();
+        assertEquals(List.of(), checker.misspellings("shouldn't can't don't patient's doctor's"));
+    }
+
     @Test void punctuationAndContractionsRetainExactWordRanges() {
         LocalSpellChecker checker = new LocalSpellChecker(List.of("test", "don't", "can't", "patient's"));
         assertTrue(checker.misspellingRanges("test, test. (test) \"test\" test: don't can't patient's").isEmpty());

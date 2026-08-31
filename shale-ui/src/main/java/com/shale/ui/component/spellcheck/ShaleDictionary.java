@@ -9,7 +9,8 @@ import java.util.Set;
 
 /** Loads the bundled offline dictionary. No text or telemetry leaves the application. */
 public final class ShaleDictionary {
-    private static final Set<String> ENGLISH = load("/spellcheck/en_US.txt");
+    private static final HunspellDictionary ENGLISH = HunspellDictionary.load(
+            "/spellcheck/en_US.dic", "/spellcheck/en_US.aff");
     private static final Set<String> LEGAL = load("/spellcheck/shale-legal.txt");
     private static final Set<String> MEDICAL = load("/spellcheck/shale-medical.txt");
     private ShaleDictionary() { }
@@ -21,7 +22,7 @@ public final class ShaleDictionary {
         return checker;
     }
 
-    static Set<String> baseWords() { return ENGLISH; }
+    static Set<String> baseWords() { return ENGLISH.words(); }
     static Set<String> legalWords() { return LEGAL; }
     static Set<String> medicalWords() { return MEDICAL; }
 
