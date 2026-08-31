@@ -57,7 +57,7 @@
 				pannable="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
 				<content>
 					<FlowPane fx:id="casesFlow" hgap="10" vgap="10"
-						prefWrapLength="1180" styleClass="cases-content-surface glass-panel">
+						prefWrapLength="1180" styleClass="cases-content-surface glass-panel data-surface">
 						<padding>
 							<Insets top="10" right="10" bottom="10" left="10" />
 						</padding>
