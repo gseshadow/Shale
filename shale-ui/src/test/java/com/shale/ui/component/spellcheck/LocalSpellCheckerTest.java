@@ -5,6 +5,23 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LocalSpellCheckerTest {
+    @Test void bundledDictionaryAcceptsOrdinaryEnglishAndRejectsNonsense() {
+        LocalSpellChecker checker = ShaleDictionary.create();
+        assertEquals(List.of(), checker.misspellings("This is a test of the spell checking detection."));
+        assertEquals(List.of("asdfasdf", "tset"), checker.misspellings("asdfasdf tset"));
+    }
+
+    @Test void acceptsCommonWordFormsAndIgnoresNonWordValues() {
+        LocalSpellChecker checker = ShaleDictionary.create();
+        assertEquals(List.of(), checker.misspellings(
+                "test tests tested testing 2026 8/31/2026 12:30 john@example.com https://example.com"));
+    }
+
+    @Test void punctuationAndContractionsRetainExactWordRanges() {
+        LocalSpellChecker checker = new LocalSpellChecker(List.of("test", "don't", "can't", "patient's"));
+        assertTrue(checker.misspellingRanges("test, test. (test) \"test\" test: don't can't patient's").isEmpty());
+    }
+
     @Test void findsUniqueMisspellingsAndOffersSuggestions() {
         LocalSpellChecker checker = new LocalSpellChecker(List.of("client", "condition", "matter"));
         assertEquals(List.of("clinet"), checker.misspellings("client clinet client clinet"));
