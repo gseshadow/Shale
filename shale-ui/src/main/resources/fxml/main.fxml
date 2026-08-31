@@ -97,23 +97,32 @@
 	<center>
 		<VBox spacing="6" styleClass="content-root shell-transparent" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 			<children>
-				<VBox fx:id="sectionHeaderBox" spacing="2">
+				<!-- Shared readability boundary for every routed primary destination. -->
+				<VBox spacing="6" styleClass="primary-content-surface" VBox.vgrow="ALWAYS"
+					maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 					<children>
-						<Label fx:id="sectionTitleLabel" text="My Shale"
-							styleClass="section-title" />
-						<Label fx:id="sectionSubtitleLabel" wrapText="true"
-							text="Select a section from the left to get started."
-							style="-fx-opacity: 0.8;" />
-					</children>
-				</VBox>
+						<VBox fx:id="sectionHeaderBox" spacing="2">
+							<children>
+								<Label fx:id="sectionTitleLabel" text="My Shale"
+									styleClass="section-title" />
+								<Label fx:id="sectionSubtitleLabel" wrapText="true"
+									text="Select a section from the left to get started."
+									styleClass="functional-metadata" />
+							</children>
+						</VBox>
 
-				<!-- Shell-controlled content placeholder -->
-				<StackPane fx:id="sectionContent" VBox.vgrow="ALWAYS" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
-					<children>
-						<Label fx:id="placeholderLabel"
-							text="This section is not implemented yet." />
+						<!-- Shell-controlled content placeholder -->
+						<StackPane fx:id="sectionContent" VBox.vgrow="ALWAYS" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+							<children>
+								<Label fx:id="placeholderLabel"
+									text="This section is not implemented yet." />
+							</children>
+						</StackPane>
 					</children>
-				</StackPane>
+					<padding>
+						<Insets top="10" right="10" bottom="10" left="10" />
+					</padding>
+				</VBox>
 			</children>
 			<padding>
 				<Insets top="10" right="16" bottom="16" left="16" />
