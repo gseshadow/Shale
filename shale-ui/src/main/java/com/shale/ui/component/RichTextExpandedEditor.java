@@ -15,7 +15,6 @@ import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
 import org.fxmisc.richtext.InlineCssTextArea;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
-import org.fxmisc.undo.UndoManagerFactory;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -50,7 +49,7 @@ final class RichTextExpandedEditor extends VBox {
         load(NarrativeMarkdownCodec.decode(markdown));
         area.textProperty().addListener((o, old, value) -> { if (spellCheck) spellDelay.playFromStart(); });
         spellDelay.setOnFinished(e -> refreshSpelling());
-        installKeys(); installContextMenu(); refreshSpelling();
+        installKeys(); installContextMenu();
         undo.disableProperty().bind(Bindings.createBooleanBinding(
                 () -> !area.isUndoAvailable(), area.undoAvailableProperty()));
         redo.disableProperty().bind(Bindings.createBooleanBinding(
@@ -91,7 +90,9 @@ final class RichTextExpandedEditor extends VBox {
 
     private void load(NarrativeDocument document) {
         area.replaceText(document.text());
-        for (int i = 0; i < document.text().length(); i++) area.setStyle(i, i + 1, css(document.formatsAt(i), false));
+        misspellings = spellCheck ? checker.misspellingRanges(document.text()) : List.of();
+        for (int i = 0; i < document.text().length(); i++)
+            area.setStyle(i, i + 1, css(document.formatsAt(i), isMisspelled(i)));
         area.getUndoManager().forgetHistory();
     }
 
@@ -144,16 +145,16 @@ final class RichTextExpandedEditor extends VBox {
 
     void refreshSpelling() {
         misspellings = spellCheck ? checker.misspellingRanges(area.getText()) : List.of();
-        // Decoration is derived UI state. The filtered UndoFX stream installed above
-        // deliberately excludes these synchronous style-only changes.
-        refreshingSpelling = true;
-        try {
-            StyleSpansBuilder<String> styles = new StyleSpansBuilder<>();
-            for (int i = 0; i < area.getLength(); i++) styles.add(css(formatsAt(i), isMisspelled(i)), 1);
-            if (area.getLength() > 0) area.setStyleSpans(0, styles.create());
-        } finally {
-            refreshingSpelling = false;
-        }
+        /*
+         * InlineCssTextArea's supported default rich-text undo manager records style
+         * changes. Do not mutate document styles while a user history branch exists:
+         * in particular, a delayed refresh after Undo must not clear Redo. Ranges and
+         * context-menu suggestions still refresh; decoration waits for a clean draft.
+         */
+        if (area.isUndoAvailable() || area.isRedoAvailable()) return;
+        StyleSpansBuilder<String> styles = new StyleSpansBuilder<>();
+        for (int i = 0; i < area.getLength(); i++) styles.add(css(formatsAt(i), isMisspelled(i)), 1);
+        if (area.getLength() > 0) area.setStyleSpans(0, styles.create());
     }
 
     private void installContextMenu() {
