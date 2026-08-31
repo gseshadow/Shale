@@ -27,10 +27,12 @@ final class RichTextExpandedEditor extends VBox {
     private final LocalSpellChecker checker;
     private final PauseTransition spellDelay = new PauseTransition(Duration.millis(350));
     private final boolean spellCheck;
+    private boolean refreshingSpelling;
     private List<LocalSpellChecker.Misspelling> misspellings = List.of();
 
     RichTextExpandedEditor(String markdown, LocalSpellChecker checker, boolean spellCheck) {
         this.checker = checker; this.spellCheck = spellCheck;
+        installUndoManager();
         getStyleClass().add("rich-text-expanded-editor");
         ToolBar toolbar = new ToolBar(); toolbar.getStyleClass().add("narrative-editor-toolbar");
         ToggleButton bold = formatToggle("B", "Bold", "Bold (Ctrl+B)", () -> toggleFormat(NarrativeDocument.Format.BOLD));
@@ -59,6 +61,19 @@ final class RichTextExpandedEditor extends VBox {
     }
 
     InlineCssTextArea area() { return area; }
+
+    private void installUndoManager() {
+        /*
+         * RichTextFX's default rich-text manager observes every rich change, including
+         * derived spelling styles. Filter those changes at the observation boundary;
+         * semantic style and text changes continue through the same UndoFX manager.
+         */
+        area.setUndoManager(UndoManagerFactory.unlimitedHistoryUndoManager(
+                area.richChanges().filter(change -> !refreshingSpelling),
+                change -> change.invert(),
+                change -> area.replace(change.getPosition(), change.getRemovalEnd(), change.getInserted()),
+                (first, second) -> first.mergeWith(second)));
+    }
 
     String markdown() {
         List<EnumSet<NarrativeDocument.Format>> formats = new ArrayList<>();
