@@ -25,7 +25,7 @@
 		<ScrollableListRegion fx:id="teamListRegion">
 			<content>
 				<FlowPane fx:id="teamFlow" hgap="14" vgap="14"
-					prefWrapLength="1040" styleClass="cases-content-surface glass-panel">
+					prefWrapLength="1040" styleClass="cases-content-surface glass-panel data-surface">
 					<padding>
 						<Insets top="14" right="14" bottom="14" left="14" />
 					</padding>

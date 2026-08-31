@@ -150,7 +150,7 @@
 						<ScrollPane fx:id="myTasksScroll" fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED"
 							vbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
 							<content>
-								<HBox fx:id="myTasksList" spacing="10" styleClass="cases-content-surface glass-panel">
+								<HBox fx:id="myTasksList" spacing="10" styleClass="cases-content-surface glass-panel data-surface">
 									<padding>
 										<Insets top="10" right="10" bottom="18" left="10" />
 									</padding>
@@ -208,7 +208,7 @@
 							<ScrollPane fx:id="myCasesBoardScroll" fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED"
 								vbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
 								<content>
-									<HBox fx:id="myCasesBoardList" spacing="10" styleClass="cases-content-surface glass-panel">
+									<HBox fx:id="myCasesBoardList" spacing="10" styleClass="cases-content-surface glass-panel data-surface">
 										<padding>
 											<Insets top="10" right="10" bottom="18" left="10" />
 										</padding>
