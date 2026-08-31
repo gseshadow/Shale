@@ -5,6 +5,7 @@ import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.component.spellcheck.LocalSpellChecker;
 import com.shale.ui.util.ControlStyles;
 import javafx.animation.PauseTransition;
+import javafx.beans.binding.Bindings;
 import javafx.geometry.Orientation;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
@@ -14,6 +15,7 @@ import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
 import org.fxmisc.richtext.InlineCssTextArea;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
+import org.fxmisc.undo.UndoManagerFactory;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -26,10 +28,12 @@ final class RichTextExpandedEditor extends VBox {
     private final LocalSpellChecker checker;
     private final PauseTransition spellDelay = new PauseTransition(Duration.millis(350));
     private final boolean spellCheck;
+    private boolean refreshingSpelling;
     private List<LocalSpellChecker.Misspelling> misspellings = List.of();
 
     RichTextExpandedEditor(String markdown, LocalSpellChecker checker, boolean spellCheck) {
         this.checker = checker; this.spellCheck = spellCheck;
+        installUndoManager();
         getStyleClass().add("rich-text-expanded-editor");
         ToolBar toolbar = new ToolBar(); toolbar.getStyleClass().add("narrative-editor-toolbar");
         ToggleButton bold = formatToggle("B", "Bold", "Bold (Ctrl+B)", () -> toggleFormat(NarrativeDocument.Format.BOLD));
@@ -47,8 +51,10 @@ final class RichTextExpandedEditor extends VBox {
         area.textProperty().addListener((o, old, value) -> { if (spellCheck) spellDelay.playFromStart(); });
         spellDelay.setOnFinished(e -> refreshSpelling());
         installKeys(); installContextMenu(); refreshSpelling();
-        undo.disableProperty().bind(area.undoAvailableProperty().not());
-        redo.disableProperty().bind(area.redoAvailableProperty().not());
+        undo.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> !area.isUndoAvailable(), area.undoAvailableProperty()));
+        redo.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> !area.isRedoAvailable(), area.redoAvailableProperty()));
         Runnable state = () -> updateToolbarState(bold, italic, underline, bullets, numbers);
         area.caretPositionProperty().addListener((o, a, b) -> state.run());
         area.selectionProperty().addListener((o, a, b) -> state.run());
@@ -56,6 +62,19 @@ final class RichTextExpandedEditor extends VBox {
     }
 
     InlineCssTextArea area() { return area; }
+
+    private void installUndoManager() {
+        /*
+         * RichTextFX's default rich-text manager observes every rich change, including
+         * derived spelling styles. Filter those changes at the observation boundary;
+         * semantic style and text changes continue through the same UndoFX manager.
+         */
+        area.setUndoManager(UndoManagerFactory.unlimitedHistoryFactory().create(
+                area.richChanges().filter(change -> !refreshingSpelling),
+                change -> change.invert(),
+                change -> area.replace(change.getPosition(), change.getRemovalEnd(), change.getInserted()),
+                (first, second) -> first.mergeWith(second)));
+    }
 
     String markdown() {
         List<EnumSet<NarrativeDocument.Format>> formats = new ArrayList<>();
@@ -123,15 +142,18 @@ final class RichTextExpandedEditor extends VBox {
         return false;
     }
 
-    private void refreshSpelling() {
+    void refreshSpelling() {
         misspellings = spellCheck ? checker.misspellingRanges(area.getText()) : List.of();
-        // Decoration is derived UI state, not an edit. Suspending the manager is what
-        // keeps a delayed spell-check refresh from clearing RichTextFX's redo branch.
-        area.getUndoManager().suspendWhile(() -> {
+        // Decoration is derived UI state. The filtered UndoFX stream installed above
+        // deliberately excludes these synchronous style-only changes.
+        refreshingSpelling = true;
+        try {
             StyleSpansBuilder<String> styles = new StyleSpansBuilder<>();
             for (int i = 0; i < area.getLength(); i++) styles.add(css(formatsAt(i), isMisspelled(i)), 1);
             if (area.getLength() > 0) area.setStyleSpans(0, styles.create());
-        });
+        } finally {
+            refreshingSpelling = false;
+        }
     }
 
     private void installContextMenu() {
