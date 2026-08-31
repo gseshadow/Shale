@@ -4,6 +4,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import com.shale.ui.component.EnhancedTextArea?>
 
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
@@ -103,7 +104,7 @@
                                 <CheckBox fx:id="clientDeceasedCheckBox" GridPane.rowIndex="6" GridPane.columnIndex="1" />
 
                                 <Label text="Client Condition" GridPane.rowIndex="7" />
-                                <TextArea fx:id="clientConditionArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                                <EnhancedTextArea fx:id="clientConditionArea" editorTitle="Client Condition" prefRowCount="3" promptText="Relevant medical condition or client circumstances" GridPane.rowIndex="7" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
                             </GridPane>
                         </VBox>
                     </VBox>
@@ -189,10 +190,10 @@
                                 </HBox>
 
                                 <Label text="Description" GridPane.rowIndex="2" GridPane.columnSpan="2" />
-                                <TextArea fx:id="descriptionArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="3" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
+                                <EnhancedTextArea fx:id="descriptionArea" editorTitle="Description" prefRowCount="4" promptText="Detailed description of the matter" GridPane.rowIndex="3" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
 
                                 <Label text="Summary" GridPane.rowIndex="4" GridPane.columnSpan="2" />
-                                <TextArea fx:id="summaryArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="5" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
+                                <EnhancedTextArea fx:id="summaryArea" editorTitle="Summary" prefRowCount="4" promptText="Concise intake summary" GridPane.rowIndex="5" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
 
                             </GridPane>
                         </VBox>
