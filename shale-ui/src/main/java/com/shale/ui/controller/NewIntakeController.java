@@ -45,6 +45,8 @@ import javafx.scene.layout.VBox;
 import javafx.geometry.Insets;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import javafx.util.StringConverter;
+import javafx.util.converter.LocalDateStringConverter;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -77,6 +79,7 @@ public final class NewIntakeController {
 	private static final String INTAKE_DRAFT_PREFIX = "new-intake";
 	private static final String ESTATE_CASE_NAME_PREFIX = "Estate of ";
 	private static final long PRACTICE_AREA_PREFLIGHT_TIMEOUT_SECONDS = 5;
+	private static final String INVALID_DATE_PROPERTY = "shale.newIntake.invalidDate";
 
 	@FXML private Label validationLabel;
 
@@ -235,6 +238,9 @@ public final class NewIntakeController {
 		ControlStyles.apply(selectStatusButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		if (addPartyButton != null) ControlStyles.apply(addPartyButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		timeOfIntakeField.setText(LocalTime.now().format(TIME_FORMAT));
+		List.of(clientDateOfBirthPicker, dateMedicalNegligencePicker,
+				dateMedicalNegligenceDiscoveredPicker, dateOfInjuryPicker,
+				statuteOfLimitationsPicker, tortClaimsNoticePicker).forEach(NewIntakeController::configureDatePicker);
 
 		callerIsClientCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
 			if (Boolean.TRUE.equals(newVal)) {
@@ -324,6 +330,7 @@ public final class NewIntakeController {
 		for (ConfiguredDate field : fields) {
 			Label label = new Label(field.type().name() + (field.required() ? " *" : ""));
 			DatePicker picker = ControlStyles.formControl(new DatePicker());
+			configureDatePicker(picker);
 			String fieldKey = field.fieldKey();
 			LocalDate initialValue = NewIntakeDatesConfiguration.initialValue(fieldKey, field.type().id(),
 					intakeCaseDateTypeId, LocalDate.now(), preservedConfiguredDateValues);
@@ -1389,7 +1396,53 @@ public final class NewIntakeController {
 					ControlStyles.setInvalid(input.input(), true);
 					errors.add("A required configured date is missing.");
 				});
+		allIntakeDatePickers().stream().filter(NewIntakeController::hasInvalidDateText).forEach(picker -> {
+			ControlStyles.setInvalid(picker, true);
+			errors.add("Enter dates in a valid format or leave optional dates blank.");
+		});
 		return List.copyOf(errors);
+	}
+
+	private List<DatePicker> allIntakeDatePickers() {
+		List<DatePicker> pickers = new ArrayList<>(List.of(clientDateOfBirthPicker,
+				dateMedicalNegligencePicker, dateMedicalNegligenceDiscoveredPicker, dateOfInjuryPicker,
+				statuteOfLimitationsPicker, tortClaimsNoticePicker));
+		configuredDateInputs.values().forEach(input -> pickers.add(input.input()));
+		return pickers;
+	}
+
+	static void configureDatePicker(DatePicker picker) {
+		Objects.requireNonNull(picker, "picker");
+		StringConverter<LocalDate> delegate = new LocalDateStringConverter();
+		picker.setConverter(new StringConverter<>() {
+			@Override public String toString(LocalDate value) { return delegate.toString(value); }
+			@Override public LocalDate fromString(String text) {
+				if (text == null || text.trim().isEmpty()) {
+					markDateTextValidity(picker, true);
+					return null;
+				}
+				try {
+					LocalDate parsed = delegate.fromString(text.trim());
+					markDateTextValidity(picker, true);
+					return parsed;
+				} catch (RuntimeException invalidDate) {
+					markDateTextValidity(picker, false);
+					return picker.getValue();
+				}
+			}
+		});
+		picker.valueProperty().addListener((observable, oldValue, newValue) -> {
+			if (!hasInvalidDateText(picker)) ControlStyles.setInvalid(picker, false);
+		});
+	}
+
+	private static void markDateTextValidity(DatePicker picker, boolean valid) {
+		picker.getProperties().put(INVALID_DATE_PROPERTY, !valid);
+		ControlStyles.setInvalid(picker, !valid);
+	}
+
+	static boolean hasInvalidDateText(DatePicker picker) {
+		return Boolean.TRUE.equals(picker.getProperties().get(INVALID_DATE_PROPERTY));
 	}
 
 	private void focusFirstMissingConfiguredDate() {
