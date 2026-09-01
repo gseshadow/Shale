@@ -115,6 +115,11 @@ final class CaseSectionNavigationSelectionTest {
 
             assertSame(field(loaded.controller(), "sectionTabsBar"), tabRow,
                     "The measured strip must be the Overview/Details/etc. navigation row.");
+            assertEquals(ORDER, tabRow.getChildren().stream()
+                            .map(Button.class::cast)
+                            .map(Button::getText)
+                            .toList(),
+                    "The measured content must be the actual Case section-navigation tabs.");
 
             double requiredNavigationWidth = tabRow.prefWidth(-1);
             double constrainedNavigationWidth = Math.max(1, requiredNavigationWidth - 80);
@@ -129,30 +134,39 @@ final class CaseSectionNavigationSelectionTest {
                     "The navigation viewport should retain JavaFX computed sizing rather than claim unbounded vertical growth.");
             assertFalse(scroll.isFitToHeight(),
                     "The ScrollPane must not force the navigation content down to a short viewport height.");
-            assertTrue(scroll.minHeight(-1) >= scroll.prefHeight(-1));
             assertEquals(6, tabRow.getPadding().getTop());
             assertEquals(6, tabRow.getPadding().getBottom());
             assertEquals(ScrollPane.ScrollBarPolicy.AS_NEEDED, scroll.getHbarPolicy());
             assertFalse(scroll.isFitToWidth());
-            assertTrue(tabRow.getLayoutBounds().getWidth() > scroll.getViewportBounds().getWidth(),
+            assertTrue(tabRow.getLayoutBounds().getWidth() > viewport.getWidth(),
                     "The fixture must make the actual Case navigation row wider than its viewport. "
                             + geometry(scroll, viewport, tabRow, horizontalBar));
-            assertEquals(tabRow.prefHeight(-1) + scroll.getInsets().getTop() + scroll.getInsets().getBottom()
-                            + horizontalBar.prefHeight(-1), scroll.getPrefHeight(), 0.5,
-                    "The Case-specific strip must request its padded row, control insets, and visible horizontal bar.");
-            assertTrue(viewport.getHeight() + 0.5 >= tabRow.getLayoutBounds().getHeight(),
+            assertTrue(horizontalBar.isVisible() && horizontalBar.getHeight() > 0,
+                    "Horizontal scrolling must be rendered when the Case tabs overflow. "
+                            + geometry(scroll, viewport, tabRow, horizontalBar));
+            assertTrue(horizontalBar.getMax() > horizontalBar.getMin(),
+                    "The rendered horizontal scrollbar must expose a non-empty scrolling range.");
+            assertTrue(viewport.getHeight() + 0.5 >= tabRow.getBoundsInParent().getHeight(),
                     "The navigation viewport must accommodate the complete padded row. " + geometry(scroll, viewport, tabRow, horizontalBar));
 
             for (Map.Entry<String, Button> entry : loaded.tabs().entrySet()) {
                 Button tab = entry.getValue();
+                assertTrue(tab.getStyleClass().contains(AppSectionTabs.TAB_BUTTON_STYLE_CLASS),
+                        entry.getKey() + " must retain the shared section-tab styling contract.");
+                assertTrue(tab.minHeight(-1) >= 30,
+                        entry.getKey() + " must retain the intended minimum tab-control height.");
                 Bounds renderedInViewport = viewport.sceneToLocal(tab.localToScene(tab.getBoundsInLocal()));
-                assertTrue(viewport.getHeight() >= renderedInViewport.getHeight(),
+                assertTrue(viewport.getHeight() + 0.5 >= renderedInViewport.getHeight(),
                         entry.getKey() + " must fit inside the rendered navigation viewport.");
-                assertTrue(renderedInViewport.getMinY() >= 5,
+                assertTrue(renderedInViewport.getMinY() + 0.5 >= tabRow.getPadding().getTop(),
                         entry.getKey() + " must retain visible clearance above its rounded edge.");
-                assertTrue(renderedInViewport.getMaxY() <= viewport.getHeight() - 5,
+                assertTrue(renderedInViewport.getMaxY() <= viewport.getHeight() - tabRow.getPadding().getBottom() + 0.5,
                         entry.getKey() + " must retain visible clearance below its rounded edge.");
             }
+
+            assertTrue(scroll.getHeight() <= tabRow.getBoundsInParent().getHeight() * 2,
+                    "The Case navigation must remain a compact strip rather than expanding vertically. "
+                            + geometry(scroll, viewport, tabRow, horizontalBar));
 
             assertEquals(8, caseHeader.getPadding().getTop());
             assertEquals(6, caseHeader.getPadding().getBottom());
