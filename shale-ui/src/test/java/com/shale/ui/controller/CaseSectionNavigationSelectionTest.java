@@ -8,6 +8,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.Region;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -86,6 +87,29 @@ final class CaseSectionNavigationSelectionTest {
                     "The complete, unclipped tab row must remain horizontally scrollable at narrow widths.");
             loaded.tabs().values().forEach(button ->
                     assertTrue(button.getStyleClass().contains(AppSectionTabs.TAB_BUTTON_STYLE_CLASS)));
+        });
+    }
+
+    @Test
+    void sharedNavigationStripProvidesVerticalClearanceForTabPills() {
+        JavaFxTestSupport.runAndWait(() -> {
+            LoadedCase loaded = load(null);
+            Scene scene = new Scene(loaded.root(), 1100, 700);
+            scene.getStylesheets().add(CaseSectionNavigationSelectionTest.class.getResource("/css/app.css").toExternalForm());
+            loaded.root().applyCss();
+            loaded.root().layout();
+
+            ScrollPane scroll = (ScrollPane) loaded.root().lookup(".app-section-tabs-scroll");
+            Region viewport = (Region) scroll.lookup(".viewport");
+            double tallestTab = loaded.tabs().values().stream()
+                    .mapToDouble(button -> button.getBoundsInParent().getHeight())
+                    .max()
+                    .orElseThrow();
+
+            assertTrue(viewport.getHeight() >= tallestTab,
+                    "The shared navigation viewport must never be shorter than its tab pills.");
+            assertTrue(scroll.getHeight() >= tallestTab + 12,
+                    "The shared navigation strip must preserve at least 6px clearance above and below its tab pills.");
         });
     }
 
