@@ -99,6 +99,9 @@ import com.shale.ui.notification.NotificationPollingService;
 import com.shale.ui.notification.NoOpDesktopNotificationPresenter;
 import com.shale.ui.notification.DesktopNotificationPresenter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
+import com.shale.data.service.adapter.UserDictionaryServiceAdapter;
+import com.shale.data.dao.UserDictionaryWordDao;
+import com.shale.ui.component.spellcheck.UserDictionarySession;
 
 public final class SceneManager {
 	private static final Logger log = LoggerFactory.getLogger(SceneManager.class);
@@ -187,6 +190,7 @@ public final class SceneManager {
 		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
 		this.updatePollingService = new UpdatePollingService(updateLauncher, this::onUpdateCheckCompleted);
 		this.phiReadAuditService = new PhiReadAuditService(new AuditLogDao(dbSessionProvider), appState);
+		UserDictionarySession.configure(new UserDictionarySession(new UserDictionaryServiceAdapter(new UserDictionaryWordDao(dbSessionProvider)),appState));
 	}
 
 	private NotificationCenterService createNotificationCenterService() {
@@ -226,6 +230,7 @@ public final class SceneManager {
 	}
 
 	public void showMain() {
+		UserDictionarySession.current().load();
 		long showMainStartNanos = System.nanoTime();
 		System.out.println("[StartupTiming] showMain entry");
 		var root = load("/fxml/main.fxml", controller ->

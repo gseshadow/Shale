@@ -3,7 +3,7 @@ package com.shale.ui.component.spellcheck;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
+import com.shale.core.util.DictionaryWordNormalizer;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashMap;
@@ -76,6 +76,8 @@ public final class LocalSpellChecker {
         String normalized = normalize(word);
         if (!normalized.isBlank() && custom.add(normalized)) index(normalized);
     }
+    public void removeFromCustomDictionary(String word) { custom.remove(normalize(word)); }
+    public void clearCustomDictionary() { custom.clear(); }
     public Set<String> customDictionary() { return Set.copyOf(custom); }
 
     private static void addNormalized(Set<String> target, Collection<String> words) {
@@ -92,10 +94,7 @@ public final class LocalSpellChecker {
         suggestionsByLength.computeIfAbsent(word.length(), ignored -> new LinkedHashSet<>()).add(word);
     }
 
-    static String normalize(String word) {
-        return word == null ? "" : word.strip().replace("\uFEFF", "")
-                .replace('\u2019', '\'').toLowerCase(Locale.ROOT);
-    }
+    public static String normalize(String word) { return DictionaryWordNormalizer.normalize(word); }
 
     private static List<int[]> excludedRanges(String text) {
         List<int[]> ranges = new java.util.ArrayList<>();
