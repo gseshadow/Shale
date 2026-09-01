@@ -8,6 +8,8 @@ Before making any code changes, consult this document first. Use it to determine
 
 This document is the authoritative entry point for project knowledge.
 
+> **Tests are implementation work.** Every requested behavioral change requires inspection of related tests. Update tests whose expectations have intentionally been superseded, add coverage for the new contract, and fix production code when a test reveals a genuine regression. Do not consider the task complete until the relevant tests pass.
+
 ---
 
 ## Required Workflow
@@ -29,6 +31,33 @@ Before making changes:
    * Files changed
    * Reason for change
    * Risks or follow-up work
+
+---
+
+## Test Maintenance Is Part of Every Change
+
+For every implementation or behavioral change:
+
+1. Identify and inspect tests related to the classes, controls, workflows, commands, service ports, database objects, migrations, and behavior being changed. Include relevant unit, integration, migration-contract, UI-contract, semantic-control, and regression tests.
+2. Evaluate test failures against the newly requested behavior:
+   * If a test still represents the intended contract, fix the production regression.
+   * If the requested change intentionally supersedes the old behavior, update the outdated test.
+3. Update outdated tests in the same task:
+   * Do not preserve obsolete production behavior solely to satisfy an old test.
+   * Do not weaken tests merely to make the build pass.
+   * Replace obsolete assertions, fixtures, selectors, or workflow assumptions with assertions that verify the new authoritative behavior.
+4. Add or extend regression coverage for newly introduced behavior where appropriate.
+5. Inspect neighboring and related tests for duplicated stale assumptions rather than stopping after the first test failure.
+6. Run focused tests during implementation and the applicable module test suite before completion. For shared, architectural, migration, cross-module, or broadly reused changes, run the broader Maven reactor/test suite when appropriate.
+
+An implementation task is not complete until:
+
+* The requested behavior is implemented.
+* Related tests have been reviewed.
+* Obsolete expectations have been updated.
+* New behavior has appropriate regression coverage.
+* Genuine regressions have been fixed.
+* The relevant tests pass.
 
 ---
 
@@ -351,7 +380,7 @@ A task is not complete because it compiles.
 A task is complete when:
 
 1. Code compiles.
-2. Tests pass (when applicable).
+2. Related tests have been reviewed and maintained, and the relevant tests pass.
 3. Relevant documentation was reviewed.
 4. The visible UI behaves correctly.
 5. The actual user-reported issue is resolved.
