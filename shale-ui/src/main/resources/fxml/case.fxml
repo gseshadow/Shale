@@ -53,7 +53,7 @@
 			<padding>
 				<Insets top="10" right="12" bottom="12" left="12" />
 			</padding>
-			<ScrollPane fx:id="caseSectionNavigationScrollPane" minHeight="-Infinity" fitToWidth="false" hbarPolicy="AS_NEEDED"
+			<ScrollPane fx:id="caseSectionNavigationScrollPane" minHeight="-Infinity" prefViewportHeight="42" fitToWidth="false" hbarPolicy="AS_NEEDED"
 				vbarPolicy="NEVER" pannable="true">
 				<styleClass>
 					<String fx:value="app-section-tabs-scroll" />
