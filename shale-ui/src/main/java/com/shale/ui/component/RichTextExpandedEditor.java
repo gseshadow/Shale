@@ -28,6 +28,7 @@ final class RichTextExpandedEditor extends VBox {
     private final PauseTransition spellDelay = new PauseTransition(Duration.millis(350));
     private final boolean spellCheck;
     private List<LocalSpellChecker.Misspelling> misspellings = List.of();
+    private int contextMenuPosition = -1;
 
     RichTextExpandedEditor(String markdown, LocalSpellChecker checker, boolean spellCheck) {
         this.checker = checker; this.spellCheck = spellCheck;
