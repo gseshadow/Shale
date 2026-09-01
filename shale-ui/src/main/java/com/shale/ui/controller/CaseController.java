@@ -165,7 +165,9 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.ScrollBar;
 import javafx.scene.Node;
+import javafx.beans.binding.Bindings;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.BorderPane;
@@ -235,6 +237,8 @@ public class CaseController {
 
 	@FXML
 	private HBox sectionTabsBar;
+	@FXML
+	private ScrollPane caseSectionNavigationScrollPane;
 	@FXML
 	private BorderPane caseRootPane;
 	@FXML
@@ -1008,6 +1012,7 @@ public class CaseController {
 		refreshHeader();
 		refreshOverviewPlaceholders();
 		setupSections();
+		setupCaseSectionNavigationHeight();
 		setupRelatedEntitiesLayout();
 		wireEditButtons();
 		wireDetailsEditButtons();
@@ -1508,6 +1513,31 @@ public class CaseController {
 				section -> onSectionSelected(section, true)));
 
 		onSectionSelected(initialSectionName, false);
+	}
+
+	private void setupCaseSectionNavigationHeight() {
+		if (caseSectionNavigationScrollPane == null || sectionTabsBar == null)
+			return;
+
+		Runnable installSizing = () -> {
+			Node horizontalBarNode = caseSectionNavigationScrollPane.lookup(".scroll-bar:horizontal");
+			if (!(horizontalBarNode instanceof ScrollBar horizontalBar)
+					|| caseSectionNavigationScrollPane.prefHeightProperty().isBound())
+				return;
+
+			caseSectionNavigationScrollPane.prefHeightProperty().bind(Bindings.createDoubleBinding(
+					() -> sectionTabsBar.prefHeight(-1)
+							+ caseSectionNavigationScrollPane.getInsets().getTop()
+							+ caseSectionNavigationScrollPane.getInsets().getBottom()
+							+ (horizontalBar.isVisible() ? horizontalBar.prefHeight(-1) : 0),
+					sectionTabsBar.layoutBoundsProperty(),
+					caseSectionNavigationScrollPane.insetsProperty(),
+					horizontalBar.visibleProperty()));
+		};
+
+		caseSectionNavigationScrollPane.skinProperty().addListener((observable, oldSkin, newSkin) -> installSizing.run());
+		if (caseSectionNavigationScrollPane.getSkin() != null)
+			installSizing.run();
 	}
 
 	private void refreshHeader() {

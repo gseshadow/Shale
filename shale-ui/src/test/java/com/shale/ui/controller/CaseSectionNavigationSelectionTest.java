@@ -9,6 +9,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.ScrollBar;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
@@ -87,6 +88,7 @@ final class CaseSectionNavigationSelectionTest {
             assertSame(field(loaded.controller(), "sectionTabsBar"), scroll.getContent());
             loaded.root().applyCss();
             loaded.root().layout();
+            loaded.root().layout(); // settle the preferred height after AS_NEEDED resolves the horizontal bar
             assertTrue(scroll.getContent().prefWidth(-1) > scroll.getViewportBounds().getWidth(),
                     "The complete, unclipped tab row must remain horizontally scrollable at narrow widths.");
             loaded.tabs().values().forEach(button ->
@@ -98,32 +100,35 @@ final class CaseSectionNavigationSelectionTest {
     void caseSectionNavigationProvidesVerticalClearanceWithoutChangingHeaderSpacing() {
         JavaFxTestSupport.runAndWait(() -> {
             LoadedCase loaded = load(null);
-            Scene scene = new Scene(loaded.root(), 760, 700);
+            Scene scene = new Scene(loaded.root(), 420, 700);
             scene.getStylesheets().add(CaseSectionNavigationSelectionTest.class.getResource("/css/app.css").toExternalForm());
             loaded.root().applyCss();
             loaded.root().layout();
+            loaded.root().layout(); // settle the preferred height after AS_NEEDED resolves the horizontal bar
 
             BorderPane caseRoot = (BorderPane) loaded.root().lookup("#caseRootPane");
             VBox caseHeader = (VBox) caseRoot.getTop();
             ScrollPane scroll = (ScrollPane) loaded.root().lookup("#caseSectionNavigationScrollPane");
             Region viewport = (Region) scroll.lookup(".viewport");
             HBox tabRow = (HBox) scroll.getContent();
+            ScrollBar horizontalBar = (ScrollBar) scroll.lookup(".scroll-bar:horizontal");
 
             assertSame(field(loaded.controller(), "sectionTabsBar"), tabRow,
                     "The measured strip must be the Overview/Details/etc. navigation row.");
             assertEquals(Region.USE_PREF_SIZE, scroll.getMinHeight());
-            assertEquals(Region.USE_COMPUTED_SIZE, scroll.getPrefHeight());
             assertEquals(Region.USE_COMPUTED_SIZE, scroll.getMaxHeight(),
                     "The navigation viewport should retain JavaFX computed sizing rather than claim unbounded vertical growth.");
-            assertEquals(42, scroll.getPrefViewportHeight(), 0.1,
-                    "The Case-specific viewport must reserve the 30px pill height plus 6px clearance on each side.");
             assertFalse(scroll.isFitToHeight(),
                     "The ScrollPane must not force the navigation content down to a short viewport height.");
             assertTrue(scroll.minHeight(-1) >= scroll.prefHeight(-1));
             assertEquals(6, tabRow.getPadding().getTop());
             assertEquals(6, tabRow.getPadding().getBottom());
-            assertTrue(viewport.getHeight() + 0.5 >= tabRow.getHeight(),
-                    "The navigation viewport must accommodate the complete padded row.");
+            assertTrue(horizontalBar.isVisible(), "The narrow test width must exercise horizontal-scrollbar sizing.");
+            assertEquals(tabRow.prefHeight(-1) + scroll.getInsets().getTop() + scroll.getInsets().getBottom()
+                            + horizontalBar.prefHeight(-1), scroll.getPrefHeight(), 0.5,
+                    "The Case-specific strip must request its padded row, control insets, and visible horizontal bar.");
+            assertTrue(viewport.getHeight() + 0.5 >= tabRow.getLayoutBounds().getHeight(),
+                    "The navigation viewport must accommodate the complete padded row. " + geometry(scroll, viewport, tabRow, horizontalBar));
 
             for (Map.Entry<String, Button> entry : loaded.tabs().entrySet()) {
                 Button tab = entry.getValue();
@@ -142,6 +147,26 @@ final class CaseSectionNavigationSelectionTest {
             assertFalse(caseHeader.getStyleClass().contains("app-section-tabs-scroll"),
                     "The Case header/status surface must remain distinct from the section navigation strip.");
         });
+    }
+
+    private static String geometry(ScrollPane scroll, Region viewport, HBox row, ScrollBar horizontalBar) {
+        double tallestTab = row.getChildren().stream().mapToDouble(node -> node.getBoundsInParent().getHeight()).max().orElse(0);
+        return "scroll=" + scroll.getHeight()
+                + ", viewport=" + viewport.getBoundsInLocal().getHeight()
+                + ", rowLayout=" + row.getLayoutBounds().getHeight()
+                + ", rowParent=" + row.getBoundsInParent().getHeight()
+                + ", rowMin=" + row.minHeight(-1)
+                + ", rowPref=" + row.prefHeight(-1)
+                + ", rowMax=" + row.maxHeight(-1)
+                + ", rowPadding=" + row.getPadding()
+                + ", tallestTab=" + tallestTab
+                + ", scrollInsets=" + scroll.getInsets()
+                + ", horizontalBarVisible=" + horizontalBar.isVisible()
+                + ", horizontalBarHeight=" + horizontalBar.getHeight()
+                + ", fitToHeight=" + scroll.isFitToHeight()
+                + ", fitToWidth=" + scroll.isFitToWidth()
+                + ", hbarPolicy=" + scroll.getHbarPolicy()
+                + ", vbarPolicy=" + scroll.getVbarPolicy();
     }
 
     private static LoadedCase load(String initialSection) throws Exception {
