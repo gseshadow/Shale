@@ -76,20 +76,26 @@ final class ContactAggregateMutationContractTest {
 
         for (String field : new String[] {
                 "Name=?", "Prefix=?", "FirstName=?", "MiddleName=?", "LastName=?", "PreferredName=?", "Suffix=?",
-                "DateOfBirth=?", "Condition=?", "IsDeceased=?"
+                "DateOfBirth=?", "Condition=?", "Notes=?", "IsDeceased=?"
         }) {
             assertTrue(updateSql.contains(field), "structured Contact update must include " + field);
         }
+        assertTrue(updateSql.contains("Name=?,Prefix=?,FirstName=?,MiddleName=?,LastName=?,PreferredName=?,Suffix=?,"
+                        + "DateOfBirth=?,Condition=?,Notes=?,IsDeceased=?"),
+                "all eleven structured Contact fields must retain their authoritative SQL order");
         assertFalse(updateSql.contains("UpdatedByUserId"),
                 "dbo.Contacts does not own UpdatedByUserId");
         assertFalse(mutation.contains("c.actorUserId()"),
                 "the removed UpdatedByUserId placeholder must not retain an actor binding");
-        assertEquals(13, occurrences(updateSql, "=?"),
-                "non-null concurrency SQL must have ten fields, two scope IDs, and one timestamp parameter");
-        assertEquals(8, occurrences(update, "setString(p,i++"),
-                "the seven name fields and Condition must be bound in SQL order");
+        assertEquals(14, occurrences(updateSql, "=?"),
+                "non-null concurrency SQL must have eleven fields, two scope IDs, and one timestamp parameter");
+        assertEquals(9, occurrences(update, "setString(p,i++"),
+                "the seven name fields, Condition, and Notes must be bound in SQL order");
+        assertTrue(update.contains("setString(p,i++,c.condition());p.setString(i++,normalizeNotes(c.notes()));"
+                        + "p.setBoolean(i++,c.deceased());"),
+                "Condition, normalized Notes, and IsDeceased must follow DateOfBirth in SQL order");
         assertTrue(update.contains("p.setInt(i++,c.contactId());\n            p.setInt(i++,c.shaleClientId())"),
-                "Contact and tenant bindings must immediately follow the seven field bindings");
+                "Contact and tenant bindings must immediately follow all eleven profile-field bindings");
         assertTrue(update.contains("WHERE Id=? AND ShaleClientId=?"),
                 "Contact update must scope by authoritative Contact and tenant IDs");
         assertTrue(update.contains("ISNULL(IsDeleted,0)=0"), "Contact update must exclude deleted Contacts");
