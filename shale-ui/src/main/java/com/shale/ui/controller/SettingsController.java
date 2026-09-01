@@ -66,6 +66,8 @@ import com.shale.ui.util.ColorUtil;
 import com.shale.ui.component.factory.StatusIndicatorFactory;
 import com.shale.ui.component.factory.PracticeAreaIndicatorFactory;
 import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
+import com.shale.core.service.UserDictionaryServicePort.UserDictionaryWord;
+import com.shale.ui.component.spellcheck.UserDictionarySession;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -200,6 +202,10 @@ public final class SettingsController {
 	private Button resetPasswordButton;
 	@FXML
 	private Label userManagementStatusLabel;
+	@FXML private TableView<UserDictionaryWord> customDictionaryTable;
+	@FXML private TableColumn<UserDictionaryWord,String> customDictionaryWordColumn;
+	@FXML private Button removeCustomDictionaryWordButton;
+	@FXML private Label customDictionaryStatusLabel;
 
 	private NotificationPreferencesService notificationPreferencesService;
 	private AppState appState;
@@ -253,11 +259,32 @@ public final class SettingsController {
 		configureLookupActionRows();
 		configureUserManagementTable();
 		configureContactClassifications();
+		configureCustomDictionary();
 		updateAdminControlsVisibility();
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
 		loadAdminSectionsAsync();
+	}
+
+	private void configureCustomDictionary() {
+		if(customDictionaryTable==null)return;
+		customDictionaryWordColumn.setCellValueFactory(cell->new javafx.beans.property.ReadOnlyStringWrapper(cell.getValue().word()));
+		ControlStyles.apply(removeCustomDictionaryWordButton,ControlStyles.Purpose.DANGER,ControlStyles.Size.STANDARD);
+		loadCustomDictionary();
+	}
+
+	private void loadCustomDictionary() {
+		customDictionaryStatusLabel.setText("Loading…");
+		settingsLoadExecutor.submit(()->{try{List<UserDictionaryWord> words=UserDictionarySession.current().list();Platform.runLater(()->{customDictionaryTable.getItems().setAll(words);customDictionaryStatusLabel.setText(words.isEmpty()?"No custom words.":words.size()+" custom word(s).");});}
+		catch(RuntimeException ex){LOG.warn("Could not load custom dictionary",ex);Platform.runLater(()->customDictionaryStatusLabel.setText("Custom words could not be loaded."));}});
+	}
+
+	@FXML private void onRemoveCustomDictionaryWord() {
+		UserDictionaryWord selected=customDictionaryTable.getSelectionModel().getSelectedItem();if(selected==null){customDictionaryStatusLabel.setText("Select a word to remove.");return;}
+		removeCustomDictionaryWordButton.setDisable(true);customDictionaryStatusLabel.setText("Removing…");
+		settingsLoadExecutor.submit(()->{try{UserDictionarySession.current().remove(selected.normalizedWord());Platform.runLater(()->{removeCustomDictionaryWordButton.setDisable(false);loadCustomDictionary();});}
+		catch(RuntimeException ex){LOG.warn("Could not remove custom dictionary word",ex);Platform.runLater(()->{removeCustomDictionaryWordButton.setDisable(false);customDictionaryStatusLabel.setText("The word could not be removed. Check your connection and try again.");});}});
 	}
 
 	private void configureSettingsSemanticButtons() {
