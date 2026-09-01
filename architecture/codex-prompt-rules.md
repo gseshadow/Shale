@@ -32,6 +32,35 @@ Before making changes:
    * Reason for change
    * Risks or follow-up work
 
+### Mandatory test-impact workflow
+
+#### Before implementation
+
+1. Read this primary rules document completely and read every architecture or docs file to which it routes the task.
+2. Identify the production symbols and contracts being changed.
+3. Perform a **pre-edit test-impact search** for every test that references the affected symbols, fields, constructors, SQL fragments, binding counts, selectors, FXML IDs, or previous behavior.
+4. Create a test-impact inventory before editing production code. Adding new tests is not a substitute for reviewing and updating existing tests.
+
+#### During implementation
+
+1. Update production code and its existing tests together. Existing obsolete tests must be updated when the authoritative behavior intentionally supersedes them.
+2. Treat every constructor, record, DTO, command, SQL-field, placeholder-count, prepared-statement binding, selector, or FXML change as requiring a repository-wide search.
+3. Inspect neighboring tests for duplicated stale expectations, not only the first reported failure.
+4. Distinguish obsolete expectations from genuine regressions. Never restore retired behavior solely to satisfy an obsolete test, and never weaken assertions merely to produce a green build.
+
+#### Before completion: changed-file-to-test review
+
+1. Review `git diff --name-only` and map each changed production file to its affected tests.
+2. Search again for old field lists, constructors, method names, SQL fragments, and obsolete expectations.
+3. Run focused tests first, then the applicable complete module suites. Run the full Maven reactor for cross-module or architectural changes.
+4. Run Git diff checks and report the exact test and check commands executed with their results.
+
+#### Blocked or unexecuted tests
+
+1. A dependency or environment failure does not excuse test-impact inspection. If tests cannot execute, inspect and update every related test statically.
+2. Clearly state that the implementation remains unverified. Never claim success for an unexecuted test or describe a newly written test as passing when it was not run.
+3. Do not report the task complete when required verification did not execute.
+
 ---
 
 ## Test Maintenance Is Part of Every Change
