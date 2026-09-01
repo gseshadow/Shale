@@ -3,6 +3,7 @@ package com.shale.ui.controller;
 import com.shale.ui.testutil.JavaFxTestSupport;
 import com.shale.ui.util.AppSectionTabs;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Bounds;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -97,7 +98,7 @@ final class CaseSectionNavigationSelectionTest {
     void caseSectionNavigationProvidesVerticalClearanceWithoutChangingHeaderSpacing() {
         JavaFxTestSupport.runAndWait(() -> {
             LoadedCase loaded = load(null);
-            Scene scene = new Scene(loaded.root(), 1100, 700);
+            Scene scene = new Scene(loaded.root(), 760, 700);
             scene.getStylesheets().add(CaseSectionNavigationSelectionTest.class.getResource("/css/app.css").toExternalForm());
             loaded.root().applyCss();
             loaded.root().layout();
@@ -107,19 +108,26 @@ final class CaseSectionNavigationSelectionTest {
             ScrollPane scroll = (ScrollPane) loaded.root().lookup("#caseSectionNavigationScrollPane");
             Region viewport = (Region) scroll.lookup(".viewport");
             HBox tabRow = (HBox) scroll.getContent();
-            double tallestTab = loaded.tabs().values().stream()
-                    .mapToDouble(button -> button.getBoundsInParent().getHeight())
-                    .max()
-                    .orElseThrow();
 
             assertSame(field(loaded.controller(), "sectionTabsBar"), tabRow,
                     "The measured strip must be the Overview/Details/etc. navigation row.");
-            assertEquals(6, tabRow.getPadding().getTop());
-            assertEquals(6, tabRow.getPadding().getBottom());
-            assertTrue(tabRow.getHeight() >= tallestTab + tabRow.getPadding().getTop() + tabRow.getPadding().getBottom(),
-                    "The Case section row must include its tab pills plus vertical clearance.");
-            assertTrue(viewport.getHeight() >= tabRow.getHeight(),
-                    "The Case section viewport must not clip the padded tab row.");
+            assertEquals(Region.USE_PREF_SIZE, scroll.getMinHeight());
+            assertEquals(Region.USE_COMPUTED_SIZE, scroll.getPrefHeight());
+            assertEquals(Double.MAX_VALUE, scroll.getMaxHeight());
+            assertFalse(scroll.isFitToHeight(),
+                    "The ScrollPane must not force the navigation content down to a short viewport height.");
+            assertTrue(scroll.minHeight(-1) >= scroll.prefHeight(-1));
+
+            for (Map.Entry<String, Button> entry : loaded.tabs().entrySet()) {
+                Button tab = entry.getValue();
+                Bounds renderedInViewport = viewport.sceneToLocal(tab.localToScene(tab.getBoundsInLocal()));
+                assertTrue(viewport.getHeight() >= renderedInViewport.getHeight(),
+                        entry.getKey() + " must fit inside the rendered navigation viewport.");
+                assertTrue(renderedInViewport.getMinY() >= 5,
+                        entry.getKey() + " must retain visible clearance above its rounded edge.");
+                assertTrue(renderedInViewport.getMaxY() <= viewport.getHeight() - 5,
+                        entry.getKey() + " must retain visible clearance below its rounded edge.");
+            }
 
             assertEquals(8, caseHeader.getPadding().getTop());
             assertEquals(6, caseHeader.getPadding().getBottom());
