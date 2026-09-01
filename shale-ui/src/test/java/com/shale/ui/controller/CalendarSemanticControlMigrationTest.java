@@ -48,7 +48,8 @@ final class CalendarSemanticControlMigrationTest {
         assertTrue(source.contains("content.getChildren().addAll(titleTypeRow,typeDateRow,timeRow,descriptionLabel,descriptionArea,"),
                 "enhanced description should remain in the event form");
         assertTrue(source.contains("descriptionArea.getText()"), "event save should retain the enhanced description draft");
-        assertFalse(source.contains("TextArea descriptionArea"));
+        assertFalse(source.matches("(?s).*\\bTextArea\\s+descriptionArea\\b.*"),
+                "event description must not regress to a raw TextArea declaration");
         assertFalse(source.contains("ControlStyles.formControl(descriptionArea)"),
                 "EnhancedTextArea owns semantic styling for its internal control");
         assertFalse(source.contains("ControlStyles.apply(saveButton, ControlStyles.Purpose.DANGER)"));

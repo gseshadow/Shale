@@ -51,8 +51,8 @@ final class TaskDialogSemanticControlMigrationTest {
             assertTrue(detail.contains("ControlStyles.formControl(" + control + ")"), control);
         }
 
-        assertEnhancedDescriptionContract(create, "descriptionLabel,\n                descriptionArea");
-        assertEnhancedDescriptionContract(detail, "new Label(\"Description\"), descriptionArea");
+        assertEnhancedDescriptionContract(create, "content");
+        assertEnhancedDescriptionContract(detail, "formContent");
         assertTrue(create.contains("ControlStyles.setInvalid(titleField, true)"));
         assertTrue(create.contains("ControlStyles.setInvalid(dueTimeField, true)"));
         assertTrue(detail.contains("validationVisible[0] = true"));
@@ -101,15 +101,25 @@ final class TaskDialogSemanticControlMigrationTest {
         assertTrue(rule.contains("-fx-border-radius: 0 0 16 16;"));
     }
 
-    private static void assertEnhancedDescriptionContract(String source, String formPlacement) {
+    private static void assertEnhancedDescriptionContract(String source, String formVariable) {
         assertTrue(source.contains("import com.shale.ui.component.EnhancedTextArea;"));
         assertTrue(source.contains("EnhancedTextArea descriptionArea = new EnhancedTextArea()"));
         assertTrue(source.contains("descriptionArea.setEditorTitle(\"Task Description\")"));
-        assertTrue(source.contains(formPlacement), "descriptionArea should remain in the task form shell");
+        assertVBoxInitializerContains(source, formVariable, "descriptionArea");
         assertTrue(source.contains("descriptionArea.getText()"), "Save should retain the enhanced description draft");
-        assertFalse(source.contains("TextArea descriptionArea"), "task description must not regress to raw TextArea");
+        assertFalse(source.matches("(?s).*\\bTextArea\\s+descriptionArea\\b.*"),
+                "task description must not regress to raw TextArea");
         assertFalse(source.contains("ControlStyles.formControl(descriptionArea)"),
                 "EnhancedTextArea owns semantic styling for its internal control");
+    }
+
+    private static void assertVBoxInitializerContains(String source, String variable, String child) {
+        String declaration = "VBox " + variable + " = new VBox(";
+        int start = source.indexOf(declaration);
+        assertTrue(start >= 0, variable + " form shell should be declared");
+        int end = source.indexOf(");", start);
+        assertTrue(end > start, variable + " form shell initializer should be complete");
+        assertTrue(source.substring(start, end).contains(child), child + " wrapper should be a child of " + variable);
     }
 
     private static void assertSemantic(String source, String variable, String purpose) {
