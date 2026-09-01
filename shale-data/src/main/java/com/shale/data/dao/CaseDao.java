@@ -870,12 +870,6 @@ public final class CaseDao {
 		insertIntakeContactPoint(con, request, contactId, "ContactAddresses",
 				"LegacyAddressText", "HOME", normalizeOptional(address),
 				EntityActionAuditEvent.EntityType.CONTACT_ADDRESS);
-		if (request.createdByUserId() != null) {
-			entityActionAuditDao.append(con, EntityActionAuditEvent.now(request.shaleClientId(),
-					request.createdByUserId(), EntityActionAuditEvent.EntityType.CONTACT, contactId,
-					EntityActionAuditEvent.Action.CREATED, null, null,
-					Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID, contactId)));
-		}
 	}
 
 	private void insertIntakeContactPoint(Connection con, NewIntakeCreateRequest request, int contactId,

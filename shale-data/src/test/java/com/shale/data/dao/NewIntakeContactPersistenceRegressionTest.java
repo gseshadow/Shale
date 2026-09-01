@@ -19,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Collections;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 final class NewIntakeContactPersistenceRegressionTest {
@@ -36,14 +37,24 @@ final class NewIntakeContactPersistenceRegressionTest {
         invokeContactPoints(dao, connection, request, 202,
                 request.callerPhone(), request.callerEmail(), request.callerAddress());
 
-        assertEquals(6, executions.size());
-        assertPoint(executions.get(0), "ContactPhoneNumbers", 101, "MOBILE", "(555) 101-0001", "5551010001");
-        assertPoint(executions.get(1), "ContactEmailAddresses", 101, "PERSONAL", "client@example.test", "client@example.test");
-        assertPoint(executions.get(2), "ContactAddresses", 101, "HOME", "101 Client Street", null);
-        assertPoint(executions.get(3), "ContactPhoneNumbers", 202, "MOBILE", "(555) 202-0002", "5552020002");
-        assertPoint(executions.get(4), "ContactEmailAddresses", 202, "PERSONAL", "caller@example.test", "caller@example.test");
-        assertPoint(executions.get(5), "ContactAddresses", 202, "HOME", "202 Caller Avenue", null);
-        assertTrue(executions.get(2).sql().contains("LegacyAddressText"));
+        List<Execution> writes = executions.stream().filter(e -> !isEntityAudit(e)).toList();
+        assertEquals(6, writes.size());
+        assertPoint(writes.get(0), "ContactPhoneNumbers", 101, "MOBILE", "(555) 101-0001", "5551010001");
+        assertPoint(writes.get(1), "ContactEmailAddresses", 101, "PERSONAL", "client@example.test", "client@example.test");
+        assertPoint(writes.get(2), "ContactAddresses", 101, "HOME", "101 Client Street", null);
+        assertPoint(writes.get(3), "ContactPhoneNumbers", 202, "MOBILE", "(555) 202-0002", "5552020002");
+        assertPoint(writes.get(4), "ContactEmailAddresses", 202, "PERSONAL", "caller@example.test", "caller@example.test");
+        assertPoint(writes.get(5), "ContactAddresses", 202, "HOME", "202 Caller Avenue", null);
+        assertTrue(writes.get(2).sql().contains("LegacyAddressText"));
+
+        List<Execution> audits = executions.stream().filter(NewIntakeContactPersistenceRegressionTest::isEntityAudit).toList();
+        assertEquals(6, audits.size());
+        assertAudit(audits.get(0), "CONTACT_PHONE_NUMBER", 101, "MOBILE");
+        assertAudit(audits.get(1), "CONTACT_EMAIL_ADDRESS", 101, "PERSONAL");
+        assertAudit(audits.get(2), "CONTACT_ADDRESS", 101, "HOME");
+        assertAudit(audits.get(3), "CONTACT_PHONE_NUMBER", 202, "MOBILE");
+        assertAudit(audits.get(4), "CONTACT_EMAIL_ADDRESS", 202, "PERSONAL");
+        assertAudit(audits.get(5), "CONTACT_ADDRESS", 202, "HOME");
     }
 
     @Test
@@ -100,6 +111,26 @@ final class NewIntakeContactPersistenceRegressionTest {
     }
 
     @Test
+    void entityAuditFailureStillRollsBackTheAggregate() {
+        CaseDao dao = dao();
+        List<String> transactionCalls = new ArrayList<>();
+        Connection failing = transactionalConnection(transactionCalls, "EntityActionAuditLog");
+
+        assertThrows(RuntimeException.class, () -> new CaseAggregateTransaction(() -> failing).execute(connection -> {
+            try {
+                invokeContactPoints(dao, connection, request(), 101,
+                        "555-101-0001", "client@example.test", "101 Client Street");
+                return null;
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        }));
+
+        assertTrue(transactionCalls.contains("rollback"));
+        assertFalse(transactionCalls.contains("commit"));
+    }
+
+    @Test
     void intakeMethodKeepsSupplementalWritesBeforeItsCommitUsingRobustMethodExtraction() throws Exception {
         String method = extractMethod(Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java")),
                 "public NewIntakeCreateResult createIntake(");
@@ -140,6 +171,26 @@ final class NewIntakeContactPersistenceRegressionTest {
         if (normalizedValue != null) assertEquals(normalizedValue, execution.bindings().get(5));
     }
 
+    private static boolean isEntityAudit(Execution execution) {
+        return execution.sql().contains("EntityActionAuditLog");
+    }
+
+    private static void assertAudit(Execution execution, String entityType, int contactId, String kind) {
+        assertEquals(7, execution.bindings().get(1));
+        assertEquals(9, execution.bindings().get(2));
+        assertEquals(entityType, execution.bindings().get(3));
+        assertEquals("CREATED", execution.bindings().get(5));
+        assertEquals("CONTACT", execution.bindings().get(7));
+        assertEquals((long) contactId, execution.bindings().get(8));
+        String metadata = (String) execution.bindings().get(11);
+        assertNotNull(metadata);
+        assertTrue(metadata.contains("\"CONTACT_ID\":\"" + contactId + "\""));
+        assertTrue(metadata.contains("\"KIND\":\"" + kind + "\""));
+        assertTrue(metadata.contains("\"PRIMARY\":\"true\""));
+        for (String sensitive : Set.of("555", "example.test", "Street", "Avenue", "Condition"))
+            assertFalse(metadata.contains(sensitive), "entity audit leaked sensitive value: " + sensitive);
+    }
+
     private static Connection recordingConnection(List<Execution> executions, String failTable) {
         return (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(), new Class<?>[]{Connection.class},
                 (proxy, method, args) -> switch (method.getName()) {
@@ -167,7 +218,7 @@ final class NewIntakeContactPersistenceRegressionTest {
         Map<Integer, Object> bindings = new LinkedHashMap<>();
         return (PreparedStatement) Proxy.newProxyInstance(PreparedStatement.class.getClassLoader(),
                 new Class<?>[]{PreparedStatement.class}, (proxy, method, args) -> switch (method.getName()) {
-                    case "setInt", "setString", "setNull", "setBoolean", "setTimestamp", "setDate" -> {
+                    case "setInt", "setLong", "setString", "setNull", "setBoolean", "setTimestamp", "setDate" -> {
                         bindings.put((Integer) args[0], "setNull".equals(method.getName()) ? null : args[1]); yield null;
                     }
                     case "executeQuery" -> {
@@ -175,6 +226,12 @@ final class NewIntakeContactPersistenceRegressionTest {
                                 Collections.unmodifiableMap(new LinkedHashMap<>(bindings))));
                         if (failTable != null && sql.contains(failTable)) throw new SQLException("structured write failed");
                         yield resultSet();
+                    }
+                    case "executeUpdate" -> {
+                        executions.add(new Execution(sql,
+                                Collections.unmodifiableMap(new LinkedHashMap<>(bindings))));
+                        if (failTable != null && sql.contains(failTable)) throw new SQLException("audit write failed");
+                        yield 1;
                     }
                     case "close" -> null;
                     default -> defaultValue(method.getReturnType());
@@ -226,6 +283,6 @@ final class NewIntakeContactPersistenceRegressionTest {
                 "Client", "Person", "101 Client Street", "(555) 101-0001", "client@example.test",
                 LocalDate.of(1984, 2, 3), true, "Client condition", false,
                 "Caller", "Person", "(555) 202-0002", "202 Caller Avenue", "caller@example.test",
-                List.of(), null, 1L, new byte[]{1}, List.of());
+                List.of(), 9, 1L, new byte[]{1}, List.of());
     }
 }
