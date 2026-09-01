@@ -3,11 +3,16 @@ package com.shale.ui.controller;
 import com.shale.ui.testutil.JavaFxTestSupport;
 import com.shale.ui.util.AppSectionTabs;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Bounds;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -86,6 +91,49 @@ final class CaseSectionNavigationSelectionTest {
                     "The complete, unclipped tab row must remain horizontally scrollable at narrow widths.");
             loaded.tabs().values().forEach(button ->
                     assertTrue(button.getStyleClass().contains(AppSectionTabs.TAB_BUTTON_STYLE_CLASS)));
+        });
+    }
+
+    @Test
+    void caseSectionNavigationProvidesVerticalClearanceWithoutChangingHeaderSpacing() {
+        JavaFxTestSupport.runAndWait(() -> {
+            LoadedCase loaded = load(null);
+            Scene scene = new Scene(loaded.root(), 760, 700);
+            scene.getStylesheets().add(CaseSectionNavigationSelectionTest.class.getResource("/css/app.css").toExternalForm());
+            loaded.root().applyCss();
+            loaded.root().layout();
+
+            BorderPane caseRoot = (BorderPane) loaded.root().lookup("#caseRootPane");
+            VBox caseHeader = (VBox) caseRoot.getTop();
+            ScrollPane scroll = (ScrollPane) loaded.root().lookup("#caseSectionNavigationScrollPane");
+            Region viewport = (Region) scroll.lookup(".viewport");
+            HBox tabRow = (HBox) scroll.getContent();
+
+            assertSame(field(loaded.controller(), "sectionTabsBar"), tabRow,
+                    "The measured strip must be the Overview/Details/etc. navigation row.");
+            assertEquals(Region.USE_PREF_SIZE, scroll.getMinHeight());
+            assertEquals(Region.USE_COMPUTED_SIZE, scroll.getPrefHeight());
+            assertEquals(Double.MAX_VALUE, scroll.getMaxHeight());
+            assertFalse(scroll.isFitToHeight(),
+                    "The ScrollPane must not force the navigation content down to a short viewport height.");
+            assertTrue(scroll.minHeight(-1) >= scroll.prefHeight(-1));
+
+            for (Map.Entry<String, Button> entry : loaded.tabs().entrySet()) {
+                Button tab = entry.getValue();
+                Bounds renderedInViewport = viewport.sceneToLocal(tab.localToScene(tab.getBoundsInLocal()));
+                assertTrue(viewport.getHeight() >= renderedInViewport.getHeight(),
+                        entry.getKey() + " must fit inside the rendered navigation viewport.");
+                assertTrue(renderedInViewport.getMinY() >= 5,
+                        entry.getKey() + " must retain visible clearance above its rounded edge.");
+                assertTrue(renderedInViewport.getMaxY() <= viewport.getHeight() - 5,
+                        entry.getKey() + " must retain visible clearance below its rounded edge.");
+            }
+
+            assertEquals(8, caseHeader.getPadding().getTop());
+            assertEquals(6, caseHeader.getPadding().getBottom());
+            assertEquals(48, loaded.root().lookup("#statusTimelineHost").minHeight(-1));
+            assertFalse(caseHeader.getStyleClass().contains("app-section-tabs-scroll"),
+                    "The Case header/status surface must remain distinct from the section navigation strip.");
         });
     }
 
