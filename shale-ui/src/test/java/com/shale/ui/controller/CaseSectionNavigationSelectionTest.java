@@ -115,6 +115,15 @@ final class CaseSectionNavigationSelectionTest {
 
             assertSame(field(loaded.controller(), "sectionTabsBar"), tabRow,
                     "The measured strip must be the Overview/Details/etc. navigation row.");
+
+            double requiredNavigationWidth = tabRow.prefWidth(-1);
+            double constrainedNavigationWidth = Math.max(1, requiredNavigationWidth - 80);
+            scroll.setMinWidth(0);
+            scroll.setPrefWidth(constrainedNavigationWidth);
+            scroll.setMaxWidth(constrainedNavigationWidth);
+            loaded.root().layout();
+            loaded.root().layout(); // resolve the AS_NEEDED horizontal bar after constraining the viewport
+
             assertEquals(Region.USE_PREF_SIZE, scroll.getMinHeight());
             assertEquals(Region.USE_COMPUTED_SIZE, scroll.getMaxHeight(),
                     "The navigation viewport should retain JavaFX computed sizing rather than claim unbounded vertical growth.");
@@ -123,7 +132,11 @@ final class CaseSectionNavigationSelectionTest {
             assertTrue(scroll.minHeight(-1) >= scroll.prefHeight(-1));
             assertEquals(6, tabRow.getPadding().getTop());
             assertEquals(6, tabRow.getPadding().getBottom());
-            assertTrue(horizontalBar.isVisible(), "The narrow test width must exercise horizontal-scrollbar sizing.");
+            assertEquals(ScrollPane.ScrollBarPolicy.AS_NEEDED, scroll.getHbarPolicy());
+            assertFalse(scroll.isFitToWidth());
+            assertTrue(tabRow.getLayoutBounds().getWidth() > scroll.getViewportBounds().getWidth(),
+                    "The fixture must make the actual Case navigation row wider than its viewport. "
+                            + geometry(scroll, viewport, tabRow, horizontalBar));
             assertEquals(tabRow.prefHeight(-1) + scroll.getInsets().getTop() + scroll.getInsets().getBottom()
                             + horizontalBar.prefHeight(-1), scroll.getPrefHeight(), 0.5,
                     "The Case-specific strip must request its padded row, control insets, and visible horizontal bar.");
