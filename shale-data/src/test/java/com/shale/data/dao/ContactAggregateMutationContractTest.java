@@ -89,8 +89,12 @@ final class ContactAggregateMutationContractTest {
                 "the removed UpdatedByUserId placeholder must not retain an actor binding");
         assertEquals(14, occurrences(updateSql, "=?"),
                 "non-null concurrency SQL must have eleven fields, two scope IDs, and one timestamp parameter");
-        assertEquals(9, occurrences(update, "setString(p,i++"),
-                "the seven name fields, Condition, and Notes must be bound in SQL order");
+        assertEquals(8, occurrences(update, "setString(p,i++"),
+                "the seven name fields and Condition must use the shared nullable-string binding");
+
+        assertEquals(1,
+                occurrences(update, "p.setString(i++,normalizeNotes(c.notes()))"),
+                "Notes must be normalized and bound exactly once");
         assertTrue(update.contains("setString(p,i++,c.condition());p.setString(i++,normalizeNotes(c.notes()));"
                         + "p.setBoolean(i++,c.deceased());"),
                 "Condition, normalized Notes, and IsDeceased must follow DateOfBirth in SQL order");
