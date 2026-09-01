@@ -969,7 +969,7 @@ public final class SceneManager {
 					new FormConfigurationServiceAdapter(new FormConfigurationDao(dbSessionProvider)));
 
 			VBox dialogRoot = new VBox(
-					AppDialogs.createSecondaryWindowHeader(dialog, "New Intake", dialog::close),
+					AppDialogs.createSecondaryWindowHeader(dialog, "New Intake", controller::requestClose),
 					root);
 			dialogRoot.getStyleClass().add("secondary-window-shell");
 			VBox.setVgrow(root, Priority.ALWAYS);
