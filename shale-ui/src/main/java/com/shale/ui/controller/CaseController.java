@@ -1,5 +1,9 @@
 package com.shale.ui.controller;
 
+import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
+
+import com.shale.ui.component.EnhancedTextArea;
+
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -5386,17 +5390,7 @@ public class CaseController {
 	}
 
 	private void showTextAreaDialog(String title, String label, String currentValue, Consumer<String> onSave) {
-		Dialog<String> dialog = new Dialog<>();
-		AppDialogs.applySecondaryDialogShell(dialog, title);
-		dialog.initOwner(dialogOwner(editDescriptionButton));
-		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
-		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
-		TextArea area = new TextArea(safeText(currentValue));
-		area.setPrefRowCount(8);
-		area.setWrapText(true);
-		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current value shown below."), area));
-		dialog.setResultConverter(button -> button == saveType ? area.getText() : null);
-		dialog.showAndWait().ifPresent(onSave);
+		EnhancedTextArea.openEditor(dialogOwner(editDescriptionButton), title, safeText(currentValue), onSave);
 	}
 
 	private void showDateFieldDialog(String title, String label, LocalDate currentValue, Consumer<LocalDate> onSave) {
@@ -5453,18 +5447,7 @@ public class CaseController {
 	}
 
 	private void showDetailsTextAreaDialog(String title, String label, String currentValue, Button ownerButton, Consumer<String> onSave) {
-		Dialog<String> dialog = new Dialog<>();
-		AppDialogs.applySecondaryDialogShell(dialog, title);
-		dialog.initOwner(dialogOwner(ownerButton));
-		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
-		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
-		TextArea area = new TextArea(safeText(currentValue));
-		area.setPrefRowCount(8);
-		area.setWrapText(true);
-		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current value shown below."), area));
-		installUnsavedDetailsDialogConfirmation(dialog, ButtonType.CANCEL, () -> !Objects.equals(safeText(currentValue), safeText(area.getText())));
-		dialog.setResultConverter(button -> button == saveType ? area.getText() : null);
-		dialog.showAndWait().ifPresent(onSave);
+		EnhancedTextArea.openEditor(dialogOwner(ownerButton), title, safeText(currentValue), onSave);
 	}
 
 	private void showDetailsDateDialog(String title, String label, LocalDate currentValue, Button ownerButton, Consumer<LocalDate> onSave) {
@@ -6150,7 +6133,7 @@ public class CaseController {
 
 	private void applyLiveCaseDescription(String newDescription) {
 		if (ovDescriptionValue != null)
-			ovDescriptionValue.setText(safeText(newDescription));
+			ovDescriptionValue.setText(NarrativeMarkdownCodec.plainText(safeText(newDescription)));
 	}
 
 	// ----------------------------
@@ -7364,7 +7347,7 @@ public class CaseController {
 			if (!editMode && ovCaseNumberValue != null)
 				ovCaseNumberValue.setText(safeText(detail.getCaseNumber()));
 			if (!editMode && ovDescriptionValue != null)
-				ovDescriptionValue.setText(safeText(detail.getDescription()));
+				ovDescriptionValue.setText(NarrativeMarkdownCodec.plainText(safeText(detail.getDescription())));
 			if (statusLabel != null)
 				statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
 			renderLastUpdated(detail.getUpdatedAt());
@@ -7450,9 +7433,9 @@ public class CaseController {
 			if (ovCaseNumberEditor != null && !editMode)
 				ovCaseNumberEditor.setText(safe(dto.getCaseNumber()));
 			if (ovDescriptionValue != null)
-				ovDescriptionValue.setText(safeText(dto.getDescription()));
+				ovDescriptionValue.setText(NarrativeMarkdownCodec.plainText(safeText(dto.getDescription())));
 			if (ovDescriptionEditor != null && !editMode)
-				ovDescriptionEditor.setText(safeText(dto.getDescription()));
+				ovDescriptionEditor.setText(NarrativeMarkdownCodec.plainText(safeText(dto.getDescription())));
 		}
 
 		private void renderOverviewDates(CaseOverviewDto dto, boolean editSafeOnly) {
@@ -10254,7 +10237,7 @@ public class CaseController {
 				detPracticeAreaIdValue.setText(safe(d.practiceAreaName));
 			renderDetailsPracticeAreaMini(d.practiceAreaId, d.practiceAreaName, d.practiceAreaColor);
 			if (detDescriptionValue != null)
-				detDescriptionValue.setText(safe(d.description));
+				detDescriptionValue.setText(NarrativeMarkdownCodec.plainText(safe(d.description)));
 			if (detAcceptedDateValue != null)
 				detAcceptedDateValue.setText(formatDate(d.acceptedDate));
 			if (detClosedDateValue != null)
@@ -10286,7 +10269,7 @@ public class CaseController {
 			if (detDeniedDetailValue != null)
 				detDeniedDetailValue.setText(safe(d.deniedDetail));
 			if (detSummaryValue != null)
-				detSummaryValue.setText(safe(d.summary));
+				detSummaryValue.setText(NarrativeMarkdownCodec.plainText(safe(d.summary)));
 			if (detReceivedUpdatesValue != null)
 				detReceivedUpdatesValue.setText(boolLabel(d.receivedUpdates));
 			if (!detailsEditMode)
