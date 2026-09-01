@@ -8,6 +8,10 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -86,6 +90,42 @@ final class CaseSectionNavigationSelectionTest {
                     "The complete, unclipped tab row must remain horizontally scrollable at narrow widths.");
             loaded.tabs().values().forEach(button ->
                     assertTrue(button.getStyleClass().contains(AppSectionTabs.TAB_BUTTON_STYLE_CLASS)));
+        });
+    }
+
+    @Test
+    void caseSectionNavigationProvidesVerticalClearanceWithoutChangingHeaderSpacing() {
+        JavaFxTestSupport.runAndWait(() -> {
+            LoadedCase loaded = load(null);
+            Scene scene = new Scene(loaded.root(), 1100, 700);
+            scene.getStylesheets().add(CaseSectionNavigationSelectionTest.class.getResource("/css/app.css").toExternalForm());
+            loaded.root().applyCss();
+            loaded.root().layout();
+
+            BorderPane caseRoot = (BorderPane) loaded.root().lookup("#caseRootPane");
+            VBox caseHeader = (VBox) caseRoot.getTop();
+            ScrollPane scroll = (ScrollPane) loaded.root().lookup("#caseSectionNavigationScrollPane");
+            Region viewport = (Region) scroll.lookup(".viewport");
+            HBox tabRow = (HBox) scroll.getContent();
+            double tallestTab = loaded.tabs().values().stream()
+                    .mapToDouble(button -> button.getBoundsInParent().getHeight())
+                    .max()
+                    .orElseThrow();
+
+            assertSame(field(loaded.controller(), "sectionTabsBar"), tabRow,
+                    "The measured strip must be the Overview/Details/etc. navigation row.");
+            assertEquals(6, tabRow.getPadding().getTop());
+            assertEquals(6, tabRow.getPadding().getBottom());
+            assertTrue(tabRow.getHeight() >= tallestTab + tabRow.getPadding().getTop() + tabRow.getPadding().getBottom(),
+                    "The Case section row must include its tab pills plus vertical clearance.");
+            assertTrue(viewport.getHeight() >= tabRow.getHeight(),
+                    "The Case section viewport must not clip the padded tab row.");
+
+            assertEquals(8, caseHeader.getPadding().getTop());
+            assertEquals(6, caseHeader.getPadding().getBottom());
+            assertEquals(48, loaded.root().lookup("#statusTimelineHost").minHeight(-1));
+            assertFalse(caseHeader.getStyleClass().contains("app-section-tabs-scroll"),
+                    "The Case header/status surface must remain distinct from the section navigation strip.");
         });
     }
 

@@ -53,13 +53,17 @@
 			<padding>
 				<Insets top="10" right="12" bottom="12" left="12" />
 			</padding>
-			<ScrollPane fitToHeight="true" fitToWidth="false" hbarPolicy="AS_NEEDED"
+			<ScrollPane fx:id="caseSectionNavigationScrollPane" fitToHeight="true" fitToWidth="false" hbarPolicy="AS_NEEDED"
 				vbarPolicy="NEVER" pannable="true">
 				<styleClass>
 					<String fx:value="app-section-tabs-scroll" />
 					<String fx:value="page-header-surface" />
 				</styleClass>
-				<HBox fx:id="sectionTabsBar" spacing="8.0" alignment="CENTER_LEFT" />
+				<HBox fx:id="sectionTabsBar" spacing="8.0" alignment="CENTER_LEFT">
+					<padding>
+						<Insets top="6" right="0" bottom="6" left="0" />
+					</padding>
+				</HBox>
 			</ScrollPane>
 			<StackPane fx:id="contentHost" VBox.vgrow="ALWAYS">
 
