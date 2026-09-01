@@ -4,13 +4,17 @@ import com.shale.ui.component.richtext.NarrativeDocument;
 import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.component.spellcheck.LocalSpellChecker;
 import javafx.animation.PauseTransition;
+import javafx.beans.value.ChangeListener;
 import javafx.geometry.Orientation;
 import javafx.geometry.Point2D;
+import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.SVGPath;
+import javafx.stage.Window;
 import javafx.util.Duration;
 import org.fxmisc.richtext.CharacterHit;
 import org.fxmisc.richtext.InlineCssTextArea;
@@ -27,8 +31,17 @@ final class RichTextExpandedEditor extends VBox {
     private final LocalSpellChecker checker;
     private final PauseTransition spellDelay = new PauseTransition(Duration.millis(350));
     private final boolean spellCheck;
+    private final ContextMenu contextMenu = new ContextMenu();
+    private final ChangeListener<Node> focusOwnerListener = (observable, oldOwner, newOwner) -> {
+        if (newOwner != null && !isAncestorOf(newOwner)) contextMenu.hide();
+    };
+    private final ChangeListener<Boolean> windowFocusListener = (observable, wasFocused, isFocused) -> {
+        if (!isFocused) contextMenu.hide();
+    };
+    private final ChangeListener<Window> sceneWindowListener = (observable, oldWindow, newWindow) -> observeWindow(newWindow);
+    private Scene observedScene;
+    private Window observedWindow;
     private List<LocalSpellChecker.Misspelling> misspellings = List.of();
-    private int contextMenuPosition = -1;
 
     RichTextExpandedEditor(String markdown, LocalSpellChecker checker, boolean spellCheck) {
         this.checker = checker; this.spellCheck = spellCheck;
@@ -46,6 +59,7 @@ final class RichTextExpandedEditor extends VBox {
         area.textProperty().addListener((o, old, value) -> { if (spellCheck) spellDelay.playFromStart(); });
         spellDelay.setOnFinished(e -> refreshSpelling());
         installKeys(); installContextMenu();
+        sceneProperty().addListener((observable, oldScene, newScene) -> observeScene(newScene));
         Runnable state = () -> updateToolbarState(bold, italic, underline, bullets, numbers);
         area.caretPositionProperty().addListener((o, a, b) -> state.run());
         area.selectionProperty().addListener((o, a, b) -> state.run());
@@ -128,7 +142,11 @@ final class RichTextExpandedEditor extends VBox {
     }
 
     private void installContextMenu() {
-        ContextMenu menu = new ContextMenu();
+        // RichTextFX consumes ordinary mouse events internally, so dismiss before its
+        // handlers run and deliberately leave the event unconsumed for normal caret work.
+        addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+            if (event.getButton() == MouseButton.PRIMARY && contextMenu.isShowing()) contextMenu.hide();
+        });
         // Observe the semantic request before RichTextFX handlers, then explicitly show the
         // sole editor menu rather than relying on GenericStyledArea to show a menu property.
         area.addEventFilter(ContextMenuEvent.CONTEXT_MENU_REQUESTED, event -> {
@@ -140,11 +158,41 @@ final class RichTextExpandedEditor extends VBox {
                 CharacterHit pointerHit = area.hit(local.getX(), local.getY());
                 position = pointerHit.getCharacterIndex().orElse(pointerHit.getInsertionIndex());
             }
-            populateContextMenu(menu, misspellingAt(misspellings, position));
-            if (menu.isShowing()) menu.hide();
-            menu.show(area, event.getScreenX(), event.getScreenY());
+            if (contextMenu.isShowing()) contextMenu.hide();
+            populateContextMenu(contextMenu, misspellingAt(misspellings, position));
+            contextMenu.show(area, event.getScreenX(), event.getScreenY());
             event.consume();
         });
+    }
+
+    private boolean isAncestorOf(Node node) {
+        for (Node current = node; current != null; current = current.getParent())
+            if (current == this) return true;
+        return false;
+    }
+
+    private void observeScene(Scene scene) {
+        if (observedScene != null) observedScene.focusOwnerProperty().removeListener(focusOwnerListener);
+        if (observedScene != null) observedScene.windowProperty().removeListener(sceneWindowListener);
+        observeWindow(null);
+        observedScene = scene;
+        if (observedScene != null) observedScene.focusOwnerProperty().addListener(focusOwnerListener);
+        if (observedScene != null) observedScene.windowProperty().addListener(sceneWindowListener);
+        observeWindow(scene == null ? null : scene.getWindow());
+        if (scene == null) contextMenu.hide();
+    }
+
+    private void observeWindow(Window window) {
+        if (observedWindow != null) observedWindow.focusedProperty().removeListener(windowFocusListener);
+        observedWindow = window;
+        if (observedWindow != null) observedWindow.focusedProperty().addListener(windowFocusListener);
+    }
+
+    /** Releases popup and timer state when the containing dialog is finished. */
+    void dispose() {
+        contextMenu.hide();
+        spellDelay.stop();
+        observeScene(null);
     }
 
     private void populateContextMenu(ContextMenu menu, LocalSpellChecker.Misspelling hit) {
@@ -204,16 +252,17 @@ final class RichTextExpandedEditor extends VBox {
         int end = text.indexOf('\n', caret); return text.substring(start, end < 0 ? text.length() : end);
     }
 
-    private static ToggleButton formatToggle(String glyph, String accessible, String tooltip, Runnable action) {
+    private ToggleButton formatToggle(String glyph, String accessible, String tooltip, Runnable action) {
         ToggleButton button = baseToggle(accessible, tooltip, action); button.setText(glyph);
         button.getStyleClass().add("narrative-format-" + accessible.toLowerCase()); return button;
     }
-    private static ToggleButton iconToggle(String path, String accessible, Runnable action) {
+    private ToggleButton iconToggle(String path, String accessible, Runnable action) {
         ToggleButton button = baseToggle(accessible, accessible, action); button.setGraphic(icon(path)); return button;
     }
-    private static ToggleButton baseToggle(String accessible, String tooltip, Runnable action) {
+    private ToggleButton baseToggle(String accessible, String tooltip, Runnable action) {
         ToggleButton button = new ToggleButton(); button.setTooltip(new Tooltip(tooltip)); button.setAccessibleText(accessible);
-        button.setOnAction(e -> action.run()); button.getStyleClass().add("narrative-toolbar-button"); return button;
+        button.setOnAction(e -> { action.run(); area.requestFocus(); });
+        button.getStyleClass().add("narrative-toolbar-button"); return button;
     }
     private static SVGPath icon(String content) { SVGPath icon = new SVGPath(); icon.setContent(content); icon.getStyleClass().add("narrative-toolbar-icon"); return icon; }
 }

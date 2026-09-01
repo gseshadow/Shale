@@ -161,6 +161,7 @@ public class EnhancedTextArea extends VBox {
         });
         dialog.setResultConverter(button -> button == APPLY ? expanded.markdown() : null);
         dialog.setOnShown(event -> Platform.runLater(() -> expanded.area().requestFocus()));
+        dialog.setOnHidden(event -> expanded.dispose());
         Optional<String> result = dialog.showAndWait();
         result.ifPresent(value -> { edit.setDraft(value); applyExpandedEdit(edit); });
     }
