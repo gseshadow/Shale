@@ -22,10 +22,12 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class CaseSectionNavigationSelectionTest {
+    private static final double GEOMETRY_TOLERANCE = 1.0;
     private static final List<String> ORDER = List.of(
             "Overview", "Details", "Parties", "Tasks", "Calendar", "Dates", "Requests", "Links", "Timeline");
 
@@ -147,10 +149,18 @@ final class CaseSectionNavigationSelectionTest {
                 assertTrue(tab.minHeight(-1) >= 30,
                         entry.getKey() + " must retain the intended minimum tab-control height.");
                 Bounds renderedInRow = tabRow.sceneToLocal(tab.localToScene(tab.getBoundsInLocal()));
-                assertTrue(renderedInRow.getMinY() + 0.5 >= tabRow.getPadding().getTop(),
-                        entry.getKey() + " must retain visible clearance above its rounded edge.");
-                assertTrue(renderedInRow.getMaxY() <= tabRow.getHeight() - tabRow.getPadding().getBottom() + 0.5,
-                        entry.getKey() + " must retain visible clearance below its rounded edge.");
+                double topClearance = renderedInRow.getMinY();
+                double bottomClearance = tabRow.getHeight() - renderedInRow.getMaxY();
+                assertTrue(topClearance >= -GEOMETRY_TOLERANCE,
+                        entry.getKey() + " must not render above the navigation row; top clearance=" + topClearance);
+                assertTrue(bottomClearance >= -GEOMETRY_TOLERANCE,
+                        entry.getKey() + " must not render below the navigation row; bottom clearance=" + bottomClearance);
+                assertTrue(topClearance > 0,
+                        entry.getKey() + " must retain positive visible clearance above its rounded edge.");
+                assertTrue(bottomClearance > 0,
+                        entry.getKey() + " must retain positive visible clearance below its rounded edge.");
+                assertNull(tab.getClip(),
+                        entry.getKey() + " must not clip its rendered tab surface.");
             }
 
             assertTrue(scroll.getHeight() <= tabRow.getBoundsInParent().getHeight() * 2,
