@@ -2,6 +2,7 @@
 
 <?import java.lang.String?>
 <?import javafx.geometry.Insets?>
+<?import com.shale.ui.component.EnhancedTextArea?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
@@ -140,7 +141,7 @@
 
                         <Label text="Notes" styleClass="case-overview-row-label" GridPane.rowIndex="12" />
                         <Label fx:id="notesValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="12" GridPane.columnIndex="1" />
-                        <TextArea fx:id="notesEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="4" wrapText="true" GridPane.rowIndex="12" GridPane.columnIndex="1" />
+                        <EnhancedTextArea fx:id="notesEditor" editorTitle="Organization Notes" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="4" GridPane.rowIndex="12" GridPane.columnIndex="1" />
                             <Button fx:id="editNotesButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="12" GridPane.columnIndex="2" />
                     </GridPane>
                 </VBox>

@@ -1,5 +1,7 @@
 package com.shale.ui.controller;
 
+import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
+
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
@@ -37,6 +39,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
+import com.shale.ui.component.EnhancedTextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
 import javafx.scene.control.Tooltip;
@@ -90,7 +93,7 @@ public final class OrganizationController {
 	@FXML private Label countryValue;
 	@FXML private TextField countryEditor;
 	@FXML private Label notesValue;
-	@FXML private TextArea notesEditor;
+	@FXML private EnhancedTextArea notesEditor;
 	@FXML private Button editNameButton;
 	@FXML private Button editTypeButton;
 	@FXML private Button editPhoneButton;
@@ -390,19 +393,7 @@ public final class OrganizationController {
 	}
 
 	private void showOrganizationTextAreaDialog(String title, String label, String currentValue, Button ownerButton, Consumer<String> onSave) {
-		Dialog<String> dialog = new Dialog<>();
-		AppDialogs.applySecondaryDialogShell(dialog, title);
-		dialog.initOwner(dialogOwner(ownerButton));
-		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
-		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
-
-		TextArea area = new TextArea(safeText(currentValue));
-		area.setPrefRowCount(8);
-		area.setWrapText(true);
-		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current value shown below."), area));
-		installUnsavedOrganizationDialogConfirmation(dialog, () -> !Objects.equals(safeText(currentValue), safeText(area.getText())));
-		dialog.setResultConverter(button -> button == saveType ? area.getText() : null);
-		dialog.showAndWait().ifPresent(onSave);
+		EnhancedTextArea.openEditor(dialogOwner(ownerButton), title, safeText(currentValue), onSave);
 	}
 
 	private void showOrganizationTypeDialog(Integer currentTypeId, Button ownerButton, Consumer<Integer> onSave) {
@@ -789,7 +780,7 @@ public final class OrganizationController {
 		stateValue.setText(fallback(o.getState()));
 		postalCodeValue.setText(fallback(o.getPostalCode()));
 		countryValue.setText(fallback(o.getCountry()));
-		notesValue.setText(fallback(o.getNotes()));
+		notesValue.setText(NarrativeMarkdownCodec.plainText(fallback(o.getNotes())));
 
 		if (o.getUpdatedAt() != null) {
 			String formatted = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")
