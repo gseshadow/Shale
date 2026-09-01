@@ -11,6 +11,9 @@ import java.util.Optional;
  */
 public interface ContactServicePort {
 
+	/** SQL Server nvarchar(max) character capacity documented for dbo.Contacts.Notes. */
+	int CONTACT_NOTES_MAX_CHARS = 1_073_741_823;
+
 	List<ContactSummary> searchContacts(int shaleClientId, String query, int limit);
 
 	DirectoryPage getContactDirectoryPage(int shaleClientId, int actorUserId, int page, int pageSize,
@@ -97,6 +100,7 @@ public interface ContactServicePort {
 			String address,
 			String dateOfBirth,
 			String condition,
+			String notes,
 			boolean deceased,
 			boolean client) {
 	}
@@ -141,7 +145,7 @@ public interface ContactServicePort {
 
 	/** Read-only classification aggregate. It deliberately carries the existing display name unchanged. */
 	record ClassificationProfile(int contactId, int shaleClientId, StructuredName structuredName,
-			String legacyDisplayName, java.time.LocalDate dateOfBirth, String condition, boolean deceased,
+			String legacyDisplayName, java.time.LocalDate dateOfBirth, String condition, String notes, boolean deceased,
 			java.time.Instant contactUpdatedAt, List<AssignedDefinition> contactTypes,
 			List<AssignedDefinition> specialties, List<AssignedCredential> credentials,
 			List<ContactPhoneNumber> phoneNumbers, List<ContactEmailAddress> emailAddresses,
@@ -154,11 +158,7 @@ public interface ContactServicePort {
 			emailAddresses = List.copyOf(emailAddresses);
 			addresses = List.copyOf(addresses);
 		}
-		public ClassificationProfile(int contactId,int shaleClientId,StructuredName structuredName,String legacyDisplayName,
-				java.time.Instant contactUpdatedAt,List<AssignedDefinition> contactTypes,List<AssignedDefinition> specialties,
-				List<AssignedCredential> credentials,List<ContactPhoneNumber> phones,List<ContactEmailAddress> emails,List<ContactAddress> addresses){
-			this(contactId,shaleClientId,structuredName,legacyDisplayName,null,null,false,contactUpdatedAt,contactTypes,specialties,credentials,phones,emails,addresses);
-		}
+
 	}
 
 	record ContactPhoneNumber(long id, String kind, String displayNumber, String normalizedNumber,
@@ -268,7 +268,7 @@ public interface ContactServicePort {
 
 	record UpdateContactProfileCommand(int contactId, int shaleClientId, int actorUserId,
 			String displayName, StructuredName structuredName, java.time.LocalDate dateOfBirth,
-			String condition, boolean deceased, java.time.Instant expectedContactUpdatedAt,
+			String condition, String notes, boolean deceased, java.time.Instant expectedContactUpdatedAt,
 			List<IntendedAssignment> contactTypes, List<IntendedAssignment> specialties,
 			List<IntendedAssignment> credentials, List<IntendedPhoneNumber> phoneNumbers,
 			List<IntendedEmailAddress> emailAddresses, List<IntendedAddress> addresses) {
@@ -281,19 +281,7 @@ public interface ContactServicePort {
 			emailAddresses = emailAddresses == null ? List.of() : List.copyOf(emailAddresses);
 			addresses = addresses == null ? List.of() : List.copyOf(addresses);
 		}
-		/** Phase 2B source-compatible constructor. */
-		public UpdateContactProfileCommand(int contactId,int shaleClientId,int actorUserId,String displayName,
-				StructuredName structuredName,java.time.Instant expectedContactUpdatedAt,List<IntendedAssignment> contactTypes,
-				List<IntendedAssignment> specialties,List<IntendedAssignment> credentials){
-			this(contactId,shaleClientId,actorUserId,displayName,structuredName,null,null,false,expectedContactUpdatedAt,contactTypes,specialties,credentials,List.of(),List.of(),List.of());
-		}
-		public UpdateContactProfileCommand(int contactId,int shaleClientId,int actorUserId,String displayName,
-				StructuredName structuredName,java.time.Instant expectedContactUpdatedAt,List<IntendedAssignment> contactTypes,
-				List<IntendedAssignment> specialties,List<IntendedAssignment> credentials,List<IntendedPhoneNumber> phones,
-				List<IntendedEmailAddress> emails,List<IntendedAddress> addresses){
-			this(contactId,shaleClientId,actorUserId,displayName,structuredName,null,null,false,expectedContactUpdatedAt,
-					contactTypes,specialties,credentials,phones,emails,addresses);
-		}
+
 	}
 
 	record IntendedPhoneNumber(Long id, byte[] expectedRowVer, String kind, String displayNumber,

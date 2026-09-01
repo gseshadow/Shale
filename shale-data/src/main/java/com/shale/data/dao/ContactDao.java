@@ -72,6 +72,7 @@ public final class ContactDao {
             String address,
             LocalDate dateOfBirth,
             String condition,
+            String notes,
             boolean deceased,
             boolean client,
             boolean deleted,
@@ -124,12 +125,11 @@ public final class ContactDao {
 
     public record ClassificationProfileRow(int contactId, int shaleClientId, String prefix,
             String firstName, String middleName, String lastName, String preferredName, String suffix,
-            String legacyDisplayName, java.time.LocalDate dateOfBirth, String condition, boolean deceased,
+            String legacyDisplayName, java.time.LocalDate dateOfBirth, String condition, String notes, boolean deceased,
             Instant contactUpdatedAt, List<AssignedDefinitionRow> contactTypes,
             List<AssignedDefinitionRow> specialties, List<AssignedCredentialRow> credentials,
             List<ContactPhoneNumberRow> phoneNumbers, List<ContactEmailAddressRow> emailAddresses,
             List<ContactAddressRow> addresses) {
-		public ClassificationProfileRow(int contactId,int shaleClientId,String prefix,String firstName,String middleName,String lastName,String preferredName,String suffix,String legacyDisplayName,Instant contactUpdatedAt,List<AssignedDefinitionRow> contactTypes,List<AssignedDefinitionRow> specialties,List<AssignedCredentialRow> credentials){this(contactId,shaleClientId,prefix,firstName,middleName,lastName,preferredName,suffix,legacyDisplayName,null,null,false,contactUpdatedAt,contactTypes,specialties,credentials,List.of(),List.of(),List.of());}
     }
 
     public record ContactPhoneNumberRow(long id,String kind,String displayNumber,String normalizedNumber,
@@ -669,7 +669,7 @@ public final class ContactDao {
                     SELECT c.Id,c.Prefix,c.FirstName,c.MiddleName,c.LastName,c.PreferredName,c.Suffix,
                            COALESCE(NULLIF(LTRIM(RTRIM(c.Name)),''),NULLIF(LTRIM(RTRIM(c.WorkName)),''),
                              NULLIF(LTRIM(RTRIM(CONCAT(c.FirstName,' ',c.LastName))),'')) LegacyDisplayName,
-                           c.DateOfBirth,c.Condition,c.IsDeceased,c.UpdatedAt
+                           c.DateOfBirth,c.Condition,c.Notes,c.IsDeceased,c.UpdatedAt
                     FROM dbo.Contacts c WHERE c.Id=? AND c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0;
                     """;
             try (PreparedStatement ps = con.prepareStatement(contactSql)) {
@@ -688,7 +688,7 @@ public final class ContactDao {
                     List<ContactAddressRow> addresses=loadAddresses(con,contactId,shaleClientId);
                     return new ClassificationProfileRow(contactId, shaleClientId, prefix, first, middle, last,
                             preferred, suffix, display, rs.getDate("DateOfBirth")==null?null:rs.getDate("DateOfBirth").toLocalDate(),
-                            rs.getString("Condition"),rs.getBoolean("IsDeceased"),rs.getTimestamp("UpdatedAt")==null?null:rs.getTimestamp("UpdatedAt").toInstant(), types, specialties, credentials,phones,emails,addresses);
+                            rs.getString("Condition"),rs.getString("Notes"),rs.getBoolean("IsDeceased"),rs.getTimestamp("UpdatedAt")==null?null:rs.getTimestamp("UpdatedAt").toInstant(), types, specialties, credentials,phones,emails,addresses);
                 }
             }
         } catch (SQLException e) {
@@ -1019,6 +1019,7 @@ public final class ContactDao {
                   %s,
                   %s,
                   %s,
+                  %s,
                   %s
                 FROM dbo.Contacts c
                 WHERE c.Id = ?
@@ -1034,6 +1035,7 @@ public final class ContactDao {
                 currentAddressExpression("c", schema.tenantColumn()),
                 optionalDateColumnExpression(schema.dateOfBirthColumn(), "c", "DateOfBirth"),
                 optionalColumnExpression(schema.conditionColumn(), "c", "Condition"),
+                "c.Notes AS Notes",
                 optionalBooleanExpression(schema.deceasedColumn(), "c", "IsDeceased"),
                 optionalBooleanExpression(schema.clientColumn(), "c", "IsClient"),
                 updatedAtExpression(schema.updatedAtColumn(), "c"),
@@ -1063,6 +1065,7 @@ public final class ContactDao {
                         rs.getString("Address"),
                         dob == null ? null : dob.toLocalDate(),
                         rs.getString("Condition"),
+                        rs.getString("Notes"),
                         rs.getBoolean("IsDeceased"),
                         rs.getBoolean("IsClient"),
                         false,

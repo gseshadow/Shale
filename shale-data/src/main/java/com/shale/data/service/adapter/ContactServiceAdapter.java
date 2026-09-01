@@ -59,6 +59,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 						row.address(),
 						row.dateOfBirth() == null ? null : row.dateOfBirth().toString(),
 						row.condition(),
+						row.notes(),
 						row.deceased(),
 						row.client()));
 	}
@@ -130,7 +131,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 				.map(row -> new ClassificationProfile(row.contactId(), row.shaleClientId(),
 						new StructuredName(row.prefix(), row.firstName(), row.middleName(), row.lastName(),
 						row.preferredName(), row.suffix()), row.legacyDisplayName(), row.dateOfBirth(), row.condition(),
-						row.deceased(), row.contactUpdatedAt(),
+						row.notes(), row.deceased(), row.contactUpdatedAt(),
 						row.contactTypes().stream().map(ContactServiceAdapter::assignedDefinition).toList(),
 						row.specialties().stream().map(ContactServiceAdapter::assignedDefinition).toList(),
 						row.credentials().stream().map(ContactServiceAdapter::assignedCredential).toList(),
