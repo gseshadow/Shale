@@ -52,6 +52,7 @@ final class ContactMutationDao {
     void aggregate(UpdateContactProfileCommand c){Objects.requireNonNull(c,"command");tx(c.shaleClientId(),c.actorUserId(),false,con->{
         validateContact(con,c.shaleClientId(),c.contactId());
         validateName(c.displayName(),100,"Display Name");
+        if(c.notes()!=null&&c.notes().length()>CONTACT_NOTES_MAX_CHARS)throw new IllegalArgumentException("Notes exceeds the supported database length.");
         validateName(c.structuredName().prefix(),50,"Prefix"); validateName(c.structuredName().firstName(),100,"First Name");
         validateName(c.structuredName().middleName(),100,"Middle Name"); validateName(c.structuredName().lastName(),100,"Last Name");
         validateName(c.structuredName().preferredName(),100,"Preferred Name"); validateName(c.structuredName().suffix(),50,"Suffix");
@@ -99,6 +100,7 @@ final class ContactMutationDao {
     static String composeAddress(IntendedAddress x){List<String> parts=new ArrayList<>();for(String v:List.of(nvl(x.addressLine1()),nvl(x.addressLine2()),nvl(x.city()),nvl(x.stateOrProvince()),nvl(x.postalCode()),nvl(x.countryCode())))if(!v.isBlank())parts.add(v.trim());String out=String.join(", ",parts);return out.isBlank()?trimNull(x.legacyAddressText()):out;}private static String nvl(String x){return x==null?"":x;}private static String trimNull(String x){return x==null||x.trim().isEmpty()?null:x.trim();}
     private void auditPoint(Connection con,UpdateContactProfileCommand c,EntityActionAuditEvent.EntityType type,long id,EntityActionAuditEvent.Action action,String kind,boolean primary)throws SQLException{audit.append(con,EntityActionAuditEvent.now(c.shaleClientId(),c.actorUserId(),type,id,action,EntityActionAuditEvent.EntityType.CONTACT,(long)c.contactId(),Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,c.contactId(),EntityActionAuditEvent.MetadataKey.KIND,normKind(kind),EntityActionAuditEvent.MetadataKey.PRIMARY,primary)));}
 
+    private static String normalizeNotes(String value){return value==null||value.isBlank()?null:value;}
     private static void validateName(String value,int max,String label){if(value!=null&&value.trim().length()>max)throw new IllegalArgumentException(label+" is too long.");}
     private static boolean blank(String v){return v==null||v.isBlank();}
     private static void prevalidateIntent(Connection con,UpdateContactProfileCommand c,DefinitionCategory k,List<IntendedAssignment> intent)throws SQLException{
@@ -116,7 +118,7 @@ final class ContactMutationDao {
     private void insertAssignment(Connection con,UpdateContactProfileCommand c,DefinitionCategory k,int def)throws SQLException{requireSelectable(con,k,c.shaleClientId(),def);String sql="INSERT dbo."+assignmentTable(k)+" (ShaleClientId,ContactId,"+fk(k)+","+(k==DefinitionCategory.CREDENTIAL?"DisplayOrder,":"")+"CreatedByUserId) OUTPUT INSERTED.Id VALUES (?,?,?,"+(k==DefinitionCategory.CREDENTIAL?"0,":"")+"?)";try(PreparedStatement p=con.prepareStatement(sql)){p.setInt(1,c.shaleClientId());p.setInt(2,c.contactId());p.setInt(3,def);p.setInt(4,c.actorUserId());try(ResultSet r=p.executeQuery()){r.next();auditAssignment(con,c.shaleClientId(),c.actorUserId(),assignmentResult(con,k,r.getLong(1)),EntityActionAuditEvent.Action.ADDED);}}}
     private void updateStructuredContact(Connection con,UpdateContactProfileCommand c)throws SQLException{
         String oldCondition=null;try(PreparedStatement old=con.prepareStatement("SELECT Condition FROM dbo.Contacts WHERE Id=? AND ShaleClientId=?")){old.setInt(1,c.contactId());old.setInt(2,c.shaleClientId());try(ResultSet r=old.executeQuery()){if(r.next())oldCondition=r.getString(1);}}
-        String sql="UPDATE dbo.Contacts SET Name=?,Prefix=?,FirstName=?,MiddleName=?,LastName=?,PreferredName=?,Suffix=?,DateOfBirth=?,Condition=?,IsDeceased=?,UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0 AND "+(c.expectedContactUpdatedAt()==null?"UpdatedAt IS NULL":"UpdatedAt=?");
+        String sql="UPDATE dbo.Contacts SET Name=?,Prefix=?,FirstName=?,MiddleName=?,LastName=?,PreferredName=?,Suffix=?,DateOfBirth=?,Condition=?,Notes=?,IsDeceased=?,UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0 AND "+(c.expectedContactUpdatedAt()==null?"UpdatedAt IS NULL":"UpdatedAt=?");
         try(PreparedStatement p=con.prepareStatement(sql)){
             int i=1;
             setString(p,i++,c.displayName());
@@ -127,7 +129,7 @@ final class ContactMutationDao {
             setString(p,i++,c.structuredName().preferredName());
             setString(p,i++,c.structuredName().suffix());
 			if(c.dateOfBirth()==null)p.setNull(i++,Types.DATE);else p.setDate(i++,java.sql.Date.valueOf(c.dateOfBirth()));
-			setString(p,i++,c.condition());p.setBoolean(i++,c.deceased());
+			setString(p,i++,c.condition());p.setString(i++,normalizeNotes(c.notes()));p.setBoolean(i++,c.deceased());
             p.setInt(i++,c.contactId());
             p.setInt(i++,c.shaleClientId());
             if(c.expectedContactUpdatedAt()!=null)p.setTimestamp(i,Timestamp.from(c.expectedContactUpdatedAt()));

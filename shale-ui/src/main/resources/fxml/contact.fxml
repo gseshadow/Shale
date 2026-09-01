@@ -143,6 +143,16 @@
                             </StackPane>
                         </VBox>
                     </VBox>
+
+                    <VBox fx:id="notesSection" spacing="8" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0" GridPane.columnSpan="2" GridPane.rowIndex="2">
+                        <styleClass>
+                            <String fx:value="secondary-panel" />
+                            <String fx:value="contact-notes-panel" />
+                        </styleClass>
+                        <padding><Insets top="14" right="14" bottom="14" left="14" /></padding>
+                        <Label text="Notes" styleClass="contact-section-title" />
+                        <Label fx:id="notesValue" text="No notes provided." wrapText="true" maxWidth="1.7976931348623157E308" styleClass="case-overview-row-value contact-notes-value" />
+                    </VBox>
                 </GridPane>
             </ScrollPane>
         </StackPane>

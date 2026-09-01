@@ -1345,7 +1345,7 @@ class ApiReadControllerTest {
                 return Optional.empty();
             }
             return Optional.of(new ContactDetail(contactId, shaleClientId, "Ada Lovelace", "Ada", "Lovelace",
-                    "Ada Lovelace", "ada@example.test", "555-0100", "123 Main", "1980-01-02", "Notes", false, true));
+                    "Ada Lovelace", "ada@example.test", "555-0100", "123 Main", "1980-01-02", "Notes", null, false, true));
         }
 
 		@Override public List<Definition> getEffectiveContactTypes(int shaleClientId) { return List.of(); }

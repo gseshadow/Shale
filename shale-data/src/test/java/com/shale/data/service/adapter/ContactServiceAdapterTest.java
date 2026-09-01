@@ -67,7 +67,7 @@ class ContactServiceAdapterTest {
 		Optional<ContactDetail> detail = adapter.getContactDetail(1, 42);
 
 		assertTrue(detail.isPresent());
-		assertEquals(new ContactDetail(1, 42, "Ada Lovelace", "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555", "123 Main", "1815-12-10", "", false, true),
+		assertEquals(new ContactDetail(1, 42, "Ada Lovelace", "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555", "123 Main", "1815-12-10", "", null, false, true),
 				detail.orElseThrow());
 		assertEquals(1, gateway.lastDetailContactId);
 		assertEquals(42, gateway.lastDetailShaleClientId);
@@ -84,9 +84,9 @@ class ContactServiceAdapterTest {
 		byte[] credentialRowVer = { 21, 22 };
 		Instant updatedAt = Instant.parse("2026-08-26T12:00:00Z");
 		gateway.profile = new ContactDao.ClassificationProfileRow(5, 42, "Dr.", "Ada", "Byron", "Lovelace",
-				"Ada", "III", "Ada Lovelace", updatedAt,
+				"Ada", "III", "Ada Lovelace", null, null, "Existing notes", false, updatedAt,
 				List.of(new ContactDao.AssignedDefinitionRow(1001, historical, true, typeRowVer)),
-				List.of(), List.of(new ContactDao.AssignedCredentialRow(1002, credential, 4, false, credentialRowVer)));
+				List.of(), List.of(new ContactDao.AssignedCredentialRow(1002, credential, 4, false, credentialRowVer)), List.of(), List.of(), List.of());
 		typeRowVer[0] = 99;
 		credentialRowVer[0] = 99;
 
@@ -94,6 +94,7 @@ class ContactServiceAdapterTest {
 
 		assertEquals("Ada Lovelace", profile.legacyDisplayName());
 		assertEquals("III", profile.structuredName().suffix());
+		assertEquals("Existing notes", profile.notes());
 		assertEquals(91, profile.contactTypes().get(0).definition().id());
 		assertEquals(1001, profile.contactTypes().get(0).assignmentId());
 		assertArrayEquals(new byte[] { 11, 12 }, profile.contactTypes().get(0).rowVer());
@@ -130,8 +131,8 @@ class ContactServiceAdapterTest {
 		var structuredName = new com.shale.core.service.ContactServicePort.StructuredName(
 				"Dr.", "Ada", "Byron", "Lovelace", "Ada", "III");
 		var command = new com.shale.core.service.ContactServicePort.UpdateContactProfileCommand(
-				5, 42, 7, "Countess Lovelace", structuredName, expectedUpdatedAt,
-				List.of(typeIntent), List.of(specialtyIntent), List.of(credentialOne, credentialTwo));
+				5, 42, 7, "Countess Lovelace", structuredName, null, null, "Private notes", false, expectedUpdatedAt,
+				List.of(typeIntent), List.of(specialtyIntent), List.of(credentialOne, credentialTwo), List.of(), List.of(), List.of());
 
 		ContactDao.DefinitionRow typeDefinition = new ContactDao.DefinitionRow(
 				91, "expert", "Expert", null, "#112233", 0, true, false);
@@ -139,10 +140,10 @@ class ContactServiceAdapterTest {
 				73, "doctor_of_medicine", "Doctor of Medicine", "MD", null, "#445566", 0, true, false);
 		gateway.aggregateReloadProfile = new ContactDao.ClassificationProfileRow(
 				5, 42, "Dr.", "Ada", "Byron", "Lovelace", "Ada", "III", "Countess Lovelace",
-				authoritativeUpdatedAt,
+				null, null, "Authoritative notes", false, authoritativeUpdatedAt,
 				List.of(new ContactDao.AssignedDefinitionRow(1001, typeDefinition, false, new byte[] { 31, 32 })),
 				List.of(), List.of(new ContactDao.AssignedCredentialRow(
-						3002, credentialDefinition, 0, false, new byte[] { 41, 42 })));
+						3002, credentialDefinition, 0, false, new byte[] { 41, 42 })), List.of(), List.of(), List.of());
 
 		var result = new ContactServiceAdapter(gateway).updateContactProfile(command);
 
@@ -152,6 +153,8 @@ class ContactServiceAdapterTest {
 		assertEquals(7, gateway.aggregateCommand.actorUserId());
 		assertEquals("Countess Lovelace", gateway.aggregateCommand.displayName());
 		assertEquals(structuredName, gateway.aggregateCommand.structuredName());
+		assertEquals("Private notes", gateway.aggregateCommand.notes());
+		assertEquals("Authoritative notes", result.profile().notes());
 		assertEquals(expectedUpdatedAt, gateway.aggregateCommand.expectedContactUpdatedAt());
 		assertEquals(List.of(typeIntent), gateway.aggregateCommand.contactTypes());
 		assertEquals(List.of(specialtyIntent), gateway.aggregateCommand.specialties());
@@ -313,7 +316,7 @@ class ContactServiceAdapterTest {
 		private static ContactDao.ContactDetailRow detailRow() {
 			return new ContactDao.ContactDetailRow(1, 42, "Ada Lovelace", "Ada", "Lovelace",
 					"Ada Lovelace", "ada@example.com", "555", "123 Main", LocalDate.of(1815, 12, 10),
-					"", false, true, false, Instant.now());
+					"", null, false, true, false, Instant.now());
 		}
 	}
 }
