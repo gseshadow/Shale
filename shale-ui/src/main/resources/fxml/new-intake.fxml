@@ -222,7 +222,7 @@
         </ScrollPane>
 
         <HBox spacing="10" alignment="CENTER_RIGHT">
-            <Button fx:id="cancelButton" text="Cancel" onAction="#onCancel">
+            <Button fx:id="cancelButton" text="Cancel" cancelButton="true" onAction="#onCancel">
                 <styleClass>
                     <String fx:value="button" />
                     <String fx:value="app-toolbar-button" />

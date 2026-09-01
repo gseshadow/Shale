@@ -61,6 +61,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ArrayList;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
@@ -154,6 +155,7 @@ public final class NewIntakeController {
 	private Stage stage;
 	private Consumer<Integer> onCaseCreated;
 	private boolean saving;
+	private boolean successfulCompletion;
 	private final ExecutorService intakeSaveExecutor = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "new-intake-save");
 		t.setDaemon(true);
@@ -215,7 +217,7 @@ public final class NewIntakeController {
 				datesExecutor.shutdownNow();
 			});
 			this.stage.setOnCloseRequest(event -> {
-				if (!confirmDiscardIfDirty()) {
+				if (!mayCloseIntake()) {
 					event.consume();
 				}
 			});
@@ -956,7 +958,7 @@ public final class NewIntakeController {
 	}
 
 	private void handleCreateSuccess(int tenantId, CaseDao.NewIntakeCreateResult result) {
-		captureInitialSnapshot();
+		successfulCompletion = true;
 		deleteLocalDraftIfPresent();
 		System.out.println("[NewIntakeController] create succeeded tenant=" + tenantId + " caseId=" + result.caseId());
 		if (result.createdCaseDateCount() > 0 && runtimeBridge != null && appState != null
@@ -1277,20 +1279,28 @@ public final class NewIntakeController {
 		requestClose();
 	}
 
-	private void requestClose() {
-		if (stage != null && confirmDiscardIfDirty()) {
+	public void requestClose() {
+		if (stage != null && mayCloseIntake()) {
 			stage.close();
 		}
 	}
 
-	private boolean confirmDiscardIfDirty() {
+	private boolean mayCloseIntake() {
+		return evaluateClosePolicy(successfulCompletion, saving, hasUnsavedChanges(),
+				this::confirmDiscard, () -> showValidation("Create Intake is in progress. Please wait."));
+	}
+
+	static boolean evaluateClosePolicy(boolean successfulCompletion, boolean saving, boolean dirty,
+			BooleanSupplier confirmDiscard, Runnable savingWarning) {
+		if (successfulCompletion) return true;
 		if (saving) {
-			showValidation("Create Intake is in progress. Please wait.");
+			savingWarning.run();
 			return false;
 		}
-		if (!hasUnsavedChanges()) {
-			return true;
-		}
+		return !dirty || confirmDiscard.getAsBoolean();
+	}
+
+	private boolean confirmDiscard() {
 		Optional<Boolean> decision = AppDialogs.showChoice(
 				stage,
 				"Discard New Intake?",
