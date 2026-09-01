@@ -16,6 +16,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
+import com.shale.ui.component.EnhancedTextArea;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
 
@@ -34,7 +35,7 @@ public final class NewOrganizationController {
     @FXML private TextField stateField;
     @FXML private TextField postalCodeField;
     @FXML private TextField countryField;
-    @FXML private TextArea notesArea;
+    @FXML private EnhancedTextArea notesArea;
     @FXML private Button cancelButton;
     @FXML private Button createOrganizationButton;
 
@@ -57,7 +58,7 @@ public final class NewOrganizationController {
         ControlStyles.apply(createOrganizationButton, ControlStyles.Purpose.PRIMARY);
         ControlStyles.formControl(organizationTypeComboBox);
         for (var control : List.of(nameField, phoneField, faxField, emailField, websiteField,
-                address1Field, address2Field, cityField, stateField, postalCodeField, countryField, notesArea)) {
+                address1Field, address2Field, cityField, stateField, postalCodeField, countryField)) {
             ControlStyles.formControl(control);
         }
         if (organizationTypeComboBox != null) {

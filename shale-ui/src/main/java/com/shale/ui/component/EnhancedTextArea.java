@@ -32,6 +32,7 @@ import javafx.scene.shape.SVGPath;
 import javafx.stage.Window;
 
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /** Reusable plain-text multiline editor with transactional pop-out editing and offline spelling assistance. */
 public class EnhancedTextArea extends VBox {
@@ -138,14 +139,25 @@ public class EnhancedTextArea extends VBox {
 
     private void showExpandedEditor() {
         if (!canExpand()) return;
-        ExpandedTextEdit edit = createExpandedEdit();
+        openEditor(getScene() == null ? null : getScene().getWindow(), expandedDialogTitle(), getText(),
+                isSpellCheckEnabled(), this::setText);
+    }
+
+    /**
+     * Opens the shared transactional narrative editor for a read-only/detail view.
+     * The callback is invoked only after Apply; closing or cancelling never mutates the value.
+     */
+    public static void openEditor(Window owner, String title, String currentValue, Consumer<String> onApply) {
+        openEditor(owner, title, currentValue, true, onApply);
+    }
+
+    static void openEditor(Window owner, String title, String currentValue, boolean spellCheck, Consumer<String> onApply) {
         Dialog<String> dialog = new Dialog<>();
-        Window owner = getScene() == null ? null : getScene().getWindow();
         if (owner != null) dialog.initOwner(owner);
-        String title = expandedDialogTitle();
-        dialog.setTitle(title);
-        AppDialogs.applySecondaryDialogShell(dialog, title);
-        RichTextExpandedEditor expanded = new RichTextExpandedEditor(edit.draft(), spellChecker, isSpellCheckEnabled());
+        String resolvedTitle = title == null || title.isBlank() ? "Edit text" : title;
+        dialog.setTitle(resolvedTitle);
+        AppDialogs.applySecondaryDialogShell(dialog, resolvedTitle);
+        RichTextExpandedEditor expanded = new RichTextExpandedEditor(currentValue, UserDictionarySession.current().checker(), spellCheck);
         expanded.setPrefSize(760, 440);
         Label shortcutHint = new Label("Ctrl+Enter to Apply");
         shortcutHint.getStyleClass().add("enhanced-text-area-dialog-hint");
@@ -166,7 +178,7 @@ public class EnhancedTextArea extends VBox {
         dialog.setOnShown(event -> Platform.runLater(() -> expanded.area().requestFocus()));
         dialog.setOnHidden(event -> expanded.dispose());
         Optional<String> result = dialog.showAndWait();
-        result.ifPresent(value -> { edit.setDraft(value); applyExpandedEdit(edit); });
+        result.ifPresent(onApply);
     }
 
     private ContextMenu spellingMenu() {

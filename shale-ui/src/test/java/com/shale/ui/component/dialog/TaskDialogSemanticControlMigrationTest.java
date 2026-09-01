@@ -43,13 +43,16 @@ final class TaskDialogSemanticControlMigrationTest {
         String detail = Files.readString(DETAIL);
         String picker = Files.readString(PICKER);
 
-        for (String control : new String[] {"titleField", "descriptionArea", "dueDatePicker", "dueTimeField", "priorityComboBox"}) {
+        for (String control : new String[] {"titleField", "dueDatePicker", "dueTimeField", "priorityComboBox"}) {
             assertTrue(create.contains("ControlStyles.formControl(" + control + ")"), control);
         }
-        for (String control : new String[] {"titleField", "descriptionArea", "dueDatePicker", "dueTimeField",
+        for (String control : new String[] {"titleField", "dueDatePicker", "dueTimeField",
                 "statusCombo", "priorityCombo", "noteComposer", "editArea"}) {
             assertTrue(detail.contains("ControlStyles.formControl(" + control + ")"), control);
         }
+
+        assertEnhancedDescriptionContract(create, "descriptionLabel,\n                descriptionArea");
+        assertEnhancedDescriptionContract(detail, "new Label(\"Description\"), descriptionArea");
         assertTrue(create.contains("ControlStyles.setInvalid(titleField, true)"));
         assertTrue(create.contains("ControlStyles.setInvalid(dueTimeField, true)"));
         assertTrue(detail.contains("validationVisible[0] = true"));
@@ -96,6 +99,17 @@ final class TaskDialogSemanticControlMigrationTest {
         String rule = css.substring(selector, close);
         assertTrue(rule.contains("-fx-background-radius: 0 0 16 16;"));
         assertTrue(rule.contains("-fx-border-radius: 0 0 16 16;"));
+    }
+
+    private static void assertEnhancedDescriptionContract(String source, String formPlacement) {
+        assertTrue(source.contains("import com.shale.ui.component.EnhancedTextArea;"));
+        assertTrue(source.contains("EnhancedTextArea descriptionArea = new EnhancedTextArea()"));
+        assertTrue(source.contains("descriptionArea.setEditorTitle(\"Task Description\")"));
+        assertTrue(source.contains(formPlacement), "descriptionArea should remain in the task form shell");
+        assertTrue(source.contains("descriptionArea.getText()"), "Save should retain the enhanced description draft");
+        assertFalse(source.contains("TextArea descriptionArea"), "task description must not regress to raw TextArea");
+        assertFalse(source.contains("ControlStyles.formControl(descriptionArea)"),
+                "EnhancedTextArea owns semantic styling for its internal control");
     }
 
     private static void assertSemantic(String source, String variable, String purpose) {
