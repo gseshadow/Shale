@@ -227,8 +227,15 @@ final class MaterialRequestCardFactoryRenderingTest {
 			assertEquals(Region.USE_PREF_SIZE, rendered.card().getMaxHeight(), 0.1,
 					"The card should refuse parent-provided spare height and use its computed content height.");
 
-			assertTrue(facts.getBoundsInParent().getMaxY() <= rendered.body().getHeight() - rendered.body().getPadding().getBottom() + 0.5,
-					"Facts remain fully visible inside modest bottom padding.");
+			assertTrue(facts.getChildren().stream().allMatch(fact ->
+					fact.getBoundsInParent().getMaxY() <= facts.getHeight() + 0.5),
+					"Every fact must remain inside the FlowPane's computed layout bounds.");
+			Node finalContent = rendered.body().getChildren().get(rendered.body().getChildren().size() - 1);
+			assertTrue(finalContent.getBoundsInParent().getMaxY()
+					<= rendered.body().getHeight() - rendered.body().getPadding().getBottom() + 0.5,
+					"All content, including a due notice after the facts, must remain visible above the bottom padding.");
+			assertEquals(10.0, rendered.body().getPadding().getBottom(), 0.1,
+					"The card retains its modest bottom padding rather than reserving workaround space.");
 			assertEquals(18.0, facts.getHgap(), 0.1);
 			assertEquals(7.0, facts.getVgap(), 0.1);
 			double computedBodyHeight = rendered.body().prefHeight(rendered.body().getWidth());
