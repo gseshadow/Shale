@@ -132,7 +132,7 @@ final class CaseSectionNavigationSelectionTest {
             assertEquals(ScrollPane.ScrollBarPolicy.AS_NEEDED, scroll.getHbarPolicy());
             assertEquals(ScrollPane.ScrollBarPolicy.NEVER, scroll.getVbarPolicy());
             assertFalse(scroll.isFitToWidth());
-            assertTrue(tabRow.getLayoutBounds().getWidth() > viewport.getWidth(),
+            assertTrue(tabRow.getLayoutBounds().getWidth() > scroll.getViewportBounds().getWidth(),
                     "The fixture must make the actual Case navigation row wider than its viewport. "
                             + geometry(scroll, tabRow));
 
