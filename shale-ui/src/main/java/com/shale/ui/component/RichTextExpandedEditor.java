@@ -5,6 +5,7 @@ import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.component.spellcheck.LocalSpellChecker;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Orientation;
+import javafx.geometry.Point2D;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
 import javafx.scene.layout.Priority;
@@ -127,31 +128,40 @@ final class RichTextExpandedEditor extends VBox {
     }
 
     private void installContextMenu() {
-        ContextMenu menu = new ContextMenu(); area.setContextMenu(menu);
-        // RichTextFX does not promise to move the caret for a secondary click. Resolve the
-        // character beneath the pointer directly, before JavaFX asks the menu to show.
+        ContextMenu menu = new ContextMenu();
+        // Observe the semantic request before RichTextFX handlers, then explicitly show the
+        // sole editor menu rather than relying on GenericStyledArea to show a menu property.
         area.addEventFilter(ContextMenuEvent.CONTEXT_MENU_REQUESTED, event -> {
             refreshSpelling();
-            CharacterHit hit = area.hit(event.getX(), event.getY());
-            contextMenuPosition = hit.getCharacterIndex().orElse(hit.getInsertionIndex());
-        });
-        menu.setOnShowing(e -> {
-            menu.getItems().clear();
-            LocalSpellChecker.Misspelling hit = misspellingAt(misspellings, contextMenuPosition);
-            if (hit != null) {
-                List<String> suggestions = checker.suggestions(hit.word(), 5);
-                if (suggestions.isEmpty()) { MenuItem none = new MenuItem("No suggestions"); none.setDisable(true); menu.getItems().add(none); }
-                else for (String suggestion : suggestions) { MenuItem item = new MenuItem(suggestion); item.setOnAction(x -> replaceMisspelling(hit, suggestion)); menu.getItems().add(item); }
-                MenuItem ignore = new MenuItem("Ignore"); ignore.setOnAction(x -> { checker.ignore(hit.word()); refreshSpelling(); });
-                MenuItem add = new MenuItem("Add to dictionary"); add.setOnAction(x -> { checker.addToCustomDictionary(hit.word()); refreshSpelling(); });
-                menu.getItems().addAll(new SeparatorMenuItem(), ignore, add, new SeparatorMenuItem());
+            int position;
+            if (event.isKeyboardTrigger()) position = area.getCaretPosition();
+            else {
+                Point2D local = area.screenToLocal(event.getScreenX(), event.getScreenY());
+                CharacterHit pointerHit = area.hit(local.getX(), local.getY());
+                position = pointerHit.getCharacterIndex().orElse(pointerHit.getInsertionIndex());
             }
-            MenuItem cut = new MenuItem("Cut"); cut.setDisable(area.getSelection().getLength() == 0); cut.setOnAction(x -> area.cut());
-            MenuItem copy = new MenuItem("Copy"); copy.setDisable(area.getSelection().getLength() == 0); copy.setOnAction(x -> area.copy());
-            MenuItem paste = new MenuItem("Paste"); paste.setDisable(!Clipboard.getSystemClipboard().hasString()); paste.setOnAction(x -> area.paste());
-            MenuItem selectAll = new MenuItem("Select All"); selectAll.setDisable(area.getLength() == 0); selectAll.setOnAction(x -> area.selectAll());
-            menu.getItems().addAll(cut, copy, paste, selectAll);
+            populateContextMenu(menu, misspellingAt(misspellings, position));
+            if (menu.isShowing()) menu.hide();
+            menu.show(area, event.getScreenX(), event.getScreenY());
+            event.consume();
         });
+    }
+
+    private void populateContextMenu(ContextMenu menu, LocalSpellChecker.Misspelling hit) {
+        menu.getItems().clear();
+        if (hit != null) {
+            List<String> suggestions = checker.suggestions(hit.word(), 5);
+            if (suggestions.isEmpty()) { MenuItem none = new MenuItem("No suggestions"); none.setDisable(true); menu.getItems().add(none); }
+            else for (String suggestion : suggestions) { MenuItem item = new MenuItem(suggestion); item.setOnAction(x -> replaceMisspelling(hit, suggestion)); menu.getItems().add(item); }
+            MenuItem ignore = new MenuItem("Ignore"); ignore.setOnAction(x -> { checker.ignore(hit.word()); refreshSpelling(); });
+            MenuItem add = new MenuItem("Add to dictionary"); add.setOnAction(x -> { checker.addToCustomDictionary(hit.word()); refreshSpelling(); });
+            menu.getItems().addAll(new SeparatorMenuItem(), ignore, add, new SeparatorMenuItem());
+        }
+        MenuItem cut = new MenuItem("Cut"); cut.setDisable(area.getSelection().getLength() == 0); cut.setOnAction(x -> area.cut());
+        MenuItem copy = new MenuItem("Copy"); copy.setDisable(area.getSelection().getLength() == 0); copy.setOnAction(x -> area.copy());
+        MenuItem paste = new MenuItem("Paste"); paste.setDisable(!Clipboard.getSystemClipboard().hasString()); paste.setOnAction(x -> area.paste());
+        MenuItem selectAll = new MenuItem("Select All"); selectAll.setDisable(area.getLength() == 0); selectAll.setOnAction(x -> area.selectAll());
+        menu.getItems().addAll(cut, copy, paste, selectAll);
     }
 
     private void replaceMisspelling(LocalSpellChecker.Misspelling misspelling, String suggestion) {
