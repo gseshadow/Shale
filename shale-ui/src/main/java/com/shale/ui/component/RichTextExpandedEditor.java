@@ -3,6 +3,8 @@ package com.shale.ui.component;
 import com.shale.ui.component.richtext.NarrativeDocument;
 import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.component.spellcheck.LocalSpellChecker;
+import com.shale.ui.component.spellcheck.UserDictionarySession;
+import com.shale.ui.component.dialog.AppDialogs;
 import javafx.animation.PauseTransition;
 import javafx.beans.value.ChangeListener;
 import javafx.geometry.Orientation;
@@ -202,7 +204,7 @@ final class RichTextExpandedEditor extends VBox {
             if (suggestions.isEmpty()) { MenuItem none = new MenuItem("No suggestions"); none.setDisable(true); menu.getItems().add(none); }
             else for (String suggestion : suggestions) { MenuItem item = new MenuItem(suggestion); item.setOnAction(x -> replaceMisspelling(hit, suggestion)); menu.getItems().add(item); }
             MenuItem ignore = new MenuItem("Ignore"); ignore.setOnAction(x -> { checker.ignore(hit.word()); refreshSpelling(); });
-            MenuItem add = new MenuItem("Add to dictionary"); add.setOnAction(x -> { checker.addToCustomDictionary(hit.word()); refreshSpelling(); });
+            MenuItem add = new MenuItem("Add to dictionary"); add.setOnAction(x -> persistWord(hit.word()));
             menu.getItems().addAll(new SeparatorMenuItem(), ignore, add, new SeparatorMenuItem());
         }
         MenuItem cut = new MenuItem("Cut"); cut.setDisable(area.getSelection().getLength() == 0); cut.setOnAction(x -> area.cut());
@@ -210,6 +212,11 @@ final class RichTextExpandedEditor extends VBox {
         MenuItem paste = new MenuItem("Paste"); paste.setDisable(!Clipboard.getSystemClipboard().hasString()); paste.setOnAction(x -> area.paste());
         MenuItem selectAll = new MenuItem("Select All"); selectAll.setDisable(area.getLength() == 0); selectAll.setOnAction(x -> area.selectAll());
         menu.getItems().addAll(cut, copy, paste, selectAll);
+    }
+
+    private void persistWord(String word) {
+        try { UserDictionarySession.current().add(word); refreshSpelling(); }
+        catch (RuntimeException ex) { AppDialogs.showError(getScene()==null?null:getScene().getWindow(), "Custom dictionary", "The word could not be saved. Check your connection and try again."); refreshSpelling(); }
     }
 
     private void replaceMisspelling(LocalSpellChecker.Misspelling misspelling, String suggestion) {

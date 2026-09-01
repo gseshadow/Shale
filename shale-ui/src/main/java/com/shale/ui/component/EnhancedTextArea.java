@@ -2,7 +2,7 @@ package com.shale.ui.component;
 
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.spellcheck.LocalSpellChecker;
-import com.shale.ui.component.spellcheck.ShaleDictionary;
+import com.shale.ui.component.spellcheck.UserDictionarySession;
 import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.util.ControlStyles;
 import javafx.beans.property.BooleanProperty;
@@ -43,7 +43,7 @@ public class EnhancedTextArea extends VBox {
     private final BooleanProperty editable = new javafx.beans.property.SimpleBooleanProperty(this, "editable", true);
     private boolean updatingProjection;
 
-    public EnhancedTextArea() { this(ShaleDictionary.create()); }
+    public EnhancedTextArea() { this(UserDictionarySession.current().checker()); }
 
     EnhancedTextArea(LocalSpellChecker spellChecker) {
         this.spellChecker = spellChecker;
@@ -112,7 +112,10 @@ public class EnhancedTextArea extends VBox {
     public ExpandedTextEdit createExpandedEdit() { return new ExpandedTextEdit(getText()); }
     public void applyExpandedEdit(ExpandedTextEdit edit) { if (edit != null && canExpand()) setText(edit.draft()); }
     /** Adds a session/user supplied term without altering the bundled dictionary. */
-    public void addToCustomDictionary(String word) { spellChecker.addToCustomDictionary(word); refreshSpellCheck(); }
+    public void addToCustomDictionary(String word) {
+        try { UserDictionarySession.current().add(word); refreshSpellCheck(); }
+        catch (RuntimeException ex) { AppDialogs.showError(getScene()==null?null:getScene().getWindow(), "Custom dictionary", "The word could not be saved. Check your connection and try again."); }
+    }
     /** Ignores a term for this checker session. */
     public void ignoreSpelling(String word) { spellChecker.ignore(word); refreshSpellCheck(); }
 
