@@ -113,10 +113,17 @@ final class CaseSectionNavigationSelectionTest {
                     "The measured strip must be the Overview/Details/etc. navigation row.");
             assertEquals(Region.USE_PREF_SIZE, scroll.getMinHeight());
             assertEquals(Region.USE_COMPUTED_SIZE, scroll.getPrefHeight());
-            assertEquals(Double.MAX_VALUE, scroll.getMaxHeight());
+            assertEquals(Region.USE_COMPUTED_SIZE, scroll.getMaxHeight(),
+                    "The navigation viewport should retain JavaFX computed sizing rather than claim unbounded vertical growth.");
+            assertEquals(42, scroll.getPrefViewportHeight(), 0.1,
+                    "The Case-specific viewport must reserve the 30px pill height plus 6px clearance on each side.");
             assertFalse(scroll.isFitToHeight(),
                     "The ScrollPane must not force the navigation content down to a short viewport height.");
             assertTrue(scroll.minHeight(-1) >= scroll.prefHeight(-1));
+            assertEquals(6, tabRow.getPadding().getTop());
+            assertEquals(6, tabRow.getPadding().getBottom());
+            assertTrue(viewport.getHeight() + 0.5 >= tabRow.getHeight(),
+                    "The navigation viewport must accommodate the complete padded row.");
 
             for (Map.Entry<String, Button> entry : loaded.tabs().entrySet()) {
                 Button tab = entry.getValue();
