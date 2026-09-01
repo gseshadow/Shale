@@ -414,15 +414,18 @@ public final class CaseDao {
 					buildFullName(request.clientFirstName(), request.clientLastName()),
 					request.clientFirstName(),
 					request.clientLastName(),
-					request.clientAddress(),
-					request.clientPhone(),
-					request.clientEmail(),
 					request.clientDateOfBirth(),
 					request.clientCondition(),
 					request.clientDeceased(),
 					true,
 					request.shaleClientId(),
 					now);
+			insertIntakeContactPoints(con, request, clientContactId, request.clientPhone(),
+					request.clientEmail(), request.clientAddress());
+			if (request.createdByUserId() != null && normalizeOptional(request.clientCondition()) != null) {
+				phiAuditService.auditUpdate(con, request.createdByUserId(), "Contacts", "Condition",
+						(long) clientContactId, null, normalizeOptional(request.clientCondition()));
+			}
 
 			int callerContactId = resolveCallerContactId(con, request, clientContactId, now);
 			System.out.println("[IntakeCreate] contacts created clientContactId=" + clientContactId + " callerContactId=" + callerContactId);
@@ -445,9 +448,6 @@ public final class CaseDao {
 								buildFullName(pending.contactFirstName(), pending.contactLastName()),
 								pending.contactFirstName(),
 								pending.contactLastName(),
-								null,
-								null,
-								null,
 								null,
 								null,
 								false,
@@ -760,15 +760,22 @@ public final class CaseDao {
 				buildFullName(request.callerFirstName(), request.callerLastName()),
 				request.callerFirstName(),
 				request.callerLastName(),
-				request.callerAddress(),
-				request.callerPhone(),
-				request.callerEmail(),
 				null,
 				null,
 				false,
 				false,
 				request.shaleClientId(),
-				now);
+				now, request);
+	}
+
+	private int insertContact(Connection con, String name, String firstName, String lastName,
+			LocalDate dateOfBirth, String condition, boolean isDeceased, boolean isClient,
+			int shaleClientId, Timestamp now, NewIntakeCreateRequest request) throws SQLException {
+		int contactId = insertContact(con, name, firstName, lastName, dateOfBirth, condition,
+				isDeceased, isClient, shaleClientId, now);
+		insertIntakeContactPoints(con, request, contactId, request.callerPhone(), request.callerEmail(),
+				request.callerAddress());
+		return contactId;
 	}
 
 	private int insertOrganization(Connection con, int shaleClientId, Integer organizationTypeId, String organizationName, Timestamp now) throws SQLException {
@@ -807,9 +814,6 @@ public final class CaseDao {
 			String name,
 			String firstName,
 			String lastName,
-			String addressHome,
-			String phoneCell,
-			String emailPersonal,
 			LocalDate dateOfBirth,
 			String condition,
 			boolean isDeceased,
@@ -821,9 +825,6 @@ public final class CaseDao {
 				  Name,
 				  FirstName,
 				  LastName,
-				  AddressHome,
-				  PhoneCell,
-				  EmailPersonal,
 				  DateOfBirth,
 				  Condition,
 				  IsDeceased,
@@ -834,7 +835,7 @@ public final class CaseDao {
 				  ShaleClientId
 				)
 				OUTPUT INSERTED.Id
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?);
+				VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?);
 				""";
 
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -842,9 +843,6 @@ public final class CaseDao {
 			setNullableString(ps, i++, name);
 			setNullableString(ps, i++, firstName);
 			setNullableString(ps, i++, lastName);
-			setNullableString(ps, i++, addressHome);
-			setNullableString(ps, i++, phoneCell);
-			setNullableString(ps, i++, emailPersonal);
 			setNullableDate(ps, i++, dateOfBirth);
 			setNullableString(ps, i++, condition);
 			ps.setBoolean(i++, isDeceased);
@@ -859,6 +857,78 @@ public final class CaseDao {
 				return rs.getInt(1);
 			}
 		}
+	}
+
+	private void insertIntakeContactPoints(Connection con, NewIntakeCreateRequest request, int contactId,
+			String phone, String email, String address) throws SQLException {
+		insertIntakeContactPoint(con, request, contactId, "ContactPhoneNumbers",
+				"DisplayNumber,NormalizedNumber", "MOBILE", normalizeOptional(phone), normalizePhone(phone),
+				EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER);
+		insertIntakeContactPoint(con, request, contactId, "ContactEmailAddresses",
+				"EmailAddress,NormalizedEmail", "PERSONAL", normalizeOptional(email), normalizeEmail(email),
+				EntityActionAuditEvent.EntityType.CONTACT_EMAIL_ADDRESS);
+		insertIntakeContactPoint(con, request, contactId, "ContactAddresses",
+				"LegacyAddressText", "HOME", normalizeOptional(address),
+				EntityActionAuditEvent.EntityType.CONTACT_ADDRESS);
+		if (request.createdByUserId() != null) {
+			entityActionAuditDao.append(con, EntityActionAuditEvent.now(request.shaleClientId(),
+					request.createdByUserId(), EntityActionAuditEvent.EntityType.CONTACT, contactId,
+					EntityActionAuditEvent.Action.CREATED, null, null,
+					Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID, contactId)));
+		}
+	}
+
+	private void insertIntakeContactPoint(Connection con, NewIntakeCreateRequest request, int contactId,
+			String table, String valueColumns, String kind, String value,
+			EntityActionAuditEvent.EntityType entityType) throws SQLException {
+		insertIntakeContactPoint(con, request, contactId, table, valueColumns, kind, value, null, entityType);
+	}
+
+	private void insertIntakeContactPoint(Connection con, NewIntakeCreateRequest request, int contactId,
+			String table, String valueColumns, String kind, String firstValue, String secondValue,
+			EntityActionAuditEvent.EntityType entityType) throws SQLException {
+		if (firstValue == null) return;
+		String placeholders = secondValue == null ? "?" : "?,?";
+		String sql = "INSERT dbo." + table + " (ShaleClientId,ContactId,Kind," + valueColumns
+				+ ",IsPrimary,SortOrder,CreatedByUserId) OUTPUT INSERTED.Id VALUES (?,?,?," + placeholders + ",1,0,?)";
+		long pointId;
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int i = 1;
+			ps.setInt(i++, request.shaleClientId());
+			ps.setInt(i++, contactId);
+			ps.setString(i++, kind);
+			ps.setString(i++, firstValue);
+			if (secondValue != null) ps.setString(i++, secondValue);
+			if (request.createdByUserId() == null) ps.setNull(i, java.sql.Types.INTEGER);
+			else ps.setInt(i, request.createdByUserId());
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) throw new SQLException("Failed to create structured Contact information.");
+				pointId = rs.getLong(1);
+			}
+		}
+		if (request.createdByUserId() != null) {
+			entityActionAuditDao.append(con, EntityActionAuditEvent.now(request.shaleClientId(),
+					request.createdByUserId(), entityType, pointId, EntityActionAuditEvent.Action.CREATED,
+					EntityActionAuditEvent.EntityType.CONTACT, (long) contactId,
+					Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID, contactId,
+							EntityActionAuditEvent.MetadataKey.KIND, kind,
+							EntityActionAuditEvent.MetadataKey.PRIMARY, true)));
+		}
+	}
+
+	private static String normalizeOptional(String value) {
+		if (value == null || value.trim().isEmpty()) return null;
+		return value.trim();
+	}
+
+	private static String normalizePhone(String value) {
+		String normalized = normalizeOptional(value);
+		return normalized == null ? null : normalized.replaceAll("[^0-9+]", "");
+	}
+
+	private static String normalizeEmail(String value) {
+		String normalized = normalizeOptional(value);
+		return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
 	}
 
 	private long insertCase(Connection con, NewIntakeCreateRequest request, Timestamp now) throws SQLException {
