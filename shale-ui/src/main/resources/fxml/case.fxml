@@ -54,7 +54,11 @@
 				<Insets top="10" right="12" bottom="12" left="12" />
 			</padding>
 			<ScrollPane fitToHeight="true" fitToWidth="false" hbarPolicy="AS_NEEDED"
-				vbarPolicy="NEVER" pannable="true" styleClass="app-section-tabs-scroll page-header-surface">
+				vbarPolicy="NEVER" pannable="true">
+				<styleClass>
+					<String fx:value="app-section-tabs-scroll" />
+					<String fx:value="page-header-surface" />
+				</styleClass>
 				<HBox fx:id="sectionTabsBar" spacing="8.0" alignment="CENTER_LEFT" />
 			</ScrollPane>
 			<StackPane fx:id="contentHost" VBox.vgrow="ALWAYS">
