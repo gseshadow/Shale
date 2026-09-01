@@ -1,5 +1,6 @@
 package com.shale.ui.component.dialog;
 
+import com.shale.ui.component.EnhancedTextArea;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -101,10 +102,10 @@ public final class TaskDetailDialog {
 
         TextField titleField = new TextField(safe(model.title()));
         ControlStyles.formControl(titleField);
-        TextArea descriptionArea = new TextArea(safe(model.description()));
-        ControlStyles.formControl(descriptionArea);
+        EnhancedTextArea descriptionArea = new EnhancedTextArea();
+        descriptionArea.setText(safe(model.description()));
         descriptionArea.setPrefRowCount(4);
-        descriptionArea.setWrapText(true);
+        descriptionArea.setEditorTitle("Task Description");
 
         DatePicker dueDatePicker = new DatePicker(model.dueAt() == null ? null : model.dueAt().toLocalDate());
         ControlStyles.formControl(dueDatePicker);

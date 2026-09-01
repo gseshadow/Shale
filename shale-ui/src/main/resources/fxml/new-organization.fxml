@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import com.shale.ui.component.EnhancedTextArea?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
@@ -71,7 +72,7 @@
                             <TextField fx:id="countryField" GridPane.rowIndex="11" GridPane.columnIndex="1" />
 
                             <Label text="Notes" GridPane.rowIndex="12" />
-                            <TextArea fx:id="notesArea" prefRowCount="4" wrapText="true" GridPane.rowIndex="12" GridPane.columnIndex="1" />
+                            <EnhancedTextArea fx:id="notesArea" editorTitle="Organization Notes" prefRowCount="4" GridPane.rowIndex="12" GridPane.columnIndex="1" />
                         </GridPane>
                     </VBox>
                 </VBox>
