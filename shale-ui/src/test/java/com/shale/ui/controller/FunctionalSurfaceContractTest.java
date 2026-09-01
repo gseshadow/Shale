@@ -16,6 +16,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
 
 class FunctionalSurfaceContractTest {
     private static final Path FXML = Path.of("src/main/resources/fxml");
@@ -27,7 +28,7 @@ class FunctionalSurfaceContractTest {
         String app = Files.readString(Path.of("src/main/resources/css/app.css"));
 
         assertTrue(colors.contains("-shale-color-page-header-surface: rgba(239, 246, 253, 0.90)"));
-        assertTrue(colors.contains("-shale-color-functional-content-surface: rgba(242, 248, 255, 0.88)"));
+        assertTrue(colors.contains("-shale-color-functional-content-surface: rgba(190, 208, 220, 0.94)"));
         assertTrue(surfaces.contains(".page-header-surface"));
         assertTrue(surfaces.contains(".primary-content-surface"));
         assertTrue(surfaces.contains(".content-surface"));
@@ -56,7 +57,10 @@ class FunctionalSurfaceContractTest {
             Region surface = (Region) root.lookup(".primary-content-surface");
             StackPane outlet = (StackPane) loader.getNamespace().get("sectionContent");
             assertTrue(surface != null && surface.getBackground() != null);
-            assertTrue(surface.getBackground().getFills().getFirst().getFill().isOpaque() == false);
+            Color workspaceColor = (Color) surface.getBackground().getFills().getFirst().getFill();
+            assertTrue(workspaceColor.equals(Color.rgb(190, 208, 220, 0.94)),
+                    "the shared workspace must use the darker semantic functional-content color");
+            assertTrue(workspaceColor.isOpaque() == false);
             assertTrue(isAncestor(surface, outlet), "the routed view outlet must be inside the workspace surface");
 
             for (String view : new String[] {
