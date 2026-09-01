@@ -20,6 +20,8 @@ import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.ContactDao.ContactDetailRow;
 import com.shale.data.dao.CaseSummaryDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.EnhancedTextArea;
+import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseLinkCardFactory;
@@ -349,9 +351,10 @@ public final class ContactViewController {
         ButtonType save=new ButtonType("Save",ButtonData.OK_DONE),reload=new ButtonType("Reload",ButtonData.OTHER);dialog.getDialogPane().getButtonTypes().addAll(save,reload,ButtonType.CANCEL);
         var p=classificationProfile;var sn=p.structuredName();
         TextField display=new TextField(safe(p.legacyDisplayName())),prefix=new TextField(safe(sn.prefix())),first=new TextField(safe(sn.firstName())),middle=new TextField(safe(sn.middleName())),last=new TextField(safe(sn.lastName())),preferred=new TextField(safe(sn.preferredName())),suffix=new TextField(safe(sn.suffix()));
-        DatePicker birth=new DatePicker(p.dateOfBirth());TextArea condition=new TextArea(safe(p.condition()));condition.setWrapText(true);condition.setPrefRowCount(4);TextArea notes=new TextArea(safe(p.notes()));notes.setWrapText(true);notes.setPrefRowCount(6);CheckBox deceased=new CheckBox("This contact is deceased");deceased.setSelected(p.deceased());
+        DatePicker birth=new DatePicker(p.dateOfBirth());EnhancedTextArea condition=contactNarrativeEditor(p.condition(),"Condition",4);EnhancedTextArea notes=contactNarrativeEditor(p.notes(),"Contact Notes",6);CheckBox deceased=new CheckBox("This contact is deceased");deceased.setSelected(p.deceased());
         Label preview=new Label();preview.setWrapText(true);preview.getStyleClass().add("contact-editor-name-preview");
-        for(javafx.scene.control.Control field:List.of(display,prefix,first,middle,last,preferred,suffix,birth,condition,notes,deceased)){ControlStyles.formControl(field);field.setMaxWidth(Double.MAX_VALUE);}
+        for(javafx.scene.control.Control field:List.of(display,prefix,first,middle,last,preferred,suffix,birth,deceased)){ControlStyles.formControl(field);field.setMaxWidth(Double.MAX_VALUE);}
+        condition.setMaxWidth(Double.MAX_VALUE);notes.setMaxWidth(Double.MAX_VALUE);
         GridPane details=new GridPane();details.setHgap(12);details.setVgap(9);details.getStyleClass().add("contact-editor-name-form");ColumnConstraints left=new ColumnConstraints();left.setPercentWidth(50);left.setHgrow(Priority.ALWAYS);ColumnConstraints right=new ColumnConstraints();right.setPercentWidth(50);right.setHgrow(Priority.ALWAYS);details.getColumnConstraints().addAll(left,right);
         details.add(formField("Display Name",display),0,0,2,1);details.add(formField("Prefix",prefix),0,1);details.add(formField("First Name",first),1,1);details.add(formField("Middle Name",middle),0,2);details.add(formField("Last Name",last),1,2);details.add(formField("Preferred Name",preferred),0,3);details.add(formField("Suffix",suffix),1,3);details.add(preview,0,4,2,1);details.add(formField("Date of Birth",birth),0,5);details.add(formField("Condition",condition),0,6,2,1);details.add(deceased,0,7,2,1);details.add(formField("Notes",notes),0,8,2,1);
         PhoneEditor phones=new PhoneEditor(p.phoneNumbers());EmailEditor emails=new EmailEditor(p.emailAddresses());AddressEditor addresses=new AddressEditor(p.addresses());
@@ -368,13 +371,14 @@ public final class ContactViewController {
         saveButton.addEventFilter(javafx.event.ActionEvent.ACTION,e->{e.consume();if(saveInFlight)return;try{if(notes.getText()!=null&&notes.getText().length()>ContactServicePort.CONTACT_NOTES_MAX_CHARS)throw new IllegalArgumentException("Notes exceeds the supported database length.");if(birth.getValue()!=null&&birth.getValue().isAfter(LocalDate.now()))throw new IllegalArgumentException("Date of Birth cannot be in the future.");phones.validate();emails.validate();addresses.validate();ContactServicePort.UpdateContactProfileCommand cmd=new ContactServicePort.UpdateContactProfileCommand(contactId,currentContact.shaleClientId(),appState.getUserId(),display.getText(),new ContactServicePort.StructuredName(prefix.getText(),first.getText(),middle.getText(),last.getText(),preferred.getText(),suffix.getText()),birth.getValue(),condition.getText(),notes.getText(),deceased.isSelected(),p.contactUpdatedAt(),types.intent(),specs.intent(),creds.intent(),phones.intent(),emails.intent(),addresses.intent());saveInFlight=true;saveButton.setDisable(true);status.setText("Saving complete Contact…");status.setVisible(true);status.setManaged(true);long started=PerfLog.start();LOG.info(()->"operation=contact.aggregate-save.start tenantId="+cmd.shaleClientId()+" contactId="+cmd.contactId()+" actorId="+cmd.actorUserId());dbExec.submit(()->{try{var result=contactService.updateContactProfile(cmd);Platform.runLater(()->{if(disposed)return;saveInFlight=false;classificationProfile=result.profile();renderClassifications();renderContactPoints();contactDetailService.invalidateContact(contactId,currentContact.shaleClientId());if(runtimeBridge!=null)runtimeBridge.publishEntityUpdated(LiveUpdateEvents.ENTITY_CONTACT,contactId,currentContact.shaleClientId(),appState.getUserId(),null);dialog.close();LOG.info(()->"operation=contact.aggregate-save.success tenantId="+cmd.shaleClientId()+" contactId="+cmd.contactId()+" elapsedMs="+PerfLog.elapsedMs(started));loadContact();});}catch(RuntimeException ex){logAggregateSaveFailure(cmd,ex);Platform.runLater(()->{if(disposed)return;saveInFlight=false;boolean stale=ex.getMessage()!=null&&ex.getMessage().toLowerCase(Locale.ROOT).contains("reload");saveButton.setDisable(stale);status.setText(stale?"Another update occurred. Your values are retained; choose Reload before saving.":"Save failed and was rolled back. Your values are retained.");status.setVisible(true);status.setManaged(true);});}});}catch(IllegalArgumentException ex){status.setText(ex.getMessage());status.setVisible(true);status.setManaged(true);}});
         dialog.getDialogPane().lookupButton(reload).addEventFilter(javafx.event.ActionEvent.ACTION,e->{e.consume();dialog.close();loadContact();});dialog.showAndWait();
     }
+    static EnhancedTextArea contactNarrativeEditor(String value,String title,int preferredRows){EnhancedTextArea editor=new EnhancedTextArea();editor.setText(safe(value));editor.setEditorTitle(title);editor.setSpellCheckEnabled(true);editor.setExpandable(true);editor.setPrefRowCount(preferredRows);editor.setMaxWidth(Double.MAX_VALUE);return editor;}
     private static Label heading(String text){Label l=new Label(text);l.getStyleClass().add("contact-editor-section-heading");return l;}
     private static void logAggregateSaveFailure(ContactServicePort.UpdateContactProfileCommand command,RuntimeException failure){
         LOG.log(Level.WARNING,String.format(Locale.ROOT,
                 "operation=contact.aggregate-save tenantId=%d contactId=%d actorId=%d exceptionClass=%s",
                 command.shaleClientId(),command.contactId(),command.actorUserId(),failure.getClass().getName()),failure);
     }
-    private static VBox formField(String label,javafx.scene.control.Control field){Label caption=new Label(label);caption.setLabelFor(field);caption.getStyleClass().add("contact-editor-field-label");VBox box=new VBox(4,caption,field);box.setFillWidth(true);GridPane.setHgrow(box,Priority.ALWAYS);return box;}
+    private static VBox formField(String label,Node field){Label caption=new Label(label);caption.setLabelFor(field);caption.getStyleClass().add("contact-editor-field-label");VBox box=new VBox(4,caption,field);box.setFillWidth(true);GridPane.setHgrow(box,Priority.ALWAYS);return box;}
     private static ScrollPane sectionScroll(Node node){ScrollPane scroll=new ScrollPane(node);scroll.setFitToWidth(true);scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);scroll.getStyleClass().add("contact-editor-section-scroll");return scroll;}
     private static void showEditorSection(List<Node> sections,int selected){for(int i=0;i<sections.size();i++){boolean active=i==selected;sections.get(i).setVisible(active);sections.get(i).setManaged(active);}}
     private static String structuredPreview(String...v){return java.util.Arrays.stream(v).map(ContactViewController::safeText).filter(Objects::nonNull).collect(java.util.stream.Collectors.joining(" "));}
@@ -509,9 +513,9 @@ public final class ContactViewController {
         String condition = profile == null ? currentContact.condition() : profile.condition();
         boolean deceased = profile == null ? currentContact.deceased() : profile.deceased();
         if (dateOfBirthValue != null) dateOfBirthValue.setText(formatDate(birth));
-        if (conditionValue != null) conditionValue.setText(fallback(condition));
+        if (conditionValue != null) conditionValue.setText(NarrativeMarkdownCodec.plainText(fallback(condition)));
         if (deceasedValue != null) deceasedValue.setText(booleanLabel(deceased));
-        if (notesValue != null) notesValue.setText(profile == null || profile.notes() == null || profile.notes().isBlank() ? "No notes provided." : profile.notes());
+        if (notesValue != null) notesValue.setText(profile == null || profile.notes() == null || profile.notes().isBlank() ? "No notes provided." : NarrativeMarkdownCodec.plainText(profile.notes()));
     }
 
     private void resetSharedLinksState() {
