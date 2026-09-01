@@ -10,10 +10,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class UserDictionarySessionTest {
     @Test void addIsNormalizedPersistentIdempotentAndRemovableAcrossSessions() {
         MemoryPort port=new MemoryPort(); AppState state=state(7,11);
-        UserDictionarySession first=new UserDictionarySession(port,state);first.load();first.add(" Foo ");first.add("foo");
-        assertFalse(first.checker().isMisspelled("FOO"));assertEquals(1,port.listWords(7,11,11).size());
-        UserDictionarySession reloaded=new UserDictionarySession(port,state);reloaded.load();assertFalse(reloaded.checker().isMisspelled("foo"));
-        reloaded.remove("FOO");UserDictionarySession afterRemove=new UserDictionarySession(port,state);afterRemove.load();assertTrue(afterRemove.checker().isMisspelled("foo"));
+        String customWord="ShaleOrthopedicsNonce";
+        UserDictionarySession first=new UserDictionarySession(port,state);first.load();assertTrue(first.checker().isMisspelled(customWord));
+        first.add(" "+customWord+" ");first.add(customWord.toLowerCase(Locale.ROOT));
+        assertFalse(first.checker().isMisspelled(customWord.toUpperCase(Locale.ROOT)));assertEquals(1,port.listWords(7,11,11).size());
+        UserDictionarySession reloaded=new UserDictionarySession(port,state);reloaded.load();assertFalse(reloaded.checker().isMisspelled(customWord));
+        reloaded.remove(customWord.toUpperCase(Locale.ROOT));UserDictionarySession afterRemove=new UserDictionarySession(port,state);afterRemove.load();assertTrue(afterRemove.checker().isMisspelled(customWord));
     }
     @Test void wordsAreUserAndTenantScopedAndIdentityChangesClearCache() {
         MemoryPort port=new MemoryPort();AppState a=state(7,11);UserDictionarySession session=new UserDictionarySession(port,a);session.add("AlbuquerqueOrthopedics");

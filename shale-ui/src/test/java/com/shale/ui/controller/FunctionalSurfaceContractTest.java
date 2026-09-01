@@ -77,8 +77,13 @@ class FunctionalSurfaceContractTest {
         for (String view : new String[] {"case.fxml", "contact.fxml", "organization.fxml", "user.fxml"}) {
             assertTrue(read(view).contains("styleClass=\"page-header-surface\""), view);
         }
-        assertTrue(read("case.fxml").contains("styleClass=\"app-section-tabs-scroll page-header-surface\""));
-        assertTrue(read("my-shale.fxml").contains("styleClass=\"app-section-tabs-scroll page-header-surface\""));
+        assertNavigationSurfaceClasses(read("case.fxml"));
+        assertNavigationSurfaceClasses(read("my-shale.fxml"));
+    }
+
+    private static void assertNavigationSurfaceClasses(String fxml) {
+        assertTrue(fxml.contains("<String fx:value=\"app-section-tabs-scroll\" />"));
+        assertTrue(fxml.contains("<String fx:value=\"page-header-surface\" />"));
     }
 
     @Test
