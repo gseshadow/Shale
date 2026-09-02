@@ -861,17 +861,45 @@ public final class NewIntakeController {
 
 	private void startPrimaryIntakeSave(int tenantId) {
 		CaseDao.NewIntakeCreateRequest request = buildCreateRequest();
-		System.out.println("[NewIntakeController] create attempt started " + saveContext(tenantId));
 		intakeSaveExecutor.submit(() -> {
 			try {
-				CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
-				Platform.runLater(() -> handleCreateSuccess(tenantId, result));
+				List<CaseDao.IntakeDuplicateCase> duplicates=caseDao.findIntakeDuplicateCases(tenantId,request.caseName());
+				Platform.runLater(() -> resolveDuplicateAndSave(tenantId,request,duplicates));
 			} catch (RuntimeException ex) {
 				logCreateFailure(tenantId, ex);
 				Platform.runLater(() -> handleCreateFailure(ex));
 			}
 		});
 	}
+
+	private void resolveDuplicateAndSave(int tenantId, CaseDao.NewIntakeCreateRequest request,
+			List<CaseDao.IntakeDuplicateCase> duplicates) {
+		if (duplicates == null || duplicates.isEmpty()) { submitIntakeMutation(tenantId,request,null); return; }
+		List<AppDialogs.DialogAction<DuplicateChoice>> actions=new ArrayList<>();
+		for(CaseDao.IntakeDuplicateCase duplicate:duplicates) actions.add(AppDialogs.DialogAction.of(
+				mergeActionLabel(duplicate,duplicates.size()),new DuplicateChoice(true,duplicate.caseId()),
+				AppDialogs.DialogActionKind.PRIMARY,false,false));
+		actions.add(AppDialogs.DialogAction.of("Create Separate Case",new DuplicateChoice(false,0),AppDialogs.DialogActionKind.SECONDARY,false,false));
+		actions.add(AppDialogs.DialogAction.cancel("Cancel",null));
+		String details=duplicates.stream().map(NewIntakeController::duplicateDescription).collect(Collectors.joining("\n"));
+		Optional<DuplicateChoice> choice=AppDialogs.showChoice(stage,"Possible Duplicate Case",
+				"A Case with this name already exists.",details,actions,Math.max(520,duplicates.size()>1?640:520));
+		if(choice.isEmpty()||choice.get()==null){setSaving(false);return;}
+		DuplicateChoice selected=choice.get(); submitIntakeMutation(tenantId,request,selected.merge()?selected.caseId():null);
+	}
+
+	private void submitIntakeMutation(int tenantId,CaseDao.NewIntakeCreateRequest request,Long mergeCaseId){
+		intakeSaveExecutor.submit(()->{try{CaseDao.NewIntakeCreateResult result=mergeCaseId==null?caseDao.createIntake(request):caseDao.mergeIntake(mergeCaseId,request);
+			Platform.runLater(()->handleCreateSuccess(tenantId,result,mergeCaseId!=null));}catch(RuntimeException ex){logCreateFailure(tenantId,ex);Platform.runLater(()->handleCreateFailure(ex));}});
+	}
+
+	record DuplicateChoice(boolean merge,long caseId) { }
+	static String mergeActionLabel(CaseDao.IntakeDuplicateCase duplicate,int count){return count==1?"Merge Into Existing Case":"Merge Into Case "+caseReference(duplicate);}
+	static String duplicateDescription(CaseDao.IntakeDuplicateCase d){return String.join(" · ",List.of(
+			nonblank(d.caseName(),"Unnamed Case"),caseReference(d),"Status: "+nonblank(d.status(),"Unknown"),
+			"Client: "+nonblank(d.clientName(),"Not shown"),"Intake: "+(d.intakeDate()==null?"Not recorded":d.intakeDate().toString())));}
+	private static String caseReference(CaseDao.IntakeDuplicateCase d){return nonblank(d.caseNumber(),"Case ID "+d.caseId());}
+	private static String nonblank(String value,String fallback){return value==null||value.isBlank()?fallback:value.trim();}
 
 	private RuntimeException normalizePreflightException(Throwable throwable) {
 		Throwable current = throwable;
@@ -957,7 +985,9 @@ public final class NewIntakeController {
 		);
 	}
 
-	private void handleCreateSuccess(int tenantId, CaseDao.NewIntakeCreateResult result) {
+	private void handleCreateSuccess(int tenantId, CaseDao.NewIntakeCreateResult result) { handleCreateSuccess(tenantId,result,false); }
+
+	private void handleCreateSuccess(int tenantId, CaseDao.NewIntakeCreateResult result, boolean merged) {
 		successfulCompletion = true;
 		deleteLocalDraftIfPresent();
 		System.out.println("[NewIntakeController] create succeeded tenant=" + tenantId + " caseId=" + result.caseId());
@@ -966,7 +996,7 @@ public final class NewIntakeController {
 			runtimeBridge.publishCaseDatesChanged(result.caseId(), tenantId, appState.getUserId(),
 					LiveUpdateEvents.CHANGE_CREATED);
 		}
-		showSuccess("Intake created successfully.");
+		showSuccess(merged ? "Intake information was added to the existing Case." : "Intake created successfully.");
 		setSaving(false);
 		if (stage != null)
 			stage.close();

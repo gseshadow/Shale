@@ -393,6 +393,113 @@ public final class CaseDao {
 			int createdCaseDateCount) {
 	}
 
+	public record IntakeDuplicateCase(long caseId, String caseName, String caseNumber,
+			String status, String clientName, LocalDate intakeDate) { }
+
+	/** A deliberately narrow, tenant-scoped exact-name check used only by New Intake. */
+	public List<IntakeDuplicateCase> findIntakeDuplicateCases(int shaleClientId, String caseName) {
+		if (shaleClientId <= 0) throw new IllegalArgumentException("shaleClientId is required.");
+		String normalized = normalizeCaseName(caseName);
+		if (normalized == null) return List.of();
+		String sql = """
+			SELECT c.Id,c.Name,c.CaseNumber,
+			 status_row.Name AS StatusName, client_row.ClientName, intake_row.IntakeDate
+			FROM dbo.Cases c
+			OUTER APPLY (SELECT TOP(1) s.Name FROM dbo.CaseStatuses cs JOIN dbo.Statuses s ON s.Id=cs.StatusId
+			 WHERE cs.CaseId=c.Id ORDER BY CASE WHEN cs.IsPrimary=1 THEN 0 ELSE 1 END,cs.UpdatedAt DESC,cs.Id DESC) status_row
+			OUTER APPLY (SELECT TOP(1) LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))) ClientName
+			 FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId JOIN dbo.Contacts ct ON ct.Id=cp.ContactId
+			 WHERE cp.CaseId=c.Id AND ct.ShaleClientId=c.ShaleClientId AND ISNULL(ct.IsDeleted,0)=0
+			 AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey,pr.Name))))='party'
+			 AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side,''))))='represented'
+			 ORDER BY CASE WHEN ISNULL(cp.IsPrimary,0)=1 THEN 0 ELSE 1 END,cp.Id) client_row
+			OUTER APPLY (SELECT TOP(1) CAST(cd.StartsAt AS date) IntakeDate FROM dbo.CaseDates cd
+			 JOIN dbo.CaseDateTypes dt ON dt.Id=cd.CaseDateTypeId
+			 JOIN dbo.CaseDateTypeSemanticRoleMappings rm ON rm.CaseDateTypeId=dt.Id AND rm.SemanticRoleKey='INTAKE'
+			 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0 AND rm.IsActive=1 AND rm.IsDeleted=0
+			 ORDER BY cd.StartsAt,cd.Id) intake_row
+			WHERE c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0
+			 AND LOWER(REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(c.Name)),'  ',' '),'  ',' '),'  ',' '))=?
+			ORDER BY c.Id
+			""";
+		try (Connection con=db.requireConnection(); PreparedStatement ps=con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId); ps.setString(2, normalized);
+			try (ResultSet rs=ps.executeQuery()) { List<IntakeDuplicateCase> out=new ArrayList<>(); while(rs.next()) out.add(new IntakeDuplicateCase(
+				rs.getLong("Id"),rs.getString("Name"),rs.getString("CaseNumber"),rs.getString("StatusName"),
+				rs.getString("ClientName"),toLocalDate(rs.getDate("IntakeDate")))); return List.copyOf(out); }
+		} catch (SQLException e) { throw new RuntimeException("Failed to check for duplicate cases.",e); }
+	}
+
+	static String normalizeCaseName(String value) {
+		String normalized=normalizeOptional(value);
+		return normalized==null?null:normalized.replaceAll("\\s+"," ").toLowerCase(Locale.ROOT);
+	}
+
+	public NewIntakeCreateResult mergeIntake(long existingCaseId, NewIntakeCreateRequest request) {
+		Objects.requireNonNull(request,"request");
+		Connection con=null;
+		try {
+			con=db.requireConnection(); con.setAutoCommit(false);
+			List<ConfiguredDateValue> dates=validateConfiguredIntakeDates(con,request);
+			int intakeTypeId=requireConfiguredIntakeValue(con,request,dates);
+			if (!lockMatchingCase(con,existingCaseId,request)) throw new IllegalArgumentException("The selected case is no longer an eligible duplicate.");
+			Timestamp now=Timestamp.valueOf(LocalDateTime.now());
+			ensureRequiredPartyRolesForTenant(con,request.shaleClientId());
+			fillBlankCaseScalars(con,existingCaseId,request);
+			int clientId=mergeRoleContact(con,existingCaseId,request,PARTY_ROLE_NAME_PARTY,request.clientFirstName(),request.clientLastName(),
+				request.clientDateOfBirth(),request.clientCondition(),request.clientDeceased(),true,request.clientPhone(),request.clientEmail(),request.clientAddress(),now);
+			int callerId=request.callerIsClient()?clientId:mergeRoleContact(con,existingCaseId,request,PARTY_ROLE_NAME_CALLER,
+				request.callerFirstName(),request.callerLastName(),null,null,false,false,request.callerPhone(),request.callerEmail(),request.callerAddress(),now);
+			ensureCaseParty(con,existingCaseId,clientId,PARTY_ROLE_NAME_PARTY,now,request.shaleClientId());
+			ensureCaseParty(con,existingCaseId,callerId,PARTY_ROLE_NAME_CALLER,now,request.shaleClientId());
+			for(NewIntakePendingParty pending:request.pendingParties()==null?List.<NewIntakePendingParty>of():request.pendingParties()) addPendingPartyForMerge(con,existingCaseId,request,pending,now);
+			normalizeCasePartyRelationshipPrimaries(con,existingCaseId,request.shaleClientId());
+			int createdDates=0; for(ConfiguredDateValue date:dates) if(!hasActiveCaseDate(con,existingCaseId,date.caseDateTypeId(),request.shaleClientId())) {
+				long id=insertConfiguredCaseDate(con,request,existingCaseId,date,intakeTypeId); auditCreatedCaseDate(con,request,existingCaseId,id,date,intakeTypeId); createdDates++; }
+			con.commit(); return new NewIntakeCreateResult(existingCaseId,clientId,callerId,createdDates);
+		} catch(Exception e) { if(con!=null)try{con.rollback();}catch(SQLException ignored){} throw e instanceof RuntimeException r?r:new RuntimeException("Failed to merge intake.",e); }
+		finally { if(con!=null){try{con.setAutoCommit(true);}catch(SQLException ignored){} try{con.close();}catch(SQLException ignored){}} }
+	}
+
+	private void addPendingPartyForMerge(Connection con,long caseId,NewIntakeCreateRequest request,NewIntakePendingParty pending,Timestamp now)throws SQLException{
+		if(pending==null||pending.partyRoleId()==null||pending.partyRoleId()<=0)return;String type=pending.entityType()==null?"":pending.entityType().trim().toLowerCase(Locale.ROOT);Long entity=pending.entityId();
+		if(pending.createNew()){if("contact".equals(type))entity=(long)insertContact(con,buildFullName(pending.contactFirstName(),pending.contactLastName()),pending.contactFirstName(),pending.contactLastName(),null,null,false,false,request.shaleClientId(),now);else if("organization".equals(type))entity=(long)insertOrganization(con,request.shaleClientId(),pending.organizationTypeId(),pending.organizationName(),now);}
+		if(entity==null||entity<=0)return;insertCasePartyWithValidation(con,caseId,"contact".equals(type)?entity:null,"organization".equals(type)?entity:null,pending.partyRoleId(),pending.side(),pending.primary(),pending.notes(),request.shaleClientId(),now);
+	}
+
+	private static boolean lockMatchingCase(Connection con,long id,NewIntakeCreateRequest r)throws SQLException{
+		try(PreparedStatement ps=con.prepareStatement("SELECT Name FROM dbo.Cases WITH (UPDLOCK,HOLDLOCK) WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){
+			ps.setLong(1,id);ps.setInt(2,r.shaleClientId());try(ResultSet rs=ps.executeQuery()){return rs.next()&&Objects.equals(normalizeCaseName(rs.getString(1)),normalizeCaseName(r.caseName()));}}
+	}
+
+	private void fillBlankCaseScalars(Connection con,long id,NewIntakeCreateRequest r)throws SQLException{
+		String oldDescription=null,oldSummary=null;try(PreparedStatement read=con.prepareStatement("SELECT Description,Summary FROM dbo.Cases WHERE Id=? AND ShaleClientId=?")){read.setLong(1,id);read.setInt(2,r.shaleClientId());try(ResultSet rs=read.executeQuery()){if(!rs.next())throw new SQLException("Selected case changed during merge.");oldDescription=rs.getString(1);oldSummary=rs.getString(2);}}
+		try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.Cases SET Description=CASE WHEN NULLIF(LTRIM(RTRIM(Description)),'') IS NULL THEN ? ELSE Description END, Summary=CASE WHEN NULLIF(LTRIM(RTRIM(Summary)),'') IS NULL THEN ? ELSE Summary END, UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){
+			setNullableString(ps,1,r.description());setNullableString(ps,2,r.summary());ps.setLong(3,id);ps.setInt(4,r.shaleClientId());if(ps.executeUpdate()!=1)throw new SQLException("Selected case changed during merge.");}
+		if(r.createdByUserId()!=null){ if(normalizeOptional(oldDescription)==null&&normalizeOptional(r.description())!=null)phiAuditService.auditUpdate(con,r.createdByUserId(),"Cases","Description",id,oldDescription,r.description()); if(normalizeOptional(oldSummary)==null&&normalizeOptional(r.summary())!=null)phiAuditService.auditUpdate(con,r.createdByUserId(),"Cases","Summary",id,oldSummary,r.summary()); }
+	}
+
+	private int mergeRoleContact(Connection con,long caseId,NewIntakeCreateRequest r,String role,String first,String last,LocalDate dob,String condition,boolean deceased,boolean client,String phone,String email,String address,Timestamp now)throws SQLException{
+		List<Integer> ids=new ArrayList<>(); try(PreparedStatement ps=con.prepareStatement("SELECT cp.ContactId FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId JOIN dbo.Contacts ct ON ct.Id=cp.ContactId WHERE cp.CaseId=? AND ct.ShaleClientId=? AND ISNULL(ct.IsDeleted,0)=0 AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey,pr.Name))))=? ORDER BY CASE WHEN ISNULL(cp.IsPrimary,0)=1 THEN 0 ELSE 1 END,cp.Id")){
+			ps.setLong(1,caseId);ps.setInt(2,r.shaleClientId());ps.setString(3,role);try(ResultSet rs=ps.executeQuery()){while(rs.next())ids.add(rs.getInt(1));}}
+		int id;if(ids.size()==1){id=ids.getFirst();fillBlankContactScalars(con,id,r,first,last,dob,condition);insertMissingContactPoints(con,r,id,phone,email,address);}else{id=insertContact(con,buildFullName(first,last),first,last,dob,condition,deceased,client,r.shaleClientId(),now);insertIntakeContactPoints(con,r,id,phone,email,address);} return id;
+	}
+
+	private void fillBlankContactScalars(Connection con,int id,NewIntakeCreateRequest r,String first,String last,LocalDate dob,String condition)throws SQLException{
+		try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.Contacts SET FirstName=COALESCE(NULLIF(LTRIM(RTRIM(FirstName)),''),?),LastName=COALESCE(NULLIF(LTRIM(RTRIM(LastName)),''),?),Name=COALESCE(NULLIF(LTRIM(RTRIM(Name)),''),?),DateOfBirth=COALESCE(DateOfBirth,?),Condition=COALESCE(NULLIF(LTRIM(RTRIM(Condition)),''),?),UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){
+			setNullableString(ps,1,first);setNullableString(ps,2,last);setNullableString(ps,3,buildFullName(first,last));setNullableDate(ps,4,dob);setNullableString(ps,5,condition);ps.setInt(6,id);ps.setInt(7,r.shaleClientId());if(ps.executeUpdate()!=1)throw new SQLException("Contact changed during merge.");}
+		if(r.createdByUserId()!=null){entityActionAuditDao.append(con,EntityActionAuditEvent.now(r.shaleClientId(),r.createdByUserId(),EntityActionAuditEvent.EntityType.CONTACT,id,EntityActionAuditEvent.Action.UPDATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,id)));if(normalizeOptional(condition)!=null)phiAuditService.auditUpdate(con,r.createdByUserId(),"Contacts","Condition",(long)id,null,condition);}
+	}
+
+	private void insertMissingContactPoints(Connection con,NewIntakeCreateRequest r,int id,String phone,String email,String address)throws SQLException{
+		if(!hasContactPoint(con,"ContactPhoneNumbers",id,"NormalizedNumber",normalizePhone(phone)))insertIntakeContactPoint(con,r,id,"ContactPhoneNumbers","DisplayNumber,NormalizedNumber","MOBILE",normalizeOptional(phone),normalizePhone(phone),EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER);
+		if(!hasContactPoint(con,"ContactEmailAddresses",id,"NormalizedEmail",normalizeEmail(email)))insertIntakeContactPoint(con,r,id,"ContactEmailAddresses","EmailAddress,NormalizedEmail","PERSONAL",normalizeOptional(email),normalizeEmail(email),EntityActionAuditEvent.EntityType.CONTACT_EMAIL_ADDRESS);
+		if(!hasContactPoint(con,"ContactAddresses",id,"LegacyAddressText",normalizeOptional(address)))insertIntakeContactPoint(con,r,id,"ContactAddresses","LegacyAddressText","HOME",normalizeOptional(address),EntityActionAuditEvent.EntityType.CONTACT_ADDRESS);
+	}
+	private static boolean hasContactPoint(Connection con,String table,int id,String column,String value)throws SQLException{if(value==null)return true;String expression=column.equals("LegacyAddressText")?"LOWER(LTRIM(RTRIM("+column+")))":"LOWER("+column+")";try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo."+table+" WHERE ContactId=? AND ISNULL(IsDeleted,0)=0 AND "+expression+"=?")){ps.setInt(1,id);ps.setString(2,value.toLowerCase(Locale.ROOT));try(ResultSet rs=ps.executeQuery()){return rs.next();}}}
+	private static boolean hasActiveCaseDate(Connection con,long caseId,int type,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.CaseDates WHERE CaseId=? AND CaseDateTypeId=? AND ShaleClientId=? AND IsDeleted=0")){ps.setLong(1,caseId);ps.setInt(2,type);ps.setInt(3,tenant);try(ResultSet rs=ps.executeQuery()){return rs.next();}}}
+	private void ensureCaseParty(Connection con,long caseId,int contact,String role,Timestamp now,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId WHERE cp.CaseId=? AND cp.ContactId=? AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey,pr.Name))))=?")){ps.setLong(1,caseId);ps.setInt(2,contact);ps.setString(3,role);try(ResultSet rs=ps.executeQuery()){if(rs.next())return;}}insertCaseParty(con,caseId,contact,role,PARTY_SIDE_KEY_REPRESENTED,true,now,tenant);}
+
 	public NewIntakeCreateResult createIntake(NewIntakeCreateRequest request) {
 		Objects.requireNonNull(request, "request");
 		if (request.shaleClientId() <= 0)
