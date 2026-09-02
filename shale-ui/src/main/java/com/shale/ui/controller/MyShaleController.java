@@ -539,8 +539,6 @@ public final class MyShaleController {
 	}
 
 	private void applyRemainingSemanticControls() {
-		sectionTabs.values().forEach(button ->
-				ControlStyles.apply(button, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL));
 		if (myCasesBoardSearchField != null) ControlStyles.formControl(myCasesBoardSearchField);
 		if (myCasesBoardStatusFilterChoice != null) ControlStyles.formControl(myCasesBoardStatusFilterChoice);
 		if (myCasesBoardSortChoice != null) ControlStyles.formControl(myCasesBoardSortChoice);
