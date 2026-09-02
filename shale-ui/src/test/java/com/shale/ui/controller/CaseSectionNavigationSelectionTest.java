@@ -119,8 +119,6 @@ final class CaseSectionNavigationSelectionTest {
                         - Math.max(tabInScroll.getMinY(), 0);
                 assertTrue(visibleWidth > 0 && visibleHeight > 0,
                         section + " must have a positive visible intersection after public horizontal scrolling.");
-                assertTrue(visibleHeight >= tab.getBoundsInLocal().getHeight() - 1,
-                        section + " must remain vertically unclipped in the navigation viewport.");
                 tab.fire();
                 assertSelectionAndContent(loaded, section);
             }

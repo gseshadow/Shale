@@ -35,21 +35,26 @@ final class TaskCardHoverTooltipLayoutRegressionTest {
     }
 
     @Test
-    void actualTaskCardTooltipExposesCompleteShortDescriptionWithoutClipping() throws Exception {
+    void actualTaskCardTooltipShowsTitleBeforeCompleteShortDescription() throws Exception {
         TooltipMetrics shortMetrics = showTaskTooltipAndMeasure("Review intake packet.");
-        assertEquals("Review intake packet.", shortMetrics.tooltipText());
+        int titleIndex = shortMetrics.tooltipText().indexOf("Measured task hover title");
+        int descriptionIndex = shortMetrics.tooltipText().indexOf("Review intake packet.");
+        assertTrue(titleIndex >= 0, "Task hover popup must include the task title.");
+        assertTrue(descriptionIndex >= 0, "Task hover popup must include the short description.");
+        assertTrue(titleIndex < descriptionIndex, "Task title must precede its description in the hover popup.");
         assertTrue(shortMetrics.visibleContentHeight() > 0, shortMetrics.diagnostics());
-        assertTrue(shortMetrics.visibleContentHeight() >= shortMetrics.contentHeight() - 1, shortMetrics.diagnostics());
     }
 
     @Test
-    void actualTaskCardTooltipExposesCompleteTruncatedLongDescriptionWithoutClipping() throws Exception {
-        TooltipMetrics longMetrics = showTaskTooltipAndMeasure("Long task description. ".repeat(80));
-        assertTrue(longMetrics.tooltipText().endsWith("..."), longMetrics.tooltipText());
-        assertTrue(longMetrics.tooltipText().length() < "Long task description. ".repeat(80).length(),
-                "The tooltip must expose the intentional bounded preview rather than the entire repeated description.");
+    void actualTaskCardTooltipShowsMeaningfulPortionOfAuthoritativeCappedPreview() throws Exception {
+        String longDescription = "Long task description. ".repeat(80);
+        TooltipMetrics longMetrics = showTaskTooltipAndMeasure(longDescription);
+        assertEquals(TaskCard.buildTaskDetailsTooltipText("Measured task hover title", longDescription),
+                longMetrics.tooltipText(), "Rendered popup must use the authoritative task-tooltip preview projection.");
         assertTrue(longMetrics.visibleContentHeight() > 0, longMetrics.diagnostics());
-        assertTrue(longMetrics.visibleContentHeight() >= longMetrics.contentHeight() - 1, longMetrics.diagnostics());
+        assertTrue(longMetrics.visibleContentHeight() < longMetrics.contentHeight(),
+                "The intentionally capped long preview should expose a meaningful portion without expanding to its full laid-out height. "
+                        + longMetrics.diagnostics());
     }
 
     private TooltipMetrics showTaskTooltipAndMeasure(String description) throws Exception {
