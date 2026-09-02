@@ -76,12 +76,15 @@ jobs:
         shell: pwsh
         env:
           SELECTED_COMMAND: ${{ steps.selection.outputs.selected_command }}
-          MAVEN_ARGS_JSON: ${{ steps.selection.outputs.selected_maven_args }}
+          MAVEN_BATCHES_JSON: ${{ steps.selection.outputs.selected_maven_batches }}
         run: |
           Write-Host "+ $env:SELECTED_COMMAND"
-          $mavenArgs = @($env:MAVEN_ARGS_JSON | ConvertFrom-Json)
-          & mvn @mavenArgs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $mavenBatches = $env:MAVEN_BATCHES_JSON | ConvertFrom-Json
+          foreach ($batch in $mavenBatches) {
+            $mavenArgs = @($batch)
+            & mvn @mavenArgs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Summarize Surefire and Failsafe reports
         if: always()

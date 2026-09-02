@@ -502,6 +502,7 @@
         "shale-ui/src/test/java/com/shale/ui/controller/CaseTimelineDescriptionTest.java",
         "build/test-selection/**",
         ".github/workflows/maven-test-gate.yml",
+        "docs/testing/change-aware-test-selection.md",
         "docs/testing/full-suite-only-inventory.md"
       ],
       "suppress_area_patterns": [

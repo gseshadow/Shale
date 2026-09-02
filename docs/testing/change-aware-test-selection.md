@@ -57,6 +57,15 @@ structured process arguments. In particular, the complete comma-separated `-Dtes
 one Maven argument; CI and `--run` never pass the display string through `Invoke-Expression`, `eval`,
 `cmd /c`, or a shell interpreter.
 
+Every selected class is accompanied by its changed path, mapping rule, and classification (critical,
+directly modified, affected behavior, or manual inventory). Automated affected selections are capped
+at 50 classes; exceeding that limit is a selector-model error rather than a blocking mega-command.
+Broad feature inventories are therefore manual-only. Structured Maven commands are additionally kept
+below a conservative 7,000-character Windows limit and, when an explicitly requested legitimate
+inventory exceeds it, are split deterministically into module-local batches without truncation. The
+critical safety manifest is never serialized onto the command line: it remains the separate `mvn test`
+invocation supplied through the parent POM.
+
 ### 4. Explicit full suite
 
 ```bash

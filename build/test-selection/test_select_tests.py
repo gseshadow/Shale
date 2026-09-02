@@ -27,7 +27,7 @@ class ChangeSelectorTest(unittest.TestCase):
     def test_calendar_fxml_change_selects_structural_presentation_only(self):
         result = self.selected("shale-ui/src/main/resources/fxml/calendar.fxml")
         self.assertEqual(["ui-fxml-structure", "ui-presentation"], result["selected_areas"])
-        self.assertIn("*FxmlLoadTest", result["test_patterns"])
+        self.assertIn("com.shale.ui.controller.SettingsFxmlLoadTest", result["test_patterns"])
         self.assertNotIn("*Calendar*Test", result["test_patterns"])
 
     def test_task_and_my_shale_change_selects_tasks(self):
@@ -39,7 +39,7 @@ class ChangeSelectorTest(unittest.TestCase):
     def test_global_css_selects_static_presentation_not_rendered_ui(self):
         result = self.selected("shale-ui/src/main/resources/css/app.css")
         self.assertEqual(["ui-presentation"], result["selected_areas"])
-        self.assertIn("*CssContractTest", result["test_patterns"])
+        self.assertIn("com.shale.ui.util.SemanticControlCssContractTest", result["test_patterns"])
         self.assertNotIn("*Runtime*Test", result["test_patterns"])
         for unrelated in ("*Case*Test", "*Calendar*Test", "*Task*Test", "*Layout*Test"):
             self.assertNotIn(unrelated, result["test_patterns"])
@@ -91,6 +91,38 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertEqual(["shale-core", "shale-data", "shale-ui"], result["selected_modules"])
         for unsafe in ("*Case*Test", "Case*Test", "*Intake*Test", "*BehaviorTest", "*LifecycleTest"):
             self.assertNotIn(unsafe, result["test_patterns"])
+        self.assertEqual(set(result["test_patterns"]), set(result["test_reasons"]))
+        self.assertTrue(all(reason["changed_paths"] and reason["mapping_rules"] and reason["classifications"]
+                            for reason in result["test_reasons"].values()))
+
+    def test_complete_case_timeline_pr_fixture_selects_five_safe_commands(self):
+        fixture = SCRIPT.with_name("fixtures") / "case-timeline-pr-paths.txt"
+        paths = [line for line in fixture.read_text(encoding="utf-8").splitlines() if line]
+        result = SELECTOR.select(paths)
+        self.assertEqual(5, len(result["test_patterns"]))
+        self.assertEqual("mvn test", result["critical_command"])
+        self.assertEqual(["test"], result["critical_maven_args"])
+        self.assertEqual([], result["focused_maven_batches"])
+        self.assertEqual(1, len(result["selected_maven_batches"]))
+        self.assertLessEqual(result["maximum_command_length"], result["windows_safe_command_length"])
+        gate = (SCRIPT.parents[2] / ".github/workflows/maven-test-gate.yml").read_text(encoding="utf-8")
+        self.assertIn("run: mvn -DskipTests package", gate)
+        self.assertIn("run: python -m unittest build.test-selection.test_select_tests", gate)
+        self.assertIn("run: mvn test", gate)
+        for unrelated in ("NewIntake", "Calendar", "Settings", "Reports", "Task"):
+            self.assertFalse(any(unrelated in qualified for qualified in result["test_patterns"]))
+
+    def test_automated_mega_selection_is_a_model_error_but_manual_inventory_is_batched(self):
+        automatic = self.selected("shale-ui/src/main/java/com/shale/ui/controller/CaseController.java")
+        self.assertIn("exceeding the policy limit", automatic["selection_error"])
+        self.assertEqual("", automatic["selected_command"])
+        self.assertEqual([], automatic["selected_maven_batches"])
+        manual = SELECTOR.select([], ["cases"])
+        self.assertFalse(manual["selection_error"])
+        self.assertGreater(len(manual["test_patterns"]), SELECTOR.AUTOMATED_CLASS_LIMIT)
+        self.assertGreater(len(manual["selected_maven_batches"]), 1)
+        self.assertTrue(all(len(SELECTOR.display_command(["mvn", *batch])) <= SELECTOR.WINDOWS_SAFE_COMMAND_LENGTH
+                            for batch in manual["selected_maven_batches"]))
 
     def test_maven_test_list_is_one_structured_process_argument(self):
         result = SELECTOR.select([
@@ -157,7 +189,8 @@ class ChangeSelectorTest(unittest.TestCase):
     def test_explicit_feature_selection_uses_safe_reactor_option(self):
         result = SELECTOR.select([], ["calendar"])
         self.assertIn("-Dsurefire.failIfNoSpecifiedTests=false", result["selected_command"])
-        self.assertIn("-pl shale-core,shale-data,shale-ui -am", result["selected_command"])
+        self.assertEqual(["shale-core", "shale-data", "shale-ui"], result["selected_modules"])
+        self.assertTrue(all("-am" in batch for batch in result["selected_maven_batches"]))
 
     def test_every_test_is_reachable_by_historical_full_suite_pattern(self):
         root = SCRIPT.parents[2]
@@ -205,7 +238,7 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertIn("run: mvn test", gate)
         self.assertIn("actions/upload-artifact@v4", gate)
         self.assertIn("& mvn @mavenArgs", gate)
-        self.assertIn("selected_maven_args", gate)
+        self.assertIn("selected_maven_batches", gate)
         self.assertLess(gate.index("- name: Run critical suite"), gate.index("- name: Run affected-area suite"))
         for unsafe in ("Invoke-Expression", "cmd /c", "eval "):
             self.assertNotIn(unsafe, gate)
