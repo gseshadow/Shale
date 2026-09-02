@@ -2,6 +2,7 @@
 build/test-selection/critical-tests.txt
 build/test-selection/fixtures/case-timeline-pr-paths.txt
 build/test-selection/inventory.py
+build/test-selection/run_selection.py
 build/test-selection/select_tests.py
 build/test-selection/test-areas.json
 build/test-selection/test_select_tests.py

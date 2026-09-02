@@ -44,6 +44,7 @@ jobs:
           if (-not $base -or $base -match '^0+$') { $base = 'HEAD^' }
           python build/test-selection/select_tests.py --base $base --head $env:HEAD_SHA `
             --format markdown --output build/test-selection/selection-summary.md `
+            --plan-output build/test-selection/selection-plan.json `
             --github-output $env:GITHUB_OUTPUT
           Get-Content build/test-selection/selection-summary.md | Add-Content $env:GITHUB_STEP_SUMMARY
 
@@ -73,18 +74,7 @@ jobs:
 
       - name: Run affected-area suite
         if: steps.selection.outputs.selected_command != ''
-        shell: pwsh
-        env:
-          SELECTED_COMMAND: ${{ steps.selection.outputs.selected_command }}
-          MAVEN_BATCHES_JSON: ${{ steps.selection.outputs.selected_maven_batches }}
-        run: |
-          Write-Host "+ $env:SELECTED_COMMAND"
-          $mavenBatches = $env:MAVEN_BATCHES_JSON | ConvertFrom-Json
-          foreach ($batch in $mavenBatches) {
-            $mavenArgs = @($batch)
-            & mvn @mavenArgs
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+        run: python build/test-selection/run_selection.py build/test-selection/selection-plan.json --command affected
 
       - name: Summarize Surefire and Failsafe reports
         if: always()

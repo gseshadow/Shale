@@ -3,6 +3,7 @@ from pathlib import Path
 import unittest
 import fnmatch
 import json
+import os
 import tempfile
 import xml.etree.ElementTree as ET
 from unittest import mock
@@ -11,6 +12,10 @@ SCRIPT = Path(__file__).with_name("select_tests.py")
 SPEC = importlib.util.spec_from_file_location("select_tests", SCRIPT)
 SELECTOR = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SELECTOR)
+RUNNER_SCRIPT = Path(__file__).with_name("run_selection.py")
+RUNNER_SPEC = importlib.util.spec_from_file_location("run_selection", RUNNER_SCRIPT)
+RUNNER = importlib.util.module_from_spec(RUNNER_SPEC)
+RUNNER_SPEC.loader.exec_module(RUNNER)
 
 
 class ChangeSelectorTest(unittest.TestCase):
@@ -138,6 +143,50 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertEqual(1, sum(1 for argument in selected_call.args[0] if argument == test_argument))
         self.assertFalse(selected_call.kwargs["shell"])
 
+    def test_runner_preserves_real_process_argument_boundaries(self):
+        fixture = SCRIPT.with_name("fixtures") / "case-timeline-pr-paths.txt"
+        plan = SELECTOR.select(fixture.read_text(encoding="utf-8").splitlines())
+        with tempfile.TemporaryDirectory() as directory:
+            recorder = Path(directory) / "record_args.py"
+            output = Path(directory) / "args.json"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "open(os.environ['ARG_RECORD'], 'w', encoding='utf-8').write(json.dumps(sys.argv[1:]))\n",
+                encoding="utf-8",
+            )
+            recorder.chmod(0o755)
+            with mock.patch.dict(os.environ, {"ARG_RECORD": str(output)}):
+                RUNNER.execute_affected(plan, launcher=str(recorder))
+            recorded = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual("-pl", recorded[0])
+        self.assertEqual("shale-core,shale-data,shale-ui", recorded[1])
+        self.assertEqual("-am", recorded[2])
+        self.assertEqual(1, sum(argument.startswith("-Dtest=") for argument in recorded))
+        selected = next(argument for argument in recorded if argument.startswith("-Dtest="))
+        self.assertEqual(plan["test_patterns"], selected.removeprefix("-Dtest=").split(","))
+        self.assertEqual("test", recorded[-1])
+
+    def test_runner_rejects_malformed_or_unsafe_plans(self):
+        with self.assertRaisesRegex(ValueError, "requires a nonempty following value"):
+            RUNNER.validate_maven_args(["-pl", "-am", "test"])
+        with self.assertRaisesRegex(ValueError, "requires a nonempty following value"):
+            RUNNER.validate_maven_args(["-pl", "", "test"])
+        with self.assertRaisesRegex(ValueError, "Windows-safe"):
+            RUNNER.validate_maven_args(["-Dtest=" + "A" * RUNNER.WINDOWS_SAFE_COMMAND_LENGTH, "test"])
+        fixture = SCRIPT.with_name("fixtures") / "case-timeline-pr-paths.txt"
+        plan = SELECTOR.select(fixture.read_text(encoding="utf-8").splitlines())
+        plan["test_patterns"] = [*plan["test_patterns"], "com.shale.ui.UnrelatedTest"]
+        with self.assertRaisesRegex(ValueError, "exactly its five justified tests"):
+            RUNNER.affected_batches(plan)
+
+    def test_runner_prefers_windows_maven_launcher(self):
+        with mock.patch.object(RUNNER.os, "name", "nt"), mock.patch.object(
+                RUNNER.shutil, "which", side_effect=lambda name: "C:/Maven/bin/mvn.cmd" if name == "mvn.cmd" else None
+        ) as which:
+            self.assertEqual("C:/Maven/bin/mvn.cmd", RUNNER.resolve_maven())
+        self.assertEqual(mock.call("mvn.cmd"), which.call_args_list[0])
+
     def test_github_outputs_preserve_display_and_structured_selected_invocation(self):
         result = SELECTOR.select([
             "shale-data/src/main/java/com/shale/data/dao/CaseTimelineWriter.java",
@@ -237,10 +286,10 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertIn("python build/test-selection/select_tests.py --base", gate)
         self.assertIn("run: mvn test", gate)
         self.assertIn("actions/upload-artifact@v4", gate)
-        self.assertIn("& mvn @mavenArgs", gate)
-        self.assertIn("selected_maven_batches", gate)
+        self.assertIn("run_selection.py build/test-selection/selection-plan.json --command affected", gate)
+        self.assertIn("--plan-output build/test-selection/selection-plan.json", gate)
         self.assertLess(gate.index("- name: Run critical suite"), gate.index("- name: Run affected-area suite"))
-        for unsafe in ("Invoke-Expression", "cmd /c", "eval "):
+        for unsafe in ("Invoke-Expression", "cmd /c", "eval ", "@mavenArgs", "MAVEN_BATCHES_JSON"):
             self.assertNotIn(unsafe, gate)
         self.assertIn("workflow_dispatch:", full)
         self.assertIn("schedule:", full)

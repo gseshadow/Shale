@@ -66,6 +66,12 @@ inventory exceeds it, are split deterministically into module-local batches with
 critical safety manifest is never serialized onto the command line: it remains the separate `mvn test`
 invocation supplied through the parent POM.
 
+The selector writes an authoritative JSON execution plan for CI. The repository-owned
+`run_selection.py` runner validates that plan, resolves `mvn.cmd` explicitly on Windows, logs the
+display-only command and every indexed argument, and launches Maven with
+`subprocess.run(argv, shell=False, check=True)`. PowerShell never reconstructs or transports dynamic
+Maven argument arrays.
+
 ### 4. Explicit full suite
 
 ```bash

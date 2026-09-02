@@ -273,6 +273,7 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
     return {
         "changed_paths": sorted(paths),
         "selected_areas": sorted(selected),
+        "focused_change_set": focused_change_set.get("name", "") if focused_change_set else "",
         "selected_modules": modules,
         "test_patterns": patterns,
         "test_reasons": test_reasons,
@@ -366,6 +367,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--area", action="append", default=[], help="Explicit feature area; repeatable")
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
     parser.add_argument("--output", type=Path, help="Also write the selected format to this file")
+    parser.add_argument("--plan-output", type=Path, help="Write the authoritative JSON execution plan")
     parser.add_argument("--github-output", type=Path, help="Write CI step outputs")
     parser.add_argument("--run", action="store_true", help="Execute the emitted commands in order")
     args = parser.parse_args(argv)
@@ -385,6 +387,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered, encoding="utf-8")
+    if args.plan_output:
+        args.plan_output.parent.mkdir(parents=True, exist_ok=True)
+        args.plan_output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if args.github_output:
         with args.github_output.open("a", encoding="utf-8") as output:
             output.write(f"full_suite={str(result['full_suite']).lower()}\n")
