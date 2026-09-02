@@ -27,6 +27,8 @@ final class NewIntakeDuplicateDialogContractTest {
         assertTrue(resolve.contains("Create Separate Case"));
         assertTrue(resolve.contains("DialogAction.cancel(\"Cancel\""));
         assertTrue(resolve.contains("for(CaseDao.IntakeDuplicateCase duplicate:duplicates)"));
+        assertTrue(resolve.contains("details,actions,640"),
+                "duplicate summary and all three actions need the dialog's intentional readable width");
         assertTrue(resolve.contains("setSaving(false)"),"cancel must stop without submitting a mutation");
     }
 

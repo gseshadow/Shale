@@ -883,7 +883,7 @@ public final class NewIntakeController {
 		actions.add(AppDialogs.DialogAction.cancel("Cancel",null));
 		String details=duplicates.stream().map(NewIntakeController::duplicateDescription).collect(Collectors.joining("\n"));
 		Optional<DuplicateChoice> choice=AppDialogs.showChoice(stage,"Possible Duplicate Case",
-				"A Case with this name already exists.",details,actions,Math.max(520,duplicates.size()>1?640:520));
+				"A Case with this name already exists.",details,actions,640);
 		if(choice.isEmpty()||choice.get()==null){setSaving(false);return;}
 		DuplicateChoice selected=choice.get(); submitIntakeMutation(tenantId,request,selected.merge()?selected.caseId():null);
 	}
