@@ -16,6 +16,10 @@ echo Building Shale Release %VERSION%
 echo ====================================
 
 set DESKTOP_TARGET=%ROOT%\shale-desktop\target
+set UPDATER_TARGET=%ROOT%\shale-updater\target
+set DESKTOP_JAR=%DESKTOP_TARGET%\shale-desktop-%VERSION%.jar
+set UPDATER_JAR=%UPDATER_TARGET%\shale-updater-%VERSION%.jar
+set DESKTOP_LIB=%DESKTOP_TARGET%\lib
 set DIST=%ROOT%\dist
 set DIST_APP=%ROOT%\dist-appimage
 set ASSETS_DIR=%ROOT%\build\assets
@@ -31,8 +35,13 @@ if exist "%ROOT%\dist-updater\ShaleUpdater" rmdir /s /q "%ROOT%\dist-updater\Sha
 echo Dist cleanup complete.
 echo.
 
-call mvn -f "%ROOT%\pom.xml" -pl shale-desktop -am clean package || goto :fail
-call "%ROOT%\build\scripts\build-updater.bat" || goto :fail
+call mvn -f "%ROOT%\pom.xml" -pl shale-desktop,shale-updater -am clean package || goto :fail
+
+if not exist "%DESKTOP_JAR%" goto :missing_desktop_jar
+if not exist "%UPDATER_JAR%" goto :missing_updater_jar
+if not exist "%DESKTOP_LIB%\" goto :missing_desktop_lib
+
+call "%ROOT%\build\scripts\build-updater.bat" --package-only || goto :fail
 
 echo Building desktop application image...
 jpackage ^
@@ -55,6 +64,27 @@ call "%ROOT%\build\scripts\build-shale-windows-msi.bat" || goto :fail
 
 echo Release build complete.
 exit /b 0
+
+:missing_desktop_jar
+echo Combined Maven build completed but the exact-version desktop JAR is missing.
+echo Missing artifact: desktop JAR
+echo Expected path: "%DESKTOP_JAR%"
+echo Resolved root-POM version: "%VERSION%"
+goto :fail
+
+:missing_updater_jar
+echo Combined Maven build completed but the exact-version updater JAR is missing.
+echo Missing artifact: updater JAR
+echo Expected path: "%UPDATER_JAR%"
+echo Resolved root-POM version: "%VERSION%"
+goto :fail
+
+:missing_desktop_lib
+echo Combined Maven build completed but the desktop dependency directory is missing.
+echo Missing artifact: desktop runtime dependency directory
+echo Expected path: "%DESKTOP_LIB%"
+echo Resolved root-POM version: "%VERSION%"
+goto :fail
 
 :fail
 echo build-shale-release.bat failed.
