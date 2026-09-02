@@ -8,6 +8,7 @@ import fnmatch
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 from typing import Iterable
@@ -16,12 +17,24 @@ ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = Path(__file__).with_name("test-areas.json")
 
 
+def display_command(arguments: Iterable[str]) -> str:
+    """Return diagnostics only; execution always receives the original argument list."""
+    return " ".join(arguments)
+
+
+def configured_command_arguments(command: str) -> list[str]:
+    """Parse repository-owned simple commands without invoking a command interpreter."""
+    return shlex.split(command, posix=os.name != "nt")
+
+
 def load_config() -> dict:
     return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
 def matches(path: str, patterns: Iterable[str]) -> bool:
-    path = path.replace("\\", "/").lstrip("./")
+    path = path.replace("\\", "/")
+    while path.startswith("./"):
+        path = path[2:]
     return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
 
 
@@ -99,30 +112,55 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
         escalation_reasons.extend(f"{path}: unknown production path" for path in unknown_production)
 
     full_suite = bool(escalation_reasons)
+    focused_change_set = None
+    normalized_paths = set(paths)
+    if not explicit_areas:
+        for definition in config.get("focused_change_sets", []):
+            allowed = definition.get("allowed_paths", [])
+            anchors = definition.get("anchor_paths", [])
+            if normalized_paths and all(matches(path, allowed) for path in normalized_paths) \
+                    and any(matches(path, anchors) for path in normalized_paths):
+                focused_change_set = definition
+                break
+
     selected_definitions = [area_config[name] for name in sorted(selected)]
-    modules = sorted(affected_modules | {module for item in selected_definitions for module in item.get("modules", [])})
-    patterns = sorted({pattern for item in selected_definitions for pattern in item.get("test_patterns", [])} | modified_tests)
+    configured_modules = (focused_change_set.get("modules", []) if focused_change_set else
+                          {module for item in selected_definitions for module in item.get("modules", [])})
+    modules = sorted(affected_modules | set(configured_modules))
+    suppressed_areas = set(focused_change_set.get("suppress_area_patterns", [])) if focused_change_set else set()
+    patterns = sorted(
+        {pattern for area, item in ((name, area_config[name]) for name in sorted(selected))
+         if area not in suppressed_areas for pattern in item.get("test_patterns", [])}
+        | set(focused_change_set.get("test_classes", []) if focused_change_set else [])
+        | modified_tests
+    )
     python_tests = sorted({command for item in selected_definitions for command in item.get("python_tests", [])})
+    python_command_args = [configured_command_arguments(command) for command in python_tests]
 
     focused_command = ""
+    focused_maven_args: list[str] = []
     if modified_tests:
-        focused_command = " ".join([
-            "mvn", "-pl", ",".join(sorted(modified_test_modules)), "-am",
+        focused_maven_args = [
+            "-pl", ",".join(sorted(modified_test_modules)), "-am",
             f"-Dtest={','.join(sorted(modified_tests))}",
             "-Dsurefire.failIfNoSpecifiedTests=false", "test"
-        ])
+        ]
+        focused_command = display_command(["mvn", *focused_maven_args])
 
+    selected_maven_args: list[str] = []
     if "ui-visual-advisory" in selected:
         selected_command = "mvn -Pui-visual test"
+        selected_maven_args = ["-Pui-visual", "test"]
     elif patterns:
         module_args = ["-pl", ",".join(modules), "-am"] if modules else []
-        selected_command = " ".join([
-            "mvn", *module_args, f"-Dtest={','.join(patterns)}",
+        selected_maven_args = [*module_args, f"-Dtest={','.join(patterns)}",
             "-Dsurefire.failIfNoSpecifiedTests=false", "test"
-        ])
+        ]
+        selected_command = display_command(["mvn", *selected_maven_args])
     else:
         selected_command = ""
-    informational_command = "mvn -Pall-tests test" if full_suite else ""
+    informational_maven_args = ["-Pall-tests", "test"] if full_suite else []
+    informational_command = display_command(["mvn", *informational_maven_args]) if informational_maven_args else ""
 
     return {
         "changed_paths": sorted(paths),
@@ -131,10 +169,15 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
         "test_patterns": patterns,
         "modified_test_classes": sorted(modified_tests),
         "python_commands": python_tests,
+        "python_command_args": python_command_args,
         "critical_command": "mvn test",
+        "critical_maven_args": ["test"],
         "focused_command": focused_command,
+        "focused_maven_args": focused_maven_args,
         "selected_command": selected_command,
+        "selected_maven_args": selected_maven_args,
         "informational_command": informational_command,
+        "informational_maven_args": informational_maven_args,
         "commands": [command for command in [*python_tests, focused_command, selected_command, "mvn test"] if command],
         "full_suite": full_suite,
         "escalation_reasons": escalation_reasons,
@@ -174,9 +217,15 @@ def markdown(result: dict) -> str:
 
 
 def run_commands(result: dict) -> int:
-    for command in result["commands"]:
-        print(f"+ {command}", flush=True)
-        completed = subprocess.run(command, cwd=ROOT, shell=True)
+    command_specs = [
+        *[(display_command(arguments), arguments) for arguments in result["python_command_args"]],
+        *([(result["focused_command"], ["mvn", *result["focused_maven_args"]])] if result["focused_maven_args"] else []),
+        *([(result["selected_command"], ["mvn", *result["selected_maven_args"]])] if result["selected_maven_args"] else []),
+        (result["critical_command"], ["mvn", *result["critical_maven_args"]]),
+    ]
+    for display, arguments in command_specs:
+        print(f"+ {display}", flush=True)
+        completed = subprocess.run(arguments, cwd=ROOT, shell=False)
         if completed.returncode:
             return completed.returncode
     return 0
@@ -213,8 +262,11 @@ def main(argv: list[str] | None = None) -> int:
         with args.github_output.open("a", encoding="utf-8") as output:
             output.write(f"full_suite={str(result['full_suite']).lower()}\n")
             output.write(f"selected_command={result['selected_command']}\n")
+            output.write(f"selected_maven_args={json.dumps(result['selected_maven_args'])}\n")
             output.write(f"informational_command={result['informational_command']}\n")
+            output.write(f"informational_maven_args={json.dumps(result['informational_maven_args'])}\n")
             output.write(f"python_commands={json.dumps(result['python_commands'])}\n")
+            output.write(f"python_command_args={json.dumps(result['python_command_args'])}\n")
     return run_commands(result) if args.run else 0
 
 

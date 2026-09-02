@@ -47,10 +47,15 @@ python build/test-selection/select_tests.py --area ui-behavior --run
 ```
 
 On Windows, `py` may replace `python`. The emitted Maven command selects the owning modules with
-`-pl ... -am`, a repository-maintained group of class patterns, and
+`-pl ... -am`, repository-maintained explicit or narrowly bounded test classes, and
 `-Dsurefire.failIfNoSpecifiedTests=false`, so upstream modules without matching tests do not fail.
 Pass `--area` more than once for an intentional combined selection. Use `--format markdown` to obtain
 a review-friendly explanation without running anything.
+
+The selector retains a readable command string for logs and job summaries, but execution always uses
+structured process arguments. In particular, the complete comma-separated `-Dtest=...` selection is
+one Maven argument; CI and `--run` never pass the display string through `Invoke-Expression`, `eval`,
+`cmd /c`, or a shell interpreter.
 
 ### 4. Explicit full suite
 
@@ -117,7 +122,8 @@ days.
 
 ## Maintaining the inventories
 
-When adding or renaming a test, update feature patterns or the critical manifest only when the
+When adding or renaming a test, update explicit feature ownership or the fully qualified critical
+class manifest only when the
 contract warrants it. Regenerate and check the review inventory:
 
 ```bash

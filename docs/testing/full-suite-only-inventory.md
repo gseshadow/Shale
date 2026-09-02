@@ -8,11 +8,11 @@ are intentionally full-suite-only until reviewed, consolidated, or assigned to a
 
 ## Inventory summary
 
-- Discoverable test classes: **324**
-- Source-declared JUnit test methods/factories: **1311** (parameterized runtime invocations may be higher)
+- Discoverable test classes: **328**
+- Source-declared JUnit test methods/factories: **1323** (parameterized runtime invocations may be higher)
 - Critical classes: **25**
 - Critical source-declared methods/factories: **95** (7.2%)
-- Full-suite-only classes: **36**
+- Full-suite-only classes: **37**
 
 ## Prioritized full-suite-only review
 
@@ -21,6 +21,7 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | Priority | Test source | Declared tests |
 | --- | --- | ---: |
 | duplicate source-contract coverage | `shale-data/src/test/java/com/shale/data/dao/CodexInstructionChainContractTest.java` | 2 |
+| duplicate source-contract coverage | `shale-data/src/test/java/com/shale/data/dao/EntityActionAuditEntityTypeConstraintMigrationTest.java` | 5 |
 | duplicate source-contract coverage | `shale-data/src/test/java/com/shale/data/dao/MaterialRequestCustomStatusMigrationTest.java` | 4 |
 | duplicate source-contract coverage | `shale-data/src/test/java/com/shale/data/dao/MaterialRequestDatesMigrationTest.java` | 1 |
 | duplicate source-contract coverage | `shale-data/src/test/java/com/shale/data/dao/MaterialRequestDeletionContractTest.java` | 2 |
@@ -40,7 +41,6 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | still valuable but feature-specific | `shale-data/src/test/java/com/shale/data/dao/MaterialRequestClosureNormalizationTest.java` | 6 |
 | still valuable but feature-specific | `shale-data/src/test/java/com/shale/data/dao/MaterialRequestRecurringFollowUpTest.java` | 4 |
 | still valuable but feature-specific | `shale-data/src/test/java/com/shale/data/service/adapter/MaterialRequestRequestedFromValidationTest.java` | 2 |
-| still valuable but feature-specific | `shale-server/src/test/java/com/shale/server/controller/DevIdentityControllerTest.java` | 2 |
 | still valuable but feature-specific | `shale-ui/src/test/java/com/shale/core/caseupdates/MedicalRecordRequestKeywordMatcherTest.java` | 4 |
 | still valuable but feature-specific | `shale-ui/src/test/java/com/shale/ui/component/EnhancedTextAreaTest.java` | 4 |
 | still valuable but feature-specific | `shale-ui/src/test/java/com/shale/ui/component/ExpandedTextEditTest.java` | 1 |
@@ -52,6 +52,7 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | still valuable but feature-specific | `shale-ui/src/test/java/com/shale/ui/component/factory/MaterialRequestStatusTimelineTest.java` | 3 |
 | still valuable but feature-specific | `shale-ui/src/test/java/com/shale/ui/component/richtext/NarrativeMarkdownCodecTest.java` | 9 |
 | still valuable but feature-specific | `shale-ui/src/test/java/com/shale/ui/component/spellcheck/LocalSpellCheckerTest.java` | 14 |
+| still valuable but feature-specific | `shale-ui/src/test/java/com/shale/ui/controller/AuditLogViewerEntityTypeTest.java` | 1 |
 | still valuable but feature-specific | `shale-ui/src/test/java/com/shale/ui/controller/MaterialRequestCardArchitectureTest.java` | 2 |
 | still valuable but feature-specific | `shale-ui/src/test/java/com/shale/ui/controller/RequestLookupCardSelectionTest.java` | 7 |
 | still valuable but feature-specific | `shale-ui/src/test/java/com/shale/ui/controller/RequestedFromWorkflowDialogTest.java` | 12 |
@@ -128,26 +129,28 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | `shale-data/src/test/java/com/shale/data/dao/CaseSummarySearchContractTest.java` | no | cases | 2 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseSummaryServerProjectionContractTest.java` | no | cases, server | 2 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseSummaryUserDetailContractTest.java` | no | cases, settings-team | 3 |
+| `shale-data/src/test/java/com/shale/data/dao/CaseTimelineCoverageContractTest.java` | no | cases | 5 |
+| `shale-data/src/test/java/com/shale/data/dao/CaseTimelineWriterTest.java` | no | cases | 2 |
 | `shale-data/src/test/java/com/shale/data/dao/CasesIntakeTakenByMigrationTest.java` | no | cases | 1 |
 | `shale-data/src/test/java/com/shale/data/dao/CodexInstructionChainContractTest.java` | no | full-suite-only | 2 |
 | `shale-data/src/test/java/com/shale/data/dao/ContactAdministrationReadContractTest.java` | no | contacts, settings-team | 2 |
-| `shale-data/src/test/java/com/shale/data/dao/ContactAggregateMutationContractTest.java` | yes | contacts | 4 |
+| `shale-data/src/test/java/com/shale/data/dao/ContactAggregateMutationContractTest.java` | yes | contacts, security-data | 4 |
 | `shale-data/src/test/java/com/shale/data/dao/ContactClassificationReadContractTest.java` | no | contacts | 3 |
 | `shale-data/src/test/java/com/shale/data/dao/ContactCompleteAggregateContractTest.java` | no | contacts | 1 |
 | `shale-data/src/test/java/com/shale/data/dao/ContactDefinitionColorsMigrationTest.java` | no | contacts | 3 |
 | `shale-data/src/test/java/com/shale/data/dao/ContactDirectoryCredentialProjectionTest.java` | no | contacts | 1 |
 | `shale-data/src/test/java/com/shale/data/dao/ContactDirectoryPhase2CDContractTest.java` | no | contacts | 3 |
 | `shale-data/src/test/java/com/shale/data/dao/ContactFoundationMigrationContractTest.java` | no | contacts | 9 |
-| `shale-data/src/test/java/com/shale/data/dao/ContactMutationContractTest.java` | yes | contacts | 7 |
+| `shale-data/src/test/java/com/shale/data/dao/ContactMutationContractTest.java` | yes | contacts, security-data | 7 |
 | `shale-data/src/test/java/com/shale/data/dao/ContactNotesProductionPathContractTest.java` | no | contacts | 1 |
-| `shale-data/src/test/java/com/shale/data/dao/ContactPhase1CAuditMigrationContractTest.java` | no | contacts, security-data | 4 |
-| `shale-data/src/test/java/com/shale/data/dao/ContactPhase2BAuditMigrationContractTest.java` | no | contacts, security-data | 4 |
+| `shale-data/src/test/java/com/shale/data/dao/ContactPhase1CAuditMigrationContractTest.java` | no | contacts | 4 |
+| `shale-data/src/test/java/com/shale/data/dao/ContactPhase2BAuditMigrationContractTest.java` | no | contacts | 4 |
 | `shale-data/src/test/java/com/shale/data/dao/ContactPhase2CAContactPointsMigrationContractTest.java` | no | contacts | 8 |
-| `shale-data/src/test/java/com/shale/data/dao/ContactPhase2CBAuditMigrationContractTest.java` | no | contacts, security-data | 1 |
+| `shale-data/src/test/java/com/shale/data/dao/ContactPhase2CBAuditMigrationContractTest.java` | no | contacts | 1 |
 | `shale-data/src/test/java/com/shale/data/dao/ContactPhase2ELegacyReadBoundaryContractTest.java` | no | contacts | 3 |
-| `shale-data/src/test/java/com/shale/data/dao/ContactPhase3AReadinessAuditContractTest.java` | no | contacts, security-data | 8 |
+| `shale-data/src/test/java/com/shale/data/dao/ContactPhase3AReadinessAuditContractTest.java` | no | contacts | 8 |
 | `shale-data/src/test/java/com/shale/data/dao/ContactPhase3BNoLegacyRuntimeContractTest.java` | no | contacts, ui-visual-advisory | 3 |
-| `shale-data/src/test/java/com/shale/data/dao/EntityActionAuditEntityTypeConstraintMigrationTest.java` | no | security-data | 5 |
+| `shale-data/src/test/java/com/shale/data/dao/EntityActionAuditEntityTypeConstraintMigrationTest.java` | no | full-suite-only | 5 |
 | `shale-data/src/test/java/com/shale/data/dao/EntityActionAuditEventTest.java` | yes | security-data | 10 |
 | `shale-data/src/test/java/com/shale/data/dao/EntityActionAuditMigrationContractTest.java` | yes | security-data | 2 |
 | `shale-data/src/test/java/com/shale/data/dao/FormConfigurationFoundationTest.java` | no | full-suite-only | 6 |
@@ -208,10 +211,10 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | `shale-server/src/test/java/com/shale/server/config/ShaleServerServiceConfigurationTest.java` | yes | server | 4 |
 | `shale-server/src/test/java/com/shale/server/controller/ApiReadControllerTest.java` | no | server | 38 |
 | `shale-server/src/test/java/com/shale/server/controller/AuthControllerTest.java` | yes | server | 10 |
-| `shale-server/src/test/java/com/shale/server/controller/DevIdentityControllerTest.java` | no | full-suite-only | 2 |
-| `shale-server/src/test/java/com/shale/server/controller/HealthControllerTest.java` | yes | full-suite-only | 3 |
+| `shale-server/src/test/java/com/shale/server/controller/DevIdentityControllerTest.java` | no | server | 2 |
+| `shale-server/src/test/java/com/shale/server/controller/HealthControllerTest.java` | yes | server | 3 |
 | `shale-server/src/test/java/com/shale/server/controller/OpenApiDocumentationTest.java` | no | server | 1 |
-| `shale-server/src/test/java/com/shale/server/runtime/RequestScopedDbSessionProviderTest.java` | yes | security-data | 5 |
+| `shale-server/src/test/java/com/shale/server/runtime/RequestScopedDbSessionProviderTest.java` | yes | security-data, server | 5 |
 | `shale-server/src/test/java/com/shale/server/runtime/ServerSessionSkeletonTest.java` | yes | security-data, server | 5 |
 | `shale-ui/src/test/java/com/shale/core/caseupdates/MedicalRecordRequestKeywordMatcherTest.java` | no | full-suite-only | 4 |
 | `shale-ui/src/test/java/com/shale/ui/component/CalendarEventCardTooltipTest.java` | no | calendar | 3 |
@@ -259,7 +262,7 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | `shale-ui/src/test/java/com/shale/ui/component/richtext/NarrativeMarkdownCodecTest.java` | no | full-suite-only | 9 |
 | `shale-ui/src/test/java/com/shale/ui/component/spellcheck/LocalSpellCheckerTest.java` | no | full-suite-only | 14 |
 | `shale-ui/src/test/java/com/shale/ui/component/spellcheck/UserDictionarySessionTest.java` | no | settings-team | 5 |
-| `shale-ui/src/test/java/com/shale/ui/controller/AuditLogViewerEntityTypeTest.java` | no | security-data | 1 |
+| `shale-ui/src/test/java/com/shale/ui/controller/AuditLogViewerEntityTypeTest.java` | no | full-suite-only | 1 |
 | `shale-ui/src/test/java/com/shale/ui/controller/AuthoritativeCaseDateEditorTest.java` | no | cases | 4 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CalendarCaseDateInPlaceEditorContractTest.java` | no | calendar, cases | 5 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CalendarCaseDatesLayerPreferenceContractTest.java` | no | calendar, cases | 3 |
@@ -279,6 +282,7 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseDateOccurrenceRemovalContractTest.java` | no | cases | 4 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseDateProductionEntryPointTitleTest.java` | no | cases | 2 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseDatesPhase2CArchitectureTest.java` | no | cases | 4 |
+| `shale-ui/src/test/java/com/shale/ui/controller/CaseDetailsTimelineCoverageTest.java` | no | cases | 3 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseIntakeTakenByHeaderTest.java` | no | cases | 3 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseLinkSharesPhase533ContactLoadingUiTest.java` | no | cases, contacts | 2 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseLinkSharesPhase535VisualIntegrationTest.java` | no | cases, ui-visual-advisory | 4 |
@@ -302,6 +306,7 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseOverviewResponsibleAttorneyEligibilityTest.java` | no | cases | 3 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseRequestsLifecycleRegressionTest.java` | no | cases | 3 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseSectionNavigationSelectionTest.java` | no | cases | 6 |
+| `shale-ui/src/test/java/com/shale/ui/controller/CaseTimelineDescriptionTest.java` | no | cases | 2 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CasesMigratedDateCutoverContractTest.java` | no | cases | 6 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CasesToolbarCssRuntimeTest.java` | no | cases, ui-visual-advisory | 1 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CompleteExportContractTest.java` | no | reports | 6 |
@@ -351,7 +356,7 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | `shale-ui/src/test/java/com/shale/ui/controller/SettingsControllerLifecycleTest.java` | no | settings-team, ui-behavior | 13 |
 | `shale-ui/src/test/java/com/shale/ui/controller/SettingsFxmlLoadTest.java` | no | settings-team, ui-fxml-structure | 1 |
 | `shale-ui/src/test/java/com/shale/ui/controller/SettingsLinkTypeAdministrationTest.java` | no | settings-team | 3 |
-| `shale-ui/src/test/java/com/shale/ui/controller/SettingsNotificationAuditSemanticControlTest.java` | no | notifications, security-data, settings-team | 4 |
+| `shale-ui/src/test/java/com/shale/ui/controller/SettingsNotificationAuditSemanticControlTest.java` | no | notifications, settings-team | 4 |
 | `shale-ui/src/test/java/com/shale/ui/controller/SettingsObsoleteCalendarMappingRemovalTest.java` | no | calendar, settings-team | 1 |
 | `shale-ui/src/test/java/com/shale/ui/controller/SettingsUserManagementNameCellContractTest.java` | no | settings-team | 4 |
 | `shale-ui/src/test/java/com/shale/ui/controller/SettingsUserManagementSemanticRuntimeTest.java` | no | settings-team, ui-visual-advisory | 1 |
@@ -383,5 +388,5 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | `shale-ui/src/test/java/com/shale/ui/util/SemanticControlCssContractTest.java` | no | ui-presentation | 2 |
 | `shale-ui/src/test/java/com/shale/ui/util/SemanticControlCssRuntimeTest.java` | no | ui-visual-advisory | 1 |
 | `shale-updater/src/test/java/com/shale/updater/InstallServiceTest.java` | yes | updater | 2 |
-| `shale-updater/src/test/java/com/shale/updater/MainTest.java` | yes | full-suite-only | 2 |
-| `shale-updater/src/test/java/com/shale/updater/platform/MacPlatformSupportTest.java` | yes | full-suite-only | 4 |
+| `shale-updater/src/test/java/com/shale/updater/MainTest.java` | yes | updater | 2 |
+| `shale-updater/src/test/java/com/shale/updater/platform/MacPlatformSupportTest.java` | yes | updater | 4 |

@@ -22,7 +22,7 @@ def critical_names() -> set[str]:
     names = set()
     for line in (HERE / "critical-tests.txt").read_text(encoding="utf-8").splitlines():
         if line.strip() and not line.lstrip().startswith("#"):
-            names.add(Path(line.strip()).stem)
+            names.add(line.strip())
     return names
 
 
@@ -30,9 +30,10 @@ def invocation_count(path: Path) -> int:
     return len(re.findall(r"@(Test|ParameterizedTest|RepeatedTest|TestFactory)\b", path.read_text(encoding="utf-8")))
 
 
-def owners(name: str, config: dict) -> list[str]:
+def owners(name: str, qualified_name: str, config: dict) -> list[str]:
     return sorted(area for area, definition in config["areas"].items()
-                  if any(fnmatch.fnmatchcase(name, pattern) for pattern in definition.get("test_patterns", [])))
+                  if any(fnmatch.fnmatchcase(name, pattern) or fnmatch.fnmatchcase(qualified_name, pattern)
+                         for pattern in definition.get("test_patterns", [])))
 
 
 def priority(name: str) -> str:
@@ -56,12 +57,13 @@ def render() -> str:
     full_only = []
     for path in test_sources():
         name = path.stem
+        qualified_name = path.as_posix().split("/src/test/java/", 1)[1][:-5].replace("/", ".")
         count = invocation_count(path)
         total_invocations += count
-        is_critical = name in critical
+        is_critical = qualified_name in critical
         if is_critical:
             critical_invocations += count
-        area_owners = owners(name, config)
+        area_owners = owners(name, qualified_name, config)
         relative = path.relative_to(ROOT).as_posix()
         rows.append((relative, is_critical, area_owners, count))
         if not is_critical and not area_owners:
