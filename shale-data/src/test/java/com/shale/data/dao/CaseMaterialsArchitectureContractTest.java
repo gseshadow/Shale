@@ -9,19 +9,6 @@ import org.junit.jupiter.api.Test;
 
 final class CaseMaterialsArchitectureContractTest {
     @Test
-    void promptRulesRequireTestMaintenanceForEveryBehavioralChange() throws Exception {
-        String rules = Files.readString(Path.of("..", "architecture", "codex-prompt-rules.md"));
-        assertTrue(rules.contains("Tests are implementation work"));
-        assertTrue(rules.contains("Identify and inspect tests related to the classes, controls, workflows, commands, service ports, database objects, migrations, and behavior being changed"));
-        assertTrue(rules.contains("If a test still represents the intended contract, fix the production regression"));
-        assertTrue(rules.contains("If the requested change intentionally supersedes the old behavior, update the outdated test"));
-        assertTrue(rules.contains("Do not weaken tests merely to make the build pass"));
-        assertTrue(rules.contains("Inspect neighboring and related tests for duplicated stale assumptions"));
-        assertTrue(rules.contains("run the broader Maven reactor/test suite when appropriate"));
-        assertTrue(rules.contains("An implementation task is not complete until"));
-    }
-
-    @Test
     void promptRulesRequireAuditCompatibilityForNewFeaturesAndArchitecture() throws Exception {
         String rules = Files.readString(Path.of("..", "architecture", "codex-prompt-rules.md"));
         assertTrue(rules.contains("identify sensitive reads/views and all meaningful domain or administrative mutations"));

@@ -9,7 +9,7 @@ are intentionally full-suite-only until reviewed, consolidated, or assigned to a
 ## Inventory summary
 
 - Discoverable test classes: **326**
-- Source-declared JUnit test methods/factories: **1319** (parameterized runtime invocations may be higher)
+- Source-declared JUnit test methods/factories: **1318** (parameterized runtime invocations may be higher)
 - Critical classes: **25**
 - Critical source-declared methods/factories: **95** (7.2%)
 - Full-suite-only classes: **38**
@@ -119,7 +119,7 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | `shale-data/src/test/java/com/shale/data/dao/CaseLinksFoundationMigrationTest.java` | no | cases | 9 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseLinksPhase541ContactReverseLookupTest.java` | no | cases, contacts | 3 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseLinksPhase542ContactReverseLookupLifecycleTest.java` | no | cases, contacts | 3 |
-| `shale-data/src/test/java/com/shale/data/dao/CaseMaterialsArchitectureContractTest.java` | no | cases | 4 |
+| `shale-data/src/test/java/com/shale/data/dao/CaseMaterialsArchitectureContractTest.java` | no | cases | 3 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseMaterialsFoundationMigrationTest.java` | no | cases | 9 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseStatusSoftDeleteContractTest.java` | no | cases | 3 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseSummaryCalendarContractTest.java` | no | calendar, cases | 2 |
