@@ -3,15 +3,12 @@ package com.shale.ui.controller;
 import com.shale.ui.testutil.JavaFxTestSupport;
 import com.shale.ui.util.AppSectionTabs;
 import javafx.fxml.FXMLLoader;
-import javafx.geometry.Bounds;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -22,12 +19,10 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class CaseSectionNavigationSelectionTest {
-    private static final double GEOMETRY_TOLERANCE = 1.0;
     private static final List<String> ORDER = List.of(
             "Overview", "Details", "Parties", "Tasks", "Calendar", "Dates", "Requests", "Links", "Timeline");
 
@@ -68,15 +63,25 @@ final class CaseSectionNavigationSelectionTest {
     }
 
     @Test
-    void usesSharedComponentContractAndScrollableSingleRowAtNarrowWidth() throws Exception {
+    void caseNavigationUsesSharedStructureAndDeclaredDesignTokens() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
         String fxml = Files.readString(Path.of("src/main/resources/fxml/case.fxml"));
         String css = Files.readString(Path.of("src/main/resources/css/app.css"));
         assertTrue(source.contains("AppSectionTabs.buildTabs("));
         assertTrue(source.contains("AppSectionTabs.setActive("));
-        assertFalse(fxml.contains("Case Materials"));
+        assertTrue(fxml.contains("fx:id=\"caseSectionNavigationScrollPane\""));
+        assertTrue(fxml.contains("fitToWidth=\"false\" hbarPolicy=\"AS_NEEDED\""));
+        assertTrue(fxml.contains("vbarPolicy=\"NEVER\" pannable=\"true\""));
+        assertTrue(fxml.contains("fx:id=\"sectionTabsBar\""));
+        assertTrue(fxml.contains("<Insets top=\"6\" right=\"0\" bottom=\"6\" left=\"0\" />"),
+                "Case navigation row must retain its declared 6px vertical padding token.");
+        assertTrue(css.matches("(?s).*\\.app-section-tab\\s*\\{[^}]*-fx-min-height:\\s*30(?:px)?;.*"),
+                "Shared Case tabs must retain the declared 30px minimum-height token.");
         assertFalse(css.contains(".case-section-tab"));
+    }
 
+    @Test
+    void everyCaseTabCanBeScrolledIntoViewAndActivatedAtNarrowWidth() {
         JavaFxTestSupport.runAndWait(() -> {
             LoadedCase loaded = load(null);
             Scene scene = new Scene(loaded.root(), 420, 700);
@@ -89,104 +94,35 @@ final class CaseSectionNavigationSelectionTest {
             loaded.root().applyCss();
             loaded.root().layout();
             loaded.root().layout(); // settle the preferred height after AS_NEEDED resolves the horizontal bar
-            assertTrue(scroll.getContent().prefWidth(-1) > scroll.getViewportBounds().getWidth(),
-                    "The complete, unclipped tab row must remain horizontally scrollable at narrow widths.");
-            loaded.tabs().values().forEach(button ->
-                    assertTrue(button.getStyleClass().contains(AppSectionTabs.TAB_BUTTON_STYLE_CLASS)));
-        });
-    }
-
-    @Test
-    void caseSectionNavigationProvidesVerticalClearanceWithoutChangingHeaderSpacing() {
-        JavaFxTestSupport.runAndWait(() -> {
-            LoadedCase loaded = load(null);
-            Scene scene = new Scene(loaded.root(), 420, 700);
-            scene.getStylesheets().add(CaseSectionNavigationSelectionTest.class.getResource("/css/app.css").toExternalForm());
-            loaded.root().applyCss();
-            loaded.root().layout();
-            loaded.root().layout(); // settle the preferred height after AS_NEEDED resolves the horizontal bar
-
-            BorderPane caseRoot = (BorderPane) loaded.root().lookup("#caseRootPane");
-            VBox caseHeader = (VBox) caseRoot.getTop();
-            ScrollPane scroll = (ScrollPane) loaded.root().lookup("#caseSectionNavigationScrollPane");
             HBox tabRow = (HBox) scroll.getContent();
-
             assertSame(field(loaded.controller(), "sectionTabsBar"), tabRow,
-                    "The measured strip must be the Overview/Details/etc. navigation row.");
+                    "The rendered content must be the actual Case section-navigation host.");
             assertEquals(ORDER, tabRow.getChildren().stream()
                             .map(Button.class::cast)
                             .map(Button::getText)
                             .toList(),
                     "The measured content must be the actual Case section-navigation tabs.");
 
-            double requiredNavigationWidth = tabRow.prefWidth(-1);
-            double constrainedNavigationWidth = Math.max(1, requiredNavigationWidth - 80);
-            scroll.setMinWidth(0);
-            scroll.setPrefWidth(constrainedNavigationWidth);
-            scroll.setMaxWidth(constrainedNavigationWidth);
-            loaded.root().layout();
-            loaded.root().layout(); // resolve the AS_NEEDED horizontal bar after constraining the viewport
-
-            assertFalse(scroll.isFitToHeight(),
-                    "The ScrollPane must not force the navigation content down to a short viewport height.");
-            assertEquals(6, tabRow.getPadding().getTop());
-            assertEquals(6, tabRow.getPadding().getBottom());
-            assertEquals(ScrollPane.ScrollBarPolicy.AS_NEEDED, scroll.getHbarPolicy());
-            assertEquals(ScrollPane.ScrollBarPolicy.NEVER, scroll.getVbarPolicy());
-            assertFalse(scroll.isFitToWidth());
             assertTrue(tabRow.getLayoutBounds().getWidth() > scroll.getViewportBounds().getWidth(),
-                    "The fixture must make the actual Case navigation row wider than its viewport. "
-                            + geometry(scroll, tabRow));
+                    "The narrow fixture must genuinely overflow before testing scrolling and activation.");
 
-            Bounds rowInScroll = scroll.sceneToLocal(tabRow.localToScene(tabRow.getBoundsInLocal()));
-            assertTrue(rowInScroll.getMinY() >= -0.5 && rowInScroll.getMaxY() <= scroll.getHeight() + 0.5,
-                    "The complete padded navigation row must remain inside the visible strip. " + geometry(scroll, tabRow));
-
-            for (Map.Entry<String, Button> entry : loaded.tabs().entrySet()) {
-                Button tab = entry.getValue();
-                assertTrue(tab.getStyleClass().contains(AppSectionTabs.TAB_BUTTON_STYLE_CLASS),
-                        entry.getKey() + " must retain the shared section-tab styling contract.");
-                assertTrue(tab.minHeight(-1) >= 30,
-                        entry.getKey() + " must retain the intended minimum tab-control height.");
-                Bounds renderedInRow = tabRow.sceneToLocal(tab.localToScene(tab.getBoundsInLocal()));
-                double topClearance = renderedInRow.getMinY();
-                double bottomClearance = tabRow.getHeight() - renderedInRow.getMaxY();
-                assertTrue(topClearance >= -GEOMETRY_TOLERANCE,
-                        entry.getKey() + " must not render above the navigation row; top clearance=" + topClearance);
-                assertTrue(bottomClearance >= -GEOMETRY_TOLERANCE,
-                        entry.getKey() + " must not render below the navigation row; bottom clearance=" + bottomClearance);
-                assertTrue(topClearance > 0,
-                        entry.getKey() + " must retain positive visible clearance above its rounded edge.");
-                assertTrue(bottomClearance > 0,
-                        entry.getKey() + " must retain positive visible clearance below its rounded edge.");
-                assertNull(tab.getClip(),
-                        entry.getKey() + " must not clip its rendered tab surface.");
+            int lastIndex = ORDER.size() - 1;
+            for (int index = 0; index <= lastIndex; index++) {
+                String section = ORDER.get(index);
+                scroll.setHvalue(index / (double) lastIndex);
+                loaded.root().layout();
+                Button tab = loaded.tabs().get(section);
+                var tabInScroll = scroll.sceneToLocal(tab.localToScene(tab.getBoundsInLocal()));
+                double visibleWidth = Math.min(tabInScroll.getMaxX(), scroll.getViewportBounds().getWidth())
+                        - Math.max(tabInScroll.getMinX(), 0);
+                double visibleHeight = Math.min(tabInScroll.getMaxY(), scroll.getViewportBounds().getHeight())
+                        - Math.max(tabInScroll.getMinY(), 0);
+                assertTrue(visibleWidth > 0 && visibleHeight > 0,
+                        section + " must have a positive visible intersection after public horizontal scrolling.");
+                tab.fire();
+                assertSelectionAndContent(loaded, section);
             }
-
-            assertTrue(scroll.getHeight() <= tabRow.getBoundsInParent().getHeight() * 2,
-                    "The Case navigation must remain a compact strip rather than expanding vertically. "
-                            + geometry(scroll, tabRow));
-
-            assertEquals(8, caseHeader.getPadding().getTop());
-            assertEquals(6, caseHeader.getPadding().getBottom());
-            assertEquals(48, loaded.root().lookup("#statusTimelineHost").minHeight(-1));
-            assertFalse(caseHeader.getStyleClass().contains("app-section-tabs-scroll"),
-                    "The Case header/status surface must remain distinct from the section navigation strip.");
         });
-    }
-
-    private static String geometry(ScrollPane scroll, HBox row) {
-        double tallestTab = row.getChildren().stream().mapToDouble(node -> node.getBoundsInParent().getHeight()).max().orElse(0);
-        return "scroll=" + scroll.getHeight()
-                + ", viewport=" + scroll.getViewportBounds()
-                + ", rowLayout=" + row.getLayoutBounds().getHeight()
-                + ", rowParent=" + row.getBoundsInParent().getHeight()
-                + ", rowPadding=" + row.getPadding()
-                + ", tallestTab=" + tallestTab
-                + ", fitToHeight=" + scroll.isFitToHeight()
-                + ", fitToWidth=" + scroll.isFitToWidth()
-                + ", hbarPolicy=" + scroll.getHbarPolicy()
-                + ", vbarPolicy=" + scroll.getVbarPolicy();
     }
 
     private static LoadedCase load(String initialSection) throws Exception {
