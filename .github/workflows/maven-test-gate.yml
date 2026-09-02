@@ -1,0 +1,101 @@
+name: Maven test gate
+
+on:
+  push:
+    branches:
+      - codex/latest
+  pull_request:
+    branches:
+      - codex/latest
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maven-test-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Complete Maven reactor (Windows, Java 21)
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21 and Maven cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run complete Maven test reactor
+        run: mvn test
+
+      - name: Summarize Surefire and Failsafe reports
+        if: always()
+        shell: pwsh
+        run: |
+          $reports = Get-ChildItem -Path . -Recurse -File -Include 'TEST-*.xml' |
+            Where-Object { $_.DirectoryName -match '[\\/](surefire|failsafe)-reports$' }
+
+          if (-not $reports) {
+            Add-Content $env:GITHUB_STEP_SUMMARY '## Maven test reports'
+            Add-Content $env:GITHUB_STEP_SUMMARY 'No Surefire or Failsafe XML reports were produced.'
+            exit 0
+          }
+
+          $rows = foreach ($report in $reports) {
+            [xml]$xml = Get-Content -Raw $report.FullName
+            $suite = $xml.testsuite
+            $module = $report.Directory.Parent.Parent.Name
+            [pscustomobject]@{
+              Module = $module
+              Tests = [int]$suite.tests
+              Failures = [int]$suite.failures
+              Errors = [int]$suite.errors
+              Skipped = [int]$suite.skipped
+              Seconds = [double]$suite.time
+            }
+
+            foreach ($case in $suite.testcase) {
+              if ($case.failure -or $case.error) {
+                $title = "$module - $($case.classname).$($case.name)" -replace '[\r\n]', ' '
+                [Console]::WriteLine("::error title=$title::See $($report.FullName) for the failure details.")
+              }
+            }
+          }
+
+          $modules = $rows | Group-Object Module | Sort-Object Name
+          $totalTests = ($rows | Measure-Object Tests -Sum).Sum
+          $totalFailures = ($rows | Measure-Object Failures -Sum).Sum
+          $totalErrors = ($rows | Measure-Object Errors -Sum).Sum
+          $totalSkipped = ($rows | Measure-Object Skipped -Sum).Sum
+          $totalSeconds = ($rows | Measure-Object Seconds -Sum).Sum
+
+          Add-Content $env:GITHUB_STEP_SUMMARY '## Maven test reports'
+          Add-Content $env:GITHUB_STEP_SUMMARY '| Scope | Tests | Failures | Errors | Skipped | Test duration (s) |'
+          Add-Content $env:GITHUB_STEP_SUMMARY '| --- | ---: | ---: | ---: | ---: | ---: |'
+          foreach ($module in $modules) {
+            $tests = ($module.Group | Measure-Object Tests -Sum).Sum
+            $failures = ($module.Group | Measure-Object Failures -Sum).Sum
+            $errors = ($module.Group | Measure-Object Errors -Sum).Sum
+            $skipped = ($module.Group | Measure-Object Skipped -Sum).Sum
+            $seconds = ($module.Group | Measure-Object Seconds -Sum).Sum
+            Add-Content $env:GITHUB_STEP_SUMMARY "| Module: $($module.Name) | $tests | $failures | $errors | $skipped | $([math]::Round($seconds, 3)) |"
+          }
+          Add-Content $env:GITHUB_STEP_SUMMARY "| **Reactor total** | **$totalTests** | **$totalFailures** | **$totalErrors** | **$totalSkipped** | **$([math]::Round($totalSeconds, 3))** |"
+
+      - name: Archive Surefire and Failsafe reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-test-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          if-no-files-found: warn
+          retention-days: 14
