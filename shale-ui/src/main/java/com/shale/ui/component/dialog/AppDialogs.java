@@ -3,6 +3,7 @@ package com.shale.ui.component.dialog;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -13,6 +14,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -24,6 +26,8 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.Window;
+import com.shale.ui.util.ActionButtonFactory;
+import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.DialogSizingUtil;
 import com.shale.ui.util.WindowSizingUtil;
 
@@ -282,9 +286,9 @@ public final class AppDialogs {
 		VBox root = new VBox(18);
 		root.getStyleClass().add("app-dialog-root");
 		root.setPadding(new Insets(18));
-		double safeMinWidth = Math.max(CONFIRMATION_DIALOG_MIN_WIDTH, minWidth);
-		root.setMinWidth(safeMinWidth);
-		root.setPrefWidth(safeMinWidth);
+		double safePrefWidth = Math.max(CONFIRMATION_DIALOG_MIN_WIDTH, minWidth);
+		root.setMinWidth(CONFIRMATION_DIALOG_MIN_WIDTH);
+		root.setPrefWidth(safePrefWidth);
 		root.setMinHeight(CONFIRMATION_DIALOG_MIN_HEIGHT);
 
 		if (!isBlank(heading) || !isBlank(message)) {
@@ -309,27 +313,11 @@ public final class AppDialogs {
 			root.getChildren().add(customContent);
 		}
 
-		HBox actionsRow = new HBox(10);
-		actionsRow.setAlignment(Pos.CENTER_RIGHT);
-		actionsRow.getStyleClass().add("app-dialog-actions");
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		actionsRow.getChildren().add(spacer);
-		for (DialogAction<T> action : actions) {
-			Button button = new Button(action.text());
-			double buttonWidth = buttonPrefWidthForActionText(action.text());
-			button.setMinWidth(buttonWidth);
-			button.setPrefWidth(buttonWidth);
-			button.getStyleClass().add("app-dialog-button");
-			button.getStyleClass().add(action.kind().styleClass());
-			button.setDefaultButton(action.defaultAction());
-			button.setCancelButton(action.cancelAction());
-			button.setOnAction(event -> {
-				result.value = action.value();
-				stage.close();
-			});
-			actionsRow.getChildren().add(button);
-		}
+		FlowPane actionsRow = createActionsRow(actions, value -> {
+			result.value = value;
+			stage.close();
+		});
+		actionsRow.setPrefWrapLength(safePrefWidth - root.getPadding().getLeft() - root.getPadding().getRight());
 		root.getChildren().add(actionsRow);
 
 		Scene scene = new Scene(root);
@@ -340,14 +328,37 @@ public final class AppDialogs {
 				stage,
 				owner,
 				root,
-				safeMinWidth,
+				safePrefWidth,
+				CONFIRMATION_DIALOG_MIN_WIDTH,
 				CONFIRMATION_DIALOG_MIN_HEIGHT);
 		stage.showAndWait();
 		return Optional.ofNullable(result.value);
 	}
 
-	static double buttonPrefWidthForActionText(String text) {
-		return Math.max(128, (text == null ? 0 : text.length()) * 8.0 + 32);
+	static <T> FlowPane createActionsRow(List<DialogAction<T>> actions, Consumer<T> onAction) {
+		Objects.requireNonNull(actions, "actions");
+		Objects.requireNonNull(onAction, "onAction");
+		FlowPane actionsRow = new FlowPane(10, 10);
+		actionsRow.setAlignment(Pos.CENTER_RIGHT);
+		actionsRow.setMaxWidth(Double.MAX_VALUE);
+		actionsRow.getStyleClass().add("app-dialog-actions");
+		for (DialogAction<T> action : actions) {
+			Button button = ActionButtonFactory.semantic(action.text(), null,
+					purposeFor(action.kind()), ControlStyles.Size.STANDARD);
+			button.setDefaultButton(action.defaultAction());
+			button.setCancelButton(action.cancelAction());
+			button.setOnAction(event -> onAction.accept(action.value()));
+			actionsRow.getChildren().add(button);
+		}
+		return actionsRow;
+	}
+
+	private static ControlStyles.Purpose purposeFor(DialogActionKind kind) {
+		return switch (kind) {
+			case PRIMARY -> ControlStyles.Purpose.PRIMARY;
+			case SECONDARY -> ControlStyles.Purpose.SECONDARY;
+			case DANGER -> ControlStyles.Purpose.DANGER;
+		};
 	}
 
 	private static boolean isBlank(String value) {

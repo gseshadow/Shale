@@ -54,13 +54,24 @@ final class NewIntakeControllerLocalFallbackSerializationTest {
 	}
 
 	@Test
-	void dialogButtonSizingSupportsFallbackLabels() {
-		String source = assertDoesNotThrow(() -> java.nio.file.Files.readString(
+	void fallbackDialogUsesResponsiveActionLayoutWithoutFixedButtonWidths() {
+		String dialogSource = assertDoesNotThrow(() -> java.nio.file.Files.readString(
 				java.nio.file.Path.of("src/main/java/com/shale/ui/component/dialog/AppDialogs.java")));
+		String intakeSource = assertDoesNotThrow(() -> java.nio.file.Files.readString(
+				java.nio.file.Path.of("src/main/java/com/shale/ui/controller/NewIntakeController.java")));
 
-		assertTrue(source.contains("button.setMinWidth(buttonWidth)"));
-		assertTrue(source.contains("button.setPrefWidth(buttonWidth)"));
-		assertTrue(source.contains("Math.max(128"));
+		assertTrue(intakeSource.contains("AppDialogs.showChoice"),
+				"fallback actions must use the shared responsive dialog path");
+		assertTrue(intakeSource.contains("Save Local Backup"));
+		assertTrue(intakeSource.contains("Copy Intake Text"));
+		assertTrue(intakeSource.contains("Keep Editing"));
+		assertTrue(dialogSource.contains("FlowPane actionsRow = createActionsRow"));
+		assertTrue(dialogSource.contains("new FlowPane(10, 10)"),
+				"fallback labels must wrap with consistent gaps when space is constrained");
+		assertTrue(dialogSource.contains("ActionButtonFactory.semantic(action.text()"),
+				"buttons must size naturally from their complete labels");
+		assertFalse(dialogSource.contains("button.setMinWidth(buttonWidth)"));
+		assertFalse(dialogSource.contains("button.setPrefWidth(buttonWidth)"));
 	}
 
 	private static NewIntakeController.IntakeFormSnapshot snapshotWithDates() {
