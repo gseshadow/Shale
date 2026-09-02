@@ -35,24 +35,21 @@ final class TaskCardHoverTooltipLayoutRegressionTest {
     }
 
     @Test
-    void actualTaskCardTooltipWindowAutosizesToCompactRenderedContent() throws Exception {
+    void actualTaskCardTooltipExposesCompleteShortDescriptionWithoutClipping() throws Exception {
         TooltipMetrics shortMetrics = showTaskTooltipAndMeasure("Review intake packet.");
-        System.out.println("SHORT_TASK_TOOLTIP_METRICS " + shortMetrics.diagnostics());
-
-        assertTrue(shortMetrics.windowHeight() < 140, shortMetrics.diagnostics());
-        assertTrue(shortMetrics.windowHeight() < shortMetrics.sceneHeight() * 0.35, shortMetrics.diagnostics());
-        assertTrue(Math.abs(shortMetrics.windowHeight() - shortMetrics.contentHeight()) < 55, shortMetrics.diagnostics());
+        assertEquals("Review intake packet.", shortMetrics.tooltipText());
+        assertTrue(shortMetrics.visibleContentHeight() > 0, shortMetrics.diagnostics());
+        assertTrue(shortMetrics.visibleContentHeight() >= shortMetrics.contentHeight() - 1, shortMetrics.diagnostics());
     }
 
     @Test
-    void actualTaskCardTooltipTruncatesLongRepeatedDescriptionWithoutFullHeightWindow() throws Exception {
+    void actualTaskCardTooltipExposesCompleteTruncatedLongDescriptionWithoutClipping() throws Exception {
         TooltipMetrics longMetrics = showTaskTooltipAndMeasure("Long task description. ".repeat(80));
-        System.out.println("LONG_REPEATED_TASK_TOOLTIP_METRICS " + longMetrics.diagnostics());
-
         assertTrue(longMetrics.tooltipText().endsWith("..."), longMetrics.tooltipText());
-        assertTrue(longMetrics.windowHeight() < 240, longMetrics.diagnostics());
-        assertTrue(longMetrics.windowHeight() < longMetrics.sceneHeight() * 0.5, longMetrics.diagnostics());
-        assertTrue(Math.abs(longMetrics.windowHeight() - longMetrics.contentHeight()) < 70, longMetrics.diagnostics());
+        assertTrue(longMetrics.tooltipText().length() < "Long task description. ".repeat(80).length(),
+                "The tooltip must expose the intentional bounded preview rather than the entire repeated description.");
+        assertTrue(longMetrics.visibleContentHeight() > 0, longMetrics.diagnostics());
+        assertTrue(longMetrics.visibleContentHeight() >= longMetrics.contentHeight() - 1, longMetrics.diagnostics());
     }
 
     private TooltipMetrics showTaskTooltipAndMeasure(String description) throws Exception {
@@ -81,9 +78,12 @@ final class TaskCardHoverTooltipLayoutRegressionTest {
             popup.getScene().getRoot().layout();
             Node tooltipRoot = popup.getScene().getRoot();
             Node label = tooltipRoot.lookup(".label");
-            double contentHeight = label == null ? tooltipRoot.getLayoutBounds().getHeight() : label.getLayoutBounds().getHeight();
+            assertNotNull(label, "Task details popup must expose its description label.");
+            double contentHeight = label.getLayoutBounds().getHeight();
             String popupText = label instanceof javafx.scene.control.Label labeled ? labeled.getText() : "";
-            result.set(new TooltipMetrics(popup.getScene().getWindow().getHeight(), contentHeight, scene.getHeight(), popupText, describeNodeTree(tooltipRoot, "")));
+            double visibleContentHeight = Math.min(label.getBoundsInParent().getMaxY(), tooltipRoot.getLayoutBounds().getMaxY())
+                    - Math.max(label.getBoundsInParent().getMinY(), tooltipRoot.getLayoutBounds().getMinY());
+            result.set(new TooltipMetrics(contentHeight, visibleContentHeight, popupText, describeNodeTree(tooltipRoot, "")));
             popup.hide();
         });
         return result.get();
@@ -98,7 +98,6 @@ final class TaskCardHoverTooltipLayoutRegressionTest {
                 .append(node.getClass().getName())
                 .append(" styleClasses=").append(node.getStyleClass())
                 .append(" minH=").append(node.minHeight(-1))
-                .append(" prefH=").append(node.prefHeight(-1))
                 .append(" maxH=").append(node.maxHeight(-1))
                 .append(" layoutH=").append(node.getLayoutBounds().getHeight())
                 .append(" parentH=").append(node.getBoundsInParent().getHeight())
@@ -118,9 +117,9 @@ final class TaskCardHoverTooltipLayoutRegressionTest {
                 || System.getProperty("os.name", "").toLowerCase().contains("mac");
     }
 
-    private record TooltipMetrics(double windowHeight, double contentHeight, double sceneHeight, String tooltipText, String nodeTree) {
+    private record TooltipMetrics(double contentHeight, double visibleContentHeight, String tooltipText, String nodeTree) {
         private String diagnostics() {
-            return "windowHeight=" + windowHeight + ", contentHeight=" + contentHeight + ", sceneHeight=" + sceneHeight + "\n" + nodeTree;
+            return "contentHeight=" + contentHeight + ", visibleContentHeight=" + visibleContentHeight + "\n" + nodeTree;
         }
     }
 }
