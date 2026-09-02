@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "modules": ["shale-core", "shale-data", "shale-ui", "shale-desktop", "shale-updater", "shale-server"],
   "documentation_patterns": ["**/*.md", "docs/**", "LICENSE*"],
   "full_suite_patterns": [
@@ -69,11 +69,30 @@
       "paths": ["build/scripts/**", "build/native/**", "docs/*packaging*.md"],
       "reason": "Build, packaging, or release automation changed."
     },
-    "ui-rendered": {
+    "ui-presentation": {
       "modules": ["shale-ui"],
-      "test_patterns": ["*Runtime*Test", "*Visual*Test", "*Layout*Test", "*Rendering*Test", "*ContentSizingTest", "*TooltipLayoutRegressionTest", "SettingsFxmlLoadTest"],
-      "paths": ["shale-ui/src/main/resources/css/app.css", "shale-ui/src/main/resources/css/foundation/**", "shale-ui/src/main/java/com/shale/ui/component/**", "shale-ui/src/main/java/com/shale/ui/util/ControlStyles.java"],
-      "reason": "Global design-system CSS or shared UI component changed; broader semantic and rendered UI coverage is required."
+      "test_patterns": ["*CssContractTest"],
+      "python_tests": ["python build/test-selection/validate_ui_resources.py"],
+      "paths": ["shale-ui/src/main/resources/css/**", "shale-ui/src/main/resources/fxml/**"],
+      "reason": "CSS or FXML presentation changed; static resource validation is required, without rendered geometry."
+    },
+    "ui-fxml-structure": {
+      "modules": ["shale-ui"],
+      "test_patterns": ["*FxmlLoadTest", "*FxmlContractTest", "*FXMLContractTest", "SettingsFxmlLoadTest"],
+      "paths": ["shale-ui/src/main/resources/fxml/**"],
+      "reason": "FXML changed; FXMLLoader/resource loading, controller ID, required-node, and handler wiring contracts are required."
+    },
+    "ui-behavior": {
+      "modules": ["shale-ui"],
+      "test_patterns": ["*BehaviorTest", "*ActivationTest", "*LifecycleTest"],
+      "paths": ["shale-ui/src/main/java/com/shale/ui/controller/**", "shale-ui/src/main/java/com/shale/ui/component/**", "shale-ui/src/main/java/com/shale/ui/util/ControlStyles.java"],
+      "reason": "JavaFX controller, event, or shared-control behavior changed; directly relevant behavioral contracts are required."
+    },
+    "ui-visual-advisory": {
+      "modules": ["shale-ui"],
+      "test_patterns": ["*Runtime*Test", "*Visual*Test", "*Layout*Test", "*Rendering*Test", "*ContentSizingTest", "*TooltipLayoutRegressionTest"],
+      "paths": [],
+      "reason": "Explicit advisory JavaFX visual/geometry selection; this area is never selected from changed paths."
     },
     "security-data": {
       "modules": ["shale-core", "shale-data", "shale-server"],
