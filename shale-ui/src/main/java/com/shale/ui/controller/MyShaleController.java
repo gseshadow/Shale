@@ -3397,7 +3397,7 @@ public final class MyShaleController {
 		return switch (resolved.kind()) {
 			case ALL -> true;
 			case COMPLETED -> completed;
-			case ALL_ACTIVE -> !completed;
+			case ALL_ACTIVE -> showCompletedMyTasks || !completed;
 			case STATUS -> !completed && matchesTaskStatus(task, resolved);
 		};
 	}
