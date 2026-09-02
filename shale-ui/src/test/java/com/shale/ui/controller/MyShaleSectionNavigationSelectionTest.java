@@ -3,7 +3,10 @@ package com.shale.ui.controller;
 import com.shale.ui.testutil.JavaFxTestSupport;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import org.junit.jupiter.api.Test;
 
@@ -45,6 +48,29 @@ final class MyShaleSectionNavigationSelectionTest {
             loaded.tabs().get("Overview").fire();
             assertSelectionAndContent(loaded, "Overview");
             assertEquals(1, selectedCount(loaded.tabs()));
+        });
+    }
+
+    @Test
+    void navigationRowProvidesRoomForTheCompleteSharedTabPills() {
+        JavaFxTestSupport.runAndWait(() -> {
+            LoadedMyShale loaded = load();
+            Scene scene = new Scene(loaded.root(), 900, 700);
+            scene.getStylesheets().add(getClass().getResource("/css/app.css").toExternalForm());
+            loaded.root().applyCss();
+            loaded.root().layout();
+
+            ScrollPane scroll = (ScrollPane) loaded.root().lookup(".app-section-tabs-scroll");
+            HBox row = (HBox) scroll.getContent();
+            assertEquals(6, row.getPadding().getTop(), 0.01,
+                    "My Shale must use the shared navigation row's vertical breathing room.");
+            assertEquals(6, row.getPadding().getBottom(), 0.01,
+                    "My Shale must use the shared navigation row's vertical breathing room.");
+            for (Button tab : loaded.tabs().values()) {
+                var tabInViewport = scroll.getViewportBounds().contains(
+                        scroll.sceneToLocal(tab.localToScene(tab.getBoundsInLocal())));
+                assertTrue(tabInViewport, tab.getText() + " must be fully contained without vertical clipping.");
+            }
         });
     }
 

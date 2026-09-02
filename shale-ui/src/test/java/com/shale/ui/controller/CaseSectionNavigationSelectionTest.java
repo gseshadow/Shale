@@ -8,6 +8,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.paint.Color;
 import javafx.scene.layout.HBox;
 import org.junit.jupiter.api.Test;
 
@@ -73,11 +74,38 @@ final class CaseSectionNavigationSelectionTest {
         assertTrue(fxml.contains("fitToWidth=\"false\" hbarPolicy=\"AS_NEEDED\""));
         assertTrue(fxml.contains("vbarPolicy=\"NEVER\" pannable=\"true\""));
         assertTrue(fxml.contains("fx:id=\"sectionTabsBar\""));
-        assertTrue(fxml.contains("<Insets top=\"6\" right=\"0\" bottom=\"6\" left=\"0\" />"),
-                "Case navigation row must retain its declared 6px vertical padding token.");
+        assertTrue(fxml.contains("styleClass=\"app-section-tabs-row\""),
+                "Case navigation must use the shared semantic tab-row layout.");
+        assertTrue(css.matches("(?s).*\\.app-section-tabs-row\\s*\\{[^}]*-fx-padding:\\s*6 0 6 0;.*"),
+                "Shared tab rows must retain the declared 6px vertical padding token.");
         assertTrue(css.matches("(?s).*\\.app-section-tab\\s*\\{[^}]*-fx-min-height:\\s*30(?:px)?;.*"),
                 "Shared Case tabs must retain the declared 30px minimum-height token.");
         assertFalse(css.contains(".case-section-tab"));
+    }
+
+    @Test
+    void sharedTabsHaveOpaqueContrastingInactiveAndSelectedSurfaces() {
+        JavaFxTestSupport.runAndWait(() -> {
+            LoadedCase loaded = load(null);
+            Scene scene = new Scene(loaded.root(), 1000, 700);
+            scene.getStylesheets().add(getClass().getResource("/css/app.css").toExternalForm());
+            loaded.root().applyCss();
+            loaded.root().layout();
+
+            Button selected = loaded.tabs().get("Overview");
+            Button inactive = loaded.tabs().get("Details");
+            Color selectedFill = (Color) selected.getBackground().getFills().getFirst().getFill();
+            Color inactiveFill = (Color) inactive.getBackground().getFills().getFirst().getFill();
+            Color inactiveText = (Color) inactive.getTextFill();
+
+            assertTrue(selectedFill.isOpaque(), "Selected tabs need a deterministic surface independent of the workspace.");
+            assertTrue(inactiveFill.isOpaque(), "Inactive tabs need a deterministic surface independent of the workspace.");
+            assertTrue(selectedFill.getSaturation() > inactiveFill.getSaturation()
+                            && selectedFill.getBrightness() < inactiveFill.getBrightness(),
+                    "The selected blue pill must remain stronger than the muted blue-gray inactive pill.");
+            assertTrue(inactiveText.getBrightness() < 0.5,
+                    "Inactive tab text must remain readable on its light pill surface.");
+        });
     }
 
     @Test

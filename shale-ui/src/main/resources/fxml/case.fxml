@@ -59,11 +59,7 @@
 					<String fx:value="app-section-tabs-scroll" />
 					<String fx:value="page-header-surface" />
 				</styleClass>
-				<HBox fx:id="sectionTabsBar" spacing="8.0" alignment="CENTER_LEFT">
-					<padding>
-						<Insets top="6" right="0" bottom="6" left="0" />
-					</padding>
-				</HBox>
+				<HBox fx:id="sectionTabsBar" spacing="8.0" alignment="CENTER_LEFT" styleClass="app-section-tabs-row" />
 			</ScrollPane>
 			<StackPane fx:id="contentHost" VBox.vgrow="ALWAYS">
 
