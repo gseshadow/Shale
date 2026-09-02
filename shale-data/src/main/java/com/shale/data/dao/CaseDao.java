@@ -122,6 +122,18 @@ public final class CaseDao {
 		public static final String RECEIVED_UPDATES_CHANGED = "RECEIVED_UPDATES_CHANGED";
 		public static final String CASE_DELETED = "CASE_DELETED";
 		public static final String CASE_RESTORED = "CASE_RESTORED";
+		public static final String CASE_DATE_CREATED = "CASE_DATE_CREATED";
+		public static final String CASE_DATE_UPDATED = "CASE_DATE_UPDATED";
+		public static final String CASE_DATE_REMOVED = "CASE_DATE_REMOVED";
+		public static final String CASE_DATE_RESTORED = "CASE_DATE_RESTORED";
+		public static final String MATERIAL_REQUEST_CREATED = "MATERIAL_REQUEST_CREATED";
+		public static final String MATERIAL_REQUEST_UPDATED = "MATERIAL_REQUEST_UPDATED";
+		public static final String MATERIAL_REQUEST_STATUS_CHANGED = "MATERIAL_REQUEST_STATUS_CHANGED";
+		public static final String MATERIAL_REQUEST_REMOVED = "MATERIAL_REQUEST_REMOVED";
+		public static final String MATERIAL_REQUEST_NOTE_ADDED = "MATERIAL_REQUEST_NOTE_ADDED";
+		public static final String CASE_LINK_CREATED = "CASE_LINK_CREATED";
+		public static final String CASE_LINK_UPDATED = "CASE_LINK_UPDATED";
+		public static final String CASE_LINK_REMOVED = "CASE_LINK_REMOVED";
 
 		private static final Set<String> ALLOWED = Set.of(
 				CASE_CREATED,
@@ -165,6 +177,10 @@ public final class CaseDao {
 				RECEIVED_UPDATES_CHANGED,
 				CASE_DELETED,
 				CASE_RESTORED
+				, CASE_DATE_CREATED, CASE_DATE_UPDATED, CASE_DATE_REMOVED, CASE_DATE_RESTORED
+				, MATERIAL_REQUEST_CREATED, MATERIAL_REQUEST_UPDATED, MATERIAL_REQUEST_STATUS_CHANGED,
+				MATERIAL_REQUEST_REMOVED, MATERIAL_REQUEST_NOTE_ADDED
+				, CASE_LINK_CREATED, CASE_LINK_UPDATED, CASE_LINK_REMOVED
 		);
 
 		private CaseTimelineEventTypes() {
@@ -2735,7 +2751,10 @@ public final class CaseDao {
 				INNER JOIN dbo.Cases c ON c.Id = cte.CaseId
 				                   AND c.ShaleClientId = cte.ShaleClientId
 				LEFT JOIN dbo.Users u ON u.Id = cte.ActorUserId
+				                       AND u.ShaleClientId = cte.ShaleClientId
 				WHERE cte.CaseId = ?
+				  AND cte.ShaleClientId = CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT)
+				  AND cte.EventType NOT LIKE 'TASK[_]%'
 				ORDER BY cte.OccurredAt DESC, cte.Id DESC;
 				""";
 
@@ -7191,6 +7210,8 @@ public final class CaseDao {
 				}
 				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.CREATED, Map.of(
 						EntityActionAuditEvent.MetadataKey.EXTERNAL_LINK_ID, externalId));
+				CaseTimelineWriter.append(con,caseId,shaleClientId,actorUserId,CaseTimelineWriter.CASE_LINK_CREATED,
+						"added the link '"+safeTimelineLabel(displayName,"Link")+"'",null);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -7229,6 +7250,8 @@ public final class CaseDao {
 						EntityActionAuditEvent.MetadataKey.EXTERNAL_LINK_ID, externalId));
 				for (CaseLinkShareDraft share : shares == null ? List.<CaseLinkShareDraft>of() : shares)
 					auditCaseLinkShare(con, shaleClientId, actorUserId, caseLinkId, caseId, share.contactId(), EntityActionAuditEvent.Action.ADDED, null);
+				CaseTimelineWriter.append(con,caseId,shaleClientId,actorUserId,CaseTimelineWriter.CASE_LINK_CREATED,
+						"added the link '"+safeTimelineLabel(displayName,"Link")+"'",null);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -7263,6 +7286,8 @@ public final class CaseDao {
 				if (Boolean.TRUE.equals(primary) && !existing.primary())
 					auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.PRIMARY_SET, Map.of(
 							EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID, caseLinkId));
+				CaseTimelineWriter.append(con,caseId,shaleClientId,actorUserId,CaseTimelineWriter.CASE_LINK_UPDATED,
+						"updated the link '"+safeTimelineLabel(displayName,"Link")+"'",null);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -7312,6 +7337,8 @@ public final class CaseDao {
 				if (Boolean.TRUE.equals(primary) && !existing.primary())
 					auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.PRIMARY_SET, Map.of(
 							EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID, caseLinkId));
+				CaseTimelineWriter.append(con,caseId,shaleClientId,actorUserId,CaseTimelineWriter.CASE_LINK_UPDATED,
+						"updated the link '"+safeTimelineLabel(displayName,"Link")+"'",null);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -7409,6 +7436,8 @@ public final class CaseDao {
 				softDeleteExternalIfUnreferenced(con, shaleClientId, dto.externalLinkId(), actorUserId);
 				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.DELETED, Map.of(
 						EntityActionAuditEvent.MetadataKey.EXTERNAL_LINK_ID, dto.externalLinkId()));
+				CaseTimelineWriter.append(con,caseId,shaleClientId,actorUserId,CaseTimelineWriter.CASE_LINK_REMOVED,
+						"removed the link '"+safeTimelineLabel(dto.displayName(),"Link")+"'",null);
 				con.commit();
 			} catch (Exception e) {
 				con.rollback();
@@ -7420,6 +7449,8 @@ public final class CaseDao {
 			throw new RuntimeException("Failed to delete case link", e);
 		}
 	}
+
+	private static String safeTimelineLabel(String value,String fallback){String v=value==null?"":value.trim();return v.isBlank()?fallback:v.replace("'","’");}
 
 	public List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int tenant, String query, int limit) {
 		String q = query == null ? "" : query.trim();

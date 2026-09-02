@@ -55,6 +55,8 @@ public final class CaseDateDao {
             phiAuditService.auditCreate(con,command.actorUserId(),"Cases","Name",caseId,command.caseName());
             phiAuditService.auditCreate(con,command.actorUserId(),"Cases","Description",caseId,command.description());
             phiAuditService.auditCreate(con,command.actorUserId(),"Cases","Summary",caseId,command.summary());
+            CaseTimelineWriter.append(con,caseId,command.shaleClientId(),command.actorUserId(),
+                    CaseDao.CaseTimelineEventTypes.CASE_CREATED,"created the Case",null);
             return caseId;
         });
     }
@@ -74,6 +76,8 @@ public final class CaseDateDao {
         audit(con,command.shaleClientId(),command.actorUserId(),caseId,id,EntityActionAuditEvent.Action.CREATED);
         phiAuditService.auditCreate(con,command.actorUserId(),"CaseDates","StartsAt",id,value.startsAt());
         phiAuditService.auditCreate(con,command.actorUserId(),"CaseDates","EndsAt",id,value.endsAt());
+        appendDateTimeline(con,caseId,command.shaleClientId(),command.actorUserId(),CaseTimelineWriter.CASE_DATE_CREATED,
+                caseDateTypeName(con,effectiveTypeId),value.startsAt(),value.endsAt(),null,null);
     }
 
     private static void validateSessionActor(Connection con,int tenant,int actor)throws SQLException{
@@ -529,6 +533,8 @@ public final class CaseDateDao {
         audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),id,EntityActionAuditEvent.Action.CREATED);
         phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","StartsAt",id,v.startsAt());
         phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","EndsAt",id,v.endsAt());
+        appendDateTimeline(con,c.caseId(),c.shaleClientId(),c.actorUserId(),CaseTimelineWriter.CASE_DATE_CREATED,
+                "Case date",v.startsAt(),v.endsAt(),null,null);
     }
 
     private void updateMappedOccurrence(Connection con,CaseDateAggregateCommand c,SingletonMutationRow row,CompatibilityCaseDateMutation.Value v)throws SQLException{
@@ -537,6 +543,8 @@ public final class CaseDateDao {
         audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),row.id(),EntityActionAuditEvent.Action.UPDATED);
         phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","StartsAt",row.id(),row.startsAt(),v.startsAt());
         phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","EndsAt",row.id(),row.endsAt(),v.endsAt());
+        appendDateTimeline(con,c.caseId(),c.shaleClientId(),c.actorUserId(),CaseTimelineWriter.CASE_DATE_UPDATED,
+                "Case date",v.startsAt(),v.endsAt(),row.startsAt(),row.endsAt());
     }
 
     private void clearMappedOccurrence(Connection con,CaseDateAggregateCommand c,SingletonMutationRow row)throws SQLException{
@@ -545,6 +553,8 @@ public final class CaseDateDao {
         audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),row.id(),EntityActionAuditEvent.Action.DELETED);
         phiAuditService.auditDelete(con,c.actorUserId(),"CaseDates","StartsAt",row.id(),row.startsAt());
         phiAuditService.auditDelete(con,c.actorUserId(),"CaseDates","EndsAt",row.id(),row.endsAt());
+        appendDateTimeline(con,c.caseId(),c.shaleClientId(),c.actorUserId(),CaseTimelineWriter.CASE_DATE_REMOVED,
+                "Case date",row.startsAt(),row.endsAt(),null,null);
     }
 
     public List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int tenant, int actor) {
@@ -640,6 +650,7 @@ public final class CaseDateDao {
                     try(ResultSet rs=ps.executeQuery()){ if(!rs.next()) throw new IllegalStateException("Case date was not created."); id=rs.getLong(1); }
                 }
                 touchCase(con, c.caseId(), c.shaleClientId()); audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),id,EntityActionAuditEvent.Action.CREATED); phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","StartsAt",id,c.startsAt()); phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","EndsAt",id,c.endsAt()); phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","Notes",id,norm(c.notes()));
+                appendDateTimeline(con,c.caseId(),c.shaleClientId(),c.actorUserId(),CaseTimelineWriter.CASE_DATE_CREATED,caseDateTypeName(con,c.caseDateTypeId()),c.startsAt(),c.endsAt(),null,null);
                 CaseDateDto dto = requireDate(con, id, c.shaleClientId()); con.commit(); return dto;
             } catch(Exception e){ con.rollback(); throw e; } finally { con.setAutoCommit(true); }
         } catch (SQLException e) { throw fail(e); }
@@ -657,14 +668,33 @@ public final class CaseDateDao {
                     UPDATE dbo.CaseDates SET CaseDateTypeId=?, Title=?, StartsAt=?, EndsAt=?, AllDay=?, Notes=?, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=?
                     WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=0 AND RowVer=?
                     """)){ ps.setInt(1,c.caseDateTypeId()); ps.setString(2,title); setLdt(ps,3,c.startsAt()); setLdt(ps,4,c.endsAt()); ps.setBoolean(5,c.allDay()); ps.setString(6,notes); ps.setInt(7,c.actorUserId()); ps.setLong(8,c.caseDateId()); ps.setInt(9,c.shaleClientId()); ps.setLong(10,c.caseId()); ps.setBytes(11,c.expectedRowVer()); rows=ps.executeUpdate(); }
-                if(rows!=1) throw new IllegalStateException("Case date changed."); touchCase(con,c.caseId(),c.shaleClientId()); audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),c.caseDateId(),EntityActionAuditEvent.Action.UPDATED); phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","StartsAt",c.caseDateId(),before.startsAt,c.startsAt()); phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","EndsAt",c.caseDateId(),before.endsAt,c.endsAt()); phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","Notes",c.caseDateId(),before.notes,notes); CaseDateDto dto=requireDate(con,c.caseDateId(),c.shaleClientId()); con.commit(); return dto;
+                if(rows!=1) throw new IllegalStateException("Case date changed."); touchCase(con,c.caseId(),c.shaleClientId()); audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),c.caseDateId(),EntityActionAuditEvent.Action.UPDATED); phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","StartsAt",c.caseDateId(),before.startsAt,c.startsAt()); phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","EndsAt",c.caseDateId(),before.endsAt,c.endsAt()); phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","Notes",c.caseDateId(),before.notes,notes);
+                appendDateTimeline(con,c.caseId(),c.shaleClientId(),c.actorUserId(),CaseTimelineWriter.CASE_DATE_UPDATED,caseDateTypeName(con,c.caseDateTypeId()),c.startsAt(),c.endsAt(),before.startsAt,before.endsAt);
+                CaseDateDto dto=requireDate(con,c.caseDateId(),c.shaleClientId()); con.commit(); return dto;
             } catch(Exception e){ con.rollback(); throw e; } finally { con.setAutoCommit(true); }
         } catch (SQLException e) { throw fail(e); }
     }
 
     public void deleteCaseDate(DeleteCaseDateCommand c) { mutateDeleted(c.shaleClientId(),c.actorUserId(),c.caseId(),c.caseDateId(),c.expectedRowVer(),false); }
     public CaseDateDto restoreCaseDate(RestoreCaseDateCommand c) { mutateDeleted(c.shaleClientId(),c.actorUserId(),c.caseId(),c.caseDateId(),c.expectedRowVer(),true); try(Connection con=db.requireConnection()){return requireDate(con,c.caseDateId(),c.shaleClientId());} catch(SQLException e){throw fail(e);} }
-    private void mutateDeleted(int t,int a,long caseId,long id,byte[] rv,boolean restore){ try(Connection con=db.requireConnection()){ verifyTenant(con,t); validateActor(con,t,a); validateCase(con,t,caseId); MutationRow before=requireMutationRow(con,t,caseId,id,restore); requireRowVerMatch(before.rowVer,rv); requireHistoricalType(con,t,before.typeId); con.setAutoCommit(false); try{if(restore)requireProtectedSingletonAvailable(con,t,caseId,before.typeId,id);String sql= restore ? "UPDATE dbo.CaseDates SET IsDeleted=0, DeletedAt=NULL, DeletedByUserId=NULL, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=1 AND RowVer=?" : "UPDATE dbo.CaseDates SET IsDeleted=1, DeletedAt=SYSUTCDATETIME(), DeletedByUserId=?, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=0 AND RowVer=?"; int rows; try(PreparedStatement ps=con.prepareStatement(sql)){int i=1; ps.setInt(i++,a); if(!restore) ps.setInt(i++,a); ps.setLong(i++,id); ps.setInt(i++,t); ps.setLong(i++,caseId); ps.setBytes(i,rv); rows=ps.executeUpdate();} if(rows!=1) throw new IllegalStateException("Case date changed."); touchCase(con,caseId,t); audit(con,t,a,caseId,id, restore?EntityActionAuditEvent.Action.ACTIVATED:EntityActionAuditEvent.Action.DELETED); if(!restore) phiAuditService.auditDelete(con,a,"CaseDates","Notes",id,before.notes); con.commit(); }catch(Exception e){con.rollback(); throw e;}finally{con.setAutoCommit(true);} }catch(SQLException e){throw fail(e);} }
+    private void mutateDeleted(int t,int a,long caseId,long id,byte[] rv,boolean restore){ try(Connection con=db.requireConnection()){ verifyTenant(con,t); validateActor(con,t,a); validateCase(con,t,caseId); MutationRow before=requireMutationRow(con,t,caseId,id,restore); requireRowVerMatch(before.rowVer,rv); TypeRow type=requireHistoricalType(con,t,before.typeId); con.setAutoCommit(false); try{if(restore)requireProtectedSingletonAvailable(con,t,caseId,before.typeId,id);String sql= restore ? "UPDATE dbo.CaseDates SET IsDeleted=0, DeletedAt=NULL, DeletedByUserId=NULL, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=1 AND RowVer=?" : "UPDATE dbo.CaseDates SET IsDeleted=1, DeletedAt=SYSUTCDATETIME(), DeletedByUserId=?, UpdatedAt=SYSUTCDATETIME(), UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND CaseId=? AND IsDeleted=0 AND RowVer=?"; int rows; try(PreparedStatement ps=con.prepareStatement(sql)){int i=1; ps.setInt(i++,a); if(!restore) ps.setInt(i++,a); ps.setLong(i++,id); ps.setInt(i++,t); ps.setLong(i++,caseId); ps.setBytes(i,rv); rows=ps.executeUpdate();} if(rows!=1) throw new IllegalStateException("Case date changed."); touchCase(con,caseId,t); audit(con,t,a,caseId,id, restore?EntityActionAuditEvent.Action.ACTIVATED:EntityActionAuditEvent.Action.DELETED); if(!restore) phiAuditService.auditDelete(con,a,"CaseDates","Notes",id,before.notes);
+        appendDateTimeline(con,caseId,t,a,restore?CaseTimelineWriter.CASE_DATE_RESTORED:CaseTimelineWriter.CASE_DATE_REMOVED,caseDateTypeName(con,before.typeId),before.startsAt,before.endsAt,null,null); con.commit(); }catch(Exception e){con.rollback(); throw e;}finally{con.setAutoCommit(true);} }catch(SQLException e){throw fail(e);} }
+
+    private static void appendDateTimeline(Connection con,long caseId,int tenant,int actor,String eventType,
+            String typeName,LocalDateTime startsAt,LocalDateTime endsAt,LocalDateTime oldStartsAt,LocalDateTime oldEndsAt)throws SQLException{
+        String label=typeName==null||typeName.isBlank()?"Case date":typeName.trim();
+        String action=switch(eventType){case CaseTimelineWriter.CASE_DATE_CREATED->"added";case CaseTimelineWriter.CASE_DATE_REMOVED->"removed";case CaseTimelineWriter.CASE_DATE_RESTORED->"restored";default->"changed";};
+        String body=oldStartsAt==null?formatOccurrence(startsAt,endsAt):"from "+formatOccurrence(oldStartsAt,oldEndsAt)+" to "+formatOccurrence(startsAt,endsAt);
+        CaseTimelineWriter.append(con,caseId,tenant,actor,eventType,action+" "+label,body);
+    }
+
+    private static String formatOccurrence(LocalDateTime start,LocalDateTime end){
+        String value=start==null?"none":start.toString(); return end==null?value:value+" through "+end;
+    }
+
+    private static String caseDateTypeName(Connection con,int typeId)throws SQLException{
+        try(PreparedStatement ps=con.prepareStatement("SELECT Name FROM dbo.CaseDateTypes WHERE Id=?")){ps.setInt(1,typeId);try(ResultSet rs=ps.executeQuery()){return rs.next()?rs.getString(1):"Case date";}}
+    }
 
     private static void requireProtectedSingletonAvailable(Connection con,int tenant,long caseId,int typeId,Long excludedId)throws SQLException{
         String role=null;

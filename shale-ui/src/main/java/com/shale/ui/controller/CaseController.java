@@ -3175,13 +3175,11 @@ public class CaseController {
 	}
 
 	private Node createTimelineEventCard(CaseTimelineEventDto event) {
-		Label titleLabel = new Label(safeText(event.getTitle()));
+		Label titleLabel = new Label(timelineDescription(event));
 		titleLabel.setStyle("-fx-font-weight: bold;");
 		titleLabel.setWrapText(true);
 
-		String actorDisplayName = safeText(event.getActorDisplayName()).trim();
-		String actorMeta = actorDisplayName.isBlank() ? "By system" : "By " + actorDisplayName;
-		Label actorLabel = new Label(actorMeta);
+		Label actorLabel = new Label(safeText(event.getEventType()).isBlank() ? "Historical event" : friendlyTimelineType(event.getEventType()));
 		actorLabel.setStyle("-fx-opacity: 0.85;");
 
 		Label timestampLabel = new Label(formatDateTime(event.getOccurredAt()));
@@ -3193,17 +3191,34 @@ public class CaseController {
 		metaRow.setAlignment(Pos.CENTER_LEFT);
 
 		VBox content = new VBox(6, titleLabel, metaRow);
-		String body = safeText(event.getBody()).trim();
-		if (!body.isBlank()) {
-			Label bodyLabel = new Label(body);
-			bodyLabel.setWrapText(true);
-			content.getChildren().add(bodyLabel);
-		}
-
 		VBox card = new VBox(content);
 		card.setPadding(new Insets(10, 12, 10, 12));
 		card.getStyleClass().addAll("secondary-panel", "shale-entity-card", "shale-entity-card-embedded");
 		return card;
+	}
+
+	static String timelineDescription(CaseTimelineEventDto event) {
+		if (event == null) return "Case activity recorded.";
+		String actor = safeText(event.getActorDisplayName()).trim();
+		if (actor.isBlank()) actor = "System";
+		String title = safeText(event.getTitle()).trim();
+		String body = safeText(event.getBody()).trim();
+		if (title.isBlank()) title = friendlyTimelineType(event.getEventType());
+		String phrase = switch (safeText(event.getEventType())) {
+			case CaseDao.CaseTimelineEventTypes.STATUS_CHANGED -> "changed Status";
+			case CaseDao.CaseTimelineEventTypes.RESPONSIBLE_ATTORNEY_CHANGED -> "changed Responsible Attorney";
+			case CaseDao.CaseTimelineEventTypes.CASE_DELETED -> "deleted the Case";
+			case CaseDao.CaseTimelineEventTypes.CASE_RESTORED -> "restored the Case";
+			default -> title;
+		};
+		return actor + " " + phrase + (body.isBlank() ? "." : " " + body + ".");
+	}
+
+	private static String friendlyTimelineType(String eventType) {
+		String value = safeText(eventType).trim();
+		if (value.isBlank()) return "Case activity";
+		String normalized = value.toLowerCase(Locale.ROOT).replace('_', ' ');
+		return Character.toUpperCase(normalized.charAt(0)) + normalized.substring(1);
 	}
 
 	private void renderPartiesSection() {
