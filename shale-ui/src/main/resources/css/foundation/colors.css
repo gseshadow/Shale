@@ -32,6 +32,12 @@
 
     /* Intent colors */
     -shale-color-primary-accent: #4b7fce;
+    -shale-color-section-tab-surface: #d7e3f1;
+    -shale-color-section-tab-hover-surface: #c5d8ee;
+    -shale-color-section-tab-pressed-surface: #b4cbe6;
+    -shale-color-section-tab-selected-surface: #4b7fce;
+    -shale-color-section-tab-text: #173455;
+    -shale-color-section-tab-selected-text: #f8fbff;
     -shale-color-success: rgba(34, 139, 86, 0.97);
     -shale-color-warning: rgba(248, 242, 228, 0.74);
     -shale-color-error: #c62828;
