@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "modules": ["shale-core", "shale-data", "shale-ui", "shale-desktop", "shale-updater", "shale-server"],
+  "documentation_patterns": ["**/*.md", "docs/**", "LICENSE*"],
+  "full_suite_patterns": [
+    "pom.xml", "*/pom.xml", ".mvn/**",
+    "build/test-selection/**", ".github/workflows/**",
+    "AGENTS.md", "architecture/codex-prompt-rules.md"
+  ],
+  "areas": {
+    "calendar": {
+      "modules": ["shale-core", "shale-data", "shale-ui"],
+      "test_patterns": ["*Calendar*Test", "Calendar*Test", "*EventWizard*Test", "*TimeDuration*Test", "UserScheduleCalendarTest"],
+      "paths": ["**/calendar/**", "**/Calendar*.java", "**/*Calendar*.java", "**/calendar.fxml", "**/calendar*.css"],
+      "reason": "Calendar feed, event, Case Date projection, Calendar FXML, or Calendar styling changed."
+    },
+    "contacts": {
+      "modules": ["shale-core", "shale-data", "shale-ui"],
+      "test_patterns": ["Contact*Test", "*Contact*Test", "*Credential*Test"],
+      "paths": ["**/contact/**", "**/Contact*.java", "**/*Contact*.java", "**/contact.fxml", "**/contacts.fxml", "docs/sql/**/*contact*.sql"],
+      "reason": "Contact domain, persistence, presentation, FXML, or migration changed."
+    },
+    "tasks": {
+      "modules": ["shale-data", "shale-ui"],
+      "test_patterns": ["Task*Test", "*Task*Test", "MyShale*Test", "*MyShale*Test"],
+      "paths": ["**/task/**", "**/Task*.java", "**/*Task*.java", "**/MyShale*.java", "**/*MyShale*.java", "**/my-shale.fxml"],
+      "reason": "Task or My Shale task behavior changed."
+    },
+    "cases": {
+      "modules": ["shale-core", "shale-data", "shale-ui"],
+      "test_patterns": ["Case*Test", "*Case*Test", "NewIntake*Test", "*Intake*Test", "RelatedCase*Test", "SearchCase*Test"],
+      "paths": ["**/case/**", "**/Case*.java", "**/*Case*.java", "**/case.fxml", "**/cases.fxml", "**/new-intake.fxml"],
+      "reason": "Case view, Case domain, intake, persistence, or Case FXML changed."
+    },
+    "organizations": {
+      "modules": ["shale-data", "shale-ui"],
+      "test_patterns": ["Organization*Test", "*Organization*Test"],
+      "paths": ["**/organization/**", "**/Organization*.java", "**/*Organization*.java", "**/organization.fxml", "**/organizations.fxml", "**/new-organization.fxml"],
+      "reason": "Organization domain, persistence, controller, or FXML changed."
+    },
+    "reports": {
+      "modules": ["shale-data", "shale-ui"],
+      "test_patterns": ["Report*Test", "*Report*Test", "CompleteExportContractTest"],
+      "paths": ["**/report/**", "**/Report*.java", "**/*Report*.java", "**/reports.fxml"],
+      "reason": "Report query, export, controller, or FXML changed."
+    },
+    "settings-team": {
+      "modules": ["shale-core", "shale-data", "shale-ui"],
+      "test_patterns": ["Settings*Test", "*Settings*Test", "User*Test", "*User*Test", "*Administration*Test"],
+      "paths": ["**/settings/**", "**/Settings*.java", "**/*Settings*.java", "**/User*.java", "**/*UserManagement*.java", "**/settings.fxml", "**/team.fxml", "**/user.fxml"],
+      "reason": "Settings, team, user management, or administration changed."
+    },
+    "updater": {
+      "modules": ["shale-updater", "shale-desktop"],
+      "test_patterns": ["*Update*Test", "InstallServiceTest", "com.shale.updater.*Test"],
+      "paths": ["shale-updater/**", "shale-desktop/src/main/java/**/update/**", "build/scripts/build-updater.bat"],
+      "reason": "Updater integrity, installation, platform support, or desktop launch contract changed."
+    },
+    "server": {
+      "modules": ["shale-core", "shale-data", "shale-server"],
+      "test_patterns": ["com.shale.server.*Test", "Web*Test", "*Server*Test", "*Api*Test", "AuthControllerTest"],
+      "paths": ["shale-server/src/main/**", "shale-web/**"],
+      "reason": "Server, API, authentication endpoint, or web consumer changed."
+    },
+    "build-scripts": {
+      "modules": [],
+      "test_patterns": [],
+      "python_tests": ["python -m unittest build.scripts.test_windows_release_batch_contract"],
+      "paths": ["build/scripts/**", "build/native/**", "docs/*packaging*.md"],
+      "reason": "Build, packaging, or release automation changed."
+    },
+    "ui-rendered": {
+      "modules": ["shale-ui"],
+      "test_patterns": ["*Runtime*Test", "*Visual*Test", "*Layout*Test", "*Rendering*Test", "*ContentSizingTest", "*TooltipLayoutRegressionTest", "SettingsFxmlLoadTest"],
+      "paths": ["shale-ui/src/main/resources/css/app.css", "shale-ui/src/main/resources/css/foundation/**", "shale-ui/src/main/java/com/shale/ui/component/**", "shale-ui/src/main/java/com/shale/ui/util/ControlStyles.java"],
+      "reason": "Global design-system CSS or shared UI component changed; broader semantic and rendered UI coverage is required."
+    },
+    "security-data": {
+      "modules": ["shale-core", "shale-data", "shale-server"],
+      "test_patterns": ["*Security*Test", "*Audit*Test", "*Audit*ContractTest", "*Rls*Test", "*RLS*Test", "*Tenant*Test", "*Transaction*Test", "RequestScopedDbSessionProviderTest", "ServerSessionSkeletonTest"],
+      "paths": ["**/auth/**", "**/security/**", "**/*Audit*.java", "**/*Tenant*.java", "**/*Session*.java", "docs/sql/**/*rls*.sql", "docs/sql/**/*audit*.sql", "architecture/tenancy-and-rls.md"],
+      "reason": "Security, RLS, tenant session, or audit infrastructure changed; critical and affected data/security contracts are blocking."
+    },
+    "notifications": {
+      "modules": ["shale-data", "shale-ui", "shale-desktop"],
+      "test_patterns": ["*Notification*Test", "*LiveUpdate*Test", "*Polling*Test", "NegotiateClientLoggingTest"],
+      "paths": ["**/notification/**", "**/*Notification*.java", "**/*LiveUpdate*.java", "**/*LiveBus*.java"],
+      "reason": "Notification or live-update behavior changed."
+    }
+  },
+  "shared_paths": [
+    {
+      "patterns": ["shale-core/src/main/java/**/dto/**", "shale-core/src/main/java/**/service/**"],
+      "areas": ["cases", "contacts", "tasks", "organizations", "reports", "server"],
+      "reason": "A shared core DTO or service port changed; direct module consumers are selected."
+    }
+  ]
+}

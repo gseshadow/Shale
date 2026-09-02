@@ -1,0 +1,26 @@
+# Release-blocking security, tenancy, audit, wiring, updater, and persistence invariants.
+**/AuthUserLifecycleSecurityTest.java
+**/AuthServiceAdapterTest.java
+**/CaseAggregateTransactionTest.java
+**/CaseDateDaoMutationContractTest.java
+**/CaseLifecycleAuditContractTest.java
+**/ContactAggregateMutationContractTest.java
+**/ContactMutationContractTest.java
+**/EntityActionAuditEventTest.java
+**/EntityActionAuditMigrationContractTest.java
+**/RequestLookupRlsPhase2MigrationTest.java
+**/TaskDaoCompletionStatusSynchronizationTest.java
+**/UserManagementRemovalContractTest.java
+**/ShaleLauncherTest.java
+**/DesktopUiUpdateLauncherTest.java
+**/DesktopUpdateLauncherTest.java
+**/ShaleServerServiceConfigurationTest.java
+**/AuthControllerTest.java
+**/HealthControllerTest.java
+**/RequestScopedDbSessionProviderTest.java
+**/ServerSessionSkeletonTest.java
+**/NotificationPrivacyProjectorTest.java
+**/CaseDatesLiveUpdateContractTest.java
+**/InstallServiceTest.java
+**/MainTest.java
+**/MacPlatformSupportTest.java

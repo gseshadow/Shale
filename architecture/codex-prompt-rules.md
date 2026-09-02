@@ -52,8 +52,14 @@ Before making changes:
 
 1. Review `git diff --name-only` and map each changed production file to its affected tests.
 2. Search again for old field lists, constructors, method names, SQL fragments, and obsolete expectations.
-3. Run focused tests first, then the applicable complete module suites. Run the full Maven reactor for cross-module or architectural changes.
-4. Run Git diff checks and report the exact test and check commands executed with their results.
+3. Inspect the production and test diff, then run `python build/test-selection/select_tests.py --base <base> --head HEAD`.
+4. Run directly modified tests first, then the selector's affected-area suite, then the critical default with `mvn test`.
+5. Request or run `mvn -Pall-tests test` only when the selector escalates a cross-cutting/unknown change or the user explicitly requests it.
+6. Add or update tests only in affected areas. Never enable every historical test merely because tests are implementation work.
+7. Explain why every selected test area is relevant to the changed production or test contract.
+
+> **Relevance, not historical existence, determines routine test execution.**
+8. Run Git diff checks and report the exact test and check commands executed with their results.
 
 #### Blocked or unexecuted tests
 
@@ -86,9 +92,10 @@ Before making changes:
 For a behavioral change:
 
 1. Run focused affected tests.
-2. Run the affected module and dependency suite.
-3. Run the required full reactor gate with `mvn test`.
-4. Do not treat the release script as the first full-suite validation.
+2. Run the repository selector's affected-area module and dependency suite.
+3. Run the release-blocking critical reactor with `mvn test`.
+4. Run `mvn -Pall-tests test` only for selector escalation, cross-cutting changes, or explicit user direction.
+5. Do not treat the release script as the first validation of the critical suite.
 
 Use the established cross-module Maven form where necessary:
 
@@ -122,7 +129,7 @@ For every implementation or behavioral change:
    * Replace obsolete assertions, fixtures, selectors, or workflow assumptions with assertions that verify the new authoritative behavior.
 4. Add or extend regression coverage for newly introduced behavior where appropriate.
 5. Inspect neighboring and related tests for duplicated stale assumptions rather than stopping after the first test failure.
-6. Run focused tests during implementation and the applicable module test suite before completion. For shared, architectural, migration, cross-module, or broadly reused changes, run the broader Maven reactor/test suite when appropriate.
+6. Run focused tests during implementation, the repository selector, the affected-area suite, and the critical suite before completion. Use the full-suite profile only when selection escalates or explicit direction requires it.
 
 An implementation task is not complete until:
 

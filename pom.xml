@@ -40,6 +40,8 @@
 
         <!-- Defaults forwarded by javafx-maven-plugin for local developer runs. -->
         <shale.profile></shale.profile>
+        <!-- Routine builds execute only the release-blocking critical inventory. -->
+        <shale.test.includesFile>${maven.multiModuleProjectDirectory}/build/test-selection/critical-tests.txt</shale.test.includesFile>
     </properties>
 
     <modules>
@@ -196,5 +198,25 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <includesFile>${shale.test.includesFile}</includesFile>
+                    <failIfNoTests>false</failIfNoTests>
+                    <failIfNoSpecifiedTests>false</failIfNoSpecifiedTests>
+                </configuration>
+            </plugin>
+        </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>all-tests</id>
+            <properties>
+                <shale.test.includesFile>${maven.multiModuleProjectDirectory}/build/test-selection/all-tests.txt</shale.test.includesFile>
+            </properties>
+        </profile>
+    </profiles>
 </project>
