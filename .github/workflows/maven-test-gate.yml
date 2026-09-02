@@ -1,29 +1,29 @@
-name: Maven test gate
+name: Relevant Test Gate
 
 on:
   push:
-    branches:
-      - codex/latest
+    branches: [codex/latest]
   pull_request:
-    branches:
-      - codex/latest
+    branches: [codex/latest]
 
 permissions:
   contents: read
 
 concurrency:
-  group: maven-test-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: relevant-tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Complete Maven reactor (Windows, Java 21)
+  relevant-tests:
+    name: Relevant Test Gate (Windows, Java 21)
     runs-on: windows-latest
     timeout-minutes: 60
 
     steps:
-      - name: Check out repository
+      - name: Check out repository and comparison history
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Java 21 and Maven cache
         uses: actions/setup-java@v4
@@ -32,8 +32,46 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Run complete Maven test reactor
+      - name: Select affected test areas
+        id: selection
+        shell: pwsh
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          $base = if ($env:PR_BASE) { $env:PR_BASE } else { $env:PUSH_BEFORE }
+          if (-not $base -or $base -match '^0+$') { $base = 'HEAD^' }
+          python build/test-selection/select_tests.py --base $base --head $env:HEAD_SHA `
+            --format markdown --output build/test-selection/selection-summary.md `
+            --github-output $env:GITHUB_OUTPUT
+          Get-Content build/test-selection/selection-summary.md | Add-Content $env:GITHUB_STEP_SUMMARY
+
+      - name: Run critical suite
         run: mvn test
+
+      - name: Run selected Python contract tests
+        if: steps.selection.outputs.python_commands != '[]'
+        shell: pwsh
+        env:
+          COMMANDS_JSON: ${{ steps.selection.outputs.python_commands }}
+        run: |
+          $commands = $env:COMMANDS_JSON | ConvertFrom-Json
+          foreach ($command in $commands) {
+            Write-Host "+ $command"
+            Invoke-Expression $command
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Run affected-area or escalated full suite
+        if: steps.selection.outputs.selected_command != ''
+        shell: pwsh
+        env:
+          SELECTED_COMMAND: ${{ steps.selection.outputs.selected_command }}
+        run: |
+          Write-Host "+ $env:SELECTED_COMMAND"
+          Invoke-Expression $env:SELECTED_COMMAND
+          exit $LASTEXITCODE
 
       - name: Summarize Surefire and Failsafe reports
         if: always()
@@ -41,61 +79,44 @@ jobs:
         run: |
           $reports = Get-ChildItem -Path . -Recurse -File -Include 'TEST-*.xml' |
             Where-Object { $_.DirectoryName -match '[\\/](surefire|failsafe)-reports$' }
-
+          Add-Content $env:GITHUB_STEP_SUMMARY '## Maven test reports'
           if (-not $reports) {
-            Add-Content $env:GITHUB_STEP_SUMMARY '## Maven test reports'
             Add-Content $env:GITHUB_STEP_SUMMARY 'No Surefire or Failsafe XML reports were produced.'
             exit 0
           }
-
           $rows = foreach ($report in $reports) {
             [xml]$xml = Get-Content -Raw $report.FullName
             $suite = $xml.testsuite
             $module = $report.Directory.Parent.Parent.Name
-            [pscustomobject]@{
-              Module = $module
-              Tests = [int]$suite.tests
-              Failures = [int]$suite.failures
-              Errors = [int]$suite.errors
-              Skipped = [int]$suite.skipped
-              Seconds = [double]$suite.time
-            }
-
+            [pscustomobject]@{ Module=$module; Tests=[int]$suite.tests; Failures=[int]$suite.failures; Errors=[int]$suite.errors; Skipped=[int]$suite.skipped; Seconds=[double]$suite.time }
             foreach ($case in $suite.testcase) {
               if ($case.failure -or $case.error) {
                 $title = "$module - $($case.classname).$($case.name)" -replace '[\r\n]', ' '
-                [Console]::WriteLine("::error title=$title::See $($report.FullName) for the failure details.")
+                [Console]::WriteLine("::error title=$title::See $($report.FullName) for details.")
               }
             }
           }
-
-          $modules = $rows | Group-Object Module | Sort-Object Name
-          $totalTests = ($rows | Measure-Object Tests -Sum).Sum
-          $totalFailures = ($rows | Measure-Object Failures -Sum).Sum
-          $totalErrors = ($rows | Measure-Object Errors -Sum).Sum
-          $totalSkipped = ($rows | Measure-Object Skipped -Sum).Sum
-          $totalSeconds = ($rows | Measure-Object Seconds -Sum).Sum
-
-          Add-Content $env:GITHUB_STEP_SUMMARY '## Maven test reports'
           Add-Content $env:GITHUB_STEP_SUMMARY '| Scope | Tests | Failures | Errors | Skipped | Test duration (s) |'
           Add-Content $env:GITHUB_STEP_SUMMARY '| --- | ---: | ---: | ---: | ---: | ---: |'
-          foreach ($module in $modules) {
-            $tests = ($module.Group | Measure-Object Tests -Sum).Sum
-            $failures = ($module.Group | Measure-Object Failures -Sum).Sum
-            $errors = ($module.Group | Measure-Object Errors -Sum).Sum
-            $skipped = ($module.Group | Measure-Object Skipped -Sum).Sum
-            $seconds = ($module.Group | Measure-Object Seconds -Sum).Sum
-            Add-Content $env:GITHUB_STEP_SUMMARY "| Module: $($module.Name) | $tests | $failures | $errors | $skipped | $([math]::Round($seconds, 3)) |"
+          foreach ($module in ($rows | Group-Object Module | Sort-Object Name)) {
+            $tests=($module.Group|Measure-Object Tests -Sum).Sum; $failures=($module.Group|Measure-Object Failures -Sum).Sum
+            $errors=($module.Group|Measure-Object Errors -Sum).Sum; $skipped=($module.Group|Measure-Object Skipped -Sum).Sum
+            $seconds=($module.Group|Measure-Object Seconds -Sum).Sum
+            Add-Content $env:GITHUB_STEP_SUMMARY "| Module: $($module.Name) | $tests | $failures | $errors | $skipped | $([math]::Round($seconds,3)) |"
           }
-          Add-Content $env:GITHUB_STEP_SUMMARY "| **Reactor total** | **$totalTests** | **$totalFailures** | **$totalErrors** | **$totalSkipped** | **$([math]::Round($totalSeconds, 3))** |"
+          $tests=($rows|Measure-Object Tests -Sum).Sum; $failures=($rows|Measure-Object Failures -Sum).Sum
+          $errors=($rows|Measure-Object Errors -Sum).Sum; $skipped=($rows|Measure-Object Skipped -Sum).Sum
+          $seconds=($rows|Measure-Object Seconds -Sum).Sum
+          Add-Content $env:GITHUB_STEP_SUMMARY "| **Reactor total** | **$tests** | **$failures** | **$errors** | **$skipped** | **$([math]::Round($seconds,3))** |"
 
       - name: Archive Surefire and Failsafe reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: maven-test-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          name: relevant-test-reports-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             **/target/surefire-reports/**
             **/target/failsafe-reports/**
+            build/test-selection/selection-summary.md
           if-no-files-found: warn
           retention-days: 14

@@ -1,0 +1,47 @@
+name: Informational Full Maven Suite
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 5 * * 1'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: full-maven-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-suite:
+    name: Full suite (informational, Windows, Java 21)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run every historically discoverable test
+        run: mvn -Pall-tests test
+      - name: Publish visible scheduled failure candidate
+        if: failure() && github.event_name == 'schedule'
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY '## Full-suite issue candidate'
+          Add-Content $env:GITHUB_STEP_SUMMARY 'The informational scheduled full suite failed. Review the archived reports and open or update a maintenance issue.'
+          [Console]::WriteLine('::warning title=Scheduled full suite failed::Review reports and create a maintenance issue candidate; routine releases are not blocked.')
+      - name: Archive all reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-suite-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          if-no-files-found: warn
+          retention-days: 30
