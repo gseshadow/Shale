@@ -14,10 +14,29 @@ class NewIntakeConfiguredDatesStep3ContractTest {
         assertTrue(s.contains("long formConfigurationId"));
         assertTrue(s.contains("byte[] formConfigurationRowVer"));
         assertTrue(s.contains("record ConfiguredDateValue(String fieldKey, int caseDateTypeId, boolean required, LocalDate value)"));
-        assertTrue(s.indexOf("validateConfiguredIntakeDates(con, request)") < s.indexOf("insertContact(con,"));
+		assertValidationPrecedesMutation(method(s, "public NewIntakeCreateResult createIntake"), "insertContact(con,");
+		assertValidationPrecedesMutation(method(s, "public NewIntakeCreateResult mergeIntake"), "mergeRoleContact(con,");
         assertTrue(s.indexOf("insertConfiguredCaseDate(con") < s.indexOf("con.commit()"));
         assertTrue(s.contains("con.rollback()"));
     }
+
+	private static void assertValidationPrecedesMutation(String method, String mutation) {
+		String compact = method.replaceAll("\\s+", "");
+		assertTrue(compact.indexOf("validateConfiguredIntakeDates(con,request)")
+				< compact.indexOf(mutation));
+	}
+
+	private static String method(String source, String signature) {
+		int start = source.indexOf(signature);
+		assertTrue(start >= 0, "method signature not found: " + signature);
+		int open = source.indexOf('{', start);
+		int depth = 0;
+		for (int i = open; i < source.length(); i++) {
+			if (source.charAt(i) == '{') depth++;
+			else if (source.charAt(i) == '}' && --depth == 0) return source.substring(start, i + 1);
+		}
+		throw new AssertionError("unterminated method: " + signature);
+	}
 
     @Test void exactSetRequiredEffectiveWinnerAndDateOnlyRulesAreEnforced() throws Exception {
         String s=source();
