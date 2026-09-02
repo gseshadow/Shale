@@ -4,6 +4,7 @@ import unittest
 import fnmatch
 import json
 import os
+import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from unittest import mock
@@ -157,7 +158,7 @@ class ChangeSelectorTest(unittest.TestCase):
             )
             recorder.chmod(0o755)
             with mock.patch.dict(os.environ, {"ARG_RECORD": str(output)}):
-                RUNNER.execute_affected(plan, launcher=str(recorder))
+                RUNNER.execute_affected(plan, launcher=[sys.executable, str(recorder)])
             recorded = json.loads(output.read_text(encoding="utf-8"))
         self.assertEqual("-pl", recorded[0])
         self.assertEqual("shale-core,shale-data,shale-ui", recorded[1])
@@ -186,6 +187,19 @@ class ChangeSelectorTest(unittest.TestCase):
         ) as which:
             self.assertEqual("C:/Maven/bin/mvn.cmd", RUNNER.resolve_maven())
         self.assertEqual(mock.call("mvn.cmd"), which.call_args_list[0])
+
+    def test_selector_contract_suite_is_required_only_for_infrastructure_changes(self):
+        self.assertTrue(SELECTOR.selector_tests_required(["build/test-selection/run_selection.py"]))
+        self.assertTrue(SELECTOR.selector_tests_required([".github/workflows/maven-test-gate.yml"]))
+        self.assertFalse(SELECTOR.selector_tests_required([
+            "shale-ui/src/main/java/com/shale/ui/controller/CaseController.java"
+        ]))
+        pom_diff = mock.Mock(stdout="+        <shale.test.includesFile>critical-tests.txt</shale.test.includesFile>\n")
+        with mock.patch.object(SELECTOR.subprocess, "run", return_value=pom_diff):
+            self.assertTrue(SELECTOR.selector_tests_required(["pom.xml"], "base", "head"))
+        unrelated_pom_diff = mock.Mock(stdout="+        <dependency.version>2</dependency.version>\n")
+        with mock.patch.object(SELECTOR.subprocess, "run", return_value=unrelated_pom_diff):
+            self.assertFalse(SELECTOR.selector_tests_required(["pom.xml"], "base", "head"))
 
     def test_github_outputs_preserve_display_and_structured_selected_invocation(self):
         result = SELECTOR.select([
@@ -288,6 +302,7 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertIn("actions/upload-artifact@v4", gate)
         self.assertIn("run_selection.py build/test-selection/selection-plan.json --command affected", gate)
         self.assertIn("--plan-output build/test-selection/selection-plan.json", gate)
+        self.assertIn("if: steps.selection.outputs.selector_tests_required == 'true'", gate)
         self.assertLess(gate.index("- name: Run critical suite"), gate.index("- name: Run affected-area suite"))
         for unsafe in ("Invoke-Expression", "cmd /c", "eval ", "@mavenArgs", "MAVEN_BATCHES_JSON"):
             self.assertNotIn(unsafe, gate)

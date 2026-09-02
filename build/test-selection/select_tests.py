@@ -18,6 +18,10 @@ CONFIG_PATH = Path(__file__).with_name("test-areas.json")
 CRITICAL_PATH = Path(__file__).with_name("critical-tests.txt")
 WINDOWS_SAFE_COMMAND_LENGTH = 7000
 AUTOMATED_CLASS_LIMIT = 50
+POM_TEST_SELECTION_MARKERS = (
+    "shale.test.includesFile", "shale.test.excludesFile", "maven-surefire-plugin",
+    "surefire.version", "all-tests.txt", "ui-visual-advisory-tests.txt",
+)
 
 
 def display_command(arguments: Iterable[str]) -> str:
@@ -106,6 +110,22 @@ def changed_paths(base: str, head: str) -> list[str]:
     command = ["git", "diff", "--name-only", "--diff-filter=ACMR", base, head, "--"]
     completed = subprocess.run(command, cwd=ROOT, check=True, text=True, encoding="utf-8", capture_output=True)
     return sorted({line.strip().replace("\\", "/") for line in completed.stdout.splitlines() if line.strip()})
+
+
+def selector_tests_required(paths: list[str], base: str | None = None, head: str = "HEAD") -> bool:
+    if any(path.startswith("build/test-selection/")
+           or path == ".github/workflows/maven-test-gate.yml" for path in paths):
+        return True
+    pom_paths = [path for path in paths if path == "pom.xml" or path.endswith("/pom.xml")]
+    if not pom_paths or not base:
+        return False
+    completed = subprocess.run(
+        ["git", "diff", "--unified=0", base, head, "--", *pom_paths],
+        cwd=ROOT, check=True, capture_output=True, text=True, encoding="utf-8",
+    )
+    changed_lines = "\n".join(line for line in completed.stdout.splitlines()
+                              if line.startswith(("+", "-")) and not line.startswith(("+++", "---")))
+    return any(marker in changed_lines for marker in POM_TEST_SELECTION_MARKERS)
 
 
 def test_class_for_path(path: str) -> str | None:
@@ -379,6 +399,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         paths = sorted(set(args.path)) if args.path else (changed_paths(args.base, args.head) if args.base else [])
         result = select(paths, args.area)
+        result["selector_tests_required"] = selector_tests_required(paths, args.base, args.head)
     except (subprocess.CalledProcessError, ValueError) as error:
         parser.error(str(error))
 
@@ -400,6 +421,7 @@ def main(argv: list[str] | None = None) -> int:
             output.write(f"informational_maven_args={json.dumps(result['informational_maven_args'])}\n")
             output.write(f"python_commands={json.dumps(result['python_commands'])}\n")
             output.write(f"python_command_args={json.dumps(result['python_command_args'])}\n")
+            output.write(f"selector_tests_required={str(result['selector_tests_required']).lower()}\n")
     if result["selection_error"]:
         print(f"Selector policy error: {result['selection_error']}", file=sys.stderr)
         return 2

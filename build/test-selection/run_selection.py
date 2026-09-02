@@ -10,7 +10,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-from typing import Iterable
+from typing import Iterable, Sequence
 
 
 WINDOWS_SAFE_COMMAND_LENGTH = 7000
@@ -76,10 +76,14 @@ def affected_batches(plan: dict) -> list[list[str]]:
     return batches
 
 
-def execute_affected(plan: dict, launcher: str | None = None) -> None:
-    maven = launcher or resolve_maven()
+def execute_affected(plan: dict, launcher: str | Sequence[str] | None = None) -> None:
+    launcher_prefix = ([resolve_maven()] if launcher is None
+                       else [launcher] if isinstance(launcher, str)
+                       else list(launcher))
+    if not launcher_prefix or any(not argument for argument in launcher_prefix):
+        raise ValueError("Launcher command prefix must contain nonempty arguments.")
     for arguments in affected_batches(plan):
-        argv = [maven, *arguments]
+        argv = [*launcher_prefix, *arguments]
         print(f"Display only: {display_command(argv)}", flush=True)
         for index, argument in enumerate(argv):
             print(f"argv[{index}] = {argument}", flush=True)

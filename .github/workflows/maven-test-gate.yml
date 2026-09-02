@@ -52,6 +52,7 @@ jobs:
         run: mvn -DskipTests package
 
       - name: Validate selector infrastructure
+        if: steps.selection.outputs.selector_tests_required == 'true'
         run: python -m unittest build.test-selection.test_select_tests
 
       - name: Run critical suite
