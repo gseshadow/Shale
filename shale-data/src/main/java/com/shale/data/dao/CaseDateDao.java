@@ -431,7 +431,7 @@ public final class CaseDateDao {
                     throw new IllegalStateException("Case changed since absence was observed; reload before saving.");
                 if (!active.isEmpty()) throw new IllegalStateException("Case Date appeared since it was loaded; reload before saving.");
                 long id = insertMappedOccurrence(con, command, key, create.value());
-                auditOccurrenceCreate(con, command, id, create.value());
+                auditOccurrenceCreate(con, command, id, create.value(), key);
             } else {
                 if (active.isEmpty()) throw new IllegalStateException("Case Date is missing or deleted; reload before saving.");
                 SingletonMutationRow row = active.get(0);
@@ -529,12 +529,12 @@ public final class CaseDateDao {
         throw new IllegalStateException("Case Date was not created.");
     }
 
-    private void auditOccurrenceCreate(Connection con,CaseDateAggregateCommand c,long id,CompatibilityCaseDateMutation.Value v)throws SQLException{
+    private void auditOccurrenceCreate(Connection con,CaseDateAggregateCommand c,long id,CompatibilityCaseDateMutation.Value v,MigratedCaseDateKey key)throws SQLException{
         audit(con,c.shaleClientId(),c.actorUserId(),c.caseId(),id,EntityActionAuditEvent.Action.CREATED);
         phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","StartsAt",id,v.startsAt());
         phiAuditService.auditCreate(con,c.actorUserId(),"CaseDates","EndsAt",id,v.endsAt());
         appendDateTimeline(con,c.caseId(),c.shaleClientId(),c.actorUserId(),CaseTimelineWriter.CASE_DATE_CREATED,
-                "Case date",v.startsAt(),v.endsAt(),null,null);
+                caseDateTypeName(con,requireEffectiveMappedType(con,c.shaleClientId(),key)),v.startsAt(),v.endsAt(),null,null);
     }
 
     private void updateMappedOccurrence(Connection con,CaseDateAggregateCommand c,SingletonMutationRow row,CompatibilityCaseDateMutation.Value v)throws SQLException{
@@ -544,7 +544,7 @@ public final class CaseDateDao {
         phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","StartsAt",row.id(),row.startsAt(),v.startsAt());
         phiAuditService.auditUpdate(con,c.actorUserId(),"CaseDates","EndsAt",row.id(),row.endsAt(),v.endsAt());
         appendDateTimeline(con,c.caseId(),c.shaleClientId(),c.actorUserId(),CaseTimelineWriter.CASE_DATE_UPDATED,
-                "Case date",v.startsAt(),v.endsAt(),row.startsAt(),row.endsAt());
+                caseDateTypeName(con,row.typeId()),v.startsAt(),v.endsAt(),row.startsAt(),row.endsAt());
     }
 
     private void clearMappedOccurrence(Connection con,CaseDateAggregateCommand c,SingletonMutationRow row)throws SQLException{
@@ -554,7 +554,7 @@ public final class CaseDateDao {
         phiAuditService.auditDelete(con,c.actorUserId(),"CaseDates","StartsAt",row.id(),row.startsAt());
         phiAuditService.auditDelete(con,c.actorUserId(),"CaseDates","EndsAt",row.id(),row.endsAt());
         appendDateTimeline(con,c.caseId(),c.shaleClientId(),c.actorUserId(),CaseTimelineWriter.CASE_DATE_REMOVED,
-                "Case date",row.startsAt(),row.endsAt(),null,null);
+                caseDateTypeName(con,row.typeId()),row.startsAt(),row.endsAt(),null,null);
     }
 
     public List<CaseDateDto> listDeletedCaseDatesForCase(long caseId, int tenant, int actor) {
@@ -684,12 +684,19 @@ public final class CaseDateDao {
             String typeName,LocalDateTime startsAt,LocalDateTime endsAt,LocalDateTime oldStartsAt,LocalDateTime oldEndsAt)throws SQLException{
         String label=typeName==null||typeName.isBlank()?"Case date":typeName.trim();
         String action=switch(eventType){case CaseTimelineWriter.CASE_DATE_CREATED->"added";case CaseTimelineWriter.CASE_DATE_REMOVED->"removed";case CaseTimelineWriter.CASE_DATE_RESTORED->"restored";default->"changed";};
-        String body=oldStartsAt==null?formatOccurrence(startsAt,endsAt):"from "+formatOccurrence(oldStartsAt,oldEndsAt)+" to "+formatOccurrence(startsAt,endsAt);
+        String body=oldStartsAt==null?formatOccurrence(startsAt,endsAt)
+                : Objects.equals(oldStartsAt,startsAt)&&Objects.equals(oldEndsAt,endsAt)?"details updated"
+                : "from "+formatOccurrence(oldStartsAt,oldEndsAt)+" to "+formatOccurrence(startsAt,endsAt);
         CaseTimelineWriter.append(con,caseId,tenant,actor,eventType,action+" "+label,body);
     }
 
     private static String formatOccurrence(LocalDateTime start,LocalDateTime end){
-        String value=start==null?"none":start.toString(); return end==null?value:value+" through "+end;
+        String value=start==null?"none":formatTimelineDateTime(start); return end==null?value:value+" through "+formatTimelineDateTime(end);
+    }
+
+    private static String formatTimelineDateTime(LocalDateTime value){
+        if(value.toLocalTime().equals(java.time.LocalTime.MIDNIGHT))return value.toLocalDate().format(java.time.format.DateTimeFormatter.ofPattern("MMM d, uuuu"));
+        return value.format(java.time.format.DateTimeFormatter.ofPattern("MMM d, uuuu h:mm a"));
     }
 
     private static String caseDateTypeName(Connection con,int typeId)throws SQLException{

@@ -20,6 +20,11 @@ final class CaseTimelineWriter {
     static final String CASE_LINK_CREATED = "CASE_LINK_CREATED";
     static final String CASE_LINK_UPDATED = "CASE_LINK_UPDATED";
     static final String CASE_LINK_REMOVED = "CASE_LINK_REMOVED";
+    static final String CASE_LINK_PRIMARY_CHANGED = "CASE_LINK_PRIMARY_CHANGED";
+    static final String CASE_LINKS_REORDERED = "CASE_LINKS_REORDERED";
+    static final String CASE_LINK_SHARE_ADDED = "CASE_LINK_SHARE_ADDED";
+    static final String CASE_LINK_SHARE_UPDATED = "CASE_LINK_SHARE_UPDATED";
+    static final String CASE_LINK_SHARE_REMOVED = "CASE_LINK_SHARE_REMOVED";
 
     private CaseTimelineWriter() {}
 

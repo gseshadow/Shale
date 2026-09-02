@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -134,6 +135,12 @@ public final class CaseDao {
 		public static final String CASE_LINK_CREATED = "CASE_LINK_CREATED";
 		public static final String CASE_LINK_UPDATED = "CASE_LINK_UPDATED";
 		public static final String CASE_LINK_REMOVED = "CASE_LINK_REMOVED";
+		public static final String CASE_LINK_PRIMARY_CHANGED = "CASE_LINK_PRIMARY_CHANGED";
+		public static final String CASE_LINKS_REORDERED = "CASE_LINKS_REORDERED";
+		public static final String CASE_LINK_SHARE_ADDED = "CASE_LINK_SHARE_ADDED";
+		public static final String CASE_LINK_SHARE_UPDATED = "CASE_LINK_SHARE_UPDATED";
+		public static final String CASE_LINK_SHARE_REMOVED = "CASE_LINK_SHARE_REMOVED";
+		public static final String NON_ENGAGEMENT_LETTER_SENT_CHANGED = "NON_ENGAGEMENT_LETTER_SENT_CHANGED";
 
 		private static final Set<String> ALLOWED = Set.of(
 				CASE_CREATED,
@@ -180,7 +187,9 @@ public final class CaseDao {
 				, CASE_DATE_CREATED, CASE_DATE_UPDATED, CASE_DATE_REMOVED, CASE_DATE_RESTORED
 				, MATERIAL_REQUEST_CREATED, MATERIAL_REQUEST_UPDATED, MATERIAL_REQUEST_STATUS_CHANGED,
 				MATERIAL_REQUEST_REMOVED, MATERIAL_REQUEST_NOTE_ADDED
-				, CASE_LINK_CREATED, CASE_LINK_UPDATED, CASE_LINK_REMOVED
+				, CASE_LINK_CREATED, CASE_LINK_UPDATED, CASE_LINK_REMOVED, CASE_LINK_PRIMARY_CHANGED,
+				CASE_LINKS_REORDERED, CASE_LINK_SHARE_ADDED, CASE_LINK_SHARE_UPDATED, CASE_LINK_SHARE_REMOVED,
+				NON_ENGAGEMENT_LETTER_SENT_CHANGED
 		);
 
 		private CaseTimelineEventTypes() {
@@ -7277,6 +7286,10 @@ public final class CaseDao {
 				validateActorForTenant(con, shaleClientId, actorUserId);
 				validateActiveLinkTypeForTenant(con, shaleClientId, linkTypeId);
 				CaseLinkDto existing = validateCaseLinkForTenant(con, shaleClientId, caseId, caseLinkId, externalLinkId);
+				if (sameCaseLinkValues(existing, linkTypeId, displayName, url, description, primary, notes, sortOrder)) {
+					con.rollback();
+					return existing;
+				}
 				updateExternalLinkRow(con, shaleClientId, actorUserId, externalLinkId, linkTypeId, displayName, url,
 						description, expectedExternalLinkRowVer);
 				updateCaseLinkRow(con, shaleClientId, actorUserId, caseLinkId, notes, sortOrder, expectedCaseLinkRowVer);
@@ -7316,6 +7329,12 @@ public final class CaseDao {
 				CaseLinkDto existing = validateCaseLinkForTenant(con, shaleClientId, caseId, caseLinkId, externalLinkId);
 				validateShareDraftContacts(con, shaleClientId, adds);
 				validateShareUpdatesAndRemovals(con, shaleClientId, caseLinkId, updates, removals);
+				if (sameCaseLinkValues(existing, linkTypeId, displayName, url, description, primary, notes, sortOrder)
+						&& (adds == null || adds.isEmpty()) && (updates == null || updates.isEmpty())
+						&& (removals == null || removals.isEmpty())) {
+					con.rollback();
+					return existing;
+				}
 				updateExternalLinkRow(con, shaleClientId, actorUserId, externalLinkId, linkTypeId, displayName, url, description, expectedExternalLinkRowVer);
 				updateCaseLinkRow(con, shaleClientId, actorUserId, caseLinkId, notes, sortOrder, expectedCaseLinkRowVer);
 				for (CaseLinkShareDraft share : adds == null ? List.<CaseLinkShareDraft>of() : adds)
@@ -7360,11 +7379,18 @@ public final class CaseDao {
 				validateActorForTenant(con, shaleClientId, actorUserId);
 				validateCaseLinkForTenant(con, shaleClientId, caseId, caseLinkId, null);
 				Long previousPrimary = findCurrentPrimaryCaseLinkId(con, shaleClientId, caseId);
+				if (Objects.equals(previousPrimary, caseLinkId)) {
+					con.rollback();
+					return validateCaseLinkForTenant(con, shaleClientId, caseId, caseLinkId, null);
+				}
 				setOnlyPrimary(con, shaleClientId, caseId, caseLinkId, actorUserId);
 				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.PRIMARY_SET, previousPrimary == null ? Map.of(
 						EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID, caseLinkId)
 						: Map.of(EntityActionAuditEvent.MetadataKey.PREVIOUS_PRIMARY_CASE_LINK_ID, previousPrimary, EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID,
 								caseLinkId));
+				CaseLinkDto selected = findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
+				CaseTimelineWriter.append(con, caseId, shaleClientId, actorUserId, CaseTimelineWriter.CASE_LINK_PRIMARY_CHANGED,
+						"made the link '" + safeTimelineLabel(selected == null ? null : selected.displayName(), "Link") + "' primary", null);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -7398,12 +7424,21 @@ public final class CaseDao {
 				if (!new HashSet<>(ids).equals(expected)) {
 					throw new IllegalArgumentException("Reorder must include each active case link exactly once.");
 				}
+				List<Long> currentOrder = active.stream()
+						.sorted(Comparator.comparingInt(CaseLinkDto::sortOrder).thenComparingLong(CaseLinkDto::caseLinkId))
+						.map(CaseLinkDto::caseLinkId).toList();
+				if (currentOrder.equals(ids)) {
+					con.rollback();
+					return active;
+				}
 				int order = 0;
 				for (Long id : ids) {
 					updateCaseLinkSortOrder(con, shaleClientId, caseId, actorUserId, id, order++);
 				}
 				auditCaseLink(con, shaleClientId, actorUserId, caseId, caseId, EntityActionAuditEvent.Action.REORDERED, Map.of(
 						EntityActionAuditEvent.MetadataKey.REORDERED_LINK_COUNT, ids.size()));
+				CaseTimelineWriter.append(con, caseId, shaleClientId, actorUserId, CaseTimelineWriter.CASE_LINKS_REORDERED,
+						"reordered Case Links", null);
 				con.commit();
 				return listCaseLinks(con, caseId, shaleClientId);
 			} catch (Exception e) {
@@ -7451,6 +7486,35 @@ public final class CaseDao {
 	}
 
 	private static String safeTimelineLabel(String value,String fallback){String v=value==null?"":value.trim();return v.isBlank()?fallback:v.replace("'","’");}
+
+	private static String normalizeTimelineValue(String value) {
+		String normalized = value == null ? "" : value.trim();
+		return normalized.isBlank() ? null : normalized;
+	}
+
+	private static boolean sameCaseLinkValues(CaseLinkDto existing, int linkTypeId, String displayName,
+			String url, String description, Boolean primary, String notes, Integer sortOrder) {
+		return existing != null
+				&& existing.linkTypeId() == linkTypeId
+				&& Objects.equals(normalizeTimelineValue(existing.displayName()), normalizeTimelineValue(displayName))
+				&& Objects.equals(normalizeTimelineValue(existing.url()), normalizeTimelineValue(url))
+				&& Objects.equals(normalizeTimelineValue(existing.description()), normalizeTimelineValue(description))
+				&& (primary == null || existing.primary() == primary)
+				&& Objects.equals(normalizeTimelineValue(existing.notes()), normalizeTimelineValue(notes))
+				&& (sortOrder == null || existing.sortOrder() == sortOrder);
+	}
+
+	private static String contactTimelineLabel(Connection con, int tenant, int contactId) throws SQLException {
+		String sql = "SELECT COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(FirstName,''),' ',COALESCE(LastName,'')))),''),"
+				+ "NULLIF(LTRIM(RTRIM(Name)),'')) FROM dbo.Contacts WHERE Id=? AND ShaleClientId=? AND IsDeleted=0";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, contactId);
+			ps.setInt(2, tenant);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? safeTimelineLabel(rs.getString(1), "Contact #" + contactId) : "Contact #" + contactId;
+			}
+		}
+	}
 
 	public List<CaseLinkContactOptionDto> searchCaseLinkShareContacts(int tenant, String query, int limit) {
 		String q = query == null ? "" : query.trim();
@@ -7752,6 +7816,8 @@ public final class CaseDao {
 				validateActiveContactForTenant(con, tenant, contactId);
 				long shareId = insertCaseLinkShare(con, tenant, actor, caseLinkId, contactId, sharedAt, notes);
 				auditCaseLinkShare(con, tenant, actor, caseLinkId, caseId, contactId, EntityActionAuditEvent.Action.ADDED, shareId);
+				CaseTimelineWriter.append(con, caseId, tenant, actor, CaseTimelineWriter.CASE_LINK_SHARE_ADDED,
+						"shared a Case Link with " + contactTimelineLabel(con, tenant, contactId), null);
 				con.commit();
 				return findCaseLinkShare(con, tenant, caseId, caseLinkId, shareId);
 			} catch (Exception e) {
@@ -7775,8 +7841,16 @@ public final class CaseDao {
 				validateActorForTenant(con, tenant, actor);
 				validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null);
 				validateActiveContactForTenant(con, tenant, contactId);
+				CaseLinkShareDto existing = findCaseLinkShare(con, tenant, caseId, caseLinkId, shareId);
+				if (existing != null && existing.contactId() == contactId && Objects.equals(existing.sharedAt(), sharedAt)
+						&& Objects.equals(normalizeTimelineValue(existing.notes()), normalizeTimelineValue(notes))) {
+					con.rollback();
+					return existing;
+				}
 				updateCaseLinkShareRow(con, tenant, actor, caseLinkId, shareId, contactId, sharedAt, notes, rowVer);
 				auditCaseLinkShare(con, tenant, actor, caseLinkId, caseId, contactId, EntityActionAuditEvent.Action.UPDATED, shareId);
+				CaseTimelineWriter.append(con, caseId, tenant, actor, CaseTimelineWriter.CASE_LINK_SHARE_UPDATED,
+						"updated Case Link sharing for " + contactTimelineLabel(con, tenant, contactId), null);
 				con.commit();
 				return findCaseLinkShare(con, tenant, caseId, caseLinkId, shareId);
 			} catch (Exception e) {
@@ -7800,6 +7874,8 @@ public final class CaseDao {
 				validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null);
 				softDeleteCaseLinkShare(con, tenant, actor, caseLinkId, shareId, rowVer);
 				auditCaseLinkShare(con, tenant, actor, caseLinkId, caseId, null, EntityActionAuditEvent.Action.REMOVED, shareId);
+				CaseTimelineWriter.append(con, caseId, tenant, actor, CaseTimelineWriter.CASE_LINK_SHARE_REMOVED,
+						"removed a Case Link share", null);
 				con.commit();
 			} catch (Exception e) {
 				con.rollback();

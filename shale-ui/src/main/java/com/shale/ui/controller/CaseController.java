@@ -7835,39 +7835,7 @@ public class CaseController {
 							request.desired().desiredOpposingCounselContactName()
 					);
 				}
-				if (computation.incidentChanged()) {
-					addDateChangedTimelineEvent(
-							request.saveCaseId(),
-							request.tenantId(),
-							request.userId(),
-							CaseDao.CaseTimelineEventTypes.INCIDENT_DATE_CHANGED,
-							"Incident date changed",
-							request.baseline().incidentDate(),
-							request.desired().desiredIncidentDate()
-					);
-				}
-				if (computation.solChanged()) {
-					addDateChangedTimelineEvent(
-							request.saveCaseId(),
-							request.tenantId(),
-							request.userId(),
-							CaseDao.CaseTimelineEventTypes.SOL_DATE_CHANGED,
-							"SOL date changed",
-							request.baseline().solDate(),
-							request.desired().desiredSolDate()
-					);
-				}
-				if (computation.tortNoticeChanged()) {
-					addDateChangedTimelineEvent(
-							request.saveCaseId(),
-							request.tenantId(),
-							request.userId(),
-							CaseDao.CaseTimelineEventTypes.TORT_NOTICE_DEADLINE_CHANGED,
-							"Tort notice deadline changed",
-							request.baseline().tortNoticeDeadline(),
-							request.desired().desiredTortNoticeDeadline()
-					);
-				}
+				// Authoritative Case Date mutations append their own single transaction-bound event.
 				if (computation.practiceAreaChanged()) {
 					addPracticeAreaChangedTimelineEvent(
 							request.saveCaseId(),
@@ -9313,6 +9281,15 @@ public class CaseController {
 							"Fee agreement signed updated",
 							request.baseline().getFeeAgreementSigned(),
 							request.feeAgreementSigned()
+					);
+					addBooleanChangedTimelineEvent(
+							request.caseId(),
+							(appState == null ? null : appState.getShaleClientId()),
+							(appState == null ? null : appState.getUserId()),
+							CaseDao.CaseTimelineEventTypes.NON_ENGAGEMENT_LETTER_SENT_CHANGED,
+							"Non-engagement letter sent updated",
+							request.baseline().getNonEngagementLetterSent(),
+							request.nonEngagementLetterSent()
 					);
 					addBooleanChangedTimelineEvent(
 							request.caseId(),
