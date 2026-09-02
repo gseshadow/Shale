@@ -27,7 +27,7 @@ def matches(path: str, patterns: Iterable[str]) -> bool:
 
 def changed_paths(base: str, head: str) -> list[str]:
     command = ["git", "diff", "--name-only", "--diff-filter=ACMR", base, head, "--"]
-    completed = subprocess.run(command, cwd=ROOT, check=True, text=True, capture_output=True)
+    completed = subprocess.run(command, cwd=ROOT, check=True, text=True, encoding="utf-8", capture_output=True)
     return sorted({line.strip().replace("\\", "/") for line in completed.stdout.splitlines() if line.strip()})
 
 

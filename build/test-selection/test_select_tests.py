@@ -99,16 +99,16 @@ class ChangeSelectorTest(unittest.TestCase):
 
     def test_every_test_is_reachable_by_historical_full_suite_pattern(self):
         root = SCRIPT.parents[2]
-        patterns = [line.strip() for line in SCRIPT.with_name("all-tests.txt").read_text().splitlines()
+        patterns = [line.strip() for line in SCRIPT.with_name("all-tests.txt").read_text(encoding="utf-8").splitlines()
                     if line.strip() and not line.startswith("#")]
         tests = list(root.glob("shale-*/src/test/java/**/*.java"))
         unreachable = [str(path.relative_to(root)) for path in tests
-                       if "@Test" in path.read_text() and not any(fnmatch.fnmatchcase(path.name, Path(pattern).name) for pattern in patterns)]
+                       if "@Test" in path.read_text(encoding="utf-8") and not any(fnmatch.fnmatchcase(path.name, Path(pattern).name) for pattern in patterns)]
         self.assertEqual([], unreachable)
 
     def test_critical_manifest_is_small_and_references_existing_tests(self):
         root = SCRIPT.parents[2]
-        critical = [Path(line.strip()).stem for line in SCRIPT.with_name("critical-tests.txt").read_text().splitlines()
+        critical = [Path(line.strip()).stem for line in SCRIPT.with_name("critical-tests.txt").read_text(encoding="utf-8").splitlines()
                     if line.strip() and not line.startswith("#")]
         existing = {path.stem for path in root.glob("shale-*/src/test/java/**/*Test.java")}
         self.assertTrue(set(critical) <= existing)
@@ -133,9 +133,9 @@ class ChangeSelectorTest(unittest.TestCase):
 
     def test_ci_has_relevant_gate_and_separate_informational_full_suite(self):
         root = SCRIPT.parents[2]
-        gate = (root / ".github/workflows/maven-test-gate.yml").read_text()
-        full = (root / ".github/workflows/maven-full-suite.yml").read_text()
-        visual = (root / ".github/workflows/maven-ui-visual.yml").read_text()
+        gate = (root / ".github/workflows/maven-test-gate.yml").read_text(encoding="utf-8")
+        full = (root / ".github/workflows/maven-full-suite.yml").read_text(encoding="utf-8")
+        visual = (root / ".github/workflows/maven-ui-visual.yml").read_text(encoding="utf-8")
         self.assertIn("name: Relevant Test Gate", gate)
         self.assertIn("python build/test-selection/select_tests.py --base", gate)
         self.assertIn("run: mvn test", gate)
