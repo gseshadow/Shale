@@ -61,6 +61,51 @@ Before making changes:
 2. Clearly state that the implementation remains unverified. Never claim success for an unexecuted test or describe a newly written test as passing when it was not run.
 3. Do not report the task complete when required verification did not execute.
 
+### Tests must protect contracts, not framework internals
+
+1. JavaFX tests may verify visible behavior, operability, clipping, containment, semantic style classes, and supported layout breakpoints.
+2. Do not reproduce JavaFX skin sizing algorithms in tests. Release-blocking tests must not depend on internal skin-node selectors such as `.scroll-bar`.
+3. Do not assert exact internal scrollbar height, `ScrollPaneSkin` preferred-size arithmetic, or other framework-owned implementation geometry.
+4. Exact pixel assertions are permitted only when the value is an intentional Shale design token or documented UI contract.
+5. Declared padding may be asserted exactly. Rendered geometry should normally assert containment or visible behavior with a justified layout tolerance.
+
+### Review the complete failing test
+
+1. Before changing a failed test, inspect every assertion in the method and inspect neighboring tests for related assumptions.
+2. Do not patch only the first failing assertion when the method contains related geometry or implementation-detail assumptions.
+3. If successive failures expose different assertions in the same method, stop incremental patching and reassess the entire testing model against the supported contract.
+
+### Unverified runtime changes
+
+1. If Codex cannot execute the focused test because of Maven, network, dependency, JavaFX, or environment failure, it must not claim the task is complete.
+2. When runtime verification is unavailable, avoid inventing new rendered-geometry calculations. Keep unverified changes minimal and explicitly identify the exact command a developer or CI must run.
+3. A compile error introduced during test refactoring is unacceptable. Perform every available static check and inspect all references before handing off an unverified change.
+
+### Required verification sequence
+
+For a behavioral change:
+
+1. Run focused affected tests.
+2. Run the affected module and dependency suite.
+3. Run the required full reactor gate with `mvn test`.
+4. Do not treat the release script as the first full-suite validation.
+
+Use the established cross-module Maven form where necessary:
+
+```bash
+mvn -pl <module> -am -Dtest=<TestClass> \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+### Release-blocking test quality
+
+Every release-blocking test must:
+
+1. State the user-visible, business, security, data-integrity, or architectural regression it prevents.
+2. Be deterministic in its supported environment.
+3. Have an actionable failure message.
+4. Avoid coupling unrelated contracts into one large test method.
+
 ---
 
 ## Test Maintenance Is Part of Every Change
