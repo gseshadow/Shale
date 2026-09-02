@@ -47,6 +47,12 @@ jobs:
             --github-output $env:GITHUB_OUTPUT
           Get-Content build/test-selection/selection-summary.md | Add-Content $env:GITHUB_STEP_SUMMARY
 
+      - name: Validate compilation and packaging
+        run: mvn -DskipTests package
+
+      - name: Validate selector infrastructure
+        run: python -m unittest build.test-selection.test_select_tests
+
       - name: Run critical suite
         run: mvn test
 
@@ -63,7 +69,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
-      - name: Run affected-area or escalated full suite
+      - name: Run affected-area suite
         if: steps.selection.outputs.selected_command != ''
         shell: pwsh
         env:

@@ -54,7 +54,7 @@ Before making changes:
 2. Search again for old field lists, constructors, method names, SQL fragments, and obsolete expectations.
 3. Inspect the production and test diff, then run `python build/test-selection/select_tests.py --base <base> --head HEAD`.
 4. Run directly modified tests first, then the selector's affected-area suite, then the critical default with `mvn test`.
-5. Request or run `mvn -Pall-tests test` only when the selector escalates a cross-cutting/unknown change or the user explicitly requests it.
+5. Request or run `mvn -Pall-tests test` only when the selector recommends it informationally for a cross-cutting/unknown change or the user explicitly requests it. Its result never replaces or fails the required focused gate.
 6. Add or update tests only in affected areas. Never enable every historical test merely because tests are implementation work.
 7. Explain why every selected test area is relevant to the changed production or test contract.
 
@@ -69,11 +69,12 @@ Before making changes:
 
 ### Tests must protect contracts, not framework internals
 
-1. JavaFX tests may verify visible behavior, operability, clipping, containment, semantic style classes, and supported layout breakpoints.
-2. Do not reproduce JavaFX skin sizing algorithms in tests. Release-blocking tests must not depend on internal skin-node selectors such as `.scroll-bar`.
-3. Do not assert exact internal scrollbar height, `ScrollPaneSkin` preferred-size arithmetic, or other framework-owned implementation geometry.
-4. Exact pixel assertions are permitted only when the value is an intentional Shale design token or documented UI contract.
-5. Declared padding may be asserted exactly. Rendered geometry should normally assert containment or visible behavior with a justified layout tolerance.
+1. Ordinary visual corrections (CSS colors, backgrounds, borders, radius, padding, spacing, typography, and semantic style classes) normally require visual inspection plus static CSS/resource validation—not a new rendered-geometry regression test.
+2. FXML presentation changes may verify resource loading, controller IDs, required nodes, and event-handler wiring. Do not turn them into rendered dimension or JavaFX skin contracts.
+3. Do not reproduce JavaFX skin sizing algorithms in tests. Release-blocking tests must not depend on internal skin-node selectors such as `.scroll-bar`, viewport arithmetic, popup containment, scene timing, text measurement, or post-layout clipping calculations.
+4. Tests primarily dependent on exact pixels, skin nodes, internal selectors, scrollbars, popup/window positioning, platform text metrics, or padding-derived rendered geometry belong only in the advisory `mvn -Pui-visual test` profile.
+5. Exact values may be asserted in blocking tests only when they are intentional Shale design tokens or declared resource properties; do not infer a blocking geometry contract from the rendered result.
+6. Never add or loosen a rendered-geometry test merely to make an ordinary styling fix pass. Delete obsolete framework-calculation tests rather than preserving superseded source structure.
 
 ### Review the complete failing test
 
@@ -94,7 +95,7 @@ For a behavioral change:
 1. Run focused affected tests.
 2. Run the repository selector's affected-area module and dependency suite.
 3. Run the release-blocking critical reactor with `mvn test`.
-4. Run `mvn -Pall-tests test` only for selector escalation, cross-cutting changes, or explicit user direction.
+4. Run `mvn -Pall-tests test` only as non-blocking information for selector escalation/cross-cutting changes, or on explicit user direction.
 5. Do not treat the release script as the first validation of the critical suite.
 
 Use the established cross-module Maven form where necessary:

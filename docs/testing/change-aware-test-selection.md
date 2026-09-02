@@ -4,7 +4,7 @@ Shale intentionally does not run every historical test for every routine change.
 the selection policy in `build/test-selection/test-areas.json`; CI YAML only supplies the base/head
 diff and executes the emitted commands.
 
-## The four modes
+## Validation modes
 
 ### 1. Critical default
 
@@ -24,9 +24,10 @@ python build/test-selection/select_tests.py --base origin/codex/latest --head HE
 ```
 
 The selector reports changed paths, affected Maven modules, test patterns, exact commands, selection
-reasons, skipped areas, directly modified test classes, and full-suite escalation. It fails safely to
-the full suite for a parent/module POM, test infrastructure, workflow, Codex selection rules, or an
-unknown production path. Documentation-only changes have no affected-area Maven command; CI still
+rationale, skipped areas, directly modified test classes, and informational full-suite escalation.
+It recommends the full suite for information when a parent/module POM, test infrastructure, workflow,
+Codex selection rule, or unknown production path changes. That historical result is never part of the
+required gate. Documentation-only changes have no affected-area Maven command; CI still
 runs the independently required critical gate.
 
 Use `--run` to execute the displayed Python contracts, selected affected-area/full suite, and critical
@@ -41,7 +42,8 @@ python build/test-selection/select_tests.py --area calendar --run
 python build/test-selection/select_tests.py --area contacts --run
 python build/test-selection/select_tests.py --area tasks --run
 python build/test-selection/select_tests.py --area cases --run
-python build/test-selection/select_tests.py --area ui-rendered --run
+python build/test-selection/select_tests.py --area ui-presentation --run
+python build/test-selection/select_tests.py --area ui-behavior --run
 ```
 
 On Windows, `py` may replace `python`. The emitted Maven command selects the owning modules with
@@ -61,11 +63,22 @@ patterns. Every existing test remains reachable. The separate **Informational Fu
 workflow supports manual dispatch and a weekly schedule; its job is informational and does not form
 the ordinary Relevant Test Gate.
 
+### 5. Advisory JavaFX visual suite
+
+```bash
+mvn -Pui-visual test
+```
+
+This manually and periodically runnable profile owns tests coupled to rendered dimensions, JavaFX
+skins/internal nodes, viewports and scrollbars, popup/window timing or containment, platform text
+measurement, clipping, and padding-derived geometry. Its separately named workflow uses non-blocking
+semantics and archives reports. Changed paths never select `ui-visual-advisory`; request it explicitly.
+
 ## Path-to-area map
 
 | Changed path or contract | Selected area(s) |
 | --- | --- |
-| Calendar Java/FXML/local CSS | `calendar` |
+| Calendar Java | `calendar`, and `ui-behavior` for UI controllers/components |
 | Contact Java/FXML/data/migrations | `contacts` |
 | Tasks or My Shale task code/FXML | `tasks` |
 | Case view/domain/intake/FXML | `cases` |
@@ -75,7 +88,10 @@ the ordinary Relevant Test Gate.
 | Updater and desktop updater launch | `updater` |
 | Server/API/web consumer | `server` |
 | Build, packaging, release scripts | `build-scripts` Python contracts |
-| Global UI CSS/shared components | `ui-rendered` |
+| Any JavaFX CSS | `ui-presentation` (static contracts only) |
+| Any JavaFX FXML | `ui-presentation` plus `ui-fxml-structure` (loading/ID/node/handler structure only) |
+| JavaFX controller/shared-component Java | relevant feature area plus `ui-behavior` |
+| Rendered geometry/skin checks | `ui-visual-advisory`, explicit/manual only |
 | Shared core DTO/service port | Direct consumers: Cases, Contacts, Tasks, Organizations, Reports, Server |
 | Security/RLS/audit/session infrastructure | `security-data` plus the always-run critical suite |
 | Notification/live-update code | `notifications` |
@@ -89,8 +105,9 @@ The JSON manifest is authoritative and more precise than this overview.
 ## CI behavior and reports
 
 The required **Relevant Test Gate** checks out full history, compares PR base/head or push before/after,
-runs the critical suite, runs selected build contracts and feature tests, and uses `-Pall-tests` only
-on escalation. Its job summary includes the selector explanation and module/reactor Surefire counts.
+runs package/compilation validation, selector contracts, the critical suite, and selected feature
+tests. Full-suite escalation is reported as an informational command and is not executed by this
+required job. Its summary includes the selector explanation and module/reactor Surefire counts.
 Surefire/Failsafe XML and the selection summary are archived even after failures. Concurrency
 cancellation remains enabled.
 

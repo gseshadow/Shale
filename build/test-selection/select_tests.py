@@ -77,7 +77,10 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
             continue
 
         path_areas: set[str] = set()
+        presentation_resource = path.startswith("shale-ui/src/main/resources/") and path.endswith((".css", ".fxml"))
         for area, definition in area_config.items():
+            if presentation_resource and area not in {"ui-presentation", "ui-fxml-structure"}:
+                continue
             if matches(path, definition.get("paths", [])):
                 path_areas.add(area)
                 reasons.setdefault(area, []).append(f"{path}: {definition['reason']}")
@@ -109,8 +112,8 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
             "-Dsurefire.failIfNoSpecifiedTests=false", "test"
         ])
 
-    if full_suite:
-        selected_command = "mvn -Pall-tests test"
+    if "ui-visual-advisory" in selected:
+        selected_command = "mvn -Pui-visual test"
     elif patterns:
         module_args = ["-pl", ",".join(modules), "-am"] if modules else []
         selected_command = " ".join([
@@ -119,6 +122,7 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
         ])
     else:
         selected_command = ""
+    informational_command = "mvn -Pall-tests test" if full_suite else ""
 
     return {
         "changed_paths": sorted(paths),
@@ -130,6 +134,7 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
         "critical_command": "mvn test",
         "focused_command": focused_command,
         "selected_command": selected_command,
+        "informational_command": informational_command,
         "commands": [command for command in [*python_tests, focused_command, selected_command, "mvn test"] if command],
         "full_suite": full_suite,
         "escalation_reasons": escalation_reasons,
@@ -159,7 +164,9 @@ def markdown(result: dict) -> str:
     ])
     lines.extend(f"- `{command}`" for command in result["commands"] or ["(no Maven tests)"])
     if result["escalation_reasons"]:
-        lines.extend(["", "### Escalation reasons"])
+        lines.extend(["", "### Informational full-suite escalation", "", f"- `{result['informational_command']}`",
+                      "- This historical-suite result is non-blocking and does not replace the focused gate.",
+                      "", "### Escalation reasons"])
         lines.extend(f"- {reason}" for reason in result["escalation_reasons"])
     lines.extend(["", "### Skipped areas"])
     lines.extend(f"- **{area}:** {reason}" for area, reason in result["skipped_areas"].items())
@@ -206,6 +213,7 @@ def main(argv: list[str] | None = None) -> int:
         with args.github_output.open("a", encoding="utf-8") as output:
             output.write(f"full_suite={str(result['full_suite']).lower()}\n")
             output.write(f"selected_command={result['selected_command']}\n")
+            output.write(f"informational_command={result['informational_command']}\n")
             output.write(f"python_commands={json.dumps(result['python_commands'])}\n")
     return run_commands(result) if args.run else 0
 
