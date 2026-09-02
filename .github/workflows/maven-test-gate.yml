@@ -44,6 +44,7 @@ jobs:
           if (-not $base -or $base -match '^0+$') { $base = 'HEAD^' }
           python build/test-selection/select_tests.py --base $base --head $env:HEAD_SHA `
             --format markdown --output build/test-selection/selection-summary.md `
+            --plan-output build/test-selection/selection-plan.json `
             --github-output $env:GITHUB_OUTPUT
           Get-Content build/test-selection/selection-summary.md | Add-Content $env:GITHUB_STEP_SUMMARY
 
@@ -51,6 +52,7 @@ jobs:
         run: mvn -DskipTests package
 
       - name: Validate selector infrastructure
+        if: steps.selection.outputs.selector_tests_required == 'true'
         run: python -m unittest build.test-selection.test_select_tests
 
       - name: Run critical suite
@@ -60,24 +62,20 @@ jobs:
         if: steps.selection.outputs.python_commands != '[]'
         shell: pwsh
         env:
-          COMMANDS_JSON: ${{ steps.selection.outputs.python_commands }}
+          COMMAND_ARGS_JSON: ${{ steps.selection.outputs.python_command_args }}
         run: |
-          $commands = $env:COMMANDS_JSON | ConvertFrom-Json
-          foreach ($command in $commands) {
-            Write-Host "+ $command"
-            Invoke-Expression $command
+          $commandSets = $env:COMMAND_ARGS_JSON | ConvertFrom-Json
+          foreach ($commandArgs in $commandSets) {
+            $executable = $commandArgs[0]
+            $arguments = @($commandArgs | Select-Object -Skip 1)
+            Write-Host "+ $executable $($arguments -join ' ')"
+            & $executable @arguments
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
       - name: Run affected-area suite
         if: steps.selection.outputs.selected_command != ''
-        shell: pwsh
-        env:
-          SELECTED_COMMAND: ${{ steps.selection.outputs.selected_command }}
-        run: |
-          Write-Host "+ $env:SELECTED_COMMAND"
-          Invoke-Expression $env:SELECTED_COMMAND
-          exit $LASTEXITCODE
+        run: python build/test-selection/run_selection.py build/test-selection/selection-plan.json --command affected
 
       - name: Summarize Surefire and Failsafe reports
         if: always()

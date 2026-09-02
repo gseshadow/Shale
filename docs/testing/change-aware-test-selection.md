@@ -47,10 +47,30 @@ python build/test-selection/select_tests.py --area ui-behavior --run
 ```
 
 On Windows, `py` may replace `python`. The emitted Maven command selects the owning modules with
-`-pl ... -am`, a repository-maintained group of class patterns, and
+`-pl ... -am`, repository-maintained explicit or narrowly bounded test classes, and
 `-Dsurefire.failIfNoSpecifiedTests=false`, so upstream modules without matching tests do not fail.
 Pass `--area` more than once for an intentional combined selection. Use `--format markdown` to obtain
 a review-friendly explanation without running anything.
+
+The selector retains a readable command string for logs and job summaries, but execution always uses
+structured process arguments. In particular, the complete comma-separated `-Dtest=...` selection is
+one Maven argument; CI and `--run` never pass the display string through `Invoke-Expression`, `eval`,
+`cmd /c`, or a shell interpreter.
+
+Every selected class is accompanied by its changed path, mapping rule, and classification (critical,
+directly modified, affected behavior, or manual inventory). Automated affected selections are capped
+at 50 classes; exceeding that limit is a selector-model error rather than a blocking mega-command.
+Broad feature inventories are therefore manual-only. Structured Maven commands are additionally kept
+below a conservative 7,000-character Windows limit and, when an explicitly requested legitimate
+inventory exceeds it, are split deterministically into module-local batches without truncation. The
+critical safety manifest is never serialized onto the command line: it remains the separate `mvn test`
+invocation supplied through the parent POM.
+
+The selector writes an authoritative JSON execution plan for CI. The repository-owned
+`run_selection.py` runner validates that plan, resolves `mvn.cmd` explicitly on Windows, logs the
+display-only command and every indexed argument, and launches Maven with
+`subprocess.run(argv, shell=False, check=True)`. PowerShell never reconstructs or transports dynamic
+Maven argument arrays.
 
 ### 4. Explicit full suite
 
@@ -117,7 +137,8 @@ days.
 
 ## Maintaining the inventories
 
-When adding or renaming a test, update feature patterns or the critical manifest only when the
+When adding or renaming a test, update explicit feature ownership or the fully qualified critical
+class manifest only when the
 contract warrants it. Regenerate and check the review inventory:
 
 ```bash

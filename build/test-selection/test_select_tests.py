@@ -2,12 +2,21 @@ import importlib.util
 from pathlib import Path
 import unittest
 import fnmatch
+import json
+import os
+import sys
+import tempfile
 import xml.etree.ElementTree as ET
+from unittest import mock
 
 SCRIPT = Path(__file__).with_name("select_tests.py")
 SPEC = importlib.util.spec_from_file_location("select_tests", SCRIPT)
 SELECTOR = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SELECTOR)
+RUNNER_SCRIPT = Path(__file__).with_name("run_selection.py")
+RUNNER_SPEC = importlib.util.spec_from_file_location("run_selection", RUNNER_SCRIPT)
+RUNNER = importlib.util.module_from_spec(RUNNER_SPEC)
+RUNNER_SPEC.loader.exec_module(RUNNER)
 
 
 class ChangeSelectorTest(unittest.TestCase):
@@ -24,7 +33,7 @@ class ChangeSelectorTest(unittest.TestCase):
     def test_calendar_fxml_change_selects_structural_presentation_only(self):
         result = self.selected("shale-ui/src/main/resources/fxml/calendar.fxml")
         self.assertEqual(["ui-fxml-structure", "ui-presentation"], result["selected_areas"])
-        self.assertIn("*FxmlLoadTest", result["test_patterns"])
+        self.assertIn("com.shale.ui.controller.SettingsFxmlLoadTest", result["test_patterns"])
         self.assertNotIn("*Calendar*Test", result["test_patterns"])
 
     def test_task_and_my_shale_change_selects_tasks(self):
@@ -36,7 +45,7 @@ class ChangeSelectorTest(unittest.TestCase):
     def test_global_css_selects_static_presentation_not_rendered_ui(self):
         result = self.selected("shale-ui/src/main/resources/css/app.css")
         self.assertEqual(["ui-presentation"], result["selected_areas"])
-        self.assertIn("*CssContractTest", result["test_patterns"])
+        self.assertIn("com.shale.ui.util.SemanticControlCssContractTest", result["test_patterns"])
         self.assertNotIn("*Runtime*Test", result["test_patterns"])
         for unrelated in ("*Case*Test", "*Calendar*Test", "*Task*Test", "*Layout*Test"):
             self.assertNotIn(unrelated, result["test_patterns"])
@@ -62,6 +71,150 @@ class ChangeSelectorTest(unittest.TestCase):
         result = self.selected("shale-data/src/main/java/com/shale/data/auth/AuthUserLifecycle.java")
         self.assertIn("security-data", result["selected_areas"])
         self.assertEqual("mvn test", result["critical_command"])
+        self.assertIn("com.shale.data.auth.AuthUserLifecycleSecurityTest", result["test_patterns"])
+        self.assertIn("com.shale.data.dao.EntityActionAuditEventTest", result["test_patterns"])
+        self.assertIn("com.shale.server.runtime.RequestScopedDbSessionProviderTest", result["test_patterns"])
+
+    def test_case_timeline_change_uses_only_explicit_focused_classes(self):
+        result = SELECTOR.select([
+            "shale-data/src/main/java/com/shale/data/dao/CaseTimelineWriter.java",
+            "shale-data/src/main/java/com/shale/data/dao/CaseDao.java",
+            "shale-data/src/main/java/com/shale/data/dao/CaseDateDao.java",
+            "shale-data/src/main/java/com/shale/data/dao/MaterialRequestDao.java",
+            "shale-ui/src/main/java/com/shale/ui/controller/CaseController.java",
+            "shale-data/src/test/java/com/shale/data/dao/CaseLifecycleAuditContractTest.java",
+            "build/test-selection/select_tests.py",
+            ".github/workflows/maven-test-gate.yml",
+        ])
+        expected = {
+            "com.shale.data.dao.CaseLifecycleAuditContractTest",
+            "com.shale.data.dao.CaseTimelineCoverageContractTest",
+            "com.shale.data.dao.CaseTimelineWriterTest",
+            "com.shale.ui.controller.CaseDetailsTimelineCoverageTest",
+            "com.shale.ui.controller.CaseTimelineDescriptionTest",
+        }
+        self.assertEqual(expected, set(result["test_patterns"]))
+        self.assertEqual(["shale-core", "shale-data", "shale-ui"], result["selected_modules"])
+        for unsafe in ("*Case*Test", "Case*Test", "*Intake*Test", "*BehaviorTest", "*LifecycleTest"):
+            self.assertNotIn(unsafe, result["test_patterns"])
+        self.assertEqual(set(result["test_patterns"]), set(result["test_reasons"]))
+        self.assertTrue(all(reason["changed_paths"] and reason["mapping_rules"] and reason["classifications"]
+                            for reason in result["test_reasons"].values()))
+
+    def test_complete_case_timeline_pr_fixture_selects_five_safe_commands(self):
+        fixture = SCRIPT.with_name("fixtures") / "case-timeline-pr-paths.txt"
+        paths = [line for line in fixture.read_text(encoding="utf-8").splitlines() if line]
+        result = SELECTOR.select(paths)
+        self.assertEqual(5, len(result["test_patterns"]))
+        self.assertEqual("mvn test", result["critical_command"])
+        self.assertEqual(["test"], result["critical_maven_args"])
+        self.assertEqual([], result["focused_maven_batches"])
+        self.assertEqual(1, len(result["selected_maven_batches"]))
+        self.assertLessEqual(result["maximum_command_length"], result["windows_safe_command_length"])
+        gate = (SCRIPT.parents[2] / ".github/workflows/maven-test-gate.yml").read_text(encoding="utf-8")
+        self.assertIn("run: mvn -DskipTests package", gate)
+        self.assertIn("run: python -m unittest build.test-selection.test_select_tests", gate)
+        self.assertIn("run: mvn test", gate)
+        for unrelated in ("NewIntake", "Calendar", "Settings", "Reports", "Task"):
+            self.assertFalse(any(unrelated in qualified for qualified in result["test_patterns"]))
+
+    def test_automated_mega_selection_is_a_model_error_but_manual_inventory_is_batched(self):
+        automatic = self.selected("shale-ui/src/main/java/com/shale/ui/controller/CaseController.java")
+        self.assertIn("exceeding the policy limit", automatic["selection_error"])
+        self.assertEqual("", automatic["selected_command"])
+        self.assertEqual([], automatic["selected_maven_batches"])
+        manual = SELECTOR.select([], ["cases"])
+        self.assertFalse(manual["selection_error"])
+        self.assertGreater(len(manual["test_patterns"]), SELECTOR.AUTOMATED_CLASS_LIMIT)
+        self.assertGreater(len(manual["selected_maven_batches"]), 1)
+        self.assertTrue(all(len(SELECTOR.display_command(["mvn", *batch])) <= SELECTOR.WINDOWS_SAFE_COMMAND_LENGTH
+                            for batch in manual["selected_maven_batches"]))
+
+    def test_maven_test_list_is_one_structured_process_argument(self):
+        result = SELECTOR.select([
+            "shale-data/src/main/java/com/shale/data/dao/CaseTimelineWriter.java",
+            "shale-data/src/main/java/com/shale/data/dao/CaseDao.java",
+        ])
+        test_argument = next(value for value in result["selected_maven_args"] if value.startswith("-Dtest="))
+        self.assertIn(",", test_argument)
+        with mock.patch.object(SELECTOR.subprocess, "run", return_value=mock.Mock(returncode=0)) as run:
+            SELECTOR.run_commands({**result, "python_command_args": [], "focused_maven_args": []})
+        selected_call = next(call for call in run.call_args_list if test_argument in call.args[0])
+        self.assertIsInstance(selected_call.args[0], list)
+        self.assertEqual(1, sum(1 for argument in selected_call.args[0] if argument == test_argument))
+        self.assertFalse(selected_call.kwargs["shell"])
+
+    def test_runner_preserves_real_process_argument_boundaries(self):
+        fixture = SCRIPT.with_name("fixtures") / "case-timeline-pr-paths.txt"
+        plan = SELECTOR.select(fixture.read_text(encoding="utf-8").splitlines())
+        with tempfile.TemporaryDirectory() as directory:
+            recorder = Path(directory) / "record_args.py"
+            output = Path(directory) / "args.json"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "open(os.environ['ARG_RECORD'], 'w', encoding='utf-8').write(json.dumps(sys.argv[1:]))\n",
+                encoding="utf-8",
+            )
+            recorder.chmod(0o755)
+            with mock.patch.dict(os.environ, {"ARG_RECORD": str(output)}):
+                RUNNER.execute_affected(plan, launcher=[sys.executable, str(recorder)])
+            recorded = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual("-pl", recorded[0])
+        self.assertEqual("shale-core,shale-data,shale-ui", recorded[1])
+        self.assertEqual("-am", recorded[2])
+        self.assertEqual(1, sum(argument.startswith("-Dtest=") for argument in recorded))
+        selected = next(argument for argument in recorded if argument.startswith("-Dtest="))
+        self.assertEqual(plan["test_patterns"], selected.removeprefix("-Dtest=").split(","))
+        self.assertEqual("test", recorded[-1])
+
+    def test_runner_rejects_malformed_or_unsafe_plans(self):
+        with self.assertRaisesRegex(ValueError, "requires a nonempty following value"):
+            RUNNER.validate_maven_args(["-pl", "-am", "test"])
+        with self.assertRaisesRegex(ValueError, "requires a nonempty following value"):
+            RUNNER.validate_maven_args(["-pl", "", "test"])
+        with self.assertRaisesRegex(ValueError, "Windows-safe"):
+            RUNNER.validate_maven_args(["-Dtest=" + "A" * RUNNER.WINDOWS_SAFE_COMMAND_LENGTH, "test"])
+        fixture = SCRIPT.with_name("fixtures") / "case-timeline-pr-paths.txt"
+        plan = SELECTOR.select(fixture.read_text(encoding="utf-8").splitlines())
+        plan["test_patterns"] = [*plan["test_patterns"], "com.shale.ui.UnrelatedTest"]
+        with self.assertRaisesRegex(ValueError, "exactly its five justified tests"):
+            RUNNER.affected_batches(plan)
+
+    def test_runner_prefers_windows_maven_launcher(self):
+        with mock.patch.object(RUNNER.os, "name", "nt"), mock.patch.object(
+                RUNNER.shutil, "which", side_effect=lambda name: "C:/Maven/bin/mvn.cmd" if name == "mvn.cmd" else None
+        ) as which:
+            self.assertEqual("C:/Maven/bin/mvn.cmd", RUNNER.resolve_maven())
+        self.assertEqual(mock.call("mvn.cmd"), which.call_args_list[0])
+
+    def test_selector_contract_suite_is_required_only_for_infrastructure_changes(self):
+        self.assertTrue(SELECTOR.selector_tests_required(["build/test-selection/run_selection.py"]))
+        self.assertTrue(SELECTOR.selector_tests_required([".github/workflows/maven-test-gate.yml"]))
+        self.assertFalse(SELECTOR.selector_tests_required([
+            "shale-ui/src/main/java/com/shale/ui/controller/CaseController.java"
+        ]))
+        pom_diff = mock.Mock(stdout="+        <shale.test.includesFile>critical-tests.txt</shale.test.includesFile>\n")
+        with mock.patch.object(SELECTOR.subprocess, "run", return_value=pom_diff):
+            self.assertTrue(SELECTOR.selector_tests_required(["pom.xml"], "base", "head"))
+        unrelated_pom_diff = mock.Mock(stdout="+        <dependency.version>2</dependency.version>\n")
+        with mock.patch.object(SELECTOR.subprocess, "run", return_value=unrelated_pom_diff):
+            self.assertFalse(SELECTOR.selector_tests_required(["pom.xml"], "base", "head"))
+
+    def test_github_outputs_preserve_display_and_structured_selected_invocation(self):
+        result = SELECTOR.select([
+            "shale-data/src/main/java/com/shale/data/dao/CaseTimelineWriter.java",
+            "shale-data/src/main/java/com/shale/data/dao/CaseDao.java",
+        ])
+        self.assertEqual(result["selected_command"], SELECTOR.display_command(["mvn", *result["selected_maven_args"]]))
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "github-output.txt"
+            with mock.patch.object(SELECTOR, "changed_paths", return_value=[]):
+                self.assertEqual(0, SELECTOR.main(["--path", "shale-data/src/main/java/com/shale/data/dao/CaseTimelineWriter.java",
+                                                   "--github-output", str(output)]))
+            values = dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines())
+            arguments = json.loads(values["selected_maven_args"])
+            self.assertEqual(values["selected_command"], SELECTOR.display_command(["mvn", *arguments]))
 
     def test_modified_test_class_is_selected_exactly(self):
         path = "shale-ui/src/test/java/com/shale/ui/controller/ReportsControllerLifecycleTest.java"
@@ -78,12 +231,16 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertEqual("", result["selected_command"])
 
     def test_parent_pom_and_selector_changes_escalate(self):
-        for path in ("pom.xml", "shale-ui/pom.xml", "build/test-selection/test-areas.json"):
+        for path in ("pom.xml", "shale-ui/pom.xml", "build/test-selection/test-areas.json",
+                     ".github/workflows/maven-test-gate.yml"):
             with self.subTest(path=path):
                 result = self.selected(path)
                 self.assertTrue(result["full_suite"])
                 self.assertEqual("", result["selected_command"])
                 self.assertEqual("mvn -Pall-tests test", result["informational_command"])
+                self.assertEqual(["-Pall-tests", "test"], result["informational_maven_args"])
+                self.assertEqual(result["informational_command"],
+                                 SELECTOR.display_command(["mvn", *result["informational_maven_args"]]))
 
     def test_unknown_production_path_escalates(self):
         result = self.selected("shale-ui/src/main/java/com/shale/ui/mystery/NewSubsystem.java")
@@ -95,7 +252,8 @@ class ChangeSelectorTest(unittest.TestCase):
     def test_explicit_feature_selection_uses_safe_reactor_option(self):
         result = SELECTOR.select([], ["calendar"])
         self.assertIn("-Dsurefire.failIfNoSpecifiedTests=false", result["selected_command"])
-        self.assertIn("-pl shale-core,shale-data,shale-ui -am", result["selected_command"])
+        self.assertEqual(["shale-core", "shale-data", "shale-ui"], result["selected_modules"])
+        self.assertTrue(all("-am" in batch for batch in result["selected_maven_batches"]))
 
     def test_every_test_is_reachable_by_historical_full_suite_pattern(self):
         root = SCRIPT.parents[2]
@@ -108,10 +266,12 @@ class ChangeSelectorTest(unittest.TestCase):
 
     def test_critical_manifest_is_small_and_references_existing_tests(self):
         root = SCRIPT.parents[2]
-        critical = [Path(line.strip()).stem for line in SCRIPT.with_name("critical-tests.txt").read_text(encoding="utf-8").splitlines()
+        critical = [line.strip() for line in SCRIPT.with_name("critical-tests.txt").read_text(encoding="utf-8").splitlines()
                     if line.strip() and not line.startswith("#")]
-        existing = {path.stem for path in root.glob("shale-*/src/test/java/**/*Test.java")}
+        existing = {path.as_posix().split("/src/test/java/", 1)[1][:-5].replace("/", ".")
+                    for path in root.glob("shale-*/src/test/java/**/*Test.java")}
         self.assertTrue(set(critical) <= existing)
+        self.assertTrue(all("." in name and "*" not in name for name in critical))
         self.assertLessEqual(len(critical) / len(existing), 0.25)
 
     def test_parent_pom_uses_critical_default_and_full_recovery_profile(self):
@@ -140,6 +300,12 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertIn("python build/test-selection/select_tests.py --base", gate)
         self.assertIn("run: mvn test", gate)
         self.assertIn("actions/upload-artifact@v4", gate)
+        self.assertIn("run_selection.py build/test-selection/selection-plan.json --command affected", gate)
+        self.assertIn("--plan-output build/test-selection/selection-plan.json", gate)
+        self.assertIn("if: steps.selection.outputs.selector_tests_required == 'true'", gate)
+        self.assertLess(gate.index("- name: Run critical suite"), gate.index("- name: Run affected-area suite"))
+        for unsafe in ("Invoke-Expression", "cmd /c", "eval ", "@mavenArgs", "MAVEN_BATCHES_JSON"):
+            self.assertNotIn(unsafe, gate)
         self.assertIn("workflow_dispatch:", full)
         self.assertIn("schedule:", full)
         self.assertIn("mvn -Pall-tests test", full)
