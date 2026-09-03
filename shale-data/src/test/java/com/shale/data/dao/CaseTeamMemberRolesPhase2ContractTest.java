@@ -67,4 +67,16 @@ class CaseTeamMemberRolesPhase2ContractTest {
 		assertTrue(java.contains("JOIN dbo.CaseTeamRoleDefinitions d ON d.ShaleClientId IS NULL AND d.LegacyRoleId=cu.RoleId"));
 		assertTrue(java.contains("FROM #PreservedCaseTeamRoles p JOIN dbo.CaseUsers"));
 	}
+
+	@Test void phase3CompleteTeamSaveIsOneTransactionWithConcurrencyAuditAndCompatibility()throws Exception{
+		String java=read("shale-data/src/main/java/com/shale/data/dao/CaseTeamMembershipDao.java");
+		assertTrue(java.contains("updateTeam(CaseTeamUpdateCommand"));
+		assertTrue(java.contains("WITH (UPDLOCK,HOLDLOCK)"),"complete diff must be calculated under the business transaction lock");
+		assertTrue(java.contains("Arrays.equals(current,desired.membershipRowVer())"),"baseline membership RowVer must be validated");
+		assertTrue(java.contains("reconcileRoles(c,x,memberId"));
+		assertTrue(java.contains("event(c,x.tenantId(),x.actorUserId(),CASE_TEAM_MEMBER_ROLE"));
+		assertTrue(java.contains("syncLegacyOnAssign"),"legacy compatibility must remain conservative");
+		String adapter=read("shale-data/src/main/java/com/shale/data/service/adapter/CaseServiceAdapter.java");
+		assertTrue(adapter.contains("updateCaseTeam(CaseTeamUpdateCommand c){return requireCaseTeamMembershipDao().updateTeam(c);}"),"production service adapter must delegate the aggregate operation to its DAO");
+	}
 }

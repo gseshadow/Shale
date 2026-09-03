@@ -38,6 +38,8 @@ import java.util.stream.Collectors;
 import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseTeamMembershipDto;
+import com.shale.core.dto.CaseTeamRoleDefinitionDto;
 import com.shale.core.dto.CaseDateDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.CaseLinkDto;
@@ -6201,7 +6203,7 @@ public class CaseController {
 			return;
 		}
 
-		if (caseDao == null || appState == null || caseId == null)
+		if (caseService == null || appState == null || caseId == null || appState.getShaleClientId() == null || appState.getUserId() == null)
 			return;
 
 		final long activeCaseId = caseId.longValue();
@@ -6210,9 +6212,9 @@ public class CaseController {
 		{
 			try {
 				long teamLoadStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=listCaseTeamRows page=case_view caseId=" + activeCaseId);
-				List<CaseDao.CaseUserTeamRow> teamRows = caseDao.listCaseTeamRows(activeCaseId);
-				PerfLog.logDone("DAO", "method=listCaseTeamRows page=case_view caseId=" + activeCaseId + " rows=" + (teamRows == null ? 0 : teamRows.size()), teamLoadStartNanos);
+				PerfLog.log("DAO", "start", "method=listCaseTeamMemberships page=case_view caseId=" + activeCaseId);
+				List<CaseTeamMembershipDto> teamRows = caseService.listCaseTeamMemberships(appState.getShaleClientId(), appState.getUserId(), activeCaseId);
+				PerfLog.logDone("DAO", "method=listCaseTeamMemberships page=case_view caseId=" + activeCaseId + " rows=" + teamRows.size(), teamLoadStartNanos);
 
 				runOnFx(() ->
 				{
@@ -6221,13 +6223,30 @@ public class CaseController {
 						renderTeamFromDraft();
 						return;
 					}
-					renderTeamCardsFromTeamRows(teamRows);
+					renderAuthoritativeTeam(teamRows);
 				});
 
 			} catch (Exception ex) {
 				runOnFx(() -> System.out.println("[TEAM] Failed to load team: " + ex.getMessage()));
 			}
 		}, "case-team-load-" + activeCaseId).start();
+	}
+
+	private void renderAuthoritativeTeam(List<CaseTeamMembershipDto> rows) {
+		if (teamFlow == null) return;
+		teamFlow.getChildren().clear();
+		if (rows == null || rows.isEmpty()) { teamFlow.getChildren().add(new Label("—")); return; }
+		for (CaseTeamMembershipDto member : rows.stream().sorted(java.util.Comparator.comparing(CaseTeamMembershipDto::displayName,String.CASE_INSENSITIVE_ORDER)).toList()) {
+			CaseDao.UserRow user = tenantUserById == null ? null : tenantUserById.get(member.userId());
+			Node card = userCardFactory.create(new UserCardModel(member.userId(), safeText(member.displayName()).isBlank()?"User #"+member.userId():member.displayName(), user==null?null:user.color(), null), Variant.COMPACT);
+			String roles = member.roles().stream().filter(r->!r.assignmentDeleted()).map(r->r.name()+((!r.definitionActive()||r.definitionDeleted())?" (Inactive)":"")).collect(java.util.stream.Collectors.joining(", "));
+			Tooltip.install(card,new Tooltip(roles.isBlank()?"No roles assigned":roles));
+			FlowPane roleLabels=new FlowPane(4,4);
+			if(roles.isBlank()){Label none=new Label("No roles assigned");none.getStyleClass().add("case-team-no-roles");roleLabels.getChildren().add(none);}
+			else member.roles().stream().filter(r->!r.assignmentDeleted()).forEach(r->{Label chip=new Label(r.name()+((!r.definitionActive()||r.definitionDeleted())?" · Inactive":""));chip.getStyleClass().addAll("case-team-role-chip",(!r.definitionActive()||r.definitionDeleted())?"case-team-role-chip-inactive":"case-team-role-chip-active");roleLabels.getChildren().add(chip);});
+			VBox memberCard=new VBox(5,card,roleLabels);memberCard.getStyleClass().add("case-team-overview-member");
+			teamFlow.getChildren().add(memberCard);
+		}
 	}
 
 	private void renderTeamCardsFromTeamRows(List<CaseDao.CaseUserTeamRow> rows) {
@@ -6300,7 +6319,7 @@ public class CaseController {
 	}
 
 	private void onEditTeamInternal() {
-		if (caseDao == null || appState == null || caseId == null) {
+		if (caseDao == null || caseService == null || appState == null || caseId == null) {
 			showError("Team edit is unavailable.");
 			return;
 		}
@@ -6316,84 +6335,43 @@ public class CaseController {
 
 		final long activeCaseId = caseId.longValue();
 		final int tId = tenantId;
+		final long loadGeneration = documentGeneration;
 
 		new Thread(() ->
 		{
 			try {
-				// Load once and cache for rendering draft team
 				List<CaseDao.UserRow> allUsers = caseDao.listUsersForTenant(tId);
-				java.util.Map<Integer, CaseDao.UserRow> map = new java.util.HashMap<>();
-				for (var u : (allUsers == null ? List.<CaseDao.UserRow>of() : allUsers)) {
-					if (u != null)
-						map.put(u.id(), u);
-				}
-
-				// For the dialog: current assigned roles should come from DRAFT if present, else DB
-				List<CaseDao.CaseUserRoleRow> assignedRoles;
-				if (draftTeamAssignments != null) {
-					assignedRoles = draftTeamAssignments.stream()
-							.map(a -> new CaseDao.CaseUserRoleRow(a.userId(), a.roleId()))
-							.toList();
-				} else {
-					assignedRoles = caseDao.listCaseUserRoles(activeCaseId);
-				}
-
-				// Attorneys filter (you already have this)
-				java.util.Set<Integer> attorneyIds = caseDao.listAttorneyUserIdsForTenant(tId);
+				int actorId = appState.getUserId();
+				List<CaseTeamMembershipDto> baseline = caseService.listCaseTeamMemberships(tId, actorId, activeCaseId);
+				List<CaseTeamRoleDefinitionDto> roles = caseService.listCaseTeamRolesForAdministration(tId, actorId);
 
 				runOnFx(() ->
 				{
+					if (loadGeneration != documentGeneration || caseId == null
+							|| caseId.longValue() != activeCaseId || teamFlow == null || teamFlow.getScene() == null)
+						return;
 					setBusy(false);
 
-					this.tenantUserById = map;
-
 					Stage owner = (Stage) teamFlow.getScene().getWindow();
-
-					TeamEditorDialog dlg = new TeamEditorDialog(
-							owner,
-							allUsers,
-							assignedRoles,
-							attorneyIds
-					);
-
-					dlg.showAndWaitForResult().ifPresent(res -> saveTeamAssignments(activeCaseId, res.assignments()));
+					TeamEditorDialog dlg = new TeamEditorDialog(owner, caseService, tId, actorId, activeCaseId,
+							allUsers, baseline, roles, () -> {
+								publishCaseFieldUpdated(activeCaseId, "teamChanged", 1);
+								reloadCurrentCaseForViewMode();
+							});
+					dlg.showAndWait();
 				});
 
 			} catch (Exception ex) {
 				runOnFx(() ->
 				{
+					if (loadGeneration != documentGeneration || caseId == null
+							|| caseId.longValue() != activeCaseId || teamFlow == null || teamFlow.getScene() == null)
+						return;
 					setBusy(false);
 					showError("Failed to load team editor. " + ex.getMessage());
 				});
 			}
 		}, "case-team-editor-load-" + activeCaseId).start();
-	}
-
-	private void saveTeamAssignments(long activeCaseId, List<TeamEditorDialog.TeamAssignment> assignments) {
-		setBusy(true);
-		new Thread(() ->
-		{
-			try {
-				List<CaseDao.TeamAssignmentRow> desired = (assignments == null ? List.<TeamEditorDialog.TeamAssignment>of() : assignments).stream()
-						.map(a -> new CaseDao.TeamAssignmentRow(a.userId(), a.roleId()))
-						.toList();
-				caseDao.replaceCaseTeamAssignments(activeCaseId, desired);
-				addTeamChangedTimelineEvent(activeCaseId, appState.getShaleClientId(), appState.getUserId());
-				runOnFx(() ->
-				{
-					setBusy(false);
-					clearError();
-					publishCaseFieldUpdated(activeCaseId, "teamChanged", 1);
-					reloadCurrentCaseForViewMode();
-				});
-			} catch (Exception ex) {
-				runOnFx(() ->
-				{
-					setBusy(false);
-					showError("Failed to save team. " + ex.getMessage());
-				});
-			}
-		}, "case-team-save-" + activeCaseId).start();
 	}
 
 	private void renderTeamFromDraft() {

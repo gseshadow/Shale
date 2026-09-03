@@ -42,3 +42,11 @@ The schema migration returns total memberships, memberships with legacy roles, m
 ## Deferred
 
 The arrow editor is not redesigned and does not expose zero/multiple role editing. Legacy role-based projections outside the new aggregate read remain compatibility consumers for this phase. A later editor/read cutover will consume membership/assignment DTOs everywhere and then retire `CaseUsers.RoleId` only after production reconciliation proves no compatibility dependency remains.
+
+## Phase 3 desktop cutover
+
+The Case Overview editor now consumes the authoritative membership aggregate. It keeps an immutable opening snapshot and a separate staged state, supports roleless membership and multiple stable role-definition IDs, and reconciles the complete desired team through one actor-aware transaction. The transaction validates tenant, case, actor, users, effective definitions, duplicate assignments, the protected `responsible_attorney` singleton, and membership row versions. Membership, assignment, legacy compatibility, entity-action audit, and Case Timeline writes commit or roll back together. No Phase 3 schema change is required.
+
+The read-only Case Overview also consumes the aggregate: each membership is rendered once, roleless members remain present, and active assignments to inactive/deleted definitions remain identified as inactive. The retired editor's dual lists, arrows, selected-member role selector, separate Responsible Attorney selector, and actor-less save path are no longer used by Case Overview. `CaseUsers.RoleId` remains a conservative compatibility projection; adding a second role never overwrites a different represented legacy role, and removing the represented role clears only that projection.
+
+Audit compatibility uses the existing Phase 2 `CASE_TEAM_MEMBER` and `CASE_TEAM_MEMBER_ROLE` entity types and timeline event vocabulary. Search, staging, cancellation, and discard prompts are UI-only and intentionally produce no audit record. Meaningful saved membership and assignment changes are audited on the business connection before commit; no migration or ad-hoc audit representation is introduced.

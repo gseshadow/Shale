@@ -82,6 +82,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override public void removeCaseTeamMember(CaseTeamMemberLifecycleCommand c){requireCaseTeamMembershipDao().removeMember(c);}
 	@Override public void assignCaseTeamMemberRole(CaseTeamMemberRoleCommand c){requireCaseTeamMembershipDao().assign(c);}
 	@Override public void removeCaseTeamMemberRole(CaseTeamMemberRoleLifecycleCommand c){requireCaseTeamMembershipDao().removeRole(c);}
+	@Override public List<CaseTeamMembershipDto> updateCaseTeam(CaseTeamUpdateCommand c){return requireCaseTeamMembershipDao().updateTeam(c);}
 	private CaseTeamMembershipDao requireCaseTeamMembershipDao(){if(caseTeamMembershipDao==null)throw new UnsupportedOperationException("Case Team membership operations are unavailable from this test gateway.");return caseTeamMembershipDao;}
 
 	@Override

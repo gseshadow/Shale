@@ -2928,3 +2928,22 @@
 .contact-filter-option:focused { -fx-background-color: rgba(220,232,245,.92); }
 .contact-filter-option > .label { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 600; }
 .contact-filter-option:checked > .left-container > .check { -fx-background-color: -shale-button-dialog-primary-background; }
+
+/* Phase 3 Case Team editor */
+.case-team-editor-heading { -fx-font-size: 20px; -fx-font-weight: bold; }
+.case-team-editor-support, .case-team-no-roles { -fx-text-fill: -shale-color-text-muted; }
+.case-team-editor-label, .case-team-member-name { -fx-font-weight: bold; }
+.case-team-member-card { -fx-background-color: -shale-color-card-surface; -fx-background-radius: 10; -fx-border-color: -shale-color-border; -fx-border-radius: 10; -fx-padding: 10; }
+.case-team-role-chip { -fx-alignment: center-left; -fx-background-color: -shale-color-content-surface; -fx-background-radius: 999; -fx-padding: 2 4 2 9; }
+.case-team-role-chip-inactive { -fx-opacity: .68; -fx-border-color: -shale-color-border; -fx-border-radius: 999; }
+.case-team-editor-footer { -fx-padding: 10 0 0 0; }
+.case-team-editor-error { -fx-text-fill: -shale-control-danger-text; }
+.case-team-search-results { -fx-min-height: 146px; -fx-pref-height: 146px; -fx-max-height: 146px; -fx-background-color: -shale-color-content-surface; -fx-border-color: -shale-color-border; -fx-border-radius: 8px; }
+.case-team-search-results .list-cell { -fx-padding: 3px 5px; -fx-background-color: transparent; }
+.case-team-search-card { -fx-alignment: center-left; -fx-padding: 5px 8px; -fx-background-radius: 7px; }
+.case-team-search-results .list-cell:hover .case-team-search-card { -fx-background-color: rgba(220,232,245,.62); }
+.case-team-search-results .list-cell:pressed .case-team-search-card { -fx-background-color: rgba(205,222,240,.78); }
+.case-team-search-results .list-cell:selected .case-team-search-card { -fx-background-color: rgba(198,220,240,.82); -fx-border-color: -shale-control-focus-border; -fx-border-radius: 7px; }
+.case-team-search-results:focused .list-cell:selected .case-team-search-card { -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 6, .12, 0, 0); }
+.case-team-search-initials { -fx-min-width: 28px; -fx-pref-width: 28px; -fx-min-height: 28px; -fx-alignment: center; -fx-background-radius: 999px; -fx-text-fill: white; -fx-font-size: 10px; -fx-font-weight: bold; }
+.case-team-search-add { -fx-text-fill: -shale-button-dialog-primary-background; -fx-font-size: 11px; -fx-font-weight: bold; }
