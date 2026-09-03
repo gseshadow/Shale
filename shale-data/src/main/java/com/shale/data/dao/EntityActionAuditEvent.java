@@ -19,7 +19,7 @@ public record EntityActionAuditEvent(
 		String source,
 		Map<MetadataKey, String> metadata) {
 
-	public enum EntityType { CONTACT, CONTACT_PHONE_NUMBER, CONTACT_EMAIL_ADDRESS, CONTACT_ADDRESS, CASE, CASE_STATUS, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CASE_DATE_TYPE, CALENDAR_EVENT, CASE_DATE_ROLE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER, CONTACT_TYPE, SPECIALTY, CREDENTIAL_DEFINITION, CONTACT_CONTACT_TYPE, CONTACT_SPECIALTY, CONTACT_CREDENTIAL }
+	public enum EntityType { CONTACT, CONTACT_PHONE_NUMBER, CONTACT_EMAIL_ADDRESS, CONTACT_ADDRESS, CASE, CASE_STATUS, LINK_TYPE, CASE_LINK, CASE_LINK_SHARE, CASE_DATE, CASE_DATE_TYPE, CASE_TEAM_ROLE, CALENDAR_EVENT, CASE_DATE_ROLE_MAPPING, FORM_CONFIGURATION, MATERIAL_TYPE, MATERIAL_REQUEST, MATERIAL_REQUEST_FOLLOW_UP, MATERIAL_ITEM, USER, CONTACT_TYPE, SPECIALTY, CREDENTIAL_DEFINITION, CONTACT_CONTACT_TYPE, CONTACT_SPECIALTY, CONTACT_CREDENTIAL }
 
 	public enum Action {
 		CREATED,
@@ -135,6 +135,7 @@ public record EntityActionAuditEvent(
 			case CASE_LINK_SHARE -> action == Action.ADDED || action == Action.UPDATED || action == Action.REMOVED;
 			case CASE_DATE -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.ACTIVATED || action == Action.RESTORED || action == Action.LINKED || action == Action.UNLINKED;
 			case CASE_DATE_TYPE -> action == Action.CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.DELETED || action == Action.RESTORED;
+			case CASE_TEAM_ROLE -> action == Action.CREATED || action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.ACTIVATED || action == Action.DEACTIVATED || action == Action.REMOVED || action == Action.RESTORED || action == Action.OVERRIDE_RESET;
 			case CALENDAR_EVENT -> action == Action.CREATED || action == Action.UPDATED || action == Action.DELETED || action == Action.RESTORED || action == Action.LINKED || action == Action.UNLINKED;
 			case CASE_DATE_ROLE_MAPPING -> action == Action.OVERRIDE_CREATED || action == Action.UPDATED || action == Action.OVERRIDE_RESET;
 			case FORM_CONFIGURATION -> action == Action.CREATED || action == Action.UPDATED;
