@@ -3,9 +3,9 @@
 This review replaces the former blocking `ui-rendered` area. CSS and presentation-only FXML changes
 select `ui-presentation` (with `ui-fxml-structure` for FXML); Java/controller changes select
 `ui-behavior` and their relevant feature;
-rendered geometry is explicit and advisory through `mvn -Pui-visual test`.
+rendered geometry is available as an optional local advisory check through `mvn -Pui-visual test`. GitHub does not execute or require these tests.
 
-## Retained as blocking behavioral or structural coverage
+## Retained as local behavioral or structural coverage
 
 - `CalendarEventCardVisualPolishTest` — semantic ownership/accent classes and factory behavior.
 - `CalendarVisualPolishSourceTest` — calendar pseudo-class states, controls, and filtering behavior.
@@ -16,8 +16,8 @@ rendered geometry is explicit and advisory through `mvn -Pui-visual test`.
 - `SettingsUserManagementSemanticRuntimeTest` — semantic action classifications after FXML injection.
 - `UserAssignedTasksRenderingTest` — shared card path, filtering, navigation, and semantic controls.
 
-These tests do not enter the critical manifest automatically; they block only when their directly
-mapped behavior or structural area is selected.
+These tests do not enter the critical manifest automatically; run them locally when their directly
+mapped behavior or structural area is relevant. GitHub does not execute or require them.
 
 ## Moved to advisory visual status
 

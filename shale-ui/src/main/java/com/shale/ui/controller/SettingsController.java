@@ -168,6 +168,7 @@ public final class SettingsController {
 	private Label requestStatusSettingsStatusLabel;
 	@FXML
 	private VBox contactClassificationAdministrationSection;
+	@FXML private VBox caseTeamRoleAdministrationContent;
 	@FXML
 	private VBox contactClassificationContent;
 	@FXML
@@ -259,6 +260,7 @@ public final class SettingsController {
 		configureLookupActionRows();
 		configureUserManagementTable();
 		configureContactClassifications();
+		configureCaseTeamRoles();
 		configureCustomDictionary();
 		updateAdminControlsVisibility();
 		if (notificationPreferencesService != null) {
@@ -317,10 +319,17 @@ public final class SettingsController {
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
 		if (fxmlReady) {
 			configureContactClassifications();
+			configureCaseTeamRoles();
 			loadFromPreferences();
 			updateAdminControlsVisibility();
 			loadAdminSectionsAsync();
 		}
+	}
+
+	private void configureCaseTeamRoles() {
+		if (caseTeamRoleAdministrationContent != null && caseService != null && appState != null
+				&& caseTeamRoleAdministrationContent.getChildren().isEmpty() && appState.isAdmin())
+			caseTeamRoleAdministrationContent.getChildren().setAll(new CaseTeamRoleAdminPane(caseService, appState).node());
 	}
 
 	private void configureContactClassifications() {

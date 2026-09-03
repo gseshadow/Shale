@@ -1057,3 +1057,9 @@ Contacts—without changing the source columns. Free-form addresses populate onl
 The legacy columns remain the runtime authority until Phase 2C-B introduces audited transactional
 dual-write and reconciliation. See `architecture/contact-management.md` for precedence, normalization,
 lifecycle, deployment, and retirement boundaries.
+
+## dbo.CaseTeamRoleDefinitions (Phase 1 foundation)
+
+`CaseTeamRoleDefinitions` is the tenant/global overlay catalog for Case Team assignment meanings. It is deliberately separate from the legacy `Roles` authorization/assignment lookup and does not change `CaseUsers` in Phase 1. Global protected rows have stable `SystemKey` and `LegacyRoleId` values so a later many-to-many assignment migration can map existing `CaseUsers.RoleId` values without using editable names. Tenant rows with the same `SystemKey` are overrides; deleted overrides fall back to the global row, while inactive overrides remain the effective masked result. Tenant rows without `SystemKey` are custom roles.
+
+The table stores `Id`, nullable `ShaleClientId`, `SystemKey`, `LegacyRoleId`, `Name`, optional `Description`, required `Color`, `SortOrder`, `IsActive`, `IsDeleted`, `IsProtected`, lifecycle actor/time metadata, and `RowVer`. It uses tenant-or-global RLS, filtered global and tenant `SystemKey` uniqueness, normalized effective-name validation in the administration transaction, and entity-action auditing. Phase 1 seeds the legacy Case Team values Responsible Attorney (4), Prelitigation Staff (5), Attorney (7), Legal Assistant (11), Paralegal (12), Law Clerk (13), and Co-counsel (14). Existing `CaseUsers` behavior remains authoritative until the assignment/editor phase.

@@ -12,6 +12,6 @@ Supporting documents:
 - live-update-architecture.md
 - case-summary-projection-inventory.md
 
-Repository test execution and release gating:
+Optional local test execution and selection:
 - `docs/testing/change-aware-test-selection.md`
 - `docs/testing/full-suite-only-inventory.md`

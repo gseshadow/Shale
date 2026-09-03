@@ -13,6 +13,7 @@ import com.shale.core.model.CaseDateSemanticRole;
 import com.shale.core.dto.CaseDateSemanticRoleMappingDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.dto.CaseTeamRoleDefinitionDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
@@ -184,6 +185,20 @@ public interface CaseServicePort {
 	CaseDetailDto updateCaseCoreDetails(UpdateCaseCoreDetailsCommand command);
 
 	CaseDetailDto updateCaseAssignment(UpdateCaseAssignmentCommand command);
+
+	default List<CaseTeamRoleDefinitionDto> listCaseTeamRolesForAdministration(int shaleClientId, int actorUserId){ throw unsupportedCaseLinkOperation("listCaseTeamRolesForAdministration"); }
+	default CaseTeamRoleDefinitionDto createCaseTeamRole(CaseTeamRoleCommand command){ throw unsupportedCaseLinkOperation("createCaseTeamRole"); }
+	default CaseTeamRoleDefinitionDto updateCaseTeamRole(CaseTeamRoleCommand command){ throw unsupportedCaseLinkOperation("updateCaseTeamRole"); }
+	default void removeCaseTeamRole(CaseTeamRoleLifecycleCommand command){ throw unsupportedCaseLinkOperation("removeCaseTeamRole"); }
+	default void restoreCaseTeamRole(CaseTeamRoleLifecycleCommand command){ throw unsupportedCaseLinkOperation("restoreCaseTeamRole"); }
+	default void resetCaseTeamRoleOverride(CaseTeamRoleLifecycleCommand command){ throw unsupportedCaseLinkOperation("resetCaseTeamRoleOverride"); }
+
+	record CaseTeamRoleCommand(Integer id, int tenantId, int actorUserId, String name, String description, String color, int sortOrder, boolean active, byte[] rowVer) {
+		public CaseTeamRoleCommand { rowVer=copyRowVer(rowVer); } @Override public byte[] rowVer(){return copyRowVer(rowVer);}
+	}
+	record CaseTeamRoleLifecycleCommand(int tenantId, int actorUserId, int id, byte[] rowVer) {
+		public CaseTeamRoleLifecycleCommand { rowVer=copyRowVer(rowVer); } @Override public byte[] rowVer(){return copyRowVer(rowVer);}
+	}
 
 	record CaseDateTypeCommand(Integer id, int shaleClientId, int actorUserId, String systemKey, String name, String description, String calendarCategory, String color, boolean supportsTime, Integer sortOrder, boolean active, byte[] expectedRowVer) { public CaseDateTypeCommand { expectedRowVer = copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); } }
 	record SetCaseDateTypeActiveCommand(int shaleClientId, int actorUserId, int id, boolean active, byte[] expectedRowVer) { public SetCaseDateTypeActiveCommand { expectedRowVer = copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); } }

@@ -160,7 +160,6 @@ class ChangeSelectorTest(unittest.TestCase):
 
     def test_selector_contract_suite_is_required_only_for_infrastructure_changes(self):
         self.assertTrue(SELECTOR.selector_tests_required(["build/test-selection/run_selection.py"]))
-        self.assertTrue(SELECTOR.selector_tests_required([".github/workflows/maven-test-gate.yml"]))
         self.assertFalse(SELECTOR.selector_tests_required([
             "shale-ui/src/main/java/com/shale/ui/controller/CaseController.java"
         ]))
@@ -171,18 +170,6 @@ class ChangeSelectorTest(unittest.TestCase):
         with mock.patch.object(SELECTOR.subprocess, "run", return_value=unrelated_pom_diff):
             self.assertFalse(SELECTOR.selector_tests_required(["pom.xml"], "base", "head"))
 
-    def test_github_outputs_preserve_display_and_structured_selected_invocation(self):
-        fixture = SCRIPT.with_name("fixtures") / "case-timeline-pr-paths.txt"
-        result = SELECTOR.select(fixture.read_text(encoding="utf-8").splitlines())
-        self.assertEqual(result["selected_command"], SELECTOR.display_command(["mvn", *result["selected_maven_args"]]))
-        with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory) / "github-output.txt"
-            with mock.patch.object(SELECTOR, "changed_paths", return_value=[]):
-                self.assertEqual(0, SELECTOR.main(["--path", "shale-data/src/test/java/com/shale/data/dao/CaseDateTimelineWriterTest.java",
-                                                   "--github-output", str(output)]))
-            values = dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines())
-            arguments = json.loads(values["selected_maven_args"])
-            self.assertEqual(values["selected_command"], SELECTOR.display_command(["mvn", *arguments]))
 
     def test_modified_test_class_is_selected_exactly(self):
         path = "shale-ui/src/test/java/com/shale/ui/controller/ReportsControllerLifecycleTest.java"
@@ -198,8 +185,7 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertEqual("", result["selected_command"])
 
     def test_parent_pom_and_selector_changes_escalate(self):
-        for path in ("pom.xml", "shale-ui/pom.xml", "build/test-selection/test-areas.json",
-                     ".github/workflows/maven-test-gate.yml"):
+        for path in ("pom.xml", "shale-ui/pom.xml", "build/test-selection/test-areas.json"):
             with self.subTest(path=path):
                 result = self.selected(path)
                 self.assertTrue(result["full_suite"])
@@ -258,29 +244,6 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertEqual("${shale.test.includesFile}", surefire[0].find("m:configuration/m:includesFile", ns).text)
         self.assertEqual("${shale.test.excludesFile}", surefire[0].find("m:configuration/m:excludesFile", ns).text)
 
-    def test_ci_has_relevant_gate_and_separate_informational_full_suite(self):
-        root = SCRIPT.parents[2]
-        gate = (root / ".github/workflows/maven-test-gate.yml").read_text(encoding="utf-8")
-        full = (root / ".github/workflows/maven-full-suite.yml").read_text(encoding="utf-8")
-        visual = (root / ".github/workflows/maven-ui-visual.yml").read_text(encoding="utf-8")
-        self.assertIn("name: Relevant Test Gate", gate)
-        self.assertIn("python build/test-selection/select_tests.py --base", gate)
-        self.assertIn("run: mvn test", gate)
-        self.assertIn("actions/upload-artifact@v4", gate)
-        self.assertIn("run_selection.py build/test-selection/selection-plan.json --command affected", gate)
-        self.assertIn("--plan-output build/test-selection/selection-plan.json", gate)
-        self.assertIn("if: steps.selection.outputs.selector_tests_required == 'true'", gate)
-        self.assertLess(gate.index("- name: Run critical suite"), gate.index("- name: Run affected-area suite"))
-        for unsafe in ("Invoke-Expression", "cmd /c", "eval ", "@mavenArgs", "MAVEN_BATCHES_JSON"):
-            self.assertNotIn(unsafe, gate)
-        self.assertIn("workflow_dispatch:", full)
-        self.assertIn("schedule:", full)
-        self.assertIn("mvn -Pall-tests test", full)
-        self.assertIn("continue-on-error: true", full)
-        self.assertIn("name: Advisory JavaFX Visual Suite", visual)
-        self.assertIn("mvn -Pui-visual test", visual)
-        self.assertIn("continue-on-error: true", visual)
-        self.assertNotIn("informational_command", gate)
 
 
 if __name__ == "__main__":
