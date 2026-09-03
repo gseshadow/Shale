@@ -8,11 +8,11 @@ are intentionally full-suite-only until reviewed, consolidated, or assigned to a
 
 ## Inventory summary
 
-- Discoverable test classes: **328**
-- Source-declared JUnit test methods/factories: **1323** (parameterized runtime invocations may be higher)
+- Discoverable test classes: **330**
+- Source-declared JUnit test methods/factories: **1326** (parameterized runtime invocations may be higher)
 - Critical classes: **25**
 - Critical source-declared methods/factories: **95** (7.2%)
-- Full-suite-only classes: **37**
+- Full-suite-only classes: **39**
 
 ## Prioritized full-suite-only review
 
@@ -36,6 +36,8 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | phase-numbered historical contract | `shale-data/src/test/java/com/shale/data/dao/MaterialRequestDaoPhase2ContractTest.java` | 8 |
 | phase-numbered historical contract | `shale-data/src/test/java/com/shale/data/dao/RequestLookupSystemKeyUniqueIndexesPhase2MigrationTest.java` | 5 |
 | still valuable but feature-specific | `shale-core/src/test/java/com/shale/core/util/PerformanceLoggingTest.java` | 2 |
+| still valuable but feature-specific | `shale-data/src/test/java/com/shale/data/dao/CaseDateTimelineWriterTest.java` | 2 |
+| still valuable but feature-specific | `shale-data/src/test/java/com/shale/data/dao/CaseDetailsTimelineWriterTest.java` | 2 |
 | still valuable but feature-specific | `shale-data/src/test/java/com/shale/data/dao/FormConfigurationFoundationTest.java` | 6 |
 | still valuable but feature-specific | `shale-data/src/test/java/com/shale/data/dao/MaterialRequestActivityAndRecipientsTest.java` | 4 |
 | still valuable but feature-specific | `shale-data/src/test/java/com/shale/data/dao/MaterialRequestClosureNormalizationTest.java` | 6 |
@@ -103,12 +105,14 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | `shale-data/src/test/java/com/shale/data/dao/CaseDateOccurrenceTitleContractTest.java` | no | cases | 2 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseDateSemanticRoleAdministrationContractTest.java` | no | cases, settings-team | 3 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseDateSemanticRoleFoundationTest.java` | no | cases | 4 |
+| `shale-data/src/test/java/com/shale/data/dao/CaseDateTimelineWriterTest.java` | no | full-suite-only | 2 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseDateTypeAdministrationContractTest.java` | no | cases, settings-team | 6 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseDateTypeOwnershipInventoryContractTest.java` | no | cases | 4 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseDatesFinalRuntimeCleanupContractTest.java` | no | cases, ui-visual-advisory | 2 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseDatesFoundationMigrationTest.java` | no | cases | 4 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseDatesLegacyPhase3bMigrationContractTest.java` | no | cases | 33 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseDatesOccurrenceTitleMigrationTest.java` | no | cases | 1 |
+| `shale-data/src/test/java/com/shale/data/dao/CaseDetailsTimelineWriterTest.java` | no | full-suite-only | 2 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseExportPagingTest.java` | no | cases | 1 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseLifecycleAuditContractTest.java` | yes | cases, security-data | 3 |
 | `shale-data/src/test/java/com/shale/data/dao/CaseLinkSharesFoundationMigrationTest.java` | no | cases | 7 |
@@ -282,7 +286,7 @@ This is a review queue, not a deletion decision. The category is a name-based tr
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseDateOccurrenceRemovalContractTest.java` | no | cases | 4 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseDateProductionEntryPointTitleTest.java` | no | cases | 2 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseDatesPhase2CArchitectureTest.java` | no | cases | 4 |
-| `shale-ui/src/test/java/com/shale/ui/controller/CaseDetailsTimelineCoverageTest.java` | no | cases | 3 |
+| `shale-ui/src/test/java/com/shale/ui/controller/CaseDetailsTimelineCoverageTest.java` | no | cases | 2 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseIntakeTakenByHeaderTest.java` | no | cases | 3 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseLinkSharesPhase533ContactLoadingUiTest.java` | no | cases, contacts | 2 |
 | `shale-ui/src/test/java/com/shale/ui/controller/CaseLinkSharesPhase535VisualIntegrationTest.java` | no | cases, ui-visual-advisory | 4 |
