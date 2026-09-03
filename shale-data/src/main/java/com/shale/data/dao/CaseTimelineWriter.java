@@ -25,6 +25,11 @@ final class CaseTimelineWriter {
     static final String CASE_LINK_SHARE_ADDED = "CASE_LINK_SHARE_ADDED";
     static final String CASE_LINK_SHARE_UPDATED = "CASE_LINK_SHARE_UPDATED";
     static final String CASE_LINK_SHARE_REMOVED = "CASE_LINK_SHARE_REMOVED";
+    static final String CASE_TEAM_MEMBER_ADDED = "CASE_TEAM_MEMBER_ADDED";
+    static final String CASE_TEAM_MEMBER_REMOVED = "CASE_TEAM_MEMBER_REMOVED";
+    static final String CASE_TEAM_ROLE_ASSIGNED = "CASE_TEAM_ROLE_ASSIGNED";
+    static final String CASE_TEAM_ROLE_REMOVED = "CASE_TEAM_ROLE_REMOVED";
+    static final String RESPONSIBLE_ATTORNEY_CHANGED = "RESPONSIBLE_ATTORNEY_CHANGED";
 
     private CaseTimelineWriter() {}
 
