@@ -1,6 +1,7 @@
 package com.shale.data.dao;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.shale.core.dto.CaseDetailDto;
 import java.lang.reflect.Proxy;
@@ -23,23 +24,76 @@ class CaseDetailsTimelineWriterTest {
 
         assertEquals(1, rows.size());
         assertEquals(List.of(42L, 7, CaseDao.CaseTimelineEventTypes.CASE_NAME_CHANGED, 9,
-                "Case name changed", "from Old name to New name"), projected(rows.get(0)));
+                "changed Case Name", "from Old name to New name"), projected(rows.get(0)));
+    }
+
+    @Test
+    void overviewCaseNumberNameAndDescriptionChangesUseTheRuntimeWriter() throws Exception {
+        List<List<Object>> rows = new ArrayList<>();
+
+        CaseDetailsTimelineWriter.appendChanges(connection(rows), 42, 7, 9,
+                detail("Old name", "N-1", "private old description"),
+                detail("Old name", "N-2", "private old description"));
+        assertEquals(CaseDao.CaseTimelineEventTypes.CASE_NUMBER_CHANGED, rows.get(0).get(2));
+        assertEquals("from N-1 to N-2", rows.get(0).get(6));
+
+        rows.clear();
+        CaseDetailsTimelineWriter.appendChanges(connection(rows), 42, 7, 9,
+                detail("Old name", "N-1", "private old description"),
+                detail("New name", "N-1", "private old description"));
+        assertEquals(CaseDao.CaseTimelineEventTypes.CASE_NAME_CHANGED, rows.get(0).get(2));
+        assertEquals("from Old name to New name", rows.get(0).get(6));
+
+        rows.clear();
+        CaseDetailsTimelineWriter.appendChanges(connection(rows), 42, 7, 9,
+                detail("Old name", "N-1", "private old description"),
+                detail("Old name", "N-1", "private new description"));
+        assertEquals(CaseDao.CaseTimelineEventTypes.DESCRIPTION_CHANGED, rows.get(0).get(2));
+        assertNull(rows.get(0).get(6), "Description content must never be copied to Timeline");
+    }
+
+    @Test
+    void combinedOverviewSaveWritesOneEntryPerChangedFieldWithoutDuplicates() throws Exception {
+        List<List<Object>> rows = new ArrayList<>();
+        CaseDetailsTimelineWriter.appendChanges(connection(rows), 42, 7, 9,
+                detail("Old name", "N-1", "private old description"),
+                detail("New name", "N-2", "private new description"));
+
+        assertEquals(List.of(
+                CaseDao.CaseTimelineEventTypes.CASE_NAME_CHANGED,
+                CaseDao.CaseTimelineEventTypes.CASE_NUMBER_CHANGED,
+                CaseDao.CaseTimelineEventTypes.DESCRIPTION_CHANGED),
+                rows.stream().map(row -> row.get(2)).toList());
+        rows.forEach(row -> {
+            assertEquals(42L, row.get(0));
+            assertEquals(7, row.get(1));
+            assertEquals(9, row.get(4));
+        });
     }
 
     @Test
     void unchangedSaveWritesNoEntryAndSensitiveDetailsAreRedacted() throws Exception {
         List<List<Object>> rows = new ArrayList<>();
         Connection connection = connection(rows);
-        CaseDetailDto baseline = detail("Same name", "private old description");
+        CaseDetailDto baseline = detail("Same name", "N-1", "private old description");
 
         CaseDetailsTimelineWriter.appendChanges(connection, 42, 7, 9, baseline, baseline);
         assertEquals(0, rows.size());
 
         CaseDetailsTimelineWriter.appendChanges(connection, 42, 7, 9, baseline,
-                detail("Same name", "private new description"));
+                detail("Same name", "N-1", "private new description"));
         assertEquals(1, rows.size());
         assertEquals(CaseDao.CaseTimelineEventTypes.DESCRIPTION_CHANGED, rows.get(0).get(2));
         assertEquals(null, rows.get(0).get(6));
+    }
+
+    @Test
+    void normalizationOnlyOverviewSaveWritesNoEntry() throws Exception {
+        List<List<Object>> rows = new ArrayList<>();
+        CaseDetailsTimelineWriter.appendChanges(connection(rows), 42, 7, 9,
+                detail("Case name", "N-1", "description"),
+                detail("  Case name  ", " N-1 ", " description "));
+        assertEquals(0, rows.size());
     }
 
     private static List<Object> projected(List<Object> row) {
@@ -74,7 +128,11 @@ class CaseDetailsTimelineWriterTest {
     }
 
     private static CaseDetailDto detail(String name, String description) {
-        return new CaseDetailDto(42, "N-1", name, description, "Open", null,
+        return detail(name, "N-1", description);
+    }
+
+    private static CaseDetailDto detail(String name, String number, String description) {
+        return new CaseDetailDto(42, number, name, description, "Open", null,
                 null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, LocalDateTime.now(), new byte[]{1});

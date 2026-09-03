@@ -3148,6 +3148,10 @@ public class CaseController {
 		}, "case-timeline-load-" + activeCaseId).start();
 	}
 
+	private void refreshTimelineAfterOverviewSave() {
+		if (isSectionActive("Timeline")) loadCaseTimelineEventsAsync();
+	}
+
 	private void renderTimelineEvents(List<CaseTimelineEventDto> events) {
 		if (timelineListBox == null)
 			return;
@@ -5682,6 +5686,7 @@ public class CaseController {
 					applyDetail(updated);
 					compatibilityDates.invalidate();
 					setBusy(false);
+					refreshTimelineAfterOverviewSave();
 					publishCaseFieldUpdated(activeCaseId, field, switch (field) {
 					case "name" -> name;
 					case "caseNumber" -> number;
@@ -7847,31 +7852,7 @@ public class CaseController {
 							draftPracticeAreaName
 					);
 				}
-				addTextIdentityChangedTimelineEvent(
-						request.saveCaseId(),
-						request.tenantId(),
-						request.userId(),
-						CaseDao.CaseTimelineEventTypes.CASE_NAME_CHANGED,
-						"Case name changed",
-						request.baseline().oldName(),
-						request.saveDraft().caseName()
-				);
-				addTextIdentityChangedTimelineEvent(
-						request.saveCaseId(),
-						request.tenantId(),
-						request.userId(),
-						CaseDao.CaseTimelineEventTypes.CASE_NUMBER_CHANGED,
-						"Case number changed",
-						request.baseline().oldNumber(),
-						request.saveDraft().caseNumber()
-				);
-				addDescriptionChangedTimelineEvent(
-						request.saveCaseId(),
-						request.tenantId(),
-						request.userId(),
-						request.baseline().oldDescription(),
-						request.saveDraft().description()
-				);
+				// Core text-field chronology is written atomically by updateCaseNonDate.
 				if (teamChanged) {
 					addTeamChangedTimelineEvent(
 							request.saveCaseId(),
@@ -8023,6 +8004,7 @@ public class CaseController {
 
 			clearDraftState();
 			compatibilityDates.invalidate();
+			refreshTimelineAfterOverviewSave();
 			reloadCurrentCaseForViewMode();
 		}
 
@@ -9805,36 +9787,6 @@ public class CaseController {
 		return "Practice area #" + practiceAreaId;
 	}
 
-	private void addTextIdentityChangedTimelineEvent(
-			long caseId,
-			Integer tenantId,
-			Integer actorUserId,
-			String eventType,
-			String title,
-			String oldValue,
-			String newValue) {
-		if (caseDao == null || tenantId == null || tenantId <= 0)
-			return;
-
-		String normalizedOld = normalizeTimelineTextValue(oldValue);
-		String normalizedNew = normalizeTimelineTextValue(newValue);
-		if (Objects.equals(normalizedOld, normalizedNew))
-			return;
-
-		String oldLabel = normalizedOld == null ? "none" : normalizedOld;
-		String newLabel = normalizedNew == null ? "none" : normalizedNew;
-		String body = "from " + oldLabel + " to " + newLabel;
-
-		caseDao.addCaseTimelineEvent(
-				(int) caseId,
-				tenantId,
-				eventType,
-				actorUserId,
-				title,
-				body
-		);
-	}
-
 	private String normalizeTimelineTextValue(String value) {
 		String trimmed = safeText(value).trim();
 		return trimmed.isBlank() ? null : trimmed;
@@ -9853,48 +9805,6 @@ public class CaseController {
 				actorUserId,
 				"Team changed",
 				"updated assigned team"
-		);
-	}
-
-	private void addDescriptionChangedTimelineEvent(
-			long caseId,
-			Integer tenantId,
-			Integer actorUserId,
-			String oldDescription,
-			String newDescription) {
-		addLongTextChangedTimelineEvent(
-				caseId,
-				tenantId,
-				actorUserId,
-				CaseDao.CaseTimelineEventTypes.DESCRIPTION_CHANGED,
-				"Description updated",
-				oldDescription,
-				newDescription
-		);
-	}
-
-	private void addLongTextChangedTimelineEvent(
-			long caseId,
-			Integer tenantId,
-			Integer actorUserId,
-			String eventType,
-			String title,
-			String oldValue,
-			String newValue) {
-		if (caseDao == null || tenantId == null || tenantId <= 0)
-			return;
-		String normalizedOld = normalizeTimelineTextValue(oldValue);
-		String normalizedNew = normalizeTimelineTextValue(newValue);
-		if (Objects.equals(normalizedOld, normalizedNew))
-			return;
-
-		caseDao.addCaseTimelineEvent(
-				(int) caseId,
-				tenantId,
-				eventType,
-				actorUserId,
-				title,
-				null
 		);
 	}
 

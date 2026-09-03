@@ -14,9 +14,9 @@ final class CaseDetailsTimelineWriter {
 
     static void appendChanges(Connection con, long caseId, int tenant, int actor,
             CaseDetailDto before, CaseDetailDto after) throws SQLException {
-        text(con,caseId,tenant,actor,CaseDao.CaseTimelineEventTypes.CASE_NAME_CHANGED,"Case name changed",before.getCaseName(),after.getCaseName(),false);
-        text(con,caseId,tenant,actor,CaseDao.CaseTimelineEventTypes.CASE_NUMBER_CHANGED,"Case number changed",before.getCaseNumber(),after.getCaseNumber(),false);
-        text(con,caseId,tenant,actor,CaseDao.CaseTimelineEventTypes.DESCRIPTION_CHANGED,"Description updated",before.getDescription(),after.getDescription(),true);
+        text(con,caseId,tenant,actor,CaseDao.CaseTimelineEventTypes.CASE_NAME_CHANGED,"changed Case Name",before.getCaseName(),after.getCaseName(),false);
+        text(con,caseId,tenant,actor,CaseDao.CaseTimelineEventTypes.CASE_NUMBER_CHANGED,"changed Case Number",before.getCaseNumber(),after.getCaseNumber(),false);
+        text(con,caseId,tenant,actor,CaseDao.CaseTimelineEventTypes.DESCRIPTION_CHANGED,"updated Description",before.getDescription(),after.getDescription(),true);
         date(con,caseId,tenant,actor,CaseDao.CaseTimelineEventTypes.ACCEPTED_DATE_CHANGED,"Accepted date changed",before.getAcceptedDate(),after.getAcceptedDate());
         date(con,caseId,tenant,actor,CaseDao.CaseTimelineEventTypes.CLOSED_DATE_CHANGED,"Closed date changed",before.getClosedDate(),after.getClosedDate());
         date(con,caseId,tenant,actor,CaseDao.CaseTimelineEventTypes.DENIED_DATE_CHANGED,"Denied date changed",before.getDeniedDate(),after.getDeniedDate());
