@@ -30,11 +30,25 @@ BEGIN TRY
   CREATE UNIQUE INDEX UX_CaseTeamRoleDefinitions_GlobalSystemKey ON dbo.CaseTeamRoleDefinitions(SystemKey) WHERE ShaleClientId IS NULL AND SystemKey IS NOT NULL;
  IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CaseTeamRoleDefinitions') AND name=N'UX_CaseTeamRoleDefinitions_TenantSystemKey')
   CREATE UNIQUE INDEX UX_CaseTeamRoleDefinitions_TenantSystemKey ON dbo.CaseTeamRoleDefinitions(ShaleClientId,SystemKey) WHERE ShaleClientId IS NOT NULL AND SystemKey IS NOT NULL;
+ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CaseTeamRoleDefinitions') AND name=N'UX_CaseTeamRoleDefinitions_GlobalLegacyRoleId')
+  CREATE UNIQUE INDEX UX_CaseTeamRoleDefinitions_GlobalLegacyRoleId ON dbo.CaseTeamRoleDefinitions(LegacyRoleId) WHERE ShaleClientId IS NULL AND LegacyRoleId IS NOT NULL;
  IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CaseTeamRoleDefinitions') AND name=N'IX_CaseTeamRoleDefinitions_TenantOrder')
   CREATE INDEX IX_CaseTeamRoleDefinitions_TenantOrder ON dbo.CaseTeamRoleDefinitions(ShaleClientId,IsDeleted,IsActive,SortOrder,Name);
- DECLARE @seed TABLE(SystemKey varchar(64),LegacyRoleId int,Name nvarchar(200),Description nvarchar(510),SortOrder int);
- INSERT @seed VALUES ('responsible_attorney',4,N'Responsible Attorney',N'Attorney responsible for the case.',10),('prelitigation_staff',5,N'Prelitigation Staff',NULL,20),('attorney',7,N'Attorney',NULL,30),('legal_assistant',11,N'Legal Assistant',NULL,40),('paralegal',12,N'Paralegal',NULL,50),('law_clerk',13,N'Law Clerk',NULL,60),('co_counsel',14,N'Co-counsel',NULL,70);
- IF EXISTS(SELECT 1 FROM @seed s WHERE NOT EXISTS(SELECT 1 FROM dbo.Roles r WHERE r.Id=s.LegacyRoleId)) THROW 56501,'A legacy Case Team role required for reliable assignment mapping is missing.',1;
+ DECLARE @seed TABLE(SystemKey varchar(64),LegacyRoleId int,LegacyName nvarchar(200),Name nvarchar(200),Description nvarchar(510),SortOrder int);
+ INSERT @seed VALUES
+  ('responsible_attorney',4,N'responsible_attorney',N'Responsible Attorney',N'Attorney responsible for the case.',10),
+  ('prelitigation_staff',5,N'prelitigation',N'Prelitigation Staff',NULL,20),
+  ('attorney',7,N'attorney',N'Attorney',NULL,30),
+  ('legal_assistant',11,N'legal_assistant',N'Legal Assistant',NULL,40),
+  ('paralegal',12,N'paralegal',N'Paralegal',NULL,50),
+  ('law_clerk',13,N'law_clerk',N'Law Clerk',NULL,60),
+  ('co_counsel',14,N'co_counsel',N'Co-counsel',NULL,70);
+ IF EXISTS(
+  SELECT 1
+  FROM @seed s
+  LEFT JOIN dbo.Roles r ON r.Id=s.LegacyRoleId
+  WHERE r.Id IS NULL OR LOWER(LTRIM(RTRIM(r.Name)))<>s.LegacyName
+ ) THROW 56501,'A legacy Case Team role ID/name mapping is missing or does not match the expected production vocabulary.',1;
  MERGE dbo.CaseTeamRoleDefinitions t USING @seed s ON t.ShaleClientId IS NULL AND t.SystemKey=s.SystemKey
  WHEN MATCHED THEN UPDATE SET LegacyRoleId=s.LegacyRoleId,IsProtected=1
  WHEN NOT MATCHED THEN INSERT(ShaleClientId,SystemKey,LegacyRoleId,Name,Description,Color,SortOrder,IsActive,IsDeleted,IsProtected) VALUES(NULL,s.SystemKey,s.LegacyRoleId,s.Name,s.Description,N'#6C757D',s.SortOrder,1,0,1);
