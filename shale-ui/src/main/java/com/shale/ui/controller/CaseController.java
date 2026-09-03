@@ -6335,6 +6335,7 @@ public class CaseController {
 
 		final long activeCaseId = caseId.longValue();
 		final int tId = tenantId;
+		final int loadGeneration = documentGeneration;
 
 		new Thread(() ->
 		{
@@ -6346,10 +6347,12 @@ public class CaseController {
 
 				runOnFx(() ->
 				{
+					if (loadGeneration != documentGeneration || caseId == null
+							|| caseId.longValue() != activeCaseId || teamFlow == null || teamFlow.getScene() == null)
+						return;
 					setBusy(false);
 
 					Stage owner = (Stage) teamFlow.getScene().getWindow();
-					TeamEditorDialog dlg = new TeamEditorDialog(
 					TeamEditorDialog dlg = new TeamEditorDialog(owner, caseService, tId, actorId, activeCaseId,
 							allUsers, baseline, roles, () -> {
 								publishCaseFieldUpdated(activeCaseId, "teamChanged", 1);
@@ -6361,6 +6364,9 @@ public class CaseController {
 			} catch (Exception ex) {
 				runOnFx(() ->
 				{
+					if (loadGeneration != documentGeneration || caseId == null
+							|| caseId.longValue() != activeCaseId || teamFlow == null || teamFlow.getScene() == null)
+						return;
 					setBusy(false);
 					showError("Failed to load team editor. " + ex.getMessage());
 				});
