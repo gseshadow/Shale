@@ -6335,7 +6335,7 @@ public class CaseController {
 
 		final long activeCaseId = caseId.longValue();
 		final int tId = tenantId;
-		final int loadGeneration = documentGeneration;
+		final long loadGeneration = documentGeneration;
 
 		new Thread(() ->
 		{

@@ -43,7 +43,7 @@ public final class CaseTeamEditorState {
         this.baseline=fingerprint();
     }
     public List<Member> members(){return List.copyOf(members.values());}
-    public List<CaseDao.UserRow> search(String text){String q=text==null?"":text.strip().toLowerCase(Locale.ROOT);return users.stream().filter(u->!members.containsKey(u.id())).filter(u->q.isEmpty()||u.displayName().toLowerCase(Locale.ROOT).contains(q)).limit(50).toList();}
+    public List<CaseDao.UserRow> search(String text){String q=text==null?"":text.strip().toLowerCase(Locale.ROOT);return users.stream().filter(u->!members.containsKey(u.id())).filter(u->q.isEmpty()||u.displayName().toLowerCase(Locale.ROOT).contains(q)).toList();}
     public Member addMember(CaseDao.UserRow user){if(user==null||members.containsKey(user.id()))return members.get(user==null?-1:user.id());Member m=new Member(0,user,null);members.put(user.id(),m);return m;}
     public void removeMember(int userId){members.remove(userId);}
     public boolean addRole(int userId,int roleId,boolean confirmMove){Member target=members.get(userId);CaseTeamRoleDefinitionDto d=definitions.get(roleId);if(target==null||d==null||!d.active()||d.deleted()||target.roleIds.contains(roleId))return false;
