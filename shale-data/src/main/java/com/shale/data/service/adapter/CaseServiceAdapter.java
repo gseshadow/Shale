@@ -28,12 +28,14 @@ import com.shale.core.dto.ContactSharedCaseLinkDto;
 import com.shale.core.dto.LinkTypeDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseTeamRoleDefinitionDto;
+import com.shale.core.dto.CaseTeamMembershipDto;
 import com.shale.core.dto.PracticeAreaDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.util.CaseLinkUrlNormalizer;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.CaseDateDao;
 import com.shale.data.dao.CaseTeamRoleDefinitionDao;
+import com.shale.data.dao.CaseTeamMembershipDao;
 import com.shale.data.dao.CaseSummaryDao;
 import com.shale.core.model.CaseDateAggregateCommand;
 import com.shale.core.model.CaseDateAggregateResult;
@@ -48,20 +50,24 @@ public final class CaseServiceAdapter implements CaseServicePort {
 
 	private final CaseGateway caseGateway;
 	private final CaseTeamRoleDefinitionDao caseTeamRoleDao;
+	private final CaseTeamMembershipDao caseTeamMembershipDao;
 
 	public CaseServiceAdapter(CaseDao caseDao) {
 		this.caseGateway = new DaoCaseGateway(caseDao, new CaseDateDao(caseDao.dbSessionProvider()), new CaseSummaryDao(caseDao.dbSessionProvider()));
 		this.caseTeamRoleDao = new CaseTeamRoleDefinitionDao(caseDao.dbSessionProvider());
+		this.caseTeamMembershipDao = new CaseTeamMembershipDao(caseDao.dbSessionProvider());
 	}
 
 	public CaseServiceAdapter(CaseDao caseDao, CaseDateDao caseDateDao) {
 		this.caseGateway = new DaoCaseGateway(caseDao, caseDateDao, new CaseSummaryDao(caseDao.dbSessionProvider()));
 		this.caseTeamRoleDao = new CaseTeamRoleDefinitionDao(caseDao.dbSessionProvider());
+		this.caseTeamMembershipDao = new CaseTeamMembershipDao(caseDao.dbSessionProvider());
 	}
 
 	CaseServiceAdapter(CaseGateway caseGateway) {
 		this.caseGateway = Objects.requireNonNull(caseGateway, "caseGateway");
 		this.caseTeamRoleDao = null;
+		this.caseTeamMembershipDao = null;
 	}
 
 	@Override public List<CaseTeamRoleDefinitionDto> listCaseTeamRolesForAdministration(int tenant,int actor){ return requireCaseTeamRoleDao().listForAdministration(tenant,actor); }
@@ -71,6 +77,12 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override public void restoreCaseTeamRole(CaseTeamRoleLifecycleCommand c){ requireCaseTeamRoleDao().lifecycle(c, com.shale.data.dao.EntityActionAuditEvent.Action.RESTORED); }
 	@Override public void resetCaseTeamRoleOverride(CaseTeamRoleLifecycleCommand c){ requireCaseTeamRoleDao().reset(c); }
 	private CaseTeamRoleDefinitionDao requireCaseTeamRoleDao(){if(caseTeamRoleDao==null)throw new UnsupportedOperationException("Case Team role administration is unavailable from this test gateway.");return caseTeamRoleDao;}
+	@Override public List<CaseTeamMembershipDto> listCaseTeamMemberships(int t,int a,long c){return requireCaseTeamMembershipDao().list(t,a,c);}
+	@Override public CaseTeamMembershipDto addCaseTeamMember(CaseTeamMemberCommand c){return requireCaseTeamMembershipDao().add(c);}
+	@Override public void removeCaseTeamMember(CaseTeamMemberLifecycleCommand c){requireCaseTeamMembershipDao().removeMember(c);}
+	@Override public void assignCaseTeamMemberRole(CaseTeamMemberRoleCommand c){requireCaseTeamMembershipDao().assign(c);}
+	@Override public void removeCaseTeamMemberRole(CaseTeamMemberRoleLifecycleCommand c){requireCaseTeamMembershipDao().removeRole(c);}
+	private CaseTeamMembershipDao requireCaseTeamMembershipDao(){if(caseTeamMembershipDao==null)throw new UnsupportedOperationException("Case Team membership operations are unavailable from this test gateway.");return caseTeamMembershipDao;}
 
 	@Override
 	public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {

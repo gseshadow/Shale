@@ -14,6 +14,7 @@ import com.shale.core.dto.CaseDateSemanticRoleMappingDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseTeamRoleDefinitionDto;
+import com.shale.core.dto.CaseTeamMembershipDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
@@ -192,6 +193,20 @@ public interface CaseServicePort {
 	default void removeCaseTeamRole(CaseTeamRoleLifecycleCommand command){ throw unsupportedCaseLinkOperation("removeCaseTeamRole"); }
 	default void restoreCaseTeamRole(CaseTeamRoleLifecycleCommand command){ throw unsupportedCaseLinkOperation("restoreCaseTeamRole"); }
 	default void resetCaseTeamRoleOverride(CaseTeamRoleLifecycleCommand command){ throw unsupportedCaseLinkOperation("resetCaseTeamRoleOverride"); }
+	default List<CaseTeamMembershipDto> listCaseTeamMemberships(int tenantId, int actorUserId, long caseId) { throw unsupportedCaseLinkOperation("listCaseTeamMemberships"); }
+	default CaseTeamMembershipDto addCaseTeamMember(CaseTeamMemberCommand command) { throw unsupportedCaseLinkOperation("addCaseTeamMember"); }
+	default void removeCaseTeamMember(CaseTeamMemberLifecycleCommand command) { throw unsupportedCaseLinkOperation("removeCaseTeamMember"); }
+	default void assignCaseTeamMemberRole(CaseTeamMemberRoleCommand command) { throw unsupportedCaseLinkOperation("assignCaseTeamMemberRole"); }
+	default void removeCaseTeamMemberRole(CaseTeamMemberRoleLifecycleCommand command) { throw unsupportedCaseLinkOperation("removeCaseTeamMemberRole"); }
+
+	record CaseTeamMemberCommand(int tenantId, int actorUserId, long caseId, int userId) {}
+	record CaseTeamMemberLifecycleCommand(int tenantId, int actorUserId, long caseId, long membershipId, byte[] rowVer) {
+		public CaseTeamMemberLifecycleCommand { rowVer=copyRowVer(rowVer); } @Override public byte[] rowVer(){return copyRowVer(rowVer);}
+	}
+	record CaseTeamMemberRoleCommand(int tenantId, int actorUserId, long caseId, long membershipId, int roleDefinitionId) {}
+	record CaseTeamMemberRoleLifecycleCommand(int tenantId, int actorUserId, long caseId, long membershipId, long assignmentId, byte[] rowVer) {
+		public CaseTeamMemberRoleLifecycleCommand { rowVer=copyRowVer(rowVer); } @Override public byte[] rowVer(){return copyRowVer(rowVer);}
+	}
 
 	record CaseTeamRoleCommand(Integer id, int tenantId, int actorUserId, String name, String description, String color, int sortOrder, boolean active, byte[] rowVer) {
 		public CaseTeamRoleCommand { rowVer=copyRowVer(rowVer); } @Override public byte[] rowVer(){return copyRowVer(rowVer);}

@@ -6914,6 +6914,17 @@ public final class CaseDao {
 			con = db.requireConnection();
 			con.setAutoCommit(false);
 
+			/* Preserve assignments the single-role editor cannot represent, keyed by user. */
+			try (PreparedStatement ps = con.prepareStatement("""
+				SELECT cu.UserId,a.CaseTeamRoleDefinitionId,a.RoleDefinitionTenantKey INTO #PreservedCaseTeamRoles
+				FROM dbo.CaseTeamMemberRoles a JOIN dbo.CaseUsers cu ON cu.Id=a.CaseUserId AND cu.ShaleClientId=a.ShaleClientId
+				JOIN dbo.CaseTeamRoleDefinitions d ON d.Id=a.CaseTeamRoleDefinitionId
+				WHERE cu.CaseId=? AND a.IsDeleted=0 AND (d.LegacyRoleId IS NULL OR cu.RoleId IS NULL OR d.LegacyRoleId<>cu.RoleId);
+				DELETE a FROM dbo.CaseTeamMemberRoles a JOIN dbo.CaseUsers cu ON cu.Id=a.CaseUserId WHERE cu.CaseId=?;
+				""")) {
+				ps.setLong(1, caseId); ps.setLong(2, caseId); ps.executeUpdate();
+			}
+
 			try (PreparedStatement ps = con.prepareStatement(deleteExisting)) {
 				ps.setLong(1, caseId);
 				ps.executeUpdate();
@@ -6932,6 +6943,20 @@ public final class CaseDao {
 					}
 					ps.executeBatch();
 				}
+			}
+
+			/* Synchronize the displayed legacy role and restore all additional assignments untouched. */
+			try (PreparedStatement ps = con.prepareStatement("""
+				INSERT dbo.CaseTeamMemberRoles(ShaleClientId,CaseId,CaseUserId,CaseTeamRoleDefinitionId,RoleDefinitionTenantKey)
+				SELECT cu.ShaleClientId,cu.CaseId,cu.Id,d.Id,0
+				FROM dbo.CaseUsers cu JOIN dbo.CaseTeamRoleDefinitions d ON d.ShaleClientId IS NULL AND d.LegacyRoleId=cu.RoleId
+				WHERE cu.CaseId=?;
+				INSERT dbo.CaseTeamMemberRoles(ShaleClientId,CaseId,CaseUserId,CaseTeamRoleDefinitionId,RoleDefinitionTenantKey)
+				SELECT cu.ShaleClientId,cu.CaseId,cu.Id,p.CaseTeamRoleDefinitionId,p.RoleDefinitionTenantKey
+				FROM #PreservedCaseTeamRoles p JOIN dbo.CaseUsers cu ON cu.CaseId=? AND cu.UserId=p.UserId
+				WHERE NOT EXISTS(SELECT 1 FROM dbo.CaseTeamMemberRoles a WHERE a.CaseUserId=cu.Id AND a.CaseTeamRoleDefinitionId=p.CaseTeamRoleDefinitionId AND a.IsDeleted=0);
+				""")) {
+				ps.setLong(1, caseId); ps.setLong(2, caseId); ps.executeUpdate();
 			}
 
 			touchCaseUpdatedAt(con, caseId, requireCurrentShaleClientId(con));
