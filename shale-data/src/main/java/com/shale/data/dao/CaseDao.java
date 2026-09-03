@@ -2319,7 +2319,12 @@ public final class CaseDao {
 			String summary, byte[] expectedRowVer, Integer actorUserId) {
 		if (expectedRowVer == null || expectedRowVer.length == 0)
 			throw new IllegalArgumentException("expectedRowVer is required");
+		if (actorUserId == null || actorUserId <= 0)
+			throw new IllegalArgumentException("actorUserId is required");
 		try (Connection con = db.requireConnection()) {
+			con.setAutoCommit(false);
+			try {
+			int tenant = requireCurrentShaleClientId(con);
 			CaseSchema schema = resolveCaseSchema(con);
 			String sql = """
 					UPDATE %s SET Name = ?, CaseNumber = ?, Description = ?, Summary = ?, UpdatedAt = SYSDATETIME()
@@ -2334,16 +2339,26 @@ public final class CaseDao {
 				ps.setLong(5, caseId);
 				ps.setBytes(6, expectedRowVer);
 				int rows = ps.executeUpdate();
-				if (rows == 0)
+				if (rows == 0) {
+					con.rollback();
 					return null;
+				}
 				if (rows != 1)
 					throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
 				CaseDetailDto updated = selectCaseDetail(con, caseId);
 				if (before != null && updated != null) {
-					phiAuditService.auditUpdate(actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
-					phiAuditService.auditUpdate(actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
+					CaseDetailsTimelineWriter.appendChanges(con, caseId, tenant, actorUserId, before, updated);
 				}
+				con.commit();
 				return updated;
+			}
+			} catch (SQLException | RuntimeException e) {
+				con.rollback();
+				throw e;
+			} finally {
+				con.setAutoCommit(true);
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update non-date case fields (caseId=" + caseId + ")", e);
@@ -2365,6 +2380,7 @@ public final class CaseDao {
 		if(after==null) throw new IllegalStateException("Case is not available for this tenant.");
 		phiAuditService.auditUpdate(con,actorUserId,"Cases","Description",caseId,before==null?null:before.getDescription(),after.getDescription());
 		phiAuditService.auditUpdate(con,actorUserId,"Cases","Summary",caseId,before==null?null:before.getSummary(),after.getSummary());
+		if (before != null) CaseDetailsTimelineWriter.appendChanges(con,caseId,tenant,actorUserId,before,after);
 		return after;
 	}
 
