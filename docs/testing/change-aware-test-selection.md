@@ -23,8 +23,9 @@ Windows release reactor, inherits this default. Rendered JavaFX geometry is excl
 python build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format markdown
 ```
 
-The selector reports changed paths, affected Maven modules, test patterns, exact commands, selection
-rationale, skipped areas, directly modified test classes, and informational full-suite escalation.
+The selector reports changed paths, affected Maven modules, blocking test classes, exact commands,
+selection rationale, skipped areas, directly modified test classes, complete ownership counts, and
+informational full-suite escalation.
 It recommends the full suite for information when a parent/module POM, test infrastructure, workflow,
 Codex selection rule, or unknown production path changes. That historical result is never part of the
 required gate. Documentation-only changes have no affected-area Maven command; CI still
@@ -57,12 +58,17 @@ structured process arguments. In particular, the complete comma-separated `-Dtes
 one Maven argument; CI and `--run` never pass the display string through `Invoke-Expression`, `eval`,
 `cmd /c`, or a shell interpreter.
 
-Every selected class is accompanied by its changed path, mapping rule, and classification (critical,
-directly modified, affected behavior, or manual inventory). Automated affected selections are capped
-at 50 classes; exceeding that limit is a selector-model error rather than a blocking mega-command.
-Broad feature inventories are therefore manual-only. Structured Maven commands are additionally kept
-below a conservative 7,000-character Windows limit and, when an explicitly requested legitimate
-inventory exceeds it, are split deterministically into module-local batches without truncation. The
+Area ownership and blocking execution are separate contracts. Automatic PR selection uses, in order,
+directly modified tests, explicit narrow file-to-test mappings, and each affected area's small
+`blocking_smoke_patterns` manifest. It never expands the area's complete `ownership_patterns` list.
+The separately maintained critical suite still runs through `mvn test`. Complete feature ownership is
+available through explicit `--area` execution for manual/advisory or periodic coverage; developers do
+not add selector exceptions or focused change-set declarations for ordinary feature work.
+
+If complete ownership is larger than the former 50-class automatic limit, the selector reports that
+count and the manual area command without failing the PR or scheduling the broad list. Structured Maven
+commands remain below a conservative 7,000-character Windows limit and explicitly requested legitimate
+inventories are split deterministically into module-local batches without truncation. The
 critical safety manifest is never serialized onto the command line: it remains the separate `mvn test`
 invocation supplied through the parent POM.
 

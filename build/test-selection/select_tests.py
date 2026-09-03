@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = Path(__file__).with_name("test-areas.json")
 CRITICAL_PATH = Path(__file__).with_name("critical-tests.txt")
 WINDOWS_SAFE_COMMAND_LENGTH = 7000
-AUTOMATED_CLASS_LIMIT = 50
+OWNERSHIP_ADVISORY_THRESHOLD = 50
 POM_TEST_SELECTION_MARKERS = (
     "shale.test.includesFile", "shale.test.excludesFile", "maven-surefire-plugin",
     "surefire.version", "all-tests.txt", "ui-visual-advisory-tests.txt",
@@ -38,7 +38,7 @@ def test_catalog() -> dict[str, str]:
     catalog: dict[str, str] = {}
     for path in ROOT.glob("shale-*/src/test/java/**/*Test.java"):
         qualified = path.as_posix().split("/src/test/java/", 1)[1][:-5].replace("/", ".")
-        catalog[qualified] = path.parts[0]
+        catalog[qualified] = path.relative_to(ROOT).parts[0]
     return catalog
 
 
@@ -153,7 +153,6 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
     selected: set[str] = set(explicit_areas or [])
     reasons: dict[str, list[str]] = {area: ["Explicit feature selection."] for area in selected}
     modified_tests: set[str] = set()
-    modified_test_modules: set[str] = set()
     affected_modules: set[str] = set()
     unknown_production: list[str] = []
     escalation_reasons: list[str] = []
@@ -168,7 +167,6 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
             modified_tests.add(test_class)
             if module:
                 affected_modules.add(module)
-                modified_test_modules.add(module)
 
         if matches(path, config["full_suite_patterns"]):
             escalation_reasons.append(f"{path}: parent build, module graph, selector, workflow, or Codex test infrastructure")
@@ -197,29 +195,23 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
         escalation_reasons.extend(f"{path}: unknown production path" for path in unknown_production)
 
     full_suite = bool(escalation_reasons)
-    focused_change_set = None
-    normalized_paths = set(paths)
-    if not explicit_areas:
-        for definition in config.get("focused_change_sets", []):
-            allowed = definition.get("allowed_paths", [])
-            anchors = definition.get("anchor_paths", [])
-            if normalized_paths and all(matches(path, allowed) for path in normalized_paths) \
-                    and any(matches(path, anchors) for path in normalized_paths):
-                focused_change_set = definition
-                break
-
     selected_definitions = [area_config[name] for name in sorted(selected)]
-    configured_modules = (focused_change_set.get("modules", []) if focused_change_set else
-                          {module for item in selected_definitions for module in item.get("modules", [])})
-    modules = sorted(affected_modules | set(configured_modules))
-    suppressed_areas = set(focused_change_set.get("suppress_area_patterns", [])) if focused_change_set else set()
-    configured_patterns = (
-        {pattern for area, item in ((name, area_config[name]) for name in sorted(selected))
-         if area not in suppressed_areas for pattern in item.get("test_patterns", [])}
-        | set(focused_change_set.get("test_classes", []) if focused_change_set else [])
-        | modified_tests
-    )
+    configured_modules = ({module for item in selected_definitions for module in item.get("modules", [])}
+                          if explicit_areas else set())
+    area_pattern_key = "ownership_patterns" if explicit_areas else "blocking_smoke_patterns"
+    configured_patterns = {pattern for item in selected_definitions
+                           for pattern in item.get(area_pattern_key, [])} | modified_tests
+    narrow_mappings: dict[str, list[str]] = {}
+    if not explicit_areas:
+        for mapping in config.get("file_test_mappings", []):
+            matching = [path for path in paths if matches(path, mapping.get("paths", []))]
+            if matching:
+                for pattern in mapping.get("test_classes", []):
+                    configured_patterns.add(pattern)
+                    narrow_mappings.setdefault(pattern, []).extend(matching)
     patterns = sorted(expand_test_patterns(configured_patterns, catalog))
+    modules = sorted(affected_modules | configured_modules
+                     | {catalog[qualified] for qualified in patterns if qualified in catalog})
     critical = critical_classes()
     test_reasons: dict[str, dict] = {}
     for qualified in patterns:
@@ -230,14 +222,12 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
             mapping_rules.append("directly-modified-test")
             selecting_paths.update(path for path in paths if test_class_for_path(path) == qualified)
             classifications.add("directly_modified")
-        if focused_change_set and qualified in focused_change_set.get("test_classes", []):
-            mapping_rules.append(f"focused-change-set:{focused_change_set['name']}")
-            selecting_paths.update(path for path in paths if matches(path, focused_change_set.get("anchor_paths", [])))
+        if qualified in narrow_mappings:
+            mapping_rules.append("explicit-file-mapping")
+            selecting_paths.update(narrow_mappings[qualified])
             classifications.add("affected_behavior")
         for area in sorted(selected):
-            if area in suppressed_areas:
-                continue
-            area_patterns = area_config[area].get("test_patterns", [])
+            area_patterns = area_config[area].get(area_pattern_key, [])
             if any(fnmatch.fnmatchcase(qualified, pattern)
                    or fnmatch.fnmatchcase(qualified.rsplit(".", 1)[-1], pattern) for pattern in area_patterns):
                 mapping_rules.append(f"area:{area}")
@@ -246,7 +236,7 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
                     selecting_paths.add("(explicit area selection)")
                     classifications.add("manual_inventory")
                 else:
-                    classifications.add("affected_behavior")
+                    classifications.add("blocking_smoke")
         if qualified in critical:
             classifications.add("critical")
         test_reasons[qualified] = {
@@ -261,22 +251,9 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
     python_tests = sorted({command for item in selected_definitions for command in item.get("python_tests", [])})
     python_command_args = [configured_command_arguments(command) for command in python_tests]
 
-    focused_command = ""
-    focused_maven_args: list[str] = []
-    focused_maven_batches: list[list[str]] = []
-    # Do not schedule a second invocation when the affected selection already is
-    # exactly the directly modified tests (as for the Case Timeline focus set).
-    if modified_tests and modified_tests != set(patterns):
-        focused_maven_batches = maven_batches(sorted(modified_tests), sorted(modified_test_modules), catalog)
-        focused_maven_args = focused_maven_batches[0] if len(focused_maven_batches) == 1 else []
-        focused_command = " ; ".join(display_command(["mvn", *args]) for args in focused_maven_batches)
-
     selected_maven_args: list[str] = []
     selected_maven_batches: list[list[str]] = []
     selection_error = ""
-    if not explicit_areas and not focused_change_set and len(patterns) > AUTOMATED_CLASS_LIMIT:
-        selection_error = (f"Automated affected selection resolved to {len(patterns)} classes, exceeding the "
-                           f"policy limit of {AUTOMATED_CLASS_LIMIT}; add a narrowly mapped focused change-set.")
     if "ui-visual-advisory" in selected:
         selected_command = "mvn -Pui-visual test"
         selected_maven_args = ["-Pui-visual", "test"]
@@ -293,28 +270,26 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
     return {
         "changed_paths": sorted(paths),
         "selected_areas": sorted(selected),
-        "focused_change_set": focused_change_set.get("name", "") if focused_change_set else "",
         "selected_modules": modules,
         "test_patterns": patterns,
+        "ownership_class_count": len(expand_test_patterns({pattern for item in selected_definitions for pattern in item.get("ownership_patterns", [])}, catalog)),
+        "ownership_advisory_command": " ".join(["python", "build/test-selection/select_tests.py", *[part for area in sorted(selected) for part in ("--area", area)], "--run"]) if selected and not explicit_areas else "",
         "test_reasons": test_reasons,
         "modified_test_classes": sorted(modified_tests),
         "python_commands": python_tests,
         "python_command_args": python_command_args,
         "critical_command": "mvn test",
         "critical_maven_args": ["test"],
-        "focused_command": focused_command,
-        "focused_maven_args": focused_maven_args,
-        "focused_maven_batches": focused_maven_batches,
         "selected_command": selected_command,
         "selected_maven_args": selected_maven_args,
         "selected_maven_batches": selected_maven_batches,
         "maximum_command_length": max((len(display_command(["mvn", *args])) for args in selected_maven_batches), default=0),
         "windows_safe_command_length": WINDOWS_SAFE_COMMAND_LENGTH,
-        "automated_class_limit": AUTOMATED_CLASS_LIMIT,
+        "ownership_advisory_threshold": OWNERSHIP_ADVISORY_THRESHOLD,
         "selection_error": selection_error,
         "informational_command": informational_command,
         "informational_maven_args": informational_maven_args,
-        "commands": [command for command in [*python_tests, focused_command, selected_command, "mvn test"] if command],
+        "commands": [command for command in [*python_tests, selected_command, "mvn test"] if command],
         "full_suite": full_suite,
         "escalation_reasons": escalation_reasons,
         "reasons": {area: reasons.get(area, [area_config[area]["reason"]]) for area in sorted(selected)},
@@ -340,6 +315,7 @@ def markdown(result: dict) -> str:
         f"**Selected modules:** {', '.join(result['selected_modules']) or 'none'}",
         f"**Modified test classes:** {', '.join(result['modified_test_classes']) or 'none'}",
         f"**Maximum generated command length:** {result['maximum_command_length']} / {result['windows_safe_command_length']}",
+        f"**Complete owned classes (manual/advisory):** {result['ownership_class_count']}",
         "", "### Selected test reasons",
     ])
     if result["test_reasons"]:
@@ -354,6 +330,10 @@ def markdown(result: dict) -> str:
     lines.extend(f"- `{command}`" for command in result["commands"] or ["(no Maven tests)"])
     if result["selection_error"]:
         lines.extend(["", "### Selector policy error", "", f"- {result['selection_error']}"])
+    if result["ownership_advisory_command"]:
+        lines.extend(["", "### Broader ownership coverage", "",
+                      f"- `{result['ownership_advisory_command']}`",
+                      "- Complete area ownership is manual/advisory and is not part of the blocking PR selection."])
     if result["escalation_reasons"]:
         lines.extend(["", "### Informational full-suite escalation", "", f"- `{result['informational_command']}`",
                       "- This historical-suite result is non-blocking and does not replace the focused gate.",
@@ -367,7 +347,6 @@ def markdown(result: dict) -> str:
 def run_commands(result: dict) -> int:
     command_specs = [
         *[(display_command(arguments), arguments) for arguments in result["python_command_args"]],
-        *[(display_command(["mvn", *args]), ["mvn", *args]) for args in result["focused_maven_batches"]],
         *[(display_command(["mvn", *args]), ["mvn", *args]) for args in result["selected_maven_batches"]],
         (result["critical_command"], ["mvn", *result["critical_maven_args"]]),
     ]

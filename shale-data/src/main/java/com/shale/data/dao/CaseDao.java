@@ -2369,25 +2369,31 @@ public final class CaseDao {
 	}
 
 	/** Broad Details boundary for unrelated existing-case fields only. */
-	public CaseDetailDto updateCaseDetailsNonMigrated(long caseId, String name, String caseNumber, Integer practiceAreaId,
+	public CaseDetailDto updateCaseDetailsNonMigrated(long caseId, int shaleClientId, String name, String caseNumber, Integer practiceAreaId,
 			String description, LocalDate acceptedDate, LocalDate closedDate, LocalDate deniedDate, String clientEstate,
 			String officePrinterCode, Boolean medicalRecordsRequested, Boolean feeAgreementSigned,
 			Boolean nonEngagementLetterSent, Boolean acceptedChronology, Boolean acceptedConsultantExpertSearch,
 			Boolean acceptedTestifyingExpertSearch, Boolean acceptedMedicalLiterature, String acceptedDetail,
 			Boolean deniedChronology, String deniedDetail, String summary, String receivedUpdates,
-			byte[] expectedRowVer, Integer actorUserId) {
+			byte[] expectedRowVer, int actorUserId) {
 		if (expectedRowVer == null || expectedRowVer.length == 0)
 			throw new IllegalArgumentException("expectedRowVer is required");
 		try (Connection con = db.requireConnection()) {
+			if (shaleClientId <= 0 || actorUserId <= 0)
+				throw new IllegalArgumentException("tenant and actor are required");
 			CaseSchema schema = resolveCaseSchema(con);
 			String sql = """
 					UPDATE %s SET Name=?, CaseNumber=?, PracticeAreaId=?, Description=?, AcceptedDate=?, ClosedDate=?, DeniedDate=?,
 					ClientEstate=?, OfficePrinterCode=?, MedicalRecordsRequested=?, FeeAgreementSigned=?, NonEngagementLetterSent=?,
 					AcceptedChronology=?, AcceptedConsultantExpertSearch=?, AcceptedTestifyingExpertSearch=?, AcceptedMedicalLiterature=?,
 					AcceptedDetail=?, DeniedChronology=?, DeniedDetail=?, Summary=?, ReceivedUpdates=?, UpdatedAt=SYSDATETIME()
-					WHERE Id=? AND RowVer=? AND %s;
+					WHERE Id=? AND ShaleClientId=? AND RowVer=? AND %s;
 					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), null));
+			con.setAutoCommit(false);
+			try {
 			CaseDetailDto before = selectCaseDetail(con, caseId);
+			if (before == null)
+				throw new IllegalArgumentException("Case is not available for this tenant.");
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int i = 1;
 				ps.setString(i++, name);
@@ -2415,21 +2421,32 @@ public final class CaseDao {
 				setNullableString(ps, i++, summary);
 				setNullableString(ps, i++, receivedUpdates);
 				ps.setLong(i++, caseId);
+				ps.setInt(i++, shaleClientId);
 				ps.setBytes(i, expectedRowVer);
 				int rows = ps.executeUpdate();
-				if (rows == 0)
+				if (rows == 0) {
+					con.rollback();
 					return null;
+				}
 				if (rows != 1)
 					throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
 				CaseDetailDto updated = selectCaseDetail(con, caseId);
 				if (before != null && updated != null) {
-					phiAuditService.auditUpdate(actorUserId, "Cases", "AcceptedDetail", caseId, before.getAcceptedDetail(), updated.getAcceptedDetail());
-					phiAuditService.auditUpdate(actorUserId, "Cases", "DeniedDetail", caseId, before.getDeniedDetail(), updated.getDeniedDetail());
-					phiAuditService.auditUpdate(actorUserId, "Cases", "ReceivedUpdates", caseId, before.getReceivedUpdates(), updated.getReceivedUpdates());
-					phiAuditService.auditUpdate(actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
-					phiAuditService.auditUpdate(actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "AcceptedDetail", caseId, before.getAcceptedDetail(), updated.getAcceptedDetail());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "DeniedDetail", caseId, before.getDeniedDetail(), updated.getDeniedDetail());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "ReceivedUpdates", caseId, before.getReceivedUpdates(), updated.getReceivedUpdates());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
+					CaseDetailsTimelineWriter.appendChanges(con, caseId, shaleClientId, actorUserId, before, updated);
 				}
+				con.commit();
 				return updated;
+			}
+			} catch (SQLException | RuntimeException e) {
+				con.rollback();
+				throw e;
+			} finally {
+				con.setAutoCommit(true);
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update non-migrated case details (caseId=" + caseId + ")", e);

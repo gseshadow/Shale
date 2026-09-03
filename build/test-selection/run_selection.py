@@ -16,13 +16,6 @@ from typing import Iterable, Sequence
 WINDOWS_SAFE_COMMAND_LENGTH = 7000
 MAVEN_VALUE_OPTIONS = {"-pl", "--projects", "-f", "--file", "-s", "--settings",
                        "-gs", "--global-settings", "-t", "--toolchains", "-T", "--threads"}
-CASE_TIMELINE_TESTS = {
-    "com.shale.data.dao.CaseLifecycleAuditContractTest",
-    "com.shale.data.dao.CaseTimelineCoverageContractTest",
-    "com.shale.data.dao.CaseTimelineWriterTest",
-    "com.shale.ui.controller.CaseDetailsTimelineCoverageTest",
-    "com.shale.ui.controller.CaseTimelineDescriptionTest",
-}
 
 
 def resolve_maven() -> str:
@@ -61,18 +54,6 @@ def affected_batches(plan: dict) -> list[list[str]]:
             raise ValueError("Each selected Maven batch must be an argument array.")
         validate_maven_args(batch)
 
-    if plan.get("focused_change_set") == "case-timeline":
-        selected = set(plan.get("test_patterns", []))
-        batch_tests = {
-            test_class
-            for batch in batches
-            for argument in batch
-            if argument.startswith("-Dtest=")
-            for test_class in argument.removeprefix("-Dtest=").split(",")
-        }
-        if (selected != CASE_TIMELINE_TESTS or batch_tests != CASE_TIMELINE_TESTS
-                or len(plan.get("test_patterns", [])) != len(CASE_TIMELINE_TESTS)):
-            raise ValueError("Case Timeline affected selection must contain exactly its five justified tests.")
     return batches
 
 
