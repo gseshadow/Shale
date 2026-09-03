@@ -12,6 +12,11 @@ This document is the authoritative entry point for project knowledge.
 
 ---
 
+
+## GitHub automation policy
+
+Automated testing in GitHub Actions is disabled by explicit project-owner decision. GitHub workflows must not run Maven tests, Python selector tests, static FXML/CSS validators, JavaFX visual tests, critical or affected suites, full suites, or test-report collection. Compilation and relevant test execution are local developer/Codex responsibilities. Releases and pull requests are not blocked by GitHub test workflows. `mvn test`, focused Maven commands, `mvn -Pall-tests test`, `mvn -Pui-visual test`, and `build/test-selection/` remain optional local tools where relevant. Do not replace the removed workflows with a no-op or external test gate.
+
 ## Required Workflow
 
 Before making changes:
@@ -53,8 +58,8 @@ Before making changes:
 1. Review `git diff --name-only` and map each changed production file to its affected tests.
 2. Search again for old field lists, constructors, method names, SQL fragments, and obsolete expectations.
 3. Inspect the production and test diff, then run `python build/test-selection/select_tests.py --base <base> --head HEAD`.
-4. Run directly modified tests first, then the selector's affected-area suite, then the critical default with `mvn test`.
-5. Request or run `mvn -Pall-tests test` only when the selector recommends it informationally for a cross-cutting/unknown change or the user explicitly requests it. Its result never replaces or fails the required focused gate.
+4. Run directly modified tests first, then the selector's affected-area suite, then the local critical default with `mvn test`.
+5. Request or run `mvn -Pall-tests test` only when the selector recommends it informationally for a cross-cutting/unknown change or the user explicitly requests it. Its result never replaces the relevant focused local checks.
 6. Add or update tests only in affected areas. Never enable every historical test merely because tests are implementation work.
 7. Explain why every selected test area is relevant to the changed production or test contract.
 
@@ -85,7 +90,7 @@ Before making changes:
 ### Unverified runtime changes
 
 1. If Codex cannot execute the focused test because of Maven, network, dependency, JavaFX, or environment failure, it must not claim the task is complete.
-2. When runtime verification is unavailable, avoid inventing new rendered-geometry calculations. Keep unverified changes minimal and explicitly identify the exact command a developer or CI must run.
+2. When runtime verification is unavailable, avoid inventing new rendered-geometry calculations. Keep unverified changes minimal and explicitly identify the exact local command a developer must run.
 3. A compile error introduced during test refactoring is unacceptable. Perform every available static check and inspect all references before handing off an unverified change.
 
 ### Required verification sequence
@@ -94,7 +99,7 @@ For a behavioral change:
 
 1. Run focused affected tests.
 2. Run the repository selector's affected-area module and dependency suite.
-3. Run the release-blocking critical reactor with `mvn test`.
+3. Run the local critical reactor with `mvn test`.
 4. Run `mvn -Pall-tests test` only as non-blocking information for selector escalation/cross-cutting changes, or on explicit user direction.
 5. Do not treat the release script as the first validation of the critical suite.
 
@@ -105,9 +110,9 @@ mvn -pl <module> -am -Dtest=<TestClass> \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-### Release-blocking test quality
+### Local test quality
 
-Every release-blocking test must:
+Every test treated as a local completion requirement must:
 
 1. State the user-visible, business, security, data-integrity, or architectural regression it prevents.
 2. Be deterministic in its supported environment.

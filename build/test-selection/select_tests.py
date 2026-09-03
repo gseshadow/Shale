@@ -113,8 +113,7 @@ def changed_paths(base: str, head: str) -> list[str]:
 
 
 def selector_tests_required(paths: list[str], base: str | None = None, head: str = "HEAD") -> bool:
-    if any(path.startswith("build/test-selection/")
-           or path == ".github/workflows/maven-test-gate.yml" for path in paths):
+    if any(path.startswith("build/test-selection/") for path in paths):
         return True
     pom_paths = [path for path in paths if path == "pom.xml" or path.endswith("/pom.xml")]
     if not pom_paths or not base:
@@ -333,10 +332,10 @@ def markdown(result: dict) -> str:
     if result["ownership_advisory_command"]:
         lines.extend(["", "### Broader ownership coverage", "",
                       f"- `{result['ownership_advisory_command']}`",
-                      "- Complete area ownership is manual/advisory and is not part of the blocking PR selection."])
+                      "- Complete area ownership is optional local/advisory coverage."])
     if result["escalation_reasons"]:
         lines.extend(["", "### Informational full-suite escalation", "", f"- `{result['informational_command']}`",
-                      "- This historical-suite result is non-blocking and does not replace the focused gate.",
+                      "- This historical-suite result is optional and does not replace focused local checks.",
                       "", "### Escalation reasons"])
         lines.extend(f"- {reason}" for reason in result["escalation_reasons"])
     lines.extend(["", "### Skipped areas"])
@@ -367,7 +366,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
     parser.add_argument("--output", type=Path, help="Also write the selected format to this file")
     parser.add_argument("--plan-output", type=Path, help="Write the authoritative JSON execution plan")
-    parser.add_argument("--github-output", type=Path, help="Write CI step outputs")
     parser.add_argument("--run", action="store_true", help="Execute the emitted commands in order")
     args = parser.parse_args(argv)
 
@@ -390,17 +388,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.plan_output:
         args.plan_output.parent.mkdir(parents=True, exist_ok=True)
         args.plan_output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-    if args.github_output:
-        with args.github_output.open("a", encoding="utf-8") as output:
-            output.write(f"full_suite={str(result['full_suite']).lower()}\n")
-            output.write(f"selected_command={result['selected_command']}\n")
-            output.write(f"selected_maven_args={json.dumps(result['selected_maven_args'])}\n")
-            output.write(f"selected_maven_batches={json.dumps(result['selected_maven_batches'])}\n")
-            output.write(f"informational_command={result['informational_command']}\n")
-            output.write(f"informational_maven_args={json.dumps(result['informational_maven_args'])}\n")
-            output.write(f"python_commands={json.dumps(result['python_commands'])}\n")
-            output.write(f"python_command_args={json.dumps(result['python_command_args'])}\n")
-            output.write(f"selector_tests_required={str(result['selector_tests_required']).lower()}\n")
     if result["selection_error"]:
         print(f"Selector policy error: {result['selection_error']}", file=sys.stderr)
         return 2
