@@ -198,6 +198,8 @@ public interface CaseServicePort {
 	default void removeCaseTeamMember(CaseTeamMemberLifecycleCommand command) { throw unsupportedCaseLinkOperation("removeCaseTeamMember"); }
 	default void assignCaseTeamMemberRole(CaseTeamMemberRoleCommand command) { throw unsupportedCaseLinkOperation("assignCaseTeamMemberRole"); }
 	default void removeCaseTeamMemberRole(CaseTeamMemberRoleLifecycleCommand command) { throw unsupportedCaseLinkOperation("removeCaseTeamMemberRole"); }
+	/** Reconciles the complete staged team in one actor-aware database transaction. */
+	default List<CaseTeamMembershipDto> updateCaseTeam(CaseTeamUpdateCommand command) { throw unsupportedCaseLinkOperation("updateCaseTeam"); }
 
 	record CaseTeamMemberCommand(int tenantId, int actorUserId, long caseId, int userId) {}
 	record CaseTeamMemberLifecycleCommand(int tenantId, int actorUserId, long caseId, long membershipId, byte[] rowVer) {
@@ -206,6 +208,13 @@ public interface CaseServicePort {
 	record CaseTeamMemberRoleCommand(int tenantId, int actorUserId, long caseId, long membershipId, int roleDefinitionId) {}
 	record CaseTeamMemberRoleLifecycleCommand(int tenantId, int actorUserId, long caseId, long membershipId, long assignmentId, byte[] rowVer) {
 		public CaseTeamMemberRoleLifecycleCommand { rowVer=copyRowVer(rowVer); } @Override public byte[] rowVer(){return copyRowVer(rowVer);}
+	}
+	record CaseTeamUpdateMember(long membershipId, int userId, byte[] membershipRowVer, List<Integer> roleDefinitionIds) {
+		public CaseTeamUpdateMember { membershipRowVer=copyRowVer(membershipRowVer); roleDefinitionIds=roleDefinitionIds==null?List.of():List.copyOf(roleDefinitionIds); }
+		@Override public byte[] membershipRowVer(){return copyRowVer(membershipRowVer);}
+	}
+	record CaseTeamUpdateCommand(int tenantId, int actorUserId, long caseId, List<CaseTeamUpdateMember> members) {
+		public CaseTeamUpdateCommand { members=members==null?List.of():List.copyOf(members); }
 	}
 
 	record CaseTeamRoleCommand(Integer id, int tenantId, int actorUserId, String name, String description, String color, int sortOrder, boolean active, byte[] rowVer) {
