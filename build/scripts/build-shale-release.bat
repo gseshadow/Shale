@@ -35,7 +35,13 @@ if exist "%ROOT%\dist-updater\ShaleUpdater" rmdir /s /q "%ROOT%\dist-updater\Sha
 echo Dist cleanup complete.
 echo.
 
-call mvn -f "%ROOT%\pom.xml" -pl shale-desktop,shale-updater -am clean package || goto :fail
+pushd "%ROOT%" || goto :fail
+call mvn -f "%ROOT%\pom.xml" -pl shale-desktop,shale-updater -am clean package
+if errorlevel 1 (
+    popd
+    goto :fail
+)
+popd
 
 if not exist "%DESKTOP_JAR%" goto :missing_desktop_jar
 if not exist "%UPDATER_JAR%" goto :missing_updater_jar
