@@ -220,6 +220,12 @@ public final class ContactServiceAdapter implements ContactServicePort {
 				.orElseThrow(()->new IllegalStateException("Updated Contact profile could not be reloaded."));
 		return new ContactProfileMutationResult(profile,profile.contactUpdatedAt());
 	}
+	@Override public ContactProfileMutationResult createContactProfile(CreateContactProfileCommand c) {
+		int contactId=contactGateway.createContactProfile(c);
+		ClassificationProfile profile=getClassificationProfile(contactId,c.shaleClientId())
+				.orElseThrow(()->new IllegalStateException("Created Contact profile could not be reloaded."));
+		return new ContactProfileMutationResult(profile,profile.contactUpdatedAt());
+	}
 
 	interface ContactGateway {
 		List<ContactDao.DirectoryContactRow> searchContacts(int shaleClientId, String query);
@@ -253,6 +259,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		default AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand c){ throw new UnsupportedOperationException(); }
 		default List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand c){ throw new UnsupportedOperationException(); }
 		void updateContactProfile(UpdateContactProfileCommand c);
+		default int createContactProfile(CreateContactProfileCommand c) { throw new UnsupportedOperationException("Complete Contact creation is not supported by this gateway."); }
 	}
 
 	private record DaoContactGateway(ContactDao contactDao) implements ContactGateway {
@@ -318,5 +325,6 @@ public final class ContactServiceAdapter implements ContactServicePort {
 		@Override public AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand c){return contactDao.restoreClassification(c);}
 		@Override public List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand c){return contactDao.reorderCredentials(c);}
 		@Override public void updateContactProfile(UpdateContactProfileCommand c){contactDao.updateContactProfile(c);}
+		@Override public int createContactProfile(CreateContactProfileCommand c){return contactDao.createContactProfile(c);}
 	}
 }

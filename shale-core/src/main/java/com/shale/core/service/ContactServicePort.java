@@ -62,6 +62,8 @@ public interface ContactServicePort {
 
 	ContactProfileMutationResult updateContactProfile(UpdateContactProfileCommand command);
 
+	ContactProfileMutationResult createContactProfile(CreateContactProfileCommand command);
+
 	record ContactSummary(int id, String displayName, String email, String phone) {
 	}
 
@@ -287,6 +289,23 @@ public interface ContactServicePort {
 			addresses = addresses == null ? List.of() : List.copyOf(addresses);
 		}
 
+	}
+
+	record CreateContactProfileCommand(int shaleClientId, int actorUserId,
+			String displayName, StructuredName structuredName, java.time.LocalDate dateOfBirth,
+			String condition, String notes, boolean deceased,
+			List<IntendedAssignment> contactTypes, List<IntendedAssignment> specialties,
+			List<IntendedAssignment> credentials, List<IntendedPhoneNumber> phoneNumbers,
+			List<IntendedEmailAddress> emailAddresses, List<IntendedAddress> addresses) {
+		public CreateContactProfileCommand {
+			structuredName = java.util.Objects.requireNonNull(structuredName, "structuredName");
+			contactTypes = contactTypes == null ? List.of() : List.copyOf(contactTypes);
+			specialties = specialties == null ? List.of() : List.copyOf(specialties);
+			credentials = credentials == null ? List.of() : List.copyOf(credentials);
+			phoneNumbers = phoneNumbers == null ? List.of() : List.copyOf(phoneNumbers);
+			emailAddresses = emailAddresses == null ? List.of() : List.copyOf(emailAddresses);
+			addresses = addresses == null ? List.of() : List.copyOf(addresses);
+		}
 	}
 
 	record IntendedPhoneNumber(Long id, byte[] expectedRowVer, String kind, String displayNumber,

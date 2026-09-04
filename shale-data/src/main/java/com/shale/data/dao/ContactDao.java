@@ -1679,5 +1679,6 @@ public final class ContactDao {
     public com.shale.core.service.ContactServicePort.AssignmentMutationResult restoreClassification(com.shale.core.service.ContactServicePort.AssignmentLifecycleCommand c){return mutationDao.lifecycle(c,true);}
     public java.util.List<com.shale.core.service.ContactServicePort.AssignmentMutationResult> reorderCredentials(com.shale.core.service.ContactServicePort.ReorderCredentialsCommand c){return mutationDao.reorder(c);}
     public void updateContactProfile(com.shale.core.service.ContactServicePort.UpdateContactProfileCommand c){mutationDao.aggregate(c);}
+    public int createContactProfile(com.shale.core.service.ContactServicePort.CreateContactProfileCommand c){return mutationDao.createAggregate(c);}
 
 }

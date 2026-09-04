@@ -49,8 +49,21 @@ final class ContactMutationDao {
         for(int i=0;i<items.size();i++){var x=items.get(i);try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.ContactCredentials SET DisplayOrder=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND ContactId=? AND IsDeleted=0 AND RowVer=?")){ps.setInt(1,i);ps.setInt(2,c.actorUserId());ps.setLong(3,x.assignmentId());ps.setInt(4,c.shaleClientId());ps.setInt(5,c.contactId());ps.setBytes(6,x.expectedRowVer());stale(ps.executeUpdate());}out.add(assignmentResult(con,DefinitionCategory.CREDENTIAL,x.assignmentId()));}
         audit.append(con,EntityActionAuditEvent.now(c.shaleClientId(),c.actorUserId(),EntityActionAuditEvent.EntityType.CONTACT_CREDENTIAL,c.contactId(),EntityActionAuditEvent.Action.REORDERED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,c.contactId(),EntityActionAuditEvent.MetadataKey.ORDERING_COUNT,items.size())));return List.copyOf(out);});}
 
-    void aggregate(UpdateContactProfileCommand c){Objects.requireNonNull(c,"command");tx(c.shaleClientId(),c.actorUserId(),false,con->{
-        validateContact(con,c.shaleClientId(),c.contactId());
+    void aggregate(UpdateContactProfileCommand c){Objects.requireNonNull(c,"command");tx(c.shaleClientId(),c.actorUserId(),false,con->{mutateAggregate(con,c,false);return null;});}
+
+    int createAggregate(CreateContactProfileCommand draft){Objects.requireNonNull(draft,"command");return tx(draft.shaleClientId(),draft.actorUserId(),false,con->{
+        validateProfileValues(draft.displayName(),draft.structuredName(),draft.dateOfBirth(),draft.notes());
+        String display=blank(draft.displayName())?java.util.stream.Stream.of(draft.structuredName().firstName(),draft.structuredName().lastName()).filter(v->!blank(v)).map(String::trim).collect(java.util.stream.Collectors.joining(" ")):draft.displayName();
+        int contactId;String sql="INSERT dbo.Contacts (ShaleClientId,Name,Prefix,FirstName,MiddleName,LastName,PreferredName,Suffix,DateOfBirth,Condition,Notes,IsDeceased,IsClient,IsDeleted,UpdatedAt) OUTPUT INSERTED.Id VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,0,NULL)";
+        try(PreparedStatement p=con.prepareStatement(sql)){int i=1;p.setInt(i++,draft.shaleClientId());setString(p,i++,display);setString(p,i++,draft.structuredName().prefix());setString(p,i++,draft.structuredName().firstName());setString(p,i++,draft.structuredName().middleName());setString(p,i++,draft.structuredName().lastName());setString(p,i++,draft.structuredName().preferredName());setString(p,i++,draft.structuredName().suffix());if(draft.dateOfBirth()==null)p.setNull(i++,Types.DATE);else p.setDate(i++,java.sql.Date.valueOf(draft.dateOfBirth()));setString(p,i++,draft.condition());p.setString(i++,normalizeNotes(draft.notes()));p.setBoolean(i,draft.deceased());try(ResultSet r=p.executeQuery()){if(!r.next())throw new IllegalStateException("Contact was not created.");contactId=r.getInt(1);}}
+        UpdateContactProfileCommand c=new UpdateContactProfileCommand(contactId,draft.shaleClientId(),draft.actorUserId(),display,draft.structuredName(),draft.dateOfBirth(),draft.condition(),draft.notes(),draft.deceased(),null,draft.contactTypes(),draft.specialties(),draft.credentials(),draft.phoneNumbers(),draft.emailAddresses(),draft.addresses());
+        phi.auditCreate(con,draft.actorUserId(),"Contacts","Condition",(long)contactId,draft.condition());
+        mutateAggregate(con,c,true);return contactId;
+    });}
+
+    private void mutateAggregate(Connection con,UpdateContactProfileCommand c,boolean creating)throws SQLException{
+
+        if(!creating)validateContact(con,c.shaleClientId(),c.contactId());
         validateName(c.displayName(),100,"Display Name");
         if(c.notes()!=null&&c.notes().length()>CONTACT_NOTES_MAX_CHARS)throw new IllegalArgumentException("Notes exceeds the supported database length.");
         validateName(c.structuredName().prefix(),50,"Prefix"); validateName(c.structuredName().firstName(),100,"First Name");
@@ -61,7 +74,7 @@ final class ContactMutationDao {
         prevalidateIntent(con,c,DefinitionCategory.CONTACT_TYPE,c.contactTypes());
         prevalidateIntent(con,c,DefinitionCategory.SPECIALTY,c.specialties());
         prevalidateIntent(con,c,DefinitionCategory.CREDENTIAL,c.credentials());
-		prevalidateContactUpdatedAt(con,c);
+		if(!creating)prevalidateContactUpdatedAt(con,c);
 		Map<Long,PointState> phones=inventory(con,"ContactPhoneNumbers",c);
 		Map<Long,PointState> emails=inventory(con,"ContactEmailAddresses",c);
 		Map<Long,PointState> addresses=inventory(con,"ContactAddresses",c);
@@ -72,15 +85,21 @@ final class ContactMutationDao {
         Set<Long> explicitlyRemoved=c.credentials().stream().filter(x->x.existing()&&!x.selected()).map(IntendedAssignment::assignmentId).collect(java.util.stream.Collectors.toSet());
         Set<Long> complete=new HashSet<>(requestedCredentialIds);complete.addAll(explicitlyRemoved);
         if(!complete.equals(existingCredentialIds))throw new IllegalArgumentException("Credential intent must contain the complete active assignment set.");
-        updateStructuredContact(con,c);
+        if(!creating)updateStructuredContact(con,c);
         applyIntent(con,c,DefinitionCategory.CONTACT_TYPE,c.contactTypes());
         applyIntent(con,c,DefinitionCategory.SPECIALTY,c.specialties());
         applyIntent(con,c,DefinitionCategory.CREDENTIAL,c.credentials());
         int order=0;for(var x:ordered){long id=x.existing()?x.assignmentId():activeAssignmentId(con,DefinitionCategory.CREDENTIAL,c.shaleClientId(),c.contactId(),x.definitionId());byte[] rv=x.existing()?x.expectedRowVer():assignmentResult(con,DefinitionCategory.CREDENTIAL,id).rowVer();try(PreparedStatement p=con.prepareStatement("UPDATE dbo.ContactCredentials SET DisplayOrder=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND ContactId=? AND IsDeleted=0 AND RowVer=?")){p.setInt(1,order++);p.setInt(2,c.actorUserId());p.setLong(3,id);p.setInt(4,c.shaleClientId());p.setInt(5,c.contactId());p.setBytes(6,rv);stale(p.executeUpdate());}}
         audit.append(con,EntityActionAuditEvent.now(c.shaleClientId(),c.actorUserId(),EntityActionAuditEvent.EntityType.CONTACT_CREDENTIAL,c.contactId(),EntityActionAuditEvent.Action.REORDERED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,c.contactId(),EntityActionAuditEvent.MetadataKey.ORDERING_COUNT,ordered.size())));
 		applyPhones(con,c,phones); applyEmails(con,c,emails); applyAddresses(con,c,addresses);
-        audit.append(con,EntityActionAuditEvent.now(c.shaleClientId(),c.actorUserId(),EntityActionAuditEvent.EntityType.CONTACT,c.contactId(),EntityActionAuditEvent.Action.UPDATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,c.contactId(),EntityActionAuditEvent.MetadataKey.ORDERING_COUNT,ordered.size())));
-        return null;});}
+        audit.append(con,EntityActionAuditEvent.now(c.shaleClientId(),c.actorUserId(),EntityActionAuditEvent.EntityType.CONTACT,c.contactId(),creating?EntityActionAuditEvent.Action.CREATED:EntityActionAuditEvent.Action.UPDATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,c.contactId(),EntityActionAuditEvent.MetadataKey.ORDERING_COUNT,ordered.size())));
+    }
+
+    private static void validateProfileValues(String displayName,StructuredName name,java.time.LocalDate birth,String notes){
+        validateName(displayName,100,"Display Name");if(notes!=null&&notes.length()>CONTACT_NOTES_MAX_CHARS)throw new IllegalArgumentException("Notes exceeds the supported database length.");
+        validateName(name.prefix(),50,"Prefix");validateName(name.firstName(),100,"First Name");validateName(name.middleName(),100,"Middle Name");validateName(name.lastName(),100,"Last Name");validateName(name.preferredName(),100,"Preferred Name");validateName(name.suffix(),50,"Suffix");
+        if(birth!=null&&birth.isAfter(java.time.LocalDate.now()))throw new IllegalArgumentException("Date of Birth cannot be in the future.");if(blank(displayName)&&blank(name.firstName())&&blank(name.lastName()))throw new IllegalArgumentException("Display Name, First Name, or Last Name is required.");
+    }
 
 	private record PointState(boolean deleted,byte[] rowVer){}
 	private static void prevalidateContactUpdatedAt(Connection con,UpdateContactProfileCommand c)throws SQLException{try(var p=con.prepareStatement("SELECT UpdatedAt FROM dbo.Contacts WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){p.setInt(1,c.contactId());p.setInt(2,c.shaleClientId());try(var r=p.executeQuery()){if(!r.next())throw new IllegalArgumentException("Contact is unavailable.");Timestamp t=r.getTimestamp(1);Instant actual=t==null?null:t.toInstant();if(!Objects.equals(actual,c.expectedContactUpdatedAt()))throw new IllegalStateException("The Contact changed; reload before saving.");}}}
