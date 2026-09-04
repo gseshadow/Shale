@@ -952,10 +952,7 @@
 			<Label text="Updates"
 				style="-fx-font-size: 15px; -fx-font-weight: bold;" />
 
-			<TextArea fx:id="caseUpdatesComposerArea"
-				promptText="Add a case update..." wrapText="true" prefRowCount="4" />
-
-			<Button fx:id="submitCaseUpdateButton" text="Submit"
+			<Button fx:id="submitCaseUpdateButton" text="Add Case Update"
 				maxWidth="Infinity">
 				<styleClass>
 					<String fx:value="app-toolbar-button" />
