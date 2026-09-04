@@ -4093,11 +4093,25 @@ public final class CaseDao {
 								rs.getString("EntityType"),
 								displayName,
 								rs.getString("Email"),
-								rs.getString("Phone")
-						));
+								rs.getString("Phone"),
+								splitCredentialAbbreviations(rs.getString("CredentialAbbreviations")),
+								List.of()
+					));
 					}
 				}
-				return out;
+				List<Integer> contactIds = out.stream().map(CasePartyDto::getContactId).filter(Objects::nonNull)
+						.map(Long::intValue).distinct().toList();
+				Map<Integer, List<ContactDao.ClassificationPresentationRow>> classifications =
+						ContactDao.loadCardClassifications(con, shaleClientId, contactIds);
+				return out.stream().map(row -> new CasePartyDto(row.getId(), row.getCaseId(), row.getContactId(),
+						row.getOrganizationId(), row.getPartyRoleId(), row.getPartyRoleName(), row.getPartyRoleSystemKey(),
+						row.getSide(), row.isPrimary(), row.getNotes(), row.getCreatedAt(), row.getUpdatedAt(),
+						row.getEntityType(), row.getDisplayName(), row.getEmail(), row.getPhone(),
+						row.getCredentialAbbreviations(), row.getContactId() == null ? List.of() : classifications
+								.getOrDefault(row.getContactId().intValue(), List.of()).stream()
+								.map(value -> new com.shale.core.service.ContactServicePort.ClassificationPresentation(
+										value.category(), value.definitionId(), value.label(), value.color(), value.displayOrder()))
+								.toList())).toList();
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list case parties (caseId=" + caseId + ")", e);

@@ -23,7 +23,7 @@ class ContactServiceAdapterTest {
 	@Test
 	void searchContactsDelegatesAndMapsRows() {
 		FakeContactGateway gateway = new FakeContactGateway(List.of(
-				new ContactDao.DirectoryContactRow(1, "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555")));
+				new ContactDao.DirectoryContactRow(1, "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555", List.of(), List.of())));
 		ContactServiceAdapter adapter = new ContactServiceAdapter(gateway);
 
 		List<ContactSummary> summaries = adapter.searchContacts(42, "ada", 10);
@@ -61,7 +61,7 @@ class ContactServiceAdapterTest {
 	@Test
 	void getContactDetailUsesFullContactShapeForApiDto() {
 		FakeContactGateway gateway = new FakeContactGateway(List.of(
-				new ContactDao.DirectoryContactRow(1, "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555")));
+				new ContactDao.DirectoryContactRow(1, "Ada", "Lovelace", "Ada Lovelace", "ada@example.com", "555", List.of(), List.of())));
 		ContactServiceAdapter adapter = new ContactServiceAdapter(gateway);
 
 		Optional<ContactDetail> detail = adapter.getContactDetail(1, 42);

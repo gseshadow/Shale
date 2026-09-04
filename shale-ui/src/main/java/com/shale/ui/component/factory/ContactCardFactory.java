@@ -22,7 +22,7 @@ public class ContactCardFactory {
             String phone,
             List<ClassificationPresentation> classifications
     ) {
-        public ContactCardModel { classifications=List.copyOf(classifications); }
+        public ContactCardModel { classifications=List.copyOf(Objects.requireNonNull(classifications, "classifications")); }
     }
 
     private final Consumer<Integer> onOpenContact;
@@ -53,7 +53,4 @@ public class ContactCardFactory {
         return card;
     }
 
-    public ContactCard createMini(Integer contactId, String displayName) {
-        return create(new ContactCardModel(contactId, displayName, null, null, null, List.of()), Variant.MINI);
-    }
 }

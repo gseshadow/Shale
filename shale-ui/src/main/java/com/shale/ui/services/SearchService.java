@@ -82,7 +82,7 @@ public final class SearchService {
 	private ContactDao.DirectoryContactRow credentialAware(ContactDao.DirectoryContactRow row) {
 		return new ContactDao.DirectoryContactRow(row.id(), row.firstName(), row.lastName(),
 				ContactNamePresentation.effectiveDisplayNameFromAbbreviations(row.displayName(), row.credentialAbbreviations()),
-				row.email(), row.phone(), row.credentialAbbreviations());
+				row.email(), row.phone(), row.credentialAbbreviations(), row.classifications());
 	}
 
 	private static <T> List<T> provider(String provider, List<ProviderFailure> failures, java.util.function.Supplier<List<T>> loader) {
