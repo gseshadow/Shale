@@ -36,7 +36,7 @@ import java.util.function.Supplier;
 public final class RequestedFromWorkflowDialog {
     public record Selection(String entityType, Long id, String label, boolean createNew, String contactFirstName, String contactLastName, String organizationName, Integer organizationTypeId, ContactCardFactory.ContactCardModel contactModel, OrganizationCardFactory.OrganizationCardModel organizationModel) {}
     private record EntityOption(String entityType, Long id, String label, String email, String phone, String organizationTypeName) {
-        ContactCardFactory.ContactCardModel contactModel() { return new ContactCardFactory.ContactCardModel(id == null ? null : id.intValue(), label, null, email, phone); }
+        ContactCardFactory.ContactCardModel contactModel() { return new ContactCardFactory.ContactCardModel(id == null ? null : id.intValue(), label, null, email, phone, java.util.List.of()); }
         OrganizationCardFactory.OrganizationCardModel organizationModel() { return new OrganizationCardFactory.OrganizationCardModel(id == null ? null : id.intValue(), label, null, organizationTypeName, null, null, null, null, null, null, null, null, null, null, null); }
     }
     public record DirectoryData(List<CaseDao.SelectableContactRow> contacts, List<CaseDao.SelectableOrganizationRow> organizations, List<OrganizationDao.OrganizationTypeRow> organizationTypes, List<CasePartyEntityOptionDto> caseParties) {
@@ -97,7 +97,7 @@ public final class RequestedFromWorkflowDialog {
         ContactCardFactory contactCards = new ContactCardFactory(id -> {});
         OrganizationCardFactory organizationCards = new OrganizationCardFactory(id -> {});
         results.setCellFactory(lv -> new ListCell<>() { @Override protected void updateItem(EntityOption item, boolean empty) { super.updateItem(item, empty); setText(null); if (empty || item == null) { setGraphic(null); return; } Node card = "contact".equals(item.entityType())
-                ? contactCards.create(new ContactCardFactory.ContactCardModel(item.id().intValue(), item.label(), null, item.email(), item.phone()), ContactCardFactory.Variant.MINI)
+                ? contactCards.create(new ContactCardFactory.ContactCardModel(item.id().intValue(), item.label(), null, item.email(), item.phone(), java.util.List.of()), ContactCardFactory.Variant.MINI)
                 : organizationCards.create(new OrganizationCardFactory.OrganizationCardModel(item.id().intValue(), item.label(), null, item.organizationTypeName(), null, null, null, null, null, null, null, null, null, null, null), OrganizationCardFactory.Variant.MINI); card.getStyleClass().add("requested-from-result-card"); setGraphic(card); getStyleClass().add("requested-from-result-cell"); }});
         TextField first = new TextField(); TextField last = new TextField(); TextField orgName = new TextField();
         ChoiceBox<OrganizationDao.OrganizationTypeRow> orgType = new ChoiceBox<>(); orgType.setConverter(new javafx.util.StringConverter<>() { public String toString(OrganizationDao.OrganizationTypeRow r){return r==null?"":safe(r.name());} public OrganizationDao.OrganizationTypeRow fromString(String s){return null;} });

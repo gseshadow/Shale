@@ -4,6 +4,9 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import com.shale.ui.component.ContactCard;
+import com.shale.ui.component.ContactClassificationChipGroup;
+import com.shale.core.service.ContactServicePort.ClassificationPresentation;
+import java.util.List;
 
 public class ContactCardFactory {
 
@@ -16,8 +19,10 @@ public class ContactCardFactory {
             String displayName,
             String role,
             String email,
-            String phone
+            String phone,
+            List<ClassificationPresentation> classifications
     ) {
+        public ContactCardModel { classifications=List.copyOf(classifications); }
     }
 
     private final Consumer<Integer> onOpenContact;
@@ -36,6 +41,7 @@ public class ContactCardFactory {
         card.setRole(model.role());
         card.setEmail(model.email());
         card.setPhone(model.phone());
+        card.setClassifications(model.classifications());
         card.setBackgroundCssColor(null);
 
         switch (variant) {
@@ -48,6 +54,6 @@ public class ContactCardFactory {
     }
 
     public ContactCard createMini(Integer contactId, String displayName) {
-        return create(new ContactCardModel(contactId, displayName, null, null, null), Variant.MINI);
+        return create(new ContactCardModel(contactId, displayName, null, null, null, List.of()), Variant.MINI);
     }
 }

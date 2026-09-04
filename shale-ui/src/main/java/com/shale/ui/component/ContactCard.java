@@ -1,6 +1,8 @@
 package com.shale.ui.component;
 
 import java.util.function.Consumer;
+import java.util.List;
+import com.shale.core.service.ContactServicePort.ClassificationPresentation;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -23,6 +25,7 @@ public class ContactCard extends HBox {
     private final Label roleLabel = new Label();
     private final Label emailLabel = new Label();
     private final Label phoneLabel = new Label();
+    private List<ClassificationPresentation> classifications=List.of();
 
     private Integer contactId;
     private Consumer<Integer> onOpen;
@@ -63,6 +66,7 @@ public class ContactCard extends HBox {
     public void setPhone(String phone) {
         phoneLabel.setText(normalizeOptional(phone));
     }
+    public void setClassifications(List<ClassificationPresentation> values){classifications=List.copyOf(values);}
 
     public void setBackgroundCssColor(String css) {
         backgroundCss = css;
@@ -149,7 +153,8 @@ public class ContactCard extends HBox {
         if (!(suppressPlaceholderLines && "—".equals(phoneLabel.getText()))) {
             text.getChildren().add(phoneLabel);
         }
-        getChildren().add(text);
+        VBox shell=new VBox(7,text,new ContactClassificationChipGroup(classifications,ContactClassificationChipGroup.Size.COMPACT));
+        getChildren().add(shell);
     }
 
     public void applyFull() {
@@ -177,7 +182,8 @@ public class ContactCard extends HBox {
         text.getChildren().add(emailLabel);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        getChildren().addAll(text, spacer, phoneLabel);
+        VBox details=new VBox(7,text,new ContactClassificationChipGroup(classifications,ContactClassificationChipGroup.Size.COMPACT));
+        getChildren().addAll(details, spacer, phoneLabel);
     }
 
     private void resetNameLabelVariantStyles() {

@@ -2806,6 +2806,8 @@
     -fx-padding: 4px 9px; -fx-border-width: 1px; -fx-font-weight: 700;
     -fx-text-fill: -shale-color-text-primary;
 }
+.contact-classification-chip-compact { -fx-padding: 2px 7px; -fx-font-size: 10px; }
+.contact-classification-chip-standard { -fx-padding: 4px 9px; -fx-font-size: 12px; }
 .dialog-pane.contact-editor-dialog > .content { -fx-padding: 0 18px 14px 18px; }
 .contact-editor-surface {
     -fx-background-color: -shale-color-dialog-surface;

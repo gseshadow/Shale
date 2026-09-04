@@ -53,7 +53,7 @@ public final class CaseLinkCardFactory {
     private Node create(CaseLinkDto link, Variant variant, Actions actions, Consumer<Integer> onOpenContact, boolean showManagementActions) {
         Objects.requireNonNull(link, "link");
         Objects.requireNonNull(variant, "variant");
-        Actions safeActions = actions == null ? new Actions(null, null, null, null) : actions;
+        Actions safeActions = actions == null ? new Actions(null, null, null, null, java.util.List.of()) : actions;
 
         VBox card = new VBox();
         card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-clickable", "case-link-card", "case-link-card-" + variant.name().toLowerCase());
@@ -188,7 +188,7 @@ public final class CaseLinkCardFactory {
         ContactCard card = factory.create(new ContactCardFactory.ContactCardModel(
                 share.contactId(),
                 blankTo(share.contactDisplayName(), "Contact #" + share.contactId()),
-                role, null, null), ContactCardFactory.Variant.MINI);
+                role, null, null, java.util.List.of()), ContactCardFactory.Variant.MINI);
         boolean navigable = onOpenContact != null && !share.contactUnavailable();
         card.setInteractive(navigable);
         if (!navigable) card.setMouseTransparent(true); // display-only fallback keeps cardNode.setMouseTransparent(true) behavior

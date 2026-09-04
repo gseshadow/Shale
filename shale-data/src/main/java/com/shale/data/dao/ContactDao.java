@@ -55,10 +55,14 @@ public final class ContactDao {
             String displayName,
             String email,
             String phone,
-            List<String> credentialAbbreviations
+            List<String> credentialAbbreviations,
+            List<ClassificationPresentationRow> classifications
     ) {
-        public ContactCardSummaryRow { credentialAbbreviations = List.copyOf(credentialAbbreviations); }
+        public ContactCardSummaryRow { credentialAbbreviations = List.copyOf(credentialAbbreviations); classifications=List.copyOf(classifications); }
     }
+
+    public record ClassificationPresentationRow(DefinitionCategory category, int definitionId, String label,
+            String color, int displayOrder) { }
 
     public record ContactDetailRow(
             int id,
@@ -453,13 +457,16 @@ public final class ContactDao {
             long enrichmentStarted = System.nanoTime();
             Map<Integer, List<String>> credentialsByContact = loadCredentialAbbreviations(con, shaleClientId,
                     selected.stream().map(PageRow::id).toList());
+            Map<Integer, List<ClassificationPresentationRow>> classificationsByContact = loadCardClassifications(
+                    con, shaleClientId, selected.stream().map(PageRow::id).toList());
             logPerf("contacts.directory.phase.credentialEnrichment", "tenantId=" + shaleClientId
                     + " contactIds=" + selected.size(), enrichmentStarted);
 
             long mappingStarted = System.nanoTime();
             List<ContactCardSummaryRow> out = selected.stream()
                     .map(row -> new ContactCardSummaryRow(row.id(), row.displayName(), row.email(), row.phone(),
-                            credentialsByContact.getOrDefault(row.id(), List.of())))
+                            credentialsByContact.getOrDefault(row.id(), List.of()),
+                            classificationsByContact.getOrDefault(row.id(), List.of())))
                     .toList();
             logPerf("contacts.directory.phase.resultMapping", "tenantId=" + shaleClientId + " rows=" + out.size(), mappingStarted);
             PagedResult<ContactCardSummaryRow> result = new PagedResult<>(List.copyOf(out), page, pageSize, total);
@@ -497,6 +504,44 @@ public final class ContactDao {
         }
         Map<Integer, List<String>> result = new LinkedHashMap<>();
         mutable.forEach((id, values) -> result.put(id, List.copyOf(values)));
+        return Map.copyOf(result);
+    }
+
+    /** One bounded enrichment query for every classification assigned to the selected page. */
+    private static Map<Integer, List<ClassificationPresentationRow>> loadCardClassifications(Connection con,
+            int shaleClientId, List<Integer> contactIds) throws SQLException {
+        if (contactIds.isEmpty()) return Map.of();
+        String placeholders = String.join(",", java.util.Collections.nCopies(contactIds.size(), "?"));
+        String sql = """
+                SELECT x.ContactId,x.Category,x.DefinitionId,x.Label,x.Color,x.DisplayOrder FROM (
+                  SELECT a.ContactId,0 Category,d.Id DefinitionId,d.Name Label,d.Color,d.SortOrder DisplayOrder,a.Id AssignmentId
+                  FROM dbo.ContactContactTypes a JOIN dbo.ContactTypes d ON d.Id=a.ContactTypeId
+                    AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)
+                  WHERE a.ShaleClientId=? AND a.IsDeleted=0 AND a.ContactId IN (%s)
+                  UNION ALL
+                  SELECT a.ContactId,1,d.Id,d.Name,d.Color,d.SortOrder,a.Id
+                  FROM dbo.ContactSpecialties a JOIN dbo.Specialties d ON d.Id=a.SpecialtyId
+                    AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)
+                  WHERE a.ShaleClientId=? AND a.IsDeleted=0 AND a.ContactId IN (%s)
+                  UNION ALL
+                  SELECT a.ContactId,2,d.Id,COALESCE(NULLIF(LTRIM(RTRIM(d.Abbreviation)),N''),d.Name),d.Color,a.DisplayOrder,a.Id
+                  FROM dbo.ContactCredentials a JOIN dbo.CredentialDefinitions d ON d.Id=a.CredentialDefinitionId
+                    AND (d.ShaleClientId=a.ShaleClientId OR d.ShaleClientId IS NULL)
+                  WHERE a.ShaleClientId=? AND a.IsDeleted=0 AND a.ContactId IN (%s)
+                ) x ORDER BY x.ContactId,x.Category,x.DisplayOrder,x.DefinitionId,x.AssignmentId
+                """.formatted(placeholders, placeholders, placeholders);
+        Map<Integer,List<ClassificationPresentationRow>> mutable=new LinkedHashMap<>();
+        try (PreparedStatement ps=con.prepareStatement(sql)) {
+            int index=1;
+            for(int category=0;category<3;category++) { ps.setInt(index++,shaleClientId); for(Integer id:contactIds)ps.setInt(index++,id); }
+            try(ResultSet rs=ps.executeQuery()) { while(rs.next()) {
+                DefinitionCategory category=switch(rs.getInt("Category")){case 0->DefinitionCategory.CONTACT_TYPE;case 1->DefinitionCategory.SPECIALTY;default->DefinitionCategory.CREDENTIAL;};
+                mutable.computeIfAbsent(rs.getInt("ContactId"),ignored->new ArrayList<>()).add(new ClassificationPresentationRow(
+                        category,rs.getInt("DefinitionId"),rs.getString("Label"),rs.getString("Color"),rs.getInt("DisplayOrder")));
+            }}
+        }
+        Map<Integer,List<ClassificationPresentationRow>> result=new LinkedHashMap<>();
+        mutable.forEach((id,values)->result.put(id,List.copyOf(values)));
         return Map.copyOf(result);
     }
 

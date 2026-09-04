@@ -66,11 +66,16 @@ public interface ContactServicePort {
 	}
 
 	record ContactCardSummary(int id, String displayName, String email, String phone,
-			List<String> credentialAbbreviations) {
+			List<String> credentialAbbreviations, List<ClassificationPresentation> classifications) {
 		public ContactCardSummary {
 			credentialAbbreviations = List.copyOf(credentialAbbreviations);
+			classifications = List.copyOf(classifications);
 		}
 	}
+
+	/** Ordered, authoritative presentation data shared by Contact surfaces. */
+	record ClassificationPresentation(DefinitionCategory category, int definitionId, String label,
+			String color, int displayOrder) { }
 
 	record DirectoryPage(List<ContactCardSummary> items, int page, int pageSize, long total) {
 		public DirectoryPage { items = List.copyOf(items); }
