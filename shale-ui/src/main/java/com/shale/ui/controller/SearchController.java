@@ -20,6 +20,7 @@ import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.services.CaseDetailService;
+import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.services.SearchService;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
@@ -96,14 +97,19 @@ public final class SearchController {
 	private UserCardFactory userCardFactory;
 	private TaskCardFactory taskCardFactory;
 	private final CalendarEventCardFactory calendarEventCardFactory = new CalendarEventCardFactory();
-	private Consumer<Long> onOpenTask = id -> {};
-	private Consumer<Long> onOpenCalendarEvent = id -> {};
+	private Consumer<Long> onOpenTask = id ->
+	{
+	};
+	private Consumer<Long> onOpenCalendarEvent = id ->
+	{
+	};
 	private int loadGeneration = 0;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
 	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> liveContactUpdatedHandler;
 	private boolean liveSubscribed;
 
-	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
+	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r ->
+	{
 		Thread t = new Thread(r, "global-search-loader");
 		t.setDaemon(true);
 		return t;
@@ -125,17 +131,31 @@ public final class SearchController {
 		this.caseDetailService = caseDetailService;
 		this.runtimeBridge = runtimeBridge;
 		this.query = query == null ? "" : query.trim();
-		this.caseCardFactory = new CaseCardFactory(onOpenCase == null ? id -> {
+		this.caseCardFactory = new CaseCardFactory(onOpenCase == null ? id ->
+		{
 		} : onOpenCase);
-		this.contactCardFactory = new ContactCardFactory(onOpenContact == null ? id -> {
+		this.contactCardFactory = new ContactCardFactory(onOpenContact == null ? id ->
+		{
 		} : onOpenContact);
-		this.organizationCardFactory = new OrganizationCardFactory(onOpenOrganization == null ? id -> {
+		this.organizationCardFactory = new OrganizationCardFactory(onOpenOrganization == null ? id ->
+		{
 		} : onOpenOrganization);
-		this.userCardFactory = new UserCardFactory(onOpenUser == null ? id -> {
+		this.userCardFactory = new UserCardFactory(onOpenUser == null ? id ->
+		{
 		} : onOpenUser);
-		this.onOpenTask = onOpenTask == null ? id -> { } : onOpenTask;
-		this.onOpenCalendarEvent = onOpenCalendarEvent == null ? id -> { } : onOpenCalendarEvent;
-		this.taskCardFactory = new TaskCardFactory(this.onOpenTask, id -> { }, onOpenCase == null ? id -> { } : onOpenCase, id -> { });
+		this.onOpenTask = onOpenTask == null ? id ->
+		{
+		} : onOpenTask;
+		this.onOpenCalendarEvent = onOpenCalendarEvent == null ? id ->
+		{
+		} : onOpenCalendarEvent;
+		this.taskCardFactory = new TaskCardFactory(this.onOpenTask, id ->
+		{
+		}, onOpenCase == null ? id ->
+		{
+		} : onOpenCase, id ->
+		{
+		});
 	}
 
 	@FXML
@@ -149,7 +169,8 @@ public final class SearchController {
 		configureFlow(calendarEventsFlow, 16, 16, 1040);
 		Platform.runLater(this::loadResults);
 		if (casesFlow != null) {
-			casesFlow.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			casesFlow.sceneProperty().addListener((obs, oldScene, newScene) ->
+			{
 				if (newScene == null) {
 					unsubscribeLiveCaseUpdates();
 				} else {
@@ -164,7 +185,8 @@ public final class SearchController {
 		if (runtimeBridge == null || liveSubscribed) {
 			return;
 		}
-		liveCaseUpdatedHandler = event -> {
+		liveCaseUpdatedHandler = event ->
+		{
 			String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
 			if (!mine.isBlank() && mine.equals(event.clientInstanceId())) {
 				return;
@@ -172,9 +194,11 @@ public final class SearchController {
 			Platform.runLater(this::loadResults);
 		};
 		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
-		liveContactUpdatedHandler = event -> {
+		liveContactUpdatedHandler = event ->
+		{
 			if (event != null && LiveUpdateEvents.ENTITY_CONTACT.equals(event.entityType()) && appState != null
-					&& java.util.Objects.equals(appState.getShaleClientId(), event.shaleClientId())) Platform.runLater(this::loadResults);
+					&& java.util.Objects.equals(appState.getShaleClientId(), event.shaleClientId()))
+				Platform.runLater(this::loadResults);
 		};
 		runtimeBridge.subscribeEntityUpdated(liveContactUpdatedHandler);
 		liveSubscribed = true;
@@ -185,7 +209,8 @@ public final class SearchController {
 			return;
 		}
 		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
-		if (liveContactUpdatedHandler != null) runtimeBridge.unsubscribeEntityUpdated(liveContactUpdatedHandler);
+		if (liveContactUpdatedHandler != null)
+			runtimeBridge.unsubscribeEntityUpdated(liveContactUpdatedHandler);
 		liveSubscribed = false;
 	}
 
@@ -215,10 +240,12 @@ public final class SearchController {
 		}
 
 		updateLoadingState(true);
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				SearchService.SearchResults results = searchService.searchAll(tenantId, userId, trimmedQuery, canViewDeletedCasesInSearch());
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					if (!isCurrent(generationAtSubmit, tenantId, userId)) {
 						return;
 					}
@@ -226,7 +253,8 @@ public final class SearchController {
 					updateLoadingState(false);
 				});
 			} catch (RuntimeException ex) {
-				Platform.runLater(() -> {
+				Platform.runLater(() ->
+				{
 					if (!isCurrent(generationAtSubmit, tenantId, userId)) {
 						return;
 					}
@@ -336,7 +364,8 @@ public final class SearchController {
 			return;
 		}
 		List<Node> cards = contacts.stream()
-				.map(row -> {
+				.map(row ->
+				{
 					var card = contactCardFactory.create(toContactCardModel(row), ContactCardFactory.Variant.FULL);
 					card.setPrefWidth(CONTACT_CARD_WIDTH);
 					card.setMaxWidth(CONTACT_CARD_WIDTH);
@@ -349,9 +378,8 @@ public final class SearchController {
 
 	static ContactCardModel toContactCardModel(ContactDao.DirectoryContactRow row) {
 		return new ContactCardModel(row.id(), row.displayName(), null, row.email(), row.phone(),
-				row.classifications().stream().map(value ->
-						new com.shale.core.service.ContactServicePort.ClassificationPresentation(value.category(),
-								value.definitionId(), value.label(), value.color(), value.displayOrder())).toList());
+				row.classifications().stream().map(value -> new com.shale.core.service.ContactServicePort.ClassificationPresentation(value.category(),
+						value.definitionId(), value.label(), value.color(), value.displayOrder())).toList());
 	}
 
 	private void renderOrganizations(List<Organization> organizations) {
@@ -359,7 +387,8 @@ public final class SearchController {
 			return;
 		}
 		List<Node> cards = organizations.stream()
-				.map(organization -> {
+				.map(organization ->
+				{
 					var card = organizationCardFactory.create(organization, OrganizationCardFactory.Variant.FULL);
 					card.setPrefWidth(ORGANIZATION_CARD_WIDTH);
 					card.setMaxWidth(ORGANIZATION_CARD_WIDTH);
@@ -375,7 +404,8 @@ public final class SearchController {
 			return;
 		}
 		List<Node> cards = users.stream()
-				.map(row -> {
+				.map(row ->
+				{
 					var card = userCardFactory.create(new UserCardModel(
 							row.id(),
 							row.displayName(),
@@ -391,8 +421,10 @@ public final class SearchController {
 	}
 
 	private void renderTasks(List<TaskDao.GlobalSearchTaskRow> tasks) {
-		if (tasksFlow == null) return;
-		List<Node> cards = tasks.stream().map(row -> {
+		if (tasksFlow == null)
+			return;
+		List<Node> cards = tasks.stream().map(row ->
+		{
 			var assignedUsers = row.assignedUserId() == null
 					? List.<TaskCardFactory.AssignedUserModel>of()
 					: List.of(new TaskCardFactory.AssignedUserModel(row.assignedUserId(), row.assignedUserDisplayName(), null));
@@ -416,7 +448,8 @@ public final class SearchController {
 					row.dueAt(),
 					row.completedAt(),
 					assignedUsers), TaskCardFactory.Variant.FULL, true);
-			card.setPrefWidth(TASK_CARD_WIDTH); card.setMaxWidth(TASK_CARD_WIDTH);
+			card.setPrefWidth(TASK_CARD_WIDTH);
+			card.setMaxWidth(TASK_CARD_WIDTH);
 			return (Node) card;
 		}).toList();
 		tasksFlow.getChildren().setAll(cards);
@@ -424,8 +457,10 @@ public final class SearchController {
 	}
 
 	private void renderCalendarEvents(List<CalendarEventDao.GlobalSearchCalendarEventRow> events) {
-		if (calendarEventsFlow == null) return;
-		List<Node> cards = events.stream().map(row -> {
+		if (calendarEventsFlow == null)
+			return;
+		List<Node> cards = events.stream().map(row ->
+		{
 			CalendarFeedItem item = new CalendarFeedItem(
 					"EVENT:" + safe(row.calendarEventId()),
 					row.title(),
@@ -448,9 +483,11 @@ public final class SearchController {
 			Node eventCard = calendarEventCardFactory.create(item, java.time.LocalDate.now(), java.time.LocalDateTime.now());
 			VBox container = new VBox(4, eventCard);
 			container.getStyleClass().add("search-calendar-event-result");
-			if (!safe(row.location()).equals("—")) container.getChildren().add(new Label("Location: " + row.location()));
+			if (!safe(row.location()).equals("—"))
+				container.getChildren().add(new Label("Location: " + row.location()));
 			container.setOnMouseClicked(e -> onOpenCalendarEvent.accept(row.calendarEventId() == null ? 0L : row.calendarEventId().longValue()));
-			container.setPrefWidth(EVENT_CARD_WIDTH); container.setMaxWidth(EVENT_CARD_WIDTH);
+			container.setPrefWidth(EVENT_CARD_WIDTH);
+			container.setMaxWidth(EVENT_CARD_WIDTH);
 			return (Node) container;
 		}).toList();
 		calendarEventsFlow.getChildren().setAll(cards);
@@ -476,7 +513,8 @@ public final class SearchController {
 			return;
 		}
 		String caseName = row.summary().caseName() == null || row.summary().caseName().isBlank()
-				? "This case" : "\"" + row.summary().caseName() + "\"";
+				? "This case"
+				: "\"" + row.summary().caseName() + "\"";
 		boolean confirmed = AppDialogs.showConfirmation(
 				dialogOwner(),
 				"Restore Case",
@@ -490,11 +528,14 @@ public final class SearchController {
 		loadGeneration++;
 		final int restoreGeneration = loadGeneration;
 		final Integer userId = appState == null ? null : appState.getUserId();
-		dbExec.submit(() -> {
+		dbExec.submit(() ->
+		{
 			try {
 				boolean restored = caseDetailService.restoreCase(row.summary().caseId(), tenantId, row.rowVer());
-				Platform.runLater(() -> {
-					if (!isCurrent(restoreGeneration, tenantId, userId)) return;
+				Platform.runLater(() ->
+				{
+					if (!isCurrent(restoreGeneration, tenantId, userId))
+						return;
 					if (!restored) {
 						AppDialogs.showError(dialogOwner(), "Restore Case", "Case could not be restored.");
 						loadResults();
@@ -504,8 +545,10 @@ public final class SearchController {
 					loadResults();
 				});
 			} catch (RuntimeException ex) {
-				Platform.runLater(() -> {
-					if (!isCurrent(restoreGeneration, tenantId, userId)) return;
+				Platform.runLater(() ->
+				{
+					if (!isCurrent(restoreGeneration, tenantId, userId))
+						return;
 					AppDialogs.showError(dialogOwner(), "Restore Case", "Failed to restore case.");
 					loadResults();
 				});
