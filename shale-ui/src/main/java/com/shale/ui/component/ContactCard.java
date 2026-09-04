@@ -10,12 +10,10 @@ import javafx.scene.Cursor;
 import javafx.scene.input.KeyCode;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
-public class ContactCard extends HBox {
+public class ContactCard extends VBox {
 
     public enum Variant {
         FULL, COMPACT, MINI
@@ -36,6 +34,7 @@ public class ContactCard extends HBox {
 
     public ContactCard() {
         nameLabel.setId("contact-card-name-label");
+        phoneLabel.setId("contact-card-phone-label");
         buildUiMiniDefaults();
         wireEvents();
     }
@@ -133,7 +132,7 @@ public class ContactCard extends HBox {
         setPrefWidth(280);
         setMaxWidth(280);
         setPadding(new Insets(10, 12, 10, 12));
-        setSpacing(10);
+        setSpacing(7);
 
         resetNameLabelVariantStyles();
         nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
@@ -141,7 +140,8 @@ public class ContactCard extends HBox {
         emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
         phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
         emailLabel.setWrapText(true);
-        phoneLabel.setWrapText(true);
+        phoneLabel.setWrapText(false);
+        phoneLabel.setMinWidth(Region.USE_PREF_SIZE);
 
         VBox text = new VBox(4, nameLabel);
         if (roleLabel.isManaged()) {
@@ -150,11 +150,9 @@ public class ContactCard extends HBox {
         if (!(suppressPlaceholderLines && "—".equals(emailLabel.getText()))) {
             text.getChildren().add(emailLabel);
         }
-        if (!(suppressPlaceholderLines && "—".equals(phoneLabel.getText()))) {
-            text.getChildren().add(phoneLabel);
-        }
-        VBox shell=new VBox(7,text,new ContactClassificationChipGroup(classifications,ContactClassificationChipGroup.Size.COMPACT));
-        getChildren().add(shell);
+        if (!(suppressPlaceholderLines && "—".equals(phoneLabel.getText()))) text.getChildren().add(phoneLabel);
+        getChildren().addAll(text,
+                new ContactClassificationChipGroup(classifications,ContactClassificationChipGroup.Size.COMPACT));
     }
 
     public void applyFull() {
@@ -173,17 +171,17 @@ public class ContactCard extends HBox {
         emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.76);");
         phoneLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.82);");
         emailLabel.setWrapText(true);
-        phoneLabel.setWrapText(true);
+        phoneLabel.setWrapText(false);
+        phoneLabel.setMinWidth(Region.USE_PREF_SIZE);
 
         VBox text = new VBox(6, nameLabel);
         if (roleLabel.isManaged()) {
             text.getChildren().add(roleLabel);
         }
         text.getChildren().add(emailLabel);
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        VBox details=new VBox(7,text,new ContactClassificationChipGroup(classifications,ContactClassificationChipGroup.Size.COMPACT));
-        getChildren().addAll(details, spacer, phoneLabel);
+        text.getChildren().add(phoneLabel);
+        getChildren().addAll(text,
+                new ContactClassificationChipGroup(classifications,ContactClassificationChipGroup.Size.COMPACT));
     }
 
     private void resetNameLabelVariantStyles() {

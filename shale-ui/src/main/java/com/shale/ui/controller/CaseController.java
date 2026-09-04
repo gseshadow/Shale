@@ -3441,14 +3441,7 @@ public class CaseController {
 					: new ContactCardFactory(onOpenContact == null ? id ->
 					{
 					} : onOpenContact);
-			ContactCardFactory.ContactCardModel model = new ContactCardFactory.ContactCardModel(
-					party.getContactId().intValue(),
-					safeText(party.getDisplayName()),
-					null,
-					party.getEmail(),
-					party.getPhone(),
-					java.util.List.of()
-			);
+			ContactCardFactory.ContactCardModel model = toContactCardModel(party);
 			ContactCardFactory.Variant variant = ContactCardFactory.Variant.COMPACT;
 			ContactCard card = factory.create(model, variant);
 			card.setSuppressPlaceholderLines(true);
@@ -3462,6 +3455,11 @@ public class CaseController {
 		fallback.setStyle("-fx-font-weight: bold;");
 		fallback.setWrapText(true);
 		return fallback;
+	}
+
+	static ContactCardFactory.ContactCardModel toContactCardModel(CasePartyDto party) {
+		return new ContactCardFactory.ContactCardModel(party.getContactId().intValue(), safeText(party.getDisplayName()),
+				null, party.getEmail(), party.getPhone(), party.getClassifications());
 	}
 
 	private String formatOverviewPartyRelationshipMeta(String roleLabel, boolean primary) {
@@ -7029,7 +7027,7 @@ public class CaseController {
 			} : onOpenContact);
 		}
 
-		ovCallerHost.getChildren().setAll(contactCardFactory.createMini(contactId, safe(name)));
+		ovCallerHost.getChildren().setAll(contactCardFactory.create(overviewMiniModel(contactId, name), ContactCardFactory.Variant.MINI));
 	}
 
 	private void renderClientsMini(List<CaseOverviewDto.ContactSummary> clients) {
@@ -7048,12 +7046,13 @@ public class CaseController {
 						.filter(Objects::nonNull)
 						.toList();
 		if (safeClients.isEmpty()) {
-			ovClientHost.getChildren().setAll(contactCardFactory.createMini(null, "—"));
+			ovClientHost.getChildren().setAll(contactCardFactory.create(
+					new ContactCardFactory.ContactCardModel(null, "—", null, null, null, List.of()), ContactCardFactory.Variant.MINI));
 			return;
 		}
 		VBox list = new VBox(8);
 		for (CaseOverviewDto.ContactSummary client : safeClients) {
-			list.getChildren().add(contactCardFactory.createMini(client.contactId(), safe(client.displayName())));
+			list.getChildren().add(contactCardFactory.create(overviewMiniModel(client.contactId(), client.displayName()), ContactCardFactory.Variant.MINI));
 		}
 		ovClientHost.getChildren().setAll(list);
 	}
@@ -7069,7 +7068,16 @@ public class CaseController {
 			} : onOpenContact);
 		}
 
-		ovOpposingCounselHost.getChildren().setAll(contactCardFactory.createMini(contactId, safe(name)));
+		ovOpposingCounselHost.getChildren().setAll(contactCardFactory.create(overviewMiniModel(contactId, name), ContactCardFactory.Variant.MINI));
+	}
+
+	private ContactCardFactory.ContactCardModel overviewMiniModel(Integer contactId, String fallbackName) {
+		return caseParties.stream().filter(party -> party != null && party.getContactId() != null
+				&& Objects.equals(contactId == null ? null : contactId.longValue(), party.getContactId())).findFirst()
+				.map(party -> new ContactCardFactory.ContactCardModel(contactId, party.getDisplayName(), null,
+						party.getEmail(), party.getPhone(), party.getClassifications()))
+				.orElseGet(() -> new ContactCardFactory.ContactCardModel(contactId, safe(fallbackName), null,
+						null, null, List.of()));
 	}
 
 	private void renderDetailsFromCurrent() {
@@ -8616,6 +8624,10 @@ public class CaseController {
 			Integer tenantId = appState.getShaleClientId();
 			if (tenantId == null || event.shaleClientId() != tenantId) return;
 			String entityType = event.entityType();
+			if (LiveUpdateEvents.ENTITY_CONTACT.equals(entityType)) {
+				runOnFx(CaseController.this::reloadCurrentCaseForViewMode);
+				return;
+			}
 			if (LiveUpdateEvents.ENTITY_CASE_DATES.equals(entityType)) {
 				if (event.entityId() != caseId.longValue() || !rememberCaseDateEvent(event.eventId())) return;
 				if (runtimeBridge != null) {

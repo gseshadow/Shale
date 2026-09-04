@@ -40,13 +40,12 @@ public final class ContactDao {
             String displayName,
             String email,
             String phone,
-            List<String> credentialAbbreviations
+            List<String> credentialAbbreviations,
+            List<ClassificationPresentationRow> classifications
     ) {
         public DirectoryContactRow {
             credentialAbbreviations = credentialAbbreviations == null ? List.of() : List.copyOf(credentialAbbreviations);
-        }
-        public DirectoryContactRow(int id, String firstName, String lastName, String displayName, String email, String phone) {
-            this(id, firstName, lastName, displayName, email, phone, List.of());
+            classifications = List.copyOf(Objects.requireNonNull(classifications, "classifications"));
         }
     }
 
@@ -230,19 +229,19 @@ public final class ContactDao {
 
             try (PreparedStatement ps = con.prepareStatement(sql)) {
                 ps.setInt(1, shaleClientId);
+                List<DirectoryContactRow> selected = new ArrayList<>();
                 try (ResultSet rs = ps.executeQuery()) {
-                    List<DirectoryContactRow> out = new ArrayList<>();
                     while (rs.next()) {
-                        out.add(new DirectoryContactRow(
+                        selected.add(new DirectoryContactRow(
                                 rs.getInt("Id"),
                                 rs.getString("FirstName"),
                                 rs.getString("LastName"),
                                 rs.getString("DisplayName"),
                                 rs.getString("Email"),
-                                rs.getString("Phone"), splitCredentialAbbreviations(rs.getString("CredentialAbbreviations"))));
+                                rs.getString("Phone"), splitCredentialAbbreviations(rs.getString("CredentialAbbreviations")), List.of()));
                     }
-                    return out;
                 }
+                return withCardClassifications(con, shaleClientId, selected);
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to list contacts for tenant (clientId=" + shaleClientId + ")", e);
@@ -289,19 +288,19 @@ public final class ContactDao {
 
             try (PreparedStatement ps = con.prepareStatement(sql)) {
                 bindGlobalSearchQuery(ps, 1, shaleClientId, schema, query);
+                List<DirectoryContactRow> selected = new ArrayList<>();
                 try (ResultSet rs = ps.executeQuery()) {
-                    List<DirectoryContactRow> out = new ArrayList<>();
                     while (rs.next()) {
-                        out.add(new DirectoryContactRow(
+                        selected.add(new DirectoryContactRow(
                                 rs.getInt("Id"),
                                 rs.getString("FirstName"),
                                 rs.getString("LastName"),
                                 rs.getString("DisplayName"),
                                 rs.getString("Email"),
-                                rs.getString("Phone"), splitCredentialAbbreviations(rs.getString("CredentialAbbreviations"))));
+                                rs.getString("Phone"), splitCredentialAbbreviations(rs.getString("CredentialAbbreviations")), List.of()));
                     }
-                    return out;
                 }
+                return withCardClassifications(con, shaleClientId, selected);
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to search contacts for tenant (clientId=" + shaleClientId + ")", e);
@@ -351,21 +350,23 @@ public final class ContactDao {
             try (PreparedStatement ps = con.prepareStatement(sql)) {
                 ps.setInt(1, contactId);
                 ps.setInt(2, shaleClientId);
+                DirectoryContactRow row;
                 try (ResultSet rs = ps.executeQuery()) {
                     if (!rs.next()) {
                         logPerf("contacts.directory.detail.query", "contactId=" + contactId + " tenantId=" + shaleClientId + " found=false", started);
                         return null;
                     }
-                    DirectoryContactRow row = new DirectoryContactRow(
+                    row = new DirectoryContactRow(
                             rs.getInt("Id"),
                             rs.getString("FirstName"),
                             rs.getString("LastName"),
                             rs.getString("DisplayName"),
                             rs.getString("Email"),
-                            rs.getString("Phone"), splitCredentialAbbreviations(rs.getString("CredentialAbbreviations")));
-                    logPerf("contacts.directory.detail.query", "contactId=" + contactId + " tenantId=" + shaleClientId + " found=true", started);
-                    return row;
+                            rs.getString("Phone"), splitCredentialAbbreviations(rs.getString("CredentialAbbreviations")), List.of());
                 }
+                row = withCardClassifications(con, shaleClientId, List.of(row)).get(0);
+                logPerf("contacts.directory.detail.query", "contactId=" + contactId + " tenantId=" + shaleClientId + " found=true", started);
+                return row;
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to load directory contact by id (id=" + contactId + ")", e);
@@ -508,7 +509,7 @@ public final class ContactDao {
     }
 
     /** One bounded enrichment query for every classification assigned to the selected page. */
-    private static Map<Integer, List<ClassificationPresentationRow>> loadCardClassifications(Connection con,
+    static Map<Integer, List<ClassificationPresentationRow>> loadCardClassifications(Connection con,
             int shaleClientId, List<Integer> contactIds) throws SQLException {
         if (contactIds.isEmpty()) return Map.of();
         String placeholders = String.join(",", java.util.Collections.nCopies(contactIds.size(), "?"));
@@ -543,6 +544,15 @@ public final class ContactDao {
         Map<Integer,List<ClassificationPresentationRow>> result=new LinkedHashMap<>();
         mutable.forEach((id,values)->result.put(id,List.copyOf(values)));
         return Map.copyOf(result);
+    }
+
+    private static List<DirectoryContactRow> withCardClassifications(Connection con, int shaleClientId,
+            List<DirectoryContactRow> selected) throws SQLException {
+        Map<Integer, List<ClassificationPresentationRow>> classifications = loadCardClassifications(
+                con, shaleClientId, selected.stream().map(DirectoryContactRow::id).toList());
+        return selected.stream().map(row -> new DirectoryContactRow(row.id(), row.firstName(), row.lastName(),
+                row.displayName(), row.email(), row.phone(), row.credentialAbbreviations(),
+                classifications.getOrDefault(row.id(), List.of()))).toList();
     }
 
     public long countDirectoryContacts(int shaleClientId, String searchQuery) {

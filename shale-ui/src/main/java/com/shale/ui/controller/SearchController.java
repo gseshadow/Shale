@@ -100,6 +100,7 @@ public final class SearchController {
 	private Consumer<Long> onOpenCalendarEvent = id -> {};
 	private int loadGeneration = 0;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
+	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> liveContactUpdatedHandler;
 	private boolean liveSubscribed;
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
@@ -171,6 +172,11 @@ public final class SearchController {
 			Platform.runLater(this::loadResults);
 		};
 		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		liveContactUpdatedHandler = event -> {
+			if (event != null && LiveUpdateEvents.ENTITY_CONTACT.equals(event.entityType()) && appState != null
+					&& java.util.Objects.equals(appState.getShaleClientId(), event.shaleClientId())) Platform.runLater(this::loadResults);
+		};
+		runtimeBridge.subscribeEntityUpdated(liveContactUpdatedHandler);
 		liveSubscribed = true;
 	}
 
@@ -179,6 +185,7 @@ public final class SearchController {
 			return;
 		}
 		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		if (liveContactUpdatedHandler != null) runtimeBridge.unsubscribeEntityUpdated(liveContactUpdatedHandler);
 		liveSubscribed = false;
 	}
 
@@ -330,12 +337,7 @@ public final class SearchController {
 		}
 		List<Node> cards = contacts.stream()
 				.map(row -> {
-					var card = contactCardFactory.create(new ContactCardModel(
-							row.id(),
-							row.displayName(),
-							null,
-							row.email(),
-							row.phone(), java.util.List.of()), ContactCardFactory.Variant.FULL);
+					var card = contactCardFactory.create(toContactCardModel(row), ContactCardFactory.Variant.FULL);
 					card.setPrefWidth(CONTACT_CARD_WIDTH);
 					card.setMaxWidth(CONTACT_CARD_WIDTH);
 					return (Node) card;
@@ -343,6 +345,13 @@ public final class SearchController {
 				.toList();
 		contactsFlow.getChildren().setAll(cards);
 		updateSectionState(contactsFlow, contactsEmptyLabel, cards.isEmpty());
+	}
+
+	static ContactCardModel toContactCardModel(ContactDao.DirectoryContactRow row) {
+		return new ContactCardModel(row.id(), row.displayName(), null, row.email(), row.phone(),
+				row.classifications().stream().map(value ->
+						new com.shale.core.service.ContactServicePort.ClassificationPresentation(value.category(),
+								value.definitionId(), value.label(), value.color(), value.displayOrder())).toList());
 	}
 
 	private void renderOrganizations(List<Organization> organizations) {
