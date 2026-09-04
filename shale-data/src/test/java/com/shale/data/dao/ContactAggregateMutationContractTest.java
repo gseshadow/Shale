@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 final class ContactAggregateMutationContractTest {
@@ -127,14 +130,31 @@ final class ContactAggregateMutationContractTest {
         assertEquals(1,occurrences(create,"tx(draft.shaleClientId(),draft.actorUserId(),false"),
                 "creation must own one tenant/actor transaction");
         assertTrue(create.contains("INSERT dbo.Contacts"),"the Contact must be inserted inside the aggregate transaction");
-        assertTrue(create.contains("CreatedAt,CreatedByUserId,UpdatedAt,UpdatedByUserId"),
-                "creation must initialize every required Contact timestamp and actor column");
+        assertTrue(create.contains("CreatedAt,UpdatedAt"),
+                "creation must initialize both authoritative Contact timestamp columns");
+        assertFalse(create.contains("CreatedByUserId"),
+                "dbo.Contacts has no CreatedByUserId column");
+        assertFalse(create.contains("UpdatedByUserId"),
+                "dbo.Contacts has no UpdatedByUserId column");
         assertEquals(2,occurrences(create,"p.setTimestamp(i++,now)"),
                 "CreatedAt and UpdatedAt must use the same transaction timestamp");
-        assertEquals(2,occurrences(create,"p.setInt(i++,draft.actorUserId())"),
-                "creation must initialize both actor columns from the authorized current actor");
         assertTrue(create.contains("p.setInt(i++,draft.shaleClientId())"),
                 "creation must preserve the authorized tenant owner");
+        String insertSql=create.substring(create.indexOf("String sql="),create.indexOf(';',create.indexOf("String sql=")));
+        int columnsStart=insertSql.indexOf('(')+1;
+        int columnsEnd=insertSql.indexOf(')',columnsStart);
+        Set<String> insertedColumns=Arrays.stream(insertSql.substring(columnsStart,columnsEnd).split(","))
+                .map(String::trim).collect(Collectors.toSet());
+        assertEquals(Set.of("ShaleClientId","Name","Prefix","FirstName","MiddleName","LastName",
+                        "PreferredName","Suffix","DateOfBirth","Condition","Notes","IsDeceased","IsClient",
+                        "IsDeleted","CreatedAt","UpdatedAt"),insertedColumns,
+                "the create aggregate must use only authoritative production dbo.Contacts columns");
+        assertEquals(14,occurrences(insertSql,"?"),
+                "the Contact insert must retain exactly fourteen placeholders for its fourteen bound values");
+        assertTrue(create.contains("p.setBoolean(i++,draft.deceased());p.setTimestamp(i++,now);p.setTimestamp(i++,now);try"),
+                "the final bindings must align IsDeceased, CreatedAt, and UpdatedAt without stale actor parameters");
+        assertTrue(create.contains("phi.auditCreate(con,draft.actorUserId(),\"Contacts\",\"Condition\""),
+                "sensitive actor attribution must remain in the established PHI audit");
         assertTrue(create.contains("mutateAggregate(con,c,true)"),"children and classifications must share creation's transaction");
         assertTrue(shared.contains("applyIntent(con,c,DefinitionCategory.CONTACT_TYPE"));
         assertTrue(shared.contains("applyPhones(con,c,phones)"));
