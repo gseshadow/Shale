@@ -9,13 +9,15 @@ final class ContactPhase2BAuditMigrationContractTest {
     private static final Path MIGRATION=AuditEntityTypeMigrationChain.PHASE_2B;
     private static final Path VERIFY=Path.of("..","docs","sql","verification","2026-08-26_contacts_phase2b_audit_allowlist_verification.sql");
 
-    @Test void contactUpdatedIsTheOnlyContactEntityAction() {
+    @Test void contactCreateAndUpdateAreAllowedEntityActions() {
         var event=EntityActionAuditEvent.now(7,9,EntityActionAuditEvent.EntityType.CONTACT,41,
                 EntityActionAuditEvent.Action.UPDATED,null,null,
                 Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,41));
         assertEquals(Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,"41"),event.metadata());
-        assertThrows(IllegalArgumentException.class,()->EntityActionAuditEvent.now(7,9,
-                EntityActionAuditEvent.EntityType.CONTACT,41,EntityActionAuditEvent.Action.CREATED,null,null,Map.of()));
+        var created=EntityActionAuditEvent.now(7,9,EntityActionAuditEvent.EntityType.CONTACT,42,
+                EntityActionAuditEvent.Action.CREATED,null,null,
+                Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,42));
+        assertEquals(EntityActionAuditEvent.Action.CREATED,created.action());
     }
 
     @Test void successorPreservesAllTokensAndAddsExactlyContact() throws Exception {

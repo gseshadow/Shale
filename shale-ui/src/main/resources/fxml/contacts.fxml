@@ -19,6 +19,7 @@
         <FilterPanel>
             <left>
                 <FlowPane hgap="8" vgap="8" styleClass="contact-filter-controls">
+                    <Button fx:id="addContactButton" text="Add Contact" onAction="#addContact" />
                     <TextField fx:id="contactsSearchField" promptText="Search contacts…" />
                     <ShaleFilterMenu fx:id="contactTypeFilter" />
                     <ShaleFilterMenu fx:id="specialtyFilter" />

@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 
 final class ContactAggregateMutationContractTest {
     private static final String AGGREGATE_SIGNATURE = "void aggregate(UpdateContactProfileCommand c)";
+    private static final String AGGREGATE_MUTATION_SIGNATURE =
+            "private void mutateAggregate(Connection con,UpdateContactProfileCommand c,boolean creating)";
     private static final String CONTACT_UPDATE_SIGNATURE =
             "private void updateStructuredContact(Connection con,UpdateContactProfileCommand c)";
 
@@ -22,9 +24,10 @@ final class ContactAggregateMutationContractTest {
     @Test
     void ownsOneTransactionAndPrevalidatesBeforeStructuredMutation() throws Exception {
     	String mutationSource = source();
-    	String aggregate = extractMethod(mutationSource, AGGREGATE_SIGNATURE);
+        String transactionEntry = extractMethod(mutationSource, AGGREGATE_SIGNATURE);
+        String aggregate = extractMethod(mutationSource, AGGREGATE_MUTATION_SIGNATURE);
 
-        assertEquals(1, occurrences(aggregate, "tx(c.shaleClientId(),c.actorUserId(),false"),
+	        assertEquals(1, occurrences(transactionEntry, "tx(c.shaleClientId(),c.actorUserId(),false"),
                 "aggregate must own exactly one transaction boundary");
         int typeValidation = aggregate.indexOf(
                 "prevalidateIntent(con,c,DefinitionCategory.CONTACT_TYPE,c.contactTypes())");
@@ -63,7 +66,7 @@ final class ContactAggregateMutationContractTest {
                 "Credential assignment reorder audit must remain in aggregate transaction");
         assertTrue(aggregate.contains("EntityActionAuditEvent.Action.REORDERED"),
                 "Credential ordering audit action must remain in aggregate transaction");
-        assertTrue(aggregate.contains("EntityType.CONTACT,c.contactId(),EntityActionAuditEvent.Action.UPDATED"),
+        assertTrue(aggregate.contains("EntityType.CONTACT,c.contactId(),creating?EntityActionAuditEvent.Action.CREATED:EntityActionAuditEvent.Action.UPDATED"),
                 "CONTACT/UPDATED audit must remain in aggregate transaction");
     }
 
@@ -114,6 +117,21 @@ final class ContactAggregateMutationContractTest {
         assertTrue(update.contains("stale(p.executeUpdate())"), "a stale Contact update must be rejected");
         assertFalse(update.contains("WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0\");"),
                 "Contact update must not fall back to an unguarded last-write-wins predicate");
+    }
+
+    @Test
+    void createOwnsOneTransactionForContactChildrenClassificationsAndAudit() throws Exception {
+        String mutation=source();
+        String create=extractMethod(mutation,"int createAggregate(CreateContactProfileCommand draft)");
+        String shared=extractMethod(mutation,AGGREGATE_MUTATION_SIGNATURE);
+        assertEquals(1,occurrences(create,"tx(draft.shaleClientId(),draft.actorUserId(),false"),
+                "creation must own one tenant/actor transaction");
+        assertTrue(create.contains("INSERT dbo.Contacts"),"the Contact must be inserted inside the aggregate transaction");
+        assertTrue(create.contains("mutateAggregate(con,c,true)"),"children and classifications must share creation's transaction");
+        assertTrue(shared.contains("applyIntent(con,c,DefinitionCategory.CONTACT_TYPE"));
+        assertTrue(shared.contains("applyPhones(con,c,phones)"));
+        assertTrue(shared.contains("Action.CREATED:EntityActionAuditEvent.Action.UPDATED"),
+                "create and edit must emit their distinct authoritative audit actions");
     }
 
     @Test

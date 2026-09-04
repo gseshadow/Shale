@@ -23,6 +23,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.Button;
 import javafx.scene.layout.FlowPane;
 import javafx.util.Duration;
+import javafx.stage.Window;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +59,7 @@ public final class ContactsController {
     @FXML private FlowPane selectedFilterChips;
     @FXML private Label activeFilterCount;
     @FXML private Button clearFiltersButton;
+    @FXML private Button addContactButton;
 
     private AppState appState;
     private ContactServicePort contactService;
@@ -77,6 +79,7 @@ public final class ContactsController {
     private List<ContactServicePort.Definition> typeOptions=List.of(), specialtyOptions=List.of();
     private List<ContactServicePort.CredentialDefinition> credentialOptions=List.of();
     private long pageLoadStartedNanos;
+    private Consumer<Integer> onOpenContact;
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "contacts-directory-loader");
@@ -88,6 +91,7 @@ public final class ContactsController {
         this.appState = appState;
         this.contactService = contactService;
         this.runtimeBridge = runtimeBridge;
+        this.onOpenContact = onOpenContact;
         if (runtimeBridge != null) runtimeBridge.subscribeEntityUpdated(this::handleContactUpdated);
         this.contactCardFactory = new ContactCardFactory(onOpenContact == null ? id -> {
         } : onOpenContact);
@@ -119,6 +123,7 @@ public final class ContactsController {
 
     @FXML
     private void initialize() {
+        if (addContactButton != null) ControlStyles.apply(addContactButton, ControlStyles.Purpose.PRIMARY);
         if (contactsSearchField != null) {
             ControlStyles.formControl(contactsSearchField);
             searchDebounce = new PauseTransition(SEARCH_DEBOUNCE);
@@ -138,6 +143,15 @@ public final class ContactsController {
         Platform.runLater(() -> {
             wireInfiniteScroll();
             loadFirstPage();
+        });
+    }
+
+    @FXML private void addContact() {
+        if (contactService == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null) return;
+        Window owner=addContactButton==null||addContactButton.getScene()==null?null:addContactButton.getScene().getWindow();
+        new ContactViewController().showCreateEditor(owner,appState,contactService,typeOptions,specialtyOptions,credentialOptions,id->{
+            loadFirstPage();
+            if(onOpenContact!=null)onOpenContact.accept(id);
         });
     }
 
