@@ -129,18 +129,19 @@ final class ContactAggregateMutationContractTest {
         String shared=extractMethod(mutation,AGGREGATE_MUTATION_SIGNATURE);
         assertEquals(1,occurrences(create,"tx(draft.shaleClientId(),draft.actorUserId(),false"),
                 "creation must own one tenant/actor transaction");
-        assertTrue(create.contains("INSERT dbo.Contacts"),"the Contact must be inserted inside the aggregate transaction");
-        assertTrue(create.contains("CreatedAt,UpdatedAt"),
+        assertTrue(create.contains("prepareStatement(CREATE_CONTACT_SQL)"),
+                "the Contact insert must execute the reviewed schema-contract SQL");
+        assertTrue(mutation.contains("CreatedAt,UpdatedAt"),
                 "creation must initialize both authoritative Contact timestamp columns");
-        assertFalse(create.contains("CreatedByUserId"),
+        String insertSql=extractStringConstant(mutation,"CREATE_CONTACT_SQL");
+        assertFalse(insertSql.contains("CreatedByUserId"),
                 "dbo.Contacts has no CreatedByUserId column");
-        assertFalse(create.contains("UpdatedByUserId"),
+        assertFalse(insertSql.contains("UpdatedByUserId"),
                 "dbo.Contacts has no UpdatedByUserId column");
         assertEquals(2,occurrences(create,"p.setTimestamp(i++,now)"),
                 "CreatedAt and UpdatedAt must use the same transaction timestamp");
         assertTrue(create.contains("p.setInt(i++,draft.shaleClientId())"),
                 "creation must preserve the authorized tenant owner");
-        String insertSql=create.substring(create.indexOf("String sql="),create.indexOf(';',create.indexOf("String sql=")));
         int columnsStart=insertSql.indexOf('(')+1;
         int columnsEnd=insertSql.indexOf(')',columnsStart);
         Set<String> insertedColumns=Arrays.stream(insertSql.substring(columnsStart,columnsEnd).split(","))
@@ -155,11 +156,23 @@ final class ContactAggregateMutationContractTest {
                 "the final bindings must align IsDeceased, CreatedAt, and UpdatedAt without stale actor parameters");
         assertTrue(create.contains("phi.auditCreate(con,draft.actorUserId(),\"Contacts\",\"Condition\""),
                 "sensitive actor attribution must remain in the established PHI audit");
+        assertTrue(mutation.contains("contacts-create-v2-no-actor-columns"),
+                "the compiled artifact must expose a safe schema-contract diagnostic marker");
         assertTrue(create.contains("mutateAggregate(con,c,true)"),"children and classifications must share creation's transaction");
         assertTrue(shared.contains("applyIntent(con,c,DefinitionCategory.CONTACT_TYPE"));
         assertTrue(shared.contains("applyPhones(con,c,phones)"));
         assertTrue(shared.contains("Action.CREATED:EntityActionAuditEvent.Action.UPDATED"),
                 "create and edit must emit their distinct authoritative audit actions");
+    }
+
+    private static String extractStringConstant(String source,String name) {
+        String declaration="String "+name+"=\"";
+        int start=source.indexOf(declaration);
+        assertTrue(start>=0,"Missing SQL constant: "+name);
+        start+=declaration.length();
+        int end=source.indexOf("\";",start);
+        assertTrue(end>start,"Unterminated SQL constant: "+name);
+        return source.substring(start,end);
     }
 
     @Test

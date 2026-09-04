@@ -5,10 +5,15 @@ import static com.shale.core.service.ContactServicePort.*;
 import java.sql.*;
 import java.time.Instant;
 import java.util.*;
+import java.util.logging.Logger;
 import com.shale.core.runtime.DbSessionProvider;
 
 /** Transactional Phase 1C definition and classification mutation store. */
 final class ContactMutationDao {
+    private static final Logger LOG=Logger.getLogger(ContactMutationDao.class.getName());
+    private static final String CREATE_CONTACT_SCHEMA_CONTRACT="contacts-create-v2-no-actor-columns";
+    private static final String CREATE_CONTACT_SQL="INSERT dbo.Contacts (ShaleClientId,Name,Prefix,FirstName,MiddleName,LastName,PreferredName,Suffix,DateOfBirth,Condition,Notes,IsDeceased,IsClient,IsDeleted,CreatedAt,UpdatedAt) OUTPUT INSERTED.Id VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,0,?,?)";
+    static {var source=ContactMutationDao.class.getProtectionDomain().getCodeSource();LOG.info(()->"ContactMutationDao loaded from "+(source==null?"unknown code source":source.getLocation())+"; schema contract="+CREATE_CONTACT_SCHEMA_CONTRACT);}
     private final DbSessionProvider db;
     private final EntityActionAuditDao audit = new EntityActionAuditDao();
     private final PhiAuditService phi;
@@ -55,8 +60,8 @@ final class ContactMutationDao {
         validateProfileValues(draft.displayName(),draft.structuredName(),draft.dateOfBirth(),draft.notes());
         String display=blank(draft.displayName())?java.util.stream.Stream.of(draft.structuredName().firstName(),draft.structuredName().lastName()).filter(v->!blank(v)).map(String::trim).collect(java.util.stream.Collectors.joining(" ")):draft.displayName();
         Timestamp now=databaseTimestamp(con);
-        int contactId;String sql="INSERT dbo.Contacts (ShaleClientId,Name,Prefix,FirstName,MiddleName,LastName,PreferredName,Suffix,DateOfBirth,Condition,Notes,IsDeceased,IsClient,IsDeleted,CreatedAt,UpdatedAt) OUTPUT INSERTED.Id VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,0,?,?)";
-        try(PreparedStatement p=con.prepareStatement(sql)){int i=1;p.setInt(i++,draft.shaleClientId());setString(p,i++,display);setString(p,i++,draft.structuredName().prefix());setString(p,i++,draft.structuredName().firstName());setString(p,i++,draft.structuredName().middleName());setString(p,i++,draft.structuredName().lastName());setString(p,i++,draft.structuredName().preferredName());setString(p,i++,draft.structuredName().suffix());if(draft.dateOfBirth()==null)p.setNull(i++,Types.DATE);else p.setDate(i++,java.sql.Date.valueOf(draft.dateOfBirth()));setString(p,i++,draft.condition());p.setString(i++,normalizeNotes(draft.notes()));p.setBoolean(i++,draft.deceased());p.setTimestamp(i++,now);p.setTimestamp(i++,now);try(ResultSet r=p.executeQuery()){if(!r.next())throw new IllegalStateException("Contact was not created.");contactId=r.getInt(1);}}
+        int contactId;
+        try(PreparedStatement p=con.prepareStatement(CREATE_CONTACT_SQL)){int i=1;p.setInt(i++,draft.shaleClientId());setString(p,i++,display);setString(p,i++,draft.structuredName().prefix());setString(p,i++,draft.structuredName().firstName());setString(p,i++,draft.structuredName().middleName());setString(p,i++,draft.structuredName().lastName());setString(p,i++,draft.structuredName().preferredName());setString(p,i++,draft.structuredName().suffix());if(draft.dateOfBirth()==null)p.setNull(i++,Types.DATE);else p.setDate(i++,java.sql.Date.valueOf(draft.dateOfBirth()));setString(p,i++,draft.condition());p.setString(i++,normalizeNotes(draft.notes()));p.setBoolean(i++,draft.deceased());p.setTimestamp(i++,now);p.setTimestamp(i++,now);try(ResultSet r=p.executeQuery()){if(!r.next())throw new IllegalStateException("Contact was not created.");contactId=r.getInt(1);}}
         UpdateContactProfileCommand c=new UpdateContactProfileCommand(contactId,draft.shaleClientId(),draft.actorUserId(),display,draft.structuredName(),draft.dateOfBirth(),draft.condition(),draft.notes(),draft.deceased(),null,draft.contactTypes(),draft.specialties(),draft.credentials(),draft.phoneNumbers(),draft.emailAddresses(),draft.addresses());
         phi.auditCreate(con,draft.actorUserId(),"Contacts","Condition",(long)contactId,draft.condition());
         mutateAggregate(con,c,true);return contactId;
