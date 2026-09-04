@@ -2680,7 +2680,7 @@ public class CaseController {
 		private Node createShareContactCard(StagedShare share) {
 			ContactCardFactory factory = new ContactCardFactory(id -> { });
 			String role = (share.unavailable ? "Unavailable · " : "") + "Shared " + share.sharedAt.format(DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a"));
-			ContactCard card = factory.create(new ContactCardFactory.ContactCardModel(share.contactId, share.displayName, role, null, null), ContactCardFactory.Variant.MINI);
+			ContactCard card = factory.create(new ContactCardFactory.ContactCardModel(share.contactId, share.displayName, role, null, null, java.util.List.of()), ContactCardFactory.Variant.MINI);
 			card.setInteractive(false);
 			card.setSuppressPlaceholderLines(true);
 			card.getStyleClass().addAll("shale-entity-card-embedded", "case-link-embedded-contact-card");
@@ -2722,7 +2722,7 @@ public class CaseController {
 		}
 		private Node createSelectableContactCard(CaseLinkContactOptionDto option, boolean selected, Runnable toggle, boolean cell) {
 			ContactCardFactory factory = new ContactCardFactory(id -> { });
-			ContactCard card = factory.create(new ContactCardFactory.ContactCardModel(option.contactId(), option.displayName(), null, null, null), ContactCardFactory.Variant.MINI);
+			ContactCard card = factory.create(new ContactCardFactory.ContactCardModel(option.contactId(), option.displayName(), null, null, null, java.util.List.of()), ContactCardFactory.Variant.MINI);
 			card.setInteractive(false);
 			card.getStyleClass().addAll("shale-entity-card-selectable", "case-link-selectable-contact-card");
 			if (selected) card.getStyleClass().add("case-link-selectable-contact-card-selected");
@@ -3446,7 +3446,8 @@ public class CaseController {
 					safeText(party.getDisplayName()),
 					null,
 					party.getEmail(),
-					party.getPhone()
+					party.getPhone(),
+					java.util.List.of()
 			);
 			ContactCardFactory.Variant variant = ContactCardFactory.Variant.COMPACT;
 			ContactCard card = factory.create(model, variant);

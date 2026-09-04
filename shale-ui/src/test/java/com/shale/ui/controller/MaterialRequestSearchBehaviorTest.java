@@ -16,7 +16,7 @@ final class MaterialRequestSearchBehaviorTest {
 
     @Test void requestedFromValidityRequiresExactlyOneRealEntity() {
         assertFalse(CaseMaterialRequestsTabController.validRequestedFrom(null));
-        var contact = new CaseMaterialRequestsTabController.RequestedFromSelection("contact",1L,"Display",new com.shale.ui.component.factory.ContactCardFactory.ContactCardModel(1,"Display",null,null,null),null);
+        var contact = new CaseMaterialRequestsTabController.RequestedFromSelection("contact",1L,"Display",new com.shale.ui.component.factory.ContactCardFactory.ContactCardModel(1,"Display",null,null,null,java.util.List.of()),null);
         var organization = new CaseMaterialRequestsTabController.RequestedFromSelection("organization",2L,"Display",null,new com.shale.ui.component.factory.OrganizationCardFactory.OrganizationCardModel(2,"Display",null,null,null,null,null,null,null,null,null,null,null,null,null));
         var ambiguous = new CaseMaterialRequestsTabController.RequestedFromSelection("bad",3L,"Display",contact.contactModel(),organization.organizationModel());
         assertTrue(CaseMaterialRequestsTabController.validRequestedFrom(contact));

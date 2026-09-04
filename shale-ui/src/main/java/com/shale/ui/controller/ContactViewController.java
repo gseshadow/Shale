@@ -21,6 +21,7 @@ import com.shale.data.dao.ContactDao.ContactDetailRow;
 import com.shale.data.dao.CaseSummaryDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.EnhancedTextArea;
+import com.shale.ui.component.ContactClassificationChipGroup;
 import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.component.factory.CaseCardFactory;
@@ -95,6 +96,7 @@ public final class ContactViewController {
     @FXML private Label deceasedValue;
     @FXML private Label notesValue;
     @FXML private VBox notesSection;
+    @FXML private VBox headerClassificationHost;
 
     private int contactId;
     private ContactDetailService contactDetailService;
@@ -317,6 +319,15 @@ public final class ContactViewController {
     }
 
     private void renderClassifications(){
+        if(headerClassificationHost!=null){
+            List<ContactServicePort.ClassificationPresentation> all=new java.util.ArrayList<>();
+            if(classificationProfile!=null){
+                classificationProfile.contactTypes().stream().sorted(Comparator.comparingInt((ContactServicePort.AssignedDefinition a)->a.definition().sortOrder()).thenComparingInt(a->a.definition().id())).forEach(a->all.add(new ContactServicePort.ClassificationPresentation(ContactServicePort.DefinitionCategory.CONTACT_TYPE,a.definition().id(),a.definition().name(),a.definition().color(),a.definition().sortOrder())));
+                classificationProfile.specialties().stream().sorted(Comparator.comparingInt((ContactServicePort.AssignedDefinition a)->a.definition().sortOrder()).thenComparingInt(a->a.definition().id())).forEach(a->all.add(new ContactServicePort.ClassificationPresentation(ContactServicePort.DefinitionCategory.SPECIALTY,a.definition().id(),a.definition().name(),a.definition().color(),a.definition().sortOrder())));
+                classificationProfile.credentials().stream().sorted(Comparator.comparingInt(ContactServicePort.AssignedCredential::displayOrder).thenComparingInt(a->a.definition().id())).forEach(a->{String abbreviation=safe(a.definition().abbreviation()).trim();all.add(new ContactServicePort.ClassificationPresentation(ContactServicePort.DefinitionCategory.CREDENTIAL,a.definition().id(),abbreviation.isBlank()?a.definition().name():abbreviation,a.definition().color(),a.displayOrder()));});
+            }
+            headerClassificationHost.getChildren().setAll(new ContactClassificationChipGroup(all,ContactClassificationChipGroup.Size.STANDARD));
+        }
         renderDefinitionChips(contactTypeChips,classificationProfile==null?List.of():classificationProfile.contactTypes(),"No assigned contact types");
         renderDefinitionChips(specialtyChips,classificationProfile==null?List.of():classificationProfile.specialties(),"No assigned specialties");
         if(credentialChips==null)return;credentialChips.getChildren().clear();
@@ -616,7 +627,7 @@ public final class ContactViewController {
             for (ContactSharedCaseLinkDto row : rows) {
                 CaseLinkDto link = row.caseLink();
                 Node card = caseLinkCardFactory.createReadOnly(link, CaseLinkCardFactory.Variant.COMPACT,
-                        new CaseLinkCardFactory.Actions(() -> openSharedLink(link), null, null, null), onOpenContact);
+                        new CaseLinkCardFactory.Actions(() -> openSharedLink(link), null, null, null, java.util.List.of()), onOpenContact);
                 if (card instanceof Region region) region.setMaxWidth(Double.MAX_VALUE);
                 group.getChildren().add(card);
             }

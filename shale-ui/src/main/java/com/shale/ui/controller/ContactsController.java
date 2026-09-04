@@ -302,7 +302,6 @@ public final class ContactsController {
     private Node buildCard(ContactCardSummary row) {
         var card = contactCardFactory.create(cardModel(row), CONTACTS_CARD_VARIANT);
         card.setMinHeight(CONTACT_CARD_HEIGHT);
-        card.setPrefHeight(CONTACT_CARD_HEIGHT);
         card.setPrefWidth(CONTACT_CARD_WIDTH);
         card.setMaxWidth(CONTACT_CARD_WIDTH);
         return card;
@@ -310,7 +309,7 @@ public final class ContactsController {
 
     static ContactCardModel cardModel(ContactCardSummary row) {
         String displayName = safe(row.displayName()).isBlank() ? "—" : safe(row.displayName());
-        return new ContactCardModel(row.id(), displayName, null, row.email(), row.phone());
+        return new ContactCardModel(row.id(), displayName, null, row.email(), row.phone(),row.classifications());
     }
 
     private Node buildLoadingMoreNode() {

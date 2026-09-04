@@ -45,6 +45,7 @@
                 <Label text="•" style="-fx-opacity: 0.55;" />
                 <Label fx:id="lastUpdatedLabel" text="Last updated: —" styleClass="functional-metadata" />
             </HBox>
+            <VBox fx:id="headerClassificationHost" />
         </VBox>
     </top>
 

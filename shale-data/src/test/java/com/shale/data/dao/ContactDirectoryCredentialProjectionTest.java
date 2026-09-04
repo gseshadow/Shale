@@ -44,7 +44,7 @@ class ContactDirectoryCredentialProjectionTest {
             if (method.equals("close")) { connectionClosed.set(true); return null; }
             if (method.equals("prepareStatement")) {
                 String sql = (String) args[0];
-                if (sql.contains("FROM dbo.ContactCredentials a")) directorySql.set(sql);
+                if (sql.contains("FROM dbo.ContactCredentials a") && !sql.contains("ContactContactTypes")) directorySql.set(sql);
                 return statement(sql, statementClosed, resultSetClosed);
             }
             return defaultValue(method);
@@ -70,6 +70,7 @@ class ContactDirectoryCredentialProjectionTest {
                 if (sql.contains("OFFSET ? ROWS")) return result(List.of(Map.of(
                         "Id", 101, "DisplayName", "Example Doctor", "Email", "doctor@example.test",
                         "Phone", "555")), resultSetClosed);
+                if (sql.contains("ContactContactTypes")) return result(List.of(),resultSetClosed);
                 if (sql.contains("FROM dbo.ContactCredentials a")) return result(List.of(Map.of(
                         "ContactId", 101, "Abbreviation", "M.D.")), resultSetClosed);
                 throw new AssertionError("Unexpected SQL: " + sql);

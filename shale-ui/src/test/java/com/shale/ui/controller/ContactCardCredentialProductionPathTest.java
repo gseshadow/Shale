@@ -31,7 +31,7 @@ class ContactCardCredentialProductionPathTest {
     }
 
     @Test void controllerPassesAdapterEffectiveNameToCardModel() {
-        var summary = new ContactCardSummary(101, "Dr. Example Doctor M.D.", null, null, List.of("M.D."));
+        var summary = new ContactCardSummary(101, "Dr. Example Doctor M.D.", null, null, List.of("M.D."),List.of());
         assertEquals(1, summary.credentialAbbreviations().size(), "number received by ContactsController");
         var model = ContactsController.cardModel(summary);
         assertEquals("Dr. Example Doctor M.D.", model.displayName());
@@ -40,11 +40,24 @@ class ContactCardCredentialProductionPathTest {
     @Test void actualJavaFxCardNameLabelRendersEffectiveName() {
         JavaFxTestSupport.runAndWait(() -> {
             var card = new ContactCardFactory(id -> {}).create(
-                    new ContactCardFactory.ContactCardModel(101, "Dr. Example Doctor M.D.", null, null, null),
+                    new ContactCardFactory.ContactCardModel(101, "Dr. Example Doctor M.D.", null, null, null, java.util.List.of()),
                     ContactCardFactory.Variant.FULL);
             Label name = (Label) card.lookup("#contact-card-name-label");
             assertNotNull(name);
             assertEquals("Dr. Example Doctor M.D.", name.getText());
+        });
+    }
+
+    @Test void existingProductionCardRendersAllClassificationCategories() {
+        JavaFxTestSupport.runAndWait(()->{
+            var values=List.of(
+                    new com.shale.core.service.ContactServicePort.ClassificationPresentation(com.shale.core.service.ContactServicePort.DefinitionCategory.CONTACT_TYPE,1,"Expert","#112233",0),
+                    new com.shale.core.service.ContactServicePort.ClassificationPresentation(com.shale.core.service.ContactServicePort.DefinitionCategory.SPECIALTY,2,"Radiology","#445566",0),
+                    new com.shale.core.service.ContactServicePort.ClassificationPresentation(com.shale.core.service.ContactServicePort.DefinitionCategory.CREDENTIAL,3,"M.D.","#778899",0));
+            var card=new ContactCardFactory(id->{}).create(new ContactCardFactory.ContactCardModel(1,"Doctor M.D.",null,"doctor@example.test","555",values),ContactCardFactory.Variant.FULL);
+            var chips=card.lookupAll(".contact-classification-chip").stream().map(n->((Label)n).getText()).toList();
+            assertEquals(List.of("Expert","Radiology","M.D."),chips);
+            assertEquals("Doctor M.D.",((Label)card.lookup("#contact-card-name-label")).getText());
         });
     }
 
@@ -61,9 +74,9 @@ class ContactCardCredentialProductionPathTest {
         JavaFxTestSupport.runAndWait(() -> {
             ContactCardFactory factory = new ContactCardFactory(id -> {});
             var directoryCard = factory.create(new ContactCardFactory.ContactCardModel(
-                    101, "Example Doctor M.D.", null, null, null), ContactCardFactory.Variant.FULL);
+                    101, "Example Doctor M.D.", null, null, null, java.util.List.of()), ContactCardFactory.Variant.FULL);
             var overviewPartyCard = factory.create(new ContactCardFactory.ContactCardModel(
-                    101, "Example Doctor M.D.", null, null, null), ContactCardFactory.Variant.COMPACT);
+                    101, "Example Doctor M.D.", null, null, null, java.util.List.of()), ContactCardFactory.Variant.COMPACT);
             assertEquals("Example Doctor M.D.", ((Label) directoryCard.lookup("#contact-card-name-label")).getText());
             assertEquals("Example Doctor M.D.", ((Label) overviewPartyCard.lookup("#contact-card-name-label")).getText());
         });

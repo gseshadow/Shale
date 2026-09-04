@@ -61,7 +61,7 @@ final class CaseMaterialRequestCreateSaveContractTest {
     }
     @Test
     void optionalRequestedByDoesNotParticipateInSaveEligibility() {
-        var requestedFrom = new CaseMaterialRequestsTabController.RequestedFromSelection("contact", 10L, "Valid Contact", new com.shale.ui.component.factory.ContactCardFactory.ContactCardModel(10, "Valid Contact", null, null, null), null);
+        var requestedFrom = new CaseMaterialRequestsTabController.RequestedFromSelection("contact", 10L, "Valid Contact", new com.shale.ui.component.factory.ContactCardFactory.ContactCardModel(10, "Valid Contact", null, null, null, java.util.List.of()), null);
         var type = new MaterialTypeDto(1, null, "records", "Records", null, null, 0);
         var method = new RequestMethodDto(2, null, "email", "Email", null, 0, true, false);
         var status = new RequestStatusDto(3, null, "requested", "Requested", 0, true, false);

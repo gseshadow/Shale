@@ -40,7 +40,8 @@ public final class ContactServiceAdapter implements ContactServicePort {
 				contactGateway.findDirectoryContactsPage(shaleClientId, actorUserId, page, pageSize, query, filters);
 		return new DirectoryPage(result.items().stream().map(row -> new ContactCardSummary(
 				row.id(), ContactNamePresentation.effectiveDisplayNameFromAbbreviations(row.displayName(), row.credentialAbbreviations()),
-				row.email(), row.phone(), row.credentialAbbreviations())).toList(),
+				row.email(), row.phone(), row.credentialAbbreviations(), row.classifications().stream().map(x ->
+						new ClassificationPresentation(x.category(),x.definitionId(),x.label(),x.color(),x.displayOrder())).toList())).toList(),
 				result.page(), result.pageSize(), result.total());
 	}
 

@@ -335,7 +335,7 @@ public final class SearchController {
 							row.displayName(),
 							null,
 							row.email(),
-							row.phone()), ContactCardFactory.Variant.FULL);
+							row.phone(), java.util.List.of()), ContactCardFactory.Variant.FULL);
 					card.setPrefWidth(CONTACT_CARD_WIDTH);
 					card.setMaxWidth(CONTACT_CARD_WIDTH);
 					return (Node) card;

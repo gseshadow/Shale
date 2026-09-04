@@ -585,3 +585,10 @@ Newly migrated areas must not introduce:
 ### Case Links semantic-control adoption
 
 Case Links is the second opt-in desktop area. Its tab action and dialog affirmative actions use Primary/Standard; dialog cancellation uses Secondary/Standard; card Edit and staged share-management actions use Small Ghost or Secondary controls; Set Primary is Secondary/Small; and confirmed Case Link deletion is Danger/Small. Link cards themselves remain the established keyboard- and mouse-activatable navigation surface rather than adding a competing Open button solely to demonstrate the Navigation button variant. Link Type colors remain data presentation in pills, rails, and card washes and never determine action colors. The create/edit and share-detail fields use the shared form shell and show `:invalid` only after the existing validation workflow rejects a save, clearing the state as values are corrected.
+# Contact classification chips
+
+`ContactClassificationChipGroup` is the reusable presentation-only owner of Contact classification
+chips. Contact cards use its `COMPACT` size and the Contact header uses `STANDARD`. Controllers and
+card factories must pass ordered authoritative presentation records to this component rather than
+duplicating chip CSS or color calculations. It validates stored colors, applies the neutral fallback,
+and preserves category and definition identity on each informational, noninteractive chip.

@@ -37,8 +37,8 @@ class ContactServiceAdapterTest {
 	void directoryCardProjectionCarriesAuthoritativeOrderedCredentialsInOneGatewayCall() {
 		FakeContactGateway gateway = new FakeContactGateway(List.of());
 		gateway.directoryPage = new ContactDao.PagedResult<>(List.of(
-				new ContactDao.ContactCardSummaryRow(1, "Dr. Example Doctor", "doctor@example.test", "555", List.of("M.D.", "Ph.D.")),
-				new ContactDao.ContactCardSummaryRow(2, "No Credentials", null, null, List.of())), 0, 100, 2);
+				new ContactDao.ContactCardSummaryRow(1, "Dr. Example Doctor", "doctor@example.test", "555", List.of("M.D.", "Ph.D."), List.of()),
+				new ContactDao.ContactCardSummaryRow(2, "No Credentials", null, null, List.of(), List.of())), 0, 100, 2);
 
 		var page = new ContactServiceAdapter(gateway).getContactDirectoryPage(42, 9, 0, 100, "doctor", ContactServicePort.DirectoryFilters.EMPTY);
 
