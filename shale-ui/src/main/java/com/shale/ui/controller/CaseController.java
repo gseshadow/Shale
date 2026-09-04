@@ -485,8 +485,6 @@ public class CaseController {
 	private Button btnEditTeam;
 
 	@FXML
-	private TextArea caseUpdatesComposerArea;
-	@FXML
 	private Button submitCaseUpdateButton;
 	@FXML
 	private TextField caseUpdatesSearchField;
@@ -812,8 +810,6 @@ public class CaseController {
 	private VBox caseTaskActivityFeedBox;
 	@FXML
 	private Label caseTaskActivityEmptyLabel;
-	private Long editingCaseUpdateId;
-	private String editingCaseUpdateDraftText = "";
 	private boolean savingCaseUpdateEdit = false;
 
 	private final Map<String, Button> sectionTabs = new LinkedHashMap<>();
@@ -1105,15 +1101,6 @@ public class CaseController {
 		}
 		if (addOrganizationButton != null)
 			addOrganizationButton.setOnAction(e -> onAddRelatedEntity());
-		if (caseUpdatesComposerArea != null) {
-			caseUpdatesComposerArea.setOnKeyPressed(e ->
-			{
-				if (e.isControlDown() && e.getCode() == javafx.scene.input.KeyCode.ENTER) {
-					onSubmitCaseUpdate();
-					e.consume();
-				}
-			});
-		}
 	}
 
 	private void ensureStyleClass(javafx.scene.Node node, String styleClass) {
@@ -6466,12 +6453,6 @@ public class CaseController {
 	private void renderCaseUpdatesInternal(List<CaseUpdateDto> updates) {
 		List<CaseUpdateDto> safeUpdates = updates == null ? List.of() : List.copyOf(updates);
 		caseUpdates = safeUpdates;
-		if (editingCaseUpdateId != null
-				&& safeUpdates.stream().noneMatch(u -> u != null && u.getId() == editingCaseUpdateId.longValue())) {
-			editingCaseUpdateId = null;
-			editingCaseUpdateDraftText = "";
-			savingCaseUpdateEdit = false;
-		}
 		applyCaseUpdateFilterInternal();
 	}
 
@@ -6544,7 +6525,7 @@ public class CaseController {
 			showError("Case updates are unavailable.");
 			return;
 		}
-		if (caseUpdatesComposerArea == null || submitCaseUpdateButton == null) {
+		if (submitCaseUpdateButton == null) {
 			showError("Case updates controls are unavailable.");
 			return;
 		}
@@ -6555,7 +6536,20 @@ public class CaseController {
 			return;
 		}
 
-		String trimmedText = safeText(caseUpdatesComposerArea.getText()).trim();
+		EnhancedTextArea.openEditor(dialogOwner(submitCaseUpdateButton), "Add Case Update", "", this::saveNewCaseUpdate);
+	}
+
+	private void saveNewCaseUpdate(String noteText) {
+		if (caseDao == null || appState == null || caseId == null || submitCaseUpdateButton == null) {
+			showError("Case updates are unavailable.");
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			showError("No tenant is selected.");
+			return;
+		}
+		String trimmedText = safeText(noteText).trim();
 		if (trimmedText.isBlank()) {
 			showError("Update text is required.");
 			return;
@@ -6566,7 +6560,6 @@ public class CaseController {
 		final Integer createdByUserId = appState.getUserId();
 
 		submitCaseUpdateButton.setDisable(true);
-		caseUpdatesComposerArea.setDisable(true);
 		clearError();
 
 		new Thread(() ->
@@ -6580,10 +6573,6 @@ public class CaseController {
 				{
 					if (caseId == null || caseId.longValue() != activeCaseId)
 						return;
-					if (caseUpdatesComposerArea != null) {
-						caseUpdatesComposerArea.clear();
-						caseUpdatesComposerArea.setDisable(false);
-					}
 					caseUpdatesLoadedOnce = true;
 					caseUpdatesStale = false;
 					renderCaseUpdates(updates);
@@ -6596,8 +6585,6 @@ public class CaseController {
 				runOnFx(() ->
 				{
 					showError("Failed to save case update. " + ex.getMessage());
-					if (caseUpdatesComposerArea != null)
-						caseUpdatesComposerArea.setDisable(false);
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
 				});
@@ -6650,10 +6637,10 @@ public class CaseController {
 		VBox bodyBox;
 		HBox rightActions = new HBox();
 		rightActions.setAlignment(Pos.CENTER_RIGHT);
-		if (!isEditingCaseUpdate(dto) && canEditCaseUpdate(dto)) {
+		if (canEditCaseUpdate(dto)) {
 			Button editButton = new Button("Edit");
 			editButton.setDisable(savingCaseUpdateEdit);
-			editButton.setOnAction(e -> startEditingCaseUpdate(dto));
+			editButton.setOnAction(e -> startEditingCaseUpdate(dto, editButton));
 			rightActions.getChildren().add(editButton);
 		}
 
@@ -6664,29 +6651,9 @@ public class CaseController {
 		metadataLabel.setWrapText(true);
 		metadataLabel.setStyle("-fx-opacity: 0.75; -fx-font-size: 11px;");
 
-		if (isEditingCaseUpdate(dto)) {
-			TextArea editArea = new TextArea(editingCaseUpdateDraftText);
-			editArea.setWrapText(true);
-			editArea.setPrefRowCount(4);
-			editArea.setDisable(savingCaseUpdateEdit);
-			editArea.textProperty().addListener((obs, oldText, newText) -> editingCaseUpdateDraftText = safeText(newText));
-
-			Button saveButton = new Button("Save");
-			saveButton.setDisable(savingCaseUpdateEdit);
-			saveButton.setOnAction(e -> saveEditedCaseUpdate(dto));
-
-			Button cancelButton = new Button("Cancel");
-			cancelButton.setDisable(savingCaseUpdateEdit);
-			cancelButton.setOnAction(e -> cancelEditingCaseUpdate());
-
-			HBox editActions = new HBox(8, saveButton, cancelButton);
-			editActions.setAlignment(Pos.CENTER_LEFT);
-			bodyBox = new VBox(8, editArea, editActions);
-		} else {
-			Label noteLabel = new Label(safeText(dto.getNoteText()));
-			noteLabel.setWrapText(true);
-			bodyBox = new VBox(noteLabel);
-		}
+		Label noteLabel = new Label(NarrativeMarkdownCodec.plainText(safeText(dto.getNoteText())));
+		noteLabel.setWrapText(true);
+		bodyBox = new VBox(noteLabel);
 
 		VBox card = new VBox(4, topRow, metadataLabel, bodyBox);
 		card.setPadding(new Insets(10, 12, 10, 12));
@@ -6720,27 +6687,14 @@ public class CaseController {
 		return actorUserId != null && createdByUserId != null && actorUserId.intValue() == createdByUserId.intValue();
 	}
 
-	private boolean isEditingCaseUpdate(CaseUpdateDto dto) {
-		return dto != null && editingCaseUpdateId != null && dto.getId() == editingCaseUpdateId.longValue();
-	}
-
-	private void startEditingCaseUpdate(CaseUpdateDto dto) {
+	private void startEditingCaseUpdate(CaseUpdateDto dto, Button ownerButton) {
 		if (dto == null || !canEditCaseUpdate(dto))
 			return;
-		editingCaseUpdateId = dto.getId();
-		editingCaseUpdateDraftText = safeText(dto.getNoteText());
-		savingCaseUpdateEdit = false;
-		renderCaseUpdates(caseUpdates);
+		EnhancedTextArea.openEditor(dialogOwner(ownerButton), "Edit Case Update", safeText(dto.getNoteText()),
+				value -> saveEditedCaseUpdate(dto, value));
 	}
 
-	private void cancelEditingCaseUpdate() {
-		editingCaseUpdateId = null;
-		editingCaseUpdateDraftText = "";
-		savingCaseUpdateEdit = false;
-		renderCaseUpdates(caseUpdates);
-	}
-
-	private void saveEditedCaseUpdate(CaseUpdateDto dto) {
+	private void saveEditedCaseUpdate(CaseUpdateDto dto, String noteText) {
 		if (dto == null || caseDao == null || appState == null || caseId == null)
 			return;
 
@@ -6751,7 +6705,7 @@ public class CaseController {
 			return;
 		}
 
-		String trimmedText = safeText(editingCaseUpdateDraftText).trim();
+		String trimmedText = safeText(noteText).trim();
 		if (trimmedText.isBlank()) {
 			showError("Update text is required.");
 			return;
@@ -6785,8 +6739,6 @@ public class CaseController {
 				{
 					if (caseId == null || caseId.longValue() != activeCaseId)
 						return;
-					editingCaseUpdateId = null;
-					editingCaseUpdateDraftText = "";
 					savingCaseUpdateEdit = false;
 					caseUpdatesLoadedOnce = true;
 					caseUpdatesStale = false;
