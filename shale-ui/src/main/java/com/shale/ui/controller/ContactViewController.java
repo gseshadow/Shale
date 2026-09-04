@@ -627,7 +627,11 @@ public final class ContactViewController {
             for (ContactSharedCaseLinkDto row : rows) {
                 CaseLinkDto link = row.caseLink();
                 Node card = caseLinkCardFactory.createReadOnly(link, CaseLinkCardFactory.Variant.COMPACT,
-                        new CaseLinkCardFactory.Actions(() -> openSharedLink(link), null, null, null, java.util.List.of()), onOpenContact);
+                		new CaseLinkCardFactory.Actions(
+                		        () -> openSharedLink(link),
+                		        null,
+                		        null,
+                		        null), onOpenContact);
                 if (card instanceof Region region) region.setMaxWidth(Double.MAX_VALUE);
                 group.getChildren().add(card);
             }

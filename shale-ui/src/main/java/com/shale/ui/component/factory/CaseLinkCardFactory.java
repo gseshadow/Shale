@@ -53,7 +53,9 @@ public final class CaseLinkCardFactory {
     private Node create(CaseLinkDto link, Variant variant, Actions actions, Consumer<Integer> onOpenContact, boolean showManagementActions) {
         Objects.requireNonNull(link, "link");
         Objects.requireNonNull(variant, "variant");
-        Actions safeActions = actions == null ? new Actions(null, null, null, null, java.util.List.of()) : actions;
+        Actions safeActions = actions == null
+                ? new Actions(null, null, null, null)
+                : actions;
 
         VBox card = new VBox();
         card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-clickable", "case-link-card", "case-link-card-" + variant.name().toLowerCase());
