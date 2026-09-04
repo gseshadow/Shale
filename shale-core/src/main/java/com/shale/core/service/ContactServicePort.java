@@ -62,7 +62,9 @@ public interface ContactServicePort {
 
 	ContactProfileMutationResult updateContactProfile(UpdateContactProfileCommand command);
 
-	ContactProfileMutationResult createContactProfile(CreateContactProfileCommand command);
+	default ContactProfileMutationResult createContactProfile(CreateContactProfileCommand command) {
+		throw new UnsupportedOperationException("Contact creation is not supported");
+	}
 
 	record ContactSummary(int id, String displayName, String email, String phone) {
 	}

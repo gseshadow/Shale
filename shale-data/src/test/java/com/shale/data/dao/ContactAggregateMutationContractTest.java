@@ -127,6 +127,14 @@ final class ContactAggregateMutationContractTest {
         assertEquals(1,occurrences(create,"tx(draft.shaleClientId(),draft.actorUserId(),false"),
                 "creation must own one tenant/actor transaction");
         assertTrue(create.contains("INSERT dbo.Contacts"),"the Contact must be inserted inside the aggregate transaction");
+        assertTrue(create.contains("CreatedAt,CreatedByUserId,UpdatedAt,UpdatedByUserId"),
+                "creation must initialize every required Contact timestamp and actor column");
+        assertEquals(2,occurrences(create,"p.setTimestamp(i++,now)"),
+                "CreatedAt and UpdatedAt must use the same transaction timestamp");
+        assertEquals(2,occurrences(create,"p.setInt(i++,draft.actorUserId())"),
+                "creation must initialize both actor columns from the authorized current actor");
+        assertTrue(create.contains("p.setInt(i++,draft.shaleClientId())"),
+                "creation must preserve the authorized tenant owner");
         assertTrue(create.contains("mutateAggregate(con,c,true)"),"children and classifications must share creation's transaction");
         assertTrue(shared.contains("applyIntent(con,c,DefinitionCategory.CONTACT_TYPE"));
         assertTrue(shared.contains("applyPhones(con,c,phones)"));
