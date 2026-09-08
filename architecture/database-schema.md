@@ -441,6 +441,37 @@ Organizations table.
 | `UpdatedAt`          | datetime2      | Updated timestamp |
 | `RowVer`             | timestamp      | Row version       |
 
+Phase 1A preserves all legacy columns and adds unique `(ShaleClientId, Id)` as a composite tenant FK
+target. `OrganizationTypeId` remains the runtime primary-type authority until the deferred dual-write
+and read cutover.
+
+### dbo.OrganizationTypes
+
+The existing identity table is the authoritative global/tenant overlay definition table. It retains
+`OrganizationTypeId int IDENTITY` and `Name nvarchar(100)`, while nullable `ShaleClientId` permits
+future global rows. It adds required `SystemKey nvarchar(64)`, `Color nvarchar(20)`, `SortOrder`,
+`IsActive`, `IsDeleted`, `CreatedAt`, and `RowVer`; nullable `Description nvarchar(500)`, actor IDs,
+and update/deletion timestamps complete the lifecycle contract. System keys are lowercase snake_case,
+with separate filtered uniqueness for global and tenant rows. Colors are uppercase `#RRGGBB`.
+
+The original seven rows remain tenant-7 definitions with IDs/names unchanged: Provider/provider,
+Facility/facility, Firm/firm, Agency/agency, Insurer/insurer, Lab/lab, and Other/other. Their zero-based
+`SortOrder` follows ID order; no global definitions are seeded. The former tenant-7 default is removed.
+Definitions use the existing `TenantFilter` policy with `sec.fn_FilterByTenantOrGlobal`.
+
+### dbo.OrganizationOrganizationTypes
+
+Historical many-to-many type assignments use bigint identity `Id`, strict non-null tenant ownership,
+`OrganizationId`, authoritative `OrganizationTypeId`, `IsPrimary`, nonnegative `SortOrder`, soft-delete
+lifecycle/actor fields, timestamps, and `RowVer`. Composite Organization ownership is enforced through
+`(ShaleClientId, OrganizationId)`; filtered indexes allow at most one active definition assignment and
+one active primary per Organization. The table uses strict `sec.fn_FilterByTenant` RLS. Phase 1A
+backfills one active primary row for every Organization, including deleted Organizations, but leaves
+the legacy type column unchanged. A matching historical row suppresses rerun backfill even when it was
+later soft-deleted; mutable definition presentation and lifecycle state are likewise never reset by a
+successful rerun. Definition global-or-same-tenant authorization remains a Phase 1C
+transactional validation because the stable type-ID FK cannot express that conditional relationship.
+
 ---
 
 ## dbo.CaseUpdates
