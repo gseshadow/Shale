@@ -38,6 +38,8 @@ import java.util.stream.Collectors;
 import com.shale.core.dto.CasePartyDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseOverviewAdministrationDto;
+import com.shale.core.dto.CaseOverviewDateConfigurationDto;
 import com.shale.core.dto.CaseTeamMembershipDto;
 import com.shale.core.dto.CaseTeamRoleDefinitionDto;
 import com.shale.core.dto.CaseDateDto;
@@ -108,6 +110,7 @@ import com.shale.ui.component.dialog.ClientAssignmentDialog;
 import com.shale.ui.component.dialog.ContactPickerDialog;
 import com.shale.ui.component.dialog.CreateContactDialog;
 import com.shale.ui.component.dialog.CaseDateOccurrenceDialog;
+import com.shale.ui.component.dialog.CaseOverviewEditorDialog;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
 import com.shale.ui.component.dialog.NewTaskDialog;
 import com.shale.ui.component.factory.UserCardFactory;
@@ -177,6 +180,7 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -247,6 +251,14 @@ public class CaseController {
 	private ScrollPane overviewScrollPane;
 	@FXML
 	private VBox overviewPane;
+	@FXML private GridPane overviewDetailsGrid;
+	@FXML private HBox overviewHeaderActionRow;
+	@FXML private Button editOverviewButton;
+	private final VBox configuredOverviewDates = new VBox();
+	private CaseOverviewDateConfigurationDto overviewDateConfiguration;
+	private List<CaseDateDto> overviewConfiguredDateValues = List.of();
+	private int overviewConfigurationGeneration;
+	private Runnable overviewEditorLauncher = this::openOverviewEditor;
 	@FXML
 	private VBox detailsSectionPane;
 	@FXML
@@ -927,6 +939,7 @@ public class CaseController {
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
+		refreshOverviewAdminAction();
 		this.runtimeBridge = runtimeBridge;
 		this.caseDocumentService = (caseDao == null || caseSummaryDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, caseSummaryDao, contactDao);
 		this.caseDocumentExportService = this.caseDocumentService == null ? null : new CaseDocumentExportService(this.caseDocumentService);
@@ -936,6 +949,7 @@ public class CaseController {
 		PerfLog.log("NAV", "start", "page=case_view caseId=" + caseId);
 		PerfLog.log("CTRL", "start", "controller=CaseController page=case_view caseId=" + caseId);
 		refreshHeader();
+		loadOverviewConfigurationAsync();
 	}
 
 	public void setMaterialRequestService(MaterialRequestServicePort materialRequestService) {
@@ -1022,6 +1036,7 @@ public class CaseController {
 		detailsEditor.setEditMode(false);
 		clearError();
 		wireLiveRefreshLifecycle();
+		configureOverviewAdministrationControls();
 
 		if (changeResponsibleAttorneyButton != null)
 			changeResponsibleAttorneyButton.setOnAction(e -> onEditResponsibleAttorneyField());
@@ -4569,6 +4584,69 @@ public class CaseController {
 	// ----------------------------
 	// Overview loading
 	// ----------------------------
+	private void configureOverviewAdministrationControls() {
+		ensureEditOverviewButtonPlacement();
+		if(editOverviewButton!=null){ControlStyles.apply(editOverviewButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.STANDARD);editOverviewButton.setOnAction(e->overviewEditorLauncher.run());refreshOverviewAdminAction();}
+		configuredOverviewDates.getStyleClass().add("case-overview-configured-dates");
+		if(overviewDetailsGrid!=null){List<Node> remove=overviewDetailsGrid.getChildren().stream().filter(n->{Integer r=GridPane.getRowIndex(n);return r!=null&&r>=4&&r<=8;}).toList();overviewDetailsGrid.getChildren().removeAll(remove);for(Node n:overviewDetailsGrid.getChildren()){Integer r=GridPane.getRowIndex(n);if(r!=null&&r>=9)GridPane.setRowIndex(n,r-4);}overviewDetailsGrid.add(configuredOverviewDates,0,4,3,1);}
+	}
+
+	void ensureEditOverviewButtonPlacement() {
+		if (editOverviewButton == null || overviewHeaderActionRow == null || deleteCaseButton == null) {
+			throw new IllegalStateException("Case Overview header controls were not injected from case.fxml.");
+		}
+		if (editOverviewButton.getParent() == overviewHeaderActionRow) {
+			verifyEditOverviewButtonPlacement();
+			return;
+		}
+		Parent currentParent = editOverviewButton.getParent();
+		if (!(currentParent instanceof Pane currentPane)) {
+			throw new IllegalStateException("Edit Overview cannot be moved safely from its injected parent: "
+					+ (currentParent == null ? "none" : currentParent.getClass().getName()));
+		}
+		currentPane.getChildren().remove(editOverviewButton);
+		int deleteIndex = overviewHeaderActionRow.getChildren().indexOf(deleteCaseButton);
+		if (deleteIndex < 0) {
+			throw new IllegalStateException("Delete Case is not attached to the Case Overview header action row.");
+		}
+		overviewHeaderActionRow.getChildren().add(deleteIndex, editOverviewButton);
+		verifyEditOverviewButtonPlacement();
+	}
+
+	private void verifyEditOverviewButtonPlacement() {
+		int editIndex = overviewHeaderActionRow.getChildren().indexOf(editOverviewButton);
+		int deleteIndex = overviewHeaderActionRow.getChildren().indexOf(deleteCaseButton);
+		long occurrences = overviewHeaderActionRow.getChildren().stream().filter(node -> node == editOverviewButton).count();
+		if (editOverviewButton.getParent() != overviewHeaderActionRow || occurrences != 1 || editIndex + 1 != deleteIndex) {
+			throw new IllegalStateException("Edit Overview must appear exactly once immediately before Delete Case in the Case Overview header.");
+		}
+	}
+
+	void refreshOverviewAdminAction() {
+		setVisibleManaged(editOverviewButton, appState != null && appState.isAdmin());
+	}
+
+	void setOverviewEditorLauncherForTest(Runnable launcher) {
+		overviewEditorLauncher = Objects.requireNonNull(launcher);
+	}
+
+	private void loadOverviewConfigurationAsync(){
+		if(caseService==null||appState==null||caseId==null||appState.getShaleClientId()==null||appState.getUserId()==null)return;
+		long activeCase=caseId;int tenant=appState.getShaleClientId(),actor=appState.getUserId(),generation=++overviewConfigurationGeneration;
+		configuredOverviewDates.getChildren().setAll(new Label("Loading overview dates…"));
+		caseDateExecutor.submit(()->{try{CaseOverviewDateConfigurationDto config=caseService.getCaseOverviewDateConfiguration(activeCase,tenant,actor);List<EffectiveCaseDateTypeDto> types=caseService.listEffectiveCaseDateTypes(tenant,actor);List<CaseDateDto> values=caseService.listCaseDatesForCase(activeCase,tenant,actor);Platform.runLater(()->{if(caseId==null||caseId.longValue()!=activeCase||generation!=overviewConfigurationGeneration)return;overviewDateConfiguration=config;effectiveCaseDateTypes=types==null?List.of():List.copyOf(types);overviewConfiguredDateValues=values==null?List.of():List.copyOf(values);renderConfiguredOverviewDates();});}catch(RuntimeException ex){LOG.error("Case Overview configuration load failed tenantId={} actorId={} caseId={}",tenant,actor,activeCase,ex);Platform.runLater(()->{if(generation==overviewConfigurationGeneration)configuredOverviewDates.getChildren().setAll(new Label("Overview dates could not be loaded."));});}});
+	}
+
+	private void renderConfiguredOverviewDates(){configuredOverviewDates.getChildren().clear();if(overviewDateConfiguration==null)return;for(EffectiveCaseDateTypeDto type:overviewDateConfiguration.visibleDateTypes()){CaseDateDto value=overviewConfiguredDateValues.stream().filter(d->d.caseDateTypeId()==type.id()).sorted(Comparator.comparing(CaseDateDto::startsAt).thenComparingLong(CaseDateDto::id)).findFirst().orElse(null);Region color=new Region();color.getStyleClass().add("case-overview-date-color");color.setStyle("-fx-background-color: "+type.color()+";");Label name=new Label(type.name());name.getStyleClass().add("case-overview-row-label");name.setMinWidth(150);Label display=new Label(value==null?"—":formatCaseDateOccurrence(value));display.getStyleClass().add("case-overview-row-value");HBox.setHgrow(display,Priority.ALWAYS);Button action=ActionButtonFactory.semantic(value==null?"Add":"Edit",e->openOverviewDate(type,value),ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);action.setAccessibleText((value==null?"Add ":"Edit ")+type.name());HBox row=new HBox(10,color,name,display,action);row.getStyleClass().add("case-overview-configured-date-row");configuredOverviewDates.getChildren().add(row);}}
+
+	private void openOverviewDate(EffectiveCaseDateTypeDto type,CaseDateDto value){if(value!=null){openCaseDateDialog(value);return;}List<EffectiveCaseDateTypeDto> ordered=new ArrayList<>();ordered.add(type);effectiveCaseDateTypes.stream().filter(t->t.id()!=type.id()).forEach(ordered::add);effectiveCaseDateTypes=List.copyOf(ordered);openCaseDateDialog(null);}
+
+	private void openOverviewEditor(){
+		if(appState==null||!appState.isAdmin()||caseService==null||caseDao==null||caseId==null)return;long activeCase=caseId;int tenant=appState.getShaleClientId(),actor=appState.getUserId();
+		caseDateExecutor.submit(()->{try{CaseOverviewAdministrationDto baseline=caseService.getCaseOverviewAdministration(activeCase,tenant,actor);List<CaseOverviewEditorDialog.UserOption> users=caseDao.listUsersForTenant(tenant).stream().map(u->new CaseOverviewEditorDialog.UserOption(u.id(),u.displayName(),u.color(),true)).toList();Platform.runLater(()->{if(caseId==null||caseId.longValue()!=activeCase)return;CaseOverviewEditorDialog.show(caseOverviewOwner(),baseline,users,s->saveOverviewSubmission(baseline,s,tenant,actor,activeCase),this::loadOverviewConfigurationAsync);});}catch(RuntimeException ex){LOG.error("Edit Overview load failed tenantId={} actorId={} caseId={}",tenant,actor,activeCase,ex);Platform.runLater(()->AppDialogs.showError(caseOverviewOwner(),"Edit Overview",rootMessage(ex)));}});
+	}
+
+	private java.util.concurrent.CompletionStage<String> saveOverviewSubmission(CaseOverviewAdministrationDto baseline,CaseOverviewEditorDialog.Submission s,int tenant,int actor,long activeCase){return java.util.concurrent.CompletableFuture.supplyAsync(()->{try{var command=new CaseServicePort.UpdateCaseOverviewCommand(tenant,actor,activeCase,s.orderedTypeIds(),s.intakeUserId(),baseline.configuration().rowVer(),baseline.caseRowVer(),s.layoutChanged(),s.intakeChanged());var result=caseService.updateCaseOverview(command);Platform.runLater(()->{overviewDateConfiguration=result.overview().configuration();latestCaseRowVer=result.overview().caseRowVer();renderConfiguredOverviewDates();if(result.changed())publishCaseFieldUpdated(activeCase,"overviewChanged",1);reloadCurrentCaseForViewMode();});return null;}catch(RuntimeException ex){LOG.warn("Edit Overview save failed tenantId={} actorId={} caseId={}",tenant,actor,activeCase,ex);return rootMessage(ex);}},caseDateExecutor);}
 
 	// ----------------------------
 	// Loading + applying data
@@ -4585,6 +4663,7 @@ public class CaseController {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
+		loadOverviewConfigurationAsync();
 		loadCompatibilityDatesAsync(activeCaseId);
 		caseUpdatesStale = true;
 		loadCaseUpdatesAsync();
@@ -4683,6 +4762,7 @@ public class CaseController {
 	private void refreshCaseDateViewsAfterLocalMutation(long activeCaseId, boolean compatibilityAffected) {
 		if (caseId == null || caseId.longValue() != activeCaseId) return;
 		caseDatesStale = true;
+		loadOverviewConfigurationAsync();
 		if ("Dates".equals(activeSectionName)) loadCaseDatesAsync();
 		if (compatibilityAffected) loadCompatibilityDatesAsync(activeCaseId);
 	}
@@ -5354,6 +5434,7 @@ public class CaseController {
 	private void refreshDeleteAction() {
 		boolean showDelete = current != null && caseDetailService != null && !editMode && !detailsEditMode;
 		setVisibleManaged(deleteCaseButton, showDelete);
+		refreshOverviewAdminAction();
 	}
 
 	// ----------------------------
