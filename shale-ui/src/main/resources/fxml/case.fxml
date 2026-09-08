@@ -81,7 +81,7 @@
 						<padding>
 							<Insets top="12" right="12" bottom="12" left="12" />
 						</padding>
-						<HBox alignment="CENTER_LEFT" spacing="8">
+						<HBox fx:id="overviewHeaderActionRow" alignment="CENTER_LEFT" spacing="8">
 							<Label fx:id="contentTitleLabel" text="Case Overview"
 								style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 							<Region HBox.hgrow="ALWAYS" />
