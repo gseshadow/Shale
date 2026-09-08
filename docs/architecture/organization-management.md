@@ -15,10 +15,10 @@ repository baseline, the intended product model, and the phased implementation b
 soft deletion, timestamps, and `RowVer`. The Java `Organization` model represents those legacy
 columns directly.
 
-`dbo.OrganizationTypes` already exists. Current runtime code only reads `OrganizationTypeId` and
-`Name`. `OrganizationDaoOrganizationTypeQueryTest` deliberately protects the verified fact that
-current Organization Type queries must not assume `OrganizationTypes.ShaleClientId` exists. A live
-catalog/data inventory is therefore required before writing the modernization migration.
+`dbo.OrganizationTypes` has now been modernized by the Phase 1A migration contract. Current runtime
+code still reads only `OrganizationTypeId` and `Name`; the new overlay fields and RLS are database
+foundation rather than a runtime read cutover. `OrganizationDaoOrganizationTypeQueryTest` therefore
+continues to protect the unchanged legacy query shape.
 
 No structured Organization phone, email, address, or website child tables exist in the repository.
 The equivalent Contact tables are `ContactPhoneNumbers`, `ContactEmailAddresses`, and
@@ -165,15 +165,32 @@ legacy contact-point population, duplicates, and representative data shapes. Run
 `Shale_Copy` or another approved administrative connection before writing Phase 1 SQL. Do not change
 schema or data.
 
-Repository inventory is complete in this document; live SQL evidence remains required.
+Repository inventory and the approved live Phase 0 inventory are complete. The verified baseline was
+176 tenant-7 Organizations (171 active and 5 deleted) and exactly seven tenant-7 Organization Types.
 
 ### Phase 1A — Organization Type foundation
 
-After reviewing Phase 0 output, add the compatible overlay fields, constraints, indexes, actor
+Implemented by `2026-09-08_organization_types_foundation_phase1a.sql` and its separate read-only
+verification contract. The migration adds the compatible overlay fields, constraints, indexes, actor
 metadata, lifecycle fields, color, ordering, and `RowVer` to the existing `OrganizationTypes` table.
 Attach the established tenant-or-global RLS predicate only after verifying the live policy contract.
 Add `OrganizationOrganizationTypes` with strict tenant RLS and composite Organization ownership.
 Backfill existing single-type assignments without changing visible behavior.
+
+The seven existing IDs, names, and tenant-7 ownership values remain unchanged and receive explicit
+stable keys, deterministic zero-based ordering, and the reviewed Shale-compatible palette. No global
+type is seeded. Every Organization, including the five soft-deleted rows, receives one active primary
+assignment matching its legacy `OrganizationTypeId`. Reruns insert only when no matching historical
+assignment exists, so a later soft removal is never restored, replaced, or duplicated. Reruns also
+preserve later definition color, ordering, lifecycle, timestamp, actor, and RowVer changes.
+The assignment's authoritative type-ID FK cannot alone enforce that a definition is global or belongs
+to the assignment tenant, so Phase 1C must validate that rule transactionally.
+
+`OrganizationTypes` uses `sec.fn_FilterByTenantOrGlobal`; `OrganizationOrganizationTypes` uses strict
+`sec.fn_FilterByTenant`. Both predicates attach to the single enabled existing `TenantFilter` policy.
+No runtime Java, audit allowlist, visible behavior, or legacy Organization column changes in Phase 1A.
+`Organizations.OrganizationTypeId` remains the compatibility primary-type authority until the later
+dual-write and read cutover.
 
 Deliver one guarded, rerunnable migration and a separate read-only verification script. Do not change
 runtime Java reads/writes or UI in Phase 1A.
