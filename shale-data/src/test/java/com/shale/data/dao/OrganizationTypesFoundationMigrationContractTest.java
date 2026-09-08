@@ -25,6 +25,9 @@ final class OrganizationTypesFoundationMigrationContractTest {
     private static boolean validColor(String color) {
         return color != null && color.matches("#[0-9A-F]{6}") && color.equals(color.toUpperCase(Locale.ROOT));
     }
+    private static boolean validSystemKey(String key) {
+        return key != null && key.matches("[a-z][a-z0-9_]*") && key.equals(key.toLowerCase(Locale.ROOT));
+    }
     private static String withoutSqlStringLiterals(String sql) {
         StringBuilder result = new StringBuilder(sql.length());
         boolean quoted = false;
@@ -71,6 +74,22 @@ final class OrganizationTypesFoundationMigrationContractTest {
         assertFalse(validColor("#ABCDEF "));
         assertFalse(validColor("#abcdef"));
         assertFalse(validColor("#ABCDE"));
+    }
+
+    @Test void systemKeyContractIsBinaryLowercaseSnakeCase() throws Exception {
+        String s = read("docs/sql/2026-09-08_organization_types_foundation_phase1a.sql");
+        String v = read("docs/sql/verification/2026-09-08_organization_types_foundation_phase1a_verification.sql");
+        for (String sql : new String[]{s, v}) {
+            assertTrue(sql.contains("SystemKey COLLATE Latin1_General_100_BIN2"));
+            assertTrue(sql.contains("LOWER(SystemKey) COLLATE Latin1_General_100_BIN2"));
+            assertTrue(sql.contains("LEFT(SystemKey,1) COLLATE Latin1_General_100_BIN2"));
+            assertTrue(sql.contains("systemkeycollatelatin1_general_100_bin2=lowersystemkeycollatelatin1_general_100_bin2"));
+        }
+        assertTrue(validSystemKey("provider"));
+        assertTrue(validSystemKey("provider_2"));
+        for (String invalid : new String[]{"Provider", "PROVIDER", "", "provider type", "provider-type", "provider!", "2provider"}) {
+            assertFalse(validSystemKey(invalid), invalid);
+        }
     }
 
     @Test void firstDeploymentDefersPostAddAndPostCreateBindingToDynamicSql() throws Exception {
