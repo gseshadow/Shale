@@ -1008,6 +1008,29 @@ If a combined All-mode load partially fails, the viewer must not present incompl
 
 ## Case Dates
 
+### Per-case Case Overview configuration (Phase 1, 2026-09-08)
+
+`dbo.CaseOverviewConfigurations` is the strict tenant-owned, one-row-per-Case marker that distinguishes
+an Overview which has never been customized from an explicitly saved customization. It stores Case and
+tenant identity, created/updated actor and UTC timestamps, and `RowVer`. Its normalized child,
+`dbo.CaseOverviewDateSelections`, stores selected authoritative `CaseDateTypes` identities with unique,
+zero-based contiguous `SortOrder`; no child rows therefore represents an intentionally empty layout.
+Both tables use the established strict tenant RLS predicate. The application resolves the five legacy
+Overview defaults in their existing order (Date of Injury, Date of Medical Negligence, Intake, Statute of
+Limitations, Tort Notice Deadline) only when the parent is absent. Replacement validates current effective
+tenant-overlay winners and commits the parent, ordered children, Case touch, and safe entity-action audit
+atomically. It never changes `CaseDates` and writes no Case Timeline row.
+
+`Cases.IntakeTakenByUserId` remains the existing nullable authoritative Intake By relationship; no duplicate
+column or historical `CreatedBy` backfill is introduced. Admin-only changes use the Case `RowVer`, retain
+inactive historical assignees on reads, accept only a new active same-tenant user, and append one
+transaction-bound `INTAKE_TAKEN_BY_CHANGED` timeline event only for a real change.
+
+Audit compatibility: layout replacement emits `CASE_OVERVIEW_CONFIGURATION` `CREATED`/`UPDATED` with only
+Case id and ordering count; Intake By emits `CASE` `UPDATED` with only Case id. The accompanying forward-only
+allowlist successor adds the new entity type. Neither audit metadata contains names, date values, RowVer, or
+other sensitive payloads.
+
 ### dbo.CaseDateTypes
 
 Customizable lookup for authoritative case-date meanings. Intake, Statute of Limitations, and Tort Notice Deadline are the only global required built-ins. The ten deployed noncritical definitions (Trial, Hearing, Mediation, Deposition, Discovery Deadline, Date of Injury, Date of Medical Negligence, Date Medical Negligence Was Discovered, Fee Agreement Signed, and Non-Engagement Letter Sent) are owned by tenant 7; tenant 8 begins built-in-only. Existing ids and references were preserved by changing ownership in place. Optional templates are outside this phase. Rows retain stable lowercase `SystemKey`, display `Name`, `Description`, constrained `CalendarCategory`, `Color`, `SupportsTime`, active/deleted lifecycle fields, actor metadata, timestamps, and `RowVer`.

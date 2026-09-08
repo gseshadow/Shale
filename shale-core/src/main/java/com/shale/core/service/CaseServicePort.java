@@ -16,6 +16,7 @@ import com.shale.core.dto.CaseStatusDto;
 import com.shale.core.dto.CaseTeamRoleDefinitionDto;
 import com.shale.core.dto.CaseTeamMembershipDto;
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseOverviewDateConfigurationDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkShareDto;
@@ -66,6 +67,18 @@ public interface CaseServicePort {
 	List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
 
 	List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId);
+
+	default CaseOverviewDateConfigurationDto getCaseOverviewDateConfiguration(long caseId, int shaleClientId, int actorUserId) {
+		throw new UnsupportedOperationException("Case Overview date configuration is unavailable.");
+	}
+
+	default CaseOverviewDateConfigurationDto replaceCaseOverviewDateConfiguration(ReplaceCaseOverviewDateConfigurationCommand command) {
+		throw new UnsupportedOperationException("Case Overview date configuration mutation is unavailable.");
+	}
+
+	default IntakeTakenByMutationResult updateIntakeTakenBy(UpdateIntakeTakenByCommand command) {
+		throw new UnsupportedOperationException("Intake By mutation is unavailable.");
+	}
 
 	default int resolveEffectiveCaseDateTypeId(int shaleClientId, int actorUserId, CaseDateSemanticRole role) {
 		throw unsupportedCaseLinkOperation("resolveEffectiveCaseDateTypeId");
@@ -459,4 +472,25 @@ public interface CaseServicePort {
 	/** Stable identity and lossless value for an authoritative mapped Case Date. */
 	record CreateMappedCaseDate(String systemKey, Integer caseDateTypeId,
 			java.time.LocalDateTime startsAt, java.time.LocalDateTime endsAt, boolean allDay) {}
+
+	record ReplaceCaseOverviewDateConfigurationCommand(int shaleClientId, int actorUserId, long caseId,
+			List<Integer> orderedCaseDateTypeIds, byte[] expectedRowVer) {
+		public ReplaceCaseOverviewDateConfigurationCommand {
+			orderedCaseDateTypeIds = orderedCaseDateTypeIds == null ? List.of() : List.copyOf(orderedCaseDateTypeIds);
+			expectedRowVer = copyRowVer(expectedRowVer);
+		}
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record UpdateIntakeTakenByCommand(int shaleClientId, int actorUserId, long caseId,
+			Integer intakeTakenByUserId, byte[] expectedCaseRowVer) {
+		public UpdateIntakeTakenByCommand { expectedCaseRowVer = copyRowVer(expectedCaseRowVer); }
+		@Override public byte[] expectedCaseRowVer() { return copyRowVer(expectedCaseRowVer); }
+	}
+
+	record IntakeTakenByMutationResult(long caseId, Integer intakeTakenByUserId,
+			String intakeTakenByDisplayName, byte[] caseRowVer, boolean changed) {
+		public IntakeTakenByMutationResult { caseRowVer = copyRowVer(caseRowVer); }
+		@Override public byte[] caseRowVer() { return copyRowVer(caseRowVer); }
+	}
 }
