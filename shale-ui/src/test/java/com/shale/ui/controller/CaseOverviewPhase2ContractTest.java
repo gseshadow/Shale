@@ -1,0 +1,10 @@
+package com.shale.ui.controller;
+import static org.junit.jupiter.api.Assertions.*;
+import java.nio.file.*;
+import org.junit.jupiter.api.Test;
+class CaseOverviewPhase2ContractTest {
+ @Test void adminEntryPointHasNoManagedPlaceholderAndUsesAtomicCommand()throws Exception{String f=Files.readString(Path.of("src/main/resources/fxml/case.fxml"));String c=Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));assertTrue(f.contains("fx:id=\"editOverviewButton\""));assertTrue(c.contains("appState != null && appState.isAdmin()"));assertTrue(c.contains("setVisibleManaged(editOverviewButton"));assertTrue(c.contains("new CaseServicePort.UpdateCaseOverviewCommand"));assertFalse(c.contains("replaceCaseOverviewDateConfiguration(command)"));}
+ @Test void overviewDatesAreConfigurationDrivenAndIdentityBound()throws Exception{String c=Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));assertTrue(c.contains("overviewDateConfiguration.visibleDateTypes()"));assertTrue(c.contains("d.caseDateTypeId()==type.id()"));assertTrue(c.contains("openOverviewDate(type,value)"));assertTrue(c.contains("caseService.listCaseDatesForCase"));}
+ @Test void successfulCombinedSavePublishesOnceAndFailuresPublishNothing()throws Exception{String c=Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));String m=c.substring(c.indexOf("saveOverviewSubmission("),c.indexOf("// ----------------------------",c.indexOf("saveOverviewSubmission(")));assertEquals(1,count(m,"publishCaseFieldUpdated"));assertTrue(m.contains("if(result.changed())"));assertTrue(m.indexOf("caseService.updateCaseOverview")<m.indexOf("publishCaseFieldUpdated"));}
+ private static int count(String s,String token){int n=0,p=0;while((p=s.indexOf(token,p))>=0){n++;p+=token.length();}return n;}
+}

@@ -21,7 +21,7 @@ class CaseOverviewConfigurationContractTest {
   assertTrue(s.contains("RowVer=?")); assertTrue(s.contains("con.setAutoCommit(false)")); assertTrue(s.contains("con.rollback()"));
   assertTrue(s.contains("CaseDateTypeSemanticRoleMappings")); assertTrue(s.contains("is not effective for this tenant"));
   assertTrue(s.contains("INTAKE_TAKEN_BY_CHANGED")); assertTrue(s.contains("CaseTimelineWriter.append"));
-  assertEquals(1,count(s,"CaseTimelineWriter.append"),"only Intake By, not layout, writes timeline");
+  assertEquals(2,count(s,"CaseTimelineWriter.append"),"individual and combined Intake By paths each own one conditional timeline append");
   assertTrue(s.contains("EntityType.CASE_OVERVIEW_CONFIGURATION"));
   assertTrue(s.contains("Objects.equals(before.userId,c.intakeTakenByUserId())"));
   assertTrue(s.contains("ISNULL(IsRemoved,0)=0"));
@@ -31,6 +31,8 @@ class CaseOverviewConfigurationContractTest {
   assertTrue(s.contains("SET XACT_ABORT ON")); assertTrue(s.contains("BEGIN TRY")); assertTrue(s.contains("BEGIN TRANSACTION"));
   assertTrue(s.contains("UQ_CaseOverviewConfigurations_TenantCase")); assertTrue(s.contains("UQ_CaseOverviewDateSelections_ConfigType"));
   assertTrue(s.contains("UQ_CaseOverviewDateSelections_ConfigOrder")); assertTrue(s.contains("sec.fn_FilterByTenant(ShaleClientId)"));
+  assertTrue(s.contains("ShaleClientId int NOT NULL, CaseId int NOT NULL"));
+  assertFalse(s.contains("CaseId bigint NOT NULL"));
   assertFalse(s.contains("UPDATE dbo.Cases")); assertFalse(s.contains("UPDATE dbo.CaseDates"));
  }
  @Test void productionServiceAdapterExposesTheThreeDaoOperations() throws Exception {
@@ -38,6 +40,20 @@ class CaseOverviewConfigurationContractTest {
   assertTrue(s.contains("requireOverviewConfigurationDao().get(caseId,tenant,actor)"));
   assertTrue(s.contains("requireOverviewConfigurationDao().replace(c)"));
   assertTrue(s.contains("requireOverviewConfigurationDao().updateIntakeTakenBy(c)"));
+  assertTrue(s.contains("requireOverviewConfigurationDao().update(c)"));
+ }
+ @Test void combinedSaveOwnsOneTransactionAndPreservesAtomicTimelineRules() throws Exception {
+  String s=Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseOverviewConfigurationDao.java"));
+  String combined=s.substring(s.indexOf("public CaseOverviewMutationResult update("),s.indexOf("public CaseOverviewDateConfigurationDto replace("));
+  assertEquals(1,count(combined,"con.setAutoCommit(false)"));assertEquals(1,count(combined,"con.commit()"));assertTrue(combined.contains("con.rollback()"));
+  assertEquals(1,count(combined,"CaseTimelineWriter.append"),"only a true Intake By change writes one timeline row");
+  assertTrue(combined.contains("if(!c.layoutChanged()&&!c.intakeTakenByChanged())"));assertTrue(combined.contains("updateCaseOnce"));
+  assertTrue(combined.contains("retained"),"configured inactive type identities remain valid while retained");
+ }
+ @Test void overviewUserCandidatesExcludeRemovedUsers() throws Exception {
+  String s=Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
+  int start=s.indexOf("public List<UserRow> listUsersForTenant");int end=s.indexOf("public List<CaseUserTeamRow>",start);
+  assertTrue(s.substring(start,end).contains("u.IsRemoved = 0"));
  }
  @Test void auditAllowlistSuccessorIsTransactionalAndAddsSafeEntityVocabulary() throws Exception {
   String s=Files.readString(Path.of("../docs/sql/2026-09-08_entity_action_audit_case_overview_configuration.sql"));

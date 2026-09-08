@@ -77,6 +77,8 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override public com.shale.core.dto.CaseOverviewDateConfigurationDto getCaseOverviewDateConfiguration(long caseId,int tenant,int actor){return requireOverviewConfigurationDao().get(caseId,tenant,actor);}
 	@Override public com.shale.core.dto.CaseOverviewDateConfigurationDto replaceCaseOverviewDateConfiguration(ReplaceCaseOverviewDateConfigurationCommand c){return requireOverviewConfigurationDao().replace(c);}
 	@Override public IntakeTakenByMutationResult updateIntakeTakenBy(UpdateIntakeTakenByCommand c){return requireOverviewConfigurationDao().updateIntakeTakenBy(c);}
+	@Override public com.shale.core.dto.CaseOverviewAdministrationDto getCaseOverviewAdministration(long caseId,int tenant,int actor){return requireOverviewConfigurationDao().getAdministration(caseId,tenant,actor);}
+	@Override public CaseOverviewMutationResult updateCaseOverview(UpdateCaseOverviewCommand c){return requireOverviewConfigurationDao().update(c);}
 	private com.shale.data.dao.CaseOverviewConfigurationDao requireOverviewConfigurationDao(){if(caseOverviewConfigurationDao==null)throw new UnsupportedOperationException("Case Overview configuration is unavailable from this test gateway.");return caseOverviewConfigurationDao;}
 
 	@Override public List<CaseTeamRoleDefinitionDto> listCaseTeamRolesForAdministration(int tenant,int actor){ return requireCaseTeamRoleDao().listForAdministration(tenant,actor); }
