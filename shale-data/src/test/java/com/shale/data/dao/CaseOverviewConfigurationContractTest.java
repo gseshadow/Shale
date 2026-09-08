@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import java.nio.file.*;
 import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class CaseOverviewConfigurationContractTest {
@@ -49,6 +51,21 @@ class CaseOverviewConfigurationContractTest {
   assertEquals(1,count(combined,"CaseTimelineWriter.append"),"only a true Intake By change writes one timeline row");
   assertTrue(combined.contains("if(!c.layoutChanged()&&!c.intakeTakenByChanged())"));assertTrue(combined.contains("updateCaseOnce"));
   assertTrue(combined.contains("retained"),"configured inactive type identities remain valid while retained");
+ }
+ @Test void overviewCaseMutationsUseOnlyDeployedModificationColumnsAndConcurrencyPredicate() throws Exception {
+  String source=Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseOverviewConfigurationDao.java"));
+  var matcher=Pattern.compile("UPDATE dbo\\.Cases SET ([^\\\"]+) WHERE").matcher(source);
+  int caseUpdates=0;
+  while(matcher.find()) {
+   caseUpdates++;
+   Set<String> columns=Pattern.compile(",").splitAsStream(matcher.group(1)).map(v->v.substring(0,v.indexOf('='))).collect(java.util.stream.Collectors.toSet());
+   assertTrue(Set.of("IntakeTakenByUserId","UpdatedAt").containsAll(columns),"Cases mutation referenced undeployed modification columns: "+columns);
+   assertTrue(columns.contains("UpdatedAt"),"every Overview Cases mutation must advance RowVer through UpdatedAt");
+  }
+  assertEquals(4,caseUpdates,"the combined, standalone Intake By, and layout-only Cases mutation variants must all be inspected");
+  assertTrue(source.contains("UPDATE dbo.Cases SET IntakeTakenByUserId=?,UpdatedAt=SYSDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0 AND RowVer=?"));
+  assertTrue(source.contains("UPDATE dbo.Cases SET UpdatedAt=SYSDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0 AND RowVer=?"));
+  assertTrue(source.contains("UPDATE dbo.Cases SET UpdatedAt=SYSDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0"));
  }
  @Test void overviewUserCandidatesExcludeRemovedUsers() throws Exception {
   String s=Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
