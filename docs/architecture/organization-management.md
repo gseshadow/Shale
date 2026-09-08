@@ -180,7 +180,9 @@ Backfill existing single-type assignments without changing visible behavior.
 The seven existing IDs, names, and tenant-7 ownership values remain unchanged and receive explicit
 stable keys, deterministic zero-based ordering, and the reviewed Shale-compatible palette. No global
 type is seeded. Every Organization, including the five soft-deleted rows, receives one active primary
-assignment matching its legacy `OrganizationTypeId`; reruns insert only a missing active assignment.
+assignment matching its legacy `OrganizationTypeId`. Reruns insert only when no matching historical
+assignment exists, so a later soft removal is never restored, replaced, or duplicated. Reruns also
+preserve later definition color, ordering, lifecycle, timestamp, actor, and RowVer changes.
 The assignment's authoritative type-ID FK cannot alone enforce that a definition is global or belongs
 to the assignment tenant, so Phase 1C must validate that rule transactionally.
 

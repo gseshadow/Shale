@@ -19,13 +19,19 @@ IF (SELECT COUNT(*) FROM sys.security_policies WHERE name=N'TenantFilter')<>1 TH
 SELECT @PolicyId=object_id,@Policy=QUOTENAME(SCHEMA_NAME(schema_id))+N'.'+QUOTENAME(name) FROM sys.security_policies WHERE name=N'TenantFilter' AND is_enabled=1;
 IF @PolicyId IS NULL THROW 57006,'TenantFilter must be enabled.',1;
 
-/* The explicit semantic mapping is safe only for the verified Phase 0 baseline. */
-IF COL_LENGTH(N'dbo.OrganizationTypes',N'SystemKey') IS NULL AND ((SELECT COUNT_BIG(*) FROM dbo.OrganizationTypes)<>7 OR EXISTS(
+/* Capture immutable foundation state before adding/backfilling any Phase 1A column. Mutable color,
+   ordering, and lifecycle values must never be used to infer whether this is the first deployment. */
+DECLARE @IsFirstFoundationDeployment bit=CASE WHEN COL_LENGTH(N'dbo.OrganizationTypes',N'SystemKey') IS NULL
+ AND COL_LENGTH(N'dbo.OrganizationTypes',N'Color') IS NULL AND COL_LENGTH(N'dbo.OrganizationTypes',N'SortOrder') IS NULL
+ AND COL_LENGTH(N'dbo.OrganizationTypes',N'IsActive') IS NULL AND COL_LENGTH(N'dbo.OrganizationTypes',N'IsDeleted') IS NULL
+ AND COL_LENGTH(N'dbo.OrganizationTypes',N'RowVer') IS NULL THEN 1 ELSE 0 END;
+/* The explicit semantic mapping is safe only for the verified first-deployment Phase 0 baseline. */
+IF @IsFirstFoundationDeployment=1 AND ((SELECT COUNT_BIG(*) FROM dbo.OrganizationTypes)<>7 OR EXISTS(
  SELECT 1 FROM (VALUES(1,N'Provider',7),(2,N'Facility',7),(3,N'Firm',7),(4,N'Agency',7),(5,N'Insurer',7),(6,N'Lab',7),(7,N'Other',7)) e(Id,Name,Tenant)
  FULL JOIN dbo.OrganizationTypes d ON d.OrganizationTypeId=e.Id
  WHERE e.Id IS NULL OR d.OrganizationTypeId IS NULL OR d.Name<>e.Name OR d.ShaleClientId<>e.Tenant))
  THROW 57007,'OrganizationTypes differs from the exact seven-row Phase 0 baseline; manual semantic review is required.',1;
-IF COL_LENGTH(N'dbo.OrganizationTypes',N'SystemKey') IS NOT NULL AND EXISTS(
+IF @IsFirstFoundationDeployment=0 AND EXISTS(
  SELECT 1 FROM (VALUES(1,N'Provider',7),(2,N'Facility',7),(3,N'Firm',7),(4,N'Agency',7),(5,N'Insurer',7),(6,N'Lab',7),(7,N'Other',7)) e(Id,Name,Tenant)
  LEFT JOIN dbo.OrganizationTypes d ON d.OrganizationTypeId=e.Id WHERE d.OrganizationTypeId IS NULL OR d.Name<>e.Name OR d.ShaleClientId<>e.Tenant)
  THROW 57024,'A preserved baseline OrganizationType ID, name, or tenant changed.',1;
@@ -63,9 +69,17 @@ IF COL_LENGTH(N'dbo.OrganizationTypes',N'DeletedAt') IS NULL ALTER TABLE dbo.Org
 IF COL_LENGTH(N'dbo.OrganizationTypes',N'DeletedByUserId') IS NULL ALTER TABLE dbo.OrganizationTypes ADD DeletedByUserId int NULL;
 IF COL_LENGTH(N'dbo.OrganizationTypes',N'RowVer') IS NULL ALTER TABLE dbo.OrganizationTypes ADD RowVer rowversion NOT NULL;
 
+IF @IsFirstFoundationDeployment=1
 UPDATE d SET SystemKey=v.SystemKey,Color=v.Color,SortOrder=v.SortOrder,IsActive=1,IsDeleted=0,CreatedAt=COALESCE(d.CreatedAt,SYSUTCDATETIME())
 FROM dbo.OrganizationTypes d JOIN (VALUES(1,N'provider',N'#0F766E',0),(2,N'facility',N'#2563EB',1),(3,N'firm',N'#7C3AED',2),(4,N'agency',N'#D97706',3),(5,N'insurer',N'#059669',4),(6,N'lab',N'#0891B2',5),(7,N'other',N'#6B7280',6))v(Id,SystemKey,Color,SortOrder) ON v.Id=d.OrganizationTypeId
-WHERE d.SystemKey IS NULL OR d.SystemKey<>v.SystemKey OR d.Color IS NULL OR d.Color<>v.Color OR d.SortOrder IS NULL OR d.SortOrder<>v.SortOrder OR d.IsActive IS NULL OR d.IsDeleted IS NULL OR d.CreatedAt IS NULL;
+WHERE d.SystemKey IS NULL OR d.Color IS NULL OR d.SortOrder IS NULL OR d.IsActive IS NULL OR d.IsDeleted IS NULL OR d.CreatedAt IS NULL;
+ELSE
+UPDATE d SET SystemKey=COALESCE(d.SystemKey,v.SystemKey),Color=COALESCE(d.Color,N'#6C757D'),SortOrder=COALESCE(d.SortOrder,v.SortOrder),
+ IsActive=COALESCE(d.IsActive,CONVERT(bit,1)),IsDeleted=COALESCE(d.IsDeleted,CONVERT(bit,0)),CreatedAt=COALESCE(d.CreatedAt,SYSUTCDATETIME())
+FROM dbo.OrganizationTypes d JOIN (VALUES(1,N'provider',0),(2,N'facility',1),(3,N'firm',2),(4,N'agency',3),(5,N'insurer',4),(6,N'lab',5),(7,N'other',6))v(Id,SystemKey,SortOrder) ON v.Id=d.OrganizationTypeId
+WHERE d.SystemKey IS NULL OR d.Color IS NULL OR d.SortOrder IS NULL OR d.IsActive IS NULL OR d.IsDeleted IS NULL OR d.CreatedAt IS NULL;
+IF EXISTS(SELECT 1 FROM (VALUES(1,N'provider'),(2,N'facility'),(3,N'firm'),(4,N'agency'),(5,N'insurer'),(6,N'lab'),(7,N'other'))v(Id,SystemKey) LEFT JOIN dbo.OrganizationTypes d ON d.OrganizationTypeId=v.Id WHERE d.SystemKey<>v.SystemKey OR d.SystemKey IS NULL)
+ THROW 57025,'A preserved baseline OrganizationType SystemKey is missing or changed.',1;
 
 IF EXISTS(SELECT 1 FROM dbo.OrganizationTypes WHERE SystemKey IS NULL OR Color IS NULL OR SortOrder IS NULL OR IsActive IS NULL OR IsDeleted IS NULL OR CreatedAt IS NULL) THROW 57010,'Definition backfill is incomplete.',1;
 ALTER TABLE dbo.OrganizationTypes ALTER COLUMN SystemKey nvarchar(64) NOT NULL;
@@ -103,7 +117,8 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.Organiza
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'UX_OrganizationTypes_Tenant_SystemKey') CREATE UNIQUE INDEX UX_OrganizationTypes_Tenant_SystemKey ON dbo.OrganizationTypes(ShaleClientId,SystemKey) WHERE ShaleClientId IS NOT NULL;
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.Organizations') AND name=N'UX_Organizations_ShaleClientId_Id') CREATE UNIQUE INDEX UX_Organizations_ShaleClientId_Id ON dbo.Organizations(ShaleClientId,Id);
 
-IF OBJECT_ID(N'dbo.OrganizationOrganizationTypes',N'U') IS NULL CREATE TABLE dbo.OrganizationOrganizationTypes(
+DECLARE @IsFirstAssignmentDeployment bit=CASE WHEN OBJECT_ID(N'dbo.OrganizationOrganizationTypes',N'U') IS NULL THEN 1 ELSE 0 END;
+IF @IsFirstAssignmentDeployment=1 CREATE TABLE dbo.OrganizationOrganizationTypes(
  Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_OrganizationOrganizationTypes PRIMARY KEY, ShaleClientId int NOT NULL, OrganizationId int NOT NULL, OrganizationTypeId int NOT NULL,
  IsPrimary bit NOT NULL CONSTRAINT DF_OrganizationOrganizationTypes_IsPrimary DEFAULT(0), SortOrder int NOT NULL CONSTRAINT DF_OrganizationOrganizationTypes_SortOrder DEFAULT(0),
  IsDeleted bit NOT NULL CONSTRAINT DF_OrganizationOrganizationTypes_IsDeleted DEFAULT(0), CreatedAt datetime2 NOT NULL CONSTRAINT DF_OrganizationOrganizationTypes_CreatedAt DEFAULT(SYSUTCDATETIME()), CreatedByUserId int NULL,
@@ -133,7 +148,9 @@ IF EXISTS(SELECT 1 FROM sys.foreign_keys f WHERE f.parent_object_id IN(OBJECT_ID
 
 INSERT dbo.OrganizationOrganizationTypes(ShaleClientId,OrganizationId,OrganizationTypeId,IsPrimary,SortOrder,IsDeleted,CreatedAt)
 SELECT o.ShaleClientId,o.Id,o.OrganizationTypeId,1,0,0,SYSUTCDATETIME() FROM dbo.Organizations o
-WHERE NOT EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes a WHERE a.ShaleClientId=o.ShaleClientId AND a.OrganizationId=o.Id AND a.OrganizationTypeId=o.OrganizationTypeId AND a.IsDeleted=0);
+WHERE NOT EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes a WHERE a.ShaleClientId=o.ShaleClientId AND a.OrganizationId=o.Id AND a.OrganizationTypeId=o.OrganizationTypeId);
+IF @IsFirstAssignmentDeployment=1 AND ((SELECT COUNT_BIG(*) FROM dbo.OrganizationOrganizationTypes WHERE IsDeleted=0 AND IsPrimary=1)<>176 OR EXISTS(SELECT 1 FROM dbo.Organizations o WHERE NOT EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes a WHERE a.ShaleClientId=o.ShaleClientId AND a.OrganizationId=o.Id AND a.OrganizationTypeId=o.OrganizationTypeId AND a.IsDeleted=0 AND a.IsPrimary=1)))
+ THROW 57026,'Initial assignment backfill did not create exactly 176 matching active primary assignments.',1;
 
 /* Type ownership (global or same tenant) cannot be expressed by the simple authoritative-ID FK;
    Phase 1C must validate it transactionally. The backfill is nevertheless checked here. */

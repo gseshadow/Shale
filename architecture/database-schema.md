@@ -467,7 +467,9 @@ lifecycle/actor fields, timestamps, and `RowVer`. Composite Organization ownersh
 `(ShaleClientId, OrganizationId)`; filtered indexes allow at most one active definition assignment and
 one active primary per Organization. The table uses strict `sec.fn_FilterByTenant` RLS. Phase 1A
 backfills one active primary row for every Organization, including deleted Organizations, but leaves
-the legacy type column unchanged. Definition global-or-same-tenant authorization remains a Phase 1C
+the legacy type column unchanged. A matching historical row suppresses rerun backfill even when it was
+later soft-deleted; mutable definition presentation and lifecycle state are likewise never reset by a
+successful rerun. Definition global-or-same-tenant authorization remains a Phase 1C
 transactional validation because the stable type-ID FK cannot express that conditional relationship.
 
 ---
