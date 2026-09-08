@@ -1103,15 +1103,6 @@ public class CaseController {
 		}
 		if (addOrganizationButton != null)
 			addOrganizationButton.setOnAction(e -> onAddRelatedEntity());
-		if (caseUpdatesComposerArea != null) {
-			caseUpdatesComposerArea.setOnKeyPressed(e ->
-			{
-				if (e.isControlDown() && e.getCode() == javafx.scene.input.KeyCode.ENTER) {
-					onSubmitCaseUpdate();
-					e.consume();
-				}
-			});
-		}
 	}
 
 	private void ensureStyleClass(javafx.scene.Node node, String styleClass) {
@@ -6536,7 +6527,7 @@ public class CaseController {
 			showError("Case updates are unavailable.");
 			return;
 		}
-		if (caseUpdatesComposerArea == null || submitCaseUpdateButton == null) {
+		if (submitCaseUpdateButton == null) {
 			showError("Case updates controls are unavailable.");
 			return;
 		}
@@ -6547,7 +6538,20 @@ public class CaseController {
 			return;
 		}
 
-		String trimmedText = safeText(caseUpdatesComposerArea.getText()).trim();
+		EnhancedTextArea.openEditor(dialogOwner(submitCaseUpdateButton), "Add Case Update", "", this::saveNewCaseUpdate);
+	}
+
+	private void saveNewCaseUpdate(String noteText) {
+		if (caseDao == null || appState == null || caseId == null || submitCaseUpdateButton == null) {
+			showError("Case updates are unavailable.");
+			return;
+		}
+		Integer shaleClientId = appState.getShaleClientId();
+		if (shaleClientId == null || shaleClientId <= 0) {
+			showError("No tenant is selected.");
+			return;
+		}
+		String trimmedText = safeText(noteText).trim();
 		if (trimmedText.isBlank()) {
 			showError("Update text is required.");
 			return;
@@ -6558,7 +6562,6 @@ public class CaseController {
 		final Integer createdByUserId = appState.getUserId();
 
 		submitCaseUpdateButton.setDisable(true);
-		caseUpdatesComposerArea.setDisable(true);
 		clearError();
 
 		new Thread(() ->
@@ -6588,8 +6591,6 @@ public class CaseController {
 				runOnFx(() ->
 				{
 					showError("Failed to save case update. " + ex.getMessage());
-					if (caseUpdatesComposerArea != null)
-						caseUpdatesComposerArea.setDisable(false);
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
 				});
