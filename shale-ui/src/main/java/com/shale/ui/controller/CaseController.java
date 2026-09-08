@@ -485,6 +485,8 @@ public class CaseController {
 	private Button btnEditTeam;
 
 	@FXML
+	private EnhancedTextArea caseUpdatesComposerArea;
+	@FXML
 	private Button submitCaseUpdateButton;
 	@FXML
 	private TextField caseUpdatesSearchField;
@@ -6573,6 +6575,10 @@ public class CaseController {
 				{
 					if (caseId == null || caseId.longValue() != activeCaseId)
 						return;
+					if (caseUpdatesComposerArea != null) {
+						caseUpdatesComposerArea.setText("");
+						caseUpdatesComposerArea.setDisable(false);
+					}
 					caseUpdatesLoadedOnce = true;
 					caseUpdatesStale = false;
 					renderCaseUpdates(updates);

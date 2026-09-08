@@ -8,27 +8,62 @@ import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
 
+import com.shale.ui.component.EnhancedTextArea;
+import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
+
 /** Protects the shared narrative-editor contract for Case Updates. */
 final class CaseUpdatesNarrativeEditorTest {
     private static final String CONTROLLER = read("src/main/java/com/shale/ui/controller/CaseController.java");
     private static final String FXML = read("src/main/resources/fxml/case.fxml");
+    private static final String ENHANCED_TEXT_AREA = read("src/main/java/com/shale/ui/component/EnhancedTextArea.java");
 
     @Test
-    void addUsesTransactionalSharedPopupAndExistingSavePath() {
-        String open = method("private void onSubmitCaseUpdateInternal()", "private void saveNewCaseUpdate");
-        String save = method("private void saveNewCaseUpdate", "private void handleMedicalRecordsRequestedSafeguardAfterSavedUpdate");
+    void newUpdateUsesInlineEnhancedDraftAndSubmitRemainsAuthoritative() {
+        String submit = method("private void onSubmitCaseUpdateInternal()", "private void handleMedicalRecordsRequestedSafeguardAfterSavedUpdate");
 
-        assertTrue(FXML.contains("fx:id=\"submitCaseUpdateButton\" text=\"Add Case Update\""),
-                "Case Updates should expose the established Add action");
-        assertFalse(FXML.contains("fx:id=\"caseUpdatesComposerArea\""),
-                "Case Updates should no longer expose a raw inline TextArea composer");
-        assertTrue(open.contains("EnhancedTextArea.openEditor") && open.contains("\"Add Case Update\"")
-                        && open.contains("this::saveNewCaseUpdate"),
-                "Add must use the shared popup and persist only from its Apply callback");
-        assertTrue(save.contains("trimmedText.isBlank()") && save.contains("Update text is required."),
+        assertTrue(FXML.contains("<EnhancedTextArea fx:id=\"caseUpdatesComposerArea\""),
+                "Case Updates should keep an immediately editable inline EnhancedTextArea draft");
+        assertFalse(FXML.contains("<TextArea fx:id=\"caseUpdatesComposerArea\""),
+                "The inline composer must not regress to a raw JavaFX TextArea");
+        assertTrue(FXML.contains("editorTitle=\"Case Update\"")
+                        && FXML.contains("expandable=\"true\"")
+                        && FXML.contains("spellCheckEnabled=\"true\"")
+                        && FXML.contains("prefRowCount=\"4\""),
+                "The compact composer should expose the shared popup and authenticated spellcheck defaults");
+        assertTrue(FXML.contains("fx:id=\"submitCaseUpdateButton\" text=\"Submit\""),
+                "The existing Submit action must remain authoritative for creation");
+        assertTrue(submit.contains("caseUpdatesComposerArea.getText()"),
+                "Submit must read the current inline draft, including popup-applied changes");
+        assertFalse(submit.contains("EnhancedTextArea.openEditor"),
+                "Submit must not be replaced by a popup-only Add workflow");
+        assertTrue(submit.contains("trimmedText.isBlank()") && submit.contains("Update text is required."),
                 "The existing blank-update validation must remain before persistence");
-        assertTrue(save.contains("caseDao.addCaseNote(activeCaseId, activeClientId, trimmedText, createdByUserId)"),
-                "Apply must retain the authoritative Case Update DAO save path and actor context");
+        assertTrue(submit.contains("caseDao.addCaseNote(activeCaseId, activeClientId, trimmedText, createdByUserId)"),
+                "Submit must retain the authoritative Case Update DAO save path and actor context");
+        assertTrue(submit.contains("caseUpdatesComposerArea.setText(\"\")")
+                        && submit.contains("renderCaseUpdates(updates)"),
+                "A successful Submit must clear the draft and refresh saved updates");
+    }
+
+    @Test
+    void composerPopupApplyChangesOnlyDraftAndCancelLeavesItUntouched() {
+        EnhancedTextArea composer = new EnhancedTextArea();
+        composer.setText("Order records from UNM");
+
+        var applied = composer.createExpandedEdit();
+        applied.setDraft("**Order** records from UNM");
+        composer.applyExpandedEdit(applied);
+        assertTrue("**Order** records from UNM".equals(composer.getText()),
+                "Applying the expanded form editor should update only its inline draft value");
+
+        var cancelled = composer.createExpandedEdit();
+        cancelled.setDraft("This popup change is cancelled");
+        assertTrue("**Order** records from UNM".equals(composer.getText()),
+                "Discarding the isolated popup draft must leave the inline value unchanged");
+        assertTrue(ENHANCED_TEXT_AREA.contains("isSpellCheckEnabled(), this::setText"),
+                "The embedded popup Apply callback must target the control value, not Case persistence");
+        assertFalse(ENHANCED_TEXT_AREA.contains("CaseDao"),
+                "The shared form editor must remain independent from Case Update persistence");
     }
 
     @Test
@@ -45,14 +80,26 @@ final class CaseUpdatesNarrativeEditorTest {
                 "Edit must initialize the shared popup from persisted text and save only on Apply");
         assertTrue(save.contains("caseDao.updateCaseNote(caseUpdateId, activeCaseId, activeClientId, activeActorUserId, trimmedText)"),
                 "Apply must preserve Case Update identity, case, tenant, actor, and the existing update path");
+        assertFalse(cardMethod().contains("new TextArea") || cardMethod().contains("new Button(\"Save\")")
+                        || cardMethod().contains("new Button(\"Cancel\")"),
+                "Saved-update cards must remain read-only instead of entering a raw inline edit state");
     }
 
     @Test
     void cardsRenderSupportedFormattingWithoutChangingLegacyPlainText() {
-        String card = method("private Node createCaseUpdateCardInternal", "private String buildCaseUpdateMetadata");
+        String card = cardMethod();
 
         assertTrue(card.contains("NarrativeMarkdownCodec.plainText(safeText(dto.getNoteText()))"),
                 "Read-only cards must use Shale's shared syntax-free narrative projection");
+        assertTrue("Important\n• Call client".equals(
+                        NarrativeMarkdownCodec.plainText("**Important**\n- Call client")),
+                "Supported formatting should render without exposing Markdown syntax");
+        assertTrue("Legacy plain text".equals(NarrativeMarkdownCodec.plainText("Legacy plain text")),
+                "Legacy plain-text updates should display unchanged");
+    }
+
+    private static String cardMethod() {
+        return method("private Node createCaseUpdateCardInternal", "private String buildCaseUpdateMetadata");
     }
 
     private static String method(String start, String end) {
