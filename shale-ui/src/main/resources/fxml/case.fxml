@@ -85,6 +85,8 @@
 							<Label fx:id="contentTitleLabel" text="Case Overview"
 								style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 							<Region HBox.hgrow="ALWAYS" />
+							<Button fx:id="editOverviewButton" text="Edit Overview"
+								visible="false" managed="false" />
 							<Button fx:id="deleteCaseButton"
 								id="caseOverviewDeleteCaseButton" text="Delete Case"
 								visible="false" managed="false">

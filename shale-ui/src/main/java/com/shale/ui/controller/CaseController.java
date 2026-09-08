@@ -256,6 +256,7 @@ public class CaseController {
 	private CaseOverviewDateConfigurationDto overviewDateConfiguration;
 	private List<CaseDateDto> overviewConfiguredDateValues = List.of();
 	private int overviewConfigurationGeneration;
+	private Runnable overviewEditorLauncher = this::openOverviewEditor;
 	@FXML
 	private VBox detailsSectionPane;
 	@FXML
@@ -936,7 +937,7 @@ public class CaseController {
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
-		setVisibleManaged(editOverviewButton, appState != null && appState.isAdmin());
+		refreshOverviewAdminAction();
 		this.runtimeBridge = runtimeBridge;
 		this.caseDocumentService = (caseDao == null || caseSummaryDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, caseSummaryDao, contactDao);
 		this.caseDocumentExportService = this.caseDocumentService == null ? null : new CaseDocumentExportService(this.caseDocumentService);
@@ -4582,9 +4583,17 @@ public class CaseController {
 	// Overview loading
 	// ----------------------------
 	private void configureOverviewAdministrationControls() {
-		if(editOverviewButton!=null){ControlStyles.apply(editOverviewButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);editOverviewButton.setOnAction(e->openOverviewEditor());setVisibleManaged(editOverviewButton,false);}
+		if(editOverviewButton!=null){ControlStyles.apply(editOverviewButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.STANDARD);editOverviewButton.setOnAction(e->overviewEditorLauncher.run());refreshOverviewAdminAction();}
 		configuredOverviewDates.getStyleClass().add("case-overview-configured-dates");
 		if(overviewDetailsGrid!=null){List<Node> remove=overviewDetailsGrid.getChildren().stream().filter(n->{Integer r=GridPane.getRowIndex(n);return r!=null&&r>=4&&r<=8;}).toList();overviewDetailsGrid.getChildren().removeAll(remove);for(Node n:overviewDetailsGrid.getChildren()){Integer r=GridPane.getRowIndex(n);if(r!=null&&r>=9)GridPane.setRowIndex(n,r-4);}overviewDetailsGrid.add(configuredOverviewDates,0,4,3,1);}
+	}
+
+	void refreshOverviewAdminAction() {
+		setVisibleManaged(editOverviewButton, appState != null && appState.isAdmin());
+	}
+
+	void setOverviewEditorLauncherForTest(Runnable launcher) {
+		overviewEditorLauncher = Objects.requireNonNull(launcher);
 	}
 
 	private void loadOverviewConfigurationAsync(){
@@ -5391,6 +5400,7 @@ public class CaseController {
 	private void refreshDeleteAction() {
 		boolean showDelete = current != null && caseDetailService != null && !editMode && !detailsEditMode;
 		setVisibleManaged(deleteCaseButton, showDelete);
+		refreshOverviewAdminAction();
 	}
 
 	// ----------------------------
