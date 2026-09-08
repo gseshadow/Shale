@@ -4,7 +4,7 @@ BEGIN TRY
  BEGIN TRANSACTION;
  IF OBJECT_ID(N'dbo.Cases',N'U') IS NULL OR OBJECT_ID(N'dbo.CaseDateTypes',N'U') IS NULL OR OBJECT_ID(N'dbo.Users',N'U') IS NULL THROW 56900,'Required Case Overview dependencies are missing.',1;
  IF OBJECT_ID(N'dbo.CaseOverviewConfigurations',N'U') IS NULL CREATE TABLE dbo.CaseOverviewConfigurations(
-  Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_CaseOverviewConfigurations PRIMARY KEY, ShaleClientId int NOT NULL, CaseId bigint NOT NULL,
+  Id bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_CaseOverviewConfigurations PRIMARY KEY, ShaleClientId int NOT NULL, CaseId int NOT NULL,
   CreatedAt datetime2(7) NOT NULL CONSTRAINT DF_CaseOverviewConfigurations_CreatedAt DEFAULT(SYSUTCDATETIME()), CreatedByUserId int NOT NULL,
   UpdatedAt datetime2(7) NULL, UpdatedByUserId int NULL, RowVer rowversion NOT NULL,
   CONSTRAINT FK_CaseOverviewConfigurations_CaseTenant FOREIGN KEY(ShaleClientId,CaseId) REFERENCES dbo.Cases(ShaleClientId,Id), CONSTRAINT FK_CaseOverviewConfigurations_Client FOREIGN KEY(ShaleClientId) REFERENCES dbo.ShaleClients(Id),
