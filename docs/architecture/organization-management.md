@@ -1,0 +1,278 @@
+# Organization Management Architecture and Roadmap
+
+## Purpose
+
+Modernize Organizations to the standard established by Contacts while preserving Shale's existing
+tenant, service, navigation, card, and case-party architecture. This document records the verified
+repository baseline, the intended product model, and the phased implementation boundary.
+
+## Verified repository baseline
+
+### Database and model
+
+`dbo.Organizations` is a strict tenant-owned entity with `Id`, `ShaleClientId`, one nullable
+`OrganizationTypeId`, `Name`, one Phone/Fax/Email/Website, one structured postal address, Notes,
+soft deletion, timestamps, and `RowVer`. The Java `Organization` model represents those legacy
+columns directly.
+
+`dbo.OrganizationTypes` already exists. Current runtime code only reads `OrganizationTypeId` and
+`Name`. `OrganizationDaoOrganizationTypeQueryTest` deliberately protects the verified fact that
+current Organization Type queries must not assume `OrganizationTypes.ShaleClientId` exists. A live
+catalog/data inventory is therefore required before writing the modernization migration.
+
+No structured Organization phone, email, address, or website child tables exist in the repository.
+The equivalent Contact tables are `ContactPhoneNumbers`, `ContactEmailAddresses`, and
+`ContactAddresses`. They provide strict tenant ownership, one active primary value per category,
+ordering, soft-delete history, actor metadata, timestamps, and `RowVer`.
+
+### Persistence and services
+
+`OrganizationDao` owns directory paging, full detail loading, create, update, soft delete, type reads,
+and several legacy case-link operations. Its active list/detail queries use explicit Organization
+tenant predicates and soft-delete filters.
+
+Current create and update persistence is materially behind the Contact aggregate pattern:
+
+* `NewOrganizationController` calls `OrganizationDao.create` directly.
+* `OrganizationController` performs direct DAO field updates.
+* `OrganizationServicePort` exists, but JavaFX does not use it as the mutation boundary.
+* `actorUserId` exists on service commands but is not used by the adapter/DAO mutation.
+* Update does not bind `Organizations.RowVer` and therefore has no optimistic-concurrency guard.
+* Organization create/update does not append transaction-bound entity-action audit events.
+* The adapter reloads the current Organization and copies it into a whole-row legacy update.
+* `NewOrganizationController` performs type loading and create on the JavaFX thread.
+
+`OrganizationServiceAdapter#createOrganization` selects the first configured Organization Type when
+used by server/API flows. The desktop create flow instead requires an explicitly selected type.
+This disagreement must be removed by the aggregate service design.
+
+### UI surfaces
+
+The main directory is `organizations.fxml` plus `OrganizationsController`. It uses debounced,
+generation-guarded, 100-row paged loading and `OrganizationCardFactory.FULL`. The directory query is
+lightweight, but supports only name filtering and returns one legacy type and one set of legacy
+contact values.
+
+The reusable `OrganizationCardFactory` and `OrganizationCard` already support FULL, COMPACT, and MINI
+variants and are used by the main directory, Global Search, Case surfaces, intake drafts, requested-from
+workflows, and material workflows. The existing factory must be extended rather than replaced.
+
+`organization.fxml` plus `OrganizationController` renders a two-column detail screen with one field
+per row, pencil-button single-field dialogs, and Related Cases. It has no Organization classification
+chip group, no related-contact section, and no clickable phone, email, website, or address actions.
+It maintains static detail and type-option caches and supports live-update invalidation.
+
+`new-organization.fxml` plus `NewOrganizationController` is a separate create form, so Add and Edit do
+not share one staged aggregate editor. It uses the enhanced narrative control for Notes but otherwise
+uses legacy scalar controls.
+
+Contact clickable actions already exist in `ContactExternalActions` and `ExternalBrowserHelper`.
+Contact classification presentation already exists in `ContactClassificationChipGroup`. These should
+be generalized or reused through entity-neutral inputs rather than copied into Organization-specific
+utilities.
+
+### Relationships
+
+Organization detail related-case reads already flow through
+`CaseSummaryDao.listActiveRelatedToOrganization`, backed by authoritative `CaseParties`, Party Roles,
+side, primary state, and notes. This must remain the only relationship authority.
+
+`OrganizationDao` still contains legacy `CaseOrganizations` link/unlink and linkable-case methods.
+They are compatibility debt and must not be used by the redesign. Soft deletion currently removes
+matching `CaseParties` rows in the Organization DAO transaction; this destructive relationship
+behavior needs explicit review in a later lifecycle phase and is outside the classification foundation.
+
+`Contacts.OrganizationId` is an existing legacy Organization reference. The redesign must inventory
+its active consumers before deciding whether the Organization View should expose related Contacts or
+whether a richer employment/affiliation model is warranted. It must not create a second relationship
+authority accidentally.
+
+`CaseLinkShares` records shares with Contacts only. The Organization redesign does not add an
+Organization Shared Links section unless a separate product decision expands that domain.
+
+## Product decisions
+
+### Organization Types
+
+Organizations may have multiple color-coded, searchable Organization Types. Organization Type is an
+organization-wide classification, not a case role. Examples may include hospital, medical practice,
+law firm, insurer, government agency, court, expert firm, records vendor, and pharmacy, but global
+seeds must be chosen from reviewed live data rather than assumptions.
+
+Modernize the existing `OrganizationTypes` table to the global/tenant overlay standard if the live
+inventory proves that migration compatible. Do not create a parallel `OrganizationTypeDefinitions`
+table merely to obtain a cleaner name.
+
+Add a strict tenant-owned historical assignment table named `OrganizationOrganizationTypes`, subject
+to live identifier-length and naming verification. Backfill each Organization's legacy
+`OrganizationTypeId` as an active assignment. Preserve `Organizations.OrganizationTypeId` as a
+compatibility primary-type bridge until every reader and writer is proven migrated. Assignment
+mutations must transactionally maintain that compatibility value during the bridge period.
+
+Unknown custom types are presentation-only and receive no special workflow behavior.
+
+### Contact points
+
+Organizations support multiple ordered phones, emails, websites, and addresses, with no more than one
+active primary value in each category. Fax is a phone kind rather than an unrelated scalar domain.
+
+Recommended organization-specific child tables are:
+
+* `OrganizationPhoneNumbers`
+* `OrganizationEmailAddresses`
+* `OrganizationWebsites`
+* `OrganizationAddresses`
+
+Each is strict tenant-owned and historical, with Organization ownership enforced by a composite
+tenant foreign key, normalized/search values where appropriate, kind/purpose, primary state,
+ordering, lifecycle actor metadata, timestamps, and `RowVer`.
+
+Do not use a polymorphic entity/contact-point foreign key. Reuse the Contact contracts and UI
+composition patterns while retaining enforceable Organization foreign keys.
+
+Suggested kinds are organization-specific and must be reviewed before constraints are finalized:
+
+* phones: MAIN, RECORDS, BILLING, FAX, OTHER
+* emails: MAIN, RECORDS, BILLING, OTHER
+* websites: MAIN, PORTAL, RECORDS, OTHER
+* addresses: MAIN, RECORDS, BILLING, SERVICE, REGISTERED_AGENT, OTHER
+
+Legacy scalar values remain compatibility/history inputs during migration. Ambiguous or invalid data
+is preserved rather than silently discarded or guessed.
+
+### UI
+
+Use one shared staged aggregate Organization editor for both Add and Edit. Cancel or window close must
+perform no mutation. Save uses one service command and one database transaction.
+
+Extend the existing Organization card factory to accept a list of type presentations plus primary
+contact-point summaries. Use the existing classification chip visual language with accessible color
+contrast. Child actions must consume their events so calling, emailing, opening a website, or opening
+an address does not also navigate the parent card.
+
+The Organization View header shows the Organization name and all assigned type chips. The main body
+groups contact information into readable cards with Call, Email, Open Website, and Open in Maps
+actions. Related Cases remains a separate sibling section using the existing `CaseCardFactory` and
+relationship metadata wrapper.
+
+## Phased implementation roadmap
+
+### Phase 0 — live catalog and data inventory
+
+Create a read-only SQL inventory for `Organizations`, `OrganizationTypes`, `Contacts.OrganizationId`,
+their keys/indexes/defaults/checks/RLS predicates, row counts, type usage, orphan/cross-tenant risks,
+legacy contact-point population, duplicates, and representative data shapes. Run it against
+`Shale_Copy` or another approved administrative connection before writing Phase 1 SQL. Do not change
+schema or data.
+
+Repository inventory is complete in this document; live SQL evidence remains required.
+
+### Phase 1A — Organization Type foundation
+
+After reviewing Phase 0 output, add the compatible overlay fields, constraints, indexes, actor
+metadata, lifecycle fields, color, ordering, and `RowVer` to the existing `OrganizationTypes` table.
+Attach the established tenant-or-global RLS predicate only after verifying the live policy contract.
+Add `OrganizationOrganizationTypes` with strict tenant RLS and composite Organization ownership.
+Backfill existing single-type assignments without changing visible behavior.
+
+Deliver one guarded, rerunnable migration and a separate read-only verification script. Do not change
+runtime Java reads/writes or UI in Phase 1A.
+
+### Phase 1B — read/domain contracts
+
+Add Organization Type definition, assigned type, classification presentation, and profile records to
+`OrganizationServicePort`. Implement effective overlay reads, exact historical assignment reads, and
+batch directory hydration. Tenant overrides win by stable `SystemKey`; inactive winners mask global
+defaults for new selection; removed overrides reset to global; historical assignments retain exact
+definition presentation.
+
+Keep `Organizations.OrganizationTypeId` and current visible behavior authoritative until the mutation
+bridge is deployed.
+
+### Phase 1C — transactional type administration and assignments
+
+Implement admin-authorized Organization Type creation, override, update, activate/deactivate, remove,
+restore, and ordering. Implement user-authorized assignment add/remove/restore/reorder. Validate the
+tenant session, actor, Organization, effective definition, and concurrency tokens on one connection
+and transaction. Append PHI-safe entity-action audit events in that transaction. Dual-write the
+legacy `Organizations.OrganizationTypeId` compatibility primary value.
+
+### Phase 2A — structured contact-point foundation and migration
+
+Add the four Organization contact-point tables using the proven Contact table invariants. Provide a
+guarded migration and separate verification. Conservatively backfill legacy Phone, Fax, Email,
+Website, and address fields. Do not delete or blank legacy columns.
+
+### Phase 2B — Organization aggregate read/write boundary
+
+Add aggregate detail/create/update commands and results to `OrganizationServicePort`. The mutation
+starts its transaction before authorization, validates `Organizations.RowVer`, validates every child
+RowVer and complete intended active set, applies types and contact points, maintains compatibility
+fields, appends audits, and returns the final authoritative profile. Stale input is not silently merged
+or retried.
+
+Move JavaFX create and edit mutations off the FX thread and through the service port. Remove the
+desktop's direct mutation dependency on `OrganizationDao` while retaining DAO-backed reads only where
+the current architecture still explicitly permits them.
+
+### Phase 3 — shared Add/Edit Organization experience
+
+Replace the separate new form and field-by-field dialogs with one bounded, scrollable staged editor.
+Support identity, multiple types, multiple contact points, primary selection, ordering, removal and
+restore, validation, Notes, unsaved-change confirmation, and stable Cancel/Save actions. Use the same
+editor entry point from the Organizations list and Organization View.
+
+### Phase 4 — Organization View and card presentation
+
+Restyle the detail header and information surface using Shale's existing component vocabulary. Show
+all type chips in the header and cards. Render contact-point cards with clickable actions. Extend, do
+not replace, `OrganizationCardFactory` for FULL/COMPACT/MINI consumers, and batch-hydrate directory and
+search results to avoid N+1 queries.
+
+### Phase 5 — Settings administration
+
+Add Organization Types to the existing classification/lookup administration patterns. Global rows
+remain immutable; tenant customization creates overrides; custom rows are tenant-owned; lifecycle and
+RowVer conflicts follow the established Contact administration behavior.
+
+### Phase 6 — relationship and lifecycle review
+
+Inventory and decide the future of `Contacts.OrganizationId`, related Contacts presentation,
+Organization deletion's current `CaseParties` cleanup, and obsolete `CaseOrganizations` DAO methods.
+This phase must preserve `CaseParties` as case relationship authority. Do not expand Organization link
+sharing without a separate product decision.
+
+### Phase 7 — cutover and retirement
+
+Reconcile legacy and structured data, switch all list/search/detail/card consumers to the aggregate
+model, monitor compatibility, and only then remove fallbacks. Dropping legacy columns or tables is a
+later separately approved destructive migration.
+
+## Testing and verification
+
+Before every implementation phase, perform the repository-required pre-edit impact search. Relevant
+baseline tests include Organization DAO type query, Organization service adapter, Organization card
+variants, New Organization semantic controls, Related Case renderer mapping, server API reads, intake
+party cards, requested-from workflows, material workflows, and Global Search.
+
+New coverage must include overlay precedence, other-tenant exclusion, lifecycle behavior, historical
+rendering, duplicate prevention, backfill reconciliation, primary constraints, RowVer conflicts,
+transaction-bound audit behavior, desktop aggregate editor behavior, clickable-action event isolation,
+batch hydration, and server serialization where records change.
+
+Use the repository's Organizations affected-area selection and focused tests first, then the local
+critical `mvn test`. The optional full suite is informational only when selector escalation or an
+explicit request calls for it. Ordinary CSS adjustments require visual/static validation rather than
+new blocking pixel-geometry tests.
+
+## Contact redesign lessons carried forward
+
+* Design read and mutation contracts before wiring the editor.
+* Populate all required timestamps and actor fields.
+* Search every port record/constructor and test implementation when contracts grow.
+* Batch-load card classifications and primary contact points.
+* Verify the actual card factory used by every surface.
+* Distinguish failed loads from legitimate empty results.
+* Preserve historical assignments and legacy values through cutover.
+* Do not let classifications replace case-specific roles.
+* Keep migrations additive, guarded, rerunnable, and independently verifiable.
