@@ -4,6 +4,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import com.shale.ui.component.EnhancedTextArea?>
 
 <BorderPane fx:id="caseRootPane"
 	xmlns:fx="http://javafx.com/fxml"
@@ -952,8 +953,10 @@
 			<Label text="Updates"
 				style="-fx-font-size: 15px; -fx-font-weight: bold;" />
 
-			<TextArea fx:id="caseUpdatesComposerArea"
-				promptText="Add a case update..." wrapText="true" prefRowCount="4" />
+			<EnhancedTextArea fx:id="caseUpdatesComposerArea"
+				editorTitle="Case Update" promptText="Add a case update..."
+				expandable="true" spellCheckEnabled="true" prefRowCount="4"
+				maxWidth="1.7976931348623157E308" />
 
 			<Button fx:id="submitCaseUpdateButton" text="Submit"
 				maxWidth="Infinity">
