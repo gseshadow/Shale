@@ -9,6 +9,17 @@ import org.junit.jupiter.api.Test;
 
 final class EntityActionAuditEventTest {
 	@Test
+	void caseOverviewAndIntakeAdministrativeActionsUseSafeEstablishedAuditContract() {
+		assertDoesNotThrow(() -> EntityActionAuditEvent.now(7, 9,
+				EntityActionAuditEvent.EntityType.CASE_OVERVIEW_CONFIGURATION, 31,
+				EntityActionAuditEvent.Action.UPDATED, EntityActionAuditEvent.EntityType.CASE, 88L,
+				Map.of(EntityActionAuditEvent.MetadataKey.CASE_ID, 88,
+						EntityActionAuditEvent.MetadataKey.ORDERING_COUNT, 0)));
+		assertDoesNotThrow(() -> EntityActionAuditEvent.now(7, 9,
+				EntityActionAuditEvent.EntityType.CASE, 88, EntityActionAuditEvent.Action.UPDATED,
+				null, null, Map.of(EntityActionAuditEvent.MetadataKey.CASE_ID, 88)));
+	}
+	@Test
 	void validatesPositiveTenantActorAndEntityIds() {
 		assertThrows(IllegalArgumentException.class, () -> EntityActionAuditEvent.now(0, 1, EntityActionAuditEvent.EntityType.CASE_LINK, 1, EntityActionAuditEvent.Action.CREATED, null, null, Map.of()));
 		assertThrows(IllegalArgumentException.class, () -> EntityActionAuditEvent.now(1, 0, EntityActionAuditEvent.EntityType.CASE_LINK, 1, EntityActionAuditEvent.Action.CREATED, null, null, Map.of()));

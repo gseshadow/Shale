@@ -51,24 +51,33 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	private final CaseGateway caseGateway;
 	private final CaseTeamRoleDefinitionDao caseTeamRoleDao;
 	private final CaseTeamMembershipDao caseTeamMembershipDao;
+	private final com.shale.data.dao.CaseOverviewConfigurationDao caseOverviewConfigurationDao;
 
 	public CaseServiceAdapter(CaseDao caseDao) {
 		this.caseGateway = new DaoCaseGateway(caseDao, new CaseDateDao(caseDao.dbSessionProvider()), new CaseSummaryDao(caseDao.dbSessionProvider()));
 		this.caseTeamRoleDao = new CaseTeamRoleDefinitionDao(caseDao.dbSessionProvider());
 		this.caseTeamMembershipDao = new CaseTeamMembershipDao(caseDao.dbSessionProvider());
+		this.caseOverviewConfigurationDao = new com.shale.data.dao.CaseOverviewConfigurationDao(caseDao.dbSessionProvider());
 	}
 
 	public CaseServiceAdapter(CaseDao caseDao, CaseDateDao caseDateDao) {
 		this.caseGateway = new DaoCaseGateway(caseDao, caseDateDao, new CaseSummaryDao(caseDao.dbSessionProvider()));
 		this.caseTeamRoleDao = new CaseTeamRoleDefinitionDao(caseDao.dbSessionProvider());
 		this.caseTeamMembershipDao = new CaseTeamMembershipDao(caseDao.dbSessionProvider());
+		this.caseOverviewConfigurationDao = new com.shale.data.dao.CaseOverviewConfigurationDao(caseDao.dbSessionProvider());
 	}
 
 	CaseServiceAdapter(CaseGateway caseGateway) {
 		this.caseGateway = Objects.requireNonNull(caseGateway, "caseGateway");
 		this.caseTeamRoleDao = null;
 		this.caseTeamMembershipDao = null;
+		this.caseOverviewConfigurationDao = null;
 	}
+
+	@Override public com.shale.core.dto.CaseOverviewDateConfigurationDto getCaseOverviewDateConfiguration(long caseId,int tenant,int actor){return requireOverviewConfigurationDao().get(caseId,tenant,actor);}
+	@Override public com.shale.core.dto.CaseOverviewDateConfigurationDto replaceCaseOverviewDateConfiguration(ReplaceCaseOverviewDateConfigurationCommand c){return requireOverviewConfigurationDao().replace(c);}
+	@Override public IntakeTakenByMutationResult updateIntakeTakenBy(UpdateIntakeTakenByCommand c){return requireOverviewConfigurationDao().updateIntakeTakenBy(c);}
+	private com.shale.data.dao.CaseOverviewConfigurationDao requireOverviewConfigurationDao(){if(caseOverviewConfigurationDao==null)throw new UnsupportedOperationException("Case Overview configuration is unavailable from this test gateway.");return caseOverviewConfigurationDao;}
 
 	@Override public List<CaseTeamRoleDefinitionDto> listCaseTeamRolesForAdministration(int tenant,int actor){ return requireCaseTeamRoleDao().listForAdministration(tenant,actor); }
 	@Override public CaseTeamRoleDefinitionDto createCaseTeamRole(CaseTeamRoleCommand c){ return requireCaseTeamRoleDao().create(c); }
