@@ -182,6 +182,7 @@ The live schema does **not** include these columns:
 | `IncidentOccurred`         | Use `DateOfInjury` for current Date of Incident.                                          |
 | `CaseStatusId`             | Not present in the live `dbo.Cases` output. Do not use unless a future migration adds it. |
 | `CasePracticeAreaId`       | Not present in the live `dbo.Cases` output.                                               |
+| `UpdatedByUserId`          | Not present. Case mutations update `UpdatedAt`; actor attribution uses established audit and Timeline records. |
 
 
 ### Customizable lookup type standard
