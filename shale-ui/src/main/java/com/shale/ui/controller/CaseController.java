@@ -180,6 +180,7 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -251,6 +252,7 @@ public class CaseController {
 	@FXML
 	private VBox overviewPane;
 	@FXML private GridPane overviewDetailsGrid;
+	@FXML private HBox overviewHeaderActionRow;
 	@FXML private Button editOverviewButton;
 	private final VBox configuredOverviewDates = new VBox();
 	private CaseOverviewDateConfigurationDto overviewDateConfiguration;
@@ -4583,9 +4585,41 @@ public class CaseController {
 	// Overview loading
 	// ----------------------------
 	private void configureOverviewAdministrationControls() {
+		ensureEditOverviewButtonPlacement();
 		if(editOverviewButton!=null){ControlStyles.apply(editOverviewButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.STANDARD);editOverviewButton.setOnAction(e->overviewEditorLauncher.run());refreshOverviewAdminAction();}
 		configuredOverviewDates.getStyleClass().add("case-overview-configured-dates");
 		if(overviewDetailsGrid!=null){List<Node> remove=overviewDetailsGrid.getChildren().stream().filter(n->{Integer r=GridPane.getRowIndex(n);return r!=null&&r>=4&&r<=8;}).toList();overviewDetailsGrid.getChildren().removeAll(remove);for(Node n:overviewDetailsGrid.getChildren()){Integer r=GridPane.getRowIndex(n);if(r!=null&&r>=9)GridPane.setRowIndex(n,r-4);}overviewDetailsGrid.add(configuredOverviewDates,0,4,3,1);}
+	}
+
+	void ensureEditOverviewButtonPlacement() {
+		if (editOverviewButton == null || overviewHeaderActionRow == null || deleteCaseButton == null) {
+			throw new IllegalStateException("Case Overview header controls were not injected from case.fxml.");
+		}
+		if (editOverviewButton.getParent() == overviewHeaderActionRow) {
+			verifyEditOverviewButtonPlacement();
+			return;
+		}
+		Parent currentParent = editOverviewButton.getParent();
+		if (!(currentParent instanceof Pane currentPane)) {
+			throw new IllegalStateException("Edit Overview cannot be moved safely from its injected parent: "
+					+ (currentParent == null ? "none" : currentParent.getClass().getName()));
+		}
+		currentPane.getChildren().remove(editOverviewButton);
+		int deleteIndex = overviewHeaderActionRow.getChildren().indexOf(deleteCaseButton);
+		if (deleteIndex < 0) {
+			throw new IllegalStateException("Delete Case is not attached to the Case Overview header action row.");
+		}
+		overviewHeaderActionRow.getChildren().add(deleteIndex, editOverviewButton);
+		verifyEditOverviewButtonPlacement();
+	}
+
+	private void verifyEditOverviewButtonPlacement() {
+		int editIndex = overviewHeaderActionRow.getChildren().indexOf(editOverviewButton);
+		int deleteIndex = overviewHeaderActionRow.getChildren().indexOf(deleteCaseButton);
+		long occurrences = overviewHeaderActionRow.getChildren().stream().filter(node -> node == editOverviewButton).count();
+		if (editOverviewButton.getParent() != overviewHeaderActionRow || occurrences != 1 || editIndex + 1 != deleteIndex) {
+			throw new IllegalStateException("Edit Overview must appear exactly once immediately before Delete Case in the Case Overview header.");
+		}
 	}
 
 	void refreshOverviewAdminAction() {
