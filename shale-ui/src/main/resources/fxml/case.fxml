@@ -191,6 +191,7 @@
 										styleClass="case-overview-section-title" />
 									<Region HBox.hgrow="ALWAYS"
 										styleClass="case-overview-section-line" />
+									<Button fx:id="editOverviewButton" text="Edit Overview" />
 								</HBox>
 								<GridPane fx:id="overviewDetailsGrid" hgap="14" vgap="0"
 									styleClass="case-overview-rows">
