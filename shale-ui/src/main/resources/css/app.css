@@ -1730,6 +1730,12 @@
     -fx-border-width: 0 0 1 0;
 }
 
+.case-overview-editor-row { -fx-padding: 9px 10px; -fx-background-radius: 9px; -fx-border-radius: 9px; -fx-border-color: rgba(74,104,138,.18); }
+.case-overview-editor-row-selected { -fx-background-color: rgba(34,112,128,.10); -fx-border-color: rgba(34,112,128,.35); }
+.case-overview-date-color { -fx-min-width: 10px; -fx-pref-width: 10px; -fx-min-height: 26px; -fx-background-radius: 5px; }
+.case-overview-configured-dates { -fx-spacing: 7px; -fx-padding: 5px 0; }
+.case-overview-configured-date-row { -fx-alignment: center-left; -fx-spacing: 10px; }
+
 .case-overview-party-side {
     -fx-padding: 9 0 3 8;
     -fx-text-fill: -shale-color-text-primary;
