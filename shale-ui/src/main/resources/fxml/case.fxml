@@ -82,6 +82,7 @@
 							<Insets top="12" right="12" bottom="12" left="12" />
 						</padding>
 						<HBox fx:id="overviewHeaderActionRow" alignment="CENTER_LEFT" spacing="8">
+							<children>
 							<Label fx:id="contentTitleLabel" text="Case Overview"
 								style="-fx-font-size: 16px; -fx-font-weight: bold;" />
 							<Region HBox.hgrow="ALWAYS" />
@@ -149,6 +150,7 @@
 									<String fx:value="shale-button-toolbar" />
 								</styleClass>
 							</Button>
+							</children>
 						</HBox>
 
 						<HBox spacing="8" alignment="CENTER_LEFT">
