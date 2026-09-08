@@ -22,6 +22,9 @@ final class OrganizationTypesFoundationMigrationContractTest {
                 .replace(" ", "").replace("\t", "").replace("\n", "")
                 .replace("\r", "").replace("(", "").replace(")", "");
     }
+    private static boolean validColor(String color) {
+        return color != null && color.matches("#[0-9A-F]{6}") && color.equals(color.toUpperCase(Locale.ROOT));
+    }
 
     @Test void migrationPreservesBaselineAndBuildsDefinitionContract() throws Exception {
         String s = read("docs/sql/2026-09-08_organization_types_foundation_phase1a.sql");
@@ -34,8 +37,21 @@ final class OrganizationTypesFoundationMigrationContractTest {
         for (String column : new String[]{"SystemKey", "Description", "Color", "SortOrder", "IsActive", "IsDeleted", "CreatedAt", "CreatedByUserId", "UpdatedAt", "UpdatedByUserId", "DeletedAt", "DeletedByUserId", "RowVer"}) assertTrue(s.contains("N'" + column + "'") || s.contains("ADD " + column), column);
         assertTrue(s.contains("UX_OrganizationTypes_Global_SystemKey"));
         assertTrue(s.contains("UX_OrganizationTypes_Tenant_SystemKey"));
-        assertTrue(s.contains("Color=UPPER(Color)"));
+        assertTrue(s.contains("Color COLLATE Latin1_General_100_BIN2=UPPER(Color) COLLATE Latin1_General_100_BIN2"));
         assertFalse(s.contains("INSERT dbo.OrganizationTypes"));
+    }
+
+    @Test void colorContractIsCaseSensitiveEvenWhenDatabaseDefaultIsNot() throws Exception {
+        String s = read("docs/sql/2026-09-08_organization_types_foundation_phase1a.sql");
+        String v = read("docs/sql/verification/2026-09-08_organization_types_foundation_phase1a_verification.sql");
+        for (String sql : new String[]{s, v}) {
+            assertTrue(sql.contains("LEN(Color)"));
+            assertTrue(sql.contains("SUBSTRING(Color,2,6) COLLATE Latin1_General_100_BIN2"));
+            assertTrue(sql.contains("UPPER(Color) COLLATE Latin1_General_100_BIN2"));
+        }
+        assertTrue(validColor("#ABCDEF"));
+        assertFalse(validColor("#abcdef"));
+        assertFalse(validColor("#ABCDE"));
     }
 
     @Test void successfulRerunNeverResetsMutableDefinitionState() throws Exception {
@@ -107,6 +123,19 @@ final class OrganizationTypesFoundationMigrationContractTest {
         assertEquals("isdeleted=0andisprimary=1", normalizeFilter("(([IsDeleted]=(0)) AND ([IsPrimary]=(1)))"));
         assertNotEquals("isdeleted=0", normalizeFilter("([IsDeleted]=(1))"));
         assertNotEquals("isdeleted=0andisprimary=1", normalizeFilter("([IsDeleted]=(0)) AND ([IsPrimary]=(0))"));
+    }
+
+    @Test void migrationRejectsEveryIncompatibleNamedPhaseOneAObjectBeforeCommit() throws Exception {
+        String s = read("docs/sql/2026-09-08_organization_types_foundation_phase1a.sql");
+        int validation = s.indexOf("DECLARE @RequiredIndexes TABLE");
+        int commit = s.indexOf("COMMIT TRANSACTION;");
+        assertTrue(validation > 0 && validation < commit);
+        for (String indexContract : new String[]{"i.object_id=OBJECT_ID(N'dbo.'+e.TableName)", "i.NormalizedFilter<>e.NormalizedFilter", "ISNULL(x.Keys,N'')<>e.Keys", "ISNULL(x.Includes,N'')<>e.Includes", "i.is_unique<>e.IsUnique", "i.has_filter<>", "i.is_disabled=1", "i.is_hypothetical=1"}) assertTrue(s.contains(indexContract), indexContract);
+        assertTrue(s.contains("Required Phase 1A index has incompatible target, keys, includes, uniqueness, filter, or state."));
+        for (String fkContract : new String[]{"f.parent_object_id=OBJECT_ID(N'dbo.'+e.ChildTable)", "f.referenced_object_id<>OBJECT_ID(N'dbo.'+e.ParentTable)", "x.ChildColumns<>e.ChildColumns", "x.ParentColumns<>e.ParentColumns", "f.is_disabled=1", "f.is_not_trusted=1"}) assertTrue(s.contains(fkContract), fkContract);
+        assertTrue(s.contains("Required Phase 1A foreign key has incompatible child, parent, ordered columns, or state."));
+        for (String checkContract : new String[]{"c.parent_object_id=OBJECT_ID(N'dbo.'+e.TableName)", "c.NormalizedDefinition<>e.NormalizedDefinition", "c.is_disabled=1", "c.is_not_trusted=1"}) assertTrue(s.contains(checkContract), checkContract);
+        assertTrue(s.contains("Required Phase 1A CHECK has incompatible target, semantic definition, or state."));
     }
 
     @Test void forbiddenPhaseOneCSurfacesRemainUntouched() throws Exception {

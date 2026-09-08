@@ -104,7 +104,7 @@ IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJEC
 IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'DF_OrganizationTypes_CreatedAt') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_CreatedAt DEFAULT(SYSUTCDATETIME()) FOR CreatedAt;
 IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'DF_OrganizationTypes_Color') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_Color DEFAULT(N'#6C757D') FOR Color;
 IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'CK_OrganizationTypes_SystemKey') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_SystemKey CHECK(SystemKey=LOWER(SystemKey) AND SystemKey<>N'' AND SystemKey NOT LIKE N'%[^a-z0-9_]%' AND LEFT(SystemKey,1) LIKE N'[a-z]');
-IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'CK_OrganizationTypes_Color') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_Color CHECK(Color=UPPER(Color) AND Color LIKE N'#[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]');
+IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'CK_OrganizationTypes_Color') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_Color CHECK(LEN(Color)=7 AND LEFT(Color,1)=N'#' AND SUBSTRING(Color,2,6) COLLATE Latin1_General_100_BIN2 NOT LIKE N'%[^0-9A-F]%' AND Color COLLATE Latin1_General_100_BIN2=UPPER(Color) COLLATE Latin1_General_100_BIN2);
 IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'CK_OrganizationTypes_SortOrder') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_SortOrder CHECK(SortOrder>=0);
 IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'CK_OrganizationTypes_DeleteFields') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_DeleteFields CHECK((IsDeleted=0 AND DeletedAt IS NULL AND DeletedByUserId IS NULL) OR (IsDeleted=1 AND IsActive=0 AND DeletedAt IS NOT NULL AND DeletedByUserId IS NOT NULL));
 IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'FK_OrganizationTypes_CreatedBy') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT FK_OrganizationTypes_CreatedBy FOREIGN KEY(CreatedByUserId) REFERENCES dbo.Users(id);
@@ -142,9 +142,49 @@ IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.Organiza
 IF EXISTS(SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.OrganizationOrganizationTypes') AND name IN(N'CreatedAt',N'UpdatedAt',N'DeletedAt') AND (precision<>27 OR scale<>7)) THROW 57021,'Assignment timestamps must be datetime2(7).',1;
 
 /* Named objects are owned contracts: compatible later additive objects are tolerated, but an
-   incompatible object using a Phase 1A name fails rather than being silently accepted. */
-IF EXISTS(SELECT 1 FROM (VALUES(N'OrganizationTypes',N'UX_OrganizationTypes_Global_SystemKey',1),(N'OrganizationTypes',N'UX_OrganizationTypes_Tenant_SystemKey',1),(N'Organizations',N'UX_Organizations_ShaleClientId_Id',1),(N'OrganizationOrganizationTypes',N'UX_OrganizationOrganizationTypes_Active',1),(N'OrganizationOrganizationTypes',N'UX_OrganizationOrganizationTypes_ActivePrimary',1),(N'OrganizationOrganizationTypes',N'IX_OrganizationOrganizationTypes_Display',0))e(t,n,u) LEFT JOIN sys.indexes i ON i.object_id=OBJECT_ID(N'dbo.'+e.t) AND i.name=e.n WHERE i.index_id IS NULL OR i.is_unique<>e.u OR i.is_disabled=1 OR i.is_hypothetical=1) THROW 57022,'Required named index is missing or incompatible.',1;
-IF EXISTS(SELECT 1 FROM sys.foreign_keys f WHERE f.parent_object_id IN(OBJECT_ID(N'dbo.OrganizationTypes'),OBJECT_ID(N'dbo.OrganizationOrganizationTypes')) AND f.name IN(N'FK_OrganizationType_ShaleClient',N'FK_OrganizationTypes_CreatedBy',N'FK_OrganizationTypes_UpdatedBy',N'FK_OrganizationTypes_DeletedBy',N'FK_OrganizationOrganizationTypes_Client',N'FK_OrganizationOrganizationTypes_Organization_Tenant',N'FK_OrganizationOrganizationTypes_Type',N'FK_OrganizationOrganizationTypes_CreatedBy',N'FK_OrganizationOrganizationTypes_UpdatedBy',N'FK_OrganizationOrganizationTypes_DeletedBy') AND (f.is_disabled=1 OR f.is_not_trusted=1)) THROW 57023,'Required foreign key is disabled or untrusted.',1;
+   incompatible object using a Phase 1A name fails inside this transaction. Filters and CHECKs are
+   normalized across SQL Server brackets, whitespace, and redundant parentheses before comparison. */
+DECLARE @RequiredIndexes TABLE(TableName sysname,IndexName sysname,IsUnique bit,Keys nvarchar(300),Includes nvarchar(300),NormalizedFilter nvarchar(300));
+INSERT @RequiredIndexes VALUES
+(N'OrganizationTypes',N'UX_OrganizationTypes_Global_SystemKey',1,N'SystemKey',N'',N'shaleclientidisnull'),
+(N'OrganizationTypes',N'UX_OrganizationTypes_Tenant_SystemKey',1,N'ShaleClientId,SystemKey',N'',N'shaleclientidisnotnull'),
+(N'Organizations',N'UX_Organizations_ShaleClientId_Id',1,N'ShaleClientId,Id',N'',N''),
+(N'OrganizationOrganizationTypes',N'PK_OrganizationOrganizationTypes',1,N'Id',N'',N''),
+(N'OrganizationOrganizationTypes',N'UX_OrganizationOrganizationTypes_Active',1,N'ShaleClientId,OrganizationId,OrganizationTypeId',N'',N'isdeleted=0'),
+(N'OrganizationOrganizationTypes',N'UX_OrganizationOrganizationTypes_ActivePrimary',1,N'ShaleClientId,OrganizationId',N'',N'isdeleted=0andisprimary=1'),
+(N'OrganizationOrganizationTypes',N'IX_OrganizationOrganizationTypes_Display',0,N'ShaleClientId,OrganizationId,IsDeleted,SortOrder,Id',N'',N'');
+IF EXISTS(SELECT 1 FROM @RequiredIndexes e OUTER APPLY(SELECT i.object_id,i.index_id,i.is_unique,i.has_filter,i.is_disabled,i.is_hypothetical,
+ LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(i.filter_definition,N''),N'[',N''),N']',N''),N' ',N''),NCHAR(9),N''),NCHAR(10),N''),NCHAR(13),N''),N'(',N''),N')',N'')) NormalizedFilter
+ FROM sys.indexes i WHERE i.object_id=OBJECT_ID(N'dbo.'+e.TableName) AND i.name=e.IndexName)i
+ OUTER APPLY(SELECT STRING_AGG(CASE WHEN ic.key_ordinal>0 THEN c.name END,N',') WITHIN GROUP(ORDER BY ic.key_ordinal) Keys,STRING_AGG(CASE WHEN ic.is_included_column=1 THEN c.name END,N',') WITHIN GROUP(ORDER BY ic.index_column_id) Includes
+ FROM sys.index_columns ic JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id WHERE ic.object_id=i.object_id AND ic.index_id=i.index_id)x
+ WHERE i.index_id IS NULL OR i.is_unique<>e.IsUnique OR i.is_disabled=1 OR i.is_hypothetical=1 OR i.has_filter<>CASE WHEN e.NormalizedFilter=N'' THEN 0 ELSE 1 END OR i.NormalizedFilter<>e.NormalizedFilter OR ISNULL(x.Keys,N'')<>e.Keys OR ISNULL(x.Includes,N'')<>e.Includes)
+ THROW 57022,'Required Phase 1A index has incompatible target, keys, includes, uniqueness, filter, or state.',1;
+
+DECLARE @RequiredChecks TABLE(TableName sysname,ConstraintName sysname,NormalizedDefinition nvarchar(1000));
+INSERT @RequiredChecks VALUES
+(N'OrganizationTypes',N'CK_OrganizationTypes_SystemKey',N'systemkey=lowersystemkeyandsystemkey<>n''''andsystemkeynotliken''%[^a-z0-9_]%''andleftsystemkey,1liken''[a-z]'''),
+(N'OrganizationTypes',N'CK_OrganizationTypes_Color',N'lencolor=7andleftcolor,1=n''#''andsubstringcolor,2,6collatelatin1_general_100_bin2notliken''%[^0-9a-f]%''andcolorcollatelatin1_general_100_bin2=uppercolorcollatelatin1_general_100_bin2'),
+(N'OrganizationTypes',N'CK_OrganizationTypes_SortOrder',N'sortorder>=0'),
+(N'OrganizationTypes',N'CK_OrganizationTypes_DeleteFields',N'isdeleted=0anddeletedatisnullanddeletedbyuseridisnullorisdeleted=1andisactive=0anddeletedatisnotnullanddeletedbyuseridisnotnull'),
+(N'OrganizationOrganizationTypes',N'CK_OrganizationOrganizationTypes_SortOrder',N'sortorder>=0'),
+(N'OrganizationOrganizationTypes',N'CK_OrganizationOrganizationTypes_DeleteFields',N'isdeleted=0anddeletedatisnullanddeletedbyuseridisnullorisdeleted=1andisprimary=0anddeletedatisnotnullanddeletedbyuseridisnotnull');
+IF EXISTS(SELECT 1 FROM @RequiredChecks e OUTER APPLY(SELECT c.object_id,c.is_disabled,c.is_not_trusted,
+ LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.definition,N'[',N''),N']',N''),N' ',N''),NCHAR(9),N''),NCHAR(10),N''),NCHAR(13),N''),N'(',N''),N')',N'')) NormalizedDefinition
+ FROM sys.check_constraints c WHERE c.parent_object_id=OBJECT_ID(N'dbo.'+e.TableName) AND c.name=e.ConstraintName)c
+ WHERE c.object_id IS NULL OR c.is_disabled=1 OR c.is_not_trusted=1 OR c.NormalizedDefinition<>e.NormalizedDefinition)
+ THROW 57027,'Required Phase 1A CHECK has incompatible target, semantic definition, or state.',1;
+
+DECLARE @RequiredFks TABLE(ConstraintName sysname,ChildTable sysname,ChildColumns nvarchar(300),ParentTable sysname,ParentColumns nvarchar(300));
+INSERT @RequiredFks VALUES
+(N'FK_OrganizationType_ShaleClient',N'OrganizationTypes',N'ShaleClientId',N'ShaleClients',N'Id'),
+(N'FK_OrganizationTypes_CreatedBy',N'OrganizationTypes',N'CreatedByUserId',N'Users',N'id'),(N'FK_OrganizationTypes_UpdatedBy',N'OrganizationTypes',N'UpdatedByUserId',N'Users',N'id'),(N'FK_OrganizationTypes_DeletedBy',N'OrganizationTypes',N'DeletedByUserId',N'Users',N'id'),
+(N'FK_OrganizationOrganizationTypes_Client',N'OrganizationOrganizationTypes',N'ShaleClientId',N'ShaleClients',N'Id'),(N'FK_OrganizationOrganizationTypes_Organization_Tenant',N'OrganizationOrganizationTypes',N'ShaleClientId,OrganizationId',N'Organizations',N'ShaleClientId,Id'),(N'FK_OrganizationOrganizationTypes_Type',N'OrganizationOrganizationTypes',N'OrganizationTypeId',N'OrganizationTypes',N'OrganizationTypeId'),
+(N'FK_OrganizationOrganizationTypes_CreatedBy',N'OrganizationOrganizationTypes',N'CreatedByUserId',N'Users',N'id'),(N'FK_OrganizationOrganizationTypes_UpdatedBy',N'OrganizationOrganizationTypes',N'UpdatedByUserId',N'Users',N'id'),(N'FK_OrganizationOrganizationTypes_DeletedBy',N'OrganizationOrganizationTypes',N'DeletedByUserId',N'Users',N'id');
+IF EXISTS(SELECT 1 FROM @RequiredFks e OUTER APPLY(SELECT f.object_id,f.referenced_object_id,f.is_disabled,f.is_not_trusted FROM sys.foreign_keys f WHERE f.parent_object_id=OBJECT_ID(N'dbo.'+e.ChildTable) AND f.name=e.ConstraintName)f
+ OUTER APPLY(SELECT STRING_AGG(pc.name,N',') WITHIN GROUP(ORDER BY fc.constraint_column_id) ChildColumns,STRING_AGG(rc.name,N',') WITHIN GROUP(ORDER BY fc.constraint_column_id) ParentColumns FROM sys.foreign_key_columns fc JOIN sys.columns pc ON pc.object_id=fc.parent_object_id AND pc.column_id=fc.parent_column_id JOIN sys.columns rc ON rc.object_id=fc.referenced_object_id AND rc.column_id=fc.referenced_column_id WHERE fc.constraint_object_id=f.object_id)x
+ WHERE f.object_id IS NULL OR f.referenced_object_id<>OBJECT_ID(N'dbo.'+e.ParentTable) OR x.ChildColumns<>e.ChildColumns OR x.ParentColumns<>e.ParentColumns OR f.is_disabled=1 OR f.is_not_trusted=1)
+ THROW 57023,'Required Phase 1A foreign key has incompatible child, parent, ordered columns, or state.',1;
 
 INSERT dbo.OrganizationOrganizationTypes(ShaleClientId,OrganizationId,OrganizationTypeId,IsPrimary,SortOrder,IsDeleted,CreatedAt)
 SELECT o.ShaleClientId,o.Id,o.OrganizationTypeId,1,0,0,SYSUTCDATETIME() FROM dbo.Organizations o
