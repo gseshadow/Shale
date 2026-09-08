@@ -2,7 +2,9 @@ package com.shale.data.dao;
 
 import static org.junit.jupiter.api.Assertions.*;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import java.lang.reflect.Proxy;
 import java.nio.file.*;
+import java.sql.ResultSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -16,6 +18,11 @@ class CaseOverviewConfigurationContractTest {
  @Test void duplicatesAreRejectedButExplicitEmptySelectionIsValid() {
   assertDoesNotThrow(()->CaseOverviewConfigurationDao.rejectDuplicates(List.of()));
   assertThrows(IllegalArgumentException.class,()->CaseOverviewConfigurationDao.rejectDuplicates(List.of(3,3)));
+ }
+ @Test void nullableJdbcIntAcceptsIntegerLongAndNullDriverRepresentations() throws Exception {
+  assertEquals(Integer.valueOf(37),CaseOverviewConfigurationDao.getNullableInt(resultSet(Integer.valueOf(37)),1));
+  assertEquals(Integer.valueOf(37),CaseOverviewConfigurationDao.getNullableInt(resultSet(Long.valueOf(37)),1));
+  assertNull(CaseOverviewConfigurationDao.getNullableInt(resultSet(null),1),"SQL NULL Intake By must remain Unknown/null");
  }
  @Test void daoOwnsAuthorizationTenantConcurrencyAtomicTimelineAndAuditContracts() throws Exception {
   String s=Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseOverviewConfigurationDao.java"));
@@ -78,5 +85,6 @@ class CaseOverviewConfigurationContractTest {
   assertTrue(s.contains("BEGIN TRANSACTION")); assertTrue(s.contains("IF XACT_STATE() <> 0 ROLLBACK"));
  }
  private static EffectiveCaseDateTypeDto type(int id,String key){return new EffectiveCaseDateTypeDto(id,7,key,key,null,"OTHER","#123456",false,id,true,false,EffectiveCaseDateTypeDto.Origin.TENANT_CREATED,new byte[]{1});}
+ private static ResultSet resultSet(Number value){return (ResultSet)Proxy.newProxyInstance(CaseOverviewConfigurationContractTest.class.getClassLoader(),new Class<?>[]{ResultSet.class},(proxy,method,args)->{if(method.getName().equals("getObject"))return value;throw new UnsupportedOperationException(method.getName());});}
  private static int count(String text,String token){int n=0,p=0;while((p=text.indexOf(token,p))>=0){n++;p+=token.length();}return n;}
 }
