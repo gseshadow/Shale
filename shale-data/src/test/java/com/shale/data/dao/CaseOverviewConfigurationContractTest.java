@@ -2,8 +2,12 @@ package com.shale.data.dao;
 
 import static org.junit.jupiter.api.Assertions.*;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import java.lang.reflect.Proxy;
 import java.nio.file.*;
+import java.sql.ResultSet;
 import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class CaseOverviewConfigurationContractTest {
@@ -14,6 +18,11 @@ class CaseOverviewConfigurationContractTest {
  @Test void duplicatesAreRejectedButExplicitEmptySelectionIsValid() {
   assertDoesNotThrow(()->CaseOverviewConfigurationDao.rejectDuplicates(List.of()));
   assertThrows(IllegalArgumentException.class,()->CaseOverviewConfigurationDao.rejectDuplicates(List.of(3,3)));
+ }
+ @Test void nullableJdbcIntAcceptsIntegerLongAndNullDriverRepresentations() throws Exception {
+  assertEquals(Integer.valueOf(37),CaseOverviewConfigurationDao.getNullableInt(resultSet(Integer.valueOf(37)),1));
+  assertEquals(Integer.valueOf(37),CaseOverviewConfigurationDao.getNullableInt(resultSet(Long.valueOf(37)),1));
+  assertNull(CaseOverviewConfigurationDao.getNullableInt(resultSet(null),1),"SQL NULL Intake By must remain Unknown/null");
  }
  @Test void daoOwnsAuthorizationTenantConcurrencyAtomicTimelineAndAuditContracts() throws Exception {
   String s=Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseOverviewConfigurationDao.java"));
@@ -50,6 +59,21 @@ class CaseOverviewConfigurationContractTest {
   assertTrue(combined.contains("if(!c.layoutChanged()&&!c.intakeTakenByChanged())"));assertTrue(combined.contains("updateCaseOnce"));
   assertTrue(combined.contains("retained"),"configured inactive type identities remain valid while retained");
  }
+ @Test void overviewCaseMutationsUseOnlyDeployedModificationColumnsAndConcurrencyPredicate() throws Exception {
+  String source=Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseOverviewConfigurationDao.java"));
+  var matcher=Pattern.compile("UPDATE dbo\\.Cases SET ([^\\\"]+) WHERE").matcher(source);
+  int caseUpdates=0;
+  while(matcher.find()) {
+   caseUpdates++;
+   Set<String> columns=Pattern.compile(",").splitAsStream(matcher.group(1)).map(v->v.substring(0,v.indexOf('='))).collect(java.util.stream.Collectors.toSet());
+   assertTrue(Set.of("IntakeTakenByUserId","UpdatedAt").containsAll(columns),"Cases mutation referenced undeployed modification columns: "+columns);
+   assertTrue(columns.contains("UpdatedAt"),"every Overview Cases mutation must advance RowVer through UpdatedAt");
+  }
+  assertEquals(4,caseUpdates,"the combined, standalone Intake By, and layout-only Cases mutation variants must all be inspected");
+  assertTrue(source.contains("UPDATE dbo.Cases SET IntakeTakenByUserId=?,UpdatedAt=SYSDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0 AND RowVer=?"));
+  assertTrue(source.contains("UPDATE dbo.Cases SET UpdatedAt=SYSDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0 AND RowVer=?"));
+  assertTrue(source.contains("UPDATE dbo.Cases SET UpdatedAt=SYSDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0"));
+ }
  @Test void overviewUserCandidatesExcludeRemovedUsers() throws Exception {
   String s=Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
   int start=s.indexOf("public List<UserRow> listUsersForTenant");int end=s.indexOf("public List<CaseUserTeamRow>",start);
@@ -61,5 +85,6 @@ class CaseOverviewConfigurationContractTest {
   assertTrue(s.contains("BEGIN TRANSACTION")); assertTrue(s.contains("IF XACT_STATE() <> 0 ROLLBACK"));
  }
  private static EffectiveCaseDateTypeDto type(int id,String key){return new EffectiveCaseDateTypeDto(id,7,key,key,null,"OTHER","#123456",false,id,true,false,EffectiveCaseDateTypeDto.Origin.TENANT_CREATED,new byte[]{1});}
+ private static ResultSet resultSet(Number value){return (ResultSet)Proxy.newProxyInstance(CaseOverviewConfigurationContractTest.class.getClassLoader(),new Class<?>[]{ResultSet.class},(proxy,method,args)->{if(method.getName().equals("getObject"))return value;throw new UnsupportedOperationException(method.getName());});}
  private static int count(String text,String token){int n=0,p=0;while((p=text.indexOf(token,p))>=0){n++;p+=token.length();}return n;}
 }

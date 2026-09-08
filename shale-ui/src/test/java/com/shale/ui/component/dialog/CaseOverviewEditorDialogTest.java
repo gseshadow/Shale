@@ -24,4 +24,16 @@ class CaseOverviewEditorDialogTest {
         assertTrue(source.contains("down.setDisable(!model.canMoveDown(type.id()))"));
         assertTrue(source.contains("new Submission(model.selectedIds()"), "submission must use the shown-row order");
     }
+
+    @Test void usesCustomWindowChromeWithDragCloseEscapeAndDirtyCloseLifecycle() throws Exception {
+        String source = Files.readString(SOURCE);
+        assertTrue(source.contains("AppDialogs.applySecondaryWindowChrome(stage)"), "native window decoration must be hidden");
+        assertTrue(source.contains("AppDialogs.createSecondaryWindowShell(stage,\"Edit Overview\",close,content)"), "the Shale header must retain its draggable close affordance");
+        assertTrue(source.contains("KeyCode.ESCAPE"));
+        assertTrue(source.contains("close.run()"), "Escape must use the same dirty-close confirmation path");
+        assertTrue(source.contains("stage.initOwner(owner)"));
+        assertTrue(source.contains("stage.initModality(Modality.WINDOW_MODAL)"));
+        assertTrue(source.contains("stage.setOnCloseRequest"));
+        assertTrue(source.contains("WindowSizingUtil.sizeModalStage"));
+    }
 }
