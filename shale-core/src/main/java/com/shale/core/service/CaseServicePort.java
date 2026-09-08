@@ -17,6 +17,7 @@ import com.shale.core.dto.CaseTeamRoleDefinitionDto;
 import com.shale.core.dto.CaseTeamMembershipDto;
 import com.shale.core.dto.CaseOverviewDto;
 import com.shale.core.dto.CaseOverviewDateConfigurationDto;
+import com.shale.core.dto.CaseOverviewAdministrationDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkShareDto;
@@ -78,6 +79,14 @@ public interface CaseServicePort {
 
 	default IntakeTakenByMutationResult updateIntakeTakenBy(UpdateIntakeTakenByCommand command) {
 		throw new UnsupportedOperationException("Intake By mutation is unavailable.");
+	}
+
+	default CaseOverviewAdministrationDto getCaseOverviewAdministration(long caseId, int shaleClientId, int actorUserId) {
+		throw new UnsupportedOperationException("Case Overview administration is unavailable.");
+	}
+
+	default CaseOverviewMutationResult updateCaseOverview(UpdateCaseOverviewCommand command) {
+		throw new UnsupportedOperationException("Atomic Case Overview mutation is unavailable.");
 	}
 
 	default int resolveEffectiveCaseDateTypeId(int shaleClientId, int actorUserId, CaseDateSemanticRole role) {
@@ -493,4 +502,20 @@ public interface CaseServicePort {
 		public IntakeTakenByMutationResult { caseRowVer = copyRowVer(caseRowVer); }
 		@Override public byte[] caseRowVer() { return copyRowVer(caseRowVer); }
 	}
+
+	record UpdateCaseOverviewCommand(int shaleClientId, int actorUserId, long caseId,
+			List<Integer> orderedCaseDateTypeIds, Integer intakeTakenByUserId,
+			byte[] expectedConfigurationRowVer, byte[] expectedCaseRowVer,
+			boolean layoutChanged, boolean intakeTakenByChanged) {
+		public UpdateCaseOverviewCommand {
+			orderedCaseDateTypeIds = orderedCaseDateTypeIds == null ? List.of() : List.copyOf(orderedCaseDateTypeIds);
+			expectedConfigurationRowVer = copyRowVer(expectedConfigurationRowVer);
+			expectedCaseRowVer = copyRowVer(expectedCaseRowVer);
+		}
+		@Override public byte[] expectedConfigurationRowVer() { return copyRowVer(expectedConfigurationRowVer); }
+		@Override public byte[] expectedCaseRowVer() { return copyRowVer(expectedCaseRowVer); }
+	}
+
+	record CaseOverviewMutationResult(CaseOverviewAdministrationDto overview, boolean changed,
+			boolean layoutChanged, boolean intakeTakenByChanged) {}
 }

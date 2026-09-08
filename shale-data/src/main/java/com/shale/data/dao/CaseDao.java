@@ -6824,6 +6824,7 @@ public final class CaseDao {
 			boolean hasIsActive = tableHasColumn(con, "Users", "IsActive");
 			boolean hasIsDeleted = tableHasColumn(con, "Users", "IsDeleted");
 			boolean hasIsDeletedLower = tableHasColumn(con, "Users", "is_deleted"); // in case your column is lower-case style
+			boolean hasIsRemoved = tableHasColumn(con, "Users", "IsRemoved");
 
 			StringBuilder sql = new StringBuilder(baseSql);
 
@@ -6835,6 +6836,9 @@ public final class CaseDao {
 			}
 			if (hasIsDeletedLower) {
 				sql.append("\n  AND (u.is_deleted = 0 OR u.is_deleted IS NULL)\n");
+			}
+			if (hasIsRemoved) {
+				sql.append("\n  AND (u.IsRemoved = 0 OR u.IsRemoved IS NULL)\n");
 			}
 
 			sql.append(orderSql);
