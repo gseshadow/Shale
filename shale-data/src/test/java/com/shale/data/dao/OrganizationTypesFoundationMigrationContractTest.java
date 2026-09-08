@@ -25,13 +25,31 @@ final class OrganizationTypesFoundationMigrationContractTest {
     private static boolean validColor(String color) {
         return color != null && color.matches("#[0-9A-F]{6}") && color.equals(color.toUpperCase(Locale.ROOT));
     }
+    private static String withoutSqlStringLiterals(String sql) {
+        StringBuilder result = new StringBuilder(sql.length());
+        boolean quoted = false;
+        for (int i = 0; i < sql.length(); i++) {
+            char ch = sql.charAt(i);
+            if (ch == '\'' && quoted && i + 1 < sql.length() && sql.charAt(i + 1) == '\'') {
+                result.append("  ");
+                i++;
+            } else if (ch == '\'') {
+                quoted = !quoted;
+                result.append(' ');
+            } else {
+                result.append(quoted ? ' ' : ch);
+            }
+        }
+        assertFalse(quoted, "SQL string literal must be closed");
+        return result.toString();
+    }
 
     @Test void migrationPreservesBaselineAndBuildsDefinitionContract() throws Exception {
         String s = read("docs/sql/2026-09-08_organization_types_foundation_phase1a.sql");
         assertTrue(s.contains("DECLARE @IsFirstFoundationDeployment bit=CASE WHEN"));
         assertTrue(s.contains("IF @IsFirstFoundationDeployment=1 AND ((SELECT COUNT_BIG(*) FROM dbo.OrganizationTypes)<>7"));
         assertTrue(s.contains("IF @IsFirstFoundationDeployment=0 AND EXISTS"), "reruns tolerate later definitions while preserving the seven baseline identities");
-        for (String row : new String[]{"(1,N'Provider',7)", "(7,N'Other',7)", "N'provider',N'#0F766E',0", "N'other',N'#6B7280',6"}) assertTrue(s.contains(row), row);
+        for (String row : new String[]{"(1,N'Provider',7)", "(7,N'Other',7)", "N''provider'',N''#0F766E'',0", "N''other'',N''#6B7280'',6"}) assertTrue(s.contains(row), row);
         assertTrue(s.contains("sys.default_constraints dc JOIN sys.columns c"));
         assertTrue(s.contains("ALTER COLUMN ShaleClientId int NULL"));
         for (String column : new String[]{"SystemKey", "Description", "Color", "SortOrder", "IsActive", "IsDeleted", "CreatedAt", "CreatedByUserId", "UpdatedAt", "UpdatedByUserId", "DeletedAt", "DeletedByUserId", "RowVer"}) assertTrue(s.contains("N'" + column + "'") || s.contains("ADD " + column), column);
@@ -45,22 +63,36 @@ final class OrganizationTypesFoundationMigrationContractTest {
         String s = read("docs/sql/2026-09-08_organization_types_foundation_phase1a.sql");
         String v = read("docs/sql/verification/2026-09-08_organization_types_foundation_phase1a_verification.sql");
         for (String sql : new String[]{s, v}) {
-            assertTrue(sql.contains("LEN(Color)"));
+            assertTrue(sql.contains("DATALENGTH(Color)"));
             assertTrue(sql.contains("SUBSTRING(Color,2,6) COLLATE Latin1_General_100_BIN2"));
             assertTrue(sql.contains("UPPER(Color) COLLATE Latin1_General_100_BIN2"));
         }
         assertTrue(validColor("#ABCDEF"));
+        assertFalse(validColor("#ABCDEF "));
         assertFalse(validColor("#abcdef"));
         assertFalse(validColor("#ABCDE"));
+    }
+
+    @Test void firstDeploymentDefersPostAddAndPostCreateBindingToDynamicSql() throws Exception {
+        String s = read("docs/sql/2026-09-08_organization_types_foundation_phase1a.sql");
+        assertTrue(s.contains("EXEC sys.sp_executesql @sql,N'@First bit',@IsFirstFoundationDeployment;"));
+        assertTrue(s.contains("EXEC sys.sp_executesql @sql,N'@First bit',@IsFirstAssignmentDeployment;"));
+        String staticSql = withoutSqlStringLiterals(s);
+        assertFalse(staticSql.contains("UPDATE d SET SystemKey="));
+        assertFalse(staticSql.contains("ALTER TABLE dbo.OrganizationTypes ALTER COLUMN SystemKey"));
+        assertFalse(staticSql.contains("CREATE UNIQUE INDEX UX_OrganizationTypes_Global_SystemKey"));
+        assertFalse(staticSql.contains("CREATE UNIQUE INDEX UX_OrganizationOrganizationTypes_Active"));
+        assertFalse(staticSql.contains("INSERT dbo.OrganizationOrganizationTypes("));
+        assertFalse(staticSql.contains("JOIN dbo.OrganizationOrganizationTypes a"));
     }
 
     @Test void successfulRerunNeverResetsMutableDefinitionState() throws Exception {
         String s = read("docs/sql/2026-09-08_organization_types_foundation_phase1a.sql");
         int rerun = s.indexOf("ELSE\nUPDATE d SET SystemKey=COALESCE");
-        int complete = s.indexOf("IF EXISTS(SELECT 1 FROM (VALUES(1,N'provider')", rerun);
+        int complete = s.indexOf("IF EXISTS(SELECT 1 FROM (VALUES(1,N''provider'')", rerun);
         assertTrue(rerun > 0 && complete > rerun);
         String rerunBackfill = s.substring(rerun, complete);
-        assertTrue(rerunBackfill.contains("Color=COALESCE(d.Color,N'#6C757D')"));
+        assertTrue(rerunBackfill.contains("Color=COALESCE(d.Color,N''#6C757D'')"));
         assertTrue(rerunBackfill.contains("SortOrder=COALESCE(d.SortOrder,v.SortOrder)"));
         assertTrue(rerunBackfill.contains("IsActive=COALESCE(d.IsActive"));
         assertTrue(rerunBackfill.contains("IsDeleted=COALESCE(d.IsDeleted"));
@@ -80,7 +112,7 @@ final class OrganizationTypesFoundationMigrationContractTest {
         assertTrue(s.contains("WHERE IsDeleted=0 AND IsPrimary=1"));
         assertTrue(s.contains("INSERT dbo.OrganizationOrganizationTypes"));
         assertTrue(s.contains("NOT EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes"));
-        String historicalGuard = s.substring(s.indexOf("WHERE NOT EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes"), s.indexOf("IF @IsFirstAssignmentDeployment=1 AND"));
+        String historicalGuard = s.substring(s.indexOf("WHERE NOT EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes"), s.indexOf("IF @First=1 AND"));
         assertFalse(historicalGuard.contains("IsDeleted"), "a deleted historical assignment must prevent foundation recreation");
         assertTrue(s.contains("did not create exactly 176 matching active primary assignments"));
         assertTrue(s.contains("#OrganizationBaseline"));

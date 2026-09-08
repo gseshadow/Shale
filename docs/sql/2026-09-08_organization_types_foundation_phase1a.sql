@@ -69,25 +69,25 @@ IF COL_LENGTH(N'dbo.OrganizationTypes',N'DeletedAt') IS NULL ALTER TABLE dbo.Org
 IF COL_LENGTH(N'dbo.OrganizationTypes',N'DeletedByUserId') IS NULL ALTER TABLE dbo.OrganizationTypes ADD DeletedByUserId int NULL;
 IF COL_LENGTH(N'dbo.OrganizationTypes',N'RowVer') IS NULL ALTER TABLE dbo.OrganizationTypes ADD RowVer rowversion NOT NULL;
 
-IF @IsFirstFoundationDeployment=1
+SET @sql=N'IF @First=1
 UPDATE d SET SystemKey=v.SystemKey,Color=v.Color,SortOrder=v.SortOrder,IsActive=1,IsDeleted=0,CreatedAt=COALESCE(d.CreatedAt,SYSUTCDATETIME())
-FROM dbo.OrganizationTypes d JOIN (VALUES(1,N'provider',N'#0F766E',0),(2,N'facility',N'#2563EB',1),(3,N'firm',N'#7C3AED',2),(4,N'agency',N'#D97706',3),(5,N'insurer',N'#059669',4),(6,N'lab',N'#0891B2',5),(7,N'other',N'#6B7280',6))v(Id,SystemKey,Color,SortOrder) ON v.Id=d.OrganizationTypeId
+FROM dbo.OrganizationTypes d JOIN (VALUES(1,N''provider'',N''#0F766E'',0),(2,N''facility'',N''#2563EB'',1),(3,N''firm'',N''#7C3AED'',2),(4,N''agency'',N''#D97706'',3),(5,N''insurer'',N''#059669'',4),(6,N''lab'',N''#0891B2'',5),(7,N''other'',N''#6B7280'',6))v(Id,SystemKey,Color,SortOrder) ON v.Id=d.OrganizationTypeId
 WHERE d.SystemKey IS NULL OR d.Color IS NULL OR d.SortOrder IS NULL OR d.IsActive IS NULL OR d.IsDeleted IS NULL OR d.CreatedAt IS NULL;
 ELSE
-UPDATE d SET SystemKey=COALESCE(d.SystemKey,v.SystemKey),Color=COALESCE(d.Color,N'#6C757D'),SortOrder=COALESCE(d.SortOrder,v.SortOrder),
+UPDATE d SET SystemKey=COALESCE(d.SystemKey,v.SystemKey),Color=COALESCE(d.Color,N''#6C757D''),SortOrder=COALESCE(d.SortOrder,v.SortOrder),
  IsActive=COALESCE(d.IsActive,CONVERT(bit,1)),IsDeleted=COALESCE(d.IsDeleted,CONVERT(bit,0)),CreatedAt=COALESCE(d.CreatedAt,SYSUTCDATETIME())
-FROM dbo.OrganizationTypes d JOIN (VALUES(1,N'provider',0),(2,N'facility',1),(3,N'firm',2),(4,N'agency',3),(5,N'insurer',4),(6,N'lab',5),(7,N'other',6))v(Id,SystemKey,SortOrder) ON v.Id=d.OrganizationTypeId
+FROM dbo.OrganizationTypes d JOIN (VALUES(1,N''provider'',0),(2,N''facility'',1),(3,N''firm'',2),(4,N''agency'',3),(5,N''insurer'',4),(6,N''lab'',5),(7,N''other'',6))v(Id,SystemKey,SortOrder) ON v.Id=d.OrganizationTypeId
 WHERE d.SystemKey IS NULL OR d.Color IS NULL OR d.SortOrder IS NULL OR d.IsActive IS NULL OR d.IsDeleted IS NULL OR d.CreatedAt IS NULL;
-IF EXISTS(SELECT 1 FROM (VALUES(1,N'provider'),(2,N'facility'),(3,N'firm'),(4,N'agency'),(5,N'insurer'),(6,N'lab'),(7,N'other'))v(Id,SystemKey) LEFT JOIN dbo.OrganizationTypes d ON d.OrganizationTypeId=v.Id WHERE d.SystemKey<>v.SystemKey OR d.SystemKey IS NULL)
- THROW 57025,'A preserved baseline OrganizationType SystemKey is missing or changed.',1;
-
-IF EXISTS(SELECT 1 FROM dbo.OrganizationTypes WHERE SystemKey IS NULL OR Color IS NULL OR SortOrder IS NULL OR IsActive IS NULL OR IsDeleted IS NULL OR CreatedAt IS NULL) THROW 57010,'Definition backfill is incomplete.',1;
+IF EXISTS(SELECT 1 FROM (VALUES(1,N''provider''),(2,N''facility''),(3,N''firm''),(4,N''agency''),(5,N''insurer''),(6,N''lab''),(7,N''other''))v(Id,SystemKey) LEFT JOIN dbo.OrganizationTypes d ON d.OrganizationTypeId=v.Id WHERE d.SystemKey<>v.SystemKey OR d.SystemKey IS NULL)
+ THROW 57025,''A preserved baseline OrganizationType SystemKey is missing or changed.'',1;
+IF EXISTS(SELECT 1 FROM dbo.OrganizationTypes WHERE SystemKey IS NULL OR Color IS NULL OR SortOrder IS NULL OR IsActive IS NULL OR IsDeleted IS NULL OR CreatedAt IS NULL) THROW 57010,''Definition backfill is incomplete.'',1;
 ALTER TABLE dbo.OrganizationTypes ALTER COLUMN SystemKey nvarchar(64) NOT NULL;
 ALTER TABLE dbo.OrganizationTypes ALTER COLUMN Color nvarchar(20) NOT NULL;
 ALTER TABLE dbo.OrganizationTypes ALTER COLUMN SortOrder int NOT NULL;
 ALTER TABLE dbo.OrganizationTypes ALTER COLUMN IsActive bit NOT NULL;
 ALTER TABLE dbo.OrganizationTypes ALTER COLUMN IsDeleted bit NOT NULL;
-ALTER TABLE dbo.OrganizationTypes ALTER COLUMN CreatedAt datetime2 NOT NULL;
+ALTER TABLE dbo.OrganizationTypes ALTER COLUMN CreatedAt datetime2 NOT NULL;';
+EXEC sys.sp_executesql @sql,N'@First bit',@IsFirstFoundationDeployment;
 IF EXISTS(SELECT 1 FROM (VALUES(N'OrganizationTypeId',N'int',4,0,1,0),(N'Name',N'nvarchar',200,0,0,0),(N'ShaleClientId',N'int',4,1,0,0),(N'SystemKey',N'nvarchar',128,0,0,0),(N'Description',N'nvarchar',1000,1,0,0),(N'Color',N'nvarchar',40,0,0,0),(N'SortOrder',N'int',4,0,0,0),(N'IsActive',N'bit',1,0,0,0),(N'IsDeleted',N'bit',1,0,0,0),(N'CreatedAt',N'datetime2',8,0,0,0),(N'CreatedByUserId',N'int',4,1,0,0),(N'UpdatedAt',N'datetime2',8,1,0,0),(N'UpdatedByUserId',N'int',4,1,0,0),(N'DeletedAt',N'datetime2',8,1,0,0),(N'DeletedByUserId',N'int',4,1,0,0),(N'RowVer',N'timestamp',8,0,0,1))e(n,t,l,z,i,r) LEFT JOIN sys.columns c ON c.object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND c.name=e.n LEFT JOIN sys.types y ON y.user_type_id=c.user_type_id WHERE c.column_id IS NULL OR y.name<>e.t OR c.max_length<>e.l OR c.is_nullable<>e.z OR c.is_identity<>e.i OR (CASE WHEN c.system_type_id=189 THEN 1 ELSE 0 END)<>e.r)
  THROW 57019,'OrganizationTypes has incompatible required columns.',1;
 IF EXISTS(SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name IN(N'CreatedAt',N'UpdatedAt',N'DeletedAt') AND (precision<>27 OR scale<>7)) THROW 57020,'OrganizationTypes timestamps must be datetime2(7).',1;
@@ -98,23 +98,23 @@ OPEN names; FETCH NEXT FROM names INTO @DefaultName; WHILE @@FETCH_STATUS=0 BEGI
  IF EXISTS(SELECT 1 FROM sys.key_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=@DefaultName) SET @sql=N'ALTER TABLE dbo.OrganizationTypes DROP CONSTRAINT '+QUOTENAME(@DefaultName); ELSE SET @sql=N'DROP INDEX '+QUOTENAME(@DefaultName)+N' ON dbo.OrganizationTypes'; EXEC sys.sp_executesql @sql;
  FETCH NEXT FROM names INTO @DefaultName; END CLOSE names; DEALLOCATE names;
 
-IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'DF_OrganizationTypes_SortOrder') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_SortOrder DEFAULT(0) FOR SortOrder;
-IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'DF_OrganizationTypes_IsActive') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_IsActive DEFAULT(1) FOR IsActive;
-IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'DF_OrganizationTypes_IsDeleted') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_IsDeleted DEFAULT(0) FOR IsDeleted;
-IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'DF_OrganizationTypes_CreatedAt') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_CreatedAt DEFAULT(SYSUTCDATETIME()) FOR CreatedAt;
-IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'DF_OrganizationTypes_Color') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_Color DEFAULT(N'#6C757D') FOR Color;
-IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'CK_OrganizationTypes_SystemKey') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_SystemKey CHECK(SystemKey=LOWER(SystemKey) AND SystemKey<>N'' AND SystemKey NOT LIKE N'%[^a-z0-9_]%' AND LEFT(SystemKey,1) LIKE N'[a-z]');
-IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'CK_OrganizationTypes_Color') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_Color CHECK(LEN(Color)=7 AND LEFT(Color,1)=N'#' AND SUBSTRING(Color,2,6) COLLATE Latin1_General_100_BIN2 NOT LIKE N'%[^0-9A-F]%' AND Color COLLATE Latin1_General_100_BIN2=UPPER(Color) COLLATE Latin1_General_100_BIN2);
-IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'CK_OrganizationTypes_SortOrder') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_SortOrder CHECK(SortOrder>=0);
-IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'CK_OrganizationTypes_DeleteFields') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_DeleteFields CHECK((IsDeleted=0 AND DeletedAt IS NULL AND DeletedByUserId IS NULL) OR (IsDeleted=1 AND IsActive=0 AND DeletedAt IS NOT NULL AND DeletedByUserId IS NOT NULL));
-IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'FK_OrganizationTypes_CreatedBy') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT FK_OrganizationTypes_CreatedBy FOREIGN KEY(CreatedByUserId) REFERENCES dbo.Users(id);
-IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'FK_OrganizationTypes_UpdatedBy') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT FK_OrganizationTypes_UpdatedBy FOREIGN KEY(UpdatedByUserId) REFERENCES dbo.Users(id);
-IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'FK_OrganizationTypes_DeletedBy') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT FK_OrganizationTypes_DeletedBy FOREIGN KEY(DeletedByUserId) REFERENCES dbo.Users(id);
-
-IF EXISTS(SELECT 1 FROM dbo.OrganizationTypes GROUP BY SystemKey HAVING COUNT(*)>1 AND MIN(CASE WHEN ShaleClientId IS NULL THEN 1 ELSE 0 END)=1) THROW 57011,'Duplicate global SystemKeys prevent uniqueness.',1;
-IF EXISTS(SELECT 1 FROM dbo.OrganizationTypes WHERE ShaleClientId IS NOT NULL GROUP BY ShaleClientId,SystemKey HAVING COUNT(*)>1) THROW 57012,'Duplicate tenant SystemKeys prevent uniqueness.',1;
-IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'UX_OrganizationTypes_Global_SystemKey') CREATE UNIQUE INDEX UX_OrganizationTypes_Global_SystemKey ON dbo.OrganizationTypes(SystemKey) WHERE ShaleClientId IS NULL;
-IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.OrganizationTypes') AND name=N'UX_OrganizationTypes_Tenant_SystemKey') CREATE UNIQUE INDEX UX_OrganizationTypes_Tenant_SystemKey ON dbo.OrganizationTypes(ShaleClientId,SystemKey) WHERE ShaleClientId IS NOT NULL;
+SET @sql=N'IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''DF_OrganizationTypes_SortOrder'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_SortOrder DEFAULT(0) FOR SortOrder;
+IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''DF_OrganizationTypes_IsActive'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_IsActive DEFAULT(1) FOR IsActive;
+IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''DF_OrganizationTypes_IsDeleted'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_IsDeleted DEFAULT(0) FOR IsDeleted;
+IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''DF_OrganizationTypes_CreatedAt'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_CreatedAt DEFAULT(SYSUTCDATETIME()) FOR CreatedAt;
+IF NOT EXISTS(SELECT 1 FROM sys.default_constraints WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''DF_OrganizationTypes_Color'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT DF_OrganizationTypes_Color DEFAULT(N''#6C757D'') FOR Color;
+IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''CK_OrganizationTypes_SystemKey'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_SystemKey CHECK(SystemKey=LOWER(SystemKey) AND SystemKey<>N'''' AND SystemKey NOT LIKE N''%[^a-z0-9_]%'' AND LEFT(SystemKey,1) LIKE N''[a-z]'');
+IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''CK_OrganizationTypes_Color'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_Color CHECK(DATALENGTH(Color)=14 AND LEFT(Color,1)=N''#'' AND SUBSTRING(Color,2,6) COLLATE Latin1_General_100_BIN2 NOT LIKE N''%[^0-9A-F]%'' AND Color COLLATE Latin1_General_100_BIN2=UPPER(Color) COLLATE Latin1_General_100_BIN2);
+IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''CK_OrganizationTypes_SortOrder'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_SortOrder CHECK(SortOrder>=0);
+IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''CK_OrganizationTypes_DeleteFields'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT CK_OrganizationTypes_DeleteFields CHECK((IsDeleted=0 AND DeletedAt IS NULL AND DeletedByUserId IS NULL) OR (IsDeleted=1 AND IsActive=0 AND DeletedAt IS NOT NULL AND DeletedByUserId IS NOT NULL));
+IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''FK_OrganizationTypes_CreatedBy'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT FK_OrganizationTypes_CreatedBy FOREIGN KEY(CreatedByUserId) REFERENCES dbo.Users(id);
+IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''FK_OrganizationTypes_UpdatedBy'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT FK_OrganizationTypes_UpdatedBy FOREIGN KEY(UpdatedByUserId) REFERENCES dbo.Users(id);
+IF NOT EXISTS(SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''FK_OrganizationTypes_DeletedBy'') ALTER TABLE dbo.OrganizationTypes ADD CONSTRAINT FK_OrganizationTypes_DeletedBy FOREIGN KEY(DeletedByUserId) REFERENCES dbo.Users(id);
+IF EXISTS(SELECT 1 FROM dbo.OrganizationTypes WHERE ShaleClientId IS NULL GROUP BY SystemKey HAVING COUNT(*)>1) THROW 57011,''Duplicate global SystemKeys prevent uniqueness.'',1;
+IF EXISTS(SELECT 1 FROM dbo.OrganizationTypes WHERE ShaleClientId IS NOT NULL GROUP BY ShaleClientId,SystemKey HAVING COUNT(*)>1) THROW 57012,''Duplicate tenant SystemKeys prevent uniqueness.'',1;
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''UX_OrganizationTypes_Global_SystemKey'') CREATE UNIQUE INDEX UX_OrganizationTypes_Global_SystemKey ON dbo.OrganizationTypes(SystemKey) WHERE ShaleClientId IS NULL;
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N''dbo.OrganizationTypes'') AND name=N''UX_OrganizationTypes_Tenant_SystemKey'') CREATE UNIQUE INDEX UX_OrganizationTypes_Tenant_SystemKey ON dbo.OrganizationTypes(ShaleClientId,SystemKey) WHERE ShaleClientId IS NOT NULL;';
+EXEC sys.sp_executesql @sql;
 IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.Organizations') AND name=N'UX_Organizations_ShaleClientId_Id') CREATE UNIQUE INDEX UX_Organizations_ShaleClientId_Id ON dbo.Organizations(ShaleClientId,Id);
 
 DECLARE @IsFirstAssignmentDeployment bit=CASE WHEN OBJECT_ID(N'dbo.OrganizationOrganizationTypes',N'U') IS NULL THEN 1 ELSE 0 END;
@@ -136,9 +136,10 @@ IF @IsFirstAssignmentDeployment=1 CREATE TABLE dbo.OrganizationOrganizationTypes
 IF EXISTS(SELECT 1 FROM (VALUES(N'Id',N'bigint',8,0,1,0),(N'ShaleClientId',N'int',4,0,0,0),(N'OrganizationId',N'int',4,0,0,0),(N'OrganizationTypeId',N'int',4,0,0,0),(N'IsPrimary',N'bit',1,0,0,0),(N'SortOrder',N'int',4,0,0,0),(N'IsDeleted',N'bit',1,0,0,0),(N'CreatedAt',N'datetime2',8,0,0,0),(N'CreatedByUserId',N'int',4,1,0,0),(N'UpdatedAt',N'datetime2',8,1,0,0),(N'UpdatedByUserId',N'int',4,1,0,0),(N'DeletedAt',N'datetime2',8,1,0,0),(N'DeletedByUserId',N'int',4,1,0,0),(N'RowVer',N'timestamp',8,0,0,1))e(n,t,l,z,i,r) LEFT JOIN sys.columns c ON c.object_id=OBJECT_ID(N'dbo.OrganizationOrganizationTypes') AND c.name=e.n LEFT JOIN sys.types y ON y.user_type_id=c.user_type_id WHERE c.column_id IS NULL OR y.name<>e.t OR c.max_length<>e.l OR c.is_nullable<>e.z OR c.is_identity<>e.i OR (CASE WHEN c.system_type_id=189 THEN 1 ELSE 0 END)<>e.r)
  THROW 57013,'OrganizationOrganizationTypes has incompatible required columns.',1;
 
-IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.OrganizationOrganizationTypes') AND name=N'UX_OrganizationOrganizationTypes_Active') CREATE UNIQUE INDEX UX_OrganizationOrganizationTypes_Active ON dbo.OrganizationOrganizationTypes(ShaleClientId,OrganizationId,OrganizationTypeId) WHERE IsDeleted=0;
-IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.OrganizationOrganizationTypes') AND name=N'UX_OrganizationOrganizationTypes_ActivePrimary') CREATE UNIQUE INDEX UX_OrganizationOrganizationTypes_ActivePrimary ON dbo.OrganizationOrganizationTypes(ShaleClientId,OrganizationId) WHERE IsDeleted=0 AND IsPrimary=1;
-IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.OrganizationOrganizationTypes') AND name=N'IX_OrganizationOrganizationTypes_Display') CREATE INDEX IX_OrganizationOrganizationTypes_Display ON dbo.OrganizationOrganizationTypes(ShaleClientId,OrganizationId,IsDeleted,SortOrder,Id);
+SET @sql=N'IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N''dbo.OrganizationOrganizationTypes'') AND name=N''UX_OrganizationOrganizationTypes_Active'') CREATE UNIQUE INDEX UX_OrganizationOrganizationTypes_Active ON dbo.OrganizationOrganizationTypes(ShaleClientId,OrganizationId,OrganizationTypeId) WHERE IsDeleted=0;
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N''dbo.OrganizationOrganizationTypes'') AND name=N''UX_OrganizationOrganizationTypes_ActivePrimary'') CREATE UNIQUE INDEX UX_OrganizationOrganizationTypes_ActivePrimary ON dbo.OrganizationOrganizationTypes(ShaleClientId,OrganizationId) WHERE IsDeleted=0 AND IsPrimary=1;
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N''dbo.OrganizationOrganizationTypes'') AND name=N''IX_OrganizationOrganizationTypes_Display'') CREATE INDEX IX_OrganizationOrganizationTypes_Display ON dbo.OrganizationOrganizationTypes(ShaleClientId,OrganizationId,IsDeleted,SortOrder,Id);';
+EXEC sys.sp_executesql @sql;
 IF EXISTS(SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.OrganizationOrganizationTypes') AND name IN(N'CreatedAt',N'UpdatedAt',N'DeletedAt') AND (precision<>27 OR scale<>7)) THROW 57021,'Assignment timestamps must be datetime2(7).',1;
 
 /* Named objects are owned contracts: compatible later additive objects are tolerated, but an
@@ -164,7 +165,7 @@ IF EXISTS(SELECT 1 FROM @RequiredIndexes e OUTER APPLY(SELECT i.object_id,i.inde
 DECLARE @RequiredChecks TABLE(TableName sysname,ConstraintName sysname,NormalizedDefinition nvarchar(1000));
 INSERT @RequiredChecks VALUES
 (N'OrganizationTypes',N'CK_OrganizationTypes_SystemKey',N'systemkey=lowersystemkeyandsystemkey<>n''''andsystemkeynotliken''%[^a-z0-9_]%''andleftsystemkey,1liken''[a-z]'''),
-(N'OrganizationTypes',N'CK_OrganizationTypes_Color',N'lencolor=7andleftcolor,1=n''#''andsubstringcolor,2,6collatelatin1_general_100_bin2notliken''%[^0-9a-f]%''andcolorcollatelatin1_general_100_bin2=uppercolorcollatelatin1_general_100_bin2'),
+(N'OrganizationTypes',N'CK_OrganizationTypes_Color',N'datalengthcolor=14andleftcolor,1=n''#''andsubstringcolor,2,6collatelatin1_general_100_bin2notliken''%[^0-9a-f]%''andcolorcollatelatin1_general_100_bin2=uppercolorcollatelatin1_general_100_bin2'),
 (N'OrganizationTypes',N'CK_OrganizationTypes_SortOrder',N'sortorder>=0'),
 (N'OrganizationTypes',N'CK_OrganizationTypes_DeleteFields',N'isdeleted=0anddeletedatisnullanddeletedbyuseridisnullorisdeleted=1andisactive=0anddeletedatisnotnullanddeletedbyuseridisnotnull'),
 (N'OrganizationOrganizationTypes',N'CK_OrganizationOrganizationTypes_SortOrder',N'sortorder>=0'),
@@ -186,15 +187,15 @@ IF EXISTS(SELECT 1 FROM @RequiredFks e OUTER APPLY(SELECT f.object_id,f.referenc
  WHERE f.object_id IS NULL OR f.referenced_object_id<>OBJECT_ID(N'dbo.'+e.ParentTable) OR x.ChildColumns<>e.ChildColumns OR x.ParentColumns<>e.ParentColumns OR f.is_disabled=1 OR f.is_not_trusted=1)
  THROW 57023,'Required Phase 1A foreign key has incompatible child, parent, ordered columns, or state.',1;
 
-INSERT dbo.OrganizationOrganizationTypes(ShaleClientId,OrganizationId,OrganizationTypeId,IsPrimary,SortOrder,IsDeleted,CreatedAt)
+/* Dynamic execution prevents first-batch binding against a table that did not exist when this
+   migration batch began. Historical rows, including deleted rows, suppress foundation reinsertion. */
+SET @sql=N'INSERT dbo.OrganizationOrganizationTypes(ShaleClientId,OrganizationId,OrganizationTypeId,IsPrimary,SortOrder,IsDeleted,CreatedAt)
 SELECT o.ShaleClientId,o.Id,o.OrganizationTypeId,1,0,0,SYSUTCDATETIME() FROM dbo.Organizations o
 WHERE NOT EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes a WHERE a.ShaleClientId=o.ShaleClientId AND a.OrganizationId=o.Id AND a.OrganizationTypeId=o.OrganizationTypeId);
-IF @IsFirstAssignmentDeployment=1 AND ((SELECT COUNT_BIG(*) FROM dbo.OrganizationOrganizationTypes WHERE IsDeleted=0 AND IsPrimary=1)<>176 OR EXISTS(SELECT 1 FROM dbo.Organizations o WHERE NOT EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes a WHERE a.ShaleClientId=o.ShaleClientId AND a.OrganizationId=o.Id AND a.OrganizationTypeId=o.OrganizationTypeId AND a.IsDeleted=0 AND a.IsPrimary=1)))
- THROW 57026,'Initial assignment backfill did not create exactly 176 matching active primary assignments.',1;
-
-/* Type ownership (global or same tenant) cannot be expressed by the simple authoritative-ID FK;
-   Phase 1C must validate it transactionally. The backfill is nevertheless checked here. */
-IF EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes a JOIN dbo.OrganizationTypes t ON t.OrganizationTypeId=a.OrganizationTypeId WHERE t.ShaleClientId IS NOT NULL AND t.ShaleClientId<>a.ShaleClientId) THROW 57014,'Cross-tenant definition assignment detected.',1;
+IF @First=1 AND ((SELECT COUNT_BIG(*) FROM dbo.OrganizationOrganizationTypes WHERE IsDeleted=0 AND IsPrimary=1)<>176 OR EXISTS(SELECT 1 FROM dbo.Organizations o WHERE NOT EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes a WHERE a.ShaleClientId=o.ShaleClientId AND a.OrganizationId=o.Id AND a.OrganizationTypeId=o.OrganizationTypeId AND a.IsDeleted=0 AND a.IsPrimary=1)))
+ THROW 57026,''Initial assignment backfill did not create exactly 176 matching active primary assignments.'',1;
+IF EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes a JOIN dbo.OrganizationTypes t ON t.OrganizationTypeId=a.OrganizationTypeId WHERE t.ShaleClientId IS NOT NULL AND t.ShaleClientId<>a.ShaleClientId) THROW 57014,''Cross-tenant definition assignment detected.'',1;';
+EXEC sys.sp_executesql @sql,N'@First bit',@IsFirstAssignmentDeployment;
 
 DECLARE @ExpectedRls TABLE(TableName sysname,Expected nvarchar(200)); INSERT @ExpectedRls VALUES(N'OrganizationTypes',N'sec.fn_filterbytenantorglobalshaleclientid'),(N'OrganizationOrganizationTypes',N'sec.fn_filterbytenantshaleclientid');
 DECLARE @table sysname,@fn sysname; DECLARE rls CURSOR LOCAL FAST_FORWARD FOR SELECT TableName,CASE WHEN TableName=N'OrganizationTypes' THEN N'fn_FilterByTenantOrGlobal' ELSE N'fn_FilterByTenant' END FROM @ExpectedRls;
