@@ -30,6 +30,23 @@ class ChangeSelectorTest(unittest.TestCase):
         self.assertNotIn("*Calendar*Test", result["test_patterns"])
         self.assertFalse(result["full_suite"])
 
+    def test_shared_organization_port_smokes_have_traceable_shared_path_reasons(self):
+        path = "shale-core/src/main/java/com/shale/core/service/OrganizationServicePort.java"
+        result = self.selected(path)
+        expected = {
+            "com.shale.data.dao.ContactMutationContractTest": ("area:contacts", "critical"),
+            "com.shale.data.service.adapter.TaskServiceAdapterTest": ("area:tasks", "blocking_smoke"),
+            "com.shale.server.controller.AuthControllerTest": ("area:server", "critical"),
+            "com.shale.ui.controller.ReportsControllerLifecycleTest": ("area:reports", "blocking_smoke"),
+        }
+        for qualified, (mapping, classification) in expected.items():
+            with self.subTest(test=qualified):
+                reason = result["test_reasons"][qualified]
+                self.assertEqual([path], reason["changed_paths"])
+                self.assertIn(mapping, reason["mapping_rules"])
+                self.assertIn("blocking_smoke", reason["classifications"])
+                self.assertIn(classification, reason["classifications"])
+
     def test_calendar_fxml_change_selects_structural_presentation_only(self):
         result = self.selected("shale-ui/src/main/resources/fxml/calendar.fxml")
         self.assertEqual(["ui-fxml-structure", "ui-presentation"], result["selected_areas"])
