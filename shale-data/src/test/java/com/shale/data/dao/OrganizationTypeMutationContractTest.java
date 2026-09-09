@@ -27,9 +27,12 @@ final class OrganizationTypeMutationContractTest {
 		assertTrue(s.contains("SystemKey=? COLLATE Latin1_General_100_BIN2"));
 		assertTrue(s.contains("IsDeleted=1")&&s.contains("DeletedAt=SYSUTCDATETIME()")&&s.contains("DeletedByUserId=?"));
 		assertTrue(s.contains("exact active assignment set"));
+		assertEquals(1,count(s,"UPDATE dbo.Organizations SET OrganizationTypeId=?,Name=?"),"the aggregate writer must consolidate scalar and compatibility changes");
+		assertTrue(s.contains("OUTPUT inserted.RowVer WHERE Id=? AND ShaleClientId=? AND RowVer=?"),"the consolidated update must return its generated concurrency token");
 		assertFalse(s.matches("(?is).*\\bMERGE\\b.*"));
 		assertFalse(s.matches("(?s).*\\(Integer\\)\\s*[^;]*getObject.*"),"JDBC numeric values use Number conversion");
 	}
+	private static int count(String value,String token){int count=0;for(int at=0;(at=value.indexOf(token,at))>=0;at+=token.length())count++;return count;}
 
 	@Test void rowVersionsAreDefensivelyCopiedByEveryMutationContract() {
 		byte[] bytes={1,2};

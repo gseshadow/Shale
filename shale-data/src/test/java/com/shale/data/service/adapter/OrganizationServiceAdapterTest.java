@@ -28,6 +28,11 @@ final class OrganizationServiceAdapterTest {
 		var command=new com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand(41,9,new com.shale.core.service.OrganizationServicePort.OrganizationFields("Org",null,null,null,null,null,null,null,null,null,null,null),List.of(new com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment(null,12,true,0,null)));
 		var result=service.createOrganizationAggregate(command);assertSame(command,organizations.aggregateCreate);assertEquals(7,result.organizationId());assertArrayEquals(new byte[]{8},result.organizationRowVer());assertTrue(result.typeProfile().compatibilityConsistent());
 	}
+	@Test void phaseTwoBAggregateUpdateReturnsTheTransactionCapturedRowVersionWithoutASecondRead(){
+		FakeOrganizations organizations=new FakeOrganizations(organization(7,41));var service=new OrganizationServiceAdapter(organizations,(t,o)->List.of());
+		var command=new com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand(7,41,9,new byte[]{7},new com.shale.core.service.OrganizationServicePort.OrganizationFields("Org",null,null,null,null,null,null,null,null,null,null,null),List.of(new com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment(101L,13,true,0,new byte[]{3})));
+		var result=service.updateOrganizationAggregate(command);assertSame(command,organizations.aggregateUpdate);assertArrayEquals(new byte[]{8},result.organizationRowVer());assertEquals(0,organizations.rowVerReads,"the adapter must not replace the transaction-captured token with a later read");
+	}
 	@Test void legacyCreateMapsSelectedTypeToOnePrimaryAggregateAssignment(){FakeOrganizations g=new FakeOrganizations(organization(7,41));g.effectiveTypes=List.of(new OrganizationDao.OrganizationTypeDefinitionRow(12,41,"provider","Provider",null,"#123456",0,true,false,new byte[]{1}));var service=new OrganizationServiceAdapter(g,(t,o)->List.of());int id=service.createOrganization(new com.shale.core.service.OrganizationServicePort.CreateOrganizationCommand(41,9,"Org",null,null,null,null,null,null,null,null,null,null,null,12));assertEquals(7,id);assertEquals(1,g.aggregateCreate.assignments().size());assertTrue(g.aggregateCreate.assignments().get(0).primary());assertEquals(12,g.aggregateCreate.assignments().get(0).organizationTypeId());}
 	@Test void typeReadsDelegateAndPreserveLifecycleIdentityOrderingAndDefensiveRowVersions() {
 		FakeOrganizations organizations = new FakeOrganizations(organization(7, 41));
@@ -118,6 +123,8 @@ final class OrganizationServiceAdapterTest {
 		private int effectiveCalls,profileCalls;
 		private com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand assignmentCommand;
 		private com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand aggregateCreate;
+		private com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand aggregateUpdate;
+		private int rowVerReads;
 		FakeOrganizations(){this(null);}
 		FakeOrganizations(Organization organization){this.organization=organization;}
 		@Override public Organization findById(int id){return organization;}
@@ -130,6 +137,7 @@ final class OrganizationServiceAdapterTest {
 		@Override public void update(Organization o){}
 		@Override public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult assignOrganizationType(com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand c){assignmentCommand=c;return new com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult(101, c.organizationId(), c.organizationTypeId(), false, 1, false, new byte[]{1});}
 		@Override public com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile createOrganizationAggregate(com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand c){aggregateCreate=c;return new com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile(7,41,12,true,List.of());}
-		@Override public byte[] findOrganizationRowVer(int organization,int tenant){return new byte[]{8};}
+		@Override public com.shale.core.service.OrganizationServicePort.OrganizationAggregateResult updateOrganizationAggregate(com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand c){aggregateUpdate=c;return new com.shale.core.service.OrganizationServicePort.OrganizationAggregateResult(7,new byte[]{8},new com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile(7,41,13,true,List.of()));}
+		@Override public byte[] findOrganizationRowVer(int organization,int tenant){rowVerReads++;return new byte[]{8};}
 	}
 }

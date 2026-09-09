@@ -16,6 +16,7 @@ import java.util.function.Consumer;
 
 import com.shale.core.model.Organization;
 import com.shale.core.service.OrganizationServicePort;
+import com.shale.core.service.OrganizationServicePort.OrganizationAggregateResult;
 import com.shale.core.service.OrganizationServicePort.OrganizationFields;
 import com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand;
 import com.shale.data.dao.OrganizationDao;
@@ -29,6 +30,7 @@ import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
@@ -126,6 +128,7 @@ public final class OrganizationController {
 	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> liveOrganizationUpdatedHandler;
 	private boolean liveSubscribed;
 	private boolean pendingRemoteUpdate;
+	private boolean awaitingAuthoritativeReloadAfterLocalSave;
 	private int relatedCasesLoadGeneration;
 	private List<RelatedCaseRow> relatedCases = List.of();
 	private List<OrganizationDao.OrganizationTypeRow> organizationTypeOptions = List.of();
@@ -162,17 +165,21 @@ public final class OrganizationController {
 	@FXML
 	private void initialize() {
 		if (editButton != null) {
+			ControlStyles.apply(editButton, ControlStyles.Purpose.SECONDARY);
 			editButton.setOnAction(e -> onEdit());
 			setVisibleManaged(editButton, false);
 		}
 		setInlineEditButtonsVisible(false);
 		if (saveButton != null) {
+			ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
 			saveButton.setOnAction(e -> onSave());
 		}
 		if (cancelButton != null) {
+			ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
 			cancelButton.setOnAction(e -> onCancel());
 		}
 		if (deleteOrganizationButton != null) {
+			ControlStyles.apply(deleteOrganizationButton, ControlStyles.Purpose.DANGER);
 			deleteOrganizationButton.setOnAction(e -> onDeleteOrganization());
 			setVisibleManaged(deleteOrganizationButton, false);
 		}
@@ -313,6 +320,7 @@ public final class OrganizationController {
 
 					currentOrganization = loadedForUi;
 					assignmentStage=loadedStage;organizationRowVer=loadedOrganizationRowVer==null?null:loadedOrganizationRowVer.clone();if(typeEditor!=null)typeEditor.setStage(assignmentStage);
+					awaitingAuthoritativeReloadAfterLocalSave=false;
 					organizationTypeOptions = typeOptionsForUi;
 					resetRelatedCaseControls();
 					renderFromCurrent();
@@ -322,6 +330,7 @@ public final class OrganizationController {
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() -> {
+					awaitingAuthoritativeReloadAfterLocalSave=false;
 					setBusy(false);
 					setError("Failed to load organization details.");
 				});
@@ -528,7 +537,7 @@ public final class OrganizationController {
 
 
 	private void onEdit() {
-		if (currentOrganization == null) {
+		if (currentOrganization == null || !canEditOrganization()) {
 			return;
 		}
 		writeEditorsFromOrganization(currentOrganization);
@@ -559,7 +568,19 @@ public final class OrganizationController {
 		if(!assignmentStage.isValid()){setError("Exactly one eligible primary Organization Type is required.");return;}
 		var fields=new OrganizationFields(safeText(nameEditor.getText()),safeText(phoneEditor.getText()),safeText(faxEditor.getText()),safeText(emailEditor.getText()),safeText(websiteEditor.getText()),safeText(address1Editor.getText()),safeText(address2Editor.getText()),safeText(cityEditor.getText()),safeText(stateEditor.getText()),safeText(postalCodeEditor.getText()),safeText(countryEditor.getText()),safeText(notesEditor.getText()));
 		var command=new UpdateOrganizationAggregateCommand(currentOrganization.getId(),currentTenantId(),appState.getUserId(),organizationRowVer,fields,assignmentStage.commandAssignments());
-		setBusy(true);dbExec.submit(()->{try{organizationService.updateOrganizationAggregate(command);invalidateDetailCache(currentOrganization.getId());publishOrganizationUpdated(currentOrganization.getId());Platform.runLater(this::loadOrganization);}catch(RuntimeException ex){Platform.runLater(()->{setBusy(false);setError(ex.getMessage()!=null&&ex.getMessage().contains("changed")?"Organization changed elsewhere; authoritative values were reloaded.":"Failed to save organization.");loadOrganization();});}});
+		setBusy(true);dbExec.submit(()->{try{OrganizationAggregateResult result=organizationService.updateOrganizationAggregate(command);Platform.runLater(()->applySuccessfulAggregateSave(result));}catch(RuntimeException ex){Platform.runLater(()->{setBusy(false);setError(ex.getMessage()!=null&&ex.getMessage().contains("changed")?"Organization changed elsewhere; authoritative values were reloaded.":"Failed to save organization.");loadOrganization();});}});
+	}
+
+	private void applySuccessfulAggregateSave(OrganizationAggregateResult result) {
+		int updatedId=result.organizationId();
+		organizationRowVer=result.organizationRowVer();
+		setEditMode(false);
+		pendingRemoteUpdate=false;
+		hideRemoteUpdateBanner();
+		invalidateDetailCache(updatedId);
+		awaitingAuthoritativeReloadAfterLocalSave=true;
+		loadOrganization();
+		publishOrganizationUpdated(updatedId);
 	}
 
 	private void onDeleteOrganization() {
@@ -682,6 +703,10 @@ public final class OrganizationController {
 			return true;
 		}
 		if (event.entityId() != organizationId.longValue()) {
+			return true;
+		}
+		if (awaitingAuthoritativeReloadAfterLocalSave && appState != null
+				&& Objects.equals(appState.getUserId(), event.updatedByUserId())) {
 			return true;
 		}
 		return isOwnEcho(event);
@@ -910,7 +935,7 @@ public final class OrganizationController {
 
 	private void setEditMode(boolean enabled) {
 		this.editMode = enabled;
-		setVisibleManaged(editButton, !enabled && currentOrganization != null);
+		setVisibleManaged(editButton, !enabled && currentOrganization != null && canEditOrganization());
 		setVisibleManaged(saveButton, enabled);
 		setVisibleManaged(cancelButton, enabled);
 		refreshAdminActions();
@@ -958,9 +983,14 @@ public final class OrganizationController {
 	private void setInlineEditButtonsVisible(boolean visible){for(Button button:java.util.Arrays.asList(editNameButton,editTypeButton,editPhoneButton,editFaxButton,editEmailButton,editWebsiteButton,editAddress1Button,editAddress2Button,editCityButton,editStateButton,editPostalCodeButton,editCountryButton,editNotesButton))if(button!=null)setVisibleManaged(button,visible);}
 
 	private void refreshAdminActions() {
-		setVisibleManaged(editButton,!editMode && currentOrganization!=null);
+		setVisibleManaged(editButton,canEditOrganization() && !editMode && currentOrganization!=null);
 		boolean showDelete = isAdminUser() && !editMode && currentOrganization != null;
 		setVisibleManaged(deleteOrganizationButton, showDelete);
+	}
+
+	private boolean canEditOrganization() {
+		Integer userId = appState == null ? null : appState.getUserId();
+		return userId != null && userId > 0;
 	}
 
 	private boolean isAdminUser() {
