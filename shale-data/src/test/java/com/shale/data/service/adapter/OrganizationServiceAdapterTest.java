@@ -23,6 +23,12 @@ final class OrganizationServiceAdapterTest {
 		assertSame(command, organizations.assignmentCommand);
 		assertEquals(101L, result.assignmentId());
 	}
+	@Test void phaseTwoBAggregateCreateDelegatesOnceAndReturnsAuthoritativeProfileAndRowVersion(){
+		FakeOrganizations organizations=new FakeOrganizations(organization(7,41));var service=new OrganizationServiceAdapter(organizations,(t,o)->List.of());
+		var command=new com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand(41,9,new com.shale.core.service.OrganizationServicePort.OrganizationFields("Org",null,null,null,null,null,null,null,null,null,null,null),List.of(new com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment(null,12,true,0,null)));
+		var result=service.createOrganizationAggregate(command);assertSame(command,organizations.aggregateCreate);assertEquals(7,result.organizationId());assertArrayEquals(new byte[]{8},result.organizationRowVer());assertTrue(result.typeProfile().compatibilityConsistent());
+	}
+	@Test void legacyCreateMapsSelectedTypeToOnePrimaryAggregateAssignment(){FakeOrganizations g=new FakeOrganizations(organization(7,41));g.effectiveTypes=List.of(new OrganizationDao.OrganizationTypeDefinitionRow(12,41,"provider","Provider",null,"#123456",0,true,false,new byte[]{1}));var service=new OrganizationServiceAdapter(g,(t,o)->List.of());int id=service.createOrganization(new com.shale.core.service.OrganizationServicePort.CreateOrganizationCommand(41,9,"Org",null,null,null,null,null,null,null,null,null,null,null,12));assertEquals(7,id);assertEquals(1,g.aggregateCreate.assignments().size());assertTrue(g.aggregateCreate.assignments().get(0).primary());assertEquals(12,g.aggregateCreate.assignments().get(0).organizationTypeId());}
 	@Test void typeReadsDelegateAndPreserveLifecycleIdentityOrderingAndDefensiveRowVersions() {
 		FakeOrganizations organizations = new FakeOrganizations(organization(7, 41));
 		byte[] definitionRowVer = {1, 2};
@@ -111,6 +117,7 @@ final class OrganizationServiceAdapterTest {
 		private OrganizationDao.OrganizationTypeProfileRow profile;
 		private int effectiveCalls,profileCalls;
 		private com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand assignmentCommand;
+		private com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand aggregateCreate;
 		FakeOrganizations(){this(null);}
 		FakeOrganizations(Organization organization){this.organization=organization;}
 		@Override public Organization findById(int id){return organization;}
@@ -122,5 +129,7 @@ final class OrganizationServiceAdapterTest {
 		@Override public int create(OrganizationDao.OrganizationCreateRequest r){return 0;}
 		@Override public void update(Organization o){}
 		@Override public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult assignOrganizationType(com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand c){assignmentCommand=c;return new com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult(101, c.organizationId(), c.organizationTypeId(), false, 1, false, new byte[]{1});}
+		@Override public com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile createOrganizationAggregate(com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand c){aggregateCreate=c;return new com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile(7,41,12,true,List.of());}
+		@Override public byte[] findOrganizationRowVer(int organization,int tenant){return new byte[]{8};}
 	}
 }

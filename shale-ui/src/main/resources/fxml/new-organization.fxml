@@ -2,6 +2,7 @@
 
 <?import javafx.geometry.Insets?>
 <?import com.shale.ui.component.EnhancedTextArea?>
+<?import com.shale.ui.component.OrganizationTypeAssignmentPane?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
@@ -38,8 +39,8 @@
                             <Label text="Name" GridPane.rowIndex="0" />
                             <TextField fx:id="nameField" GridPane.rowIndex="0" GridPane.columnIndex="1" />
 
-                            <Label text="Organization Type" GridPane.rowIndex="1" />
-                            <ComboBox fx:id="organizationTypeComboBox" maxWidth="1.7976931348623157E308" GridPane.rowIndex="1" GridPane.columnIndex="1" />
+                            <Label text="Organization Types" GridPane.rowIndex="1" />
+                            <OrganizationTypeAssignmentPane fx:id="organizationTypeAssignments" maxWidth="1.7976931348623157E308" GridPane.rowIndex="1" GridPane.columnIndex="1" />
 
                             <Label text="Phone" GridPane.rowIndex="2" />
                             <TextField fx:id="phoneField" GridPane.rowIndex="2" GridPane.columnIndex="1" />

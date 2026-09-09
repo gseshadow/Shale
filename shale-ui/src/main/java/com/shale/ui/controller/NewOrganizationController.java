@@ -4,18 +4,18 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-import com.shale.data.dao.OrganizationDao;
-import com.shale.data.dao.OrganizationDao.OrganizationCreateRequest;
+import com.shale.core.service.OrganizationServicePort;
+import com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand;
+import com.shale.core.service.OrganizationServicePort.OrganizationFields;
+import com.shale.ui.component.OrganizationTypeAssignmentPane;
+import com.shale.ui.controller.support.OrganizationTypeAssignmentStage;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ControlStyles;
 
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.TextArea;
 import com.shale.ui.component.EnhancedTextArea;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
@@ -24,7 +24,7 @@ public final class NewOrganizationController {
 
     @FXML private Label validationLabel;
     @FXML private TextField nameField;
-    @FXML private ComboBox<OrganizationDao.OrganizationTypeRow> organizationTypeComboBox;
+    @FXML private OrganizationTypeAssignmentPane organizationTypeAssignments;
     @FXML private TextField phoneField;
     @FXML private TextField faxField;
     @FXML private TextField emailField;
@@ -40,14 +40,14 @@ public final class NewOrganizationController {
     @FXML private Button createOrganizationButton;
 
     private AppState appState;
-    private OrganizationDao organizationDao;
+    private OrganizationServicePort organizationService;
     private Stage stage;
     private Consumer<Integer> onOrganizationCreated;
     private boolean saving;
 
-    public void init(AppState appState, OrganizationDao organizationDao, Stage stage, Consumer<Integer> onOrganizationCreated) {
+    public void init(AppState appState, OrganizationServicePort organizationService, Stage stage, Consumer<Integer> onOrganizationCreated) {
         this.appState = appState;
-        this.organizationDao = organizationDao;
+        this.organizationService = organizationService;
         this.stage = stage;
         this.onOrganizationCreated = onOrganizationCreated;
     }
@@ -56,47 +56,18 @@ public final class NewOrganizationController {
     private void initialize() {
         ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
         ControlStyles.apply(createOrganizationButton, ControlStyles.Purpose.PRIMARY);
-        ControlStyles.formControl(organizationTypeComboBox);
+        organizationTypeAssignments.setMessageHandler(message -> { if (message == null || message.isBlank()) hideValidation(); else showValidation(message); });
         for (var control : List.of(nameField, phoneField, faxField, emailField, websiteField,
-                address1Field, address2Field, cityField, stateField, postalCodeField, countryField)) {
-            ControlStyles.formControl(control);
-        }
-        if (organizationTypeComboBox != null) {
-            organizationTypeComboBox.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
-                @Override
-                protected void updateItem(OrganizationDao.OrganizationTypeRow item, boolean empty) {
-                    super.updateItem(item, empty);
-                    setText(empty || item == null ? null : fallback(item.name()));
-                }
-            });
-            organizationTypeComboBox.setButtonCell(new javafx.scene.control.ListCell<>() {
-                @Override
-                protected void updateItem(OrganizationDao.OrganizationTypeRow item, boolean empty) {
-                    super.updateItem(item, empty);
-                    setText(empty || item == null ? null : fallback(item.name()));
-                }
-            });
-        }
+                address1Field, address2Field, cityField, stateField, postalCodeField, countryField)) ControlStyles.formControl(control);
 
         Platform.runLater(this::loadOrganizationTypes);
     }
 
     private void loadOrganizationTypes() {
-        if (organizationDao == null || organizationTypeComboBox == null) {
-            showValidation("Organization creation is not configured.");
-            return;
-        }
-
-        try {
-            List<OrganizationDao.OrganizationTypeRow> types = organizationDao.findOrganizationTypes();
-            organizationTypeComboBox.setItems(FXCollections.observableArrayList(types));
-            if (!types.isEmpty()) {
-                organizationTypeComboBox.getSelectionModel().selectFirst();
-            }
-            hideValidation();
-        } catch (RuntimeException ex) {
-            showValidation("Unable to load organization types.");
-        }
+        if (organizationService == null || organizationTypeAssignments == null) { showValidation("Organization creation is not configured."); return; }
+        try { organizationTypeAssignments.setStage(OrganizationTypeAssignmentStage.forCreate(
+                organizationService.listEffectiveOrganizationTypes(requireClientId()))); hideValidation(); }
+        catch (RuntimeException ex) { showValidation("Unable to load organization types."); }
     }
 
     @FXML
@@ -111,27 +82,16 @@ public final class NewOrganizationController {
             return;
         }
 
-        OrganizationDao.OrganizationTypeRow selectedType = organizationTypeComboBox.getSelectionModel().getSelectedItem();
-        OrganizationCreateRequest request = new OrganizationCreateRequest(
-                requireClientId(),
-                selectedType.organizationTypeId(),
-                safeText(nameField.getText()),
-                safeText(phoneField.getText()),
-                safeText(faxField.getText()),
-                safeText(emailField.getText()),
-                safeText(websiteField.getText()),
-                safeText(address1Field.getText()),
-                safeText(address2Field.getText()),
-                safeText(cityField.getText()),
-                safeText(stateField.getText()),
-                safeText(postalCodeField.getText()),
-                safeText(countryField.getText()),
-                safeText(notesArea.getText())
-        );
+        OrganizationFields fields = new OrganizationFields(safeText(nameField.getText()), safeText(phoneField.getText()),
+                safeText(faxField.getText()), safeText(emailField.getText()), safeText(websiteField.getText()),
+                safeText(address1Field.getText()), safeText(address2Field.getText()), safeText(cityField.getText()),
+                safeText(stateField.getText()), safeText(postalCodeField.getText()), safeText(countryField.getText()), safeText(notesArea.getText()));
+        CreateOrganizationAggregateCommand request = new CreateOrganizationAggregateCommand(requireClientId(), requireActorId(),
+                fields, organizationTypeAssignments.getStage().commandAssignments());
 
         setSaving(true);
         try {
-            int organizationId = organizationDao.create(request);
+            int organizationId = organizationService.createOrganizationAggregate(request).organizationId();
             hideValidation();
             if (onOrganizationCreated != null) {
                 onOrganizationCreated.accept(organizationId);
@@ -155,12 +115,8 @@ public final class NewOrganizationController {
             return Optional.of("Name is required.");
         }
 
-        OrganizationDao.OrganizationTypeRow selectedType = organizationTypeComboBox == null
-                ? null
-                : organizationTypeComboBox.getSelectionModel().getSelectedItem();
-        if (selectedType == null || selectedType.organizationTypeId() <= 0) {
-            return Optional.of("Organization Type is required.");
-        }
+        if (organizationTypeAssignments == null || organizationTypeAssignments.getStage() == null
+                || !organizationTypeAssignments.getStage().isValid()) return Optional.of("Exactly one primary Organization Type is required.");
 
         try {
             requireClientId();
@@ -178,6 +134,8 @@ public final class NewOrganizationController {
         }
         return clientId;
     }
+
+    private int requireActorId() { Integer id=appState==null?null:appState.getUserId(); if(id==null||id<=0)throw new RuntimeException("No user selected."); return id; }
 
     private void setSaving(boolean saving) {
         this.saving = saving;

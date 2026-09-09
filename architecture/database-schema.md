@@ -1,9 +1,11 @@
 # Shale Database Schema Reference
 
-> **Organizations Phase 1C (2026-09-09):** Definition and assignment mutations now use the Phase 1A
-> lifecycle, tenant, actor, ordering, and `RowVer` columns transactionally. Primary changes synchronize
-> `Organizations.OrganizationTypeId` and audit on the same connection. Legacy Organization create and
-> update remain outside the aggregate dual-write cutover.
+> **Organizations Phase 2B (2026-09-09):** Definition and assignment mutations use the Phase 1A
+> lifecycle, tenant, actor, ordering, and `RowVer` columns transactionally. Aggregate Organization
+> create/edit reconciles the complete ordered assignment profile; primary changes synchronize
+> `Organizations.OrganizationTypeId` and assignment audits on the same connection. Legacy single-type
+> callers map to one primary assignment on that same transaction; complete-profile desktop writes use
+> the aggregate cutover and preserve historical assignment identity.
 
 *Last updated: 2026-06-15*
 
