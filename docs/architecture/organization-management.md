@@ -211,11 +211,29 @@ presentation remain deferred; no runtime read or write cutover has occurred.
 
 ### Phase 1C — transactional type administration and assignments
 
-Implement admin-authorized Organization Type creation, override, update, activate/deactivate, remove,
-restore, and ordering. Implement user-authorized assignment add/remove/restore/reorder. Validate the
-tenant session, actor, Organization, effective definition, and concurrency tokens on one connection
-and transaction. Append PHI-safe entity-action audit events in that transaction. Dual-write the
-legacy `Organizations.OrganizationTypeId` compatibility primary value.
+Implemented. The service boundary supports administrator-authorized tenant definition creation,
+global override creation, update, activation/deactivation, soft removal, and restoration. `SystemKey`
+is immutable lowercase snake-case overlay identity; a deleted historical override is restored rather
+than duplicated. Definition ordering remains the `SortOrder` accepted by create/update because the
+Contact Phase 1C pattern has no separate definition-ordering transaction.
+
+Active tenant actors may add (or restore) selectable assignments, soft-remove and restore non-primary
+assignments, choose a primary, atomically replace-and-remove a primary, and reorder the exact active
+assignment set. Assignment mutations lock the Organization and active primary, reject existing
+compatibility disagreement, retain one active primary, and update `Organizations.OrganizationTypeId`
+in the same transaction as primary flags. Definition lifecycle changes never rewrite historical
+assignments, which continue to resolve by their concrete stored type ID.
+
+Every operation verifies tenant/actor IDs, request-session tenant context, actor tenant membership,
+administrator status for definition administration, ownership, and required `RowVer` values. Mutation
+and PHI-safe entity-action audit append share one connection and transaction. Deploy the guarded
+`2026-09-09_organizations_phase1c_audit_allowlist.sql` successor to `Shale_Copy` with an approved
+all-tenant administrative principal, then run its independent read-only verification script.
+
+Settings administration, Organization editor controls, presentation, and runtime read cutover remain
+future phases. Existing legacy Organization create/update paths remain compatibility-only and do not
+yet dual-write `OrganizationOrganizationTypes`; Phase 2B must route those aggregate writes through the
+transactional service before the bridge can be retired.
 
 ### Phase 2A — structured contact-point foundation and migration
 

@@ -102,6 +102,17 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 				row.shaleClientId() == null ? OrganizationTypeOrigin.GLOBAL : OrganizationTypeOrigin.TENANT,
 				row.rowVer());
 	}
+	@Override public OrganizationTypeMutationResult createOrganizationType(CreateOrganizationTypeCommand c){return organizationGateway.createOrganizationType(c);}
+	@Override public OrganizationTypeMutationResult updateOrganizationType(UpdateOrganizationTypeCommand c){return organizationGateway.updateOrganizationType(c);}
+	@Override public OrganizationTypeMutationResult setOrganizationTypeActive(OrganizationTypeLifecycleCommand c){return organizationGateway.setOrganizationTypeActive(c);}
+	@Override public OrganizationTypeMutationResult removeOrganizationType(OrganizationTypeLifecycleCommand c){return organizationGateway.removeOrganizationType(c);}
+	@Override public OrganizationTypeMutationResult restoreOrganizationType(OrganizationTypeLifecycleCommand c){return organizationGateway.restoreOrganizationType(c);}
+	@Override public OrganizationTypeAssignmentMutationResult assignOrganizationType(AssignOrganizationTypeCommand c){return organizationGateway.assignOrganizationType(c);}
+	@Override public OrganizationTypeAssignmentMutationResult removeOrganizationTypeAssignment(OrganizationTypeAssignmentLifecycleCommand c){return organizationGateway.removeOrganizationTypeAssignment(c);}
+	@Override public OrganizationTypeAssignmentMutationResult restoreOrganizationTypeAssignment(OrganizationTypeAssignmentLifecycleCommand c){return organizationGateway.restoreOrganizationTypeAssignment(c);}
+	@Override public OrganizationTypeAssignmentMutationResult setPrimaryOrganizationType(SetPrimaryOrganizationTypeCommand c){return organizationGateway.setPrimaryOrganizationType(c);}
+	@Override public OrganizationTypeAssignmentMutationResult replaceAndRemovePrimaryOrganizationType(ReplaceAndRemovePrimaryOrganizationTypeCommand c){return organizationGateway.replaceAndRemovePrimaryOrganizationType(c);}
+	@Override public List<OrganizationTypeAssignmentMutationResult> reorderOrganizationTypeAssignments(ReorderOrganizationTypeAssignmentsCommand c){return organizationGateway.reorderOrganizationTypeAssignments(c);}
 	@Override
 	public int createOrganization(CreateOrganizationCommand command) {
 		Objects.requireNonNull(command, "command");
@@ -166,6 +177,17 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organizationId, int shaleClientId);
 		int create(OrganizationDao.OrganizationCreateRequest request);
 		void update(Organization organization);
+		default OrganizationTypeMutationResult createOrganizationType(CreateOrganizationTypeCommand c){throw new UnsupportedOperationException("Organization Type creation is not supported");}
+		default OrganizationTypeMutationResult updateOrganizationType(UpdateOrganizationTypeCommand c){throw new UnsupportedOperationException("Organization Type update is not supported");}
+		default OrganizationTypeMutationResult setOrganizationTypeActive(OrganizationTypeLifecycleCommand c){throw new UnsupportedOperationException("Organization Type lifecycle is not supported");}
+		default OrganizationTypeMutationResult removeOrganizationType(OrganizationTypeLifecycleCommand c){throw new UnsupportedOperationException("Organization Type removal is not supported");}
+		default OrganizationTypeMutationResult restoreOrganizationType(OrganizationTypeLifecycleCommand c){throw new UnsupportedOperationException("Organization Type restoration is not supported");}
+		default OrganizationTypeAssignmentMutationResult assignOrganizationType(AssignOrganizationTypeCommand c){throw new UnsupportedOperationException("Organization Type assignment is not supported");}
+		default OrganizationTypeAssignmentMutationResult removeOrganizationTypeAssignment(OrganizationTypeAssignmentLifecycleCommand c){throw new UnsupportedOperationException("Organization Type assignment removal is not supported");}
+		default OrganizationTypeAssignmentMutationResult restoreOrganizationTypeAssignment(OrganizationTypeAssignmentLifecycleCommand c){throw new UnsupportedOperationException("Organization Type assignment restoration is not supported");}
+		default OrganizationTypeAssignmentMutationResult setPrimaryOrganizationType(SetPrimaryOrganizationTypeCommand c){throw new UnsupportedOperationException("Organization Type primary selection is not supported");}
+		default OrganizationTypeAssignmentMutationResult replaceAndRemovePrimaryOrganizationType(ReplaceAndRemovePrimaryOrganizationTypeCommand c){throw new UnsupportedOperationException("Organization Type replacement is not supported");}
+		default List<OrganizationTypeAssignmentMutationResult> reorderOrganizationTypeAssignments(ReorderOrganizationTypeAssignmentsCommand c){throw new UnsupportedOperationException("Organization Type assignment ordering is not supported");}
 	}
 
 	@FunctionalInterface
@@ -182,6 +204,17 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		@Override public OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organizationId, int shaleClientId) { return dao.findOrganizationTypeProfile(organizationId, shaleClientId); }
 		@Override public int create(OrganizationDao.OrganizationCreateRequest request) { return dao.create(request); }
 		@Override public void update(Organization organization) { dao.update(organization); }
+		@Override public OrganizationTypeMutationResult createOrganizationType(CreateOrganizationTypeCommand c){return dao.createOrganizationType(c);}
+		@Override public OrganizationTypeMutationResult updateOrganizationType(UpdateOrganizationTypeCommand c){return dao.updateOrganizationType(c);}
+		@Override public OrganizationTypeMutationResult setOrganizationTypeActive(OrganizationTypeLifecycleCommand c){return dao.setOrganizationTypeActive(c);}
+		@Override public OrganizationTypeMutationResult removeOrganizationType(OrganizationTypeLifecycleCommand c){return dao.removeOrganizationType(c);}
+		@Override public OrganizationTypeMutationResult restoreOrganizationType(OrganizationTypeLifecycleCommand c){return dao.restoreOrganizationType(c);}
+		@Override public OrganizationTypeAssignmentMutationResult assignOrganizationType(AssignOrganizationTypeCommand c){return dao.assignOrganizationType(c);}
+		@Override public OrganizationTypeAssignmentMutationResult removeOrganizationTypeAssignment(OrganizationTypeAssignmentLifecycleCommand c){return dao.removeOrganizationTypeAssignment(c);}
+		@Override public OrganizationTypeAssignmentMutationResult restoreOrganizationTypeAssignment(OrganizationTypeAssignmentLifecycleCommand c){return dao.restoreOrganizationTypeAssignment(c);}
+		@Override public OrganizationTypeAssignmentMutationResult setPrimaryOrganizationType(SetPrimaryOrganizationTypeCommand c){return dao.setPrimaryOrganizationType(c);}
+		@Override public OrganizationTypeAssignmentMutationResult replaceAndRemovePrimaryOrganizationType(ReplaceAndRemovePrimaryOrganizationTypeCommand c){return dao.replaceAndRemovePrimaryOrganizationType(c);}
+		@Override public List<OrganizationTypeAssignmentMutationResult> reorderOrganizationTypeAssignments(ReorderOrganizationTypeAssignmentsCommand c){return dao.reorderOrganizationTypeAssignments(c);}
 	}
 
 }

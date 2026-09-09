@@ -1,5 +1,13 @@
 # Customizable Lookup Types Architecture Standard
 
+## Organization Types implementation status
+
+Organizations Phase 1C implements tenant-owned definition lifecycle and tenant/global overlay
+mutations for `OrganizationTypes`, plus historical `OrganizationOrganizationTypes` assignment add,
+restore, removal, exact-set ordering, primary replacement, and `RowVer` concurrency. Primary changes
+are transactionally synchronized with `Organizations.OrganizationTypeId` and the entity-action audit
+writer. Settings/UI work and the broader Organization aggregate cutover remain pending.
+
 *Last updated: 2026-07-22*
 
 This document is the authoritative engineering standard and implementation roadmap for Shale customizable lookup type definition tables. It is documentation-only: it describes the future standard, verified current-state facts from the completed read-only audit, and implementation checklists. It does **not** assert that existing tables already conform.

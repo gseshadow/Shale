@@ -20,10 +20,24 @@ public final class OrganizationDao {
 	private static final String ORGANIZATION_TYPES_TABLE = "OrganizationTypes";
 
 	private final DbSessionProvider db;
+	private final OrganizationTypeMutationDao typeMutations;
 
 	public OrganizationDao(DbSessionProvider dbSessionProvider) {
 		this.db = Objects.requireNonNull(dbSessionProvider, "dbSessionProvider");
+		this.typeMutations = new OrganizationTypeMutationDao(this.db);
 	}
+
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult createOrganizationType(com.shale.core.service.OrganizationServicePort.CreateOrganizationTypeCommand c){return typeMutations.create(c);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult updateOrganizationType(com.shale.core.service.OrganizationServicePort.UpdateOrganizationTypeCommand c){return typeMutations.update(c);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult setOrganizationTypeActive(com.shale.core.service.OrganizationServicePort.OrganizationTypeLifecycleCommand c){return typeMutations.lifecycle(c,"active");}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult removeOrganizationType(com.shale.core.service.OrganizationServicePort.OrganizationTypeLifecycleCommand c){return typeMutations.lifecycle(c,"remove");}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult restoreOrganizationType(com.shale.core.service.OrganizationServicePort.OrganizationTypeLifecycleCommand c){return typeMutations.lifecycle(c,"restore");}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult assignOrganizationType(com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand c){return typeMutations.assign(c);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult removeOrganizationTypeAssignment(com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentLifecycleCommand c){return typeMutations.assignmentLifecycle(c,false);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult restoreOrganizationTypeAssignment(com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentLifecycleCommand c){return typeMutations.assignmentLifecycle(c,true);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult setPrimaryOrganizationType(com.shale.core.service.OrganizationServicePort.SetPrimaryOrganizationTypeCommand c){return typeMutations.setPrimary(c);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult replaceAndRemovePrimaryOrganizationType(com.shale.core.service.OrganizationServicePort.ReplaceAndRemovePrimaryOrganizationTypeCommand c){return typeMutations.replaceAndRemove(c);}
+	public java.util.List<com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult> reorderOrganizationTypeAssignments(com.shale.core.service.OrganizationServicePort.ReorderOrganizationTypeAssignmentsCommand c){return typeMutations.reorder(c);}
 
 	public record PagedResult<T>(List<T> items, int page, int pageSize, long total) {
 	}
