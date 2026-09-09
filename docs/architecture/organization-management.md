@@ -267,11 +267,24 @@ all type chips in the header and cards. Render contact-point cards with clickabl
 not replace, `OrganizationCardFactory` for FULL/COMPACT/MINI consumers, and batch-hydrate directory and
 search results to avoid N+1 queries.
 
-### Phase 5 — Settings administration
+### Phase 5 — Settings administration (implemented as Organizations Phase 2A)
 
 Add Organization Types to the existing classification/lookup administration patterns. Global rows
 remain immutable; tenant customization creates overrides; custom rows are tenant-owned; lifecycle and
 RowVer conflicts follow the established Contact administration behavior.
+
+The Settings section now separates effective active definitions, inactive tenant definitions, and
+removed tenant definitions. Its administrator-only controls support tenant creation/editing,
+same-SystemKey global customization, activation/deactivation, soft removal, and restoration through
+the Phase 1C service boundary. Removing an override reveals its global fallback; deactivating an
+override masks that fallback. Lifecycle changes preserve historical Organization assignments, and a
+stale `RowVer` reloads authoritative state rather than overwriting another administrator's change.
+Manual Refresh or Settings navigation picks up another workstation's changes; no broad live-update
+contract was introduced.
+
+This does not complete Organization Types. Multi-type assignment editing and primary selection remain
+Phase 2B work; cards, headers, and search filters remain later presentation work. Restoring a deleted
+Organization record is a separate lifecycle concern and remains unimplemented.
 
 ### Phase 6 — relationship and lifecycle review
 

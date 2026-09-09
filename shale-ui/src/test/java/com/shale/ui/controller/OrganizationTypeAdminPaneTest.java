@@ -1,0 +1,12 @@
+package com.shale.ui.controller;
+
+import static org.junit.jupiter.api.Assertions.*;
+import java.nio.file.*;
+import org.junit.jupiter.api.Test;
+
+final class OrganizationTypeAdminPaneTest {
+ @Test void generatedKeysAreStableLowercaseSnakeCase(){assertEquals("medical_practice",OrganizationTypeAdminPane.systemKey("  Médical Practice  "));assertEquals("court_appeals",OrganizationTypeAdminPane.systemKey("Court / Appeals"));}
+ @Test void editorValidationProtectsDefinitionContract(){assertEquals("Name is required.",OrganizationTypeAdminPane.validate(" ","","valid_key","0"));assertEquals("Description must be at most 500 characters.",OrganizationTypeAdminPane.validate("Valid","x".repeat(501),"valid_key","0"));assertEquals("Internal key must use lowercase snake_case.",OrganizationTypeAdminPane.validate("Valid","","Invalid Key","0"));assertNull(OrganizationTypeAdminPane.validate(" Valid ","optional","valid_key","3"));}
+ @Test void settingsWiringIsAdminOnlyAndUsesServiceBoundary()throws Exception{String f=Files.readString(Path.of("src/main/resources/fxml/settings.fxml")),settings=Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java")),pane=Files.readString(Path.of("src/main/java/com/shale/ui/controller/OrganizationTypeAdminPane.java"));assertTrue(f.contains("Organization Types"));assertTrue(f.contains("organizationTypeAdministrationSection"));assertTrue(settings.contains("organizationTypeAdministrationSection.setVisible(visible)"));assertTrue(settings.contains("appState.isAdmin()"));assertTrue(pane.contains("listOrganizationTypesForAdministration"));for(String op:new String[]{"createOrganizationType","updateOrganizationType","setOrganizationTypeActive","removeOrganizationType","restoreOrganizationType"})assertTrue(pane.contains(op),op);assertFalse(pane.contains("OrganizationDao"));assertFalse(pane.contains("OrganizationOrganizationTypes"));}
+ @Test void lifecycleCopyExplainsHistoricalPreservationAndGlobalFallback()throws Exception{String pane=Files.readString(Path.of("src/main/java/com/shale/ui/controller/OrganizationTypeAdminPane.java"));assertTrue(pane.contains("Existing Organization assignments are preserved for historical display"));assertTrue(pane.contains("The global definition will become effective again"));assertTrue(pane.contains("Historical Organization assignments are not changed"));assertTrue(pane.contains("r.rowVer()"));}
+}
