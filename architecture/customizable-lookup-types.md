@@ -250,7 +250,8 @@ Initial classification from the read-only audit:
 - New Phase 1A foundation following this standard: `CaseDateTypes` with `CaseDates` as the tenant-owned occurrence table.
 - Partial overlay implementations: `CalendarEventTypes`, `PracticeAreas`, `Statuses`.
 - Behavior-sensitive customizable lookups: `PartyRoles`, `PartySides`, `Statuses`, `TaskStatuses`, `RequestStatuses`, and `Roles`, although `Roles` is not yet safe for tenant customization.
-- Product decision completed and Phase 1A foundation implemented: `OrganizationTypes`.
+- Product decision completed with Phase 1A foundation and Phase 1B read-only runtime contracts implemented:
+  `OrganizationTypes`.
 - Uncertain or requiring a product decision: `Categories`.
 - Placeholder: `TaskCategories`.
 - Explicit exclusion: `CaseStatuses` is transactional case-status history referencing `Statuses.Id`; it is not a customizable lookup definition table.
@@ -269,7 +270,7 @@ Initial classification from the read-only audit:
 | `TaskStatuses` | Behavior-sensitive customizable lookup | Needs explicit completion/terminal semantics | High; task completion workflow | Phase 6 | Define `IsCompleted`/`IsTerminal` or equivalent; migrate name-based completion logic. |
 | `Roles` | Behavior-sensitive, not safe for tenant customization | No `SystemKey`; numeric authorization/assignment semantics | Critical; authorization and assignment | Phase 7 | Separate authorization/capability redesign; migration plan; deny privileges by default. |
 | `Categories` | Uncertain/product decision | Candidate purpose and administration model unresolved | Unknown | Phase 8 | Product decision and live schema verification. |
-| `OrganizationTypes` | Phase 1A overlay foundation | Runtime effective reads, mutation authorization/audit, and administration remain deferred | Moderate; Organization classification | Organization redesign Phases 1B–1C/5 | Preserve `Organizations.OrganizationTypeId` compatibility authority through dual-write/cutover. |
+| `OrganizationTypes` | Phase 1A overlay foundation plus Phase 1B read-only runtime support | Mutation authorization/audit, administration, UI presentation, and cutover remain deferred | Moderate; Organization classification | Organization redesign Phases 1C/5 | Preserve `Organizations.OrganizationTypeId` compatibility authority through dual-write/cutover. |
 | `TaskCategories` | Placeholder | Placeholder status; definition/use unclear | Unknown | Phase 8 | Product decision, schema inventory, and implementation proposal. |
 | `CaseStatuses` | Explicit exclusion | Transactional history referencing `Statuses.Id`, not definition data | High; case history integrity | Excluded | Never standardize as a customizable lookup type definition table. |
 

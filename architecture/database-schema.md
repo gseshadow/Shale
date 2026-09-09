@@ -472,6 +472,13 @@ later soft-deleted; mutable definition presentation and lifecycle state are like
 successful rerun. Definition global-or-same-tenant authorization remains a Phase 1C
 transactional validation because the stable type-ID FK cannot express that conditional relationship.
 
+Phase 1B adds read-only Java contracts over this foundation. Effective selection resolves global/tenant
+definitions by `SystemKey`, while an Organization profile joins each active assignment to its stored
+`OrganizationTypeId` so inactive or deleted historical definitions remain visible. The profile also reports
+whether its active primary assignment matches `Organizations.OrganizationTypeId`; it never repairs a
+mismatch. Phase 1A remains the database foundation, and no mutation, Settings, UI, or runtime cutover is part
+of Phase 1B.
+
 ---
 
 ## dbo.CaseUpdates

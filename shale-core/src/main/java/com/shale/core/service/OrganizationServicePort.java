@@ -13,6 +13,10 @@ public interface OrganizationServicePort {
 
 	Optional<OrganizationDetail> getOrganizationDetail(int organizationId, int shaleClientId);
 
+	List<OrganizationTypeDefinition> listEffectiveOrganizationTypes(int shaleClientId);
+
+	Optional<OrganizationTypeProfile> getOrganizationTypeProfile(int organizationId, int shaleClientId);
+
 	int createOrganization(CreateOrganizationCommand command);
 
 	boolean updateOrganization(UpdateOrganizationCommand command);
@@ -47,6 +51,48 @@ public interface OrganizationServicePort {
 			String country,
 			String notes,
 			List<RelatedCaseSummary> relatedCases) {
+	}
+
+	enum OrganizationTypeOrigin { GLOBAL, TENANT }
+
+	/** Selector-ready definition after resolving the tenant/global SystemKey overlay. */
+	record OrganizationTypeDefinition(
+			int organizationTypeId,
+			Integer shaleClientId,
+			String systemKey,
+			String name,
+			String description,
+			String color,
+			int sortOrder,
+			boolean active,
+			boolean deleted,
+			OrganizationTypeOrigin origin,
+			byte[] rowVer) {
+		public OrganizationTypeDefinition { rowVer = copyRowVer(rowVer); }
+		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
+	}
+
+	/** An active assignment joined to its authoritative stored definition identity. */
+	record AssignedOrganizationType(
+			long assignmentId,
+			int organizationTypeId,
+			boolean primary,
+			int sortOrder,
+			OrganizationTypeDefinition definition,
+			byte[] rowVer) {
+		public AssignedOrganizationType { rowVer = copyRowVer(rowVer); }
+		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
+		public boolean historical() { return !definition.active() || definition.deleted(); }
+	}
+
+	/** Read-only assignment aggregate; compatibilityConsistent never repairs either source. */
+	record OrganizationTypeProfile(
+			int organizationId,
+			int shaleClientId,
+			Integer compatibilityOrganizationTypeId,
+			boolean compatibilityConsistent,
+			List<AssignedOrganizationType> assignments) {
+		public OrganizationTypeProfile { assignments = List.copyOf(assignments); }
 	}
 
 	record CreateOrganizationCommand(
@@ -95,4 +141,6 @@ public interface OrganizationServicePort {
 			boolean primary,
 			String notes) {
 	}
+
+	private static byte[] copyRowVer(byte[] value) { return value == null ? null : value.clone(); }
 }
