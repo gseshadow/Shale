@@ -89,15 +89,29 @@ final class OrganizationEditEntryPointTest {
         assertTrue(save.contains("organizationService.updateOrganizationAggregate(command)"),
                 "Save must delegate to the existing aggregate update operation");
         assertTrue(count(save, "updateOrganizationAggregate(") == 1, "one click must issue exactly one aggregate update");
-        assertTrue(save.contains("Platform.runLater(this::loadOrganization)"), "successful Save must reload authoritative state");
-        assertTrue(save.contains("publishOrganizationUpdated(currentOrganization.getId())"),
-                "the live update remains after the successful aggregate call");
+        assertTrue(save.contains("Platform.runLater(()->applySuccessfulAggregateSave(result))"),
+                "successful Save must apply the committed result on the FX thread");
+        String applySuccess = method(source, "private void applySuccessfulAggregateSave(OrganizationAggregateResult result)");
+        assertTrue(applySuccess.indexOf("setEditMode(false)") < applySuccess.indexOf("publishOrganizationUpdated(updatedId)"),
+                "the controller must leave edit mode before its post-commit publication can be observed");
+        assertTrue(count(applySuccess, "loadOrganization()") == 1, "a successful Save must request one authoritative reload");
         assertTrue(cancel.contains("assignmentStage.discard()") && !cancel.contains("organizationService."),
                 "Cancel must discard staged changes without mutation");
         assertTrue(count(source, "organizationService.updateOrganizationAggregate(") == 1,
                 "only Save may mutate the aggregate, so closing the view cannot persist staged changes");
         assertFalse(initialize.contains("initializeInlineEditButtons()"),
                 "the retired field-by-field mutation controls must remain unreachable");
+    }
+
+    @Test
+    void localPostCommitEventIsSuppressedButARealConcurrentEditorsEventIsNot() throws Exception {
+        OrganizationController controller = new OrganizationController();
+        AppState state = new AppState();state.setUserId(42);state.setShaleClientId(7);
+        set(controller,"appState",state);set(controller,"organizationId",12);set(controller,"awaitingAuthoritativeReloadAfterLocalSave",true);
+        var local = new com.shale.ui.services.UiRuntimeBridge.EntityUpdatedEvent(1,"local","Organization",12,7,42,"",null,java.util.Map.of(),"");
+        var remote = new com.shale.ui.services.UiRuntimeBridge.EntityUpdatedEvent(1,"remote","Organization",12,7,99,"",null,java.util.Map.of(),"");
+        assertTrue((boolean)invokeResult(controller,"shouldIgnoreLiveEvent",local),"the successful local publication must not create a concurrency banner");
+        assertFalse((boolean)invokeResult(controller,"shouldIgnoreLiveEvent",remote),"a different actor's concurrent update must remain observable");
     }
 
     @Test
@@ -150,5 +164,11 @@ final class OrganizationEditEntryPointTest {
         Method method = OrganizationController.class.getDeclaredMethod(name);
         method.setAccessible(true);
         method.invoke(target);
+    }
+
+    private static Object invokeResult(Object target, String name, Object argument) throws Exception {
+        Method method = OrganizationController.class.getDeclaredMethod(name, argument.getClass());
+        method.setAccessible(true);
+        return method.invoke(target, argument);
     }
 }
