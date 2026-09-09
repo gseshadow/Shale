@@ -8,7 +8,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -17,14 +16,10 @@ import java.util.function.Consumer;
 import com.shale.core.model.Organization;
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.OrganizationServicePort.OrganizationAggregateResult;
-import com.shale.core.service.OrganizationServicePort.OrganizationFields;
-import com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.CaseSummaryDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
-import com.shale.ui.component.OrganizationTypeAssignmentPane;
-import com.shale.ui.controller.support.OrganizationTypeAssignmentStage;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
@@ -32,25 +27,14 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.PerfLog;
-import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar.ButtonData;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceBox;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
-import javafx.scene.control.TextArea;
-import com.shale.ui.component.EnhancedTextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TextInputControl;
-import javafx.scene.control.Tooltip;
-import javafx.scene.paint.Color;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
@@ -59,14 +43,11 @@ import javafx.stage.Window;
 public final class OrganizationController {
 
 	private static final Map<String, Organization> DETAIL_CACHE = new ConcurrentHashMap<>();
-	private static final Map<Integer, List<OrganizationDao.OrganizationTypeRow>> TYPE_OPTIONS_CACHE = new ConcurrentHashMap<>();
 
 	@FXML private Label organizationTitleLabel;
 	@FXML private Label lastUpdatedLabel;
 	@FXML private Label errorLabel;
 	@FXML private Button editButton;
-	@FXML private Button saveButton;
-	@FXML private Button cancelButton;
 	@FXML private Button deleteOrganizationButton;
 	@FXML private HBox remoteUpdateBanner;
 	@FXML private Button reloadRemoteButton;
@@ -76,53 +57,25 @@ public final class OrganizationController {
 	@FXML private ChoiceBox<String> relatedCasesSortChoice;
 
 	@FXML private Label nameValue;
-	@FXML private TextField nameEditor;
 	@FXML private Label typeValue;
-	@FXML private OrganizationTypeAssignmentPane typeEditor;
 	@FXML private Label phoneValue;
-	@FXML private TextField phoneEditor;
 	@FXML private Label faxValue;
-	@FXML private TextField faxEditor;
 	@FXML private Label emailValue;
-	@FXML private TextField emailEditor;
 	@FXML private Label websiteValue;
-	@FXML private TextField websiteEditor;
 	@FXML private Label address1Value;
-	@FXML private TextField address1Editor;
 	@FXML private Label address2Value;
-	@FXML private TextField address2Editor;
 	@FXML private Label cityValue;
-	@FXML private TextField cityEditor;
 	@FXML private Label stateValue;
-	@FXML private TextField stateEditor;
 	@FXML private Label postalCodeValue;
-	@FXML private TextField postalCodeEditor;
 	@FXML private Label countryValue;
-	@FXML private TextField countryEditor;
 	@FXML private Label notesValue;
-	@FXML private EnhancedTextArea notesEditor;
-	@FXML private Button editNameButton;
-	@FXML private Button editTypeButton;
-	@FXML private Button editPhoneButton;
-	@FXML private Button editFaxButton;
-	@FXML private Button editEmailButton;
-	@FXML private Button editWebsiteButton;
-	@FXML private Button editAddress1Button;
-	@FXML private Button editAddress2Button;
-	@FXML private Button editCityButton;
-	@FXML private Button editStateButton;
-	@FXML private Button editPostalCodeButton;
-	@FXML private Button editCountryButton;
-	@FXML private Button editNotesButton;
 
 	private Integer organizationId;
 	private OrganizationDao organizationDao;
 	private OrganizationServicePort organizationService;
-	private OrganizationTypeAssignmentStage assignmentStage;
-	private byte[] organizationRowVer;
 	private CaseSummaryDao caseSummaryDao;
 	private Organization currentOrganization;
-	private boolean editMode;
+	private boolean editDialogOpen;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
 	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> liveOrganizationUpdatedHandler;
@@ -131,7 +84,6 @@ public final class OrganizationController {
 	private boolean awaitingAuthoritativeReloadAfterLocalSave;
 	private int relatedCasesLoadGeneration;
 	private List<RelatedCaseRow> relatedCases = List.of();
-	private List<OrganizationDao.OrganizationTypeRow> organizationTypeOptions = List.of();
 	private CaseCardFactory caseCardFactory;
 	private Consumer<Integer> onOpenCase;
 	private Runnable onOrganizationDeleted;
@@ -169,15 +121,6 @@ public final class OrganizationController {
 			editButton.setOnAction(e -> onEdit());
 			setVisibleManaged(editButton, false);
 		}
-		setInlineEditButtonsVisible(false);
-		if (saveButton != null) {
-			ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
-			saveButton.setOnAction(e -> onSave());
-		}
-		if (cancelButton != null) {
-			ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
-			cancelButton.setOnAction(e -> onCancel());
-		}
 		if (deleteOrganizationButton != null) {
 			ControlStyles.apply(deleteOrganizationButton, ControlStyles.Purpose.DANGER);
 			deleteOrganizationButton.setOnAction(e -> onDeleteOrganization());
@@ -188,9 +131,6 @@ public final class OrganizationController {
 		}
 		CaseListFilterSortSupport.initializeControls(relatedCasesSearchField, relatedCasesSortChoice, this::renderRelatedCases);
 
-		if(typeEditor!=null)typeEditor.setMessageHandler(this::setError);
-
-		setEditMode(false);
 		hideRemoteUpdateBanner();
 		refreshAdminActions();
 
@@ -206,62 +146,6 @@ public final class OrganizationController {
 
 		subscribeLiveOrganizationUpdates();
 		Platform.runLater(this::loadOrganization);
-	}
-
-	private void initializeInlineEditButtons() {
-		configureTextEditButton(editNameButton, "Name", true, OrganizationField.NAME);
-		configureTypeEditButton();
-		configureTextEditButton(editPhoneButton, "Phone", false, OrganizationField.PHONE);
-		configureTextEditButton(editFaxButton, "Fax", false, OrganizationField.FAX);
-		configureTextEditButton(editEmailButton, "Email", false, OrganizationField.EMAIL);
-		configureTextEditButton(editWebsiteButton, "Website", false, OrganizationField.WEBSITE);
-		configureTextEditButton(editAddress1Button, "Address1", false, OrganizationField.ADDRESS1);
-		configureTextEditButton(editAddress2Button, "Address2", false, OrganizationField.ADDRESS2);
-		configureTextEditButton(editCityButton, "City", false, OrganizationField.CITY);
-		configureTextEditButton(editStateButton, "State", false, OrganizationField.STATE);
-		configureTextEditButton(editPostalCodeButton, "Postal Code", false, OrganizationField.POSTAL_CODE);
-		configureTextEditButton(editCountryButton, "Country", false, OrganizationField.COUNTRY);
-		configureTextAreaEditButton(editNotesButton, "Notes", OrganizationField.NOTES);
-	}
-
-	private void configureTextEditButton(Button button, String fieldLabel, boolean required, OrganizationField field) {
-		configureInlineEditButton(button, fieldLabel, () -> showOrganizationTextFieldDialog(
-				"Edit " + fieldLabel,
-				fieldLabel,
-				field.textValue(currentOrganization),
-				required,
-				button,
-				value -> saveSingleOrganizationField(field, value)));
-	}
-
-	private void configureTextAreaEditButton(Button button, String fieldLabel, OrganizationField field) {
-		configureInlineEditButton(button, fieldLabel, () -> showOrganizationTextAreaDialog(
-				"Edit " + fieldLabel,
-				fieldLabel,
-				field.textValue(currentOrganization),
-				button,
-				value -> saveSingleOrganizationField(field, value)));
-	}
-
-	private void configureTypeEditButton() {
-		configureInlineEditButton(editTypeButton, "Organization Type", () -> showOrganizationTypeDialog(
-				currentOrganization == null ? null : currentOrganization.getOrganizationTypeId(),
-				editTypeButton,
-				this::saveOrganizationTypeField));
-	}
-
-	private void configureInlineEditButton(Button button, String fieldLabel, Runnable action) {
-		if (button == null) {
-			return;
-		}
-		button.setTooltip(new Tooltip("Edit " + fieldLabel));
-		button.setOnAction(e -> {
-			if (currentOrganization == null) {
-				return;
-			}
-			clearError();
-			action.run();
-		});
 	}
 
 	private void loadOrganization() {
@@ -289,25 +173,7 @@ public final class OrganizationController {
 				} else {
 					PerfLog.log("organizations.detail.cache", "hit", "organizationId=" + organizationId + " tenantId=" + currentTenantId());
 				}
-				Integer tenantId = currentTenantId();
-				if(tenantId==null)throw new IllegalStateException("No tenant is selected.");
-				var effectiveDefinitions=organizationService.listEffectiveOrganizationTypes(tenantId);
-				var loadedProfile=organizationService.getOrganizationTypeProfile(organizationId,tenantId).orElseThrow(()->new IllegalStateException("Organization Type profile was not found."));
-				var loadedStage=OrganizationTypeAssignmentStage.forEdit(effectiveDefinitions,loadedProfile);
-				byte[] loadedOrganizationRowVer=organizationDao.findOrganizationRowVer(organizationId,tenantId);
-				List<OrganizationDao.OrganizationTypeRow> loadedTypeOptions = tenantId == null ? null : TYPE_OPTIONS_CACHE.get(tenantId);
-				if (loadedTypeOptions == null) {
-					long typesStarted = PerfLog.start();
-					loadedTypeOptions = organizationDao.findOrganizationTypes();
-					if (tenantId != null) {
-						TYPE_OPTIONS_CACHE.put(tenantId, loadedTypeOptions == null ? List.of() : loadedTypeOptions);
-					}
-					PerfLog.logDone("organizations.detail.types.dao", "tenantId=" + tenantId + " rows=" + (loadedTypeOptions == null ? 0 : loadedTypeOptions.size()) + " cacheHit=false", typesStarted);
-				} else {
-					PerfLog.log("organizations.detail.types.cache", "hit", "tenantId=" + tenantId + " rows=" + loadedTypeOptions.size());
-				}
 				final Organization loadedForUi = loaded;
-				final List<OrganizationDao.OrganizationTypeRow> typeOptionsForUi = loadedTypeOptions == null ? List.of() : loadedTypeOptions;
 				final boolean cacheHitForUi = cacheHit;
 				Platform.runLater(() -> {
 					setBusy(false);
@@ -319,9 +185,7 @@ public final class OrganizationController {
 					}
 
 					currentOrganization = loadedForUi;
-					assignmentStage=loadedStage;organizationRowVer=loadedOrganizationRowVer==null?null:loadedOrganizationRowVer.clone();if(typeEditor!=null)typeEditor.setStage(assignmentStage);
 					awaitingAuthoritativeReloadAfterLocalSave=false;
-					organizationTypeOptions = typeOptionsForUi;
 					resetRelatedCaseControls();
 					renderFromCurrent();
 					clearError();
@@ -374,211 +238,21 @@ public final class OrganizationController {
 	}
 
 
-	private void showOrganizationTextFieldDialog(String title, String label, String currentValue, boolean required, Button ownerButton, Consumer<String> onSave) {
-		Dialog<String> dialog = new Dialog<>();
-		AppDialogs.applySecondaryDialogShell(dialog, title);
-		dialog.initOwner(dialogOwner(ownerButton));
-		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
-		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
-
-		TextField field = new TextField(safeText(currentValue));
-		Label error = new Label();
-		error.setTextFill(Color.web("#b42318"));
-		error.setVisible(false);
-		error.setManaged(false);
-		dialog.getDialogPane().setContent(new VBox(8, new Label(label), new Label("Current: " + displayCurrentValue(currentValue)), field, error));
-
-		Node save = dialog.getDialogPane().lookupButton(saveType);
-		save.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
-			if (required && safeText(field.getText()).trim().isBlank()) {
-				error.setText(label + " is required.");
-				error.setVisible(true);
-				error.setManaged(true);
-				e.consume();
-			}
-		});
-		installUnsavedOrganizationDialogConfirmation(dialog, () -> !Objects.equals(safeText(currentValue), safeText(field.getText())));
-		dialog.setResultConverter(button -> button == saveType ? field.getText() : null);
-		dialog.showAndWait().ifPresent(onSave);
-	}
-
-	private void showOrganizationTextAreaDialog(String title, String label, String currentValue, Button ownerButton, Consumer<String> onSave) {
-		EnhancedTextArea.openEditor(dialogOwner(ownerButton), title, safeText(currentValue), onSave);
-	}
-
-	private void showOrganizationTypeDialog(Integer currentTypeId, Button ownerButton, Consumer<Integer> onSave) {
-		Dialog<OrganizationDao.OrganizationTypeRow> dialog = new Dialog<>();
-		AppDialogs.applySecondaryDialogShell(dialog, "Edit Organization Type");
-		dialog.initOwner(dialogOwner(ownerButton));
-		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
-		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
-
-		ComboBox<OrganizationDao.OrganizationTypeRow> picker = new ComboBox<>(FXCollections.observableArrayList(organizationTypeOptions));
-		picker.setMaxWidth(Double.MAX_VALUE);
-		picker.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
-			@Override
-			protected void updateItem(OrganizationDao.OrganizationTypeRow item, boolean empty) {
-				super.updateItem(item, empty);
-				setText(empty || item == null ? null : fallback(item.name()));
-			}
-		});
-		picker.setButtonCell(new javafx.scene.control.ListCell<>() {
-			@Override
-			protected void updateItem(OrganizationDao.OrganizationTypeRow item, boolean empty) {
-				super.updateItem(item, empty);
-				setText(empty || item == null ? null : fallback(item.name()));
-			}
-		});
-		picker.getSelectionModel().select(findOrganizationTypeRow(currentTypeId));
-		dialog.getDialogPane().setContent(new VBox(8,
-				new Label("Organization Type"),
-				new Label("Current: " + displayCurrentValue(currentOrganization == null ? null : currentOrganization.getOrganizationTypeName())),
-				picker));
-		installUnsavedOrganizationDialogConfirmation(dialog, () -> !Objects.equals(currentTypeId, selectedOrganizationTypeId(picker)));
-		dialog.setResultConverter(button -> button == saveType ? picker.getSelectionModel().getSelectedItem() : null);
-		Optional<OrganizationDao.OrganizationTypeRow> selected = dialog.showAndWait();
-		selected.map(OrganizationDao.OrganizationTypeRow::organizationTypeId).ifPresent(onSave);
-	}
-
-	private void installUnsavedOrganizationDialogConfirmation(Dialog<?> dialog, java.util.function.BooleanSupplier hasChanges) {
-		Node cancel = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
-		if (cancel == null) {
-			return;
-		}
-		cancel.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
-			if (hasChanges == null || !hasChanges.getAsBoolean()) {
-				return;
-			}
-			boolean confirmed = AppDialogs.showConfirmation(
-					dialog.getOwner(),
-					"Discard Changes?",
-					"Discard unsaved changes?",
-					"Canceling will discard the changes in this field.",
-					"Discard Changes",
-					AppDialogs.DialogActionKind.DANGER);
-			if (!confirmed) {
-				e.consume();
-			}
-		});
-	}
-
-	private void saveSingleOrganizationField(OrganizationField field, String value) {
-		if (currentOrganization == null || field == null) {
-			return;
-		}
-		Organization.Builder builder = copyCurrentOrganization();
-		field.apply(builder, safeText(value));
-		saveOrganizationSnapshot(builder.build());
-	}
-
-	private void saveOrganizationTypeField(Integer organizationTypeId) {
-		if (currentOrganization == null) {
-			return;
-		}
-		OrganizationDao.OrganizationTypeRow selected = findOrganizationTypeRow(organizationTypeId);
-		saveOrganizationSnapshot(copyCurrentOrganization()
-				.organizationTypeId(organizationTypeId)
-				.organizationTypeName(selected == null ? currentOrganization.getOrganizationTypeName() : selected.name())
-				.build());
-	}
-
-	private void saveOrganizationSnapshot(Organization updated) {
-		setError("Independent field saves are disabled; use Edit and Save to commit the complete Organization profile.");
-	}
-
-	private void applySavedOrganization(Organization reloaded, Integer updatedId, long saveStarted) {
-		setBusy(false);
-		if (reloaded == null) {
-			setError("Organization could not be reloaded after save.");
-			return;
-		}
-		currentOrganization = reloaded;
-		cacheDetail(reloaded);
-		pendingRemoteUpdate = false;
-		hideRemoteUpdateBanner();
-		renderFromCurrent();
-		setEditMode(false);
-		clearError();
-		PerfLog.logDone("organizations.field.save", "phase=apply organizationId=" + updatedId, saveStarted);
-	}
-
-	private Organization.Builder copyCurrentOrganization() {
-		return Organization.builder()
-				.id(currentOrganization.getId())
-				.shaleClientId(currentOrganization.getShaleClientId())
-				.organizationTypeId(currentOrganization.getOrganizationTypeId())
-				.organizationTypeName(currentOrganization.getOrganizationTypeName())
-				.name(safeText(currentOrganization.getName()))
-				.phone(safeText(currentOrganization.getPhone()))
-				.fax(safeText(currentOrganization.getFax()))
-				.email(safeText(currentOrganization.getEmail()))
-				.website(safeText(currentOrganization.getWebsite()))
-				.address1(safeText(currentOrganization.getAddress1()))
-				.address2(safeText(currentOrganization.getAddress2()))
-				.city(safeText(currentOrganization.getCity()))
-				.state(safeText(currentOrganization.getState()))
-				.postalCode(safeText(currentOrganization.getPostalCode()))
-				.country(safeText(currentOrganization.getCountry()))
-				.notes(safeText(currentOrganization.getNotes()))
-				.deleted(currentOrganization.isDeleted())
-				.createdAt(currentOrganization.getCreatedAt())
-				.updatedAt(currentOrganization.getUpdatedAt());
-	}
-
-	private Integer selectedOrganizationTypeId(ComboBox<OrganizationDao.OrganizationTypeRow> picker) {
-		OrganizationDao.OrganizationTypeRow selected = picker == null ? null : picker.getSelectionModel().getSelectedItem();
-		return selected == null ? null : selected.organizationTypeId();
-	}
-
-	private String displayCurrentValue(String value) {
-		String safe = safeText(value);
-		return safe.isBlank() ? "—" : safe;
-	}
-
-
 	private void onEdit() {
-		if (currentOrganization == null || !canEditOrganization()) {
-			return;
-		}
-		writeEditorsFromOrganization(currentOrganization);
-		setEditMode(true);
-	}
-
-	private void onCancel() {
-		if(assignmentStage!=null)assignmentStage.discard();
-		if (pendingRemoteUpdate) {
-			setEditMode(false);
-			onReloadRemote();
-			return;
-		}
-
-		if (currentOrganization != null) {
-			writeEditorsFromOrganization(currentOrganization);
-			renderFromCurrent();
-		}
-		setEditMode(false);
-		clearError();
-	}
-
-	private void onSave() {
-		if (currentOrganization == null || organizationService == null || assignmentStage==null || organizationRowVer==null) {
-			setError("Organization details are unavailable.");
-			return;
-		}
-		if(!assignmentStage.isValid()){setError("Exactly one eligible primary Organization Type is required.");return;}
-		var fields=new OrganizationFields(safeText(nameEditor.getText()),safeText(phoneEditor.getText()),safeText(faxEditor.getText()),safeText(emailEditor.getText()),safeText(websiteEditor.getText()),safeText(address1Editor.getText()),safeText(address2Editor.getText()),safeText(cityEditor.getText()),safeText(stateEditor.getText()),safeText(postalCodeEditor.getText()),safeText(countryEditor.getText()),safeText(notesEditor.getText()));
-		var command=new UpdateOrganizationAggregateCommand(currentOrganization.getId(),currentTenantId(),appState.getUserId(),organizationRowVer,fields,assignmentStage.commandAssignments());
-		setBusy(true);dbExec.submit(()->{try{OrganizationAggregateResult result=organizationService.updateOrganizationAggregate(command);Platform.runLater(()->applySuccessfulAggregateSave(result));}catch(RuntimeException ex){Platform.runLater(()->{setBusy(false);setError(ex.getMessage()!=null&&ex.getMessage().contains("changed")?"Organization changed elsewhere; authoritative values were reloaded.":"Failed to save organization.");loadOrganization();});}});
+		if (currentOrganization == null || !canEditOrganization() || editDialogOpen) return;
+		editDialogOpen = true;
+		new EditOrganizationDialog(currentOrganization.getId(), organizationDao, organizationService, appState, dbExec,
+				this::applySuccessfulAggregateSave, () -> { editDialogOpen = false; refreshAdminActions(); })
+				.show(dialogOwner(editButton));
+		refreshAdminActions();
 	}
 
 	private void applySuccessfulAggregateSave(OrganizationAggregateResult result) {
-		int updatedId=result.organizationId();
-		organizationRowVer=result.organizationRowVer();
-		setEditMode(false);
-		pendingRemoteUpdate=false;
+		int updatedId = result.organizationId();
+		pendingRemoteUpdate = false;
 		hideRemoteUpdateBanner();
 		invalidateDetailCache(updatedId);
-		awaitingAuthoritativeReloadAfterLocalSave=true;
+		awaitingAuthoritativeReloadAfterLocalSave = true;
 		loadOrganization();
 		publishOrganizationUpdated(updatedId);
 	}
@@ -685,7 +359,7 @@ public final class OrganizationController {
 		}
 
 		runOnFx(() -> {
-			if (editMode) {
+			if (editDialogOpen) {
 				pendingRemoteUpdate = true;
 				showRemoteUpdateBanner();
 				return;
@@ -777,42 +451,8 @@ public final class OrganizationController {
 			lastUpdatedLabel.setText("Last updated: —");
 		}
 
-		writeEditorsFromOrganization(o);
 		refreshAdminActions();
 		PerfLog.logDone("organizations.detail.render", "organizationId=" + (o == null ? null : o.getId()) + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
-	}
-
-	private void writeEditorsFromOrganization(Organization o) {
-		if(typeEditor!=null&&assignmentStage!=null)typeEditor.setStage(assignmentStage);
-		nameEditor.setText(safeText(o.getName()));
-		phoneEditor.setText(safeText(o.getPhone()));
-		faxEditor.setText(safeText(o.getFax()));
-		emailEditor.setText(safeText(o.getEmail()));
-		websiteEditor.setText(safeText(o.getWebsite()));
-		address1Editor.setText(safeText(o.getAddress1()));
-		address2Editor.setText(safeText(o.getAddress2()));
-		cityEditor.setText(safeText(o.getCity()));
-		stateEditor.setText(safeText(o.getState()));
-		postalCodeEditor.setText(safeText(o.getPostalCode()));
-		countryEditor.setText(safeText(o.getCountry()));
-		notesEditor.setText(safeText(o.getNotes()));
-	}
-
-	private Integer resolveSelectedOrganizationTypeId() {
-		if(assignmentStage!=null)return assignmentStage.assigned().stream().filter(OrganizationTypeAssignmentStage.Item::primary).map(i->i.definition().organizationTypeId()).findFirst().orElse(null);
-		return currentOrganization == null ? null : currentOrganization.getOrganizationTypeId();
-	}
-
-	private OrganizationDao.OrganizationTypeRow findOrganizationTypeRow(Integer organizationTypeId) {
-		if (organizationTypeId == null) {
-			return null;
-		}
-		for (OrganizationDao.OrganizationTypeRow row : organizationTypeOptions) {
-			if (row != null && row.organizationTypeId() == organizationTypeId.intValue()) {
-				return row;
-			}
-		}
-		return null;
 	}
 
 	private void renderRelatedCases() {
@@ -933,58 +573,14 @@ public final class OrganizationController {
 		CaseListFilterSortSupport.resetControls(relatedCasesSearchField, relatedCasesSortChoice);
 	}
 
-	private void setEditMode(boolean enabled) {
-		this.editMode = enabled;
-		setVisibleManaged(editButton, !enabled && currentOrganization != null && canEditOrganization());
-		setVisibleManaged(saveButton, enabled);
-		setVisibleManaged(cancelButton, enabled);
-		refreshAdminActions();
-
-		toggleField(nameValue, nameEditor, enabled);
-		toggleField(typeValue, typeEditor, enabled);
-		toggleField(phoneValue, phoneEditor, enabled);
-		toggleField(faxValue, faxEditor, enabled);
-		toggleField(emailValue, emailEditor, enabled);
-		toggleField(websiteValue, websiteEditor, enabled);
-		toggleField(address1Value, address1Editor, enabled);
-		toggleField(address2Value, address2Editor, enabled);
-		toggleField(cityValue, cityEditor, enabled);
-		toggleField(stateValue, stateEditor, enabled);
-		toggleField(postalCodeValue, postalCodeEditor, enabled);
-		toggleField(countryValue, countryEditor, enabled);
-		toggleField(notesValue, notesEditor, enabled);
-	}
-
 	private void setBusy(boolean busy) {
-		if (editButton != null) {
-			editButton.setDisable(busy);
-		}
-		if (saveButton != null) {
-			saveButton.setDisable(busy);
-		}
-		if (cancelButton != null) {
-			cancelButton.setDisable(busy);
-		}
-		if (deleteOrganizationButton != null) {
-			deleteOrganizationButton.setDisable(busy);
-		}
-		setInlineEditButtonsDisabled(busy);
+		if (editButton != null) editButton.setDisable(busy);
+		if (deleteOrganizationButton != null) deleteOrganizationButton.setDisable(busy);
 	}
-
-	private void setInlineEditButtonsDisabled(boolean disabled) {
-		for (Button button : java.util.Arrays.asList(editNameButton, editTypeButton, editPhoneButton, editFaxButton, editEmailButton,
-				editWebsiteButton, editAddress1Button, editAddress2Button, editCityButton, editStateButton,
-				editPostalCodeButton, editCountryButton, editNotesButton)) {
-			if (button != null) {
-				button.setDisable(disabled);
-			}
-		}
-	}
-	private void setInlineEditButtonsVisible(boolean visible){for(Button button:java.util.Arrays.asList(editNameButton,editTypeButton,editPhoneButton,editFaxButton,editEmailButton,editWebsiteButton,editAddress1Button,editAddress2Button,editCityButton,editStateButton,editPostalCodeButton,editCountryButton,editNotesButton))if(button!=null)setVisibleManaged(button,visible);}
 
 	private void refreshAdminActions() {
-		setVisibleManaged(editButton,canEditOrganization() && !editMode && currentOrganization!=null);
-		boolean showDelete = isAdminUser() && !editMode && currentOrganization != null;
+		setVisibleManaged(editButton, canEditOrganization() && !editDialogOpen && currentOrganization != null);
+		boolean showDelete = isAdminUser() && currentOrganization != null;
 		setVisibleManaged(deleteOrganizationButton, showDelete);
 	}
 
@@ -995,17 +591,6 @@ public final class OrganizationController {
 
 	private boolean isAdminUser() {
 		return appState != null && appState.isAdmin();
-	}
-
-	private static void toggleField(Label valueNode, javafx.scene.Node editorNode, boolean editMode) {
-		if (editorNode instanceof TextInputControl textInput) {
-			setVisibleManaged(valueNode, false);
-			setVisibleManaged(editorNode, true);
-			ReadOnlyTextDisplaySupport.apply(textInput, editMode);
-			return;
-		}
-		setVisibleManaged(valueNode, !editMode);
-		setVisibleManaged(editorNode, editMode);
 	}
 
 	private static void runOnFx(Runnable runnable) {
@@ -1054,60 +639,6 @@ public final class OrganizationController {
 			return "";
 		}
 		return text.trim();
-	}
-
-	private enum OrganizationField {
-		NAME {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getName(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.name(value); }
-		},
-		PHONE {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getPhone(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.phone(value); }
-		},
-		FAX {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getFax(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.fax(value); }
-		},
-		EMAIL {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getEmail(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.email(value); }
-		},
-		WEBSITE {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getWebsite(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.website(value); }
-		},
-		ADDRESS1 {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getAddress1(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.address1(value); }
-		},
-		ADDRESS2 {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getAddress2(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.address2(value); }
-		},
-		CITY {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getCity(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.city(value); }
-		},
-		STATE {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getState(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.state(value); }
-		},
-		POSTAL_CODE {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getPostalCode(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.postalCode(value); }
-		},
-		COUNTRY {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getCountry(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.country(value); }
-		},
-		NOTES {
-			@Override String textValue(Organization o) { return o == null ? "" : o.getNotes(); }
-			@Override void apply(Organization.Builder builder, String value) { builder.notes(value); }
-		};
-
-		abstract String textValue(Organization organization);
-		abstract void apply(Organization.Builder builder, String value);
 	}
 
 }
