@@ -241,7 +241,7 @@ Add the four Organization contact-point tables using the proven Contact table in
 guarded migration and separate verification. Conservatively backfill legacy Phone, Fax, Email,
 Website, and address fields. Do not delete or blank legacy columns.
 
-### Phase 2B — Organization aggregate read/write boundary
+### Phase 2B — Organization aggregate read/write boundary (implemented 2026-09-09)
 
 Add aggregate detail/create/update commands and results to `OrganizationServicePort`. The mutation
 starts its transaction before authorization, validates `Organizations.RowVer`, validates every child
@@ -252,6 +252,20 @@ or retried.
 Move JavaFX create and edit mutations off the FX thread and through the service port. Remove the
 desktop's direct mutation dependency on `OrganizationDao` while retaining DAO-backed reads only where
 the current architecture still explicitly permits them.
+
+Phase 2B uses one reusable, dialog-local Organization Type assignment stage for Add and Edit. It
+starts from an immutable profile snapshot, exposes effective active definitions by stored definition
+ID, preserves inactive/removed historical assignments, and keeps add/remove/primary/order changes
+local until parent Save. Exactly one eligible active assignment is submitted as primary. The DAO-owned
+aggregate transaction validates tenant/actor, locks current state, checks Organization and assignment
+`RowVer` values, reconciles the exact ordered set (including restoration), synchronizes
+`Organizations.OrganizationTypeId`, and writes the existing assignment audit events before commit.
+Desktop live invalidation is published only after successful return.
+
+The server's former Organization create/update request shapes cannot carry the complete assignment
+profile or concurrency tokens. Those endpoints now fail closed with `501`; a future server contract
+may expose the aggregate command. Phase 2C cards, header chips, and type search/filter presentation
+remain deferred. Restoring a deleted Organization record remains a separate lifecycle feature.
 
 ### Phase 3 — shared Add/Edit Organization experience
 

@@ -114,6 +114,8 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 	@Override public OrganizationTypeAssignmentMutationResult setPrimaryOrganizationType(SetPrimaryOrganizationTypeCommand c){return organizationGateway.setPrimaryOrganizationType(c);}
 	@Override public OrganizationTypeAssignmentMutationResult replaceAndRemovePrimaryOrganizationType(ReplaceAndRemovePrimaryOrganizationTypeCommand c){return organizationGateway.replaceAndRemovePrimaryOrganizationType(c);}
 	@Override public List<OrganizationTypeAssignmentMutationResult> reorderOrganizationTypeAssignments(ReorderOrganizationTypeAssignmentsCommand c){return organizationGateway.reorderOrganizationTypeAssignments(c);}
+	@Override public OrganizationAggregateResult createOrganizationAggregate(CreateOrganizationAggregateCommand c){OrganizationTypeProfile p=organizationGateway.createOrganizationAggregate(c);return new OrganizationAggregateResult(p.organizationId(),organizationGateway.findOrganizationRowVer(p.organizationId(),c.shaleClientId()),p);}
+	@Override public OrganizationAggregateResult updateOrganizationAggregate(UpdateOrganizationAggregateCommand c){OrganizationTypeProfile p=organizationGateway.updateOrganizationAggregate(c);return new OrganizationAggregateResult(p.organizationId(),organizationGateway.findOrganizationRowVer(p.organizationId(),c.shaleClientId()),p);}
 	@Override
 	public int createOrganization(CreateOrganizationCommand command) {
 		Objects.requireNonNull(command, "command");
@@ -190,6 +192,9 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		default OrganizationTypeAssignmentMutationResult setPrimaryOrganizationType(SetPrimaryOrganizationTypeCommand c){throw new UnsupportedOperationException("Organization Type primary selection is not supported");}
 		default OrganizationTypeAssignmentMutationResult replaceAndRemovePrimaryOrganizationType(ReplaceAndRemovePrimaryOrganizationTypeCommand c){throw new UnsupportedOperationException("Organization Type replacement is not supported");}
 		default List<OrganizationTypeAssignmentMutationResult> reorderOrganizationTypeAssignments(ReorderOrganizationTypeAssignmentsCommand c){throw new UnsupportedOperationException("Organization Type assignment ordering is not supported");}
+		default OrganizationTypeProfile createOrganizationAggregate(CreateOrganizationAggregateCommand c){throw new UnsupportedOperationException("Organization aggregate creation is not supported");}
+		default OrganizationTypeProfile updateOrganizationAggregate(UpdateOrganizationAggregateCommand c){throw new UnsupportedOperationException("Organization aggregate update is not supported");}
+		default byte[] findOrganizationRowVer(int organizationId,int tenant){throw new UnsupportedOperationException("Organization concurrency reads are not supported");}
 	}
 
 	@FunctionalInterface
@@ -218,6 +223,9 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		@Override public OrganizationTypeAssignmentMutationResult setPrimaryOrganizationType(SetPrimaryOrganizationTypeCommand c){return dao.setPrimaryOrganizationType(c);}
 		@Override public OrganizationTypeAssignmentMutationResult replaceAndRemovePrimaryOrganizationType(ReplaceAndRemovePrimaryOrganizationTypeCommand c){return dao.replaceAndRemovePrimaryOrganizationType(c);}
 		@Override public List<OrganizationTypeAssignmentMutationResult> reorderOrganizationTypeAssignments(ReorderOrganizationTypeAssignmentsCommand c){return dao.reorderOrganizationTypeAssignments(c);}
+		@Override public OrganizationTypeProfile createOrganizationAggregate(CreateOrganizationAggregateCommand c){return dao.createOrganizationAggregate(c);}
+		@Override public OrganizationTypeProfile updateOrganizationAggregate(UpdateOrganizationAggregateCommand c){return dao.updateOrganizationAggregate(c);}
+		@Override public byte[] findOrganizationRowVer(int organizationId,int tenant){return dao.findOrganizationRowVer(organizationId,tenant);}
 	}
 
 }
