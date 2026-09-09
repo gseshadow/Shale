@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import com.shale.core.dto.CaseSummaryProjection;
@@ -13,6 +14,44 @@ import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.OrganizationDao;
 
 final class OrganizationServiceAdapterTest {
+	@Test void typeReadsDelegateAndPreserveLifecycleIdentityOrderingAndDefensiveRowVersions() {
+		FakeOrganizations organizations = new FakeOrganizations(organization(7, 41));
+		byte[] definitionRowVer = {1, 2};
+		byte[] assignmentRowVer = {3, 4};
+		var historical = new OrganizationDao.OrganizationTypeDefinitionRow(12, null, "hospital", "Hospital",
+				"Historical", "#123456", 5, false, true, definitionRowVer);
+		organizations.effectiveTypes = List.of(new OrganizationDao.OrganizationTypeDefinitionRow(13, 41,
+				"provider", "Provider", null, "#ABCDEF", 1, true, false, new byte[] {5, 6}));
+		organizations.profile = new OrganizationDao.OrganizationTypeProfileRow(7, 41, 12, true,
+				List.of(new OrganizationDao.AssignedOrganizationTypeRow(101L, 12, true, 2, historical, assignmentRowVer)));
+
+		OrganizationServiceAdapter adapter = new OrganizationServiceAdapter(organizations, (tenant, organization) -> List.of());
+		var definitions = adapter.listEffectiveOrganizationTypes(41);
+		var profile = adapter.getOrganizationTypeProfile(7, 41).orElseThrow();
+		definitionRowVer[0] = 9;
+		assignmentRowVer[0] = 9;
+
+		assertEquals(1, organizations.effectiveCalls, "effective definitions use one gateway call");
+		assertEquals(1, organizations.profileCalls, "the profile uses one aggregate gateway call");
+		assertEquals(13, definitions.get(0).organizationTypeId());
+		assertEquals(com.shale.core.service.OrganizationServicePort.OrganizationTypeOrigin.TENANT,
+				definitions.get(0).origin());
+		assertTrue(profile.compatibilityConsistent());
+		assertEquals(12, profile.assignments().get(0).definition().organizationTypeId());
+		assertTrue(profile.assignments().get(0).historical());
+		assertArrayEquals(new byte[] {1, 2}, profile.assignments().get(0).definition().rowVer());
+		assertArrayEquals(new byte[] {3, 4}, profile.assignments().get(0).rowVer());
+		byte[] exposed = profile.assignments().get(0).rowVer();
+		exposed[0] = 8;
+		assertArrayEquals(new byte[] {3, 4}, profile.assignments().get(0).rowVer());
+	}
+
+	@Test void missingTypeProfileIsExposedAsEmptyWithoutCompatibilityRepair() {
+		FakeOrganizations organizations = new FakeOrganizations(null);
+		OrganizationServiceAdapter adapter = new OrganizationServiceAdapter(organizations, (tenant, organization) -> List.of());
+		assertEquals(Optional.empty(), adapter.getOrganizationTypeProfile(404, 41));
+		assertEquals(1, organizations.profileCalls);
+	}
 	@Test void detailDelegatesOnceToAuthoritativeSetProjectionAndPreservesRowsAndMetadata() {
 		FakeOrganizations organizations = new FakeOrganizations(organization(7, 41));
 		var summary = new CaseSummaryProjection(91,41,"C-91","Alpha",3,"open","OPEN","Open","#fff",4,"PI",
@@ -57,10 +96,16 @@ final class OrganizationServiceAdapterTest {
 		}
 	}
 	private static final class FakeOrganizations implements OrganizationServiceAdapter.OrganizationGateway {
-		private final Organization organization; FakeOrganizations(Organization organization){this.organization=organization;}
+		private final Organization organization;
+		private List<OrganizationDao.OrganizationTypeDefinitionRow> effectiveTypes=List.of();
+		private OrganizationDao.OrganizationTypeProfileRow profile;
+		private int effectiveCalls,profileCalls;
+		FakeOrganizations(Organization organization){this.organization=organization;}
 		@Override public Organization findById(int id){return organization;}
 		@Override public OrganizationDao.PagedResult<OrganizationDao.DirectoryOrganizationRow> findDirectoryPage(int p,int s,String q){return new OrganizationDao.PagedResult<>(List.of(),p,s,0);}
 		@Override public List<OrganizationDao.OrganizationTypeRow> findOrganizationTypes(){return List.of();}
+		@Override public List<OrganizationDao.OrganizationTypeDefinitionRow> listEffectiveOrganizationTypeDefinitions(int tenant){effectiveCalls++;return effectiveTypes;}
+		@Override public OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organization,int tenant){profileCalls++;return profile;}
 		@Override public int create(OrganizationDao.OrganizationCreateRequest r){return 0;}
 		@Override public void update(Organization o){}
 	}

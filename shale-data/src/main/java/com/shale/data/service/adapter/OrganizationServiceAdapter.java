@@ -80,6 +80,28 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 				organization.getNotes(),
 				relatedCases));
 	}
+
+	@Override
+	public List<OrganizationTypeDefinition> listEffectiveOrganizationTypes(int shaleClientId) {
+		return organizationGateway.listEffectiveOrganizationTypeDefinitions(shaleClientId).stream()
+				.map(OrganizationServiceAdapter::definition).toList();
+	}
+
+	@Override
+	public Optional<OrganizationTypeProfile> getOrganizationTypeProfile(int organizationId, int shaleClientId) {
+		return Optional.ofNullable(organizationGateway.findOrganizationTypeProfile(organizationId, shaleClientId))
+				.map(row -> new OrganizationTypeProfile(row.organizationId(), row.shaleClientId(),
+						row.compatibilityOrganizationTypeId(), row.compatibilityConsistent(), row.assignments().stream()
+								.map(a -> new AssignedOrganizationType(a.assignmentId(), a.organizationTypeId(), a.primary(),
+										a.sortOrder(), definition(a.definition()), a.rowVer())).toList()));
+	}
+
+	private static OrganizationTypeDefinition definition(OrganizationDao.OrganizationTypeDefinitionRow row) {
+		return new OrganizationTypeDefinition(row.organizationTypeId(), row.shaleClientId(), row.systemKey(),
+				row.name(), row.description(), row.color(), row.sortOrder(), row.active(), row.deleted(),
+				row.shaleClientId() == null ? OrganizationTypeOrigin.GLOBAL : OrganizationTypeOrigin.TENANT,
+				row.rowVer());
+	}
 	@Override
 	public int createOrganization(CreateOrganizationCommand command) {
 		Objects.requireNonNull(command, "command");
@@ -140,6 +162,8 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		OrganizationDao.PagedResult<OrganizationDao.DirectoryOrganizationRow> findDirectoryPage(int page, int pageSize, String query);
 		Organization findById(int organizationId);
 		List<OrganizationDao.OrganizationTypeRow> findOrganizationTypes();
+		List<OrganizationDao.OrganizationTypeDefinitionRow> listEffectiveOrganizationTypeDefinitions(int shaleClientId);
+		OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organizationId, int shaleClientId);
 		int create(OrganizationDao.OrganizationCreateRequest request);
 		void update(Organization organization);
 	}
@@ -154,6 +178,8 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		@Override public OrganizationDao.PagedResult<OrganizationDao.DirectoryOrganizationRow> findDirectoryPage(int page, int pageSize, String query) { return dao.findDirectoryPage(page, pageSize, query); }
 		@Override public Organization findById(int organizationId) { return dao.findById(organizationId); }
 		@Override public List<OrganizationDao.OrganizationTypeRow> findOrganizationTypes() { return dao.findOrganizationTypes(); }
+		@Override public List<OrganizationDao.OrganizationTypeDefinitionRow> listEffectiveOrganizationTypeDefinitions(int shaleClientId) { return dao.listEffectiveOrganizationTypeDefinitions(shaleClientId); }
+		@Override public OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organizationId, int shaleClientId) { return dao.findOrganizationTypeProfile(organizationId, shaleClientId); }
 		@Override public int create(OrganizationDao.OrganizationCreateRequest request) { return dao.create(request); }
 		@Override public void update(Organization organization) { dao.update(organization); }
 	}
