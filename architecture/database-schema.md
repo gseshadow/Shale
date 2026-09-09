@@ -1,5 +1,10 @@
 # Shale Database Schema Reference
 
+> **Organizations Phase 1C (2026-09-09):** Definition and assignment mutations now use the Phase 1A
+> lifecycle, tenant, actor, ordering, and `RowVer` columns transactionally. Primary changes synchronize
+> `Organizations.OrganizationTypeId` and audit on the same connection. Legacy Organization create and
+> update remain outside the aggregate dual-write cutover.
+
 *Last updated: 2026-06-15*
 
 This document is the working schema reference for Codex and Shale development prompts.

@@ -14,6 +14,14 @@ import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.OrganizationDao;
 
 final class OrganizationServiceAdapterTest {
+	@Test void phaseOneCMutationsDelegateToTheAuthoritativeOrganizationGateway() {
+		FakeOrganizations organizations = new FakeOrganizations(organization(7, 41));
+		OrganizationServiceAdapter adapter = new OrganizationServiceAdapter(organizations, (tenant, organization) -> List.of());
+		var command = new com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand(41, 9, 7, 12);
+		var result = adapter.assignOrganizationType(command);
+		assertSame(command, organizations.assignmentCommand);
+		assertEquals(101L, result.assignmentId());
+	}
 	@Test void typeReadsDelegateAndPreserveLifecycleIdentityOrderingAndDefensiveRowVersions() {
 		FakeOrganizations organizations = new FakeOrganizations(organization(7, 41));
 		byte[] definitionRowVer = {1, 2};
@@ -100,6 +108,7 @@ final class OrganizationServiceAdapterTest {
 		private List<OrganizationDao.OrganizationTypeDefinitionRow> effectiveTypes=List.of();
 		private OrganizationDao.OrganizationTypeProfileRow profile;
 		private int effectiveCalls,profileCalls;
+		private com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand assignmentCommand;
 		FakeOrganizations(Organization organization){this.organization=organization;}
 		@Override public Organization findById(int id){return organization;}
 		@Override public OrganizationDao.PagedResult<OrganizationDao.DirectoryOrganizationRow> findDirectoryPage(int p,int s,String q){return new OrganizationDao.PagedResult<>(List.of(),p,s,0);}
@@ -108,5 +117,6 @@ final class OrganizationServiceAdapterTest {
 		@Override public OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organization,int tenant){profileCalls++;return profile;}
 		@Override public int create(OrganizationDao.OrganizationCreateRequest r){return 0;}
 		@Override public void update(Organization o){}
+		@Override public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult assignOrganizationType(com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand c){assignmentCommand=c;return new com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult(101, c.organizationId(), c.organizationTypeId(), false, 1, false, new byte[]{1});}
 	}
 }
