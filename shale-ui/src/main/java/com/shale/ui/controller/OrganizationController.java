@@ -29,6 +29,7 @@ import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
+import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ReadOnlyTextDisplaySupport;
 
@@ -162,17 +163,21 @@ public final class OrganizationController {
 	@FXML
 	private void initialize() {
 		if (editButton != null) {
+			ControlStyles.apply(editButton, ControlStyles.Purpose.SECONDARY);
 			editButton.setOnAction(e -> onEdit());
 			setVisibleManaged(editButton, false);
 		}
 		setInlineEditButtonsVisible(false);
 		if (saveButton != null) {
+			ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
 			saveButton.setOnAction(e -> onSave());
 		}
 		if (cancelButton != null) {
+			ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
 			cancelButton.setOnAction(e -> onCancel());
 		}
 		if (deleteOrganizationButton != null) {
+			ControlStyles.apply(deleteOrganizationButton, ControlStyles.Purpose.DANGER);
 			deleteOrganizationButton.setOnAction(e -> onDeleteOrganization());
 			setVisibleManaged(deleteOrganizationButton, false);
 		}
@@ -528,7 +533,7 @@ public final class OrganizationController {
 
 
 	private void onEdit() {
-		if (currentOrganization == null) {
+		if (currentOrganization == null || !canEditOrganization()) {
 			return;
 		}
 		writeEditorsFromOrganization(currentOrganization);
@@ -910,7 +915,7 @@ public final class OrganizationController {
 
 	private void setEditMode(boolean enabled) {
 		this.editMode = enabled;
-		setVisibleManaged(editButton, !enabled && currentOrganization != null);
+		setVisibleManaged(editButton, !enabled && currentOrganization != null && canEditOrganization());
 		setVisibleManaged(saveButton, enabled);
 		setVisibleManaged(cancelButton, enabled);
 		refreshAdminActions();
@@ -958,9 +963,14 @@ public final class OrganizationController {
 	private void setInlineEditButtonsVisible(boolean visible){for(Button button:java.util.Arrays.asList(editNameButton,editTypeButton,editPhoneButton,editFaxButton,editEmailButton,editWebsiteButton,editAddress1Button,editAddress2Button,editCityButton,editStateButton,editPostalCodeButton,editCountryButton,editNotesButton))if(button!=null)setVisibleManaged(button,visible);}
 
 	private void refreshAdminActions() {
-		setVisibleManaged(editButton,!editMode && currentOrganization!=null);
+		setVisibleManaged(editButton,canEditOrganization() && !editMode && currentOrganization!=null);
 		boolean showDelete = isAdminUser() && !editMode && currentOrganization != null;
 		setVisibleManaged(deleteOrganizationButton, showDelete);
+	}
+
+	private boolean canEditOrganization() {
+		Integer userId = appState == null ? null : appState.getUserId();
+		return userId != null && userId > 0;
 	}
 
 	private boolean isAdminUser() {
