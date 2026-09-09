@@ -2756,6 +2756,7 @@
 .contact-classification-status-stale { -fx-background-color: #fff2f0; -fx-border-color: #d99891; -fx-text-fill: #7a2922; }
 .contact-classification-empty { -fx-background-color: rgba(248,250,252,0.82); -fx-border-color: rgba(17,37,66,0.14); -fx-text-fill: rgba(17,37,66,0.72); }
 .dialog-pane.contact-classification-dialog { -fx-pref-width: 580px; }
+.dialog-pane.organization-type-dialog { -fx-min-width: 500px; }
 .contact-classification-dialog-body { -fx-padding: 4px 0; }
 .contact-classification-dialog-context { -fx-text-fill: rgba(17,37,66,0.75); }
 .contact-classification-form .label { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 700; }
@@ -2783,6 +2784,21 @@
 }
 .contact-classification-card-subdued .contact-classification-color-swatch {
     -fx-opacity: 0.72;
+}
+
+/* Organization Type Settings uses compact horizontal definition rows without
+   changing the shared Contact classification cards or Organization cards. */
+.organization-type-definition-card {
+    -fx-padding: 10px 12px;
+    -fx-spacing: 10px;
+    -fx-max-width: 100000px;
+    -fx-alignment: center-left;
+}
+.organization-type-definition-card .organization-type-card-badges {
+    -fx-alignment: center-left;
+}
+.organization-type-definition-card .organization-type-card-actions {
+    -fx-alignment: center-right;
 }
 
 /* Phase 2B Contact profile and aggregate editor */
