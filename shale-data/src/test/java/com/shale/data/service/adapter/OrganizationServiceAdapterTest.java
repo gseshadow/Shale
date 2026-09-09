@@ -111,6 +111,7 @@ final class OrganizationServiceAdapterTest {
 		private OrganizationDao.OrganizationTypeProfileRow profile;
 		private int effectiveCalls,profileCalls;
 		private com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand assignmentCommand;
+		FakeOrganizations(){this(null);}
 		FakeOrganizations(Organization organization){this.organization=organization;}
 		@Override public Organization findById(int id){return organization;}
 		@Override public OrganizationDao.PagedResult<OrganizationDao.DirectoryOrganizationRow> findDirectoryPage(int p,int s,String q){return new OrganizationDao.PagedResult<>(List.of(),p,s,0);}
