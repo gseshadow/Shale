@@ -13,6 +13,7 @@ import com.shale.core.dto.RequestStatusDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.MaterialRequestServicePort;
 import com.shale.core.service.ContactServicePort;
+import com.shale.core.service.OrganizationServicePort;
 import com.shale.data.dao.UserDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.UserCard;
@@ -171,6 +172,8 @@ public final class SettingsController {
 	@FXML private VBox caseTeamRoleAdministrationContent;
 	@FXML
 	private VBox contactClassificationContent;
+	@FXML private VBox organizationTypeAdministrationSection;
+	@FXML private VBox organizationTypeAdministrationContent;
 	@FXML
 	private TableView<UserManagementViewRow> userManagementTable;
 	@FXML
@@ -213,6 +216,7 @@ public final class SettingsController {
 	private CaseServicePort caseService;
 	private MaterialRequestServicePort materialRequestService;
 	private ContactServicePort contactService;
+	private OrganizationServicePort organizationService;
 	private UserDao userDao;
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
@@ -260,6 +264,7 @@ public final class SettingsController {
 		configureLookupActionRows();
 		configureUserManagementTable();
 		configureContactClassifications();
+		configureOrganizationTypes();
 		configureCaseTeamRoles();
 		configureCustomDictionary();
 		updateAdminControlsVisibility();
@@ -326,6 +331,14 @@ public final class SettingsController {
 		}
 	}
 
+	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService,
+			MaterialRequestServicePort materialRequestService, ContactServicePort contactService, OrganizationServicePort organizationService,
+			UserDao userDao, UiRuntimeBridge runtimeBridge) {
+		this.organizationService=Objects.requireNonNull(organizationService,"organizationService");
+		init(notificationPreferencesService,appState,onOpenAuditLog,caseService,materialRequestService,contactService,userDao,runtimeBridge);
+		if(fxmlReady)configureOrganizationTypes();
+	}
+
 	private void configureCaseTeamRoles() {
 		if (caseTeamRoleAdministrationContent != null && caseService != null && appState != null
 				&& caseTeamRoleAdministrationContent.getChildren().isEmpty() && appState.isAdmin())
@@ -337,6 +350,12 @@ public final class SettingsController {
 				&& contactClassificationContent.getChildren().isEmpty()) {
 			contactClassificationContent.getChildren().setAll(new ContactClassificationAdminPane(contactService, appState).node());
 		}
+	}
+
+	private void configureOrganizationTypes(){
+		if(organizationTypeAdministrationContent!=null&&organizationService!=null&&appState!=null
+				&&organizationTypeAdministrationContent.getChildren().isEmpty()&&appState.isAdmin())
+			organizationTypeAdministrationContent.getChildren().setAll(new OrganizationTypeAdminPane(organizationService,appState).node());
 	}
 
 	/**
@@ -3541,6 +3560,7 @@ public final class SettingsController {
 			contactClassificationAdministrationSection.setVisible(visible);
 			contactClassificationAdministrationSection.setManaged(visible);
 		}
+		if(organizationTypeAdministrationSection!=null){organizationTypeAdministrationSection.setVisible(visible);organizationTypeAdministrationSection.setManaged(visible);}
 		if (userAdministrationSection != null) {
 			userAdministrationSection.setVisible(visible);
 			userAdministrationSection.setManaged(visible);

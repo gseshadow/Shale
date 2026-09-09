@@ -49,11 +49,25 @@ final class ContactPhase2BAuditMigrationContractTest {
 
         assertEquals(Set.of("CONTACT_ADDRESS", "CONTACT_PHONE_NUMBER", "CONTACT_EMAIL_ADDRESS"), additions);
         assertTrue(removed.isEmpty(), "the later successor must preserve CONTACT and every earlier audit token");
-        assertEquals(AuditEntityTypeMigrationChain.currentlyRequiredVocabulary(), finalVocabulary);
         assertEquals(finalTokens.size(), finalVocabulary.size(), "the final ordered declaration must contain no duplicates");
-        assertEquals(List.of(AuditEntityTypeMigrationChain.PHASE_1C, AuditEntityTypeMigrationChain.PHASE_2B,
-                AuditEntityTypeMigrationChain.PHASE_2C_B), List.of(
-                AuditEntityTypeMigrationChain.PHASE_1C, MIGRATION, AuditEntityTypeMigrationChain.CURRENT));
+
+        Set<String> complete=new HashSet<>(finalVocabulary);
+        String role=Files.readString(AuditEntityTypeMigrationChain.CASE_TEAM_ROLE);
+        String member=Files.readString(AuditEntityTypeMigrationChain.CASE_TEAM_MEMBER);
+        String organizations=Files.readString(AuditEntityTypeMigrationChain.ORGANIZATIONS);
+        assertTrue(role.contains("''CASE_TEAM_ROLE''")); complete.add("CASE_TEAM_ROLE");
+        assertTrue(member.contains("''CASE_TEAM_MEMBER''")&&member.contains("''CASE_TEAM_MEMBER_ROLE''"));
+        complete.addAll(Set.of("CASE_TEAM_MEMBER","CASE_TEAM_MEMBER_ROLE"));
+        assertTrue(organizations.contains("('ORGANIZATION_TYPE'), ('ORGANIZATION_ORGANIZATION_TYPE')"));
+        complete.addAll(AuditEntityTypeMigrationChain.declaredAllowlist(organizations));
+        assertEquals(AuditEntityTypeMigrationChain.currentlyRequiredVocabulary(),complete,
+                "every chronological successor must preserve the deployed vocabulary and add only its intended tokens");
+        assertEquals(List.of(AuditEntityTypeMigrationChain.PHASE_1C,AuditEntityTypeMigrationChain.PHASE_2B,
+                AuditEntityTypeMigrationChain.PHASE_2C_B,AuditEntityTypeMigrationChain.CASE_TEAM_ROLE,
+                AuditEntityTypeMigrationChain.CASE_TEAM_MEMBER,AuditEntityTypeMigrationChain.ORGANIZATIONS),
+                List.of(AuditEntityTypeMigrationChain.PHASE_1C,MIGRATION,AuditEntityTypeMigrationChain.PHASE_2C_B,
+                AuditEntityTypeMigrationChain.CASE_TEAM_ROLE,AuditEntityTypeMigrationChain.CASE_TEAM_MEMBER,
+                AuditEntityTypeMigrationChain.CURRENT));
     }
 
     @Test void scriptsAreGuardedTransactionalAndVerificationIsReadOnly() throws Exception {

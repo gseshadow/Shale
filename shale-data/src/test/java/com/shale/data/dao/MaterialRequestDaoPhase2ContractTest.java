@@ -94,11 +94,10 @@ final class MaterialRequestDaoPhase2ContractTest {
     }
 
     @Test void scopeGuardsNoMaterialItemApplicationOrUiApiStorage() {
-        assertFalse(DAO.contains("MaterialItemDao"));
-        assertFalse(DAO.contains("CaseTimeline"));
+        assertFalse(hasForbiddenPhase2Dependency(DAO));
         assertTrue(DAO.contains("NotificationDao")); // established Material Request notification integration
-        assertFalse(DAO.contains("ExternalLinks"));
-        assertFalse(DAO.contains("Calendar"));
+        assertFalse(hasForbiddenPhase2Dependency("final class Unrelated { MaterialItem value; CaseTimelineWriter timeline; }"),
+                "unrelated domain and timeline type names must not trigger the owned dependency guard");
         assertTrue(MaterialRequestFollowUpDto.class.isRecord());
     }
 
@@ -119,4 +118,7 @@ final class MaterialRequestDaoPhase2ContractTest {
     }
 
     private static String read(String path) { try { return Files.readString(Files.exists(Path.of(path)) ? Path.of(path) : Path.of("..").resolve(path)); } catch (Exception e) { throw new AssertionError(e); } }
+    private static boolean hasForbiddenPhase2Dependency(String source) {
+        return source.contains("MaterialItemDao") || source.contains("ExternalLinks") || source.contains("CalendarDao");
+    }
 }

@@ -14,6 +14,9 @@ public interface OrganizationServicePort {
 	Optional<OrganizationDetail> getOrganizationDetail(int organizationId, int shaleClientId);
 
 	List<OrganizationTypeDefinition> listEffectiveOrganizationTypes(int shaleClientId);
+	default List<OrganizationTypeDefinition> listOrganizationTypesForAdministration(int shaleClientId, int actorUserId) {
+		throw new UnsupportedOperationException("Organization Type administration is not supported");
+	}
 
 	Optional<OrganizationTypeProfile> getOrganizationTypeProfile(int organizationId, int shaleClientId);
 

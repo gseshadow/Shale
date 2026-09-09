@@ -28,6 +28,7 @@ public final class OrganizationDao {
 	}
 
 	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult createOrganizationType(com.shale.core.service.OrganizationServicePort.CreateOrganizationTypeCommand c){return typeMutations.create(c);}
+	public List<OrganizationTypeDefinitionRow> listOrganizationTypesForAdministration(int tenant,int actor){return typeMutations.listForAdministration(tenant,actor);}
 	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult updateOrganizationType(com.shale.core.service.OrganizationServicePort.UpdateOrganizationTypeCommand c){return typeMutations.update(c);}
 	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult setOrganizationTypeActive(com.shale.core.service.OrganizationServicePort.OrganizationTypeLifecycleCommand c){return typeMutations.lifecycle(c,"active");}
 	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult removeOrganizationType(com.shale.core.service.OrganizationServicePort.OrganizationTypeLifecycleCommand c){return typeMutations.lifecycle(c,"remove");}

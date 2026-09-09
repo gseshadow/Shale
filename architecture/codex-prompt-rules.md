@@ -321,6 +321,12 @@ Required:
 
 ## Database Safety Rules
 
+SQL verification output must not use SQL Server keywords or `SET`-option names as bare column aliases.
+In particular, never write bare `RowCount`. Prefer a descriptive non-keyword alias such as
+`MatchingCount`, `FindingCount`, or `AuditRowCount`. If a keyword is unavoidable, delimit it with
+brackets, though a descriptive alias is preferred. Verification result columns must clearly
+distinguish informational counts from failure/finding counts.
+
 Before modifying SQL:
 
 1. Verify all referenced columns exist.

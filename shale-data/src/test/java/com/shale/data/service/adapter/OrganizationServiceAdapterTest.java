@@ -14,6 +14,7 @@ import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.OrganizationDao;
 
 final class OrganizationServiceAdapterTest {
+	@Test void administrationReadDelegatesWithoutLosingLifecycleRows(){var gateway=new FakeOrganizations();gateway.administrationTypes=List.of(new OrganizationDao.OrganizationTypeDefinitionRow(20,41,"removed","Removed","history","#6C757D",2,false,true,new byte[]{9}));var service=new OrganizationServiceAdapter(gateway,(id,tenant)->List.of());var rows=service.listOrganizationTypesForAdministration(41,7);assertEquals(1,gateway.administrationCalls);assertTrue(rows.get(0).deleted());}
 	@Test void phaseOneCMutationsDelegateToTheAuthoritativeOrganizationGateway() {
 		FakeOrganizations organizations = new FakeOrganizations(organization(7, 41));
 		OrganizationServiceAdapter adapter = new OrganizationServiceAdapter(organizations, (tenant, organization) -> List.of());
@@ -106,14 +107,17 @@ final class OrganizationServiceAdapterTest {
 	private static final class FakeOrganizations implements OrganizationServiceAdapter.OrganizationGateway {
 		private final Organization organization;
 		private List<OrganizationDao.OrganizationTypeDefinitionRow> effectiveTypes=List.of();
+		private List<OrganizationDao.OrganizationTypeDefinitionRow> administrationTypes=List.of(); private int administrationCalls;
 		private OrganizationDao.OrganizationTypeProfileRow profile;
 		private int effectiveCalls,profileCalls;
 		private com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand assignmentCommand;
+		FakeOrganizations(){this(null);}
 		FakeOrganizations(Organization organization){this.organization=organization;}
 		@Override public Organization findById(int id){return organization;}
 		@Override public OrganizationDao.PagedResult<OrganizationDao.DirectoryOrganizationRow> findDirectoryPage(int p,int s,String q){return new OrganizationDao.PagedResult<>(List.of(),p,s,0);}
 		@Override public List<OrganizationDao.OrganizationTypeRow> findOrganizationTypes(){return List.of();}
 		@Override public List<OrganizationDao.OrganizationTypeDefinitionRow> listEffectiveOrganizationTypeDefinitions(int tenant){effectiveCalls++;return effectiveTypes;}
+		@Override public List<OrganizationDao.OrganizationTypeDefinitionRow> listOrganizationTypesForAdministration(int tenant,int actor){administrationCalls++;return administrationTypes;}
 		@Override public OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organization,int tenant){profileCalls++;return profile;}
 		@Override public int create(OrganizationDao.OrganizationCreateRequest r){return 0;}
 		@Override public void update(Organization o){}
