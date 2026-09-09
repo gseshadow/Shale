@@ -141,6 +141,15 @@ def module_for_path(path: str, modules: Iterable[str]) -> str | None:
     return first if first in modules else None
 
 
+def paths_selecting_area(paths: Iterable[str], area: str, config: dict) -> set[str]:
+    """Return direct and shared changed paths that genuinely selected an area."""
+    selecting = {path for path in paths if matches(path, config["areas"][area].get("paths", []))}
+    for shared in config.get("shared_paths", []):
+        if area in shared.get("areas", []):
+            selecting.update(path for path in paths if matches(path, shared.get("patterns", [])))
+    return selecting
+
+
 def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
     config = load_config()
     catalog = test_catalog()
@@ -230,7 +239,7 @@ def select(paths: list[str], explicit_areas: list[str] | None = None) -> dict:
             if any(fnmatch.fnmatchcase(qualified, pattern)
                    or fnmatch.fnmatchcase(qualified.rsplit(".", 1)[-1], pattern) for pattern in area_patterns):
                 mapping_rules.append(f"area:{area}")
-                selecting_paths.update(path for path in paths if matches(path, area_config[area].get("paths", [])))
+                selecting_paths.update(paths_selecting_area(paths, area, config))
                 if explicit_areas:
                     selecting_paths.add("(explicit area selection)")
                     classifications.add("manual_inventory")

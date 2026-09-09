@@ -35,6 +35,25 @@ public final class OrganizationDao {
 	public record OrganizationTypeRow(int organizationTypeId, String name) {
 	}
 
+	public record OrganizationTypeDefinitionRow(int organizationTypeId, Integer shaleClientId, String systemKey,
+			String name, String description, String color, int sortOrder, boolean active, boolean deleted,
+			byte[] rowVer) {
+		public OrganizationTypeDefinitionRow { rowVer = rowVer == null ? null : rowVer.clone(); }
+		@Override public byte[] rowVer() { return rowVer == null ? null : rowVer.clone(); }
+	}
+
+	public record AssignedOrganizationTypeRow(long assignmentId, int organizationTypeId, boolean primary,
+			int sortOrder, OrganizationTypeDefinitionRow definition, byte[] rowVer) {
+		public AssignedOrganizationTypeRow { rowVer = rowVer == null ? null : rowVer.clone(); }
+		@Override public byte[] rowVer() { return rowVer == null ? null : rowVer.clone(); }
+	}
+
+	public record OrganizationTypeProfileRow(int organizationId, int shaleClientId,
+			Integer compatibilityOrganizationTypeId, boolean compatibilityConsistent,
+			List<AssignedOrganizationTypeRow> assignments) {
+		public OrganizationTypeProfileRow { assignments = List.copyOf(assignments); }
+	}
+
 	public record OrganizationOptionRow(Integer organizationId, String name) {
 	}
 
@@ -714,6 +733,94 @@ public final class OrganizationDao {
 		}
 	}
 
+	/** One bounded selector query implementing deleted-reset and inactive-mask overlay semantics. */
+	public List<OrganizationTypeDefinitionRow> listEffectiveOrganizationTypeDefinitions(int shaleClientId) {
+		validateTenantId(shaleClientId);
+		String sql = """
+				WITH visible AS (
+				  SELECT ot.OrganizationTypeId,ot.ShaleClientId,ot.SystemKey,ot.Name,ot.Description,
+				         ot.Color,ot.SortOrder,ot.IsActive,ot.IsDeleted,ot.RowVer,
+				         ROW_NUMBER() OVER (PARTITION BY ot.SystemKey
+				           ORDER BY CASE WHEN ot.ShaleClientId=? THEN 0 ELSE 1 END,ot.OrganizationTypeId) rn
+				  FROM dbo.OrganizationTypes ot
+				  WHERE (ot.ShaleClientId=? OR ot.ShaleClientId IS NULL) AND ot.IsDeleted=0
+				)
+				SELECT OrganizationTypeId,ShaleClientId,SystemKey,Name,Description,Color,SortOrder,
+				       IsActive,IsDeleted,RowVer
+				FROM visible WHERE rn=1 AND IsActive=1
+				ORDER BY SortOrder,Name,OrganizationTypeId;
+				""";
+		try (Connection con = db.requireConnection()) {
+			verifyTenantMatchesSession(con, shaleClientId);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, shaleClientId);
+				ps.setInt(2, shaleClientId);
+				try (ResultSet rs = ps.executeQuery()) {
+					List<OrganizationTypeDefinitionRow> rows = new ArrayList<>();
+					while (rs.next()) rows.add(mapOrganizationTypeDefinition(rs));
+					return List.copyOf(rows);
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load effective Organization Types (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	/** One bounded aggregate query; the assignment's stored OrganizationTypeId is never overlaid. */
+	public OrganizationTypeProfileRow findOrganizationTypeProfile(int organizationId, int shaleClientId) {
+		if (organizationId <= 0) throw new IllegalArgumentException("organizationId must be > 0");
+		validateTenantId(shaleClientId);
+		String sql = """
+				SELECT o.Id OrganizationId,o.OrganizationTypeId CompatibilityOrganizationTypeId,
+				       a.Id AssignmentId,a.OrganizationTypeId AssignedOrganizationTypeId,
+				       a.IsPrimary AssignmentIsPrimary,a.SortOrder AssignmentSortOrder,a.RowVer AssignmentRowVer,
+				       ot.OrganizationTypeId,ot.ShaleClientId DefinitionShaleClientId,ot.SystemKey,ot.Name,
+				       ot.Description,ot.Color,ot.SortOrder DefinitionSortOrder,ot.IsActive,ot.IsDeleted,
+				       ot.RowVer DefinitionRowVer
+				FROM dbo.Organizations o
+				LEFT JOIN dbo.OrganizationOrganizationTypes a
+				  ON a.OrganizationId=o.Id AND a.ShaleClientId=o.ShaleClientId AND a.IsDeleted=0
+				LEFT JOIN dbo.OrganizationTypes ot
+				  ON ot.OrganizationTypeId=a.OrganizationTypeId
+				 AND (ot.ShaleClientId IS NULL OR ot.ShaleClientId=o.ShaleClientId)
+				WHERE o.Id=? AND o.ShaleClientId=? AND ISNULL(o.IsDeleted,0)=0
+				ORDER BY a.IsPrimary DESC,a.SortOrder,ot.SortOrder,ot.Name,a.Id;
+				""";
+		try (Connection con = db.requireConnection()) {
+			verifyTenantMatchesSession(con, shaleClientId);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, organizationId);
+				ps.setInt(2, shaleClientId);
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next()) return null;
+					Integer compatibilityId = nullableInt(rs, "CompatibilityOrganizationTypeId");
+					List<AssignedOrganizationTypeRow> assignments = new ArrayList<>();
+					Integer primaryTypeId = null;
+					do {
+						Long assignmentId = nullableLong(rs, "AssignmentId");
+						if (assignmentId == null) continue;
+						Integer assignedTypeId = nullableInt(rs, "AssignedOrganizationTypeId");
+						Integer definitionTypeId = nullableInt(rs, "OrganizationTypeId");
+						if (assignedTypeId == null || definitionTypeId == null || !assignedTypeId.equals(definitionTypeId)) {
+							throw new IllegalStateException("Organization Type assignment references an unavailable definition.");
+						}
+						boolean primary = rs.getBoolean("AssignmentIsPrimary");
+						if (primary) primaryTypeId = assignedTypeId;
+						OrganizationTypeDefinitionRow definition = mapOrganizationTypeDefinition(rs,
+								"DefinitionShaleClientId", "DefinitionSortOrder", "DefinitionRowVer");
+						assignments.add(new AssignedOrganizationTypeRow(assignmentId, assignedTypeId, primary,
+								requiredInt(rs, "AssignmentSortOrder"), definition, rs.getBytes("AssignmentRowVer")));
+					} while (rs.next());
+					boolean consistent = compatibilityId != null && compatibilityId.equals(primaryTypeId);
+					return new OrganizationTypeProfileRow(organizationId, shaleClientId, compatibilityId,
+							consistent, assignments);
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load Organization Type profile (id=" + organizationId + ")", e);
+		}
+	}
+
 	public List<OrganizationOptionRow> findSelectableOrganizations() {
 		String sql = """
 				SELECT o.Id, o.Name
@@ -778,6 +885,18 @@ public final class OrganizationDao {
 				rs.getString("Website"),
 				rs.getString("City"),
 				rs.getString("State"));
+	}
+
+	private static OrganizationTypeDefinitionRow mapOrganizationTypeDefinition(ResultSet rs) throws SQLException {
+		return mapOrganizationTypeDefinition(rs, "ShaleClientId", "SortOrder", "RowVer");
+	}
+
+	private static OrganizationTypeDefinitionRow mapOrganizationTypeDefinition(ResultSet rs,
+			String tenantColumn, String sortColumn, String rowVerColumn) throws SQLException {
+		return new OrganizationTypeDefinitionRow(requiredInt(rs, "OrganizationTypeId"), nullableInt(rs, tenantColumn),
+				rs.getString("SystemKey"), rs.getString("Name"), rs.getString("Description"), rs.getString("Color"),
+				requiredInt(rs, sortColumn), rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted"),
+				rs.getBytes(rowVerColumn));
 	}
 
 	private static Organization mapOrganization(ResultSet rs) throws SQLException {
@@ -886,6 +1005,32 @@ public final class OrganizationDao {
 	private static Integer getNullableInt(ResultSet rs, int colIndex) throws SQLException {
 		int value = rs.getInt(colIndex);
 		return rs.wasNull() ? null : value;
+	}
+
+	private static void validateTenantId(int shaleClientId) {
+		if (shaleClientId <= 0) throw new IllegalArgumentException("shaleClientId must be > 0");
+	}
+
+	private static void verifyTenantMatchesSession(Connection con, int shaleClientId) throws SQLException {
+		if (requireCurrentShaleClientId(con) != shaleClientId) {
+			throw new IllegalArgumentException("shaleClientId does not match current session");
+		}
+	}
+
+	private static Integer nullableInt(ResultSet rs, String column) throws SQLException {
+		Number value = (Number) rs.getObject(column);
+		return value == null ? null : value.intValue();
+	}
+
+	private static int requiredInt(ResultSet rs, String column) throws SQLException {
+		Integer value = nullableInt(rs, column);
+		if (value == null) throw new SQLException(column + " must not be null");
+		return value;
+	}
+
+	private static Long nullableLong(ResultSet rs, String column) throws SQLException {
+		Number value = (Number) rs.getObject(column);
+		return value == null ? null : value.longValue();
 	}
 
 	private static Instant toInstant(Timestamp ts) {

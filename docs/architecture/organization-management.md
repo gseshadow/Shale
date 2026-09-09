@@ -195,16 +195,19 @@ dual-write and read cutover.
 Deliver one guarded, rerunnable migration and a separate read-only verification script. Do not change
 runtime Java reads/writes or UI in Phase 1A.
 
-### Phase 1B — read/domain contracts
+### Phase 1B — read/domain contracts (implemented)
 
-Add Organization Type definition, assigned type, classification presentation, and profile records to
-`OrganizationServicePort`. Implement effective overlay reads, exact historical assignment reads, and
-batch directory hydration. Tenant overrides win by stable `SystemKey`; inactive winners mask global
-defaults for new selection; removed overrides reset to global; historical assignments retain exact
-definition presentation.
+`OrganizationServicePort` now exposes immutable Organization Type definition, assigned-type, and profile
+records. The data adapter provides one bounded effective tenant/global definition query and one bounded
+single-Organization assignment-profile query. Tenant overrides win by stable `SystemKey`; inactive winners
+mask globals for new selection; deleted overrides reset to active globals; and historical assignments retain
+the exact definition selected by their stored `OrganizationTypeId`, including inactive/deleted lifecycle data.
+Directory/search pages deliberately do not hydrate profiles in this phase.
 
-Keep `Organizations.OrganizationTypeId` and current visible behavior authoritative until the mutation
-bridge is deployed.
+`Organizations.OrganizationTypeId` and current visible behavior remain the compatibility primary-type
+authority. Profiles report disagreement with the active primary assignment without repairing either source.
+Phase 1A remains the deployed database foundation. Phase 1C mutations, Settings administration, and all UI
+presentation remain deferred; no runtime read or write cutover has occurred.
 
 ### Phase 1C — transactional type administration and assignments
 
