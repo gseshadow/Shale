@@ -39,6 +39,10 @@ public final class OrganizationDao {
 	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult setPrimaryOrganizationType(com.shale.core.service.OrganizationServicePort.SetPrimaryOrganizationTypeCommand c){return typeMutations.setPrimary(c);}
 	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult replaceAndRemovePrimaryOrganizationType(com.shale.core.service.OrganizationServicePort.ReplaceAndRemovePrimaryOrganizationTypeCommand c){return typeMutations.replaceAndRemove(c);}
 	public java.util.List<com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult> reorderOrganizationTypeAssignments(com.shale.core.service.OrganizationServicePort.ReorderOrganizationTypeAssignmentsCommand c){return typeMutations.reorder(c);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile createOrganizationAggregate(com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand c){int id=typeMutations.createAggregate(c);return toProfile(findOrganizationTypeProfile(id,c.shaleClientId()));}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile updateOrganizationAggregate(com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand c){typeMutations.updateAggregate(c);return toProfile(findOrganizationTypeProfile(c.organizationId(),c.shaleClientId()));}
+	public byte[] findOrganizationRowVer(int organizationId,int tenant){try(Connection con=db.requireConnection()){verifyTenantMatchesSession(con,tenant);try(PreparedStatement p=con.prepareStatement("SELECT RowVer FROM dbo.Organizations WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){p.setInt(1,organizationId);p.setInt(2,tenant);try(ResultSet r=p.executeQuery()){return r.next()?r.getBytes(1):null;}}}catch(SQLException e){throw new IllegalStateException("Failed to load Organization concurrency token.",e);}}
+	private static com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile toProfile(OrganizationTypeProfileRow row){return new com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile(row.organizationId(),row.shaleClientId(),row.compatibilityOrganizationTypeId(),row.compatibilityConsistent(),row.assignments().stream().map(a->new com.shale.core.service.OrganizationServicePort.AssignedOrganizationType(a.assignmentId(),a.organizationTypeId(),a.primary(),a.sortOrder(),new com.shale.core.service.OrganizationServicePort.OrganizationTypeDefinition(a.definition().organizationTypeId(),a.definition().shaleClientId(),a.definition().systemKey(),a.definition().name(),a.definition().description(),a.definition().color(),a.definition().sortOrder(),a.definition().active(),a.definition().deleted(),a.definition().shaleClientId()==null?com.shale.core.service.OrganizationServicePort.OrganizationTypeOrigin.GLOBAL:com.shale.core.service.OrganizationServicePort.OrganizationTypeOrigin.TENANT,a.definition().rowVer()),a.rowVer())).toList());}
 
 	public record PagedResult<T>(List<T> items, int page, int pageSize, long total) {
 	}
@@ -380,6 +384,7 @@ public final class OrganizationDao {
 	}
 
 	public int create(OrganizationCreateRequest request) {
+		if (legacyCompatibilityOnlyWritesAreClosed()) throw new UnsupportedOperationException("Use createOrganizationAggregate so Organization Types remain consistent.");
 		Objects.requireNonNull(request, "request");
 		if (request.shaleClientId() <= 0) {
 			throw new IllegalArgumentException("shaleClientId is required");
@@ -453,6 +458,7 @@ public final class OrganizationDao {
 	}
 
 	public void update(Organization organization) {
+		if (legacyCompatibilityOnlyWritesAreClosed()) throw new UnsupportedOperationException("Use updateOrganizationAggregate so Organization Types remain consistent.");
 		long started = perfStart();
 		Objects.requireNonNull(organization, "organization");
 		if (organization.getId() == null || organization.getId() <= 0) {
@@ -513,6 +519,7 @@ public final class OrganizationDao {
 			throw new RuntimeException("Failed to update organization (id=" + organization.getId() + ")", e);
 		}
 	}
+	private static boolean legacyCompatibilityOnlyWritesAreClosed(){return true;}
 
 
 

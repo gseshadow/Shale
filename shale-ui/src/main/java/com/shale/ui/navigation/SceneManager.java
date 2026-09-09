@@ -822,7 +822,7 @@ public final class SceneManager {
 		{
 			OrganizationController c = (OrganizationController) controller;
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			c.init(organizationId, organizationDao, new CaseSummaryDao(dbSessionProvider), appState, runtimeBridge, onOpenCase, onOrganizationDeleted);
+			c.init(organizationId, organizationDao, new OrganizationServiceAdapter(organizationDao,new CaseSummaryDao(dbSessionProvider)), new CaseSummaryDao(dbSessionProvider), appState, runtimeBridge, onOpenCase, onOrganizationDeleted);
 			return c;
 		});
 	}
@@ -932,7 +932,7 @@ public final class SceneManager {
 
 			NewOrganizationController controller = loader.getController();
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			controller.init(appState, organizationDao, dialog, onOrganizationCreated);
+			controller.init(appState, new OrganizationServiceAdapter(organizationDao, new CaseSummaryDao(dbSessionProvider)), dialog, onOrganizationCreated);
 
 			VBox dialogRoot = new VBox(
 					AppDialogs.createSecondaryWindowHeader(dialog, "New Organization", dialog::close),

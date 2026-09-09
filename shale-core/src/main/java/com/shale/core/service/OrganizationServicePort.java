@@ -36,6 +36,16 @@ public interface OrganizationServicePort {
 
 	boolean updateOrganization(UpdateOrganizationCommand command);
 
+	/** Phase 2B authoritative create boundary. Fields and the exact type profile commit together. */
+	default OrganizationAggregateResult createOrganizationAggregate(CreateOrganizationAggregateCommand command) {
+		throw new UnsupportedOperationException("Aggregate Organization creation is not supported");
+	}
+
+	/** Phase 2B authoritative edit boundary. No caller may update the compatibility type independently. */
+	default OrganizationAggregateResult updateOrganizationAggregate(UpdateOrganizationAggregateCommand command) {
+		throw new UnsupportedOperationException("Aggregate Organization update is not supported");
+	}
+
 	record OrganizationSummary(
 			int id,
 			String name,
@@ -108,6 +118,37 @@ public interface OrganizationServicePort {
 			boolean compatibilityConsistent,
 			List<AssignedOrganizationType> assignments) {
 		public OrganizationTypeProfile { assignments = List.copyOf(assignments); }
+	}
+
+	record StagedOrganizationTypeAssignment(Long assignmentId, int organizationTypeId, boolean primary,
+			int sortOrder, byte[] expectedRowVer) {
+		public StagedOrganizationTypeAssignment { expectedRowVer = copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record OrganizationFields(String name, String phone, String fax, String email, String website,
+			String address1, String address2, String city, String state, String postalCode, String country,
+			String notes) { }
+
+	record CreateOrganizationAggregateCommand(int shaleClientId, int actorUserId, OrganizationFields fields,
+			List<StagedOrganizationTypeAssignment> assignments) {
+		public CreateOrganizationAggregateCommand { assignments = List.copyOf(assignments); }
+	}
+
+	record UpdateOrganizationAggregateCommand(int organizationId, int shaleClientId, int actorUserId,
+			byte[] expectedOrganizationRowVer, OrganizationFields fields,
+			List<StagedOrganizationTypeAssignment> assignments) {
+		public UpdateOrganizationAggregateCommand {
+			expectedOrganizationRowVer = copyRowVer(expectedOrganizationRowVer);
+			assignments = List.copyOf(assignments);
+		}
+		@Override public byte[] expectedOrganizationRowVer() { return copyRowVer(expectedOrganizationRowVer); }
+	}
+
+	record OrganizationAggregateResult(int organizationId, byte[] organizationRowVer,
+			OrganizationTypeProfile typeProfile) {
+		public OrganizationAggregateResult { organizationRowVer = copyRowVer(organizationRowVer); }
+		@Override public byte[] organizationRowVer() { return copyRowVer(organizationRowVer); }
 	}
 
 	record CreateOrganizationTypeCommand(int shaleClientId, int actorUserId, String systemKey,

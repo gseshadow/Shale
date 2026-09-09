@@ -3,6 +3,7 @@
 <?import java.lang.String?>
 <?import javafx.geometry.Insets?>
 <?import com.shale.ui.component.EnhancedTextArea?>
+<?import com.shale.ui.component.OrganizationTypeAssignmentPane?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
@@ -86,8 +87,7 @@
 
                             <Label text="Organization Type" styleClass="case-overview-row-label" GridPane.rowIndex="1" />
                             <Label fx:id="typeValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-                            <ComboBox fx:id="typeEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-                            <Button fx:id="editTypeButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="1" GridPane.columnIndex="2" />
+                            <OrganizationTypeAssignmentPane fx:id="typeEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="1" GridPane.columnIndex="1" />
 
                             <Label text="Phone" styleClass="case-overview-row-label" GridPane.rowIndex="2" />
                             <Label fx:id="phoneValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="2" GridPane.columnIndex="1" />

@@ -911,6 +911,7 @@ public final class CaseDao {
 	}
 
 	private int insertOrganization(Connection con, int shaleClientId, Integer organizationTypeId, String organizationName, Timestamp now) throws SQLException {
+		if (legacyEmbeddedOrganizationCreationIsClosed()) throw new UnsupportedOperationException("Create the Organization with its complete type profile before linking it to a Case.");
 		if (organizationTypeId == null || organizationTypeId.intValue() <= 0) {
 			throw new RuntimeException("Organization Type is required.");
 		}
@@ -941,6 +942,7 @@ public final class CaseDao {
 			}
 		}
 	}
+	private static boolean legacyEmbeddedOrganizationCreationIsClosed(){return true;}
 
 	private int insertContact(Connection con,
 			String name,

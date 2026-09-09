@@ -15,10 +15,15 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import com.shale.core.model.Organization;
+import com.shale.core.service.OrganizationServicePort;
+import com.shale.core.service.OrganizationServicePort.OrganizationFields;
+import com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.CaseSummaryDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.OrganizationTypeAssignmentPane;
+import com.shale.ui.controller.support.OrganizationTypeAssignmentStage;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
@@ -71,7 +76,7 @@ public final class OrganizationController {
 	@FXML private Label nameValue;
 	@FXML private TextField nameEditor;
 	@FXML private Label typeValue;
-	@FXML private ComboBox<OrganizationDao.OrganizationTypeRow> typeEditor;
+	@FXML private OrganizationTypeAssignmentPane typeEditor;
 	@FXML private Label phoneValue;
 	@FXML private TextField phoneEditor;
 	@FXML private Label faxValue;
@@ -110,6 +115,9 @@ public final class OrganizationController {
 
 	private Integer organizationId;
 	private OrganizationDao organizationDao;
+	private OrganizationServicePort organizationService;
+	private OrganizationTypeAssignmentStage assignmentStage;
+	private byte[] organizationRowVer;
 	private CaseSummaryDao caseSummaryDao;
 	private Organization currentOrganization;
 	private boolean editMode;
@@ -134,6 +142,7 @@ public final class OrganizationController {
 	public void init(
 			int organizationId,
 			OrganizationDao organizationDao,
+			OrganizationServicePort organizationService,
 			CaseSummaryDao caseSummaryDao,
 			AppState appState,
 			UiRuntimeBridge runtimeBridge,
@@ -141,6 +150,7 @@ public final class OrganizationController {
 			Runnable onOrganizationDeleted) {
 		this.organizationId = organizationId;
 		this.organizationDao = organizationDao;
+		this.organizationService = Objects.requireNonNull(organizationService,"organizationService");
 		this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
@@ -155,7 +165,7 @@ public final class OrganizationController {
 			editButton.setOnAction(e -> onEdit());
 			setVisibleManaged(editButton, false);
 		}
-		initializeInlineEditButtons();
+		setInlineEditButtonsVisible(false);
 		if (saveButton != null) {
 			saveButton.setOnAction(e -> onSave());
 		}
@@ -171,22 +181,7 @@ public final class OrganizationController {
 		}
 		CaseListFilterSortSupport.initializeControls(relatedCasesSearchField, relatedCasesSortChoice, this::renderRelatedCases);
 
-		if (typeEditor != null) {
-			typeEditor.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
-				@Override
-				protected void updateItem(OrganizationDao.OrganizationTypeRow item, boolean empty) {
-					super.updateItem(item, empty);
-					setText(empty || item == null ? null : fallback(item.name()));
-				}
-			});
-			typeEditor.setButtonCell(new javafx.scene.control.ListCell<>() {
-				@Override
-				protected void updateItem(OrganizationDao.OrganizationTypeRow item, boolean empty) {
-					super.updateItem(item, empty);
-					setText(empty || item == null ? null : fallback(item.name()));
-				}
-			});
-		}
+		if(typeEditor!=null)typeEditor.setMessageHandler(this::setError);
 
 		setEditMode(false);
 		hideRemoteUpdateBanner();
@@ -288,6 +283,11 @@ public final class OrganizationController {
 					PerfLog.log("organizations.detail.cache", "hit", "organizationId=" + organizationId + " tenantId=" + currentTenantId());
 				}
 				Integer tenantId = currentTenantId();
+				if(tenantId==null)throw new IllegalStateException("No tenant is selected.");
+				var effectiveDefinitions=organizationService.listEffectiveOrganizationTypes(tenantId);
+				var loadedProfile=organizationService.getOrganizationTypeProfile(organizationId,tenantId).orElseThrow(()->new IllegalStateException("Organization Type profile was not found."));
+				var loadedStage=OrganizationTypeAssignmentStage.forEdit(effectiveDefinitions,loadedProfile);
+				byte[] loadedOrganizationRowVer=organizationDao.findOrganizationRowVer(organizationId,tenantId);
 				List<OrganizationDao.OrganizationTypeRow> loadedTypeOptions = tenantId == null ? null : TYPE_OPTIONS_CACHE.get(tenantId);
 				if (loadedTypeOptions == null) {
 					long typesStarted = PerfLog.start();
@@ -312,6 +312,7 @@ public final class OrganizationController {
 					}
 
 					currentOrganization = loadedForUi;
+					assignmentStage=loadedStage;organizationRowVer=loadedOrganizationRowVer==null?null:loadedOrganizationRowVer.clone();if(typeEditor!=null)typeEditor.setStage(assignmentStage);
 					organizationTypeOptions = typeOptionsForUi;
 					resetRelatedCaseControls();
 					renderFromCurrent();
@@ -473,28 +474,7 @@ public final class OrganizationController {
 	}
 
 	private void saveOrganizationSnapshot(Organization updated) {
-		long saveStarted = PerfLog.start();
-		if (updated == null || organizationDao == null) {
-			setError("Organization details are unavailable.");
-			return;
-		}
-
-		setBusy(true);
-		dbExec.submit(() -> {
-			try {
-				PerfLog.log("organizations.field.save", "start", "organizationId=" + updated.getId());
-				organizationDao.update(updated);
-				invalidateDetailCache(updated.getId());
-				publishOrganizationUpdated(updated.getId());
-				Organization reloaded = organizationDao.findById(updated.getId());
-				Platform.runLater(() -> applySavedOrganization(reloaded, updated.getId(), saveStarted));
-			} catch (Exception ex) {
-				Platform.runLater(() -> {
-					setBusy(false);
-					setError("Failed to save organization.");
-				});
-			}
-		});
+		setError("Independent field saves are disabled; use Edit and Save to commit the complete Organization profile.");
 	}
 
 	private void applySavedOrganization(Organization reloaded, Integer updatedId, long saveStarted) {
@@ -556,6 +536,7 @@ public final class OrganizationController {
 	}
 
 	private void onCancel() {
+		if(assignmentStage!=null)assignmentStage.discard();
 		if (pendingRemoteUpdate) {
 			setEditMode(false);
 			onReloadRemote();
@@ -571,34 +552,14 @@ public final class OrganizationController {
 	}
 
 	private void onSave() {
-		if (currentOrganization == null || organizationDao == null) {
+		if (currentOrganization == null || organizationService == null || assignmentStage==null || organizationRowVer==null) {
 			setError("Organization details are unavailable.");
 			return;
 		}
-
-		Organization updated = Organization.builder()
-				.id(currentOrganization.getId())
-				.shaleClientId(currentOrganization.getShaleClientId())
-				.organizationTypeId(resolveSelectedOrganizationTypeId())
-				.organizationTypeName(currentOrganization.getOrganizationTypeName())
-				.name(safeText(nameEditor.getText()))
-				.phone(safeText(phoneEditor.getText()))
-				.fax(safeText(faxEditor.getText()))
-				.email(safeText(emailEditor.getText()))
-				.website(safeText(websiteEditor.getText()))
-				.address1(safeText(address1Editor.getText()))
-				.address2(safeText(address2Editor.getText()))
-				.city(safeText(cityEditor.getText()))
-				.state(safeText(stateEditor.getText()))
-				.postalCode(safeText(postalCodeEditor.getText()))
-				.country(safeText(countryEditor.getText()))
-				.notes(safeText(notesEditor.getText()))
-				.deleted(currentOrganization.isDeleted())
-				.createdAt(currentOrganization.getCreatedAt())
-				.updatedAt(currentOrganization.getUpdatedAt())
-				.build();
-
-		saveOrganizationSnapshot(updated);
+		if(!assignmentStage.isValid()){setError("Exactly one eligible primary Organization Type is required.");return;}
+		var fields=new OrganizationFields(safeText(nameEditor.getText()),safeText(phoneEditor.getText()),safeText(faxEditor.getText()),safeText(emailEditor.getText()),safeText(websiteEditor.getText()),safeText(address1Editor.getText()),safeText(address2Editor.getText()),safeText(cityEditor.getText()),safeText(stateEditor.getText()),safeText(postalCodeEditor.getText()),safeText(countryEditor.getText()),safeText(notesEditor.getText()));
+		var command=new UpdateOrganizationAggregateCommand(currentOrganization.getId(),currentTenantId(),appState.getUserId(),organizationRowVer,fields,assignmentStage.commandAssignments());
+		setBusy(true);dbExec.submit(()->{try{organizationService.updateOrganizationAggregate(command);invalidateDetailCache(currentOrganization.getId());publishOrganizationUpdated(currentOrganization.getId());Platform.runLater(this::loadOrganization);}catch(RuntimeException ex){Platform.runLater(()->{setBusy(false);setError(ex.getMessage()!=null&&ex.getMessage().contains("changed")?"Organization changed elsewhere; authoritative values were reloaded.":"Failed to save organization.");loadOrganization();});}});
 	}
 
 	private void onDeleteOrganization() {
@@ -797,10 +758,7 @@ public final class OrganizationController {
 	}
 
 	private void writeEditorsFromOrganization(Organization o) {
-		if (typeEditor != null) {
-			typeEditor.setItems(FXCollections.observableArrayList(organizationTypeOptions));
-			typeEditor.getSelectionModel().select(findOrganizationTypeRow(o.getOrganizationTypeId()));
-		}
+		if(typeEditor!=null&&assignmentStage!=null)typeEditor.setStage(assignmentStage);
 		nameEditor.setText(safeText(o.getName()));
 		phoneEditor.setText(safeText(o.getPhone()));
 		faxEditor.setText(safeText(o.getFax()));
@@ -816,10 +774,7 @@ public final class OrganizationController {
 	}
 
 	private Integer resolveSelectedOrganizationTypeId() {
-		OrganizationDao.OrganizationTypeRow selected = typeEditor == null ? null : typeEditor.getSelectionModel().getSelectedItem();
-		if (selected != null && selected.organizationTypeId() > 0) {
-			return selected.organizationTypeId();
-		}
+		if(assignmentStage!=null)return assignmentStage.assigned().stream().filter(OrganizationTypeAssignmentStage.Item::primary).map(i->i.definition().organizationTypeId()).findFirst().orElse(null);
 		return currentOrganization == null ? null : currentOrganization.getOrganizationTypeId();
 	}
 
@@ -955,7 +910,7 @@ public final class OrganizationController {
 
 	private void setEditMode(boolean enabled) {
 		this.editMode = enabled;
-		setVisibleManaged(editButton, false);
+		setVisibleManaged(editButton, !enabled && currentOrganization != null);
 		setVisibleManaged(saveButton, enabled);
 		setVisibleManaged(cancelButton, enabled);
 		refreshAdminActions();
@@ -992,7 +947,7 @@ public final class OrganizationController {
 	}
 
 	private void setInlineEditButtonsDisabled(boolean disabled) {
-		for (Button button : List.of(editNameButton, editTypeButton, editPhoneButton, editFaxButton, editEmailButton,
+		for (Button button : java.util.Arrays.asList(editNameButton, editTypeButton, editPhoneButton, editFaxButton, editEmailButton,
 				editWebsiteButton, editAddress1Button, editAddress2Button, editCityButton, editStateButton,
 				editPostalCodeButton, editCountryButton, editNotesButton)) {
 			if (button != null) {
@@ -1000,8 +955,10 @@ public final class OrganizationController {
 			}
 		}
 	}
+	private void setInlineEditButtonsVisible(boolean visible){for(Button button:java.util.Arrays.asList(editNameButton,editTypeButton,editPhoneButton,editFaxButton,editEmailButton,editWebsiteButton,editAddress1Button,editAddress2Button,editCityButton,editStateButton,editPostalCodeButton,editCountryButton,editNotesButton))if(button!=null)setVisibleManaged(button,visible);}
 
 	private void refreshAdminActions() {
+		setVisibleManaged(editButton,!editMode && currentOrganization!=null);
 		boolean showDelete = isAdminUser() && !editMode && currentOrganization != null;
 		setVisibleManaged(deleteOrganizationButton, showDelete);
 	}
