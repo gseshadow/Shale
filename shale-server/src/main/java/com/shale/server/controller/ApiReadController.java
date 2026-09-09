@@ -570,6 +570,8 @@ public final class ApiReadController {
     @Operation(summary = "Create organization", description = "Creates a tenant-scoped organization for the authenticated user and returns the refreshed organization detail.")
     @PostMapping("/api/organizations")
     public OrganizationDetail createOrganization(@RequestBody CreateOrganizationRequest request) {
+        if (legacyOrganizationWriteContractIsClosed()) throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED,
+                "Organization writes require the Phase 2B complete type-assignment profile; this legacy API contract is closed.");
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
         String name = ApiValidation.organizationName(request == null ? null : request.name());
@@ -610,6 +612,8 @@ public final class ApiReadController {
     @Operation(summary = "Update organization detail", description = "Updates supported tenant-scoped organization fields and returns the refreshed organization detail.")
     @PatchMapping("/api/organizations/{organizationId:\\d+}")
     public OrganizationDetail updateOrganization(@PathVariable("organizationId") int organizationId, @RequestBody UpdateOrganizationRequest request) {
+        if (legacyOrganizationWriteContractIsClosed()) throw new ResponseStatusException(HttpStatus.NOT_IMPLEMENTED,
+                "Organization writes require Organization and assignment RowVer values plus the complete Phase 2B profile; this legacy API contract is closed.");
         int safeOrganizationId = Math.toIntExact(ApiValidation.positiveId(organizationId, "organizationId"));
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
