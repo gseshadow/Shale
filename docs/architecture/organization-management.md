@@ -155,6 +155,29 @@ groups contact information into readable cards with Call, Email, Open Website, a
 actions. Related Cases remains a separate sibling section using the existing `CaseCardFactory` and
 relationship metadata wrapper.
 
+### Phase 2B.1 — dedicated Organization editor (implemented)
+
+The Organization detail view is permanently read-only. Its authorized **Edit Organization** action
+opens a fresh, window-modal editor owned by the application window; it never swaps detail labels for
+hidden or inline form controls. The bounded, scrollable modal follows the Edit Contact dialog language,
+keeps semantic Save and Cancel actions in its stable dialog footer, and contains the existing reusable
+`OrganizationTypeAssignmentPane` alongside all legacy scalar Organization fields.
+
+Each opening loads authoritative Organization details, effective type definitions, the complete assignment
+profile, the Organization `RowVer`, and assignment `RowVer` values away from the JavaFX application thread.
+Compatibility consistency is validated while constructing the dialog-local
+`OrganizationTypeAssignmentStage`. Scalar and assignment edits remain staged locally until one Save delegates
+to the Phase 2B atomic aggregate update, which preserves compatibility-primary synchronization and writes its
+existing transaction-bound audit records. A successful result closes the modal, invalidates the detail cache,
+refreshes the read-only view once, and publishes the established post-commit live update. A genuine concurrency
+conflict keeps the modal open and reloads authoritative state before Save is re-enabled; other validation or
+persistence failures retain the staged editor without exposing database error text.
+
+Cancel and an accepted window-close discard both scalar and assignment staging without persistence, audit, or
+live-update effects. Closing an unchanged editor is immediate; closing a dirty editor uses the Edit Contact
+discard-confirmation convention. Phase 2C remains responsible for clickable phone/fax, email, website and map
+presentation, Organization Type chips, cards, and search filters; none are introduced by Phase 2B.1.
+
 ## Phased implementation roadmap
 
 ### Phase 0 — live catalog and data inventory
