@@ -6,9 +6,19 @@ Organizations Phase 1C implements tenant-owned definition lifecycle and tenant/g
 mutations for `OrganizationTypes`, plus historical `OrganizationOrganizationTypes` assignment add,
 restore, removal, exact-set ordering, primary replacement, and `RowVer` concurrency. Primary changes
 are transactionally synchronized with `Organizations.OrganizationTypeId` and the entity-action audit
-writer. Settings/UI work and the broader Organization aggregate cutover remain pending.
+writer. Organizations Phase 2A now provides administrator-only Settings cards separated into
+active/effective, inactive tenant, and removed tenant definitions. Administrators can create and edit
+tenant definitions, customize globals through same-key tenant overrides, activate/deactivate,
+soft-remove, and restore through the Phase 1C boundary. Removed overrides reveal the global fallback;
+inactive overrides mask it. All existing Organization assignments remain historical, and every edit or
+lifecycle action uses `RowVer`; stale input reloads authoritative data instead of overwriting it.
 
-*Last updated: 2026-07-22*
+No reusable Organization Type definition live-update contract exists, so Refresh and Settings
+navigation are the documented cross-workstation refresh boundary. Phase 2B assignment editing and
+primary selection, cards/header/search presentation, and deleted-Organization restoration remain
+separate and unimplemented.
+
+*Last updated: 2026-09-09*
 
 This document is the authoritative engineering standard and implementation roadmap for Shale customizable lookup type definition tables. It is documentation-only: it describes the future standard, verified current-state facts from the completed read-only audit, and implementation checklists. It does **not** assert that existing tables already conform.
 

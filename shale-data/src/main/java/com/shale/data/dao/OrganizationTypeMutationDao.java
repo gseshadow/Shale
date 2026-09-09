@@ -13,6 +13,22 @@ final class OrganizationTypeMutationDao {
 
 	OrganizationTypeMutationDao(DbSessionProvider db) { this.db = Objects.requireNonNull(db, "db"); }
 
+	List<OrganizationDao.OrganizationTypeDefinitionRow> listForAdministration(int tenant, int actor) {
+		if (tenant <= 0 || actor <= 0) throw new IllegalArgumentException("Tenant and actor IDs must be positive.");
+		try (Connection con = db.requireConnection()) {
+			verifyTenant(con, tenant); validateActor(con, tenant, actor, true);
+			String sql = "SELECT OrganizationTypeId,ShaleClientId,SystemKey,Name,Description,Color,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.OrganizationTypes WHERE ShaleClientId IS NULL OR ShaleClientId=? ORDER BY SortOrder,Name,OrganizationTypeId";
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, tenant);
+				try (ResultSet rs = ps.executeQuery()) {
+					List<OrganizationDao.OrganizationTypeDefinitionRow> rows = new ArrayList<>();
+					while (rs.next()) { Number scope=(Number)rs.getObject(2); rows.add(new OrganizationDao.OrganizationTypeDefinitionRow(rs.getInt(1), scope==null?null:scope.intValue(), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getInt(7), rs.getBoolean(8), rs.getBoolean(9), rs.getBytes(10))); }
+					return List.copyOf(rows);
+				}
+			}
+		} catch (SQLException e) { throw new IllegalStateException("Organization Type administration could not be loaded.", e); }
+	}
+
 	OrganizationTypeMutationResult create(CreateOrganizationTypeCommand c) {
 		Objects.requireNonNull(c, "command");
 		return tx(c.shaleClientId(), c.actorUserId(), true, con -> {

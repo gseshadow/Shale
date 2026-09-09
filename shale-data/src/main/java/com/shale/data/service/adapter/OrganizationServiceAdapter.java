@@ -86,6 +86,7 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		return organizationGateway.listEffectiveOrganizationTypeDefinitions(shaleClientId).stream()
 				.map(OrganizationServiceAdapter::definition).toList();
 	}
+	@Override public List<OrganizationTypeDefinition> listOrganizationTypesForAdministration(int tenant,int actor){return organizationGateway.listOrganizationTypesForAdministration(tenant,actor).stream().map(OrganizationServiceAdapter::definition).toList();}
 
 	@Override
 	public Optional<OrganizationTypeProfile> getOrganizationTypeProfile(int organizationId, int shaleClientId) {
@@ -174,6 +175,7 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		Organization findById(int organizationId);
 		List<OrganizationDao.OrganizationTypeRow> findOrganizationTypes();
 		List<OrganizationDao.OrganizationTypeDefinitionRow> listEffectiveOrganizationTypeDefinitions(int shaleClientId);
+		default List<OrganizationDao.OrganizationTypeDefinitionRow> listOrganizationTypesForAdministration(int tenant,int actor){throw new UnsupportedOperationException("Organization Type administration is not supported");}
 		OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organizationId, int shaleClientId);
 		int create(OrganizationDao.OrganizationCreateRequest request);
 		void update(Organization organization);
@@ -201,6 +203,7 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		@Override public Organization findById(int organizationId) { return dao.findById(organizationId); }
 		@Override public List<OrganizationDao.OrganizationTypeRow> findOrganizationTypes() { return dao.findOrganizationTypes(); }
 		@Override public List<OrganizationDao.OrganizationTypeDefinitionRow> listEffectiveOrganizationTypeDefinitions(int shaleClientId) { return dao.listEffectiveOrganizationTypeDefinitions(shaleClientId); }
+		@Override public List<OrganizationDao.OrganizationTypeDefinitionRow> listOrganizationTypesForAdministration(int tenant,int actor){return dao.listOrganizationTypesForAdministration(tenant,actor);}
 		@Override public OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organizationId, int shaleClientId) { return dao.findOrganizationTypeProfile(organizationId, shaleClientId); }
 		@Override public int create(OrganizationDao.OrganizationCreateRequest request) { return dao.create(request); }
 		@Override public void update(Organization organization) { dao.update(organization); }
