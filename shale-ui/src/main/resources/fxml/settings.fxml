@@ -196,7 +196,7 @@
 			<VBox fx:id="organizationTypeAdministrationSection" spacing="8" styleClass="strong-panel">
 				<padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
 				<Label text="Organization Types" styleClass="search-section-title"/>
-				<Label text="Manage color-coded Organization classifications. Global definitions are read-only; customize one for this firm to create a tenant override. Existing assignments remain available for historical display when a definition is inactive or removed." styleClass="search-summary-text" wrapText="true"/>
+				<Label text="Global definitions are read-only but can be customized for this firm. Inactive or removed definitions remain available for historical assignments." styleClass="search-summary-text" wrapText="true"/>
 				<VBox fx:id="organizationTypeAdministrationContent" spacing="8"/>
 			</VBox>
 
