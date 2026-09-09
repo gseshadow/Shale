@@ -30,7 +30,7 @@ class CaseTeamMemberRolesPhase2ContractTest {
 		assertTrue(sql.contains("sec.fn_FilterByTenant(ShaleClientId) ON dbo.CaseTeamMemberRoles"));
 		assertTrue(sql.contains("UX_CaseTeamMemberRoles_Active"));
 		assertTrue(sql.contains("RowVer rowversion NOT NULL"));
-		for(String count:new String[]{"TotalMemberships","MembershipsWithLegacyRoles","MigratedActiveAssignments","RolelessMemberships","UnmappedLegacyRoles","DuplicateActiveAssignments","CrossTenantViolations"})assertTrue(sql.contains(count),"missing verification count "+count);
+		for(String count:new String[]{"TotalMemberships","MembershipsWithLegacyRoles","TotalActiveAssignments","RolelessMemberships","UnmappedLegacyRoles","MissingLegacyBackfills","DuplicateActiveAssignments","CrossTenantViolations"})assertTrue(sql.contains(count),"missing verification count "+count);
 	}
 
 	@Test void daoSupportsZeroOneManyRestoreHistoricalReadsAndIndependentRemoval()throws Exception{

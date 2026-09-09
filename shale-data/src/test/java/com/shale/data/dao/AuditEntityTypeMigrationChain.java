@@ -19,7 +19,13 @@ final class AuditEntityTypeMigrationChain {
             "2026-08-26_contacts_phase2b_audit_allowlist.sql");
     static final Path PHASE_2C_B = Path.of("..", "docs", "sql",
             "2026-08-26_contacts_phase2c_b_audit_allowlist.sql");
-    static final Path CURRENT = PHASE_2C_B;
+    static final Path CASE_TEAM_ROLE = Path.of("..", "docs", "sql",
+            "2026-09-03_case_team_role_audit_allowlist_phase1.sql");
+    static final Path CASE_TEAM_MEMBER = Path.of("..", "docs", "sql",
+            "2026-09-03_case_team_member_audit_allowlist_phase2.sql");
+    static final Path ORGANIZATIONS = Path.of("..", "docs", "sql",
+            "2026-09-09_organizations_phase1c_audit_allowlist.sql");
+    static final Path CURRENT = ORGANIZATIONS;
     static final Set<String> USER_MANAGEMENT_SEEDED = Set.of(
             "CASE", "LINK_TYPE", "CASE_LINK", "CASE_LINK_SHARE", "MATERIAL_TYPE", "MATERIAL_REQUEST",
             "MATERIAL_REQUEST_FOLLOW_UP", "MATERIAL_ITEM", "USER", "CASE_DATE", "CALENDAR_EVENT",
