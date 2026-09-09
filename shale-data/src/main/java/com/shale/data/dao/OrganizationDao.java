@@ -384,142 +384,20 @@ public final class OrganizationDao {
 	}
 
 	public int create(OrganizationCreateRequest request) {
-		if (legacyCompatibilityOnlyWritesAreClosed()) throw new UnsupportedOperationException("Use createOrganizationAggregate so Organization Types remain consistent.");
-		Objects.requireNonNull(request, "request");
-		if (request.shaleClientId() <= 0) {
-			throw new IllegalArgumentException("shaleClientId is required");
-		}
-		if (request.organizationTypeId() <= 0) {
-			throw new IllegalArgumentException("organizationTypeId is required");
-		}
-		if (request.name() == null || request.name().isBlank()) {
-			throw new IllegalArgumentException("name is required");
-		}
-
-		String sql = """
-				INSERT INTO %s (
-				  ShaleClientId,
-				  OrganizationTypeId,
-				  Name,
-				  Phone,
-				  Fax,
-				  Email,
-				  Website,
-				  Address1,
-				  Address2,
-				  City,
-				  State,
-				  PostalCode,
-				  Country,
-				  Notes,
-				  IsDeleted,
-				  CreatedAt,
-				  UpdatedAt
-				)
-				OUTPUT INSERTED.Id
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?);
-				""".formatted(ORGANIZATIONS_TABLE);
-
-		Timestamp now = Timestamp.from(Instant.now());
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-			int currentShaleClientId = requireCurrentShaleClientId(con);
-			if (request.shaleClientId() != currentShaleClientId) {
-				throw new IllegalArgumentException("shaleClientId does not match current session");
-			}
-
-			int idx = 1;
-			ps.setInt(idx++, request.shaleClientId());
-			ps.setInt(idx++, request.organizationTypeId());
-			setNullableString(ps, idx++, request.name());
-			setNullableString(ps, idx++, request.phone());
-			setNullableString(ps, idx++, request.fax());
-			setNullableString(ps, idx++, request.email());
-			setNullableString(ps, idx++, request.website());
-			setNullableString(ps, idx++, request.address1());
-			setNullableString(ps, idx++, request.address2());
-			setNullableString(ps, idx++, request.city());
-			setNullableString(ps, idx++, request.state());
-			setNullableString(ps, idx++, request.postalCode());
-			setNullableString(ps, idx++, request.country());
-			setNullableString(ps, idx++, request.notes());
-			ps.setTimestamp(idx++, now);
-			ps.setTimestamp(idx++, now);
-
-			try (ResultSet rs = ps.executeQuery()) {
-				if (!rs.next()) {
-					throw new RuntimeException("Failed to create organization");
-				}
-				return rs.getInt(1);
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to create organization", e);
-		}
+		Objects.requireNonNull(request,"request");
+		try(Connection con=db.requireConnection()){boolean auto=con.getAutoCommit();con.setAutoCommit(false);try{int tenant=requireCurrentShaleClientId(con);if(tenant!=request.shaleClientId())throw new SecurityException("shaleClientId does not match current session");int actor=requireCurrentActorUserId(con);int id=typeMutations.createSingleTypeOnConnection(con,tenant,actor,new com.shale.core.service.OrganizationServicePort.OrganizationFields(request.name(),request.phone(),request.fax(),request.email(),request.website(),request.address1(),request.address2(),request.city(),request.state(),request.postalCode(),request.country(),request.notes()),request.organizationTypeId());con.commit();return id;}catch(Exception e){con.rollback();throw e instanceof RuntimeException r?r:new IllegalStateException("Failed to create Organization aggregate.",e);}finally{con.setAutoCommit(auto);}}catch(SQLException e){throw new IllegalStateException("Failed to create Organization aggregate.",e);}
 	}
+
+	private static int requireCurrentActorUserId(Connection con)throws SQLException{try(PreparedStatement p=con.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'PrincipalUserId') AS INT)");ResultSet r=p.executeQuery()){if(!r.next()||r.getObject(1)==null)throw new SecurityException("An authenticated actor is required.");int id=((Number)r.getObject(1)).intValue();if(id<=0)throw new SecurityException("An authenticated actor is required.");return id;}}
 
 	public void update(Organization organization) {
-		if (legacyCompatibilityOnlyWritesAreClosed()) throw new UnsupportedOperationException("Use updateOrganizationAggregate so Organization Types remain consistent.");
-		long started = perfStart();
-		Objects.requireNonNull(organization, "organization");
-		if (organization.getId() == null || organization.getId() <= 0) {
-			throw new IllegalArgumentException("organization.id is required");
-		}
-
-		String sql = """
-				UPDATE %s
-				SET
-				  Name = ?,
-				  OrganizationTypeId = ?,
-				  Phone = ?,
-				  Fax = ?,
-				  Email = ?,
-				  Website = ?,
-				  Address1 = ?,
-				  Address2 = ?,
-				  City = ?,
-				  State = ?,
-				  PostalCode = ?,
-				  Country = ?,
-				  Notes = ?,
-				  UpdatedAt = SYSUTCDATETIME()
-				WHERE Id = ?
-				  AND ShaleClientId = ?
-				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
-				""".formatted(ORGANIZATIONS_TABLE);
-
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-			int idx = 1;
-			ps.setString(idx++, organization.getName());
-			if (organization.getOrganizationTypeId() == null) {
-				ps.setNull(idx++, java.sql.Types.INTEGER);
-			} else {
-				ps.setInt(idx++, organization.getOrganizationTypeId());
-			}
-			ps.setString(idx++, organization.getPhone());
-			ps.setString(idx++, organization.getFax());
-			ps.setString(idx++, organization.getEmail());
-			ps.setString(idx++, organization.getWebsite());
-			ps.setString(idx++, organization.getAddress1());
-			ps.setString(idx++, organization.getAddress2());
-			ps.setString(idx++, organization.getCity());
-			ps.setString(idx++, organization.getState());
-			ps.setString(idx++, organization.getPostalCode());
-			ps.setString(idx++, organization.getCountry());
-			ps.setString(idx++, organization.getNotes());
-			ps.setInt(idx++, organization.getId());
-			ps.setInt(idx++, requireCurrentShaleClientId(con));
-
-			int affected = ps.executeUpdate();
-			logPerf("organizations.save.update", "organizationId=" + organization.getId() + " affected=" + affected, started);
-			if (affected == 0) {
-				throw new RuntimeException("Organization not found or cannot be updated (id=" + organization.getId() + ")");
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to update organization (id=" + organization.getId() + ")", e);
-		}
+		Objects.requireNonNull(organization,"organization");int[] context=currentTenantAndActor();int tenant=context[0],actor=context[1];
+		OrganizationTypeProfileRow profile=findOrganizationTypeProfile(organization.getId(),tenant);if(profile==null)throw new IllegalArgumentException("Organization was not found.");
+		int requested=organization.getOrganizationTypeId()==null?profile.compatibilityOrganizationTypeId():organization.getOrganizationTypeId();
+		List<com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment> desired=new ArrayList<>();boolean found=false;for(var a:profile.assignments()){boolean primary=a.organizationTypeId()==requested;found|=primary;desired.add(new com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment(a.assignmentId(),a.organizationTypeId(),primary,a.sortOrder(),a.rowVer()));}if(!found)desired.add(new com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment(null,requested,true,desired.size(),null));
+		typeMutations.updateAggregate(new com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand(organization.getId(),tenant,actor,findOrganizationRowVer(organization.getId(),tenant),new com.shale.core.service.OrganizationServicePort.OrganizationFields(organization.getName(),organization.getPhone(),organization.getFax(),organization.getEmail(),organization.getWebsite(),organization.getAddress1(),organization.getAddress2(),organization.getCity(),organization.getState(),organization.getPostalCode(),organization.getCountry(),organization.getNotes()),desired));
 	}
-	private static boolean legacyCompatibilityOnlyWritesAreClosed(){return true;}
+	private int[] currentTenantAndActor(){try(Connection con=db.requireConnection()){return new int[]{requireCurrentShaleClientId(con),requireCurrentActorUserId(con)};}catch(SQLException e){throw new IllegalStateException("Failed to resolve Organization mutation context.",e);}}
 
 
 

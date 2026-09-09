@@ -219,7 +219,9 @@ public interface OrganizationServicePort {
 			String state,
 			String postalCode,
 			String country,
-			String notes) {
+			String notes,
+			Integer organizationTypeId) {
+		public CreateOrganizationCommand(int tenant,int actor,String name,String phone,String fax,String email,String website,String address1,String address2,String city,String state,String postal,String country,String notes){this(tenant,actor,name,phone,fax,email,website,address1,address2,city,state,postal,country,notes,null);}
 	}
 
 	record UpdateOrganizationCommand(
@@ -237,7 +239,12 @@ public interface OrganizationServicePort {
 			String state,
 			String postalCode,
 			String country,
-			String notes) {
+			String notes,
+			Integer organizationTypeId,
+			byte[] expectedOrganizationRowVer) {
+		public UpdateOrganizationCommand { expectedOrganizationRowVer=copyRowVer(expectedOrganizationRowVer); }
+		@Override public byte[] expectedOrganizationRowVer(){return copyRowVer(expectedOrganizationRowVer);}
+		public UpdateOrganizationCommand(int id,int tenant,int actor,String name,String phone,String fax,String email,String website,String address1,String address2,String city,String state,String postal,String country,String notes){this(id,tenant,actor,name,phone,fax,email,website,address1,address2,city,state,postal,country,notes,null,null);}
 	}
 
 	record RelatedCaseSummary(

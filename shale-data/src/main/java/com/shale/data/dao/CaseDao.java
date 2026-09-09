@@ -488,7 +488,7 @@ public final class CaseDao {
 
 	private void addPendingPartyForMerge(Connection con,long caseId,NewIntakeCreateRequest request,NewIntakePendingParty pending,Timestamp now)throws SQLException{
 		if(pending==null||pending.partyRoleId()==null||pending.partyRoleId()<=0)return;String type=pending.entityType()==null?"":pending.entityType().trim().toLowerCase(Locale.ROOT);Long entity=pending.entityId();
-		if(pending.createNew()){if("contact".equals(type))entity=(long)insertContact(con,buildFullName(pending.contactFirstName(),pending.contactLastName()),pending.contactFirstName(),pending.contactLastName(),null,null,false,false,request.shaleClientId(),now);else if("organization".equals(type))entity=(long)insertOrganization(con,request.shaleClientId(),pending.organizationTypeId(),pending.organizationName(),now);}
+		if(pending.createNew()){if("contact".equals(type))entity=(long)insertContact(con,buildFullName(pending.contactFirstName(),pending.contactLastName()),pending.contactFirstName(),pending.contactLastName(),null,null,false,false,request.shaleClientId(),now);else if("organization".equals(type))entity=(long)insertOrganization(con,request.shaleClientId(),request.createdByUserId(),pending.organizationTypeId(),pending.organizationName(),now);}
 		if(entity==null||entity<=0)return;insertCasePartyWithValidation(con,caseId,"contact".equals(type)?entity:null,"organization".equals(type)?entity:null,pending.partyRoleId(),pending.side(),pending.primary(),pending.notes(),request.shaleClientId(),now);
 	}
 
@@ -589,6 +589,7 @@ public final class CaseDao {
 					} else if ("organization".equals(entityType)) {
 						entityId = Long.valueOf(insertOrganization(con,
 								request.shaleClientId(),
+								request.createdByUserId(),
 								pending.organizationTypeId(),
 								pending.organizationName(),
 								now));
@@ -910,39 +911,10 @@ public final class CaseDao {
 		return contactId;
 	}
 
-	private int insertOrganization(Connection con, int shaleClientId, Integer organizationTypeId, String organizationName, Timestamp now) throws SQLException {
-		if (legacyEmbeddedOrganizationCreationIsClosed()) throw new UnsupportedOperationException("Create the Organization with its complete type profile before linking it to a Case.");
-		if (organizationTypeId == null || organizationTypeId.intValue() <= 0) {
-			throw new RuntimeException("Organization Type is required.");
-		}
-		String sql = """
-				INSERT INTO dbo.Organizations (
-				  OrganizationTypeId,
-				  Name,
-				  IsDeleted,
-				  CreatedAt,
-				  UpdatedAt,
-				  ShaleClientId
-				)
-				OUTPUT INSERTED.Id
-				VALUES (?, ?, 0, ?, ?, ?);
-				""";
-		try (PreparedStatement ps = con.prepareStatement(sql)) {
-			int i = 1;
-			ps.setInt(i++, organizationTypeId.intValue());
-			setNullableString(ps, i++, organizationName);
-			ps.setTimestamp(i++, now);
-			ps.setTimestamp(i++, now);
-			ps.setInt(i++, shaleClientId);
-			try (ResultSet rs = ps.executeQuery()) {
-				if (!rs.next()) {
-					throw new RuntimeException("Failed to create organization.");
-				}
-				return rs.getInt(1);
-			}
-		}
+	private int insertOrganization(Connection con,int shaleClientId,Integer actorUserId,Integer organizationTypeId,String organizationName,Timestamp now)throws SQLException{
+		if(organizationTypeId==null||organizationTypeId<=0)throw new IllegalArgumentException("Organization Type is required.");int actor=actorUserId==null?requirePrincipalUserId(con):actorUserId;return new OrganizationTypeMutationDao(db).createSingleTypeOnConnection(con,shaleClientId,actor,new com.shale.core.service.OrganizationServicePort.OrganizationFields(organizationName,null,null,null,null,null,null,null,null,null,null,null),organizationTypeId);
 	}
-	private static boolean legacyEmbeddedOrganizationCreationIsClosed(){return true;}
+	private static int requirePrincipalUserId(Connection con)throws SQLException{try(PreparedStatement p=con.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'PrincipalUserId') AS INT)");ResultSet r=p.executeQuery()){if(!r.next()||r.getObject(1)==null)throw new SecurityException("An authenticated actor is required.");return ((Number)r.getObject(1)).intValue();}}
 
 	private int insertContact(Connection con,
 			String name,

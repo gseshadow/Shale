@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import java.lang.reflect.Proxy;
 import java.time.Instant;
@@ -190,6 +192,10 @@ class ApiReadControllerTest {
                 .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"99"))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Organization not found."));
     }
+
+	@Test void legacyOrganizationCreateRemainsFunctionalAndForwardsOptionalSingleType()throws Exception{final OrganizationServicePort.CreateOrganizationCommand[] captured={null};OrganizationServicePort port=(OrganizationServicePort)Proxy.newProxyInstance(OrganizationServicePort.class.getClassLoader(),new Class<?>[]{OrganizationServicePort.class},(p,m,a)->switch(m.getName()){case"createOrganization"->{captured[0]=(OrganizationServicePort.CreateOrganizationCommand)a[0];yield 7;}case"getOrganizationDetail"->Optional.of(new OrganizationServicePort.OrganizationDetail(7,41,12,"Provider","Org",null,null,null,null,null,null,null,null,null,null,null,List.of()));default->throw new AssertionError(m.getName());});MockMvc mvc=developmentMockMvc(unusedPort(CaseServicePort.class),unusedPort(TaskServicePort.class),unusedPort(ContactServicePort.class),unusedPort(NotificationServicePort.class),port);mvc.perform(post("/api/organizations").contentType(MediaType.APPLICATION_JSON).header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31").header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41").content("{\"name\":\"Org\",\"organizationTypeId\":12}" )).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(7));assertEquals(12,captured[0].organizationTypeId());assertEquals(31,captured[0].actorUserId());}
+
+	@Test void legacyOrganizationUpdatePreservesEndpointAndForwardsTypeAndConcurrencyToken()throws Exception{final OrganizationServicePort.UpdateOrganizationCommand[] captured={null};OrganizationServicePort port=(OrganizationServicePort)Proxy.newProxyInstance(OrganizationServicePort.class.getClassLoader(),new Class<?>[]{OrganizationServicePort.class},(p,m,a)->switch(m.getName()){case"updateOrganization"->{captured[0]=(OrganizationServicePort.UpdateOrganizationCommand)a[0];yield true;}case"getOrganizationDetail"->Optional.of(new OrganizationServicePort.OrganizationDetail(7,41,13,"Firm","Org",null,null,null,null,null,null,null,null,null,null,null,List.of()));default->throw new AssertionError(m.getName());});MockMvc mvc=developmentMockMvc(unusedPort(CaseServicePort.class),unusedPort(TaskServicePort.class),unusedPort(ContactServicePort.class),unusedPort(NotificationServicePort.class),port);mvc.perform(patch("/api/organizations/7").contentType(MediaType.APPLICATION_JSON).header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31").header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41").content("{\"name\":\"Org\",\"organizationTypeId\":13,\"rowVer\":\"AQI=\"}" )).andExpect(status().isOk());assertEquals(13,captured[0].organizationTypeId());assertArrayEquals(new byte[]{1,2},captured[0].expectedOrganizationRowVer());}
 
     @Test
     void caseSearchReachesServiceLayerWithDevelopmentHeaders() throws Exception {

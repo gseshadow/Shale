@@ -140,7 +140,8 @@ public final class ApiReadController {
             String state,
             String postalCode,
             String country,
-            String notes) {
+			String notes,
+			Integer organizationTypeId) {
     }
 
     public record UpdateOrganizationRequest(
@@ -155,7 +156,9 @@ public final class ApiReadController {
             String state,
             String postalCode,
             String country,
-            String notes) {
+			String notes,
+			Integer organizationTypeId,
+			String rowVer) {
     }
 
     private static final int DEFAULT_SEARCH_LIMIT = 25;
@@ -584,7 +587,7 @@ public final class ApiReadController {
         String country = ApiValidation.optionalOrganizationText(request == null ? null : request.country(), "Country", 100);
         String notes = ApiValidation.optionalOrganizationText(request == null ? null : request.notes(), "Notes", 10000);
         int organizationId = organizationServicePort.createOrganization(new CreateOrganizationCommand(
-                shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes));
+                shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes,request==null?null:request.organizationTypeId()));
         return organizationServicePort.getOrganizationDetail(organizationId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found."));
     }
@@ -627,7 +630,7 @@ public final class ApiReadController {
         String country = ApiValidation.optionalOrganizationText(request == null ? null : request.country(), "Country", 100);
         String notes = ApiValidation.optionalOrganizationText(request == null ? null : request.notes(), "Notes", 10000);
         boolean updated = organizationServicePort.updateOrganization(new UpdateOrganizationCommand(
-                safeOrganizationId, shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes));
+                safeOrganizationId, shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes,request==null?null:request.organizationTypeId(),decodeOptionalRowVer(request==null?null:request.rowVer())));
         if (!updated) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found.");
         }
@@ -824,6 +827,6 @@ public final class ApiReadController {
         int endExclusive = Math.min(offset + size, fetched.size());
         return fetched.subList(offset, endExclusive);
     }
-    private static boolean legacyOrganizationWriteContractIsClosed() { return true; }
+	private static byte[] decodeOptionalRowVer(String value){if(value==null||value.isBlank())return null;try{return java.util.Base64.getDecoder().decode(value);}catch(IllegalArgumentException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"rowVer must be Base64 encoded.");}}
 
 }

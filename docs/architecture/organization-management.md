@@ -262,10 +262,15 @@ aggregate transaction validates tenant/actor, locks current state, checks Organi
 `Organizations.OrganizationTypeId`, and writes the existing assignment audit events before commit.
 Desktop live invalidation is published only after successful return.
 
-The server's former Organization create/update request shapes cannot carry the complete assignment
-profile or concurrency tokens. Those endpoints now fail closed with `501`; a future server contract
-may expose the aggregate command. Phase 2C cards, header chips, and type search/filter presentation
-remain deferred. Restoring a deleted Organization record remains a separate lifecycle feature.
+Legacy callers that provide one `OrganizationTypeId` are mapped deterministically to one assignment:
+primary, `SortOrder = 0`, with the same compatibility ID. Embedded Case/Intake creation invokes the
+same connection-bound worker inside the already-owned Case transaction. Existing server create/update
+routes remain functional and response-compatible; their optional type selects the primary while update
+preserves unrelated non-primary assignments. Server update accepts an optional Base64 Organization
+`RowVer`; when omitted it reloads the current token immediately before the aggregate transaction, which
+protects against a race after that reload but is not an HTTP precondition supplied by the client.
+Phase 2C cards, header chips, and type search/filter presentation remain deferred. Restoring a deleted
+Organization record remains a separate lifecycle feature.
 
 ### Phase 3 — shared Add/Edit Organization experience
 
