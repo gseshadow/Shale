@@ -9,10 +9,14 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
+import com.shale.ui.util.ContactExternalActions;
+import com.shale.data.dao.OrganizationDao.OrganizationCardType;
 
 public class OrganizationCard extends HBox {
 
@@ -30,6 +34,8 @@ public class OrganizationCard extends HBox {
 	private String backgroundCss;
 	private boolean hovered;
 	private boolean suppressPlaceholderLines;
+	private List<OrganizationCardType> types=List.of();
+	private ContactExternalActions externalActions=new ContactExternalActions();
 
 	public OrganizationCard() {
 		buildUiMiniDefaults();
@@ -52,6 +58,7 @@ public class OrganizationCard extends HBox {
 		String resolvedName = organizationTypeName == null ? "" : organizationTypeName.trim();
 		if (!resolvedName.isEmpty()) {
 			typeLabel.setText("Type: " + resolvedName);
+			types=List.of(new OrganizationCardType(0,organizationTypeId==null?0:organizationTypeId,resolvedName,"#6C757D",true,0));
 			return;
 		}
 
@@ -61,14 +68,19 @@ public class OrganizationCard extends HBox {
 	public void setPhone(String phone) {
 		phoneLabel.setText("Phone: " + fallback(phone));
 	}
+	public void setStructuredPhone(String display,String normalized,String extension){setPhone(display);if(normalized!=null)try{ContactExternalActions.telephone(normalized,extension);wireAction(phoneLabel,"Call phone number",()->externalActions.open(ContactExternalActions.telephone(normalized,extension)));}catch(IllegalArgumentException ignored){}}
 
 	public void setEmail(String email) {
 		emailLabel.setText("Email: " + fallback(email));
+		if(email!=null&&email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))wireAction(emailLabel,"Send email",()->externalActions.open(ContactExternalActions.email(email)));
 	}
 
 	public void setWebsite(String website) {
 		websiteLabel.setText("Web: " + fallback(website));
+		try{ContactExternalActions.website(website);wireAction(websiteLabel,"Open website",()->externalActions.open(ContactExternalActions.website(website)));}catch(IllegalArgumentException ignored){}
 	}
+	public void setTypes(List<OrganizationCardType> values){types=List.copyOf(values);}
+	public void setExternalActions(ContactExternalActions actions){externalActions=java.util.Objects.requireNonNull(actions);}
 
 	public void setAddress(String address1, String address2, String city, String state, String postalCode, String country) {
 		List<String> parts = new ArrayList<>();
@@ -88,7 +100,9 @@ public class OrganizationCard extends HBox {
 
 		String oneLineAddress = parts.isEmpty() ? "—" : String.join(" • ", parts);
 		addressLabel.setText("Address: " + oneLineAddress);
+		if(!parts.isEmpty())wireAction(addressLabel,"Open address in maps",()->externalActions.open(ContactExternalActions.maps(String.join(", ",parts))));
 	}
+	public void setAddress(String address){addressLabel.setText("Address: "+fallback(address));if(address!=null&&!address.isBlank())wireAction(addressLabel,"Open address in maps",()->externalActions.open(ContactExternalActions.maps(address)));}
 
 	public void setNotesSnippet(String notes) {
 		String trimmed = notes == null ? "" : notes.trim();
@@ -143,9 +157,7 @@ public class OrganizationCard extends HBox {
 		phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
 
 		VBox text = new VBox(4, nameLabel);
-		if (!(suppressPlaceholderLines && "Type: Unknown".equals(typeLabel.getText()))) {
-			text.getChildren().add(typeLabel);
-		}
+		text.getChildren().add(typeChips());
 		if (!(suppressPlaceholderLines && "Phone: —".equals(phoneLabel.getText()))) {
 			text.getChildren().add(phoneLabel);
 		}
@@ -177,7 +189,8 @@ public class OrganizationCard extends HBox {
 		addressLabel.setWrapText(true);
 		notesLabel.setWrapText(true);
 
-		VBox text = new VBox(5, nameLabel, typeLabel, phoneLabel, emailLabel, websiteLabel, addressLabel);
+		VBox text = new VBox(5, nameLabel, typeChips());
+		for(Label value:List.of(phoneLabel,emailLabel,addressLabel,websiteLabel))if(!value.getText().endsWith("—"))text.getChildren().add(value);
 		if (!notesLabel.getText().isBlank()) {
 			text.getChildren().add(notesLabel);
 		}
@@ -195,6 +208,7 @@ public class OrganizationCard extends HBox {
 
 	private void buildUiMiniDefaults() {
 		setCursor(Cursor.HAND);
+		setFocusTraversable(true);
 		setBackgroundCssColor(null);
 		applyMini();
 	}
@@ -215,7 +229,10 @@ public class OrganizationCard extends HBox {
 				onOpen.accept(organizationId);
 			}
 		});
+		setOnKeyPressed(e->{if(onOpen!=null&&organizationId!=null&&(e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE)){onOpen.accept(organizationId);e.consume();}});
 	}
+	private Node typeChips(){return new ClassificationChipGroup(types.stream().sorted(java.util.Comparator.comparing(OrganizationCardType::primary).reversed().thenComparingInt(OrganizationCardType::sortOrder).thenComparingLong(OrganizationCardType::assignmentId)).map(t->new ClassificationChipGroup.Chip(t.label(),t.color(),"Organization Type",t.definitionId(),t.primary())).toList(),ClassificationChipGroup.Size.COMPACT);}
+	private static void wireAction(Label label,String tooltip,Runnable action){label.getStyleClass().add("external-action-link");label.setCursor(Cursor.HAND);label.setTooltip(new Tooltip(tooltip));label.setAccessibleText(tooltip);label.setOnMouseClicked(e->{e.consume();try{action.run();}catch(RuntimeException ignored){}});}
 
 	private Node buildAvatar(double radius) {
 		Circle c = new Circle(radius);

@@ -2,6 +2,7 @@ package com.shale.ui.controller;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -64,6 +65,7 @@ public final class OrganizationsController {
 	private long pageLoadStartedNanos;
 
 	private final List<DirectoryOrganizationRow> loaded = new ArrayList<>();
+	private Map<Integer,OrganizationDao.OrganizationCardPresentation> cardPresentations=Map.of();
 
 	private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "organizations-loader");
@@ -187,6 +189,7 @@ public final class OrganizationsController {
 		hasMore = true;
 
 		loaded.clear();
+		cardPresentations=Map.of();
 		if (organizationsFlow != null) {
 			organizationsFlow.getChildren().clear();
 		}
@@ -233,6 +236,8 @@ public final class OrganizationsController {
 				long daoStarted = PerfLog.start();
 				PerfLog.log("organizations.search.dao", "start", "generation=" + generationAtSubmit + " page=" + pageToLoad + " queryLength=" + search.length() + " fullDetailHydration=false");
 				OrganizationDao.PagedResult<DirectoryOrganizationRow> page = organizationDao.findDirectoryPage(pageToLoad, pageSize, search);
+				Integer tenantId=appState==null?null:appState.getShaleClientId();
+				Map<Integer,OrganizationDao.OrganizationCardPresentation> pagePresentation=tenantId==null?Map.of():organizationDao.findCardPresentations(tenantId,page.items().stream().map(DirectoryOrganizationRow::id).toList());
 				PerfLog.logDone("organizations.search.dao", "generation=" + generationAtSubmit + " page=" + pageToLoad + " rows=" + page.items().size() + " total=" + page.total() + " fullDetailHydration=false", daoStarted);
 
 				Platform.runLater(() -> {
@@ -243,6 +248,7 @@ public final class OrganizationsController {
 					}
 
 					loaded.addAll(page.items());
+					var merged=new java.util.HashMap<>(cardPresentations);merged.putAll(pagePresentation);cardPresentations=Map.copyOf(merged);
 					currentPage++;
 					hasMore = loaded.size() < page.total();
 					loading = false;
@@ -296,7 +302,7 @@ public final class OrganizationsController {
 				null,
 				null,
 				null,
-				null), ORGANIZATION_CARD_VARIANT);
+				null),cardPresentations.get(org.id()), ORGANIZATION_CARD_VARIANT);
 	}
 
 	private void updateEmptyState(boolean empty) {
