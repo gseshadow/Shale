@@ -23,6 +23,7 @@ import org.w3c.dom.NodeList;
 final class OrganizationEditEntryPointTest {
     private static final Path FXML = Path.of("src/main/resources/fxml/organization.fxml");
     private static final Path CONTROLLER = Path.of("src/main/java/com/shale/ui/controller/OrganizationController.java");
+    private static final Path EDITOR = Path.of("src/main/java/com/shale/ui/controller/EditOrganizationDialog.java");
 
     @Test
     void headerExposesAggregateEditBesideDestructiveDelete() throws Exception {
@@ -70,37 +71,44 @@ final class OrganizationEditEntryPointTest {
     }
 
     @Test
-    void buttonIsWiredToTheExistingAggregateEditorLifecycle() throws Exception {
+    void buttonOpensDedicatedAggregateEditorAndViewHasNoInlineControls() throws Exception {
         String source = Files.readString(CONTROLLER);
+        String fxml = Files.readString(FXML);
         String initialize = method(source, "private void initialize()");
-        String load = method(source, "private void loadOrganization()");
         String edit = method(source, "private void onEdit()");
-        String save = method(source, "private void onSave()");
-        String cancel = method(source, "private void onCancel()");
 
         assertTrue(initialize.contains("editButton.setOnAction(e -> onEdit())"), "FXML button must invoke the aggregate edit handler");
         assertTrue(edit.contains("!canEditOrganization()"), "direct UI handler invocation must retain its authorization guard");
-        assertTrue(edit.contains("writeEditorsFromOrganization(currentOrganization)") && edit.contains("setEditMode(true)"),
-                "the entry point must seed the existing aggregate editor rather than open a second implementation");
-        assertTrue(load.contains("listEffectiveOrganizationTypes(tenantId)")
-                        && load.contains("getOrganizationTypeProfile(organizationId,tenantId)")
-                        && load.contains("OrganizationTypeAssignmentStage.forEdit(effectiveDefinitions,loadedProfile)"),
-                "authoritative definitions and the complete assignment profile must seed the edit stage");
-        assertTrue(save.contains("organizationService.updateOrganizationAggregate(command)"),
-                "Save must delegate to the existing aggregate update operation");
-        assertTrue(count(save, "updateOrganizationAggregate(") == 1, "one click must issue exactly one aggregate update");
-        assertTrue(save.contains("Platform.runLater(()->applySuccessfulAggregateSave(result))"),
-                "successful Save must apply the committed result on the FX thread");
+        assertTrue(edit.contains("new EditOrganizationDialog") && edit.contains("editDialogOpen"),
+                "Edit must open one dedicated modal and guard duplicate opening");
+        assertFalse(fxml.contains("Editor\"") || fxml.contains("saveButton") || fxml.contains("cancelButton"),
+                "the permanently read-only view must not retain hidden editors or inline Save/Cancel");
+        assertFalse(source.contains("setEditMode") || source.contains("writeEditorsFromOrganization"),
+                "the controller must not retain inline-edit state or field swapping");
         String applySuccess = method(source, "private void applySuccessfulAggregateSave(OrganizationAggregateResult result)");
-        assertTrue(applySuccess.indexOf("setEditMode(false)") < applySuccess.indexOf("publishOrganizationUpdated(updatedId)"),
-                "the controller must leave edit mode before its post-commit publication can be observed");
         assertTrue(count(applySuccess, "loadOrganization()") == 1, "a successful Save must request one authoritative reload");
-        assertTrue(cancel.contains("assignmentStage.discard()") && !cancel.contains("organizationService."),
-                "Cancel must discard staged changes without mutation");
-        assertTrue(count(source, "organizationService.updateOrganizationAggregate(") == 1,
-                "only Save may mutate the aggregate, so closing the view cannot persist staged changes");
-        assertFalse(initialize.contains("initializeInlineEditButtons()"),
-                "the retired field-by-field mutation controls must remain unreachable");
+        assertFalse(source.contains("saveSingleOrganizationField") || source.contains("saveOrganizationSnapshot"),
+                "retired field-by-field Organization mutation must be removed");
+    }
+
+    @Test
+    void dedicatedEditorOwnsAuthoritativeAsyncModalLifecycle() throws Exception {
+        String editor = Files.readString(EDITOR);
+        assertTrue(editor.contains("Edit Organization") && editor.contains("Modality.WINDOW_MODAL") && editor.contains("dialog.initOwner(owner)"),
+                "editor must use the Edit Contact-style owned window-modal shell");
+        assertTrue(editor.contains("ScrollPane") && editor.contains("sizeModalStage") && editor.contains("dialog.setResizable(true)"),
+                "editor content must remain bounded, scrollable, resizable, and screen-aware");
+        assertTrue(editor.contains("executor.execute") && editor.contains("dao.findById(organizationId)")
+                        && editor.contains("listEffectiveOrganizationTypes(tenant)")
+                        && editor.contains("getOrganizationTypeProfile(organizationId, tenant)")
+                        && editor.contains("findOrganizationRowVer(organizationId, tenant)"),
+                "each opening must load the complete authoritative aggregate away from the FX thread");
+        assertTrue(count(editor, "service.updateOrganizationAggregate(command)") == 1,
+                "Save must delegate exactly once to the atomic aggregate mutation");
+        assertTrue(editor.contains("baseline.assignments().isDirty()") && editor.contains("confirmDiscard()"),
+                "dirty detection and close confirmation must cover shared assignment staging");
+        assertTrue(editor.contains("Organization changed elsewhere. Authoritative values are being reloaded.") && editor.contains("reload();"),
+                "a concurrency conflict must reload authoritative state before another save");
     }
 
     @Test
