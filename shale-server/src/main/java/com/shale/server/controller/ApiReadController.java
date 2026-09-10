@@ -613,18 +613,19 @@ public final class ApiReadController {
         int safeOrganizationId = Math.toIntExact(ApiValidation.positiveId(organizationId, "organizationId"));
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
-        String name = ApiValidation.organizationName(request == null ? null : request.name());
-        String phone = ApiValidation.optionalOrganizationText(request == null ? null : request.phone(), "Phone", 100);
-        String fax = ApiValidation.optionalOrganizationText(request == null ? null : request.fax(), "Fax", 100);
-        String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
-        String website = ApiValidation.optionalOrganizationText(request == null ? null : request.website(), "Website", 500);
-        String address1 = ApiValidation.optionalOrganizationText(request == null ? null : request.address1(), "Address line 1", 500);
-        String address2 = ApiValidation.optionalOrganizationText(request == null ? null : request.address2(), "Address line 2", 500);
-        String city = ApiValidation.optionalOrganizationText(request == null ? null : request.city(), "City", 200);
-        String state = ApiValidation.optionalOrganizationText(request == null ? null : request.state(), "State", 100);
-        String postalCode = ApiValidation.optionalOrganizationText(request == null ? null : request.postalCode(), "Zip", 100);
-        String country = ApiValidation.optionalOrganizationText(request == null ? null : request.country(), "Country", 100);
-        String notes = ApiValidation.optionalOrganizationText(request == null ? null : request.notes(), "Notes", 10000);
+		OrganizationDetail opening=organizationServicePort.getOrganizationDetail(safeOrganizationId,shaleClientId).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Organization not found."));
+		String name = request==null||request.name()==null?opening.name():ApiValidation.organizationName(request.name());
+		String phone = request==null||request.phone()==null?opening.phone():ApiValidation.optionalOrganizationText(request.phone(), "Phone", 100);
+		String fax = request==null||request.fax()==null?opening.fax():ApiValidation.optionalOrganizationText(request.fax(), "Fax", 100);
+		String email = request==null||request.email()==null?opening.email():ApiValidation.optionalEmail(request.email(), "Email");
+		String website = request==null||request.website()==null?opening.website():ApiValidation.optionalOrganizationText(request.website(), "Website", 500);
+		String address1 = request==null||request.address1()==null?opening.address1():ApiValidation.optionalOrganizationText(request.address1(), "Address line 1", 500);
+		String address2 = request==null||request.address2()==null?opening.address2():ApiValidation.optionalOrganizationText(request.address2(), "Address line 2", 500);
+		String city = request==null||request.city()==null?opening.city():ApiValidation.optionalOrganizationText(request.city(), "City", 200);
+		String state = request==null||request.state()==null?opening.state():ApiValidation.optionalOrganizationText(request.state(), "State", 100);
+		String postalCode = request==null||request.postalCode()==null?opening.postalCode():ApiValidation.optionalOrganizationText(request.postalCode(), "Zip", 100);
+		String country = request==null||request.country()==null?opening.country():ApiValidation.optionalOrganizationText(request.country(), "Country", 100);
+		String notes = request==null||request.notes()==null?opening.notes():ApiValidation.optionalOrganizationText(request.notes(), "Notes", 10000);
         boolean updated = organizationServicePort.updateOrganization(new UpdateOrganizationCommand(
                 safeOrganizationId, shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes,request==null?null:request.organizationTypeId(),decodeOptionalRowVer(request==null?null:request.rowVer())));
         if (!updated) {
