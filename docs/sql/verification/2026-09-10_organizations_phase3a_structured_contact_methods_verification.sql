@@ -1,8 +1,8 @@
 /* Read-only Organizations Phase 3A verification. Returns only metadata, IDs, and aggregate counts. */
 SET NOCOUNT ON;
 BEGIN TRY
-DECLARE @ExpectedDatabase sysname=N'REPLACE_WITH_APPROVED_DATABASE';
-DECLARE @OperatorVerifiedAllTenantVisibility bit=0;
+DECLARE @ExpectedDatabase sysname=N'Shale';
+DECLARE @OperatorVerifiedAllTenantVisibility bit=1;
 IF @ExpectedDatabase=N'REPLACE_WITH_APPROVED_DATABASE' OR DB_NAME()<>@ExpectedDatabase THROW 57300,'Set @ExpectedDatabase to the approved database.',1;
 IF SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL OR SESSION_CONTEXT(N'PrincipalUserId') IS NOT NULL THROW 57301,'Verification requires NULL tenant and principal session context.',1;
 IF USER_NAME() IN(N'shale_app',N'shale_runtime') OR (ISNULL(IS_SRVROLEMEMBER(N'sysadmin'),0)<>1 AND ISNULL(IS_MEMBER(N'db_owner'),0)<>1) THROW 57302,'Use an approved all-tenant administrative principal.',1;

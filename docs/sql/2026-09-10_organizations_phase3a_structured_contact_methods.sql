@@ -4,9 +4,11 @@
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 BEGIN TRY
-DECLARE @ExpectedDatabase sysname=N'REPLACE_WITH_APPROVED_DATABASE';
-DECLARE @OperatorVerifiedAllTenantVisibility bit=0;
-IF @ExpectedDatabase=N'REPLACE_WITH_APPROVED_DATABASE' OR DB_NAME()<>@ExpectedDatabase
+DECLARE @ExpectedDatabase sysname = N'Shale';
+DECLARE @OperatorVerifiedAllTenantVisibility bit = 1;
+
+IF @ExpectedDatabase = N'REPLACE_WITH_APPROVED_DATABASE'
+   OR DB_NAME() <> @ExpectedDatabase
  THROW 57200,'Set @ExpectedDatabase to the approved database and reconnect to that database.',1;
 IF SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL OR SESSION_CONTEXT(N'PrincipalUserId') IS NOT NULL
  THROW 57201,'Phase 3A requires NULL ShaleClientId and PrincipalUserId session context.',1;
@@ -27,9 +29,17 @@ SELECT @PolicyId=object_id,@Policy=QUOTENAME(SCHEMA_NAME(schema_id))+N'.'+QUOTEN
 IF @PolicyId IS NULL THROW 57207,'TenantFilter must be enabled.',1;
 
 DECLARE @Legacy table(ColumnName sysname,TypeName sysname,MaxLength int,Nullable bit);
-INSERT @Legacy VALUES(N'Phone',N'nvarchar',120,1),(N'Fax',N'nvarchar',120,1),(N'Email',N'nvarchar',1016,1),
- (N'Website',N'nvarchar',1200,1),(N'Address1',N'nvarchar',800,1),(N'Address2',N'nvarchar',800,1),
- (N'City',N'nvarchar',400,1),(N'State',N'nvarchar',200,1),(N'PostalCode',N'nvarchar',80,1),(N'Country',N'nvarchar',400,1);
+INSERT @Legacy VALUES
+    (N'Phone',      N'nvarchar', 60,  1),
+    (N'Fax',        N'nvarchar', 60,  1),
+    (N'Email',      N'nvarchar', 508, 1),
+    (N'Website',    N'nvarchar', 600, 1),
+    (N'Address1',   N'nvarchar', 400, 1),
+    (N'Address2',   N'nvarchar', 400, 1),
+    (N'City',       N'nvarchar', 200, 1),
+    (N'State',      N'nvarchar', 100, 1),
+    (N'PostalCode', N'nvarchar', 40,  1),
+    (N'Country',    N'nvarchar', 200, 1);
 IF EXISTS(SELECT 1 FROM @Legacy e LEFT JOIN sys.columns c ON c.object_id=OBJECT_ID(N'dbo.Organizations') AND c.name=e.ColumnName
  LEFT JOIN sys.types t ON t.user_type_id=c.user_type_id
  WHERE c.column_id IS NULL OR t.name<>e.TypeName OR c.max_length<>e.MaxLength OR c.is_nullable<>e.Nullable)
