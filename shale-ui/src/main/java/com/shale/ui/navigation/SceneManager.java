@@ -944,7 +944,7 @@ public final class SceneManager {
 			dialogScene.getStylesheets().add(Objects.requireNonNull(
 					getClass().getResource("/css/app.css")).toExternalForm());
 			dialog.setScene(dialogScene);
-			WindowSizingUtil.sizeModalStage(dialog, stage, 760, 720);
+			WindowSizingUtil.sizeModalStage(dialog, stage, 900, 680, 680, 480);
 			dialog.showAndWait();
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to open New Organization dialog", e);

@@ -573,3 +573,34 @@ Each generation loads its lightweight page/count before the existing five fixed 
 only that page's IDs. No profile or per-card query is introduced. Snapshot and generation checks prevent stale
 search/filter results from applying. This read-only work introduces no mutation or audit event. New Organization
 remains a legacy-scalar editor reconciled by the aggregate boundary; structured creation is still future work.
+
+## Phase 3F.1 structured New Organization workflow
+
+New and Edit Organization now compose the same `OrganizationAggregateEditor`. The shared editor owns the
+Organization Details, structured Contact Information cards, `OrganizationTypeAssignmentPane`, Notes,
+validation, primary selection, ordering, and dirty-state rules; the surrounding controllers own only their
+create-versus-edit loading, concurrency, save, and close lifecycle. New Organization no longer contains
+legacy Phone, Fax, Email, Website, or address scalar controls, including hidden duplicates.
+
+A create stage begins with empty Notes, no type assignments, and four empty structured collections. New
+contact rows have neither IDs nor RowVers. The first assigned type, email, address, and website becomes
+primary. A Fax may be added first, but it does not displace a voice primary; adding the first later voice
+number establishes the preferred voice row. Removing an unsaved row discards it locally rather than creating
+history, and untouched add-card drafts never enter the submitted exact sets.
+
+Create submits one `createOrganizationAggregate` command. It contains identity/Notes, the exact type stage,
+and one `StructuredContactMutation` with all four collections explicitly owned and contiguously ordered.
+`OrganizationTypeMutationDao` remains the sole transaction owner for the Organization, assignments,
+structured rows, derived legacy compatibility scalars, and existing PHI-safe entity-action audits. Any child,
+compatibility, uniqueness, actor/tenant, or audit failure rolls back the transaction. This phase uses the
+existing schema and audit vocabulary and adds no migration.
+
+Cancel and clean close perform no mutation. Dirty close covers Name, Notes, types, and all contact collections
+and uses the same discard confirmation as Edit; discard publishes no update and writes no audit. A successful
+create closes first, then invokes the established directory callback once, which preserves the directory's
+current criteria and performs its existing authoritative refresh/live-update behavior.
+
+Case, Intake, Material Request, direct DAO, and server Organization creation remain deliberate legacy-scalar
+callers. Phase 3C continues reconciling those contracts to deterministic structured compatibility rows inside
+the aggregate transaction. Phase 3F.2 is the future boundary for removing those compatibility callers only
+after each embedded/public contract is explicitly migrated; Phase 3F.1 does not change the public API.
