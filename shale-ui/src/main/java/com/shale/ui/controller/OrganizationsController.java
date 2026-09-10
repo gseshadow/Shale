@@ -3,6 +3,8 @@ package com.shale.ui.controller;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -13,6 +15,7 @@ import javafx.util.Duration;
 import com.shale.data.dao.OrganizationDao.DirectoryOrganizationRow;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.ScrollableListRegion;
+import com.shale.ui.component.ShaleFilterMenu;
 import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.navigation.SceneManager;
@@ -26,6 +29,8 @@ import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.layout.FlowPane;
 
 public final class OrganizationsController {
@@ -45,6 +50,11 @@ public final class OrganizationsController {
 	private Label organizationsEmptyStateLabel;
 	@FXML
 	private Label organizationsLoadingStateLabel;
+	@FXML private ShaleFilterMenu organizationTypeFilter;
+	@FXML private FlowPane selectedFilterChips;
+	@FXML private Label activeFilterCount;
+	@FXML private Button clearFiltersButton;
+	@FXML private ComboBox<String> organizationSort;
 
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
@@ -63,6 +73,9 @@ public final class OrganizationsController {
 	private volatile String latestRequestedQuery = "";
 	private PauseTransition searchDebounce;
 	private long pageLoadStartedNanos;
+	private final Set<Integer> selectedTypeIds=new LinkedHashSet<>();
+	private List<OrganizationDao.OrganizationTypeDefinitionRow> typeOptions=List.of();
+	private OrganizationDao.OrganizationSearchCriteria activeCriteria;
 
 	private final List<DirectoryOrganizationRow> loaded = new ArrayList<>();
 	private Map<Integer,OrganizationDao.OrganizationCardPresentation> cardPresentations=Map.of();
@@ -80,10 +93,24 @@ public final class OrganizationsController {
 		this.onOpenOrganization = onOpenOrganization;
 		this.sceneManager = sceneManager;
 		this.organizationCardFactory = new OrganizationCardFactory(this::openOrganization);
+		loadTypeOptions();
 	}
+
+	private void loadTypeOptions(){
+		Integer tenant=appState==null?null:appState.getShaleClientId();if(organizationDao==null||tenant==null||tenant<=0)return;
+		dbExec.submit(()->{try{var values=organizationDao.listEffectiveOrganizationTypeDefinitions(tenant);Platform.runLater(()->{typeOptions=values;rebuildTypeFilter();});}catch(RuntimeException ex){ex.printStackTrace();}});
+	}
+	private void rebuildTypeFilter(){if(organizationTypeFilter==null)return;organizationTypeFilter.setCaption("Organization Type");organizationTypeFilter.setOptions(typeOptions.stream().map(t->new ShaleFilterMenu.Option(t.organizationTypeId(),t.name(),t.color())).toList(),selectedTypeIds,this::toggleType);renderFilterState();}
+	private void toggleType(int id,boolean selected){if(selected)selectedTypeIds.add(id);else selectedTypeIds.remove(id);renderFilterState();loadFirstPage();}
+	@FXML private void clearFilters(){selectedTypeIds.clear();rebuildTypeFilter();loadFirstPage();}
+	private void renderFilterState(){int count=selectedTypeIds.size();if(activeFilterCount!=null)activeFilterCount.setText(count+" filter"+(count==1?"":"s"));if(clearFiltersButton!=null)clearFiltersButton.setDisable(count==0);if(selectedFilterChips!=null){selectedFilterChips.getChildren().clear();typeOptions.stream().filter(t->selectedTypeIds.contains(t.organizationTypeId())).forEach(t->{Button b=new Button(t.name()+"  ×");b.getStyleClass().add("contact-filter-chip");if(t.color()!=null&&t.color().matches("#[0-9a-fA-F]{6}"))b.setStyle("-fx-border-color: "+t.color()+"; -fx-background-color: "+t.color()+"22;");b.setOnAction(e->{selectedTypeIds.remove(t.organizationTypeId());rebuildTypeFilter();loadFirstPage();});selectedFilterChips.getChildren().add(b);});}}
 
 	@FXML
 	private void initialize() {
+		if(organizationSort!=null){organizationSort.getItems().setAll("Name A–Z","Name Z–A");organizationSort.getSelectionModel().selectFirst();organizationSort.valueProperty().addListener((o,a,b)->{if(a!=null)loadFirstPage();});com.shale.ui.util.ControlStyles.formControl(organizationSort);}
+		if(clearFiltersButton!=null)com.shale.ui.util.ControlStyles.apply(clearFiltersButton,com.shale.ui.util.ControlStyles.Purpose.GHOST,com.shale.ui.util.ControlStyles.Size.SMALL);
+		if(addOrganizationButton!=null)com.shale.ui.util.ControlStyles.apply(addOrganizationButton,com.shale.ui.util.ControlStyles.Purpose.PRIMARY);
+		if(organizationsSearchField!=null)com.shale.ui.util.ControlStyles.formControl(organizationsSearchField);
 		if (organizationsSearchField != null) {
 			searchDebounce = new PauseTransition(SEARCH_DEBOUNCE);
 			searchDebounce.setOnFinished(e -> {
@@ -184,6 +211,8 @@ public final class OrganizationsController {
 		}
 		latestRequestedQuery = normalizedQuery();
 		loadGeneration++;
+		Integer tenant=appState==null?null:appState.getShaleClientId();
+		if(tenant!=null&&tenant>0)activeCriteria=new OrganizationDao.OrganizationSearchCriteria(tenant,latestRequestedQuery,List.copyOf(selectedTypeIds),OrganizationDao.DirectorySort.NAME,organizationSort!=null&&organizationSort.getSelectionModel().getSelectedIndex()==1?OrganizationDao.SortDirection.DESC:OrganizationDao.SortDirection.ASC,0,pageSize);
 		currentPage = 0;
 		loading = false;
 		hasMore = true;
@@ -212,6 +241,7 @@ public final class OrganizationsController {
 		final int pageToLoad = currentPage;
 		final int generationAtSubmit = loadGeneration;
 		final String search = normalizedQuery();
+		final OrganizationDao.OrganizationSearchCriteria criteria=activeCriteria==null?null:new OrganizationDao.OrganizationSearchCriteria(activeCriteria.shaleClientId(),activeCriteria.searchText(),activeCriteria.organizationTypeIds(),activeCriteria.sortField(),activeCriteria.sortDirection(),pageToLoad*pageSize,pageSize);
 		latestRequestedQuery = search;
 		final long queryStarted = PerfLog.start();
 		if (pageToLoad == 0) { pageLoadStartedNanos = queryStarted; }
@@ -235,7 +265,7 @@ public final class OrganizationsController {
 				}
 				long daoStarted = PerfLog.start();
 				PerfLog.log("organizations.search.dao", "start", "generation=" + generationAtSubmit + " page=" + pageToLoad + " queryLength=" + search.length() + " fullDetailHydration=false");
-				OrganizationDao.PagedResult<DirectoryOrganizationRow> page = organizationDao.findDirectoryPage(pageToLoad, pageSize, search);
+				OrganizationDao.PagedResult<DirectoryOrganizationRow> page = criteria==null?organizationDao.findDirectoryPage(pageToLoad,pageSize,search):organizationDao.findDirectoryPage(criteria);
 				Integer tenantId=appState==null?null:appState.getShaleClientId();
 				Map<Integer,OrganizationDao.OrganizationCardPresentation> pagePresentation=tenantId==null?Map.of():organizationDao.findCardPresentations(tenantId,page.items().stream().map(DirectoryOrganizationRow::id).toList());
 				PerfLog.logDone("organizations.search.dao", "generation=" + generationAtSubmit + " page=" + pageToLoad + " rows=" + page.items().size() + " total=" + page.total() + " fullDetailHydration=false", daoStarted);
@@ -306,6 +336,7 @@ public final class OrganizationsController {
 	}
 
 	private void updateEmptyState(boolean empty) {
+		if(organizationsEmptyStateLabel!=null)organizationsEmptyStateLabel.setText((!normalizedQuery().isEmpty()||!selectedTypeIds.isEmpty())?"No organizations match the current search or filters.":"No organizations to display yet.");
 		if (empty) {
 			UiStateLabels.showEmpty(organizationsEmptyStateLabel);
 		} else {

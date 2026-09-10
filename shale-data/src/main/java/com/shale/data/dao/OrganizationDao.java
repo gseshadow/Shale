@@ -48,6 +48,25 @@ public final class OrganizationDao {
 	public record PagedResult<T>(List<T> items, int page, int pageSize, long total) {
 	}
 
+	public enum DirectorySort { NAME }
+	public enum SortDirection { ASC, DESC }
+
+	/** Immutable desktop-directory request. Public API callers deliberately retain the compatibility overload. */
+	public record OrganizationSearchCriteria(int shaleClientId, String searchText,
+			List<Integer> organizationTypeIds, DirectorySort sortField, SortDirection sortDirection,
+			int offset, int pageSize) {
+		public OrganizationSearchCriteria {
+			if (shaleClientId <= 0) throw new IllegalArgumentException("shaleClientId must be > 0");
+			searchText = normalizeSearch(searchText);
+			organizationTypeIds = organizationTypeIds == null ? List.of() : organizationTypeIds.stream()
+					.filter(Objects::nonNull).filter(id -> id > 0).distinct().toList();
+			sortField = sortField == null ? DirectorySort.NAME : sortField;
+			sortDirection = sortDirection == null ? SortDirection.ASC : sortDirection;
+			if (offset < 0) throw new IllegalArgumentException("offset must be >= 0");
+			if (pageSize <= 0 || pageSize > 100) throw new IllegalArgumentException("pageSize must be between 1 and 100");
+		}
+	}
+
 
 	public record SelectableCaseRow(long id, String name) {
 	}
@@ -277,6 +296,63 @@ public final class OrganizationDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to load organization directory page (page=" + page + ", pageSize=" + pageSize + ")", e);
 		}
+	}
+
+	/** Structured active-only Organization search. Selection and count share exactly the same predicate. */
+	public PagedResult<DirectoryOrganizationRow> findDirectoryPage(OrganizationSearchCriteria criteria) {
+		Objects.requireNonNull(criteria, "criteria");
+		String typeMarks = String.join(",", java.util.Collections.nCopies(criteria.organizationTypeIds().size(), "?"));
+		String typeFilter = criteria.organizationTypeIds().isEmpty() ? "" : """
+				 AND EXISTS (SELECT 1 FROM dbo.OrganizationOrganizationTypes f
+				   JOIN dbo.OrganizationTypes fd ON fd.OrganizationTypeId=f.OrganizationTypeId
+				    AND (fd.ShaleClientId IS NULL OR fd.ShaleClientId=f.ShaleClientId)
+				  WHERE f.OrganizationId=o.Id AND f.ShaleClientId=o.ShaleClientId AND f.IsDeleted=0
+				    AND fd.IsActive=1 AND fd.IsDeleted=0 AND f.OrganizationTypeId IN (%s))
+				""".formatted(typeMarks);
+		String predicate = """
+				o.ShaleClientId=? AND COALESCE(o.IsDeleted,0)=0 AND (?='' OR
+				 LOWER(COALESCE(o.Name,N'')) LIKE ? ESCAPE N'\\' OR
+				 EXISTS(SELECT 1 FROM dbo.OrganizationPhoneNumbers p WHERE p.OrganizationId=o.Id AND p.ShaleClientId=o.ShaleClientId AND p.IsDeleted=0
+				   AND (LOWER(p.DisplayNumber) LIKE ? ESCAPE N'\\' OR (?<>'' AND p.NormalizedNumber LIKE ? ESCAPE N'\\'))) OR
+				 EXISTS(SELECT 1 FROM dbo.OrganizationEmailAddresses e WHERE e.OrganizationId=o.Id AND e.ShaleClientId=o.ShaleClientId AND e.IsDeleted=0
+				   AND LOWER(e.EmailAddress) LIKE ? ESCAPE N'\\') OR
+				 EXISTS(SELECT 1 FROM dbo.OrganizationAddresses a WHERE a.OrganizationId=o.Id AND a.ShaleClientId=o.ShaleClientId AND a.IsDeleted=0
+				   AND LOWER(CONCAT(a.AddressLine1,N' ',a.AddressLine2,N' ',a.City,N' ',a.StateOrProvince,N' ',a.PostalCode,N' ',a.Country)) LIKE ? ESCAPE N'\\') OR
+				 EXISTS(SELECT 1 FROM dbo.OrganizationWebsites w WHERE w.OrganizationId=o.Id AND w.ShaleClientId=o.ShaleClientId AND w.IsDeleted=0
+				   AND LOWER(w.Website) LIKE ? ESCAPE N'\\') OR
+				 EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes a JOIN dbo.OrganizationTypes d ON d.OrganizationTypeId=a.OrganizationTypeId
+				   AND (d.ShaleClientId IS NULL OR d.ShaleClientId=a.ShaleClientId)
+				   WHERE a.OrganizationId=o.Id AND a.ShaleClientId=o.ShaleClientId AND a.IsDeleted=0 AND d.IsActive=1 AND d.IsDeleted=0
+				   AND LOWER(d.Name) LIKE ? ESCAPE N'\\'))
+				""" + typeFilter;
+		String countSql = "SELECT COUNT_BIG(*) FROM dbo.Organizations o WHERE " + predicate;
+		String direction = criteria.sortDirection() == SortDirection.DESC ? "DESC" : "ASC";
+		String pageSql = """
+				SELECT o.Id,o.OrganizationTypeId,ot.Name AS OrganizationTypeName,o.Name,o.Phone,o.Email,o.Website,o.City,o.State
+				FROM dbo.Organizations o LEFT JOIN dbo.OrganizationTypes ot ON ot.OrganizationTypeId=o.OrganizationTypeId
+				 AND (ot.ShaleClientId IS NULL OR ot.ShaleClientId=o.ShaleClientId)
+				WHERE %s ORDER BY o.Name %s,o.Id %s OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+				""".formatted(predicate, direction, direction);
+		long started=perfStart();
+		try(Connection con=db.requireConnection()) {
+			verifyTenantMatchesSession(con,criteria.shaleClientId());
+			long total;
+			try(var ps=con.prepareStatement(countSql)){bindDirectoryCriteria(ps,criteria,false);try(var rs=ps.executeQuery()){rs.next();total=rs.getLong(1);}}
+			if(total==0)return new PagedResult<>(List.of(),criteria.offset()/criteria.pageSize(),criteria.pageSize(),0);
+			List<DirectoryOrganizationRow> items=new ArrayList<>(criteria.pageSize());
+			try(var ps=con.prepareStatement(pageSql)){bindDirectoryCriteria(ps,criteria,true);try(var rs=ps.executeQuery()){while(rs.next())items.add(mapDirectoryOrganization(rs));}}
+			logPerf("organizations.directory.structuredPage","tenantId="+criteria.shaleClientId()+" offset="+criteria.offset()+" pageSize="+criteria.pageSize()+" queryLength="+criteria.searchText().length()+" filterCount="+criteria.organizationTypeIds().size()+" rows="+items.size()+" total="+total,started);
+			return new PagedResult<>(items,criteria.offset()/criteria.pageSize(),criteria.pageSize(),total);
+		}catch(SQLException e){throw new IllegalStateException("Failed to search Organization directory.",e);}
+	}
+
+	private static void bindDirectoryCriteria(PreparedStatement ps,OrganizationSearchCriteria c,boolean paging)throws SQLException{
+		int i=1;String q=c.searchText().toLowerCase(java.util.Locale.ROOT),like=containsPattern(q);
+		String phone=ContactDao.normalizePhoneDigits(c.searchText()),phoneLike=containsPattern(phone);
+		ps.setInt(i++,c.shaleClientId());ps.setString(i++,q);ps.setString(i++,like);ps.setString(i++,like);
+		ps.setString(i++,phone);ps.setString(i++,phoneLike);ps.setString(i++,like);ps.setString(i++,like);ps.setString(i++,like);ps.setString(i++,like);
+		for(Integer id:c.organizationTypeIds())ps.setInt(i++,id);
+		if(paging){ps.setInt(i++,c.offset());ps.setInt(i,c.pageSize());}
 	}
 
 	/** Five fixed, independent active-only queries for one bounded directory page; never a contact-point cross product. */

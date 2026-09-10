@@ -23,7 +23,7 @@ final class OrganizationDaoOrganizationTypeQueryTest {
                 source.indexOf("/** Lightweight directory/list page"));
         String directoryMethod = source.substring(
                 source.indexOf("public PagedResult<DirectoryOrganizationRow> findDirectoryPage"),
-                source.indexOf("/** page is 0-based */", source.indexOf("public PagedResult<DirectoryOrganizationRow> findDirectoryPage")));
+                source.indexOf("/** Structured active-only Organization search", source.indexOf("public PagedResult<DirectoryOrganizationRow> findDirectoryPage")));
         String detailMethod = source.substring(
                 source.indexOf("public Organization findById"),
                 source.indexOf("public int create"));
@@ -63,6 +63,18 @@ final class OrganizationDaoOrganizationTypeQueryTest {
 				"Phase 1B methods contain no mutation SQL");
 		assertTrue(source.contains("value.intValue()"));
 		assertTrue(source.contains("value.longValue()"));
+	}
+
+	@Test void structuredDirectorySearchUsesActiveTenantScopedExistsAndSharedCountPredicate() throws Exception {
+		String source=Files.readString(Path.of("src/main/java/com/shale/data/dao/OrganizationDao.java")).replace("\r\n","\n");
+		String method=methodBody(source,"public PagedResult<DirectoryOrganizationRow> findDirectoryPage(OrganizationSearchCriteria criteria)");
+		for(String table:new String[]{"OrganizationPhoneNumbers","OrganizationEmailAddresses","OrganizationAddresses","OrganizationWebsites","OrganizationOrganizationTypes"}) assertTrue(method.contains("dbo."+table));
+		assertTrue(method.contains("p.DisplayNumber")&&method.contains("p.NormalizedNumber"));
+		for(String component:new String[]{"AddressLine1","AddressLine2","City","StateOrProvince","PostalCode","Country"})assertTrue(method.contains(component));
+		assertTrue(method.contains("a.IsDeleted=0")&&method.contains("d.IsActive=1")&&method.contains("d.IsDeleted=0"));
+		assertTrue(method.contains("COUNT_BIG(*)")&&method.contains("WHERE %s"));
+		assertTrue(method.contains("ORDER BY o.Name %s,o.Id %s"));
+		assertFalse(method.contains("o.Notes"));
 	}
 
 	@Test
