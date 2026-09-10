@@ -912,7 +912,7 @@ public final class CaseDao {
 	}
 
 	private int insertOrganization(Connection con,int shaleClientId,Integer actorUserId,Integer organizationTypeId,String organizationName,Timestamp now)throws SQLException{
-		if(organizationTypeId==null||organizationTypeId<=0)throw new IllegalArgumentException("Organization Type is required.");int actor=actorUserId==null?requirePrincipalUserId(con):actorUserId;return new OrganizationTypeMutationDao(db).createSingleTypeOnConnection(con,shaleClientId,actor,new com.shale.core.service.OrganizationServicePort.OrganizationFields(organizationName,null,null,null,null,null,null,null,null,null,null,null),organizationTypeId);
+		if(organizationTypeId==null||organizationTypeId<=0)throw new IllegalArgumentException("Organization Type is required.");int actor=actorUserId==null?requirePrincipalUserId(con):actorUserId;var fields=new com.shale.core.service.OrganizationServicePort.OrganizationFields(organizationName,null,null,null,null,null,null,null,null,null,null,null);return new OrganizationTypeMutationDao(db).createSingleTypeOnConnection(con,shaleClientId,actor,fields,organizationTypeId,com.shale.core.service.OrganizationServicePort.structuredCreateFromLegacy(fields));
 	}
 	private static int requirePrincipalUserId(Connection con)throws SQLException{try(PreparedStatement p=con.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'PrincipalUserId') AS INT)");ResultSet r=p.executeQuery()){if(!r.next()||r.getObject(1)==null)throw new SecurityException("An authenticated actor is required.");return ((Number)r.getObject(1)).intValue();}}
 

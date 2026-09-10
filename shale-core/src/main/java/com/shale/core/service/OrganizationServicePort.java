@@ -22,7 +22,7 @@ public interface OrganizationServicePort {
 
 	Optional<OrganizationTypeProfile> getOrganizationTypeProfile(int organizationId, int shaleClientId);
 
-	/** Complete active and historical structured contact-method profile; legacy scalars remain authoritative. */
+	/** Complete active and historical structured contact-method profile; structured rows are authoritative. */
 	Optional<OrganizationStructuredContactProfile> findStructuredContactProfile(int shaleClientId, int organizationId);
 
 	OrganizationTypeMutationResult createOrganizationType(CreateOrganizationTypeCommand command);
@@ -221,6 +221,19 @@ public interface OrganizationServicePort {
 		public static <T> OwnedContactCollection<T> omitted(){return new OwnedContactCollection<>(false,List.of());}
 		public static <T> OwnedContactCollection<T> exact(List<T> rows){return new OwnedContactCollection<>(true,rows);}
 	}
+	/** Adapt a legacy create payload into an explicitly owned structured exact set. */
+	static StructuredContactMutation structuredCreateFromLegacy(OrganizationFields f) {
+		java.util.Objects.requireNonNull(f, "fields");
+		var phones = new java.util.ArrayList<StagedOrganizationPhone>();
+		if (meaningful(f.phone())) phones.add(new StagedOrganizationPhone(null,null,OrganizationPhoneKind.WORK,f.phone(),null,true,0,false));
+		if (meaningful(f.fax())) phones.add(new StagedOrganizationPhone(null,null,OrganizationPhoneKind.FAX,f.fax(),null,phones.isEmpty(),phones.size(),false));
+		var emails = meaningful(f.email()) ? List.of(new StagedOrganizationEmail(null,null,OrganizationEmailKind.WORK,f.email(),true,0,false)) : List.<StagedOrganizationEmail>of();
+		var addresses = java.util.stream.Stream.of(f.address1(),f.address2(),f.city(),f.state(),f.postalCode(),f.country()).anyMatch(OrganizationServicePort::meaningful)
+				? List.of(new StagedOrganizationAddress(null,null,OrganizationAddressKind.WORK,f.address1(),f.address2(),f.city(),f.state(),f.postalCode(),f.country(),null,true,0,false)) : List.<StagedOrganizationAddress>of();
+		var websites = meaningful(f.website()) ? List.of(new StagedOrganizationWebsite(null,null,OrganizationWebsiteKind.MAIN,f.website(),true,0,false)) : List.<StagedOrganizationWebsite>of();
+		return new StructuredContactMutation(OwnedContactCollection.exact(phones),OwnedContactCollection.exact(emails),OwnedContactCollection.exact(addresses),OwnedContactCollection.exact(websites));
+	}
+	private static boolean meaningful(String value) { return value != null && !value.trim().isEmpty(); }
 	record StagedOrganizationPhone(Long id,byte[] expectedRowVer,OrganizationPhoneKind kind,String displayNumber,
 			String extension,boolean primary,int sortOrder,boolean deleted) {
 		public StagedOrganizationPhone { expectedRowVer=copyRowVer(expectedRowVer); }

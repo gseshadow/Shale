@@ -5,6 +5,7 @@ import static com.shale.core.service.OrganizationServicePort.*;
 import java.sql.*;
 import java.util.*;
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.service.OrganizationServicePort;
 
 /** Transaction owner for Organizations Phase 1C type definitions and assignments. */
 final class OrganizationTypeMutationDao {
@@ -134,7 +135,10 @@ final class OrganizationTypeMutationDao {
 	}
 
 	int createSingleTypeOnConnection(Connection con,int tenant,int actor,OrganizationFields fields,int typeId)throws SQLException{
-		return createAggregateOnConnection(con,new CreateOrganizationAggregateCommand(tenant,actor,fields,List.of(new StagedOrganizationTypeAssignment(null,typeId,true,0,null))));
+		return createSingleTypeOnConnection(con,tenant,actor,fields,typeId,OrganizationServicePort.structuredCreateFromLegacy(fields));
+	}
+	int createSingleTypeOnConnection(Connection con,int tenant,int actor,OrganizationFields fields,int typeId,OrganizationContactMutation contacts)throws SQLException{
+		return createAggregateOnConnection(con,new CreateOrganizationAggregateCommand(tenant,actor,fields,List.of(new StagedOrganizationTypeAssignment(null,typeId,true,0,null)),contacts));
 	}
 
 	private int createAggregateOnConnection(Connection con,CreateOrganizationAggregateCommand c)throws SQLException{
