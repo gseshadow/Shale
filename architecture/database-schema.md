@@ -452,6 +452,36 @@ Phase 1A preserves all legacy columns and adds unique `(ShaleClientId, Id)` as a
 target. `OrganizationTypeId` remains the runtime primary-type authority until the deferred dual-write
 and read cutover.
 
+### Structured Organization contact methods (Phase 3A)
+
+`OrganizationPhoneNumbers`, `OrganizationEmailAddresses`, `OrganizationAddresses`, and
+`OrganizationWebsites` are additive `bigint` identity children of the composite tenant Organization
+key. Each stores a closed uppercase `Kind`, one active-primary flag, nonnegative `SortOrder`, creation,
+update, and soft-deletion provenance, and `RowVer`. Phone rows preserve `DisplayNumber`, optional
+`NormalizedNumber`, and `Extension`; fax is the phone kind `FAX`. Address rows preserve the full
+legacy component widths and use `StateOrProvince` plus `Country` because the Organization legacy
+country is free-form rather than a verified two-letter code. Website is an Organization-specific
+equivalent because Contacts have no structured website table.
+
+Composite `(ShaleClientId, OrganizationId)` foreign keys prevent cross-tenant ownership and do not
+cascade. Every table uses the established strict `sec.fn_FilterByTenant` predicate on the enabled
+`TenantFilter` policy. Filtered indexes enforce one active primary per Organization and concept;
+phone, case-insensitive email, and website active values also reject duplicates. Display retrieval is
+deterministic by tenant, parent, lifecycle, `SortOrder`, and identity. Deleted rows cannot be primary
+and retain deletion time and actor.
+
+Phase 3A trims only outer whitespace while copying Organization Phone (`WORK`, primary, order 0), Fax
+(`FAX`, nonprimary when Phone exists, order 1), Email (`WORK`, primary, order 0), populated address
+components (`WORK`, primary, order 0), and Website (`MAIN`, primary, order 0). Partial addresses are
+preserved and empty addresses are not created. Historical exact matches, including deleted rows,
+suppress rerun insertion; existing structured rows are never overwritten. A null creation actor is
+the established mechanical-migration provenance and no ordinary entity-action audit is emitted.
+
+The scalar Organization columns remain readable/writable and application-authoritative. There is no
+trigger or dual write, so post-migration scalar edits can drift from these foundation rows until Phase
+3C establishes atomic application write ownership and audit vocabulary. Phase 3B is the read-only
+adapter step. Phase 3A changes no Organization UI, cards, search, API, or runtime mutation behavior.
+
 ### dbo.OrganizationTypes
 
 The existing identity table is the authoritative global/tenant overlay definition table. It retains

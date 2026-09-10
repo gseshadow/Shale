@@ -264,6 +264,30 @@ Add the four Organization contact-point tables using the proven Contact table in
 guarded migration and separate verification. Conservatively backfill legacy Phone, Fax, Email,
 Website, and address fields. Do not delete or blank legacy columns.
 
+Implemented as Organizations Phase 3A by
+`2026-09-10_organizations_phase3a_structured_contact_methods.sql`. The Organization-owned tables are
+`OrganizationPhoneNumbers`, `OrganizationEmailAddresses`, `OrganizationAddresses`, and
+`OrganizationWebsites`; Contacts have no safe website/link child, so the last is the smallest
+Organization-specific equivalent of the phone/email lifecycle. All four are strict tenant-owned,
+RLS-protected historical children with composite Organization ownership, stable identity, closed
+kinds, one active primary per concept, deterministic nonnegative order, actor/timestamp provenance,
+soft deletion, and `RowVer`. No parent delete cascades.
+
+Legacy mapping is exact and conservative: Phone becomes `WORK` order 0 and primary; Fax becomes `FAX`
+order 1 and is primary only when there is no populated Phone or other active primary; Email becomes
+`WORK`; the six address components become one `WORK` address whenever any component is meaningful;
+Website becomes `MAIN`. Outer whitespace is trimmed during controlled copying, but phone punctuation,
+extensions embedded in the legacy value, email internal characters, incomplete addresses, country
+text, and websites without schemes are preserved. Historical matching includes deleted rows, so a
+rerun never resurrects a removed backfill. Existing structured rows are not updated or promoted.
+
+This is database foundation only. Existing scalar columns remain the current read/write authority,
+and no trigger or runtime dual write exists; scalar edits after deployment therefore need not update
+the structured copy. Phase 3B will add a read-only adapter. Phase 3C will own atomic compatibility
+synchronization, authorization, concurrency, restoration, and mutation audits. The audit allowlist is
+unchanged now because mechanical backfill emits no user mutation events. The Organization UI, cards,
+search, APIs, and runtime mutation paths are explicitly unchanged.
+
 ### Phase 2B — Organization aggregate read/write boundary (implemented 2026-09-09)
 
 Add aggregate detail/create/update commands and results to `OrganizationServicePort`. The mutation
