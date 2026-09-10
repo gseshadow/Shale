@@ -468,3 +468,50 @@ collections therefore never clear data. Service/controller code continues to per
 post-commit authoritative refresh and Organization live-update publication; DAO code publishes nothing.
 Phase 3D remains responsible for connecting a staged Contact-style editor. Clickable presentation, cards,
 and search remain Phase 3D/3E presentation work.
+
+## Phase 3D structured Edit Organization modal
+
+The dedicated Edit Organization modal now follows the Contact editor's bounded, scrollable dialog and
+contact-point card language. Its stable Save/Cancel footer remains outside the scrolling surface. The
+scrolling content is divided into Organization Details, Contact Information (Phone Numbers, Email
+Addresses, Addresses, and Websites), Organization Types, and Notes. The legacy single Phone, Fax,
+Email, Website, and six-part address controls no longer exist in this editor; the read-only Organization
+view may continue to render their synchronized compatibility projections.
+
+Every opening loads the Organization identity and `RowVer`, effective type definitions and the complete
+assignment profile, and the complete structured contact profile away from the JavaFX thread. Active and
+historical rows, stable IDs, and opening child `RowVer` values seed dialog-local stages only after all
+loads succeed. An inconsistent Phase 3B compatibility profile is shown as a safe conflict and disables
+Save rather than overwriting either representation. Closing invalidates pending callbacks, and reopening
+creates a new authoritative stage.
+
+Phone, email, address, and website changes are exact staged sets. Cards support add, edit, soft removal,
+clearly labeled historical restoration, contiguous ordering, and primary selection. Phone and Fax share
+the phone collection: when voice rows exist, a non-Fax row owns the primary flag, while compatibility Fax
+continues to select the first ordered active Fax without requiring it to be primary. Email duplicates are
+compared case-insensitively while display casing is retained. Partial addresses are valid, blank addresses
+are not, and a noneditable `LegacyAddressText` is carried through unchanged. Website values are retained
+as entered and do not require a URL scheme. Unknown future kinds remain visible but must be deliberately
+changed to a supported kind before an exact save. As in Edit Contact, removed rows are hidden by default
+behind **Show Removed** and restoration keeps their stable identity and opening concurrency token.
+
+Dirty state compares identity, Notes, Organization Type assignment state, and the exact four structured
+stages with their opening snapshots. Cancel and discard issue no mutation, audit, refresh, or live event;
+reverting all edits clears dirty state. Save validates the complete stage, then invokes exactly one
+`updateOrganizationAggregate` command containing the exact assignment state and one
+`StructuredContactMutation` whose four collections are explicitly `owned=true`. The modal never submits
+`LegacyContactMutation`, updates compatibility scalars separately, or commits per-row mutations. The
+Phase 3C transaction remains authoritative for tenant/actor authorization, all parent/assignment/child
+RowVers, compatibility synchronization, atomic rollback, and transaction-bound PHI-safe audit events;
+no schema or audit migration is added by this UI phase.
+
+A genuine concurrency failure keeps the modal open and reloads Organization identity, types, assignments,
+and all structured rows for explicit user review; it is never silently retried. A successful aggregate
+result closes the dialog and uses the established Organization controller boundary for one authoritative
+view refresh and one post-commit live invalidation. Validation and persistence failures keep the modal
+open and publish nothing.
+
+The New Organization screen intentionally remains a legacy scalar UI caller reconciled by the Phase 3C
+compatibility bridge. Converting Add Organization to the shared structured experience is the remaining UI
+boundary. Phase 3E remains next for read-only structured presentation, clickable phone/email/map/website
+actions, Organization Type chips, card changes, and search/filter changes; none are part of Phase 3D.

@@ -101,12 +101,23 @@ final class OrganizationEditEntryPointTest {
         assertTrue(editor.contains("executor.execute") && editor.contains("dao.findById(organizationId)")
                         && editor.contains("listEffectiveOrganizationTypes(tenant)")
                         && editor.contains("getOrganizationTypeProfile(organizationId, tenant)")
+                        && editor.contains("findStructuredContactProfile(tenant, organizationId)")
                         && editor.contains("findOrganizationRowVer(organizationId, tenant)"),
                 "each opening must load the complete authoritative aggregate away from the FX thread");
         assertTrue(count(editor, "service.updateOrganizationAggregate(command)") == 1,
                 "Save must delegate exactly once to the atomic aggregate mutation");
+        assertTrue(editor.contains("new OrganizationServicePort.StructuredContactMutation(")
+                        && count(editor, "OwnedContactCollection.exact(") == 4,
+                "Save must own all four structured collections in one structured aggregate command");
+        assertFalse(editor.contains("new OrganizationServicePort.LegacyContactMutation")
+                        || editor.contains("value(phone)") || editor.contains("value(fax)")
+                        || editor.contains("value(email)") || editor.contains("value(website)"),
+                "Edit Organization must not submit legacy scalar contact controls or a legacy mutation");
         assertTrue(editor.contains("baseline.assignments().isDirty()") && editor.contains("confirmDiscard()"),
                 "dirty detection and close confirmation must cover shared assignment staging");
+        assertTrue(editor.contains("phones.isDirty()") && editor.contains("emails.isDirty()")
+                        && editor.contains("addresses.isDirty()") && editor.contains("websites.isDirty()"),
+                "dirty detection must include every structured staged collection");
         assertTrue(editor.contains("Organization changed elsewhere. Authoritative values are being reloaded.") && editor.contains("reload();"),
                 "a concurrency conflict must reload authoritative state before another save");
 		assertTrue(editor.contains("LOG.warn(\"Organization aggregate save failed operation=updateOrganizationAggregate tenantId={}")
@@ -118,6 +129,29 @@ final class OrganizationEditEntryPointTest {
 		assertTrue(editor.contains("Organization contact data changed. Reload the Organization and try again.")
 				&& editor.contains("failure instanceof IllegalArgumentException"),
 				"compatibility and safe validation failures must retain distinct user-facing classifications");
+    }
+
+    @Test
+    void structuredEditorUsesContactCardSectionsAndRemovesLegacyScalarControls() throws Exception {
+        String editor = Files.readString(EDITOR);
+        assertTrue(editor.contains("section(\"Organization Details\"")
+                        && editor.contains("section(\"Contact Information\"")
+                        && editor.contains("subsection(\"Phone Numbers\"")
+                        && editor.contains("subsection(\"Email Addresses\"")
+                        && editor.contains("subsection(\"Addresses\"")
+                        && editor.contains("subsection(\"Websites\"")
+                        && editor.contains("section(\"Organization Types\"")
+                        && editor.contains("section(\"Notes\""),
+                "the modal must expose the Contact-style structured section hierarchy");
+        assertTrue(editor.contains("contact-point-card") && editor.contains("Show Removed")
+                        && editor.contains("Move Up") && editor.contains("Make Primary"),
+                "repeated methods must reuse Contact card, history, ordering, and primary language");
+        assertFalse(editor.contains("TextField name = field(), phone")
+                        || editor.contains("add(grid, row++, \"Phone\"")
+                        || editor.contains("add(grid, row++, \"Address 1\""),
+                "legacy scalar contact inputs must not remain hidden in the dialog");
+        assertTrue(editor.contains("compatibilityConsistent()") && editor.contains("saving is disabled"),
+                "an inconsistent opening compatibility profile must prevent unsafe saving");
     }
 
     @Test
