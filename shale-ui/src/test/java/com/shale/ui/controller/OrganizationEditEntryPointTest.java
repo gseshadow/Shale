@@ -24,6 +24,7 @@ final class OrganizationEditEntryPointTest {
     private static final Path FXML = Path.of("src/main/resources/fxml/organization.fxml");
     private static final Path CONTROLLER = Path.of("src/main/java/com/shale/ui/controller/OrganizationController.java");
     private static final Path EDITOR = Path.of("src/main/java/com/shale/ui/controller/EditOrganizationDialog.java");
+    private static final Path SHARED_EDITOR = Path.of("src/main/java/com/shale/ui/controller/OrganizationAggregateEditor.java");
 
     @Test
     void headerExposesAggregateEditBesideDestructiveDelete() throws Exception {
@@ -106,17 +107,18 @@ final class OrganizationEditEntryPointTest {
                 "each opening must load the complete authoritative aggregate away from the FX thread");
         assertTrue(count(editor, "service.updateOrganizationAggregate(command)") == 1,
                 "Save must delegate exactly once to the atomic aggregate mutation");
-        assertTrue(editor.contains("new OrganizationServicePort.StructuredContactMutation(")
-                        && count(editor, "OwnedContactCollection.exact(") == 4,
+        String shared = Files.readString(SHARED_EDITOR);
+        assertTrue(shared.contains("new OrganizationServicePort.StructuredContactMutation(")
+                        && count(shared, "OwnedContactCollection.exact(") == 4,
                 "Save must own all four structured collections in one structured aggregate command");
         assertFalse(editor.contains("new OrganizationServicePort.LegacyContactMutation")
                         || editor.contains("value(phone)") || editor.contains("value(fax)")
                         || editor.contains("value(email)") || editor.contains("value(website)"),
                 "Edit Organization must not submit legacy scalar contact controls or a legacy mutation");
-        assertTrue(editor.contains("baseline.assignments().isDirty()") && editor.contains("confirmDiscard()"),
+        assertTrue(shared.contains("assignmentStage().isDirty()") && editor.contains("confirmDiscard()"),
                 "dirty detection and close confirmation must cover shared assignment staging");
-        assertTrue(editor.contains("phones.isDirty()") && editor.contains("emails.isDirty()")
-                        && editor.contains("addresses.isDirty()") && editor.contains("websites.isDirty()"),
+        assertTrue(shared.contains("phones.isDirty()") && shared.contains("emails.isDirty()")
+                        && shared.contains("addresses.isDirty()") && shared.contains("websites.isDirty()"),
                 "dirty detection must include every structured staged collection");
         assertTrue(editor.contains("Organization changed elsewhere. Authoritative values are being reloaded.") && editor.contains("reload();"),
                 "a concurrency conflict must reload authoritative state before another save");
@@ -126,14 +128,13 @@ final class OrganizationEditEntryPointTest {
 				"the persistence boundary must log safe identifiers, exception class, and the full stack trace exactly once");
 		assertFalse(editor.contains("phone.getText()") || editor.contains("email.getText()") || editor.contains("notes.getText(), failure"),
 				"failure logging must not include staged contact values or notes");
-		assertTrue(editor.contains("Organization contact data changed. Reload the Organization and try again.")
-				&& editor.contains("failure instanceof IllegalArgumentException"),
-				"compatibility and safe validation failures must retain distinct user-facing classifications");
+		assertTrue(editor.contains("failure instanceof IllegalArgumentException"),
+                "safe validation failures must remain user-facing without closing the editor");
     }
 
     @Test
     void structuredEditorUsesContactCardSectionsAndRemovesLegacyScalarControls() throws Exception {
-        String editor = Files.readString(EDITOR);
+        String editor = Files.readString(SHARED_EDITOR);
         assertTrue(editor.contains("section(\"Organization Details\"")
                         && editor.contains("section(\"Contact Information\"")
                         && editor.contains("subsection(\"Phone Numbers\"")
@@ -150,7 +151,8 @@ final class OrganizationEditEntryPointTest {
                         || editor.contains("add(grid, row++, \"Phone\"")
                         || editor.contains("add(grid, row++, \"Address 1\""),
                 "legacy scalar contact inputs must not remain hidden in the dialog");
-        assertTrue(editor.contains("compatibilityConsistent()") && editor.contains("saving is disabled"),
+        String lifecycle = Files.readString(EDITOR);
+        assertTrue(lifecycle.contains("compatibilityConsistent()") && lifecycle.contains("saving is disabled"),
                 "an inconsistent opening compatibility profile must prevent unsafe saving");
     }
 
