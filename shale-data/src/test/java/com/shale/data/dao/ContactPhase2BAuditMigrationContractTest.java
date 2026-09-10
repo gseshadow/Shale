@@ -60,11 +60,12 @@ final class ContactPhase2BAuditMigrationContractTest {
         complete.addAll(Set.of("CASE_TEAM_MEMBER","CASE_TEAM_MEMBER_ROLE"));
         assertTrue(organizations.contains("('ORGANIZATION_TYPE'), ('ORGANIZATION_ORGANIZATION_TYPE')"));
         complete.addAll(AuditEntityTypeMigrationChain.declaredAllowlist(organizations));
+		complete.addAll(AuditEntityTypeMigrationChain.declaredAllowlist(Files.readString(AuditEntityTypeMigrationChain.ORGANIZATIONS_PHASE_3C)));
         assertEquals(AuditEntityTypeMigrationChain.currentlyRequiredVocabulary(),complete,
                 "every chronological successor must preserve the deployed vocabulary and add only its intended tokens");
         assertEquals(List.of(AuditEntityTypeMigrationChain.PHASE_1C,AuditEntityTypeMigrationChain.PHASE_2B,
                 AuditEntityTypeMigrationChain.PHASE_2C_B,AuditEntityTypeMigrationChain.CASE_TEAM_ROLE,
-                AuditEntityTypeMigrationChain.CASE_TEAM_MEMBER,AuditEntityTypeMigrationChain.ORGANIZATIONS),
+				AuditEntityTypeMigrationChain.CASE_TEAM_MEMBER,AuditEntityTypeMigrationChain.ORGANIZATIONS_PHASE_3C),
                 List.of(AuditEntityTypeMigrationChain.PHASE_1C,MIGRATION,AuditEntityTypeMigrationChain.PHASE_2C_B,
                 AuditEntityTypeMigrationChain.CASE_TEAM_ROLE,AuditEntityTypeMigrationChain.CASE_TEAM_MEMBER,
                 AuditEntityTypeMigrationChain.CURRENT));

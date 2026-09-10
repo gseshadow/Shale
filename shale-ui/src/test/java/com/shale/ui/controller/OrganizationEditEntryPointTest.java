@@ -109,6 +109,15 @@ final class OrganizationEditEntryPointTest {
                 "dirty detection and close confirmation must cover shared assignment staging");
         assertTrue(editor.contains("Organization changed elsewhere. Authoritative values are being reloaded.") && editor.contains("reload();"),
                 "a concurrency conflict must reload authoritative state before another save");
+		assertTrue(editor.contains("LOG.warn(\"Organization aggregate save failed operation=updateOrganizationAggregate tenantId={}")
+				&& editor.contains("actorId={}") && editor.contains("organizationId={}")
+				&& editor.contains("failure.getClass().getName(), failure"),
+				"the persistence boundary must log safe identifiers, exception class, and the full stack trace exactly once");
+		assertFalse(editor.contains("phone.getText()") || editor.contains("email.getText()") || editor.contains("notes.getText(), failure"),
+				"failure logging must not include staged contact values or notes");
+		assertTrue(editor.contains("Organization contact data changed. Reload the Organization and try again.")
+				&& editor.contains("failure instanceof IllegalArgumentException"),
+				"compatibility and safe validation failures must retain distinct user-facing classifications");
     }
 
     @Test

@@ -426,3 +426,45 @@ audit behavior. The read itself intentionally emits no audit event because Phase
 consumer or sensitive-value display. Phase 3C remains responsible for atomic structured mutations and
 legacy compatibility synchronization; Organization UI remains unchanged until a later presentation
 phase.
+
+## Phase 3C atomic structured contact mutations
+
+`OrganizationTypeMutationDao` remains the single aggregate transaction owner. Organization scalar fields,
+the exact Organization Type assignment profile, all owned structured-contact collections, compatibility
+scalars, and PHI-minimized entity-action audits share its tenant-stamped JDBC connection and rollback
+boundary. Child helpers neither open connections nor commit. The successful Organization update consumes
+the caller's opening `Organizations.RowVer` exactly once in one consolidated parent update and returns
+`OUTPUT inserted.RowVer`; every submitted persisted child in an owned exact set must carry its opening
+`RowVer`, including unchanged rows, so omission cannot hide a concurrent edit.
+
+Contact participation is explicit. `LegacyContactMutation` preserves the existing desktop, Case/Intake,
+Material Request, direct DAO, and server contracts and changes only a deterministically selected
+compatibility-owned row. It preserves additional active and historical rows and refuses an ambiguous
+ownership decision. `StructuredContactMutation` contains four independently explicit
+`OwnedContactCollection` values: `owned=false` means unchanged, while `owned=true` is an exact active and
+explicit-history set. Exact saves reject duplicate/foreign IDs, missing or stale tokens, unsupported kinds,
+blank values, multiple primaries, and noncontiguous active ordering; omission from an owned collection
+soft-removes an active row, explicit deleted state preserves/restores stable identity, and no hard delete is
+used.
+
+Compatibility selection is deterministic. Phone uses the active primary non-FAX voice row, falling back to
+the first active voice row by `SortOrder, Id`; Fax always uses the first active FAX row by that order and does
+not require `IsPrimary`. When voice exists, the schema's one overall phone primary belongs to voice; Fax may
+be primary only when voice is absent. Email, address, and website use their active primary and otherwise the
+first active ordered row. Missing structured values clear the corresponding scalar, and compatibility-length
+validation occurs before the parent mutation. Thus a callable voice number and Fax legitimately coexist
+without a schema change.
+
+The Phase 3C audit vocabulary is `ORGANIZATION_PHONE`, `ORGANIZATION_EMAIL`, `ORGANIZATION_ADDRESS`, and
+`ORGANIZATION_WEBSITE` (plus the aggregate `ORGANIZATION` parent vocabulary). Create, update, remove,
+restore, and ordering/primary-affecting updates are appended on the business connection. Metadata is limited
+to IDs, kind, ordering/primary state; contact values and RowVers are prohibited. Deploy
+`2026-09-10_organizations_phase3c_audit_allowlist.sql` only after its refusal-default operator guards are
+completed, then run the separate read-only verification script.
+
+The genuine remaining bridge boundary is that public server requests and the current Organization UI remain
+legacy-scalar callers; the server does not yet expose structured exact-set JSON. Omitted structured
+collections therefore never clear data. Service/controller code continues to perform the established single
+post-commit authoritative refresh and Organization live-update publication; DAO code publishes nothing.
+Phase 3D remains responsible for connecting a staged Contact-style editor. Clickable presentation, cards,
+and search remain Phase 3D/3E presentation work.

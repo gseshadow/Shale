@@ -197,11 +197,50 @@ public interface OrganizationServicePort {
 		public boolean compatibilityConsistent() { return compatibility.compatibilityConsistent(); }
 		private static <T> List<T> sorted(List<T> values) { var copy = new java.util.ArrayList<>(java.util.Objects.requireNonNull(values, "contact methods")); copy.sort((a,b)->CONTACT_ORDER.compare(a,b)); return List.copyOf(copy); }
 		private static <T> Optional<T> requiredOptional(Optional<T> value) { return java.util.Objects.requireNonNull(value, "primary projection"); }
-		private static <T> Optional<T> active(Optional<T> value) { return value.filter(v -> !deleted(v) && primary(v)); }
+		private static <T> Optional<T> active(Optional<T> value) { return value.filter(v -> !deleted(v)); }
 		private static boolean primary(Object v) { if(v instanceof OrganizationPhoneNumber x)return x.primary();if(v instanceof OrganizationEmailAddress x)return x.primary();if(v instanceof OrganizationAddress x)return x.primary();return ((OrganizationWebsite)v).primary(); }
 		private static boolean deleted(Object v) { if(v instanceof OrganizationPhoneNumber x)return x.deleted();if(v instanceof OrganizationEmailAddress x)return x.deleted();if(v instanceof OrganizationAddress x)return x.deleted();return ((OrganizationWebsite)v).deleted(); }
 		private static int order(Object v) { if(v instanceof OrganizationPhoneNumber x)return x.sortOrder();if(v instanceof OrganizationEmailAddress x)return x.sortOrder();if(v instanceof OrganizationAddress x)return x.sortOrder();return ((OrganizationWebsite)v).sortOrder(); }
 		private static long id(Object v) { if(v instanceof OrganizationPhoneNumber x)return x.id();if(v instanceof OrganizationEmailAddress x)return x.id();if(v instanceof OrganizationAddress x)return x.id();return ((OrganizationWebsite)v).id(); }
+	}
+
+	/** Explicit contact participation; legacy callers can never accidentally submit an empty exact set. */
+	sealed interface OrganizationContactMutation permits LegacyContactMutation, StructuredContactMutation { }
+	record LegacyContactMutation() implements OrganizationContactMutation { }
+	record StructuredContactMutation(OwnedContactCollection<StagedOrganizationPhone> phones,
+			OwnedContactCollection<StagedOrganizationEmail> emails,
+			OwnedContactCollection<StagedOrganizationAddress> addresses,
+			OwnedContactCollection<StagedOrganizationWebsite> websites) implements OrganizationContactMutation {
+		public StructuredContactMutation {
+			phones=java.util.Objects.requireNonNull(phones); emails=java.util.Objects.requireNonNull(emails);
+			addresses=java.util.Objects.requireNonNull(addresses); websites=java.util.Objects.requireNonNull(websites);
+		}
+	}
+	record OwnedContactCollection<T>(boolean owned,List<T> rows) {
+		public OwnedContactCollection { rows=List.copyOf(java.util.Objects.requireNonNull(rows)); }
+		public static <T> OwnedContactCollection<T> omitted(){return new OwnedContactCollection<>(false,List.of());}
+		public static <T> OwnedContactCollection<T> exact(List<T> rows){return new OwnedContactCollection<>(true,rows);}
+	}
+	record StagedOrganizationPhone(Long id,byte[] expectedRowVer,OrganizationPhoneKind kind,String displayNumber,
+			String extension,boolean primary,int sortOrder,boolean deleted) {
+		public StagedOrganizationPhone { expectedRowVer=copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);}
+	}
+	record StagedOrganizationEmail(Long id,byte[] expectedRowVer,OrganizationEmailKind kind,String emailAddress,
+			boolean primary,int sortOrder,boolean deleted) {
+		public StagedOrganizationEmail { expectedRowVer=copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);}
+	}
+	record StagedOrganizationAddress(Long id,byte[] expectedRowVer,OrganizationAddressKind kind,String addressLine1,
+			String addressLine2,String city,String stateOrProvince,String postalCode,String country,String legacyAddressText,
+			boolean primary,int sortOrder,boolean deleted) {
+		public StagedOrganizationAddress { expectedRowVer=copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);}
+	}
+	record StagedOrganizationWebsite(Long id,byte[] expectedRowVer,OrganizationWebsiteKind kind,String website,
+			boolean primary,int sortOrder,boolean deleted) {
+		public StagedOrganizationWebsite { expectedRowVer=copyRowVer(expectedRowVer); }
+		@Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);}
 	}
 
 	record StagedOrganizationTypeAssignment(Long assignmentId, int organizationTypeId, boolean primary,
@@ -215,23 +254,28 @@ public interface OrganizationServicePort {
 			String notes) { }
 
 	record CreateOrganizationAggregateCommand(int shaleClientId, int actorUserId, OrganizationFields fields,
-			List<StagedOrganizationTypeAssignment> assignments) {
-		public CreateOrganizationAggregateCommand { assignments = List.copyOf(assignments); }
+			List<StagedOrganizationTypeAssignment> assignments, OrganizationContactMutation contactMutation) {
+		public CreateOrganizationAggregateCommand { assignments = List.copyOf(assignments); contactMutation=java.util.Objects.requireNonNull(contactMutation); }
+		public CreateOrganizationAggregateCommand(int tenant,int actor,OrganizationFields fields,List<StagedOrganizationTypeAssignment> assignments){this(tenant,actor,fields,assignments,new LegacyContactMutation());}
 	}
 
 	record UpdateOrganizationAggregateCommand(int organizationId, int shaleClientId, int actorUserId,
 			byte[] expectedOrganizationRowVer, OrganizationFields fields,
-			List<StagedOrganizationTypeAssignment> assignments) {
+			List<StagedOrganizationTypeAssignment> assignments, OrganizationContactMutation contactMutation) {
 		public UpdateOrganizationAggregateCommand {
 			expectedOrganizationRowVer = copyRowVer(expectedOrganizationRowVer);
 			assignments = List.copyOf(assignments);
+			contactMutation=java.util.Objects.requireNonNull(contactMutation);
 		}
+		public UpdateOrganizationAggregateCommand(int organizationId,int tenant,int actor,byte[] rowVer,OrganizationFields fields,List<StagedOrganizationTypeAssignment> assignments){this(organizationId,tenant,actor,rowVer,fields,assignments,new LegacyContactMutation());}
 		@Override public byte[] expectedOrganizationRowVer() { return copyRowVer(expectedOrganizationRowVer); }
 	}
 
 	record OrganizationAggregateResult(int organizationId, byte[] organizationRowVer,
-			OrganizationTypeProfile typeProfile) {
+			OrganizationTypeProfile typeProfile, OrganizationFields fields,
+			OrganizationStructuredContactProfile structuredContactProfile) {
 		public OrganizationAggregateResult { organizationRowVer = copyRowVer(organizationRowVer); }
+		public OrganizationAggregateResult(int id,byte[] rowVer,OrganizationTypeProfile profile){this(id,rowVer,profile,null,null);}
 		@Override public byte[] organizationRowVer() { return copyRowVer(organizationRowVer); }
 	}
 

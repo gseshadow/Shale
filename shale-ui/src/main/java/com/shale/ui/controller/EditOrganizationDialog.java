@@ -5,6 +5,9 @@ import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.shale.core.model.Organization;
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.OrganizationServicePort.OrganizationFields;
@@ -38,6 +41,7 @@ import javafx.stage.Window;
 
 /** Dedicated, dialog-local editor for the complete Organization aggregate. */
 final class EditOrganizationDialog {
+	private static final Logger LOG = LoggerFactory.getLogger(EditOrganizationDialog.class);
     record LoadResult(Organization organization, byte[] rowVer, OrganizationTypeAssignmentStage assignments) {
         LoadResult { rowVer = rowVer == null ? null : rowVer.clone(); }
         @Override public byte[] rowVer() { return rowVer == null ? null : rowVer.clone(); }
@@ -188,13 +192,22 @@ final class EditOrganizationDialog {
                     saved.accept(result);
                 });
             } catch (RuntimeException failure) {
+				LOG.warn("Organization aggregate save failed operation=updateOrganizationAggregate tenantId={} actorId={} organizationId={} exceptionClass={}",
+						tenant, actor, organizationId, failure.getClass().getName(), failure);
                 Platform.runLater(() -> {
                     if (!dialog.isShowing()) return;
                     saving = false;
-                    boolean conflict = failure.getMessage() != null && failure.getMessage().toLowerCase(java.util.Locale.ROOT).contains("changed");
+					String safeFailure = safeFailureMessage(failure);
+					boolean conflict = safeFailure.contains("changed by another user");
                     if (conflict) {
                         showStatus("Organization changed elsewhere. Authoritative values are being reloaded.");
                         reload();
+					} else if (safeFailure.contains("compatibility ownership")) {
+						setControlsDisabled(false);
+						showStatus("Organization contact data changed. Reload the Organization and try again.");
+					} else if (failure instanceof IllegalArgumentException && !safeFailure.isBlank()) {
+						setControlsDisabled(false);
+						showStatus(failure.getMessage());
                     } else {
                         setControlsDisabled(false);
                         showStatus("Unable to save Organization. No changes were applied.");
@@ -203,6 +216,10 @@ final class EditOrganizationDialog {
             }
         });
     }
+
+	private static String safeFailureMessage(Throwable failure) {
+		return failure.getMessage() == null ? "" : failure.getMessage().toLowerCase(java.util.Locale.ROOT);
+	}
 
     private GridPane detailsGrid() {
         GridPane grid = new GridPane();
