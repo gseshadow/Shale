@@ -22,6 +22,7 @@ import com.shale.data.dao.CaseSummaryDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.EnhancedTextArea;
 import com.shale.ui.component.ContactClassificationChipGroup;
+import com.shale.ui.component.ContactMethodDisplayCard;
 import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.component.factory.CaseCardFactory;
@@ -351,7 +352,7 @@ public final class ContactViewController {
         if(addressCards.getChildren().isEmpty())addressCards.getChildren().add(emptyChip("No addresses"));
         updateContactMethodColumns();
     }
-    private Node viewPointCard(String value,String kind,boolean primary,String action,Runnable run){Label v=new Label(fallback(value));v.setWrapText(true);v.getStyleClass().add("contact-point-value");Label k=badge(kind,false),p=badge("Primary",true);Button b=new Button(action);ControlStyles.apply(b,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);b.setOnAction(e->run.run());HBox top=new HBox(6,k);if(primary)top.getChildren().add(p);Region spacer=new Region();HBox.setHgrow(spacer,Priority.ALWAYS);top.getChildren().addAll(spacer,b);VBox card=new VBox(7,top,v);card.getStyleClass().add("contact-point-card");return card;}
+    private Node viewPointCard(String value,String kind,boolean primary,String action,Runnable run){return new ContactMethodDisplayCard(fallback(value),kind,primary,action,run);}
     private static Label badge(String text,boolean primary){Label l=new Label(text);l.getStyleClass().add("contact-point-badge");if(primary)l.getStyleClass().add("contact-point-primary");return l;}
     private void openExternal(String category,Runnable action){try{action.run();LOG.info(()->"operation=contact.external-action contactId="+contactId+" category="+category+" result=success");}catch(RuntimeException ex){LOG.info(()->"operation=contact.external-action contactId="+contactId+" category="+category+" result=unavailable");setError("No application is available for that action.");}}
     private static boolean legacyOnly(ContactServicePort.ContactAddress x){return !safe(x.legacyAddressText()).isBlank()&&java.util.stream.Stream.of(x.addressLine1(),x.addressLine2(),x.city(),x.stateOrProvince(),x.postalCode(),x.countryCode()).allMatch(v->safe(v).isBlank());}

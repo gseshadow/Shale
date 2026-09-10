@@ -531,6 +531,12 @@ addresses are composed only from populated components. Phone, email, map, and we
 validated external-action URI builder. Websites permit only HTTP(S), adding HTTPS to the launch target (not the
 stored value) when needed; unsupported host actions are localized and nonfatal.
 
+Read-only values are ordinary wrapped display text, not hyperlinks. Contact and Organization profiles share the
+same `ContactMethodDisplayCard`: kind and optional Primary badges occupy the upper-left, while a real semantic
+small secondary `Call`, `Email`, `Open in Maps`, or `Open Website` button occupies the upper-right. Fax uses the
+same card without an empty action slot or misleading Call button. The shared component consumes nested button
+mouse actions so an actionable method embedded in an Organization card cannot also activate card navigation.
+
 The existing `OrganizationCard` is extended rather than replaced. Directory pages fetch card presentation data
 for at most 100 current-page Organization IDs using five tenant-scoped, active-only queries (types, preferred
 voice phone, preferred email, primary address, and preferred website). Independent queries avoid a contact-point

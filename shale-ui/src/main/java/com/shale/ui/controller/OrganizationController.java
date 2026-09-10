@@ -21,6 +21,7 @@ import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.CaseSummaryDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.ClassificationChipGroup;
+import com.shale.ui.component.ContactMethodDisplayCard;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
@@ -139,6 +140,8 @@ public final class OrganizationController {
 
 		hideRemoteUpdateBanner();
 		refreshAdminActions();
+		if(phoneCards!=null)phoneCards.widthProperty().addListener((o,a,b)->configureMethodTiles(phoneCards));
+		if(emailCards!=null)emailCards.widthProperty().addListener((o,a,b)->configureMethodTiles(emailCards));
 
 		if (organizationTitleLabel != null) {
 			organizationTitleLabel.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -468,19 +471,15 @@ public final class OrganizationController {
 		if(phoneCards==null||emailCards==null||addressCards==null||websiteCards==null)return;
 		phoneCards.getChildren().clear();emailCards.getChildren().clear();addressCards.getChildren().clear();websiteCards.getChildren().clear();
 		if(currentContactProfile!=null){
-			currentContactProfile.activePhones().stream().sorted(contactOrder(OrganizationServicePort.OrganizationPhoneNumber::primary,OrganizationServicePort.OrganizationPhoneNumber::sortOrder,OrganizationServicePort.OrganizationPhoneNumber::id)).forEach(p->phoneCards.getChildren().add(methodCard(phoneDisplay(p),kindLabel(p.kind(),p.rawKind()),p.primary(),p.fax()?null:"Call phone number",()->externalActions.open(ContactExternalActions.telephone(p.normalizedNumber(),p.extension())))));
-			currentContactProfile.activeEmails().stream().sorted(contactOrder(OrganizationServicePort.OrganizationEmailAddress::primary,OrganizationServicePort.OrganizationEmailAddress::sortOrder,OrganizationServicePort.OrganizationEmailAddress::id)).forEach(e->emailCards.getChildren().add(methodCard(e.emailAddress(),kindLabel(e.kind(),e.rawKind()),e.primary(),validEmail(e.emailAddress())?"Send email":null,()->externalActions.open(ContactExternalActions.email(e.emailAddress())))));
+			currentContactProfile.activePhones().stream().sorted(contactOrder(OrganizationServicePort.OrganizationPhoneNumber::primary,OrganizationServicePort.OrganizationPhoneNumber::sortOrder,OrganizationServicePort.OrganizationPhoneNumber::id)).forEach(p->phoneCards.getChildren().add(methodCard(phoneDisplay(p),kindLabel(p.kind(),p.rawKind()),p.primary(),p.fax()?null:"Call",()->externalActions.open(ContactExternalActions.telephone(p.normalizedNumber(),p.extension())))));
+			currentContactProfile.activeEmails().stream().sorted(contactOrder(OrganizationServicePort.OrganizationEmailAddress::primary,OrganizationServicePort.OrganizationEmailAddress::sortOrder,OrganizationServicePort.OrganizationEmailAddress::id)).forEach(e->emailCards.getChildren().add(methodCard(e.emailAddress(),kindLabel(e.kind(),e.rawKind()),e.primary(),validEmail(e.emailAddress())?"Email":null,()->externalActions.open(ContactExternalActions.email(e.emailAddress())))));
 			currentContactProfile.activeAddresses().stream().sorted(contactOrder(OrganizationServicePort.OrganizationAddress::primary,OrganizationServicePort.OrganizationAddress::sortOrder,OrganizationServicePort.OrganizationAddress::id)).forEach(a->{String value=formatAddress(a);addressCards.getChildren().add(methodCard(value,kindLabel(a.kind(),a.rawKind()),a.primary(),value.isBlank()?null:"Open address in maps",()->externalActions.open(ContactExternalActions.maps(value))));});
-			currentContactProfile.activeWebsites().stream().sorted(contactOrder(OrganizationServicePort.OrganizationWebsite::primary,OrganizationServicePort.OrganizationWebsite::sortOrder,OrganizationServicePort.OrganizationWebsite::id)).forEach(w->websiteCards.getChildren().add(methodCard(w.website(),kindLabel(w.kind(),w.rawKind()),w.primary(),safeWebsite(w.website())?"Open website":null,()->externalActions.open(ContactExternalActions.website(w.website())))));
+			currentContactProfile.activeWebsites().stream().sorted(contactOrder(OrganizationServicePort.OrganizationWebsite::primary,OrganizationServicePort.OrganizationWebsite::sortOrder,OrganizationServicePort.OrganizationWebsite::id)).forEach(w->websiteCards.getChildren().add(methodCard(w.website(),kindLabel(w.kind(),w.rawKind()),w.primary(),safeWebsite(w.website())?"Open Website":null,()->externalActions.open(ContactExternalActions.website(w.website())))));
 		}
 		showGroup(phoneSection,!phoneCards.getChildren().isEmpty());showGroup(emailSection,!emailCards.getChildren().isEmpty());showGroup(addressSection,!addressCards.getChildren().isEmpty());showGroup(websiteSection,!websiteCards.getChildren().isEmpty());
 	}
 	private Node methodCard(String value,String kind,boolean primary,String action,Runnable launch){
-		VBox card=new VBox(4);card.getStyleClass().add("contact-point-view-card");
-		Label display=new Label(value);display.setWrapText(true);display.setMaxWidth(Double.MAX_VALUE);display.getStyleClass().add("case-overview-row-value");
-		Label meta=new Label(kind+(primary?" · Primary":""));meta.getStyleClass().add("functional-metadata");
-		if(action!=null){display.getStyleClass().add("external-action-link");display.setCursor(javafx.scene.Cursor.HAND);display.setTooltip(new Tooltip(action));display.setAccessibleText(action);display.setOnMouseClicked(e->{e.consume();try{launch.run();}catch(RuntimeException ex){AppDialogs.showError(dialogOwner(editButton),"Open External Action","Unable to open this item.");}});}
-		card.getChildren().addAll(display,meta);return card;
+		return new ContactMethodDisplayCard(value,kind,primary,action,()->{try{launch.run();}catch(RuntimeException ex){AppDialogs.showError(dialogOwner(editButton),"Open External Action","Unable to open this item.");}});
 	}
 	private static void showGroup(Node node,boolean show){if(node!=null){node.setVisible(show);node.setManaged(show);}}
 	private static String phoneDisplay(OrganizationServicePort.OrganizationPhoneNumber p){return p.displayNumber()+(p.extension()==null||p.extension().isBlank()?"":" ext. "+p.extension());}
@@ -490,6 +489,7 @@ public final class OrganizationController {
 	private static boolean validEmail(String value){return value!=null&&value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");}
 	private static boolean safeWebsite(String value){try{ContactExternalActions.website(value);return true;}catch(IllegalArgumentException ex){return false;}}
 	private static <T> Comparator<T> contactOrder(java.util.function.Predicate<T> primary,java.util.function.ToIntFunction<T> order,java.util.function.ToLongFunction<T> id){return Comparator.<T,Boolean>comparing(primary::test).reversed().thenComparingInt(order).thenComparingLong(id);}
+	private static void configureMethodTiles(TilePane pane){double width=pane.getWidth();boolean two=width>=600;pane.setPrefColumns(two?2:1);pane.setPrefTileWidth(two?Math.max(250,(width-pane.getHgap())/2):Math.max(250,width));}
 
 	private void renderRelatedCases() {
 		if (!Platform.isFxApplicationThread()) {

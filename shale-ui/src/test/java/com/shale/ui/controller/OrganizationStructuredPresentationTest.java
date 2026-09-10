@@ -14,5 +14,8 @@ final class OrganizationStructuredPresentationTest {
         for(String id:List.of("organizationTypeChips","phoneCards","emailCards","addressCards","websiteCards"))assertTrue(view.contains("fx:id=\""+id+"\""),id);
         assertTrue(controller().contains("currentContactProfile.activePhones()"));
         assertFalse(controller().contains("phoneValue.setText"));
+        assertTrue(controller().contains("new ContactMethodDisplayCard"));
+        assertFalse(controller().contains("external-action-link"));
+        assertTrue(controller().contains("p.fax()?null:\"Call\""));
     }
 }
