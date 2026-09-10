@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import com.shale.core.model.Organization;
@@ -105,6 +106,11 @@ public final class OrganizationDao {
 			String city,
 			String state
 	) {
+	}
+	public record OrganizationCardType(long assignmentId,int definitionId,String label,String color,boolean primary,int sortOrder) { }
+	public record OrganizationCardPresentation(List<OrganizationCardType> types,String phone,String phoneNormalized,
+			String phoneExtension,String email,String address,String website) {
+		public OrganizationCardPresentation { types=List.copyOf(types); }
 	}
 
 	public record OrganizationCreateRequest(
@@ -272,6 +278,37 @@ public final class OrganizationDao {
 			throw new RuntimeException("Failed to load organization directory page (page=" + page + ", pageSize=" + pageSize + ")", e);
 		}
 	}
+
+	/** Five fixed, independent active-only queries for one bounded directory page; never a contact-point cross product. */
+	public Map<Integer,OrganizationCardPresentation> findCardPresentations(int shaleClientId,List<Integer> organizationIds) {
+		validateTenantId(shaleClientId);
+		List<Integer> ids=organizationIds==null?List.of():organizationIds.stream().filter(Objects::nonNull).filter(id->id>0).distinct().limit(100).toList();
+		if(ids.isEmpty())return Map.of();
+		String marks=String.join(",",java.util.Collections.nCopies(ids.size(),"?"));
+		var types=new java.util.HashMap<Integer,List<OrganizationCardType>>();
+		var phone=new java.util.HashMap<Integer,String[]>(); var email=new java.util.HashMap<Integer,String>();
+		var address=new java.util.HashMap<Integer,String>(); var website=new java.util.HashMap<Integer,String>();
+		try(Connection con=db.requireConnection()){
+			verifyTenantMatchesSession(con,shaleClientId);
+			String typeSql="SELECT a.OrganizationId,a.Id,ot.OrganizationTypeId,ot.Name,ot.Color,a.IsPrimary,a.SortOrder FROM dbo.OrganizationOrganizationTypes a JOIN dbo.OrganizationTypes ot ON ot.OrganizationTypeId=a.OrganizationTypeId AND (ot.ShaleClientId IS NULL OR ot.ShaleClientId=a.ShaleClientId) WHERE a.ShaleClientId=? AND a.OrganizationId IN ("+marks+") AND a.IsDeleted=0 AND ot.IsActive=1 AND ot.IsDeleted=0 ORDER BY a.OrganizationId,a.IsPrimary DESC,a.SortOrder,a.Id";
+			try(var p=con.prepareStatement(typeSql)){bindTenantIds(p,shaleClientId,ids);try(var r=p.executeQuery()){while(r.next())types.computeIfAbsent(r.getInt(1),ignored->new ArrayList<>()).add(new OrganizationCardType(r.getLong(2),r.getInt(3),r.getString(4),r.getString(5),r.getBoolean(6),r.getInt(7)));}}
+			String phoneSql="SELECT OrganizationId,DisplayNumber,NormalizedNumber,Extension FROM (SELECT OrganizationId,DisplayNumber,NormalizedNumber,Extension,ROW_NUMBER() OVER(PARTITION BY OrganizationId ORDER BY IsPrimary DESC,SortOrder,Id) rn FROM dbo.OrganizationPhoneNumbers WHERE ShaleClientId=? AND OrganizationId IN ("+marks+") AND IsDeleted=0 AND Kind<>'FAX') q WHERE rn=1";
+			try(var p=con.prepareStatement(phoneSql)){bindTenantIds(p,shaleClientId,ids);try(var r=p.executeQuery()){while(r.next())phone.put(r.getInt(1),new String[]{r.getString(2),r.getString(3),r.getString(4)});}}
+			email.putAll(loadCardScalar(con,"OrganizationEmailAddresses","EmailAddress",shaleClientId,ids,marks));
+			website.putAll(loadCardScalar(con,"OrganizationWebsites","Website",shaleClientId,ids,marks));
+			String addressSql="SELECT OrganizationId,AddressLine1,AddressLine2,City,StateOrProvince,PostalCode,Country FROM (SELECT OrganizationId,AddressLine1,AddressLine2,City,StateOrProvince,PostalCode,Country,ROW_NUMBER() OVER(PARTITION BY OrganizationId ORDER BY IsPrimary DESC,SortOrder,Id) rn FROM dbo.OrganizationAddresses WHERE ShaleClientId=? AND OrganizationId IN ("+marks+") AND IsDeleted=0) q WHERE rn=1";
+			try(var p=con.prepareStatement(addressSql)){bindTenantIds(p,shaleClientId,ids);try(var r=p.executeQuery()){while(r.next())address.put(r.getInt(1),formatAddress(r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7)));}}
+		}catch(SQLException e){throw new IllegalStateException("Failed to load Organization card presentation.",e);}
+		var out=new java.util.HashMap<Integer,OrganizationCardPresentation>();
+		for(Integer id:ids){String[] p=phone.get(id);out.put(id,new OrganizationCardPresentation(types.getOrDefault(id,List.of()),p==null?null:p[0],p==null?null:p[1],p==null?null:p[2],email.get(id),address.get(id),website.get(id)));}
+		return Map.copyOf(out);
+	}
+	private static Map<Integer,String> loadCardScalar(Connection con,String table,String column,int tenant,List<Integer> ids,String marks)throws SQLException{
+		String sql="SELECT OrganizationId,"+column+" FROM (SELECT OrganizationId,"+column+",ROW_NUMBER() OVER(PARTITION BY OrganizationId ORDER BY IsPrimary DESC,SortOrder,Id) rn FROM dbo."+table+" WHERE ShaleClientId=? AND OrganizationId IN ("+marks+") AND IsDeleted=0) q WHERE rn=1";
+		var out=new java.util.HashMap<Integer,String>();try(var p=con.prepareStatement(sql)){bindTenantIds(p,tenant,ids);try(var r=p.executeQuery()){while(r.next())out.put(r.getInt(1),r.getString(2));}}return out;
+	}
+	private static void bindTenantIds(PreparedStatement p,int tenant,List<Integer> ids)throws SQLException{p.setInt(1,tenant);for(int i=0;i<ids.size();i++)p.setInt(i+2,ids.get(i));}
+	private static String formatAddress(String... values){return java.util.Arrays.stream(values).filter(v->v!=null&&!v.isBlank()).map(String::trim).collect(java.util.stream.Collectors.joining(", "));}
 
 	/** page is 0-based */
 	public PagedResult<Organization> findPage(int page, int pageSize, String searchName) {

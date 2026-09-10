@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 import com.shale.core.model.Organization;
 import com.shale.ui.component.OrganizationCard;
 import com.shale.ui.util.ColorUtil;
+import com.shale.data.dao.OrganizationDao.OrganizationCardPresentation;
 
 public class OrganizationCardFactory {
 
@@ -62,6 +63,14 @@ public class OrganizationCardFactory {
 		}
 
 		return card;
+	}
+	public OrganizationCard create(OrganizationCardModel model,OrganizationCardPresentation presentation,Variant variant){
+		OrganizationCard card=create(model,variant);
+		if(presentation==null)return card;
+		card.setSuppressPlaceholderLines(true);
+		card.setTypes(presentation.types());card.setStructuredPhone(presentation.phone(),presentation.phoneNormalized(),presentation.phoneExtension());
+		card.setEmail(presentation.email());card.setAddress(presentation.address());card.setWebsite(presentation.website());
+		switch(variant){case FULL->card.applyFull();case COMPACT->card.applyCompact();case MINI->card.applyMini();}return card;
 	}
 
 	public OrganizationCard create(Organization organization, Variant variant) {

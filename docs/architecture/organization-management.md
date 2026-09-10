@@ -515,3 +515,30 @@ The New Organization screen intentionally remains a legacy scalar UI caller reco
 compatibility bridge. Converting Add Organization to the shared structured experience is the remaining UI
 boundary. Phase 3E remains next for read-only structured presentation, clickable phone/email/map/website
 actions, Organization Type chips, card changes, and search/filter changes; none are part of Phase 3D.
+
+## Phase 3E.1 structured read-only presentation
+
+Organization View now loads the active Organization, its authoritative Organization Type assignment profile,
+and its complete structured contact profile off the JavaFX thread under one stale-generation guard. The header
+shows active definitions as wrapping, database-colored chips in primary, assignment-order, stable-ID order; the
+compatibility scalar type is not rendered separately. Historical/deleted assignments and contact methods remain
+available to the editor/read aggregate but are outside the normal read-only presentation.
+
+The former scalar Phone, Fax, Email, Website, Address1, Address2, City, State, Postal Code, and Country rows are
+replaced by sparse Phone Numbers, Email Addresses, Addresses, and Websites card groups. Values remain unchanged
+for display, unknown kinds receive a readable fallback, Fax is visibly a Fax and is not callable, and partial
+addresses are composed only from populated components. Phone, email, map, and website actions reuse the shared
+validated external-action URI builder. Websites permit only HTTP(S), adding HTTPS to the launch target (not the
+stored value) when needed; unsupported host actions are localized and nonfatal.
+
+The existing `OrganizationCard` is extended rather than replaced. Directory pages fetch card presentation data
+for at most 100 current-page Organization IDs using five tenant-scoped, active-only queries (types, preferred
+voice phone, preferred email, primary address, and preferred website). Independent queries avoid a contact-point
+cross product and keep query count fixed as card count grows. Page results and their projections share the
+existing search/page generation guard, so stale hydration cannot attach to a newer generation. Nested external
+actions consume their mouse event while the card retains mouse and keyboard profile navigation.
+
+This read-only feature adds no meaningful mutation and therefore no new entity-action audit event or migration;
+existing structured reads retain their established audit treatment. Phase 3E.2 remains responsible for
+Organization Type and structured contact search/filtering. New Organization structured creation also remains a
+later compatibility cleanup.
