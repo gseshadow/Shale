@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,26 @@ import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.OrganizationDao;
 
 final class OrganizationServiceAdapterTest {
+	@Test void structuredReadDelegatesOnceMapsHistoryUnknownKindsAndCompatibility(){
+		var g=new FakeOrganizations();byte[] rv={1,2};g.structuredProfile=new OrganizationDao.StructuredContactProfileRow(7,41,
+				new OrganizationDao.LegacyContactRow(" 555 ","999","USER@example.test","https://x", "One",null,"Town","NM","1","US"),
+				List.of(phoneRow(2,"ALIEN","old",false,1,true,new byte[]{3}),phoneRow(1,"WORK","555",true,0,false,rv),phoneRow(3,"FAX","999",true,0,false,new byte[]{4})),
+				List.of(new OrganizationDao.EmailRow(4,41,7,"WORK","user@example.test","user@example.test",true,0,false,life(),new byte[]{5})),
+				List.of(new OrganizationDao.AddressRow(5,41,7,"WORK","One",null,"Town","NM","1","US",null,true,0,false,life(),new byte[]{6})),
+				List.of(new OrganizationDao.WebsiteRow(6,41,7,"MAIN","https://x",true,0,false,life(),new byte[]{7})));
+		var profile=new OrganizationServiceAdapter(g,(t,o)->List.of()).findStructuredContactProfile(41,7).orElseThrow();rv[0]=9;
+		assertEquals(1,g.structuredCalls);assertEquals(1,profile.primaryPhone().orElseThrow().id());assertEquals(3,profile.primaryFax().orElseThrow().id());
+		assertEquals(com.shale.core.service.OrganizationServicePort.OrganizationPhoneKind.UNKNOWN,profile.phones().get(2).kind());
+		assertEquals("ALIEN",profile.phones().get(2).rawKind());assertTrue(profile.compatibilityConsistent());assertArrayEquals(new byte[]{1,2},profile.primaryPhone().orElseThrow().rowVer());
+	}
+	@Test void structuredCompatibilityReportsMissingDifferentAndDuplicatePrimariesWithoutSelectingArbitrarily(){
+		var g=new FakeOrganizations();g.structuredProfile=new OrganizationDao.StructuredContactProfileRow(7,41,new OrganizationDao.LegacyContactRow("legacy",null,null,null,null,null,null,null,null,null),List.of(phoneRow(1,"WORK","one",true,0,false,new byte[]{1}),phoneRow(2,"HOME","two",true,1,false,new byte[]{2})),List.of(),List.of(),List.of());
+		var profile=new OrganizationServiceAdapter(g,(t,o)->List.of()).findStructuredContactProfile(41,7).orElseThrow();
+		assertTrue(profile.primaryPhone().isEmpty());assertEquals(com.shale.core.service.OrganizationServicePort.CompatibilityState.INVALID_PRIMARY,profile.compatibility().phone());assertFalse(profile.compatibilityConsistent());
+	}
+	@Test void structuredReadValidatesIdsAndMissingRemainsEmpty(){var g=new FakeOrganizations();var service=new OrganizationServiceAdapter(g,(t,o)->List.of());assertThrows(IllegalArgumentException.class,()->service.findStructuredContactProfile(0,1));assertThrows(IllegalArgumentException.class,()->service.findStructuredContactProfile(1,0));assertTrue(service.findStructuredContactProfile(41,404).isEmpty());assertEquals(1,g.structuredCalls);}
+	private static OrganizationDao.PhoneRow phoneRow(long id,String kind,String value,boolean primary,int order,boolean deleted,byte[] rv){return new OrganizationDao.PhoneRow(id,41,7,kind,value,null,null,primary,order,deleted,life(),rv);}
+	private static OrganizationDao.LifecycleRow life(){return new OrganizationDao.LifecycleRow(Instant.EPOCH,null,null,null,null,null);}
 	@Test void administrationReadDelegatesWithoutLosingLifecycleRows(){var gateway=new FakeOrganizations();gateway.administrationTypes=List.of(new OrganizationDao.OrganizationTypeDefinitionRow(20,41,"removed","Removed","history","#6C757D",2,false,true,new byte[]{9}));var service=new OrganizationServiceAdapter(gateway,(id,tenant)->List.of());var rows=service.listOrganizationTypesForAdministration(41,7);assertEquals(1,gateway.administrationCalls);assertTrue(rows.get(0).deleted());}
 	@Test void phaseOneCMutationsDelegateToTheAuthoritativeOrganizationGateway() {
 		FakeOrganizations organizations = new FakeOrganizations(organization(7, 41));
@@ -120,7 +141,9 @@ final class OrganizationServiceAdapterTest {
 		private List<OrganizationDao.OrganizationTypeDefinitionRow> effectiveTypes=List.of();
 		private List<OrganizationDao.OrganizationTypeDefinitionRow> administrationTypes=List.of(); private int administrationCalls;
 		private OrganizationDao.OrganizationTypeProfileRow profile;
+		private OrganizationDao.StructuredContactProfileRow structuredProfile;
 		private int effectiveCalls,profileCalls;
+		private int structuredCalls;
 		private com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand assignmentCommand;
 		private com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand aggregateCreate;
 		private com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand aggregateUpdate;
@@ -133,6 +156,7 @@ final class OrganizationServiceAdapterTest {
 		@Override public List<OrganizationDao.OrganizationTypeDefinitionRow> listEffectiveOrganizationTypeDefinitions(int tenant){effectiveCalls++;return effectiveTypes;}
 		@Override public List<OrganizationDao.OrganizationTypeDefinitionRow> listOrganizationTypesForAdministration(int tenant,int actor){administrationCalls++;return administrationTypes;}
 		@Override public OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organization,int tenant){profileCalls++;return profile;}
+		@Override public OrganizationDao.StructuredContactProfileRow findStructuredContactProfile(int tenant,int organization){structuredCalls++;return structuredProfile;}
 		@Override public int create(OrganizationDao.OrganizationCreateRequest r){return 0;}
 		@Override public void update(Organization o){}
 		@Override public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult assignOrganizationType(com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand c){assignmentCommand=c;return new com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult(101, c.organizationId(), c.organizationTypeId(), false, 1, false, new byte[]{1});}

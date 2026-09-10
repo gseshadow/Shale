@@ -20,10 +20,10 @@ code still reads only `OrganizationTypeId` and `Name`; the new overlay fields an
 foundation rather than a runtime read cutover. `OrganizationDaoOrganizationTypeQueryTest` therefore
 continues to protect the unchanged legacy query shape.
 
-No structured Organization phone, email, address, or website child tables exist in the repository.
-The equivalent Contact tables are `ContactPhoneNumbers`, `ContactEmailAddresses`, and
-`ContactAddresses`. They provide strict tenant ownership, one active primary value per category,
-ordering, soft-delete history, actor metadata, timestamps, and `RowVer`.
+Phase 3A added `OrganizationPhoneNumbers`, `OrganizationEmailAddresses`, `OrganizationAddresses`,
+and `OrganizationWebsites`. Like the equivalent Contact tables, they provide strict tenant
+ownership, one active primary value per category, ordering, soft-delete history, actor metadata,
+timestamps, and `RowVer`.
 
 ### Persistence and services
 
@@ -393,3 +393,36 @@ new blocking pixel-geometry tests.
 * Preserve historical assignments and legacy values through cutover.
 * Do not let classifications replace case-specific roles.
 * Keep migrations additive, guarded, rerunnable, and independently verifiable.
+
+## Phase 3B structured contact-method read boundary
+
+Phase 3B adds the immutable, Organization-owned `OrganizationPhoneNumber`,
+`OrganizationEmailAddress`, `OrganizationAddress`, and `OrganizationWebsite` read models and the
+aggregate `OrganizationStructuredContactProfile`. `OrganizationServicePort.findStructuredContactProfile`
+returns `Optional.empty()` when the active Organization is absent in the caller's tenant; an
+Organization in another tenant is deliberately indistinguishable from a missing one.
+
+`OrganizationDao` owns this read. It verifies the tenant-stamped session, loads the active parent and
+its legacy scalar values, then issues one explicit-column query for each structured table on the same
+connection. Every statement filters both `ShaleClientId` and `OrganizationId`; this bounded five-query
+shape avoids both N+1 access and a four-way contact-method cross product.
+
+The profile contains complete active and soft-deleted history. Each collection is immutable and sorts
+active rows first by `SortOrder`, then stable `Id`, followed by deleted rows in the same order. Safe
+active projections are provided. Primary phone, fax, email, address, and website projections consider
+only active rows, and duplicate active primaries produce `INVALID_PRIMARY` compatibility state rather
+than an arbitrary selection. Unknown future `Kind` values map to `UNKNOWN` while preserving their raw
+database value; other corrupt invariants produce a table-scoped data-integrity failure.
+
+Compatibility is reported independently for phone, fax, email, address, and website as both absent,
+matching, legacy-only, structured-only, different, or invalid-primary. Comparison trims outer
+whitespace, compares email case-insensitively, compares address components independently, and does not
+rewrite values or erase phone punctuation differences. An overall convenience result is true only
+when every concept is matching or absent on both sides.
+
+Legacy scalar Organization fields remain application-authoritative. This additive read does not alter
+Organization detail, cards, search, controllers, server APIs, caches, live updates, writes, schema, or
+audit behavior. The read itself intentionally emits no audit event because Phase 3B introduces no new
+consumer or sensitive-value display. Phase 3C remains responsible for atomic structured mutations and
+legacy compatibility synchronization; Organization UI remains unchanged until a later presentation
+phase.
