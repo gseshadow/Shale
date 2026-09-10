@@ -482,6 +482,12 @@ trigger or dual write, so post-migration scalar edits can drift from these found
 3C establishes atomic application write ownership and audit vocabulary. Phase 3B is the read-only
 adapter step. Phase 3A changes no Organization UI, cards, search, API, or runtime mutation behavior.
 
+Phase 3F.2 supersedes that Phase 3A runtime boundary: the structured tables are now authoritative for
+application presentation and mutation. The scalar contact columns remain physically present as synchronized
+compatibility mirrors for server, report/export, and legacy model projections. Only the Organization aggregate
+transaction owner may write them; legacy create/patch inputs must first be adapted to structured mutation state.
+No trigger, schema removal, or independent scalar update is permitted.
+
 ### dbo.OrganizationTypes
 
 The existing identity table is the authoritative global/tenant overlay definition table. It retains

@@ -604,3 +604,50 @@ Case, Intake, Material Request, direct DAO, and server Organization creation rem
 callers. Phase 3C continues reconciling those contracts to deterministic structured compatibility rows inside
 the aggregate transaction. Phase 3F.2 is the future boundary for removing those compatibility callers only
 after each embedded/public contract is explicitly migrated; Phase 3F.1 does not change the public API.
+
+## Phase 3F.2 — structured authority and legacy compatibility closure
+
+The four structured Organization contact tables are the authoritative in-repository presentation and mutation
+model. `Organizations.Phone`, `Fax`, `Email`, `Website`, and postal-address columns remain synchronized
+compatibility mirrors; they are not removed, and new application code must not treat them as contact storage.
+Only `OrganizationTypeMutationDao`, the aggregate transaction owner, may write those mirrors. Legacy inputs are
+adapted to structured mutations before that owner commits.
+
+### Complete mutation ownership
+
+* New and Edit submit structured exact sets through the Organization service aggregate commands.
+* The public legacy service create method converts populated scalar inputs to explicitly owned structured rows;
+  blanks produce no rows. Its update method is a compatibility patch adapter which reconciles only the safely
+  identified compatibility-owned row and preserves additional structured values.
+* `OrganizationDao#create` and `#update` remain deprecated source-compatible adapters and contain no independent
+  Organization mutation SQL. Organization deletion remains its established separate lifecycle operation.
+* Case and Intake call the connection-bound single-type aggregate worker with four explicitly owned empty
+  contact collections. The worker neither opens nor commits a connection, so the Organization, type assignment,
+  structured audit events, parent Case/Intake, and party relationship roll back together.
+* Material Request “Requested From” currently collects only Name and Type. Its reachable DAO compatibility call
+  delegates to the same aggregate and therefore submits empty structured collections, creates no blank child,
+  and returns only after commit; the existing chooser refresh/selection occurs only after that success.
+
+### Public and read-only compatibility boundaries
+
+Server Organization POST/PATCH JSON remains unchanged. POST scalar fields become structured create rows and
+mirrors atomically. PATCH omission retains the opening scalar projection; an explicit blank clears the safely
+owned compatibility row. Additional structured rows survive, and ambiguous ownership fails with the existing
+safe conflict handling rather than falling through. Internal row versions and exact-set JSON are not exposed.
+
+Server responses, lightweight legacy service summaries, global-search model hydration, Case party/requested-from
+projections, and document/report/export shapes retain the synchronized scalar columns where changing the source
+would alter a public or established projection contract. These are read-only compatibility projections, use
+bounded queries, preserve tenant and deletion predicates, and do not create join multiplication. Organization
+profiles, cards, directory search, and filters continue to use structured projections.
+
+Aggregate mutations append the existing minimized Organization/type/contact audit vocabulary on the transaction
+connection; contact values are not metadata and no audit migration is required. A rollback removes all such
+events. Cache invalidation and live-update publication remain caller-owned post-commit effects: one successful
+outer workflow publishes/refreshes after its complete commit, while failures publish nothing.
+
+Operational drift is checked by the separate, guarded, read-only
+`docs/sql/verification/2026-09-10_organizations_phase3f2_compatibility_verification.sql`. It performs no repair,
+DDL, DML, trigger changes, or RLS disablement. Genuine remaining compatibility boundaries are the public server
+scalar contract and the stable scalar read projections listed above. Deleted Organization restoration remains a
+separate future lifecycle phase.
