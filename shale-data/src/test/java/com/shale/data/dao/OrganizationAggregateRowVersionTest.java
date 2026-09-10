@@ -20,7 +20,7 @@ final class OrganizationAggregateRowVersionTest {
         assertEquals(1,db.openingTokenPredicates,"the opening token must be consumed exactly once");
         assertEquals("Renamed",db.name);assertEquals(13,db.compatibilityType);
         assertTrue(db.assignments.get(2L).primary);assertFalse(db.assignments.get(1L).primary);
-        assertTrue(db.events.contains("commit"));assertEquals(1,db.committedAudits,"the primary change audit must commit with the aggregate");
+        assertTrue(db.events.contains("commit"));assertEquals(2,db.committedAudits,"the primary and Organization update audits must commit with the aggregate");
     }
 
     @Test void assignmentOnlyReconciliationDoesNotSelfInvalidateOrganizationConcurrency() {
@@ -85,6 +85,7 @@ final class OrganizationAggregateRowVersionTest {
             if(sql.contains("FROM dbo.Users"))return rows(new Object[][]{{1}});
             if(sql.startsWith("SELECT o.OrganizationTypeId")){long primaries=assignments.values().stream().filter(a->!a.deleted&&a.primary).count();Integer primary=assignments.values().stream().filter(a->!a.deleted&&a.primary).map(a->a.type).findFirst().orElse(null);return rows(new Object[][]{{compatibilityType,organizationRowVer.clone(),primaries,primary}});}
             if(sql.contains("FROM dbo.OrganizationTypes WHERE OrganizationTypeId"))return rows(new Object[][]{{b.get(1),7,"type_"+b.get(1),true,false,rv(1)}});
+			if(sql.contains("FROM dbo.OrganizationPhoneNumbers")||sql.contains("FROM dbo.OrganizationEmailAddresses")||sql.contains("FROM dbo.OrganizationAddresses")||sql.contains("FROM dbo.OrganizationWebsites"))return rows(new Object[0][]);
             if(sql.contains("WITH(UPDLOCK,HOLDLOCK)")&&sql.contains("FROM dbo.OrganizationOrganizationTypes"))return assignmentRows(assignments.values().stream().filter(a->!a.deleted).sorted(Comparator.comparingInt(a->a.order)).toList());
             if(sql.contains("IsDeleted=1 ORDER BY")){int type=(Integer)b.get(3);return assignmentRows(assignments.values().stream().filter(a->a.deleted&&a.type==type).limit(1).toList());}
             if(sql.contains("OUTPUT INSERTED.Id")&&sql.contains("OrganizationOrganizationTypes")){long id=nextId++;A row=new A(id,(Integer)b.get(3),false,(Integer)b.get(4),false,rv(nextVersion++));assignments.put(id,row);return rows(new Object[][]{{id}});}
