@@ -7,6 +7,13 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 final class OrganizationStructuredContactProfileTest {
+	@Test void legacyCreateAdapterProducesOwnedRowsWithoutManufacturingBlanks() {
+		var fields=new OrganizationServicePort.OrganizationFields("Org"," 555 "," ","a@example.test",null,null,null,"Town",null,null,null,null);
+		var mutation=OrganizationServicePort.structuredCreateFromLegacy(fields);
+		assertTrue(mutation.phones().owned());assertEquals(1,mutation.phones().rows().size());
+		assertTrue(mutation.emails().owned());assertEquals(1,mutation.emails().rows().size());
+		assertEquals(1,mutation.addresses().rows().size());assertTrue(mutation.websites().rows().isEmpty());
+	}
  @Test void completeHistoryIsImmutableOrderedAndRowVersionsAreDefensive(){
   byte[] token={1,2}; var history=phone(9,0,true,false,token); var active=phone(3,2,false,true,new byte[]{3});
   var profile=profile(List.of(history,active)); token[0]=8;

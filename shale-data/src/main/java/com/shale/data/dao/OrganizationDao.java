@@ -514,6 +514,8 @@ public final class OrganizationDao {
 		}
 	}
 
+	/** @deprecated Legacy-field compatibility adapter; delegates to the aggregate owner. */
+	@Deprecated(forRemoval = false)
 	public int create(OrganizationCreateRequest request) {
 		Objects.requireNonNull(request,"request");
 		try(Connection con=db.requireConnection()){boolean auto=con.getAutoCommit();con.setAutoCommit(false);try{int tenant=requireCurrentShaleClientId(con);if(tenant!=request.shaleClientId())throw new SecurityException("shaleClientId does not match current session");int actor=requireCurrentActorUserId(con);int id=typeMutations.createSingleTypeOnConnection(con,tenant,actor,new com.shale.core.service.OrganizationServicePort.OrganizationFields(request.name(),request.phone(),request.fax(),request.email(),request.website(),request.address1(),request.address2(),request.city(),request.state(),request.postalCode(),request.country(),request.notes()),request.organizationTypeId());con.commit();return id;}catch(Exception e){con.rollback();throw e instanceof RuntimeException r?r:new IllegalStateException("Failed to create Organization aggregate.",e);}finally{con.setAutoCommit(auto);}}catch(SQLException e){throw new IllegalStateException("Failed to create Organization aggregate.",e);}
@@ -521,12 +523,14 @@ public final class OrganizationDao {
 
 	private static int requireCurrentActorUserId(Connection con)throws SQLException{try(PreparedStatement p=con.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'PrincipalUserId') AS INT)");ResultSet r=p.executeQuery()){if(!r.next()||r.getObject(1)==null)throw new SecurityException("An authenticated actor is required.");int id=((Number)r.getObject(1)).intValue();if(id<=0)throw new SecurityException("An authenticated actor is required.");return id;}}
 
+	/** @deprecated Legacy whole-model compatibility adapter; delegates to the aggregate owner. */
+	@Deprecated(forRemoval = false)
 	public void update(Organization organization) {
 		Objects.requireNonNull(organization,"organization");int[] context=currentTenantAndActor();int tenant=context[0],actor=context[1];
 		OrganizationTypeProfileRow profile=findOrganizationTypeProfile(organization.getId(),tenant);if(profile==null)throw new IllegalArgumentException("Organization was not found.");
 		int requested=organization.getOrganizationTypeId()==null?profile.compatibilityOrganizationTypeId():organization.getOrganizationTypeId();
 		List<com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment> desired=new ArrayList<>();boolean found=false;for(var a:profile.assignments()){boolean primary=a.organizationTypeId()==requested;found|=primary;desired.add(new com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment(a.assignmentId(),a.organizationTypeId(),primary,a.sortOrder(),a.rowVer()));}if(!found)desired.add(new com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment(null,requested,true,desired.size(),null));
-		typeMutations.updateAggregate(new com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand(organization.getId(),tenant,actor,findOrganizationRowVer(organization.getId(),tenant),new com.shale.core.service.OrganizationServicePort.OrganizationFields(organization.getName(),organization.getPhone(),organization.getFax(),organization.getEmail(),organization.getWebsite(),organization.getAddress1(),organization.getAddress2(),organization.getCity(),organization.getState(),organization.getPostalCode(),organization.getCountry(),organization.getNotes()),desired));
+		typeMutations.updateAggregate(new com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand(organization.getId(),tenant,actor,findOrganizationRowVer(organization.getId(),tenant),new com.shale.core.service.OrganizationServicePort.OrganizationFields(organization.getName(),organization.getPhone(),organization.getFax(),organization.getEmail(),organization.getWebsite(),organization.getAddress1(),organization.getAddress2(),organization.getCity(),organization.getState(),organization.getPostalCode(),organization.getCountry(),organization.getNotes()),desired,new com.shale.core.service.OrganizationServicePort.LegacyContactMutation()));
 	}
 	private int[] currentTenantAndActor(){try(Connection con=db.requireConnection()){return new int[]{requireCurrentShaleClientId(con),requireCurrentActorUserId(con)};}catch(SQLException e){throw new IllegalStateException("Failed to resolve Organization mutation context.",e);}}
 
