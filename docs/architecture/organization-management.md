@@ -548,3 +548,28 @@ This read-only feature adds no meaningful mutation and therefore no new entity-a
 existing structured reads retain their established audit treatment. Phase 3E.2 remains responsible for
 Organization Type and structured contact search/filtering. New Organization structured creation also remains a
 later compatibility cleanup.
+
+## Phase 3E.2 structured directory search and Organization Type filtering
+
+The desktop directory searches active Organizations by name and active structured phone display/normalized
+values, email address, address lines 1 and 2, city, state/province, postal code, country, website, and active
+assigned Organization Type name. Deleted Organizations, contact methods, and assignments and inactive/deleted
+type definitions are excluded; Notes and historical removed values are not searchable. Phone query digits reuse
+Contact directory normalization without changing stored display values; punctuation-only input cannot activate
+the normalized-number branch.
+
+The compact Contact-style popup lists tenant-effective active Organization Types with configured colors and
+supports multiple selections. Selections use OR semantics across every active assignment, including non-primary
+assignments; search and the selected-type group combine with AND. Clear Filters, sort, and filter changes start a
+new first-page generation.
+
+An immutable criteria snapshot carries tenant, normalized text, defensively copied type IDs, deterministic name
+sort/direction, offset, and bounded page size. Page and count use one shared, parameterized predicate. Explicit
+Organization/child `ShaleClientId` correlations remain alongside RLS; independent `EXISTS` predicates avoid child
+cross-products and duplicate results, and Organization ID is the final sort tie-breaker. The legacy server service
+overload remains name-search compatible, with no new public API parameter.
+
+Each generation loads its lightweight page/count before the existing five fixed card-projection queries receive
+only that page's IDs. No profile or per-card query is introduced. Snapshot and generation checks prevent stale
+search/filter results from applying. This read-only work introduces no mutation or audit event. New Organization
+remains a legacy-scalar editor reconciled by the aggregate boundary; structured creation is still future work.

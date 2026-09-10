@@ -1504,7 +1504,8 @@ public final class ContactDao {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private static String normalizePhoneDigits(String value) {
+    /** Shared query normalization used by Contact and Organization directory search. */
+    static String normalizePhoneDigits(String value) {
         if (value == null) {
             return "";
         }
