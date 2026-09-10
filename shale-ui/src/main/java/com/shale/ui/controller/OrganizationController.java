@@ -20,6 +20,8 @@ import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.CaseSummaryDao.RelatedCaseRow;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.ClassificationChipGroup;
+import com.shale.ui.component.ContactMethodDisplayCard;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
@@ -27,6 +29,7 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.ContactExternalActions;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -34,8 +37,11 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.TilePane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
@@ -56,18 +62,15 @@ public final class OrganizationController {
 	@FXML private TextField relatedCasesSearchField;
 	@FXML private ChoiceBox<String> relatedCasesSortChoice;
 
-	@FXML private Label nameValue;
-	@FXML private Label typeValue;
-	@FXML private Label phoneValue;
-	@FXML private Label faxValue;
-	@FXML private Label emailValue;
-	@FXML private Label websiteValue;
-	@FXML private Label address1Value;
-	@FXML private Label address2Value;
-	@FXML private Label cityValue;
-	@FXML private Label stateValue;
-	@FXML private Label postalCodeValue;
-	@FXML private Label countryValue;
+	@FXML private FlowPane organizationTypeChips;
+	@FXML private TilePane phoneCards;
+	@FXML private TilePane emailCards;
+	@FXML private VBox addressCards;
+	@FXML private VBox websiteCards;
+	@FXML private VBox phoneSection;
+	@FXML private VBox emailSection;
+	@FXML private VBox addressSection;
+	@FXML private VBox websiteSection;
 	@FXML private Label notesValue;
 
 	private Integer organizationId;
@@ -75,6 +78,10 @@ public final class OrganizationController {
 	private OrganizationServicePort organizationService;
 	private CaseSummaryDao caseSummaryDao;
 	private Organization currentOrganization;
+	private OrganizationServicePort.OrganizationTypeProfile currentTypeProfile;
+	private OrganizationServicePort.OrganizationStructuredContactProfile currentContactProfile;
+	private int detailLoadGeneration;
+	private ContactExternalActions externalActions = new ContactExternalActions();
 	private boolean editDialogOpen;
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
@@ -133,6 +140,8 @@ public final class OrganizationController {
 
 		hideRemoteUpdateBanner();
 		refreshAdminActions();
+		if(phoneCards!=null)phoneCards.widthProperty().addListener((o,a,b)->configureMethodTiles(phoneCards));
+		if(emailCards!=null)emailCards.widthProperty().addListener((o,a,b)->configureMethodTiles(emailCards));
 
 		if (organizationTitleLabel != null) {
 			organizationTitleLabel.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -149,6 +158,8 @@ public final class OrganizationController {
 	}
 
 	private void loadOrganization() {
+		final int generation=++detailLoadGeneration;
+		final Integer requestedId=organizationId,requestedTenant=currentTenantId();
 		long loadStarted = PerfLog.start();
 		if (organizationDao == null || organizationId == null) {
 			setError("Organization view is not configured.");
@@ -159,23 +170,24 @@ public final class OrganizationController {
 		PerfLog.log("organizations.detail.load", "queued", "organizationId=" + organizationId + " tenantId=" + currentTenantId());
 		dbExec.submit(() -> {
 			try {
-				String cacheKey = detailCacheKey(organizationId);
-				Organization loaded = cacheKey == null ? null : DETAIL_CACHE.get(cacheKey);
-				boolean cacheHit = loaded != null;
-				if (loaded == null) {
+				String cacheKey = detailCacheKey(requestedId);
+				Organization loaded;
+				boolean cacheHit = false;
+				{
 					long daoStarted = PerfLog.start();
-					PerfLog.log("organizations.detail.dao", "start", "organizationId=" + organizationId + " tenantId=" + currentTenantId() + " cacheHit=false");
-					loaded = organizationDao.findById(organizationId);
-					PerfLog.logDone("organizations.detail.dao", "organizationId=" + organizationId + " found=" + (loaded != null) + " fullDetailHydration=true", daoStarted);
+					PerfLog.log("organizations.detail.dao", "start", "organizationId=" + requestedId + " tenantId=" + requestedTenant + " cacheHit=false");
+					loaded = organizationDao.findById(requestedId);
+					PerfLog.logDone("organizations.detail.dao", "organizationId=" + requestedId + " found=" + (loaded != null) + " fullDetailHydration=true", daoStarted);
 					if (loaded != null && cacheKey != null) {
 						DETAIL_CACHE.put(cacheKey, loaded);
 					}
-				} else {
-					PerfLog.log("organizations.detail.cache", "hit", "organizationId=" + organizationId + " tenantId=" + currentTenantId());
 				}
+				OrganizationServicePort.OrganizationTypeProfile types=requestedTenant==null?null:organizationService.getOrganizationTypeProfile(requestedId,requestedTenant).orElse(null);
+				OrganizationServicePort.OrganizationStructuredContactProfile contacts=requestedTenant==null?null:organizationService.findStructuredContactProfile(requestedTenant,requestedId).orElse(null);
 				final Organization loadedForUi = loaded;
 				final boolean cacheHitForUi = cacheHit;
 				Platform.runLater(() -> {
+					if(generation!=detailLoadGeneration||!Objects.equals(requestedId,organizationId)||!Objects.equals(requestedTenant,currentTenantId()))return;
 					setBusy(false);
 					if (loadedForUi == null) {
 						relatedCases = List.of();
@@ -185,15 +197,18 @@ public final class OrganizationController {
 					}
 
 					currentOrganization = loadedForUi;
+					currentTypeProfile=types; currentContactProfile=contacts;
 					awaitingAuthoritativeReloadAfterLocalSave=false;
 					resetRelatedCaseControls();
 					renderFromCurrent();
 					clearError();
+					if((currentTypeProfile!=null&&!currentTypeProfile.compatibilityConsistent())||(currentContactProfile!=null&&!currentContactProfile.compatibilityConsistent()))setError("Some organization information needs review before it is edited.");
 					PerfLog.logDone("organizations.detail.load", "phase=detailApplied organizationId=" + organizationId + " cacheHit=" + cacheHitForUi, loadStarted);
 					loadRelatedCasesSafe();
 				});
 			} catch (Exception ex) {
-				Platform.runLater(() -> {
+			Platform.runLater(() -> {
+					if(generation!=detailLoadGeneration)return;
 					awaitingAuthoritativeReloadAfterLocalSave=false;
 					setBusy(false);
 					setError("Failed to load organization details.");
@@ -427,19 +442,8 @@ public final class OrganizationController {
 		}
 
 		organizationTitleLabel.setText(fallback(o.getName()));
-		String type = fallback(o.getOrganizationTypeName());
-		typeValue.setText(type);
-		nameValue.setText(fallback(o.getName()));
-		phoneValue.setText(fallback(o.getPhone()));
-		faxValue.setText(fallback(o.getFax()));
-		emailValue.setText(fallback(o.getEmail()));
-		websiteValue.setText(fallback(o.getWebsite()));
-		address1Value.setText(fallback(o.getAddress1()));
-		address2Value.setText(fallback(o.getAddress2()));
-		cityValue.setText(fallback(o.getCity()));
-		stateValue.setText(fallback(o.getState()));
-		postalCodeValue.setText(fallback(o.getPostalCode()));
-		countryValue.setText(fallback(o.getCountry()));
+		renderTypeChips();
+		renderContactInformation();
 		notesValue.setText(NarrativeMarkdownCodec.plainText(fallback(o.getNotes())));
 
 		if (o.getUpdatedAt() != null) {
@@ -454,6 +458,38 @@ public final class OrganizationController {
 		refreshAdminActions();
 		PerfLog.logDone("organizations.detail.render", "organizationId=" + (o == null ? null : o.getId()) + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
 	}
+
+	private void renderTypeChips(){
+		if(organizationTypeChips==null)return;
+		List<ClassificationChipGroup.Chip> chips=currentTypeProfile==null?List.of():currentTypeProfile.assignments().stream()
+				.filter(a->!a.historical()).sorted(Comparator.comparing(OrganizationServicePort.AssignedOrganizationType::primary).reversed().thenComparingInt(OrganizationServicePort.AssignedOrganizationType::sortOrder).thenComparingLong(OrganizationServicePort.AssignedOrganizationType::assignmentId))
+				.map(a->new ClassificationChipGroup.Chip(a.definition().name(),a.definition().color(),"Organization Type",a.definition().organizationTypeId(),a.primary())).toList();
+		organizationTypeChips.getChildren().setAll(new ClassificationChipGroup(chips,ClassificationChipGroup.Size.STANDARD));
+	}
+
+	private void renderContactInformation(){
+		if(phoneCards==null||emailCards==null||addressCards==null||websiteCards==null)return;
+		phoneCards.getChildren().clear();emailCards.getChildren().clear();addressCards.getChildren().clear();websiteCards.getChildren().clear();
+		if(currentContactProfile!=null){
+			currentContactProfile.activePhones().stream().sorted(contactOrder(OrganizationServicePort.OrganizationPhoneNumber::primary,OrganizationServicePort.OrganizationPhoneNumber::sortOrder,OrganizationServicePort.OrganizationPhoneNumber::id)).forEach(p->phoneCards.getChildren().add(methodCard(phoneDisplay(p),kindLabel(p.kind(),p.rawKind()),p.primary(),p.fax()?null:"Call",()->externalActions.open(ContactExternalActions.telephone(p.normalizedNumber(),p.extension())))));
+			currentContactProfile.activeEmails().stream().sorted(contactOrder(OrganizationServicePort.OrganizationEmailAddress::primary,OrganizationServicePort.OrganizationEmailAddress::sortOrder,OrganizationServicePort.OrganizationEmailAddress::id)).forEach(e->emailCards.getChildren().add(methodCard(e.emailAddress(),kindLabel(e.kind(),e.rawKind()),e.primary(),validEmail(e.emailAddress())?"Email":null,()->externalActions.open(ContactExternalActions.email(e.emailAddress())))));
+			currentContactProfile.activeAddresses().stream().sorted(contactOrder(OrganizationServicePort.OrganizationAddress::primary,OrganizationServicePort.OrganizationAddress::sortOrder,OrganizationServicePort.OrganizationAddress::id)).forEach(a->{String value=formatAddress(a);addressCards.getChildren().add(methodCard(value,kindLabel(a.kind(),a.rawKind()),a.primary(),value.isBlank()?null:"Open address in maps",()->externalActions.open(ContactExternalActions.maps(value))));});
+			currentContactProfile.activeWebsites().stream().sorted(contactOrder(OrganizationServicePort.OrganizationWebsite::primary,OrganizationServicePort.OrganizationWebsite::sortOrder,OrganizationServicePort.OrganizationWebsite::id)).forEach(w->websiteCards.getChildren().add(methodCard(w.website(),kindLabel(w.kind(),w.rawKind()),w.primary(),safeWebsite(w.website())?"Open Website":null,()->externalActions.open(ContactExternalActions.website(w.website())))));
+		}
+		showGroup(phoneSection,!phoneCards.getChildren().isEmpty());showGroup(emailSection,!emailCards.getChildren().isEmpty());showGroup(addressSection,!addressCards.getChildren().isEmpty());showGroup(websiteSection,!websiteCards.getChildren().isEmpty());
+	}
+	private Node methodCard(String value,String kind,boolean primary,String action,Runnable launch){
+		return new ContactMethodDisplayCard(value,kind,primary,action,()->{try{launch.run();}catch(RuntimeException ex){AppDialogs.showError(dialogOwner(editButton),"Open External Action","Unable to open this item.");}});
+	}
+	private static void showGroup(Node node,boolean show){if(node!=null){node.setVisible(show);node.setManaged(show);}}
+	private static String phoneDisplay(OrganizationServicePort.OrganizationPhoneNumber p){return p.displayNumber()+(p.extension()==null||p.extension().isBlank()?"":" ext. "+p.extension());}
+	private static String kindLabel(Enum<?> kind,String raw){if(kind==null||"UNKNOWN".equals(kind.name()))return readable(raw);return readable(kind.name());}
+	private static String readable(String value){if(value==null||value.isBlank())return "Other";String s=value.trim().replace('_',' ').toLowerCase();return Character.toUpperCase(s.charAt(0))+s.substring(1);}
+	private static String formatAddress(OrganizationServicePort.OrganizationAddress a){return java.util.stream.Stream.of(a.addressLine1(),a.addressLine2(),a.city(),a.stateOrProvince(),a.postalCode(),a.country()).filter(v->v!=null&&!v.isBlank()).map(String::trim).collect(java.util.stream.Collectors.joining(", "));}
+	private static boolean validEmail(String value){return value!=null&&value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");}
+	private static boolean safeWebsite(String value){try{ContactExternalActions.website(value);return true;}catch(IllegalArgumentException ex){return false;}}
+	private static <T> Comparator<T> contactOrder(java.util.function.Predicate<T> primary,java.util.function.ToIntFunction<T> order,java.util.function.ToLongFunction<T> id){return Comparator.<T,Boolean>comparing(primary::test).reversed().thenComparingInt(order).thenComparingLong(id);}
+	private static void configureMethodTiles(TilePane pane){double width=pane.getWidth();boolean two=width>=600;pane.setPrefColumns(two?2:1);pane.setPrefTileWidth(two?Math.max(250,(width-pane.getHgap())/2):Math.max(250,width));}
 
 	private void renderRelatedCases() {
 		if (!Platform.isFxApplicationThread()) {

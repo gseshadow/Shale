@@ -10,4 +10,10 @@ class ContactExternalActionsTest {
   var opened=new ArrayList<java.net.URI>();new ContactExternalActions(opened::add).open(ContactExternalActions.email("a@b.co"));assertEquals(1,opened.size());
  }
  @Test void missingHandlerIsNonPlatformSpecificFailure(){assertThrows(IllegalStateException.class,()->new ContactExternalActions(u->{throw new UnsupportedOperationException();}).open(ContactExternalActions.email("a@b.co")));}
+ @Test void organizationTargetsUseDialablePhoneAndSafeWebSchemes(){
+  assertEquals("tel:+15551212;ext=42",ContactExternalActions.telephone("+15551212","42").toString());
+  assertEquals("https://example.com/path",ContactExternalActions.website("example.com/path").toString());
+  assertThrows(IllegalArgumentException.class,()->ContactExternalActions.website("javascript:alert(1)"));
+  assertThrows(IllegalArgumentException.class,()->ContactExternalActions.telephone("not a number",null));
+ }
 }
