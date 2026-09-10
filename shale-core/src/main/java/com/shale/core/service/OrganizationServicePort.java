@@ -1,6 +1,8 @@
 package com.shale.core.service;
 
 import java.time.LocalDate;
+import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +21,9 @@ public interface OrganizationServicePort {
 	}
 
 	Optional<OrganizationTypeProfile> getOrganizationTypeProfile(int organizationId, int shaleClientId);
+
+	/** Complete active and historical structured contact-method profile; legacy scalars remain authoritative. */
+	Optional<OrganizationStructuredContactProfile> findStructuredContactProfile(int shaleClientId, int organizationId);
 
 	OrganizationTypeMutationResult createOrganizationType(CreateOrganizationTypeCommand command);
 	OrganizationTypeMutationResult updateOrganizationType(UpdateOrganizationTypeCommand command);
@@ -118,6 +123,85 @@ public interface OrganizationServicePort {
 			boolean compatibilityConsistent,
 			List<AssignedOrganizationType> assignments) {
 		public OrganizationTypeProfile { assignments = List.copyOf(assignments); }
+	}
+
+	enum OrganizationPhoneKind { MOBILE, HOME, WORK, FAX, OTHER, UNKNOWN }
+	enum OrganizationEmailKind { PERSONAL, WORK, OTHER, UNKNOWN }
+	enum OrganizationAddressKind { HOME, WORK, OTHER, UNKNOWN }
+	enum OrganizationWebsiteKind { MAIN, WORK, OTHER, UNKNOWN }
+
+	/** Compatibility state is intentionally per scalar concept and never repairs either representation. */
+	enum CompatibilityState {
+		BOTH_ABSENT, MATCHING, LEGACY_ONLY, STRUCTURED_ONLY, DIFFERENT, INVALID_PRIMARY;
+		public boolean consistent() { return this == BOTH_ABSENT || this == MATCHING; }
+	}
+
+	record ContactLifecycle(Instant createdAt, Integer createdByUserId, Instant updatedAt,
+			Integer updatedByUserId, Instant deletedAt, Integer deletedByUserId) { }
+
+	record OrganizationPhoneNumber(long id, int shaleClientId, int organizationId,
+			OrganizationPhoneKind kind, String rawKind, String displayNumber, String normalizedNumber,
+			String extension, boolean primary, int sortOrder, boolean deleted, ContactLifecycle lifecycle,
+			byte[] rowVer) {
+		public OrganizationPhoneNumber { rowVer = copyRowVer(rowVer); }
+		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
+		public boolean fax() { return kind == OrganizationPhoneKind.FAX; }
+	}
+	record OrganizationEmailAddress(long id, int shaleClientId, int organizationId,
+			OrganizationEmailKind kind, String rawKind, String emailAddress, String normalizedEmail,
+			boolean primary, int sortOrder, boolean deleted, ContactLifecycle lifecycle, byte[] rowVer) {
+		public OrganizationEmailAddress { rowVer = copyRowVer(rowVer); }
+		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
+	}
+	record OrganizationAddress(long id, int shaleClientId, int organizationId,
+			OrganizationAddressKind kind, String rawKind, String addressLine1, String addressLine2, String city,
+			String stateOrProvince, String postalCode, String country, String legacyAddressText,
+			boolean primary, int sortOrder, boolean deleted, ContactLifecycle lifecycle, byte[] rowVer) {
+		public OrganizationAddress { rowVer = copyRowVer(rowVer); }
+		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
+	}
+	record OrganizationWebsite(long id, int shaleClientId, int organizationId,
+			OrganizationWebsiteKind kind, String rawKind, String website, boolean primary, int sortOrder,
+			boolean deleted, ContactLifecycle lifecycle, byte[] rowVer) {
+		public OrganizationWebsite { rowVer = copyRowVer(rowVer); }
+		@Override public byte[] rowVer() { return copyRowVer(rowVer); }
+	}
+
+	record StructuredContactCompatibility(CompatibilityState phone, CompatibilityState fax,
+			CompatibilityState email, CompatibilityState address, CompatibilityState website) {
+		public boolean compatibilityConsistent() {
+			return phone.consistent() && fax.consistent() && email.consistent()
+					&& address.consistent() && website.consistent();
+		}
+	}
+
+	record OrganizationStructuredContactProfile(int organizationId, int shaleClientId,
+			List<OrganizationPhoneNumber> phones, List<OrganizationEmailAddress> emails,
+			List<OrganizationAddress> addresses, List<OrganizationWebsite> websites,
+			Optional<OrganizationPhoneNumber> primaryPhone, Optional<OrganizationPhoneNumber> primaryFax,
+			Optional<OrganizationEmailAddress> primaryEmail, Optional<OrganizationAddress> primaryAddress,
+			Optional<OrganizationWebsite> primaryWebsite, StructuredContactCompatibility compatibility) {
+		private static final Comparator<Object> CONTACT_ORDER = Comparator
+				.comparing((Object value) -> deleted(value)).thenComparingInt(OrganizationStructuredContactProfile::order)
+				.thenComparingLong(OrganizationStructuredContactProfile::id);
+		public OrganizationStructuredContactProfile {
+			phones = sorted(phones); emails = sorted(emails); addresses = sorted(addresses); websites = sorted(websites);
+			primaryPhone = active(requiredOptional(primaryPhone)); primaryFax = active(requiredOptional(primaryFax));
+			primaryEmail = active(requiredOptional(primaryEmail)); primaryAddress = active(requiredOptional(primaryAddress));
+			primaryWebsite = active(requiredOptional(primaryWebsite)); java.util.Objects.requireNonNull(compatibility, "compatibility");
+		}
+		public List<OrganizationPhoneNumber> activePhones() { return phones.stream().filter(p -> !p.deleted()).toList(); }
+		public List<OrganizationEmailAddress> activeEmails() { return emails.stream().filter(e -> !e.deleted()).toList(); }
+		public List<OrganizationAddress> activeAddresses() { return addresses.stream().filter(a -> !a.deleted()).toList(); }
+		public List<OrganizationWebsite> activeWebsites() { return websites.stream().filter(w -> !w.deleted()).toList(); }
+		public boolean compatibilityConsistent() { return compatibility.compatibilityConsistent(); }
+		private static <T> List<T> sorted(List<T> values) { var copy = new java.util.ArrayList<>(java.util.Objects.requireNonNull(values, "contact methods")); copy.sort((a,b)->CONTACT_ORDER.compare(a,b)); return List.copyOf(copy); }
+		private static <T> Optional<T> requiredOptional(Optional<T> value) { return java.util.Objects.requireNonNull(value, "primary projection"); }
+		private static <T> Optional<T> active(Optional<T> value) { return value.filter(v -> !deleted(v) && primary(v)); }
+		private static boolean primary(Object v) { if(v instanceof OrganizationPhoneNumber x)return x.primary();if(v instanceof OrganizationEmailAddress x)return x.primary();if(v instanceof OrganizationAddress x)return x.primary();return ((OrganizationWebsite)v).primary(); }
+		private static boolean deleted(Object v) { if(v instanceof OrganizationPhoneNumber x)return x.deleted();if(v instanceof OrganizationEmailAddress x)return x.deleted();if(v instanceof OrganizationAddress x)return x.deleted();return ((OrganizationWebsite)v).deleted(); }
+		private static int order(Object v) { if(v instanceof OrganizationPhoneNumber x)return x.sortOrder();if(v instanceof OrganizationEmailAddress x)return x.sortOrder();if(v instanceof OrganizationAddress x)return x.sortOrder();return ((OrganizationWebsite)v).sortOrder(); }
+		private static long id(Object v) { if(v instanceof OrganizationPhoneNumber x)return x.id();if(v instanceof OrganizationEmailAddress x)return x.id();if(v instanceof OrganizationAddress x)return x.id();return ((OrganizationWebsite)v).id(); }
 	}
 
 	record StagedOrganizationTypeAssignment(Long assignmentId, int organizationTypeId, boolean primary,

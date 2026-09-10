@@ -73,6 +73,24 @@ public final class OrganizationDao {
 		public OrganizationTypeProfileRow { assignments = List.copyOf(assignments); }
 	}
 
+	public record StructuredContactProfileRow(int organizationId, int shaleClientId, LegacyContactRow legacy,
+			List<PhoneRow> phones, List<EmailRow> emails, List<AddressRow> addresses, List<WebsiteRow> websites) {
+		public StructuredContactProfileRow { phones=List.copyOf(phones);emails=List.copyOf(emails);addresses=List.copyOf(addresses);websites=List.copyOf(websites); }
+	}
+	public record LegacyContactRow(String phone,String fax,String email,String website,String address1,String address2,
+			String city,String state,String postalCode,String country) { }
+	public record LifecycleRow(Instant createdAt,Integer createdBy,Instant updatedAt,Integer updatedBy,
+			Instant deletedAt,Integer deletedBy) { }
+	public record PhoneRow(long id,int tenant,int organization,String kind,String display,String normalized,String extension,
+			boolean primary,int sortOrder,boolean deleted,LifecycleRow lifecycle,byte[] rowVer) { public PhoneRow{rowVer=copy(rowVer);}@Override public byte[] rowVer(){return copy(rowVer);} }
+	public record EmailRow(long id,int tenant,int organization,String kind,String email,String normalized,
+			boolean primary,int sortOrder,boolean deleted,LifecycleRow lifecycle,byte[] rowVer) { public EmailRow{rowVer=copy(rowVer);}@Override public byte[] rowVer(){return copy(rowVer);} }
+	public record AddressRow(long id,int tenant,int organization,String kind,String line1,String line2,String city,String state,
+			String postal,String country,String legacyText,boolean primary,int sortOrder,boolean deleted,LifecycleRow lifecycle,byte[] rowVer) { public AddressRow{rowVer=copy(rowVer);}@Override public byte[] rowVer(){return copy(rowVer);} }
+	public record WebsiteRow(long id,int tenant,int organization,String kind,String website,boolean primary,int sortOrder,
+			boolean deleted,LifecycleRow lifecycle,byte[] rowVer) { public WebsiteRow{rowVer=copy(rowVer);}@Override public byte[] rowVer(){return copy(rowVer);} }
+	private static byte[] copy(byte[] value){return value==null?null:value.clone();}
+
 	public record OrganizationOptionRow(Integer organizationId, String name) {
 	}
 
@@ -720,6 +738,40 @@ public final class OrganizationDao {
 			throw new RuntimeException("Failed to load Organization Type profile (id=" + organizationId + ")", e);
 		}
 	}
+
+	/** Five bounded statements on one tenant-stamped connection: parent scalars plus each structured table. */
+	public StructuredContactProfileRow findStructuredContactProfile(int shaleClientId,int organizationId) {
+		validateTenantId(shaleClientId);
+		if(organizationId<=0)throw new IllegalArgumentException("organizationId must be > 0");
+		String parent="SELECT Phone,Fax,Email,Website,Address1,Address2,City,State,PostalCode,Country FROM dbo.Organizations WHERE ShaleClientId=? AND Id=? AND ISNULL(IsDeleted,0)=0";
+		try(Connection con=db.requireConnection()){
+			verifyTenantMatchesSession(con,shaleClientId);
+			LegacyContactRow legacy;
+			try(var p=con.prepareStatement(parent)){p.setInt(1,shaleClientId);p.setInt(2,organizationId);try(var r=p.executeQuery()){if(!r.next())return null;legacy=new LegacyContactRow(r.getString(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7),r.getString(8),r.getString(9),r.getString(10));}}
+			return new StructuredContactProfileRow(organizationId,shaleClientId,legacy,loadOrganizationPhones(con,shaleClientId,organizationId),loadOrganizationEmails(con,shaleClientId,organizationId),loadOrganizationAddresses(con,shaleClientId,organizationId),loadOrganizationWebsites(con,shaleClientId,organizationId));
+		}catch(SQLException e){throw new IllegalStateException("Failed to load Organization structured contact profile (id="+organizationId+").",e);}
+	}
+
+	private static final String CONTACT_ORDER=" ORDER BY IsDeleted,SortOrder,Id";
+	private static List<PhoneRow> loadOrganizationPhones(Connection c,int tenant,int organization)throws SQLException{
+		String sql="SELECT Id,ShaleClientId,OrganizationId,Kind,DisplayNumber,NormalizedNumber,Extension,IsPrimary,SortOrder,IsDeleted,CreatedAt,CreatedByUserId,UpdatedAt,UpdatedByUserId,DeletedAt,DeletedByUserId,RowVer FROM dbo.OrganizationPhoneNumbers WHERE ShaleClientId=? AND OrganizationId=?"+CONTACT_ORDER;
+		var out=new ArrayList<PhoneRow>();try(var p=c.prepareStatement(sql)){bindOwner(p,tenant,organization);try(var r=p.executeQuery()){while(r.next()){validateContactRow(r,"OrganizationPhoneNumbers",tenant,organization);requiredText(r,"DisplayNumber","OrganizationPhoneNumbers");out.add(new PhoneRow(r.getLong("Id"),r.getInt("ShaleClientId"),r.getInt("OrganizationId"),r.getString("Kind"),r.getString("DisplayNumber"),r.getString("NormalizedNumber"),r.getString("Extension"),r.getBoolean("IsPrimary"),r.getInt("SortOrder"),r.getBoolean("IsDeleted"),lifecycle(r),r.getBytes("RowVer")));}}return List.copyOf(out);}}
+	private static List<EmailRow> loadOrganizationEmails(Connection c,int tenant,int organization)throws SQLException{
+		String sql="SELECT Id,ShaleClientId,OrganizationId,Kind,EmailAddress,NormalizedEmail,IsPrimary,SortOrder,IsDeleted,CreatedAt,CreatedByUserId,UpdatedAt,UpdatedByUserId,DeletedAt,DeletedByUserId,RowVer FROM dbo.OrganizationEmailAddresses WHERE ShaleClientId=? AND OrganizationId=?"+CONTACT_ORDER;
+		var out=new ArrayList<EmailRow>();try(var p=c.prepareStatement(sql)){bindOwner(p,tenant,organization);try(var r=p.executeQuery()){while(r.next()){validateContactRow(r,"OrganizationEmailAddresses",tenant,organization);requiredText(r,"EmailAddress","OrganizationEmailAddresses");out.add(new EmailRow(r.getLong("Id"),r.getInt("ShaleClientId"),r.getInt("OrganizationId"),r.getString("Kind"),r.getString("EmailAddress"),r.getString("NormalizedEmail"),r.getBoolean("IsPrimary"),r.getInt("SortOrder"),r.getBoolean("IsDeleted"),lifecycle(r),r.getBytes("RowVer")));}}return List.copyOf(out);}}
+	private static List<AddressRow> loadOrganizationAddresses(Connection c,int tenant,int organization)throws SQLException{
+		String sql="SELECT Id,ShaleClientId,OrganizationId,Kind,AddressLine1,AddressLine2,City,StateOrProvince,PostalCode,Country,LegacyAddressText,IsPrimary,SortOrder,IsDeleted,CreatedAt,CreatedByUserId,UpdatedAt,UpdatedByUserId,DeletedAt,DeletedByUserId,RowVer FROM dbo.OrganizationAddresses WHERE ShaleClientId=? AND OrganizationId=?"+CONTACT_ORDER;
+		var out=new ArrayList<AddressRow>();try(var p=c.prepareStatement(sql)){bindOwner(p,tenant,organization);try(var r=p.executeQuery()){while(r.next()){validateContactRow(r,"OrganizationAddresses",tenant,organization);if(allBlank(r,"AddressLine1","AddressLine2","City","StateOrProvince","PostalCode","Country","LegacyAddressText"))integrity("OrganizationAddresses","blank address");out.add(new AddressRow(r.getLong("Id"),r.getInt("ShaleClientId"),r.getInt("OrganizationId"),r.getString("Kind"),r.getString("AddressLine1"),r.getString("AddressLine2"),r.getString("City"),r.getString("StateOrProvince"),r.getString("PostalCode"),r.getString("Country"),r.getString("LegacyAddressText"),r.getBoolean("IsPrimary"),r.getInt("SortOrder"),r.getBoolean("IsDeleted"),lifecycle(r),r.getBytes("RowVer")));}}return List.copyOf(out);}}
+	private static List<WebsiteRow> loadOrganizationWebsites(Connection c,int tenant,int organization)throws SQLException{
+		String sql="SELECT Id,ShaleClientId,OrganizationId,Kind,Website,IsPrimary,SortOrder,IsDeleted,CreatedAt,CreatedByUserId,UpdatedAt,UpdatedByUserId,DeletedAt,DeletedByUserId,RowVer FROM dbo.OrganizationWebsites WHERE ShaleClientId=? AND OrganizationId=?"+CONTACT_ORDER;
+		var out=new ArrayList<WebsiteRow>();try(var p=c.prepareStatement(sql)){bindOwner(p,tenant,organization);try(var r=p.executeQuery()){while(r.next()){validateContactRow(r,"OrganizationWebsites",tenant,organization);requiredText(r,"Website","OrganizationWebsites");out.add(new WebsiteRow(r.getLong("Id"),r.getInt("ShaleClientId"),r.getInt("OrganizationId"),r.getString("Kind"),r.getString("Website"),r.getBoolean("IsPrimary"),r.getInt("SortOrder"),r.getBoolean("IsDeleted"),lifecycle(r),r.getBytes("RowVer")));}}return List.copyOf(out);}}
+	private static void bindOwner(PreparedStatement p,int tenant,int organization)throws SQLException{p.setInt(1,tenant);p.setInt(2,organization);}
+	private static LifecycleRow lifecycle(ResultSet r)throws SQLException{return new LifecycleRow(instant(r,"CreatedAt"),nullableInt(r,"CreatedByUserId"),instant(r,"UpdatedAt"),nullableInt(r,"UpdatedByUserId"),instant(r,"DeletedAt"),nullableInt(r,"DeletedByUserId"));}
+	private static Instant instant(ResultSet r,String column)throws SQLException{Timestamp value=r.getTimestamp(column);return value==null?null:value.toInstant();}
+	private static void validateContactRow(ResultSet r,String table,int tenant,int organization)throws SQLException{if(r.getInt("ShaleClientId")!=tenant||r.getInt("OrganizationId")!=organization)integrity(table,"ownership mismatch");if(r.getInt("SortOrder")<0)integrity(table,"negative SortOrder");if(r.getBoolean("IsDeleted")&&r.getBoolean("IsPrimary"))integrity(table,"deleted primary");requiredText(r,"Kind",table);if(r.getBytes("RowVer")==null)integrity(table,"missing RowVer");}
+	private static void requiredText(ResultSet r,String column,String table)throws SQLException{String value=r.getString(column);if(value==null||value.trim().isEmpty())integrity(table,"blank "+column);}
+	private static boolean allBlank(ResultSet r,String... columns)throws SQLException{for(String c:columns){String v=r.getString(c);if(v!=null&&!v.trim().isEmpty())return false;}return true;}
+	private static void integrity(String table,String issue){throw new IllegalStateException("Data integrity failure in dbo."+table+": "+issue+".");}
 
 	public List<OrganizationOptionRow> findSelectableOrganizations() {
 		String sql = """

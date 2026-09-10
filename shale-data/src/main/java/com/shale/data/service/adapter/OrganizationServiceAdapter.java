@@ -97,6 +97,33 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 										a.sortOrder(), definition(a.definition()), a.rowVer())).toList()));
 	}
 
+	@Override public Optional<OrganizationStructuredContactProfile> findStructuredContactProfile(int tenant,int organizationId){
+		if(tenant<=0)throw new IllegalArgumentException("shaleClientId must be > 0");
+		if(organizationId<=0)throw new IllegalArgumentException("organizationId must be > 0");
+		return Optional.ofNullable(organizationGateway.findStructuredContactProfile(tenant,organizationId)).map(OrganizationServiceAdapter::structuredProfile);
+	}
+	private static OrganizationStructuredContactProfile structuredProfile(OrganizationDao.StructuredContactProfileRow r){
+		var phones=r.phones().stream().map(x->new OrganizationPhoneNumber(x.id(),x.tenant(),x.organization(),phoneKind(x.kind()),x.kind(),x.display(),x.normalized(),x.extension(),x.primary(),x.sortOrder(),x.deleted(),lifecycle(x.lifecycle()),x.rowVer())).toList();
+		var emails=r.emails().stream().map(x->new OrganizationEmailAddress(x.id(),x.tenant(),x.organization(),emailKind(x.kind()),x.kind(),x.email(),x.normalized(),x.primary(),x.sortOrder(),x.deleted(),lifecycle(x.lifecycle()),x.rowVer())).toList();
+		var addresses=r.addresses().stream().map(x->new OrganizationAddress(x.id(),x.tenant(),x.organization(),addressKind(x.kind()),x.kind(),x.line1(),x.line2(),x.city(),x.state(),x.postal(),x.country(),x.legacyText(),x.primary(),x.sortOrder(),x.deleted(),lifecycle(x.lifecycle()),x.rowVer())).toList();
+		var websites=r.websites().stream().map(x->new OrganizationWebsite(x.id(),x.tenant(),x.organization(),websiteKind(x.kind()),x.kind(),x.website(),x.primary(),x.sortOrder(),x.deleted(),lifecycle(x.lifecycle()),x.rowVer())).toList();
+		var voice=primary(phones.stream().filter(p->!p.fax()).toList());var fax=primary(phones.stream().filter(OrganizationPhoneNumber::fax).toList());var email=primary(emails);var address=primary(addresses);var website=primary(websites);
+		var legacy=r.legacy();var compatibility=new StructuredContactCompatibility(state(legacy.phone(),voice.map(OrganizationPhoneNumber::displayNumber).orElse(null),invalidPrimary(phones.stream().filter(p->!p.fax()).toList()),false),state(legacy.fax(),fax.map(OrganizationPhoneNumber::displayNumber).orElse(null),invalidPrimary(phones.stream().filter(OrganizationPhoneNumber::fax).toList()),false),state(legacy.email(),email.map(OrganizationEmailAddress::emailAddress).orElse(null),invalidPrimary(emails),true),addressState(legacy,address,invalidPrimary(addresses)),state(legacy.website(),website.map(OrganizationWebsite::website).orElse(null),invalidPrimary(websites),false));
+		return new OrganizationStructuredContactProfile(r.organizationId(),r.shaleClientId(),phones,emails,addresses,websites,voice,fax,email,address,website,compatibility);
+	}
+	private static ContactLifecycle lifecycle(OrganizationDao.LifecycleRow x){return new ContactLifecycle(x.createdAt(),x.createdBy(),x.updatedAt(),x.updatedBy(),x.deletedAt(),x.deletedBy());}
+	private static OrganizationPhoneKind phoneKind(String x){try{return OrganizationPhoneKind.valueOf(x);}catch(IllegalArgumentException e){return OrganizationPhoneKind.UNKNOWN;}}
+	private static OrganizationEmailKind emailKind(String x){try{return OrganizationEmailKind.valueOf(x);}catch(IllegalArgumentException e){return OrganizationEmailKind.UNKNOWN;}}
+	private static OrganizationAddressKind addressKind(String x){try{return OrganizationAddressKind.valueOf(x);}catch(IllegalArgumentException e){return OrganizationAddressKind.UNKNOWN;}}
+	private static OrganizationWebsiteKind websiteKind(String x){try{return OrganizationWebsiteKind.valueOf(x);}catch(IllegalArgumentException e){return OrganizationWebsiteKind.UNKNOWN;}}
+	private static <T> Optional<T> primary(List<T> values){var found=values.stream().filter(x->activePrimary(x)).toList();return found.size()==1?Optional.of(found.get(0)):Optional.empty();}
+	private static boolean invalidPrimary(List<?> values){return values.stream().filter(OrganizationServiceAdapter::activePrimary).count()>1;}
+	private static boolean activePrimary(Object x){if(x instanceof OrganizationPhoneNumber v)return !v.deleted()&&v.primary();if(x instanceof OrganizationEmailAddress v)return !v.deleted()&&v.primary();if(x instanceof OrganizationAddress v)return !v.deleted()&&v.primary();return !((OrganizationWebsite)x).deleted()&&((OrganizationWebsite)x).primary();}
+	private static CompatibilityState state(String legacy,String structured,boolean invalid,boolean ignoreCase){if(invalid)return CompatibilityState.INVALID_PRIMARY;String a=trim(legacy),b=trim(structured);if(a==null&&b==null)return CompatibilityState.BOTH_ABSENT;if(a==null)return CompatibilityState.STRUCTURED_ONLY;if(b==null)return CompatibilityState.LEGACY_ONLY;return (ignoreCase?a.equalsIgnoreCase(b):a.equals(b))?CompatibilityState.MATCHING:CompatibilityState.DIFFERENT;}
+	private static CompatibilityState addressState(OrganizationDao.LegacyContactRow l,Optional<OrganizationAddress> p,boolean invalid){if(invalid)return CompatibilityState.INVALID_PRIMARY;boolean legacy=java.util.stream.Stream.of(l.address1(),l.address2(),l.city(),l.state(),l.postalCode(),l.country()).anyMatch(v->trim(v)!=null);if(p.isEmpty())return legacy?CompatibilityState.LEGACY_ONLY:CompatibilityState.BOTH_ABSENT;var a=p.get();boolean structured=java.util.stream.Stream.of(a.addressLine1(),a.addressLine2(),a.city(),a.stateOrProvince(),a.postalCode(),a.country()).anyMatch(v->trim(v)!=null);if(!legacy)return structured?CompatibilityState.STRUCTURED_ONLY:CompatibilityState.BOTH_ABSENT;return same(l.address1(),a.addressLine1())&&same(l.address2(),a.addressLine2())&&same(l.city(),a.city())&&same(l.state(),a.stateOrProvince())&&same(l.postalCode(),a.postalCode())&&same(l.country(),a.country())?CompatibilityState.MATCHING:CompatibilityState.DIFFERENT;}
+	private static boolean same(String a,String b){return Objects.equals(trim(a),trim(b));}
+	private static String trim(String x){if(x==null)return null;String v=x.trim();return v.isEmpty()?null:v;}
+
 	private static OrganizationTypeDefinition definition(OrganizationDao.OrganizationTypeDefinitionRow row) {
 		return new OrganizationTypeDefinition(row.organizationTypeId(), row.shaleClientId(), row.systemKey(),
 				row.name(), row.description(), row.color(), row.sortOrder(), row.active(), row.deleted(),
@@ -128,6 +155,7 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		List<OrganizationDao.OrganizationTypeDefinitionRow> listEffectiveOrganizationTypeDefinitions(int shaleClientId);
 		default List<OrganizationDao.OrganizationTypeDefinitionRow> listOrganizationTypesForAdministration(int tenant,int actor){throw new UnsupportedOperationException("Organization Type administration is not supported");}
 		OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organizationId, int shaleClientId);
+		OrganizationDao.StructuredContactProfileRow findStructuredContactProfile(int shaleClientId,int organizationId);
 		int create(OrganizationDao.OrganizationCreateRequest request);
 		void update(Organization organization);
 		default OrganizationTypeMutationResult createOrganizationType(CreateOrganizationTypeCommand c){throw new UnsupportedOperationException("Organization Type creation is not supported");}
@@ -159,6 +187,7 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		@Override public List<OrganizationDao.OrganizationTypeDefinitionRow> listEffectiveOrganizationTypeDefinitions(int shaleClientId) { return dao.listEffectiveOrganizationTypeDefinitions(shaleClientId); }
 		@Override public List<OrganizationDao.OrganizationTypeDefinitionRow> listOrganizationTypesForAdministration(int tenant,int actor){return dao.listOrganizationTypesForAdministration(tenant,actor);}
 		@Override public OrganizationDao.OrganizationTypeProfileRow findOrganizationTypeProfile(int organizationId, int shaleClientId) { return dao.findOrganizationTypeProfile(organizationId, shaleClientId); }
+		@Override public OrganizationDao.StructuredContactProfileRow findStructuredContactProfile(int tenant,int organizationId){return dao.findStructuredContactProfile(tenant,organizationId);}
 		@Override public int create(OrganizationDao.OrganizationCreateRequest request) { return dao.create(request); }
 		@Override public void update(Organization organization) { dao.update(organization); }
 		@Override public OrganizationTypeMutationResult createOrganizationType(CreateOrganizationTypeCommand c){return dao.createOrganizationType(c);}
