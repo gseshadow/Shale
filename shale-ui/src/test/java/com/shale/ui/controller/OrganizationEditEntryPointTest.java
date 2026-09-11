@@ -1,6 +1,7 @@
 package com.shale.ui.controller;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -16,7 +17,12 @@ import com.shale.ui.state.AppState;
 import com.shale.ui.testutil.JavaFxTestSupport;
 
 import javafx.scene.control.Button;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
@@ -131,14 +137,39 @@ final class OrganizationEditEntryPointTest {
                 "dirty detection must include every structured staged collection");
         assertTrue(editor.contains("Organization changed elsewhere. Authoritative values are being reloaded.") && editor.contains("reload();"),
                 "a concurrency conflict must reload authoritative state before another save");
-		assertTrue(editor.contains("LOG.warn(\"Organization aggregate save failed operation=updateOrganizationAggregate tenantId={}")
-				&& editor.contains("actorId={}") && editor.contains("organizationId={}")
-				&& editor.contains("failure.getClass().getName(), failure"),
-				"the persistence boundary must log safe identifiers, exception class, and the full stack trace exactly once");
 		assertFalse(editor.contains("phone.getText()") || editor.contains("email.getText()") || editor.contains("notes.getText(), failure"),
 				"failure logging must not include staged contact values or notes");
 		assertTrue(editor.contains("failure instanceof IllegalArgumentException"),
                 "safe validation failures must remain user-facing without closing the editor");
+    }
+
+    @Test
+    void unexpectedPersistenceFailureLogsOneSafeWarningWithAttachedThrowable() {
+        Logger logger = (Logger) LoggerFactory.getLogger(EditOrganizationDialog.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            RuntimeException failure = new IllegalStateException("persistence unavailable");
+
+            EditOrganizationDialog.logPersistenceFailure(7,42,19,failure);
+
+            assertEquals(1,appender.list.size(),"one failed aggregate mutation must emit exactly one warning");
+            ILoggingEvent event=appender.list.getFirst();
+            assertEquals(Level.WARN,event.getLevel());
+            String message=event.getFormattedMessage();
+            assertTrue(message.contains("operation=updateOrganizationAggregate"));
+            assertTrue(message.contains("tenantId=7")&&message.contains("actorId=42")&&message.contains("organizationId=19"));
+            assertTrue(message.contains("exceptionClass=java.lang.IllegalStateException"));
+            assertNotNull(event.getThrowableProxy(),"the logging API must retain the failure stack trace");
+            assertEquals(failure.getClass().getName(),event.getThrowableProxy().getClassName());
+            assertEquals(failure.getMessage(),event.getThrowableProxy().getMessage(),
+                    "the attached stack trace must belong to the injected persistence failure");
+            for(String sensitive:new String[]{"phone","email","notes","rowver","sql","password","credential"})
+                assertFalse(message.toLowerCase(java.util.Locale.ROOT).contains(sensitive),"structured values and persistence secrets must not enter log metadata: "+sensitive);
+        } finally {
+            logger.detachAppender(appender);
+        }
     }
 
     @Test
