@@ -99,12 +99,21 @@ final class OrganizationEditEntryPointTest {
                 "editor must use the Edit Contact-style owned window-modal shell");
         assertTrue(editor.contains("ScrollPane") && editor.contains("sizeModalStage") && editor.contains("dialog.setResizable(true)"),
                 "editor content must remain bounded, scrollable, resizable, and screen-aware");
-        assertTrue(editor.contains("executor.execute") && editor.contains("dao.findById(organizationId)")
-                        && editor.contains("listEffectiveOrganizationTypes(tenant)")
-                        && editor.contains("getOrganizationTypeProfile(organizationId, tenant)")
-                        && editor.contains("findStructuredContactProfile(tenant, organizationId)")
-                        && editor.contains("findOrganizationRowVer(organizationId, tenant)"),
-                "each opening must load the complete authoritative aggregate away from the FX thread");
+        String reload = method(editor, "private void reload()");
+        assertTrue(reload.indexOf("executor.execute") < reload.indexOf("dao.findById(organizationId)")
+                        && reload.contains("listEffectiveOrganizationTypes(tenant)")
+                        && reload.contains("getOrganizationTypeProfile(organizationId,tenant)")
+                        && reload.contains("findStructuredContactProfile(tenant,organizationId)")
+                        && reload.contains("findOrganizationRowVer(organizationId,tenant)"),
+                "the shared reload boundary must fetch parent, types, assignments, contacts, and RowVers on its worker executor");
+        assertTrue(reload.contains("Platform.runLater(()->applyLoad(request,new LoadResult(")
+                        && reload.contains("long request=++generation") && reload.contains("baseline=null")
+                        && reload.contains("scroll.setContent(null)"),
+                "each opening/reload must have a fresh generation and apply its authoritative aggregate on the FX thread");
+        String applyLoad = method(editor, "private void applyLoad(long request,LoadResult loaded)");
+        assertTrue(applyLoad.contains("request!=generation") && applyLoad.contains("!dialog.isShowing()")
+                        && applyLoad.contains("OrganizationAggregateEditor.forEdit"),
+                "stale or closed callbacks must not replace the currently displayed shared editor");
         assertTrue(count(editor, "service.updateOrganizationAggregate(command)") == 1,
                 "Save must delegate exactly once to the atomic aggregate mutation");
         String shared = Files.readString(SHARED_EDITOR);
@@ -168,12 +177,22 @@ final class OrganizationEditEntryPointTest {
     }
 
     @Test
-    void viewDoesNotIntroduceDeferredPhaseTwoCPresentation() throws Exception {
+    void viewUsesCompletedStructuredPresentationWithoutLegacyTypeField() throws Exception {
         String fxml = Files.readString(FXML);
-        assertTrue(count(fxml, "text=\"Organization Type\"") == 1,
-                "the read-only compatibility Organization Type field remains the only type presentation");
-        assertFalse(fxml.contains("classification-chip") || fxml.contains("OrganizationCard"),
-                "this entry-point fix must not add Phase 2C chips, cards, header, or search presentation");
+        String controller = Files.readString(CONTROLLER);
+        assertTrue(fxml.contains("fx:id=\"organizationTypeChips\"") && fxml.contains("fx:id=\"phoneCards\"")
+                        && fxml.contains("fx:id=\"emailCards\"") && fxml.contains("fx:id=\"addressCards\"")
+                        && fxml.contains("fx:id=\"websiteCards\""),
+                "the profile must host all completed structured type and contact-method presentations");
+        assertFalse(fxml.contains("text=\"Organization Type\"") || fxml.contains("fx:id=\"organizationTypeValue\""),
+                "the legacy compatibility-only single Organization Type field must not be rendered beside chips");
+        assertTrue(controller.contains("Comparator.comparing(OrganizationServicePort.AssignedOrganizationType::primary).reversed()")
+                        && controller.contains("new ClassificationChipGroup.Chip")
+                        && controller.contains("p.fax()?null:\"Call\"")
+                        && controller.contains("validEmail(e.emailAddress())?\"Email\":null")
+                        && controller.contains("value.isBlank()?null:\"Open in Maps\"")
+                        && controller.contains("safeWebsite(w.website())?\"Open Website\":null"),
+                "active chips must be primary-first and structured cards must expose safe explicit actions without making Fax callable");
     }
 
     private static Element button(NodeList buttons, String id) {
