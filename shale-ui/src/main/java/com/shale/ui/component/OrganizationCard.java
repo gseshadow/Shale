@@ -9,6 +9,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.Button;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
@@ -36,6 +37,8 @@ public class OrganizationCard extends HBox {
 	private List<OrganizationCardType> types=List.of();
 	private ContactExternalActions externalActions=new ContactExternalActions();
 	private Runnable phoneAction,emailAction,addressAction,websiteAction;
+	private boolean removed;
+	private Runnable restoreAction;
 
 	public OrganizationCard() {
 		buildUiMiniDefaults();
@@ -81,6 +84,7 @@ public class OrganizationCard extends HBox {
 	}
 	public void setTypes(List<OrganizationCardType> values){types=List.copyOf(values);}
 	public void setExternalActions(ContactExternalActions actions){externalActions=java.util.Objects.requireNonNull(actions);}
+	public void setRemoved(boolean removed,Runnable restoreAction){this.removed=removed;this.restoreAction=restoreAction;if(removed){getStyleClass().add("organization-card-removed");setCursor(Cursor.DEFAULT);phoneAction=emailAction=addressAction=websiteAction=null;}}
 
 	public void setAddress(String address1, String address2, String city, String state, String postalCode, String country) {
 		List<String> parts = new ArrayList<>();
@@ -188,6 +192,7 @@ public class OrganizationCard extends HBox {
 		notesLabel.setWrapText(true);
 
 		VBox text = new VBox(5, nameLabel, typeChips());
+		if(removed){Label badge=new Label("Removed");badge.getStyleClass().add("lifecycle-removed-badge");text.getChildren().add(1,badge);}
 		if(!phoneLabel.getText().endsWith("—"))text.getChildren().add(methodCard(phoneLabel,"Phone","Call",phoneAction));
 		if(!emailLabel.getText().endsWith("—"))text.getChildren().add(methodCard(emailLabel,"Email","Email",emailAction));
 		if(!addressLabel.getText().endsWith("—"))text.getChildren().add(methodCard(addressLabel,"Address","Open in Maps",addressAction));
@@ -195,6 +200,7 @@ public class OrganizationCard extends HBox {
 		if (!notesLabel.getText().isBlank()) {
 			text.getChildren().add(notesLabel);
 		}
+		if(removed&&restoreAction!=null){Button restore=com.shale.ui.util.ActionButtonFactory.semantic("Restore Organization",e->restoreAction.run(),com.shale.ui.util.ControlStyles.Purpose.PRIMARY,com.shale.ui.util.ControlStyles.Size.SMALL);text.getChildren().add(restore);}
 
 		getChildren().addAll(avatar, text);
 	}
@@ -226,11 +232,11 @@ public class OrganizationCard extends HBox {
 			refreshSurfaceStyle();
 		});
 		setOnMouseClicked(e -> {
-			if (onOpen != null && organizationId != null) {
+			if (!removed && onOpen != null && organizationId != null) {
 				onOpen.accept(organizationId);
 			}
 		});
-		setOnKeyPressed(e->{if(e.getTarget()==this&&onOpen!=null&&organizationId!=null&&(e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE)){onOpen.accept(organizationId);e.consume();}});
+		setOnKeyPressed(e->{if(!removed&&e.getTarget()==this&&onOpen!=null&&organizationId!=null&&(e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE)){onOpen.accept(organizationId);e.consume();}});
 	}
 	private Node typeChips(){return new ClassificationChipGroup(types.stream().sorted(java.util.Comparator.comparing(OrganizationCardType::primary).reversed().thenComparingInt(OrganizationCardType::sortOrder).thenComparingLong(OrganizationCardType::assignmentId)).map(t->new ClassificationChipGroup.Chip(t.label(),t.color(),"Organization Type",t.definitionId(),t.primary())).toList(),ClassificationChipGroup.Size.COMPACT);}
 	private static Node methodCard(Label source,String kind,String actionText,Runnable action){String value=source.getText().replaceFirst("^[^:]+: ","");return new ContactMethodDisplayCard(value,kind,false,action==null?null:actionText,()->{try{action.run();}catch(RuntimeException ignored){}});}
@@ -243,7 +249,7 @@ public class OrganizationCard extends HBox {
 	}
 
 	private void refreshSurfaceStyle() {
-		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
+		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered&&!removed)+(removed?"-fx-opacity: 0.82;":""));
 	}
 
 	private static String fallback(String value) {

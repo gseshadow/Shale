@@ -145,6 +145,7 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 	@Override public List<OrganizationTypeAssignmentMutationResult> reorderOrganizationTypeAssignments(ReorderOrganizationTypeAssignmentsCommand c){return organizationGateway.reorderOrganizationTypeAssignments(c);}
 	@Override public OrganizationAggregateResult createOrganizationAggregate(CreateOrganizationAggregateCommand c){OrganizationTypeProfile p=organizationGateway.createOrganizationAggregate(c);int id=p.organizationId();return authoritative(id,c.shaleClientId(),organizationGateway.findOrganizationRowVer(id,c.shaleClientId()),p,c.fields());}
 	@Override public OrganizationAggregateResult updateOrganizationAggregate(UpdateOrganizationAggregateCommand c){var saved=organizationGateway.updateOrganizationAggregate(c);return authoritative(c.organizationId(),c.shaleClientId(),saved.organizationRowVer(),saved.typeProfile(),c.fields());}
+	@Override public RestoreOrganizationResult restoreOrganization(RestoreOrganizationCommand c){return organizationGateway.restoreOrganization(c);}
 	private OrganizationAggregateResult authoritative(int id,int tenant,byte[] rowVer,OrganizationTypeProfile types,OrganizationFields fallback){var row=organizationGateway.findStructuredContactProfile(tenant,id);if(row==null)return new OrganizationAggregateResult(id,rowVer,types,fallback,null);var l=row.legacy();var fields=new OrganizationFields(fallback.name(),l.phone(),l.fax(),l.email(),l.website(),l.address1(),l.address2(),l.city(),l.state(),l.postalCode(),l.country(),fallback.notes());return new OrganizationAggregateResult(id,rowVer,types,fields,structuredProfile(row));}
 	@Override public int createOrganization(CreateOrganizationCommand c){Objects.requireNonNull(c,"command");var type=listEffectiveOrganizationTypes(c.shaleClientId()).stream().filter(t->c.organizationTypeId()==null||t.organizationTypeId()==c.organizationTypeId()).findFirst().orElseThrow(()->new IllegalStateException("No effective Organization Types are configured."));var fields=new OrganizationFields(c.name(),c.phone(),c.fax(),c.email(),c.website(),c.address1(),c.address2(),c.city(),c.state(),c.postalCode(),c.country(),c.notes());return createOrganizationAggregate(new CreateOrganizationAggregateCommand(c.shaleClientId(),c.actorUserId(),fields,List.of(new StagedOrganizationTypeAssignment(null,type.organizationTypeId(),true,0,null)),OrganizationServicePort.structuredCreateFromLegacy(fields))).organizationId();}
 
@@ -173,6 +174,7 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		default OrganizationTypeProfile createOrganizationAggregate(CreateOrganizationAggregateCommand c){throw new UnsupportedOperationException("Organization aggregate creation is not supported");}
 		default OrganizationAggregateResult updateOrganizationAggregate(UpdateOrganizationAggregateCommand c){throw new UnsupportedOperationException("Organization aggregate update is not supported");}
 		default byte[] findOrganizationRowVer(int organizationId,int tenant){throw new UnsupportedOperationException("Organization concurrency reads are not supported");}
+		default RestoreOrganizationResult restoreOrganization(RestoreOrganizationCommand c){throw new UnsupportedOperationException("Organization restoration is not supported");}
 	}
 
 	@FunctionalInterface
@@ -203,6 +205,7 @@ public final class OrganizationServiceAdapter implements OrganizationServicePort
 		@Override public OrganizationTypeProfile createOrganizationAggregate(CreateOrganizationAggregateCommand c){return dao.createOrganizationAggregate(c);}
 		@Override public OrganizationAggregateResult updateOrganizationAggregate(UpdateOrganizationAggregateCommand c){return dao.updateOrganizationAggregate(c);}
 		@Override public byte[] findOrganizationRowVer(int organizationId,int tenant){return dao.findOrganizationRowVer(organizationId,tenant);}
+		@Override public RestoreOrganizationResult restoreOrganization(RestoreOrganizationCommand c){return dao.restoreOrganization(c);}
 	}
 
 }

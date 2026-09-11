@@ -651,3 +651,42 @@ Operational drift is checked by the separate, guarded, read-only
 DDL, DML, trigger changes, or RLS disablement. Genuine remaining compatibility boundaries are the public server
 scalar contract and the stable scalar read projections listed above. Deleted Organization restoration remains a
 separate future lifecycle phase.
+
+## Phase 3F.3 — deleted Organization discovery and restoration
+
+The desktop Organizations directory remains `ACTIVE_ONLY` by default. Active tenant administrators alone see
+the compact **Show removed** control; it switches to a clearly indicated removed-only directory without mixing
+lifecycle states, retains text and Organization Type filters, and starts a new first-page generation. Page and
+count share the lifecycle predicate, tenant correlation, structured search predicates, deterministic `Name, Id`
+sort, and the existing five bounded current-page card projection queries.
+
+Removed results reuse `OrganizationCard`. They carry a Removed badge and restrained presentation, do not open the
+active profile, and disable phone, email, map, and website launch behavior. An administrator can restore from the
+card after a non-destructive confirmation naming the Organization and explaining that its retained relationships,
+types, and contact information become active. A submission guard prevents duplicate requests; failure retains the
+removed result and presents a safe review/reload message.
+
+`OrganizationServicePort.RestoreOrganizationCommand` is an explicit lifecycle contract containing tenant, actor,
+Organization identity, and the opening parent `RowVer`. The DAO transaction validates positive IDs and the tenant
+session, requires an active same-tenant administrator, locks the deleted parent, rejects missing, active, foreign,
+or stale state, and preflights retained primary/type, ordering, primary, and child-ownership invariants. Unsafe
+history is never repaired during Restore and instead requires administrative data review. The existing deployed
+Organizations table has no parent `DeletedAt`, `DeletedByUserId`, or `UpdatedByUserId` columns, so restoration clears
+only `IsDeleted`, updates `UpdatedAt`, and captures `OUTPUT inserted.RowVer`.
+
+Restoration updates the existing parent row only. It does not insert an Organization, alter its ID, mutate or
+restore type assignments or structured contact rows, duplicate children, rewrite mirrors, run backfill, or touch
+Case relationships. Consequently independently removed children remain historical and retained active children,
+primary/order state, compatibility projections, Case links, and audit history remain unchanged. This is also the
+safe causal boundary because the established delete operation does not mark children as removed-by-parent.
+Phase 3F.3 also removes the former compatibility cleanup that physically deleted `CaseParties` during parent
+soft deletion; new deletions therefore retain both `CaseOrganizations` and `CaseParties` relationships. Historical
+party rows already removed by older releases cannot be causally reconstructed and are not fabricated by Restore.
+
+One PHI-safe `ORGANIZATION / RESTORED` entity-action event is appended on the mutation connection before commit;
+audit failure rolls back the parent update. No audit migration is needed because `RESTORED` and `ORGANIZATION` are
+already deployed vocabulary. The controller publishes exactly one tenant Organization invalidation after commit,
+then refreshes removed mode; stale, unauthorized, inconsistent, and audit-failed attempts publish nothing.
+Public server Organization JSON remains the synchronized legacy-scalar compatibility boundary and no restoration
+HTTP route is introduced. The read-only operational report is
+`docs/sql/verification/2026-09-11_organizations_phase3f3_lifecycle_verification.sql`.

@@ -127,7 +127,7 @@ public record EntityActionAuditEvent(
 
 	private static boolean isAllowedCombination(EntityType entityType, Action action) {
 		return switch (entityType) {
-			case ORGANIZATION -> action == Action.CREATED || action == Action.UPDATED;
+			case ORGANIZATION -> action == Action.CREATED || action == Action.UPDATED || action == Action.RESTORED;
 			case ORGANIZATION_PHONE, ORGANIZATION_EMAIL, ORGANIZATION_ADDRESS, ORGANIZATION_WEBSITE -> action == Action.CREATED || action == Action.UPDATED || action == Action.REMOVED || action == Action.RESTORED || action == Action.REORDERED;
 			case CONTACT -> action == Action.CREATED || action == Action.UPDATED;
 			case CONTACT_PHONE_NUMBER, CONTACT_EMAIL_ADDRESS, CONTACT_ADDRESS -> action == Action.CREATED || action == Action.UPDATED || action == Action.REMOVED || action == Action.RESTORED || action == Action.REORDERED;
