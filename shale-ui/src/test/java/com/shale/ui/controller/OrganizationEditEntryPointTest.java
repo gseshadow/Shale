@@ -1,6 +1,7 @@
 package com.shale.ui.controller;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -16,7 +17,12 @@ import com.shale.ui.state.AppState;
 import com.shale.ui.testutil.JavaFxTestSupport;
 
 import javafx.scene.control.Button;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
@@ -99,12 +105,21 @@ final class OrganizationEditEntryPointTest {
                 "editor must use the Edit Contact-style owned window-modal shell");
         assertTrue(editor.contains("ScrollPane") && editor.contains("sizeModalStage") && editor.contains("dialog.setResizable(true)"),
                 "editor content must remain bounded, scrollable, resizable, and screen-aware");
-        assertTrue(editor.contains("executor.execute") && editor.contains("dao.findById(organizationId)")
-                        && editor.contains("listEffectiveOrganizationTypes(tenant)")
-                        && editor.contains("getOrganizationTypeProfile(organizationId, tenant)")
-                        && editor.contains("findStructuredContactProfile(tenant, organizationId)")
-                        && editor.contains("findOrganizationRowVer(organizationId, tenant)"),
-                "each opening must load the complete authoritative aggregate away from the FX thread");
+        String reload = method(editor, "private void reload()");
+        assertTrue(reload.indexOf("executor.execute") < reload.indexOf("dao.findById(organizationId)")
+                        && reload.contains("listEffectiveOrganizationTypes(tenant)")
+                        && reload.contains("getOrganizationTypeProfile(organizationId,tenant)")
+                        && reload.contains("findStructuredContactProfile(tenant,organizationId)")
+                        && reload.contains("findOrganizationRowVer(organizationId,tenant)"),
+                "the shared reload boundary must fetch parent, types, assignments, contacts, and RowVers on its worker executor");
+        assertTrue(reload.contains("Platform.runLater(()->applyLoad(request,new LoadResult(")
+                        && reload.contains("long request=++generation") && reload.contains("baseline=null")
+                        && reload.contains("scroll.setContent(null)"),
+                "each opening/reload must have a fresh generation and apply its authoritative aggregate on the FX thread");
+        String applyLoad = method(editor, "private void applyLoad(long request,LoadResult loaded)");
+        assertTrue(applyLoad.contains("request!=generation") && applyLoad.contains("!dialog.isShowing()")
+                        && applyLoad.contains("OrganizationAggregateEditor.forEdit"),
+                "stale or closed callbacks must not replace the currently displayed shared editor");
         assertTrue(count(editor, "service.updateOrganizationAggregate(command)") == 1,
                 "Save must delegate exactly once to the atomic aggregate mutation");
         String shared = Files.readString(SHARED_EDITOR);
@@ -122,14 +137,39 @@ final class OrganizationEditEntryPointTest {
                 "dirty detection must include every structured staged collection");
         assertTrue(editor.contains("Organization changed elsewhere. Authoritative values are being reloaded.") && editor.contains("reload();"),
                 "a concurrency conflict must reload authoritative state before another save");
-		assertTrue(editor.contains("LOG.warn(\"Organization aggregate save failed operation=updateOrganizationAggregate tenantId={}")
-				&& editor.contains("actorId={}") && editor.contains("organizationId={}")
-				&& editor.contains("failure.getClass().getName(), failure"),
-				"the persistence boundary must log safe identifiers, exception class, and the full stack trace exactly once");
 		assertFalse(editor.contains("phone.getText()") || editor.contains("email.getText()") || editor.contains("notes.getText(), failure"),
 				"failure logging must not include staged contact values or notes");
 		assertTrue(editor.contains("failure instanceof IllegalArgumentException"),
                 "safe validation failures must remain user-facing without closing the editor");
+    }
+
+    @Test
+    void unexpectedPersistenceFailureLogsOneSafeWarningWithAttachedThrowable() {
+        Logger logger = (Logger) LoggerFactory.getLogger(EditOrganizationDialog.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            RuntimeException failure = new IllegalStateException("persistence unavailable");
+
+            EditOrganizationDialog.logPersistenceFailure(7,42,19,failure);
+
+            assertEquals(1,appender.list.size(),"one failed aggregate mutation must emit exactly one warning");
+            ILoggingEvent event=appender.list.getFirst();
+            assertEquals(Level.WARN,event.getLevel());
+            String message=event.getFormattedMessage();
+            assertTrue(message.contains("operation=updateOrganizationAggregate"));
+            assertTrue(message.contains("tenantId=7")&&message.contains("actorId=42")&&message.contains("organizationId=19"));
+            assertTrue(message.contains("exceptionClass=java.lang.IllegalStateException"));
+            assertNotNull(event.getThrowableProxy(),"the logging API must retain the failure stack trace");
+            assertEquals(failure.getClass().getName(),event.getThrowableProxy().getClassName());
+            assertEquals(failure.getMessage(),event.getThrowableProxy().getMessage(),
+                    "the attached stack trace must belong to the injected persistence failure");
+            for(String sensitive:new String[]{"phone","email","notes","rowver","sql","password","credential"})
+                assertFalse(message.toLowerCase(java.util.Locale.ROOT).contains(sensitive),"structured values and persistence secrets must not enter log metadata: "+sensitive);
+        } finally {
+            logger.detachAppender(appender);
+        }
     }
 
     @Test
@@ -168,12 +208,22 @@ final class OrganizationEditEntryPointTest {
     }
 
     @Test
-    void viewDoesNotIntroduceDeferredPhaseTwoCPresentation() throws Exception {
+    void viewUsesCompletedStructuredPresentationWithoutLegacyTypeField() throws Exception {
         String fxml = Files.readString(FXML);
-        assertTrue(count(fxml, "text=\"Organization Type\"") == 1,
-                "the read-only compatibility Organization Type field remains the only type presentation");
-        assertFalse(fxml.contains("classification-chip") || fxml.contains("OrganizationCard"),
-                "this entry-point fix must not add Phase 2C chips, cards, header, or search presentation");
+        String controller = Files.readString(CONTROLLER);
+        assertTrue(fxml.contains("fx:id=\"organizationTypeChips\"") && fxml.contains("fx:id=\"phoneCards\"")
+                        && fxml.contains("fx:id=\"emailCards\"") && fxml.contains("fx:id=\"addressCards\"")
+                        && fxml.contains("fx:id=\"websiteCards\""),
+                "the profile must host all completed structured type and contact-method presentations");
+        assertFalse(fxml.contains("text=\"Organization Type\"") || fxml.contains("fx:id=\"organizationTypeValue\""),
+                "the legacy compatibility-only single Organization Type field must not be rendered beside chips");
+        assertTrue(controller.contains("Comparator.comparing(OrganizationServicePort.AssignedOrganizationType::primary).reversed()")
+                        && controller.contains("new ClassificationChipGroup.Chip")
+                        && controller.contains("p.fax()?null:\"Call\"")
+                        && controller.contains("validEmail(e.emailAddress())?\"Email\":null")
+                        && controller.contains("value.isBlank()?null:\"Open in Maps\"")
+                        && controller.contains("safeWebsite(w.website())?\"Open Website\":null"),
+                "active chips must be primary-first and structured cards must expose safe explicit actions without making Fax callable");
     }
 
     private static Element button(NodeList buttons, String id) {
