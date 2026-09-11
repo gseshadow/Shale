@@ -4,11 +4,10 @@
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 BEGIN TRY
-DECLARE @ExpectedDatabase sysname = N'REPLACE_WITH_APPROVED_DATABASE';
-DECLARE @OperatorVerifiedAllTenantVisibility bit = 0;
+DECLARE @ExpectedDatabase sysname=N'REPLACE_WITH_APPROVED_DATABASE';
+DECLARE @OperatorVerifiedAllTenantVisibility bit=0;
 
-IF @ExpectedDatabase = N'REPLACE_WITH_APPROVED_DATABASE'
-   OR DB_NAME() <> @ExpectedDatabase
+IF @ExpectedDatabase=N'REPLACE_WITH_APPROVED_DATABASE' OR DB_NAME()<>@ExpectedDatabase
  THROW 57200,'Set @ExpectedDatabase to the approved database and reconnect to that database.',1;
 IF SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL OR SESSION_CONTEXT(N'PrincipalUserId') IS NOT NULL
  THROW 57201,'Phase 3A requires NULL ShaleClientId and PrincipalUserId session context.',1;
