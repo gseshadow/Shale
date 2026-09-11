@@ -31,6 +31,8 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
+import com.shale.ui.component.OrganizationCard;
+import com.shale.ui.component.dialog.AppDialogs;
 import javafx.scene.layout.FlowPane;
 
 public final class OrganizationsController {
@@ -55,6 +57,7 @@ public final class OrganizationsController {
 	@FXML private Label activeFilterCount;
 	@FXML private Button clearFiltersButton;
 	@FXML private ComboBox<String> organizationSort;
+	@FXML private Button showRemovedOrganizationsButton;
 
 	private AppState appState;
 	private UiRuntimeBridge runtimeBridge;
@@ -76,6 +79,8 @@ public final class OrganizationsController {
 	private final Set<Integer> selectedTypeIds=new LinkedHashSet<>();
 	private List<OrganizationDao.OrganizationTypeDefinitionRow> typeOptions=List.of();
 	private OrganizationDao.OrganizationSearchCriteria activeCriteria;
+	private OrganizationDao.OrganizationLifecycleMode lifecycleMode=OrganizationDao.OrganizationLifecycleMode.ACTIVE_ONLY;
+	private boolean restoreInProgress;
 
 	private final List<DirectoryOrganizationRow> loaded = new ArrayList<>();
 	private Map<Integer,OrganizationDao.OrganizationCardPresentation> cardPresentations=Map.of();
@@ -93,6 +98,7 @@ public final class OrganizationsController {
 		this.onOpenOrganization = onOpenOrganization;
 		this.sceneManager = sceneManager;
 		this.organizationCardFactory = new OrganizationCardFactory(this::openOrganization);
+		setVisibleManaged(showRemovedOrganizationsButton,appState!=null&&appState.isAdmin());
 		loadTypeOptions();
 	}
 
@@ -110,6 +116,7 @@ public final class OrganizationsController {
 		if(organizationSort!=null){organizationSort.getItems().setAll("Name A–Z","Name Z–A");organizationSort.getSelectionModel().selectFirst();organizationSort.valueProperty().addListener((o,a,b)->{if(a!=null)loadFirstPage();});com.shale.ui.util.ControlStyles.formControl(organizationSort);}
 		if(clearFiltersButton!=null)com.shale.ui.util.ControlStyles.apply(clearFiltersButton,com.shale.ui.util.ControlStyles.Purpose.GHOST,com.shale.ui.util.ControlStyles.Size.SMALL);
 		if(addOrganizationButton!=null)com.shale.ui.util.ControlStyles.apply(addOrganizationButton,com.shale.ui.util.ControlStyles.Purpose.PRIMARY);
+		if(showRemovedOrganizationsButton!=null){com.shale.ui.util.ControlStyles.apply(showRemovedOrganizationsButton,com.shale.ui.util.ControlStyles.Purpose.SECONDARY,com.shale.ui.util.ControlStyles.Size.SMALL);setVisibleManaged(showRemovedOrganizationsButton,appState!=null&&appState.isAdmin());}
 		if(organizationsSearchField!=null)com.shale.ui.util.ControlStyles.formControl(organizationsSearchField);
 		if (organizationsSearchField != null) {
 			searchDebounce = new PauseTransition(SEARCH_DEBOUNCE);
@@ -212,7 +219,7 @@ public final class OrganizationsController {
 		latestRequestedQuery = normalizedQuery();
 		loadGeneration++;
 		Integer tenant=appState==null?null:appState.getShaleClientId();
-		if(tenant!=null&&tenant>0)activeCriteria=new OrganizationDao.OrganizationSearchCriteria(tenant,latestRequestedQuery,List.copyOf(selectedTypeIds),OrganizationDao.DirectorySort.NAME,organizationSort!=null&&organizationSort.getSelectionModel().getSelectedIndex()==1?OrganizationDao.SortDirection.DESC:OrganizationDao.SortDirection.ASC,0,pageSize);
+		if(tenant!=null&&tenant>0)activeCriteria=new OrganizationDao.OrganizationSearchCriteria(tenant,latestRequestedQuery,List.copyOf(selectedTypeIds),OrganizationDao.DirectorySort.NAME,organizationSort!=null&&organizationSort.getSelectionModel().getSelectedIndex()==1?OrganizationDao.SortDirection.DESC:OrganizationDao.SortDirection.ASC,lifecycleMode,0,pageSize);
 		currentPage = 0;
 		loading = false;
 		hasMore = true;
@@ -241,7 +248,7 @@ public final class OrganizationsController {
 		final int pageToLoad = currentPage;
 		final int generationAtSubmit = loadGeneration;
 		final String search = normalizedQuery();
-		final OrganizationDao.OrganizationSearchCriteria criteria=activeCriteria==null?null:new OrganizationDao.OrganizationSearchCriteria(activeCriteria.shaleClientId(),activeCriteria.searchText(),activeCriteria.organizationTypeIds(),activeCriteria.sortField(),activeCriteria.sortDirection(),pageToLoad*pageSize,pageSize);
+		final OrganizationDao.OrganizationSearchCriteria criteria=activeCriteria==null?null:new OrganizationDao.OrganizationSearchCriteria(activeCriteria.shaleClientId(),activeCriteria.searchText(),activeCriteria.organizationTypeIds(),activeCriteria.sortField(),activeCriteria.sortDirection(),activeCriteria.lifecycleMode(),pageToLoad*pageSize,pageSize);
 		latestRequestedQuery = search;
 		final long queryStarted = PerfLog.start();
 		if (pageToLoad == 0) { pageLoadStartedNanos = queryStarted; }
@@ -317,7 +324,7 @@ public final class OrganizationsController {
 	}
 
 	private Node buildCard(DirectoryOrganizationRow org) {
-		return organizationCardFactory.create(new OrganizationCardFactory.OrganizationCardModel(
+		OrganizationCard card=organizationCardFactory.create(new OrganizationCardFactory.OrganizationCardModel(
 				org.id(),
 				org.name(),
 				org.organizationTypeId(),
@@ -333,7 +340,19 @@ public final class OrganizationsController {
 				null,
 				null,
 				null),cardPresentations.get(org.id()), ORGANIZATION_CARD_VARIANT);
+		card.setRemoved(org.deleted(),appState!=null&&appState.isAdmin()?()->confirmAndRestore(org):null);
+		if(org.deleted())card.applyFull();
+		return card;
 	}
+
+	@FXML private void toggleRemovedOrganizations(){if(appState==null||!appState.isAdmin())return;lifecycleMode=lifecycleMode==OrganizationDao.OrganizationLifecycleMode.ACTIVE_ONLY?OrganizationDao.OrganizationLifecycleMode.REMOVED_ONLY:OrganizationDao.OrganizationLifecycleMode.ACTIVE_ONLY;showRemovedOrganizationsButton.setText(lifecycleMode==OrganizationDao.OrganizationLifecycleMode.REMOVED_ONLY?"Showing removed":"Show removed");loadFirstPage();}
+	private void confirmAndRestore(DirectoryOrganizationRow org){
+		if(restoreInProgress||appState==null||!appState.isAdmin()||org==null||!org.deleted()||org.rowVer()==null)return;
+		javafx.stage.Window owner=showRemovedOrganizationsButton==null||showRemovedOrganizationsButton.getScene()==null?null:showRemovedOrganizationsButton.getScene().getWindow();
+		if(!AppDialogs.showConfirmation(owner,"Restore Organization","Restore “"+org.name()+"”?","The existing Organization, relationships, types, and contact information will become active again.","Restore Organization",AppDialogs.DialogActionKind.PRIMARY))return;
+		restoreInProgress=true;dbExec.submit(()->{try{var result=organizationDao.restoreOrganization(new com.shale.core.service.OrganizationServicePort.RestoreOrganizationCommand(appState.getShaleClientId(),appState.getUserId(),org.id(),org.rowVer()));Platform.runLater(()->{restoreInProgress=false;loadFirstPage();publishOrganizationUpdated(result.organizationId());});}catch(RuntimeException ex){Platform.runLater(()->{restoreInProgress=false;AppDialogs.showError(owner,"Organization not restored",ex instanceof SecurityException?"You are not authorized to restore Organizations.":"This Organization could not be restored. It may have changed or require administrative data review.");});}});
+	}
+	private static void setVisibleManaged(Node node,boolean visible){if(node!=null){node.setVisible(visible);node.setManaged(visible);}}
 
 	private void updateEmptyState(boolean empty) {
 		if(organizationsEmptyStateLabel!=null)organizationsEmptyStateLabel.setText((!normalizedQuery().isEmpty()||!selectedTypeIds.isEmpty())?"No organizations match the current search or filters.":"No organizations to display yet.");

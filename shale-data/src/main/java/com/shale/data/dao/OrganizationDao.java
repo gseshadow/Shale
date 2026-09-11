@@ -22,6 +22,7 @@ public final class OrganizationDao {
 
 	private final DbSessionProvider db;
 	private final OrganizationTypeMutationDao typeMutations;
+	private final EntityActionAuditDao entityActionAudit = new EntityActionAuditDao();
 
 	public OrganizationDao(DbSessionProvider dbSessionProvider) {
 		this.db = Objects.requireNonNull(dbSessionProvider, "dbSessionProvider");
@@ -50,11 +51,14 @@ public final class OrganizationDao {
 
 	public enum DirectorySort { NAME }
 	public enum SortDirection { ASC, DESC }
+	public enum OrganizationLifecycleMode { ACTIVE_ONLY, REMOVED_ONLY }
 
 	/** Immutable desktop-directory request. Public API callers deliberately retain the compatibility overload. */
 	public record OrganizationSearchCriteria(int shaleClientId, String searchText,
 			List<Integer> organizationTypeIds, DirectorySort sortField, SortDirection sortDirection,
-			int offset, int pageSize) {
+			OrganizationLifecycleMode lifecycleMode, int offset, int pageSize) {
+		public OrganizationSearchCriteria(int tenant,String text,List<Integer> types,DirectorySort sort,
+				SortDirection direction,int offset,int size){this(tenant,text,types,sort,direction,OrganizationLifecycleMode.ACTIVE_ONLY,offset,size);}
 		public OrganizationSearchCriteria {
 			if (shaleClientId <= 0) throw new IllegalArgumentException("shaleClientId must be > 0");
 			searchText = normalizeSearch(searchText);
@@ -62,6 +66,7 @@ public final class OrganizationDao {
 					.filter(Objects::nonNull).filter(id -> id > 0).distinct().toList();
 			sortField = sortField == null ? DirectorySort.NAME : sortField;
 			sortDirection = sortDirection == null ? SortDirection.ASC : sortDirection;
+			lifecycleMode = lifecycleMode == null ? OrganizationLifecycleMode.ACTIVE_ONLY : lifecycleMode;
 			if (offset < 0) throw new IllegalArgumentException("offset must be >= 0");
 			if (pageSize <= 0 || pageSize > 100) throw new IllegalArgumentException("pageSize must be between 1 and 100");
 		}
@@ -123,8 +128,14 @@ public final class OrganizationDao {
 			String email,
 			String website,
 			String city,
-			String state
+			String state,
+			boolean deleted,
+			byte[] rowVer
 	) {
+		public DirectoryOrganizationRow(Integer id,String name,Integer typeId,String typeName,String phone,String email,
+				String website,String city,String state){this(id,name,typeId,typeName,phone,email,website,city,state,false,null);}
+		public DirectoryOrganizationRow { rowVer=copy(rowVer); }
+		@Override public byte[] rowVer(){return copy(rowVer);}
 	}
 	public record OrganizationCardType(long assignmentId,int definitionId,String label,String color,boolean primary,int sortOrder) { }
 	public record OrganizationCardPresentation(List<OrganizationCardType> types,String phone,String phoneNormalized,
@@ -310,7 +321,7 @@ public final class OrganizationDao {
 				    AND fd.IsActive=1 AND fd.IsDeleted=0 AND f.OrganizationTypeId IN (%s))
 				""".formatted(typeMarks);
 		String predicate = """
-				o.ShaleClientId=? AND COALESCE(o.IsDeleted,0)=0 AND (?='' OR
+				o.ShaleClientId=? AND COALESCE(o.IsDeleted,0)=? AND (?='' OR
 				 LOWER(COALESCE(o.Name,N'')) LIKE ? ESCAPE N'\\' OR
 				 EXISTS(SELECT 1 FROM dbo.OrganizationPhoneNumbers p WHERE p.OrganizationId=o.Id AND p.ShaleClientId=o.ShaleClientId AND p.IsDeleted=0
 				   AND (LOWER(p.DisplayNumber) LIKE ? ESCAPE N'\\' OR (?<>'' AND p.NormalizedNumber LIKE ? ESCAPE N'\\'))) OR
@@ -328,7 +339,7 @@ public final class OrganizationDao {
 		String countSql = "SELECT COUNT_BIG(*) FROM dbo.Organizations o WHERE " + predicate;
 		String direction = criteria.sortDirection() == SortDirection.DESC ? "DESC" : "ASC";
 		String pageSql = """
-				SELECT o.Id,o.OrganizationTypeId,ot.Name AS OrganizationTypeName,o.Name,o.Phone,o.Email,o.Website,o.City,o.State
+				SELECT o.Id,o.OrganizationTypeId,ot.Name AS OrganizationTypeName,o.Name,o.Phone,o.Email,o.Website,o.City,o.State,o.IsDeleted,o.RowVer
 				FROM dbo.Organizations o LEFT JOIN dbo.OrganizationTypes ot ON ot.OrganizationTypeId=o.OrganizationTypeId
 				 AND (ot.ShaleClientId IS NULL OR ot.ShaleClientId=o.ShaleClientId)
 				WHERE %s ORDER BY o.Name %s,o.Id %s OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
@@ -349,7 +360,7 @@ public final class OrganizationDao {
 	private static void bindDirectoryCriteria(PreparedStatement ps,OrganizationSearchCriteria c,boolean paging)throws SQLException{
 		int i=1;String q=c.searchText().toLowerCase(java.util.Locale.ROOT),like=containsPattern(q);
 		String phone=ContactDao.normalizePhoneDigits(c.searchText()),phoneLike=containsPattern(phone);
-		ps.setInt(i++,c.shaleClientId());ps.setString(i++,q);ps.setString(i++,like);ps.setString(i++,like);
+		ps.setInt(i++,c.shaleClientId());ps.setBoolean(i++,c.lifecycleMode()==OrganizationLifecycleMode.REMOVED_ONLY);ps.setString(i++,q);ps.setString(i++,like);ps.setString(i++,like);
 		ps.setString(i++,phone);ps.setString(i++,phoneLike);ps.setString(i++,like);ps.setString(i++,like);ps.setString(i++,like);ps.setString(i++,like);
 		for(Integer id:c.organizationTypeIds())ps.setInt(i++,id);
 		if(paging){ps.setInt(i++,c.offset());ps.setInt(i,c.pageSize());}
@@ -554,21 +565,8 @@ public final class OrganizationDao {
 				  AND ShaleClientId = ?
 				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
 				""".formatted(ORGANIZATIONS_TABLE);
-		String cleanupCasePartiesSql = """
-				DELETE cp
-				FROM dbo.CaseParties cp
-				WHERE cp.OrganizationId = ?
-				  AND EXISTS (
-				      SELECT 1
-				      FROM dbo.Cases c
-				      WHERE c.Id = cp.CaseId
-				        AND c.ShaleClientId = ?
-				  );
-				""";
-
 		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql);
-				PreparedStatement cleanupPs = con.prepareStatement(cleanupCasePartiesSql)) {
+				PreparedStatement ps = con.prepareStatement(sql)) {
 			int currentShaleClientId = requireCurrentShaleClientId(con);
 			if (shaleClientId.intValue() != currentShaleClientId) {
 				throw new IllegalArgumentException("shaleClientId does not match current session");
@@ -577,10 +575,6 @@ public final class OrganizationDao {
 			boolean previousAutoCommit = con.getAutoCommit();
 			con.setAutoCommit(false);
 			try {
-				cleanupPs.setInt(1, organizationId);
-				cleanupPs.setInt(2, shaleClientId);
-				cleanupPs.executeUpdate();
-
 				int idx = 1;
 				ps.setInt(idx++, organizationId);
 				ps.setInt(idx++, shaleClientId);
@@ -596,6 +590,74 @@ public final class OrganizationDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to soft delete organization (id=" + organizationId + ")", e);
+		}
+	}
+
+	/** Restores only the parent row. Child and Case relationship lifecycle state is never rewritten here. */
+	public com.shale.core.service.OrganizationServicePort.RestoreOrganizationResult restoreOrganization(
+			com.shale.core.service.OrganizationServicePort.RestoreOrganizationCommand command) {
+		Objects.requireNonNull(command,"command");
+		if(command.shaleClientId()<=0||command.actorUserId()<=0||command.organizationId()<=0)
+			throw new IllegalArgumentException("Tenant, actor, and Organization IDs must be positive.");
+		if(command.expectedOrganizationRowVer()==null||command.expectedOrganizationRowVer().length==0)
+			throw new IllegalArgumentException("Opening Organization RowVer is required.");
+		try(Connection con=db.requireConnection()){
+			boolean auto=con.getAutoCommit();con.setAutoCommit(false);
+			try{
+				verifyTenantMatchesSession(con,command.shaleClientId());
+				requireAdministrator(con,command.shaleClientId(),command.actorUserId());
+				String name;byte[] opening;
+				try(var p=con.prepareStatement("SELECT Name,RowVer,IsDeleted FROM dbo.Organizations WITH(UPDLOCK,HOLDLOCK) WHERE Id=? AND ShaleClientId=?")){
+					p.setInt(1,command.organizationId());p.setInt(2,command.shaleClientId());try(var r=p.executeQuery()){
+						if(!r.next())throw new IllegalArgumentException("Removed Organization was not found.");
+						if(!r.getBoolean("IsDeleted"))throw new IllegalArgumentException("Organization is already active.");
+						name=r.getString("Name");opening=r.getBytes("RowVer");
+					}
+				}
+				if(!java.util.Arrays.equals(opening,command.expectedOrganizationRowVer()))throw new IllegalStateException("The Organization changed; reload before restoring.");
+				validateRestoreConsistency(con,command.shaleClientId(),command.organizationId());
+				byte[] finalRowVer;
+				try(var p=con.prepareStatement("UPDATE dbo.Organizations SET IsDeleted=0,UpdatedAt=SYSUTCDATETIME() OUTPUT inserted.RowVer WHERE Id=? AND ShaleClientId=? AND IsDeleted=1 AND RowVer=?")){
+					p.setInt(1,command.organizationId());p.setInt(2,command.shaleClientId());p.setBytes(3,command.expectedOrganizationRowVer());try(var r=p.executeQuery()){if(!r.next())throw new IllegalStateException("The Organization changed; reload before restoring.");finalRowVer=r.getBytes(1);}
+				}
+				entityActionAudit.append(con,EntityActionAuditEvent.now(command.shaleClientId(),command.actorUserId(),EntityActionAuditEvent.EntityType.ORGANIZATION,command.organizationId(),EntityActionAuditEvent.Action.RESTORED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.ORGANIZATION_ID,command.organizationId())));
+				con.commit();return new com.shale.core.service.OrganizationServicePort.RestoreOrganizationResult(command.organizationId(),command.shaleClientId(),name,finalRowVer);
+			}catch(Exception e){con.rollback();if(e instanceof RuntimeException r)throw r;throw new IllegalStateException("Organization restoration failed.",e);}finally{con.setAutoCommit(auto);}
+		}catch(SQLException e){throw new IllegalStateException("Organization restoration failed.",e);}
+	}
+
+	private static void requireAdministrator(Connection con,int tenant,int actor)throws SQLException{
+		try(var p=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0 AND ISNULL(IsRemoved,0)=0 AND ISNULL(is_admin,0)=1")){
+			p.setInt(1,actor);p.setInt(2,tenant);try(var r=p.executeQuery()){if(!r.next())throw new SecurityException("An active tenant administrator is required to restore Organizations.");}
+		}
+	}
+	private static void validateRestoreConsistency(Connection con,int tenant,int organization)throws SQLException{
+		String sql="""
+			SELECT CASE WHEN COUNT(*)>=1 AND SUM(CASE WHEN IsPrimary=1 THEN 1 ELSE 0 END)=1
+			 AND MAX(CASE WHEN IsPrimary=1 THEN OrganizationTypeId END)=(SELECT OrganizationTypeId FROM dbo.Organizations WHERE Id=? AND ShaleClientId=?) THEN 1 ELSE 0 END
+			FROM dbo.OrganizationOrganizationTypes WHERE OrganizationId=? AND ShaleClientId=? AND IsDeleted=0
+			""";
+		try(var p=con.prepareStatement(sql)){p.setInt(1,organization);p.setInt(2,tenant);p.setInt(3,organization);p.setInt(4,tenant);try(var r=p.executeQuery()){r.next();if(!r.getBoolean(1))throw new IllegalStateException("This Organization requires administrative data review before it can be restored.");}}
+		String mirrors="""
+			SELECT CASE WHEN ISNULL(o.Phone,N'')=ISNULL(phone.DisplayNumber,N'') AND ISNULL(o.Fax,N'')=ISNULL(fax.DisplayNumber,N'')
+			 AND LOWER(ISNULL(o.Email,N''))=LOWER(ISNULL(email.EmailAddress,N'')) AND ISNULL(o.Website,N'')=ISNULL(web.Website,N'')
+			 AND ISNULL(o.Address1,N'')=ISNULL(addr.AddressLine1,N'') AND ISNULL(o.Address2,N'')=ISNULL(addr.AddressLine2,N'')
+			 AND ISNULL(o.City,N'')=ISNULL(addr.City,N'') AND ISNULL(o.State,N'')=ISNULL(addr.StateOrProvince,N'')
+			 AND ISNULL(o.PostalCode,N'')=ISNULL(addr.PostalCode,N'') AND ISNULL(o.Country,N'')=ISNULL(addr.Country,N'') THEN 1 ELSE 0 END
+			FROM dbo.Organizations o
+			OUTER APPLY(SELECT TOP(1) DisplayNumber FROM dbo.OrganizationPhoneNumbers p WHERE p.OrganizationId=o.Id AND p.ShaleClientId=o.ShaleClientId AND p.IsDeleted=0 AND p.Kind<>'FAX' ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) phone
+			OUTER APPLY(SELECT TOP(1) DisplayNumber FROM dbo.OrganizationPhoneNumbers p WHERE p.OrganizationId=o.Id AND p.ShaleClientId=o.ShaleClientId AND p.IsDeleted=0 AND p.Kind='FAX' ORDER BY p.SortOrder,p.Id) fax
+			OUTER APPLY(SELECT TOP(1) EmailAddress FROM dbo.OrganizationEmailAddresses e WHERE e.OrganizationId=o.Id AND e.ShaleClientId=o.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) email
+			OUTER APPLY(SELECT TOP(1) Website FROM dbo.OrganizationWebsites w WHERE w.OrganizationId=o.Id AND w.ShaleClientId=o.ShaleClientId AND w.IsDeleted=0 ORDER BY w.IsPrimary DESC,w.SortOrder,w.Id) web
+			OUTER APPLY(SELECT TOP(1) AddressLine1,AddressLine2,City,StateOrProvince,PostalCode,Country FROM dbo.OrganizationAddresses a WHERE a.OrganizationId=o.Id AND a.ShaleClientId=o.ShaleClientId AND a.IsDeleted=0 ORDER BY a.IsPrimary DESC,a.SortOrder,a.Id) addr
+			WHERE o.Id=? AND o.ShaleClientId=?
+			""";
+		try(var p=con.prepareStatement(mirrors)){p.setInt(1,organization);p.setInt(2,tenant);try(var r=p.executeQuery()){if(!r.next()||!r.getBoolean(1))throw new IllegalStateException("This Organization requires administrative data review before it can be restored.");}}
+		try(var p=con.prepareStatement("SELECT COUNT(*) FROM dbo.OrganizationOrganizationTypes WHERE OrganizationId=? AND ShaleClientId<>?")){p.setInt(1,organization);p.setInt(2,tenant);try(var r=p.executeQuery()){r.next();if(r.getInt(1)>0)throw new IllegalStateException("This Organization requires administrative data review before it can be restored.");}}
+		for(String table:List.of("OrganizationPhoneNumbers","OrganizationEmailAddresses","OrganizationAddresses","OrganizationWebsites")){
+			String q="SELECT COUNT(*),SUM(CASE WHEN IsPrimary=1 THEN 1 ELSE 0 END),COUNT(DISTINCT SortOrder),MIN(SortOrder),MAX(SortOrder) FROM dbo."+table+" WHERE OrganizationId=? AND ShaleClientId=? AND IsDeleted=0";
+			try(var p=con.prepareStatement(q)){p.setInt(1,organization);p.setInt(2,tenant);try(var r=p.executeQuery()){r.next();int count=r.getInt(1),primaries=r.getInt(2),orders=r.getInt(3),min=r.getInt(4),max=r.getInt(5);if((count>0&&primaries!=1)||orders!=count||(count>0&&(min!=0||max!=count-1)))throw new IllegalStateException("This Organization requires administrative data review before it can be restored.");}}
+			try(var p=con.prepareStatement("SELECT COUNT(*) FROM dbo."+table+" WHERE OrganizationId=? AND ShaleClientId<>?")){p.setInt(1,organization);p.setInt(2,tenant);try(var r=p.executeQuery()){r.next();if(r.getInt(1)>0)throw new IllegalStateException("This Organization requires administrative data review before it can be restored.");}}
 		}
 	}
 
@@ -953,8 +1015,11 @@ public final class OrganizationDao {
 				rs.getString("Email"),
 				rs.getString("Website"),
 				rs.getString("City"),
-				rs.getString("State"));
+				rs.getString("State"),
+				directoryDeleted(rs), directoryRowVer(rs));
 	}
+	private static boolean directoryDeleted(ResultSet rs){try{return rs.getBoolean("IsDeleted");}catch(SQLException ignored){return false;}}
+	private static byte[] directoryRowVer(ResultSet rs){try{return rs.getBytes("RowVer");}catch(SQLException ignored){return null;}}
 
 	private static OrganizationTypeDefinitionRow mapOrganizationTypeDefinition(ResultSet rs) throws SQLException {
 		return mapOrganizationTypeDefinition(rs, "ShaleClientId", "SortOrder", "RowVer");

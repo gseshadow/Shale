@@ -17,6 +17,7 @@
 			<Button fx:id="addOrganizationButton" text="Add Organization" />
 			<TextField fx:id="organizationsSearchField" promptText="Search organizations…" prefWidth="250" />
 			<ShaleFilterMenu fx:id="organizationTypeFilter" />
+			<Button fx:id="showRemovedOrganizationsButton" text="Show removed" onAction="#toggleRemovedOrganizations" />
 			<ComboBox fx:id="organizationSort" prefWidth="120" />
 			<Label fx:id="activeFilterCount" text="0 filters" styleClass="contact-filter-count" />
 			<Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#clearFilters" styleClass="contact-filter-clear" />

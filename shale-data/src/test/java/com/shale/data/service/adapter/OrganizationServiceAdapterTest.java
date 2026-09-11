@@ -54,6 +54,7 @@ final class OrganizationServiceAdapterTest {
 		var command=new com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand(7,41,9,new byte[]{7},new com.shale.core.service.OrganizationServicePort.OrganizationFields("Org",null,null,null,null,null,null,null,null,null,null,null),List.of(new com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment(101L,13,true,0,new byte[]{3})));
 		var result=service.updateOrganizationAggregate(command);assertSame(command,organizations.aggregateUpdate);assertArrayEquals(new byte[]{8},result.organizationRowVer());assertEquals(0,organizations.rowVerReads,"the adapter must not replace the transaction-captured token with a later read");
 	}
+	@Test void restorationDelegatesExplicitLifecycleCommandAndReturnsFinalToken(){var g=new FakeOrganizations();var service=new OrganizationServiceAdapter(g,(t,o)->List.of());var c=new com.shale.core.service.OrganizationServicePort.RestoreOrganizationCommand(41,9,7,new byte[]{1});var result=service.restoreOrganization(c);assertSame(c,g.restore);assertEquals(7,result.organizationId());assertArrayEquals(new byte[]{2},result.organizationRowVer());}
 	@Test void legacyCreateMapsSelectedTypeAndScalarsToOneStructuredAggregate(){FakeOrganizations g=new FakeOrganizations(organization(7,41));g.effectiveTypes=List.of(new OrganizationDao.OrganizationTypeDefinitionRow(12,41,"provider","Provider",null,"#123456",0,true,false,new byte[]{1}));var service=new OrganizationServiceAdapter(g,(t,o)->List.of());int id=service.createOrganization(new com.shale.core.service.OrganizationServicePort.CreateOrganizationCommand(41,9,"Org","555",null,"a@example.test",null,null,null,null,null,null,null,null,12));assertEquals(7,id);assertEquals(1,g.aggregateCreate.assignments().size());assertTrue(g.aggregateCreate.assignments().get(0).primary());assertEquals(12,g.aggregateCreate.assignments().get(0).organizationTypeId());var contacts=assertInstanceOf(com.shale.core.service.OrganizationServicePort.StructuredContactMutation.class,g.aggregateCreate.contactMutation());assertTrue(contacts.phones().owned());assertEquals(1,contacts.phones().rows().size());assertEquals(1,contacts.emails().rows().size());assertTrue(contacts.addresses().rows().isEmpty());assertTrue(contacts.websites().rows().isEmpty());}
 	@Test void typeReadsDelegateAndPreserveLifecycleIdentityOrderingAndDefensiveRowVersions() {
 		FakeOrganizations organizations = new FakeOrganizations(organization(7, 41));
@@ -148,6 +149,7 @@ final class OrganizationServiceAdapterTest {
 		private com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand aggregateCreate;
 		private com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand aggregateUpdate;
 		private int rowVerReads;
+		private com.shale.core.service.OrganizationServicePort.RestoreOrganizationCommand restore;
 		FakeOrganizations(){this(null);}
 		FakeOrganizations(Organization organization){this.organization=organization;}
 		@Override public Organization findById(int id){return organization;}
@@ -161,5 +163,6 @@ final class OrganizationServiceAdapterTest {
 		@Override public com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile createOrganizationAggregate(com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand c){aggregateCreate=c;return new com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile(7,41,12,true,List.of());}
 		@Override public com.shale.core.service.OrganizationServicePort.OrganizationAggregateResult updateOrganizationAggregate(com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand c){aggregateUpdate=c;return new com.shale.core.service.OrganizationServicePort.OrganizationAggregateResult(7,new byte[]{8},new com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile(7,41,13,true,List.of()));}
 		@Override public byte[] findOrganizationRowVer(int organization,int tenant){rowVerReads++;return new byte[]{8};}
+		@Override public com.shale.core.service.OrganizationServicePort.RestoreOrganizationResult restoreOrganization(com.shale.core.service.OrganizationServicePort.RestoreOrganizationCommand c){restore=c;return new com.shale.core.service.OrganizationServicePort.RestoreOrganizationResult(c.organizationId(),c.shaleClientId(),"Org",new byte[]{2});}
 	}
 }

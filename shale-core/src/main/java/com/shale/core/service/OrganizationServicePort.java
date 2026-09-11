@@ -51,6 +51,21 @@ public interface OrganizationServicePort {
 		throw new UnsupportedOperationException("Aggregate Organization update is not supported");
 	}
 
+	/** Administrator-only lifecycle command; restores the existing aggregate identity in place. */
+	default RestoreOrganizationResult restoreOrganization(RestoreOrganizationCommand command) {
+		throw new UnsupportedOperationException("Organization restoration is not supported");
+	}
+
+	record RestoreOrganizationCommand(int shaleClientId, int actorUserId, int organizationId,
+			byte[] expectedOrganizationRowVer) {
+		public RestoreOrganizationCommand { expectedOrganizationRowVer = copyRowVer(expectedOrganizationRowVer); }
+		@Override public byte[] expectedOrganizationRowVer() { return copyRowVer(expectedOrganizationRowVer); }
+	}
+	record RestoreOrganizationResult(int organizationId, int shaleClientId, String name, byte[] organizationRowVer) {
+		public RestoreOrganizationResult { organizationRowVer = copyRowVer(organizationRowVer); }
+		@Override public byte[] organizationRowVer() { return copyRowVer(organizationRowVer); }
+	}
+
 	record OrganizationSummary(
 			int id,
 			String name,
