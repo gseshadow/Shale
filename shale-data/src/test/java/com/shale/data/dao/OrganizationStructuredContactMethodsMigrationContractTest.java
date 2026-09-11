@@ -67,7 +67,6 @@ final class OrganizationStructuredContactMethodsMigrationContractTest {
         assertTrue(sql.contains("NULLIF(LTRIM(RTRIM(o.Address1)),N'''')") && sql.contains("NULLIF(LTRIM(RTRIM(o.Country)),N'''')"));
         assertTrue(sql.contains("N''MAIN'',LTRIM(RTRIM(o.Website))"));
         for (String guard : new String[]{
-                "NOT EXISTS(SELECT 1 FROM dbo.OrganizationPhoneNumbers p WHERE p.ShaleClientId=s.ShaleClientId AND p.OrganizationId=s.OrganizationId AND p.Kind=s.Kind AND p.DisplayNumber=s.Value)",
                 "NOT EXISTS(SELECT 1 FROM dbo.OrganizationEmailAddresses e WHERE e.ShaleClientId=o.ShaleClientId AND e.OrganizationId=o.Id AND e.EmailAddress=LTRIM(RTRIM(o.Email)))",
                 "NOT EXISTS(SELECT 1 FROM dbo.OrganizationAddresses a WHERE a.ShaleClientId=o.ShaleClientId AND a.OrganizationId=o.Id AND ISNULL(a.AddressLine1,N'''')",
                 "NOT EXISTS(SELECT 1 FROM dbo.OrganizationWebsites w WHERE w.ShaleClientId=o.ShaleClientId AND w.OrganizationId=o.Id AND w.Website=LTRIM(RTRIM(o.Website)))"}) {
@@ -78,16 +77,40 @@ final class OrganizationStructuredContactMethodsMigrationContractTest {
         assertFalse(sql.contains("ALTER TABLE dbo.Organizations DROP"));
     }
 
+    @Test void phoneBackfillRerunTreatsEveryHistoricalNonFaxKindAsTheLegacyVoiceIdentity() throws Exception {
+        String sql = read("docs/sql/2026-09-10_organizations_phase3a_structured_contact_methods.sql");
+        String guard = "NOT EXISTS(SELECT 1 FROM dbo.OrganizationPhoneNumbers p WHERE p.ShaleClientId=s.ShaleClientId AND p.OrganizationId=s.OrganizationId "
+                + "AND ((s.Kind=N''FAX'' AND p.Kind=N''FAX'') OR (s.Kind=N''WORK'' AND p.Kind IN(N''MOBILE'',N''HOME'',N''WORK'',N''OTHER''))) "
+                + "AND p.DisplayNumber=s.Value)";
+        assertTrue(sql.contains(guard),
+                "a historical exact MOBILE, HOME, WORK, or OTHER match must prevent rerun from manufacturing a WORK row, while Fax remains FAX-only");
+        assertFalse(guard.contains("IsDeleted="),
+                "a deleted historical voice match must continue suppressing rerun insertion");
+    }
+
     @Test void verificationIsReadOnlyAndReportsZeroHealthyFindings() throws Exception {
         String verify = read("docs/sql/verification/2026-09-10_organizations_phase3a_structured_contact_methods_verification.sql");
-        for (String finding : new String[]{"legacy Phone without historical structured match", "legacy Fax without historical fax match", "legacy Email without historical structured match", "populated partial address without historical structured match", "legacy Website without historical structured match", "active duplicates", "more than one active", "cross-tenant or orphan", "invalid sort orders", "blank active scalar values", "empty active addresses", "missing/wrong/unexpected RLS predicates", "untrusted, disabled, or cascading foreign keys"})
+        for (String finding : new String[]{"legacy Phone without historical structured voice match", "legacy Fax without historical fax match", "legacy Email without historical structured match", "populated partial address without historical structured match", "legacy Website without historical structured match", "active duplicates", "more than one active", "cross-tenant or orphan", "invalid sort orders", "blank active scalar values", "empty active addresses", "missing/wrong/unexpected RLS predicates", "untrusted, disabled, or cascading foreign keys"})
             assertTrue(verify.contains(finding), finding);
+        assertTrue(verify.contains("@ExpectedDatabase sysname=N'REPLACE_WITH_APPROVED_DATABASE'")
+                && verify.contains("@OperatorVerifiedAllTenantVisibility bit=0"),
+                "read-only verification must also refuse execution until explicitly configured");
         assertTrue(verify.contains("ShaleClientId IN(7,8)") && verify.contains("missing context must return zero rows"));
         assertTrue(verify.contains("IF EXISTS(SELECT 1 FROM @Findings WHERE FindingCount<>0) THROW"));
         assertFalse(GO.matcher(verify).find());
         assertFalse(verify.matches("(?is).*\\b(?:ALTER|CREATE|DROP|UPDATE|DELETE|MERGE)\\s+(?:TABLE\\s+|INTO\\s+)?dbo\\..*"));
         assertFalse(verify.matches("(?is).*\\bINSERT\\s+(?:INTO\\s+)?dbo\\..*"));
         assertFalse(verify.matches("(?is).*COUNT_BIG\\(\\*\\)\\s+(?:AS\\s+)?RowCount\\b.*"));
+    }
+
+    @Test void verificationAcceptsExactHistoricalVoiceKindsButKeepsFaxKindSpecific() throws Exception {
+        String verify = read("docs/sql/verification/2026-09-10_organizations_phase3a_structured_contact_methods_verification.sql");
+        assertTrue(verify.contains("p.Kind IN(N''MOBILE'',N''HOME'',N''WORK'',N''OTHER'') AND p.DisplayNumber=LTRIM(RTRIM(o.Phone))"),
+                "active or deleted MOBILE, HOME, WORK, and OTHER rows with the exact trimmed display value must satisfy legacy Phone verification");
+        assertFalse(verify.contains("p.Kind IN(N''MOBILE'',N''HOME'',N''WORK'',N''FAX'',N''OTHER'')"),
+                "FAX alone must not satisfy legacy Phone verification");
+        assertTrue(verify.contains("p.Kind=N''FAX'' AND p.DisplayNumber=LTRIM(RTRIM(o.Fax))"),
+                "legacy Fax must still require an exact historical FAX match");
     }
 
     @Test void runtimeOrganizationWritePathsRemainUnchangedByPhaseThreeA() throws Exception {

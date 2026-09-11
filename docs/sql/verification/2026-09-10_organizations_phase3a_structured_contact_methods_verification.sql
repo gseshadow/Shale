@@ -1,8 +1,8 @@
 /* Read-only Organizations Phase 3A verification. Returns only metadata, IDs, and aggregate counts. */
 SET NOCOUNT ON;
 BEGIN TRY
-DECLARE @ExpectedDatabase sysname=N'Shale';
-DECLARE @OperatorVerifiedAllTenantVisibility bit=1;
+DECLARE @ExpectedDatabase sysname=N'REPLACE_WITH_APPROVED_DATABASE';
+DECLARE @OperatorVerifiedAllTenantVisibility bit=0;
 IF @ExpectedDatabase=N'REPLACE_WITH_APPROVED_DATABASE' OR DB_NAME()<>@ExpectedDatabase THROW 57300,'Set @ExpectedDatabase to the approved database.',1;
 IF SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL OR SESSION_CONTEXT(N'PrincipalUserId') IS NOT NULL THROW 57301,'Verification requires NULL tenant and principal session context.',1;
 IF USER_NAME() IN(N'shale_app',N'shale_runtime') OR (ISNULL(IS_SRVROLEMEMBER(N'sysadmin'),0)<>1 AND ISNULL(IS_MEMBER(N'db_owner'),0)<>1) THROW 57302,'Use an approved all-tenant administrative principal.',1;
@@ -33,7 +33,7 @@ UNION ALL SELECT N''OrganizationWebsites'',ShaleClientId,COUNT_BIG(*) FROM dbo.O
 
 DECLARE @Findings table(Finding nvarchar(160) NOT NULL,FindingCount bigint NOT NULL);
 INSERT @Findings EXEC sys.sp_executesql N'
-SELECT N''legacy Phone without historical structured match'',COUNT_BIG(*) FROM dbo.Organizations o WHERE NULLIF(LTRIM(RTRIM(o.Phone)),N'''') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.OrganizationPhoneNumbers p WHERE p.ShaleClientId=o.ShaleClientId AND p.OrganizationId=o.Id AND p.Kind=N''WORK'' AND p.DisplayNumber=LTRIM(RTRIM(o.Phone)))
+SELECT N''legacy Phone without historical structured voice match'',COUNT_BIG(*) FROM dbo.Organizations o WHERE NULLIF(LTRIM(RTRIM(o.Phone)),N'''') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.OrganizationPhoneNumbers p WHERE p.ShaleClientId=o.ShaleClientId AND p.OrganizationId=o.Id AND p.Kind IN(N''MOBILE'',N''HOME'',N''WORK'',N''OTHER'') AND p.DisplayNumber=LTRIM(RTRIM(o.Phone)))
 UNION ALL SELECT N''legacy Fax without historical fax match'',COUNT_BIG(*) FROM dbo.Organizations o WHERE NULLIF(LTRIM(RTRIM(o.Fax)),N'''') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.OrganizationPhoneNumbers p WHERE p.ShaleClientId=o.ShaleClientId AND p.OrganizationId=o.Id AND p.Kind=N''FAX'' AND p.DisplayNumber=LTRIM(RTRIM(o.Fax)))
 UNION ALL SELECT N''legacy Email without historical structured match'',COUNT_BIG(*) FROM dbo.Organizations o WHERE NULLIF(LTRIM(RTRIM(o.Email)),N'''') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.OrganizationEmailAddresses e WHERE e.ShaleClientId=o.ShaleClientId AND e.OrganizationId=o.Id AND e.EmailAddress=LTRIM(RTRIM(o.Email)))
 UNION ALL SELECT N''populated partial address without historical structured match'',COUNT_BIG(*) FROM dbo.Organizations o WHERE COALESCE(NULLIF(LTRIM(RTRIM(o.Address1)),N''''),NULLIF(LTRIM(RTRIM(o.Address2)),N''''),NULLIF(LTRIM(RTRIM(o.City)),N''''),NULLIF(LTRIM(RTRIM(o.State)),N''''),NULLIF(LTRIM(RTRIM(o.PostalCode)),N''''),NULLIF(LTRIM(RTRIM(o.Country)),N'''')) IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.OrganizationAddresses a WHERE a.ShaleClientId=o.ShaleClientId AND a.OrganizationId=o.Id AND ISNULL(a.AddressLine1,N'''')=ISNULL(NULLIF(LTRIM(RTRIM(o.Address1)),N''''),N'''') AND ISNULL(a.AddressLine2,N'''')=ISNULL(NULLIF(LTRIM(RTRIM(o.Address2)),N''''),N'''') AND ISNULL(a.City,N'''')=ISNULL(NULLIF(LTRIM(RTRIM(o.City)),N''''),N'''') AND ISNULL(a.StateOrProvince,N'''')=ISNULL(NULLIF(LTRIM(RTRIM(o.State)),N''''),N'''') AND ISNULL(a.PostalCode,N'''')=ISNULL(NULLIF(LTRIM(RTRIM(o.PostalCode)),N''''),N'''') AND ISNULL(a.Country,N'''')=ISNULL(NULLIF(LTRIM(RTRIM(o.Country)),N''''),N''''))

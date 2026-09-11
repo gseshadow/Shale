@@ -4,8 +4,8 @@
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 BEGIN TRY
-DECLARE @ExpectedDatabase sysname = N'Shale';
-DECLARE @OperatorVerifiedAllTenantVisibility bit = 1;
+DECLARE @ExpectedDatabase sysname = N'REPLACE_WITH_APPROVED_DATABASE';
+DECLARE @OperatorVerifiedAllTenantVisibility bit = 0;
 
 IF @ExpectedDatabase = N'REPLACE_WITH_APPROVED_DATABASE'
    OR DB_NAME() <> @ExpectedDatabase
@@ -116,7 +116,7 @@ SET @sql=N';WITH s AS(SELECT ShaleClientId,Id OrganizationId,N''WORK'' Kind,LTRI
  UNION ALL SELECT ShaleClientId,Id,N''FAX'',LTRIM(RTRIM(Fax)),1 FROM dbo.Organizations WHERE NULLIF(LTRIM(RTRIM(Fax)),N'''') IS NOT NULL)
 INSERT dbo.OrganizationPhoneNumbers(ShaleClientId,OrganizationId,Kind,DisplayNumber,IsPrimary,SortOrder)
 SELECT s.ShaleClientId,s.OrganizationId,s.Kind,s.Value,CASE WHEN NOT EXISTS(SELECT 1 FROM dbo.OrganizationPhoneNumbers p WHERE p.ShaleClientId=s.ShaleClientId AND p.OrganizationId=s.OrganizationId AND p.IsDeleted=0 AND p.IsPrimary=1) AND (s.Kind=N''WORK'' OR NOT EXISTS(SELECT 1 FROM dbo.Organizations o WHERE o.ShaleClientId=s.ShaleClientId AND o.Id=s.OrganizationId AND NULLIF(LTRIM(RTRIM(o.Phone)),N'''') IS NOT NULL)) THEN 1 ELSE 0 END,s.SortOrder FROM s
-WHERE NOT EXISTS(SELECT 1 FROM dbo.OrganizationPhoneNumbers p WHERE p.ShaleClientId=s.ShaleClientId AND p.OrganizationId=s.OrganizationId AND p.Kind=s.Kind AND p.DisplayNumber=s.Value);
+WHERE NOT EXISTS(SELECT 1 FROM dbo.OrganizationPhoneNumbers p WHERE p.ShaleClientId=s.ShaleClientId AND p.OrganizationId=s.OrganizationId AND ((s.Kind=N''FAX'' AND p.Kind=N''FAX'') OR (s.Kind=N''WORK'' AND p.Kind IN(N''MOBILE'',N''HOME'',N''WORK'',N''OTHER''))) AND p.DisplayNumber=s.Value);
 INSERT dbo.OrganizationEmailAddresses(ShaleClientId,OrganizationId,Kind,EmailAddress,NormalizedEmail,IsPrimary,SortOrder)
 SELECT o.ShaleClientId,o.Id,N''WORK'',LTRIM(RTRIM(o.Email)),LOWER(LTRIM(RTRIM(o.Email))),CASE WHEN EXISTS(SELECT 1 FROM dbo.OrganizationEmailAddresses e WHERE e.ShaleClientId=o.ShaleClientId AND e.OrganizationId=o.Id AND e.IsDeleted=0 AND e.IsPrimary=1) THEN 0 ELSE 1 END,0 FROM dbo.Organizations o
 WHERE NULLIF(LTRIM(RTRIM(o.Email)),N'''') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.OrganizationEmailAddresses e WHERE e.ShaleClientId=o.ShaleClientId AND e.OrganizationId=o.Id AND e.EmailAddress=LTRIM(RTRIM(o.Email)));
