@@ -28,6 +28,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.layout.VBox;
 
 final class SettingsFxmlLoadTest {
     @BeforeAll
@@ -67,6 +68,12 @@ final class SettingsFxmlLoadTest {
             assertTrue(!auditOpened.get(), "Non-admin Settings users must not open the audit log.");
 
             assertNotNull(inactiveUsers.getOnAction(), "Existing Settings controls should keep resolving their handlers.");
+
+            VBox organizationTypes = (VBox) loader.getNamespace().get("organizationTypeAdministrationContent");
+            assertNotNull(organizationTypes,
+                    "Settings must retain the real Organization Type administration host.");
+            assertSame(organizationTypes, injectedField(controller, "organizationTypeAdministrationContent"),
+                    "Organization Type administration host must be injected into SettingsController.");
         });
     }
 

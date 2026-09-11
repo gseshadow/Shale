@@ -49,14 +49,14 @@ final class OrganizationCardMiniStyleTest {
     @Test
     void requestedFromSelectionHoverAndFocusStylesDoNotOverrideMiniOrganizationNameText() throws IOException {
         String css = Files.readString(APP_CSS);
-        String requestedFromCss = css.substring(css.indexOf(".requested-from-results"));
 
-        assertTrue(requestedFromCss.contains(".requested-from-results .list-cell:filled:hover"));
-        assertTrue(requestedFromCss.contains(".requested-from-results .list-cell:filled:selected"));
-        assertTrue(requestedFromCss.contains(".requested-from-results .list-cell:filled:focused"));
-        assertFalse(requestedFromCss.contains(".organization-card-name"));
-        assertFalse(requestedFromCss.contains("-fx-text-fill: white"));
-        assertFalse(requestedFromCss.contains("-fx-text-fill: #fff"));
+        assertTrue(cssHasSelector(css, ".requested-from-results .list-cell:filled:hover"));
+        assertTrue(cssHasSelector(css, ".requested-from-results .list-cell:filled:selected"));
+        assertTrue(cssHasSelector(css, ".requested-from-results .list-cell:filled:focused"));
+        assertFalse(requestedFromStateRules(css).stream().anyMatch(rule ->
+                        rule.selector().contains(".organization-card-name")
+                                || rule.declarations().contains("-fx-text-fill")),
+                "requested-from cell state rules may style the cell chrome, not descendant Organization name text");
     }
 
     @Test
@@ -95,4 +95,25 @@ final class OrganizationCardMiniStyleTest {
         }
         return false;
     }
+
+    private static boolean cssHasSelector(String css, String selector) {
+        return cssRules(css).stream().anyMatch(rule -> Pattern.compile("(?:^|,)\\s*" + Pattern.quote(selector) + "\\s*(?:,|$)")
+                .matcher(rule.selector()).find());
+    }
+
+    private static java.util.List<CssRule> requestedFromStateRules(String css) {
+        return cssRules(css).stream().filter(rule -> rule.selector().contains("requested-from")
+                && (rule.selector().contains(":hover") || rule.selector().contains(":selected")
+                        || rule.selector().contains(":focused"))).toList();
+    }
+
+    private static java.util.List<CssRule> cssRules(String css) {
+        Pattern rulePattern = Pattern.compile("([^{}]+)\\{([^}]*)}");
+        var matcher = rulePattern.matcher(css);
+        var rules = new java.util.ArrayList<CssRule>();
+        while (matcher.find()) rules.add(new CssRule(matcher.group(1), matcher.group(2)));
+        return rules;
+    }
+
+    private record CssRule(String selector, String declarations) { }
 }
