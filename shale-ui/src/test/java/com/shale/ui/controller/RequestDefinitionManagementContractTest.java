@@ -31,4 +31,12 @@ final class RequestDefinitionManagementContractTest {
         assertTrue(MATERIALS.contains("cid()==capturedCase&&tenant()==capturedTenant&&gen.get()==capturedGeneration"));
         assertTrue(MATERIALS.contains("svc.listEffectiveMaterialTypes(capturedTenant)"));
     }
+    @Test void contextualActionPreservesTheTypedRequestHeaderContract(){
+        assertTrue(MATERIALS.contains("static VBox section(Label t,Button b,Label s,VBox list)"));
+        assertTrue(MATERIALS.contains("VBox requestSection=section(title,newRequestButton,status,list)"));
+        assertTrue(MATERIALS.contains("HBox headerContainer=(HBox)requestSection.getChildren().get(0)"));
+        assertTrue(MATERIALS.contains("if(state!=null&&state.isAdmin())"));
+        assertTrue(MATERIALS.contains("headerContainer.getChildren().add(manageRequestFieldsButton)"));
+        assertFalse(MATERIALS.contains("section(title,headerActions,status,list)"));
+    }
 }

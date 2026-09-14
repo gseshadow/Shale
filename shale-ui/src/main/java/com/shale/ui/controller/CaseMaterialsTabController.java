@@ -55,11 +55,18 @@ final class CaseMaterialRequestsTabController {
     void init(MaterialRequestServicePort s, AppState a, Supplier<Long> c, Supplier<Window> o){init(s,null,null,a,null,null,null,c,o);} void init(MaterialRequestServicePort s, CaseTaskService tasks, AppState a, Supplier<Long> c, Supplier<Window> o){init(s,tasks,null,a,null,null,null,c,o);} void init(MaterialRequestServicePort s, CaseTaskService tasks, CaseServicePort cases, AppState a, CaseDao cd, ContactDao ctd, OrganizationDao od, Supplier<Long> c, Supplier<Window> o){svc=s;caseTaskService=tasks;caseService=cases;state=a;caseDao=cd;contactDao=ctd;organizationDao=od;caseId=c;owner=o; rebuildRequestCardFactory();}
     void setEntityNavigation(Consumer<Integer> contact, Consumer<Integer> organization, Consumer<Integer> user){onOpenContact=contact;onOpenOrganization=organization;onOpenUser=user;rebuildRequestCardFactory();}
     private void rebuildRequestCardFactory(){requestCardFactory=new MaterialRequestCardFactory(this::openDetail,onOpenContact,onOpenOrganization,onOpenUser);}
-    Node view(){ if(root!=null)return root; list=new VBox(10); list.setPadding(REQUEST_LIST_INSETS); title=title("Material Requests"); status=muted("Loading material requests…"); Button add=semanticButton(ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD, "New Request",null); add.setOnAction(e->openNewRequestWindow());
-        Button manage=semanticButton(ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD, "Manage Request Fields",null);
-        manage.setId("manage-request-fields"); manage.setOnAction(e->openRequestDefinitionManagement());
-        HBox headerActions=new HBox(8,add); if(state!=null&&state.isAdmin())headerActions.getChildren().add(manage);
-        search=new TextField();search.setPromptText("Search requests");search.getStyleClass().add("app-dialog-search-field");showDeleted=new CheckBox("Show deleted");HBox filters=new HBox(10,search,showDeleted);filters.setAlignment(Pos.CENTER_LEFT);HBox.setHgrow(search,Priority.ALWAYS);VBox section=section(title,headerActions,status,list);section.getChildren().add(1,filters);root=new VBox(10,section); root.setPadding(new Insets(8)); root.getStyleClass().add("case-main-surface");search.textProperty().addListener((o,a,b)->render(currentData));showDeleted.selectedProperty().addListener((o,a,b)->refresh());return root; }
+    Node view(){ if(root!=null)return root; list=new VBox(10); list.setPadding(REQUEST_LIST_INSETS); title=title("Material Requests"); status=muted("Loading material requests…");
+        Button newRequestButton=semanticButton(ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD, "New Request",null);
+        newRequestButton.setOnAction(e->openNewRequestWindow());
+        VBox requestSection=section(title,newRequestButton,status,list);
+        HBox headerContainer=(HBox)requestSection.getChildren().get(0);
+        if(state!=null&&state.isAdmin()){
+            Button manageRequestFieldsButton=semanticButton(ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD, "Manage Request Fields",null);
+            manageRequestFieldsButton.setId("manage-request-fields");
+            manageRequestFieldsButton.setOnAction(e->openRequestDefinitionManagement());
+            headerContainer.getChildren().add(manageRequestFieldsButton);
+        }
+        search=new TextField();search.setPromptText("Search requests");search.getStyleClass().add("app-dialog-search-field");showDeleted=new CheckBox("Show deleted");HBox filters=new HBox(10,search,showDeleted);filters.setAlignment(Pos.CENTER_LEFT);HBox.setHgrow(search,Priority.ALWAYS);requestSection.getChildren().add(1,filters);root=new VBox(10,requestSection); root.setPadding(new Insets(8)); root.getStyleClass().add("case-main-surface");search.textProperty().addListener((o,a,b)->render(currentData));showDeleted.selectedProperty().addListener((o,a,b)->refresh());return root; }
     private void openRequestDefinitionManagement(){
         if(state==null||!state.isAdmin()||svc==null)return;
         final long capturedCase=cid(); final int capturedTenant=tenant(); final int capturedGeneration=gen.get();
