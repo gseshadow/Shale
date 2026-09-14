@@ -297,6 +297,7 @@ public class CaseController {
 	private VBox caseLinksTabPane;
 	@FXML
 	private VBox caseLinksCardsBox;
+	@FXML private Button manageLinkTypesButton;
 	@FXML
 	private Label caseLinksStatusLabel;
 	@FXML
@@ -717,6 +718,7 @@ public class CaseController {
 	private int caseDatesLoadGeneration;
 	private CaseDateOccurrenceEditorLauncher caseDateOccurrenceEditorLauncher;
 	private CaseDateTypeManagementLauncher caseDateTypeManagementLauncher;
+	private LinkTypeManagementLauncher linkTypeManagementLauncher;
 	private final Set<Integer> openingCaseCalendarEventIds = new HashSet<>();
 
 	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
@@ -939,10 +941,13 @@ public class CaseController {
 				this::showCaseDatesMessage, open -> { caseDateEditorOpen = open; if (!open) applyDeferredCaseDatesRefresh(); }, id -> this.onOpenCase.accept(id));
 		this.caseDateTypeManagementLauncher = caseService == null ? null : new CaseDateTypeManagementLauncher(caseService, caseDateExecutor,
 				typeId -> { if (this.runtimeBridge != null && this.appState != null && this.appState.getShaleClientId() != null && this.appState.getUserId() != null) this.runtimeBridge.publishCaseDateTypeChanged(typeId, this.appState.getShaleClientId(), this.appState.getUserId()); });
+		this.linkTypeManagementLauncher = caseService == null ? null : new LinkTypeManagementLauncher(caseService, caseDateExecutor,
+				(typeId, change) -> { if (this.runtimeBridge != null && this.appState != null && this.appState.getShaleClientId() != null && this.appState.getUserId() != null) { this.runtimeBridge.publishLinkTypeChanged(typeId, this.appState.getShaleClientId(), this.appState.getUserId(), change); this.runtimeBridge.publishEntityAuditActivityAdded(null, this.appState.getShaleClientId(), this.appState.getUserId()); } }, runtimeBridge);
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
 		if (manageCaseDateTypesButton != null) { manageCaseDateTypesButton.setVisible(appState != null && appState.isAdmin()); manageCaseDateTypesButton.setManaged(appState != null && appState.isAdmin()); }
+		if (manageLinkTypesButton != null) { manageLinkTypesButton.setVisible(appState != null && appState.isAdmin()); manageLinkTypesButton.setManaged(appState != null && appState.isAdmin()); }
 		refreshOverviewAdminAction();
 		this.runtimeBridge = runtimeBridge;
 		this.caseDocumentService = (caseDao == null || caseSummaryDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, caseSummaryDao, contactDao);
@@ -1090,6 +1095,10 @@ public class CaseController {
 			addCaseLinkButton.getStyleClass().removeAll(ActionButtonFactory.BASE_STYLE_CLASS, ActionButtonFactory.PRIMARY_STYLE_CLASS);
 			ControlStyles.apply(addCaseLinkButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 			addCaseLinkButton.setOnAction(e -> onAddCaseLink());
+		}
+		if (manageLinkTypesButton != null) {
+			ControlStyles.apply(manageLinkTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+			manageLinkTypesButton.setOnAction(e -> openLinkTypeManagement());
 		}
 		configureCaseCalendarControls();
 		if (generateSummaryHtmlMenuItem != null)
@@ -1998,6 +2007,20 @@ public class CaseController {
 			loadOverviewConfigurationAsync();
 			compatibilityDates.invalidate();
 			loadCompatibilityDatesAsync(openingCaseId);
+		});
+	}
+
+	private void openLinkTypeManagement() {
+		if (appState == null || !appState.isAdmin() || linkTypeManagementLauncher == null || caseId == null
+				|| appState.getShaleClientId() == null || appState.getUserId() == null) return;
+		final int openingCaseId = caseId;
+		final int openingTenantId = appState.getShaleClientId();
+		linkTypeManagementLauncher.open(caseLinksOwner(), openingTenantId, appState.getUserId(), result -> {
+			if (!result.changed() || caseId == null || caseId != openingCaseId || appState == null
+					|| appState.getShaleClientId() == null || appState.getShaleClientId() != openingTenantId) return;
+			caseLinksStale = true;
+			loadCaseLinksAsync("Link types refreshed.");
+			invalidateOverviewPrimaryLinkAfterCaseLinkMutation();
 		});
 	}
 
