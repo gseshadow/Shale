@@ -172,8 +172,7 @@ public final class SettingsController {
 	@FXML
 	private VBox contactClassificationAdministrationSection;
 	@FXML private VBox caseTeamRoleAdministrationContent;
-	@FXML
-	private VBox contactClassificationContent;
+	@FXML private Button manageContactClassificationsButton;
 	@FXML private VBox organizationTypeAdministrationSection;
 	@FXML private VBox organizationTypeAdministrationContent;
 	@FXML
@@ -301,6 +300,7 @@ public final class SettingsController {
 		ControlStyles.apply(resetNotificationPreferencesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		ControlStyles.apply(viewAuditLogButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		if (manageCaseDateTypesButton != null) ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		if (manageContactClassificationsButton != null) ControlStyles.apply(manageContactClassificationsButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 	}
 
 	private void configureUserManagementSemanticButtons() {
@@ -349,10 +349,15 @@ public final class SettingsController {
 	}
 
 	private void configureContactClassifications() {
-		if (contactClassificationContent != null && contactService != null && appState != null
-				&& contactClassificationContent.getChildren().isEmpty()) {
-			contactClassificationContent.getChildren().setAll(new ContactClassificationAdminPane(contactService, appState).node());
-		}
+		if (manageContactClassificationsButton != null)
+			manageContactClassificationsButton.setDisable(contactService == null || appState == null || !appState.isAdmin());
+	}
+
+	@FXML
+	private void onManageContactClassifications(ActionEvent event) {
+		if (!requireAdminLookupManagement("Contact Classifications") || contactService == null) return;
+		new ContactClassificationManagementLauncher(contactService, settingsLoadExecutor)
+				.open(settingsWindow(event), requireTenantId(), requireActorUserId(), result -> { });
 	}
 
 	private void configureOrganizationTypes(){
@@ -614,7 +619,9 @@ public final class SettingsController {
 	private void onManageCaseDateTypes(ActionEvent event) {
 		if (!requireAdminLookupManagement("Case Date Types") || caseService == null) return;
 		new CaseDateTypeManagementLauncher(caseService, settingsLoadExecutor, this::publishCaseDateTypeChanged)
-				.open(settingsWindow(event), requireTenantId(), requireActorUserId(), result -> loadCaseDateRoleMappingsAsync("Case Date settings refreshed."));
+				.open(settingsWindow(event), requireTenantId(), requireActorUserId(), result -> {
+					if (result.changed()) loadCaseDateRoleMappingsAsync("Case Date settings refreshed.");
+				});
 	}
 
 	private void loadCaseDateRoleMappingsAsync(String successMessage) {
