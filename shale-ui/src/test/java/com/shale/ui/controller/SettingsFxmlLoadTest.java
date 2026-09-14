@@ -69,6 +69,10 @@ final class SettingsFxmlLoadTest {
 
             assertNotNull(inactiveUsers.getOnAction(), "Existing Settings controls should keep resolving their handlers.");
 
+            Button manageDictionary = (Button) loader.getNamespace().get("manageCustomDictionaryButton");
+            assertNotNull(manageDictionary, "Custom Dictionary must be presented as one compact Settings action.");
+            assertNotNull(manageDictionary.getOnAction(), "The dictionary manager must be created only from the Manage action.");
+
             VBox organizationTypes = (VBox) loader.getNamespace().get("organizationTypeAdministrationContent");
             assertNotNull(organizationTypes,
                     "Settings must retain the real Organization Type administration host.");

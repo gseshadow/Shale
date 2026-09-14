@@ -15,9 +15,11 @@ styling.
 
 Spell checking is offline and dictionary based. The bundled baseline dictionary
 is compiled once from `spellcheck/en_US.dic` and `spellcheck/en_US.aff`, honoring
-Hunspell affix morphology; callers can add session/user dictionary
-terms through `addToCustomDictionary`. A future settings-backed implementation
-can persist those terms without changing the component's text contract.
+Hunspell affix morphology; callers can add per-user, tenant-scoped dictionary
+terms through `addToCustomDictionary`. Those terms are persisted through the
+user-dictionary service port and can be reviewed or removed from the compact
+Custom Dictionary row in Settings. Dictionary management does not change the
+component's text contract or replace its quick Add to dictionary action.
 
 The English resources are from `wooorm/dictionaries`, package `dictionaries/en`
 (SCOWL-derived en_US Hunspell dictionary). Their complete third-party notice is

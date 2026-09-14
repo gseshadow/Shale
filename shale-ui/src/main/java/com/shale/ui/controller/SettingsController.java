@@ -16,6 +16,7 @@ import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.UserCard;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
+import com.shale.ui.component.spellcheck.UserDictionarySession;
 import com.shale.ui.notification.NotificationPreferenceKey;
 import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
@@ -64,8 +65,6 @@ import javafx.css.PseudoClass;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.component.factory.StatusIndicatorFactory;
 import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
-import com.shale.core.service.UserDictionaryServicePort.UserDictionaryWord;
-import com.shale.ui.component.spellcheck.UserDictionarySession;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -191,10 +190,8 @@ public final class SettingsController {
 	private Button resetPasswordButton;
 	@FXML
 	private Label userManagementStatusLabel;
-	@FXML private TableView<UserDictionaryWord> customDictionaryTable;
-	@FXML private TableColumn<UserDictionaryWord,String> customDictionaryWordColumn;
-	@FXML private Button removeCustomDictionaryWordButton;
-	@FXML private Label customDictionaryStatusLabel;
+	@FXML private VBox customDictionarySection;
+	@FXML private Button manageCustomDictionaryButton;
 
 	private NotificationPreferencesService notificationPreferencesService;
 	private AppState appState;
@@ -250,23 +247,17 @@ public final class SettingsController {
 	}
 
 	private void configureCustomDictionary() {
-		if(customDictionaryTable==null)return;
-		customDictionaryWordColumn.setCellValueFactory(cell->new javafx.beans.property.ReadOnlyStringWrapper(cell.getValue().word()));
-		ControlStyles.apply(removeCustomDictionaryWordButton,ControlStyles.Purpose.DANGER,ControlStyles.Size.STANDARD);
-		loadCustomDictionary();
+		if (manageCustomDictionaryButton == null) return;
+		ControlStyles.apply(manageCustomDictionaryButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		manageCustomDictionaryButton.setDisable(appState == null || appState.getShaleClientId() == null
+				|| appState.getShaleClientId() <= 0 || appState.getUserId() == null || appState.getUserId() <= 0);
 	}
 
-	private void loadCustomDictionary() {
-		customDictionaryStatusLabel.setText("Loading…");
-		settingsLoadExecutor.submit(()->{try{List<UserDictionaryWord> words=UserDictionarySession.current().list();Platform.runLater(()->{customDictionaryTable.getItems().setAll(words);customDictionaryStatusLabel.setText(words.isEmpty()?"No custom words.":words.size()+" custom word(s).");});}
-		catch(RuntimeException ex){LOG.warn("Could not load custom dictionary",ex);Platform.runLater(()->customDictionaryStatusLabel.setText("Custom words could not be loaded."));}});
-	}
-
-	@FXML private void onRemoveCustomDictionaryWord() {
-		UserDictionaryWord selected=customDictionaryTable.getSelectionModel().getSelectedItem();if(selected==null){customDictionaryStatusLabel.setText("Select a word to remove.");return;}
-		removeCustomDictionaryWordButton.setDisable(true);customDictionaryStatusLabel.setText("Removing…");
-		settingsLoadExecutor.submit(()->{try{UserDictionarySession.current().remove(selected.normalizedWord());Platform.runLater(()->{removeCustomDictionaryWordButton.setDisable(false);loadCustomDictionary();});}
-		catch(RuntimeException ex){LOG.warn("Could not remove custom dictionary word",ex);Platform.runLater(()->{removeCustomDictionaryWordButton.setDisable(false);customDictionaryStatusLabel.setText("The word could not be removed. Check your connection and try again.");});}});
+	@FXML private void onManageCustomDictionary(ActionEvent event) {
+		if (appState == null || appState.getShaleClientId() == null || appState.getShaleClientId() <= 0
+				|| appState.getUserId() == null || appState.getUserId() <= 0) return;
+		new CustomDictionaryManagementLauncher(UserDictionarySession.current(), settingsLoadExecutor)
+				.open(settingsWindow(event), result -> { });
 	}
 
 	private void configureSettingsSemanticButtons() {
@@ -279,6 +270,7 @@ public final class SettingsController {
 		if (managePracticeAreasButton != null) ControlStyles.apply(managePracticeAreasButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		if (manageRequestFieldsButton != null) ControlStyles.apply(manageRequestFieldsButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		if (manageContactClassificationsButton != null) ControlStyles.apply(manageContactClassificationsButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		if (manageCustomDictionaryButton != null) ControlStyles.apply(manageCustomDictionaryButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 	}
 
 	private void configureUserManagementSemanticButtons() {
@@ -302,6 +294,7 @@ public final class SettingsController {
 		this.contactService = Objects.requireNonNull(contactService, "contactService");
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
 		if (fxmlReady) {
+			configureCustomDictionary();
 			configureContactClassifications();
 			configureCaseTeamRoles();
 			loadFromPreferences();
