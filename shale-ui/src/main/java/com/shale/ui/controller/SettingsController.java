@@ -25,6 +25,7 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ControlStyles;
+import com.shale.ui.util.ControlAvailability;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -2891,45 +2892,38 @@ public final class SettingsController {
 	@FXML
 	private VBox userAdministrationSection;
 
+	private boolean hasAdminContext() {
+		return isAdminUser() && appState.getShaleClientId() != null && appState.getShaleClientId() > 0
+				&& appState.getUserId() != null && appState.getUserId() > 0;
+	}
+
 	private void updateAdminControlsVisibility() {
-		boolean visible = isAdminUser();
-		if (auditSection != null) {
-			auditSection.setVisible(visible);
-			auditSection.setManaged(visible);
-		}
-		if (caseStatusAdministrationSection != null) {
-			caseStatusAdministrationSection.setVisible(visible);
-			caseStatusAdministrationSection.setManaged(visible);
-		}
-		if (practiceAreaAdministrationSection != null) {
-			practiceAreaAdministrationSection.setVisible(visible);
-			practiceAreaAdministrationSection.setManaged(visible);
-		}
-		if (linkTypeAdministrationSection != null) {
-			linkTypeAdministrationSection.setVisible(visible);
-			linkTypeAdministrationSection.setManaged(visible);
-		}
-		if (caseDateTypeAdministrationSection != null) {
-			caseDateTypeAdministrationSection.setVisible(visible);
-			caseDateTypeAdministrationSection.setManaged(visible);
-		}
-		if (caseDateRoleMappingsSection != null) {
-			caseDateRoleMappingsSection.setVisible(visible);
-			caseDateRoleMappingsSection.setManaged(visible);
-		}
-		if (requestAdministrationSection != null) {
-			requestAdministrationSection.setVisible(visible);
-			requestAdministrationSection.setManaged(visible);
-		}
-		if (contactClassificationAdministrationSection != null) {
-			contactClassificationAdministrationSection.setVisible(visible);
-			contactClassificationAdministrationSection.setManaged(visible);
-		}
-		if(caseTeamRoleAdministrationSection!=null){caseTeamRoleAdministrationSection.setVisible(visible);caseTeamRoleAdministrationSection.setManaged(visible);}
-		if(organizationTypeAdministrationSection!=null){organizationTypeAdministrationSection.setVisible(visible);organizationTypeAdministrationSection.setManaged(visible);}
-		if (userAdministrationSection != null) {
-			userAdministrationSection.setVisible(visible);
-			userAdministrationSection.setManaged(visible);
+		boolean admin = isAdminUser();
+		setVisibleManaged(auditSection, admin);
+		setVisibleManaged(caseStatusAdministrationSection, admin);
+		setVisibleManaged(caseDateRoleMappingsSection, admin && caseService != null);
+		setVisibleManaged(userAdministrationSection, admin && userDao != null);
+		boolean context = hasAdminContext();
+		ControlAvailability.apply(managePracticeAreasButton, practiceAreaAdministrationSection,
+				context && caseService != null, this::onManagePracticeAreas);
+		ControlAvailability.apply(manageLinkTypesButton, linkTypeAdministrationSection,
+				context && caseService != null, this::onManageLinkTypes);
+		ControlAvailability.apply(manageCaseTeamRolesButton, caseTeamRoleAdministrationSection,
+				context && caseService != null, this::onManageCaseTeamRoles);
+		ControlAvailability.apply(manageCaseDateTypesButton, caseDateTypeAdministrationSection,
+				context && caseService != null, this::onManageCaseDateTypes);
+		ControlAvailability.apply(manageRequestFieldsButton, requestAdministrationSection,
+				context && materialRequestService != null, this::onManageRequestFields);
+		ControlAvailability.apply(manageContactClassificationsButton, contactClassificationAdministrationSection,
+				context && contactService != null, this::onManageContactClassifications);
+		ControlAvailability.apply(manageOrganizationTypesButton, organizationTypeAdministrationSection,
+				context && organizationService != null, this::onManageOrganizationTypes);
+	}
+
+	private static void setVisibleManaged(Node node, boolean visible) {
+		if (node != null) {
+			node.setVisible(visible);
+			node.setManaged(visible);
 		}
 	}
 }

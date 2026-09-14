@@ -33,6 +33,7 @@ import static com.shale.ui.controller.MaterialsUi.*;
 
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ControlStyles;
+import com.shale.ui.util.ControlAvailability;
 import com.shale.ui.services.CaseTaskService;
 
 import java.time.*;
@@ -50,9 +51,9 @@ final class CaseMaterialRequestsTabController {
     private static final double NEW_REQUEST_WIDTH=560, NEW_REQUEST_HEIGHT=640, NEW_REQUEST_MIN_WIDTH=500, NEW_REQUEST_MIN_HEIGHT=420;
     static final double REQUEST_DETAIL_WIDTH=1080, REQUEST_DETAIL_HEIGHT=700, REQUEST_DETAIL_MIN_WIDTH=900, REQUEST_DETAIL_MIN_HEIGHT=520;
     private static final Insets REQUEST_LIST_INSETS = new Insets(8);
-    private MaterialRequestCardFactory requestCardFactory = new MaterialRequestCardFactory(this::openDetail); private MaterialRequestServicePort svc; private CaseServicePort caseService; private CaseTaskService caseTaskService; private AppState state; private CaseDao caseDao; private ContactDao contactDao; private OrganizationDao organizationDao; private Supplier<Long> caseId; private Supplier<Window> owner; private VBox root,list; private Label title,status; private TextField search; private CheckBox showDeleted; private RequestListData currentData=new RequestListData(List.of(),List.of(),List.of(),List.of()); private boolean loaded;
+    private MaterialRequestCardFactory requestCardFactory = new MaterialRequestCardFactory(this::openDetail); private MaterialRequestServicePort svc; private CaseServicePort caseService; private CaseTaskService caseTaskService; private AppState state; private CaseDao caseDao; private ContactDao contactDao; private OrganizationDao organizationDao; private Supplier<Long> caseId; private Supplier<Window> owner; private VBox root,list; private Label title,status; private TextField search; private CheckBox showDeleted; private Button manageRequestFieldsButton; private RequestListData currentData=new RequestListData(List.of(),List.of(),List.of(),List.of()); private boolean loaded;
     private Consumer<Integer> onOpenContact, onOpenOrganization, onOpenUser; private final AtomicBoolean savingRequest=new AtomicBoolean();
-    void init(MaterialRequestServicePort s, AppState a, Supplier<Long> c, Supplier<Window> o){init(s,null,null,a,null,null,null,c,o);} void init(MaterialRequestServicePort s, CaseTaskService tasks, AppState a, Supplier<Long> c, Supplier<Window> o){init(s,tasks,null,a,null,null,null,c,o);} void init(MaterialRequestServicePort s, CaseTaskService tasks, CaseServicePort cases, AppState a, CaseDao cd, ContactDao ctd, OrganizationDao od, Supplier<Long> c, Supplier<Window> o){svc=s;caseTaskService=tasks;caseService=cases;state=a;caseDao=cd;contactDao=ctd;organizationDao=od;caseId=c;owner=o; rebuildRequestCardFactory();}
+    void init(MaterialRequestServicePort s, AppState a, Supplier<Long> c, Supplier<Window> o){init(s,null,null,a,null,null,null,c,o);} void init(MaterialRequestServicePort s, CaseTaskService tasks, AppState a, Supplier<Long> c, Supplier<Window> o){init(s,tasks,null,a,null,null,null,c,o);} void init(MaterialRequestServicePort s, CaseTaskService tasks, CaseServicePort cases, AppState a, CaseDao cd, ContactDao ctd, OrganizationDao od, Supplier<Long> c, Supplier<Window> o){svc=s;caseTaskService=tasks;caseService=cases;state=a;caseDao=cd;contactDao=ctd;organizationDao=od;caseId=c;owner=o; rebuildRequestCardFactory();refreshManagementAction();}
     void setEntityNavigation(Consumer<Integer> contact, Consumer<Integer> organization, Consumer<Integer> user){onOpenContact=contact;onOpenOrganization=organization;onOpenUser=user;rebuildRequestCardFactory();}
     private void rebuildRequestCardFactory(){requestCardFactory=new MaterialRequestCardFactory(this::openDetail,onOpenContact,onOpenOrganization,onOpenUser);}
     Node view(){ if(root!=null)return root; list=new VBox(10); list.setPadding(REQUEST_LIST_INSETS); title=title("Material Requests"); status=muted("Loading material requests…");
@@ -60,12 +61,10 @@ final class CaseMaterialRequestsTabController {
         newRequestButton.setOnAction(e->openNewRequestWindow());
         VBox requestSection=section(title,newRequestButton,status,list);
         HBox headerContainer=(HBox)requestSection.getChildren().get(0);
-        if(state!=null&&state.isAdmin()){
-            Button manageRequestFieldsButton=semanticButton(ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL, "Manage Request Fields",null);
-            manageRequestFieldsButton.setId("manage-request-fields");
-            manageRequestFieldsButton.setOnAction(e->openRequestDefinitionManagement());
-            headerContainer.getChildren().add(manageRequestFieldsButton);
-        }
+        manageRequestFieldsButton=semanticButton(ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL, "Manage Request Fields",null);
+        manageRequestFieldsButton.setId("manage-request-fields");
+        headerContainer.getChildren().add(manageRequestFieldsButton);
+        refreshManagementAction();
         search=new TextField();search.setPromptText("Search requests");search.getStyleClass().add("app-dialog-search-field");showDeleted=new CheckBox("Show deleted");HBox filters=new HBox(10,search,showDeleted);filters.setAlignment(Pos.CENTER_LEFT);HBox.setHgrow(search,Priority.ALWAYS);requestSection.getChildren().add(1,filters);root=new VBox(10,requestSection); root.setPadding(new Insets(8)); root.getStyleClass().add("case-main-surface");search.textProperty().addListener((o,a,b)->render(currentData));showDeleted.selectedProperty().addListener((o,a,b)->refresh());return root; }
     private void openRequestDefinitionManagement(){
         if(state==null||!state.isAdmin()||svc==null)return;
@@ -79,6 +78,12 @@ final class CaseMaterialRequestsTabController {
                 Platform.runLater(()->{if(cid()==capturedCase&&tenant()==capturedTenant&&gen.get()==capturedGeneration)refresh();});
             }catch(RuntimeException failure){LOG.warn("Request definition refresh failed caseId={}",capturedCase,failure);}});
         });
+    }
+    private void refreshManagementAction(){
+        Long activeCase=caseId==null?null:caseId.get();
+        boolean available=state!=null&&state.isAdmin()&&svc!=null&&activeCase!=null&&activeCase>0
+                &&state.getShaleClientId()!=null&&state.getShaleClientId()>0&&state.getUserId()!=null&&state.getUserId()>0;
+        ControlAvailability.apply(manageRequestFieldsButton,available,e->openRequestDefinitionManagement());
     }
     private record RequestListData(List<MaterialRequestSummaryDto> requests, List<RequestStatusDto> statuses,List<RequestMethodDto> methods,List<MaterialRequestStatusHistoryDto> statusHistory) {}
     void load(){ if(!loaded) refresh(); } void refresh(){ long cid=cid(); int tid=tenant(); boolean include=showDeleted!=null&&showDeleted.isSelected(); int g=gen.incrementAndGet(); show(status,"Loading material requests…"); list.getChildren().clear(); runRead("list-material-requests",()->loadRequestListData(cid,tid,include), data->{ if(stale(g,cid)||(showDeleted!=null&&showDeleted.isSelected())!=include)return; loaded=true;currentData=data==null?new RequestListData(List.of(),List.of(),List.of(),List.of()):data;render(currentData);}, "Material requests could not be loaded."); }
