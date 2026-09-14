@@ -28,6 +28,7 @@ import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ControlStyles;
+import com.shale.ui.util.ControlAvailability;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ContactExternalActions;
 
@@ -113,6 +114,7 @@ public final class OrganizationController {
 			Consumer<Integer> onOpenCase,
 			Runnable onOrganizationDeleted) {
 		this.organizationId = organizationId;
+		this.currentOrganization = null;
 		this.organizationDao = organizationDao;
 		this.organizationService = Objects.requireNonNull(organizationService,"organizationService");
 		this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
@@ -121,6 +123,7 @@ public final class OrganizationController {
 		this.onOpenCase = onOpenCase;
 		this.onOrganizationDeleted = onOrganizationDeleted;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
+		refreshAdminActions();
 	}
 
 	@FXML
@@ -137,8 +140,7 @@ public final class OrganizationController {
 		}
 		if(manageOrganizationTypesButton!=null){
 			ControlStyles.apply(manageOrganizationTypesButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);
-			manageOrganizationTypesButton.setOnAction(e->onManageOrganizationTypes());
-			setVisibleManaged(manageOrganizationTypesButton,false);
+			ControlAvailability.apply(manageOrganizationTypesButton,false,e->onManageOrganizationTypes());
 		}
 		if (reloadRemoteButton != null) {
 			reloadRemoteButton.setOnAction(e -> onReloadRemote());
@@ -640,7 +642,9 @@ public final class OrganizationController {
 		setVisibleManaged(editButton, canEditOrganization() && !editDialogOpen && currentOrganization != null);
 		boolean showDelete = isAdminUser() && currentOrganization != null;
 		setVisibleManaged(deleteOrganizationButton, showDelete);
-		setVisibleManaged(manageOrganizationTypesButton,showDelete);
+		boolean managementAvailable=showDelete&&organizationService!=null&&currentTenantId()!=null
+				&&currentTenantId()>0&&appState.getUserId()!=null&&appState.getUserId()>0;
+		ControlAvailability.apply(manageOrganizationTypesButton,managementAvailable,e->onManageOrganizationTypes());
 	}
 
 	private boolean canEditOrganization() {

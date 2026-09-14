@@ -25,6 +25,7 @@ import com.shale.ui.component.ContactClassificationChipGroup;
 import com.shale.ui.component.ContactMethodDisplayCard;
 import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 import com.shale.ui.util.ControlStyles;
+import com.shale.ui.util.ControlAvailability;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
@@ -156,6 +157,7 @@ public final class ContactViewController {
             PhiReadAuditService phiReadAuditService,
             Consumer<Integer> onOpenContact, UiRuntimeBridge runtimeBridge) {
         this.contactId = contactId;
+        this.currentContact = null;
         this.contactDetailService = contactDetailService;
         this.appState = appState;
         this.onOpenCase = onOpenCase;
@@ -166,6 +168,7 @@ public final class ContactViewController {
         this.runtimeBridge = runtimeBridge;
         if (this.runtimeBridge != null) this.runtimeBridge.subscribeEntityUpdated(sharedLinksLiveHandler);
         this.caseCardFactory = new CaseCardFactory(onOpenCase);
+        refreshContactActions();
         auditContactRead();
         if (initialized) {
             resetSharedLinksState();
@@ -174,7 +177,7 @@ public final class ContactViewController {
         }
     }
 
-    public void setContactService(ContactServicePort service){this.contactService=Objects.requireNonNull(service);}
+    public void setContactService(ContactServicePort service){this.contactService=Objects.requireNonNull(service);refreshContactActions();}
 
     private void handleSharedLinksLiveEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
         if (event == null || appState == null || !LiveUpdateEvents.ENTITY_CASE_LINK_SHARE.equals(event.entityType())) return;
@@ -209,8 +212,7 @@ public final class ContactViewController {
         }
         if (manageClassificationsButton != null) {
             ControlStyles.apply(manageClassificationsButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
-            manageClassificationsButton.setOnAction(e -> openClassificationManagement());
-            setVisibleManaged(manageClassificationsButton, false);
+            ControlAvailability.apply(manageClassificationsButton, false, e -> openClassificationManagement());
         }
 
         initialized = true;
@@ -775,8 +777,10 @@ public final class ContactViewController {
 
     private void refreshContactActions() {
         setVisibleManaged(editButton, canEditContact() && currentContact != null);
-        setVisibleManaged(manageClassificationsButton, appState != null && appState.isAdmin()
-                && contactService != null && currentContact != null);
+        boolean managementAvailable = appState != null && appState.isAdmin() && contactService != null
+                && currentContact != null && currentContact.shaleClientId() > 0
+                && appState.getUserId() != null && appState.getUserId() > 0;
+        ControlAvailability.apply(manageClassificationsButton, managementAvailable, e -> openClassificationManagement());
         refreshDeleteAction();
     }
 

@@ -7,6 +7,7 @@ import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.*;
 import com.shale.data.dao.CaseDao;
 import com.shale.ui.util.ControlStyles;
+import com.shale.ui.util.ControlAvailability;
 import com.shale.ui.controller.CaseTeamRoleManagementLauncher;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -50,7 +51,7 @@ public final class TeamEditorDialog {
         stage=new Stage();AppDialogs.applySecondaryWindowChrome(stage);stage.initOwner(owner);stage.initModality(Modality.APPLICATION_MODAL);stage.setTitle("Case Team");
         Label heading=new Label("Case Team");heading.getStyleClass().add("case-team-editor-heading");
         Label support=new Label("Add people to the case and manage any number of roles for each team member.");support.setWrapText(true);support.getStyleClass().add("case-team-editor-support");
-        HBox roleManagement=new HBox();if(administrator&&roleLauncher!=null){Button manageRoles=new Button("Manage Roles");ControlStyles.apply(manageRoles,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);manageRoles.setOnAction(e->{if(state.dirty()){showError("Save or Cancel the pending Case Team changes before managing role definitions.");return;}roleLauncher.open(stage,tenantId,actorId,result->{if(result.changed()){closing=true;stage.close();rolesChanged.run();}});});roleManagement.getChildren().add(manageRoles);}
+        HBox roleManagement=new HBox();Button manageRoles=new Button("Manage Roles");ControlStyles.apply(manageRoles,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);roleManagement.getChildren().add(manageRoles);boolean roleManagementAvailable=administrator&&roleLauncher!=null&&tenantId>0&&actorId>0;ControlAvailability.apply(manageRoles,roleManagement,roleManagementAvailable,e->{if(state.dirty()){showError("Save or Cancel the pending Case Team changes before managing role definitions.");return;}roleLauncher.open(stage,tenantId,actorId,result->{if(result.changed()){closing=true;stage.close();rolesChanged.run();}});});
         Label addLabel=new Label("Add team member");addLabel.getStyleClass().add("case-team-editor-label");
         search.setPromptText("Search active users by name…");ControlStyles.formControl(search);
         results.setFixedCellSize(48);results.setMinHeight(146);results.setPrefHeight(146);results.setMaxHeight(146);results.getStyleClass().add("case-team-search-results");results.setPlaceholder(searchEmpty);
