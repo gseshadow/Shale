@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.CommittedChangeTracker;
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.ControlStyles;
@@ -42,7 +43,7 @@ public final class CaseDateTypeManagementPane {
     private final int actorId;
     private final Executor executor;
     private final IntConsumer publisher;
-    private final AtomicBoolean changed;
+    private final CommittedChangeTracker changed;
     private final AtomicBoolean mutationInFlight = new AtomicBoolean();
     private final VBox root = new VBox(12);
     private final FlowPane cards = new FlowPane(10, 10);
@@ -55,7 +56,7 @@ public final class CaseDateTypeManagementPane {
     private EffectiveCaseDateTypeDto selected;
 
     public CaseDateTypeManagementPane(CaseServicePort service, int tenantId, int actorId, Executor executor,
-            IntConsumer publisher, AtomicBoolean changed) {
+            IntConsumer publisher, CommittedChangeTracker changed) {
         this.service = service; this.tenantId = tenantId; this.actorId = actorId; this.executor = executor;
         this.publisher = publisher == null ? ignored -> {} : publisher; this.changed = changed;
         Button add = button("Add Case Date Type", ControlStyles.Purpose.PRIMARY, () -> editDefinition(null));
@@ -180,7 +181,7 @@ public final class CaseDateTypeManagementPane {
             try {
                 int id = operation.run();
                 if (disposed || generation != loadGeneration) return;
-                changed.set(true);
+                changed.markCommitted();
                 try { publisher.accept(id); } catch (RuntimeException publishFailure) {
                     LOG.warn("Case Date Type committed but live invalidation publication failed tenantId={} actorId={} typeId={}", tenantId, actorId, id, publishFailure);
                 }

@@ -2,8 +2,8 @@ package com.shale.ui.component;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.util.ActionButtonFactory;
@@ -29,8 +29,12 @@ public final class DefinitionManagementWindow {
     private DefinitionManagementWindow() {}
 
     public static void show(Window owner, String title, String helpText, Node content,
-            AtomicBoolean changed, BooleanSupplier canClose, Runnable dispose, Consumer<DefinitionManagementResult> onClosed) {
+            BooleanSupplier changed, BooleanSupplier canClose, Runnable dispose, Consumer<DefinitionManagementResult> onClosed) {
         Objects.requireNonNull(content, "content");
+        Objects.requireNonNull(changed, "changed");
+        Objects.requireNonNull(canClose, "canClose");
+        Objects.requireNonNull(dispose, "dispose");
+        Objects.requireNonNull(onClosed, "onClosed");
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle(title);
         if (owner != null) dialog.initOwner(owner);
@@ -67,8 +71,8 @@ public final class DefinitionManagementWindow {
         dialog.setOnHidden(e -> {
             if (!completed.compareAndSet(false, true)) return;
             dispose.run();
-            onClosed.accept(new DefinitionManagementResult(changed.get()));
-            if (owner != null) owner.requestFocus();
+            onClosed.accept(new DefinitionManagementResult(changed.getAsBoolean()));
+            if (owner != null && owner.isShowing()) owner.requestFocus();
         });
         dialog.show();
         dialog.getDialogPane().requestFocus();
