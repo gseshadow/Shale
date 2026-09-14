@@ -719,6 +719,7 @@ public class CaseController {
 	private CaseDateOccurrenceEditorLauncher caseDateOccurrenceEditorLauncher;
 	private CaseDateTypeManagementLauncher caseDateTypeManagementLauncher;
 	private LinkTypeManagementLauncher linkTypeManagementLauncher;
+	private CaseTeamRoleManagementLauncher caseTeamRoleManagementLauncher;
 	private final Set<Integer> openingCaseCalendarEventIds = new HashSet<>();
 
 	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
@@ -943,6 +944,7 @@ public class CaseController {
 				typeId -> { if (this.runtimeBridge != null && this.appState != null && this.appState.getShaleClientId() != null && this.appState.getUserId() != null) this.runtimeBridge.publishCaseDateTypeChanged(typeId, this.appState.getShaleClientId(), this.appState.getUserId()); });
 		this.linkTypeManagementLauncher = caseService == null ? null : new LinkTypeManagementLauncher(caseService, caseDateExecutor,
 				(typeId, change) -> { if (this.runtimeBridge != null && this.appState != null && this.appState.getShaleClientId() != null && this.appState.getUserId() != null) { this.runtimeBridge.publishLinkTypeChanged(typeId, this.appState.getShaleClientId(), this.appState.getUserId(), change); this.runtimeBridge.publishEntityAuditActivityAdded(null, this.appState.getShaleClientId(), this.appState.getUserId()); } }, runtimeBridge);
+		this.caseTeamRoleManagementLauncher = caseService == null ? null : new CaseTeamRoleManagementLauncher(caseService,caseDateExecutor);
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
@@ -6436,6 +6438,8 @@ public class CaseController {
 							allUsers, baseline, roles, () -> {
 								publishCaseFieldUpdated(activeCaseId, "teamChanged", 1);
 								reloadCurrentCaseForViewMode();
+							},caseTeamRoleManagementLauncher,appState.isAdmin(),()->{
+								if(loadGeneration==documentGeneration&&caseId!=null&&caseId.longValue()==activeCaseId)reloadCurrentCaseForViewMode();
 							});
 					dlg.showAndWait();
 				});
