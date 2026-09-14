@@ -5,8 +5,6 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Separator?>
-<?import javafx.scene.control.TableView?>
-<?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.layout.HBox?>
@@ -67,18 +65,12 @@
 
             <Separator/>
 
-            <VBox spacing="8" styleClass="strong-panel">
+            <VBox fx:id="customDictionarySection" spacing="8" styleClass="strong-panel">
                 <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
                 <Label text="Custom Dictionary" styleClass="search-section-title"/>
-                <Label text="Words you accepted with Add to dictionary. Bundled English, legal, and medical terms are not shown."
+                <Label text="Manage words accepted by Shale’s spelling tools."
                        styleClass="search-summary-text" wrapText="true"/>
-                <TableView fx:id="customDictionaryTable" prefHeight="180">
-                    <columns><TableColumn fx:id="customDictionaryWordColumn" text="Word" prefWidth="420"/></columns>
-                </TableView>
-                <HBox spacing="8">
-                    <Button fx:id="removeCustomDictionaryWordButton" text="Remove" onAction="#onRemoveCustomDictionaryWord"/>
-                    <Label fx:id="customDictionaryStatusLabel" styleClass="search-summary-text" wrapText="true"/>
-                </HBox>
+                <Button fx:id="manageCustomDictionaryButton" text="Manage" onAction="#onManageCustomDictionary"/>
             </VBox>
 
             <Separator/>
