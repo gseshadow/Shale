@@ -174,7 +174,7 @@ public final class SettingsController {
 	@FXML private VBox caseTeamRoleAdministrationContent;
 	@FXML private Button manageContactClassificationsButton;
 	@FXML private VBox organizationTypeAdministrationSection;
-	@FXML private VBox organizationTypeAdministrationContent;
+	@FXML private Button manageOrganizationTypesButton;
 	@FXML
 	private TableView<UserManagementViewRow> userManagementTable;
 	@FXML
@@ -361,9 +361,16 @@ public final class SettingsController {
 	}
 
 	private void configureOrganizationTypes(){
-		if(organizationTypeAdministrationContent!=null&&organizationService!=null&&appState!=null
-				&&organizationTypeAdministrationContent.getChildren().isEmpty()&&appState.isAdmin())
-			organizationTypeAdministrationContent.getChildren().setAll(new OrganizationTypeAdminPane(organizationService,appState).node());
+		if(manageOrganizationTypesButton!=null) {
+			ControlStyles.apply(manageOrganizationTypesButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.STANDARD);
+			manageOrganizationTypesButton.setDisable(organizationService==null||appState==null||!appState.isAdmin());
+		}
+	}
+
+	@FXML private void onManageOrganizationTypes(ActionEvent event) {
+		if(!requireAdminLookupManagement("Organization Types")||organizationService==null)return;
+		new OrganizationTypeManagementLauncher(organizationService,settingsLoadExecutor)
+				.open(settingsWindow(event),requireTenantId(),requireActorUserId(),result->{ });
 	}
 
 	/**
