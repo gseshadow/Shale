@@ -24,8 +24,8 @@ final class CaseDateTypeManagementContractTest {
         assertTrue(PANE.contains("Platform.runLater"));
         assertTrue(PANE.contains("generation == loadGeneration"));
         assertTrue(PANE.contains("mutationInFlight.compareAndSet(false, true)"));
-        assertTrue(PANE.contains("changed.set(true)"));
-        assertTrue(WINDOW.contains("onClosed.accept(new DefinitionManagementResult(changed.get()))"));
+        assertTrue(PANE.contains("changed.markCommitted()"));
+        assertTrue(WINDOW.contains("onClosed.accept(new DefinitionManagementResult(changed.getAsBoolean()))"));
         assertTrue(WINDOW.contains("dispose.run()"));
     }
 

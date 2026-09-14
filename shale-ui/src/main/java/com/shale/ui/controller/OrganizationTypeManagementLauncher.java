@@ -2,12 +2,11 @@ package com.shale.ui.controller;
 
 import java.util.Objects;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.ui.component.DefinitionManagementResult;
-import com.shale.ui.component.DefinitionManagementWindow;
+import com.shale.ui.component.DefinitionManagementSession;
 
 import javafx.stage.Window;
 
@@ -22,11 +21,11 @@ public final class OrganizationTypeManagementLauncher {
     }
 
     public void open(Window owner, int tenantId, int actorId, Consumer<DefinitionManagementResult> onClosed) {
-        AtomicBoolean changed = new AtomicBoolean();
+        DefinitionManagementSession session = new DefinitionManagementSession();
         OrganizationTypeAdminPane pane = new OrganizationTypeAdminPane(
-                service, tenantId, actorId, executor, changed);
-        DefinitionManagementWindow.show(owner, "Manage Organization Types",
+                service, tenantId, actorId, executor, session.changes());
+        session.show(owner, "Manage Organization Types",
                 "Manage organization types, colors, and availability. Existing Organization assignments are preserved.",
-                pane.node(), changed, () -> !pane.mutationInFlight(), pane::dispose, onClosed);
+                pane.node(), () -> !pane.mutationInFlight(), pane::dispose, onClosed);
     }
 }
