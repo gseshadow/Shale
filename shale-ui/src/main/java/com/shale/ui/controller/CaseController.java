@@ -6618,7 +6618,7 @@ public class CaseController {
 			showError("Case updates are unavailable.");
 			return;
 		}
-		if (submitCaseUpdateButton == null) {
+		if (caseUpdatesComposerArea == null || submitCaseUpdateButton == null) {
 			showError("Case updates controls are unavailable.");
 			return;
 		}
@@ -6629,7 +6629,7 @@ public class CaseController {
 			return;
 		}
 
-		EnhancedTextArea.openEditor(dialogOwner(submitCaseUpdateButton), "Add Case Update", "", this::saveNewCaseUpdate);
+		saveNewCaseUpdate(caseUpdatesComposerArea.getText());
 	}
 
 	private void saveNewCaseUpdate(String noteText) {
