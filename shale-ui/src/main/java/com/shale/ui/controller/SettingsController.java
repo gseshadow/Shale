@@ -145,6 +145,7 @@ public final class SettingsController {
 	private Label caseDateTypeSettingsStatusLabel;
 	@FXML
 	private VBox requestAdministrationSection;
+	@FXML private Button manageRequestFieldsButton;
 	@FXML
 	private VBox materialTypeCardsContainer;
 	@FXML
@@ -291,6 +292,7 @@ public final class SettingsController {
 		ControlStyles.apply(viewAuditLogButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		if (manageCaseDateTypesButton != null) ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		if (manageLinkTypesButton != null) ControlStyles.apply(manageLinkTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		if (manageRequestFieldsButton != null) ControlStyles.apply(manageRequestFieldsButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		if (manageContactClassificationsButton != null) ControlStyles.apply(manageContactClassificationsButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 	}
 
@@ -597,8 +599,14 @@ public final class SettingsController {
 		loadCaseStatusesAsync(null);
 		loadPracticeAreasAsync(null);
 		loadCaseDateRoleMappingsAsync(null);
-		loadRequestLookupsAsync();
 		loadManagedUsersAsync(null);
+	}
+
+	@FXML
+	private void onManageRequestFields(ActionEvent event) {
+		if (!requireAdminLookupManagement("Request Fields") || materialRequestService == null) return;
+		new RequestDefinitionManagementLauncher(materialRequestService, settingsLoadExecutor)
+				.open(settingsWindow(event), requireTenantId(), requireActorUserId(), result -> { });
 	}
 
 	@FXML
@@ -2833,8 +2841,7 @@ public final class SettingsController {
 				{
 					setMutationRunning(kind, false);
 					message(kind, success);
-					loadRequestLookupsAsync();
-				});
+							});
 			} catch (RuntimeException ex) {
 				Platform.runLater(() ->
 				{
