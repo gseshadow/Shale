@@ -67,7 +67,7 @@ public final class DefinitionManagementWindow {
         dialog.setOnHidden(e -> {
             if (!completed.compareAndSet(false, true)) return;
             dispose.run();
-            if (changed.get()) onClosed.accept(new DefinitionManagementResult(true));
+            onClosed.accept(new DefinitionManagementResult(changed.get()));
             if (owner != null) owner.requestFocus();
         });
         dialog.show();

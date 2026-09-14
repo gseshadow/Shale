@@ -98,6 +98,7 @@ public final class ContactViewController {
     @FXML private Label notesValue;
     @FXML private VBox notesSection;
     @FXML private VBox headerClassificationHost;
+    @FXML private Button manageClassificationsButton;
 
     private int contactId;
     private ContactDetailService contactDetailService;
@@ -205,6 +206,11 @@ public final class ContactViewController {
             ControlStyles.apply(deleteContactButton, ControlStyles.Purpose.DANGER);
             deleteContactButton.setOnAction(e -> onDeleteContact());
             setVisibleManaged(deleteContactButton, false);
+        }
+        if (manageClassificationsButton != null) {
+            ControlStyles.apply(manageClassificationsButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+            manageClassificationsButton.setOnAction(e -> openClassificationManagement());
+            setVisibleManaged(manageClassificationsButton, false);
         }
 
         initialized = true;
@@ -320,6 +326,19 @@ public final class ContactViewController {
         }
         if(classificationProfile==null){setError("Classifications are still loading. Refresh and try again.");return;}
         showProfileEditor();
+    }
+
+    private void openClassificationManagement() {
+        if (appState == null || !appState.isAdmin() || contactService == null || currentContact == null) return;
+        final int openingContactId = contactId;
+        final int tenantId = currentContact.shaleClientId();
+        Window owner = rootPane == null || rootPane.getScene() == null ? null : rootPane.getScene().getWindow();
+        new ContactClassificationManagementLauncher(contactService, dbExec).open(
+                owner, tenantId, appState.getUserId(), result -> {
+                    if (!result.changed() || disposed || contactId != openingContactId) return;
+                    contactDetailService.invalidateContact(openingContactId, tenantId);
+                    loadContact();
+                });
     }
 
     private void renderClassifications(){
@@ -756,6 +775,8 @@ public final class ContactViewController {
 
     private void refreshContactActions() {
         setVisibleManaged(editButton, canEditContact() && currentContact != null);
+        setVisibleManaged(manageClassificationsButton, appState != null && appState.isAdmin()
+                && contactService != null && currentContact != null);
         refreshDeleteAction();
     }
 

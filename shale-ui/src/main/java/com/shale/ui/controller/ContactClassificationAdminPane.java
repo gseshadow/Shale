@@ -6,8 +6,7 @@ import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -28,10 +27,10 @@ import javafx.scene.layout.*;
 /** Cohesive administrator UI for Phase 2A definition administration. */
 public final class ContactClassificationAdminPane {
     private final ContactServicePort service;
-    private final AppState state;
-    private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "contact-classification-settings"); t.setDaemon(true); return t;
-    });
+    private final int tenantId;
+    private final int actorId;
+    private final Executor worker;
+    private final AtomicBoolean changed;
     private final AtomicBoolean loading = new AtomicBoolean();
     private final AtomicBoolean mutating = new AtomicBoolean();
     private final AtomicBoolean disposed = new AtomicBoolean();
@@ -45,8 +44,15 @@ public final class ContactClassificationAdminPane {
     private final VBox root = new VBox(14);
     private volatile List<AdministrationDefinition> rows = List.of();
 
-    public ContactClassificationAdminPane(ContactServicePort service, AppState state) {
-        this.service = Objects.requireNonNull(service); this.state = Objects.requireNonNull(state);
+    public ContactClassificationAdminPane(ContactServicePort service, int tenantId, int actorId,
+            Executor worker, AtomicBoolean changed) {
+        this(service, tenantId, actorId, worker, changed, true);
+    }
+
+    private ContactClassificationAdminPane(ContactServicePort service, int tenantId, int actorId,
+            Executor worker, AtomicBoolean changed, boolean authorized) {
+        this.service = Objects.requireNonNull(service); this.tenantId = tenantId; this.actorId = actorId;
+        this.worker = Objects.requireNonNull(worker); this.changed = Objects.requireNonNull(changed);
         tabs.getTabs().setAll(tab("Contact Types", DefinitionCategory.CONTACT_TYPE),
                 tab("Specialties", DefinitionCategory.SPECIALTY), tab("Credentials", DefinitionCategory.CREDENTIAL));
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
@@ -72,13 +78,17 @@ public final class ContactClassificationAdminPane {
         list.getStyleClass().add("contact-classification-list");
         root.getStyleClass().add("contact-classification-admin");
         root.getChildren().setAll(tabs, actions, status, list);
-        root.sceneProperty().addListener((observable, oldScene, newScene) -> {
-            if (oldScene != null && newScene == null) dispose();
-        });
-        if (!state.isAdmin()) {
+        if (authorized) requestLoad();
+        else {
             tabs.setDisable(true); actions.setDisable(true);
             setStatus("Access restricted — administrator access is required.", "error");
-        } else requestLoad();
+        }
+    }
+
+    /** Compatibility constructor retained for focused component tests; launchers enforce authorization. */
+    ContactClassificationAdminPane(ContactServicePort service, AppState state) {
+        this(service, value(state.getShaleClientId()), value(state.getUserId()), Runnable::run,
+                new AtomicBoolean(), state.isAdmin());
     }
 
     public Node node() { return root; }
@@ -92,12 +102,12 @@ public final class ContactClassificationAdminPane {
     }
 
     private void loadLatest() {
-        if (disposed.get() || !state.isAdmin() || !loading.compareAndSet(false, true)) return;
+        if (disposed.get() || !loading.compareAndSet(false, true)) return;
         int generation = loadGeneration.get();
         int tenant = tenant(), actor = actor(); setBusy(true);
         setStatus(rows.isEmpty() ? "Loading classifications…" : "Refreshing classifications…", "loading");
         DefinitionCategory category = selectedCategory();
-        worker.submit(() -> {
+        worker.execute(() -> {
             try {
                 if (Platform.isFxApplicationThread()) throw new IllegalStateException("Settings reads must run off the JavaFX thread.");
                 List<AdministrationDefinition> loaded = service.listDefinitionsForAdministration(category, tenant, actor);
@@ -287,17 +297,17 @@ public final class ContactClassificationAdminPane {
     private void mutate(Supplier<DefinitionMutationResult> operation, java.util.function.Consumer<RuntimeException> failure, Runnable success) {
         if (disposed.get() || !mutating.compareAndSet(false, true)) return; setBusy(true);
         setStatus("Applying classification change…", "loading");
-        worker.submit(() -> { try { operation.get(); Platform.runLater(() -> { mutating.set(false); if (disposed.get()) return; setBusy(false); if(success!=null)success.run(); requestLoad(); }); }
+        worker.execute(() -> { try { operation.get(); changed.set(true); Platform.runLater(() -> { mutating.set(false); if (disposed.get()) return; setBusy(false); if(success!=null)success.run(); requestLoad(); }); }
             catch (RuntimeException ex) { Platform.runLater(() -> { mutating.set(false); if (disposed.get()) return; setBusy(false); if(failure!=null)failure.accept(ex); else setStatus("Change failed — " + friendly(ex), "error"); }); } });
     }
 
-    void dispose() {
-        if (disposed.compareAndSet(false, true)) worker.shutdownNow();
-    }
+    void dispose() { if (disposed.compareAndSet(false, true)) loadGeneration.incrementAndGet(); }
+    boolean mutationInFlight() { return mutating.get(); }
 
     private void setBusy(boolean busy) { add.setDisable(busy); refresh.setDisable(busy); showRemoved.setDisable(busy); list.setDisable(busy); }
-    private int tenant() { Integer id=state.getShaleClientId(); if(id==null||id<=0)throw new SecurityException("A tenant session is required."); return id; }
-    private int actor() { Integer id=state.getUserId(); if(id==null||id<=0)throw new SecurityException("An authenticated administrator is required."); return id; }
+    private int tenant() { return tenantId; }
+    private int actor() { return actorId; }
+    private static int value(Integer id) { return id == null ? -1 : id; }
     private static TextField field(String value, String id) { TextField field=new TextField(value); field.setId(id); ControlStyles.formControl(field); field.setMaxWidth(Double.MAX_VALUE); return field; }
     static void configureDescription(TextArea description) {
         description.setId("definition-description"); description.setPrefRowCount(5); description.setWrapText(true);

@@ -113,7 +113,11 @@
                         <padding>
                             <Insets top="14" right="14" bottom="14" left="14" />
                         </padding>
-                        <Label text="Classifications" styleClass="contact-section-title" />
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <Label text="Classifications" styleClass="contact-section-title" />
+                            <Region HBox.hgrow="ALWAYS" />
+                            <Button fx:id="manageClassificationsButton" text="Manage Classifications" visible="false" managed="false" />
+                        </HBox>
                         <Label text="Contact Types" styleClass="contact-group-label" />
                         <FlowPane fx:id="contactTypeChips" hgap="6" vgap="6" />
                         <Label text="Specialties" styleClass="contact-group-label" />
