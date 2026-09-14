@@ -489,6 +489,7 @@ public class CaseController {
 	@FXML
 	private Button changePracticeAreaButton;
 	@FXML private Button managePracticeAreasButton;
+	@FXML private Button manageCaseStatusesButton;
 	@FXML
 	private Button changeOpposingCounselButton;
 	@FXML
@@ -723,6 +724,7 @@ public class CaseController {
 	private LinkTypeManagementLauncher linkTypeManagementLauncher;
 	private CaseTeamRoleManagementLauncher caseTeamRoleManagementLauncher;
 	private PracticeAreaManagementLauncher practiceAreaManagementLauncher;
+	private CaseStatusManagementLauncher caseStatusManagementLauncher;
 	private final Set<Integer> openingCaseCalendarEventIds = new HashSet<>();
 
 	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
@@ -949,6 +951,7 @@ public class CaseController {
 				(typeId, change) -> { if (this.runtimeBridge != null && this.appState != null && this.appState.getShaleClientId() != null && this.appState.getUserId() != null) { this.runtimeBridge.publishLinkTypeChanged(typeId, this.appState.getShaleClientId(), this.appState.getUserId(), change); this.runtimeBridge.publishEntityAuditActivityAdded(null, this.appState.getShaleClientId(), this.appState.getUserId()); } }, runtimeBridge);
 		this.caseTeamRoleManagementLauncher = caseService == null ? null : new CaseTeamRoleManagementLauncher(caseService,caseDateExecutor);
 		this.practiceAreaManagementLauncher = caseService == null ? null : new PracticeAreaManagementLauncher(caseService, caseDateExecutor);
+		this.caseStatusManagementLauncher = caseService == null ? null : new CaseStatusManagementLauncher(caseService, caseDateExecutor);
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
@@ -2003,6 +2006,7 @@ public class CaseController {
 		if (managePracticeAreasButton != null) {
 			ControlStyles.apply(managePracticeAreasButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		}
+		if (manageCaseStatusesButton != null) ControlStyles.apply(manageCaseStatusesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		if (manageCaseDateTypesButton != null) {
 			ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		}
@@ -2017,6 +2021,8 @@ public class CaseController {
 		ControlAvailability.apply(managePracticeAreasButton, base && practiceAreaManagementLauncher != null,
 				e -> openPracticeAreaManagement());
 		boolean actorAvailable = base && appState.getUserId() != null && appState.getUserId() > 0;
+		ControlAvailability.apply(manageCaseStatusesButton, actorAvailable && caseStatusManagementLauncher != null,
+				e -> openCaseStatusManagement());
 		ControlAvailability.apply(manageCaseDateTypesButton, actorAvailable && caseDateTypeManagementLauncher != null,
 				e -> openCaseDateTypeManagement());
 		ControlAvailability.apply(manageLinkTypesButton, actorAvailable && linkTypeManagementLauncher != null,
@@ -2037,6 +2043,27 @@ public class CaseController {
 			if (!result.changed() || documentGeneration != openingNavigationGeneration || caseId == null || caseId != openingCaseId || appState == null
 					|| appState.getShaleClientId() == null || appState.getShaleClientId() != openingTenantId) return;
 			practiceAreasByTenantCache.remove(openingTenantId);
+			reloadCurrentCaseForViewMode();
+		});
+	}
+
+	private void openCaseStatusManagement() {
+		if (appState == null || !appState.isAdmin() || caseStatusManagementLauncher == null || caseId == null
+				|| appState.getShaleClientId() == null || appState.getUserId() == null) return;
+		if (editMode || detailsEditMode) {
+			AppDialogs.showError(manageCaseStatusesButton.getScene().getWindow(), "Case Statuses",
+					"Save or cancel the current Case edits before managing Case Statuses.");
+			return;
+		}
+		final int openingCaseId = caseId;
+		final int openingTenantId = appState.getShaleClientId();
+		final long openingNavigationGeneration = documentGeneration;
+		caseStatusManagementLauncher.open(manageCaseStatusesButton.getScene().getWindow(), openingTenantId,
+				appState.getUserId(), result -> {
+			if (!result.changed() || documentGeneration != openingNavigationGeneration || caseId == null
+					|| caseId != openingCaseId || appState == null || appState.getShaleClientId() == null
+					|| appState.getShaleClientId() != openingTenantId) return;
+			statusesByTenantCache.remove(openingTenantId);
 			reloadCurrentCaseForViewMode();
 		});
 	}

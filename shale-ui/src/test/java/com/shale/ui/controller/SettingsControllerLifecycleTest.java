@@ -1,7 +1,6 @@
 package com.shale.ui.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -15,9 +14,6 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
-import com.shale.core.dto.CaseStatusDto;
-
-import javafx.scene.paint.Color;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 
@@ -33,8 +29,8 @@ final class SettingsControllerLifecycleTest {
                 "SceneManager injects SettingsController dependencies through the controller factory before FXML initialize(); initialize should start non-blocking section hydration.");
         assertTrue(containsCode(loadAdminSections, "if (!fxmlReady || !isAdminUser()) return;"),
                 "Settings async hydration must preserve admin-only lookup-management visibility and service access.");
-        assertTrue(containsCode(loadAdminSections, "loadCaseStatusesAsync(null);"),
-                "SettingsController.initialize() should asynchronously populate Settings > Case Statuses for admins when service injection already happened.");
+        assertTrue(!containsCode(loadAdminSections, "loadCaseStatusesAsync"),
+                "Settings initialization must not eagerly construct or load the Case Status manager.");
         assertTrue(!containsCode(loadAdminSections, "loadPracticeAreasAsync(null);"),
                 "Settings initialization must not eagerly construct or load the Practice Area manager.");
         assertTrue(containsCode(loadAdminSections, "loadManagedUsersAsync(null);"),
@@ -48,63 +44,12 @@ final class SettingsControllerLifecycleTest {
                 "Independent Settings sections should hydrate on a background executor instead of the JavaFX application thread.");
         assertTrue(containsCode(source, "settingsLoadExecutor.submit"),
                 "Settings service/DAO calls should be submitted to the background executor.");
-        assertTrue(containsCode(source, "Platform.runLater(() -> applyCaseStatusRows"),
-                "Case Status UI application must happen on the JavaFX application thread.");
-
         assertTrue(containsCode(source, "Platform.runLater(() -> {"),
                 "User-management UI application must happen on the JavaFX application thread.");
-        assertTrue(containsCode(source, "if (generation != caseStatusLoadGeneration) return;"),
-                "Case Status async results need stale-result protection.");
-
         assertTrue(containsCode(source, "if (generation != userManagementLoadGeneration) return;"),
                 "User Management async results need stale-result protection.");
     }
 
-
-    @Test
-    void statusColorRoundTripsDatabaseHexFormat() {
-        Color color = SettingsController.dbColorToFx("0x28A745FF");
-
-        assertEquals(0x28 / 255.0, color.getRed(), 0.0001);
-        assertEquals(0xA7 / 255.0, color.getGreen(), 0.0001);
-        assertEquals(0x45 / 255.0, color.getBlue(), 0.0001);
-        assertEquals(1.0, color.getOpacity(), 0.0001);
-        assertEquals("#28A745", SettingsController.fxColorToDb(color));
-    }
-
-    @Test
-    void colorConversionUsesSafeDefaultForBlankValues() {
-        assertEquals("#6C757D", SettingsController.fxColorToDb(SettingsController.dbColorToFx("")));
-    }
-
-    @Test
-    void protectedStatusKeysArePreservedOnEditAndOmittedForNewStatuses() {
-        CaseStatusDto existing = new CaseStatusDto(7, "Accepted", true, 20, "0x28A745FF", "accepted", "accepted", 7, true, false);
-
-        assertEquals("accepted", SettingsController.lifecycleKeyForSave(existing));
-        assertEquals("accepted", SettingsController.systemKeyForSave(existing));
-        assertNull(SettingsController.lifecycleKeyForSave(null));
-        assertNull(SettingsController.systemKeyForSave(null));
-    }
-
-    @Test
-    void statusDialogPreservesExistingSortOrderAndOmitsSortForNewStatuses() {
-        CaseStatusDto existing = new CaseStatusDto(7, "Accepted", true, 20, "0x28A745FF", "accepted", "accepted", 7, true, false);
-
-        assertEquals(20, SettingsController.sortOrderForSave(existing));
-        assertNull(SettingsController.sortOrderForSave(null));
-    }
-
-    @Test
-    void statusDialogUsesSecondaryShellAndDoesNotExposeSortOrderEditor() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
-        String method = methodSource(source, "showCaseStatusDialog");
-
-        assertTrue(containsCode(method, "AppDialogs.applySecondaryDialogShell"),
-                "Case status dialogs should use the same secondary dialog shell as existing Shale dialogs instead of the default JavaFX window chrome/icon.");
-        assertTrue(!containsCode(method, "new Label(\"Sort Order\")"),
-                "Sort Order should remain table/reorder-button driven and not be a manual dialog field.");
-    }
 
     @Test
     void lookupManagementSectionsAreAdminOnlyButGeneralSettingsRemainVisible() throws Exception {
@@ -130,13 +75,11 @@ final class SettingsControllerLifecycleTest {
 
         assertTrue(containsCode(source, "private boolean requireAdminLookupManagement"),
                 "Lookup-management controller paths should share an admin authorization guard.");
-        assertTrue(containsCode(source, "if (!requireAdminLookupManagement(\"Case Statuses\"))"),
-                "Case status load/edit paths must reject non-admins before service calls.");
+        assertTrue(containsCode(source, "if (!requireAdminLookupManagement(\"Case Statuses\") || caseService == null)"),
+                "The compact Case Status launcher must reject non-admins before opening management.");
         assertTrue(containsCode(source, "if (!requireAdminLookupManagement(\"Practice Areas\"))"),
                 "Practice area load/edit paths must reject non-admins before service calls.");
-        assertTrue(containsCode(source, "caseService.createCaseStatus"));
-        assertTrue(containsCode(source, "caseService.updateCaseStatus"));
-        assertTrue(containsCode(source, "caseService.reorderCaseStatuses"));
+        assertTrue(containsCode(source, "new CaseStatusManagementLauncher(caseService, settingsLoadExecutor)"));
         assertTrue(containsCode(source, "caseService.createPracticeArea"));
         assertTrue(containsCode(source, "caseService.updatePracticeArea"));
         assertTrue(containsCode(source, "caseService.deactivatePracticeArea"));

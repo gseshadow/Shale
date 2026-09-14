@@ -88,12 +88,9 @@
                     <Insets top="12" right="12" bottom="12" left="12"/>
                 </padding>
                 <Label text="Case Statuses" styleClass="search-section-title"/>
-                <Label text="Manage the case statuses available for this tenant."
+                <Label text="Manage case statuses, colors, workflow state, and order."
                        styleClass="search-summary-text" wrapText="true"/>
-                <VBox fx:id="caseStatusCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
-                <HBox fx:id="caseStatusActionRow" spacing="8">
-                    <Label fx:id="caseStatusSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
-                </HBox>
+                <Button fx:id="manageCaseStatusesButton" text="Manage" onAction="#onManageCaseStatuses"/>
             </VBox>
 
 
