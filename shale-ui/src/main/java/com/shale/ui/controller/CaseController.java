@@ -487,6 +487,7 @@ public class CaseController {
 	private StackPane ovPracticeAreaHost;
 	@FXML
 	private Button changePracticeAreaButton;
+	@FXML private Button managePracticeAreasButton;
 	@FXML
 	private Button changeOpposingCounselButton;
 	@FXML
@@ -720,6 +721,7 @@ public class CaseController {
 	private CaseDateTypeManagementLauncher caseDateTypeManagementLauncher;
 	private LinkTypeManagementLauncher linkTypeManagementLauncher;
 	private CaseTeamRoleManagementLauncher caseTeamRoleManagementLauncher;
+	private PracticeAreaManagementLauncher practiceAreaManagementLauncher;
 	private final Set<Integer> openingCaseCalendarEventIds = new HashSet<>();
 
 	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
@@ -945,9 +947,11 @@ public class CaseController {
 		this.linkTypeManagementLauncher = caseService == null ? null : new LinkTypeManagementLauncher(caseService, caseDateExecutor,
 				(typeId, change) -> { if (this.runtimeBridge != null && this.appState != null && this.appState.getShaleClientId() != null && this.appState.getUserId() != null) { this.runtimeBridge.publishLinkTypeChanged(typeId, this.appState.getShaleClientId(), this.appState.getUserId(), change); this.runtimeBridge.publishEntityAuditActivityAdded(null, this.appState.getShaleClientId(), this.appState.getUserId()); } }, runtimeBridge);
 		this.caseTeamRoleManagementLauncher = caseService == null ? null : new CaseTeamRoleManagementLauncher(caseService,caseDateExecutor);
+		this.practiceAreaManagementLauncher = caseService == null ? null : new PracticeAreaManagementLauncher(caseService, caseDateExecutor);
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
+		configurePracticeAreaManagement();
 		if (manageCaseDateTypesButton != null) { manageCaseDateTypesButton.setVisible(appState != null && appState.isAdmin()); manageCaseDateTypesButton.setManaged(appState != null && appState.isAdmin()); }
 		if (manageLinkTypesButton != null) { manageLinkTypesButton.setVisible(appState != null && appState.isAdmin()); manageLinkTypesButton.setManaged(appState != null && appState.isAdmin()); }
 		refreshOverviewAdminAction();
@@ -1073,6 +1077,7 @@ public class CaseController {
 			changeStatusButton.setOnAction(e -> onEditStatusField());
 		if (changePracticeAreaButton != null)
 			changePracticeAreaButton.setOnAction(e -> onEditPracticeAreaField());
+		if (managePracticeAreasButton != null) managePracticeAreasButton.setOnAction(e -> openPracticeAreaManagement());
 		if (detChangeStatusButton != null)
 			detChangeStatusButton.setOnAction(e -> onDetailsChangeStatus());
 		if (detChangePracticeAreaButton != null)
@@ -1996,6 +2001,31 @@ public class CaseController {
 		if (refreshCaseDatesButton != null) { ControlStyles.apply(refreshCaseDatesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD); refreshCaseDatesButton.setAccessibleText("Refresh case dates"); refreshCaseDatesButton.setOnAction(e -> loadCaseDatesAsync()); }
 		if (showRemovedCaseDatesButton != null) { ControlStyles.apply(showRemovedCaseDatesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL); showRemovedCaseDatesButton.setAccessibleText("Show removed case dates"); showRemovedCaseDatesButton.setOnAction(e -> { showRemovedCaseDates = !showRemovedCaseDates; updateRemovedCaseDatesVisibility(); if (showRemovedCaseDates) loadCaseDatesAsync(); }); }
 		if (manageCaseDateTypesButton != null) { ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL); manageCaseDateTypesButton.setVisible(appState != null && appState.isAdmin()); manageCaseDateTypesButton.setManaged(appState != null && appState.isAdmin()); manageCaseDateTypesButton.setOnAction(e -> openCaseDateTypeManagement()); }
+	}
+
+	private void configurePracticeAreaManagement() {
+		if (managePracticeAreasButton == null) return;
+		ControlStyles.apply(managePracticeAreasButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		boolean admin = appState != null && appState.isAdmin();
+		managePracticeAreasButton.setVisible(admin); managePracticeAreasButton.setManaged(admin);
+	}
+
+	private void openPracticeAreaManagement() {
+		if (appState == null || !appState.isAdmin() || practiceAreaManagementLauncher == null || caseId == null
+				|| appState.getShaleClientId() == null) return;
+		if (editMode || detailsEditMode) {
+			AppDialogs.showError(managePracticeAreasButton.getScene().getWindow(), "Practice Areas", "Save or cancel the current Case edits before managing Practice Areas.");
+			return;
+		}
+		final int openingCaseId = caseId;
+		final int openingTenantId = appState.getShaleClientId();
+		final int openingNavigationGeneration = documentGeneration;
+		practiceAreaManagementLauncher.open(managePracticeAreasButton.getScene().getWindow(), openingTenantId, result -> {
+			if (!result.changed() || documentGeneration != openingNavigationGeneration || caseId == null || caseId != openingCaseId || appState == null
+					|| appState.getShaleClientId() == null || appState.getShaleClientId() != openingTenantId) return;
+			practiceAreasByTenantCache.remove(openingTenantId);
+			reloadCurrentCaseForViewMode();
+		});
 	}
 
 	private void openCaseDateTypeManagement() {

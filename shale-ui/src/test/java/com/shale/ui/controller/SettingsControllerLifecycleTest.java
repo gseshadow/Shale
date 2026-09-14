@@ -35,10 +35,8 @@ final class SettingsControllerLifecycleTest {
                 "Settings async hydration must preserve admin-only lookup-management visibility and service access.");
         assertTrue(containsCode(loadAdminSections, "loadCaseStatusesAsync(null);"),
                 "SettingsController.initialize() should asynchronously populate Settings > Case Statuses for admins when service injection already happened.");
-        assertTrue(containsCode(loadAdminSections, "loadPracticeAreasAsync(null);"),
-                "SettingsController.initialize() should asynchronously populate Settings > Practice Areas for admins when service injection already happened.");
-        assertTrue(containsCode(loadAdminSections, "loadLinkTypesAsync(null);"),
-                "SettingsController.initialize() should asynchronously populate Settings > Link Types for admins when service injection already happened.");
+        assertTrue(!containsCode(loadAdminSections, "loadPracticeAreasAsync(null);"),
+                "Settings initialization must not eagerly construct or load the Practice Area manager.");
         assertTrue(containsCode(loadAdminSections, "loadManagedUsersAsync(null);"),
                 "SettingsController.initialize() should asynchronously populate Settings > User Management for admins when service injection already happened.");
     }
@@ -52,14 +50,12 @@ final class SettingsControllerLifecycleTest {
                 "Settings service/DAO calls should be submitted to the background executor.");
         assertTrue(containsCode(source, "Platform.runLater(() -> applyCaseStatusRows"),
                 "Case Status UI application must happen on the JavaFX application thread.");
-        assertTrue(containsCode(source, "Platform.runLater(() -> applyPracticeAreaRows"),
-                "Practice Area UI application must happen on the JavaFX application thread.");
+
         assertTrue(containsCode(source, "Platform.runLater(() -> {"),
                 "User-management UI application must happen on the JavaFX application thread.");
         assertTrue(containsCode(source, "if (generation != caseStatusLoadGeneration) return;"),
                 "Case Status async results need stale-result protection.");
-        assertTrue(containsCode(source, "if (generation != practiceAreaLoadGeneration) return;"),
-                "Practice Area async results need stale-result protection.");
+
         assertTrue(containsCode(source, "if (generation != userManagementLoadGeneration) return;"),
                 "User Management async results need stale-result protection.");
     }

@@ -229,9 +229,10 @@
 									<Label text="Practice area"
 										styleClass="case-overview-row-label" GridPane.rowIndex="2"
 										GridPane.columnIndex="0" />
-									<StackPane fx:id="ovPracticeAreaHost"
-										styleClass="case-overview-row-value-host"
-										GridPane.rowIndex="2" GridPane.columnIndex="1" />
+									<VBox spacing="6" GridPane.rowIndex="2" GridPane.columnIndex="1">
+										<StackPane fx:id="ovPracticeAreaHost" styleClass="case-overview-row-value-host" />
+										<Button fx:id="managePracticeAreasButton" text="Manage Practice Areas" />
+									</VBox>
 									<Button fx:id="changePracticeAreaButton" text="✎"
 										styleClass="case-overview-edit-button" GridPane.rowIndex="2"
 										GridPane.columnIndex="2" />
