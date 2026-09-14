@@ -45,9 +45,9 @@ final class OrganizationTypeManagementContractTest {
     @Test void launcherOwnsOnlyCompositionAndThePaneNeverOwnsItsExecutor() throws Exception {
         String launcher=Files.readString(Path.of("src/main/java/com/shale/ui/controller/OrganizationTypeManagementLauncher.java"));
         String pane=Files.readString(Path.of("src/main/java/com/shale/ui/controller/OrganizationTypeAdminPane.java"));
-        assertTrue(launcher.contains("DefinitionManagementWindow.show")&&launcher.contains("new OrganizationTypeAdminPane"));
+        assertTrue(launcher.contains("DefinitionManagementSession")&&launcher.contains("new OrganizationTypeAdminPane"));
         assertFalse(pane.contains("Executors.new")||pane.contains("shutdownNow")||pane.contains("OrganizationOrganizationTypes"));
-        assertTrue(pane.contains("changed.set(true)"),"only committed mutations may accumulate the changed result");
+        assertTrue(pane.contains("changed.markCommitted()"),"only committed mutations may accumulate the changed result");
     }
 
     private static Element element(org.w3c.dom.Document document,String id){

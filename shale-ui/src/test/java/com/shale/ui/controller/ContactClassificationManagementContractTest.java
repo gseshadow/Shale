@@ -31,7 +31,7 @@ final class ContactClassificationManagementContractTest {
         assertTrue(settings.contains("new ContactClassificationManagementLauncher"));
         assertTrue(contact.contains("new ContactClassificationManagementLauncher"));
         assertTrue(launcher.contains("new ContactClassificationAdminPane"));
-        assertTrue(launcher.contains("DefinitionManagementWindow.show"));
+        assertTrue(launcher.contains("DefinitionManagementSession"));
     }
 
     @Test void contactActionIsAdminOnlyAndRefreshesCapturedContactWithoutAssignmentMutation() {
@@ -61,14 +61,14 @@ final class ContactClassificationManagementContractTest {
         assertTrue(pane.contains("worker.execute"));
         assertTrue(pane.contains("Platform.runLater"));
         assertTrue(pane.contains("generation != loadGeneration.get()"));
-        assertTrue(pane.contains("changed.set(true)"));
+        assertTrue(pane.contains("changed.markCommitted()"));
     }
 
     @Test void sharedWindowReportsExactlyOneAccumulatedResultAfterDisposal() {
         String window = read("src/main/java/com/shale/ui/component/DefinitionManagementWindow.java");
         assertTrue(window.contains("completed.compareAndSet(false, true)"));
         assertTrue(window.contains("dispose.run()"));
-        assertTrue(window.contains("onClosed.accept(new DefinitionManagementResult(changed.get()))"));
+        assertTrue(window.contains("onClosed.accept(new DefinitionManagementResult(changed.getAsBoolean()))"));
     }
 
     private static String extractMethod(String source, String signature) {

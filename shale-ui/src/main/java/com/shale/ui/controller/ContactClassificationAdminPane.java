@@ -13,6 +13,7 @@ import java.util.function.Supplier;
 
 import com.shale.core.service.ContactServicePort;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.CommittedChangeTracker;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.ColorUtil;
@@ -30,7 +31,7 @@ public final class ContactClassificationAdminPane {
     private final int tenantId;
     private final int actorId;
     private final Executor worker;
-    private final AtomicBoolean changed;
+    private final CommittedChangeTracker changed;
     private final AtomicBoolean loading = new AtomicBoolean();
     private final AtomicBoolean mutating = new AtomicBoolean();
     private final AtomicBoolean disposed = new AtomicBoolean();
@@ -45,12 +46,12 @@ public final class ContactClassificationAdminPane {
     private volatile List<AdministrationDefinition> rows = List.of();
 
     public ContactClassificationAdminPane(ContactServicePort service, int tenantId, int actorId,
-            Executor worker, AtomicBoolean changed) {
+            Executor worker, CommittedChangeTracker changed) {
         this(service, tenantId, actorId, worker, changed, true);
     }
 
     private ContactClassificationAdminPane(ContactServicePort service, int tenantId, int actorId,
-            Executor worker, AtomicBoolean changed, boolean authorized) {
+            Executor worker, CommittedChangeTracker changed, boolean authorized) {
         this.service = Objects.requireNonNull(service); this.tenantId = tenantId; this.actorId = actorId;
         this.worker = Objects.requireNonNull(worker); this.changed = Objects.requireNonNull(changed);
         tabs.getTabs().setAll(tab("Contact Types", DefinitionCategory.CONTACT_TYPE),
@@ -88,7 +89,7 @@ public final class ContactClassificationAdminPane {
     /** Compatibility constructor retained for focused component tests; launchers enforce authorization. */
     ContactClassificationAdminPane(ContactServicePort service, AppState state) {
         this(service, value(state.getShaleClientId()), value(state.getUserId()), Runnable::run,
-                new AtomicBoolean(), state.isAdmin());
+                new CommittedChangeTracker(), state.isAdmin());
     }
 
     public Node node() { return root; }
@@ -297,7 +298,7 @@ public final class ContactClassificationAdminPane {
     private void mutate(Supplier<DefinitionMutationResult> operation, java.util.function.Consumer<RuntimeException> failure, Runnable success) {
         if (disposed.get() || !mutating.compareAndSet(false, true)) return; setBusy(true);
         setStatus("Applying classification change…", "loading");
-        worker.execute(() -> { try { operation.get(); changed.set(true); Platform.runLater(() -> { mutating.set(false); if (disposed.get()) return; setBusy(false); if(success!=null)success.run(); requestLoad(); }); }
+        worker.execute(() -> { try { operation.get(); changed.markCommitted(); Platform.runLater(() -> { mutating.set(false); if (disposed.get()) return; setBusy(false); if(success!=null)success.run(); requestLoad(); }); }
             catch (RuntimeException ex) { Platform.runLater(() -> { mutating.set(false); if (disposed.get()) return; setBusy(false); if(failure!=null)failure.accept(ex); else setStatus("Change failed — " + friendly(ex), "error"); }); } });
     }
 
