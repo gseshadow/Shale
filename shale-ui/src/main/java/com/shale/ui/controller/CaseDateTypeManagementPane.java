@@ -107,8 +107,17 @@ public final class CaseDateTypeManagementPane {
 
     static List<EffectiveCaseDateTypeDto> manageableRows(List<EffectiveCaseDateTypeDto> loaded, int tenantId) {
         if (loaded == null) return List.of();
-        return loaded.stream().filter(r -> r != null && r.shaleClientId() != null && r.shaleClientId() == tenantId && !r.deleted())
+        return loaded.stream().filter(r -> isManageable(r, tenantId))
                 .sorted(Comparator.comparing(EffectiveCaseDateTypeDto::name, String.CASE_INSENSITIVE_ORDER).thenComparingInt(EffectiveCaseDateTypeDto::id)).toList();
+    }
+
+    static boolean isManageable(EffectiveCaseDateTypeDto row, int tenantId) {
+        return row != null && row.shaleClientId() != null && row.shaleClientId() == tenantId
+                && row.origin() == EffectiveCaseDateTypeDto.Origin.TENANT_CREATED && !row.deleted();
+    }
+
+    static String lifecycleActionLabel(EffectiveCaseDateTypeDto row) {
+        return row != null && row.active() ? "Deactivate" : "Activate";
     }
 
     private Node card(EffectiveCaseDateTypeDto row) {
@@ -130,7 +139,7 @@ public final class CaseDateTypeManagementPane {
     private void updateActions() {
         boolean enabled = selected != null && !mutationInFlight.get();
         edit.setDisable(!enabled); toggle.setDisable(!enabled); remove.setDisable(!enabled);
-        toggle.setText(selected == null ? "Activate/Deactivate" : selected.active() ? "Deactivate" : "Activate");
+        toggle.setText(selected == null ? "Activate/Deactivate" : lifecycleActionLabel(selected));
     }
 
     private void editDefinition(EffectiveCaseDateTypeDto existing) {

@@ -35,7 +35,11 @@ final class CaseDateTypeManagementContractTest {
         var inactive = type(3, 7, null, false);
         var otherTenant = type(4, 8, null, true);
         assertEquals(List.of(active, inactive), CaseDateTypeManagementPane.manageableRows(List.of(global, active, inactive, otherTenant), 7));
-        assertTrue(PANE.contains("row.active() ? \"Deactivate\" : \"Activate\""));
+        assertFalse(CaseDateTypeManagementPane.isManageable(global, 7));
+        assertTrue(CaseDateTypeManagementPane.isManageable(active, 7));
+        assertTrue(CaseDateTypeManagementPane.isManageable(inactive, 7));
+        assertEquals("Deactivate", CaseDateTypeManagementPane.lifecycleActionLabel(active));
+        assertEquals("Activate", CaseDateTypeManagementPane.lifecycleActionLabel(inactive));
         assertTrue(PANE.contains("resetCaseDateTypeOverride"));
     }
 
