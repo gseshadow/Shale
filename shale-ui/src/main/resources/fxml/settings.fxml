@@ -102,12 +102,9 @@
                     <Insets top="12" right="12" bottom="12" left="12"/>
                 </padding>
                 <Label text="Practice Areas" styleClass="search-section-title"/>
-                <Label text="Manage the practice areas available for this tenant."
+                <Label text="Manage practice-area names, colors, and availability."
                        styleClass="search-summary-text" wrapText="true"/>
-                <VBox fx:id="practiceAreaCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
-                <HBox fx:id="practiceAreaActionRow" spacing="8">
-                    <Label fx:id="practiceAreaSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
-                </HBox>
+                <Button fx:id="managePracticeAreasButton" text="Manage" onAction="#onManagePracticeAreas"/>
             </VBox>
 
 
