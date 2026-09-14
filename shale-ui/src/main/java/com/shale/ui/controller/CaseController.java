@@ -292,6 +292,7 @@ public class CaseController {
 	private Button refreshCaseDatesButton;
 	@FXML
 	private Button showRemovedCaseDatesButton;
+	@FXML private Button manageCaseDateTypesButton;
 	@FXML
 	private VBox caseLinksTabPane;
 	@FXML
@@ -715,6 +716,7 @@ public class CaseController {
 	private boolean showRemovedCaseDates;
 	private int caseDatesLoadGeneration;
 	private CaseDateOccurrenceEditorLauncher caseDateOccurrenceEditorLauncher;
+	private CaseDateTypeManagementLauncher caseDateTypeManagementLauncher;
 	private final Set<Integer> openingCaseCalendarEventIds = new HashSet<>();
 
 	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
@@ -935,9 +937,12 @@ public class CaseController {
 				() -> new CaseDateOccurrenceEditorLauncher.Context(appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId(), appState == null || appState.getUserId() == null ? 0 : appState.getUserId(), this.caseId == null ? 0 : this.caseId, caseDatesTabPane != null && caseDatesTabPane.getScene() != null),
 				this::caseDatesOwner, result -> { long savedCaseId = result.context().caseId(); refreshCaseDateViewsAfterLocalMutation(savedCaseId, isMigratedCaseDateSystemKey(result.date().typeSystemKey())); if (runtimeBridge != null) runtimeBridge.publishCaseDatesChanged(savedCaseId, result.context().tenantId(), result.context().actorId(), result.removed() ? LiveUpdateEvents.CHANGE_REMOVED : LiveUpdateEvents.CHANGE_UPDATED); loadCaseDatesAsync(); },
 				this::showCaseDatesMessage, open -> { caseDateEditorOpen = open; if (!open) applyDeferredCaseDatesRefresh(); }, id -> this.onOpenCase.accept(id));
+		this.caseDateTypeManagementLauncher = caseService == null ? null : new CaseDateTypeManagementLauncher(caseService, caseDateExecutor,
+				typeId -> { if (this.runtimeBridge != null && this.appState != null && this.appState.getShaleClientId() != null && this.appState.getUserId() != null) this.runtimeBridge.publishCaseDateTypeChanged(typeId, this.appState.getShaleClientId(), this.appState.getUserId()); });
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
+		if (manageCaseDateTypesButton != null) { manageCaseDateTypesButton.setVisible(appState != null && appState.isAdmin()); manageCaseDateTypesButton.setManaged(appState != null && appState.isAdmin()); }
 		refreshOverviewAdminAction();
 		this.runtimeBridge = runtimeBridge;
 		this.caseDocumentService = (caseDao == null || caseSummaryDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, caseSummaryDao, contactDao);
@@ -1979,6 +1984,21 @@ public class CaseController {
 		if (addCaseDateButton != null) { ControlStyles.apply(addCaseDateButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD); addCaseDateButton.setAccessibleText("Add case date"); addCaseDateButton.setOnAction(e -> openCaseDateDialog(null)); }
 		if (refreshCaseDatesButton != null) { ControlStyles.apply(refreshCaseDatesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD); refreshCaseDatesButton.setAccessibleText("Refresh case dates"); refreshCaseDatesButton.setOnAction(e -> loadCaseDatesAsync()); }
 		if (showRemovedCaseDatesButton != null) { ControlStyles.apply(showRemovedCaseDatesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL); showRemovedCaseDatesButton.setAccessibleText("Show removed case dates"); showRemovedCaseDatesButton.setOnAction(e -> { showRemovedCaseDates = !showRemovedCaseDates; updateRemovedCaseDatesVisibility(); if (showRemovedCaseDates) loadCaseDatesAsync(); }); }
+		if (manageCaseDateTypesButton != null) { ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL); manageCaseDateTypesButton.setVisible(appState != null && appState.isAdmin()); manageCaseDateTypesButton.setManaged(appState != null && appState.isAdmin()); manageCaseDateTypesButton.setOnAction(e -> openCaseDateTypeManagement()); }
+	}
+
+	private void openCaseDateTypeManagement() {
+		if (appState == null || !appState.isAdmin() || caseDateTypeManagementLauncher == null || caseId == null
+				|| appState.getShaleClientId() == null || appState.getUserId() == null) return;
+		final int openingCaseId = caseId;
+		caseDateTypeManagementLauncher.open(caseDatesOwner(), appState.getShaleClientId(), appState.getUserId(), result -> {
+			if (!result.changed() || caseId == null || caseId != openingCaseId) return;
+			caseDatesStale = true;
+			loadCaseDatesAsync();
+			loadOverviewConfigurationAsync();
+			compatibilityDates.invalidate();
+			loadCompatibilityDatesAsync(openingCaseId);
+		});
 	}
 
 	private void resetCaseDatesState() {
