@@ -240,9 +240,10 @@
 									<Label text="Case status"
 										styleClass="case-overview-row-label" GridPane.rowIndex="3"
 										GridPane.columnIndex="0" />
-									<StackPane fx:id="ovCaseStatusHost"
-										styleClass="case-overview-row-value-host"
-										GridPane.rowIndex="3" GridPane.columnIndex="1" />
+									<VBox spacing="6" GridPane.rowIndex="3" GridPane.columnIndex="1">
+										<StackPane fx:id="ovCaseStatusHost" styleClass="case-overview-row-value-host" />
+										<Button fx:id="manageCaseStatusesButton" text="Manage Case Statuses" />
+									</VBox>
 									<Button fx:id="changeStatusButton" text="✎"
 										styleClass="case-overview-edit-button" GridPane.rowIndex="3"
 										GridPane.columnIndex="2" />
