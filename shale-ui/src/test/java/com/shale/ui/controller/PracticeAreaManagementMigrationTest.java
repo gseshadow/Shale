@@ -35,6 +35,10 @@ final class PracticeAreaManagementMigrationTest {
                 "The contextual callback must preserve the authoritative long navigation generation without narrowing it to a Case ID type.");
         assertFalse(cases.contains("final int openingNavigationGeneration = documentGeneration"));
         assertTrue(cases.contains("practiceAreasByTenantCache.remove(openingTenantId)"));
+        assertTrue(cases.indexOf("configureContextualDefinitionManagementButtons();")
+                        < cases.indexOf("private void configureContextualDefinitionManagementButtons()"),
+                "FXML-injected contextual actions must be semantically classified during initialize().");
+        assertTrue(cases.contains("ControlStyles.apply(managePracticeAreasButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL)"));
     }
 
     @Test

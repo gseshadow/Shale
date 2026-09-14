@@ -136,7 +136,7 @@ public final class OrganizationController {
 			setVisibleManaged(deleteOrganizationButton, false);
 		}
 		if(manageOrganizationTypesButton!=null){
-			ControlStyles.apply(manageOrganizationTypesButton,ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);
+			ControlStyles.apply(manageOrganizationTypesButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);
 			manageOrganizationTypesButton.setOnAction(e->onManageOrganizationTypes());
 			setVisibleManaged(manageOrganizationTypesButton,false);
 		}
