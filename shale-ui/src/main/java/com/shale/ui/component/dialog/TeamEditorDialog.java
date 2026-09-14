@@ -7,6 +7,7 @@ import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.CaseServicePort.*;
 import com.shale.data.dao.CaseDao;
 import com.shale.ui.util.ControlStyles;
+import com.shale.ui.controller.CaseTeamRoleManagementLauncher;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -38,11 +39,18 @@ public final class TeamEditorDialog {
     public TeamEditorDialog(Stage owner, CaseServicePort service, int tenantId, int actorId, long caseId,
             List<CaseDao.UserRow> users, List<CaseTeamMembershipDto> baseline,
             List<CaseTeamRoleDefinitionDto> roles, Runnable saved) {
+        this(owner,service,tenantId,actorId,caseId,users,baseline,roles,saved,null,false,()->{});
+    }
+    public TeamEditorDialog(Stage owner, CaseServicePort service, int tenantId, int actorId, long caseId,
+            List<CaseDao.UserRow> users, List<CaseTeamMembershipDto> baseline,
+            List<CaseTeamRoleDefinitionDto> roles, Runnable saved,CaseTeamRoleManagementLauncher roleLauncher,
+            boolean administrator,Runnable rolesChanged) {
         this.service=Objects.requireNonNull(service);this.tenantId=tenantId;this.actorId=actorId;this.caseId=caseId;this.saved=saved==null?()->{}:saved;
         state=new CaseTeamEditorState(users,baseline,roles);
         stage=new Stage();AppDialogs.applySecondaryWindowChrome(stage);stage.initOwner(owner);stage.initModality(Modality.APPLICATION_MODAL);stage.setTitle("Case Team");
         Label heading=new Label("Case Team");heading.getStyleClass().add("case-team-editor-heading");
         Label support=new Label("Add people to the case and manage any number of roles for each team member.");support.setWrapText(true);support.getStyleClass().add("case-team-editor-support");
+        HBox roleManagement=new HBox();if(administrator&&roleLauncher!=null){Button manageRoles=new Button("Manage Roles");ControlStyles.apply(manageRoles,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);manageRoles.setOnAction(e->{if(state.dirty()){showError("Save or Cancel the pending Case Team changes before managing role definitions.");return;}roleLauncher.open(stage,tenantId,actorId,result->{if(result.changed()){closing=true;stage.close();rolesChanged.run();}});});roleManagement.getChildren().add(manageRoles);}
         Label addLabel=new Label("Add team member");addLabel.getStyleClass().add("case-team-editor-label");
         search.setPromptText("Search active users by name…");ControlStyles.formControl(search);
         results.setFixedCellSize(48);results.setMinHeight(146);results.setPrefHeight(146);results.setMaxHeight(146);results.getStyleClass().add("case-team-search-results");results.setPlaceholder(searchEmpty);
@@ -53,12 +61,13 @@ public final class TeamEditorDialog {
         error.getStyleClass().add("case-team-editor-error");error.setWrapText(true);error.setVisible(false);error.setManaged(false);
         ControlStyles.apply(cancel,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(save,ControlStyles.Purpose.PRIMARY);cancel.setOnAction(e->requestClose());save.setOnAction(e->save());save.setDefaultButton(true);
         Region spacer=new Region();HBox.setHgrow(spacer,Priority.ALWAYS);HBox footer=new HBox(10,spacer,cancel,save);footer.getStyleClass().add("case-team-editor-footer");
-        VBox body=new VBox(8,heading,support,addLabel,search,results,new Separator(),members,error,footer);body.setPadding(new Insets(16));VBox.setVgrow(members,Priority.ALWAYS);
+        VBox body=new VBox(8,heading,support,roleManagement,new Separator(),addLabel,search,results,new Separator(),members,error,footer);body.setPadding(new Insets(16));VBox.setVgrow(members,Priority.ALWAYS);
         VBox shell=AppDialogs.createSecondaryWindowShell(stage,"Case Team",this::requestClose,body);shell.getStyleClass().add("case-team-editor");
         Scene scene=new Scene(shell,Math.min(760,screenWidth(owner)-60),Math.min(680,screenHeight(owner)-60));scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/css/app.css")).toExternalForm());scene.setOnKeyPressed(e->{if(e.getCode()==KeyCode.ESCAPE){e.consume();requestClose();}});stage.setScene(scene);stage.setMinWidth(520);stage.setMinHeight(480);stage.setOnCloseRequest(e->{e.consume();requestClose();});
         refreshMembers();refreshResults();
     }
     public void showAndWait(){stage.showAndWait();}
+    private void showError(String message){error.setText(message);error.setVisible(true);error.setManaged(true);}
     private void addSelectedResult(){CaseDao.UserRow u=results.getSelectionModel().getSelectedItem();if(u==null)return;state.addMember(u);search.clear();refreshMembers();search.requestFocus();}
     private void refreshResults(){results.setItems(FXCollections.observableArrayList(state.search(search.getText())));}
     private void refreshMembers(){members.setItems(FXCollections.observableArrayList(state.members()));members.refresh();refreshResults();}

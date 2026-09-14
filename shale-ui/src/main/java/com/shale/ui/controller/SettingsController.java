@@ -166,7 +166,8 @@ public final class SettingsController {
 	private Label requestStatusSettingsStatusLabel;
 	@FXML
 	private VBox contactClassificationAdministrationSection;
-	@FXML private VBox caseTeamRoleAdministrationContent;
+	@FXML private VBox caseTeamRoleAdministrationSection;
+	@FXML private Button manageCaseTeamRolesButton;
 	@FXML private Button manageContactClassificationsButton;
 	@FXML private VBox organizationTypeAdministrationSection;
 	@FXML private Button manageOrganizationTypesButton;
@@ -334,10 +335,10 @@ public final class SettingsController {
 	}
 
 	private void configureCaseTeamRoles() {
-		if (caseTeamRoleAdministrationContent != null && caseService != null && appState != null
-				&& caseTeamRoleAdministrationContent.getChildren().isEmpty() && appState.isAdmin())
-			caseTeamRoleAdministrationContent.getChildren().setAll(new CaseTeamRoleAdminPane(caseService, appState).node());
+		if(manageCaseTeamRolesButton!=null){ControlStyles.apply(manageCaseTeamRolesButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.STANDARD);manageCaseTeamRolesButton.setDisable(caseService==null||appState==null||!appState.isAdmin());}
 	}
+
+	@FXML private void onManageCaseTeamRoles(ActionEvent event){if(!requireAdminLookupManagement("Case Team Roles")||caseService==null)return;new CaseTeamRoleManagementLauncher(caseService,settingsLoadExecutor).open(settingsWindow(event),requireTenantId(),requireActorUserId(),result->{ });}
 
 	private void configureContactClassifications() {
 		if (manageContactClassificationsButton != null)
@@ -3234,6 +3235,7 @@ public final class SettingsController {
 			contactClassificationAdministrationSection.setVisible(visible);
 			contactClassificationAdministrationSection.setManaged(visible);
 		}
+		if(caseTeamRoleAdministrationSection!=null){caseTeamRoleAdministrationSection.setVisible(visible);caseTeamRoleAdministrationSection.setManaged(visible);}
 		if(organizationTypeAdministrationSection!=null){organizationTypeAdministrationSection.setVisible(visible);organizationTypeAdministrationSection.setManaged(visible);}
 		if (userAdministrationSection != null) {
 			userAdministrationSection.setVisible(visible);
