@@ -1052,6 +1052,7 @@ public class CaseController {
 		clearError();
 		wireLiveRefreshLifecycle();
 		configureOverviewAdministrationControls();
+		configureContextualDefinitionManagementButtons();
 
 		if (changeResponsibleAttorneyButton != null)
 			changeResponsibleAttorneyButton.setOnAction(e -> onEditResponsibleAttorneyField());
@@ -1077,7 +1078,6 @@ public class CaseController {
 			changeStatusButton.setOnAction(e -> onEditStatusField());
 		if (changePracticeAreaButton != null)
 			changePracticeAreaButton.setOnAction(e -> onEditPracticeAreaField());
-		if (managePracticeAreasButton != null) managePracticeAreasButton.setOnAction(e -> openPracticeAreaManagement());
 		if (detChangeStatusButton != null)
 			detChangeStatusButton.setOnAction(e -> onDetailsChangeStatus());
 		if (detChangePracticeAreaButton != null)
@@ -1102,10 +1102,6 @@ public class CaseController {
 			addCaseLinkButton.getStyleClass().removeAll(ActionButtonFactory.BASE_STYLE_CLASS, ActionButtonFactory.PRIMARY_STYLE_CLASS);
 			ControlStyles.apply(addCaseLinkButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 			addCaseLinkButton.setOnAction(e -> onAddCaseLink());
-		}
-		if (manageLinkTypesButton != null) {
-			ControlStyles.apply(manageLinkTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
-			manageLinkTypesButton.setOnAction(e -> openLinkTypeManagement());
 		}
 		configureCaseCalendarControls();
 		if (generateSummaryHtmlMenuItem != null)
@@ -2001,6 +1997,21 @@ public class CaseController {
 		if (refreshCaseDatesButton != null) { ControlStyles.apply(refreshCaseDatesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD); refreshCaseDatesButton.setAccessibleText("Refresh case dates"); refreshCaseDatesButton.setOnAction(e -> loadCaseDatesAsync()); }
 		if (showRemovedCaseDatesButton != null) { ControlStyles.apply(showRemovedCaseDatesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL); showRemovedCaseDatesButton.setAccessibleText("Show removed case dates"); showRemovedCaseDatesButton.setOnAction(e -> { showRemovedCaseDates = !showRemovedCaseDates; updateRemovedCaseDatesVisibility(); if (showRemovedCaseDates) loadCaseDatesAsync(); }); }
 		if (manageCaseDateTypesButton != null) { ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL); manageCaseDateTypesButton.setVisible(appState != null && appState.isAdmin()); manageCaseDateTypesButton.setManaged(appState != null && appState.isAdmin()); manageCaseDateTypesButton.setOnAction(e -> openCaseDateTypeManagement()); }
+	}
+
+	private void configureContextualDefinitionManagementButtons() {
+		if (managePracticeAreasButton != null) {
+			ControlStyles.apply(managePracticeAreasButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+			managePracticeAreasButton.setOnAction(e -> openPracticeAreaManagement());
+		}
+		if (manageCaseDateTypesButton != null) {
+			ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+			manageCaseDateTypesButton.setOnAction(e -> openCaseDateTypeManagement());
+		}
+		if (manageLinkTypesButton != null) {
+			ControlStyles.apply(manageLinkTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+			manageLinkTypesButton.setOnAction(e -> openLinkTypeManagement());
+		}
 	}
 
 	private void configurePracticeAreaManagement() {

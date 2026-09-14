@@ -61,7 +61,7 @@ final class CaseMaterialRequestsTabController {
         VBox requestSection=section(title,newRequestButton,status,list);
         HBox headerContainer=(HBox)requestSection.getChildren().get(0);
         if(state!=null&&state.isAdmin()){
-            Button manageRequestFieldsButton=semanticButton(ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD, "Manage Request Fields",null);
+            Button manageRequestFieldsButton=semanticButton(ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL, "Manage Request Fields",null);
             manageRequestFieldsButton.setId("manage-request-fields");
             manageRequestFieldsButton.setOnAction(e->openRequestDefinitionManagement());
             headerContainer.getChildren().add(manageRequestFieldsButton);

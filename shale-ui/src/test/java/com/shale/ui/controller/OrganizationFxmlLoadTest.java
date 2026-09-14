@@ -3,6 +3,7 @@ package com.shale.ui.controller;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.lang.reflect.Field;
@@ -68,8 +69,14 @@ final class OrganizationFxmlLoadTest {
             assertNotNull(controller, "Organization profile must construct its declared controller.");
             Button edit = (Button) loader.getNamespace().get("editButton");
             Button delete = (Button) loader.getNamespace().get("deleteOrganizationButton");
+            Button manageTypes = (Button) loader.getNamespace().get("manageOrganizationTypesButton");
             assertNotNull(edit, "Edit Organization action must be present.");
             assertNotNull(delete, "Delete Organization action must be present.");
+            assertNotNull(manageTypes, "Manage Organization Types action must be present.");
+            assertTrue(manageTypes.getStyleClass().contains("shale-control-secondary"),
+                    "Contextual definition management must use Shale's secondary purpose.");
+            assertTrue(manageTypes.getStyleClass().contains("shale-control-small"),
+                    "The contextual management action must fit the compact Organization header.");
             assertSame(edit, injectedField(controller, "editButton"), "Edit action must be injected into the controller.");
             assertSame(delete, injectedField(controller, "deleteOrganizationButton"), "Delete action must be injected into the controller.");
         });
