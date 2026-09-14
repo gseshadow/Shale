@@ -1,5 +1,6 @@
 package com.shale.ui.component.dialog;
 
+import com.shale.ui.component.EnhancedTextArea;
 import com.shale.core.model.CalendarEventType;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.UserCardFactory;
@@ -374,10 +375,10 @@ public final class NewCalendarEventDialog {
             }
 
             Label descriptionLabel = new Label("Description");
-            TextArea descriptionArea = new TextArea(initial == null ? "" : initial.description());
-            ControlStyles.formControl(descriptionArea);
+            EnhancedTextArea descriptionArea = new EnhancedTextArea();
+            descriptionArea.setText(initial == null ? "" : initial.description());
             descriptionArea.setPrefRowCount(4);
-            descriptionArea.setWrapText(true);
+            descriptionArea.setEditorTitle("Event Description");
             VBox selectedCaseHost = new VBox();
             selectedCaseHost.setAlignment(Pos.CENTER_LEFT);
             selectedCaseHost.setFillWidth(true);

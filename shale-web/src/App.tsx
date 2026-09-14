@@ -2426,7 +2426,7 @@ function ContactDetailReadOnly({ accessToken, detail, onDetailChanged }: { acces
           <DetailItem label="Last Name" value={detail.lastName} />
           <DetailItem label="Email" value={detail.email} />
           <DetailItem label="Phone" value={detail.phone} />
-          <DetailItem label="Home Address" value={detail.addressHome} preserveWhitespace />
+          <DetailItem label="Home Address" value={detail.address} preserveWhitespace />
           <DetailItem label="Date of Birth" value={formatDate(detail.dateOfBirth)} />
           <DetailItem label="Notes" value={detail.condition} preserveWhitespace />
           <DetailItem label="Deceased" value={detail.deceased ? 'Yes' : 'No'} />
@@ -2444,7 +2444,7 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [addressHome, setAddressHome] = useState('');
+  const [address, setAddressHome] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [condition, setCondition] = useState('');
   const [deceased, setDeceased] = useState(false);
@@ -2476,7 +2476,7 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
         lastName: lastName.trim() || null,
         email: email.trim() || null,
         phone: phone.trim() || null,
-        addressHome: addressHome.trim() || null,
+        address: address.trim() || null,
         dateOfBirth: dateOfBirth || null,
         condition: condition.trim() || null,
         deceased,
@@ -2502,7 +2502,7 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
       <label htmlFor="new-contact-phone">Phone</label>
       <input id="new-contact-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" maxLength={100} />
       <label htmlFor="new-contact-address-home">Home address</label>
-      <textarea id="new-contact-address-home" value={addressHome} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
+      <textarea id="new-contact-address-home" value={address} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
       <label htmlFor="new-contact-date-of-birth">Date of birth</label>
       <input id="new-contact-date-of-birth" type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} disabled={isSubmitting} />
       <label htmlFor="new-contact-notes">Notes</label>
@@ -2523,7 +2523,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
   const [lastName, setLastName] = useState(detail.lastName || '');
   const [email, setEmail] = useState(detail.email || '');
   const [phone, setPhone] = useState(detail.phone || '');
-  const [addressHome, setAddressHome] = useState(detail.addressHome || '');
+  const [address, setAddressHome] = useState(detail.address || '');
   const [dateOfBirth, setDateOfBirth] = useState(toDateInputValue(detail.dateOfBirth));
   const [condition, setCondition] = useState(detail.condition || '');
   const [deceased, setDeceased] = useState(detail.deceased);
@@ -2555,7 +2555,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
         lastName: lastName.trim() || null,
         email: email.trim() || null,
         phone: phone.trim() || null,
-        addressHome: addressHome.trim() || null,
+        address: address.trim() || null,
         dateOfBirth: dateOfBirth || null,
         condition: condition.trim() || null,
         deceased,
@@ -2581,7 +2581,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
       <label htmlFor="contact-phone">Phone</label>
       <input id="contact-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" maxLength={100} />
       <label htmlFor="contact-address-home">Home address</label>
-      <textarea id="contact-address-home" value={addressHome} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
+      <textarea id="contact-address-home" value={address} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
       <label htmlFor="contact-date-of-birth">Date of birth</label>
       <input id="contact-date-of-birth" type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} disabled={isSubmitting} />
       <label htmlFor="contact-notes">Notes</label>

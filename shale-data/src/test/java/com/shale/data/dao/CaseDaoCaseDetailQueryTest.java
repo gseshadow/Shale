@@ -12,7 +12,7 @@ final class CaseDaoCaseDetailQueryTest {
     void existingCaseDetailSelectExcludesAllNineMigratedCaseColumns() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
         String method = method(source, "private com.shale.core.dto.CaseDetailDto selectCaseDetail", "private static com.shale.core.dto.CaseDetailDto mapCaseDetail");
-        String mapper = method(source, "private static com.shale.core.dto.CaseDetailDto mapCaseDetail", "public com.shale.core.dto.CaseDetailDto updateCase");
+        String mapper = method(source, "private static com.shale.core.dto.CaseDetailDto mapCaseDetail", "public CaseDetailDto updateCaseNonDate");
 
         assertTrue(method.contains("c.AcceptedDate"));
         assertTrue(method.contains("c.ClosedDate"));
@@ -37,7 +37,7 @@ final class CaseDaoCaseDetailQueryTest {
     @Test
     void caseDetailSelectDoesNotReferenceRemovedMedicalRecordsReceivedColumn() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-        String method = method(source, "private com.shale.core.dto.CaseDetailDto selectCaseDetail", "public com.shale.core.dto.CaseDetailDto updateCase");
+        String method = method(source, "private com.shale.core.dto.CaseDetailDto selectCaseDetail", "public CaseDetailDto updateCaseNonDate");
 
         assertTrue(!method.contains("MedicalRecordsReceived"));
     }
@@ -46,7 +46,7 @@ final class CaseDaoCaseDetailQueryTest {
     void caseDetailHydratesIntakeUserInTenantSafeJoinWithoutExcludingHistoricalUsers() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
         String method = method(source, "private com.shale.core.dto.CaseDetailDto selectCaseDetail", "private static com.shale.core.dto.CaseDetailDto mapCaseDetail");
-        String mapper = method(source, "private static com.shale.core.dto.CaseDetailDto mapCaseDetail", "public com.shale.core.dto.CaseDetailDto updateCase");
+        String mapper = method(source, "private static com.shale.core.dto.CaseDetailDto mapCaseDetail", "public CaseDetailDto updateCaseNonDate");
 
         assertTrue(method.contains("intake_user.id = c.IntakeTakenByUserId"));
         assertTrue(method.contains("intake_user.ShaleClientId = c.ShaleClientId"));

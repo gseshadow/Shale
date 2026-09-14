@@ -1,5 +1,12 @@
 # Shale Database Schema Reference
 
+> **Organizations Phase 2B (2026-09-09):** Definition and assignment mutations use the Phase 1A
+> lifecycle, tenant, actor, ordering, and `RowVer` columns transactionally. Aggregate Organization
+> create/edit reconciles the complete ordered assignment profile; primary changes synchronize
+> `Organizations.OrganizationTypeId` and assignment audits on the same connection. Legacy single-type
+> callers map to one primary assignment on that same transaction; complete-profile desktop writes use
+> the aggregate cutover and preserve historical assignment identity.
+
 *Last updated: 2026-06-15*
 
 This document is the working schema reference for Codex and Shale development prompts.
@@ -119,8 +126,8 @@ Primary case table.
 | ------------------------------------ | ------------- | ------------------------------------- |
 | `Id`                                 | int           | Primary key                           |
 | `Name`                               | nvarchar(max) | Case name                             |
-| `CallerTime`                         | time          | Intake/caller time                    |
-| `CallerDate`                         | date          | Intake/caller date                    |
+| `CallerTime`                         | time          | Legacy Intake reconciliation/history input; not runtime authority |
+| `CallerDate`                         | date          | Legacy Intake reconciliation/history input; not runtime authority |
 | `AcceptedDate`                       | date          | Accepted date                         |
 | `ClosedDate`                         | date          | Closed date                           |
 | `DeniedDate`                         | date          | Denied date                           |
@@ -164,7 +171,7 @@ Primary case table.
 | UI Field                    | Source                           |
 | --------------------------- | -------------------------------- |
 | Case Name                   | `dbo.Cases.Name`                 |
-| Intake Date                 | `dbo.Cases.CallerDate`           |
+| Intake Date                 | Tenant-effective protected `INTAKE` occurrence in `dbo.CaseDates` |
 | Description                 | `dbo.Cases.Description`          |
 | Summary                     | `dbo.Cases.Summary`              |
 | Date of Incident            | `dbo.Cases.DateOfInjury`         |
@@ -182,6 +189,7 @@ The live schema does **not** include these columns:
 | `IncidentOccurred`         | Use `DateOfInjury` for current Date of Incident.                                          |
 | `CaseStatusId`             | Not present in the live `dbo.Cases` output. Do not use unless a future migration adds it. |
 | `CasePracticeAreaId`       | Not present in the live `dbo.Cases` output.                                               |
+| `UpdatedByUserId`          | Not present. Case mutations update `UpdatedAt`; actor attribution uses established audit and Timeline records. |
 
 
 ### Customizable lookup type standard
@@ -216,8 +224,14 @@ Status lookup table.
 | `Color`         | nvarchar(20)  | Display color       |
 | `LifecycleKey`  | nvarchar(64)  | Lifecycle key       |
 | `SystemKey`     | nvarchar(128) | System key          |
+| `IsActive`      | bit           | Selector eligibility; added by the Status soft-delete migration |
+| `IsDeleted`     | bit           | Soft-delete marker; added by the Status soft-delete migration |
 
 Important: status table exists, but no confirmed FK from `dbo.Cases` appears in the current live schema output.
+
+Status removal is an in-place lifecycle update (`IsActive=0, IsDeleted=1`) on the tenant-owned `Statuses` row. It never deletes the definition or changes `CaseStatuses`. Effective assignment selectors resolve tenant/global precedence before excluding inactive/deleted winners, so an inactive tenant override cannot reveal its global fallback. Historical and current-status reads retain their ID join without lifecycle predicates.
+
+Status removal and restoration use the entity-action audit transaction seam with `CASE_STATUS` plus `DEACTIVATED`/`RESTORED`. Metadata is restricted to `ACTIVE`; names, colors, notes, history dates, RowVer, and case data are excluded. The business update and audit append share the DAO-owned connection and rollback together.
 
 ---
 
@@ -362,6 +376,38 @@ Contacts table.
 | `ReferredFrom`   | nvarchar(max) | Referral source        |
 | `ReferralType`   | nvarchar(max) | Referral type          |
 | `RowVer`         | timestamp     | Row version            |
+| `Prefix`         | nvarchar(50)  | Additive honorific; Phase 1A does not change display behavior |
+| `MiddleName`     | nvarchar(100) | Additive structured middle name |
+| `PreferredName`  | nvarchar(100) | Additive preferred name |
+| `Suffix`         | nvarchar(50)  | Actual name suffix only; professional credentials are assignments |
+
+### Contact classification foundation (Phase 1A)
+
+`dbo.ContactTypes`, `dbo.Specialties`, and `dbo.CredentialDefinitions` are independent customizable
+global/tenant overlay definition tables. Each stores `Id`, nullable `ShaleClientId`, `SystemKey`,
+`Name`, `Description`, `SortOrder`, `IsActive`, `IsDeleted`, deletion/creation/update actor and time
+metadata, and `RowVer`. `CredentialDefinitions` additionally separates full `Name` (Doctor of
+Medicine) from required display `Abbreviation` (MD); credentials are not suffixes and `SystemKey` is
+stable identity. Deleted definitions must be inactive and have both deletion fields, while nondeleted
+ones have neither. Only the authoritative global `expert` Contact Type is initially seeded; all other
+global Contact Types, Specialties, and Credentials remain intentionally unseeded.
+
+`dbo.ContactContactTypes`, `dbo.ContactSpecialties`, and `dbo.ContactCredentials` are strict
+tenant-owned historical assignment tables with `Id`, `ShaleClientId`, `ContactId`, their definition
+foreign key, lifecycle actor/time metadata, and `RowVer`; credentials additionally have
+`DisplayOrder`. Composite Contact foreign keys enforce Contact tenant ownership, filtered indexes
+prevent duplicate active assignments (including duplicate MD/RN instances), and valid deletion
+metadata retains history. Professional license/jurisdiction data requires a separate future model;
+restoration semantics are deferred without destructive schema implications. All actor columns
+reference `dbo.Users(id)`, but nullable `Users.ShaleClientId` means services must still validate
+authorization. Definition ownership
+(global or same tenant) requires future transactional service validation. See
+[contact-management.md](contact-management.md) for compatibility, RLS, Case role, audit, and rollout
+rules. In particular, `Prefix` is an honorific and `Suffix` is only a true suffix (Jr., Sr., II, III,
+IV); current runtime reads, writes, and display behavior remain unchanged. `dbo.Contacts` has no RLS
+predicate and Phase 1A intentionally does not add one. The case-specific tenant `PartyRoles` expert
+role remains separate from the contact-wide global Contact Type, and `PartyRoles`, `CaseParties`, and
+legacy `CaseContacts` are not modified. A later dual-write phase is required before `IsExpert` cutover. Phase 1A reruns strictly validate required named objects and columns but tolerate unrelated additive columns, indexes, foreign keys, and CHECK constraints introduced by later phases.
 | `ShaleClientId`  | int           | Tenant id              |
 
 Contact display fallback:
@@ -401,6 +447,80 @@ Organizations table.
 | `CreatedAt`          | datetime2      | Created timestamp |
 | `UpdatedAt`          | datetime2      | Updated timestamp |
 | `RowVer`             | timestamp      | Row version       |
+
+Phase 1A preserves all legacy columns and adds unique `(ShaleClientId, Id)` as a composite tenant FK
+target. `OrganizationTypeId` remains the runtime primary-type authority until the deferred dual-write
+and read cutover.
+
+### Structured Organization contact methods (Phase 3A)
+
+`OrganizationPhoneNumbers`, `OrganizationEmailAddresses`, `OrganizationAddresses`, and
+`OrganizationWebsites` are additive `bigint` identity children of the composite tenant Organization
+key. Each stores a closed uppercase `Kind`, one active-primary flag, nonnegative `SortOrder`, creation,
+update, and soft-deletion provenance, and `RowVer`. Phone rows preserve `DisplayNumber`, optional
+`NormalizedNumber`, and `Extension`; fax is the phone kind `FAX`. Address rows preserve the full
+legacy component widths and use `StateOrProvince` plus `Country` because the Organization legacy
+country is free-form rather than a verified two-letter code. Website is an Organization-specific
+equivalent because Contacts have no structured website table.
+
+Composite `(ShaleClientId, OrganizationId)` foreign keys prevent cross-tenant ownership and do not
+cascade. Every table uses the established strict `sec.fn_FilterByTenant` predicate on the enabled
+`TenantFilter` policy. Filtered indexes enforce one active primary per Organization and concept;
+phone, case-insensitive email, and website active values also reject duplicates. Display retrieval is
+deterministic by tenant, parent, lifecycle, `SortOrder`, and identity. Deleted rows cannot be primary
+and retain deletion time and actor.
+
+Phase 3A trims only outer whitespace while copying Organization Phone (`WORK`, primary, order 0), Fax
+(`FAX`, nonprimary when Phone exists, order 1), Email (`WORK`, primary, order 0), populated address
+components (`WORK`, primary, order 0), and Website (`MAIN`, primary, order 0). Partial addresses are
+preserved and empty addresses are not created. Historical exact matches, including deleted rows,
+suppress rerun insertion; existing structured rows are never overwritten. A null creation actor is
+the established mechanical-migration provenance and no ordinary entity-action audit is emitted.
+
+The scalar Organization columns remain readable/writable and application-authoritative. There is no
+trigger or dual write, so post-migration scalar edits can drift from these foundation rows until Phase
+3C establishes atomic application write ownership and audit vocabulary. Phase 3B is the read-only
+adapter step. Phase 3A changes no Organization UI, cards, search, API, or runtime mutation behavior.
+
+Phase 3F.2 supersedes that Phase 3A runtime boundary: the structured tables are now authoritative for
+application presentation and mutation. The scalar contact columns remain physically present as synchronized
+compatibility mirrors for server, report/export, and legacy model projections. Only the Organization aggregate
+transaction owner may write them; legacy create/patch inputs must first be adapted to structured mutation state.
+No trigger, schema removal, or independent scalar update is permitted.
+
+### dbo.OrganizationTypes
+
+The existing identity table is the authoritative global/tenant overlay definition table. It retains
+`OrganizationTypeId int IDENTITY` and `Name nvarchar(100)`, while nullable `ShaleClientId` permits
+future global rows. It adds required `SystemKey nvarchar(64)`, `Color nvarchar(20)`, `SortOrder`,
+`IsActive`, `IsDeleted`, `CreatedAt`, and `RowVer`; nullable `Description nvarchar(500)`, actor IDs,
+and update/deletion timestamps complete the lifecycle contract. System keys are lowercase snake_case,
+with separate filtered uniqueness for global and tenant rows. Colors are uppercase `#RRGGBB`.
+
+The original seven rows remain tenant-7 definitions with IDs/names unchanged: Provider/provider,
+Facility/facility, Firm/firm, Agency/agency, Insurer/insurer, Lab/lab, and Other/other. Their zero-based
+`SortOrder` follows ID order; no global definitions are seeded. The former tenant-7 default is removed.
+Definitions use the existing `TenantFilter` policy with `sec.fn_FilterByTenantOrGlobal`.
+
+### dbo.OrganizationOrganizationTypes
+
+Historical many-to-many type assignments use bigint identity `Id`, strict non-null tenant ownership,
+`OrganizationId`, authoritative `OrganizationTypeId`, `IsPrimary`, nonnegative `SortOrder`, soft-delete
+lifecycle/actor fields, timestamps, and `RowVer`. Composite Organization ownership is enforced through
+`(ShaleClientId, OrganizationId)`; filtered indexes allow at most one active definition assignment and
+one active primary per Organization. The table uses strict `sec.fn_FilterByTenant` RLS. Phase 1A
+backfills one active primary row for every Organization, including deleted Organizations, but leaves
+the legacy type column unchanged. A matching historical row suppresses rerun backfill even when it was
+later soft-deleted; mutable definition presentation and lifecycle state are likewise never reset by a
+successful rerun. Definition global-or-same-tenant authorization remains a Phase 1C
+transactional validation because the stable type-ID FK cannot express that conditional relationship.
+
+Phase 1B adds read-only Java contracts over this foundation. Effective selection resolves global/tenant
+definitions by `SystemKey`, while an Organization profile joins each active assignment to its stored
+`OrganizationTypeId` so inactive or deleted historical definitions remain visible. The profile also reports
+whether its active primary assignment matches `Organizations.OrganizationTypeId`; it never repairs a
+mismatch. Phase 1A remains the database foundation, and no mutation, Settings, UI, or runtime cutover is part
+of Phase 1B.
 
 ---
 
@@ -459,7 +579,7 @@ LEFT JOIN dbo.Users updateUser
 | --------------------------- | ------------------------------------------------------------------------------------------ |
 | Case Name                   | `dbo.Cases.Name`                                                                           |
 | Client                      | `dbo.CaseContacts` Role `1` + `dbo.Contacts` display name                                  |
-| Intake Date                 | `dbo.Cases.CallerDate`                                                                     |
+| Intake Date                 | Active tenant-effective protected `INTAKE` occurrence in `dbo.CaseDates`                   |
 | Case Status                 | No confirmed `dbo.Cases` status FK in live schema. Trace existing app behavior before use. |
 | Opposing Parties            | `dbo.CaseParties` role `party` + side `opposing` + `dbo.Contacts` display names            |
 | Latest Case Update          | Latest non-deleted `dbo.CaseUpdates.NoteText`                                              |
@@ -918,11 +1038,11 @@ Phase 6.1 adds a dedicated append-only entity-action audit table because existin
 
 Audit metadata may contain only stable IDs and non-sensitive state markers, including CaseId, CaseLinkId, CaseLinkShareId, ExternalLinkId, LinkTypeId, ContactId, previous/new Primary CaseLinkId, reordered link count, and activation state. It must not contain URLs, descriptions, link notes, share notes, Contact names/emails/phones, credentials, RowVer bytes, raw commands/DTOs, SQL, or exception text. Ordinary application paths insert only and must not update/delete audit history.
 
-Deployed databases must apply the forward-only migration
-`docs/sql/2026-08-12_entity_action_audit_entity_type_constraint.sql` after all earlier audit migrations. It rebuilds the
+Deployed databases must retain the historical `2026-08-12_entity_action_audit_entity_type_constraint.sql` migration unchanged, then apply the forward-only successor
+`docs/sql/2026-08-14_entity_action_audit_entity_type_constraint_case_status.sql` after the Status soft-delete migration and all earlier audit migrations. It rebuilds the
 durable `EntityType` CHECK from authoritative table/column dependency metadata, preserves values allowed by any
-deployed historical EntityType constraint, and adds the complete production vocabulary: `CASE`, `LINK_TYPE`,
-`CASE_LINK`, `CASE_LINK_SHARE`, `CASE_DATE`, `CALENDAR_EVENT`, `CASE_DATE_ROLE_MAPPING`,
+deployed historical EntityType constraint, and adds the complete production vocabulary: `CASE`, `CASE_STATUS`, `LINK_TYPE`,
+`CASE_LINK`, `CASE_LINK_SHARE`, `CASE_DATE`, `CASE_DATE_TYPE`, `CALENDAR_EVENT`, `CASE_DATE_ROLE_MAPPING`,
 `CALENDAR_CASE_DATE_TYPE_MAPPING`, `FORM_CONFIGURATION`, `MATERIAL_TYPE`, `MATERIAL_REQUEST`,
 `MATERIAL_REQUEST_FOLLOW_UP`, `MATERIAL_ITEM`, and `USER`. The migration is transactional, repeatable, and verifies
 that the rebuilt constraint is enabled and trusted; historical migrations must not be edited or rerun to obtain this
@@ -970,23 +1090,81 @@ If a combined All-mode load partially fails, the viewer must not present incompl
 
 ## Case Dates
 
+### Per-case Case Overview configuration (Phase 1, 2026-09-08)
+
+`dbo.CaseOverviewConfigurations` is the strict tenant-owned, one-row-per-Case marker that distinguishes
+an Overview which has never been customized from an explicitly saved customization. It stores Case and
+tenant identity, created/updated actor and UTC timestamps, and `RowVer`. Its normalized child,
+`dbo.CaseOverviewDateSelections`, stores selected authoritative `CaseDateTypes` identities with unique,
+zero-based contiguous `SortOrder`; no child rows therefore represents an intentionally empty layout.
+Both tables use the established strict tenant RLS predicate. The application resolves the five legacy
+Overview defaults in their existing order (Date of Injury, Date of Medical Negligence, Intake, Statute of
+Limitations, Tort Notice Deadline) only when the parent is absent. Replacement validates current effective
+tenant-overlay winners and commits the parent, ordered children, Case touch, and safe entity-action audit
+atomically. It never changes `CaseDates` and writes no Case Timeline row.
+
+`Cases.IntakeTakenByUserId` remains the existing nullable authoritative Intake By relationship; no duplicate
+column or historical `CreatedBy` backfill is introduced. Admin-only changes use the Case `RowVer`, retain
+inactive historical assignees on reads, accept only a new active same-tenant user, and append one
+transaction-bound `INTAKE_TAKEN_BY_CHANGED` timeline event only for a real change.
+
+Audit compatibility: layout replacement emits `CASE_OVERVIEW_CONFIGURATION` `CREATED`/`UPDATED` with only
+Case id and ordering count; Intake By emits `CASE` `UPDATED` with only Case id. The accompanying forward-only
+allowlist successor adds the new entity type. Neither audit metadata contains names, date values, RowVer, or
+other sensitive payloads.
+
 ### dbo.CaseDateTypes
 
 Customizable lookup for authoritative case-date meanings. Intake, Statute of Limitations, and Tort Notice Deadline are the only global required built-ins. The ten deployed noncritical definitions (Trial, Hearing, Mediation, Deposition, Discovery Deadline, Date of Injury, Date of Medical Negligence, Date Medical Negligence Was Discovered, Fee Agreement Signed, and Non-Engagement Letter Sent) are owned by tenant 7; tenant 8 begins built-in-only. Existing ids and references were preserved by changing ownership in place. Optional templates are outside this phase. Rows retain stable lowercase `SystemKey`, display `Name`, `Description`, constrained `CalendarCategory`, `Color`, `SupportsTime`, active/deleted lifecycle fields, actor metadata, timestamps, and `RowVer`.
 
 ### dbo.CaseDates
 
-Strict tenant-owned case occurrence table with `ShaleClientId`, `CaseId`, `CaseDateTypeId`, `StartsAt`, optional `EndsAt`, `AllDay`, notes, actor metadata, soft-deletion metadata, timestamps, and `RowVer`. Multiple occurrences of the same type may exist on one case.
+Strict tenant-owned case occurrence table with `ShaleClientId`, `CaseId`, `CaseDateTypeId`, `StartsAt`, optional `EndsAt`, `AllDay`, nullable `Title` (`nvarchar(255)`) for occurrence-specific presentation, notes, actor metadata, soft-deletion metadata, timestamps, and `RowVer`. Multiple occurrences of the same type may exist on one case.
 
 Ownership: `CaseDates` owns legal/factual case dates. Following the completed Phase 3B backfill and Phase 3C validation, it is the target authoritative runtime representation for the nine migrated fixed-date meanings; their `Cases` columns are retained temporarily for rollback/history only. `CalendarEvents` owns manually created calendar events only. The unified calendar projects from authoritative sources instead of becoming the owner or duplicating domain dates. Unmigrated workflow/lifecycle dates remain separate unless deliberately reclassified. Runtime cutover and later column removal are distinct, independently gated phases.
+
+New Intake persists its displayed or edited Intake date and time as a timed authoritative occurrence
+in the same transaction as Case creation and required PHI/entity-action audits. The Cases list reads
+and sorts that occurrence; `Cases.CallerDate`/`CallerTime` are legacy reconciliation inputs only. The
+forward-only, idempotent 2026-08-14 production reconciliation inserted 21 missing Intake occurrences
+for tenant 7 and created no `CalendarEvents` rows.
 
 ### dbo.CaseDateSemanticRoles / dbo.CaseDateTypeSemanticRoleMappings
 
 `CaseDateSemanticRoles` contains the explicit protected application meanings
-`INTAKE`, `STATUTE_OF_LIMITATIONS`, and `TORT_NOTICE_DEADLINE`.
+`INTAKE`, `STATUTE_OF_LIMITATIONS`, and `TORT_NOTICE_DEADLINE`. Its key column is `RoleKey`; the table
+has `IsProtected` and provenance columns and does not have `SemanticRoleKey`, `IsActive`, or
+`IsDeleted`. Those lifecycle columns and `SemanticRoleKey` belong to
+`CaseDateTypeSemanticRoleMappings`.
 `CaseDateTypeSemanticRoleMappings` associates one active global compatibility type,
 or at most one active tenant-specific type, with each role. The association has its
 own tenant/global scope, active and soft-deleted lifecycle, actor/timestamp provenance,
 `RowVer`, foreign keys, filtered singleton indexes, and tenant-or-global RLS. Type
 presentation and occurrence identity remain in `CaseDateTypes` and `CaseDates`;
 neither existing id is rewritten by the semantic-role foundation.
+
+### Administrator-customizable definition colors
+
+Every administrator-customizable Shale definition/type must own a required configurable `Color`; assignments reference the authoritative definition ID and never copy presentation fields. The database representation is `nvarchar(20) NOT NULL`, normalized uppercase `#RRGGBB`, constrained to six hexadecimal digits, with the established neutral default `#6C757D`. Tenant overrides may change color without changing the global definition. Reset fallback uses the global definition's color, and historical assignment queries continue to return presentation data from the stored authoritative definition.
+
+For Contact Types, Specialties, and Credential Definitions, deploy `2026-08-25_contacts_phase2a_definition_colors.sql`, then run `2026-08-25_contacts_phase2a_definition_colors_verify.sql`, then deploy the matching application. Validate this sequence on `Shale_Copy` before production; the migration is guarded, all-tenant, forward-only, and rerunnable.
+## Structured Contact points (Phase 2C-A)
+
+`ContactPhoneNumbers`, `ContactEmailAddresses`, and `ContactAddresses` are additive `bigint` identity
+children of the tenant Contact key. They use fixed uppercase kinds, nullable conservative normalized
+forms, one filtered active-primary index per category, zero-based/nonnegative presentation ordering,
+soft-deletion metadata, actor foreign keys to `Users(id)`, and `rowversion`. Their composite Contact
+foreign keys include `ShaleClientId`, use no delete cascade, and each table has the established strict
+tenant filter. `Contacts` itself receives no RLS change.
+
+Phase 2C-A copies all populated legacy phone, email, and address values—including values on deleted
+Contacts—without changing the source columns. Free-form addresses populate only `LegacyAddressText`.
+The legacy columns remain the runtime authority until Phase 2C-B introduces audited transactional
+dual-write and reconciliation. See `architecture/contact-management.md` for precedence, normalization,
+lifecycle, deployment, and retirement boundaries.
+
+## dbo.CaseTeamRoleDefinitions (Phase 1 foundation)
+
+`CaseTeamRoleDefinitions` is the tenant/global overlay catalog for Case Team assignment meanings. It is deliberately separate from the legacy `Roles` authorization/assignment lookup and does not change `CaseUsers` in Phase 1. Global protected rows have stable `SystemKey` and `LegacyRoleId` values so a later many-to-many assignment migration can map existing `CaseUsers.RoleId` values without using editable names. Tenant rows with the same `SystemKey` are overrides; deleted overrides fall back to the global row, while inactive overrides remain the effective masked result. Tenant rows without `SystemKey` are custom roles.
+
+The table stores `Id`, nullable `ShaleClientId`, `SystemKey`, `LegacyRoleId`, `Name`, optional `Description`, required `Color`, `SortOrder`, `IsActive`, `IsDeleted`, `IsProtected`, lifecycle actor/time metadata, and `RowVer`. It uses tenant-or-global RLS, filtered global and tenant `SystemKey` uniqueness, normalized effective-name validation in the administration transaction, and entity-action auditing. Phase 1 seeds the legacy Case Team values Responsible Attorney (4), Prelitigation Staff (5), Attorney (7), Legal Assistant (11), Paralegal (12), Law Clerk (13), and Co-counsel (14). Existing `CaseUsers` behavior remains authoritative until the assignment/editor phase.

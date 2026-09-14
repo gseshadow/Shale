@@ -40,4 +40,32 @@ final class CaseDateTypeAdministrationContractTest {
         assertTrue(DAO.contains("A Case Date Type with that name already exists."));
         assertTrue(DAO.contains("System keys are reserved for protected system-defined Case Date Types."));
     }
+    @Test void everyAuthoritativeMutationAppendsOneSafeTransactionalAudit(){
+        assertEquals(4, occurrences(DAO, "auditType(con,c.shaleClientId(),c.actorUserId()"));
+        assertTrue(DAO.contains("EntityType.CASE_DATE_TYPE"));
+        assertTrue(DAO.contains("MetadataKey.CASE_DATE_TYPE_ID,id"));
+        assertTrue(DAO.contains("MetadataKey.ACTIVE,active"));
+        assertTrue(DAO.contains("Action.CREATED"));
+        assertTrue(DAO.contains("Action.UPDATED"));
+        assertTrue(DAO.contains("Action.DEACTIVATED"));
+        assertTrue(DAO.contains("Action.ACTIVATED"));
+        assertTrue(DAO.contains("Action.DELETED"));
+        assertTrue(DAO.contains("Action.RESTORED"));
+        int tx=DAO.indexOf("private <T> T mutateAuditedType");
+        assertTrue(DAO.indexOf("T r=op.run(con)",tx) < DAO.indexOf("con.commit();return r",tx));
+        assertTrue(DAO.contains("catch(Exception e){con.rollback()"));
+    }
+    @Test void trustedIdentityConcurrencyAndFailureChecksPrecedeAudit(){
+        assertTrue(DAO.contains("validateSessionActor(con,tenant,actor);validateActiveAdminActor"));
+        assertTrue(DAO.contains("ISNULL(IsRemoved,0)=0 AND ISNULL(is_admin,0)=1"));
+        assertTrue(DAO.contains("SESSION_CONTEXT(N'PrincipalUserId')"));
+        assertTrue(DAO.contains("ShaleClientId=? AND RowVer=?"));
+        assertTrue(DAO.contains("if(ps.executeUpdate()!=1)throw new IllegalStateException(\"Case date type changed.\")"));
+        int mutation=DAO.indexOf("EffectiveCaseDateTypeDto updated=updateTypeRow");
+        int audit=DAO.indexOf("auditType(con,c.shaleClientId(),c.actorUserId(),updated.id()", mutation);
+        assertTrue(mutation > 0 && audit > mutation);
+        String auditBody=DAO.substring(DAO.indexOf("private void auditType"),DAO.indexOf("private EffectiveCaseDateTypeDto insertType"));
+        assertFalse(auditBody.toLowerCase().matches("(?s).*(name|description|color|systemkey|rowver|case_id|case_date_id|note|starts_at|ends_at).*"));
+    }
+    private static int occurrences(String source,String token){int count=0,at=0;while((at=source.indexOf(token,at))>=0){count++;at+=token.length();}return count;}
 }

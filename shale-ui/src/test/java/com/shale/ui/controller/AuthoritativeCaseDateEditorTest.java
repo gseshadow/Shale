@@ -18,6 +18,17 @@ class AuthoritativeCaseDateEditorTest {
         return new CaseDateAggregateResult(new byte[]{token}, states);
     }
 
+    @Test void conflictedProtectedSnapshotRemainsLoadedButCannotSave() {
+        var base=snapshot((byte)1,false);
+        var conflicted=new CaseDateAggregateResult(base.caseRowVer(),base.dates(),java.util.Set.of(MigratedCaseDateKey.TORT_NOTICE_DEADLINE));
+        var editor=new AuthoritativeCaseDateEditor(); editor.replace(conflicted);
+        assertTrue(editor.isLoaded());
+        assertTrue(editor.hasConflict(MigratedCaseDateKey.TORT_NOTICE_DEADLINE));
+        var values=new EnumMap<>(AuthoritativeCaseDateEditor.values(editor.states()));
+        values.put(MigratedCaseDateKey.DATE_OF_INJURY,new CompatibilityCaseDateEditor.EditedValue(LocalDateTime.of(2026,2,2,0,0),null,true));
+        assertThrows(IllegalStateException.class,()->editor.beginSave(2,3,4,values));
+    }
+
     @Test void noOpDoesNotEnterSavingOrBuildCommand() {
         var editor=new AuthoritativeCaseDateEditor(); editor.replace(snapshot((byte)1,true));
         assertNull(editor.beginSave(2,3,4,AuthoritativeCaseDateEditor.values(editor.states())));

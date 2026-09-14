@@ -14,8 +14,8 @@ import com.shale.data.dao.MaterialRequestDao;
 import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.FormConfigurationServiceAdapter;
 import com.shale.data.service.adapter.MaterialRequestServiceAdapter;
-import com.shale.data.service.adapter.CalendarCaseDateTypeMappingServiceAdapter;
-import com.shale.data.dao.CalendarCaseDateTypeMappingDao;
+import com.shale.data.service.adapter.ContactServiceAdapter;
+import com.shale.data.service.adapter.OrganizationServiceAdapter;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
@@ -100,6 +100,9 @@ import com.shale.ui.notification.NotificationPollingService;
 import com.shale.ui.notification.NoOpDesktopNotificationPresenter;
 import com.shale.ui.notification.DesktopNotificationPresenter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
+import com.shale.data.service.adapter.UserDictionaryServiceAdapter;
+import com.shale.data.dao.UserDictionaryWordDao;
+import com.shale.ui.component.spellcheck.UserDictionarySession;
 
 public final class SceneManager {
 	private static final Logger log = LoggerFactory.getLogger(SceneManager.class);
@@ -120,6 +123,8 @@ public final class SceneManager {
 	private final NotificationPreferencesService notificationPreferencesService;
 	private CalendarController calendarController;
 	private Integer pendingCalendarNotificationEventId;
+	private PendingCaseDateRoute pendingCaseDateRoute;
+	private record PendingCaseDateRoute(int caseId, long caseDateId) {}
 	private final DurableNotificationService durableNotificationService;
 	private final TaskDueDateNotificationGenerator taskDueDateNotificationGenerator;
 	private final NotificationPollingService notificationPollingService;
@@ -186,6 +191,7 @@ public final class SceneManager {
 		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
 		this.updatePollingService = new UpdatePollingService(updateLauncher, this::onUpdateCheckCompleted);
 		this.phiReadAuditService = new PhiReadAuditService(new AuditLogDao(dbSessionProvider), appState);
+		UserDictionarySession.configure(new UserDictionarySession(new UserDictionaryServiceAdapter(new UserDictionaryWordDao(dbSessionProvider)),appState));
 	}
 
 	private NotificationCenterService createNotificationCenterService() {
@@ -225,6 +231,7 @@ public final class SceneManager {
 	}
 
 	public void showMain() {
+		UserDictionarySession.current().load();
 		long showMainStartNanos = System.nanoTime();
 		System.out.println("[StartupTiming] showMain entry");
 		var root = load("/fxml/main.fxml", controller ->
@@ -451,6 +458,12 @@ public final class SceneManager {
 		navigateTo(AppRoute.caseProfile(caseId, sectionKey == null ? "OVERVIEW" : sectionKey), true);
 	}
 
+	public void openCaseDates(Integer caseId, Long caseDateId) {
+		if (caseId == null || caseId <= 0 || caseDateId == null || caseDateId <= 0) return;
+		pendingCaseDateRoute = new PendingCaseDateRoute(caseId, caseDateId);
+		openCaseProfile(caseId, "DATES");
+	}
+
 	private void recordCaseSectionNavigation(Integer caseId, String sectionKey) {
 		if (caseId == null || caseId <= 0 || sectionKey == null || sectionKey.isBlank()) {
 			return;
@@ -635,7 +648,7 @@ public final class SceneManager {
 		{
 			ContactsController c = (ContactsController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
-			c.init(appState, contactDao, onOpenContact);
+			c.init(appState, new ContactServiceAdapter(contactDao), runtimeBridge, onOpenContact);
 			return c;
 		});
 	}
@@ -678,7 +691,8 @@ public final class SceneManager {
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			UserDao userDao = new UserDao(dbSessionProvider);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			c.init(appState, calendarService, calendarFeedDao, caseTaskService, new CaseSummaryDao(dbSessionProvider), runtimeBridge, caseId -> openCaseProfile(caseId, "OVERVIEW"), taskId -> openTaskProfile(
+			CaseDao caseDao = new CaseDao(dbSessionProvider);
+			c.init(appState, calendarService, calendarFeedDao, caseTaskService, new CaseSummaryDao(dbSessionProvider), new CaseServiceAdapter(caseDao), runtimeBridge, new UserPreferencesService(new UserPreferencesDao(dbSessionProvider), appState), caseId -> openCaseProfile(caseId, "OVERVIEW"), this::openCaseDates, taskId -> openTaskProfile(
 					taskId, c::refreshCurrentRange));
 			Integer pendingEventId = pendingCalendarNotificationEventId;
 			if (pendingEventId != null && pendingEventId > 0) {
@@ -694,9 +708,8 @@ public final class SceneManager {
 		{
 			SettingsController c = (SettingsController) controller;
 			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new MaterialRequestServiceAdapter(
-					new MaterialRequestDao(dbSessionProvider)), new UserDao(dbSessionProvider), runtimeBridge,
-					new CalendarCaseDateTypeMappingServiceAdapter(new CalendarCaseDateTypeMappingDao(dbSessionProvider)),
-					new CalendarEventTypeDao(dbSessionProvider));
+					new MaterialRequestDao(dbSessionProvider)), new ContactServiceAdapter(new ContactDao(dbSessionProvider)),
+					new OrganizationServiceAdapter(new OrganizationDao(dbSessionProvider),new CaseSummaryDao(dbSessionProvider)),new UserDao(dbSessionProvider), runtimeBridge);
 			return c;
 		});
 	}
@@ -768,18 +781,17 @@ public final class SceneManager {
 		{
 			UserController c = (UserController) controller;
 			UserDao userDao = new UserDao(dbSessionProvider);
-			CaseDao caseDao = new CaseDao(dbSessionProvider);
 			TaskDao taskDao = new TaskDao(dbSessionProvider);
 			NotificationDao notificationDao = new NotificationDao(dbSessionProvider);
 			CalendarService calendarService = new CalendarService(new CalendarEventTypeDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new CalendarFeedDao(
 					dbSessionProvider), notificationDao, runtimeBridge);
 			CaseTaskService caseTaskService = new CaseTaskService(taskDao, userDao, runtimeBridge, notificationDao);
-			UserDetailService userDetailService = new UserDetailService(userDao, caseDao, taskDao);
+			UserDetailService userDetailService = new UserDetailService(userDao, new CaseSummaryDao(dbSessionProvider), taskDao);
 			c.init(userId, userDetailService, appState, runtimeBridge, relatedCaseId ->
 			{
 				System.out.println("[Navigation] Rewired user related-case callback via SceneManager.openCaseProfile");
 				openCaseProfile(relatedCaseId, "OVERVIEW");
-			}, this::openUserProfile, caseTaskService, phiReadAuditService, calendarService);
+			}, this::openCaseDates, this::openUserProfile, caseTaskService, phiReadAuditService, calendarService);
 			return c;
 		});
 	}
@@ -790,6 +802,7 @@ public final class SceneManager {
 			ContactViewController c = (ContactViewController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
 			ContactDetailService contactDetailService = new ContactDetailService(contactDao, new CaseSummaryDao(dbSessionProvider));
+			c.setContactService(new ContactServiceAdapter(contactDao));
 			c.init(contactId, contactDetailService, appState, onOpenCase, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), onContactDeleted, phiReadAuditService,
 					this::openContactProfile, runtimeBridge);
 			return c;
@@ -809,7 +822,7 @@ public final class SceneManager {
 		{
 			OrganizationController c = (OrganizationController) controller;
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			c.init(organizationId, organizationDao, new CaseSummaryDao(dbSessionProvider), appState, runtimeBridge, onOpenCase, onOrganizationDeleted);
+			c.init(organizationId, organizationDao, new OrganizationServiceAdapter(organizationDao,new CaseSummaryDao(dbSessionProvider)), new CaseSummaryDao(dbSessionProvider), appState, runtimeBridge, onOpenCase, onOrganizationDeleted);
 			return c;
 		});
 	}
@@ -888,6 +901,11 @@ public final class SceneManager {
 			});
 			c.setOnOpenTask(this::openTaskProfile);
 			c.setOnOpenOrganization(onOpenOrganization);
+			PendingCaseDateRoute requestedDate = pendingCaseDateRoute;
+			if (requestedDate != null && requestedDate.caseId() == caseId) {
+				pendingCaseDateRoute = null;
+				Platform.runLater(() -> c.openAuthoritativeCaseDate(requestedDate.caseDateId()));
+			}
 			return c;
 		});
 	}
@@ -914,7 +932,7 @@ public final class SceneManager {
 
 			NewOrganizationController controller = loader.getController();
 			OrganizationDao organizationDao = new OrganizationDao(dbSessionProvider);
-			controller.init(appState, organizationDao, dialog, onOrganizationCreated);
+			controller.init(appState, new OrganizationServiceAdapter(organizationDao, new CaseSummaryDao(dbSessionProvider)), dialog, onOrganizationCreated);
 
 			VBox dialogRoot = new VBox(
 					AppDialogs.createSecondaryWindowHeader(dialog, "New Organization", dialog::close),
@@ -926,7 +944,7 @@ public final class SceneManager {
 			dialogScene.getStylesheets().add(Objects.requireNonNull(
 					getClass().getResource("/css/app.css")).toExternalForm());
 			dialog.setScene(dialogScene);
-			WindowSizingUtil.sizeModalStage(dialog, stage, 760, 720);
+			WindowSizingUtil.sizeModalStage(dialog, stage, 900, 680, 680, 480);
 			dialog.showAndWait();
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to open New Organization dialog", e);
@@ -953,7 +971,7 @@ public final class SceneManager {
 					new FormConfigurationServiceAdapter(new FormConfigurationDao(dbSessionProvider)));
 
 			VBox dialogRoot = new VBox(
-					AppDialogs.createSecondaryWindowHeader(dialog, "New Intake", dialog::close),
+					AppDialogs.createSecondaryWindowHeader(dialog, "New Intake", controller::requestClose),
 					root);
 			dialogRoot.getStyleClass().add("secondary-window-shell");
 			VBox.setVgrow(root, Priority.ALWAYS);

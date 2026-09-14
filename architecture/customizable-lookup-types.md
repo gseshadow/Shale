@@ -1,6 +1,24 @@
 # Customizable Lookup Types Architecture Standard
 
-*Last updated: 2026-07-22*
+## Organization Types implementation status
+
+Organizations Phase 1C implements tenant-owned definition lifecycle and tenant/global overlay
+mutations for `OrganizationTypes`, plus historical `OrganizationOrganizationTypes` assignment add,
+restore, removal, exact-set ordering, primary replacement, and `RowVer` concurrency. Primary changes
+are transactionally synchronized with `Organizations.OrganizationTypeId` and the entity-action audit
+writer. Organizations Phase 2A now provides administrator-only Settings cards separated into
+active/effective, inactive tenant, and removed tenant definitions. Administrators can create and edit
+tenant definitions, customize globals through same-key tenant overrides, activate/deactivate,
+soft-remove, and restore through the Phase 1C boundary. Removed overrides reveal the global fallback;
+inactive overrides mask it. All existing Organization assignments remain historical, and every edit or
+lifecycle action uses `RowVer`; stale input reloads authoritative data instead of overwriting it.
+
+No reusable Organization Type definition live-update contract exists, so Refresh and Settings
+navigation are the documented cross-workstation refresh boundary. Phase 2B assignment editing and
+primary selection, cards/header/search presentation, and deleted-Organization restoration remain
+separate and unimplemented.
+
+*Last updated: 2026-09-09*
 
 This document is the authoritative engineering standard and implementation roadmap for Shale customizable lookup type definition tables. It is documentation-only: it describes the future standard, verified current-state facts from the completed read-only audit, and implementation checklists. It does **not** assert that existing tables already conform.
 
@@ -250,7 +268,9 @@ Initial classification from the read-only audit:
 - New Phase 1A foundation following this standard: `CaseDateTypes` with `CaseDates` as the tenant-owned occurrence table.
 - Partial overlay implementations: `CalendarEventTypes`, `PracticeAreas`, `Statuses`.
 - Behavior-sensitive customizable lookups: `PartyRoles`, `PartySides`, `Statuses`, `TaskStatuses`, `RequestStatuses`, and `Roles`, although `Roles` is not yet safe for tenant customization.
-- Uncertain or requiring a product decision: `Categories`, `OrganizationTypes`.
+- Product decision completed with Phase 1A foundation and Phase 1B read-only runtime contracts implemented:
+  `OrganizationTypes`.
+- Uncertain or requiring a product decision: `Categories`.
 - Placeholder: `TaskCategories`.
 - Explicit exclusion: `CaseStatuses` is transactional case-status history referencing `Statuses.Id`; it is not a customizable lookup definition table.
 
@@ -268,7 +288,7 @@ Initial classification from the read-only audit:
 | `TaskStatuses` | Behavior-sensitive customizable lookup | Needs explicit completion/terminal semantics | High; task completion workflow | Phase 6 | Define `IsCompleted`/`IsTerminal` or equivalent; migrate name-based completion logic. |
 | `Roles` | Behavior-sensitive, not safe for tenant customization | No `SystemKey`; numeric authorization/assignment semantics | Critical; authorization and assignment | Phase 7 | Separate authorization/capability redesign; migration plan; deny privileges by default. |
 | `Categories` | Uncertain/product decision | Candidate purpose and administration model unresolved | Unknown | Phase 8 | Product decision and live schema verification. |
-| `OrganizationTypes` | Uncertain/product decision | Candidate purpose and administration model unresolved | Unknown | Phase 8 | Product decision and live schema/reference verification. |
+| `OrganizationTypes` | Phase 2B aggregate assignment cutover implemented | Multi-type staged Add/Edit maintains exactly one primary and synchronizes the compatibility column; cards/header/search remain Phase 2C | Moderate; Organization classification | Organization redesign Phase 2C | Preserve historical stored definition identity; use `SystemKey` only for overlay resolution. |
 | `TaskCategories` | Placeholder | Placeholder status; definition/use unclear | Unknown | Phase 8 | Product decision, schema inventory, and implementation proposal. |
 | `CaseStatuses` | Explicit exclusion | Transactional history referencing `Statuses.Id`, not definition data | High; case history integrity | Excluded | Never standardize as a customizable lookup type definition table. |
 
@@ -344,3 +364,9 @@ SELECT Id, ShaleClientId, SystemKey, Name, IsActive, IsDeleted
 FROM dbo.<Table>
 WHERE IsDeleted = 1 AND IsActive = 1;
 ```
+
+## Required color convention
+
+Every administrator-customizable definition or lookup type in Shale requires a configurable color. Persist colors as uppercase `#RRGGBB` in `nvarchar(20) NOT NULL`; validate the six hexadecimal digits in both SQL and Java, normalize before persistence, and use neutral `#6C757D` for legacy backfills and new-editor defaults. Settings editors reuse JavaFX `ColorPicker`, and cards/chips use the shared compact swatch/accent conventions with a contrasting border so both near-white and near-black colors remain identifiable.
+
+Color is presentation data owned by the authoritative definition, never by an assignment. Tenant overrides may customize it independently; Customize begins with the global color, deleted-override fallback exposes the global color, and inactive masking retains both the override and global projection colors. Reads for historical assignments resolve the current definition color using the stored authoritative definition ID rather than remapping by name, key, or color.

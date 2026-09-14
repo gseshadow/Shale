@@ -4,6 +4,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import com.shale.ui.component.EnhancedTextArea?>
 
 <VBox xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
@@ -17,7 +18,6 @@
     </padding>
 
     <children>
-        <Label text="New Intake" style="-fx-font-size: 18px; -fx-font-weight: bold;" />
         <Label fx:id="validationLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
 
         <ScrollPane fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
@@ -104,7 +104,7 @@
                                 <CheckBox fx:id="clientDeceasedCheckBox" GridPane.rowIndex="6" GridPane.columnIndex="1" />
 
                                 <Label text="Client Condition" GridPane.rowIndex="7" />
-                                <TextArea fx:id="clientConditionArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                                <EnhancedTextArea fx:id="clientConditionArea" editorTitle="Client Condition" prefRowCount="3" promptText="Relevant medical condition or client circumstances" GridPane.rowIndex="7" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
                             </GridPane>
                         </VBox>
                     </VBox>
@@ -125,19 +125,13 @@
                                 <TextField fx:id="caseNameField" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
                                 <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1">
-                                    <Label text="Date of Intake" />
-                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <DatePicker fx:id="dateOfIntakePicker" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="2">
                                     <Label text="Time of Intake" />
                                     <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
                                 </HBox>
-                                <TextField fx:id="timeOfIntakeField" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                                <TextField fx:id="timeOfIntakeField" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
 
-                                <Label text="Estate Case" GridPane.rowIndex="3" />
-                                <CheckBox fx:id="estateCaseCheckBox" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+                                <Label text="Estate Case" GridPane.rowIndex="2" />
+                                <CheckBox fx:id="estateCaseCheckBox" GridPane.rowIndex="2" GridPane.columnIndex="1" />
                             </GridPane>
                         </VBox>
 
@@ -196,10 +190,10 @@
                                 </HBox>
 
                                 <Label text="Description" GridPane.rowIndex="2" GridPane.columnSpan="2" />
-                                <TextArea fx:id="descriptionArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="3" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
+                                <EnhancedTextArea fx:id="descriptionArea" editorTitle="Description" prefRowCount="4" promptText="Detailed description of the matter" GridPane.rowIndex="3" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
 
                                 <Label text="Summary" GridPane.rowIndex="4" GridPane.columnSpan="2" />
-                                <TextArea fx:id="summaryArea" prefRowCount="3" wrapText="true" GridPane.rowIndex="5" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
+                                <EnhancedTextArea fx:id="summaryArea" editorTitle="Summary" prefRowCount="4" promptText="Concise intake summary" GridPane.rowIndex="5" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
 
                             </GridPane>
                         </VBox>
@@ -210,8 +204,8 @@
                                 <Region HBox.hgrow="ALWAYS" />
                                 <HBox fx:id="datesAdminActions" spacing="8" />
                             </HBox>
-                            <Label fx:id="datesStatusLabel" text="Using standard intake dates." style="-fx-opacity: 0.75;" wrapText="true" />
-                            <GridPane fx:id="legacyDatesGrid" hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
+                            <Label fx:id="datesStatusLabel" text="Loading date fields…" style="-fx-opacity: 0.75;" wrapText="true" />
+                            <GridPane fx:id="legacyDatesGrid" visible="false" managed="false" hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
                                 <columnConstraints><ColumnConstraints minWidth="250" prefWidth="290"/><ColumnConstraints minWidth="250" hgrow="ALWAYS" fillWidth="true"/></columnConstraints>
                                 <Label text="Date of Medical Negligence" wrapText="true" GridPane.rowIndex="0"/><DatePicker fx:id="dateMedicalNegligencePicker" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
                                 <Label text="Date Medical Negligence Was Discovered" wrapText="true" GridPane.rowIndex="1"/><DatePicker fx:id="dateMedicalNegligenceDiscoveredPicker" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
@@ -228,7 +222,7 @@
         </ScrollPane>
 
         <HBox spacing="10" alignment="CENTER_RIGHT">
-            <Button fx:id="cancelButton" text="Cancel" onAction="#onCancel">
+            <Button fx:id="cancelButton" text="Cancel" cancelButton="true" onAction="#onCancel">
                 <styleClass>
                     <String fx:value="button" />
                     <String fx:value="app-toolbar-button" />

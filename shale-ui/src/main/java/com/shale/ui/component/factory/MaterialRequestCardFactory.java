@@ -268,7 +268,7 @@ public final class MaterialRequestCardFactory {
 
     private Node requestedFromNode(MaterialRequestSummaryDto r) {
         if (r.requestedFromContactId() != null && has(r.requestedFromContactDisplayName())) {
-            Node card = contactCardFactory.create(new ContactCardFactory.ContactCardModel(r.requestedFromContactId(), r.requestedFromContactDisplayName(), null, null, null), ContactCardFactory.Variant.MINI);
+            Node card = contactCardFactory.create(new ContactCardFactory.ContactCardModel(r.requestedFromContactId(), r.requestedFromContactDisplayName(), null, null, null, java.util.List.of()), ContactCardFactory.Variant.MINI);
             installEmbeddedNavigation(card, r.requestedFromContactId(), onOpenContact);
             return card;
         }

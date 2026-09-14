@@ -2,8 +2,14 @@ package com.shale.ui.controller;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.shale.core.dto.CaseDateDto;
+import com.shale.ui.component.dialog.CaseDateOccurrenceDialog;
+import com.shale.ui.component.TimeDurationInput;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 import org.junit.jupiter.api.Test;
 
@@ -41,9 +47,21 @@ class CaseDatesPhase2CArchitectureTest {
 
     @Test void occurrenceMutationsCarryActorCaseAndRowVersion() throws Exception {
         String controller = Files.readString(CONTROLLER);
-        assertTrue(controller.contains("new CreateCaseDateCommand(tenantId, actorId, activeCaseId"));
-        assertTrue(controller.contains("new UpdateCaseDateCommand(tenantId, actorId, activeCaseId, existing.id()"));
-        assertTrue(controller.contains("existing.rowVer()"));
+        LocalDateTime startsAt = LocalDateTime.of(2026, 8, 18, 9, 30);
+        var input = new CaseDateOccurrenceDialog.Input(12, "Occurrence", startsAt, null, false, "notes");
+        var existing = new CaseDateDto(42, 7, 9, 3, "hearing", "Hearing", null, "HEARING", null,
+                true, "Old", startsAt, null, false, "notes", null, 8, null, null, null, null, new byte[]{1, 2});
+        var create = CaseController.createCaseDateCommand(7, 8, 9, input);
+        var update = CaseController.updateCaseDateCommand(7, 8, 9, existing, input);
+        assertAll(
+                () -> assertEquals(7, create.shaleClientId()),
+                () -> assertEquals(8, create.actorUserId()),
+                () -> assertEquals(9, create.caseId()),
+                () -> assertEquals(7, update.shaleClientId()),
+                () -> assertEquals(8, update.actorUserId()),
+                () -> assertEquals(9, update.caseId()),
+                () -> assertEquals(existing.id(), update.caseDateId()),
+                () -> assertArrayEquals(existing.rowVer(), update.expectedRowVer()));
         assertTrue(controller.contains("new DeleteCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer())"));
         assertTrue(controller.contains("new RestoreCaseDateCommand(tenantId, actorId, activeCaseId, d.id(), d.rowVer())"));
         assertFalse(controller.contains("DELETE FROM dbo.CaseDates"));
@@ -57,7 +75,14 @@ class CaseDatesPhase2CArchitectureTest {
         assertTrue(dialog.contains("ColorCodedComboBox<TypeChoice>"));
         assertTrue(dialog.contains("ControlStyles.formControl"));
         assertTrue(dialog.contains("ActionButtonFactory.semantic"));
-        assertTrue(dialog.contains("LocalDateTime.of(sd.getValue(), parseTime"));
+        assertTrue(dialog.contains("TimeDurationInput timing = new TimeDurationInput()"));
+        assertTrue(dialog.contains("var time=timing.commitTime()"));
+        assertTrue(dialog.contains("start=LocalDateTime.of(sd.getValue(),time)"));
+        assertTrue(dialog.contains("TimeDurationInput.calculateEnd"));
+        LocalDate date = LocalDate.of(2026, 8, 18);
+        LocalTime time = LocalTime.of(9, 30);
+        assertEquals(LocalDateTime.of(2026, 8, 18, 10, 45),
+                TimeDurationInput.calculateEnd(date, null, time, 75));
         assertTrue(dialog.contains("sd.getValue().atStartOfDay()"));
         assertTrue(dialog.contains("End must not be before start"));
         assertFalse(dialog.contains("ZoneId"));

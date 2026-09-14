@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import com.shale.core.model.Organization;
@@ -20,12 +21,55 @@ public final class OrganizationDao {
 	private static final String ORGANIZATION_TYPES_TABLE = "OrganizationTypes";
 
 	private final DbSessionProvider db;
+	private final OrganizationTypeMutationDao typeMutations;
+	private final EntityActionAuditDao entityActionAudit = new EntityActionAuditDao();
 
 	public OrganizationDao(DbSessionProvider dbSessionProvider) {
 		this.db = Objects.requireNonNull(dbSessionProvider, "dbSessionProvider");
+		this.typeMutations = new OrganizationTypeMutationDao(this.db);
 	}
 
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult createOrganizationType(com.shale.core.service.OrganizationServicePort.CreateOrganizationTypeCommand c){return typeMutations.create(c);}
+	public List<OrganizationTypeDefinitionRow> listOrganizationTypesForAdministration(int tenant,int actor){return typeMutations.listForAdministration(tenant,actor);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult updateOrganizationType(com.shale.core.service.OrganizationServicePort.UpdateOrganizationTypeCommand c){return typeMutations.update(c);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult setOrganizationTypeActive(com.shale.core.service.OrganizationServicePort.OrganizationTypeLifecycleCommand c){return typeMutations.lifecycle(c,"active");}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult removeOrganizationType(com.shale.core.service.OrganizationServicePort.OrganizationTypeLifecycleCommand c){return typeMutations.lifecycle(c,"remove");}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeMutationResult restoreOrganizationType(com.shale.core.service.OrganizationServicePort.OrganizationTypeLifecycleCommand c){return typeMutations.lifecycle(c,"restore");}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult assignOrganizationType(com.shale.core.service.OrganizationServicePort.AssignOrganizationTypeCommand c){return typeMutations.assign(c);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult removeOrganizationTypeAssignment(com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentLifecycleCommand c){return typeMutations.assignmentLifecycle(c,false);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult restoreOrganizationTypeAssignment(com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentLifecycleCommand c){return typeMutations.assignmentLifecycle(c,true);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult setPrimaryOrganizationType(com.shale.core.service.OrganizationServicePort.SetPrimaryOrganizationTypeCommand c){return typeMutations.setPrimary(c);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult replaceAndRemovePrimaryOrganizationType(com.shale.core.service.OrganizationServicePort.ReplaceAndRemovePrimaryOrganizationTypeCommand c){return typeMutations.replaceAndRemove(c);}
+	public java.util.List<com.shale.core.service.OrganizationServicePort.OrganizationTypeAssignmentMutationResult> reorderOrganizationTypeAssignments(com.shale.core.service.OrganizationServicePort.ReorderOrganizationTypeAssignmentsCommand c){return typeMutations.reorder(c);}
+	public com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile createOrganizationAggregate(com.shale.core.service.OrganizationServicePort.CreateOrganizationAggregateCommand c){int id=typeMutations.createAggregate(c);return toProfile(findOrganizationTypeProfile(id,c.shaleClientId()));}
+	public com.shale.core.service.OrganizationServicePort.OrganizationAggregateResult updateOrganizationAggregate(com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand c){byte[] rowVer=typeMutations.updateAggregate(c);return new com.shale.core.service.OrganizationServicePort.OrganizationAggregateResult(c.organizationId(),rowVer,toProfile(findOrganizationTypeProfile(c.organizationId(),c.shaleClientId())));}
+	public byte[] findOrganizationRowVer(int organizationId,int tenant){try(Connection con=db.requireConnection()){verifyTenantMatchesSession(con,tenant);try(PreparedStatement p=con.prepareStatement("SELECT RowVer FROM dbo.Organizations WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){p.setInt(1,organizationId);p.setInt(2,tenant);try(ResultSet r=p.executeQuery()){return r.next()?r.getBytes(1):null;}}}catch(SQLException e){throw new IllegalStateException("Failed to load Organization concurrency token.",e);}}
+	private static com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile toProfile(OrganizationTypeProfileRow row){return new com.shale.core.service.OrganizationServicePort.OrganizationTypeProfile(row.organizationId(),row.shaleClientId(),row.compatibilityOrganizationTypeId(),row.compatibilityConsistent(),row.assignments().stream().map(a->new com.shale.core.service.OrganizationServicePort.AssignedOrganizationType(a.assignmentId(),a.organizationTypeId(),a.primary(),a.sortOrder(),new com.shale.core.service.OrganizationServicePort.OrganizationTypeDefinition(a.definition().organizationTypeId(),a.definition().shaleClientId(),a.definition().systemKey(),a.definition().name(),a.definition().description(),a.definition().color(),a.definition().sortOrder(),a.definition().active(),a.definition().deleted(),a.definition().shaleClientId()==null?com.shale.core.service.OrganizationServicePort.OrganizationTypeOrigin.GLOBAL:com.shale.core.service.OrganizationServicePort.OrganizationTypeOrigin.TENANT,a.definition().rowVer()),a.rowVer())).toList());}
+
 	public record PagedResult<T>(List<T> items, int page, int pageSize, long total) {
+	}
+
+	public enum DirectorySort { NAME }
+	public enum SortDirection { ASC, DESC }
+	public enum OrganizationLifecycleMode { ACTIVE_ONLY, REMOVED_ONLY }
+
+	/** Immutable desktop-directory request. Public API callers deliberately retain the compatibility overload. */
+	public record OrganizationSearchCriteria(int shaleClientId, String searchText,
+			List<Integer> organizationTypeIds, DirectorySort sortField, SortDirection sortDirection,
+			OrganizationLifecycleMode lifecycleMode, int offset, int pageSize) {
+		public OrganizationSearchCriteria(int tenant,String text,List<Integer> types,DirectorySort sort,
+				SortDirection direction,int offset,int size){this(tenant,text,types,sort,direction,OrganizationLifecycleMode.ACTIVE_ONLY,offset,size);}
+		public OrganizationSearchCriteria {
+			if (shaleClientId <= 0) throw new IllegalArgumentException("shaleClientId must be > 0");
+			searchText = normalizeSearch(searchText);
+			organizationTypeIds = organizationTypeIds == null ? List.of() : organizationTypeIds.stream()
+					.filter(Objects::nonNull).filter(id -> id > 0).distinct().toList();
+			sortField = sortField == null ? DirectorySort.NAME : sortField;
+			sortDirection = sortDirection == null ? SortDirection.ASC : sortDirection;
+			lifecycleMode = lifecycleMode == null ? OrganizationLifecycleMode.ACTIVE_ONLY : lifecycleMode;
+			if (offset < 0) throw new IllegalArgumentException("offset must be >= 0");
+			if (pageSize <= 0 || pageSize > 100) throw new IllegalArgumentException("pageSize must be between 1 and 100");
+		}
 	}
 
 
@@ -34,6 +78,43 @@ public final class OrganizationDao {
 
 	public record OrganizationTypeRow(int organizationTypeId, String name) {
 	}
+
+	public record OrganizationTypeDefinitionRow(int organizationTypeId, Integer shaleClientId, String systemKey,
+			String name, String description, String color, int sortOrder, boolean active, boolean deleted,
+			byte[] rowVer) {
+		public OrganizationTypeDefinitionRow { rowVer = rowVer == null ? null : rowVer.clone(); }
+		@Override public byte[] rowVer() { return rowVer == null ? null : rowVer.clone(); }
+	}
+
+	public record AssignedOrganizationTypeRow(long assignmentId, int organizationTypeId, boolean primary,
+			int sortOrder, OrganizationTypeDefinitionRow definition, byte[] rowVer) {
+		public AssignedOrganizationTypeRow { rowVer = rowVer == null ? null : rowVer.clone(); }
+		@Override public byte[] rowVer() { return rowVer == null ? null : rowVer.clone(); }
+	}
+
+	public record OrganizationTypeProfileRow(int organizationId, int shaleClientId,
+			Integer compatibilityOrganizationTypeId, boolean compatibilityConsistent,
+			List<AssignedOrganizationTypeRow> assignments) {
+		public OrganizationTypeProfileRow { assignments = List.copyOf(assignments); }
+	}
+
+	public record StructuredContactProfileRow(int organizationId, int shaleClientId, LegacyContactRow legacy,
+			List<PhoneRow> phones, List<EmailRow> emails, List<AddressRow> addresses, List<WebsiteRow> websites) {
+		public StructuredContactProfileRow { phones=List.copyOf(phones);emails=List.copyOf(emails);addresses=List.copyOf(addresses);websites=List.copyOf(websites); }
+	}
+	public record LegacyContactRow(String phone,String fax,String email,String website,String address1,String address2,
+			String city,String state,String postalCode,String country) { }
+	public record LifecycleRow(Instant createdAt,Integer createdBy,Instant updatedAt,Integer updatedBy,
+			Instant deletedAt,Integer deletedBy) { }
+	public record PhoneRow(long id,int tenant,int organization,String kind,String display,String normalized,String extension,
+			boolean primary,int sortOrder,boolean deleted,LifecycleRow lifecycle,byte[] rowVer) { public PhoneRow{rowVer=copy(rowVer);}@Override public byte[] rowVer(){return copy(rowVer);} }
+	public record EmailRow(long id,int tenant,int organization,String kind,String email,String normalized,
+			boolean primary,int sortOrder,boolean deleted,LifecycleRow lifecycle,byte[] rowVer) { public EmailRow{rowVer=copy(rowVer);}@Override public byte[] rowVer(){return copy(rowVer);} }
+	public record AddressRow(long id,int tenant,int organization,String kind,String line1,String line2,String city,String state,
+			String postal,String country,String legacyText,boolean primary,int sortOrder,boolean deleted,LifecycleRow lifecycle,byte[] rowVer) { public AddressRow{rowVer=copy(rowVer);}@Override public byte[] rowVer(){return copy(rowVer);} }
+	public record WebsiteRow(long id,int tenant,int organization,String kind,String website,boolean primary,int sortOrder,
+			boolean deleted,LifecycleRow lifecycle,byte[] rowVer) { public WebsiteRow{rowVer=copy(rowVer);}@Override public byte[] rowVer(){return copy(rowVer);} }
+	private static byte[] copy(byte[] value){return value==null?null:value.clone();}
 
 	public record OrganizationOptionRow(Integer organizationId, String name) {
 	}
@@ -47,8 +128,19 @@ public final class OrganizationDao {
 			String email,
 			String website,
 			String city,
-			String state
+			String state,
+			boolean deleted,
+			byte[] rowVer
 	) {
+		public DirectoryOrganizationRow(Integer id,String name,Integer typeId,String typeName,String phone,String email,
+				String website,String city,String state){this(id,name,typeId,typeName,phone,email,website,city,state,false,null);}
+		public DirectoryOrganizationRow { rowVer=copy(rowVer); }
+		@Override public byte[] rowVer(){return copy(rowVer);}
+	}
+	public record OrganizationCardType(long assignmentId,int definitionId,String label,String color,boolean primary,int sortOrder) { }
+	public record OrganizationCardPresentation(List<OrganizationCardType> types,String phone,String phoneNormalized,
+			String phoneExtension,String email,String address,String website) {
+		public OrganizationCardPresentation { types=List.copyOf(types); }
 	}
 
 	public record OrganizationCreateRequest(
@@ -217,6 +309,94 @@ public final class OrganizationDao {
 		}
 	}
 
+	/** Structured active-only Organization search. Selection and count share exactly the same predicate. */
+	public PagedResult<DirectoryOrganizationRow> findDirectoryPage(OrganizationSearchCriteria criteria) {
+		Objects.requireNonNull(criteria, "criteria");
+		String typeMarks = String.join(",", java.util.Collections.nCopies(criteria.organizationTypeIds().size(), "?"));
+		String typeFilter = criteria.organizationTypeIds().isEmpty() ? "" : """
+				 AND EXISTS (SELECT 1 FROM dbo.OrganizationOrganizationTypes f
+				   JOIN dbo.OrganizationTypes fd ON fd.OrganizationTypeId=f.OrganizationTypeId
+				    AND (fd.ShaleClientId IS NULL OR fd.ShaleClientId=f.ShaleClientId)
+				  WHERE f.OrganizationId=o.Id AND f.ShaleClientId=o.ShaleClientId AND f.IsDeleted=0
+				    AND fd.IsActive=1 AND fd.IsDeleted=0 AND f.OrganizationTypeId IN (%s))
+				""".formatted(typeMarks);
+		String predicate = """
+				o.ShaleClientId=? AND COALESCE(o.IsDeleted,0)=? AND (?='' OR
+				 LOWER(COALESCE(o.Name,N'')) LIKE ? ESCAPE N'\\' OR
+				 EXISTS(SELECT 1 FROM dbo.OrganizationPhoneNumbers p WHERE p.OrganizationId=o.Id AND p.ShaleClientId=o.ShaleClientId AND p.IsDeleted=0
+				   AND (LOWER(p.DisplayNumber) LIKE ? ESCAPE N'\\' OR (?<>'' AND p.NormalizedNumber LIKE ? ESCAPE N'\\'))) OR
+				 EXISTS(SELECT 1 FROM dbo.OrganizationEmailAddresses e WHERE e.OrganizationId=o.Id AND e.ShaleClientId=o.ShaleClientId AND e.IsDeleted=0
+				   AND LOWER(e.EmailAddress) LIKE ? ESCAPE N'\\') OR
+				 EXISTS(SELECT 1 FROM dbo.OrganizationAddresses a WHERE a.OrganizationId=o.Id AND a.ShaleClientId=o.ShaleClientId AND a.IsDeleted=0
+				   AND LOWER(CONCAT(a.AddressLine1,N' ',a.AddressLine2,N' ',a.City,N' ',a.StateOrProvince,N' ',a.PostalCode,N' ',a.Country)) LIKE ? ESCAPE N'\\') OR
+				 EXISTS(SELECT 1 FROM dbo.OrganizationWebsites w WHERE w.OrganizationId=o.Id AND w.ShaleClientId=o.ShaleClientId AND w.IsDeleted=0
+				   AND LOWER(w.Website) LIKE ? ESCAPE N'\\') OR
+				 EXISTS(SELECT 1 FROM dbo.OrganizationOrganizationTypes a JOIN dbo.OrganizationTypes d ON d.OrganizationTypeId=a.OrganizationTypeId
+				   AND (d.ShaleClientId IS NULL OR d.ShaleClientId=a.ShaleClientId)
+				   WHERE a.OrganizationId=o.Id AND a.ShaleClientId=o.ShaleClientId AND a.IsDeleted=0 AND d.IsActive=1 AND d.IsDeleted=0
+				   AND LOWER(d.Name) LIKE ? ESCAPE N'\\'))
+				""" + typeFilter;
+		String countSql = "SELECT COUNT_BIG(*) FROM dbo.Organizations o WHERE " + predicate;
+		String direction = criteria.sortDirection() == SortDirection.DESC ? "DESC" : "ASC";
+		String pageSql = """
+				SELECT o.Id,o.OrganizationTypeId,ot.Name AS OrganizationTypeName,o.Name,o.Phone,o.Email,o.Website,o.City,o.State,o.IsDeleted,o.RowVer
+				FROM dbo.Organizations o LEFT JOIN dbo.OrganizationTypes ot ON ot.OrganizationTypeId=o.OrganizationTypeId
+				 AND (ot.ShaleClientId IS NULL OR ot.ShaleClientId=o.ShaleClientId)
+				WHERE %s ORDER BY o.Name %s,o.Id %s OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+				""".formatted(predicate, direction, direction);
+		long started=perfStart();
+		try(Connection con=db.requireConnection()) {
+			verifyTenantMatchesSession(con,criteria.shaleClientId());
+			long total;
+			try(var ps=con.prepareStatement(countSql)){bindDirectoryCriteria(ps,criteria,false);try(var rs=ps.executeQuery()){rs.next();total=rs.getLong(1);}}
+			if(total==0)return new PagedResult<>(List.of(),criteria.offset()/criteria.pageSize(),criteria.pageSize(),0);
+			List<DirectoryOrganizationRow> items=new ArrayList<>(criteria.pageSize());
+			try(var ps=con.prepareStatement(pageSql)){bindDirectoryCriteria(ps,criteria,true);try(var rs=ps.executeQuery()){while(rs.next())items.add(mapDirectoryOrganization(rs));}}
+			logPerf("organizations.directory.structuredPage","tenantId="+criteria.shaleClientId()+" offset="+criteria.offset()+" pageSize="+criteria.pageSize()+" queryLength="+criteria.searchText().length()+" filterCount="+criteria.organizationTypeIds().size()+" rows="+items.size()+" total="+total,started);
+			return new PagedResult<>(items,criteria.offset()/criteria.pageSize(),criteria.pageSize(),total);
+		}catch(SQLException e){throw new IllegalStateException("Failed to search Organization directory.",e);}
+	}
+
+	private static void bindDirectoryCriteria(PreparedStatement ps,OrganizationSearchCriteria c,boolean paging)throws SQLException{
+		int i=1;String q=c.searchText().toLowerCase(java.util.Locale.ROOT),like=containsPattern(q);
+		String phone=ContactDao.normalizePhoneDigits(c.searchText()),phoneLike=containsPattern(phone);
+		ps.setInt(i++,c.shaleClientId());ps.setBoolean(i++,c.lifecycleMode()==OrganizationLifecycleMode.REMOVED_ONLY);ps.setString(i++,q);ps.setString(i++,like);ps.setString(i++,like);
+		ps.setString(i++,phone);ps.setString(i++,phoneLike);ps.setString(i++,like);ps.setString(i++,like);ps.setString(i++,like);ps.setString(i++,like);
+		for(Integer id:c.organizationTypeIds())ps.setInt(i++,id);
+		if(paging){ps.setInt(i++,c.offset());ps.setInt(i,c.pageSize());}
+	}
+
+	/** Five fixed, independent active-only queries for one bounded directory page; never a contact-point cross product. */
+	public Map<Integer,OrganizationCardPresentation> findCardPresentations(int shaleClientId,List<Integer> organizationIds) {
+		validateTenantId(shaleClientId);
+		List<Integer> ids=organizationIds==null?List.of():organizationIds.stream().filter(Objects::nonNull).filter(id->id>0).distinct().limit(100).toList();
+		if(ids.isEmpty())return Map.of();
+		String marks=String.join(",",java.util.Collections.nCopies(ids.size(),"?"));
+		var types=new java.util.HashMap<Integer,List<OrganizationCardType>>();
+		var phone=new java.util.HashMap<Integer,String[]>(); var email=new java.util.HashMap<Integer,String>();
+		var address=new java.util.HashMap<Integer,String>(); var website=new java.util.HashMap<Integer,String>();
+		try(Connection con=db.requireConnection()){
+			verifyTenantMatchesSession(con,shaleClientId);
+			String typeSql="SELECT a.OrganizationId,a.Id,ot.OrganizationTypeId,ot.Name,ot.Color,a.IsPrimary,a.SortOrder FROM dbo.OrganizationOrganizationTypes a JOIN dbo.OrganizationTypes ot ON ot.OrganizationTypeId=a.OrganizationTypeId AND (ot.ShaleClientId IS NULL OR ot.ShaleClientId=a.ShaleClientId) WHERE a.ShaleClientId=? AND a.OrganizationId IN ("+marks+") AND a.IsDeleted=0 AND ot.IsActive=1 AND ot.IsDeleted=0 ORDER BY a.OrganizationId,a.IsPrimary DESC,a.SortOrder,a.Id";
+			try(var p=con.prepareStatement(typeSql)){bindTenantIds(p,shaleClientId,ids);try(var r=p.executeQuery()){while(r.next())types.computeIfAbsent(r.getInt(1),ignored->new ArrayList<>()).add(new OrganizationCardType(r.getLong(2),r.getInt(3),r.getString(4),r.getString(5),r.getBoolean(6),r.getInt(7)));}}
+			String phoneSql="SELECT OrganizationId,DisplayNumber,NormalizedNumber,Extension FROM (SELECT OrganizationId,DisplayNumber,NormalizedNumber,Extension,ROW_NUMBER() OVER(PARTITION BY OrganizationId ORDER BY IsPrimary DESC,SortOrder,Id) rn FROM dbo.OrganizationPhoneNumbers WHERE ShaleClientId=? AND OrganizationId IN ("+marks+") AND IsDeleted=0 AND Kind<>'FAX') q WHERE rn=1";
+			try(var p=con.prepareStatement(phoneSql)){bindTenantIds(p,shaleClientId,ids);try(var r=p.executeQuery()){while(r.next())phone.put(r.getInt(1),new String[]{r.getString(2),r.getString(3),r.getString(4)});}}
+			email.putAll(loadCardScalar(con,"OrganizationEmailAddresses","EmailAddress",shaleClientId,ids,marks));
+			website.putAll(loadCardScalar(con,"OrganizationWebsites","Website",shaleClientId,ids,marks));
+			String addressSql="SELECT OrganizationId,AddressLine1,AddressLine2,City,StateOrProvince,PostalCode,Country FROM (SELECT OrganizationId,AddressLine1,AddressLine2,City,StateOrProvince,PostalCode,Country,ROW_NUMBER() OVER(PARTITION BY OrganizationId ORDER BY IsPrimary DESC,SortOrder,Id) rn FROM dbo.OrganizationAddresses WHERE ShaleClientId=? AND OrganizationId IN ("+marks+") AND IsDeleted=0) q WHERE rn=1";
+			try(var p=con.prepareStatement(addressSql)){bindTenantIds(p,shaleClientId,ids);try(var r=p.executeQuery()){while(r.next())address.put(r.getInt(1),formatAddress(r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7)));}}
+		}catch(SQLException e){throw new IllegalStateException("Failed to load Organization card presentation.",e);}
+		var out=new java.util.HashMap<Integer,OrganizationCardPresentation>();
+		for(Integer id:ids){String[] p=phone.get(id);out.put(id,new OrganizationCardPresentation(types.getOrDefault(id,List.of()),p==null?null:p[0],p==null?null:p[1],p==null?null:p[2],email.get(id),address.get(id),website.get(id)));}
+		return Map.copyOf(out);
+	}
+	private static Map<Integer,String> loadCardScalar(Connection con,String table,String column,int tenant,List<Integer> ids,String marks)throws SQLException{
+		String sql="SELECT OrganizationId,"+column+" FROM (SELECT OrganizationId,"+column+",ROW_NUMBER() OVER(PARTITION BY OrganizationId ORDER BY IsPrimary DESC,SortOrder,Id) rn FROM dbo."+table+" WHERE ShaleClientId=? AND OrganizationId IN ("+marks+") AND IsDeleted=0) q WHERE rn=1";
+		var out=new java.util.HashMap<Integer,String>();try(var p=con.prepareStatement(sql)){bindTenantIds(p,tenant,ids);try(var r=p.executeQuery()){while(r.next())out.put(r.getInt(1),r.getString(2));}}return out;
+	}
+	private static void bindTenantIds(PreparedStatement p,int tenant,List<Integer> ids)throws SQLException{p.setInt(1,tenant);for(int i=0;i<ids.size();i++)p.setInt(i+2,ids.get(i));}
+	private static String formatAddress(String... values){return java.util.Arrays.stream(values).filter(v->v!=null&&!v.isBlank()).map(String::trim).collect(java.util.stream.Collectors.joining(", "));}
+
 	/** page is 0-based */
 	public PagedResult<Organization> findPage(int page, int pageSize, String searchName) {
 		if (page < 0)
@@ -345,140 +525,25 @@ public final class OrganizationDao {
 		}
 	}
 
+	/** @deprecated Legacy-field compatibility adapter; delegates to the aggregate owner. */
+	@Deprecated(forRemoval = false)
 	public int create(OrganizationCreateRequest request) {
-		Objects.requireNonNull(request, "request");
-		if (request.shaleClientId() <= 0) {
-			throw new IllegalArgumentException("shaleClientId is required");
-		}
-		if (request.organizationTypeId() <= 0) {
-			throw new IllegalArgumentException("organizationTypeId is required");
-		}
-		if (request.name() == null || request.name().isBlank()) {
-			throw new IllegalArgumentException("name is required");
-		}
-
-		String sql = """
-				INSERT INTO %s (
-				  ShaleClientId,
-				  OrganizationTypeId,
-				  Name,
-				  Phone,
-				  Fax,
-				  Email,
-				  Website,
-				  Address1,
-				  Address2,
-				  City,
-				  State,
-				  PostalCode,
-				  Country,
-				  Notes,
-				  IsDeleted,
-				  CreatedAt,
-				  UpdatedAt
-				)
-				OUTPUT INSERTED.Id
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?);
-				""".formatted(ORGANIZATIONS_TABLE);
-
-		Timestamp now = Timestamp.from(Instant.now());
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-			int currentShaleClientId = requireCurrentShaleClientId(con);
-			if (request.shaleClientId() != currentShaleClientId) {
-				throw new IllegalArgumentException("shaleClientId does not match current session");
-			}
-
-			int idx = 1;
-			ps.setInt(idx++, request.shaleClientId());
-			ps.setInt(idx++, request.organizationTypeId());
-			setNullableString(ps, idx++, request.name());
-			setNullableString(ps, idx++, request.phone());
-			setNullableString(ps, idx++, request.fax());
-			setNullableString(ps, idx++, request.email());
-			setNullableString(ps, idx++, request.website());
-			setNullableString(ps, idx++, request.address1());
-			setNullableString(ps, idx++, request.address2());
-			setNullableString(ps, idx++, request.city());
-			setNullableString(ps, idx++, request.state());
-			setNullableString(ps, idx++, request.postalCode());
-			setNullableString(ps, idx++, request.country());
-			setNullableString(ps, idx++, request.notes());
-			ps.setTimestamp(idx++, now);
-			ps.setTimestamp(idx++, now);
-
-			try (ResultSet rs = ps.executeQuery()) {
-				if (!rs.next()) {
-					throw new RuntimeException("Failed to create organization");
-				}
-				return rs.getInt(1);
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to create organization", e);
-		}
+		Objects.requireNonNull(request,"request");
+		try(Connection con=db.requireConnection()){boolean auto=con.getAutoCommit();con.setAutoCommit(false);try{int tenant=requireCurrentShaleClientId(con);if(tenant!=request.shaleClientId())throw new SecurityException("shaleClientId does not match current session");int actor=requireCurrentActorUserId(con);int id=typeMutations.createSingleTypeOnConnection(con,tenant,actor,new com.shale.core.service.OrganizationServicePort.OrganizationFields(request.name(),request.phone(),request.fax(),request.email(),request.website(),request.address1(),request.address2(),request.city(),request.state(),request.postalCode(),request.country(),request.notes()),request.organizationTypeId());con.commit();return id;}catch(Exception e){con.rollback();throw e instanceof RuntimeException r?r:new IllegalStateException("Failed to create Organization aggregate.",e);}finally{con.setAutoCommit(auto);}}catch(SQLException e){throw new IllegalStateException("Failed to create Organization aggregate.",e);}
 	}
 
+	private static int requireCurrentActorUserId(Connection con)throws SQLException{try(PreparedStatement p=con.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'PrincipalUserId') AS INT)");ResultSet r=p.executeQuery()){if(!r.next()||r.getObject(1)==null)throw new SecurityException("An authenticated actor is required.");int id=((Number)r.getObject(1)).intValue();if(id<=0)throw new SecurityException("An authenticated actor is required.");return id;}}
+
+	/** @deprecated Legacy whole-model compatibility adapter; delegates to the aggregate owner. */
+	@Deprecated(forRemoval = false)
 	public void update(Organization organization) {
-		long started = perfStart();
-		Objects.requireNonNull(organization, "organization");
-		if (organization.getId() == null || organization.getId() <= 0) {
-			throw new IllegalArgumentException("organization.id is required");
-		}
-
-		String sql = """
-				UPDATE %s
-				SET
-				  Name = ?,
-				  OrganizationTypeId = ?,
-				  Phone = ?,
-				  Fax = ?,
-				  Email = ?,
-				  Website = ?,
-				  Address1 = ?,
-				  Address2 = ?,
-				  City = ?,
-				  State = ?,
-				  PostalCode = ?,
-				  Country = ?,
-				  Notes = ?,
-				  UpdatedAt = SYSUTCDATETIME()
-				WHERE Id = ?
-				  AND ShaleClientId = ?
-				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
-				""".formatted(ORGANIZATIONS_TABLE);
-
-		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
-			int idx = 1;
-			ps.setString(idx++, organization.getName());
-			if (organization.getOrganizationTypeId() == null) {
-				ps.setNull(idx++, java.sql.Types.INTEGER);
-			} else {
-				ps.setInt(idx++, organization.getOrganizationTypeId());
-			}
-			ps.setString(idx++, organization.getPhone());
-			ps.setString(idx++, organization.getFax());
-			ps.setString(idx++, organization.getEmail());
-			ps.setString(idx++, organization.getWebsite());
-			ps.setString(idx++, organization.getAddress1());
-			ps.setString(idx++, organization.getAddress2());
-			ps.setString(idx++, organization.getCity());
-			ps.setString(idx++, organization.getState());
-			ps.setString(idx++, organization.getPostalCode());
-			ps.setString(idx++, organization.getCountry());
-			ps.setString(idx++, organization.getNotes());
-			ps.setInt(idx++, organization.getId());
-			ps.setInt(idx++, requireCurrentShaleClientId(con));
-
-			int affected = ps.executeUpdate();
-			logPerf("organizations.save.update", "organizationId=" + organization.getId() + " affected=" + affected, started);
-			if (affected == 0) {
-				throw new RuntimeException("Organization not found or cannot be updated (id=" + organization.getId() + ")");
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to update organization (id=" + organization.getId() + ")", e);
-		}
+		Objects.requireNonNull(organization,"organization");int[] context=currentTenantAndActor();int tenant=context[0],actor=context[1];
+		OrganizationTypeProfileRow profile=findOrganizationTypeProfile(organization.getId(),tenant);if(profile==null)throw new IllegalArgumentException("Organization was not found.");
+		int requested=organization.getOrganizationTypeId()==null?profile.compatibilityOrganizationTypeId():organization.getOrganizationTypeId();
+		List<com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment> desired=new ArrayList<>();boolean found=false;for(var a:profile.assignments()){boolean primary=a.organizationTypeId()==requested;found|=primary;desired.add(new com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment(a.assignmentId(),a.organizationTypeId(),primary,a.sortOrder(),a.rowVer()));}if(!found)desired.add(new com.shale.core.service.OrganizationServicePort.StagedOrganizationTypeAssignment(null,requested,true,desired.size(),null));
+		typeMutations.updateAggregate(new com.shale.core.service.OrganizationServicePort.UpdateOrganizationAggregateCommand(organization.getId(),tenant,actor,findOrganizationRowVer(organization.getId(),tenant),new com.shale.core.service.OrganizationServicePort.OrganizationFields(organization.getName(),organization.getPhone(),organization.getFax(),organization.getEmail(),organization.getWebsite(),organization.getAddress1(),organization.getAddress2(),organization.getCity(),organization.getState(),organization.getPostalCode(),organization.getCountry(),organization.getNotes()),desired,new com.shale.core.service.OrganizationServicePort.LegacyContactMutation()));
 	}
+	private int[] currentTenantAndActor(){try(Connection con=db.requireConnection()){return new int[]{requireCurrentShaleClientId(con),requireCurrentActorUserId(con)};}catch(SQLException e){throw new IllegalStateException("Failed to resolve Organization mutation context.",e);}}
 
 
 
@@ -500,21 +565,8 @@ public final class OrganizationDao {
 				  AND ShaleClientId = ?
 				  AND (IsDeleted = 0 OR IsDeleted IS NULL);
 				""".formatted(ORGANIZATIONS_TABLE);
-		String cleanupCasePartiesSql = """
-				DELETE cp
-				FROM dbo.CaseParties cp
-				WHERE cp.OrganizationId = ?
-				  AND EXISTS (
-				      SELECT 1
-				      FROM dbo.Cases c
-				      WHERE c.Id = cp.CaseId
-				        AND c.ShaleClientId = ?
-				  );
-				""";
-
 		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql);
-				PreparedStatement cleanupPs = con.prepareStatement(cleanupCasePartiesSql)) {
+				PreparedStatement ps = con.prepareStatement(sql)) {
 			int currentShaleClientId = requireCurrentShaleClientId(con);
 			if (shaleClientId.intValue() != currentShaleClientId) {
 				throw new IllegalArgumentException("shaleClientId does not match current session");
@@ -523,10 +575,6 @@ public final class OrganizationDao {
 			boolean previousAutoCommit = con.getAutoCommit();
 			con.setAutoCommit(false);
 			try {
-				cleanupPs.setInt(1, organizationId);
-				cleanupPs.setInt(2, shaleClientId);
-				cleanupPs.executeUpdate();
-
 				int idx = 1;
 				ps.setInt(idx++, organizationId);
 				ps.setInt(idx++, shaleClientId);
@@ -542,6 +590,74 @@ public final class OrganizationDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to soft delete organization (id=" + organizationId + ")", e);
+		}
+	}
+
+	/** Restores only the parent row. Child and Case relationship lifecycle state is never rewritten here. */
+	public com.shale.core.service.OrganizationServicePort.RestoreOrganizationResult restoreOrganization(
+			com.shale.core.service.OrganizationServicePort.RestoreOrganizationCommand command) {
+		Objects.requireNonNull(command,"command");
+		if(command.shaleClientId()<=0||command.actorUserId()<=0||command.organizationId()<=0)
+			throw new IllegalArgumentException("Tenant, actor, and Organization IDs must be positive.");
+		if(command.expectedOrganizationRowVer()==null||command.expectedOrganizationRowVer().length==0)
+			throw new IllegalArgumentException("Opening Organization RowVer is required.");
+		try(Connection con=db.requireConnection()){
+			boolean auto=con.getAutoCommit();con.setAutoCommit(false);
+			try{
+				verifyTenantMatchesSession(con,command.shaleClientId());
+				requireAdministrator(con,command.shaleClientId(),command.actorUserId());
+				String name;byte[] opening;
+				try(var p=con.prepareStatement("SELECT Name,RowVer,IsDeleted FROM dbo.Organizations WITH(UPDLOCK,HOLDLOCK) WHERE Id=? AND ShaleClientId=?")){
+					p.setInt(1,command.organizationId());p.setInt(2,command.shaleClientId());try(var r=p.executeQuery()){
+						if(!r.next())throw new IllegalArgumentException("Removed Organization was not found.");
+						if(!r.getBoolean("IsDeleted"))throw new IllegalArgumentException("Organization is already active.");
+						name=r.getString("Name");opening=r.getBytes("RowVer");
+					}
+				}
+				if(!java.util.Arrays.equals(opening,command.expectedOrganizationRowVer()))throw new IllegalStateException("The Organization changed; reload before restoring.");
+				validateRestoreConsistency(con,command.shaleClientId(),command.organizationId());
+				byte[] finalRowVer;
+				try(var p=con.prepareStatement("UPDATE dbo.Organizations SET IsDeleted=0,UpdatedAt=SYSUTCDATETIME() OUTPUT inserted.RowVer WHERE Id=? AND ShaleClientId=? AND IsDeleted=1 AND RowVer=?")){
+					p.setInt(1,command.organizationId());p.setInt(2,command.shaleClientId());p.setBytes(3,command.expectedOrganizationRowVer());try(var r=p.executeQuery()){if(!r.next())throw new IllegalStateException("The Organization changed; reload before restoring.");finalRowVer=r.getBytes(1);}
+				}
+				entityActionAudit.append(con,EntityActionAuditEvent.now(command.shaleClientId(),command.actorUserId(),EntityActionAuditEvent.EntityType.ORGANIZATION,command.organizationId(),EntityActionAuditEvent.Action.RESTORED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.ORGANIZATION_ID,command.organizationId())));
+				con.commit();return new com.shale.core.service.OrganizationServicePort.RestoreOrganizationResult(command.organizationId(),command.shaleClientId(),name,finalRowVer);
+			}catch(Exception e){con.rollback();if(e instanceof RuntimeException r)throw r;throw new IllegalStateException("Organization restoration failed.",e);}finally{con.setAutoCommit(auto);}
+		}catch(SQLException e){throw new IllegalStateException("Organization restoration failed.",e);}
+	}
+
+	private static void requireAdministrator(Connection con,int tenant,int actor)throws SQLException{
+		try(var p=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0 AND ISNULL(IsRemoved,0)=0 AND ISNULL(is_admin,0)=1")){
+			p.setInt(1,actor);p.setInt(2,tenant);try(var r=p.executeQuery()){if(!r.next())throw new SecurityException("An active tenant administrator is required to restore Organizations.");}
+		}
+	}
+	private static void validateRestoreConsistency(Connection con,int tenant,int organization)throws SQLException{
+		String sql="""
+			SELECT CASE WHEN COUNT(*)>=1 AND SUM(CASE WHEN IsPrimary=1 THEN 1 ELSE 0 END)=1
+			 AND MAX(CASE WHEN IsPrimary=1 THEN OrganizationTypeId END)=(SELECT OrganizationTypeId FROM dbo.Organizations WHERE Id=? AND ShaleClientId=?) THEN 1 ELSE 0 END
+			FROM dbo.OrganizationOrganizationTypes WHERE OrganizationId=? AND ShaleClientId=? AND IsDeleted=0
+			""";
+		try(var p=con.prepareStatement(sql)){p.setInt(1,organization);p.setInt(2,tenant);p.setInt(3,organization);p.setInt(4,tenant);try(var r=p.executeQuery()){r.next();if(!r.getBoolean(1))throw new IllegalStateException("This Organization requires administrative data review before it can be restored.");}}
+		String mirrors="""
+			SELECT CASE WHEN ISNULL(o.Phone,N'')=ISNULL(phone.DisplayNumber,N'') AND ISNULL(o.Fax,N'')=ISNULL(fax.DisplayNumber,N'')
+			 AND LOWER(ISNULL(o.Email,N''))=LOWER(ISNULL(email.EmailAddress,N'')) AND ISNULL(o.Website,N'')=ISNULL(web.Website,N'')
+			 AND ISNULL(o.Address1,N'')=ISNULL(addr.AddressLine1,N'') AND ISNULL(o.Address2,N'')=ISNULL(addr.AddressLine2,N'')
+			 AND ISNULL(o.City,N'')=ISNULL(addr.City,N'') AND ISNULL(o.State,N'')=ISNULL(addr.StateOrProvince,N'')
+			 AND ISNULL(o.PostalCode,N'')=ISNULL(addr.PostalCode,N'') AND ISNULL(o.Country,N'')=ISNULL(addr.Country,N'') THEN 1 ELSE 0 END
+			FROM dbo.Organizations o
+			OUTER APPLY(SELECT TOP(1) DisplayNumber FROM dbo.OrganizationPhoneNumbers p WHERE p.OrganizationId=o.Id AND p.ShaleClientId=o.ShaleClientId AND p.IsDeleted=0 AND p.Kind<>'FAX' ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) phone
+			OUTER APPLY(SELECT TOP(1) DisplayNumber FROM dbo.OrganizationPhoneNumbers p WHERE p.OrganizationId=o.Id AND p.ShaleClientId=o.ShaleClientId AND p.IsDeleted=0 AND p.Kind='FAX' ORDER BY p.SortOrder,p.Id) fax
+			OUTER APPLY(SELECT TOP(1) EmailAddress FROM dbo.OrganizationEmailAddresses e WHERE e.OrganizationId=o.Id AND e.ShaleClientId=o.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) email
+			OUTER APPLY(SELECT TOP(1) Website FROM dbo.OrganizationWebsites w WHERE w.OrganizationId=o.Id AND w.ShaleClientId=o.ShaleClientId AND w.IsDeleted=0 ORDER BY w.IsPrimary DESC,w.SortOrder,w.Id) web
+			OUTER APPLY(SELECT TOP(1) AddressLine1,AddressLine2,City,StateOrProvince,PostalCode,Country FROM dbo.OrganizationAddresses a WHERE a.OrganizationId=o.Id AND a.ShaleClientId=o.ShaleClientId AND a.IsDeleted=0 ORDER BY a.IsPrimary DESC,a.SortOrder,a.Id) addr
+			WHERE o.Id=? AND o.ShaleClientId=?
+			""";
+		try(var p=con.prepareStatement(mirrors)){p.setInt(1,organization);p.setInt(2,tenant);try(var r=p.executeQuery()){if(!r.next()||!r.getBoolean(1))throw new IllegalStateException("This Organization requires administrative data review before it can be restored.");}}
+		try(var p=con.prepareStatement("SELECT COUNT(*) FROM dbo.OrganizationOrganizationTypes WHERE OrganizationId=? AND ShaleClientId<>?")){p.setInt(1,organization);p.setInt(2,tenant);try(var r=p.executeQuery()){r.next();if(r.getInt(1)>0)throw new IllegalStateException("This Organization requires administrative data review before it can be restored.");}}
+		for(String table:List.of("OrganizationPhoneNumbers","OrganizationEmailAddresses","OrganizationAddresses","OrganizationWebsites")){
+			String q="SELECT COUNT(*),SUM(CASE WHEN IsPrimary=1 THEN 1 ELSE 0 END),COUNT(DISTINCT SortOrder),MIN(SortOrder),MAX(SortOrder) FROM dbo."+table+" WHERE OrganizationId=? AND ShaleClientId=? AND IsDeleted=0";
+			try(var p=con.prepareStatement(q)){p.setInt(1,organization);p.setInt(2,tenant);try(var r=p.executeQuery()){r.next();int count=r.getInt(1),primaries=r.getInt(2),orders=r.getInt(3),min=r.getInt(4),max=r.getInt(5);if((count>0&&primaries!=1)||orders!=count||(count>0&&(min!=0||max!=count-1)))throw new IllegalStateException("This Organization requires administrative data review before it can be restored.");}}
+			try(var p=con.prepareStatement("SELECT COUNT(*) FROM dbo."+table+" WHERE OrganizationId=? AND ShaleClientId<>?")){p.setInt(1,organization);p.setInt(2,tenant);try(var r=p.executeQuery()){r.next();if(r.getInt(1)>0)throw new IllegalStateException("This Organization requires administrative data review before it can be restored.");}}
 		}
 	}
 
@@ -714,6 +830,128 @@ public final class OrganizationDao {
 		}
 	}
 
+	/** One bounded selector query implementing deleted-reset and inactive-mask overlay semantics. */
+	public List<OrganizationTypeDefinitionRow> listEffectiveOrganizationTypeDefinitions(int shaleClientId) {
+		validateTenantId(shaleClientId);
+		String sql = """
+				WITH visible AS (
+				  SELECT ot.OrganizationTypeId,ot.ShaleClientId,ot.SystemKey,ot.Name,ot.Description,
+				         ot.Color,ot.SortOrder,ot.IsActive,ot.IsDeleted,ot.RowVer,
+				         ROW_NUMBER() OVER (PARTITION BY ot.SystemKey
+				           ORDER BY CASE WHEN ot.ShaleClientId=? THEN 0 ELSE 1 END,ot.OrganizationTypeId) rn
+				  FROM dbo.OrganizationTypes ot
+				  WHERE (ot.ShaleClientId=? OR ot.ShaleClientId IS NULL) AND ot.IsDeleted=0
+				)
+				SELECT OrganizationTypeId,ShaleClientId,SystemKey,Name,Description,Color,SortOrder,
+				       IsActive,IsDeleted,RowVer
+				FROM visible WHERE rn=1 AND IsActive=1
+				ORDER BY SortOrder,Name,OrganizationTypeId;
+				""";
+		try (Connection con = db.requireConnection()) {
+			verifyTenantMatchesSession(con, shaleClientId);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, shaleClientId);
+				ps.setInt(2, shaleClientId);
+				try (ResultSet rs = ps.executeQuery()) {
+					List<OrganizationTypeDefinitionRow> rows = new ArrayList<>();
+					while (rs.next()) rows.add(mapOrganizationTypeDefinition(rs));
+					return List.copyOf(rows);
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load effective Organization Types (clientId=" + shaleClientId + ")", e);
+		}
+	}
+
+	/** One bounded aggregate query; the assignment's stored OrganizationTypeId is never overlaid. */
+	public OrganizationTypeProfileRow findOrganizationTypeProfile(int organizationId, int shaleClientId) {
+		if (organizationId <= 0) throw new IllegalArgumentException("organizationId must be > 0");
+		validateTenantId(shaleClientId);
+		String sql = """
+				SELECT o.Id OrganizationId,o.OrganizationTypeId CompatibilityOrganizationTypeId,
+				       a.Id AssignmentId,a.OrganizationTypeId AssignedOrganizationTypeId,
+				       a.IsPrimary AssignmentIsPrimary,a.SortOrder AssignmentSortOrder,a.RowVer AssignmentRowVer,
+				       ot.OrganizationTypeId,ot.ShaleClientId DefinitionShaleClientId,ot.SystemKey,ot.Name,
+				       ot.Description,ot.Color,ot.SortOrder DefinitionSortOrder,ot.IsActive,ot.IsDeleted,
+				       ot.RowVer DefinitionRowVer
+				FROM dbo.Organizations o
+				LEFT JOIN dbo.OrganizationOrganizationTypes a
+				  ON a.OrganizationId=o.Id AND a.ShaleClientId=o.ShaleClientId AND a.IsDeleted=0
+				LEFT JOIN dbo.OrganizationTypes ot
+				  ON ot.OrganizationTypeId=a.OrganizationTypeId
+				 AND (ot.ShaleClientId IS NULL OR ot.ShaleClientId=o.ShaleClientId)
+				WHERE o.Id=? AND o.ShaleClientId=? AND ISNULL(o.IsDeleted,0)=0
+				ORDER BY a.IsPrimary DESC,a.SortOrder,ot.SortOrder,ot.Name,a.Id;
+				""";
+		try (Connection con = db.requireConnection()) {
+			verifyTenantMatchesSession(con, shaleClientId);
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, organizationId);
+				ps.setInt(2, shaleClientId);
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next()) return null;
+					Integer compatibilityId = nullableInt(rs, "CompatibilityOrganizationTypeId");
+					List<AssignedOrganizationTypeRow> assignments = new ArrayList<>();
+					Integer primaryTypeId = null;
+					do {
+						Long assignmentId = nullableLong(rs, "AssignmentId");
+						if (assignmentId == null) continue;
+						Integer assignedTypeId = nullableInt(rs, "AssignedOrganizationTypeId");
+						Integer definitionTypeId = nullableInt(rs, "OrganizationTypeId");
+						if (assignedTypeId == null || definitionTypeId == null || !assignedTypeId.equals(definitionTypeId)) {
+							throw new IllegalStateException("Organization Type assignment references an unavailable definition.");
+						}
+						boolean primary = rs.getBoolean("AssignmentIsPrimary");
+						if (primary) primaryTypeId = assignedTypeId;
+						OrganizationTypeDefinitionRow definition = mapOrganizationTypeDefinition(rs,
+								"DefinitionShaleClientId", "DefinitionSortOrder", "DefinitionRowVer");
+						assignments.add(new AssignedOrganizationTypeRow(assignmentId, assignedTypeId, primary,
+								requiredInt(rs, "AssignmentSortOrder"), definition, rs.getBytes("AssignmentRowVer")));
+					} while (rs.next());
+					boolean consistent = compatibilityId != null && compatibilityId.equals(primaryTypeId);
+					return new OrganizationTypeProfileRow(organizationId, shaleClientId, compatibilityId,
+							consistent, assignments);
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to load Organization Type profile (id=" + organizationId + ")", e);
+		}
+	}
+
+	/** Five bounded statements on one tenant-stamped connection: parent scalars plus each structured table. */
+	public StructuredContactProfileRow findStructuredContactProfile(int shaleClientId,int organizationId) {
+		validateTenantId(shaleClientId);
+		if(organizationId<=0)throw new IllegalArgumentException("organizationId must be > 0");
+		String parent="SELECT Phone,Fax,Email,Website,Address1,Address2,City,State,PostalCode,Country FROM dbo.Organizations WHERE ShaleClientId=? AND Id=? AND ISNULL(IsDeleted,0)=0";
+		try(Connection con=db.requireConnection()){
+			verifyTenantMatchesSession(con,shaleClientId);
+			LegacyContactRow legacy;
+			try(var p=con.prepareStatement(parent)){p.setInt(1,shaleClientId);p.setInt(2,organizationId);try(var r=p.executeQuery()){if(!r.next())return null;legacy=new LegacyContactRow(r.getString(1),r.getString(2),r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7),r.getString(8),r.getString(9),r.getString(10));}}
+			return new StructuredContactProfileRow(organizationId,shaleClientId,legacy,loadOrganizationPhones(con,shaleClientId,organizationId),loadOrganizationEmails(con,shaleClientId,organizationId),loadOrganizationAddresses(con,shaleClientId,organizationId),loadOrganizationWebsites(con,shaleClientId,organizationId));
+		}catch(SQLException e){throw new IllegalStateException("Failed to load Organization structured contact profile (id="+organizationId+").",e);}
+	}
+
+	private static final String CONTACT_ORDER=" ORDER BY IsDeleted,SortOrder,Id";
+	private static List<PhoneRow> loadOrganizationPhones(Connection c,int tenant,int organization)throws SQLException{
+		String sql="SELECT Id,ShaleClientId,OrganizationId,Kind,DisplayNumber,NormalizedNumber,Extension,IsPrimary,SortOrder,IsDeleted,CreatedAt,CreatedByUserId,UpdatedAt,UpdatedByUserId,DeletedAt,DeletedByUserId,RowVer FROM dbo.OrganizationPhoneNumbers WHERE ShaleClientId=? AND OrganizationId=?"+CONTACT_ORDER;
+		var out=new ArrayList<PhoneRow>();try(var p=c.prepareStatement(sql)){bindOwner(p,tenant,organization);try(var r=p.executeQuery()){while(r.next()){validateContactRow(r,"OrganizationPhoneNumbers",tenant,organization);requiredText(r,"DisplayNumber","OrganizationPhoneNumbers");out.add(new PhoneRow(r.getLong("Id"),r.getInt("ShaleClientId"),r.getInt("OrganizationId"),r.getString("Kind"),r.getString("DisplayNumber"),r.getString("NormalizedNumber"),r.getString("Extension"),r.getBoolean("IsPrimary"),r.getInt("SortOrder"),r.getBoolean("IsDeleted"),lifecycle(r),r.getBytes("RowVer")));}}return List.copyOf(out);}}
+	private static List<EmailRow> loadOrganizationEmails(Connection c,int tenant,int organization)throws SQLException{
+		String sql="SELECT Id,ShaleClientId,OrganizationId,Kind,EmailAddress,NormalizedEmail,IsPrimary,SortOrder,IsDeleted,CreatedAt,CreatedByUserId,UpdatedAt,UpdatedByUserId,DeletedAt,DeletedByUserId,RowVer FROM dbo.OrganizationEmailAddresses WHERE ShaleClientId=? AND OrganizationId=?"+CONTACT_ORDER;
+		var out=new ArrayList<EmailRow>();try(var p=c.prepareStatement(sql)){bindOwner(p,tenant,organization);try(var r=p.executeQuery()){while(r.next()){validateContactRow(r,"OrganizationEmailAddresses",tenant,organization);requiredText(r,"EmailAddress","OrganizationEmailAddresses");out.add(new EmailRow(r.getLong("Id"),r.getInt("ShaleClientId"),r.getInt("OrganizationId"),r.getString("Kind"),r.getString("EmailAddress"),r.getString("NormalizedEmail"),r.getBoolean("IsPrimary"),r.getInt("SortOrder"),r.getBoolean("IsDeleted"),lifecycle(r),r.getBytes("RowVer")));}}return List.copyOf(out);}}
+	private static List<AddressRow> loadOrganizationAddresses(Connection c,int tenant,int organization)throws SQLException{
+		String sql="SELECT Id,ShaleClientId,OrganizationId,Kind,AddressLine1,AddressLine2,City,StateOrProvince,PostalCode,Country,LegacyAddressText,IsPrimary,SortOrder,IsDeleted,CreatedAt,CreatedByUserId,UpdatedAt,UpdatedByUserId,DeletedAt,DeletedByUserId,RowVer FROM dbo.OrganizationAddresses WHERE ShaleClientId=? AND OrganizationId=?"+CONTACT_ORDER;
+		var out=new ArrayList<AddressRow>();try(var p=c.prepareStatement(sql)){bindOwner(p,tenant,organization);try(var r=p.executeQuery()){while(r.next()){validateContactRow(r,"OrganizationAddresses",tenant,organization);if(allBlank(r,"AddressLine1","AddressLine2","City","StateOrProvince","PostalCode","Country","LegacyAddressText"))integrity("OrganizationAddresses","blank address");out.add(new AddressRow(r.getLong("Id"),r.getInt("ShaleClientId"),r.getInt("OrganizationId"),r.getString("Kind"),r.getString("AddressLine1"),r.getString("AddressLine2"),r.getString("City"),r.getString("StateOrProvince"),r.getString("PostalCode"),r.getString("Country"),r.getString("LegacyAddressText"),r.getBoolean("IsPrimary"),r.getInt("SortOrder"),r.getBoolean("IsDeleted"),lifecycle(r),r.getBytes("RowVer")));}}return List.copyOf(out);}}
+	private static List<WebsiteRow> loadOrganizationWebsites(Connection c,int tenant,int organization)throws SQLException{
+		String sql="SELECT Id,ShaleClientId,OrganizationId,Kind,Website,IsPrimary,SortOrder,IsDeleted,CreatedAt,CreatedByUserId,UpdatedAt,UpdatedByUserId,DeletedAt,DeletedByUserId,RowVer FROM dbo.OrganizationWebsites WHERE ShaleClientId=? AND OrganizationId=?"+CONTACT_ORDER;
+		var out=new ArrayList<WebsiteRow>();try(var p=c.prepareStatement(sql)){bindOwner(p,tenant,organization);try(var r=p.executeQuery()){while(r.next()){validateContactRow(r,"OrganizationWebsites",tenant,organization);requiredText(r,"Website","OrganizationWebsites");out.add(new WebsiteRow(r.getLong("Id"),r.getInt("ShaleClientId"),r.getInt("OrganizationId"),r.getString("Kind"),r.getString("Website"),r.getBoolean("IsPrimary"),r.getInt("SortOrder"),r.getBoolean("IsDeleted"),lifecycle(r),r.getBytes("RowVer")));}}return List.copyOf(out);}}
+	private static void bindOwner(PreparedStatement p,int tenant,int organization)throws SQLException{p.setInt(1,tenant);p.setInt(2,organization);}
+	private static LifecycleRow lifecycle(ResultSet r)throws SQLException{return new LifecycleRow(instant(r,"CreatedAt"),nullableInt(r,"CreatedByUserId"),instant(r,"UpdatedAt"),nullableInt(r,"UpdatedByUserId"),instant(r,"DeletedAt"),nullableInt(r,"DeletedByUserId"));}
+	private static Instant instant(ResultSet r,String column)throws SQLException{Timestamp value=r.getTimestamp(column);return value==null?null:value.toInstant();}
+	private static void validateContactRow(ResultSet r,String table,int tenant,int organization)throws SQLException{if(r.getInt("ShaleClientId")!=tenant||r.getInt("OrganizationId")!=organization)integrity(table,"ownership mismatch");if(r.getInt("SortOrder")<0)integrity(table,"negative SortOrder");if(r.getBoolean("IsDeleted")&&r.getBoolean("IsPrimary"))integrity(table,"deleted primary");requiredText(r,"Kind",table);if(r.getBytes("RowVer")==null)integrity(table,"missing RowVer");}
+	private static void requiredText(ResultSet r,String column,String table)throws SQLException{String value=r.getString(column);if(value==null||value.trim().isEmpty())integrity(table,"blank "+column);}
+	private static boolean allBlank(ResultSet r,String... columns)throws SQLException{for(String c:columns){String v=r.getString(c);if(v!=null&&!v.trim().isEmpty())return false;}return true;}
+	private static void integrity(String table,String issue){throw new IllegalStateException("Data integrity failure in dbo."+table+": "+issue+".");}
+
 	public List<OrganizationOptionRow> findSelectableOrganizations() {
 		String sql = """
 				SELECT o.Id, o.Name
@@ -777,7 +1015,22 @@ public final class OrganizationDao {
 				rs.getString("Email"),
 				rs.getString("Website"),
 				rs.getString("City"),
-				rs.getString("State"));
+				rs.getString("State"),
+				directoryDeleted(rs), directoryRowVer(rs));
+	}
+	private static boolean directoryDeleted(ResultSet rs){try{return rs.getBoolean("IsDeleted");}catch(SQLException ignored){return false;}}
+	private static byte[] directoryRowVer(ResultSet rs){try{return rs.getBytes("RowVer");}catch(SQLException ignored){return null;}}
+
+	private static OrganizationTypeDefinitionRow mapOrganizationTypeDefinition(ResultSet rs) throws SQLException {
+		return mapOrganizationTypeDefinition(rs, "ShaleClientId", "SortOrder", "RowVer");
+	}
+
+	private static OrganizationTypeDefinitionRow mapOrganizationTypeDefinition(ResultSet rs,
+			String tenantColumn, String sortColumn, String rowVerColumn) throws SQLException {
+		return new OrganizationTypeDefinitionRow(requiredInt(rs, "OrganizationTypeId"), nullableInt(rs, tenantColumn),
+				rs.getString("SystemKey"), rs.getString("Name"), rs.getString("Description"), rs.getString("Color"),
+				requiredInt(rs, sortColumn), rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted"),
+				rs.getBytes(rowVerColumn));
 	}
 
 	private static Organization mapOrganization(ResultSet rs) throws SQLException {
@@ -886,6 +1139,32 @@ public final class OrganizationDao {
 	private static Integer getNullableInt(ResultSet rs, int colIndex) throws SQLException {
 		int value = rs.getInt(colIndex);
 		return rs.wasNull() ? null : value;
+	}
+
+	private static void validateTenantId(int shaleClientId) {
+		if (shaleClientId <= 0) throw new IllegalArgumentException("shaleClientId must be > 0");
+	}
+
+	private static void verifyTenantMatchesSession(Connection con, int shaleClientId) throws SQLException {
+		if (requireCurrentShaleClientId(con) != shaleClientId) {
+			throw new IllegalArgumentException("shaleClientId does not match current session");
+		}
+	}
+
+	private static Integer nullableInt(ResultSet rs, String column) throws SQLException {
+		Number value = (Number) rs.getObject(column);
+		return value == null ? null : value.intValue();
+	}
+
+	private static int requiredInt(ResultSet rs, String column) throws SQLException {
+		Integer value = nullableInt(rs, column);
+		if (value == null) throw new SQLException(column + " must not be null");
+		return value;
+	}
+
+	private static Long nullableLong(ResultSet rs, String column) throws SQLException {
+		Number value = (Number) rs.getObject(column);
+		return value == null ? null : value.longValue();
 	}
 
 	private static Instant toInstant(Timestamp ts) {

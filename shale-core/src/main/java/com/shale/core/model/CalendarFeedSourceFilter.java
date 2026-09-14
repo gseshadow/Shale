@@ -15,7 +15,8 @@ public record CalendarFeedSourceFilter(Set<CalendarFeedCategory> enabledCategori
         return new CalendarFeedSourceFilter(EnumSet.of(
                 CalendarFeedCategory.CALENDAR_EVENTS,
                 CalendarFeedCategory.TASKS,
-                CalendarFeedCategory.CASE_DEADLINES));
+                CalendarFeedCategory.CASE_DEADLINES,
+                CalendarFeedCategory.OTHER_CASE_DATES));
     }
 
     public static CalendarFeedSourceFilter caseCalendarDefaults() {

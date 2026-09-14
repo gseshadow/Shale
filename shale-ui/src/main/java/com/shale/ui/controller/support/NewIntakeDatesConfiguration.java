@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
 
 /** Pure model operations for the configurable New Intake Dates section. */
 public final class NewIntakeDatesConfiguration {
@@ -25,8 +26,9 @@ public final class NewIntakeDatesConfiguration {
 
     public static List<ConfiguredDate> renderable(FormConfigurationDto configuration,
             List<EffectiveCaseDateTypeDto> effectiveTypes) {
-        if (configuration == null || configuration.id() == 0) return List.of();
-        Map<Integer, EffectiveCaseDateTypeDto> byId = effectiveById(effectiveTypes);
+        Map<Integer, EffectiveCaseDateTypeDto> byId = effectiveById(effectiveTypes, configuration);
+        if (configuration == null || configuration.id() == 0)
+            return byId.values().stream().map(type -> new ConfiguredDate(fieldKey(type.id()), type, false)).toList();
         return configuration.sections().stream()
                 .filter(s -> SECTION_KEY.equals(s.sectionKey()) && s.enabled() && s.visible())
                 .flatMap(s -> s.fields().stream())
@@ -40,8 +42,9 @@ public final class NewIntakeDatesConfiguration {
 
     public static List<Selection> selections(FormConfigurationDto configuration,
             List<EffectiveCaseDateTypeDto> effectiveTypes) {
-        Map<Integer, EffectiveCaseDateTypeDto> byId = effectiveById(effectiveTypes);
-        if (configuration == null || configuration.id() == 0) return List.of();
+        Map<Integer, EffectiveCaseDateTypeDto> byId = effectiveById(effectiveTypes, configuration);
+        if (configuration == null || configuration.id() == 0)
+            return byId.values().stream().map(type -> new Selection(type, false)).toList();
         return configuration.sections().stream().filter(s -> SECTION_KEY.equals(s.sectionKey()))
                 .flatMap(s -> s.fields().stream())
                 .filter(f -> FIELD_KIND.equals(f.fieldKind()) && f.caseDateTypeId() != null
@@ -68,10 +71,22 @@ public final class NewIntakeDatesConfiguration {
         return new Selection(selection.type(), required);
     }
 
-    private static Map<Integer, EffectiveCaseDateTypeDto> effectiveById(List<EffectiveCaseDateTypeDto> types) {
+    public static LocalDate initialValue(String fieldKey, int caseDateTypeId, Integer intakeCaseDateTypeId,
+            LocalDate today, Map<String, LocalDate> preservedUserValues) {
+        if (preservedUserValues != null && preservedUserValues.containsKey(fieldKey))
+            return preservedUserValues.get(fieldKey);
+        return intakeCaseDateTypeId != null && caseDateTypeId == intakeCaseDateTypeId ? today : null;
+    }
+
+    private static Map<Integer, EffectiveCaseDateTypeDto> effectiveById(List<EffectiveCaseDateTypeDto> types,
+            FormConfigurationDto configuration) {
         Map<Integer, EffectiveCaseDateTypeDto> result = new LinkedHashMap<>();
+        Integer tenantId = configuration == null ? null : configuration.shaleClientId();
         if (types != null) for (EffectiveCaseDateTypeDto type : types) {
-            if (type != null && type.active() && !type.deleted()) result.putIfAbsent(type.id(), type);
+            if (type == null) continue;
+            boolean tenantVisible = tenantId == null || type.shaleClientId() == null
+                    || type.shaleClientId().equals(tenantId);
+            if (tenantVisible && type.active() && !type.deleted()) result.putIfAbsent(type.id(), type);
         }
         return result;
     }

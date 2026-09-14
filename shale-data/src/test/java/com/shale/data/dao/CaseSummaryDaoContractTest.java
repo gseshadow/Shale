@@ -71,15 +71,15 @@ final class CaseSummaryDaoContractTest {
 				"The projection method must execute exactly one set query after tenant verification");
 	}
 
-	@Test void projectionDoesNotExpandPhiOrRemoveLegacyQueries() throws Exception {
+	@Test void projectionDoesNotExpandPhiAndRemovedLegacyQueriesStayAbsent() throws Exception {
 		String source = source();
 		String projectionList = method(source,"public List<CaseSummaryProjection> list(");
 		for (String forbidden : new String[] { "c.Description", "c.Summary", "CaseUpdates", "Contacts", "Organizations", "Medical" })
 			assertFalse(projectionList.contains(forbidden), forbidden);
 		String legacy = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
-		for (String method : new String[] { "findCasesViewPage", "listCasesViewForExport", "listAssignedCasesForBoard",
-				"searchCasesByName", "searchDeletedCasesByName", "findMyCasesPage" })
-			assertTrue(legacy.contains(method), method + " must remain for deferred consumers");
+		for (String method : new String[] { "listAssignedCasesForBoard", "searchCasesByName",
+				"searchDeletedCasesByName", "findMyCasesPage" })
+			assertFalse(legacy.contains(method), method + " must not return after authoritative consumer cutover");
 	}
 
 	@Test void activeGridComposesProjectionRulesWithBoundedEnrichment() throws Exception {
@@ -119,8 +119,7 @@ final class CaseSummaryDaoContractTest {
 
 	@Test void assignedBoardIsOneSetBasedAuthoritativeSnapshot() throws Exception {
 		String source = source();
-		String board = source.substring(source.indexOf("public List<CaseBoardRow> listActiveAssignedBoard"),
-				source.indexOf("static String statusPredicate"));
+		String board = method(source, "public List<CaseBoardRow> listActiveAssignedBoard");
 		assertTrue(board.contains("verifyTenant(con, requestedTenantId)"));
 		assertTrue(board.contains("verifyEligibleAssignedUser(con, requestedTenantId, assignedUserId)"));
 		assertTrue(board.contains("c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0"));

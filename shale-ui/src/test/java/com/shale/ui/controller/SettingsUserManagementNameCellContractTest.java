@@ -11,16 +11,16 @@ final class SettingsUserManagementNameCellContractTest {
 
     @Test void nameColumnUsesTheEstablishedSharedMiniVariantAndCleansReusedCells(){
         String method=method("configureUserManagementTable");
-        assertTrue(method.contains("userManagementCardFactory.create("));
-        assertTrue(method.contains("new UserCardModel(row.id(), row.name(), row.color(), row.initials())"));
-        assertTrue(method.contains("UserCardFactory.Variant.MINI"));
-        assertTrue(method.contains("card.setInactive(row.deleted())"));
-        assertTrue(method.contains("setText(null); setGraphic(null)"));
-        assertTrue(method.contains("if (empty || row == null) return"));
-        assertFalse(method.contains("createTableMini"), "the removed table-specific large card must not return");
-        assertFalse(method.contains("User ID #"), "authoritative IDs must not be rendered as secondary metadata");
-        assertFalse(method.contains("new Circle"), "Settings must not imitate the shared mini card");
-        assertFalse(method.contains("new Label"), "Settings must not imitate the shared mini card");
+        assertTrue(containsCode(method, "userManagementCardFactory.create("));
+        assertTrue(containsCode(method, "new UserCardModel(row.id(), row.name(), row.color(), row.initials())"));
+        assertTrue(containsCode(method, "UserCardFactory.Variant.MINI"));
+        assertTrue(containsCode(method, "card.setInactive(row.deleted())"));
+        assertTrue(containsCode(method, "setText(null); setGraphic(null)"));
+        assertTrue(containsCode(method, "if (empty || row == null) return"));
+        assertFalse(containsCode(method, "createTableMini"), "the removed table-specific large card must not return");
+        assertFalse(containsCode(method, "User ID #"), "authoritative IDs must not be rendered as secondary metadata");
+        assertFalse(containsCode(method, "new Circle"), "Settings must not imitate the shared mini card");
+        assertFalse(containsCode(method, "new Label"), "Settings must not imitate the shared mini card");
     }
 
     @Test void userManagementRowsUseTheFoundationHeightRatherThanTheRemovedLargeCardHeight() throws Exception {
@@ -32,21 +32,25 @@ final class SettingsUserManagementNameCellContractTest {
 
     @Test void rowSelectionAndActivationRemainOnImmutableDtoBackedTableRow(){
         String method=method("configureUserManagementTable");
-        assertTrue(method.contains("selectedItemProperty"));
-        assertTrue(method.contains("getClickCount()==2"));
-        assertTrue(method.contains("KeyCode.ENTER"));
-        assertTrue(SOURCE.contains("selected.id()"));
-        assertTrue(SOURCE.contains("managedUserRows.stream().filter(r->r.id()==selectedId)"));
-        assertTrue(SOURCE.contains("COALESCE(IsRemoved,0)=0") || SOURCE.contains("listUsersForManagement"));
+        assertTrue(containsCode(method, "selectedItemProperty"));
+        assertTrue(containsCode(method, "getClickCount()==2"));
+        assertTrue(containsCode(method, "KeyCode.ENTER"));
+        assertTrue(containsCode(SOURCE, "selected.id()"));
+        assertTrue(containsCode(SOURCE, "managedUserRows.stream().filter(r->r.id()==selectedId)"));
+        assertTrue(containsCode(SOURCE, "COALESCE(IsRemoved,0)=0") || containsCode(SOURCE, "listUsersForManagement"));
     }
 
     @Test void filteringRemainsDtoBasedRatherThanReadingRenderedNodes(){
         String filter=method("applyUserFilter");
-        assertTrue(filter.contains("managedUserRows.stream()"));
-        assertTrue(filter.contains("r.searchText()"));
-        assertFalse(filter.contains("getGraphic"));
-        assertFalse(filter.contains("lookup("));
+        assertTrue(containsCode(filter, "managedUserRows.stream()"));
+        assertTrue(containsCode(filter, "r.searchText()"));
+        assertFalse(containsCode(filter, "getGraphic"));
+        assertFalse(containsCode(filter, "lookup("));
     }
 
     private static String method(String name){int start=SOURCE.indexOf(" "+name+"(");int brace=SOURCE.indexOf('{',start),depth=0;for(int i=brace;i<SOURCE.length();i++){char c=SOURCE.charAt(i);if(c=='{')depth++;else if(c=='}'&&--depth==0)return SOURCE.substring(start,i+1);}throw new AssertionError(name);}
+
+    private static boolean containsCode(String source, String expected) {
+        return source.replaceAll("\\s+", "").contains(expected.replaceAll("\\s+", ""));
+    }
 }

@@ -1,0 +1,7 @@
+shale-data/src/main/java/com/shale/data/dao/CaseDao.java
+shale-data/src/main/java/com/shale/data/dao/CaseDateDao.java
+shale-data/src/main/java/com/shale/data/dao/CaseDetailsTimelineWriter.java
+shale-data/src/test/java/com/shale/data/dao/CaseDateTimelineWriterTest.java
+shale-data/src/test/java/com/shale/data/dao/CaseDetailsTimelineWriterTest.java
+shale-ui/src/main/java/com/shale/ui/controller/CaseController.java
+shale-ui/src/test/java/com/shale/ui/controller/CaseDetailsTimelineCoverageTest.java

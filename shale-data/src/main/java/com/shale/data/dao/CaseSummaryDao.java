@@ -53,9 +53,21 @@ public final class CaseSummaryDao {
 			LocalDate statuteOfLimitationsDate, LocalDate tortClaimsNoticeDeadline,
 			String practiceAreaColor, Boolean nonEngagementLetterSent) { }
 
+	/** Server/web Case-search shape, kept separate from the PHI-minimized shared summary. */
+	public record ServerCaseRow(CaseSummaryProjection summary, LocalDate intakeDate, LocalDate injuryDate,
+			LocalDate statuteDate, LocalDate tortDate, String practiceAreaColor, String description,
+			Integer callerContactId, String callerName, Integer clientContactId, String clientName,
+			Integer opposingCounselContactId, String opposingCounselName) { }
+
 	/** Calendar selector/card data; Calendar event identity and scheduling stay outside this row. */
 	public record CalendarCaseRow(CaseSummaryProjection summary, Boolean nonEngagementLetterSent) {
 		public CalendarCaseRow { Objects.requireNonNull(summary, "summary"); }
+	}
+
+	/** PHI-bearing dates needed only by the bounded desktop Case document composition. */
+	public record DocumentCaseRow(CaseSummaryProjection summary, LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations) {
+		public DocumentCaseRow { Objects.requireNonNull(summary, "summary"); }
 	}
 
 	/** Case-party relationship metadata composed with the authoritative Case summary. */
@@ -295,19 +307,57 @@ public final class CaseSummaryDao {
 
 
 	/** Authoritative active one-Case lookup for desktop Documents generation. */
-	public CaseSummaryProjection findActiveForDocuments(int requestedTenantId, long caseId) {
+	public DocumentCaseRow findActiveForDocuments(int requestedTenantId, long caseId) {
 		if (requestedTenantId <= 0 || caseId <= 0) throw new IllegalArgumentException("requestedTenantId and caseId must be > 0");
 		try (Connection con = db.requireConnection()) {
 			verifyTenant(con, requestedTenantId);
-			try (PreparedStatement ps = con.prepareStatement(summarySelectSql(
-					"AND ISNULL(c.IsDeleted, 0) = 0 AND c.Id = ?", "c.Id ASC"))) {
+			try (PreparedStatement ps = con.prepareStatement(documentSelectSql())) {
 				ps.setInt(1, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(2, RoleSemantics.ROLE_LEGAL_ASSISTANT);
 				ps.setInt(3, requestedTenantId);
 				ps.setLong(4, caseId);
-				try (ResultSet rs = ps.executeQuery()) { return rs.next() ? map(rs) : null; }
+				try (ResultSet rs = ps.executeQuery()) {
+					return rs.next() ? new DocumentCaseRow(map(rs), localDate(rs, "InjuryDate"),
+							localDate(rs, "StatuteDate")) : null;
+				}
 			}
 		} catch (SQLException e) { throw new RuntimeException("Failed to validate Documents Case summary", e); }
+	}
+
+	static String documentSelectSql() {
+		String dates = """
+			OUTER APPLY (
+			 SELECT
+			  MAX(CASE WHEN stored_type.SystemKey='date_of_injury' THEN CAST(cd.StartsAt AS date) END) InjuryDate,
+			  MAX(CASE WHEN effective_sol.CaseDateTypeId IS NOT NULL THEN CAST(cd.StartsAt AS date) END) StatuteDate
+			 FROM dbo.CaseDates cd
+			 JOIN dbo.CaseDateTypes stored_type ON stored_type.Id=cd.CaseDateTypeId
+			  AND (stored_type.ShaleClientId=c.ShaleClientId OR stored_type.ShaleClientId IS NULL)
+			 OUTER APPLY (
+			  SELECT role_mapping.CaseDateTypeId
+			  FROM dbo.CaseDateTypeSemanticRoleMappings role_mapping
+			  JOIN dbo.CaseDateTypes mapped_type ON mapped_type.Id=role_mapping.CaseDateTypeId
+			  WHERE role_mapping.CaseDateTypeId=stored_type.Id
+			   AND role_mapping.SemanticRoleKey='STATUTE_OF_LIMITATIONS'
+			   AND role_mapping.IsActive=1 AND role_mapping.IsDeleted=0
+			   AND mapped_type.IsActive=1 AND mapped_type.IsDeleted=0
+			   AND (role_mapping.ShaleClientId=c.ShaleClientId OR role_mapping.ShaleClientId IS NULL)
+			   AND (mapped_type.ShaleClientId=c.ShaleClientId OR mapped_type.ShaleClientId IS NULL)
+			   AND NOT (role_mapping.ShaleClientId IS NULL AND EXISTS (
+			    SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings tenant_mapping
+			    JOIN dbo.CaseDateTypes tenant_type ON tenant_type.Id=tenant_mapping.CaseDateTypeId
+			    WHERE tenant_mapping.ShaleClientId=c.ShaleClientId
+			     AND tenant_mapping.SemanticRoleKey=role_mapping.SemanticRoleKey
+			     AND tenant_mapping.IsActive=1 AND tenant_mapping.IsDeleted=0
+			     AND tenant_type.ShaleClientId=c.ShaleClientId
+			     AND tenant_type.IsActive=1 AND tenant_type.IsDeleted=0))
+			 ) effective_sol
+			 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0
+			) document_dates
+			""";
+		return summarySelectSql("AND ISNULL(c.IsDeleted, 0) = 0 AND c.Id = ?", "c.Id ASC")
+				.replace("c.NonEngagementLetterSent", "c.NonEngagementLetterSent, document_dates.InjuryDate, document_dates.StatuteDate")
+				.replace("WHERE c.ShaleClientId = ?", dates + " WHERE c.ShaleClientId = ?");
 	}
 
 	/** Complete active Case selector snapshot for desktop Calendar, ordered by label then authoritative ID. */
@@ -451,6 +501,62 @@ public final class CaseSummaryDao {
 				return List.copyOf(rows);
 			}
 		} catch (SQLException e) { throw new RuntimeException("Failed to search authoritative Case summaries", e); }
+	}
+
+	/** Bounded server search; one SQL statement replaces the former ID query plus N overview reads. */
+	public List<ServerCaseRow> searchActiveForServer(int tenant, int actor, String query, int offset, int limit) {
+		String normalized=query==null?"":query.strip().toLowerCase(java.util.Locale.ROOT);
+		if(normalized.isBlank()) return List.of();
+		return listActiveForServer(tenant,actor,normalized,offset,limit,null);
+	}
+
+	/** Bounded server My Cases projection; assignment membership is applied before paging. */
+	public List<ServerCaseRow> listActiveAssignedForServer(int tenant,int actor,int assignedUserId,int limit) {
+		if(actor!=assignedUserId) throw new IllegalArgumentException("assigned user must be the authenticated actor");
+		return listActiveForServer(tenant,actor,null,0,limit,assignedUserId);
+	}
+
+	private List<ServerCaseRow> listActiveForServer(int tenant,int actor,String query,int offset,int limit,Integer assignedUserId) {
+		if(tenant<=0||actor<=0||offset<0||limit<=0) throw new IllegalArgumentException("invalid server Case projection boundary");
+		try(Connection con=db.requireConnection()) {
+			verifyTenant(con,tenant); verifyEligibleAssignedUser(con,tenant,actor);
+			String scope=assignedUserId==null?"":"AND EXISTS (SELECT 1 FROM dbo.CaseUsers scope WHERE scope.CaseId=c.Id AND scope.UserId=?)";
+			String search=query==null?"":"AND LOWER(COALESCE(c.Name,'')) LIKE ?";
+			String order=assignedUserId==null?"c.Name ASC,c.Id ASC":"status_row.StatusSortOrder ASC,dates.IntakeDate DESC,c.Id DESC";
+			String sql="""
+				SELECT c.Id,c.ShaleClientId,c.CaseNumber,c.Name,status_row.StatusId,status_row.SystemKey StatusSystemKey,
+				 status_row.LifecycleKey StatusLifecycleKey,status_row.StatusName,status_row.StatusColor,
+				 c.PracticeAreaId,pa.Name PracticeAreaName,pa.Color PracticeAreaColor,
+				 attorney.UserId ResponsibleAttorneyId,attorney_user.DisplayName ResponsibleAttorneyName,attorney_user.Color ResponsibleAttorneyColor,
+				 assistant.UserId PrimaryLegalAssistantId,assistant_user.DisplayName PrimaryLegalAssistantName,assistant_user.Color PrimaryLegalAssistantColor,
+				 c.CreatedAt,c.UpdatedAt,ISNULL(c.IsDeleted,0) IsDeleted,c.Description,
+				 dates.IntakeDate,dates.InjuryDate,dates.StatuteDate,dates.TortDate,
+				 caller.ContactId CallerContactId,caller.DisplayName CallerName,client.ContactId ClientContactId,client.DisplayName ClientName,
+				 counsel.ContactId OpposingCounselContactId,counsel.DisplayName OpposingCounselName
+				FROM dbo.Cases c
+				%s
+				LEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId AND (pa.ShaleClientId=c.ShaleClientId OR pa.ShaleClientId IS NULL)
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=? ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) attorney
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color FROM dbo.Users u WHERE u.id=attorney.UserId AND u.ShaleClientId=c.ShaleClientId) attorney_user
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=? ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) assistant
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
+				OUTER APPLY (SELECT
+				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
+				 MAX(CASE WHEN t.SystemKey='date_of_injury' THEN CAST(cd.StartsAt AS date) END) InjuryDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
+				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m WHERE m.CaseDateTypeId=t.Id AND m.IsActive=1 AND m.IsDeleted=0 AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL) ORDER BY CASE WHEN m.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,m.Id DESC) effective
+				 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0) dates
+				OUTER APPLY (SELECT TOP(1) ct.Id ContactId,COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))),''),ct.Name) DisplayName FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId AND (pr.ShaleClientId=c.ShaleClientId OR pr.ShaleClientId IS NULL) JOIN dbo.Contacts ct ON ct.Id=cp.ContactId AND ct.ShaleClientId=c.ShaleClientId WHERE cp.CaseId=c.Id AND ISNULL(ct.IsDeleted,0)=0 AND LOWER(COALESCE(pr.SystemKey,pr.Name))='caller' ORDER BY cp.IsPrimary DESC,cp.Id DESC) caller
+				OUTER APPLY (SELECT TOP(1) ct.Id ContactId,COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))),''),ct.Name) DisplayName FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId AND (pr.ShaleClientId=c.ShaleClientId OR pr.ShaleClientId IS NULL) JOIN dbo.Contacts ct ON ct.Id=cp.ContactId AND ct.ShaleClientId=c.ShaleClientId WHERE cp.CaseId=c.Id AND ISNULL(ct.IsDeleted,0)=0 AND LOWER(COALESCE(pr.SystemKey,pr.Name))='party' AND LOWER(LTRIM(RTRIM(cp.Side)))='represented' ORDER BY cp.IsPrimary DESC,cp.Id DESC) client
+				OUTER APPLY (SELECT TOP(1) ct.Id ContactId,COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))),''),ct.Name) DisplayName FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId AND (pr.ShaleClientId=c.ShaleClientId OR pr.ShaleClientId IS NULL) JOIN dbo.Contacts ct ON ct.Id=cp.ContactId AND ct.ShaleClientId=c.ShaleClientId WHERE cp.CaseId=c.Id AND ISNULL(ct.IsDeleted,0)=0 AND LOWER(COALESCE(pr.SystemKey,pr.Name))='counsel' AND LOWER(LTRIM(RTRIM(cp.Side)))='opposing' ORDER BY cp.IsPrimary DESC,cp.Id DESC) counsel
+				WHERE c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0 %s %s
+				ORDER BY %s OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
+				""".formatted(statusApplySql(),search,scope,order);
+			try(PreparedStatement ps=con.prepareStatement(sql)) { int i=1; ps.setInt(i++,RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY); ps.setInt(i++,RoleSemantics.ROLE_LEGAL_ASSISTANT); ps.setInt(i++,tenant); if(query!=null)ps.setString(i++,"%"+escapeLike(query)+"%"); if(assignedUserId!=null)ps.setInt(i++,assignedUserId); ps.setInt(i++,offset); ps.setInt(i,limit);
+				List<ServerCaseRow> out=new ArrayList<>(); try(ResultSet rs=ps.executeQuery()){while(rs.next())out.add(new ServerCaseRow(mapGridSummary(rs),localDate(rs,"IntakeDate"),localDate(rs,"InjuryDate"),localDate(rs,"StatuteDate"),localDate(rs,"TortDate"),rs.getString("PracticeAreaColor"),rs.getString("Description"),nullableInt(rs,"CallerContactId"),rs.getString("CallerName"),nullableInt(rs,"ClientContactId"),rs.getString("ClientName"),nullableInt(rs,"OpposingCounselContactId"),rs.getString("OpposingCounselName")));} return List.copyOf(out); }
+		} catch(SQLException e){throw new RuntimeException("Failed to load server Case summaries",e);}
 	}
 
 	/**
@@ -659,6 +765,77 @@ public final class CaseSummaryDao {
 		} catch (SQLException e) { throw new RuntimeException("Failed to load assigned Case board", e); }
 	}
 
+	/** Bounded rich-card projection for desktop User Detail's selected team member. */
+	public List<CaseGridRow> listActiveAssignedForUserDetail(int requestedTenantId, int assignedUserId, int limit) {
+		if (requestedTenantId <= 0 || assignedUserId <= 0 || limit <= 0)
+			throw new IllegalArgumentException("tenant, assignedUserId, and limit must be > 0");
+		try (Connection con = db.requireConnection()) {
+			verifyTenant(con, requestedTenantId);
+			verifyEligibleAssignedUser(con, requestedTenantId, assignedUserId);
+			String sql = """
+				SELECT TOP (?) c.Id,c.ShaleClientId,c.CaseNumber,c.Name,
+				 status_row.StatusId,status_row.SystemKey StatusSystemKey,status_row.LifecycleKey StatusLifecycleKey,
+				 status_row.StatusName,status_row.StatusColor,c.PracticeAreaId,pa.Name PracticeAreaName,pa.Color PracticeAreaColor,
+				 attorney.UserId ResponsibleAttorneyId,attorney_user.DisplayName ResponsibleAttorneyName,
+				 attorney_user.Color ResponsibleAttorneyColor,assistant.UserId PrimaryLegalAssistantId,
+				 assistant_user.DisplayName PrimaryLegalAssistantName,assistant_user.Color PrimaryLegalAssistantColor,
+				 c.CreatedAt,c.UpdatedAt,CAST(0 AS bit) IsDeleted,c.Description,c.NonEngagementLetterSent,
+				 dates.IntakeDate,dates.InjuryDate,dates.StatuteDate,dates.TortDate,
+				 client.ClientName,opposing.OpposingPartiesName,latest.LatestCaseUpdate
+				FROM dbo.Cases c
+				%s
+				LEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId AND (pa.ShaleClientId=c.ShaleClientId OR pa.ShaleClientId IS NULL)
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=?
+				 ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) attorney
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color
+				 FROM dbo.Users u WHERE u.id=attorney.UserId AND u.ShaleClientId=c.ShaleClientId) attorney_user
+				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=?
+				 ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) assistant
+				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color
+				 FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
+				OUTER APPLY (SELECT
+				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
+				 MAX(CASE WHEN t.SystemKey='date_of_injury' THEN CAST(cd.StartsAt AS date) END) InjuryDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+				 MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
+				  AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
+				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
+				  WHERE m.CaseDateTypeId=t.Id AND m.IsActive=1 AND m.IsDeleted=0
+				   AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL)
+				  ORDER BY CASE WHEN m.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,m.Id DESC) effective
+				 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0) dates
+				OUTER APPLY (SELECT TOP(1) COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))),''),ct.Name) ClientName
+				 FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId AND (pr.ShaleClientId=c.ShaleClientId OR pr.ShaleClientId IS NULL)
+				 JOIN dbo.Contacts ct ON ct.Id=cp.ContactId AND ct.ShaleClientId=c.ShaleClientId
+				 WHERE cp.CaseId=c.Id AND LOWER(LTRIM(RTRIM(pr.SystemKey)))='party' AND LOWER(LTRIM(RTRIM(cp.Side)))='represented'
+				  AND ISNULL(ct.IsDeleted,0)=0 ORDER BY cp.IsPrimary DESC,cp.UpdatedAt DESC,cp.CreatedAt DESC,cp.Id DESC) client
+				OUTER APPLY (SELECT STRING_AGG(x.DisplayName,', ') WITHIN GROUP(ORDER BY x.Id) OpposingPartiesName FROM
+				 (SELECT cp.Id,COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))),''),ct.Name,o.Name) DisplayName
+				  FROM dbo.CaseParties cp LEFT JOIN dbo.Contacts ct ON ct.Id=cp.ContactId AND ct.ShaleClientId=c.ShaleClientId
+				  LEFT JOIN dbo.Organizations o ON o.Id=cp.OrganizationId AND o.ShaleClientId=c.ShaleClientId
+				  WHERE cp.CaseId=c.Id AND LOWER(LTRIM(RTRIM(cp.Side)))='opposing'
+				   AND (ct.Id IS NULL OR ISNULL(ct.IsDeleted,0)=0) AND (o.Id IS NULL OR ISNULL(o.IsDeleted,0)=0)) x) opposing
+				OUTER APPLY (SELECT TOP(1) NULLIF(LTRIM(RTRIM(cu.NoteText)),'') LatestCaseUpdate FROM dbo.CaseUpdates cu
+				 WHERE cu.CaseId=c.Id AND ISNULL(cu.IsDeleted,0)=0 AND NULLIF(LTRIM(RTRIM(cu.NoteText)),'') IS NOT NULL
+				 ORDER BY cu.CreatedAt DESC,cu.Id DESC) latest
+				WHERE c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0
+				 AND EXISTS (SELECT 1 FROM dbo.CaseUsers scope WHERE scope.CaseId=c.Id AND scope.UserId=?)
+				ORDER BY dates.IntakeDate DESC,c.Id DESC
+				""".formatted(statusApplySql());
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				int i=1; ps.setInt(i++,limit); ps.setInt(i++,RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
+				ps.setInt(i++,RoleSemantics.ROLE_LEGAL_ASSISTANT); ps.setInt(i++,requestedTenantId); ps.setInt(i,assignedUserId);
+				List<CaseGridRow> rows=new ArrayList<>();
+				try(ResultSet rs=ps.executeQuery()){while(rs.next())rows.add(new CaseGridRow(mapGridSummary(rs),
+					localDate(rs,"IntakeDate"),localDate(rs,"StatuteDate"),localDate(rs,"InjuryDate"),localDate(rs,"TortDate"),
+					rs.getString("PracticeAreaColor"),(Boolean)rs.getObject("NonEngagementLetterSent"),rs.getString("ClientName"),
+					rs.getString("OpposingPartiesName"),rs.getString("LatestCaseUpdate"),rs.getString("Description")));}
+				return List.copyOf(rows);
+			}
+		} catch(SQLException e){throw new RuntimeException("Failed to load User Detail assigned Cases",e);}
+	}
+
 	static String statusPredicate(GridStatusMode mode, int selectedCount) {
 		return switch (mode) {
 			case UNRESTRICTED -> "";
@@ -708,7 +885,7 @@ public final class CaseSummaryDao {
 	private static String statusApplySql() {
 		return """
 			OUTER APPLY (
-			 SELECT TOP (1) s.Id StatusId, s.SystemKey, s.LifecycleKey, s.Name StatusName, s.Color StatusColor
+			 SELECT TOP (1) s.Id StatusId, s.SystemKey, s.LifecycleKey, s.Name StatusName, s.Color StatusColor, s.SortOrder StatusSortOrder
 			 FROM dbo.CaseStatuses cs JOIN dbo.Statuses s ON s.Id=cs.StatusId
 			  AND (s.ShaleClientId=c.ShaleClientId OR s.ShaleClientId IS NULL)
 			 WHERE cs.CaseId=c.Id AND cs.EndDate IS NULL

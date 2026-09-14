@@ -3,6 +3,16 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 
+
+def batch_source(filename):
+    """Read batch contracts with line endings normalized across checkouts."""
+    return (ROOT / "build/scripts" / filename).read_text(encoding="utf-8").replace("\r\n", "\n")
+
+
+def command_lines(source, command):
+    return [line.strip() for line in source.splitlines()
+            if line.strip().lower().startswith(command.lower())]
+
 class WindowsReleaseBatchContractTest(unittest.TestCase):
     def test_full_release_requires_and_forwards_boolean_mandatory_flag(self):
         source = (ROOT / "build/scripts/release-all.bat").read_text(encoding="utf-8")
@@ -91,7 +101,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
             self.assertIn(diagnostic, validator)
 
     def test_release_reports_the_first_post_updater_stage(self):
-        source = (ROOT / "build/scripts/build-shale-release.bat").read_text(encoding="utf-8")
+        source = batch_source("build-shale-release.bat")
         updater = source.index("build-updater.bat")
         desktop_stage = source.index("echo Building desktop application image...")
         jpackage = source.index("jpackage", desktop_stage)
@@ -99,11 +109,77 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertLess(desktop_stage, jpackage)
 
     def test_updater_packages_only_the_staged_runtime_jar(self):
-        source = (ROOT / "build/scripts/build-updater.bat").read_text(encoding="utf-8")
+        source = batch_source("build-updater.bat")
         self.assertIn("set UPDATER_INPUT=%ROOT%\\build\\staging\\updater-input", source)
         self.assertIn('copy /y "%UPDATER_TARGET%\\shale-updater-%VERSION%.jar"', source)
         self.assertIn('--input "%UPDATER_INPUT%"', source)
         self.assertNotIn('--input "%UPDATER_TARGET%"', source)
+
+    def test_release_runs_one_combined_maven_package_reactor(self):
+        source = batch_source("build-shale-release.bat")
+        lifecycle_commands = [line for line in command_lines(source, "call mvn")
+                              if "clean package" in line.lower()]
+        self.assertEqual(1, len(lifecycle_commands),
+                         "A Windows release must execute exactly one Maven clean/package lifecycle")
+        command = lifecycle_commands[0].lower()
+        self.assertIn('-pl shale-desktop,shale-updater', command,
+                      "The authoritative reactor must explicitly select both release leaf modules")
+        self.assertIn('-am clean package', command,
+                      "The combined reactor must include dependencies and retain clean/package")
+        self.assertNotIn("skiptests", command, "Ordinary tests must run during the release reactor")
+
+    def test_release_uses_updater_package_only_after_exact_artifact_checks(self):
+        source = batch_source("build-shale-release.bat")
+        desktop_check = source.index('if not exist "%DESKTOP_JAR%"')
+        updater_check = source.index('if not exist "%UPDATER_JAR%"')
+        dependency_check = source.index('if not exist "%DESKTOP_LIB%\\"')
+        package_call = source.index('build-updater.bat" --package-only')
+        self.assertLess(max(desktop_check, updater_check, dependency_check), package_call)
+        for artifact in ("desktop JAR", "updater JAR", "desktop runtime dependency directory"):
+            self.assertIn(f"Missing artifact: {artifact}", source)
+        self.assertGreaterEqual(source.count("Resolved root-POM version:"), 3)
+
+    def test_updater_standalone_builds_but_package_only_branches_around_maven(self):
+        source = batch_source("build-updater.bat")
+        maven_commands = command_lines(source, "call mvn")
+        self.assertEqual(1, len(maven_commands), "Standalone updater mode must retain one Maven invocation")
+        self.assertIn("-pl shale-updater -am clean package", maven_commands[0].lower())
+        branch = source.index('if /I "%PACKAGE_ONLY%"=="true" goto :verify_updater_jar')
+        maven = source.index(maven_commands[0])
+        verification = source.index("\n:verify_updater_jar")
+        self.assertLess(branch, maven)
+        self.assertLess(maven, verification)
+        usage = source.index("\n:usage")
+        self.assertNotIn("mvn", source[verification:usage].lower(),
+                         "Package-only execution must not invoke Maven")
+
+    def test_updater_package_only_fails_before_recreating_staging_without_exact_jar(self):
+        source = batch_source("build-updater.bat")
+        verification = source.index('\n:verify_updater_jar')
+        missing_check = source.index('if not exist "%UPDATER_JAR%" goto :missing_updater_jar', verification)
+        first_delete = source.index('rmdir /s /q "%DIST_UPDATER%\\ShaleUpdater"', verification)
+        self.assertLess(missing_check, first_delete,
+                        "The exact updater JAR must be checked before staging directories are removed")
+        self.assertIn('set UPDATER_JAR=%UPDATER_TARGET%\\shale-updater-%VERSION%.jar', source)
+        self.assertIn("Package-only mode requires this artifact from the immediately preceding authoritative Maven reactor.", source)
+
+    def test_updater_rejects_unknown_and_extra_arguments(self):
+        source = batch_source("build-updater.bat")
+        self.assertIn('if /I not "%~1"=="--package-only" goto :usage', source)
+        self.assertIn('if not "%~2"=="" goto :usage', source)
+        self.assertIn("Usage: build-updater.bat [--package-only]", source)
+        usage = source.index("\n:usage")
+        missing = source.index("\n:missing_updater_jar")
+        self.assertIn("exit /b 2", source[usage:missing])
+
+    def test_release_preserves_zip_msi_manifest_and_publishing_handoffs(self):
+        release_build = batch_source("build-shale-release.bat")
+        release = batch_source("release.bat")
+        publish = batch_source("release-and-publish.bat")
+        self.assertIn("Compress-Archive", release_build)
+        self.assertIn('build-shale-windows-msi.bat"', release_build)
+        self.assertIn('update-manifest.bat"', release)
+        self.assertIn('publish-update.bat"', publish)
 
     def test_native_dependency_report_parent_exists_before_redirection(self):
         source = (ROOT / "build/native/windows-toast/build-native.bat").read_text(encoding="utf-8")

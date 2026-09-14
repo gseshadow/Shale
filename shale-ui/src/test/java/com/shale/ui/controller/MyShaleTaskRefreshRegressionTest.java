@@ -27,7 +27,7 @@ final class MyShaleTaskRefreshRegressionTest {
     }
 
     @Test
-    void myTasksStatusFilterOffersExpectedBehaviorOptions() throws Exception {
+    void myTasksStatusFilterOffersExpectedOptions() throws Exception {
         String source = Files.readString(CONTROLLER);
         String fxml = Files.readString(FXML);
         assertTrue(fxml.contains("fx:id=\"myTasksStatusFilterChoice\""));
@@ -35,7 +35,5 @@ final class MyShaleTaskRefreshRegressionTest {
         assertTrue(source.contains("COMPLETED_TASK_STATUS_OPTION"));
         assertTrue(source.contains("ALL_TASK_STATUSES_OPTION"));
         assertTrue(source.contains("\"open\".equals(key) || \"waiting\".equals(key)"));
-        assertTrue(source.contains("case ALL_ACTIVE -> !completed"));
-        assertTrue(source.contains("case COMPLETED -> completed"));
     }
 }

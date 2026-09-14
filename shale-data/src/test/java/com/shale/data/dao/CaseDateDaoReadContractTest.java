@@ -25,6 +25,14 @@ class CaseDateDaoReadContractTest {
                 CaseDateDao.migratedOccurrenceKey(703, "date_of_injury", protectedTypes));
     }
 
+    @Test void duplicateHistoryIsExposedWithoutArbitraryAuthoritativeSelection() throws Exception {
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
+        assertTrue(source.contains("conflicts.add(mapped)"));
+        assertTrue(source.contains("result.remove(mapped)"));
+        assertTrue(source.contains("new CaseDateAggregateResult(token, dates, read.conflicts())"));
+        assertFalse(source.contains("Multiple active Case Date occurrences for singleton SystemKey"));
+    }
+
     @Test void effectiveSelectorSqlUsesModernOverlayResetAndOrderingContract() throws Exception {
         String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
         assertTrue(source.contains("ROW_NUMBER() OVER (PARTITION BY t.SystemKey"));
@@ -118,7 +126,7 @@ class CaseDateDaoReadContractTest {
         assertEquals(2, type.rowVer()[1]);
 
         byte[] dateRv = {4, 5, 6};
-        CaseDateDto date = new CaseDateDto(10, 7, 20, 1, "trial", "Trial", null, "TRIAL", "#B91C1C", true,
+        CaseDateDto date = new CaseDateDto(10, 7, 20, 1, "trial", "Trial", null, "TRIAL", "#B91C1C", true, null,
                 LocalDateTime.of(2026, 8, 4, 9, 30), null, false, "note", LocalDateTime.of(2026, 8, 1, 8, 0), 2, "User", null, null, null, dateRv);
         dateRv[0] = 9;
         assertEquals(4, date.rowVer()[0]);

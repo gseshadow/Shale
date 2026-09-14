@@ -42,7 +42,21 @@ final class CalendarSemanticControlMigrationTest {
         assertTrue(source.contains("ControlStyles.formControl(startTimeCombo)"));
         assertTrue(source.contains("ControlStyles.formControl(amPmCombo)"));
         assertTrue(source.contains("ControlStyles.formControl(durationCombo)"));
-        assertTrue(source.contains("ControlStyles.formControl(descriptionArea)"));
+        assertTrue(source.contains("import com.shale.ui.component.EnhancedTextArea;"));
+        assertTrue(source.contains("EnhancedTextArea descriptionArea = new EnhancedTextArea()"));
+        assertTrue(source.contains("descriptionArea.setEditorTitle(\"Event Description\")"));
+        assertTrue(source.contains("content.getChildren().addAll(titleTypeRow,typeDateRow,timeRow,descriptionLabel,descriptionArea,"),
+                "enhanced description should remain in the event form");
+        assertTrue(source.contains("descriptionArea.getText()"), "event save should retain the enhanced description draft");
+        assertFalse(source.matches("(?s).*\\bTextArea\\s+descriptionArea\\b.*"),
+                "event description must not regress to a raw TextArea declaration");
+        assertFalse(source.contains("ControlStyles.formControl(descriptionArea)"),
+                "EnhancedTextArea owns semantic styling for its internal control");
+        assertFalse(source.contains("ControlStyles.apply(saveButton, ControlStyles.Purpose.DANGER)"));
+        assertFalse(source.contains("ControlStyles.apply(cancelButton, ControlStyles.Purpose.PRIMARY)"));
+        assertTrue(source.lines()
+                .filter(line -> line.contains("ControlStyles.Purpose.DANGER"))
+                .allMatch(line -> line.contains("deleteButton")), "Delete should remain the sole destructive role");
         assertFalse(source.contains("app-dialog-button"));
         assertFalse(source.contains("-fx-text-fill: #b42318"));
     }

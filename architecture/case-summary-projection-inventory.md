@@ -8,7 +8,10 @@ This note records the discovery performed before introducing `CaseSummaryProject
 
 Each optional one-to-many relationship is selected by `OUTER APPLY TOP (1)`, so a Case remains present and malformed legacy primaries cannot multiply rows. Current status candidates must have `CaseStatuses.EndDate IS NULL`; selection is primary first, then effective date, update/create timestamps, and row ID descending. Status definitions must be global or owned by the Case tenant. Responsible attorney (role 4) and primary legal assistant (role 11) are selected by `CaseUsers.RoleId`, preferring `IsPrimary`, then update/create timestamps and row ID descending; this preserves an assignment when malformed legacy data has no primary flag. User display hydration additionally requires the Case tenant, while the selected authoritative user ID is retained even if display hydration is unavailable.
 
-The projection contains: Case ID, tenant ID, Case number/name; status ID, `SystemKey`, `LifecycleKey`, name/color; Practice Area ID/name; responsible-attorney ID/name/color; primary-legal-assistant ID/name/color; created/updated timestamps; and deleted state. It intentionally excludes descriptions, summaries, updates, notes, parties/contact details, medical data, deadlines, and `RowVer`. Intake and other Case Dates remain outside this projection until the shared query can consume the authoritative `CaseDates` semantic-role boundary rather than legacy `Cases` convenience dates.
+The base projection contains Case identity, status, Practice Area, assignments, timestamps, and deleted
+state; consumer enrichment supplies authoritative Case Dates where required. The Cases list displays
+and sorts Intake Date from active `CaseDates` through the tenant-effective protected `INTAKE` role.
+It does not consult `Cases.CallerDate` or `CallerTime`, which are legacy reconciliation inputs only.
 
 ## Existing consumer inventory
 
@@ -20,14 +23,14 @@ The projection contains: Case ID, tenant ID, Case number/name; status ID, `Syste
 | Search | `SearchService.searchAll` → `CaseSummaryDao.searchActiveByName` | shared summary plus compact-card dates/color/flag | active; literal case-insensitive name substring; score/name/ID order; unpaged | Converted for active desktop Search only; Deleted Cases and API/web search retain legacy paths. |
 | Deleted Cases | `SearchService.searchAll` → `CaseSummaryDao.searchDeletedByName` | shared summary, compact-card dates/color/flag, and restore `RowVer` | deleted only; literal case-insensitive name substring; score/name/ID order; unpaged | Converted for the admin-only desktop Deleted Cases group. Legacy DAO retained for compatibility. |
 | MyShale paging | `CaseDao.findMyCasesPage` | `CaseRow` | active by default; any `CaseUsers` membership; legacy date compatibility; caller-selected sort | Core fields fit; membership and compatibility date behavior remain separate. Deferred. |
-| MyShale/user detail assigned cases | `CaseDao.listActiveCasesForUserTeamMember`, `UserDetailService.loadAssignedCases` | rich card data | active; any `CaseUsers` membership; intake/id descending; limit | Core fields fit; membership, limits and card enrichment remain separate. Deferred. |
+| User Detail assigned Cases | `UserController` → `UserDetailService.loadAssignedCases` → `CaseSummaryDao.listActiveAssignedForUserDetail` | consumer-specific rich `CaseGridRow` mapped to the existing `CaseRow` card contract | selected-user `CaseUsers` membership; authenticated tenant; active/nondeleted; authoritative intake/injury/statute/tort; intake/ID descending; bounded limit | Converted; one set query and no legacy fixed-date fallback. |
 | Contact related Cases | `ContactDao.findRelatedCases` | local `RelatedCaseRow`: ID/name, party role/side, status, responsible attorney | contact and tenant; active contact/case relationships; name order | Case core fits; relationship role/side remains in Contact query. Deferred. |
 | Organization related Cases | Desktop and server/web `OrganizationServiceAdapter.getOrganizationDetail` → `CaseSummaryDao.listActiveRelatedToOrganization` | shared `RelatedCaseRow`: authoritative summary/dates plus relationship role/side/primary metadata | tenant-active organization/cases; one row per relationship; primary/name/Case/relationship order | Converted for desktop and server/web Organization detail; legacy `OrganizationDao.findRelatedCases` removed. |
 | Reports | `CaseDao.listCaseStatusReport`, `listCaseStatusReportCases` | status identity/display/counts and report detail rows | active; current effective status; status/date filters; status sort order | Status core fits; aggregation, report dates and detailed report columns remain separate. Deferred. |
 
 ## Conflicts found
 
-Status selection was not uniform: several card queries prefer `IsPrimary` and recency even when a row has ended, while report and newer queries require `EndDate IS NULL` and use `EffectiveDate`. Assignment queries consistently use IDs and role 4, but some require `IsPrimary = 1`, some admit any team membership for filtering, and older calendar SQL still contains role 1. Date authority also differs: the Cases grid/export use migrated `CaseDates`, while MyShale deliberately retains legacy `Cases` date compatibility. Rich `CaseRow` queries repeatedly join Practice Areas and independently apply status, assignment, party, update, contact, and organization enrichment. Those joins also caused each query to carry its own deletion and tenant details.
+Status selection was not uniform: several card queries prefer `IsPrimary` and recency even when a row has ended, while report and newer queries require `EndDate IS NULL` and use `EffectiveDate`. Assignment queries consistently use IDs and role 4, but some require `IsPrimary = 1`, some admit any team membership for filtering, and older calendar SQL still contains role 1. Migrated list and export date values use `CaseDates`; legacy column references described later are compatibility/history inventory, not Intake authority. Rich `CaseRow` queries repeatedly join Practice Areas and independently apply status, assignment, party, update, contact, and organization enrichment. Those joins also caused each query to carry its own deletion and tenant details.
 
 ## Main active Cases grid cutover
 
@@ -228,8 +231,7 @@ implementation (`CaseDao.findMyCasesPage`), its `CaseRow` mapper, and a LiveBus 
 through `CaseDao.getMyCaseRow`. No selected-user selector exists on MyShale: membership is for the
 authenticated `AppState.userId`, captured with `AppState.shaleClientId`. My Tasks case selectors and
 embedded Case metadata remain task-service data and are not independent Case-list consumers.
-`UserDetailService.listActiveCasesForUserTeamMember` is a separate user-detail surface and remains
-explicitly deferred.
+`UserDetailService.loadAssignedCases` is a separate user-detail surface; it was subsequently converted by the dedicated cutover recorded below.
 
 MyShale now has one Case read/list entry point:
 `SceneManager.createMyShaleView` → `MyShaleController.refreshMyCasesBoard` →
@@ -262,8 +264,7 @@ normal loads remain one validation query plus one set query and have no N+1 work
 
 The unreachable paging fields/methods and their `CaseRow` mapping were removed from
 `MyShaleController`. `CaseDao.findMyCasesPage`, `getMyCaseRow`, `listAssignedCasesForBoard`, and
-`listActiveCasesForUserTeamMember` remain available because compatibility/service-adapter and deferred
-desktop consumers still reference those DAO boundaries. The verified global Cases grid, global Case
+`listActiveCasesForUserTeamMember` remained available at this historical checkpoint; the User Detail cutover below subsequently removed it after no-caller proof. The verified global Cases grid, global Case
 board behavior, export, Search, Deleted Cases, Contact/Organization related views, Reports, Documents,
 Calendar, server/API, and web paths are unchanged.
 
@@ -319,15 +320,29 @@ scalar applies and the left Practice Area join preserve missing optional values 
 The document consumes only `caseName`, `primaryStatusName`, and `practiceAreaName`. Status color and both
 assignment identities remain correctly mapped in the projection but are not document template fields.
 
-The full-detail generation queries remain specialized and unchanged: overview still supplies primary caller
-and client identity plus incident/statute semantic dates and description; detail supplies workflow accepted,
+The document generation path is authoritative for Date of Injury and Statute of Limitations. The bounded
+`findActiveForDocuments` query extends its document-only row with both values in the same statement:
+injury resolves by the established `date_of_injury` type identity and SOL through the tenant-effective
+semantic-role mapping. Only active, nondeleted occurrences participate; absent values remain null, workflow
+flags do not manufacture dates, and there is no legacy fallback or per-date hydration.
+
+The remaining full-detail generation queries stay specialized: overview supplies primary caller
+and client identity plus description; detail supplies workflow accepted,
 denied, and closed dates plus narrative summary and retains its existing related-contact grain; contact
 lookups supply the established phone/address/email values; updates retain their deterministic created-time/ID
 ordering. Templates, placeholders, normalization, filenames, formats, temporary storage, rendering, opening,
 and PHI audit timing are unchanged. Legacy PDF debug logging no longer emits generated XHTML snippets or
 temporary paths, and controller failures no longer echo exception/path details that can contain Case names.
+The four deprecated date accessors remain on `CaseOverviewDto` for source compatibility but
+`CaseDao.getOverview` now leaves them null and its active query selects none of `CallerDate`,
+`DateOfInjury`, `StatuteOfLimitations`, or `TortNoticeDeadline`. The desktop controller's overview
+copy/baseline helpers likewise do not carry those scalars. Remaining `getOverview` consumers use only
+non-date identity, assignment, party, description, and display fields. Dead compatibility accessor removal
+and the latent New Intake legacy fallback are the next cleanup phase.
+
 Calendar, server/API/web, template management, persistence/mutations,
 and every previously converted desktop consumer are deferred and unchanged.
+No live SQL Server verification was performed for this cutover.
 
 Before dispatch, `CaseController` now captures tenant ID, authenticated user ID, Case ID, type, and format in
 an immutable `CaseDocumentGenerationRequest`. Incomplete context cannot generate. The background task uses
@@ -380,3 +395,37 @@ feed, or synchronization boundary changed. The legacy `CaseDao.listCaseSelection
 unverified compatibility consumers; the Calendar-exclusive `CalendarFeedDao.listCaseCardRows` and its
 DTO were removed. Previously verified grid, board, export, Search, Deleted Cases, related views,
 MyShale, Reports, and Documents consumers, plus server/API/web, are unchanged.
+
+## Server/web Case search and assigned Cases cutover
+
+The production paths `GET /api/cases/search` and `GET /api/cases/search-page` now run through
+`ApiReadController` → `CaseServiceAdapter.searchCases` → `CaseSummaryDao.searchActiveForServer`.
+`GET /api/cases/assigned` runs through `CaseServiceAdapter.listAssignedCases` →
+`CaseSummaryDao.listActiveAssignedForServer`. Both boundaries are bounded, set-based projections;
+the former Case-ID result followed by one `CaseDao.getOverview` hydration per Case is gone.
+
+The server projection preserves the existing `CaseOverviewDto`/React shape and supplies intake,
+date of injury, statute of limitations, and tort notice exclusively from active `CaseDates` through
+the tenant-effective semantic-role mapping. Absent occurrences remain null, timed intake is reduced
+to the contract's existing `LocalDate`, and workflow flags cannot fabricate dates. Tenant and actor
+come from the authenticated runtime session, active/nondeleted and assignment predicates remain in
+SQL, and name/Case-ID ordering plus bounded paging/limits are deterministic. Compatibility
+`CaseDao.getOverview` remains for desktop Case View and document-era consumers. Desktop User Detail was subsequently converted as recorded below. No live SQL Server verification was performed for this documentation update.
+
+
+## Desktop User Detail assigned Cases cutover
+
+The production path is `SceneManager.createUserView` → `UserController.refreshAssignedCasesAsync` →
+`UserDetailService.loadAssignedCases` → `CaseSummaryDao.listActiveAssignedForUserDetail` → the existing
+`CaseRow` and `CaseCardFactory`. The consumer-specific bounded projection preserves selected-user
+`CaseUsers` membership, authenticated tenant validation, active/nondeleted Cases, the established limit,
+authoritative-intake-descending/Case-ID-descending ordering, status, Practice Area, responsible-attorney
+metadata, rich card enrichment, and null dates. Intake, statute, and tort meanings use tenant-effective
+protected semantic mappings; injury uses the established `date_of_injury` type identity. All four dates
+come only from active `CaseDates` occurrences in the same set query. Workflow flags remain independent
+and cannot fabricate an occurrence.
+
+The removed `CaseDao.listActiveCasesForUserTeamMember` has no remaining production caller. Controller
+background execution, generation checks, and selected-user/cache tenant staleness guards remain intact.
+No live SQL Server verification was performed. Desktop document generation and `CaseDao.getOverview`
+cleanup are the next remaining Case Dates cutover.

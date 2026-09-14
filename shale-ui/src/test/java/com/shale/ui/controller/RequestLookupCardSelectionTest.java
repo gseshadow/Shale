@@ -17,21 +17,21 @@ final class RequestLookupCardSelectionTest {
         String card = method("buildRequestLookupCard");
         String select = method("selectRequestLookup");
 
-        assertTrue(card.contains("MouseButton.PRIMARY") && card.contains("!isActionControl(event.getTarget())"));
-        assertTrue(card.contains("KeyCode.SPACE") && card.contains("KeyCode.ENTER"));
-        assertTrue(card.contains("card.setFocusTraversable(true)"));
-        assertTrue(select.contains("updateRequestLookupSelectionStyles(kind)"));
-        assertFalse(select.contains("loadRequestLookupsAsync"), "selection must not replace cards with loading state");
-        assertFalse(select.contains("remove(") || select.contains("clear(") || select.contains("setAll("));
-        assertFalse(select.contains("editRequestLookup") || select.contains("toggleRequestLookup") || select.contains("resetRequestLookup"));
+        assertTrue(containsCode(card, "MouseButton.PRIMARY") && containsCode(card, "!isActionControl(event.getTarget())"));
+        assertTrue(containsCode(card, "KeyCode.SPACE") && containsCode(card, "KeyCode.ENTER"));
+        assertTrue(containsCode(card, "card.setFocusTraversable(true)"));
+        assertTrue(containsCode(select, "updateRequestLookupSelectionStyles(kind)"));
+        assertFalse(containsCode(select, "loadRequestLookupsAsync"), "selection must not replace cards with loading state");
+        assertFalse(containsCode(select, "remove(") || containsCode(select, "clear(") || containsCode(select, "setAll("));
+        assertFalse(containsCode(select, "editRequestLookup") || containsCode(select, "toggleRequestLookup") || containsCode(select, "resetRequestLookup"));
     }
 
     @Test void repeatedAndCrossCardSelectionOnlyUpdatesPseudoClasses() {
         String styles = method("updateRequestLookupSelectionStyles");
 
-        assertTrue(styles.contains("for (Node node : container.getChildren())"));
-        assertTrue(styles.contains("node.pseudoClassStateChanged(SELECTED_CARD"));
-        assertFalse(styles.contains("getChildren().remove") || styles.contains("getChildren().clear") || styles.contains("getChildren().setAll"));
+        assertTrue(containsCode(styles, "for (Node node : container.getChildren())"));
+        assertTrue(containsCode(styles, "node.pseudoClassStateChanged(SELECTED_CARD"));
+        assertFalse(containsCode(styles, "getChildren().remove") || containsCode(styles, "getChildren().clear") || containsCode(styles, "getChildren().setAll"));
         assertTrue(CSS.contains(".shale-entity-card-selectable:selected"));
     }
 
@@ -40,27 +40,27 @@ final class RequestLookupCardSelectionTest {
         String actionGuard = method("isActionControl");
 
         assertTrue(actionGuard.contains("node instanceof ButtonBase"));
-        assertTrue(card.contains("edit.setOnAction") && card.contains("editRequestLookup(kind)"));
-        assertTrue(card.contains("toggle.setOnAction") && card.contains("toggleRequestLookup(kind)"));
-        assertTrue(card.contains("reset.setOnAction") && card.contains("resetRequestLookup(kind)"));
+        assertTrue(containsCode(card, "edit.setOnAction") && containsCode(card, "editRequestLookup(kind)"));
+        assertTrue(containsCode(card, "toggle.setOnAction") && containsCode(card, "toggleRequestLookup(kind)"));
+        assertTrue(containsCode(card, "reset.setOnAction") && containsCode(card, "resetRequestLookup(kind)"));
         assertTrue(card.split("e.consume\\(\\);", -1).length >= 4, "each explicit action must consume its event");
         assertTrue(method("resetRequestLookup").contains("AppDialogs.showConfirmation"));
     }
 
     @Test void sharedFixCoversAllThreeConfigurableLookupManagers() {
         String styles = method("updateRequestLookupSelectionStyles");
-        assertTrue(styles.contains("case MATERIAL_TYPE -> materialTypeCardsContainer"));
-        assertTrue(styles.contains("case REQUEST_METHOD -> requestMethodCardsContainer"));
-        assertTrue(styles.contains("case REQUEST_STATUS -> requestStatusCardsContainer"));
+        assertTrue(containsCode(styles, "case MATERIAL_TYPE -> materialTypeCardsContainer"));
+        assertTrue(containsCode(styles, "case REQUEST_METHOD -> requestMethodCardsContainer"));
+        assertTrue(containsCode(styles, "case REQUEST_STATUS -> requestStatusCardsContainer"));
     }
 
     @Test void realMutationsStillRefreshAndLoadsRejectStaleResultsWithoutClearingCurrentCards() {
         assertTrue(method("mutateRequestLookup").contains("loadRequestLookupsAsync()"));
         String load = method("loadRequestLookupsAsync");
-        assertTrue(load.contains("final int generation = ++requestLookupLoadGeneration"));
-        assertTrue(load.contains("if (generation != requestLookupLoadGeneration) return;"));
-        assertTrue(load.contains("showRequestLookupLoadingIfEmpty"));
-        assertFalse(load.contains("requestStatusCardsContainer.getChildren().setAll(loadingLabel(\"Loading request statuses"));
+        assertTrue(containsCode(load, "final int generation = ++requestLookupLoadGeneration"));
+        assertTrue(containsCode(load, "if (generation != requestLookupLoadGeneration) return;"));
+        assertTrue(containsCode(load, "showRequestLookupLoadingIfEmpty"));
+        assertFalse(containsCode(load, "requestStatusCardsContainer.getChildren().setAll(loadingLabel(\"Loading request statuses"));
     }
 
     @Test void effectiveStatusFilteringRetainsGlobalOverrideAndCustomRowsWithoutMutatingDtos() {
@@ -109,5 +109,9 @@ final class RequestLookupCardSelectionTest {
     private static String read(String path) {
         try { return Files.readString(Path.of(path)); }
         catch (Exception e) { throw new AssertionError(e); }
+    }
+
+    private static boolean containsCode(String source, String expected) {
+        return source.replaceAll("\\s+", "").contains(expected.replaceAll("\\s+", ""));
     }
 }

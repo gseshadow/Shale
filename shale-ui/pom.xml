@@ -6,7 +6,7 @@
   <parent>
     <groupId>com.shale</groupId>
     <artifactId>shale-parent</artifactId>
-    <version>1.0.113</version>
+    <version>1.0.121</version>
     <relativePath>../pom.xml</relativePath>
 </parent>
 
@@ -30,6 +30,12 @@
     <dependency>
       <groupId>org.openjfx</groupId>
       <artifactId>javafx-controls</artifactId>
+    </dependency>
+    <!-- BSD-2-Clause. RichTextFX is confined to the expanded narrative editor,
+         where styled ranges and spelling decorations are required. -->
+    <dependency>
+      <groupId>org.fxmisc.richtext</groupId>
+      <artifactId>richtextfx</artifactId>
     </dependency>
     <dependency>
       <groupId>org.openjfx</groupId>

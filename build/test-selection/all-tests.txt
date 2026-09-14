@@ -1,0 +1,5 @@
+# Surefire's historical default discovery patterns. Keep every existing test reachable.
+**/Test*.java
+**/*Test.java
+**/*Tests.java
+**/*TestCase.java

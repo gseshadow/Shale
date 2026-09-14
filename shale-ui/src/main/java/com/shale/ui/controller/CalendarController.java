@@ -10,6 +10,9 @@ import com.shale.core.model.CalendarOverlaySelection;
 import com.shale.data.dao.CalendarFeedDao;
 import com.shale.data.dao.CaseSummaryDao;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
+import com.shale.ui.component.dialog.NewEventWizard;
+import com.shale.core.service.CaseServicePort;
+import com.shale.core.service.CaseServicePort.CreateCaseDateCommand;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory;
@@ -18,6 +21,7 @@ import com.shale.ui.services.CalendarService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.ControlStyles;
@@ -43,8 +47,10 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import com.shale.ui.util.PerfLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +71,7 @@ public final class CalendarController {
     private static final PseudoClass HALF_HOUR_PSEUDO_CLASS = PseudoClass.getPseudoClass("half-hour");
     private static final CalendarCaseFilterOptions.CaseOption ALL_CASES_OPTION = CalendarCaseFilterOptions.ALL_CASES;
     private static final EventTypeFilterOption ALL_TYPES_OPTION = new EventTypeFilterOption("", "All types");
+    static final String CASE_DATES_LAYER_PREFERENCE = "calendar.layer.case_dates.visible";
 
     @FXML private ToggleButton weekViewButton;
     @FXML private ToggleButton fiveDayViewButton;
@@ -98,9 +105,13 @@ public final class CalendarController {
     private Consumer<Long> onOpenTask;
     private CaseTaskService caseTaskService;
     private CaseSummaryDao caseSummaryDao;
+    private CaseServicePort caseService;
     private UiRuntimeBridge runtimeBridge;
+    private UserPreferencesService userPreferencesService;
+    private boolean suppressLayerPreferenceWrite;
+    private CaseDateOccurrenceEditorLauncher caseDateEditorLauncher;
     private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
-    private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
+    private final Set<String> seenDateRefreshEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
     private final Consumer<UiRuntimeBridge.EntityUpdatedEvent> entityUpdatedHandler = this::handleEntityUpdated;
     private int loadGeneration;
     private LocalDate selectedDate;
@@ -127,17 +138,25 @@ public final class CalendarController {
     private TaskCardFactory taskCardFactory = new TaskCardFactory(id -> {}, id -> {}, id -> {}, id -> {});
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "calendar-feed-loader"); t.setDaemon(true); return t; });
 
-    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseSummaryDao caseSummaryDao, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenCase, Consumer<Long> onOpenTask) {
+    public void init(AppState appState, CalendarService calendarService, CalendarFeedDao calendarFeedDao, CaseTaskService caseTaskService, CaseSummaryDao caseSummaryDao, CaseServicePort caseService, UiRuntimeBridge runtimeBridge, UserPreferencesService userPreferencesService, Consumer<Integer> onOpenCase, BiConsumer<Integer, Long> onOpenCaseDates, Consumer<Long> onOpenTask) {
         this.appState = appState; this.calendarService = calendarService; this.calendarFeedDao = calendarFeedDao;
         this.caseTaskService = caseTaskService;
         this.caseSummaryDao = caseSummaryDao;
+        this.caseService = caseService;
         this.runtimeBridge = runtimeBridge;
-        this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase; this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
+        this.userPreferencesService = userPreferencesService;
+        this.onOpenCase = onOpenCase == null ? id -> {} : onOpenCase;
+        this.onOpenTask = onOpenTask == null ? id -> {} : onOpenTask;
+        applyPersistedCaseDatesLayerPreference();
         resetCalendarOverlayDefaults();
         configureCalendarOverlayControls();
         this.caseCardFactory = new CaseCardFactory(this.onOpenCase);
         this.taskCardFactory = new TaskCardFactory(this.onOpenTask, id -> {}, this.onOpenCase, id -> {});
         if (runtimeBridge != null) runtimeBridge.subscribeEntityUpdated(entityUpdatedHandler);
+        if (caseService != null) caseDateEditorLauncher = new CaseDateOccurrenceEditorLauncher(caseService, dbExec,
+                () -> new CaseDateOccurrenceEditorLauncher.Context(currentTenantId(), currentActorId(), activeCaseDateCaseId, calendarIsOpen()),
+                this::calendarOwner, this::caseDateSaved, message -> AppDialogs.showError(calendarOwner(), "Case Date", message), null,
+                this.onOpenCase);
     }
 
     private void handleEntityUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
@@ -155,9 +174,9 @@ public final class CalendarController {
 
     private boolean rememberCaseDatesEvent(String eventId) {
         if (eventId == null || eventId.isBlank()) return true;
-        synchronized (seenCaseDatesEventIds) {
-            if (!seenCaseDatesEventIds.add(eventId)) return false;
-            while (seenCaseDatesEventIds.size() > 256) seenCaseDatesEventIds.remove(seenCaseDatesEventIds.iterator().next());
+        synchronized (seenDateRefreshEventIds) {
+            if (!seenDateRefreshEventIds.add(eventId)) return false;
+            while (seenDateRefreshEventIds.size() > 256) seenDateRefreshEventIds.remove(seenDateRefreshEventIds.iterator().next());
             return true;
         }
     }
@@ -256,6 +275,8 @@ public final class CalendarController {
             updateSourceFilterFromControls();
             updateClearFiltersState();
             applyFiltersAndRender();
+            if (checkBox == caseDatesLayerCheckBox && userPreferencesService != null && !suppressLayerPreferenceWrite)
+                userPreferencesService.putBoolean(CASE_DATES_LAYER_PREFERENCE, newValue);
         });
     }
 
@@ -263,8 +284,17 @@ public final class CalendarController {
         if (eventsLayerCheckBox != null) eventsLayerCheckBox.setSelected(true);
         if (tasksLayerCheckBox != null) tasksLayerCheckBox.setSelected(true);
         if (deadlinesLayerCheckBox != null) deadlinesLayerCheckBox.setSelected(true);
-        if (caseDatesLayerCheckBox != null) caseDatesLayerCheckBox.setSelected(false);
+        if (caseDatesLayerCheckBox != null) caseDatesLayerCheckBox.setSelected(true);
         sourceFilter = CalendarFeedSourceFilter.defaults();
+    }
+
+    private void applyPersistedCaseDatesLayerPreference() {
+        if (caseDatesLayerCheckBox == null || userPreferencesService == null) return;
+        boolean selected = userPreferencesService.getBoolean(CASE_DATES_LAYER_PREFERENCE, true);
+        suppressLayerPreferenceWrite = true;
+        try { caseDatesLayerCheckBox.setSelected(selected); }
+        finally { suppressLayerPreferenceWrite = false; }
+        updateSourceFilterFromControls();
     }
 
     private void updateSourceFilterFromControls() {
@@ -423,32 +453,43 @@ public final class CalendarController {
 
     @FXML private void onNewEvent() {
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
-        if (tenantId == null || tenantId <= 0 || calendarService == null) { showError("Calendar is unavailable because no tenant is selected."); return; }
+        Integer actorId = appState == null ? null : appState.getUserId();
+        if (tenantId == null || tenantId <= 0 || actorId == null || actorId <= 0 || calendarService == null || caseService == null) { showError("Calendar is unavailable because no tenant is selected."); return; }
         long dialogStart = PerfLog.start();
         PerfLog.log("DIALOG", "start", "calendar new-event shell");
-        NewCalendarEventDialog.CreateDialogHandle dialog = NewCalendarEventDialog.showCreateDialogAsyncShell(weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), LocalDate.now(), input -> {
-            LocalDateTime startsAt = input.allDay() ? input.date().atStartOfDay() : input.date().atTime(input.startTime());
-            LocalDateTime endsAt = input.allDay() ? null : startsAt.plusMinutes(input.durationMinutes());
+        NewEventWizard.Handle dialog = NewEventWizard.show(weekBoard.getScene() == null ? null : weekBoard.getScene().getWindow(), tenantId, selectedDate, () -> caseOptionsForPicker(null), () -> assignedUserOptionsForPicker(tenantId, null), request -> CompletableFuture.supplyAsync(() -> {
+            if (!Objects.equals(appState.getShaleClientId(), tenantId) || !Objects.equals(appState.getUserId(), actorId)) return "Your tenant or session changed. Close this wizard and try again.";
             try {
-                calendarService.createEvent(new com.shale.core.model.CalendarEvent(null, tenantId, input.calendarEventTypeId(), input.caseId(), null, input.title(), input.description(), startsAt, endsAt, input.allDay(), "MANUAL", null, null, input.assignedToUserId(), false, false, appState == null ? null : appState.getUserId(), null, null));
-                showError(null); loadCurrentRange(false); return null;
-            } catch (RuntimeException ex) { return "Could not save event. Please check values and try again."; }
-        }, () -> caseOptionsForPicker(null), () -> assignedUserOptionsForPicker(tenantId, null), dbExec);
+                if (request.sourceKind() == NewEventWizard.SourceKind.GENERAL_EVENT) {
+                    var input=request.general();
+                    calendarService.createEvent(new com.shale.core.model.CalendarEvent(null,tenantId,input.calendarEventTypeId(),null,null,input.title(),input.notes(),input.startsAt(),input.endsAt(),input.allDay(),"MANUAL",null,null,null,false,false,actorId,null,null));
+                } else {
+                    var input=request.caseDate();caseService.createCaseDate(new CreateCaseDateCommand(tenantId,actorId,input.caseId(),input.caseDateTypeId(),input.title(),input.startsAt(),input.endsAt(),input.allDay(),input.notes()));
+                    if(runtimeBridge!=null)runtimeBridge.publishCaseDatesChanged(input.caseId(),tenantId,actorId,LiveUpdateEvents.CHANGE_CREATED);
+                }
+                Platform.runLater(()->{showError(null);loadCurrentRange(false);});return null;
+            } catch(RuntimeException ex){return request.sourceKind()==NewEventWizard.SourceKind.GENERAL_EVENT?"Could not save event. Please check values and try again.":rootMessage(ex);}
+        },dbExec),dbExec);
         PerfLog.logDone("DIALOG", "calendar new-event shell shown", dialogStart);
-        dbExec.submit(() -> {
+        int requestGeneration=dialog.beginTypeLoad(); dbExec.submit(() -> {
             long loadStart = PerfLog.start();
             PerfLog.log("DAO", "start", "calendar new-event types load");
             try {
-                var eventTypes = calendarService.listEffectiveEventTypes(tenantId);
+                var eventTypes = calendarService.listEffectiveEventTypes(tenantId); var caseDateTypes=caseService.listEffectiveCaseDateTypes(tenantId,actorId);
                 PerfLog.logDone("DAO", "calendar new-event types load", loadStart);
-                Platform.runLater(() -> dialog.populateEventTypes(eventTypes));
+                Platform.runLater(() -> { if (Objects.equals(appState.getShaleClientId(),tenantId) && Objects.equals(appState.getUserId(),actorId)) dialog.populateTypes(tenantId,eventTypes,caseDateTypes,requestGeneration); });
             } catch (RuntimeException ex) {
                 log.warn("Unable to load calendar event types for tenantId={}", tenantId, ex);
                 Platform.runLater(() -> {
-                    dialog.showLoadError("Unable to load event types.");
+                    if (Objects.equals(appState.getShaleClientId(),tenantId) && Objects.equals(appState.getUserId(),actorId)) dialog.showTypeLoadError(tenantId,requestGeneration,"Unable to load event types.");
                 });
             }
         });
+    }
+
+    private static String rootMessage(RuntimeException ex) {
+        Throwable current=ex; while(current.getCause()!=null)current=current.getCause();
+        return current.getMessage()==null||current.getMessage().isBlank()?"Could not save Case Event. Please try again.":current.getMessage();
     }
 
     public void refreshCurrentRange() { loadCurrentRange(false); }
@@ -1034,16 +1075,54 @@ public final class CalendarController {
         CalendarFeedClickTarget target = CalendarFeedClickTarget.resolve(item);
         if (!target.actionable()) return;
         card.setCursor(Cursor.HAND);
-        card.setOnMouseClicked(evt -> {
+        Runnable activate = () -> {
             switch (target.kind()) {
                 case CALENDAR_EVENT -> openEditEventDialog(Math.toIntExact(target.id()));
                 case TASK -> onOpenTask.accept(target.id());
                 case CASE -> onOpenCase.accept(Math.toIntExact(target.id()));
-                case CASE_DATES -> onOpenCase.accept(Math.toIntExact(target.id()));
+                case CASE_DATES -> openCaseDateEditor(target.caseId(), target.id());
                 case NONE -> { }
             }
-            evt.consume();
+        };
+        card.setFocusTraversable(true);
+        card.setAccessibleText("Open " + safe(item == null ? null : item.title()));
+        card.setOnMouseClicked(evt -> {
+            if (evt.getButton() != javafx.scene.input.MouseButton.PRIMARY || !evt.isStillSincePress() || isEmbeddedAction(evt.getTarget(), card)) return;
+            activate.run(); evt.consume();
         });
+        card.setOnKeyPressed(evt -> {
+            if (evt.getCode() == javafx.scene.input.KeyCode.ENTER || evt.getCode() == javafx.scene.input.KeyCode.SPACE) {
+                activate.run(); evt.consume();
+            }
+        });
+    }
+
+    private long activeCaseDateCaseId;
+    private void openCaseDateEditor(int caseId, long caseDateId) {
+        if (caseDateEditorLauncher == null || caseId <= 0 || caseDateId <= 0) return;
+        activeCaseDateCaseId = caseId;
+        caseDateEditorLauncher.open(caseId, caseDateId);
+    }
+
+    private int currentTenantId() { Integer value = appState == null ? null : appState.getShaleClientId(); return value == null ? 0 : value; }
+    private int currentActorId() { Integer value = appState == null ? null : appState.getUserId(); return value == null ? 0 : value; }
+    private boolean calendarIsOpen() { return calendarRowsBox != null && calendarRowsBox.getScene() != null; }
+    private javafx.stage.Window calendarOwner() { return calendarIsOpen() ? calendarRowsBox.getScene().getWindow() : null; }
+    private void caseDateSaved(CaseDateOccurrenceEditorLauncher.SaveResult result) {
+        var context = result.context();
+        if (runtimeBridge != null) runtimeBridge.publishCaseDatesChanged(context.caseId(), context.tenantId(), context.actorId(), result.removed() ? LiveUpdateEvents.CHANGE_REMOVED : LiveUpdateEvents.CHANGE_UPDATED);
+        if (calendarIsOpen() && activeCaseDateCaseId == context.caseId()
+                && currentTenantId() == context.tenantId() && currentActorId() == context.actorId()) loadCurrentRange(false);
+    }
+
+    private static boolean isEmbeddedAction(Object target, Node card) {
+        Node node = target instanceof Node n ? n : null;
+        while (node != null && node != card) {
+            if (node instanceof javafx.scene.control.ButtonBase || node instanceof javafx.scene.control.TextInputControl
+                    || node instanceof javafx.scene.control.ComboBoxBase<?> || node instanceof javafx.scene.control.Hyperlink) return true;
+            node = node.getParent();
+        }
+        return false;
     }
 
     private void openEditEventDialog(int eventId) {
@@ -1073,7 +1152,10 @@ public final class CalendarController {
                 var eventTypes = calendarService.listEffectiveEventTypes(tenantId);
                 PerfLog.logDone("DAO", "calendar edit-event hydrate eventId=" + eventId, loadStart);
                 Platform.runLater(() -> {
-                    if (!dialog.isShowing()) return;
+                    if (!dialog.isShowing() || appState == null || !Objects.equals(appState.getShaleClientId(), tenantId)) {
+                        openingEditDialogEventIds.remove(eventId);
+                        return;
+                    }
                     Node rc = caseRow == null ? null : createRelatedCaseNode(caseRow);
                     Node rt = taskRow == null ? null : createRelatedTaskNode(taskRow);
                     var summary = caseRow == null ? null : caseRow.summary();

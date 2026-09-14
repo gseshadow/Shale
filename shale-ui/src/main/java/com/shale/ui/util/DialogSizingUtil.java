@@ -16,6 +16,7 @@ public final class DialogSizingUtil {
             Stage stage,
             Window owner,
             Region root,
+            double preferredWidth,
             double minimumWidth,
             double minimumHeight) {
         if (stage == null || root == null) {
@@ -23,11 +24,12 @@ public final class DialogSizingUtil {
         }
 
         root.setMinWidth(minimumWidth);
-        root.setPrefWidth(minimumWidth);
+        root.setPrefWidth(preferredWidth);
         root.setMinHeight(minimumHeight);
 
-        double initialHeight = preferredHeight(root, minimumWidth, minimumHeight);
-        WindowSizingUtil.sizeModalStage(stage, owner, minimumWidth, initialHeight, minimumWidth, minimumHeight);
+        double initialWidth = Math.max(preferredWidth, minimumWidth);
+        double initialHeight = preferredHeight(root, initialWidth, minimumHeight);
+        WindowSizingUtil.sizeModalStage(stage, owner, initialWidth, initialHeight, minimumWidth, minimumHeight);
 
         stage.setOnShown(event -> {
             double width = Math.max(minimumWidth, stage.getWidth());

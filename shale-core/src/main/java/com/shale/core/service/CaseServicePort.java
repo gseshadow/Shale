@@ -9,10 +9,15 @@ import java.util.Optional;
 import com.shale.core.dto.CaseDateDto;
 import com.shale.core.dto.MigratedCaseDateProjectionDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import com.shale.core.model.CaseDateSemanticRole;
 import com.shale.core.dto.CaseDateSemanticRoleMappingDto;
 import com.shale.core.dto.CaseDetailDto;
 import com.shale.core.dto.CaseStatusDto;
+import com.shale.core.dto.CaseTeamRoleDefinitionDto;
+import com.shale.core.dto.CaseTeamMembershipDto;
 import com.shale.core.dto.CaseOverviewDto;
+import com.shale.core.dto.CaseOverviewDateConfigurationDto;
+import com.shale.core.dto.CaseOverviewAdministrationDto;
 import com.shale.core.dto.CaseUpdateDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkShareDto;
@@ -44,7 +49,7 @@ public interface CaseServicePort {
 
 	Optional<CaseOverviewDto> getCaseOverview(long caseId, int shaleClientId);
 
-	List<CaseOverviewDto> searchCases(String query, int shaleClientId, int limit);
+	List<CaseOverviewDto> searchCases(String query, int shaleClientId, int actorUserId, int limit);
 
 	List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit);
 
@@ -63,6 +68,30 @@ public interface CaseServicePort {
 	List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
 
 	List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId);
+
+	default CaseOverviewDateConfigurationDto getCaseOverviewDateConfiguration(long caseId, int shaleClientId, int actorUserId) {
+		throw new UnsupportedOperationException("Case Overview date configuration is unavailable.");
+	}
+
+	default CaseOverviewDateConfigurationDto replaceCaseOverviewDateConfiguration(ReplaceCaseOverviewDateConfigurationCommand command) {
+		throw new UnsupportedOperationException("Case Overview date configuration mutation is unavailable.");
+	}
+
+	default IntakeTakenByMutationResult updateIntakeTakenBy(UpdateIntakeTakenByCommand command) {
+		throw new UnsupportedOperationException("Intake By mutation is unavailable.");
+	}
+
+	default CaseOverviewAdministrationDto getCaseOverviewAdministration(long caseId, int shaleClientId, int actorUserId) {
+		throw new UnsupportedOperationException("Case Overview administration is unavailable.");
+	}
+
+	default CaseOverviewMutationResult updateCaseOverview(UpdateCaseOverviewCommand command) {
+		throw new UnsupportedOperationException("Atomic Case Overview mutation is unavailable.");
+	}
+
+	default int resolveEffectiveCaseDateTypeId(int shaleClientId, int actorUserId, CaseDateSemanticRole role) {
+		throw unsupportedCaseLinkOperation("resolveEffectiveCaseDateTypeId");
+	}
 
 	List<EffectiveCaseDateTypeDto> listCaseDateTypesForAdministration(int shaleClientId, int actorUserId);
 
@@ -156,6 +185,10 @@ public interface CaseServicePort {
 
 	CaseStatusDto updateCaseStatus(CaseStatusCommand command);
 
+	void removeCaseStatus(StatusLifecycleCommand command);
+
+	CaseStatusDto restoreCaseStatus(StatusLifecycleCommand command);
+
 	CaseDetailDto updateCaseCurrentStatus(UpdateCaseStatusCommand command);
 
 	void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId);
@@ -176,6 +209,43 @@ public interface CaseServicePort {
 
 	CaseDetailDto updateCaseAssignment(UpdateCaseAssignmentCommand command);
 
+	default List<CaseTeamRoleDefinitionDto> listCaseTeamRolesForAdministration(int shaleClientId, int actorUserId){ throw unsupportedCaseLinkOperation("listCaseTeamRolesForAdministration"); }
+	default CaseTeamRoleDefinitionDto createCaseTeamRole(CaseTeamRoleCommand command){ throw unsupportedCaseLinkOperation("createCaseTeamRole"); }
+	default CaseTeamRoleDefinitionDto updateCaseTeamRole(CaseTeamRoleCommand command){ throw unsupportedCaseLinkOperation("updateCaseTeamRole"); }
+	default void removeCaseTeamRole(CaseTeamRoleLifecycleCommand command){ throw unsupportedCaseLinkOperation("removeCaseTeamRole"); }
+	default void restoreCaseTeamRole(CaseTeamRoleLifecycleCommand command){ throw unsupportedCaseLinkOperation("restoreCaseTeamRole"); }
+	default void resetCaseTeamRoleOverride(CaseTeamRoleLifecycleCommand command){ throw unsupportedCaseLinkOperation("resetCaseTeamRoleOverride"); }
+	default List<CaseTeamMembershipDto> listCaseTeamMemberships(int tenantId, int actorUserId, long caseId) { throw unsupportedCaseLinkOperation("listCaseTeamMemberships"); }
+	default CaseTeamMembershipDto addCaseTeamMember(CaseTeamMemberCommand command) { throw unsupportedCaseLinkOperation("addCaseTeamMember"); }
+	default void removeCaseTeamMember(CaseTeamMemberLifecycleCommand command) { throw unsupportedCaseLinkOperation("removeCaseTeamMember"); }
+	default void assignCaseTeamMemberRole(CaseTeamMemberRoleCommand command) { throw unsupportedCaseLinkOperation("assignCaseTeamMemberRole"); }
+	default void removeCaseTeamMemberRole(CaseTeamMemberRoleLifecycleCommand command) { throw unsupportedCaseLinkOperation("removeCaseTeamMemberRole"); }
+	/** Reconciles the complete staged team in one actor-aware database transaction. */
+	default List<CaseTeamMembershipDto> updateCaseTeam(CaseTeamUpdateCommand command) { throw unsupportedCaseLinkOperation("updateCaseTeam"); }
+
+	record CaseTeamMemberCommand(int tenantId, int actorUserId, long caseId, int userId) {}
+	record CaseTeamMemberLifecycleCommand(int tenantId, int actorUserId, long caseId, long membershipId, byte[] rowVer) {
+		public CaseTeamMemberLifecycleCommand { rowVer=copyRowVer(rowVer); } @Override public byte[] rowVer(){return copyRowVer(rowVer);}
+	}
+	record CaseTeamMemberRoleCommand(int tenantId, int actorUserId, long caseId, long membershipId, int roleDefinitionId) {}
+	record CaseTeamMemberRoleLifecycleCommand(int tenantId, int actorUserId, long caseId, long membershipId, long assignmentId, byte[] rowVer) {
+		public CaseTeamMemberRoleLifecycleCommand { rowVer=copyRowVer(rowVer); } @Override public byte[] rowVer(){return copyRowVer(rowVer);}
+	}
+	record CaseTeamUpdateMember(long membershipId, int userId, byte[] membershipRowVer, List<Integer> roleDefinitionIds) {
+		public CaseTeamUpdateMember { membershipRowVer=copyRowVer(membershipRowVer); roleDefinitionIds=roleDefinitionIds==null?List.of():List.copyOf(roleDefinitionIds); }
+		@Override public byte[] membershipRowVer(){return copyRowVer(membershipRowVer);}
+	}
+	record CaseTeamUpdateCommand(int tenantId, int actorUserId, long caseId, List<CaseTeamUpdateMember> members) {
+		public CaseTeamUpdateCommand { members=members==null?List.of():List.copyOf(members); }
+	}
+
+	record CaseTeamRoleCommand(Integer id, int tenantId, int actorUserId, String name, String description, String color, int sortOrder, boolean active, byte[] rowVer) {
+		public CaseTeamRoleCommand { rowVer=copyRowVer(rowVer); } @Override public byte[] rowVer(){return copyRowVer(rowVer);}
+	}
+	record CaseTeamRoleLifecycleCommand(int tenantId, int actorUserId, int id, byte[] rowVer) {
+		public CaseTeamRoleLifecycleCommand { rowVer=copyRowVer(rowVer); } @Override public byte[] rowVer(){return copyRowVer(rowVer);}
+	}
+
 	record CaseDateTypeCommand(Integer id, int shaleClientId, int actorUserId, String systemKey, String name, String description, String calendarCategory, String color, boolean supportsTime, Integer sortOrder, boolean active, byte[] expectedRowVer) { public CaseDateTypeCommand { expectedRowVer = copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); } }
 	record SetCaseDateTypeActiveCommand(int shaleClientId, int actorUserId, int id, boolean active, byte[] expectedRowVer) { public SetCaseDateTypeActiveCommand { expectedRowVer = copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); } }
 	record ResetCaseDateTypeOverrideCommand(int shaleClientId, int actorUserId, int id, byte[] expectedRowVer) { public ResetCaseDateTypeOverrideCommand { expectedRowVer = copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); } }
@@ -188,10 +258,10 @@ public interface CaseServicePort {
 	record SaveCaseDateSemanticRoleMappingCommand(int shaleClientId, int actorUserId, String roleKey, int caseDateTypeId, Long expectedMappingId, byte[] expectedRowVer) { public SaveCaseDateSemanticRoleMappingCommand { expectedRowVer=copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);} }
 	record ResetCaseDateSemanticRoleMappingCommand(int shaleClientId, int actorUserId, String roleKey, long mappingId, byte[] expectedRowVer) { public ResetCaseDateSemanticRoleMappingCommand { expectedRowVer=copyRowVer(expectedRowVer); } @Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);} }
 
-	record CreateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, int caseDateTypeId, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes) {
+	record CreateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, int caseDateTypeId, String title, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes) {
 	}
 
-	record UpdateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId, int caseDateTypeId, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes, byte[] expectedRowVer) {
+	record UpdateCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId, int caseDateTypeId, String title, LocalDateTime startsAt, LocalDateTime endsAt, boolean allDay, String notes, byte[] expectedRowVer) {
 		public UpdateCaseDateCommand { expectedRowVer = copyRowVer(expectedRowVer); }
 		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
 	}
@@ -366,6 +436,8 @@ public interface CaseServicePort {
 			String systemKey) {
 	}
 
+	record StatusLifecycleCommand(int shaleClientId, int actorUserId, int statusId) { }
+
 	record UpdateCaseStatusCommand(
 			long caseId,
 			int shaleClientId,
@@ -409,4 +481,41 @@ public interface CaseServicePort {
 	/** Stable identity and lossless value for an authoritative mapped Case Date. */
 	record CreateMappedCaseDate(String systemKey, Integer caseDateTypeId,
 			java.time.LocalDateTime startsAt, java.time.LocalDateTime endsAt, boolean allDay) {}
+
+	record ReplaceCaseOverviewDateConfigurationCommand(int shaleClientId, int actorUserId, long caseId,
+			List<Integer> orderedCaseDateTypeIds, byte[] expectedRowVer) {
+		public ReplaceCaseOverviewDateConfigurationCommand {
+			orderedCaseDateTypeIds = orderedCaseDateTypeIds == null ? List.of() : List.copyOf(orderedCaseDateTypeIds);
+			expectedRowVer = copyRowVer(expectedRowVer);
+		}
+		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record UpdateIntakeTakenByCommand(int shaleClientId, int actorUserId, long caseId,
+			Integer intakeTakenByUserId, byte[] expectedCaseRowVer) {
+		public UpdateIntakeTakenByCommand { expectedCaseRowVer = copyRowVer(expectedCaseRowVer); }
+		@Override public byte[] expectedCaseRowVer() { return copyRowVer(expectedCaseRowVer); }
+	}
+
+	record IntakeTakenByMutationResult(long caseId, Integer intakeTakenByUserId,
+			String intakeTakenByDisplayName, byte[] caseRowVer, boolean changed) {
+		public IntakeTakenByMutationResult { caseRowVer = copyRowVer(caseRowVer); }
+		@Override public byte[] caseRowVer() { return copyRowVer(caseRowVer); }
+	}
+
+	record UpdateCaseOverviewCommand(int shaleClientId, int actorUserId, long caseId,
+			List<Integer> orderedCaseDateTypeIds, Integer intakeTakenByUserId,
+			byte[] expectedConfigurationRowVer, byte[] expectedCaseRowVer,
+			boolean layoutChanged, boolean intakeTakenByChanged) {
+		public UpdateCaseOverviewCommand {
+			orderedCaseDateTypeIds = orderedCaseDateTypeIds == null ? List.of() : List.copyOf(orderedCaseDateTypeIds);
+			expectedConfigurationRowVer = copyRowVer(expectedConfigurationRowVer);
+			expectedCaseRowVer = copyRowVer(expectedCaseRowVer);
+		}
+		@Override public byte[] expectedConfigurationRowVer() { return copyRowVer(expectedConfigurationRowVer); }
+		@Override public byte[] expectedCaseRowVer() { return copyRowVer(expectedCaseRowVer); }
+	}
+
+	record CaseOverviewMutationResult(CaseOverviewAdministrationDto overview, boolean changed,
+			boolean layoutChanged, boolean intakeTakenByChanged) {}
 }

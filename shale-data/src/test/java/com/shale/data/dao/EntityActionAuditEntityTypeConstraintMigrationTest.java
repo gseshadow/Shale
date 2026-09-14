@@ -16,23 +16,17 @@ import org.junit.jupiter.api.Test;
 
 final class EntityActionAuditEntityTypeConstraintMigrationTest {
     private static final Path MIGRATION = Path.of("..", "docs", "sql",
-            "2026-08-12_entity_action_audit_entity_type_constraint.sql");
-    private static final Set<String> HISTORICALLY_DEPLOYED = Set.of(
-            "CASE", "LINK_TYPE", "CASE_LINK", "CASE_LINK_SHARE", "MATERIAL_TYPE", "MATERIAL_REQUEST",
-            "MATERIAL_REQUEST_FOLLOW_UP", "MATERIAL_ITEM", "CASE_DATE", "CALENDAR_EVENT",
-            "CASE_DATE_ROLE_MAPPING", "CALENDAR_CASE_DATE_TYPE_MAPPING", "FORM_CONFIGURATION", "USER");
+            "2026-08-14_entity_action_audit_entity_type_constraint_case_status.sql");
+    private static final Set<String> HISTORICALLY_DEPLOYED = AuditEntityTypeMigrationChain.HISTORICAL_AT_AUGUST_14;
 
     private static String sql() throws Exception { return Files.readString(MIGRATION); }
 
     @Test
-    void acceptsEveryEmittedAndPreviouslyDeployedEntityType() throws Exception {
-        Set<String> emitted = Arrays.stream(EntityActionAuditEvent.EntityType.values())
-                .map(Enum::name).collect(Collectors.toSet());
+    void retainsExactlyTheVocabularyKnownWhenTheHistoricalMigrationDeployed() throws Exception {
         Set<String> seeded = seededValues(sql());
-        assertTrue(seeded.containsAll(emitted), "missing emitted EntityTypes: " + difference(emitted, seeded));
-        assertTrue(seeded.containsAll(HISTORICALLY_DEPLOYED),
-                "missing historically deployed EntityTypes: " + difference(HISTORICALLY_DEPLOYED, seeded));
-        assertEquals(emitted, seeded, "the explicit release vocabulary must track production exactly");
+        assertEquals(HISTORICALLY_DEPLOYED, seeded,
+                "an immutable historical migration must not time-travel to later entity types");
+        assertTrue(java.util.Collections.disjoint(seeded, AuditEntityTypeMigrationChain.PHASE_1C_ADDITIONS));
     }
 
     @Test

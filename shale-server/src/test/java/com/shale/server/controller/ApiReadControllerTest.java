@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import java.lang.reflect.Proxy;
 import java.time.Instant;
@@ -190,6 +192,10 @@ class ApiReadControllerTest {
                 .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"99"))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Organization not found."));
     }
+
+	@Test void legacyOrganizationCreateRemainsFunctionalAndForwardsOptionalSingleType()throws Exception{final OrganizationServicePort.CreateOrganizationCommand[] captured={null};OrganizationServicePort port=(OrganizationServicePort)Proxy.newProxyInstance(OrganizationServicePort.class.getClassLoader(),new Class<?>[]{OrganizationServicePort.class},(p,m,a)->switch(m.getName()){case"createOrganization"->{captured[0]=(OrganizationServicePort.CreateOrganizationCommand)a[0];yield 7;}case"getOrganizationDetail"->Optional.of(new OrganizationServicePort.OrganizationDetail(7,41,12,"Provider","Org",null,null,null,null,null,null,null,null,null,null,null,List.of()));default->throw new AssertionError(m.getName());});MockMvc mvc=developmentMockMvc(unusedPort(CaseServicePort.class),unusedPort(TaskServicePort.class),unusedPort(ContactServicePort.class),unusedPort(NotificationServicePort.class),port);mvc.perform(post("/api/organizations").contentType(MediaType.APPLICATION_JSON).header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31").header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41").content("{\"name\":\"Org\",\"organizationTypeId\":12}" )).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(7));assertEquals(12,captured[0].organizationTypeId());assertEquals(31,captured[0].actorUserId());}
+
+	@Test void legacyOrganizationUpdatePreservesEndpointAndForwardsTypeAndConcurrencyToken()throws Exception{final OrganizationServicePort.UpdateOrganizationCommand[] captured={null};OrganizationServicePort port=(OrganizationServicePort)Proxy.newProxyInstance(OrganizationServicePort.class.getClassLoader(),new Class<?>[]{OrganizationServicePort.class},(p,m,a)->switch(m.getName()){case"updateOrganization"->{captured[0]=(OrganizationServicePort.UpdateOrganizationCommand)a[0];yield true;}case"getOrganizationDetail"->Optional.of(new OrganizationServicePort.OrganizationDetail(7,41,13,"Firm","Org",null,null,null,null,null,null,null,null,null,null,null,List.of()));default->throw new AssertionError(m.getName());});MockMvc mvc=developmentMockMvc(unusedPort(CaseServicePort.class),unusedPort(TaskServicePort.class),unusedPort(ContactServicePort.class),unusedPort(NotificationServicePort.class),port);mvc.perform(patch("/api/organizations/7").contentType(MediaType.APPLICATION_JSON).header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31").header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41").content("{\"name\":\"Org\",\"organizationTypeId\":13,\"rowVer\":\"AQI=\"}" )).andExpect(status().isOk());assertEquals(13,captured[0].organizationTypeId());assertArrayEquals(new byte[]{1,2},captured[0].expectedOrganizationRowVer());}
 
     @Test
     void caseSearchReachesServiceLayerWithDevelopmentHeaders() throws Exception {
@@ -661,7 +667,7 @@ class ApiReadControllerTest {
                           "lastName":" Lovelace ",
                           "email":" ada@example.test ",
                           "phone":" 555-0100 ",
-                          "addressHome":" 123 Main ",
+                          "address":" 123 Main ",
                           "dateOfBirth":"1980-01-02",
                           "condition":" Notes ",
                           "deceased":false
@@ -679,7 +685,7 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals("Lovelace", contactServicePort.createdCommand.lastName());
         org.junit.jupiter.api.Assertions.assertEquals("ada@example.test", contactServicePort.createdCommand.email());
         org.junit.jupiter.api.Assertions.assertEquals("555-0100", contactServicePort.createdCommand.phone());
-        org.junit.jupiter.api.Assertions.assertEquals("123 Main", contactServicePort.createdCommand.addressHome());
+        org.junit.jupiter.api.Assertions.assertEquals("123 Main", contactServicePort.createdCommand.address());
         org.junit.jupiter.api.Assertions.assertEquals("1980-01-02", contactServicePort.createdCommand.dateOfBirth());
         org.junit.jupiter.api.Assertions.assertEquals("Notes", contactServicePort.createdCommand.condition());
     }
@@ -805,6 +811,7 @@ class ApiReadControllerTest {
 
         org.junit.jupiter.api.Assertions.assertEquals("smith", caseServicePort.searchQuery);
         org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.searchShaleClientId);
+        org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.searchActorUserId);
         org.junit.jupiter.api.Assertions.assertEquals(2, caseServicePort.searchLimit);
     }
 
@@ -888,6 +895,7 @@ class ApiReadControllerTest {
         private CaseServicePort.CreateCaseCommand createdCommand;
         private String searchQuery;
         private int searchShaleClientId;
+        private int searchActorUserId;
         private int searchLimit;
         private long detailCaseId;
         private int detailShaleClientId;
@@ -936,9 +944,10 @@ class ApiReadControllerTest {
         }
 
         @Override
-        public List<CaseOverviewDto> searchCases(String query, int shaleClientId, int limit) {
+        public List<CaseOverviewDto> searchCases(String query, int shaleClientId, int actorUserId, int limit) {
             this.searchQuery = query;
             this.searchShaleClientId = shaleClientId;
+            this.searchActorUserId = actorUserId;
             this.searchLimit = limit;
             return List.of(caseOverview(), secondCaseOverview());
         }
@@ -968,7 +977,8 @@ class ApiReadControllerTest {
 
         @Override
         public List<com.shale.core.dto.CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
-            return List.of(new com.shale.core.dto.CaseStatusDto(1, "Open", false, 10, "#00AA00", null, "open", null));
+            return List.of(new com.shale.core.dto.CaseStatusDto(
+                    1, "Open", false, 10, "#00AA00", null, "open", null, true, false));
         }
 
         @Override
@@ -1119,6 +1129,16 @@ class ApiReadControllerTest {
         @Override
         public com.shale.core.dto.CaseStatusDto updateCaseStatus(CaseStatusCommand command) {
             throw new AssertionError("updateCaseStatus should not be called");
+        }
+
+        @Override
+        public void removeCaseStatus(StatusLifecycleCommand command) {
+            throw new AssertionError("removeCaseStatus should not be called");
+        }
+
+        @Override
+        public com.shale.core.dto.CaseStatusDto restoreCaseStatus(StatusLifecycleCommand command) {
+            throw new AssertionError("restoreCaseStatus should not be called");
         }
 
         @Override
@@ -1319,6 +1339,11 @@ class ApiReadControllerTest {
         }
 
         @Override
+        public DirectoryPage getContactDirectoryPage(int shaleClientId, int actorUserId, int page, int pageSize, String query, ContactServicePort.DirectoryFilters filters) {
+            return new DirectoryPage(List.of(), page, pageSize, 0);
+        }
+
+        @Override
         public Optional<ContactDetail> getContactDetail(int contactId, int shaleClientId) {
             this.contactId = contactId;
             this.detailShaleClientId = shaleClientId;
@@ -1326,8 +1351,17 @@ class ApiReadControllerTest {
                 return Optional.empty();
             }
             return Optional.of(new ContactDetail(contactId, shaleClientId, "Ada Lovelace", "Ada", "Lovelace",
-                    "Ada Lovelace", "ada@example.test", "555-0100", "123 Main", "1980-01-02", "Notes", false, true));
+                    "Ada Lovelace", "ada@example.test", "555-0100", "123 Main", "1980-01-02", "Notes", null, false, true));
         }
+
+		@Override public List<Definition> getEffectiveContactTypes(int shaleClientId) { return List.of(); }
+		@Override public List<Definition> getEffectiveSpecialties(int shaleClientId) { return List.of(); }
+		@Override public List<CredentialDefinition> getEffectiveCredentialDefinitions(int shaleClientId) { return List.of(); }
+		@Override public List<AdministrationDefinition> listDefinitionsForAdministration(
+				DefinitionCategory category, int shaleClientId, int actorUserId) { return List.of(); }
+		@Override public Optional<ClassificationProfile> getClassificationProfile(int contactId, int shaleClientId) {
+			return Optional.empty();
+		}
 
         @Override
         public int createContact(CreateContactCommand command) {
@@ -1344,6 +1378,22 @@ class ApiReadControllerTest {
         public boolean softDeleteContact(int contactId, int shaleClientId, int actorUserId) {
             throw new AssertionError("softDeleteContact should not be called");
         }
+
+		@Override public DefinitionMutationResult createDefinition(CreateDefinitionCommand command) { throw unused(); }
+		@Override public DefinitionMutationResult updateDefinition(UpdateDefinitionCommand command) { throw unused(); }
+		@Override public DefinitionMutationResult setDefinitionActive(DefinitionLifecycleCommand command) { throw unused(); }
+		@Override public DefinitionMutationResult removeDefinition(DefinitionLifecycleCommand command) { throw unused(); }
+		@Override public DefinitionMutationResult restoreDefinition(DefinitionLifecycleCommand command) { throw unused(); }
+		@Override public AssignmentMutationResult assignClassification(AssignClassificationCommand command) { throw unused(); }
+		@Override public AssignmentMutationResult removeClassification(AssignmentLifecycleCommand command) { throw unused(); }
+		@Override public AssignmentMutationResult restoreClassification(AssignmentLifecycleCommand command) { throw unused(); }
+		@Override public List<AssignmentMutationResult> reorderCredentials(ReorderCredentialsCommand command) { return List.of(); }
+		@Override public ContactProfileMutationResult updateContactProfile(UpdateContactProfileCommand command) { throw unused(); }
+		@Override public ContactProfileMutationResult createContactProfile(CreateContactProfileCommand command) { throw unused(); }
+
+		private static UnsupportedOperationException unused() {
+			return new UnsupportedOperationException("Contact classification mutations are outside this API read test double.");
+		}
     }
 
 	private static final class RecordingNotificationServicePort implements NotificationServicePort {

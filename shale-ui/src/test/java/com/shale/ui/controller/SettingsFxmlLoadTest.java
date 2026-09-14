@@ -16,9 +16,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import com.shale.core.service.CaseServicePort;
-import com.shale.core.service.CalendarCaseDateTypeMappingServicePort;
 import com.shale.core.service.MaterialRequestServicePort;
-import com.shale.data.dao.CalendarEventTypeDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserPreferencesDao;
 import com.shale.ui.notification.NotificationPreferencesService;
@@ -30,6 +28,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.layout.VBox;
 
 final class SettingsFxmlLoadTest {
     @BeforeAll
@@ -47,8 +46,7 @@ final class SettingsFxmlLoadTest {
                 Object controller = assertDoesNotThrow(() -> type.getDeclaredConstructor().newInstance());
                 if (controller instanceof SettingsController settingsController) {
                     settingsController.init(notificationPreferences(), nonAdminState(), () -> auditOpened.set(true),
-                            noDatabaseCaseService(), noDatabaseMaterialRequestService(), noDatabaseUserDao(), null,
-                            noDatabaseMappingService(), noDatabaseCalendarEventTypeDao());
+                            noDatabaseCaseService(), noDatabaseMaterialRequestService(), noDatabaseUserDao(), null);
                 }
                 return controller;
             });
@@ -70,6 +68,12 @@ final class SettingsFxmlLoadTest {
             assertTrue(!auditOpened.get(), "Non-admin Settings users must not open the audit log.");
 
             assertNotNull(inactiveUsers.getOnAction(), "Existing Settings controls should keep resolving their handlers.");
+
+            VBox organizationTypes = (VBox) loader.getNamespace().get("organizationTypeAdministrationContent");
+            assertNotNull(organizationTypes,
+                    "Settings must retain the real Organization Type administration host.");
+            assertSame(organizationTypes, injectedField(controller, "organizationTypeAdministrationContent"),
+                    "Organization Type administration host must be injected into SettingsController.");
         });
     }
 
@@ -116,16 +120,6 @@ final class SettingsFxmlLoadTest {
 
     private static MaterialRequestServicePort noDatabaseMaterialRequestService() {
         return noDatabaseProxy(MaterialRequestServicePort.class);
-    }
-
-    private static CalendarCaseDateTypeMappingServicePort noDatabaseMappingService() {
-        return noDatabaseProxy(CalendarCaseDateTypeMappingServicePort.class);
-    }
-
-    private static CalendarEventTypeDao noDatabaseCalendarEventTypeDao() {
-        return new CalendarEventTypeDao(() -> {
-            throw new AssertionError("Settings FXML compatibility validation must not open a database connection.");
-        });
     }
 
     private static <T> T noDatabaseProxy(Class<T> port) {

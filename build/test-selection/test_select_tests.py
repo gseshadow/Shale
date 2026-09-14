@@ -1,0 +1,267 @@
+import importlib.util
+from pathlib import Path
+import unittest
+import fnmatch
+import json
+import os
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
+from unittest import mock
+
+SCRIPT = Path(__file__).with_name("select_tests.py")
+SPEC = importlib.util.spec_from_file_location("select_tests", SCRIPT)
+SELECTOR = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(SELECTOR)
+RUNNER_SCRIPT = Path(__file__).with_name("run_selection.py")
+RUNNER_SPEC = importlib.util.spec_from_file_location("run_selection", RUNNER_SCRIPT)
+RUNNER = importlib.util.module_from_spec(RUNNER_SPEC)
+RUNNER_SPEC.loader.exec_module(RUNNER)
+
+
+class ChangeSelectorTest(unittest.TestCase):
+    def selected(self, path):
+        return SELECTOR.select([path])
+
+    def test_contact_change_selects_contacts_but_not_calendar(self):
+        result = self.selected("shale-ui/src/main/java/com/shale/ui/controller/ContactViewController.java")
+        self.assertIn("contacts", result["selected_areas"])
+        self.assertNotIn("calendar", result["selected_areas"])
+        self.assertNotIn("*Calendar*Test", result["test_patterns"])
+        self.assertFalse(result["full_suite"])
+
+    def test_shared_organization_port_smokes_have_traceable_shared_path_reasons(self):
+        path = "shale-core/src/main/java/com/shale/core/service/OrganizationServicePort.java"
+        result = self.selected(path)
+        expected = {
+            "com.shale.data.dao.ContactMutationContractTest": ("area:contacts", "critical"),
+            "com.shale.data.service.adapter.TaskServiceAdapterTest": ("area:tasks", "blocking_smoke"),
+            "com.shale.server.controller.AuthControllerTest": ("area:server", "critical"),
+            "com.shale.ui.controller.ReportsControllerLifecycleTest": ("area:reports", "blocking_smoke"),
+        }
+        for qualified, (mapping, classification) in expected.items():
+            with self.subTest(test=qualified):
+                reason = result["test_reasons"][qualified]
+                self.assertEqual([path], reason["changed_paths"])
+                self.assertIn(mapping, reason["mapping_rules"])
+                self.assertIn("blocking_smoke", reason["classifications"])
+                self.assertIn(classification, reason["classifications"])
+
+    def test_calendar_fxml_change_selects_structural_presentation_only(self):
+        result = self.selected("shale-ui/src/main/resources/fxml/calendar.fxml")
+        self.assertEqual(["ui-fxml-structure", "ui-presentation"], result["selected_areas"])
+        self.assertIn("com.shale.ui.controller.SettingsFxmlLoadTest", result["test_patterns"])
+        self.assertNotIn("*Calendar*Test", result["test_patterns"])
+
+    def test_task_and_my_shale_change_selects_tasks(self):
+        for path in ("shale-data/src/main/java/com/shale/data/dao/TaskDao.java",
+                     "shale-ui/src/main/java/com/shale/ui/controller/MyShaleController.java"):
+            with self.subTest(path=path):
+                self.assertIn("tasks", self.selected(path)["selected_areas"])
+
+    def test_global_css_selects_static_presentation_not_rendered_ui(self):
+        result = self.selected("shale-ui/src/main/resources/css/app.css")
+        self.assertEqual(["ui-presentation"], result["selected_areas"])
+        self.assertIn("com.shale.ui.util.SemanticControlCssContractTest", result["test_patterns"])
+        self.assertNotIn("*Runtime*Test", result["test_patterns"])
+        for unrelated in ("*Case*Test", "*Calendar*Test", "*Task*Test", "*Layout*Test"):
+            self.assertNotIn(unrelated, result["test_patterns"])
+
+    def test_tab_color_css_does_not_select_feature_or_popup_geometry(self):
+        result = self.selected("shale-ui/src/main/resources/css/foundation/tabs.css")
+        self.assertEqual(["ui-presentation"], result["selected_areas"])
+        self.assertFalse(any(token in result["selected_command"] for token in
+                             ("Case", "Calendar", "Task", "Popup", "Layout", "Rendering")))
+
+    def test_controller_change_selects_feature_and_ui_behavior(self):
+        result = self.selected("shale-ui/src/main/java/com/shale/ui/controller/CaseController.java")
+        self.assertIn("cases", result["selected_areas"])
+        self.assertIn("ui-behavior", result["selected_areas"])
+
+    def test_visual_advisory_is_explicit_only_and_manually_runnable(self):
+        implicit = self.selected("shale-ui/src/main/resources/css/app.css")
+        self.assertNotIn("ui-visual-advisory", implicit["selected_areas"])
+        explicit = SELECTOR.select([], ["ui-visual-advisory"])
+        self.assertEqual("mvn -Pui-visual test", explicit["selected_command"])
+
+    def test_security_and_rls_select_critical_affected_data_coverage(self):
+        result = self.selected("shale-data/src/main/java/com/shale/data/auth/AuthUserLifecycle.java")
+        self.assertIn("security-data", result["selected_areas"])
+        self.assertEqual("mvn test", result["critical_command"])
+        self.assertIn("com.shale.data.auth.AuthUserLifecycleSecurityTest", result["test_patterns"])
+        self.assertIn("com.shale.data.dao.EntityActionAuditEventTest", result["test_patterns"])
+        self.assertIn("com.shale.server.runtime.RequestScopedDbSessionProviderTest", result["test_patterns"])
+
+    def test_complete_overview_timeline_pr_uses_modified_tests_not_case_ownership(self):
+        fixture = SCRIPT.with_name("fixtures") / "case-timeline-pr-paths.txt"
+        paths = [line for line in fixture.read_text(encoding="utf-8").splitlines() if line]
+        result = SELECTOR.select(paths)
+        expected = {
+            "com.shale.data.dao.CaseDateTimelineWriterTest",
+            "com.shale.data.dao.CaseDetailsTimelineWriterTest",
+            "com.shale.ui.controller.CaseDetailsTimelineCoverageTest",
+        }
+        self.assertFalse(result["selection_error"])
+        self.assertEqual(expected, set(result["test_patterns"]))
+        self.assertEqual(expected, set(result["modified_test_classes"]))
+        self.assertEqual("mvn test", result["critical_command"])
+        self.assertEqual(1, len(result["selected_maven_batches"]))
+        self.assertLessEqual(result["maximum_command_length"], result["windows_safe_command_length"])
+        self.assertGreater(result["ownership_class_count"], SELECTOR.OWNERSHIP_ADVISORY_THRESHOLD)
+        self.assertIn("--area cases", result["ownership_advisory_command"])
+        for unrelated in ("NewIntake", "Calendar", "Settings", "Reports", "Material", "CaseLink", "Visual"):
+            self.assertFalse(any(unrelated in qualified for qualified in result["test_patterns"]))
+        self.assertEqual("mvn -Pall-tests test", SELECTOR.display_command(["mvn", "-Pall-tests", "test"]))
+
+    def test_broad_automatic_area_uses_smoke_manifest_without_failure(self):
+        automatic = self.selected("shale-ui/src/main/java/com/shale/ui/controller/CaseController.java")
+        self.assertFalse(automatic["selection_error"])
+        self.assertLessEqual(len(automatic["test_patterns"]), SELECTOR.OWNERSHIP_ADVISORY_THRESHOLD)
+        self.assertGreater(automatic["ownership_class_count"], SELECTOR.OWNERSHIP_ADVISORY_THRESHOLD)
+        manual = SELECTOR.select([], ["cases"])
+        self.assertGreater(len(manual["test_patterns"]), SELECTOR.OWNERSHIP_ADVISORY_THRESHOLD)
+        self.assertGreater(len(manual["selected_maven_batches"]), 1)
+        self.assertTrue(all(len(SELECTOR.display_command(["mvn", *batch])) <= SELECTOR.WINDOWS_SAFE_COMMAND_LENGTH
+                            for batch in manual["selected_maven_batches"]))
+
+    def test_maven_test_list_is_one_structured_process_argument(self):
+        fixture = SCRIPT.with_name("fixtures") / "case-timeline-pr-paths.txt"
+        result = SELECTOR.select(fixture.read_text(encoding="utf-8").splitlines())
+        test_argument = next(value for value in result["selected_maven_args"] if value.startswith("-Dtest="))
+        self.assertIn(",", test_argument)
+        with mock.patch.object(SELECTOR.subprocess, "run", return_value=mock.Mock(returncode=0)) as run:
+            SELECTOR.run_commands({**result, "python_command_args": []})
+        selected_call = next(call for call in run.call_args_list if test_argument in call.args[0])
+        self.assertIsInstance(selected_call.args[0], list)
+        self.assertEqual(1, sum(1 for argument in selected_call.args[0] if argument == test_argument))
+        self.assertFalse(selected_call.kwargs["shell"])
+
+    def test_runner_preserves_real_process_argument_boundaries(self):
+        fixture = SCRIPT.with_name("fixtures") / "case-timeline-pr-paths.txt"
+        plan = SELECTOR.select(fixture.read_text(encoding="utf-8").splitlines())
+        with tempfile.TemporaryDirectory() as directory:
+            recorder = Path(directory) / "record_args.py"
+            output = Path(directory) / "args.json"
+            recorder.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "open(os.environ['ARG_RECORD'], 'w', encoding='utf-8').write(json.dumps(sys.argv[1:]))\n",
+                encoding="utf-8",
+            )
+            recorder.chmod(0o755)
+            with mock.patch.dict(os.environ, {"ARG_RECORD": str(output)}):
+                RUNNER.execute_affected(plan, launcher=[sys.executable, str(recorder)])
+            recorded = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual("-pl", recorded[0])
+        self.assertEqual("shale-data,shale-ui", recorded[1])
+        self.assertEqual("-am", recorded[2])
+        self.assertEqual(1, sum(argument.startswith("-Dtest=") for argument in recorded))
+        selected = next(argument for argument in recorded if argument.startswith("-Dtest="))
+        self.assertEqual(plan["test_patterns"], selected.removeprefix("-Dtest=").split(","))
+        self.assertEqual("test", recorded[-1])
+
+    def test_runner_rejects_malformed_or_unsafe_plans(self):
+        with self.assertRaisesRegex(ValueError, "requires a nonempty following value"):
+            RUNNER.validate_maven_args(["-pl", "-am", "test"])
+        with self.assertRaisesRegex(ValueError, "requires a nonempty following value"):
+            RUNNER.validate_maven_args(["-pl", "", "test"])
+        with self.assertRaisesRegex(ValueError, "Windows-safe"):
+            RUNNER.validate_maven_args(["-Dtest=" + "A" * RUNNER.WINDOWS_SAFE_COMMAND_LENGTH, "test"])
+
+    def test_runner_prefers_windows_maven_launcher(self):
+        with mock.patch.object(RUNNER.os, "name", "nt"), mock.patch.object(
+                RUNNER.shutil, "which", side_effect=lambda name: "C:/Maven/bin/mvn.cmd" if name == "mvn.cmd" else None
+        ) as which:
+            self.assertEqual("C:/Maven/bin/mvn.cmd", RUNNER.resolve_maven())
+        self.assertEqual(mock.call("mvn.cmd"), which.call_args_list[0])
+
+    def test_selector_contract_suite_is_required_only_for_infrastructure_changes(self):
+        self.assertTrue(SELECTOR.selector_tests_required(["build/test-selection/run_selection.py"]))
+        self.assertFalse(SELECTOR.selector_tests_required([
+            "shale-ui/src/main/java/com/shale/ui/controller/CaseController.java"
+        ]))
+        pom_diff = mock.Mock(stdout="+        <shale.test.includesFile>critical-tests.txt</shale.test.includesFile>\n")
+        with mock.patch.object(SELECTOR.subprocess, "run", return_value=pom_diff):
+            self.assertTrue(SELECTOR.selector_tests_required(["pom.xml"], "base", "head"))
+        unrelated_pom_diff = mock.Mock(stdout="+        <dependency.version>2</dependency.version>\n")
+        with mock.patch.object(SELECTOR.subprocess, "run", return_value=unrelated_pom_diff):
+            self.assertFalse(SELECTOR.selector_tests_required(["pom.xml"], "base", "head"))
+
+
+    def test_modified_test_class_is_selected_exactly(self):
+        path = "shale-ui/src/test/java/com/shale/ui/controller/ReportsControllerLifecycleTest.java"
+        result = self.selected(path)
+        self.assertEqual(["com.shale.ui.controller.ReportsControllerLifecycleTest"], result["modified_test_classes"])
+        self.assertIn("com.shale.ui.controller.ReportsControllerLifecycleTest", result["test_patterns"])
+        self.assertIn("-Dtest=com.shale.ui.controller.ReportsControllerLifecycleTest", result["selected_command"])
+
+    def test_documentation_only_change_has_no_affected_suite(self):
+        result = self.selected("docs/web-api-local-smoke-test.md")
+        self.assertFalse(result["selected_areas"])
+        self.assertFalse(result["full_suite"])
+        self.assertEqual("", result["selected_command"])
+
+    def test_parent_pom_and_selector_changes_escalate(self):
+        for path in ("pom.xml", "shale-ui/pom.xml", "build/test-selection/test-areas.json"):
+            with self.subTest(path=path):
+                result = self.selected(path)
+                self.assertTrue(result["full_suite"])
+                self.assertEqual("", result["selected_command"])
+                self.assertEqual("mvn -Pall-tests test", result["informational_command"])
+                self.assertEqual(["-Pall-tests", "test"], result["informational_maven_args"])
+                self.assertEqual(result["informational_command"],
+                                 SELECTOR.display_command(["mvn", *result["informational_maven_args"]]))
+
+    def test_unknown_production_path_escalates(self):
+        result = self.selected("shale-ui/src/main/java/com/shale/ui/mystery/NewSubsystem.java")
+        self.assertTrue(result["full_suite"])
+        self.assertEqual("", result["selected_command"])
+        self.assertEqual("mvn -Pall-tests test", result["informational_command"])
+        self.assertIn("unknown production path", result["escalation_reasons"][0])
+
+    def test_explicit_feature_selection_uses_safe_reactor_option(self):
+        result = SELECTOR.select([], ["calendar"])
+        self.assertIn("-Dsurefire.failIfNoSpecifiedTests=false", result["selected_command"])
+        self.assertEqual(["shale-core", "shale-data", "shale-ui"], result["selected_modules"])
+        self.assertTrue(all("-am" in batch for batch in result["selected_maven_batches"]))
+
+    def test_every_test_is_reachable_by_historical_full_suite_pattern(self):
+        root = SCRIPT.parents[2]
+        patterns = [line.strip() for line in SCRIPT.with_name("all-tests.txt").read_text(encoding="utf-8").splitlines()
+                    if line.strip() and not line.startswith("#")]
+        tests = list(root.glob("shale-*/src/test/java/**/*.java"))
+        unreachable = [str(path.relative_to(root)) for path in tests
+                       if "@Test" in path.read_text(encoding="utf-8") and not any(fnmatch.fnmatchcase(path.name, Path(pattern).name) for pattern in patterns)]
+        self.assertEqual([], unreachable)
+
+    def test_critical_manifest_is_small_and_references_existing_tests(self):
+        root = SCRIPT.parents[2]
+        critical = [line.strip() for line in SCRIPT.with_name("critical-tests.txt").read_text(encoding="utf-8").splitlines()
+                    if line.strip() and not line.startswith("#")]
+        existing = {path.as_posix().split("/src/test/java/", 1)[1][:-5].replace("/", ".")
+                    for path in root.glob("shale-*/src/test/java/**/*Test.java")}
+        self.assertTrue(set(critical) <= existing)
+        self.assertTrue(all("." in name and "*" not in name for name in critical))
+        self.assertLessEqual(len(critical) / len(existing), 0.25)
+
+    def test_parent_pom_uses_critical_default_and_full_recovery_profile(self):
+        root = SCRIPT.parents[2]
+        pom = ET.parse(root / "pom.xml").getroot()
+        ns = {"m": "http://maven.apache.org/POM/4.0.0"}
+        properties = pom.find("m:properties", ns)
+        self.assertTrue(properties.find("m:shale.test.includesFile", ns).text.endswith("critical-tests.txt"))
+        profiles = {item.find("m:id", ns).text: item for item in pom.findall("m:profiles/m:profile", ns)}
+        full_value = profiles["all-tests"].find("m:properties/m:shale.test.includesFile", ns).text
+        self.assertTrue(full_value.endswith("all-tests.txt"))
+        visual_value = profiles["ui-visual"].find("m:properties/m:shale.test.includesFile", ns).text
+        self.assertTrue(visual_value.endswith("ui-visual-advisory-tests.txt"))
+        surefire = [plugin for plugin in pom.findall("m:build/m:plugins/m:plugin", ns)
+                    if plugin.find("m:artifactId", ns).text == "maven-surefire-plugin"]
+        self.assertEqual(1, len(surefire))
+        self.assertEqual("${shale.test.includesFile}", surefire[0].find("m:configuration/m:includesFile", ns).text)
+        self.assertEqual("${shale.test.excludesFile}", surefire[0].find("m:configuration/m:excludesFile", ns).text)
+
+
+
+if __name__ == "__main__":
+    unittest.main()

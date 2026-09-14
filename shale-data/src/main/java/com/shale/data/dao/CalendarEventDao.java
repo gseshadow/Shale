@@ -12,7 +12,6 @@ import java.util.Objects;
 public final class CalendarEventDao {
     public record GlobalSearchCalendarEventRow(Integer calendarEventId, int shaleClientId, Integer caseId, String caseName, String title, String description, String location, LocalDateTime startsAt, LocalDateTime endsAt) { }
     private final DbSessionProvider db;
-    private final CaseCalendarSynchronizer caseCalendarSynchronizer = new CaseCalendarSynchronizer();
     private final EntityActionAuditDao audit = new EntityActionAuditDao();
 
     public CalendarEventDao(DbSessionProvider db) {
@@ -39,7 +38,6 @@ public final class CalendarEventDao {
                     id=rs.getInt(1);
                 } else { throw new IllegalStateException("Calendar event was not created."); }
             }
-            caseCalendarSynchronizer.fromCalendar(con,identity.tenant(),id,"CREATE",true);
             auditCalendar(con,identity,id,EntityActionAuditEvent.Action.CREATED,event.caseId());
             touchCaseUpdatedAt(con, event.caseId(), identity.tenant()); con.commit(); return id;
             } catch(SQLException | RuntimeException e) { con.rollback(); throw e; } finally { con.setAutoCommit(true); }
@@ -97,8 +95,6 @@ public final class CalendarEventDao {
             ps.setInt(16, event.shaleClientId());
             ps.setBytes(17, before.rowVer());
             if (ps.executeUpdate() == 1) {
-                String syncOperation=!before.cancelled()&&event.cancelled()?"CANCEL":before.cancelled()&&!event.cancelled()?"RESTORE":"UPDATE";
-                caseCalendarSynchronizer.fromCalendar(con,identity.tenant(),event.calendarEventId(),syncOperation,before.eventTypeId()!=event.calendarEventTypeId());
                 auditCalendar(con,identity,event.calendarEventId(),EntityActionAuditEvent.Action.UPDATED,event.caseId());
                 touchCaseUpdatedAt(con, previousCaseId, event.shaleClientId());
                 touchCaseUpdatedAt(con, event.caseId(), event.shaleClientId());
@@ -219,8 +215,7 @@ public final class CalendarEventDao {
             try (PreparedStatement ps = con.prepareStatement(sql)) {
             CalendarSourceState before=lockCalendarEvent(con,calendarEventId,identity.tenant());
             Integer previousCaseId = before.caseId();
-            caseCalendarSynchronizer.fromCalendar(con,identity.tenant(),calendarEventId,"DELETE",false);
-            byte[] deleteRowVer=lockCalendarEvent(con,calendarEventId,identity.tenant()).rowVer();
+            byte[] deleteRowVer=before.rowVer();
             ps.setInt(1, calendarEventId);
             ps.setInt(2, shaleClientId);
             ps.setBytes(3,deleteRowVer);
@@ -236,12 +231,11 @@ public final class CalendarEventDao {
     }
 
     private static RuntimeException mutationFailure(SQLException e){
-        if(e.getErrorCode()==2601||e.getErrorCode()==2627)return new IllegalStateException("Calendar/Case Date link changed; reload and try again.");
         return new IllegalStateException("Calendar event could not be saved.");
     }
 
-    private record CalendarSourceState(Integer caseId,int eventTypeId,boolean cancelled,byte[] rowVer){}
-    private static CalendarSourceState lockCalendarEvent(Connection con,int id,int tenant)throws SQLException{try(PreparedStatement p=con.prepareStatement("SELECT CaseId,CalendarEventTypeId,IsCancelled,RowVer FROM dbo.CalendarEvents WITH(UPDLOCK,HOLDLOCK) WHERE CalendarEventId=? AND ShaleClientId=?")){p.setInt(1,id);p.setInt(2,tenant);try(ResultSet r=p.executeQuery()){if(!r.next())throw new IllegalArgumentException("Record is not available.");return new CalendarSourceState((Integer)r.getObject(1),r.getInt(2),r.getBoolean(3),r.getBytes(4));}}}
+    private record CalendarSourceState(Integer caseId,byte[] rowVer){}
+    private static CalendarSourceState lockCalendarEvent(Connection con,int id,int tenant)throws SQLException{try(PreparedStatement p=con.prepareStatement("SELECT CaseId,RowVer FROM dbo.CalendarEvents WITH(UPDLOCK,HOLDLOCK) WHERE CalendarEventId=? AND ShaleClientId=?")){p.setInt(1,id);p.setInt(2,tenant);try(ResultSet r=p.executeQuery()){if(!r.next())throw new IllegalArgumentException("Record is not available.");return new CalendarSourceState((Integer)r.getObject(1),r.getBytes(2));}}}
 
     private record SessionIdentity(int tenant,int actor){}
     private static SessionIdentity requireIdentity(Connection con)throws SQLException{try(Statement s=con.createStatement();ResultSet r=s.executeQuery("SELECT TRY_CONVERT(int,SESSION_CONTEXT(N'ShaleClientId')),TRY_CONVERT(int,SESSION_CONTEXT(N'PrincipalUserId'))")){if(!r.next())throw new IllegalStateException("Authenticated SQL session context is required.");int t=r.getInt(1),a=r.getInt(2);if(t<=0||a<=0)throw new IllegalStateException("Authenticated SQL session context is required.");try(PreparedStatement p=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE id=? AND ShaleClientId=? AND COALESCE(is_deleted,0)=0 AND COALESCE(IsRemoved,0)=0")){p.setInt(1,a);p.setInt(2,t);try(ResultSet u=p.executeQuery()){if(!u.next())throw new IllegalStateException("Authenticated SQL session context is required.");}}return new SessionIdentity(t,a);}}

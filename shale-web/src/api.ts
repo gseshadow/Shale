@@ -206,7 +206,7 @@ export interface ContactDetail {
   displayName: string | null;
   email: string | null;
   phone: string | null;
-  addressHome: string | null;
+  address: string | null;
   dateOfBirth: string | null;
   condition: string | null;
   deceased: boolean;
@@ -219,7 +219,7 @@ export interface CreateContactRequest {
   lastName: string | null;
   email: string | null;
   phone: string | null;
-  addressHome: string | null;
+  address: string | null;
   dateOfBirth: string | null;
   condition: string | null;
   deceased: boolean;
@@ -231,7 +231,7 @@ export interface UpdateContactDetailsRequest {
   lastName: string | null;
   email: string | null;
   phone: string | null;
-  addressHome: string | null;
+  address: string | null;
   dateOfBirth: string | null;
   condition: string | null;
   deceased: boolean;

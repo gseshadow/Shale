@@ -20,7 +20,7 @@
             vbarPolicy="AS_NEEDED"
             styleClass="surface-scroll">
     <content>
-        <VBox spacing="14" styleClass="cases-content-surface glass-panel">
+        <VBox spacing="14" styleClass="cases-content-surface glass-panel data-surface">
             <padding>
                 <Insets top="16" right="16" bottom="16" left="16"/>
             </padding>
@@ -67,6 +67,22 @@
 
             <Separator/>
 
+            <VBox spacing="8" styleClass="strong-panel">
+                <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+                <Label text="Custom Dictionary" styleClass="search-section-title"/>
+                <Label text="Words you accepted with Add to dictionary. Bundled English, legal, and medical terms are not shown."
+                       styleClass="search-summary-text" wrapText="true"/>
+                <TableView fx:id="customDictionaryTable" prefHeight="180">
+                    <columns><TableColumn fx:id="customDictionaryWordColumn" text="Word" prefWidth="420"/></columns>
+                </TableView>
+                <HBox spacing="8">
+                    <Button fx:id="removeCustomDictionaryWordButton" text="Remove" onAction="#onRemoveCustomDictionaryWord"/>
+                    <Label fx:id="customDictionaryStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+                </HBox>
+            </VBox>
+
+            <Separator/>
+
             <VBox fx:id="caseStatusAdministrationSection" spacing="8" styleClass="strong-panel">
                 <padding>
                     <Insets top="12" right="12" bottom="12" left="12"/>
@@ -109,6 +125,14 @@
             </VBox>
 
 
+            <VBox spacing="8" styleClass="strong-panel">
+                <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+                <Label text="Case Team Roles" styleClass="search-section-title"/>
+                <Label text="Manage tenant-effective system and custom Case Team role definitions. Assignment editing remains unchanged." styleClass="search-summary-text" wrapText="true"/>
+                <VBox fx:id="caseTeamRoleAdministrationContent" spacing="8"/>
+            </VBox>
+
+
             <VBox fx:id="caseDateTypeAdministrationSection" spacing="8" styleClass="strong-panel">
                 <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
                 <Label text="Case Date Types" styleClass="search-section-title"/>
@@ -118,18 +142,6 @@
                 <VBox fx:id="caseDateTypeCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
                 <HBox fx:id="caseDateTypeActionRow" spacing="8">
                     <Label fx:id="caseDateTypeSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
-                </HBox>
-            </VBox>
-
-
-            <VBox fx:id="calendarCaseDateMappingAdministrationSection" spacing="8" styleClass="strong-panel">
-                <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
-                <Label text="Calendar / Case Date Mappings" styleClass="search-section-title"/>
-                <Label text="Map active Calendar Event Types to active Case Date Types and choose one or both synchronization directions. Each active type can belong to only one active mapping."
-                       styleClass="search-summary-text" wrapText="true"/>
-                <VBox fx:id="calendarCaseDateMappingCardsContainer" spacing="8" styleClass="shale-density-card-compact"/>
-                <HBox fx:id="calendarCaseDateMappingActionRow" spacing="8">
-                    <Label fx:id="calendarCaseDateMappingStatusLabel" styleClass="search-summary-text" wrapText="true"/>
                 </HBox>
             </VBox>
 
@@ -172,6 +184,21 @@
                 </VBox>
             </VBox>
 
+
+			<VBox fx:id="contactClassificationAdministrationSection" spacing="8" styleClass="strong-panel">
+				<padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+				<Label text="Contact Classifications" styleClass="search-section-title"/>
+				<Label text="Manage Contact Types, Specialties, and professional Credential Definitions for this organization. Global definitions are read-only and can be customized locally."
+					   styleClass="search-summary-text" wrapText="true"/>
+				<VBox fx:id="contactClassificationContent" spacing="8"/>
+			</VBox>
+
+			<VBox fx:id="organizationTypeAdministrationSection" spacing="8" styleClass="strong-panel">
+				<padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+				<Label text="Organization Types" styleClass="search-section-title"/>
+				<Label text="Global definitions are read-only but can be customized for this firm. Inactive or removed definitions remain available for historical assignments." styleClass="search-summary-text" wrapText="true"/>
+				<VBox fx:id="organizationTypeAdministrationContent" spacing="8"/>
+			</VBox>
 
             <VBox fx:id="userAdministrationSection" spacing="8" styleClass="strong-panel">
                 <padding>

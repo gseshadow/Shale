@@ -251,33 +251,33 @@
     -fx-min-height: 30;
     -fx-background-radius: 999;
     -fx-border-radius: 999;
-    -fx-background-color: rgba(18, 38, 69, 0.18);
-    -fx-border-color: rgba(232, 242, 255, 0.26);
+    -fx-background-color: -shale-color-section-tab-surface;
+    -fx-border-color: rgba(38, 75, 119, 0.20);
     -fx-border-width: 1;
-    -fx-text-fill: rgba(232, 242, 255, 0.88);
+    -fx-text-fill: -shale-color-section-tab-text;
     -fx-font-weight: 600;
     -fx-cursor: hand;
 }
 
 .app-section-tab:hover {
-    -fx-background-color: rgba(34, 66, 109, 0.26);
-    -fx-border-color: rgba(232, 242, 255, 0.42);
+    -fx-background-color: -shale-color-section-tab-hover-surface;
+    -fx-border-color: rgba(38, 75, 119, 0.34);
 }
 
 .app-section-tab:pressed {
-    -fx-background-color: rgba(34, 66, 109, 0.38);
-    -fx-border-color: rgba(232, 242, 255, 0.52);
+    -fx-background-color: -shale-color-section-tab-pressed-surface;
+    -fx-border-color: rgba(38, 75, 119, 0.46);
 }
 
 .app-section-tab:focused {
-    -fx-border-color: rgba(220, 237, 255, 0.92);
-    -fx-effect: dropshadow(gaussian, rgba(159, 196, 255, 0.48), 5, 0.22, 0, 0);
+    -fx-border-color: #386db7;
+    -fx-effect: dropshadow(gaussian, rgba(56, 109, 183, 0.42), 5, 0.22, 0, 0);
 }
 
 .app-section-tab-active {
-    -fx-background-color: rgba(84, 130, 195, 0.58);
+    -fx-background-color: -shale-color-section-tab-selected-surface;
     -fx-border-color: #9fc4ff;
-    -fx-text-fill: #f8fbff;
+    -fx-text-fill: -shale-color-section-tab-selected-text;
     -fx-font-weight: 800;
 }
 
@@ -286,11 +286,11 @@
 }
 
 .app-section-tab-active:hover {
-    -fx-background-color: rgba(84, 130, 195, 0.70);
+    -fx-background-color: #3f72bd;
 }
 
 .app-section-tab-active:pressed {
-    -fx-background-color: rgba(84, 130, 195, 0.82);
+    -fx-background-color: #3565aa;
 }
 
 .app-section-tab:disabled {
@@ -305,7 +305,10 @@
 
 .app-section-tabs-scroll {
     -fx-background-insets: 0;
-    -fx-padding: 0;
+}
+
+.app-section-tabs-row {
+    -fx-padding: 6 0 6 0;
 }
 
 
@@ -1727,6 +1730,12 @@
     -fx-border-width: 0 0 1 0;
 }
 
+.case-overview-editor-row { -fx-padding: 9px 10px; -fx-background-radius: 9px; -fx-border-radius: 9px; -fx-border-color: rgba(74,104,138,.18); }
+.case-overview-editor-row-selected { -fx-background-color: rgba(34,112,128,.10); -fx-border-color: rgba(34,112,128,.35); }
+.case-overview-date-color { -fx-min-width: 10px; -fx-pref-width: 10px; -fx-min-height: 26px; -fx-background-radius: 5px; }
+.case-overview-configured-dates { -fx-spacing: 7px; -fx-padding: 5px 0; }
+.case-overview-configured-date-row { -fx-alignment: center-left; -fx-spacing: 10px; }
+
 .case-overview-party-side {
     -fx-padding: 9 0 3 8;
     -fx-text-fill: -shale-color-text-primary;
@@ -2642,3 +2651,324 @@
 }
 .status-timeline--compact .scroll-bar:horizontal .track { -fx-background-color: rgba(91,103,124,0.10); }
 .status-timeline--compact .scroll-bar:horizontal .thumb { -fx-background-color: rgba(91,103,124,0.38); }
+/* Contact classification administration uses the shared strong-panel Settings
+   surface; only its internal layout needs Contact-specific styling. */
+.contact-classification-admin { -fx-spacing: 14px; }
+.contact-classification-tabs {
+    -fx-tab-min-height: 38px;
+    -fx-tab-max-height: 38px;
+    -fx-pref-height: 42px;
+    -fx-max-height: 42px;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+.contact-classification-tabs > .tab-header-area { -fx-padding: 0; }
+.contact-classification-tabs > .tab-header-area > .tab-header-background { -fx-background-color: transparent; }
+.contact-classification-tabs > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: rgba(17,37,66,0.06);
+    -fx-background-radius: 9px 9px 0 0;
+    -fx-border-color: rgba(17,37,66,0.13);
+    -fx-border-radius: 9px 9px 0 0;
+    -fx-padding: 0 18px;
+    -fx-cursor: hand;
+}
+.contact-classification-tabs > .tab-header-area > .headers-region > .tab:hover {
+    -fx-background-color: rgba(75,127,206,0.12);
+}
+.contact-classification-tabs > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: rgba(255,255,255,0.96);
+    -fx-border-color: rgba(75,127,206,0.48);
+}
+.contact-classification-tabs > .tab-header-area > .headers-region > .tab:focused {
+    -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 9, 0.2, 0, 0);
+}
+.contact-classification-tabs .tab-label { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 700; }
+.contact-classification-tabs > .tab-content-area { -fx-background-color: transparent; -fx-padding: 0; }
+.contact-classification-toolbar {
+    -fx-alignment: center-left;
+    -fx-padding: 4px 0;
+}
+.contact-classification-toggle {
+    -fx-min-height: 40px;
+    -fx-padding: 8px 12px;
+    -fx-background-color: rgba(248,250,252,0.94);
+    -fx-background-radius: 10px;
+    -fx-border-color: -shale-control-border;
+    -fx-border-radius: 10px;
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+}
+.contact-classification-toggle:hover { -fx-background-color: white; -fx-border-color: -shale-control-border-hover; }
+.contact-classification-toggle:focused { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 10, 0.2, 0, 0); }
+.contact-classification-toggle > .box { -fx-background-color: white; -fx-border-color: rgba(17,37,66,0.35); -fx-border-radius: 4px; -fx-background-radius: 4px; }
+.contact-classification-toggle:selected > .box { -fx-background-color: #315fba; -fx-border-color: #315fba; }
+.contact-classification-toggle:selected > .box > .mark { -fx-background-color: white; }
+.contact-classification-list { -fx-spacing: 12px; }
+.contact-classification-card {
+    -fx-padding: 16px;
+    -fx-spacing: 8px;
+    -fx-max-width: 100000px;
+}
+.contact-classification-card-subdued { -fx-opacity: 0.78; }
+.contact-classification-card-title { -fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
+.contact-classification-abbreviation {
+    -fx-padding: 3px 8px;
+    -fx-background-color: rgba(75,127,206,0.12);
+    -fx-background-radius: 999px;
+    -fx-text-fill: #294f87;
+    -fx-font-weight: 800;
+}
+.contact-classification-metadata { -fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.68); }
+.contact-classification-description { -fx-text-fill: rgba(17,37,66,0.88); }
+.contact-classification-description-missing { -fx-text-fill: rgba(17,37,66,0.54); -fx-font-style: italic; }
+.contact-classification-badge {
+    -fx-padding: 3px 8px;
+    -fx-background-radius: 999px;
+    -fx-border-radius: 999px;
+    -fx-border-width: 1px;
+    -fx-font-size: 10px;
+    -fx-font-weight: 800;
+}
+.contact-classification-badge.origin-global { -fx-background-color: #eef3f8; -fx-border-color: #a9b8c8; -fx-text-fill: #34495e; }
+.contact-classification-badge.origin-custom { -fx-background-color: #edf7f2; -fx-border-color: #91bea5; -fx-text-fill: #225e40; }
+.contact-classification-badge.origin-override { -fx-background-color: #f2effb; -fx-border-color: #afa1d4; -fx-text-fill: #513c86; }
+.contact-classification-badge.state-effective,
+.contact-classification-badge.state-global-fallback { -fx-background-color: #eef7ff; -fx-border-color: #95b9da; -fx-text-fill: #245a83; }
+.contact-classification-badge.state-overridden,
+.contact-classification-badge.state-global-masked,
+.contact-classification-badge.state-ineffective { -fx-background-color: #f7f2e8; -fx-border-color: #c8ad72; -fx-text-fill: #70551f; }
+.contact-classification-badge.state-inactive { -fx-background-color: #fff4df; -fx-border-color: #d7aa56; -fx-text-fill: #704b08; }
+.contact-classification-badge.state-removed { -fx-background-color: #f8eaea; -fx-border-color: #ce9292; -fx-text-fill: #7b2828; }
+.contact-classification-card-actions { -fx-padding: 5px 0 0 0; }
+.button.contact-classification-caution { -fx-text-fill: #774d00; -fx-border-color: rgba(151,102,12,0.42); -fx-background-color: rgba(255,244,220,0.8); }
+.button.contact-classification-caution:hover { -fx-background-color: rgba(255,232,184,0.92); }
+.contact-classification-status,
+.contact-classification-state-message {
+    -fx-padding: 12px 14px;
+    -fx-background-radius: 9px;
+    -fx-border-radius: 9px;
+    -fx-wrap-text: true;
+}
+.contact-classification-status-loading { -fx-background-color: #eef5fb; -fx-border-color: #a9c5dc; -fx-text-fill: #254e70; }
+.contact-classification-status-error,
+.contact-classification-status-stale { -fx-background-color: #fff2f0; -fx-border-color: #d99891; -fx-text-fill: #7a2922; }
+.contact-classification-empty { -fx-background-color: rgba(248,250,252,0.82); -fx-border-color: rgba(17,37,66,0.14); -fx-text-fill: rgba(17,37,66,0.72); }
+.dialog-pane.contact-classification-dialog { -fx-pref-width: 580px; }
+.dialog-pane.organization-type-dialog { -fx-min-width: 500px; }
+.contact-classification-dialog-body { -fx-padding: 4px 0; }
+.contact-classification-dialog-context { -fx-text-fill: rgba(17,37,66,0.75); }
+.contact-classification-form .label { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 700; }
+.contact-classification-form .text-area { -fx-pref-height: 118px; -fx-max-width: 100000px; }
+.contact-classification-form .text-area .scroll-bar:horizontal { -fx-opacity: 0; -fx-pref-height: 0; -fx-max-height: 0; }
+.text-field.contact-classification-readonly {
+    -fx-background-color: rgba(226,232,240,0.9);
+    -fx-border-color: rgba(17,37,66,0.24);
+    -fx-text-fill: rgba(17,37,66,0.76);
+}
+.contact-classification-field-help { -fx-font-size: 10px; -fx-text-fill: rgba(17,37,66,0.62); }
+.contact-classification-editor-error { -fx-text-fill: #8b2525; -fx-font-weight: 700; }
+
+.contact-classification-color-swatch {
+    -fx-min-width: 16px;
+    -fx-pref-width: 16px;
+    -fx-max-width: 16px;
+    -fx-min-height: 16px;
+    -fx-pref-height: 16px;
+    -fx-max-height: 16px;
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+    -fx-border-width: 2px;
+    -fx-border-color: rgba(16, 34, 62, 0.58);
+}
+.contact-classification-card-subdued .contact-classification-color-swatch {
+    -fx-opacity: 0.72;
+}
+
+/* Organization Type Settings uses compact horizontal definition rows without
+   changing the shared Contact classification cards or Organization cards. */
+.organization-type-definition-card {
+    -fx-padding: 10px 12px;
+    -fx-spacing: 10px;
+    -fx-max-width: 100000px;
+    -fx-alignment: center-left;
+}
+.organization-type-definition-card .organization-type-card-badges {
+    -fx-alignment: center-left;
+}
+.organization-type-definition-card .organization-type-card-actions {
+    -fx-alignment: center-right;
+}
+
+/* Phase 2B Contact profile and aggregate editor */
+.contact-profile-panel,
+.contact-classifications-panel {
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-border-color: -shale-color-strong-panel-border;
+    -fx-border-width: 1px;
+}
+.contact-profile-panel { -fx-padding: 14px; }
+.contact-classifications-panel { -fx-background-color: -shale-color-dialog-surface; }
+.contact-section-title { -fx-font-size: 16px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
+.contact-group-label { -fx-font-size: 11px; -fx-font-weight: 800; -fx-text-fill: rgba(17,37,66,.72); }
+.contact-information-rows .case-overview-row-label { -fx-text-fill: rgba(17,37,66,.72); -fx-font-weight: 700; -fx-padding: 6px 0; }
+.contact-information-rows .case-overview-row-value { -fx-text-fill: -shale-color-text-primary; -fx-padding: 6px 0; }
+.contact-empty-state {
+    -fx-background-color: rgba(248,250,252,.88);
+    -fx-background-radius: 7px;
+    -fx-border-color: rgba(17,37,66,.15);
+    -fx-border-radius: 7px;
+    -fx-padding: 7px 10px;
+    -fx-text-fill: rgba(17,37,66,.72);
+}
+.contact-classification-chip {
+    -fx-background-radius: 999px; -fx-border-radius: 999px;
+    -fx-padding: 4px 9px; -fx-border-width: 1px; -fx-font-weight: 700;
+    -fx-text-fill: -shale-color-text-primary;
+}
+.contact-classification-chip-compact { -fx-padding: 2px 7px; -fx-font-size: 10px; }
+.contact-classification-chip-standard { -fx-padding: 4px 9px; -fx-font-size: 12px; }
+.dialog-pane.contact-editor-dialog > .content { -fx-padding: 0 18px 14px 18px; }
+.contact-editor-surface {
+    -fx-background-color: -shale-color-dialog-surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -shale-color-strong-panel-border;
+    -fx-border-radius: 12px;
+    -fx-border-width: 1px;
+    -fx-padding: 14px;
+}
+.contact-editor-navigation {
+    -fx-background-color: rgba(232,241,251,.72);
+    -fx-background-radius: 9px;
+    -fx-padding: 4px;
+}
+.contact-editor-navigation-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 7px;
+    -fx-border-color: transparent;
+    -fx-border-radius: 7px;
+    -fx-padding: 8px 10px;
+    -fx-text-fill: rgba(17,37,66,.76);
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+}
+.contact-editor-navigation-button:hover { -fx-background-color: rgba(255,255,255,.72); }
+.contact-editor-navigation-button:selected { -fx-background-color: white; -fx-text-fill: -shale-color-text-primary; -fx-effect: dropshadow(gaussian, rgba(17,37,66,.16), 7, .12, 0, 1); }
+.contact-editor-navigation-button:focused { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 8, .18, 0, 0); }
+.contact-editor-content { -fx-min-height: 390px; }
+.contact-editor-section-scroll,
+.contact-editor-section-scroll > .viewport { -fx-background-color: transparent; }
+.contact-editor-section-scroll { -fx-border-color: transparent; -fx-padding: 2px; }
+.contact-editor-name-form { -fx-padding: 8px 4px; }
+.contact-editor-field-label { -fx-text-fill: rgba(17,37,66,.76); -fx-font-weight: 700; }
+.contact-editor-name-field { -fx-pref-width: 100000px; }
+.contact-editor-name-preview {
+    -fx-background-color: rgba(232,241,251,.58);
+    -fx-background-radius: 8px;
+    -fx-border-color: rgba(17,37,66,.14);
+    -fx-border-radius: 8px;
+    -fx-padding: 11px 12px;
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-font-weight: 600;
+}
+.contact-editor-choice-row,
+.contact-editor-credential-row {
+    -fx-background-color: rgba(248,250,252,.9);
+    -fx-background-radius: 8px;
+    -fx-border-color: rgba(17,37,66,.15);
+    -fx-border-radius: 8px;
+    -fx-padding: 8px 10px;
+}
+.contact-editor-choice-row:hover,
+.contact-editor-credential-row:hover { -fx-background-color: rgba(237,244,251,.96); -fx-border-color: -shale-control-border-hover; }
+.contact-editor-color-swatch { -fx-min-width: 16px; -fx-pref-width: 16px; -fx-max-width: 16px; -fx-min-height: 16px; -fx-pref-height: 16px; -fx-max-height: 16px; -fx-background-radius: 4px; -fx-border-radius: 4px; -fx-border-width: 2px; }
+.contact-editor-choice-checkbox { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 600; -fx-cursor: hand; }
+.contact-editor-choice-checkbox > .box { -fx-background-color: white; -fx-border-color: rgba(17,37,66,.38); -fx-border-radius: 4px; -fx-background-radius: 4px; }
+.contact-editor-choice-checkbox:hover > .box { -fx-border-color: -shale-control-border-hover; }
+.contact-editor-choice-checkbox:focused > .box { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 7, .16, 0, 0); }
+.contact-editor-choice-checkbox:selected > .box { -fx-background-color: -shale-button-dialog-primary-background; -fx-border-color: -shale-button-dialog-primary-background; }
+.contact-editor-choice-checkbox:selected > .box > .mark { -fx-background-color: white; }
+.contact-editor-choice-checkbox:disabled { -fx-opacity: .58; }
+.contact-editor-choice-historical { -fx-font-style: italic; }
+.contact-editor-credential-row > .contact-editor-choice-row { -fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 0; }
+.contact-editor-credential-row .shale-control-small:disabled { -fx-opacity: .45; }
+.contact-editor-surface .shale-loading-placeholder,
+.contact-editor-surface .shale-empty-state { -fx-background-color: rgba(248,250,252,.88); -fx-background-radius: 8px; }
+.contact-editor-surface .dialog-error-text { -fx-background-color: rgba(255,242,240,.92); -fx-padding: 8px; }
+.contact-personal-details,
+.contact-methods-surface { -fx-background-color: rgba(255,255,255,.58); -fx-background-radius: 10px; -fx-border-color: rgba(17,37,66,.12); -fx-border-radius: 10px; -fx-padding: 12px; }
+.contact-subsection-title { -fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
+.contact-method-category { -fx-padding: 5px 0 0 0; }
+.contact-condition-value { -fx-padding: 6px 0; }
+.contact-point-card { -fx-background-color: rgba(248,250,252,.96); -fx-background-radius: 9px; -fx-border-color: rgba(17,37,66,.16); -fx-border-radius: 9px; -fx-padding: 10px 11px; -fx-max-width: 100000px; }
+.contact-point-card.removed { -fx-opacity: .68; -fx-border-style: segments(5px,4px); }
+.contact-point-value { -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; -fx-wrap-text: true; }
+.contact-point-badge { -fx-background-color: rgba(220,232,245,.9); -fx-background-radius: 999px; -fx-padding: 3px 7px; -fx-font-size: 10px; -fx-font-weight: 800; }
+.contact-point-primary { -fx-background-color: rgba(211,240,222,.95); }
+.contact-point-legacy { -fx-background-color: rgba(255,236,194,.95); }
+.contact-editor-section-heading { -fx-font-size: 15px; -fx-font-weight: 800; }
+.contact-editor-toolbar { -fx-padding: 2px 0 8px 0; }
+.contact-filter-controls { -fx-alignment: center-left; -fx-padding: 0; }
+.shale-filter-trigger {
+    -fx-min-height: 32px; -fx-pref-height: 32px; -fx-padding: 0 11px;
+    -fx-background-color: -shale-control-surface; -fx-background-radius: 8px;
+    -fx-border-color: -shale-control-border; -fx-border-radius: 8px;
+    -fx-text-fill: -shale-color-text-primary; -fx-cursor: hand;
+}
+.shale-filter-trigger:hover { -fx-background-color: -shale-control-surface-hover; -fx-border-color: -shale-control-border-hover; }
+.shale-filter-trigger:armed, .shale-filter-trigger:showing { -fx-background-color: -shale-control-surface-pressed; -fx-border-color: -shale-control-focus-border; }
+.shale-filter-trigger:focused { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 7, .14, 0, 0); }
+.shale-filter-trigger:disabled { -fx-opacity: .58; }
+.shale-filter-trigger-content > .label { -fx-text-fill: -shale-color-text-primary; -fx-font-size: 12px; -fx-font-weight: 700; }
+.shale-filter-popup { -fx-min-width: 210px; -fx-padding: 7px; -fx-background-color: -shale-color-dialog-surface; -fx-background-radius: 10px; -fx-border-color: -shale-color-strong-panel-border; -fx-border-radius: 10px; -fx-effect: dropshadow(gaussian, rgba(17,37,66,.24), 16, .14, 0, 5); }
+.shale-filter-option { -fx-alignment: center-left; -fx-padding: 8px 10px; -fx-background-color: transparent; -fx-background-radius: 7px; -fx-border-color: transparent transparent transparent -shale-definition-color; -fx-border-width: 0 0 0 3px; -fx-border-radius: 7px; -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 600; -fx-cursor: hand; }
+.shale-filter-option:hover, .shale-filter-option:focused { -fx-background-color: -shale-control-surface-hover; }
+.shale-filter-option:selected { -fx-background-color: derive(-shale-control-surface-hover, -3%); -fx-font-weight: 800; }
+.contact-filter-menu {
+    -fx-background-color: -shale-color-dialog-surface; -fx-background-radius: 8px;
+    -fx-border-color: -shale-control-border; -fx-border-radius: 8px; -fx-border-width: 1px;
+    -fx-padding: 1px 2px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; -fx-cursor: hand;
+}
+.contact-filter-menu:hover { -fx-background-color: rgba(232,241,251,.9); -fx-border-color: -shale-control-border-hover; }
+.contact-filter-menu:focused, .contact-filter-menu:showing { -fx-border-color: -shale-control-focus-border; -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 7, .14, 0, 0); }
+.contact-filter-menu > .arrow-button { -fx-padding: 0 7px; }
+.contact-filter-menu > .arrow-button > .arrow { -fx-background-color: -shale-color-text-primary; -fx-shape: "M 0 0 L 4 4 L 8 0 Z"; }
+.contact-filter-menu .context-menu { -fx-background-color: -shale-color-dialog-surface; -fx-background-radius: 9px; -fx-border-color: -shale-color-strong-panel-border; -fx-border-radius: 9px; -fx-padding: 6px; -fx-effect: dropshadow(gaussian, rgba(17,37,66,.2), 14, .12, 0, 4); }
+.contact-filter-menu .menu-item { -fx-background-radius: 6px; -fx-padding: 7px 10px; }
+.contact-filter-menu .menu-item:focused { -fx-background-color: rgba(220,232,245,.92); }
+.contact-filter-menu .menu-item > .label { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 600; }
+.contact-filter-menu .check-menu-item:checked > .left-container > .check { -fx-background-color: -shale-button-dialog-primary-background; }
+.contact-filter-count { -fx-background-color: rgba(220,232,245,.72); -fx-background-radius: 999px; -fx-padding: 5px 9px; -fx-text-fill: -shale-color-text-primary; -fx-font-size: 11px; -fx-font-weight: 800; }
+.contact-filter-clear { -fx-background-color: transparent; -fx-border-color: transparent; -fx-text-fill: -shale-button-dialog-primary-background; -fx-font-weight: 800; -fx-cursor: hand; }
+.contact-filter-clear:hover { -fx-background-color: rgba(220,232,245,.68); -fx-background-radius: 7px; }
+.contact-filter-clear:focused { -fx-border-color: -shale-control-focus-border; -fx-border-radius: 7px; }
+.contact-filter-clear:disabled { -fx-opacity: .42; }
+.contact-filter-chip { -fx-background-radius: 999px; -fx-border-radius: 999px; -fx-border-width: 1px; -fx-padding: 4px 9px; -fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; -fx-cursor: hand; }
+.contact-filter-chip:hover { -fx-opacity: .82; -fx-effect: dropshadow(gaussian, rgba(17,37,66,.14), 5, .1, 0, 1); }
+.contact-filter-chip:focused { -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 7, .16, 0, 0); }
+.contact-filter-option { -fx-background-radius: 6px; -fx-padding: 7px 10px; }
+.contact-filter-option:focused { -fx-background-color: rgba(220,232,245,.92); }
+.contact-filter-option > .label { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 600; }
+.contact-filter-option:checked > .left-container > .check { -fx-background-color: -shale-button-dialog-primary-background; }
+
+/* Phase 3 Case Team editor */
+.case-team-editor-heading { -fx-font-size: 20px; -fx-font-weight: bold; }
+.case-team-editor-support, .case-team-no-roles { -fx-text-fill: -shale-color-text-muted; }
+.case-team-editor-label, .case-team-member-name { -fx-font-weight: bold; }
+.case-team-member-card { -fx-background-color: -shale-color-card-surface; -fx-background-radius: 10; -fx-border-color: -shale-color-border; -fx-border-radius: 10; -fx-padding: 10; }
+.case-team-role-chip { -fx-alignment: center-left; -fx-background-color: -shale-color-content-surface; -fx-background-radius: 999; -fx-padding: 2 4 2 9; }
+.case-team-role-chip-inactive { -fx-opacity: .68; -fx-border-color: -shale-color-border; -fx-border-radius: 999; }
+.case-team-editor-footer { -fx-padding: 10 0 0 0; }
+.case-team-editor-error { -fx-text-fill: -shale-control-danger-text; }
+.case-team-search-results { -fx-min-height: 146px; -fx-pref-height: 146px; -fx-max-height: 146px; -fx-background-color: -shale-color-content-surface; -fx-border-color: -shale-color-border; -fx-border-radius: 8px; }
+.case-team-search-results .list-cell { -fx-padding: 3px 5px; -fx-background-color: transparent; }
+.case-team-search-card { -fx-alignment: center-left; -fx-padding: 5px 8px; -fx-background-radius: 7px; }
+.case-team-search-results .list-cell:hover .case-team-search-card { -fx-background-color: rgba(220,232,245,.62); }
+.case-team-search-results .list-cell:pressed .case-team-search-card { -fx-background-color: rgba(205,222,240,.78); }
+.case-team-search-results .list-cell:selected .case-team-search-card { -fx-background-color: rgba(198,220,240,.82); -fx-border-color: -shale-control-focus-border; -fx-border-radius: 7px; }
+.case-team-search-results:focused .list-cell:selected .case-team-search-card { -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 6, .12, 0, 0); }
+.case-team-search-initials { -fx-min-width: 28px; -fx-pref-width: 28px; -fx-min-height: 28px; -fx-alignment: center; -fx-background-radius: 999px; -fx-text-fill: white; -fx-font-size: 10px; -fx-font-weight: bold; }
+.case-team-search-add { -fx-text-fill: -shale-button-dialog-primary-background; -fx-font-size: 11px; -fx-font-weight: bold; }
+.classification-chip-primary { -fx-font-weight: 700; }

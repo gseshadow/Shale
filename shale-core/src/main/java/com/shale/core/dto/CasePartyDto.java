@@ -1,6 +1,8 @@
 package com.shale.core.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import com.shale.core.service.ContactServicePort.ClassificationPresentation;
 
 /**
  * Unified case-party row DTO for contact and organization party links.
@@ -23,6 +25,8 @@ public final class CasePartyDto {
 	private final String displayName;
 	private final String email;
 	private final String phone;
+	private final List<String> credentialAbbreviations;
+	private final List<ClassificationPresentation> classifications;
 
 	public CasePartyDto(long id,
 			long caseId,
@@ -39,7 +43,9 @@ public final class CasePartyDto {
 			String entityType,
 			String displayName,
 			String email,
-			String phone) {
+			String phone,
+			List<String> credentialAbbreviations,
+			List<ClassificationPresentation> classifications) {
 		this.id = id;
 		this.caseId = caseId;
 		this.contactId = contactId;
@@ -56,6 +62,8 @@ public final class CasePartyDto {
 		this.displayName = displayName == null ? "" : displayName;
 		this.email = email == null ? "" : email;
 		this.phone = phone == null ? "" : phone;
+		this.credentialAbbreviations = List.copyOf(credentialAbbreviations);
+		this.classifications = List.copyOf(classifications);
 	}
 
 	public long getId() { return id; }
@@ -74,4 +82,6 @@ public final class CasePartyDto {
 	public String getDisplayName() { return displayName; }
 	public String getEmail() { return email; }
 	public String getPhone() { return phone; }
+	public List<String> getCredentialAbbreviations() { return credentialAbbreviations; }
+	public List<ClassificationPresentation> getClassifications() { return classifications; }
 }

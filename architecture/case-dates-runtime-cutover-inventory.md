@@ -4,6 +4,20 @@
 
 This is the Phase 3D inventory and cutover plan. Phase 3B backfill and Phase 3C post-validation are complete: 2,233 eligible source rows reconcile exactly, `BlockerCount = 0`, and 610 flag-set/date-missing rows are intentional historical anomalies. The inventory assumes those deployed results and must not rerun, repair, or reinterpret them.
 
+### Final New Intake authority and reconciliation (2026-08-14)
+
+Desktop New Intake now carries the displayed or edited Intake date/time into the existing aggregate
+transaction and persists it as a timed authoritative `CaseDates` occurrence. The type is resolved by
+the tenant-effective protected `INTAKE` semantic role. Case creation, configured occurrences, parties,
+status work, and required PHI/entity-action audits remain atomic. `Cases.CallerDate` and `CallerTime`
+are legacy reconciliation/history inputs only; the Cases list displays and sorts Intake Date from the
+authoritative occurrence.
+
+The forward-only, idempotent production reconciliation inserted 21 missing Intake occurrences for
+`ShaleClientId = 7`. It created no `CalendarEvent`; Calendar continues to project `CaseDates` directly.
+Earlier statements in this chronological inventory that describe New Intake as deferred are retained
+only as historical gate records and are superseded by this section.
+
 ### Existing-case server and React cutover (2026-08-12)
 
 The existing `GET /api/cases/{id}` and `PATCH /api/cases/{id}/core-details` round trip now carries the established complete nine-slot snapshot. Each slot has its enum key and canonical SystemKey, stored type id, occurrence id/RowVer and value when present, or an explicit absent flag and witnessed `Cases.RowVer`. The server derives tenant and actor from the authenticated runtime session; request identity is never authoritative. The React detail and currently exposed core editor use stable SystemKeys, preserve absent slots without creating them, preserve unedited timed intake values, and display a reload-required conflict without retrying.
@@ -95,7 +109,7 @@ This gate deliberately converts **no production writer**: desktop (through `shal
 | --- | --- | --- |
 | `shale-data/src/main/java/com/shale/data/dao/CaseDao.java` | Case create/update SQL writes all nine migrated columns; detail, overview/grid/search and selection queries read subsets; PHI change auditing names injury and both medical dates. Existing broad updates also touch `Cases.UpdatedAt` and use the case row version. | **CONVERT (highest risk).** Remove migrated columns from ordinary `INSERT`/`UPDATE` ownership and hydrate legacy-shaped consumers from one tenant-scoped, effective-SystemKey occurrence projection. Mutations must resolve the exact tenant-effective type, update/create the single mapped occurrence transactionally with expected `CaseDates.RowVer`, retain PHI/entity audit, and touch `Cases.UpdatedAt`. Do not dual-write legacy columns. |
 | `shale-data/src/main/java/com/shale/data/dao/CalendarFeedDao.java` | **COMPLETED:** the former `CASE_DATE_PROJECTIONS` loop selected nine migrated `dbo.Cases` columns and emitted `CASE_SOL`, `CASE_TORT`, `CASE_DISC`, `CASE_CALLER`, `CASE_INJURY`, `CASE_FEE_AGREEMENT`, `CASE_NON_ENGAGEMENT`, `CASE_MED_NEG`, and `CASE_MED_NEG_DISCOVERED` entries beside authoritative occurrences. | Calendar now reads authoritative `CASE_DATE:<CaseDates.Id>` occurrences only for migrated meanings. It retains genuine `CalendarEvents`, task due dates, and the explicitly named `AcceptedDate`, `DeniedDate`, and `ClosedDate` lifecycle projections. There is no migrated legacy fallback and no Calendar CaseDates writer. |
-| `shale-data/src/main/java/com/shale/data/dao/OrganizationDao.java` and `ContactDao.java` | **PARTIALLY COMPLETED:** desktop Contact/Organization and server/web Organization related Cases use `CaseSummaryDao`; `ContactDao.findRelatedCases` remains for deferred server/contact compatibility. The removed `OrganizationDao.findRelatedCases` formerly selected legacy intake, SOL, and tort columns. | **SERVER ORGANIZATION AUTHORITATIVE.** `GET /api/organizations/{organizationId}` now reuses the set-based, tenant-safe `CaseSummaryDao.RelatedCaseRow` projection. Server Case search and assigned Cases are the next recommended cutover. |
+| `shale-data/src/main/java/com/shale/data/dao/OrganizationDao.java` and `ContactDao.java` | **PARTIALLY COMPLETED:** desktop Contact/Organization and server/web Organization related Cases use `CaseSummaryDao`; `ContactDao.findRelatedCases` remains for deferred server/contact compatibility. The removed `OrganizationDao.findRelatedCases` formerly selected legacy intake, SOL, and tort columns. | **SERVER ORGANIZATION AUTHORITATIVE.** `GET /api/organizations/{organizationId}` now reuses the set-based, tenant-safe `CaseSummaryDao.RelatedCaseRow` projection. Server Case search and assigned Cases were the next recommended cutover at that checkpoint and are now complete. |
 | `shale-data/src/main/java/com/shale/data/service/adapter/CaseServiceAdapter.java` | Web/core create and core-detail commands pass caller/injury/SOL/tort values into `CaseDao`; desktop generic case updates transit here as well. Existing occurrence APIs accept type ids rather than stable migrated meanings. | **CONVERT / REVIEW.** Add an actor-aware stable-key mutation boundary for mapped singleton meanings and coordinate case plus occurrence writes in one transaction. Decide expected occurrence row-version representation for legacy-shaped editors before coding; never bypass current type/case/actor validation. |
 | Other `shale-data` production DAOs (`TaskDao`, `NotificationDao`) | Matches for `NonEngagementLetterSent` are the workflow flag used to decorate task/notification case cards, not the migrated date. | **KEEP (not a date dependency).** Preserve the workflow flag and do not synthesize `non_engagement_letter_sent` when it is true and its date occurrence is absent. |
 
@@ -244,4 +258,146 @@ The production path `GET /api/organizations/{organizationId}` → `OrganizationS
 
 The shared query preserves trusted session/request tenant equality, active nondeleted Organization and Case predicates, one result per `CaseParties.Id`, Party Role identity/presentation, primary state, responsible-attorney metadata, and primary-first Case-name/Case-ID/relationship-ID ordering. It resolves dates set-wise from stored `CaseDateTypeId` identities and active tenant-effective semantic-role mappings, retaining historical type presentation behavior and performing no per-Case hydration. `OrganizationDao.findRelatedCases` was removed after call-site verification found no remaining production consumer; `ContactDao.findRelatedCases` is intentionally retained. Existing Organization detail PHI-read behavior is unchanged because the controller/session and response boundary did not change and this slice adds no mutation or audit event.
 
-The active Organization path no longer reads or falls back to `Cases.CallerDate`, `Cases.StatuteOfLimitations`, or `Cases.TortNoticeDeadline`. Server Case search and assigned Cases are the next recommended runtime cutover; User detail, Documents, `CaseOverviewDto`, Calendar, and mutations remain deferred.
+The active Organization path no longer reads or falls back to `Cases.CallerDate`, `Cases.StatuteOfLimitations`, or `Cases.TortNoticeDeadline`. Server Case search, server assigned Cases, and desktop User Detail assigned Cases are now complete; Documents, `CaseOverviewDto`, and mutations remain deferred.
+
+## Server/web search and My Cases runtime cutover
+
+Server/web Case search (list and page endpoints) and assigned/My Cases now use the bounded
+`CaseSummaryDao` server projection with authoritative tenant-effective semantic Case Dates. The
+legacy ID lookup plus per-result `CaseDao.getOverview` hydration is removed. Existing response fields,
+matching, paging/limits, assignment scope, responsible-attorney metadata, null behavior, and ISO
+`LocalDate` serialization are retained. `CaseDao.getOverview` remains for explicitly deferred desktop
+Case View/document compatibility. Desktop User Detail assigned Cases now uses `CaseSummaryDao.listActiveAssignedForUserDetail` with a bounded, set-based authoritative CaseDates projection and the existing card contract. The legacy `CaseDao.listActiveCasesForUserTeamMember` method was removed after no-caller verification. Desktop document generation and `CaseDao.getOverview` cleanup are the next remaining cutover. Live SQL Server verification was not performed.
+
+
+## Desktop User Detail assigned Cases runtime cutover
+
+`SceneManager.createUserView` → `UserController.refreshAssignedCasesAsync` →
+`UserDetailService.loadAssignedCases` now delegates to the consumer-specific
+`CaseSummaryDao.listActiveAssignedForUserDetail` projection and maps it to the unchanged `CaseRow` /
+shared Case-card contract. One bounded statement applies authenticated tenant scope, selected-user
+`CaseUsers` membership, active/nondeleted Case eligibility, the existing result limit, deterministic
+authoritative-intake-descending then Case-ID-descending ordering, and set-based optional card metadata.
+Tenant-effective protected mappings resolve intake, statute, and tort; `date_of_injury` remains the
+authoritative injury type identity. Missing occurrences stay null, and neither workflow flags nor other
+dates fabricate them. The controller's executor, generation, selected-user, and cache-tenant staleness
+guards are unchanged.
+
+The legacy `CaseDao.listActiveCasesForUserTeamMember` query and its obsolete SQL test were removed after
+production no-caller proof; focused authoritative and no-caller coverage replaces it. No live SQL Server
+verification was performed. Desktop document generation and `CaseDao.getOverview` cleanup are next.
+
+## Final runtime compatibility cleanup and desktop intake hardening (2026-08-13)
+
+Production call-site reconfirmation found no runtime consumer of the scalar
+`CaseDao.createBasicCase`/`insertBasicCase`, `CaseDao.updateCase`,
+`CaseDao.updateCaseDetails`, `ContactDao.findRelatedCases`,
+`CaseDao.findMyCasesPage`, `CaseDao.listAssignedCasesForBoard`,
+`CaseDao.searchCasesByName`, `CaseDao.searchDeletedCasesByName`,
+`CaseDao.getCaseRow`, `CaseDao.getMyCaseRow`, or the two legacy Case Status report
+methods. The production replacements were already `CaseDateDao.createCaseAggregate`,
+non-migrated and authoritative aggregate update boundaries, `CaseSummaryDao` related,
+search/deleted, assigned/MyShale, report, export, and single-row projections. Those
+dead methods and the unused `CaseGateway.updateCase` declaration/delegation were
+removed. The active web creation gateway was renamed `createCaseAggregate`; it still
+delegates to the single `CaseDateDao` aggregate transaction and is not a second create
+path. Broad `CaseDao` paging composition no longer has a legacy-date mode: when date
+sorting is requested it always resolves `CaseDates`, and its compatibility-shaped date
+columns are null rather than selected from `Cases`.
+
+Desktop New Intake now requires the current authoritative `NEW_INTAKE`
+`FormConfigurations` row and matching row version. A missing configuration raises the
+existing safe reload/configuration exception during validation, before party-role
+seeding, Contact, Case, CaseDate, status, party, audit, timeline, publication, or any
+other persistence. A changed configuration retains the same fail-closed reload
+message. The only reachable Case insert is the configured insert, which omits all nine
+migrated date meanings (and `CallerTime`); configured values create `CaseDates` in the
+same transaction. Existing commit, rollback, child/contact/party/status construction,
+intake attribution, audit ownership, and post-commit behavior are unchanged.
+
+Intentionally retained compatibility is narrow and consumer-proven:
+`CaseDao.getOverview` remains used by desktop Case View non-date hydration and document
+composition; its dates are authoritatively overlaid before consumption.
+`CaseOverviewDto` date getters remain part of the server JSON/desktop DTO response and
+are populated from authoritative projections. Deprecated `CaseDetailDto` date aliases
+remain server compatibility properties and derive from `mappedCaseDates`. The
+`MigratedCaseDateKey` identifiers and historical PHI/audit field vocabulary remain
+unchanged. Accepted, denied, and closed workflow dates, plus
+`FeeAgreementSigned` and `NonEngagementLetterSent`, remain on their independent
+workflow paths.
+
+No active production create or update path writes any of the nine migrated
+`dbo.Cases` date columns, and no active production read uses them. Their names remain
+only where required for historical migration, reconciliation, rollback, schema and
+validation evidence, PHI/audit vocabulary, frozen compatibility identifiers, and
+architecture documentation. The database columns themselves are not changed.
+
+The required Case Dates and `CASE_DATE_TYPE` audit migrations are deployed. The approved
+SQL Server integration and manual QA evidence is complete; there is no remaining
+implementation, automated-verification, or manual-QA work in the customizable Case Dates
+roadmap.
+
+## Final verification and sign-off status (2026-08-14)
+
+The customizable Case Dates roadmap is **complete**. User-confirmed release evidence records:
+
+* the full Maven reactor passed;
+* React typecheck and production build passed;
+* manual smoke QA passed for New Intake, Case Date editing and lifecycle, Calendar
+  uniqueness, Case Date Type administration and auditing, and document generation; and
+* the required Case Dates migrations and the `CASE_DATE_TYPE` entity-action-audit
+  constraint migration were deployed.
+
+Together with the completed implementation inventory and contract/static verification,
+this closes implementation, automated verification, database deployment verification,
+and manual QA. The earlier 2026-08-13 environment-blocked attempt is historical context
+only and is superseded by this sign-off.
+
+The production-source inventory for `CallerDate`/`CallerTime`, `DateOfInjury`,
+`DateOfMedicalNegligence`, `DateMedicalNegligenceWasDiscovered`,
+`StatuteOfLimitations`, `TortNoticeDeadline`, `DiscoveryDeadline`,
+`DateFeeAgreementSigned`, and `DateNonEngagementLetterSent` confirms that **no active
+runtime path reads or writes any of the nine migrated `dbo.Cases` date columns**.
+Remaining references are intentionally preserved in the completed migration and
+reconciliation package, schema and validation evidence, historical PHI/audit vocabulary,
+frozen compatibility identifiers and aliases populated from `CaseDates`, rollback
+records, and architecture history. These are legitimate non-runtime references and must
+not be removed merely to make a text search empty.
+
+The forward-only
+`docs/sql/2026-08-12_entity_action_audit_entity_type_constraint.sql` migration was
+deployed after the 2026-07-20 audit foundation and intervening allowlist extensions. Its
+contract test verifies that `CASE_DATE_TYPE` and the complete emitted vocabulary are
+included, exactly one positively parsed allowlist is replaced, unrelated checks are
+unchanged, existing incompatible rows fail before DDL, and reruns are transactional,
+rollback-safe, and leave one enabled, trusted canonical constraint. Future deployments
+must preserve this order: the constraint must exist before an application version emits
+`CASE_DATE_TYPE`; filename ordering is not a substitute for checking the deployment
+runner's actual order.
+
+### Deferred legacy-column removal gate
+
+Physical removal remains deferred to a separate approved phase after at least one
+release/rollback observation window. Before authoring a removal migration, that phase
+must freshly evidence every prerequisite in **Later schema-removal prerequisites**:
+
+1. rerun the static runtime allowlist and reconfirm that supported production readers,
+   writers, clients, scalar API contracts, documents, reports, and exports do not depend
+   on the columns;
+2. reconfirm exact post-migration reconciliation and the approved retention disposition
+   of all 610 anomalies without fabricating or backfilling dates;
+3. reverify tenant RLS, effective overlay precedence, optimistic concurrency, audit
+   rollback, `Cases.UpdatedAt`, soft-delete/history/restore, time/null semantics, and
+   Calendar routing and uniqueness;
+4. complete the release/rollback observation window and formally retire every
+   column-based rollback procedure; and
+5. approve a dedicated backup, validation, deployment, and rollback plan for the future
+   destructive schema change.
+
+This sign-off creates **no legacy-column removal migration**. The physical columns remain
+available only for the documented history/rollback observation period and are not runtime
+authority.
+
+The next work is a separate roadmap for the **unified Calendar New Event workflow**. It
+does not reopen the completed Case Dates roadmap, change current Calendar behavior, or
+make physical legacy-column removal part of Calendar feature delivery.

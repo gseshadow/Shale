@@ -8,5 +8,7 @@ public record CaseStatusDto(
 		String color,
 		String lifecycleKey,
 		String systemKey,
-		Integer shaleClientId) {
+		Integer shaleClientId,
+		boolean active,
+		boolean deleted) {
 }

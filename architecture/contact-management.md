@@ -1,0 +1,278 @@
+# Contact Management Architecture and Roadmap
+
+## Decision and Phase 1A boundary
+
+Contacts remain strict tenant-owned records. Phase 1A is an additive database foundation: it adds
+structured-name storage, three independent customizable-definition domains, and three historical
+assignment domains. It does **not** add Java models, DAO/service methods, Settings, Contact View,
+display-name changes, or structured phone/email/address behavior. Existing `Name`, `FirstName`,
+`LastName`, `WorkName`, `IsExpert`, and every current query continue unchanged.
+
+## Model
+
+`ContactTypes`, `Specialties`, and `CredentialDefinitions` follow the global/tenant overlay standard.
+Each has a stable lowercase `SystemKey`, presentation fields, selection order, active/deleted state,
+timestamps and actors, deletion metadata, `RowVer`, and nullable tenant ownership. A deleted definition
+must be inactive and have both deletion timestamp and actor; a nondeleted definition has neither. The effective list
+is global plus current tenant, with a same-key tenant definition winning. Inactive definitions cannot
+be newly selected; soft-deleted definitions and assignments remain available for history.
+
+The concepts are deliberately orthogonal:
+
+* **Contact Type** is contact-wide classification (Expert, Attorney, Provider, Vendor, Witness).
+* **Specialty** is an independent area of practice or expertise. A Contact need not be an Expert to
+  have one, and Specialty is not a Contact/Contact Type column.
+* **Credential** is a repeatable professional designation. A definition separates its full `Name`
+  (for example, Doctor of Medicine) from its display `Abbreviation` (MD), while `SystemKey`
+  (`doctor_of_medicine`) remains stable identity. Credentials are not name suffixes.
+  `ContactCredentials.DisplayOrder` retains explicit presentation order. Duplicate active instances
+  of one credential are unsupported; a future professional-license/jurisdiction model must be
+  separate. `Contacts.Prefix` is an honorific, while `Contacts.Suffix` is limited to actual suffixes
+  such as Jr., Sr., II, III, and IV.
+
+Only the global `ContactTypes.SystemKey='expert'` definition is seeded. Additional global Contact
+Types, Specialties, and Credentials remain intentionally unseeded pending product/domain review.
+Credential definitions are not seeded in Phase 1A.
+
+## Assignment lifecycle and tenancy
+
+`ContactContactTypes`, `ContactSpecialties`, and `ContactCredentials` are explicit, strict
+tenant-owned many-to-many tables. Each carries `ShaleClientId`, creation/update/deletion metadata,
+soft deletion, and `RowVer`. Filtered unique indexes prohibit duplicate **active** relationships while
+allowing removed relationships to remain. Whether restoration reactivates that row or inserts a new
+historical row is deferred to the audited mutation-service phase; this schema supports either.
+
+The composite `(ShaleClientId, ContactId)` foreign keys make a cross-tenant Contact assignment
+impossible. Definition foreign keys preserve history. Because a definition may be global or tenant
+owned, SQL Server cannot express “definition tenant is NULL or equals assignment tenant” as a foreign
+key. All creation, update, and deletion actor columns reference authoritative `dbo.Users(id)`; nullable
+creation/update actors support migration provenance, and deletion invariants require a deletion actor.
+Because `Users.ShaleClientId` is nullable, these FKs preserve identity/history but do not authorize.
+Every future assignment mutation service must transactionally validate the global-or-same-tenant
+definition, effective active/nondeleted state, actor tenant authorization, and Contact ownership on the
+same tenant-context connection and transaction before insert/restore. The
+verification script detects inconsistent pre-existing rows. Definitions use
+`sec.fn_FilterByTenantOrGlobal`; assignments use strict `sec.fn_FilterByTenant`, all attached to the
+established enabled `TenantFilter` policy. The migration fails rather than inventing an RLS policy.
+
+## Structured names and compatibility
+
+Nullable `Prefix`, `MiddleName`, `PreferredName`, and `Suffix` columns are additive. No values are
+derived or normalized in Phase 1A. Current name rendering and editing remain authoritative so this
+deployment cannot alter visible Contact or Case behavior. A later cutover must define formatting,
+fallback, parsing, credential punctuation, and organization-contact rules before using these fields.
+
+## Legacy Expert bridge
+
+The observed live baseline has 2,314 tenant-7 and 10 tenant-8 Contacts, no `IsExpert=1` rows,
+so the initial backfill validly inserts zero assignments; these counts are observations, not schema
+logic. The migration creates/fetches the authoritative global `expert` definition, then inserts one
+active assignment for every `Contacts.IsExpert=1` row, including soft-deleted Contacts. Its `NOT EXISTS`
+guard and active filtered unique index make reruns safe. It never changes `IsExpert`, never restores a
+removed assignment, and does not infer the legacy flag from assignments. Before any read cutover, a
+later release must dual-write the legacy flag and authoritative assignment transactionally, reconcile
+drift, deploy assignment reads with compatibility fallback, monitor, and only then separately retire
+`IsExpert` after all consumers are proven migrated.
+
+## Case roles
+
+The existing tenant-7 `PartyRoles.SystemKey=expert` row means Expert Witness in a particular Case;
+the global `ContactTypes.SystemKey=expert` row classifies a Contact across cases. Both are legitimate,
+nonconflicting concepts. Phase 1A modifies neither `PartyRoles`, `CaseParties`, nor `CaseContacts`.
+Opposing Counsel, Supporting Counsel, Expert Witness, and Treating Provider are case-specific roles, not Contact Types. Phase 1A does not change runtime case-role behavior. Future work must use authoritative `CaseParties` plus `PartyRoles`
+(including side where applicable) and must not introduce new reliance on legacy `CaseContacts`.
+
+## Phased roadmap
+
+1. **Phase 1A (this change):** deploy schema, RLS, conservative Expert seed/backfill, verification,
+   and architecture contracts. No runtime reads or writes change.
+2. **Phase 1B — read/domain contracts (implemented):** UI-free shared records and tenant-scoped
+   effective-definition/classification-profile reads are exposed through `ContactServicePort`.
+   Definition lists apply the established SystemKey overlay (tenant wins; a deleted tenant override
+   resets to global fallback), and profile reads retain exact historical definition IDs. Current
+   display-name and Expert reads remain legacy-authoritative.
+3. **Phase 1C — transactional administration and assignment writes:** add admin-authorized Settings
+   services and Contact assignment services with tenant/actor/definition validation, optimistic
+   concurrency, same-transaction entity-action auditing, and `IsExpert` dual-write.
+4. **Phase 2 — Contact experience:** expose classification, specialty, credential, and structured-name
+   editing after accessibility and validation design. Migrate credential-like legacy suffix values only
+   through reviewed, reversible data classification—not automatic parsing.
+5. **Phase 3 — display cutover:** reconcile drift, switch display-name composition and Expert reads,
+   retain fallback/telemetry, then remove fallback after compatibility acceptance.
+6. **Phase 4 — retirement:** separately approve retirement of `IsExpert` and any obsolete name paths.
+   Preserve assignment/audit history and keep Case roles on `CaseParties`/`PartyRoles`.
+
+## RLS and audit boundary
+
+Live `dbo.Contacts` currently has no TenantFilter predicate. Phase 1A deliberately does not attach
+one; this existing architectural/security condition requires separate review. The six new tables each
+have exactly one FILTER predicate on the enabled established TenantFilter policy. RLS is defense in
+depth, never a substitute for transactional authorization. No mutation path or EntityActionAuditLog
+allowlist change is included. Future mutation work must approve an entity/action vocabulary; restrict
+metadata; record actor and tenant identity; enforce RowVersion concurrency; and audit add, remove,
+restore, and update actions in the mutation transaction.
+
+## Deployment, rollback, and operations
+
+Phase 1A was deployed to production on 2026-08-24. The migration also completed twice on
+`Shale_Copy`, with complete verification after both runs. Production verification found zero column,
+structured-column, critical-default, lifecycle, actor-FK, tenant, duplicate-key, cross-tenant,
+predicate, required-index, and composite-key semantic violations. It confirmed exactly one compatible
+global Expert definition, zero legacy Expert Contacts and assignments, and exactly one enabled
+TenantFilter policy. Contacts intentionally remain without an RLS predicate. No PHI, credentials, or
+connection information is recorded here.
+
+Phase 1B adds no SQL and assumes that verified deployed contract. Runtime reads explicitly restrict
+Contact and assignment tenant identity on the tenant-context connection; RLS remains defense in depth.
+
+Reruns validate every Phase 1A-owned required column and named index, foreign key, CHECK, default,
+and RLS predicate by its contract. A conflicting object with a Phase 1A name or an incompatible
+required column fails for manual review. Unrelated columns, indexes, foreign keys, and CHECKs added
+by legitimate later additive phases are tolerated, so the foundation remains rerunnable.
+
+The scripts use `USER_NAME()`—the current SQL Server/Azure SQL database principal identity—to reject
+`shale_app` and `shale_runtime`; they do not use an application-name connection-string value. They
+also require NULL `SESSION_CONTEXT(N'ShaleClientId')`, sysadmin or `db_owner` administrative
+membership, and an explicit `@OperatorVerifiedAllTenantVisibility=1` acknowledgement after an
+independent all-tenant visibility preflight. Role membership alone is not treated as proof that an RLS
+predicate grants all-tenant visibility, and neither script changes permissions or principal state.
+
+There is intentionally no destructive down migration. Transactional DDL rolls back on execution
+failure; after a successful deployment, operational rollback is to leave the additive unused objects
+in place and roll back application consumers. Dropping objects would discard assignment history and
+is not an approved rollback. Before production, operators must confirm no unexpected partial tables,
+the existing RLS predicate semantics, and sufficient log/lock capacity for the all-contact backfill.
+
+## Open decisions (deferred, not blockers for Phase 1A)
+
+* The reviewed set and presentation of additional global Contact Types and any credential defaults.
+* Exact structured display-name/credential punctuation (the Phase 1A contract prohibits duplicate
+  active instances of the same credential).
+* Entity-action audit vocabulary/metadata for definition and assignment mutations.
+* Whether assignment restore reactivates a historical row or inserts a new historical row; services
+  must choose one consistent approach while preserving removal history.
+
+## Phase 2A Settings administration
+
+The administrator-only Contact Classifications Settings page manages Contact Types, Specialties, and
+Credential Definitions through `ContactServicePort`. A bounded per-category administration read
+returns global and current-tenant rows, including inactive and removed tenant rows and exact RowVer.
+It validates the tenant session and active same-tenant administrator before reading. Java mapping
+classifies custom rows and overrides by stable SystemKey and represents effective, overridden,
+masked-global, and deleted-override global-fallback states without changing Phase 1B selectors.
+
+Global definitions remain read-only. Administrators create custom definitions, customize globals with
+their exact SystemKey, edit tenant presentation, activate/deactivate, remove or reset, and restore the
+same authoritative row. SystemKey is generated for initial creation and immutable afterward. All
+service work runs off the JavaFX thread, mutations forward the loaded RowVer, and stale failures keep
+entered editor values. Definition lifecycle never deletes or changes Contact assignments.
+
+## Phase 1C transactional mutation boundary (implemented)
+
+Phase 1C reuses, rather than replaces, the established mutation conventions: `DbSessionProvider` supplies one tenant-context connection; `SESSION_CONTEXT(N'ShaleClientId')` is compared explicitly; `dbo.Users.id`, `ShaleClientId`, `is_deleted`, `IsRemoved`, and `is_admin` are the actor authorities; JDBC `autoCommit=false` encloses validation, mutation, `EntityActionAuditDao.append`, commit, and rollback; and `UPDATE ... WHERE RowVer=?` is the optimistic-concurrency guard. Immutable shared-port commands defensively copy RowVer bytes. SQL-generated authoritative IDs and the post-mutation RowVer are returned. These are the same tenant/actor, transaction, audit, and RowVer patterns used by Case Date Type and User administration.
+
+Definition creation, update, activation/deactivation, removal, and restoration require a positive tenant and actor, matching tenant session, and an active, nonremoved, nondeleted same-tenant administrator. Global rows are never mutable. A custom lowercase snake_case key is rejected if it would shadow a global key; an override must name a global authoritative ID and reuse that row's exact key. Ordinary update cannot submit or change SystemKey. Removed overrides fall back to global reads; inactive overrides continue masking globals. Removal is soft and never cascades assignments. Update, lifecycle, and restore require ExpectedRowVer. Restore updates the same row and preserves its ID.
+
+Assignment mutations require the same tenant-session validation and an active, nonremoved, nondeleted same-tenant actor, but do not require administrator status. The Contact must be active and tenant-owned. New and restored assignments accept only the authoritative ID of an active, nondeleted definition that is global or same-tenant and currently effective for its SystemKey; a shadowed global ID is rejected. Remove and restore bind assignment ID, tenant, Contact, and ExpectedRowVer. Restore reactivates the same row and rejects a competing active assignment. Removed rows remain history.
+
+Credential creation appends after the maximum active DisplayOrder unless a nonnegative order is supplied. Bulk reorder requires exactly the complete active assignment-ID set, with no duplicates and one ExpectedRowVer per row. The transaction rejects missing, removed, foreign, or stale rows and writes contiguous zero-based order. One `CONTACT_CREDENTIAL/REORDERED` audit event records only Contact ID and ordering count.
+
+The audit vocabulary is `CONTACT_TYPE`, `SPECIALTY`, and `CREDENTIAL_DEFINITION` with `CREATED`, `OVERRIDE_CREATED`, `UPDATED`, `ACTIVATED`, `DEACTIVATED`, `REMOVED`, and `RESTORED`; `CONTACT_CONTACT_TYPE` and `CONTACT_SPECIALTY` with `ADDED`, `REMOVED`, and `RESTORED`; and `CONTACT_CREDENTIAL` with those assignment actions plus `REORDERED`. Metadata is restricted to authoritative Contact/definition IDs, active state, and ordering count. Names, abbreviations, descriptions, contact data, RowVer, and all PHI are prohibited. The allowlist migration must deploy before the application release and its read-only verification must run afterward.
+
+`Contacts.IsExpert` remains the runtime read authority. Adding or restoring an assignment whose authoritative definition key is `expert` sets it true in the assignment transaction. Removing such an assignment recomputes it from every remaining nondeleted assignment joined by authoritative SystemKey, including assignments whose definition later became inactive or removed. Definition lifecycle alone never rewrites the flag or removes assignments. Repository inventory found no existing runtime Java path that writes `IsExpert`; only the Phase 1A migration backfill reads it, so Phase 1C adds no unused reverse legacy mutation API.
+
+Phase 1C contains no Contact View or Settings UI and changes no JavaFX, FXML, or CSS. It does not mutate `CaseParties`, `PartyRoles`, or `CaseContacts`. Phase 2 still must decide interaction design, accessibility, validation presentation, structured-name editing, and credential punctuation; directory search, case-role UI, structured phones/emails/addresses, display cutover, and legacy retirement remain deferred.
+
+### Custom-definition color convention (Phase 2A extension)
+
+Contact Types, Specialties, and Credential Definitions follow Shale's cross-cutting customizable-definition color contract. `Color` is required definition presentation data, stored as normalized uppercase CSS `#RRGGBB` in `nvarchar(20)`, with `#6C757D` as the safe legacy/default value. Color belongs only to the authoritative definition: assignment tables do not duplicate it, and historical assignment reads join by the stored definition ID so they retain that definition's current presentation even when inactive or removed.
+
+Tenant-created definitions and overrides may choose colors independently. **Customize** initially copies the selected global definition's color; deleting/resetting an override exposes the global definition and its color, while an inactive override continues to mask the global row and both colors remain available in the administration projection. Deployment order is: deploy the Phase 2A color migration, run its read-only verification, deploy the application, then perform Settings smoke tests. Repeat this order in `Shale_Copy` before production. Phase 2B Contact View work is intentionally excluded.
+
+## Phase 2B Contact profile and aggregate editor
+
+Phase 2B replaces per-field pencil actions with a Shale profile header, grouped Contact Information,
+colored classification chips, and one **Edit Contact** entry point. Related Cases and Links Shared With
+This Contact retain their existing authoritative navigation, role labels, metadata, and loading paths;
+Contact classifications never substitute for case-specific `CaseParties`/`PartyRoles` authority. The
+responsive scroll surface wraps values and chips and places classifications independently of shared links.
+Inactive or removed definitions remain visible on their exact stored assignment as **Historical**, using
+the joined authoritative definition color; only effective active definitions are offered as new choices.
+Credential abbreviations expose the full definition name and remain separate from names.
+
+The editor treats `Contacts.Name`/Display Name as the compatibility value used by directory search,
+headers, and integrations. A structured preview may combine Prefix, FirstName, MiddleName, LastName,
+PreferredName, and a true generational Suffix, but never overwrites a customized Display Name. Credentials
+are neither appended to Display Name nor stored in Suffix. Prefix and Suffix preserve unrecognized existing
+values and all fields are validated to deployed schema lengths.
+
+One aggregate command is the mutation boundary. Its DAO transaction starts before authorization and
+validation, verifies the tenant session, active actor and Contact, exact Contact concurrency token and assignment RowVers,
+and the complete intended effective-definition ID set before mutation. It restores the same removed
+assignment row, soft-removes deselections, writes credential order as contiguous zero-based positions,
+and recomputes `Contacts.IsExpert` solely from active authoritative Contact Type assignments whose
+`SystemKey='expert'`. Structured-name and assignment changes, PHI-safe audits, and the final profile read
+commit or roll back together; stale input is never retried or merged and the editor remains open until an
+explicit reload.
+
+The legacy `Contacts` table has no `rowversion` column in the deployed Contact foundation; its established
+`UpdatedAt` value is therefore carried as the exact Contact concurrency token and included in the guarded
+profile update predicate. Assignment tables continue to use their native `RowVer`. A null legacy
+`UpdatedAt` is matched only by `IS NULL`, then the successful aggregate update establishes a UTC value.
+
+The entity-action audit vocabulary adds only `CONTACT/UPDATED`. Its metadata is limited to authoritative
+Contact ID and bounded counts—never names, credentials, descriptions, DOB, condition, contact details,
+or RowVer. **Deploy `2026-08-26_contacts_phase2b_audit_allowlist.sql` and run its read-only verification
+before deploying the Phase 2B application build.** Both scripts retain the validated positive-allowlist
+discovery, reject ambiguous or incompatible constraints before DDL, preserve unrelated checks and all
+historical tokens, require NULL tenant context plus an approved administrative principal, and leave the
+operator acknowledgement at `0` until independently confirmed.
+
+Phase 2C remains explicitly deferred: structured or multiple phone/email/address storage, normalization,
+click-to-call, `mailto`, Maps links, directory classification filtering, global `IsExpert` retirement, and
+case-role editing are not part of Phase 2B.
+
+## Phase 2C-A structured contact-point foundation
+
+Phase 2C-A adds three strict tenant-owned children: `ContactPhoneNumbers`, `ContactEmailAddresses`,
+and `ContactAddresses`. Their composite `(ShaleClientId, ContactId)` relationship targets the existing
+unique tenant Contact key, so a value cannot be attached across tenants. Contact removal does not
+cascade; child history and lifecycle actors remain intact. Each child uses the strict tenant RLS
+predicate. This phase deliberately does not add a predicate to `Contacts`.
+
+Kinds are closed system vocabulary: phone `MOBILE`, `HOME`, `WORK`, `FAX`, `OTHER`; email
+`PERSONAL`, `WORK`, `OTHER`; and address `HOME`, `WORK`, `OTHER`. They are CHECK-constrained values,
+not administrator definitions. Consequently they have no colors. If product requirements later make
+them customizable, they must move to the established customizable-definition/tenant-overlay
+architecture and carry the required uppercase `#RRGGBB` color rather than growing ad-hoc labels.
+
+The legacy Contact columns remain unchanged and authoritative for every runtime read, write, search,
+and display. Backfill stores phone text byte-for-character in `DisplayNumber`, email text in
+`EmailAddress`, and the complete free-form address in `LegacyAddressText`. Address components are all
+null: Phase 2C-A does not guess geography. A phone normalization is populated only when the original is
+already a canonical `+` followed by 7–15 digits; email normalization is lowercase only for a trimmed,
+space-free, single-`@`, minimally shaped value. Everything else remains nullable and preserved rather
+than rejected or rewritten.
+
+Backfill precedence is deterministic and zero-based: phone MOBILE, HOME, WORK; email PERSONAL, WORK,
+OTHER; address HOME, WORK, OTHER. The first populated value becomes primary unless an active primary
+already exists. A filtered unique index permits at most one active primary per Contact/category.
+Historical rows can coexist, deleted rows cannot remain primary, and `SortOrder` is nonnegative. A
+future restore service must clear or replace an existing active primary transactionally and use RowVer;
+it must restore the same historical row when that behavior is selected, never erase history.
+
+Phase 2C-B is the explicit dual-write boundary. It must define validation and user-facing formatting,
+transactionally synchronize authoritative legacy columns and structured rows, authorize tenant and
+actor on the same connection, apply RowVer concurrency, reconcile drift, and add PHI-safe entity-action
+audit entity/action vocabulary for create, update, reorder, primary change, remove, and restore. It must
+also decide extension editing and international normalization. Maps URLs are generated at runtime from
+the selected address and are never persisted. Phase 2C-A does not change Contact View, Settings,
+Java/FXML/CSS, case-role tables, or globally retire `IsExpert`.
+
+Deployment is migration, read-only verification, then the unchanged application. The operator guard is
+off by default and requires a null tenant context, approved non-application administrative principal,
+and independently established all-tenant visibility. The migration is a single XACT_ABORT transaction;
+failure rolls back and rethrows. There is no destructive down script. Before application consumers exist,
+rollback means leaving the additive unused schema/history in place. After Phase 2C-B, rollback must follow
+its future dual-write reconciliation plan. Neither the migration nor verification may print contact-point
+values, Contact names, or PHI.

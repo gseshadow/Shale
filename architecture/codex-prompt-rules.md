@@ -8,7 +8,14 @@ Before making any code changes, consult this document first. Use it to determine
 
 This document is the authoritative entry point for project knowledge.
 
+> **Tests are implementation work.** Every requested behavioral change requires inspection of related tests. Update tests whose expectations have intentionally been superseded, add coverage for the new contract, and fix production code when a test reveals a genuine regression. Do not consider the task complete until the relevant tests pass.
+
 ---
+
+
+## GitHub automation policy
+
+Automated testing in GitHub Actions is disabled by explicit project-owner decision. GitHub workflows must not run Maven tests, Python selector tests, static FXML/CSS validators, JavaFX visual tests, critical or affected suites, full suites, or test-report collection. Compilation and relevant test execution are local developer/Codex responsibilities. Releases and pull requests are not blocked by GitHub test workflows. `mvn test`, focused Maven commands, `mvn -Pall-tests test`, `mvn -Pui-visual test`, and `build/test-selection/` remain optional local tools where relevant. Do not replace the removed workflows with a no-op or external test gate.
 
 ## Required Workflow
 
@@ -29,6 +36,115 @@ Before making changes:
    * Files changed
    * Reason for change
    * Risks or follow-up work
+
+### Mandatory test-impact workflow
+
+#### Before implementation
+
+1. Read this primary rules document completely and read every architecture or docs file to which it routes the task.
+2. Identify the production symbols and contracts being changed.
+3. Perform a **pre-edit test-impact search** for every test that references the affected symbols, fields, constructors, SQL fragments, binding counts, selectors, FXML IDs, or previous behavior.
+4. Create a test-impact inventory before editing production code. Adding new tests is not a substitute for reviewing and updating existing tests.
+
+#### During implementation
+
+1. Update production code and its existing tests together. Existing obsolete tests must be updated when the authoritative behavior intentionally supersedes them.
+2. Treat every constructor, record, DTO, command, SQL-field, placeholder-count, prepared-statement binding, selector, or FXML change as requiring a repository-wide search.
+3. Inspect neighboring tests for duplicated stale expectations, not only the first reported failure.
+4. Distinguish obsolete expectations from genuine regressions. Never restore retired behavior solely to satisfy an obsolete test, and never weaken assertions merely to produce a green build.
+
+#### Before completion: changed-file-to-test review
+
+1. Review `git diff --name-only` and map each changed production file to its affected tests.
+2. Search again for old field lists, constructors, method names, SQL fragments, and obsolete expectations.
+3. Inspect the production and test diff, then run `python build/test-selection/select_tests.py --base <base> --head HEAD`.
+4. Run directly modified tests first, then the selector's affected-area suite, then the local critical default with `mvn test`.
+5. Request or run `mvn -Pall-tests test` only when the selector recommends it informationally for a cross-cutting/unknown change or the user explicitly requests it. Its result never replaces the relevant focused local checks.
+6. Add or update tests only in affected areas. Never enable every historical test merely because tests are implementation work.
+7. Explain why every selected test area is relevant to the changed production or test contract.
+
+> **Relevance, not historical existence, determines routine test execution.**
+8. Run Git diff checks and report the exact test and check commands executed with their results.
+
+#### Blocked or unexecuted tests
+
+1. A dependency or environment failure does not excuse test-impact inspection. If tests cannot execute, inspect and update every related test statically.
+2. Clearly state that the implementation remains unverified. Never claim success for an unexecuted test or describe a newly written test as passing when it was not run.
+3. Do not report the task complete when required verification did not execute.
+
+### Tests must protect contracts, not framework internals
+
+1. Ordinary visual corrections (CSS colors, backgrounds, borders, radius, padding, spacing, typography, and semantic style classes) normally require visual inspection plus static CSS/resource validation—not a new rendered-geometry regression test.
+2. FXML presentation changes may verify resource loading, controller IDs, required nodes, and event-handler wiring. Do not turn them into rendered dimension or JavaFX skin contracts.
+3. Do not reproduce JavaFX skin sizing algorithms in tests. Release-blocking tests must not depend on internal skin-node selectors such as `.scroll-bar`, viewport arithmetic, popup containment, scene timing, text measurement, or post-layout clipping calculations.
+4. Tests primarily dependent on exact pixels, skin nodes, internal selectors, scrollbars, popup/window positioning, platform text metrics, or padding-derived rendered geometry belong only in the advisory `mvn -Pui-visual test` profile.
+5. Exact values may be asserted in blocking tests only when they are intentional Shale design tokens or declared resource properties; do not infer a blocking geometry contract from the rendered result.
+6. Never add or loosen a rendered-geometry test merely to make an ordinary styling fix pass. Delete obsolete framework-calculation tests rather than preserving superseded source structure.
+
+### Review the complete failing test
+
+1. Before changing a failed test, inspect every assertion in the method and inspect neighboring tests for related assumptions.
+2. Do not patch only the first failing assertion when the method contains related geometry or implementation-detail assumptions.
+3. If successive failures expose different assertions in the same method, stop incremental patching and reassess the entire testing model against the supported contract.
+
+### Unverified runtime changes
+
+1. If Codex cannot execute the focused test because of Maven, network, dependency, JavaFX, or environment failure, it must not claim the task is complete.
+2. When runtime verification is unavailable, avoid inventing new rendered-geometry calculations. Keep unverified changes minimal and explicitly identify the exact local command a developer must run.
+3. A compile error introduced during test refactoring is unacceptable. Perform every available static check and inspect all references before handing off an unverified change.
+
+### Required verification sequence
+
+For a behavioral change:
+
+1. Run focused affected tests.
+2. Run the repository selector's affected-area module and dependency suite.
+3. Run the local critical reactor with `mvn test`.
+4. Run `mvn -Pall-tests test` only as non-blocking information for selector escalation/cross-cutting changes, or on explicit user direction.
+5. Do not treat the release script as the first validation of the critical suite.
+
+Use the established cross-module Maven form where necessary:
+
+```bash
+mvn -pl <module> -am -Dtest=<TestClass> \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+### Local test quality
+
+Every test treated as a local completion requirement must:
+
+1. State the user-visible, business, security, data-integrity, or architectural regression it prevents.
+2. Be deterministic in its supported environment.
+3. Have an actionable failure message.
+4. Avoid coupling unrelated contracts into one large test method.
+
+---
+
+## Test Maintenance Is Part of Every Change
+
+For every implementation or behavioral change:
+
+1. Identify and inspect tests related to the classes, controls, workflows, commands, service ports, database objects, migrations, and behavior being changed. Include relevant unit, integration, migration-contract, UI-contract, semantic-control, and regression tests.
+2. Evaluate test failures against the newly requested behavior:
+   * If a test still represents the intended contract, fix the production regression.
+   * If the requested change intentionally supersedes the old behavior, update the outdated test.
+3. Update outdated tests in the same task:
+   * Do not preserve obsolete production behavior solely to satisfy an old test.
+   * Do not weaken tests merely to make the build pass.
+   * Replace obsolete assertions, fixtures, selectors, or workflow assumptions with assertions that verify the new authoritative behavior.
+4. Add or extend regression coverage for newly introduced behavior where appropriate.
+5. Inspect neighboring and related tests for duplicated stale assumptions rather than stopping after the first test failure.
+6. Run focused tests during implementation, the repository selector, the affected-area suite, and the critical suite before completion. Use the full-suite profile only when selection escalates or explicit direction requires it.
+
+An implementation task is not complete until:
+
+* The requested behavior is implemented.
+* Related tests have been reviewed.
+* Obsolete expectations have been updated.
+* New behavior has appropriate regression coverage.
+* Genuine regressions have been fixed.
+* The relevant tests pass.
 
 ---
 
@@ -205,6 +321,12 @@ Required:
 
 ## Database Safety Rules
 
+SQL verification output must not use SQL Server keywords or `SET`-option names as bare column aliases.
+In particular, never write bare `RowCount`. Prefer a descriptive non-keyword alias such as
+`MatchingCount`, `FindingCount`, or `AuditRowCount`. If a keyword is unavoidable, delimit it with
+brackets, though a descriptive alias is preferred. Verification result columns must clearly
+distinguish informational counts from failure/finding counts.
+
 Before modifying SQL:
 
 1. Verify all referenced columns exist.
@@ -351,7 +473,7 @@ A task is not complete because it compiles.
 A task is complete when:
 
 1. Code compiles.
-2. Tests pass (when applicable).
+2. Related tests have been reviewed and maintained, and the relevant tests pass.
 3. Relevant documentation was reviewed.
 4. The visible UI behaves correctly.
 5. The actual user-reported issue is resolved.

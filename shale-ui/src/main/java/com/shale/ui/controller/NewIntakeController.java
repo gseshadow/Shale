@@ -5,6 +5,7 @@ import com.shale.core.platform.AppPaths;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.EnhancedTextArea;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.StatusCardFactory;
@@ -15,6 +16,7 @@ import com.shale.ui.controller.support.NewIntakeDatesConfiguration.ConfiguredDat
 import com.shale.ui.controller.support.NewIntakeDatesConfiguration.Selection;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.FormConfigurationDto;
+import com.shale.core.model.CaseDateSemanticRole;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.FormConfigurationServicePort;
 import com.shale.ui.util.ActionButtonFactory;
@@ -31,7 +33,6 @@ import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
@@ -44,6 +45,8 @@ import javafx.scene.layout.VBox;
 import javafx.geometry.Insets;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import javafx.util.StringConverter;
+import javafx.util.converter.LocalDateStringConverter;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -58,6 +61,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ArrayList;
 import java.util.function.Consumer;
+import java.util.function.BooleanSupplier;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
@@ -74,12 +78,13 @@ public final class NewIntakeController {
 	private static final Gson GSON = new Gson();
 	private static final String DRAFTS_DIR = "drafts";
 	private static final String INTAKE_DRAFT_PREFIX = "new-intake";
+	private static final String ESTATE_CASE_NAME_PREFIX = "Estate of ";
 	private static final long PRACTICE_AREA_PREFLIGHT_TIMEOUT_SECONDS = 5;
+	private static final String INVALID_DATE_PROPERTY = "shale.newIntake.invalidDate";
 
 	@FXML private Label validationLabel;
 
 	@FXML private TextField caseNameField;
-	@FXML private DatePicker dateOfIntakePicker;
 	@FXML private TextField timeOfIntakeField;
 	@FXML private CheckBox estateCaseCheckBox;
 
@@ -90,7 +95,7 @@ public final class NewIntakeController {
 	@FXML private TextField clientEmailField;
 	@FXML private DatePicker clientDateOfBirthPicker;
 	@FXML private CheckBox clientDeceasedCheckBox;
-	@FXML private TextArea clientConditionArea;
+	@FXML private EnhancedTextArea clientConditionArea;
 
 	@FXML private CheckBox callerIsClientCheckBox;
 	@FXML private Label callerReuseLabel;
@@ -108,8 +113,8 @@ public final class NewIntakeController {
 	@FXML private Button selectPracticeAreaButton;
 	@FXML private StackPane statusHost;
 	@FXML private Button selectStatusButton;
-	@FXML private TextArea descriptionArea;
-	@FXML private TextArea summaryArea;
+	@FXML private EnhancedTextArea descriptionArea;
+	@FXML private EnhancedTextArea summaryArea;
 	@FXML private DatePicker dateMedicalNegligencePicker;
 	@FXML private DatePicker dateMedicalNegligenceDiscoveredPicker;
 	@FXML private DatePicker dateOfInjuryPicker;
@@ -134,6 +139,8 @@ public final class NewIntakeController {
 	private FormConfigurationDto loadedDatesConfiguration;
 	private List<EffectiveCaseDateTypeDto> effectiveDateTypes = List.of();
 	private final Map<String, ConfiguredDateInput> configuredDateInputs = new LinkedHashMap<>();
+	private final Map<String, LocalDate> preservedConfiguredDateValues = new LinkedHashMap<>();
+	private Integer intakeCaseDateTypeId;
 	private final List<Selection> stagedDateSelections = new ArrayList<>();
 	private long datesLoadGeneration;
 	private boolean datesViewClosed;
@@ -148,6 +155,7 @@ public final class NewIntakeController {
 	private Stage stage;
 	private Consumer<Integer> onCaseCreated;
 	private boolean saving;
+	private boolean successfulCompletion;
 	private final ExecutorService intakeSaveExecutor = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "new-intake-save");
 		t.setDaemon(true);
@@ -209,7 +217,7 @@ public final class NewIntakeController {
 				datesExecutor.shutdownNow();
 			});
 			this.stage.setOnCloseRequest(event -> {
-				if (!confirmDiscardIfDirty()) {
+				if (!mayCloseIntake()) {
 					event.consume();
 				}
 			});
@@ -231,8 +239,10 @@ public final class NewIntakeController {
 		ControlStyles.apply(selectPracticeAreaButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		ControlStyles.apply(selectStatusButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		if (addPartyButton != null) ControlStyles.apply(addPartyButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
-		dateOfIntakePicker.setValue(LocalDate.now());
 		timeOfIntakeField.setText(LocalTime.now().format(TIME_FORMAT));
+		List.of(clientDateOfBirthPicker, dateMedicalNegligencePicker,
+				dateMedicalNegligenceDiscoveredPicker, dateOfInjuryPicker,
+				statuteOfLimitationsPicker, tortClaimsNoticePicker).forEach(NewIntakeController::configureDatePicker);
 
 		callerIsClientCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
 			if (Boolean.TRUE.equals(newVal)) {
@@ -245,6 +255,11 @@ public final class NewIntakeController {
 
 		clientFirstNameField.textProperty().addListener((obs, oldVal, newVal) -> autoGenerateCaseName());
 		clientLastNameField.textProperty().addListener((obs, oldVal, newVal) -> autoGenerateCaseName());
+		clientDeceasedCheckBox.selectedProperty().bindBidirectional(estateCaseCheckBox.selectedProperty());
+		estateCaseCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+			caseNameManuallyOverridden = false;
+			autoGenerateCaseName();
+		});
 
 		caseNameField.textProperty().addListener((obs, oldVal, newVal) -> {
 			if (!updatingCaseNameProgrammatically) {
@@ -286,15 +301,19 @@ public final class NewIntakeController {
 		datesStatusLabel.setText("Loading saved date fields…");
 		CompletableFuture.supplyAsync(() -> new DatesLoad(
 				formConfigurationService.load(tenant, actor, NewIntakeDatesConfiguration.FORM_KEY),
-				caseService.listEffectiveCaseDateTypes(tenant, actor)), datesExecutor)
+				caseService.listEffectiveCaseDateTypes(tenant, actor),
+				caseService.resolveEffectiveCaseDateTypeId(tenant, actor, CaseDateSemanticRole.INTAKE)), datesExecutor)
 				.whenComplete((result, failure) -> Platform.runLater(() -> {
 					if (isDatesResultStale(generation)) return;
 					if (failure != null) {
-						datesStatusLabel.setText("Standard intake dates remain available. Saved customization could not be loaded.");
+						legacyDatesGrid.setVisible(false); legacyDatesGrid.setManaged(false);
+						configuredDatesBox.getChildren().clear(); configuredDateInputs.clear();
+						datesStatusLabel.setText("Date fields could not be loaded. Reload New Intake before entering dates.");
 						return;
 					}
 					loadedDatesConfiguration = result.configuration();
 					effectiveDateTypes = result.types();
+					intakeCaseDateTypeId = result.intakeCaseDateTypeId();
 					datesReloadRequired = false;
 					renderDatesNormalMode();
 				}));
@@ -306,14 +325,20 @@ public final class NewIntakeController {
 		configuredDatesBox.getChildren().clear(); configuredDateInputs.clear();
 		List<ConfiguredDate> fields = NewIntakeDatesConfiguration.renderable(loadedDatesConfiguration, effectiveDateTypes);
 		boolean saved = loadedDatesConfiguration != null && loadedDatesConfiguration.id() != 0;
-		legacyDatesGrid.setVisible(!saved); legacyDatesGrid.setManaged(!saved);
-		configuredDatesBox.setVisible(saved); configuredDatesBox.setManaged(saved);
-		if (!saved) { datesStatusLabel.setText("Using standard intake dates."); return; }
-		datesStatusLabel.setText(fields.isEmpty() ? "No date fields are configured for this form." : "Date fields configured for this tenant.");
+		legacyDatesGrid.setVisible(false); legacyDatesGrid.setManaged(false);
+		configuredDatesBox.setVisible(true); configuredDatesBox.setManaged(true);
+		datesStatusLabel.setText(fields.isEmpty() ? "No date fields are configured for this form."
+				: saved ? "Date fields configured for this tenant." : "Using active Case Date Types for this tenant.");
 		for (ConfiguredDate field : fields) {
 			Label label = new Label(field.type().name() + (field.required() ? " *" : ""));
 			DatePicker picker = ControlStyles.formControl(new DatePicker());
+			configureDatePicker(picker);
+			String fieldKey = field.fieldKey();
+			LocalDate initialValue = NewIntakeDatesConfiguration.initialValue(fieldKey, field.type().id(),
+					intakeCaseDateTypeId, LocalDate.now(), preservedConfiguredDateValues);
+			picker.setValue(initialValue);
 			picker.valueProperty().addListener((observable, oldValue, newValue) -> {
+				preservedConfiguredDateValues.put(fieldKey, newValue);
 				if (newValue != null) ControlStyles.setInvalid(picker, false);
 			});
 			HBox row = new HBox(16, label, picker); row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
@@ -421,7 +446,8 @@ public final class NewIntakeController {
 				|| (datesViewAttached && datesSection.getScene() == null);
 	}
 
-	private record DatesLoad(FormConfigurationDto configuration, List<EffectiveCaseDateTypeDto> types) {}
+	private record DatesLoad(FormConfigurationDto configuration, List<EffectiveCaseDateTypeDto> types,
+			int intakeCaseDateTypeId) {}
 	public record ConfiguredDateInput(int caseDateTypeId, String fieldKey, boolean required, DatePicker input) {
 		public LocalDate value() { return input.getValue(); }
 	}
@@ -576,25 +602,28 @@ public final class NewIntakeController {
 		if (caseNameManuallyOverridden) {
 			return;
 		}
-		String generated = buildCaseName(clientFirstNameField.getText(), clientLastNameField.getText());
+		String generated = buildCaseName(clientFirstNameField.getText(), clientLastNameField.getText(),
+				estateCaseCheckBox.isSelected());
 		updatingCaseNameProgrammatically = true;
 		caseNameField.setText(generated);
 		updatingCaseNameProgrammatically = false;
 	}
 
-	private String buildCaseName(String first, String last) {
+	static String buildCaseName(String first, String last, boolean estateCase) {
 		String cleanFirst = safeTrim(first);
 		String cleanLast = safeTrim(last);
 		if (cleanFirst.isEmpty() && cleanLast.isEmpty()) {
 			return "";
 		}
+		String normalName;
 		if (cleanLast.isEmpty()) {
-			return cleanFirst;
+			normalName = cleanFirst;
+		} else if (cleanFirst.isEmpty()) {
+			normalName = cleanLast;
+		} else {
+			normalName = cleanLast + ", " + cleanFirst;
 		}
-		if (cleanFirst.isEmpty()) {
-			return cleanLast;
-		}
-		return cleanLast + ", " + cleanFirst;
+		return estateCase ? ESTATE_CASE_NAME_PREFIX + normalName : normalName;
 	}
 
 	private void applyCallerMode(boolean callerIsClient) {
@@ -832,17 +861,45 @@ public final class NewIntakeController {
 
 	private void startPrimaryIntakeSave(int tenantId) {
 		CaseDao.NewIntakeCreateRequest request = buildCreateRequest();
-		System.out.println("[NewIntakeController] create attempt started " + saveContext(tenantId));
 		intakeSaveExecutor.submit(() -> {
 			try {
-				CaseDao.NewIntakeCreateResult result = caseDao.createIntake(request);
-				Platform.runLater(() -> handleCreateSuccess(tenantId, result));
+				List<CaseDao.IntakeDuplicateCase> duplicates=caseDao.findIntakeDuplicateCases(tenantId,request.caseName());
+				Platform.runLater(() -> resolveDuplicateAndSave(tenantId,request,duplicates));
 			} catch (RuntimeException ex) {
 				logCreateFailure(tenantId, ex);
 				Platform.runLater(() -> handleCreateFailure(ex));
 			}
 		});
 	}
+
+	private void resolveDuplicateAndSave(int tenantId, CaseDao.NewIntakeCreateRequest request,
+			List<CaseDao.IntakeDuplicateCase> duplicates) {
+		if (duplicates == null || duplicates.isEmpty()) { submitIntakeMutation(tenantId,request,null); return; }
+		List<AppDialogs.DialogAction<DuplicateChoice>> actions=new ArrayList<>();
+		for(CaseDao.IntakeDuplicateCase duplicate:duplicates) actions.add(AppDialogs.DialogAction.of(
+				mergeActionLabel(duplicate,duplicates.size()),new DuplicateChoice(true,duplicate.caseId()),
+				AppDialogs.DialogActionKind.PRIMARY,false,false));
+		actions.add(AppDialogs.DialogAction.of("Create Separate Case",new DuplicateChoice(false,0),AppDialogs.DialogActionKind.SECONDARY,false,false));
+		actions.add(AppDialogs.DialogAction.cancel("Cancel",null));
+		String details=duplicates.stream().map(NewIntakeController::duplicateDescription).collect(Collectors.joining("\n"));
+		Optional<DuplicateChoice> choice=AppDialogs.showChoice(stage,"Possible Duplicate Case",
+				"A Case with this name already exists.",details,actions,640);
+		if(choice.isEmpty()||choice.get()==null){setSaving(false);return;}
+		DuplicateChoice selected=choice.get(); submitIntakeMutation(tenantId,request,selected.merge()?selected.caseId():null);
+	}
+
+	private void submitIntakeMutation(int tenantId,CaseDao.NewIntakeCreateRequest request,Long mergeCaseId){
+		intakeSaveExecutor.submit(()->{try{CaseDao.NewIntakeCreateResult result=mergeCaseId==null?caseDao.createIntake(request):caseDao.mergeIntake(mergeCaseId,request);
+			Platform.runLater(()->handleCreateSuccess(tenantId,result,mergeCaseId!=null));}catch(RuntimeException ex){logCreateFailure(tenantId,ex);Platform.runLater(()->handleCreateFailure(ex));}});
+	}
+
+	record DuplicateChoice(boolean merge,long caseId) { }
+	static String mergeActionLabel(CaseDao.IntakeDuplicateCase duplicate,int count){return count==1?"Merge Into Existing Case":"Merge Into Case "+caseReference(duplicate);}
+	static String duplicateDescription(CaseDao.IntakeDuplicateCase d){return String.join(" · ",List.of(
+			nonblank(d.caseName(),"Unnamed Case"),caseReference(d),"Status: "+nonblank(d.status(),"Unknown"),
+			"Client: "+nonblank(d.clientName(),"Not shown"),"Intake: "+(d.intakeDate()==null?"Not recorded":d.intakeDate().toString())));}
+	private static String caseReference(CaseDao.IntakeDuplicateCase d){return nonblank(d.caseNumber(),"Case ID "+d.caseId());}
+	private static String nonblank(String value,String fallback){return value==null||value.isBlank()?fallback:value.trim();}
 
 	private RuntimeException normalizePreflightException(Throwable throwable) {
 		Throwable current = throwable;
@@ -875,10 +932,14 @@ public final class NewIntakeController {
 		FormConfigurationDto configuration = loadedDatesConfiguration;
 		long configurationId = configuration == null ? 0 : configuration.id();
 		byte[] configurationRowVer = configuration == null ? null : configuration.rowVer();
+		ConfiguredDateInput intakeInput = intakeCaseDateTypeId == null ? null
+				: configuredDateInputs.values().stream()
+						.filter(input -> input.caseDateTypeId() == intakeCaseDateTypeId.intValue())
+						.findFirst().orElse(null);
 		return new CaseDao.NewIntakeCreateRequest(
 				requireClientId(),
 				safeTrim(caseNameField.getText()),
-				dateOfIntakePicker.getValue(),
+				intakeInput == null ? null : intakeInput.value(),
 				LocalTime.parse(safeTrim(timeOfIntakeField.getText()), TIME_PARSE_FORMAT),
 				estateCaseCheckBox.isSelected(),
 				selectedPracticeArea.id(),
@@ -924,8 +985,10 @@ public final class NewIntakeController {
 		);
 	}
 
-	private void handleCreateSuccess(int tenantId, CaseDao.NewIntakeCreateResult result) {
-		captureInitialSnapshot();
+	private void handleCreateSuccess(int tenantId, CaseDao.NewIntakeCreateResult result) { handleCreateSuccess(tenantId,result,false); }
+
+	private void handleCreateSuccess(int tenantId, CaseDao.NewIntakeCreateResult result, boolean merged) {
+		successfulCompletion = true;
 		deleteLocalDraftIfPresent();
 		System.out.println("[NewIntakeController] create succeeded tenant=" + tenantId + " caseId=" + result.caseId());
 		if (result.createdCaseDateCount() > 0 && runtimeBridge != null && appState != null
@@ -933,7 +996,7 @@ public final class NewIntakeController {
 			runtimeBridge.publishCaseDatesChanged(result.caseId(), tenantId, appState.getUserId(),
 					LiveUpdateEvents.CHANGE_CREATED);
 		}
-		showSuccess("Intake created successfully.");
+		showSuccess(merged ? "Intake information was added to the existing Case." : "Intake created successfully.");
 		setSaving(false);
 		if (stage != null)
 			stage.close();
@@ -1098,7 +1161,6 @@ public final class NewIntakeController {
 	private void applySnapshot(IntakeFormSnapshot snapshot) {
 		if (snapshot == null) return;
 		caseNameField.setText(snapshot.caseName());
-		dateOfIntakePicker.setValue(snapshot.dateOfIntake());
 		timeOfIntakeField.setText(snapshot.timeOfIntake());
 		estateCaseCheckBox.setSelected(snapshot.estateCase());
 		clientFirstNameField.setText(snapshot.clientFirstName());
@@ -1247,20 +1309,28 @@ public final class NewIntakeController {
 		requestClose();
 	}
 
-	private void requestClose() {
-		if (stage != null && confirmDiscardIfDirty()) {
+	public void requestClose() {
+		if (stage != null && mayCloseIntake()) {
 			stage.close();
 		}
 	}
 
-	private boolean confirmDiscardIfDirty() {
+	private boolean mayCloseIntake() {
+		return evaluateClosePolicy(successfulCompletion, saving, hasUnsavedChanges(),
+				this::confirmDiscard, () -> showValidation("Create Intake is in progress. Please wait."));
+	}
+
+	static boolean evaluateClosePolicy(boolean successfulCompletion, boolean saving, boolean dirty,
+			BooleanSupplier confirmDiscard, Runnable savingWarning) {
+		if (successfulCompletion) return true;
 		if (saving) {
-			showValidation("Create Intake is in progress. Please wait.");
+			savingWarning.run();
 			return false;
 		}
-		if (!hasUnsavedChanges()) {
-			return true;
-		}
+		return !dirty || confirmDiscard.getAsBoolean();
+	}
+
+	private boolean confirmDiscard() {
 		Optional<Boolean> decision = AppDialogs.showChoice(
 				stage,
 				"Discard New Intake?",
@@ -1286,7 +1356,7 @@ public final class NewIntakeController {
 	private IntakeFormSnapshot captureCurrentSnapshot() {
 		return new IntakeFormSnapshot(
 				safeTrim(caseNameField == null ? null : caseNameField.getText()),
-				dateOfIntakePicker == null ? null : dateOfIntakePicker.getValue(),
+				null,
 				safeTrim(timeOfIntakeField == null ? null : timeOfIntakeField.getText()),
 				estateCaseCheckBox != null && estateCaseCheckBox.isSelected(),
 				safeTrim(clientFirstNameField == null ? null : clientFirstNameField.getText()),
@@ -1352,7 +1422,6 @@ public final class NewIntakeController {
 	private List<String> validateRequiredFields() {
 		List<String> errors = new ArrayList<>(java.util.stream.Stream.of(
 				required(caseNameField.getText(), "Case Name is required."),
-				requiredDate(dateOfIntakePicker.getValue(), "Date of Intake is required."),
 				validateIntakeTime(),
 				required(clientFirstNameField.getText(), "Client First Name is required."),
 				required(clientLastNameField.getText(), "Client Last Name is required."),
@@ -1367,7 +1436,53 @@ public final class NewIntakeController {
 					ControlStyles.setInvalid(input.input(), true);
 					errors.add("A required configured date is missing.");
 				});
+		allIntakeDatePickers().stream().filter(NewIntakeController::hasInvalidDateText).forEach(picker -> {
+			ControlStyles.setInvalid(picker, true);
+			errors.add("Enter dates in a valid format or leave optional dates blank.");
+		});
 		return List.copyOf(errors);
+	}
+
+	private List<DatePicker> allIntakeDatePickers() {
+		List<DatePicker> pickers = new ArrayList<>(List.of(clientDateOfBirthPicker,
+				dateMedicalNegligencePicker, dateMedicalNegligenceDiscoveredPicker, dateOfInjuryPicker,
+				statuteOfLimitationsPicker, tortClaimsNoticePicker));
+		configuredDateInputs.values().forEach(input -> pickers.add(input.input()));
+		return pickers;
+	}
+
+	static void configureDatePicker(DatePicker picker) {
+		Objects.requireNonNull(picker, "picker");
+		StringConverter<LocalDate> delegate = new LocalDateStringConverter();
+		picker.setConverter(new StringConverter<>() {
+			@Override public String toString(LocalDate value) { return delegate.toString(value); }
+			@Override public LocalDate fromString(String text) {
+				if (text == null || text.trim().isEmpty()) {
+					markDateTextValidity(picker, true);
+					return null;
+				}
+				try {
+					LocalDate parsed = delegate.fromString(text.trim());
+					markDateTextValidity(picker, true);
+					return parsed;
+				} catch (RuntimeException invalidDate) {
+					markDateTextValidity(picker, false);
+					return picker.getValue();
+				}
+			}
+		});
+		picker.valueProperty().addListener((observable, oldValue, newValue) -> {
+			if (!hasInvalidDateText(picker)) ControlStyles.setInvalid(picker, false);
+		});
+	}
+
+	private static void markDateTextValidity(DatePicker picker, boolean valid) {
+		picker.getProperties().put(INVALID_DATE_PROPERTY, !valid);
+		ControlStyles.setInvalid(picker, !valid);
+	}
+
+	static boolean hasInvalidDateText(DatePicker picker) {
+		return Boolean.TRUE.equals(picker.getProperties().get(INVALID_DATE_PROPERTY));
 	}
 
 	private void focusFirstMissingConfiguredDate() {

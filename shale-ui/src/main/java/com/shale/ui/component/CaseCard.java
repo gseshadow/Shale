@@ -375,7 +375,8 @@ public class CaseCard extends VBox {
 		});
 		setOnMouseClicked(e ->
 		{
-			if (e.getButton() == MouseButton.PRIMARY && onOpen != null && caseId != null) {
+			if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress() && !isEmbeddedAction(e.getTarget())
+					&& onOpen != null && caseId != null) {
 				onOpen.accept(caseId);
 				e.consume();
 			}
@@ -387,6 +388,16 @@ public class CaseCard extends VBox {
 				e.consume();
 			}
 		});
+	}
+
+	private boolean isEmbeddedAction(Object target) {
+		Node node = target instanceof Node n ? n : null;
+		while (node != null && node != this) {
+			if (node instanceof javafx.scene.control.ButtonBase || node instanceof javafx.scene.control.TextInputControl
+					|| node instanceof javafx.scene.control.ComboBoxBase<?> || node instanceof javafx.scene.control.Hyperlink) return true;
+			node = node.getParent();
+		}
+		return false;
 	}
 
 	/*

@@ -1,6 +1,8 @@
 package com.shale.ui.component;
 
 import java.util.function.Consumer;
+import java.util.List;
+import com.shale.core.service.ContactServicePort.ClassificationPresentation;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -8,12 +10,10 @@ import javafx.scene.Cursor;
 import javafx.scene.input.KeyCode;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
-public class ContactCard extends HBox {
+public class ContactCard extends VBox {
 
     public enum Variant {
         FULL, COMPACT, MINI
@@ -23,6 +23,7 @@ public class ContactCard extends HBox {
     private final Label roleLabel = new Label();
     private final Label emailLabel = new Label();
     private final Label phoneLabel = new Label();
+    private List<ClassificationPresentation> classifications=List.of();
 
     private Integer contactId;
     private Consumer<Integer> onOpen;
@@ -32,6 +33,8 @@ public class ContactCard extends HBox {
     private boolean interactive = true;
 
     public ContactCard() {
+        nameLabel.setId("contact-card-name-label");
+        phoneLabel.setId("contact-card-phone-label");
         buildUiMiniDefaults();
         wireEvents();
     }
@@ -62,6 +65,7 @@ public class ContactCard extends HBox {
     public void setPhone(String phone) {
         phoneLabel.setText(normalizeOptional(phone));
     }
+    public void setClassifications(List<ClassificationPresentation> values){classifications=List.copyOf(values);}
 
     public void setBackgroundCssColor(String css) {
         backgroundCss = css;
@@ -128,7 +132,7 @@ public class ContactCard extends HBox {
         setPrefWidth(280);
         setMaxWidth(280);
         setPadding(new Insets(10, 12, 10, 12));
-        setSpacing(10);
+        setSpacing(7);
 
         resetNameLabelVariantStyles();
         nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
@@ -136,7 +140,8 @@ public class ContactCard extends HBox {
         emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
         phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
         emailLabel.setWrapText(true);
-        phoneLabel.setWrapText(true);
+        phoneLabel.setWrapText(false);
+        phoneLabel.setMinWidth(Region.USE_PREF_SIZE);
 
         VBox text = new VBox(4, nameLabel);
         if (roleLabel.isManaged()) {
@@ -145,10 +150,9 @@ public class ContactCard extends HBox {
         if (!(suppressPlaceholderLines && "—".equals(emailLabel.getText()))) {
             text.getChildren().add(emailLabel);
         }
-        if (!(suppressPlaceholderLines && "—".equals(phoneLabel.getText()))) {
-            text.getChildren().add(phoneLabel);
-        }
-        getChildren().add(text);
+        if (!(suppressPlaceholderLines && "—".equals(phoneLabel.getText()))) text.getChildren().add(phoneLabel);
+        getChildren().addAll(text,
+                new ContactClassificationChipGroup(classifications,ContactClassificationChipGroup.Size.COMPACT));
     }
 
     public void applyFull() {
@@ -167,16 +171,17 @@ public class ContactCard extends HBox {
         emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.76);");
         phoneLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.82);");
         emailLabel.setWrapText(true);
-        phoneLabel.setWrapText(true);
+        phoneLabel.setWrapText(false);
+        phoneLabel.setMinWidth(Region.USE_PREF_SIZE);
 
         VBox text = new VBox(6, nameLabel);
         if (roleLabel.isManaged()) {
             text.getChildren().add(roleLabel);
         }
         text.getChildren().add(emailLabel);
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        getChildren().addAll(text, spacer, phoneLabel);
+        text.getChildren().add(phoneLabel);
+        getChildren().addAll(text,
+                new ContactClassificationChipGroup(classifications,ContactClassificationChipGroup.Size.COMPACT));
     }
 
     private void resetNameLabelVariantStyles() {

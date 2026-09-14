@@ -19,16 +19,16 @@ class CalendarFeedSourceFilterTest {
     }
 
     @Test
-    void defaultFilterShowsEventsTasksAndDeadlinesButHidesOtherCaseDates() {
+    void defaultFilterShowsEventsTasksDeadlinesAndOtherCaseDates() {
         CalendarFeedSourceFilter filter = CalendarFeedSourceFilter.defaults();
         assertTrue(filter.isEnabled(CalendarFeedCategory.CALENDAR_EVENTS));
         assertTrue(filter.isEnabled(CalendarFeedCategory.TASKS));
         assertTrue(filter.isEnabled(CalendarFeedCategory.CASE_DEADLINES));
-        assertFalse(filter.isEnabled(CalendarFeedCategory.OTHER_CASE_DATES));
+        assertTrue(filter.isEnabled(CalendarFeedCategory.OTHER_CASE_DATES));
         assertTrue(filter.matches(item("EVENT:1", null, null, null, "MANUAL", "Event", 1, "MEETING")));
         assertTrue(filter.matches(item("TASK:1", "DueAt", 1, 1, "PROJECTED", "Task", 1, "TASK_DUE")));
         assertTrue(filter.matches(item("CASE_DATE:101", "DEADLINE", null, 1, "CASE_DATE", "SOL", 1, "STATUTE_OF_LIMITATIONS")));
-        assertFalse(filter.matches(item("CASE_DATE:401", "OTHER", null, 1, "CASE_DATE", "Intake", 1, "CASE_DATE")));
+        assertTrue(filter.matches(item("CASE_DATE:401", "OTHER", null, 1, "CASE_DATE", "Intake", 1, "CASE_DATE")));
     }
     @Test
     void caseCalendarDefaultFilterShowsEventsTasksDeadlinesAndCaseDates() {
@@ -133,12 +133,18 @@ class CalendarFeedSourceFilterTest {
         assertEquals(123L, persistedEventWithTask.id());
 
         CalendarFeedClickTarget caseDate = CalendarFeedClickTarget.resolve(itemWithCaseName("CASE_DATE:107", "SOL", "DEADLINE", null, 7, "PROJECTED", "Case Seven", "STATUTE_OF_LIMITATIONS"));
-        assertEquals(CalendarFeedClickTarget.Kind.CASE, caseDate.kind());
-        assertEquals(7L, caseDate.id());
+        assertEquals(CalendarFeedClickTarget.Kind.CASE_DATES, caseDate.kind());
+        assertEquals(107L, caseDate.id());
+        assertEquals(7, caseDate.caseId());
 
         CalendarFeedClickTarget authoritativeCaseDate = CalendarFeedClickTarget.resolve(itemWithCaseName("CASE_DATE:555", "SOL", "DEADLINE", null, 7, "CASE_DATE", "Case Seven", "CASE_DATE_DEADLINE"));
         assertEquals(CalendarFeedClickTarget.Kind.CASE_DATES, authoritativeCaseDate.kind());
-        assertEquals(7L, authoritativeCaseDate.id());
+        assertEquals(555L, authoritativeCaseDate.id());
+        assertEquals(7, authoritativeCaseDate.caseId());
+
+        CalendarFeedClickTarget explicitEvent = CalendarFeedClickTarget.resolve(itemWithCaseName("CALENDAR_EVENT:321", "Same display", null, null, 7, "MANUAL", "Same case", "MEETING"));
+        assertEquals(CalendarFeedClickTarget.Kind.CALENDAR_EVENT, explicitEvent.kind());
+        assertEquals(321L, explicitEvent.id());
 
         assertFalse(CalendarFeedClickTarget.resolve(itemWithCaseName("BROKEN", "Other", null, null, null, "PROJECTED", null, "OTHER")).actionable());
     }

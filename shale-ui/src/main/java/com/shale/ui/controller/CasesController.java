@@ -153,7 +153,7 @@ public final class CasesController {
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
 	private boolean liveSubscribed;
 	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> caseDatesUpdatedHandler;
-	private final Set<String> seenCaseDatesEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
+	private final Set<String> seenDateRefreshEventIds = Collections.synchronizedSet(new LinkedHashSet<>());
 	private final AtomicBoolean caseDatesRefreshQueued = new AtomicBoolean();
 	private final long controllerCreatedNanos = PerfLog.start();
 
@@ -718,9 +718,9 @@ public final class CasesController {
 
 	private boolean rememberCaseDatesEvent(String eventId) {
 		if (eventId == null || eventId.isBlank()) return true;
-		synchronized (seenCaseDatesEventIds) {
-			if (!seenCaseDatesEventIds.add(eventId)) return false;
-			while (seenCaseDatesEventIds.size() > 256) seenCaseDatesEventIds.remove(seenCaseDatesEventIds.iterator().next());
+		synchronized (seenDateRefreshEventIds) {
+			if (!seenDateRefreshEventIds.add(eventId)) return false;
+			while (seenDateRefreshEventIds.size() > 256) seenDateRefreshEventIds.remove(seenDateRefreshEventIds.iterator().next());
 			return true;
 		}
 	}

@@ -2,13 +2,47 @@
 
 > **Current runtime authority:** `CaseDates` is authoritative for migrated data; legacy columns are retained temporarily for rollback/history and explicitly deferred compatibility callers.
 
+## New Intake creation and post-cutover reconciliation (2026-08-14)
+
+New Intake carries its displayed, prepopulated Intake date and explicitly editable time through the
+controller request into the existing `CaseDao.createIntake` aggregate transaction. The DAO resolves
+the effective `INTAKE` semantic-role mapping on that same connection, verifies that the submitted
+configured field is that resolved type, and inserts the timed `CaseDates` occurrence before the case
+transaction commits. It does not derive authority from a numeric type id, mutable label, or the legacy
+`Cases.CallerDate` column. Configured non-Intake dates remain all-day values.
+
+The forward-only reconciliation script
+`docs/sql/2026-08-14_reconcile_missing_intake_case_dates.sql` repairs post-cutover cases that retained a
+legacy Caller date/time but have no active authoritative Intake occurrence. It requires all-tenant
+administrative visibility, resolves tenant-effective semantic mappings, preserves SQL Server time
+precision, inserts only missing occurrences, reports preflight/per-tenant/postflight counts, and fails
+closed on missing mappings, ambiguous mappings, tenant actor gaps, or verification differences.
+The production execution completed for `ShaleClientId = 7` and inserted 21 missing occurrences. The
+script is forward-only and idempotent, so a repeat execution detects those authoritative occurrences
+and inserts none. `Cases.CallerDate` and `Cases.CallerTime` are now reconciliation/history inputs only,
+not runtime authority.
+
+**Audit compatibility review.** Runtime Intake occurrence creation appends the established `CASE_DATE`
+entity-action event and PHI `CaseDates.StartsAt` write audit on the aggregate connection before commit;
+an audit failure rolls back the Case, parties, status, configured dates, and audits together. The repair
+script writes the same two audit categories in its transaction, identifies entity events with the safe
+`CASE_DATES_INTAKE_RECONCILIATION` source, and limits entity metadata to Case/Case Date ids. Date/time
+values occur only in the established PHI audit representation, never entity metadata, console output,
+or exception text. No new audit schema or timeline event is introduced.
+
+The Cases list displays and sorts Intake Date from the authoritative `CaseDates` occurrence resolved
+through the protected `INTAKE` semantic role. Neither New Intake nor reconciliation creates a
+`CalendarEvent`; the Calendar projects the occurrence directly. Case creation, the timed Intake
+occurrence, configured-date occurrences, parties/status work, and required audits commit or roll back
+together in the existing aggregate transaction.
+
 Workflow/lifecycle dates remain owned by their established workflow domains and are not inferred from compatibility occurrences.
 
-*Last updated: 2026-08-10*
+*Last updated: 2026-08-14*
 
-Case dates are authoritative legal and factual dates attached to cases. Phases 1A through 1C are the foundation: `CaseDateTypes` and `CaseDates` schema/RLS/constraints/seeds, effective selector and historical read models, and actor-aware occurrence mutations. Phases 2A and 2B complete date-type administration before Phase 2C Case View occurrence management is treated as complete. Phase 3A projection, Phase 3B backfill, and Phase 3C post-validation are complete. Phase 3D post-migration runtime cutover has begun: its first slice freezes the nine-key contract and adds tenant-safe, conflict-detecting authoritative lookup. Compatibility hydration and mutation remain gated on an occurrence-row-version aggregate contract and atomic case transaction ownership, as recorded in the runtime cutover inventory.
+Case dates are authoritative legal and factual dates attached to cases. Phases 1A through 1C established the `CaseDateTypes` and `CaseDates` schema/RLS/constraints/seeds, effective selector and historical read models, and actor-aware occurrence mutations. Phases 2A through 2C completed administration and Case View occurrence management. Phases 3A through 3D completed projection, backfill, validation, and the runtime authority cutover. The complete phase record, including superseded intermediate gates, is retained in the runtime cutover inventory.
 
-The existing-case JavaFX fixed-date inline path now owns a coherent, hidden nine-slot aggregate snapshot. Loads and mutations use `CaseServicePort`; successful results replace both the case token and all occurrence states, while conflicts invalidate and explicitly reload without retry. Legacy-shaped broad desktop saves, intake, API/web, and data projections remain deferred and are enumerated in the Phase 3D inventory.
+The existing-case JavaFX fixed-date inline path owns a coherent, hidden nine-slot aggregate snapshot. Loads and mutations use `CaseServicePort`; successful results replace both the case token and all occurrence states, while conflicts invalidate and explicitly reload without retry. Desktop intake, API/web, Calendar, documents, reports, exports, and data projections use authoritative `CaseDates`; no active runtime path reads or writes the nine migrated `dbo.Cases` date columns.
 
 ## Ownership model
 
@@ -123,9 +157,48 @@ Phase 2A adds actor-aware Settings administration APIs for `CaseDateTypes` on th
 
 Administrator-created types have no `SystemKey`; keys are reserved for system-defined contracts. For tenant-created custom types, the editable properties are display name, description, `CalendarCategory`, color, `SupportsTime`, active state, and the existing sort order. These are presentation/selection capabilities already represented by the Phase 1A schema and do not change occurrence identity. A custom type's existing key, if present from older data, is immutable. Global definitions and tenant overrides sharing a global key are protected from edit, activation changes, removal, rename, or re-keying. Validation enforces required normalized names, tenant-visible duplicate names, allowed categories, `#RRGGBB` colors, row-version presence for every existing-row mutation, tenant ownership, admin actor context, and cross-tenant exclusion. Successful mutations return or reload authoritative state. Existing occurrences are not rewritten when a custom type is deactivated or removed.
 
-Case Date Type mutations are not currently written to `EntityActionAuditLog`: the deployed/repository check constraint enumerates supported entity types and does not include `CASE_DATE_TYPE`. Adding such audit rows would fail the transaction, while using `CASE_DATE` would misclassify an administrative definition change. This phase therefore defers entity-action audit until a separately approved schema expansion can add the entity type; no sensitive values are logged as a substitute.
+Case Date Type administration now appends exactly one `CASE_DATE_TYPE` entity-action event for each successful authoritative mutation. Create uses `CREATED`, ordinary edits use `UPDATED`, lifecycle toggles use `ACTIVATED`/`DEACTIVATED`, reset/remove uses `DELETED`, and mutation of a soft-deleted row uses `RESTORED`. `EntityId` is the authoritative numeric `CaseDateTypes.Id`; metadata is limited to `CASE_DATE_TYPE_ID` and `ACTIVE`. Labels, descriptions, colors, dates, occurrences, Case IDs, notes, SystemKey presentation, and RowVer are excluded.
+
+The DAO owns validation, the `CaseDateTypes` write, dependent semantic-role protection checks, audit append, and commit on one connection and transaction. Tenant and actor must match trusted `ShaleClientId` and `PrincipalUserId` SQL session context, and the actor must be an active tenant administrator. Audit follows successful validation and optimistic-concurrency mutation and precedes commit, so any validation, SQL, audit, concurrency, or commit failure rolls back both mutation and event. The returned DTO is the authoritative post-mutation row. Existing Settings publication/refresh remains outside and after this committed DAO call. Entity-action auditing does not replace occurrence PHI auditing.
+
+Case Date Type entity-action auditing is implemented, including the ordered, idempotent
+`2026-08-12_entity_action_audit_entity_type_constraint.sql` schema migration. That
+migration and the required Case Dates migrations are deployed. The full Maven reactor,
+React typecheck/build, and the approved manual smoke scenarios have passed; final
+evidence is recorded under **Final verification and sign-off status** in
+`case-dates-runtime-cutover-inventory.md`. Implementation, automated verification, and
+manual QA for the customizable Case Dates roadmap are complete.
 
 Effective active selector reads remain separate from administration reads. New-occurrence selectors use only `listEffectiveCaseDateTypes`; inactive, deleted, reset-marker, and shadowed rows must not leak into ordinary selectors.
+
+### Manual-QA prerequisites and protected singleton conflicts (2026-08-14)
+
+Deploy `docs/sql/2026-08-12_entity_action_audit_entity_type_constraint.sql` after the
+entity-action audit foundation and all earlier allowlist extensions (including
+`docs/sql/2026-08-10_case_date_semantic_role_admin_phase2.sql`), and before deploying
+the application build that emits `CASE_DATE_TYPE`. The existing migration is the sole
+constraint migration for this change; it preserves every recognized prior allowlist
+value, adds `CASE_DATE_TYPE` with `WITH CHECK`, and verifies one enabled, trusted
+canonical constraint. Do not infer this order from filename sorting alone.
+
+Intake, Statute of Limitations, and Tort Notice Deadline are singleton semantic meanings
+per Case. Create, type-changing update, and restore lock and check active occurrences in
+the owning transaction by tenant-visible semantic-role mapping history and numeric type
+identity, never by type name, label, or date. Removed occurrences do not conflict. A
+conflict rolls back before occurrence, Case touch, audit, timeline, publication, or
+Calendar synchronization can commit. Ordinary types continue to allow multiple
+occurrences.
+
+Historical duplicate rows are not selected arbitrarily. Compatibility hydration omits
+only the conflicted protected slot, marks it as a safe conflict requiring reload, and
+continues to hydrate unaffected slots. The generic Dates manager reads the complete
+active/removed occurrence lists independently, so users can remove the extra row; its
+normal post-commit invalidation then reloads and clears the conflict without reopening
+the Case. Use the read-only
+`docs/sql/2026-08-14_detect_protected_case_date_duplicates.sql` diagnostic to report
+exact tenant, Case, occurrence, type, and semantic-role IDs for separately reviewed
+repair. It performs no cleanup. The audit migration prerequisite is deployed, and the
+singleton/read-resilience behavior passed the completed manual QA sign-off.
 
 ## Phase 2B Settings date-type administration UI
 
@@ -159,7 +232,7 @@ Range matching uses the unified feed's local `LocalDateTime` boundary contract: 
 
 Historical type presentation follows the Phase 1B read rule. The stored type relationship is preserved. If the stored type has a stable key and a current active tenant-effective presentation exists, that presentation is used; otherwise the stored type's own name/category/color are used so inactive, deleted, shadowed, or replaced historical types remain understandable without becoming selector choices.
 
-`CaseDateTypes.CalendarCategory` is the layer-classification input. `DEADLINE` maps to the existing `CASE_DEADLINES` layer. `TRIAL`, `HEARING`, `MEDIATION`, `DEPOSITION`, `NOTICE`, `APPOINTMENT`, `MILESTONE`, and `OTHER` map to the existing `OTHER_CASE_DATES` layer. Unknown categories are excluded by the projection rather than misclassified as manual events. No fifth user-facing layer is introduced, and existing layer defaults remain unchanged.
+`CaseDateTypes.CalendarCategory` is the layer-classification input. `DEADLINE` maps to the existing `CASE_DEADLINES` layer. `TRIAL`, `HEARING`, `MEDIATION`, `DEPOSITION`, `NOTICE`, `APPOINTMENT`, `MILESTONE`, and `OTHER` map to the existing `OTHER_CASE_DATES` layer. Unknown categories are excluded by the projection rather than misclassified as manual events. No fifth user-facing layer is introduced. The main Calendar enables Case Dates when no saved user preference exists, preserves an explicit hidden preference, and persists in-session changes without resetting them during range refresh or live update.
 
 Projected authoritative occurrences use `CASE_DATE:<CaseDates.Id>` as the stable feed key/source identity and `CASE_DATE` as the source discriminator. The occurrence id remains the source record id, so multiple occurrences on one case or of one type remain independent and cannot collide with `EVENT:<CalendarEventsId>`, `TASK:<TaskId>`, or legacy fixed-date keys such as `CASE_SOL:<CaseId>`.
 
@@ -399,26 +472,25 @@ Rollback boundary: the CaseDateTypes and CaseDates scripts are idempotent, but t
 
 ### Mixed-version compatibility rule
 
-The rule below was written before the completed backfill and remains a Phase 3D release gate: authority cannot cut over while a supported legacy-only client can still perform normal writes. The Phase 3D plan does not authorize a compatibility dual-write; supported-client upgrade/enforcement must be decided explicitly before implementation deployment.
+The rule below was written before the completed backfill and is retained as historical release-gate rationale. Phase 3D satisfied the gate without a compatibility dual-write; no supported active runtime path now reads or writes the migrated columns.
 
 No new reader may depend exclusively on `CaseDates` while any supported deployed client can still write exclusively to the legacy `dbo.Cases` columns. Phase 3B and Phase 3C do not change runtime authority: legacy `dbo.Cases` fields remain authoritative, and the existing desktop and web applications must continue working unchanged. Backfill alone does not authorize reader or writer cutover. A later compatibility release must cover desktop, server/API, and web together, and that release will require a deliberately designed synchronization strategy for mixed versions rather than an accidental dual-write or fallback-read behavior. Legacy columns remain physically present throughout migration preparation, compatibility deployment, upgrade completion, reconciliation, and soak. Physical removal is a separate final contract phase after all supported desktop clients are upgraded and all desktop, web, API, report, export, and calendar dependencies are gone.
 
 An initial backfill is only a point-in-time copy. While any legacy-only client remains supported, a later change to a legacy value makes the copied `CaseDate` stale; the destination must not be described as current or authoritative yet. The compatibility release must define synchronization and a reconciliation pass across desktop, server/API, and web. Reconciliation must compare the then-current legacy value with every same-`SystemKey` occurrence and stop for manual resolution when a user-created exact or conflicting occurrence exists; it must not overwrite, remove, restore, or silently claim user data. Only after compatibility synchronization is deployed, supported clients are upgraded, and reconciliation plus soak are clean can authority move away from the legacy columns.
 
-### Future phased cutover roadmap
+### Finalized phased cutover roadmap
 
-1. Destination type verification.
-2. Preflight and conflict resolution.
-3. Controlled backfill.
-4. Post-backfill validation.
-5. Runtime writer cutover: Intake writes the `intake` CaseDate; fee-agreement workflow writes `fee_agreement_signed`; non-engagement workflow writes `non_engagement_letter_sent`; status transition workflow writes upgraded status-history rows for accepted/denied/closed.
-6. Runtime reader cutover from legacy case columns to authoritative `CaseDates` and upgraded status history.
-7. Case Timeline cutover to the upgraded status-history model where needed for historical presentation.
-8. Unified Calendar legacy-projection removal after readers no longer need fixed `dbo.Cases` date projections.
-9. Export/report/web/API cutover.
-10. Release soak period with reconciliation comparing legacy fields to destinations.
-11. Final dependency scan across database SQL and Java/web/UI references.
-12. Legacy column removal only when no dependencies remain and the final verification phase passes.
+1. **Complete:** destination type verification, preflight/conflict resolution, controlled backfill, and post-backfill validation.
+2. **Complete:** runtime writers and readers use authoritative `CaseDates`; lifecycle/status-history ownership remains deliberately separate.
+3. **Complete:** Case Timeline compatibility, unified Calendar legacy-projection cleanup, and export/report/web/API cutover.
+4. **Complete:** final production dependency scan and automated/manual release verification. No active runtime path reads or writes the nine migrated `dbo.Cases` date columns.
+5. **Deferred:** retain the physical legacy columns through at least one release/rollback observation window, then consider removal only through the separately approved gate in `case-dates-runtime-cutover-inventory.md`. This roadmap creates no removal migration.
+
+Historical migration, reconciliation, audit vocabulary, schema evidence, frozen compatibility
+identifiers, and rollback documentation may continue to name the columns; those references are
+legitimate non-runtime evidence and are not dependencies on the legacy storage contract. The next
+separate product roadmap is the **unified Calendar New Event workflow**. It is not remaining Case
+Dates work and must define its own Calendar behavior, scope, verification, and release gates.
 
 ## Desktop LiveBus synchronization gate (existing cases)
 
@@ -438,7 +510,9 @@ The server existing-case detail and core-details PATCH now expose and consume th
 
 `POST /api/cases` stages the currently exposed intake, injury, statute, and tort meanings as authoritative Case Date inputs. Identity is a canonical `SystemKey` with an optional authoritative type id that must equal effective tenant/global resolution; labels and names are never accepted. Blank controls are omitted rather than materialized. Values retain local `StartsAt`, optional `EndsAt`, and `AllDay`, including timed intake values.
 
-`CaseDateDao.createCaseAggregate` owns one `CaseAggregateTransaction`. Its connection-bound Case participant inserts the Case, primary status, and responsible attorney while omitting all nine migrated columns; the Case Date participant validates SQL-session identity, membership, effective ownership/eligibility, mapping uniqueness, time support, and singleton duplication. Occurrence PHI and Case/occurrence entity-action audits use the same connection. Failure before commit rolls back the unit; success is reloaded through the mapped Case detail contract. There is no scalar compatibility create input and no dual-write. The next evidenced cutover is organization/contact related-case and remaining report/export compatibility reads. No live SQL Server verification occurred in this slice.
+`CaseDateDao.createCaseAggregate` owns one `CaseAggregateTransaction`. Its connection-bound Case participant inserts the Case, primary status, and responsible attorney while omitting all nine migrated columns; the Case Date participant validates SQL-session identity, membership, effective ownership/eligibility, mapping uniqueness, time support, and singleton duplication. Occurrence PHI and Case/occurrence entity-action audits use the same connection. Failure before commit rolls back the unit; success is reloaded through the mapped Case detail contract. There is no scalar compatibility create input and no dual-write. Later slices completed the
+organization/contact related-case and report/export cutovers, and the final verification sign-off is
+recorded in `case-dates-runtime-cutover-inventory.md`.
 
 ## Configurable New Intake writer cutover
 
@@ -458,9 +532,10 @@ with `EndsAt = NULL` and `AllDay = 1`; no workstation or UTC timezone conversion
 Optional blanks create no occurrence. In configured mode all migrated legacy date inputs
 accepted by the desktop intake command, including `CallerDate` and `CallerTime`, are left
 null rather than dual-written; only completed configured occurrences are authoritative,
-while unrelated legacy fields are untouched. If no saved configuration exists (`id = 0`, null row version), the existing
-legacy controls and fixed-column writes remain unchanged. No default configuration is
-seeded.
+while unrelated legacy fields are untouched. The initial fallback for a missing saved
+configuration was removed by the final intake-hardening slice: New Intake now requires the
+current authoritative configuration and never falls back to fixed-column writes. No default
+configuration is seeded.
 
 `CaseDao.createIntake` owns the single JDBC transaction. It locks and validates the form
 configuration and effective types, verifies party-role prerequisites, inserts client/caller
@@ -471,8 +546,8 @@ transaction. The returned result reports the committed occurrence count, and the
 controller publishes one PHI-safe `CaseDates`/`CREATED` invalidation only after the DAO has
 returned from commit. Validation and rollback publish nothing. The payload follows the
 existing CaseDates contract and carries only case id and change, never dates, labels, notes,
-or concurrency tokens. Server/API/web compatibility creation remains deferred and unchanged.
-The next cutover gate is Calendar duplicate legacy-date projection cleanup.
+or concurrency tokens. Server/API/web creation was subsequently converted to the same authoritative aggregate
+contract. Calendar duplicate legacy-date projection cleanup is complete.
 
 ## Protected semantic-role tenant administration (Phase 2)
 
@@ -483,3 +558,7 @@ Creating or replacing an override and resetting it are authoritative, administra
 An active tenant type referenced by a protected-role mapping cannot be deactivated or removed until the administrator changes or resets that mapping. Existing global compatibility protection is unchanged. Mapping lifecycle never rewrites `CaseDates.CaseDateTypeId` or form configuration references, so historical occurrences remain readable through their stored type identity. LiveBus uses the existing Case Date Type change event once after a successful mutation to invalidate Settings, Cases/card projections, sorting, and open effective-role consumers; failures publish nothing and no second projection path exists.
 
 The separate classification/ownership phase remains deferred. It will correct noncritical global dates that Settings currently describes as built-in; this phase does not convert ownership, change built-in classification, or broaden protected semantic roles.
+
+## Occurrence-specific titles (2026-08-18)
+
+`CaseDateTypes.Name` remains category presentation; nullable `CaseDates.Title` is the occurrence-specific title. The authoritative create/update path trims titles, stores blanks as null, and rejects values over 255 characters. Readers display a nonblank occurrence title and otherwise fall back to the effective/historical type name without persisting that fallback. Calendar projection retains `CASE_DATE:<CaseDateId>` identity and uses the same fallback. Titles and type names never participate in matching, routing, protected-role resolution, synchronization, or Calendar Event creation. Title values are deliberately excluded from entity-action audit metadata because they can contain sensitive information; the existing transaction, PHI audit fields, timeline, RLS, concurrency, notification, and LiveBus boundaries are unchanged.

@@ -29,7 +29,7 @@ class CaseOverviewMiniCardPickerCancellationTest {
     void cancelButtonReturnsEmptyForEveryOverviewOptionTypeAndCanReopenRepeatedly() {
         JavaFxTestSupport.runAndWait(() -> {
             assertRepeatedCancel(new CaseDao.PracticeAreaRow(1, "Area", "#123456", "area"));
-            assertRepeatedCancel(new CaseDao.StatusRow(2, "Open", 1, "#654321", "open", "open"));
+            assertRepeatedCancel(new CaseDao.StatusRow(2, "Open", 1, "#654321", "open", "open", true, false));
             assertRepeatedCancel(new CaseDao.UserRow(3, "Same Name", "#abcdef"));
             assertRepeatedCancel(new CaseDao.UserRow(4, "Same Name", "#fedcba"));
         });

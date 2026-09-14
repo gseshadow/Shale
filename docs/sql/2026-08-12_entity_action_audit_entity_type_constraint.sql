@@ -171,7 +171,7 @@ BEGIN TRY
     DECLARE @Allowed table (Value varchar(64) NOT NULL PRIMARY KEY);
     /* Complete current vocabulary and every value known to have been allowed by deployed migrations. */
     INSERT @Allowed (Value) VALUES
-        ('CASE'), ('LINK_TYPE'), ('CASE_LINK'), ('CASE_LINK_SHARE'), ('CASE_DATE'),
+        ('CASE'), ('LINK_TYPE'), ('CASE_LINK'), ('CASE_LINK_SHARE'), ('CASE_DATE'), ('CASE_DATE_TYPE'),
         ('CALENDAR_EVENT'), ('CASE_DATE_ROLE_MAPPING'), ('CALENDAR_CASE_DATE_TYPE_MAPPING'),
         ('FORM_CONFIGURATION'), ('MATERIAL_TYPE'), ('MATERIAL_REQUEST'),
         ('MATERIAL_REQUEST_FOLLOW_UP'), ('MATERIAL_ITEM'), ('USER');

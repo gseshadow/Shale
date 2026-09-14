@@ -5,10 +5,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+
 import org.junit.jupiter.api.Test;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 
 final class ContactSharedLinksSectionTest {
     private static final Path FXML = Path.of("src/main/resources/fxml/contact.fxml");
@@ -16,20 +23,52 @@ final class ContactSharedLinksSectionTest {
 
     @Test
     void relatedCasesAndSharedLinksAreSeparateSiblingSections() throws Exception {
-        String fxml = Files.readString(FXML);
-        int column = fxml.indexOf("<VBox minWidth=\"430\" prefWidth=\"460\" maxWidth=\"520\" spacing=\"16\" GridPane.columnIndex=\"1\">");
-        String side = fxml.substring(column, fxml.indexOf("</GridPane>", column));
+        var factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        Element root = factory.newDocumentBuilder().parse(FXML.toFile()).getDocumentElement();
+        Element sidebar = findByFxId(root, "relatedSidebar");
+        assertTrue(sidebar != null, "Expected relatedSidebar in contact.fxml");
 
-        int relatedSection = side.indexOf("<VBox spacing=\"8\" styleClass=\"secondary-panel\"");
-        int relatedHeading = side.indexOf("Related Cases", relatedSection);
-        int relatedContainer = side.indexOf("fx:id=\"relatedCasesContainer\"", relatedHeading);
-        int closeRelated = side.indexOf("</VBox>", relatedContainer);
-        int sharedSection = side.indexOf("<VBox spacing=\"8\" styleClass=\"secondary-panel\"", closeRelated);
-        int sharedHeading = side.indexOf("Links Shared With This Contact", sharedSection);
-        int sharedContainer = side.indexOf("fx:id=\"sharedLinksContainer\"", sharedHeading);
+        List<Element> sections = childElements(sidebar).stream()
+                .filter(element -> hasStyleClass(element, "secondary-panel"))
+                .toList();
+        assertEquals(2, sections.size(), "relatedSidebar must contain exactly two sibling secondary panels");
+        assertSection(sections.get(0), "Related Cases", "relatedCasesContainer");
+        assertSection(sections.get(1), "Links Shared With This Contact", "sharedLinksContainer");
+    }
 
-        assertTrue(relatedSection >= 0 && relatedHeading > relatedSection && relatedContainer > relatedHeading);
-        assertTrue(sharedSection > closeRelated && sharedHeading > sharedSection && sharedContainer > sharedHeading);
+    private static void assertSection(Element section, String heading, String containerId) {
+        assertTrue(hasDescendantAttribute(section, "text", heading), "Missing heading: " + heading);
+        assertTrue(findByFxId(section, containerId) != null, "Missing container: " + containerId);
+    }
+
+    private static Element findByFxId(Element root, String id) {
+        if (id.equals(root.getAttributeNS("http://javafx.com/fxml/1", "id"))) return root;
+        for (Element child : childElements(root)) {
+            Element match = findByFxId(child, id);
+            if (match != null) return match;
+        }
+        return null;
+    }
+
+    private static boolean hasDescendantAttribute(Element root, String attribute, String value) {
+        if (value.equals(root.getAttribute(attribute))) return true;
+        return childElements(root).stream().anyMatch(child -> hasDescendantAttribute(child, attribute, value));
+    }
+
+    private static boolean hasStyleClass(Element element, String styleClass) {
+        return List.of(element.getAttribute("styleClass").split("\\s+")).contains(styleClass);
+    }
+
+    private static List<Element> childElements(Element parent) {
+        List<Element> children = new ArrayList<>();
+        for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+            if (child instanceof Element element) children.add(element);
+        }
+        return children;
     }
 
     @Test

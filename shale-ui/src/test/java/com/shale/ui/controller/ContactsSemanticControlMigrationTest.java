@@ -4,9 +4,9 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Control;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import org.junit.jupiter.api.Test;
 
@@ -31,10 +31,9 @@ final class ContactsSemanticControlMigrationTest {
         String fxml = read("src/main/resources/fxml/contact.fxml");
 
         assertTrue(list.contains("ControlStyles.formControl(contactsSearchField)"));
-        assertTrue(detail.contains("ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY)"));
-        assertTrue(detail.contains("ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY)"));
+        assertTrue(detail.contains("ControlStyles.apply(saveButton,ControlStyles.Purpose.PRIMARY)"));
+        assertTrue(detail.contains("ControlStyles.apply(editButton, ControlStyles.Purpose.SECONDARY)"));
         assertTrue(detail.contains("ControlStyles.apply(deleteContactButton, ControlStyles.Purpose.DANGER)"));
-        assertTrue(detail.contains("ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL"));
         assertTrue(detail.contains("ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL"));
         assertTrue(create.contains("ControlStyles.apply(createButton, ControlStyles.Purpose.PRIMARY)"));
         assertTrue(create.contains("ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY)"));
@@ -43,6 +42,11 @@ final class ContactsSemanticControlMigrationTest {
         }
         assertFalse(fxml.contains("app-toolbar-button"));
         assertFalse(fxml.contains("case-overview-edit-button"));
+        for (String retiredId : List.of("editDisplayNameButton", "editNameButton", "editFirstNameButton",
+                "editLastNameButton", "editEmailButton", "editPhoneButton", "editAddressHomeButton",
+                "editDateOfBirthButton", "editConditionButton", "editDeceasedButton")) {
+            assertFalse(fxml.contains("fx:id=\"" + retiredId + "\""), "retired field pencil remains: " + retiredId);
+        }
         assertFalse(create.contains("setStyle("), "contact creation must not retain inline action/form paint");
     }
 
@@ -75,11 +79,12 @@ final class ContactsSemanticControlMigrationTest {
                     inspect("/fxml/contacts.fxml", 1280, 800);
                     inspect("/fxml/contacts.fxml", 560, 700);
                     Parent detail = inspect("/fxml/contact.fxml", 1280, 800);
-                    require(((Button) detail.lookup("#saveButton")).getStyleClass().contains("shale-control-primary"), "Save primary");
-                    require(((Button) detail.lookup("#cancelButton")).getStyleClass().contains("shale-control-secondary"), "Cancel secondary");
-                    require(((Button) detail.lookup("#deleteContactButton")).getStyleClass().contains("shale-control-danger"), "Delete danger");
-                    require(((Button) detail.lookup("#editEmailButton")).getStyleClass().contains("shale-control-small"), "inline Edit small");
-                    require(((TextArea) detail.lookup("#conditionEditor")).getPrefRowCount() == 4, "multiline geometry retained");
+                    inspect("/fxml/contact.fxml", 700, 760);
+                    requireStyles(detail, "contact-profile-panel", "case-main-surface", "contact-profile-panel");
+                    requireStyles(detail, "contact-classifications-panel", "secondary-panel", "contact-classifications-panel");
+                    requireStyle(detail, "editButton", Button.class, "shale-control-secondary");
+                    requireStyle(detail, "deleteContactButton", Button.class, "shale-control-danger");
+                    requireControl(detail, "conditionValue", javafx.scene.control.Label.class);
                 } catch (Throwable thrown) { failure.set(thrown); }
                 finally { finished.countDown(); }
             });
@@ -94,7 +99,7 @@ final class ContactsSemanticControlMigrationTest {
             scene.getStylesheets().add(requireResource("/css/app.css").toExternalForm());
             root.applyCss(); root.layout();
             if (resource.endsWith("contacts.fxml")) {
-                Control search = (TextField) root.lookup("#contactsSearchField");
+                Control search = requireControl(root, "contactsSearchField", TextField.class);
                 require(search.getStyleClass().contains("shale-form-control"), "search shared form shell");
             }
             return root;
@@ -104,6 +109,21 @@ final class ContactsSemanticControlMigrationTest {
             java.net.URL resource = Probe.class.getResource(path);
             if (resource == null) throw new AssertionError("Missing " + path);
             return resource;
+        }
+        private static <T extends Node> T requireControl(Parent root, String id, Class<T> type) {
+            Node node = root.lookup("#" + id);
+            require(node != null, "Missing required control #" + id);
+            require(type.isInstance(node), "Control #" + id + " must be a " + type.getSimpleName());
+            return type.cast(node);
+        }
+        private static <T extends Control> void requireStyle(Parent root, String id, Class<T> type, String styleClass) {
+            T control = requireControl(root, id, type);
+            require(control.getStyleClass().contains(styleClass), "#" + id + " must use " + styleClass);
+        }
+        private static void requireStyles(Parent root, String lookupClass, String... expected) {
+            Node node = root.lookup("." + lookupClass);
+            require(node != null, "Missing required semantic surface ." + lookupClass);
+            for (String styleClass : expected) require(node.getStyleClass().contains(styleClass), "." + lookupClass + " must use " + styleClass);
         }
         private static void require(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
     }

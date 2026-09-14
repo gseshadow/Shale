@@ -110,7 +110,7 @@ public final class ApiReadController {
             String lastName,
             String email,
             String phone,
-            String addressHome,
+            String address,
             String dateOfBirth,
             String condition,
             Boolean deceased) {
@@ -122,7 +122,7 @@ public final class ApiReadController {
             String lastName,
             String email,
             String phone,
-            String addressHome,
+            String address,
             String dateOfBirth,
             String condition,
             Boolean deceased) {
@@ -140,7 +140,8 @@ public final class ApiReadController {
             String state,
             String postalCode,
             String country,
-            String notes) {
+			String notes,
+			Integer organizationTypeId) {
     }
 
     public record UpdateOrganizationRequest(
@@ -155,7 +156,9 @@ public final class ApiReadController {
             String state,
             String postalCode,
             String country,
-            String notes) {
+			String notes,
+			Integer organizationTypeId,
+			String rowVer) {
     }
 
     private static final int DEFAULT_SEARCH_LIMIT = 25;
@@ -190,7 +193,7 @@ public final class ApiReadController {
     public List<CaseOverviewDto> searchCases(@RequestParam(name = "query", defaultValue = "") String query) {
         String safeQuery = ApiValidation.searchQuery(query);
         int shaleClientId = runtimeSessionState.requireShaleClientId();
-        return caseServicePort.searchCases(safeQuery, shaleClientId, DEFAULT_SEARCH_LIMIT);
+        return caseServicePort.searchCases(safeQuery, shaleClientId, runtimeSessionState.requireUserId(), DEFAULT_SEARCH_LIMIT);
     }
 
     @Operation(summary = "Search cases with pagination metadata", description = "Returns a page-shaped response for web clients. total is null because no cheap count is currently available.")
@@ -206,6 +209,7 @@ public final class ApiReadController {
         List<CaseOverviewDto> fetched = caseServicePort.searchCases(
                 safeQuery,
                 shaleClientId,
+                runtimeSessionState.requireUserId(),
                 ApiValidation.searchLimitForPage(safePage, safeSize));
         return new PagedResponse<>(slice(fetched, safePage, safeSize), safePage, safeSize, null);
     }
@@ -491,11 +495,11 @@ public final class ApiReadController {
         }
         String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
         String phone = ApiValidation.optionalContactText(request == null ? null : request.phone(), "Phone", 100);
-        String addressHome = ApiValidation.optionalContactText(request == null ? null : request.addressHome(), "Address", 2000);
+        String address = ApiValidation.optionalContactText(request == null ? null : request.address(), "Address", 2000);
         String dateOfBirth = ApiValidation.optionalDateText(request == null ? null : request.dateOfBirth(), "Date of birth");
         String condition = ApiValidation.optionalContactText(request == null ? null : request.condition(), "Notes", 10000);
         int contactId = contactServicePort.createContact(new ContactServicePort.CreateContactCommand(
-                shaleClientId, userId, displayName, firstName, lastName, email, phone, addressHome, dateOfBirth, condition, request == null ? null : request.deceased()));
+                shaleClientId, userId, displayName, firstName, lastName, email, phone, address, dateOfBirth, condition, request == null ? null : request.deceased()));
         return contactServicePort.getContactDetail(contactId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found."));
     }
@@ -524,11 +528,11 @@ public final class ApiReadController {
         }
         String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
         String phone = ApiValidation.optionalContactText(request == null ? null : request.phone(), "Phone", 100);
-        String addressHome = ApiValidation.optionalContactText(request == null ? null : request.addressHome(), "Address", 2000);
+        String address = ApiValidation.optionalContactText(request == null ? null : request.address(), "Address", 2000);
         String dateOfBirth = ApiValidation.optionalDateText(request == null ? null : request.dateOfBirth(), "Date of birth");
         String condition = ApiValidation.optionalContactText(request == null ? null : request.condition(), "Notes", 10000);
         boolean updated = contactServicePort.updateContact(new ContactServicePort.UpdateContactCommand(
-                safeContactId, shaleClientId, userId, displayName, firstName, lastName, email, phone, addressHome, dateOfBirth, condition, request == null ? null : request.deceased()));
+                safeContactId, shaleClientId, userId, displayName, firstName, lastName, email, phone, address, dateOfBirth, condition, request == null ? null : request.deceased()));
         if (!updated) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found.");
         }
@@ -581,7 +585,7 @@ public final class ApiReadController {
         String country = ApiValidation.optionalOrganizationText(request == null ? null : request.country(), "Country", 100);
         String notes = ApiValidation.optionalOrganizationText(request == null ? null : request.notes(), "Notes", 10000);
         int organizationId = organizationServicePort.createOrganization(new CreateOrganizationCommand(
-                shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes));
+                shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes,request==null?null:request.organizationTypeId()));
         return organizationServicePort.getOrganizationDetail(organizationId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found."));
     }
@@ -609,20 +613,21 @@ public final class ApiReadController {
         int safeOrganizationId = Math.toIntExact(ApiValidation.positiveId(organizationId, "organizationId"));
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
-        String name = ApiValidation.organizationName(request == null ? null : request.name());
-        String phone = ApiValidation.optionalOrganizationText(request == null ? null : request.phone(), "Phone", 100);
-        String fax = ApiValidation.optionalOrganizationText(request == null ? null : request.fax(), "Fax", 100);
-        String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
-        String website = ApiValidation.optionalOrganizationText(request == null ? null : request.website(), "Website", 500);
-        String address1 = ApiValidation.optionalOrganizationText(request == null ? null : request.address1(), "Address line 1", 500);
-        String address2 = ApiValidation.optionalOrganizationText(request == null ? null : request.address2(), "Address line 2", 500);
-        String city = ApiValidation.optionalOrganizationText(request == null ? null : request.city(), "City", 200);
-        String state = ApiValidation.optionalOrganizationText(request == null ? null : request.state(), "State", 100);
-        String postalCode = ApiValidation.optionalOrganizationText(request == null ? null : request.postalCode(), "Zip", 100);
-        String country = ApiValidation.optionalOrganizationText(request == null ? null : request.country(), "Country", 100);
-        String notes = ApiValidation.optionalOrganizationText(request == null ? null : request.notes(), "Notes", 10000);
+		OrganizationDetail opening=organizationServicePort.getOrganizationDetail(safeOrganizationId,shaleClientId).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Organization not found."));
+		String name = request==null||request.name()==null?opening.name():ApiValidation.organizationName(request.name());
+		String phone = request==null||request.phone()==null?opening.phone():ApiValidation.optionalOrganizationText(request.phone(), "Phone", 100);
+		String fax = request==null||request.fax()==null?opening.fax():ApiValidation.optionalOrganizationText(request.fax(), "Fax", 100);
+		String email = request==null||request.email()==null?opening.email():ApiValidation.optionalEmail(request.email(), "Email");
+		String website = request==null||request.website()==null?opening.website():ApiValidation.optionalOrganizationText(request.website(), "Website", 500);
+		String address1 = request==null||request.address1()==null?opening.address1():ApiValidation.optionalOrganizationText(request.address1(), "Address line 1", 500);
+		String address2 = request==null||request.address2()==null?opening.address2():ApiValidation.optionalOrganizationText(request.address2(), "Address line 2", 500);
+		String city = request==null||request.city()==null?opening.city():ApiValidation.optionalOrganizationText(request.city(), "City", 200);
+		String state = request==null||request.state()==null?opening.state():ApiValidation.optionalOrganizationText(request.state(), "State", 100);
+		String postalCode = request==null||request.postalCode()==null?opening.postalCode():ApiValidation.optionalOrganizationText(request.postalCode(), "Zip", 100);
+		String country = request==null||request.country()==null?opening.country():ApiValidation.optionalOrganizationText(request.country(), "Country", 100);
+		String notes = request==null||request.notes()==null?opening.notes():ApiValidation.optionalOrganizationText(request.notes(), "Notes", 10000);
         boolean updated = organizationServicePort.updateOrganization(new UpdateOrganizationCommand(
-                safeOrganizationId, shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes));
+                safeOrganizationId, shaleClientId, userId, name, phone, fax, email, website, address1, address2, city, state, postalCode, country, notes,request==null?null:request.organizationTypeId(),decodeOptionalRowVer(request==null?null:request.rowVer())));
         if (!updated) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found.");
         }
@@ -819,4 +824,6 @@ public final class ApiReadController {
         int endExclusive = Math.min(offset + size, fetched.size());
         return fetched.subList(offset, endExclusive);
     }
+	private static byte[] decodeOptionalRowVer(String value){if(value==null||value.isBlank())return null;try{return java.util.Base64.getDecoder().decode(value);}catch(IllegalArgumentException e){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"rowVer must be Base64 encoded.");}}
+
 }

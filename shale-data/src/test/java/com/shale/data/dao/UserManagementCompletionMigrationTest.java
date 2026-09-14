@@ -1,27 +1,22 @@
 package com.shale.data.dao;
 
 import org.junit.jupiter.api.Test;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class UserManagementCompletionMigrationTest {
-    private static String sql() throws Exception { return Files.readString(Path.of("../docs/sql/2026-08-03_users_management_completion.sql")); }
-
-    @Test void auditConstraintIsTransactionalTrustedIdempotentAndAcceptsEveryEmittedEntityType() throws Exception {
+    private static String sql() throws Exception {
+        return AuditEntityTypeMigrationChain.read(AuditEntityTypeMigrationChain.USER_MANAGEMENT);
+    }
+    @Test void userManagementAuditConstraintMatchesItsHistoricalVocabularyAndSafetyContract() throws Exception {
         String sql=sql();
         assertTrue(sql.contains("BEGIN TRANSACTION")); assertTrue(sql.contains("XACT_ABORT ON"));
-        assertTrue(sql.contains("@OldDefinition")); assertTrue(sql.contains("Preserve any older quoted values"));
-        assertTrue(sql.contains("DROP CONSTRAINT CK_EntityActionAuditLog_EntityType"));
-        assertTrue(sql.contains("WITH CHECK ADD CONSTRAINT CK_EntityActionAuditLog_EntityType"));
-        assertTrue(sql.contains("is_not_trusted=0")); assertTrue(sql.contains("definition LIKE N'%USER%'"));
-        Set<String> emitted=Arrays.stream(EntityActionAuditEvent.EntityType.values()).map(Enum::name).collect(java.util.stream.Collectors.toSet());
-        Matcher m=Pattern.compile("\\(N'([A-Z_]+)'\\)").matcher(sql);Set<String> accepted=new java.util.HashSet<>();while(m.find())accepted.add(m.group(1));
-        assertTrue(accepted.containsAll(emitted),"migration must seed every emitted EntityType: "+emitted);
+        assertTrue(sql.contains("WITH CHECK ADD CONSTRAINT"));
+        assertTrue(sql.contains("CHECK CONSTRAINT CK_EntityActionAuditLog_EntityType"));
+        assertTrue(sql.contains("is_disabled=0 AND is_not_trusted=0"));
+        assertTrue(sql.contains("IF XACT_STATE() <> 0 ROLLBACK TRANSACTION"));
+        assertEquals(AuditEntityTypeMigrationChain.USER_MANAGEMENT_SEEDED,
+                AuditEntityTypeMigrationChain.historicalSeededAllowlist(sql),
+                "the immutable User Management migration must contain only its deployment-era seed vocabulary");
     }
 
     @Test void removalSchemaIsCompleteAndUsesDynamicSqlAfterColumnAdds() throws Exception {

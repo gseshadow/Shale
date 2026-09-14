@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import java.lang.String?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
@@ -10,41 +9,25 @@
     fx:controller="com.shale.ui.controller.OrganizationController" styleClass="app-shell">
 
     <top>
-        <VBox spacing="6.0" BorderPane.alignment="CENTER">
+        <VBox spacing="6.0" BorderPane.alignment="CENTER" styleClass="page-header-surface">
             <padding>
                 <Insets top="10" right="12" bottom="8" left="12" />
             </padding>
 
             <HBox spacing="8.0" alignment="CENTER_LEFT">
-                <Label fx:id="organizationTitleLabel" text="Organization"
-                    style="-fx-font-size: 18px; -fx-font-weight: bold;" />
+                <VBox spacing="6" HBox.hgrow="ALWAYS">
+                    <Label fx:id="organizationTitleLabel" text="Organization" wrapText="true" styleClass="functional-heading" />
+                    <FlowPane fx:id="organizationTypeChips" hgap="6" vgap="6" />
+                </VBox>
                 <Region HBox.hgrow="ALWAYS" />
-                <Button fx:id="saveButton" text="Save" visible="false" managed="false">
-                    <styleClass>
-                        <String fx:value="button" />
-                        <String fx:value="app-toolbar-button" />
-                        <String fx:value="app-toolbar-button-primary" />
-                    </styleClass>
-                </Button>
-                <Button fx:id="cancelButton" text="Cancel" visible="false" managed="false">
-                    <styleClass>
-                        <String fx:value="button" />
-                        <String fx:value="app-toolbar-button" />
-                        <String fx:value="app-toolbar-button-neutral" />
-                    </styleClass>
-                </Button>
-                <Button fx:id="deleteOrganizationButton" text="Delete Organization" visible="false" managed="false">
-                    <styleClass>
-                        <String fx:value="button" />
-                        <String fx:value="app-toolbar-button" />
-                        <String fx:value="app-toolbar-button-danger" />
-                    </styleClass>
-                </Button>
+                <Button fx:id="editButton" text="Edit Organization" visible="false" managed="false" />
+                <Button fx:id="deleteOrganizationButton" text="Delete Organization" visible="false" managed="false"
+                    styleClass="button app-toolbar-button app-toolbar-button-danger" />
             </HBox>
 
             <HBox spacing="10.0" alignment="CENTER_LEFT">
                 <Region HBox.hgrow="ALWAYS" />
-                <Label fx:id="lastUpdatedLabel" text="Last updated: —" style="-fx-opacity: 0.7;" />
+                <Label fx:id="lastUpdatedLabel" text="Last updated: —" styleClass="functional-metadata" />
             </HBox>
         </VBox>
     </top>
@@ -72,78 +55,29 @@
                         <Button fx:id="reloadRemoteButton" text="Reload" />
                     </HBox>
 
-                    <GridPane hgap="14" vgap="0" styleClass="case-overview-rows">
-                        <columnConstraints>
-                            <ColumnConstraints minWidth="150" prefWidth="170" />
-                            <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
-                            <ColumnConstraints minWidth="36" prefWidth="36" maxWidth="36" halignment="RIGHT" />
-                        </columnConstraints>
-
-                        <Label text="Name" styleClass="case-overview-row-label" GridPane.rowIndex="0" />
-                        <Label fx:id="nameValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-                        <TextField fx:id="nameEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-                            <Button fx:id="editNameButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="0" GridPane.columnIndex="2" />
-
-                            <Label text="Organization Type" styleClass="case-overview-row-label" GridPane.rowIndex="1" />
-                            <Label fx:id="typeValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-                            <ComboBox fx:id="typeEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-                            <Button fx:id="editTypeButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="1" GridPane.columnIndex="2" />
-
-                            <Label text="Phone" styleClass="case-overview-row-label" GridPane.rowIndex="2" />
-                            <Label fx:id="phoneValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-                            <TextField fx:id="phoneEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-                            <Button fx:id="editPhoneButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="2" GridPane.columnIndex="2" />
-
-                            <Label text="Fax" styleClass="case-overview-row-label" GridPane.rowIndex="3" />
-                            <Label fx:id="faxValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-                            <TextField fx:id="faxEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-                            <Button fx:id="editFaxButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="3" GridPane.columnIndex="2" />
-
-                            <Label text="Email" styleClass="case-overview-row-label" GridPane.rowIndex="4" />
-                            <Label fx:id="emailValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="4" GridPane.columnIndex="1" />
-                            <TextField fx:id="emailEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="4" GridPane.columnIndex="1" />
-                            <Button fx:id="editEmailButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="4" GridPane.columnIndex="2" />
-
-                            <Label text="Website" styleClass="case-overview-row-label" GridPane.rowIndex="5" />
-                            <Label fx:id="websiteValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="5" GridPane.columnIndex="1" />
-                            <TextField fx:id="websiteEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="5" GridPane.columnIndex="1" />
-                            <Button fx:id="editWebsiteButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="5" GridPane.columnIndex="2" />
-
-                            <Label text="Address1" styleClass="case-overview-row-label" GridPane.rowIndex="6" />
-                            <Label fx:id="address1Value" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="6" GridPane.columnIndex="1" />
-                            <TextField fx:id="address1Editor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="6" GridPane.columnIndex="1" />
-                            <Button fx:id="editAddress1Button" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="6" GridPane.columnIndex="2" />
-
-                            <Label text="Address2" styleClass="case-overview-row-label" GridPane.rowIndex="7" />
-                            <Label fx:id="address2Value" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="7" GridPane.columnIndex="1" />
-                            <TextField fx:id="address2Editor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="7" GridPane.columnIndex="1" />
-                            <Button fx:id="editAddress2Button" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="7" GridPane.columnIndex="2" />
-
-                            <Label text="City" styleClass="case-overview-row-label" GridPane.rowIndex="8" />
-                            <Label fx:id="cityValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="8" GridPane.columnIndex="1" />
-                            <TextField fx:id="cityEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="8" GridPane.columnIndex="1" />
-                            <Button fx:id="editCityButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="8" GridPane.columnIndex="2" />
-
-                            <Label text="State" styleClass="case-overview-row-label" GridPane.rowIndex="9" />
-                            <Label fx:id="stateValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="9" GridPane.columnIndex="1" />
-                            <TextField fx:id="stateEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="9" GridPane.columnIndex="1" />
-                            <Button fx:id="editStateButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="9" GridPane.columnIndex="2" />
-
-                            <Label text="Postal Code" styleClass="case-overview-row-label" GridPane.rowIndex="10" />
-                            <Label fx:id="postalCodeValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="10" GridPane.columnIndex="1" />
-                            <TextField fx:id="postalCodeEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="10" GridPane.columnIndex="1" />
-                            <Button fx:id="editPostalCodeButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="10" GridPane.columnIndex="2" />
-
-                            <Label text="Country" styleClass="case-overview-row-label" GridPane.rowIndex="11" />
-                            <Label fx:id="countryValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="11" GridPane.columnIndex="1" />
-                            <TextField fx:id="countryEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="11" GridPane.columnIndex="1" />
-                            <Button fx:id="editCountryButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="11" GridPane.columnIndex="2" />
-
-                        <Label text="Notes" styleClass="case-overview-row-label" GridPane.rowIndex="12" />
-                        <Label fx:id="notesValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="12" GridPane.columnIndex="1" />
-                        <TextArea fx:id="notesEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" prefRowCount="4" wrapText="true" GridPane.rowIndex="12" GridPane.columnIndex="1" />
-                            <Button fx:id="editNotesButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="12" GridPane.columnIndex="2" />
-                    </GridPane>
+                    <VBox spacing="12" styleClass="organization-profile-sections">
+                        <Label text="Contact Information" styleClass="functional-heading" />
+                        <VBox fx:id="phoneSection" spacing="8" styleClass="contact-method-section">
+                            <Label text="Phone Numbers" styleClass="case-overview-row-label" />
+                            <TilePane fx:id="phoneCards" hgap="10" vgap="10" prefColumns="2" />
+                        </VBox>
+                        <VBox fx:id="emailSection" spacing="8" styleClass="contact-method-section">
+                            <Label text="Email Addresses" styleClass="case-overview-row-label" />
+                            <TilePane fx:id="emailCards" hgap="10" vgap="10" prefColumns="2" />
+                        </VBox>
+                        <VBox fx:id="addressSection" spacing="8" styleClass="contact-method-section">
+                            <Label text="Addresses" styleClass="case-overview-row-label" />
+                            <VBox fx:id="addressCards" spacing="8" />
+                        </VBox>
+                        <VBox fx:id="websiteSection" spacing="8" styleClass="contact-method-section">
+                            <Label text="Websites" styleClass="case-overview-row-label" />
+                            <VBox fx:id="websiteCards" spacing="8" />
+                        </VBox>
+                        <VBox spacing="6" styleClass="contact-method-section">
+                            <Label text="Notes" styleClass="case-overview-row-label" />
+                            <Label fx:id="notesValue" text="—" wrapText="true" styleClass="case-overview-row-value" />
+                        </VBox>
+                    </VBox>
                 </VBox>
 
                 <VBox prefWidth="460" minWidth="400" maxWidth="560" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel">

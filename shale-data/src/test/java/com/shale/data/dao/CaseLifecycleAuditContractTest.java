@@ -35,6 +35,9 @@ class CaseLifecycleAuditContractTest {
         assertTrue(s.contains("Map.of(EntityActionAuditEvent.MetadataKey.CASE_ID"));
         assertFalse(s.contains("Map.of(EntityActionAuditEvent.MetadataKey.CASE_ID, caseName"));
         String list = s.substring(s.indexOf("public List<CaseTimelineEventDto> listCaseTimelineEvents"));
+		assertTrue(list.contains("cte.ShaleClientId = CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT)"));
+		assertTrue(list.contains("cte.EventType NOT LIKE 'TASK[_]%'"));
+		assertTrue(list.contains("u.ShaleClientId = cte.ShaleClientId"));
         list = list.substring(0, list.indexOf("public ", 10));
         assertFalse(list.contains("IsDeleted"));
         assertTrue(list.contains("cte.ShaleClientId = cte.ShaleClientId") || list.contains("c.ShaleClientId = cte.ShaleClientId"));

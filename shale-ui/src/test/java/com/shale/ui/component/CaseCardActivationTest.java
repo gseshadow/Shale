@@ -26,7 +26,7 @@ final class CaseCardActivationTest {
 
             MouseEvent click = new MouseEvent(MouseEvent.MOUSE_CLICKED, 1, 1, 1, 1,
                     MouseButton.PRIMARY, 1, false, false, false, false,
-                    true, false, false, true, false, false, null);
+                    true, false, false, true, false, true, null);
             Event.fireEvent(card, click);
             assertEquals(1, opened.get());
 
@@ -46,6 +46,17 @@ final class CaseCardActivationTest {
             Event.fireEvent(card, new MouseEvent(MouseEvent.MOUSE_CLICKED, 1, 1, 1, 1,
                     MouseButton.SECONDARY, 1, false, false, false, false,
                     false, false, true, false, false, false, null));
+            assertEquals(0, opened.get());
+        });
+    }
+
+    @Test void draggedPrimaryClickDoesNotNavigate() {
+        JavaFxTestSupport.runAndWait(() -> {
+            CaseCard card = new CaseCard(7); AtomicInteger opened = new AtomicInteger();
+            card.setOnOpen(id -> opened.incrementAndGet());
+            Event.fireEvent(card, new MouseEvent(MouseEvent.MOUSE_CLICKED, 1, 1, 1, 1,
+                    MouseButton.PRIMARY, 1, false, false, false, false,
+                    true, false, false, true, false, false, null));
             assertEquals(0, opened.get());
         });
     }

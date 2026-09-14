@@ -28,6 +28,7 @@ final class AuthoritativeCaseDateEditor {
     void invalidate() { snapshot = null; saving = false; }
     boolean isLoaded() { return snapshot != null; }
     boolean isSaving() { return saving; }
+    boolean hasConflict(MigratedCaseDateKey key) { return snapshot != null && snapshot.conflicts().contains(key); }
     Map<MigratedCaseDateKey, CompatibilityCaseDateState> states() {
         if (snapshot == null) throw new IllegalStateException("Authoritative Case Dates are not loaded.");
         return snapshot.dates();
@@ -37,6 +38,8 @@ final class AuthoritativeCaseDateEditor {
             Map<MigratedCaseDateKey, CompatibilityCaseDateEditor.EditedValue> edited) {
         if (saving) throw new IllegalStateException("A Case Dates save is already in progress.");
         if (snapshot == null) throw new IllegalStateException("Reload Case Dates before saving.");
+        if (!snapshot.conflicts().isEmpty())
+            throw new IllegalStateException("Resolve conflicting protected Case Dates in the Dates manager, then reload.");
         Map<MigratedCaseDateKey, CompatibilityCaseDateMutation> intents =
                 CompatibilityCaseDateEditor.mutations(snapshot.dates(), edited);
         if (intents.values().stream().allMatch(CompatibilityCaseDateMutation.Unchanged.class::isInstance)) return null;

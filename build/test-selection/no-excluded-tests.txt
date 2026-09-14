@@ -1,0 +1,2 @@
+# Intentionally matches no Java test. Profiles use this to disable the default advisory exclusion.
+**/__shale_no_excluded_tests__.java

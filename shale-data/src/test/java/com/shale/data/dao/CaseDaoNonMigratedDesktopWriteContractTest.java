@@ -10,7 +10,7 @@ class CaseDaoNonMigratedDesktopWriteContractTest {
     @Test void desktopNonDateBoundariesCannotWriteMigratedColumns() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseDao.java"));
         String overview = source.substring(source.indexOf("updateCaseNonDate("), source.indexOf("updateCaseDetailsNonMigrated("));
-        String details = source.substring(source.indexOf("updateCaseDetailsNonMigrated("), source.indexOf("public com.shale.core.dto.CaseDetailDto updateCaseDetails("));
+        String details = source.substring(source.indexOf("updateCaseDetailsNonMigrated("), source.indexOf("public StatusRow findStatusForTenantById("));
         for (String column : new String[] {"CallerDate", "CallerTime", "DateOfMedicalNegligence",
                 "DateMedicalNegligenceWasDiscovered", "DateOfInjury", "StatuteOfLimitations",
                 "TortNoticeDeadline", "DiscoveryDeadline", "DateFeeAgreementSigned",

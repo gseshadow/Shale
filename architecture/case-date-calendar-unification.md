@@ -1,5 +1,180 @@
 # Case Date and Calendar unification
 
+## Phase 1 — runtime synchronization retired (2026-08-17)
+
+### Pending schema-retirement deployment (2026-08-18)
+
+The immutable forward-only migration `docs/sql/2026-08-18_retire_calendar_case_date_link_schema.sql`
+is prepared but **has not been executed in production**. Deploy it only after application cleanup
+commit `ba3fafe7` (or a descendant containing that cleanup) is deployed everywhere, the production-wide
+zero-data/anomaly/audit preflight is reconfirmed, all application instances and workers using an
+older build are stopped, a restorable backup is verified, and an exclusive maintenance window is in
+effect. Run the migration once on an all-tenant administrative connection with a null
+`SESSION_CONTEXT('ShaleClientId')`; do not run it through a tenant-filtered runtime connection.
+
+The required order is application cleanup first, then the maintenance-window database migration,
+then application restart and post-deployment verification. The migration accepts only the complete
+expected retired schema or its complete already-absent post-state, locks both retired write surfaces,
+repeats zero-row and link-anomaly checks, and removes only the four mapping-table predicates while leaving
+`TenantFilter` enabled and all unrelated predicates unchanged. Administrative role membership does not
+prove an RLS-unfiltered read: after exact predicate validation and snapshot, the migration holds
+transaction-owned exclusive table locks, removes the mapping FILTER predicate, and only then performs
+the authoritative all-row mapping-table zero check. A row causes `THROW`; transaction rollback restores
+the FILTER predicate before releasing the lock. After a zero result, it removes the three BLOCK predicates and then the mapping table and
+Calendar Event link dependencies. It does not change business or audit rows. `CaseDates`,
+`UX_CaseDates_ShaleClientId_Id`, `CalendarEvents.RowVer`, General Calendar Event schema, direct Case
+Date Calendar projection, and the deployed audit `EntityType` constraint remain. Audit-constraint
+retirement requires a later, separate migration. Until execution is explicitly confirmed, the
+production schema remains recorded as deployed below.
+
+Direct production `sys.foreign_key_columns` rows confirm that
+`FK_CalendarEvents_CaseDate_Tenant` is the enabled, trusted, non-cascading two-column foreign key
+from `dbo.CalendarEvents` to `dbo.CaseDates`, ordered as
+`ShaleClientId → ShaleClientId` and `CaseDateId → Id`. This direct two-row evidence supersedes an
+earlier incomplete aggregate inventory result that appeared to contain only the second pair; the
+retirement migration validates the complete ordered pair set before dropping the FK.
+
+All runtime Calendar Event ↔ Case Date synchronization is retired. Authoritative Case Date create,
+update, soft-delete, and restore transactions mutate and audit only `CaseDates`; authoritative
+Calendar Event create, update/cancel, and hard-delete transactions mutate and audit only
+`CalendarEvents`. Calendar assignment notifications and Case Date post-commit LiveBus invalidation
+remain at their existing service/controller boundaries. The Calendar feed continues to project active
+Case Dates directly with stable `CASE_DATE:<CaseDates.Id>` source identity and existing case-Dates
+click routing; persisted Calendar Events remain an independent feed source.
+
+The confirmed production-wide retirement inventory contains zero non-null
+`CalendarEvents.CaseDateId` values, zero missing/cross-tenant/cross-Case/duplicate links, zero
+`CalendarCaseDateTypeMappings` rows, zero durable `CALENDAR_CASE_DATE_TYPE_MAPPING` audit rows, and
+zero synchronization/link audit rows. No production DAO, service, controller, Settings UI, or
+mutation path accesses the mapping table or link column. No cleanup or backfill was required.
+
+The linkage and mapping schema documented below remains temporarily deployed for a later,
+forward-only removal phase: `CalendarEvents.CaseDateId`, `CalendarCaseDateTypeMappings`, link
+constraints/indexes, trigger, RLS, and deployed audit constraints remain unchanged. This
+application-only cleanup removes the obsolete Java `CALENDAR_CASE_DATE_TYPE_MAPPING` entity and its
+entity/action validation branch, plus the unwritten `CASE_DATE_TO_CALENDAR`,
+`CALENDAR_TO_CASE_DATE`, and `SYNCHRONIZATION_DIRECTION` metadata vocabulary and viewer allowlist
+entries. It does not modify schema, data, migrations, or deployed constraints. Runtime does not
+consult mappings or pair records by title, date, label, type name, or any other heuristic.
+`CalendarEvents` still lacks its own RLS predicate; this separate known gap is not corrected here.
+Application mutations continue to require authenticated SQL session tenant/actor identity and apply
+explicit `ShaleClientId` predicates.
+
+Audit compatibility uses the existing schema without migration. Every active application entity
+type remains readable with an explicit viewer label. Each successful authoritative mutation retains
+exactly its own `CALENDAR_EVENT` or `CASE_DATE` entity-action record in the owning transaction;
+synchronization audit records are no longer emitted. `CASE_DATE`, `CASE_DATE_TYPE`,
+`CASE_DATE_ROLE_MAPPING`, `CALENDAR_EVENT`, and the globally shared `LINKED`/`UNLINKED` actions remain
+active vocabulary.
+
+## Phase 2 — unified Calendar New Event workflow (updated 2026-08-18)
+
+Calendar **New Event** immediately opens one form, with no choice page or Back/Next workflow. In
+order it contains Title, Assign to Case, Type, Start Date, End Date, Start Time, Duration, All Day,
+Notes, and Save/Cancel. Title, Type, and Start Date are required; Notes and Case are initially
+optional. The supplied Calendar date is the Start Date default. Case selection reuses the searchable
+Case selector loading pattern and `CaseCardFactory` MINI presentation; a selected card has Change
+and Remove actions. Open-state, tenant, and request-generation checks reject stale asynchronous
+results.
+
+Type authority follows Case assignment. Without a Case, the searchable selector exposes only active
+effective `CalendarEventTypes`; with a Case, only active tenant-effective `CaseDateTypes`. Changing
+authority clears an incompatible selection without clearing shared form values. A type is identified
+by source-kind plus authoritative numeric ID, never display text, so duplicate names stay distinct.
+A non-time-supporting Case Date Type forces All Day. Timed values use Start Time plus Duration on
+the selected Start/End dates; all-day values retain the existing local-date-at-start-of-day and
+optional multi-day-end convention, without timezone conversion.
+
+No Case creates exactly one unlinked `CalendarEvent` through `CalendarService`; Title maps to
+`CalendarEvents.Title`, Notes maps to its description, dates map to `StartsAt`/`EndsAt`, and this form
+does not expose assignment. A selected Case requires a Case Event type and creates exactly one
+`CaseDate` through `CaseServicePort.CreateCaseDateCommand`; Title maps to `CaseDates.Title`, the
+selected Case/type IDs map directly, Notes maps to `CaseDates.Notes`, and the controller publishes
+the established PHI-free Case Dates LiveBus invalidation only after success. Both titles are trimmed
+and limited to the authoritative 255 characters. Neither route reads mappings, writes
+`CalendarEvents.CaseDateId`, creates a counterpart, or invokes the other route. Submission
+revalidates captured tenant and actor, is single-flight, preserves form state after failure, and
+permits retry.
+
+The linkage/mapping schema, synchronization audit vocabulary, obsolete Settings guard, known
+`CalendarEvents` RLS gap, feed projection identities, and existing edit/click routing remain
+unchanged pending the separately gated schema-retirement release.
+
+### Shared local time and duration entry (updated 2026-08-18)
+
+Calendar New Event and the Case Date occurrence editor use the same JavaFX `TimeDurationInput`.
+Start Time is an editable selector whose 48 standard choices cover every half hour from 12:00 AM
+through 11:30 PM. Committed input is parsed centrally and displayed as `h:mm AM/PM`; accepted input
+includes hour-only and hour/minute 24-hour values and case-insensitive 12-hour values with AM/PM
+(for example `9`, `9:15`, `9 AM`, `9:15 AM`, and `14:15`). Invalid mixed-meridiem, out-of-range,
+blank, or otherwise unparseable text is rejected visibly. Display text is never authoritative or
+persisted: the forms produce `LocalTime` and then local `LocalDateTime` values without a timezone
+conversion.
+
+Duration is represented by separately labeled, accessible Hours (0–23) and Minutes (0–59)
+selectors. New timed records default to 1 Hour and 0 Minutes, while 0 Hours and 0 Minutes is invalid.
+The complete minute ranges deliberately preserve nonstandard persisted durations. All Day disables
+all three timed controls without clearing their values; a Case Date Type that does not support time
+forces that state. Returning to a time-supporting timed state therefore restores the last sensible
+values.
+
+Start Date remains required and End Date optional, with End Date prohibited before Start Date. A
+timed start is Start Date plus parsed Start Time. Its end combines the selected End Date (or Start
+Date when absent), the same local clock basis, and duration; day wrap is resolved against the
+selected end calendar date so same-day, cross-midnight, and multi-day persisted timestamps reopen
+and save unchanged. All-day records retain local start-of-day values and the optional multi-day End
+Date convention. This shared calculation is used for both General Event and Case Date requests and
+does not change source identity, Case/type authority, persistence routing, RowVer handling, Case
+touches, auditing, notifications, or LiveBus publication.
+
+**Audit compatibility review.** This is validation and local-value composition at the existing UI
+boundary only. Meaningful mutations continue through the established Calendar Event or Case Date
+transaction and existing entity/PHI audit paths, with tenant, actor, entity, parent/Case, and RowVer
+context unchanged. No new sensitive read or mutation is introduced, no audit payload is assembled
+in UI code, and the existing audit schema is sufficient without migration.
+
+## Phase 3 — source-specific Calendar activation and editing (updated 2026-08-18)
+
+Calendar activation is now an explicit typed contract. A `CASE_DATE:<CaseDates.Id>` target retains
+both the occurrence ID and owning Case ID. On the Calendar, week/day cards, Month items and
+drill-down, and schedule agendas invoke a shared UI-level `CaseDateOccurrenceEditorLauncher` rather
+than Case navigation. The launcher owns `CaseDateOccurrenceDialog` as a modal of the current Calendar
+window, reloads the exact occurrence through `CaseServicePort.getCaseDate`, loads the effective types,
+and checks captured tenant, actor, Case, occurrence, open-window, and request-generation state before
+display or save. Missing, removed, foreign-tenant, inaccessible, wrong-Case, duplicate, or stale
+results fail closed and do not open another editor.
+
+The launcher is also the authoritative occurrence-open path used by Case → Dates; normal Case
+navigation and its add/remove/restore behavior remain unchanged. Updates retain Title and every
+occurrence field, submit the loaded RowVer through `CaseServicePort.updateCaseDate`, and therefore
+retain the established transaction, audit, Case-touch, and concurrency behavior. Each owning
+controller performs only its existing post-success UI effects: the Case Dates LiveBus invalidation is
+published, while Calendar also reloads its current range without changing selected view, date,
+filters, layers, or overlays. Cancel and rejected saves leave the owning surface and dialog state
+unchanged; no Calendar Event counterpart, linkage, persistence route, or synchronization is added.
+
+Existing occurrences also expose a destructive Remove action in this shared dialog. Confirmation
+explains that the authoritative soft delete removes the occurrence from active Calendar and Case
+views; cancellation leaves the editor untouched. Removal submits the loaded tenant, actor, Case,
+occurrence, and RowVer through `DeleteCaseDateCommand` on the same Case service boundary. Save and
+Remove share one single-flight guard. Success closes the dialog and invokes the same source-owned
+LiveBus/reload effects; failure retains the editor for retry or reload. Creation never exposes Remove,
+and this flow never mutates a Calendar Event or consults `CalendarEvents.CaseDateId`.
+
+A `CALENDAR_EVENT:<CalendarEventId>` target (with the deployed `EVENT:` spelling accepted only as a
+read-compatibility alias) invokes only the existing Calendar Event editor. It reloads by event ID
+under the captured tenant and continues through `CalendarService`, preserving assignment effects,
+audit and concurrency boundaries, and optional Case association without treating that association
+as Case Date identity. Neither route consults titles, labels, type names, or dates, and neither may
+fall through to the other source's editor or the New Event wizard.
+
+Mouse and Enter/Space activation share the same resolved target. Cards require a primary, stationary
+click, consume successful activation, remain keyboard focusable, and isolate embedded controls.
+Single-flight occurrence/event guards prevent duplicate editors, while open-state, tenant, Case, and
+generation checks reject asynchronous results after navigation or session changes. Feed projection,
+ordering, filtering, LiveBus refresh, the unified New Event wizard, and all database/linkage schema
+remain unchanged.
+
 ## Step 1 — persisted linkage and mutation foundation (complete)
 
 ### Inventory and authority
@@ -25,8 +200,9 @@ existing calendar lifecycle marker. Calendar had no optimistic token, so this fo
 
 ### Link and cardinality
 
-The nullable `CalendarEvents.CaseDateId` is the sole authoritative link. A composite foreign key
-to `(CaseDates.ShaleClientId, CaseDates.Id)` enforces tenant equality and a filtered unique index
+The nullable `CalendarEvents.CaseDateId` is the sole authoritative link. The directly verified
+composite foreign key maps `(CalendarEvents.ShaleClientId, CalendarEvents.CaseDateId)` in order to
+`(CaseDates.ShaleClientId, CaseDates.Id)`, enforcing tenant equality, and a filtered unique index
 permits at most one Calendar event for a Case Date. Both sides may remain unlinked. There is no
 circular or cascading FK and no historical rows are paired. A missing or hard-deleted Calendar
 event leaves the Case Date intact; a Case Date cannot be hard-deleted while referenced. Soft delete

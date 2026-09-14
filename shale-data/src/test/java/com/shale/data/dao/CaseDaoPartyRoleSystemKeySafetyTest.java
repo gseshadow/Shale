@@ -62,7 +62,7 @@ final class CaseDaoPartyRoleSystemKeySafetyTest {
 
     @Test
     void userFacingCasePartyRenderingStillUsesDisplayName() {
-        CasePartyDto dto = new CasePartyDto(1L, 2L, null, null, 3L, "Renamed Client", "party", "represented", true, "notes", null, null, "contact", "Ada Lovelace", "", "");
+        CasePartyDto dto = new CasePartyDto(1L, 2L, null, null, 3L, "Renamed Client", "party", "represented", true, "notes", null, null, "contact", "Ada Lovelace", "", "", java.util.List.of(), java.util.List.of());
 
         assertTrue("Renamed Client".equals(dto.getPartyRoleName()));
         assertTrue("party".equals(dto.getPartyRoleSystemKey()));

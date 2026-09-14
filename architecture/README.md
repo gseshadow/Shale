@@ -11,3 +11,7 @@ Supporting documents:
 - system-overview.md
 - live-update-architecture.md
 - case-summary-projection-inventory.md
+
+Optional local test execution and selection:
+- `docs/testing/change-aware-test-selection.md`
+- `docs/testing/full-suite-only-inventory.md`

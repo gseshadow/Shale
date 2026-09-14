@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -46,10 +47,9 @@ import com.shale.core.service.CaseServicePort.CaseLinkShareDraft;
 import com.shale.core.service.CaseServicePort.CaseLinkShareUpdate;
 import com.shale.core.service.CaseServicePort.CaseLinkShareRemoval;
 import com.shale.core.service.CaseServicePort;
+import com.shale.core.service.ContactNamePresentation;
 
 public final class CaseDao {
-	private static final boolean AUTHORITATIVE_MIGRATED_DATES = true;
-	private static final boolean LEGACY_MIGRATED_DATE_COMPATIBILITY = false;
 
 	private static final Logger LOG = Logger.getLogger(CaseDao.class.getName());
 	private static final org.slf4j.Logger PERF_LOG = org.slf4j.LoggerFactory.getLogger(CaseDao.class);
@@ -123,6 +123,24 @@ public final class CaseDao {
 		public static final String RECEIVED_UPDATES_CHANGED = "RECEIVED_UPDATES_CHANGED";
 		public static final String CASE_DELETED = "CASE_DELETED";
 		public static final String CASE_RESTORED = "CASE_RESTORED";
+		public static final String CASE_DATE_CREATED = "CASE_DATE_CREATED";
+		public static final String CASE_DATE_UPDATED = "CASE_DATE_UPDATED";
+		public static final String CASE_DATE_REMOVED = "CASE_DATE_REMOVED";
+		public static final String CASE_DATE_RESTORED = "CASE_DATE_RESTORED";
+		public static final String MATERIAL_REQUEST_CREATED = "MATERIAL_REQUEST_CREATED";
+		public static final String MATERIAL_REQUEST_UPDATED = "MATERIAL_REQUEST_UPDATED";
+		public static final String MATERIAL_REQUEST_STATUS_CHANGED = "MATERIAL_REQUEST_STATUS_CHANGED";
+		public static final String MATERIAL_REQUEST_REMOVED = "MATERIAL_REQUEST_REMOVED";
+		public static final String MATERIAL_REQUEST_NOTE_ADDED = "MATERIAL_REQUEST_NOTE_ADDED";
+		public static final String CASE_LINK_CREATED = "CASE_LINK_CREATED";
+		public static final String CASE_LINK_UPDATED = "CASE_LINK_UPDATED";
+		public static final String CASE_LINK_REMOVED = "CASE_LINK_REMOVED";
+		public static final String CASE_LINK_PRIMARY_CHANGED = "CASE_LINK_PRIMARY_CHANGED";
+		public static final String CASE_LINKS_REORDERED = "CASE_LINKS_REORDERED";
+		public static final String CASE_LINK_SHARE_ADDED = "CASE_LINK_SHARE_ADDED";
+		public static final String CASE_LINK_SHARE_UPDATED = "CASE_LINK_SHARE_UPDATED";
+		public static final String CASE_LINK_SHARE_REMOVED = "CASE_LINK_SHARE_REMOVED";
+		public static final String NON_ENGAGEMENT_LETTER_SENT_CHANGED = "NON_ENGAGEMENT_LETTER_SENT_CHANGED";
 
 		private static final Set<String> ALLOWED = Set.of(
 				CASE_CREATED,
@@ -166,6 +184,12 @@ public final class CaseDao {
 				RECEIVED_UPDATES_CHANGED,
 				CASE_DELETED,
 				CASE_RESTORED
+				, CASE_DATE_CREATED, CASE_DATE_UPDATED, CASE_DATE_REMOVED, CASE_DATE_RESTORED
+				, MATERIAL_REQUEST_CREATED, MATERIAL_REQUEST_UPDATED, MATERIAL_REQUEST_STATUS_CHANGED,
+				MATERIAL_REQUEST_REMOVED, MATERIAL_REQUEST_NOTE_ADDED
+				, CASE_LINK_CREATED, CASE_LINK_UPDATED, CASE_LINK_REMOVED, CASE_LINK_PRIMARY_CHANGED,
+				CASE_LINKS_REORDERED, CASE_LINK_SHARE_ADDED, CASE_LINK_SHARE_UPDATED, CASE_LINK_SHARE_REMOVED,
+				NON_ENGAGEMENT_LETTER_SENT_CHANGED
 		);
 
 		private CaseTimelineEventTypes() {
@@ -394,6 +418,113 @@ public final class CaseDao {
 			int createdCaseDateCount) {
 	}
 
+	public record IntakeDuplicateCase(long caseId, String caseName, String caseNumber,
+			String status, String clientName, LocalDate intakeDate) { }
+
+	/** A deliberately narrow, tenant-scoped exact-name check used only by New Intake. */
+	public List<IntakeDuplicateCase> findIntakeDuplicateCases(int shaleClientId, String caseName) {
+		if (shaleClientId <= 0) throw new IllegalArgumentException("shaleClientId is required.");
+		String normalized = normalizeCaseName(caseName);
+		if (normalized == null) return List.of();
+		String sql = """
+			SELECT c.Id,c.Name,c.CaseNumber,
+			 status_row.Name AS StatusName, client_row.ClientName, intake_row.IntakeDate
+			FROM dbo.Cases c
+			OUTER APPLY (SELECT TOP(1) s.Name FROM dbo.CaseStatuses cs JOIN dbo.Statuses s ON s.Id=cs.StatusId
+			 WHERE cs.CaseId=c.Id ORDER BY CASE WHEN cs.IsPrimary=1 THEN 0 ELSE 1 END,cs.UpdatedAt DESC,cs.Id DESC) status_row
+			OUTER APPLY (SELECT TOP(1) LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))) ClientName
+			 FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId JOIN dbo.Contacts ct ON ct.Id=cp.ContactId
+			 WHERE cp.CaseId=c.Id AND ct.ShaleClientId=c.ShaleClientId AND ISNULL(ct.IsDeleted,0)=0
+			 AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey,pr.Name))))='party'
+			 AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side,''))))='represented'
+			 ORDER BY CASE WHEN ISNULL(cp.IsPrimary,0)=1 THEN 0 ELSE 1 END,cp.Id) client_row
+			OUTER APPLY (SELECT TOP(1) CAST(cd.StartsAt AS date) IntakeDate FROM dbo.CaseDates cd
+			 JOIN dbo.CaseDateTypes dt ON dt.Id=cd.CaseDateTypeId
+			 JOIN dbo.CaseDateTypeSemanticRoleMappings rm ON rm.CaseDateTypeId=dt.Id AND rm.SemanticRoleKey='INTAKE'
+			 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0 AND rm.IsActive=1 AND rm.IsDeleted=0
+			 ORDER BY cd.StartsAt,cd.Id) intake_row
+			WHERE c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0
+			 AND LOWER(REPLACE(REPLACE(REPLACE(LTRIM(RTRIM(c.Name)),'  ',' '),'  ',' '),'  ',' '))=?
+			ORDER BY c.Id
+			""";
+		try (Connection con=db.requireConnection(); PreparedStatement ps=con.prepareStatement(sql)) {
+			ps.setInt(1, shaleClientId); ps.setString(2, normalized);
+			try (ResultSet rs=ps.executeQuery()) { List<IntakeDuplicateCase> out=new ArrayList<>(); while(rs.next()) out.add(new IntakeDuplicateCase(
+				rs.getLong("Id"),rs.getString("Name"),rs.getString("CaseNumber"),rs.getString("StatusName"),
+				rs.getString("ClientName"),toLocalDate(rs.getDate("IntakeDate")))); return List.copyOf(out); }
+		} catch (SQLException e) { throw new RuntimeException("Failed to check for duplicate cases.",e); }
+	}
+
+	static String normalizeCaseName(String value) {
+		String normalized=normalizeOptional(value);
+		return normalized==null?null:normalized.replaceAll("\\s+"," ").toLowerCase(Locale.ROOT);
+	}
+
+	public NewIntakeCreateResult mergeIntake(long existingCaseId, NewIntakeCreateRequest request) {
+		Objects.requireNonNull(request,"request");
+		Connection con=null;
+		try {
+			con=db.requireConnection(); con.setAutoCommit(false);
+			List<ConfiguredDateValue> dates=validateConfiguredIntakeDates(con,request);
+			int intakeTypeId=requireConfiguredIntakeValue(con,request,dates);
+			if (!lockMatchingCase(con,existingCaseId,request)) throw new IllegalArgumentException("The selected case is no longer an eligible duplicate.");
+			Timestamp now=Timestamp.valueOf(LocalDateTime.now());
+			ensureRequiredPartyRolesForTenant(con,request.shaleClientId());
+			fillBlankCaseScalars(con,existingCaseId,request);
+			int clientId=mergeRoleContact(con,existingCaseId,request,PARTY_ROLE_NAME_PARTY,request.clientFirstName(),request.clientLastName(),
+				request.clientDateOfBirth(),request.clientCondition(),request.clientDeceased(),true,request.clientPhone(),request.clientEmail(),request.clientAddress(),now);
+			int callerId=request.callerIsClient()?clientId:mergeRoleContact(con,existingCaseId,request,PARTY_ROLE_NAME_CALLER,
+				request.callerFirstName(),request.callerLastName(),null,null,false,false,request.callerPhone(),request.callerEmail(),request.callerAddress(),now);
+			ensureCaseParty(con,existingCaseId,clientId,PARTY_ROLE_NAME_PARTY,now,request.shaleClientId());
+			ensureCaseParty(con,existingCaseId,callerId,PARTY_ROLE_NAME_CALLER,now,request.shaleClientId());
+			for(NewIntakePendingParty pending:request.pendingParties()==null?List.<NewIntakePendingParty>of():request.pendingParties()) addPendingPartyForMerge(con,existingCaseId,request,pending,now);
+			normalizeCasePartyRelationshipPrimaries(con,existingCaseId,request.shaleClientId());
+			int createdDates=0; for(ConfiguredDateValue date:dates) if(!hasActiveCaseDate(con,existingCaseId,date.caseDateTypeId(),request.shaleClientId())) {
+				long id=insertConfiguredCaseDate(con,request,existingCaseId,date,intakeTypeId); auditCreatedCaseDate(con,request,existingCaseId,id,date,intakeTypeId); createdDates++; }
+			con.commit(); return new NewIntakeCreateResult(existingCaseId,clientId,callerId,createdDates);
+		} catch(Exception e) { if(con!=null)try{con.rollback();}catch(SQLException ignored){} throw e instanceof RuntimeException r?r:new RuntimeException("Failed to merge intake.",e); }
+		finally { if(con!=null){try{con.setAutoCommit(true);}catch(SQLException ignored){} try{con.close();}catch(SQLException ignored){}} }
+	}
+
+	private void addPendingPartyForMerge(Connection con,long caseId,NewIntakeCreateRequest request,NewIntakePendingParty pending,Timestamp now)throws SQLException{
+		if(pending==null||pending.partyRoleId()==null||pending.partyRoleId()<=0)return;String type=pending.entityType()==null?"":pending.entityType().trim().toLowerCase(Locale.ROOT);Long entity=pending.entityId();
+		if(pending.createNew()){if("contact".equals(type))entity=(long)insertContact(con,buildFullName(pending.contactFirstName(),pending.contactLastName()),pending.contactFirstName(),pending.contactLastName(),null,null,false,false,request.shaleClientId(),now);else if("organization".equals(type))entity=(long)insertOrganization(con,request.shaleClientId(),request.createdByUserId(),pending.organizationTypeId(),pending.organizationName(),now);}
+		if(entity==null||entity<=0)return;insertCasePartyWithValidation(con,caseId,"contact".equals(type)?entity:null,"organization".equals(type)?entity:null,pending.partyRoleId(),pending.side(),pending.primary(),pending.notes(),request.shaleClientId(),now);
+	}
+
+	private static boolean lockMatchingCase(Connection con,long id,NewIntakeCreateRequest r)throws SQLException{
+		try(PreparedStatement ps=con.prepareStatement("SELECT Name FROM dbo.Cases WITH (UPDLOCK,HOLDLOCK) WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){
+			ps.setLong(1,id);ps.setInt(2,r.shaleClientId());try(ResultSet rs=ps.executeQuery()){return rs.next()&&Objects.equals(normalizeCaseName(rs.getString(1)),normalizeCaseName(r.caseName()));}}
+	}
+
+	private void fillBlankCaseScalars(Connection con,long id,NewIntakeCreateRequest r)throws SQLException{
+		String oldDescription=null,oldSummary=null;try(PreparedStatement read=con.prepareStatement("SELECT Description,Summary FROM dbo.Cases WHERE Id=? AND ShaleClientId=?")){read.setLong(1,id);read.setInt(2,r.shaleClientId());try(ResultSet rs=read.executeQuery()){if(!rs.next())throw new SQLException("Selected case changed during merge.");oldDescription=rs.getString(1);oldSummary=rs.getString(2);}}
+		try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.Cases SET Description=CASE WHEN NULLIF(LTRIM(RTRIM(Description)),'') IS NULL THEN ? ELSE Description END, Summary=CASE WHEN NULLIF(LTRIM(RTRIM(Summary)),'') IS NULL THEN ? ELSE Summary END, UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){
+			setNullableString(ps,1,r.description());setNullableString(ps,2,r.summary());ps.setLong(3,id);ps.setInt(4,r.shaleClientId());if(ps.executeUpdate()!=1)throw new SQLException("Selected case changed during merge.");}
+		if(r.createdByUserId()!=null){ if(normalizeOptional(oldDescription)==null&&normalizeOptional(r.description())!=null)phiAuditService.auditUpdate(con,r.createdByUserId(),"Cases","Description",id,oldDescription,r.description()); if(normalizeOptional(oldSummary)==null&&normalizeOptional(r.summary())!=null)phiAuditService.auditUpdate(con,r.createdByUserId(),"Cases","Summary",id,oldSummary,r.summary()); }
+	}
+
+	private int mergeRoleContact(Connection con,long caseId,NewIntakeCreateRequest r,String role,String first,String last,LocalDate dob,String condition,boolean deceased,boolean client,String phone,String email,String address,Timestamp now)throws SQLException{
+		List<Integer> ids=new ArrayList<>(); try(PreparedStatement ps=con.prepareStatement("SELECT cp.ContactId FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId JOIN dbo.Contacts ct ON ct.Id=cp.ContactId WHERE cp.CaseId=? AND ct.ShaleClientId=? AND ISNULL(ct.IsDeleted,0)=0 AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey,pr.Name))))=? ORDER BY CASE WHEN ISNULL(cp.IsPrimary,0)=1 THEN 0 ELSE 1 END,cp.Id")){
+			ps.setLong(1,caseId);ps.setInt(2,r.shaleClientId());ps.setString(3,role);try(ResultSet rs=ps.executeQuery()){while(rs.next())ids.add(rs.getInt(1));}}
+		int id;if(ids.size()==1){id=ids.getFirst();fillBlankContactScalars(con,id,r,first,last,dob,condition);insertMissingContactPoints(con,r,id,phone,email,address);}else{id=insertContact(con,buildFullName(first,last),first,last,dob,condition,deceased,client,r.shaleClientId(),now);insertIntakeContactPoints(con,r,id,phone,email,address);} return id;
+	}
+
+	private void fillBlankContactScalars(Connection con,int id,NewIntakeCreateRequest r,String first,String last,LocalDate dob,String condition)throws SQLException{
+		try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.Contacts SET FirstName=COALESCE(NULLIF(LTRIM(RTRIM(FirstName)),''),?),LastName=COALESCE(NULLIF(LTRIM(RTRIM(LastName)),''),?),Name=COALESCE(NULLIF(LTRIM(RTRIM(Name)),''),?),DateOfBirth=COALESCE(DateOfBirth,?),Condition=COALESCE(NULLIF(LTRIM(RTRIM(Condition)),''),?),UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){
+			setNullableString(ps,1,first);setNullableString(ps,2,last);setNullableString(ps,3,buildFullName(first,last));setNullableDate(ps,4,dob);setNullableString(ps,5,condition);ps.setInt(6,id);ps.setInt(7,r.shaleClientId());if(ps.executeUpdate()!=1)throw new SQLException("Contact changed during merge.");}
+		if(r.createdByUserId()!=null){entityActionAuditDao.append(con,EntityActionAuditEvent.now(r.shaleClientId(),r.createdByUserId(),EntityActionAuditEvent.EntityType.CONTACT,id,EntityActionAuditEvent.Action.UPDATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,id)));if(normalizeOptional(condition)!=null)phiAuditService.auditUpdate(con,r.createdByUserId(),"Contacts","Condition",(long)id,null,condition);}
+	}
+
+	private void insertMissingContactPoints(Connection con,NewIntakeCreateRequest r,int id,String phone,String email,String address)throws SQLException{
+		if(!hasContactPoint(con,"ContactPhoneNumbers",id,"NormalizedNumber",normalizePhone(phone)))insertIntakeContactPoint(con,r,id,"ContactPhoneNumbers","DisplayNumber,NormalizedNumber","MOBILE",normalizeOptional(phone),normalizePhone(phone),EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER);
+		if(!hasContactPoint(con,"ContactEmailAddresses",id,"NormalizedEmail",normalizeEmail(email)))insertIntakeContactPoint(con,r,id,"ContactEmailAddresses","EmailAddress,NormalizedEmail","PERSONAL",normalizeOptional(email),normalizeEmail(email),EntityActionAuditEvent.EntityType.CONTACT_EMAIL_ADDRESS);
+		if(!hasContactPoint(con,"ContactAddresses",id,"LegacyAddressText",normalizeOptional(address)))insertIntakeContactPoint(con,r,id,"ContactAddresses","LegacyAddressText","HOME",normalizeOptional(address),EntityActionAuditEvent.EntityType.CONTACT_ADDRESS);
+	}
+	private static boolean hasContactPoint(Connection con,String table,int id,String column,String value)throws SQLException{if(value==null)return true;String expression=column.equals("LegacyAddressText")?"LOWER(LTRIM(RTRIM("+column+")))":"LOWER("+column+")";try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo."+table+" WHERE ContactId=? AND ISNULL(IsDeleted,0)=0 AND "+expression+"=?")){ps.setInt(1,id);ps.setString(2,value.toLowerCase(Locale.ROOT));try(ResultSet rs=ps.executeQuery()){return rs.next();}}}
+	private static boolean hasActiveCaseDate(Connection con,long caseId,int type,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.CaseDates WHERE CaseId=? AND CaseDateTypeId=? AND ShaleClientId=? AND IsDeleted=0")){ps.setLong(1,caseId);ps.setInt(2,type);ps.setInt(3,tenant);try(ResultSet rs=ps.executeQuery()){return rs.next();}}}
+	private void ensureCaseParty(Connection con,long caseId,int contact,String role,Timestamp now,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId WHERE cp.CaseId=? AND cp.ContactId=? AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey,pr.Name))))=?")){ps.setLong(1,caseId);ps.setInt(2,contact);ps.setString(3,role);try(ResultSet rs=ps.executeQuery()){if(rs.next())return;}}insertCaseParty(con,caseId,contact,role,PARTY_SIDE_KEY_REPRESENTED,true,now,tenant);}
+
 	public NewIntakeCreateResult createIntake(NewIntakeCreateRequest request) {
 		Objects.requireNonNull(request, "request");
 		if (request.shaleClientId() <= 0)
@@ -405,6 +536,7 @@ public final class CaseDao {
 			con = db.requireConnection();
 			con.setAutoCommit(false);
 			List<ConfiguredDateValue> configuredDates = validateConfiguredIntakeDates(con, request);
+			int intakeTypeId = requireConfiguredIntakeValue(con, request, configuredDates);
 			System.out.println("[IntakeCreate] start shaleClientId=" + request.shaleClientId()
 					+ " caseName='" + safeLogValue(request.caseName()) + "'");
 			ensureRequiredPartyRolesForTenant(con, request.shaleClientId());
@@ -414,15 +546,18 @@ public final class CaseDao {
 					buildFullName(request.clientFirstName(), request.clientLastName()),
 					request.clientFirstName(),
 					request.clientLastName(),
-					request.clientAddress(),
-					request.clientPhone(),
-					request.clientEmail(),
 					request.clientDateOfBirth(),
 					request.clientCondition(),
 					request.clientDeceased(),
 					true,
 					request.shaleClientId(),
 					now);
+			insertIntakeContactPoints(con, request, clientContactId, request.clientPhone(),
+					request.clientEmail(), request.clientAddress());
+			if (request.createdByUserId() != null && normalizeOptional(request.clientCondition()) != null) {
+				phiAuditService.auditUpdate(con, request.createdByUserId(), "Contacts", "Condition",
+						(long) clientContactId, null, normalizeOptional(request.clientCondition()));
+			}
 
 			int callerContactId = resolveCallerContactId(con, request, clientContactId, now);
 			System.out.println("[IntakeCreate] contacts created clientContactId=" + clientContactId + " callerContactId=" + callerContactId);
@@ -447,9 +582,6 @@ public final class CaseDao {
 								pending.contactLastName(),
 								null,
 								null,
-								null,
-								null,
-								null,
 								false,
 								false,
 								request.shaleClientId(),
@@ -457,6 +589,7 @@ public final class CaseDao {
 					} else if ("organization".equals(entityType)) {
 						entityId = Long.valueOf(insertOrganization(con,
 								request.shaleClientId(),
+								request.createdByUserId(),
 								pending.organizationTypeId(),
 								pending.organizationName(),
 								now));
@@ -485,8 +618,10 @@ public final class CaseDao {
 			normalizeCasePartyRelationshipPrimaries(con, caseId, request.shaleClientId());
 			System.out.println("[IntakeCreate] party primary normalization completed caseId=" + caseId);
 			insertCaseStatus(con, caseId, request.statusId(), now);
-			for (ConfiguredDateValue date : configuredDates)
-				insertConfiguredCaseDate(con, request, caseId, date);
+			for (ConfiguredDateValue date : configuredDates) {
+				long caseDateId = insertConfiguredCaseDate(con, request, caseId, date, intakeTypeId);
+				auditCreatedCaseDate(con, request, caseId, caseDateId, date, intakeTypeId);
+			}
 			System.out.println("[IntakeCreate] primary status linked caseId=" + caseId + " statusId=" + request.statusId());
 
 			con.commit();
@@ -540,15 +675,21 @@ public final class CaseDao {
 		byte[] submittedRowVer = request.formConfigurationRowVer();
 		if (currentId != request.formConfigurationId() || !java.util.Arrays.equals(currentRowVer, submittedRowVer))
 			throw new IntakeConfigurationException("The intake form configuration changed. Reload the form before submitting again.");
-		if (currentId == 0) {
-			if (!request.configuredDates().isEmpty())
-				throw invalidConfiguredDates();
-			return List.of();
-		}
 		LinkedHashMap<String, ConfiguredDateValue> submitted = new LinkedHashMap<>();
 		for (ConfiguredDateValue value : request.configuredDates()) {
 			if (value == null || value.fieldKey() == null || submitted.putIfAbsent(value.fieldKey(), value) != null)
 				throw invalidConfiguredDates();
+		}
+		if (currentId == 0) {
+			List<ConfiguredDateValue> result = new ArrayList<>();
+			Set<Integer> typeIds = new HashSet<>();
+			for (ConfiguredDateValue value : submitted.values()) {
+				if (value.caseDateTypeId() <= 0 || !fieldKeyForCaseDateType(value.caseDateTypeId()).equals(value.fieldKey())
+						|| value.required() || !typeIds.add(value.caseDateTypeId())) throw invalidConfiguredDates();
+				validateEffectiveConfiguredDateType(con, request.shaleClientId(), value.caseDateTypeId());
+				if (value.value() != null) result.add(value);
+			}
+			return List.copyOf(result);
 		}
 		LinkedHashMap<String, ConfiguredDateValue> authoritative = new LinkedHashMap<>();
 		String sql = """
@@ -642,20 +783,61 @@ public final class CaseDao {
 		}
 	}
 
+	private static String fieldKeyForCaseDateType(int typeId) { return "case_date:" + typeId; }
+
 	private static IntakeConfigurationException invalidConfiguredDates() {
 		return new IntakeConfigurationException("The configured date fields are no longer valid. Reload the form before submitting again.");
 	}
 
-	private static void insertConfiguredCaseDate(Connection con, NewIntakeCreateRequest request, long caseId, ConfiguredDateValue value) throws SQLException {
+	private static int requireConfiguredIntakeValue(Connection con, NewIntakeCreateRequest request,
+			List<ConfiguredDateValue> configuredDates) throws SQLException {
+		if (request.createdByUserId() == null || request.createdByUserId() <= 0)
+			throw new IntakeConfigurationException("An authenticated intake user is required.");
+		int intakeTypeId = CaseDateSemanticRoleResolver.requireEffectiveTypeId(
+				con, request.shaleClientId(), CaseDateSemanticRole.INTAKE);
+		ConfiguredDateValue intake = configuredDates.stream()
+				.filter(value -> value.caseDateTypeId() == intakeTypeId)
+				.findFirst()
+				.orElseThrow(() -> new IntakeConfigurationException(
+						"The Intake date is required. Reload New Intake before submitting again."));
+		if (!Objects.equals(intake.value(), request.intakeDate()))
+			throw new IntakeConfigurationException("The Intake date changed. Reload New Intake before submitting again.");
+		if (request.intakeTime() == null)
+			throw new IntakeConfigurationException("The Intake time is required.");
+		return intakeTypeId;
+	}
+
+	private static long insertConfiguredCaseDate(Connection con, NewIntakeCreateRequest request, long caseId,
+			ConfiguredDateValue value, int intakeTypeId) throws SQLException {
+		boolean intake = value.caseDateTypeId() == intakeTypeId;
+		LocalDateTime startsAt = intake
+				? LocalDateTime.of(value.value(), request.intakeTime())
+				: value.value().atStartOfDay();
 		try (PreparedStatement ps = con.prepareStatement(
-				"INSERT dbo.CaseDates(ShaleClientId,CaseId,CaseDateTypeId,StartsAt,EndsAt,AllDay,CreatedAt,CreatedByUserId) VALUES(?,?,?, ?,NULL,1,SYSUTCDATETIME(),?)")) {
+				"INSERT dbo.CaseDates(ShaleClientId,CaseId,CaseDateTypeId,StartsAt,EndsAt,AllDay,CreatedAt,CreatedByUserId) OUTPUT INSERTED.Id VALUES(?,?,?, ?,NULL,?,SYSUTCDATETIME(),?)")) {
 			ps.setInt(1, request.shaleClientId());
 			ps.setLong(2, caseId);
 			ps.setInt(3, value.caseDateTypeId());
-			ps.setTimestamp(4, Timestamp.valueOf(value.value().atStartOfDay()));
-			ps.setInt(5, request.createdByUserId());
-			ps.executeUpdate();
+			ps.setTimestamp(4, Timestamp.valueOf(startsAt));
+			ps.setBoolean(5, !intake);
+			ps.setInt(6, request.createdByUserId());
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) throw new IllegalStateException("Case date was not created.");
+				return rs.getLong(1);
+			}
 		}
+	}
+
+	private void auditCreatedCaseDate(Connection con, NewIntakeCreateRequest request, long caseId,
+			long caseDateId, ConfiguredDateValue value, int intakeTypeId) throws SQLException {
+		LocalDateTime startsAt = value.caseDateTypeId() == intakeTypeId
+				? LocalDateTime.of(value.value(), request.intakeTime()) : value.value().atStartOfDay();
+		entityActionAuditDao.append(con, EntityActionAuditEvent.now(request.shaleClientId(),
+				request.createdByUserId(), EntityActionAuditEvent.EntityType.CASE_DATE, caseDateId,
+				EntityActionAuditEvent.Action.CREATED, EntityActionAuditEvent.EntityType.CASE, caseId,
+				Map.of(EntityActionAuditEvent.MetadataKey.CASE_ID, caseId,
+						EntityActionAuditEvent.MetadataKey.CASE_DATE_ID, caseDateId)));
+		phiAuditService.auditCreate(con, request.createdByUserId(), "CaseDates", "StartsAt", caseDateId, startsAt);
 	}
 
 	private void ensureRequiredPartyRolesForTenant(Connection con, int shaleClientId) throws SQLException {
@@ -711,56 +893,33 @@ public final class CaseDao {
 				buildFullName(request.callerFirstName(), request.callerLastName()),
 				request.callerFirstName(),
 				request.callerLastName(),
-				request.callerAddress(),
-				request.callerPhone(),
-				request.callerEmail(),
 				null,
 				null,
 				false,
 				false,
 				request.shaleClientId(),
-				now);
+				now, request);
 	}
 
-	private int insertOrganization(Connection con, int shaleClientId, Integer organizationTypeId, String organizationName, Timestamp now) throws SQLException {
-		if (organizationTypeId == null || organizationTypeId.intValue() <= 0) {
-			throw new RuntimeException("Organization Type is required.");
-		}
-		String sql = """
-				INSERT INTO dbo.Organizations (
-				  OrganizationTypeId,
-				  Name,
-				  IsDeleted,
-				  CreatedAt,
-				  UpdatedAt,
-				  ShaleClientId
-				)
-				OUTPUT INSERTED.Id
-				VALUES (?, ?, 0, ?, ?, ?);
-				""";
-		try (PreparedStatement ps = con.prepareStatement(sql)) {
-			int i = 1;
-			ps.setInt(i++, organizationTypeId.intValue());
-			setNullableString(ps, i++, organizationName);
-			ps.setTimestamp(i++, now);
-			ps.setTimestamp(i++, now);
-			ps.setInt(i++, shaleClientId);
-			try (ResultSet rs = ps.executeQuery()) {
-				if (!rs.next()) {
-					throw new RuntimeException("Failed to create organization.");
-				}
-				return rs.getInt(1);
-			}
-		}
+	private int insertContact(Connection con, String name, String firstName, String lastName,
+			LocalDate dateOfBirth, String condition, boolean isDeceased, boolean isClient,
+			int shaleClientId, Timestamp now, NewIntakeCreateRequest request) throws SQLException {
+		int contactId = insertContact(con, name, firstName, lastName, dateOfBirth, condition,
+				isDeceased, isClient, shaleClientId, now);
+		insertIntakeContactPoints(con, request, contactId, request.callerPhone(), request.callerEmail(),
+				request.callerAddress());
+		return contactId;
 	}
+
+	private int insertOrganization(Connection con,int shaleClientId,Integer actorUserId,Integer organizationTypeId,String organizationName,Timestamp now)throws SQLException{
+		if(organizationTypeId==null||organizationTypeId<=0)throw new IllegalArgumentException("Organization Type is required.");int actor=actorUserId==null?requirePrincipalUserId(con):actorUserId;var fields=new com.shale.core.service.OrganizationServicePort.OrganizationFields(organizationName,null,null,null,null,null,null,null,null,null,null,null);return new OrganizationTypeMutationDao(db).createSingleTypeOnConnection(con,shaleClientId,actor,fields,organizationTypeId,com.shale.core.service.OrganizationServicePort.structuredCreateFromLegacy(fields));
+	}
+	private static int requirePrincipalUserId(Connection con)throws SQLException{try(PreparedStatement p=con.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'PrincipalUserId') AS INT)");ResultSet r=p.executeQuery()){if(!r.next()||r.getObject(1)==null)throw new SecurityException("An authenticated actor is required.");return ((Number)r.getObject(1)).intValue();}}
 
 	private int insertContact(Connection con,
 			String name,
 			String firstName,
 			String lastName,
-			String addressHome,
-			String phoneCell,
-			String emailPersonal,
 			LocalDate dateOfBirth,
 			String condition,
 			boolean isDeceased,
@@ -772,9 +931,6 @@ public final class CaseDao {
 				  Name,
 				  FirstName,
 				  LastName,
-				  AddressHome,
-				  PhoneCell,
-				  EmailPersonal,
 				  DateOfBirth,
 				  Condition,
 				  IsDeceased,
@@ -785,7 +941,7 @@ public final class CaseDao {
 				  ShaleClientId
 				)
 				OUTPUT INSERTED.Id
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?);
+				VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?);
 				""";
 
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -793,9 +949,6 @@ public final class CaseDao {
 			setNullableString(ps, i++, name);
 			setNullableString(ps, i++, firstName);
 			setNullableString(ps, i++, lastName);
-			setNullableString(ps, i++, addressHome);
-			setNullableString(ps, i++, phoneCell);
-			setNullableString(ps, i++, emailPersonal);
 			setNullableDate(ps, i++, dateOfBirth);
 			setNullableString(ps, i++, condition);
 			ps.setBoolean(i++, isDeceased);
@@ -812,75 +965,76 @@ public final class CaseDao {
 		}
 	}
 
+	private void insertIntakeContactPoints(Connection con, NewIntakeCreateRequest request, int contactId,
+			String phone, String email, String address) throws SQLException {
+		insertIntakeContactPoint(con, request, contactId, "ContactPhoneNumbers",
+				"DisplayNumber,NormalizedNumber", "MOBILE", normalizeOptional(phone), normalizePhone(phone),
+				EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER);
+		insertIntakeContactPoint(con, request, contactId, "ContactEmailAddresses",
+				"EmailAddress,NormalizedEmail", "PERSONAL", normalizeOptional(email), normalizeEmail(email),
+				EntityActionAuditEvent.EntityType.CONTACT_EMAIL_ADDRESS);
+		insertIntakeContactPoint(con, request, contactId, "ContactAddresses",
+				"LegacyAddressText", "HOME", normalizeOptional(address),
+				EntityActionAuditEvent.EntityType.CONTACT_ADDRESS);
+	}
+
+	private void insertIntakeContactPoint(Connection con, NewIntakeCreateRequest request, int contactId,
+			String table, String valueColumns, String kind, String value,
+			EntityActionAuditEvent.EntityType entityType) throws SQLException {
+		insertIntakeContactPoint(con, request, contactId, table, valueColumns, kind, value, null, entityType);
+	}
+
+	private void insertIntakeContactPoint(Connection con, NewIntakeCreateRequest request, int contactId,
+			String table, String valueColumns, String kind, String firstValue, String secondValue,
+			EntityActionAuditEvent.EntityType entityType) throws SQLException {
+		if (firstValue == null) return;
+		String placeholders = secondValue == null ? "?" : "?,?";
+		String sql = "INSERT dbo." + table + " (ShaleClientId,ContactId,Kind," + valueColumns
+				+ ",IsPrimary,SortOrder,CreatedByUserId) OUTPUT INSERTED.Id VALUES (?,?,?," + placeholders + ",1,0,?)";
+		long pointId;
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			int i = 1;
+			ps.setInt(i++, request.shaleClientId());
+			ps.setInt(i++, contactId);
+			ps.setString(i++, kind);
+			ps.setString(i++, firstValue);
+			if (secondValue != null) ps.setString(i++, secondValue);
+			if (request.createdByUserId() == null) ps.setNull(i, java.sql.Types.INTEGER);
+			else ps.setInt(i, request.createdByUserId());
+			try (ResultSet rs = ps.executeQuery()) {
+				if (!rs.next()) throw new SQLException("Failed to create structured Contact information.");
+				pointId = rs.getLong(1);
+			}
+		}
+		if (request.createdByUserId() != null) {
+			entityActionAuditDao.append(con, EntityActionAuditEvent.now(request.shaleClientId(),
+					request.createdByUserId(), entityType, pointId, EntityActionAuditEvent.Action.CREATED,
+					EntityActionAuditEvent.EntityType.CONTACT, (long) contactId,
+					Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID, contactId,
+							EntityActionAuditEvent.MetadataKey.KIND, kind,
+							EntityActionAuditEvent.MetadataKey.PRIMARY, true)));
+		}
+	}
+
+	private static String normalizeOptional(String value) {
+		if (value == null || value.trim().isEmpty()) return null;
+		return value.trim();
+	}
+
+	private static String normalizePhone(String value) {
+		String normalized = normalizeOptional(value);
+		return normalized == null ? null : normalized.replaceAll("[^0-9+]", "");
+	}
+
+	private static String normalizeEmail(String value) {
+		String normalized = normalizeOptional(value);
+		return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
+	}
+
 	private long insertCase(Connection con, NewIntakeCreateRequest request, Timestamp now) throws SQLException {
 		validatePracticeAreaForTenant(con, request.shaleClientId(), request.practiceAreaId());
 		validateIntakeUserForTenant(con, request.shaleClientId(), request.createdByUserId());
-		if (request.formConfigurationId() != 0)
-			return insertConfiguredIntakeCase(con, request, now);
-		String sql = """
-				INSERT INTO dbo.Cases (
-				  Name,
-				  CallerDate,
-				  CallerTime,
-				  PracticeAreaId,
-				  ClientEstate,
-				  Description,
-				  Summary,
-				  DateOfMedicalNegligence,
-				  DateMedicalNegligenceWasDiscovered,
-				  DateOfInjury,
-				  StatuteOfLimitations,
-				  TortNoticeDeadline,
-				  FollowUpMeetWithClient,
-				  FollowUpNurseReview,
-				  FollowUpExpertReview,
-				  FollowUpCaseTransferred,
-				  AcceptedChronology,
-				  AcceptedConsultantExpertSearch,
-				  AcceptedTestifyingExpertSearch,
-				  AcceptedMedicalLiterature,
-				  DeniedChronology,
-				  FeeAgreementSigned,
-				  MedicalRecordsRequested,
-				  IsDeleted,
-				  CreatedAt,
-				  UpdatedAt,
-				  ShaleClientId,
-				  IntakeTakenByUserId
-				)
-				OUTPUT INSERTED.Id
-				  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?, ?);
-				""";
-
-		try (PreparedStatement ps = con.prepareStatement(sql)) {
-			int i = 1;
-			setNullableString(ps, i++, request.caseName());
-			setNullableDate(ps, i++, request.intakeDate());
-			setNullableTime(ps, i++, request.intakeTime());
-			ps.setInt(i++, request.practiceAreaId());
-			ps.setBoolean(i++, request.estateCase());
-			setNullableString(ps, i++, request.description());
-			setNullableString(ps, i++, request.summary());
-			setNullableDate(ps, i++, request.dateOfMedicalNegligence());
-			setNullableDate(ps, i++, request.dateMedicalNegligenceWasDiscovered());
-			setNullableDate(ps, i++, request.dateOfInjury());
-			setNullableDate(ps, i++, request.statuteOfLimitations());
-			setNullableDate(ps, i++, request.tortClaimsNotice());
-			ps.setTimestamp(i++, now);
-			ps.setTimestamp(i++, now);
-			ps.setInt(i++, request.shaleClientId());
-			if (request.createdByUserId() == null) {
-				ps.setNull(i++, java.sql.Types.INTEGER);
-			} else {
-				ps.setInt(i++, request.createdByUserId());
-			}
-
-			try (ResultSet rs = ps.executeQuery()) {
-				if (!rs.next())
-					throw new RuntimeException("Failed to create case.");
-				return rs.getLong(1);
-			}
-		}
+		return insertConfiguredIntakeCase(con, request, now);
 	}
 
 	/** Configured intake deliberately omits every migrated legacy date column. */
@@ -1037,57 +1191,6 @@ public final class CaseDao {
 		}
 	}
 
-	public long createBasicCase(
-			int shaleClientId,
-			String caseName,
-			String caseNumber,
-			LocalDate callerDate,
-			int practiceAreaId,
-			int responsibleAttorneyUserId,
-			int statusId,
-			String description,
-			String summary,
-			LocalDate dateOfInjury,
-			LocalDate statuteOfLimitations,
-			LocalDate tortNoticeDeadline,
-			Integer createdByUserId) {
-		if (shaleClientId <= 0)
-			throw new IllegalArgumentException("shaleClientId is required.");
-		if (caseName == null || caseName.trim().isBlank())
-			throw new IllegalArgumentException("caseName is required.");
-		Timestamp now = Timestamp.valueOf(LocalDateTime.now());
-		Connection con = null;
-		try {
-			con = db.requireConnection();
-			con.setAutoCommit(false);
-			validatePracticeAreaForTenant(con, shaleClientId, practiceAreaId);
-			validateResponsibleAttorneyForTenant(con, shaleClientId, responsibleAttorneyUserId);
-			validateStatusForTenant(con, shaleClientId, statusId);
-			long caseId = insertBasicCase(con, shaleClientId, caseName, caseNumber, callerDate, practiceAreaId,
-					description, summary, dateOfInjury, statuteOfLimitations, tortNoticeDeadline, now);
-			insertCaseStatus(con, caseId, statusId, now);
-			insertResponsibleAttorney(con, caseId, responsibleAttorneyUserId, now);
-			con.commit();
-			return caseId;
-		} catch (SQLException e) {
-			if (con != null) {
-				try {
-					con.rollback();
-				} catch (SQLException ignored) {
-				}
-			}
-			throw new RuntimeException("Failed to create case.", e);
-		} finally {
-			if (con != null) {
-				try {
-					con.setAutoCommit(true);
-					con.close();
-				} catch (SQLException ignored) {
-				}
-			}
-		}
-	}
-
 	/** Connection-bound participant for the authoritative web new-case aggregate. */
 	long insertBasicCaseAggregate(Connection con, CaseServicePort.CreateCaseCommand command, int statusId)
 			throws SQLException {
@@ -1117,43 +1220,6 @@ public final class CaseDao {
 		insertCaseStatus(con,id,statusId,now);
 		insertResponsibleAttorney(con,id,command.responsibleAttorneyUserId(),now);
 		return id;
-	}
-
-	private long insertBasicCase(Connection con, int shaleClientId, String caseName, String caseNumber,
-			LocalDate callerDate, int practiceAreaId, String description, String summary,
-			LocalDate dateOfInjury, LocalDate statuteOfLimitations, LocalDate tortNoticeDeadline,
-			Timestamp now) throws SQLException {
-		String sql = """
-				INSERT INTO dbo.Cases (
-				  Name, CaseNumber, CallerDate, PracticeAreaId, ClientEstate,
-				  Description, Summary, DateOfInjury, StatuteOfLimitations, TortNoticeDeadline,
-				  FollowUpMeetWithClient, FollowUpNurseReview, FollowUpExpertReview, FollowUpCaseTransferred,
-				  AcceptedChronology, AcceptedConsultantExpertSearch, AcceptedTestifyingExpertSearch, AcceptedMedicalLiterature,
-				  DeniedChronology, FeeAgreementSigned, MedicalRecordsRequested, IsDeleted, CreatedAt, UpdatedAt, ShaleClientId
-				)
-				OUTPUT INSERTED.Id
-				VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ?, ?, ?);
-				""";
-		try (PreparedStatement ps = con.prepareStatement(sql)) {
-			int i = 1;
-			setNullableString(ps, i++, caseName);
-			setNullableString(ps, i++, caseNumber);
-			setNullableDate(ps, i++, callerDate);
-			ps.setInt(i++, practiceAreaId);
-			setNullableString(ps, i++, description);
-			setNullableString(ps, i++, summary);
-			setNullableDate(ps, i++, dateOfInjury);
-			setNullableDate(ps, i++, statuteOfLimitations);
-			setNullableDate(ps, i++, tortNoticeDeadline);
-			ps.setTimestamp(i++, now);
-			ps.setTimestamp(i++, now);
-			ps.setInt(i++, shaleClientId);
-			try (ResultSet rs = ps.executeQuery()) {
-				if (!rs.next())
-					throw new RuntimeException("Failed to create case.");
-				return rs.getLong(1);
-			}
-		}
 	}
 
 	private void validateResponsibleAttorneyForTenant(Connection con, int shaleClientId, int userId) throws SQLException {
@@ -1214,7 +1280,7 @@ public final class CaseDao {
 
 	/** page is 0-based */
 	public PagedResult<CaseRow> findPage(int page, int pageSize, CaseSort sort, boolean includeClosedDenied) {
-		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, null, null, null, AUTHORITATIVE_MIGRATED_DATES);
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, null, null, null);
 	}
 
 	/**
@@ -1316,7 +1382,7 @@ public final class CaseDao {
 			String query,
 			Set<Integer> selectedStatusIds,
 			Long knownTotal) {
-		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, query, selectedStatusIds, knownTotal, AUTHORITATIVE_MIGRATED_DATES);
+		return findPageInternal(page, pageSize, sort, includeClosedDenied, null, query, selectedStatusIds, knownTotal);
 	}
 
 	/**
@@ -1329,7 +1395,7 @@ public final class CaseDao {
 		final int exportBatchSize = 500;
 		return collectAllExportPages(page -> findPageInternal(page, exportBatchSize, sort,
 				includeClosedDenied, null, query, selectedStatusIds,
-				null, AUTHORITATIVE_MIGRATED_DATES));
+				null));
 	}
 
 	static <T> List<T> collectAllExportPages(java.util.function.IntFunction<PagedResult<T>> loader) {
@@ -1346,843 +1412,6 @@ public final class CaseDao {
 	}
 
 	/** page is 0-based */
-	public PagedResult<CaseRow> findMyCasesPage(int userId, int page, int pageSize, CaseSort sort, boolean includeClosedDenied) {
-		if (userId <= 0) {
-			throw new IllegalArgumentException("userId must be > 0");
-		}
-		System.out.println("[TRACE ASSIGNED_CASES][CaseDao.findMyCasesPage] "
-				+ "restrictToUserId=" + userId
-				+ " page=" + page
-				+ " pageSize=" + pageSize
-				+ " sort=" + sort
-				+ " includeClosedDenied=" + includeClosedDenied);
-		return findPageInternal(page, pageSize, sort, includeClosedDenied, userId, null, null, null, LEGACY_MIGRATED_DATE_COMPATIBILITY);
-	}
-
-	public List<CaseRow> listActiveCasesForUserTeamMember(int userId, int limit) {
-		if (userId <= 0) {
-			return List.of();
-		}
-		if (limit <= 0) {
-			return List.of();
-		}
-		System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
-				+ "daoQueryMethodName=listActiveCasesForUserTeamMember "
-				+ " daoInputUserId=" + userId
-				+ " selectedUserId=" + userId
-				+ " limit=" + limit);
-		try (Connection con = db.requireConnection()) {
-			CaseSchema schema = resolveCaseSchema(con);
-			int shaleClientId = requireCurrentShaleClientId(con);
-			String caseUserActiveFilter = activeFilter(resolveCaseUsersDeletedColumn(con), "cu_scope");
-			String sql = """
-					SELECT TOP (?)
-					  c.Id,
-					  c.Name,
-					  c.CallerDate,
-					  c.StatuteOfLimitations,
-					  c.DateOfInjury AS DateOfIncident,
-					  c.TortNoticeDeadline,
-					  c.UpdatedAt,
-					  latestUpdate.LatestCaseUpdate,
-					  c.Description AS Description,
-					  current_status.PrimaryStatusId,
-					  current_status.CurrentStatusName,
-					  current_status.PrimaryStatusColor,
-					  pa.Color AS PracticeAreaColor,
-					  clientContact.ClientName,
-					  oppContact.OpposingPartiesName,
-					  ra.UserId AS ResponsibleAttorneyId,
-					  u.color AS ResponsibleAttorneyColor,
-					 c.NonEngagementLetterSent AS NonEngagementLetterSent,
-					  LTRIM(RTRIM(
-					    COALESCE(u.name_first, '') +
-					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-					    COALESCE(u.name_last, '')
-					  )) AS ResponsibleAttorneyName
-					FROM %s c
-					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
-					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
-					    FROM %s cs
-					    INNER JOIN %s s ON s.Id = cs.StatusId
-					    WHERE cs.CaseId = c.Id
-					    ORDER BY
-					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-					      cs.UpdatedAt DESC,
-					      cs.CreatedAt DESC,
-					      cs.Id DESC
-					) current_status
-					OUTER APPLY (
-					    SELECT TOP (1) cu.UserId
-					    FROM %s cu
-					    WHERE cu.CaseId = c.Id
-					      AND cu.RoleId = ?
-					      AND cu.IsPrimary = 1
-					    ORDER BY
-					      cu.UpdatedAt DESC,
-					      cu.CreatedAt DESC,
-					      cu.Id DESC
-					) ra
-					LEFT JOIN %s u
-					  ON u.id = ra.UserId
-					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS ClientName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
-					) clientContact
-					OUTER APPLY (
-					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
-					    FROM (
-					      SELECT
-					        LTRIM(RTRIM(
-					          CASE
-					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, o.Name, '')
-					          END
-					        )) AS DisplayName,
-					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
-					        cp.UpdatedAt,
-					        cp.CreatedAt,
-					        cp.Id
-					      FROM dbo.CaseParties cp
-					      LEFT JOIN Contacts ct ON ct.Id = cp.ContactId
-					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
-					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
-					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
-					    ) opp
-					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
-					) oppContact
-					OUTER APPLY (
-					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
-					    FROM dbo.CaseUpdates cu
-					    WHERE cu.CaseId = c.Id
-					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
-					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
-					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
-					) latestUpdate
-					WHERE %s
-					  AND c.ShaleClientId = ?
-					  AND EXISTS (
-					    SELECT 1
-					    FROM %s cu_scope
-					    WHERE cu_scope.CaseId = c.Id
-					      AND cu_scope.UserId = ?
-					      AND %s
-					  )
-					ORDER BY c.CallerDate DESC, c.Id DESC;
-					"""
-					.formatted(
-							CASES_TABLE,
-							CASE_STATUSES_TABLE,
-							STATUSES_TABLE,
-							CASE_USERS_TABLE,
-							USERS_TABLE,
-							activeFilter(schema.deletedColumn(), "c"),
-							CASE_USERS_TABLE,
-							caseUserActiveFilter);
-
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				int idx = 1;
-				ps.setInt(idx++, limit);
-				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
-				ps.setInt(idx++, shaleClientId);
-				ps.setInt(idx++, userId);
-
-				List<CaseRow> out = new ArrayList<>();
-				try (ResultSet rs = ps.executeQuery()) {
-					while (rs.next()) {
-						out.add(new CaseRow(
-								rs.getLong("Id"),
-								rs.getString("Name"),
-								toLocalDate(rs.getDate("CallerDate")),
-								toLocalDate(rs.getDate("StatuteOfLimitations")),
-								getNullableInt(rs, "PrimaryStatusId"),
-								getNullableInt(rs, "ResponsibleAttorneyId"),
-								rs.getString("ResponsibleAttorneyName"),
-								rs.getString("ResponsibleAttorneyColor"),
-								getNullableBoolean(rs, "NonEngagementLetterSent"),
-								rs.getString("CurrentStatusName"),
-								rs.getString("PrimaryStatusColor"),
-								rs.getString("PracticeAreaColor"),
-								rs.getString("ClientName"),
-								rs.getString("OpposingPartiesName"),
-								rs.getString("LatestCaseUpdate"),
-								rs.getString("Description"),
-								toLocalDate(rs.getDate("DateOfIncident")),
-								toLocalDate(rs.getDate("TortNoticeDeadline")),
-								toLocalDateTime(rs.getTimestamp("UpdatedAt"))));
-					}
-				}
-				System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
-						+ "selectedUserId=" + userId
-						+ " shaleClientId=" + shaleClientId
-						+ " sqlSummary=list-active-cases-for-user-team-member"
-						+ " sql=" + sql.replace('\n', ' ')
-						+ " membershipRule=anyCaseUsersRow"
-						+ " sqlParamOrder=[limit, responsibleAttorneyRoleId, shaleClientId, selectedUserId]"
-						+ " sqlParams=[" + limit + "," + ROLE_RESPONSIBLE_ATTORNEY + "," + shaleClientId + "," + userId + "]"
-						+ " caseUsersIsDeletedFilter=" + caseUserActiveFilter
-						+ " daoTotalRowsReturned=" + out.size());
-				return out;
-			}
-		} catch (SQLException e) {
-			System.err.println("[TRACE ASSIGNED_CASES][CaseDao.listActiveCasesForUserTeamMember] "
-					+ "selectedUserId=" + userId
-					+ " daoException=" + e.getMessage());
-			e.printStackTrace(System.err);
-			throw new RuntimeException("Failed to list assigned cases for team-member user (userId=" + userId + ")", e);
-		}
-	}
-
-	public List<CaseStatusReportRowDto> listCaseStatusReport(int shaleClientId, LocalDate startDate, LocalDate endDate, List<Integer> selectedStatusIds) {
-		if (shaleClientId <= 0) {
-			return List.of();
-		}
-		List<StatusRow> availableStatuses = listStatusesForTenant(shaleClientId);
-		Set<Integer> selectedIds = normalizeSelectedStatusIds(selectedStatusIds);
-		if (selectedIds.isEmpty()) {
-			return List.of();
-		}
-		Map<Integer, Long> countsByStatusId = loadCaseStatusReportCounts(shaleClientId, startDate, endDate, selectedIds);
-		List<CaseStatusReportRowDto> rows = new ArrayList<>();
-		for (StatusRow status : availableStatuses) {
-			if (status == null || !selectedIds.contains(status.id())) {
-				continue;
-			}
-			rows.add(new CaseStatusReportRowDto(
-					status.id(),
-					status.name(),
-					status.systemKey(),
-					status.lifecycleKey(),
-					status.color(),
-					status.sortOrder(),
-					countsByStatusId.getOrDefault(status.id(), 0L)));
-		}
-		return rows;
-	}
-
-	private Map<Integer, Long> loadCaseStatusReportCounts(int shaleClientId, LocalDate startDate, LocalDate endDate, Set<Integer> selectedStatusIds) {
-		if (selectedStatusIds == null || selectedStatusIds.isEmpty()) {
-			return Map.of();
-		}
-		String placeholders = sqlPlaceholders(selectedStatusIds.size());
-		String sql = """
-				SELECT
-				    currentStatus.StatusId AS StatusId,
-				    COUNT(*) AS CaseCount
-				FROM dbo.Cases c
-				OUTER APPLY (
-				    SELECT TOP (1)
-				        cs.StatusId
-				    FROM dbo.CaseStatuses cs
-				    WHERE cs.CaseId = c.Id
-				      AND cs.EndDate IS NULL
-				    ORDER BY
-				        cs.IsPrimary DESC,
-				        cs.EffectiveDate DESC,
-				        cs.Id DESC
-				) currentStatus
-				INNER JOIN dbo.Statuses s
-				    ON s.Id = currentStatus.StatusId
-				WHERE c.ShaleClientId = ?
-				  AND ISNULL(c.IsDeleted, 0) = 0
-				  AND (? IS NULL OR c.CallerDate >= ?)
-				  AND (? IS NULL OR c.CallerDate < DATEADD(day, 1, ?))
-				  AND s.Id IN (%s)
-				GROUP BY
-				    currentStatus.StatusId;
-				""".formatted(placeholders);
-		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-			int idx = 1;
-			ps.setInt(idx++, shaleClientId);
-			setNullableDateTwice(ps, idx, startDate);
-			idx += 2;
-			setNullableDateTwice(ps, idx, endDate);
-			idx += 2;
-			for (Integer statusId : selectedStatusIds) {
-				ps.setInt(idx++, statusId);
-			}
-			Map<Integer, Long> counts = new LinkedHashMap<>();
-			try (ResultSet rs = ps.executeQuery()) {
-				while (rs.next()) {
-					counts.put(rs.getInt("StatusId"), rs.getLong("CaseCount"));
-				}
-			}
-			return counts;
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to load case status report.", e);
-		}
-	}
-
-	private static Set<Integer> normalizeSelectedStatusIds(List<Integer> selectedStatusIds) {
-		if (selectedStatusIds == null || selectedStatusIds.isEmpty()) {
-			return Set.of();
-		}
-		Set<Integer> ids = new LinkedHashSet<>();
-		for (Integer statusId : selectedStatusIds) {
-			if (statusId != null && statusId > 0) {
-				ids.add(statusId);
-			}
-		}
-		return ids;
-	}
-
-	private static String sqlPlaceholders(int count) {
-		if (count <= 0) {
-			throw new IllegalArgumentException("count must be positive");
-		}
-		return String.join(", ", java.util.Collections.nCopies(count, "?"));
-	}
-
-	private static void setNullableDateTwice(PreparedStatement ps, int startIndex, LocalDate value) throws SQLException {
-		java.sql.Date sqlDate = value == null ? null : java.sql.Date.valueOf(value);
-		ps.setDate(startIndex, sqlDate);
-		ps.setDate(startIndex + 1, sqlDate);
-	}
-
-	public List<ReportCaseDetailRowDto> listCaseStatusReportCases(int shaleClientId, int statusId, LocalDate startDate, LocalDate endDate) {
-		if (shaleClientId <= 0 || statusId <= 0) {
-			return List.of();
-		}
-		String sql = """
-				SELECT
-				    c.Id,
-				    c.Name AS CaseName,
-				    c.CreatedAt,
-				    c.CallerDate AS IntakeDate,
-				    c.DeniedDate,
-				    c.ClosedDate,
-				    c.DateOfInjury,
-				    c.Description,
-				    c.StatuteOfLimitations,
-				    c.TortNoticeDeadline,
-				    c.UpdatedAt,
-				    LTRIM(RTRIM(CONCAT(ra.name_first, ' ', ra.name_last))) AS ResponsibleAttorney
-				FROM dbo.Cases c
-				OUTER APPLY (
-				    SELECT TOP (1)
-				        cs.StatusId
-				    FROM dbo.CaseStatuses cs
-				    WHERE cs.CaseId = c.Id
-				      AND cs.EndDate IS NULL
-				    ORDER BY
-				        cs.IsPrimary DESC,
-				        cs.EffectiveDate DESC,
-				        cs.Id DESC
-				) currentStatus
-				OUTER APPLY (
-				    SELECT TOP (1)
-				        cu.UserId
-				    FROM dbo.CaseUsers cu
-				    WHERE cu.CaseId = c.Id
-				      AND cu.RoleId = 4
-				    ORDER BY
-				        cu.IsPrimary DESC,
-				        cu.UpdatedAt DESC,
-				        cu.Id DESC
-				) raLink
-				LEFT JOIN dbo.Users ra
-				    ON ra.id = raLink.UserId
-				WHERE c.ShaleClientId = ?
-				  AND ISNULL(c.IsDeleted, 0) = 0
-				  AND currentStatus.StatusId = ?
-				  AND (? IS NULL OR c.CallerDate >= ?)
-				  AND (? IS NULL OR c.CallerDate < DATEADD(day, 1, ?))
-				ORDER BY
-				    c.CallerDate DESC,
-				    c.Id DESC;
-				""";
-		try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
-			int idx = 1;
-			ps.setInt(idx++, shaleClientId);
-			ps.setInt(idx++, statusId);
-			setNullableDateTwice(ps, idx, startDate);
-			idx += 2;
-			setNullableDateTwice(ps, idx, endDate);
-			List<ReportCaseDetailRowDto> rows = new ArrayList<>();
-			try (ResultSet rs = ps.executeQuery()) {
-				while (rs.next()) {
-					rows.add(new ReportCaseDetailRowDto(
-							rs.getInt("Id"),
-							rs.getString("CaseName"),
-							toLocalDateTime(rs.getTimestamp("CreatedAt")),
-							toLocalDate(rs.getDate("IntakeDate")),
-							toLocalDate(rs.getDate("DeniedDate")),
-							toLocalDate(rs.getDate("ClosedDate")),
-							toLocalDate(rs.getDate("DateOfInjury")),
-							rs.getString("Description"),
-							toLocalDate(rs.getDate("StatuteOfLimitations")),
-							toLocalDate(rs.getDate("TortNoticeDeadline")),
-							toLocalDateTime(rs.getTimestamp("UpdatedAt")),
-							rs.getString("ResponsibleAttorney")));
-				}
-			}
-			return rows;
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to load case status report cases.", e);
-		}
-	}
-
-	public List<CaseRow> listAssignedCasesForBoard(int userId) {
-		if (userId <= 0) {
-			return List.of();
-		}
-		System.out.println("[TRACE ASSIGNED_CASES][CaseDao.listAssignedCasesForBoard] "
-				+ "daoQueryMethodName=listAssignedCasesForBoard "
-				+ " daoInputUserId=" + userId
-				+ " selectedUserId=" + userId);
-		try (Connection con = db.requireConnection()) {
-			CaseSchema schema = resolveCaseSchema(con);
-			int shaleClientId = requireCurrentShaleClientId(con);
-			String caseUserActiveFilter = activeFilter(resolveCaseUsersDeletedColumn(con), "cu_scope");
-			String sql = """
-					SELECT
-					  c.Id,
-					  c.Name,
-					  c.CallerDate,
-					  c.StatuteOfLimitations,
-					  c.DateOfInjury AS DateOfIncident,
-					  c.TortNoticeDeadline,
-					  c.UpdatedAt,
-					  CAST(NULL AS nvarchar(max)) AS LatestCaseUpdate,
-					  c.Description AS Description,
-					  current_status.PrimaryStatusId,
-					  current_status.CurrentStatusName,
-					  current_status.PrimaryStatusColor,
-					  pa.Color AS PracticeAreaColor,
-					  CAST(NULL AS nvarchar(max)) AS ClientName,
-					  CAST(NULL AS nvarchar(max)) AS OpposingPartiesName,
-					  ra.UserId AS ResponsibleAttorneyId,
-					  u.color AS ResponsibleAttorneyColor,
-					  c.NonEngagementLetterSent AS NonEngagementLetterSent,
-					  LTRIM(RTRIM(
-					    COALESCE(u.name_first, '') +
-					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-					    COALESCE(u.name_last, '')
-					  )) AS ResponsibleAttorneyName
-					FROM %s c
-					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
-					OUTER APPLY (
-					    SELECT TOP (1)
-					      s.Id AS PrimaryStatusId,
-					      s.Name AS CurrentStatusName,
-					      s.Color AS PrimaryStatusColor,
-					      s.SortOrder AS CurrentStatusSortOrder
-					    FROM %s cs
-					    INNER JOIN %s s
-					      ON s.Id = cs.StatusId
-					     AND (s.ShaleClientId = ? OR s.ShaleClientId IS NULL)
-					    WHERE cs.CaseId = c.Id
-					      AND cs.EndDate IS NULL
-					    ORDER BY
-					      cs.IsPrimary DESC,
-					      s.SortOrder,
-					      cs.EffectiveDate DESC,
-					      cs.Id DESC
-					) current_status
-					OUTER APPLY (
-					    SELECT TOP (1) cu.UserId
-					    FROM %s cu
-					    WHERE cu.CaseId = c.Id
-					      AND cu.RoleId = ?
-					      AND cu.IsPrimary = 1
-					    ORDER BY
-					      cu.UpdatedAt DESC,
-					      cu.CreatedAt DESC,
-					      cu.Id DESC
-					) ra
-					LEFT JOIN %s u
-					  ON u.id = ra.UserId
-					WHERE %s
-					  AND c.ShaleClientId = ?
-					  AND EXISTS (
-					    SELECT 1
-					    FROM %s cu_scope
-					    WHERE cu_scope.CaseId = c.Id
-					      AND cu_scope.UserId = ?
-					      AND %s
-					  )
-					ORDER BY current_status.CurrentStatusSortOrder, c.CallerDate DESC, c.Id DESC;
-					""".formatted(
-					CASES_TABLE,
-					CASE_STATUSES_TABLE,
-					STATUSES_TABLE,
-					CASE_USERS_TABLE,
-					USERS_TABLE,
-					activeFilter(schema.deletedColumn(), "c"),
-					CASE_USERS_TABLE,
-					caseUserActiveFilter);
-
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				int idx = 1;
-				ps.setInt(idx++, shaleClientId);
-				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
-				ps.setInt(idx++, shaleClientId);
-				ps.setInt(idx++, userId);
-
-				List<CaseRow> out = new ArrayList<>();
-				try (ResultSet rs = ps.executeQuery()) {
-					while (rs.next()) {
-						out.add(new CaseRow(
-								rs.getLong("Id"),
-								rs.getString("Name"),
-								toLocalDate(rs.getDate("CallerDate")),
-								toLocalDate(rs.getDate("StatuteOfLimitations")),
-								getNullableInt(rs, "PrimaryStatusId"),
-								getNullableInt(rs, "ResponsibleAttorneyId"),
-								rs.getString("ResponsibleAttorneyName"),
-								rs.getString("ResponsibleAttorneyColor"),
-								getNullableBoolean(rs, "NonEngagementLetterSent"),
-								rs.getString("CurrentStatusName"),
-								rs.getString("PrimaryStatusColor"),
-								rs.getString("PracticeAreaColor"),
-								rs.getString("ClientName"),
-								rs.getString("OpposingPartiesName"),
-								rs.getString("LatestCaseUpdate"),
-								rs.getString("Description"),
-								toLocalDate(rs.getDate("DateOfIncident")),
-								toLocalDate(rs.getDate("TortNoticeDeadline"))));
-					}
-				}
-				return out;
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to list assigned cases for board (userId=" + userId + ")", e);
-		}
-	}
-
-	public List<CaseRow> searchCasesByName(String query) {
-		String normalizedQuery = normalizeSearchQuery(query);
-		if (normalizedQuery.isBlank()) {
-			return List.of();
-		}
-
-		try (Connection con = db.requireConnection()) {
-			CaseSchema schema = resolveCaseSchema(con);
-			String sql = """
-					SELECT
-					  c.Id,
-					  c.Name,
-					  c.CallerDate,
-					  c.StatuteOfLimitations,
-					  c.DateOfInjury AS DateOfIncident,
-					  c.TortNoticeDeadline,
-					  latestUpdate.LatestCaseUpdate,
-					  c.Description AS Description,
-					  current_status.PrimaryStatusId,
-					  current_status.CurrentStatusName,
-					  current_status.PrimaryStatusColor,
-					  pa.Color AS PracticeAreaColor,
-					  clientContact.ClientName,
-					  oppContact.OpposingPartiesName,
-					  ra.UserId AS ResponsibleAttorneyId,
-					  u.color AS ResponsibleAttorneyColor,
-					 c.NonEngagementLetterSent AS NonEngagementLetterSent,
-					  LTRIM(RTRIM(
-					    COALESCE(u.name_first, '') +
-					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-					    COALESCE(u.name_last, '')
-					  )) AS ResponsibleAttorneyName
-					FROM %s c
-					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
-					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
-					    FROM %s cs
-					    INNER JOIN %s s ON s.Id = cs.StatusId
-					    WHERE cs.CaseId = c.Id
-					    ORDER BY
-					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-					      cs.UpdatedAt DESC,
-					      cs.CreatedAt DESC,
-					      cs.Id DESC
-					) current_status
-					OUTER APPLY (
-					    SELECT TOP (1) cu.UserId
-					    FROM %s cu
-					    WHERE cu.CaseId = c.Id
-					      AND cu.RoleId = ?
-					      AND cu.IsPrimary = 1
-					    ORDER BY
-					      cu.UpdatedAt DESC,
-					      cu.CreatedAt DESC,
-					      cu.Id DESC
-					) ra
-					LEFT JOIN %s u
-					  ON u.id = ra.UserId
-					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS ClientName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
-					) clientContact
-					OUTER APPLY (
-					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
-					    FROM (
-					      SELECT
-					        LTRIM(RTRIM(
-					          CASE
-					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, o.Name, '')
-					          END
-					        )) AS DisplayName,
-					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
-					        cp.UpdatedAt,
-					        cp.CreatedAt,
-					        cp.Id
-					      FROM dbo.CaseParties cp
-					      LEFT JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
-					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
-					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
-					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
-					    ) opp
-					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
-					) oppContact
-					OUTER APPLY (
-					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
-					    FROM dbo.CaseUpdates cu
-					    WHERE cu.CaseId = c.Id
-					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
-					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
-					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
-					) latestUpdate
-					WHERE c.ShaleClientId = ?
-					  AND %s
-					  AND LOWER(COALESCE(c.Name, '')) LIKE ?
-					ORDER BY c.Name ASC, c.Id ASC;
-					"""
-					.formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, activeFilter(schema.deletedColumn(), "c"));
-
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				int idx = 1;
-				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
-				ps.setInt(idx++, requireCurrentShaleClientId(con));
-				ps.setString(idx, containsPattern(normalizedQuery));
-
-				List<CaseRow> out = new ArrayList<>();
-				try (ResultSet rs = ps.executeQuery()) {
-					while (rs.next()) {
-						out.add(new CaseRow(
-								rs.getLong("Id"),
-								rs.getString("Name"),
-								toLocalDate(rs.getDate("CallerDate")),
-								toLocalDate(rs.getDate("StatuteOfLimitations")),
-								getNullableInt(rs, "PrimaryStatusId"),
-								getNullableInt(rs, "ResponsibleAttorneyId"),
-								rs.getString("ResponsibleAttorneyName"),
-								rs.getString("ResponsibleAttorneyColor"),
-								getNullableBoolean(rs, "NonEngagementLetterSent"),
-								rs.getString("CurrentStatusName"),
-								rs.getString("PrimaryStatusColor"),
-								rs.getString("PracticeAreaColor"),
-								rs.getString("ClientName"),
-								rs.getString("OpposingPartiesName"),
-								rs.getString("LatestCaseUpdate"),
-								rs.getString("Description"),
-								toLocalDate(rs.getDate("DateOfIncident")),
-								toLocalDate(rs.getDate("TortNoticeDeadline"))
-						));
-					}
-				}
-				return out;
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to search cases by name", e);
-		}
-	}
-
-	public List<CaseRow> searchDeletedCasesByName(String query) {
-		String normalizedQuery = normalizeSearchQuery(query);
-		if (normalizedQuery.isBlank()) {
-			return List.of();
-		}
-
-		try (Connection con = db.requireConnection()) {
-			CaseSchema schema = resolveCaseSchema(con);
-			if (schema.deletedColumn() == null || schema.deletedColumn().isBlank()) {
-				return List.of();
-			}
-			String deletedFilter = "(" + "c." + schema.deletedColumn() + " = 1)";
-			String sql = """
-					SELECT
-					  c.Id,
-					  c.Name,
-					  c.CallerDate,
-					  c.StatuteOfLimitations,
-					  c.DateOfInjury AS DateOfIncident,
-					  c.TortNoticeDeadline,
-					  latestUpdate.LatestCaseUpdate,
-					  c.Description AS Description,
-					  current_status.PrimaryStatusId,
-					  current_status.CurrentStatusName,
-					  current_status.PrimaryStatusColor,
-					  pa.Color AS PracticeAreaColor,
-					  clientContact.ClientName,
-					  oppContact.OpposingPartiesName,
-					  ra.UserId AS ResponsibleAttorneyId,
-					  u.color AS ResponsibleAttorneyColor,
-					 c.NonEngagementLetterSent AS NonEngagementLetterSent,
-					  LTRIM(RTRIM(
-					    COALESCE(u.name_first, '') +
-					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-					    COALESCE(u.name_last, '')
-					  )) AS ResponsibleAttorneyName
-					FROM %s c
-					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
-					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
-					    FROM %s cs
-					    INNER JOIN %s s ON s.Id = cs.StatusId
-					    WHERE cs.CaseId = c.Id
-					    ORDER BY
-					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-					      cs.UpdatedAt DESC,
-					      cs.CreatedAt DESC,
-					      cs.Id DESC
-					) current_status
-					OUTER APPLY (
-					    SELECT TOP (1) cu.UserId
-					    FROM %s cu
-					    WHERE cu.CaseId = c.Id
-					      AND cu.RoleId = ?
-					      AND cu.IsPrimary = 1
-					    ORDER BY
-					      cu.UpdatedAt DESC,
-					      cu.CreatedAt DESC,
-					      cu.Id DESC
-					) ra
-					LEFT JOIN %s u
-					  ON u.id = ra.UserId
-					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS ClientName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
-					) clientContact
-					OUTER APPLY (
-					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
-					    FROM (
-					      SELECT
-					        LTRIM(RTRIM(
-					          CASE
-					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, o.Name, '')
-					          END
-					        )) AS DisplayName,
-					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
-					        cp.UpdatedAt,
-					        cp.CreatedAt,
-					        cp.Id
-					      FROM dbo.CaseParties cp
-					      LEFT JOIN dbo.Contacts ct ON ct.Id = cp.ContactId
-					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
-					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
-					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
-					    ) opp
-					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
-					) oppContact
-					OUTER APPLY (
-					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
-					    FROM dbo.CaseUpdates cu
-					    WHERE cu.CaseId = c.Id
-					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
-					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
-					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
-					) latestUpdate
-					WHERE c.ShaleClientId = ?
-					  AND %s
-					  AND LOWER(COALESCE(c.Name, '')) LIKE ?
-					ORDER BY c.Name ASC, c.Id ASC;
-					"""
-					.formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE, deletedFilter);
-
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				int idx = 1;
-				ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
-				ps.setInt(idx++, requireCurrentShaleClientId(con));
-				ps.setString(idx, containsPattern(normalizedQuery));
-
-				List<CaseRow> out = new ArrayList<>();
-				try (ResultSet rs = ps.executeQuery()) {
-					while (rs.next()) {
-						out.add(new CaseRow(
-								rs.getLong("Id"),
-								rs.getString("Name"),
-								toLocalDate(rs.getDate("CallerDate")),
-								toLocalDate(rs.getDate("StatuteOfLimitations")),
-								getNullableInt(rs, "PrimaryStatusId"),
-								getNullableInt(rs, "ResponsibleAttorneyId"),
-								rs.getString("ResponsibleAttorneyName"),
-								rs.getString("ResponsibleAttorneyColor"),
-								getNullableBoolean(rs, "NonEngagementLetterSent"),
-								rs.getString("CurrentStatusName"),
-								rs.getString("PrimaryStatusColor"),
-								rs.getString("PracticeAreaColor"),
-								rs.getString("ClientName"),
-								rs.getString("OpposingPartiesName"),
-								rs.getString("LatestCaseUpdate"),
-								rs.getString("Description"),
-								toLocalDate(rs.getDate("DateOfIncident")),
-								toLocalDate(rs.getDate("TortNoticeDeadline"))
-						));
-					}
-				}
-				return out;
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to search deleted cases by name", e);
-		}
-	}
-
 	private PagedResult<CaseRow> findPageInternal(int page,
 			int pageSize,
 			CaseSort sort,
@@ -2190,8 +1419,7 @@ public final class CaseDao {
 			Integer restrictToUserId,
 			String query,
 			Set<Integer> selectedStatusIds,
-			Long knownTotal,
-			boolean authoritativeMigratedDates) {
+			Long knownTotal) {
 		if (page < 0)
 			throw new IllegalArgumentException("page must be >= 0");
 		if (pageSize <= 0)
@@ -2220,7 +1448,7 @@ public final class CaseDao {
 		}
 
 		int offset = page * pageSize;
-		String boundaryOrderBy = boundaryOrderByClauseFor(effectiveSort, authoritativeMigratedDates);
+		String boundaryOrderBy = boundaryOrderByClauseFor(effectiveSort);
 
 		List<CaseRow> out = new ArrayList<>(pageSize);
 
@@ -2242,13 +1470,12 @@ public final class CaseDao {
 			}
 			boolean boundaryNeedsStatus = !effectiveStatusIds.isEmpty() || requiresStatusSort(effectiveSort);
 			boolean boundaryNeedsResponsibleAttorney = requiresResponsibleAttorneySort(effectiveSort);
-			boolean boundaryNeedsAuthoritativeDate = authoritativeMigratedDates && requiresAuthoritativeDateSort(effectiveSort);
+			boolean boundaryNeedsAuthoritativeDate = requiresAuthoritativeDateSort(effectiveSort);
 			String boundaryStatusApply = boundaryNeedsStatus ? boundaryStatusApplySql() : "";
 			String boundaryResponsibleAttorneyJoins = boundaryNeedsResponsibleAttorney ? boundaryResponsibleAttorneyJoinsSql() : "";
 			String boundaryDateApply = boundaryNeedsAuthoritativeDate ? authoritativeBoundaryDateApplySql() : "";
-			String migratedDateSelect = authoritativeMigratedDates
-					? "CAST(NULL AS date) AS CallerDate, CAST(NULL AS date) AS StatuteOfLimitations, CAST(NULL AS date) AS DateOfIncident, CAST(NULL AS date) AS TortNoticeDeadline,"
-					: "c.CallerDate, c.StatuteOfLimitations, c.DateOfInjury AS DateOfIncident, c.TortNoticeDeadline,";
+			String migratedDateSelect = "CAST(NULL AS date) AS CallerDate, CAST(NULL AS date) AS StatuteOfLimitations, "
+					+ "CAST(NULL AS date) AS DateOfIncident, CAST(NULL AS date) AS TortNoticeDeadline,";
 			String sql = """
 					WITH OrderedPage AS (
 					  SELECT c.Id AS CaseId, c.ShaleClientId,
@@ -2491,13 +1718,13 @@ public final class CaseDao {
 		throw new IllegalArgumentException("Sort does not require an authoritative Case Date");
 	}
 
-	private static String boundaryOrderByClauseFor(CaseSort sort, boolean authoritativeMigratedDates) {
+	private static String boundaryOrderByClauseFor(CaseSort sort) {
 		String responsibleName = "LTRIM(RTRIM(COALESCE(boundary_user.name_first, '') + CASE WHEN COALESCE(boundary_user.name_first, '') = '' OR COALESCE(boundary_user.name_last, '') = '' THEN '' ELSE ' ' END + COALESCE(boundary_user.name_last, '')))";
 		return switch (sort) {
-		case INTAKE_OLDEST -> (authoritativeMigratedDates ? "boundary_date.SortDate" : "c.CallerDate") + " ASC, c.Id ASC";
-		case STATUTE_SOONEST -> (authoritativeMigratedDates ? "boundary_date.SortDate" : "c.StatuteOfLimitations") + " ASC, c.Id ASC";
-		case STATUTE_LATEST -> (authoritativeMigratedDates ? "boundary_date.SortDate" : "c.StatuteOfLimitations") + " DESC, c.Id DESC";
-		case TORT_NOTICE_SOONEST -> (authoritativeMigratedDates ? "boundary_date.SortDate" : "c.TortNoticeDeadline") + " ASC, c.Id ASC";
+		case INTAKE_OLDEST -> "boundary_date.SortDate" + " ASC, c.Id ASC";
+		case STATUTE_SOONEST -> "boundary_date.SortDate" + " ASC, c.Id ASC";
+		case STATUTE_LATEST -> "boundary_date.SortDate" + " DESC, c.Id DESC";
+		case TORT_NOTICE_SOONEST -> "boundary_date.SortDate" + " ASC, c.Id ASC";
 		case UPDATED_OLDEST -> "c.UpdatedAt ASC, c.Id ASC";
 		case UPDATED_NEWEST -> "c.UpdatedAt DESC, c.Id DESC";
 		case CASE_NAME_ASC -> "c.Name ASC, c.Id ASC";
@@ -2506,7 +1733,7 @@ public final class CaseDao {
 		case RESPONSIBLE_ATTORNEY_DESC -> responsibleName + " DESC, c.Id DESC";
 		case CASE_STATUS_ASC -> "boundary_status.CurrentStatusName ASC, c.Id ASC";
 		case CASE_STATUS_DESC -> "boundary_status.CurrentStatusName DESC, c.Id DESC";
-		case INTAKE_NEWEST -> (authoritativeMigratedDates ? "boundary_date.SortDate" : "c.CallerDate") + " DESC, c.Id DESC";
+		case INTAKE_NEWEST -> "boundary_date.SortDate" + " DESC, c.Id DESC";
 		};
 	}
 
@@ -2695,10 +1922,10 @@ public final class CaseDao {
 							getNullableInt(rs, "PracticeAreaId"),
 							rs.getString("PracticeAreaName"),
 							rs.getString("PracticeAreaColor"),
-							toLocalDate(rs.getDate("CallerDate")),
-							toLocalDate(rs.getDate("DateOfInjury")),
-							toLocalDate(rs.getDate("StatuteOfLimitations")),
-							toLocalDate(rs.getDate("TortNoticeDeadline")),
+							null,
+							null,
+							null,
+							null,
 							getNullableInt(rs, "PrimaryCallerContactId"),
 							primaryClientContactId,
 							getNullableInt(rs, "PrimaryOpposingCounselContactId"),
@@ -2730,11 +1957,6 @@ public final class CaseDao {
 				  c.Name,
 				  c.CaseNumber,
 				  c.Description AS Description,
-				  c.CallerDate,
-				  c.DateOfInjury,
-				  c.StatuteOfLimitations,
-				  c.TortNoticeDeadline,
-
 				  pa.Id    AS PracticeAreaId,
 				  pa.Name  AS PracticeAreaName,
 				  pa.Color AS PracticeAreaColor,
@@ -3066,91 +2288,17 @@ public final class CaseDao {
 		);
 	}
 
-	public com.shale.core.dto.CaseDetailDto updateCase(
-			long caseId,
-			String name,
-			String caseNumber,
-			String description,
-			LocalDate incidentDate,
-			LocalDate solDate,
-			LocalDate tortNoticeDeadline,
-			String summary,
-			byte[] expectedRowVer,
-			Integer actorUserId) {
-		if (expectedRowVer == null || expectedRowVer.length == 0) {
-			throw new IllegalArgumentException("expectedRowVer is required");
-		}
-
-		try (Connection con = db.requireConnection()) {
-			CaseSchema schema = resolveCaseSchema(con);
-			String sql = """
-					UPDATE %s
-					SET Name = ?,
-					    CaseNumber = ?,
-					    Description = ?,
-					    DateOfInjury = ?,
-					    StatuteOfLimitations = ?,
-					    TortNoticeDeadline = ?,
-					    Summary = ?,
-					    UpdatedAt = SYSDATETIME()
-					WHERE Id = ?
-					  AND RowVer = ?
-					  AND %s;
-					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), null));
-
-			CaseDetailDto before = selectCaseDetail(con, caseId);
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-
-				ps.setString(1, name);
-				ps.setString(2, caseNumber);
-				ps.setString(3, description);
-				if (incidentDate == null)
-					ps.setNull(4, java.sql.Types.DATE);
-				else
-					ps.setDate(4, java.sql.Date.valueOf(incidentDate));
-				if (solDate == null)
-					ps.setNull(5, java.sql.Types.DATE);
-				else
-					ps.setDate(5, java.sql.Date.valueOf(solDate));
-				if (tortNoticeDeadline == null)
-					ps.setNull(6, java.sql.Types.DATE);
-				else
-					ps.setDate(6, java.sql.Date.valueOf(tortNoticeDeadline));
-				ps.setString(7, summary);
-				ps.setLong(8, caseId);
-				ps.setBytes(9, expectedRowVer);
-
-				int rows = ps.executeUpdate();
-				if (rows == 0) {
-					return null;
-				}
-				if (rows == 1) {
-					com.shale.core.dto.CaseDetailDto updated = selectCaseDetail(con, caseId);
-					if (updated == null) {
-						throw new RuntimeException("Case updated but detail row was not found (caseId=" + caseId + ")");
-					}
-					if (before != null) {
-						phiAuditService.auditUpdate(actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
-						phiAuditService.auditUpdate(actorUserId, "Cases", "DateOfInjury", caseId, before.getDateOfInjury(), updated.getDateOfInjury());
-						phiAuditService.auditUpdate(actorUserId, "Cases", "TortNoticeDeadline", caseId, before.getTortNoticeDeadline(), updated.getTortNoticeDeadline());
-						phiAuditService.auditUpdate(actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
-					}
-					return updated;
-				}
-				throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
-			}
-
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to update case (caseId=" + caseId + ")", e);
-		}
-	}
-
 	/** Existing-case desktop update boundary which deliberately owns no migrated dates. */
 	public CaseDetailDto updateCaseNonDate(long caseId, String name, String caseNumber, String description,
 			String summary, byte[] expectedRowVer, Integer actorUserId) {
 		if (expectedRowVer == null || expectedRowVer.length == 0)
 			throw new IllegalArgumentException("expectedRowVer is required");
+		if (actorUserId == null || actorUserId <= 0)
+			throw new IllegalArgumentException("actorUserId is required");
 		try (Connection con = db.requireConnection()) {
+			con.setAutoCommit(false);
+			try {
+			int tenant = requireCurrentShaleClientId(con);
 			CaseSchema schema = resolveCaseSchema(con);
 			String sql = """
 					UPDATE %s SET Name = ?, CaseNumber = ?, Description = ?, Summary = ?, UpdatedAt = SYSDATETIME()
@@ -3165,16 +2313,26 @@ public final class CaseDao {
 				ps.setLong(5, caseId);
 				ps.setBytes(6, expectedRowVer);
 				int rows = ps.executeUpdate();
-				if (rows == 0)
+				if (rows == 0) {
+					con.rollback();
 					return null;
+				}
 				if (rows != 1)
 					throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
 				CaseDetailDto updated = selectCaseDetail(con, caseId);
 				if (before != null && updated != null) {
-					phiAuditService.auditUpdate(actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
-					phiAuditService.auditUpdate(actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
+					CaseDetailsTimelineWriter.appendChanges(con, caseId, tenant, actorUserId, before, updated);
 				}
+				con.commit();
 				return updated;
+			}
+			} catch (SQLException | RuntimeException e) {
+				con.rollback();
+				throw e;
+			} finally {
+				con.setAutoCommit(true);
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update non-date case fields (caseId=" + caseId + ")", e);
@@ -3196,29 +2354,36 @@ public final class CaseDao {
 		if(after==null) throw new IllegalStateException("Case is not available for this tenant.");
 		phiAuditService.auditUpdate(con,actorUserId,"Cases","Description",caseId,before==null?null:before.getDescription(),after.getDescription());
 		phiAuditService.auditUpdate(con,actorUserId,"Cases","Summary",caseId,before==null?null:before.getSummary(),after.getSummary());
+		if (before != null) CaseDetailsTimelineWriter.appendChanges(con,caseId,tenant,actorUserId,before,after);
 		return after;
 	}
 
 	/** Broad Details boundary for unrelated existing-case fields only. */
-	public CaseDetailDto updateCaseDetailsNonMigrated(long caseId, String name, String caseNumber, Integer practiceAreaId,
+	public CaseDetailDto updateCaseDetailsNonMigrated(long caseId, int shaleClientId, String name, String caseNumber, Integer practiceAreaId,
 			String description, LocalDate acceptedDate, LocalDate closedDate, LocalDate deniedDate, String clientEstate,
 			String officePrinterCode, Boolean medicalRecordsRequested, Boolean feeAgreementSigned,
 			Boolean nonEngagementLetterSent, Boolean acceptedChronology, Boolean acceptedConsultantExpertSearch,
 			Boolean acceptedTestifyingExpertSearch, Boolean acceptedMedicalLiterature, String acceptedDetail,
 			Boolean deniedChronology, String deniedDetail, String summary, String receivedUpdates,
-			byte[] expectedRowVer, Integer actorUserId) {
+			byte[] expectedRowVer, int actorUserId) {
 		if (expectedRowVer == null || expectedRowVer.length == 0)
 			throw new IllegalArgumentException("expectedRowVer is required");
 		try (Connection con = db.requireConnection()) {
+			if (shaleClientId <= 0 || actorUserId <= 0)
+				throw new IllegalArgumentException("tenant and actor are required");
 			CaseSchema schema = resolveCaseSchema(con);
 			String sql = """
 					UPDATE %s SET Name=?, CaseNumber=?, PracticeAreaId=?, Description=?, AcceptedDate=?, ClosedDate=?, DeniedDate=?,
 					ClientEstate=?, OfficePrinterCode=?, MedicalRecordsRequested=?, FeeAgreementSigned=?, NonEngagementLetterSent=?,
 					AcceptedChronology=?, AcceptedConsultantExpertSearch=?, AcceptedTestifyingExpertSearch=?, AcceptedMedicalLiterature=?,
 					AcceptedDetail=?, DeniedChronology=?, DeniedDetail=?, Summary=?, ReceivedUpdates=?, UpdatedAt=SYSDATETIME()
-					WHERE Id=? AND RowVer=? AND %s;
+					WHERE Id=? AND ShaleClientId=? AND RowVer=? AND %s;
 					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), null));
+			con.setAutoCommit(false);
+			try {
 			CaseDetailDto before = selectCaseDetail(con, caseId);
+			if (before == null)
+				throw new IllegalArgumentException("Case is not available for this tenant.");
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
 				int i = 1;
 				ps.setString(i++, name);
@@ -3246,169 +2411,35 @@ public final class CaseDao {
 				setNullableString(ps, i++, summary);
 				setNullableString(ps, i++, receivedUpdates);
 				ps.setLong(i++, caseId);
+				ps.setInt(i++, shaleClientId);
 				ps.setBytes(i, expectedRowVer);
 				int rows = ps.executeUpdate();
-				if (rows == 0)
+				if (rows == 0) {
+					con.rollback();
 					return null;
+				}
 				if (rows != 1)
 					throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
 				CaseDetailDto updated = selectCaseDetail(con, caseId);
 				if (before != null && updated != null) {
-					phiAuditService.auditUpdate(actorUserId, "Cases", "AcceptedDetail", caseId, before.getAcceptedDetail(), updated.getAcceptedDetail());
-					phiAuditService.auditUpdate(actorUserId, "Cases", "DeniedDetail", caseId, before.getDeniedDetail(), updated.getDeniedDetail());
-					phiAuditService.auditUpdate(actorUserId, "Cases", "ReceivedUpdates", caseId, before.getReceivedUpdates(), updated.getReceivedUpdates());
-					phiAuditService.auditUpdate(actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
-					phiAuditService.auditUpdate(actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "AcceptedDetail", caseId, before.getAcceptedDetail(), updated.getAcceptedDetail());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "DeniedDetail", caseId, before.getDeniedDetail(), updated.getDeniedDetail());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "ReceivedUpdates", caseId, before.getReceivedUpdates(), updated.getReceivedUpdates());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
+					phiAuditService.auditUpdate(con, actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
+					CaseDetailsTimelineWriter.appendChanges(con, caseId, shaleClientId, actorUserId, before, updated);
 				}
+				con.commit();
 				return updated;
+			}
+			} catch (SQLException | RuntimeException e) {
+				con.rollback();
+				throw e;
+			} finally {
+				con.setAutoCommit(true);
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update non-migrated case details (caseId=" + caseId + ")", e);
-		}
-	}
-
-	public com.shale.core.dto.CaseDetailDto updateCaseDetails(
-			long caseId,
-			String name,
-			String caseNumber,
-			Integer practiceAreaId,
-			String description,
-			LocalDate callerDate,
-			String callerTime,
-			LocalDate acceptedDate,
-			LocalDate closedDate,
-			LocalDate deniedDate,
-			LocalDate dateOfMedicalNegligence,
-			LocalDate dateMedicalNegligenceWasDiscovered,
-			LocalDate dateOfInjury,
-			LocalDate statuteOfLimitations,
-			LocalDate tortNoticeDeadline,
-			LocalDate discoveryDeadline,
-			String clientEstate,
-			String officePrinterCode,
-			Boolean medicalRecordsRequested,
-			Boolean feeAgreementSigned,
-			LocalDate dateFeeAgreementSigned,
-			Boolean nonEngagementLetterSent,
-			LocalDate dateNonEngagementLetterSent,
-			Boolean acceptedChronology,
-			Boolean acceptedConsultantExpertSearch,
-			Boolean acceptedTestifyingExpertSearch,
-			Boolean acceptedMedicalLiterature,
-			String acceptedDetail,
-			Boolean deniedChronology,
-			String deniedDetail,
-			String summary,
-			String receivedUpdates,
-			byte[] expectedRowVer,
-			Integer actorUserId) {
-		if (expectedRowVer == null || expectedRowVer.length == 0)
-			throw new IllegalArgumentException("expectedRowVer is required");
-
-		try (Connection con = db.requireConnection()) {
-			CaseSchema schema = resolveCaseSchema(con);
-			String sql = """
-					UPDATE %s
-					SET Name = ?,
-					    CaseNumber = ?,
-					    PracticeAreaId = ?,
-					    Description = ?,
-					    CallerDate = ?,
-					    CallerTime = ?,
-					    AcceptedDate = ?,
-					    ClosedDate = ?,
-					    DeniedDate = ?,
-					    DateOfMedicalNegligence = ?,
-					    DateMedicalNegligenceWasDiscovered = ?,
-					    DateOfInjury = ?,
-					    StatuteOfLimitations = ?,
-					    TortNoticeDeadline = ?,
-					    DiscoveryDeadline = ?,
-					    ClientEstate = ?,
-					    OfficePrinterCode = ?,
-					    MedicalRecordsRequested = ?,
-					    FeeAgreementSigned = ?,
-					    DateFeeAgreementSigned = ?,
-					    NonEngagementLetterSent = ?,
-					    DateNonEngagementLetterSent = ?,
-					    AcceptedChronology = ?,
-					    AcceptedConsultantExpertSearch = ?,
-					    AcceptedTestifyingExpertSearch = ?,
-					    AcceptedMedicalLiterature = ?,
-					    AcceptedDetail = ?,
-					    DeniedChronology = ?,
-					    DeniedDetail = ?,
-					    Summary = ?,
-					    ReceivedUpdates = ?,
-					    UpdatedAt = SYSDATETIME()
-					WHERE Id = ?
-					  AND RowVer = ?
-					  AND %s;
-					""".formatted(CASES_TABLE, activeFilter(schema.deletedColumn(), null));
-
-			CaseDetailDto before = selectCaseDetail(con, caseId);
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				int idx = 1;
-				ps.setString(idx++, name);
-				ps.setString(idx++, caseNumber);
-				if (practiceAreaId == null)
-					ps.setNull(idx++, java.sql.Types.INTEGER);
-				else
-					ps.setInt(idx++, practiceAreaId);
-				ps.setString(idx++, description);
-				setNullableDate(ps, idx++, callerDate);
-				setNullableString(ps, idx++, callerTime);
-				setNullableDate(ps, idx++, acceptedDate);
-				setNullableDate(ps, idx++, closedDate);
-				setNullableDate(ps, idx++, deniedDate);
-				setNullableDate(ps, idx++, dateOfMedicalNegligence);
-				setNullableDate(ps, idx++, dateMedicalNegligenceWasDiscovered);
-				setNullableDate(ps, idx++, dateOfInjury);
-				setNullableDate(ps, idx++, statuteOfLimitations);
-				setNullableDate(ps, idx++, tortNoticeDeadline);
-				setNullableDate(ps, idx++, discoveryDeadline);
-				setNullableString(ps, idx++, clientEstate);
-				setNullableString(ps, idx++, officePrinterCode);
-				setNullableBoolean(ps, idx++, medicalRecordsRequested);
-				setNullableBoolean(ps, idx++, feeAgreementSigned);
-				setNullableDate(ps, idx++, dateFeeAgreementSigned);
-				setNullableBoolean(ps, idx++, nonEngagementLetterSent);
-				setNullableDate(ps, idx++, dateNonEngagementLetterSent);
-				setNullableBoolean(ps, idx++, acceptedChronology);
-				setNullableBoolean(ps, idx++, acceptedConsultantExpertSearch);
-				setNullableBoolean(ps, idx++, acceptedTestifyingExpertSearch);
-				setNullableBoolean(ps, idx++, acceptedMedicalLiterature);
-				setNullableString(ps, idx++, acceptedDetail);
-				setNullableBoolean(ps, idx++, deniedChronology);
-				setNullableString(ps, idx++, deniedDetail);
-				setNullableString(ps, idx++, summary);
-				setNullableString(ps, idx++, receivedUpdates);
-				ps.setLong(idx++, caseId);
-				ps.setBytes(idx, expectedRowVer);
-
-				int rows = ps.executeUpdate();
-				if (rows == 0)
-					return null;
-				if (rows == 1) {
-					CaseDetailDto updated = selectCaseDetail(con, caseId);
-					if (before != null && updated != null) {
-						phiAuditService.auditUpdate(actorUserId, "Cases", "AcceptedDetail", caseId, before.getAcceptedDetail(), updated.getAcceptedDetail());
-						phiAuditService.auditUpdate(actorUserId, "Cases", "DeniedDetail", caseId, before.getDeniedDetail(), updated.getDeniedDetail());
-						phiAuditService.auditUpdate(actorUserId, "Cases", "ReceivedUpdates", caseId, before.getReceivedUpdates(), updated.getReceivedUpdates());
-						phiAuditService.auditUpdate(actorUserId, "Cases", "DateOfMedicalNegligence", caseId, before.getDateOfMedicalNegligence(), updated
-								.getDateOfMedicalNegligence());
-						phiAuditService.auditUpdate(actorUserId, "Cases", "DateMedicalNegligenceWasDiscovered", caseId, before.getDateMedicalNegligenceWasDiscovered(), updated
-								.getDateMedicalNegligenceWasDiscovered());
-						phiAuditService.auditUpdate(actorUserId, "Cases", "DateOfInjury", caseId, before.getDateOfInjury(), updated.getDateOfInjury());
-						phiAuditService.auditUpdate(actorUserId, "Cases", "Description", caseId, before.getDescription(), updated.getDescription());
-						phiAuditService.auditUpdate(actorUserId, "Cases", "Summary", caseId, before.getSummary(), updated.getSummary());
-					}
-					return updated;
-				}
-				throw new RuntimeException("Unexpected update row count for caseId=" + caseId + ": " + rows);
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to update case details (caseId=" + caseId + ")", e);
 		}
 	}
 
@@ -3736,7 +2767,10 @@ public final class CaseDao {
 				INNER JOIN dbo.Cases c ON c.Id = cte.CaseId
 				                   AND c.ShaleClientId = cte.ShaleClientId
 				LEFT JOIN dbo.Users u ON u.Id = cte.ActorUserId
+				                       AND u.ShaleClientId = cte.ShaleClientId
 				WHERE cte.CaseId = ?
+				  AND cte.ShaleClientId = CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT)
+				  AND cte.EventType NOT LIKE 'TASK[_]%'
 				ORDER BY cte.OccurredAt DESC, cte.Id DESC;
 				""";
 
@@ -4268,16 +3302,8 @@ public final class CaseDao {
 				  NULLIF(LTRIM(RTRIM(COALESCE(pr.Name, ''))), '') AS RoleName,
 				  NULLIF(LTRIM(RTRIM(COALESCE(cp.Side, ''))), '') AS Side,
 				  COALESCE(cp.IsPrimary, 0) AS IsPrimary,
-				  COALESCE(
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), ''),
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailWork, ''))), ''),
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailOther, ''))), '')
-				  ) AS Email,
-				  COALESCE(
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), ''),
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneHome, ''))), ''),
-				    NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneWork, ''))), '')
-				  ) AS Phone
+				  (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) AS Email,
+				  (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone
 				FROM dbo.CaseParties cp
 				INNER JOIN dbo.Cases c
 				  ON c.Id = cp.CaseId
@@ -4348,8 +3374,8 @@ public final class CaseDao {
 				  NULLIF(LTRIM(RTRIM(COALESCE(r.Name, ''))), '') AS RoleName,
 				  NULLIF(LTRIM(RTRIM(COALESCE(cc.Side, ''))), '') AS Side,
 				  COALESCE(cc.IsPrimary, 0) AS IsPrimary,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
+				  (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) AS Email,
+				  (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone
 				FROM dbo.CaseContacts cc
 				INNER JOIN dbo.Cases c
 				  ON c.Id = cc.CaseId
@@ -4466,8 +3492,8 @@ public final class CaseDao {
 				        COALESCE(ct.Name, '')
 				    END
 				  )) AS DisplayName,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
+				  (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) AS Email,
+				  (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone
 				FROM dbo.Contacts ct
 				WHERE ct.ShaleClientId = ?
 				  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
@@ -4540,8 +3566,8 @@ public final class CaseDao {
 				        COALESCE(ct.Name, '')
 				    END
 				  )) AS DisplayName,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), '') AS Email,
-				  NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), '') AS Phone
+				  (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) AS Email,
+				  (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS Phone
 				FROM dbo.Contacts ct
 				WHERE ct.ShaleClientId = ?
 				  AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
@@ -4944,31 +3970,36 @@ public final class CaseDao {
 					  ) AS DisplayName,
 					  CASE
 					    WHEN cp.ContactId IS NOT NULL THEN
-					      COALESCE(
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailPersonal, ''))), ''),
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailWork, ''))), ''),
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.EmailOther, ''))), '')
-					      )
+					      (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id)
 					    ELSE NULLIF(LTRIM(RTRIM(COALESCE(o.Email, ''))), '')
 					  END AS Email,
 					  CASE
 					    WHEN cp.ContactId IS NOT NULL THEN
-					      COALESCE(
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneCell, ''))), ''),
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneHome, ''))), ''),
-					        NULLIF(LTRIM(RTRIM(COALESCE(ct.PhoneWork, ''))), '')
-					      )
+					      (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id)
 					    ELSE NULLIF(LTRIM(RTRIM(COALESCE(o.Phone, ''))), '')
-					  END AS Phone
+					  END AS Phone,
+					  CASE WHEN cp.ContactId IS NOT NULL THEN
+					    (SELECT STRING_AGG(CONVERT(nvarchar(max), credentials.Abbreviation), NCHAR(31))
+					       WITHIN GROUP (ORDER BY credentials.DisplayOrder, credentials.SortOrder,
+					                              credentials.Name, credentials.DefinitionId, credentials.AssignmentId)
+					     FROM (SELECT cc.Id AS AssignmentId, cc.DisplayOrder, cd.SortOrder, cd.Name,
+					                  cd.Id AS DefinitionId, cd.Abbreviation
+					             FROM dbo.ContactCredentials cc
+					             JOIN dbo.CredentialDefinitions cd ON cd.Id=cc.CredentialDefinitionId
+					              AND (cd.ShaleClientId=cc.ShaleClientId OR cd.ShaleClientId IS NULL)
+					            WHERE cc.ContactId=cp.ContactId AND cc.ShaleClientId=c.ShaleClientId
+					              AND cc.IsDeleted=0
+					              AND NULLIF(LTRIM(RTRIM(cd.Abbreviation)), N'') IS NOT NULL) credentials)
+					  END AS CredentialAbbreviations
 					FROM dbo.CaseParties cp
 					INNER JOIN dbo.Cases c
 					  ON c.Id = cp.CaseId
 					INNER JOIN dbo.PartyRoles pr
 					  ON pr.Id = cp.PartyRoleId
 					LEFT JOIN dbo.Contacts ct
-					  ON ct.Id = cp.ContactId
+					  ON ct.Id = cp.ContactId AND ct.ShaleClientId = c.ShaleClientId
 					LEFT JOIN dbo.Organizations o
-					  ON o.Id = cp.OrganizationId
+					  ON o.Id = cp.OrganizationId AND o.ShaleClientId = c.ShaleClientId
 					WHERE cp.CaseId = ?
 					  AND c.ShaleClientId = ?
 					  AND (c.IsDeleted = 0 OR c.IsDeleted IS NULL)
@@ -5015,6 +4046,11 @@ public final class CaseDao {
 				List<CasePartyDto> out = new ArrayList<>();
 				try (ResultSet rs = ps.executeQuery()) {
 					while (rs.next()) {
+						String displayName = rs.getString("DisplayName");
+						if (rs.getLong("ContactId") > 0 && !rs.wasNull()) {
+							displayName = ContactNamePresentation.effectiveDisplayNameFromAbbreviations(
+									displayName, splitCredentialAbbreviations(rs.getString("CredentialAbbreviations")));
+						}
 						out.add(new CasePartyDto(
 								rs.getLong("Id"),
 								rs.getLong("CaseId"),
@@ -5029,17 +4065,35 @@ public final class CaseDao {
 								toLocalDateTime(rs.getTimestamp("CreatedAt")),
 								toLocalDateTime(rs.getTimestamp("UpdatedAt")),
 								rs.getString("EntityType"),
-								rs.getString("DisplayName"),
+								displayName,
 								rs.getString("Email"),
-								rs.getString("Phone")
-						));
+								rs.getString("Phone"),
+								splitCredentialAbbreviations(rs.getString("CredentialAbbreviations")),
+								List.of()
+					));
 					}
 				}
-				return out;
+				List<Integer> contactIds = out.stream().map(CasePartyDto::getContactId).filter(Objects::nonNull)
+						.map(Long::intValue).distinct().toList();
+				Map<Integer, List<ContactDao.ClassificationPresentationRow>> classifications =
+						ContactDao.loadCardClassifications(con, shaleClientId, contactIds);
+				return out.stream().map(row -> new CasePartyDto(row.getId(), row.getCaseId(), row.getContactId(),
+						row.getOrganizationId(), row.getPartyRoleId(), row.getPartyRoleName(), row.getPartyRoleSystemKey(),
+						row.getSide(), row.isPrimary(), row.getNotes(), row.getCreatedAt(), row.getUpdatedAt(),
+						row.getEntityType(), row.getDisplayName(), row.getEmail(), row.getPhone(),
+						row.getCredentialAbbreviations(), row.getContactId() == null ? List.of() : classifications
+								.getOrDefault(row.getContactId().intValue(), List.of()).stream()
+								.map(value -> new com.shale.core.service.ContactServicePort.ClassificationPresentation(
+										value.category(), value.definitionId(), value.label(), value.color(), value.displayOrder()))
+								.toList())).toList();
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to list case parties (caseId=" + caseId + ")", e);
 		}
+	}
+
+	private static List<String> splitCredentialAbbreviations(String value) {
+		return value == null || value.isBlank() ? List.of() : List.of(value.split("\\u001f", -1));
 	}
 
 	public long addCaseParty(long caseId, Long contactId, Long organizationId, long partyRoleId, String side, boolean primary, String notes) {
@@ -6135,7 +5189,9 @@ public final class CaseDao {
 			int sortOrder,
 			String color,
 			String lifecycleKey,
-			String systemKey
+			String systemKey,
+			boolean active,
+			boolean deleted
 	) {
 	}
 
@@ -6503,7 +5559,8 @@ public final class CaseDao {
 				rs.getInt("SortOrder"),
 				rs.getString("Color"),
 				resolveLifecycleKey(rs.getString("LifecycleKey"), rs.getString("Name")),
-				normalizeSystemKey(rs.getString("SystemKey"))
+				normalizeSystemKey(rs.getString("SystemKey")),
+				rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted")
 		);
 	}
 
@@ -6571,7 +5628,7 @@ public final class CaseDao {
 			String lifecycleKeySelect = hasLifecycleKey ? "LifecycleKey" : "NULL AS LifecycleKey";
 			String systemKeySelect = hasSystemKey ? "SystemKey" : "NULL AS SystemKey";
 			String sql = """
-					SELECT Id, Name, SortOrder, Color, %s, %s
+					SELECT Id, Name, SortOrder, Color, %s, %s, IsActive, IsDeleted
 					FROM %s
 					WHERE ShaleClientId = ?
 					ORDER BY SortOrder, Name;
@@ -6585,7 +5642,7 @@ public final class CaseDao {
 						tenantStatuses.add(mapStatusRow(rs));
 					}
 					String globalSql = """
-							SELECT Id, Name, SortOrder, Color, %s, %s
+							SELECT Id, Name, SortOrder, Color, %s, %s, IsActive, IsDeleted
 							FROM %s
 							WHERE ShaleClientId IS NULL
 							ORDER BY SortOrder, Name;
@@ -6596,7 +5653,9 @@ public final class CaseDao {
 						while (globalRs.next()) {
 							globalStatuses.add(mapStatusRow(globalRs));
 						}
-						return resolveEffectiveStatuses(globalStatuses, tenantStatuses);
+						List<StatusRow> effective = resolveEffectiveStatuses(globalStatuses, tenantStatuses);
+						effective.removeIf(status -> !status.active() || status.deleted());
+						return effective;
 					}
 				}
 			}
@@ -6610,14 +5669,16 @@ public final class CaseDao {
 			return List.of();
 		}
 		String sql = """
-				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey
+				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey, IsActive, IsDeleted
 				FROM dbo.Statuses
 				WHERE ShaleClientId = ?
+                  AND (?=1 OR (IsActive=1 AND IsDeleted=0))
 				ORDER BY SortOrder, Name, Id;
 				""";
 		try (Connection con = db.requireConnection();
 				PreparedStatement ps = con.prepareStatement(sql)) {
 			ps.setInt(1, shaleClientId);
+            ps.setBoolean(2, includeInactive);
 			try (ResultSet rs = ps.executeQuery()) {
 				List<CaseStatusDto> out = new ArrayList<>();
 				while (rs.next()) {
@@ -6893,10 +5954,18 @@ public final class CaseDao {
 	}
 
 	public List<CaseStatusDto> listCaseStatuses(int shaleClientId, boolean includeInactive) {
-		if (shaleClientId <= 0) {
-			return List.of();
-		}
-		return toCaseStatusDtos(listStatusesForTenant(shaleClientId));
+		if (shaleClientId <= 0) return List.of();
+		String sql = "SELECT Id,ShaleClientId,Name,IsClosed,SortOrder,Color,LifecycleKey,SystemKey,IsActive,IsDeleted FROM dbo.Statuses WHERE (ShaleClientId=? OR ShaleClientId IS NULL) ORDER BY SortOrder,Name,Id";
+		try (Connection con=db.requireConnection(); PreparedStatement ps=con.prepareStatement(sql)) {
+			ps.setInt(1,shaleClientId); List<CaseStatusDto> globals=new ArrayList<>(), tenants=new ArrayList<>();
+			try(ResultSet rs=ps.executeQuery()){while(rs.next()){CaseStatusDto dto=mapCaseStatusDto(rs);(dto.shaleClientId()==null?globals:tenants).add(dto);}}
+			return resolveEffectiveCaseStatuses(globals,tenants,includeInactive);
+		} catch(SQLException e){throw new RuntimeException("Failed to list case statuses",e);}
+	}
+
+	static List<CaseStatusDto> resolveEffectiveCaseStatuses(List<CaseStatusDto> globals,List<CaseStatusDto> tenants,boolean includeInactive){
+		Map<String,CaseStatusDto> keyed=new LinkedHashMap<>();List<CaseStatusDto> unkeyed=new ArrayList<>();
+		for(CaseStatusDto d:globals){String k=normalizeSystemKey(d.systemKey());if(k==null)unkeyed.add(d);else keyed.put(k,d);} for(CaseStatusDto d:tenants){String k=normalizeSystemKey(d.systemKey());if(k==null)unkeyed.add(d);else keyed.put(k,d);} List<CaseStatusDto> out=new ArrayList<>(keyed.values());out.addAll(unkeyed);if(!includeInactive)out.removeIf(d->!d.active()||d.deleted());out.sort(java.util.Comparator.comparing((CaseStatusDto d)->d.sortOrder()==null?0:d.sortOrder()).thenComparing(CaseStatusDto::name));return out;
 	}
 
 	static List<CaseStatusDto> toCaseStatusDtos(List<StatusRow> statuses) {
@@ -6916,7 +5985,7 @@ public final class CaseDao {
 					status.color(),
 					status.lifecycleKey(),
 					status.systemKey(),
-					null));
+					null, status.active(), status.deleted()));
 		}
 		return out;
 	}
@@ -6930,8 +5999,8 @@ public final class CaseDao {
 			String normalizedSystemKey = normalizeSystemKey(systemKey);
 			validateCaseStatusUnique(con, shaleClientId, null, normalizedName, normalizedSystemKey);
 			String sql = """
-					INSERT INTO dbo.Statuses (ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey)
-					VALUES (?, ?, ?, ?, ?, ?, ?);
+					INSERT INTO dbo.Statuses (ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey, IsActive, IsDeleted)
+					VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0);
 					""";
 			try (PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 				ps.setInt(1, shaleClientId);
@@ -6978,7 +6047,7 @@ public final class CaseDao {
 			}
 			String sql = """
 					UPDATE dbo.Statuses
-					SET Name = ?, IsClosed = ?, SortOrder = ?, Color = ?, LifecycleKey = ?, SystemKey = ?
+					SET Name = ?, IsClosed = ?, SortOrder = ?, Color = ?, LifecycleKey = ?, SystemKey = ?, IsActive=1, IsDeleted=0
 					WHERE Id = ? AND ShaleClientId = ?;
 					""";
 			try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -6998,6 +6067,15 @@ public final class CaseDao {
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to update case status.", e);
 		}
+	}
+
+	public void removeCaseStatus(int tenant,int actor,int statusId){ mutateCaseStatusLifecycle(tenant,actor,statusId,false); }
+	public CaseStatusDto restoreCaseStatus(int tenant,int actor,int statusId){ mutateCaseStatusLifecycle(tenant,actor,statusId,true); try(Connection c=db.requireConnection()){return findCaseStatusById(c,statusId);}catch(SQLException e){throw new RuntimeException("Failed to reload case status",e);} }
+	private void mutateCaseStatusLifecycle(int tenant,int actor,int statusId,boolean restore){
+		try(Connection con=db.requireConnection()){con.setAutoCommit(false);try{validateAdminActorForTenant(con,tenant,actor);CaseStatusDto status=findCaseStatusById(con,statusId);if(status==null||status.shaleClientId()==null||status.shaleClientId()!=tenant)throw new IllegalArgumentException("Case status is not available for this tenant.");
+			try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.Statuses SET IsActive=?,IsDeleted=? WHERE Id=? AND ShaleClientId=?")){ps.setBoolean(1,restore);ps.setBoolean(2,!restore);ps.setInt(3,statusId);ps.setInt(4,tenant);if(ps.executeUpdate()!=1)throw new IllegalStateException("Case status changed concurrently.");}
+			entityActionAuditDao.append(con,EntityActionAuditEvent.now(tenant,actor,EntityActionAuditEvent.EntityType.CASE_STATUS,statusId,restore?EntityActionAuditEvent.Action.RESTORED:EntityActionAuditEvent.Action.DEACTIVATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.ACTIVE,restore)));con.commit();
+		}catch(Exception e){con.rollback();throw e;}finally{con.setAutoCommit(true);}}catch(SQLException e){throw new RuntimeException("Case status lifecycle change failed.",e);}
 	}
 
 	public void reorderCaseStatuses(int shaleClientId, int firstStatusId, int secondStatusId) {
@@ -7032,12 +6110,12 @@ public final class CaseDao {
 				rs.getString("Color"),
 				resolveLifecycleKey(rs.getString("LifecycleKey"), rs.getString("Name")),
 				normalizeSystemKey(rs.getString("SystemKey")),
-				getNullableInt(rs, "ShaleClientId"));
+				getNullableInt(rs, "ShaleClientId"), rs.getBoolean("IsActive"), rs.getBoolean("IsDeleted"));
 	}
 
 	private CaseStatusDto findCaseStatusById(Connection con, int statusId) throws SQLException {
 		String sql = """
-				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey
+				SELECT Id, ShaleClientId, Name, IsClosed, SortOrder, Color, LifecycleKey, SystemKey, IsActive, IsDeleted
 				FROM dbo.Statuses
 				WHERE Id = ?;
 				""";
@@ -7648,302 +6726,6 @@ public final class CaseDao {
 		}
 	}
 
-	public CaseRow getCaseRow(long caseId) {
-		try (Connection con = db.requireConnection()) {
-			CaseSchema schema = resolveCaseSchema(con);
-			String sql = """
-					SELECT
-					  c.Id,
-					  c.Name,
-					  c.CallerDate,
-					  c.StatuteOfLimitations,
-					  c.DateOfInjury AS DateOfIncident,
-					  c.TortNoticeDeadline,
-					  latestUpdate.LatestCaseUpdate,
-					  c.Description AS Description,
-					  current_status.PrimaryStatusId,
-					  current_status.CurrentStatusName,
-					  current_status.PrimaryStatusColor,
-					  pa.Color AS PracticeAreaColor,
-					  clientContact.ClientName,
-					  oppContact.OpposingPartiesName,
-					  ra.UserId AS ResponsibleAttorneyId,
-					  u.color AS ResponsibleAttorneyColor,
-					 c.NonEngagementLetterSent AS NonEngagementLetterSent,
-					  LTRIM(RTRIM(
-					    COALESCE(u.name_first, '') +
-					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-					    COALESCE(u.name_last, '')
-					  )) AS ResponsibleAttorneyName
-					FROM %s c
-					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
-					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
-					    FROM %s cs
-					    INNER JOIN %s s ON s.Id = cs.StatusId
-					    WHERE cs.CaseId = c.Id
-					    ORDER BY
-					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-					      cs.UpdatedAt DESC,
-					      cs.CreatedAt DESC,
-					      cs.Id DESC
-					) current_status
-					OUTER APPLY (
-					    SELECT TOP (1) cu.UserId
-					    FROM %s cu
-					    WHERE cu.CaseId = c.Id
-					      AND cu.RoleId = ?
-					      AND cu.IsPrimary = 1
-					    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
-					) ra
-					LEFT JOIN %s u
-					  ON u.id = ra.UserId
-					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS ClientName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
-					) clientContact
-					OUTER APPLY (
-					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
-					    FROM (
-					      SELECT
-					        LTRIM(RTRIM(
-					          CASE
-					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, o.Name, '')
-					          END
-					        )) AS DisplayName,
-					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
-					        cp.UpdatedAt,
-					        cp.CreatedAt,
-					        cp.Id
-					      FROM dbo.CaseParties cp
-					      LEFT JOIN Contacts ct ON ct.Id = cp.ContactId
-					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
-					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
-					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
-					    ) opp
-					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
-					) oppContact
-					OUTER APPLY (
-					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
-					    FROM dbo.CaseUpdates cu
-					    WHERE cu.CaseId = c.Id
-					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
-					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
-					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
-					) latestUpdate
-					WHERE c.Id = ?
-					  AND %s;
-					"""
-					.formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE,
-							activeFilter(schema.deletedColumn(), "c"));
-
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
-				ps.setLong(2, caseId);
-
-				try (ResultSet rs = ps.executeQuery()) {
-					if (!rs.next())
-						return null;
-
-					return new CaseRow(
-							rs.getLong("Id"),
-							rs.getString("Name"),
-							toLocalDate(rs.getDate("CallerDate")),
-							toLocalDate(rs.getDate("StatuteOfLimitations")),
-							getNullableInt(rs, "PrimaryStatusId"),
-							getNullableInt(rs, "ResponsibleAttorneyId"),
-							rs.getString("ResponsibleAttorneyName"),
-							rs.getString("ResponsibleAttorneyColor"),
-							getNullableBoolean(rs, "NonEngagementLetterSent"),
-							rs.getString("CurrentStatusName"),
-							rs.getString("PrimaryStatusColor"),
-							rs.getString("PracticeAreaColor"),
-							rs.getString("ClientName"),
-							rs.getString("OpposingPartiesName"),
-							rs.getString("LatestCaseUpdate"),
-							rs.getString("Description"),
-							toLocalDate(rs.getDate("DateOfIncident")),
-							toLocalDate(rs.getDate("TortNoticeDeadline"))
-					);
-				}
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to load case row (caseId=" + caseId + ")", e);
-		}
-	}
-
-	public CaseRow getMyCaseRow(int userId, long caseId) {
-		if (userId <= 0) {
-			throw new IllegalArgumentException("userId must be > 0");
-		}
-		try (Connection con = db.requireConnection()) {
-			CaseSchema schema = resolveCaseSchema(con);
-			String sql = """
-					SELECT
-					  c.Id,
-					  c.Name,
-					  c.CallerDate,
-					  c.StatuteOfLimitations,
-					  c.DateOfInjury AS DateOfIncident,
-					  c.TortNoticeDeadline,
-					  latestUpdate.LatestCaseUpdate,
-					  c.Description AS Description,
-					  current_status.PrimaryStatusId,
-					  current_status.CurrentStatusName,
-					  current_status.PrimaryStatusColor,
-					  pa.Color AS PracticeAreaColor,
-					  clientContact.ClientName,
-					  oppContact.OpposingPartiesName,
-					  ra.UserId AS ResponsibleAttorneyId,
-					  u.color AS ResponsibleAttorneyColor,
-					 c.NonEngagementLetterSent AS NonEngagementLetterSent,
-					  LTRIM(RTRIM(
-					    COALESCE(u.name_first, '') +
-					    CASE WHEN COALESCE(u.name_first, '') = '' OR COALESCE(u.name_last, '') = '' THEN '' ELSE ' ' END +
-					    COALESCE(u.name_last, '')
-					  )) AS ResponsibleAttorneyName
-					FROM %s c
-					LEFT JOIN PracticeAreas pa ON pa.Id = c.PracticeAreaId
-					OUTER APPLY (
-					    SELECT TOP (1) s.Id AS PrimaryStatusId, s.Name AS CurrentStatusName, s.Color AS PrimaryStatusColor
-					    FROM %s cs
-					    INNER JOIN %s s ON s.Id = cs.StatusId
-					    WHERE cs.CaseId = c.Id
-					    ORDER BY
-					      CASE WHEN cs.IsPrimary = 1 THEN 0 ELSE 1 END,
-					      cs.UpdatedAt DESC,
-					      cs.CreatedAt DESC,
-					      cs.Id DESC
-					) current_status
-					OUTER APPLY (
-					    SELECT TOP (1) cu.UserId
-					    FROM %s cu
-					    WHERE cu.CaseId = c.Id
-					      AND cu.RoleId = ?
-					      AND cu.IsPrimary = 1
-					    ORDER BY cu.UpdatedAt DESC, cu.CreatedAt DESC, cu.Id DESC
-					) ra
-					LEFT JOIN %s u
-					  ON u.id = ra.UserId
-					OUTER APPLY (
-					    SELECT TOP (1)
-					      CASE
-					        WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					          OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					        THEN LTRIM(RTRIM(COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')))
-					        ELSE COALESCE(ct.Name, '')
-					      END AS ClientName
-					    FROM dbo.CaseParties cp
-					    INNER JOIN dbo.PartyRoles pr ON pr.Id = cp.PartyRoleId
-					    INNER JOIN Contacts ct ON ct.Id = cp.ContactId
-					    WHERE cp.CaseId = c.Id
-					      AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey, '')))) = 'party'
-					      AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'represented'
-					      AND (ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					    ORDER BY CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END, cp.UpdatedAt DESC, cp.CreatedAt DESC, cp.Id DESC
-					) clientContact
-					OUTER APPLY (
-					    SELECT STRING_AGG(opp.DisplayName, ', ') WITHIN GROUP (ORDER BY opp.SortPrimary, opp.UpdatedAt DESC, opp.CreatedAt DESC, opp.Id DESC) AS OpposingPartiesName
-					    FROM (
-					      SELECT
-					        LTRIM(RTRIM(
-					          CASE
-					            WHEN NULLIF(LTRIM(RTRIM(COALESCE(ct.FirstName, ''))), '') IS NOT NULL
-					              OR NULLIF(LTRIM(RTRIM(COALESCE(ct.LastName, ''))), '') IS NOT NULL
-					            THEN COALESCE(ct.FirstName, '') + CASE WHEN COALESCE(ct.FirstName, '') = '' OR COALESCE(ct.LastName, '') = '' THEN '' ELSE ' ' END + COALESCE(ct.LastName, '')
-					            ELSE COALESCE(ct.Name, o.Name, '')
-					          END
-					        )) AS DisplayName,
-					        CASE WHEN COALESCE(cp.IsPrimary, 0) = 1 THEN 0 ELSE 1 END AS SortPrimary,
-					        cp.UpdatedAt,
-					        cp.CreatedAt,
-					        cp.Id
-					      FROM dbo.CaseParties cp
-					      LEFT JOIN Contacts ct ON ct.Id = cp.ContactId
-					      LEFT JOIN dbo.Organizations o ON o.Id = cp.OrganizationId
-					      WHERE cp.CaseId = c.Id
-					        AND LOWER(LTRIM(RTRIM(COALESCE(cp.Side, '')))) = 'opposing'
-					        AND (cp.ContactId IS NOT NULL OR cp.OrganizationId IS NOT NULL)
-					        AND (ct.Id IS NULL OR ct.IsDeleted = 0 OR ct.IsDeleted IS NULL)
-					        AND (o.Id IS NULL OR o.IsDeleted = 0 OR o.IsDeleted IS NULL)
-					    ) opp
-					    WHERE NULLIF(opp.DisplayName, '') IS NOT NULL
-					) oppContact
-					OUTER APPLY (
-					    SELECT TOP (1) NULLIF(LTRIM(RTRIM(cu.NoteText)), '') AS LatestCaseUpdate
-					    FROM dbo.CaseUpdates cu
-					    WHERE cu.CaseId = c.Id
-					      AND (cu.IsDeleted = 0 OR cu.IsDeleted IS NULL)
-					      AND NULLIF(LTRIM(RTRIM(cu.NoteText)), '') IS NOT NULL
-					    ORDER BY cu.CreatedAt DESC, cu.Id DESC
-					) latestUpdate
-					WHERE c.Id = ?
-					  AND %s
-					  AND EXISTS (
-					    SELECT 1
-					    FROM %s cu_scope
-					    WHERE cu_scope.CaseId = c.Id
-					      AND cu_scope.UserId = ?
-					  );
-					"""
-					.formatted(CASES_TABLE, CASE_STATUSES_TABLE, STATUSES_TABLE, CASE_USERS_TABLE, USERS_TABLE,
-							activeFilter(schema.deletedColumn(), "c"), CASE_USERS_TABLE);
-
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
-				ps.setInt(1, ROLE_RESPONSIBLE_ATTORNEY);
-				ps.setLong(2, caseId);
-				ps.setInt(3, userId);
-
-				try (ResultSet rs = ps.executeQuery()) {
-					if (!rs.next())
-						return null;
-
-					return new CaseRow(
-							rs.getLong("Id"),
-							rs.getString("Name"),
-							toLocalDate(rs.getDate("CallerDate")),
-							toLocalDate(rs.getDate("StatuteOfLimitations")),
-							getNullableInt(rs, "PrimaryStatusId"),
-							getNullableInt(rs, "ResponsibleAttorneyId"),
-							rs.getString("ResponsibleAttorneyName"),
-							rs.getString("ResponsibleAttorneyColor"),
-							getNullableBoolean(rs, "NonEngagementLetterSent"),
-							rs.getString("CurrentStatusName"),
-							rs.getString("PrimaryStatusColor"),
-							rs.getString("PracticeAreaColor"),
-							rs.getString("ClientName"),
-							rs.getString("OpposingPartiesName"),
-							rs.getString("LatestCaseUpdate"),
-							rs.getString("Description"),
-							toLocalDate(rs.getDate("DateOfIncident")),
-							toLocalDate(rs.getDate("TortNoticeDeadline"))
-					);
-				}
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to load my case row (userId=" + userId + ", caseId=" + caseId + ")", e);
-		}
-	}
-
 	public record CaseUserTeamRow(
 			int userId,
 			String displayName,
@@ -8016,6 +6798,7 @@ public final class CaseDao {
 			boolean hasIsActive = tableHasColumn(con, "Users", "IsActive");
 			boolean hasIsDeleted = tableHasColumn(con, "Users", "IsDeleted");
 			boolean hasIsDeletedLower = tableHasColumn(con, "Users", "is_deleted"); // in case your column is lower-case style
+			boolean hasIsRemoved = tableHasColumn(con, "Users", "IsRemoved");
 
 			StringBuilder sql = new StringBuilder(baseSql);
 
@@ -8027,6 +6810,9 @@ public final class CaseDao {
 			}
 			if (hasIsDeletedLower) {
 				sql.append("\n  AND (u.is_deleted = 0 OR u.is_deleted IS NULL)\n");
+			}
+			if (hasIsRemoved) {
+				sql.append("\n  AND (u.IsRemoved = 0 OR u.IsRemoved IS NULL)\n");
 			}
 
 			sql.append(orderSql);
@@ -8120,6 +6906,17 @@ public final class CaseDao {
 			con = db.requireConnection();
 			con.setAutoCommit(false);
 
+			/* Preserve assignments the single-role editor cannot represent, keyed by user. */
+			try (PreparedStatement ps = con.prepareStatement("""
+				SELECT cu.UserId,a.CaseTeamRoleDefinitionId,a.RoleDefinitionTenantKey INTO #PreservedCaseTeamRoles
+				FROM dbo.CaseTeamMemberRoles a JOIN dbo.CaseUsers cu ON cu.Id=a.CaseUserId AND cu.ShaleClientId=a.ShaleClientId
+				JOIN dbo.CaseTeamRoleDefinitions d ON d.Id=a.CaseTeamRoleDefinitionId
+				WHERE cu.CaseId=? AND a.IsDeleted=0 AND (d.LegacyRoleId IS NULL OR cu.RoleId IS NULL OR d.LegacyRoleId<>cu.RoleId);
+				DELETE a FROM dbo.CaseTeamMemberRoles a JOIN dbo.CaseUsers cu ON cu.Id=a.CaseUserId WHERE cu.CaseId=?;
+				""")) {
+				ps.setLong(1, caseId); ps.setLong(2, caseId); ps.executeUpdate();
+			}
+
 			try (PreparedStatement ps = con.prepareStatement(deleteExisting)) {
 				ps.setLong(1, caseId);
 				ps.executeUpdate();
@@ -8138,6 +6935,20 @@ public final class CaseDao {
 					}
 					ps.executeBatch();
 				}
+			}
+
+			/* Synchronize the displayed legacy role and restore all additional assignments untouched. */
+			try (PreparedStatement ps = con.prepareStatement("""
+				INSERT dbo.CaseTeamMemberRoles(ShaleClientId,CaseId,CaseUserId,CaseTeamRoleDefinitionId,RoleDefinitionTenantKey)
+				SELECT cu.ShaleClientId,cu.CaseId,cu.Id,d.Id,0
+				FROM dbo.CaseUsers cu JOIN dbo.CaseTeamRoleDefinitions d ON d.ShaleClientId IS NULL AND d.LegacyRoleId=cu.RoleId
+				WHERE cu.CaseId=?;
+				INSERT dbo.CaseTeamMemberRoles(ShaleClientId,CaseId,CaseUserId,CaseTeamRoleDefinitionId,RoleDefinitionTenantKey)
+				SELECT cu.ShaleClientId,cu.CaseId,cu.Id,p.CaseTeamRoleDefinitionId,p.RoleDefinitionTenantKey
+				FROM #PreservedCaseTeamRoles p JOIN dbo.CaseUsers cu ON cu.CaseId=? AND cu.UserId=p.UserId
+				WHERE NOT EXISTS(SELECT 1 FROM dbo.CaseTeamMemberRoles a WHERE a.CaseUserId=cu.Id AND a.CaseTeamRoleDefinitionId=p.CaseTeamRoleDefinitionId AND a.IsDeleted=0);
+				""")) {
+				ps.setLong(1, caseId); ps.setLong(2, caseId); ps.executeUpdate();
 			}
 
 			touchCaseUpdatedAt(con, caseId, requireCurrentShaleClientId(con));
@@ -8458,6 +7269,8 @@ public final class CaseDao {
 				}
 				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.CREATED, Map.of(
 						EntityActionAuditEvent.MetadataKey.EXTERNAL_LINK_ID, externalId));
+				CaseTimelineWriter.append(con,caseId,shaleClientId,actorUserId,CaseTimelineWriter.CASE_LINK_CREATED,
+						"added the link '"+safeTimelineLabel(displayName,"Link")+"'",null);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -8496,6 +7309,8 @@ public final class CaseDao {
 						EntityActionAuditEvent.MetadataKey.EXTERNAL_LINK_ID, externalId));
 				for (CaseLinkShareDraft share : shares == null ? List.<CaseLinkShareDraft>of() : shares)
 					auditCaseLinkShare(con, shaleClientId, actorUserId, caseLinkId, caseId, share.contactId(), EntityActionAuditEvent.Action.ADDED, null);
+				CaseTimelineWriter.append(con,caseId,shaleClientId,actorUserId,CaseTimelineWriter.CASE_LINK_CREATED,
+						"added the link '"+safeTimelineLabel(displayName,"Link")+"'",null);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -8521,6 +7336,10 @@ public final class CaseDao {
 				validateActorForTenant(con, shaleClientId, actorUserId);
 				validateActiveLinkTypeForTenant(con, shaleClientId, linkTypeId);
 				CaseLinkDto existing = validateCaseLinkForTenant(con, shaleClientId, caseId, caseLinkId, externalLinkId);
+				if (sameCaseLinkValues(existing, linkTypeId, displayName, url, description, primary, notes, sortOrder)) {
+					con.rollback();
+					return existing;
+				}
 				updateExternalLinkRow(con, shaleClientId, actorUserId, externalLinkId, linkTypeId, displayName, url,
 						description, expectedExternalLinkRowVer);
 				updateCaseLinkRow(con, shaleClientId, actorUserId, caseLinkId, notes, sortOrder, expectedCaseLinkRowVer);
@@ -8530,6 +7349,8 @@ public final class CaseDao {
 				if (Boolean.TRUE.equals(primary) && !existing.primary())
 					auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.PRIMARY_SET, Map.of(
 							EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID, caseLinkId));
+				CaseTimelineWriter.append(con,caseId,shaleClientId,actorUserId,CaseTimelineWriter.CASE_LINK_UPDATED,
+						"updated the link '"+safeTimelineLabel(displayName,"Link")+"'",null);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -8558,6 +7379,12 @@ public final class CaseDao {
 				CaseLinkDto existing = validateCaseLinkForTenant(con, shaleClientId, caseId, caseLinkId, externalLinkId);
 				validateShareDraftContacts(con, shaleClientId, adds);
 				validateShareUpdatesAndRemovals(con, shaleClientId, caseLinkId, updates, removals);
+				if (sameCaseLinkValues(existing, linkTypeId, displayName, url, description, primary, notes, sortOrder)
+						&& (adds == null || adds.isEmpty()) && (updates == null || updates.isEmpty())
+						&& (removals == null || removals.isEmpty())) {
+					con.rollback();
+					return existing;
+				}
 				updateExternalLinkRow(con, shaleClientId, actorUserId, externalLinkId, linkTypeId, displayName, url, description, expectedExternalLinkRowVer);
 				updateCaseLinkRow(con, shaleClientId, actorUserId, caseLinkId, notes, sortOrder, expectedCaseLinkRowVer);
 				for (CaseLinkShareDraft share : adds == null ? List.<CaseLinkShareDraft>of() : adds)
@@ -8579,6 +7406,8 @@ public final class CaseDao {
 				if (Boolean.TRUE.equals(primary) && !existing.primary())
 					auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.PRIMARY_SET, Map.of(
 							EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID, caseLinkId));
+				CaseTimelineWriter.append(con,caseId,shaleClientId,actorUserId,CaseTimelineWriter.CASE_LINK_UPDATED,
+						"updated the link '"+safeTimelineLabel(displayName,"Link")+"'",null);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -8600,11 +7429,18 @@ public final class CaseDao {
 				validateActorForTenant(con, shaleClientId, actorUserId);
 				validateCaseLinkForTenant(con, shaleClientId, caseId, caseLinkId, null);
 				Long previousPrimary = findCurrentPrimaryCaseLinkId(con, shaleClientId, caseId);
+				if (Objects.equals(previousPrimary, caseLinkId)) {
+					con.rollback();
+					return validateCaseLinkForTenant(con, shaleClientId, caseId, caseLinkId, null);
+				}
 				setOnlyPrimary(con, shaleClientId, caseId, caseLinkId, actorUserId);
 				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.PRIMARY_SET, previousPrimary == null ? Map.of(
 						EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID, caseLinkId)
 						: Map.of(EntityActionAuditEvent.MetadataKey.PREVIOUS_PRIMARY_CASE_LINK_ID, previousPrimary, EntityActionAuditEvent.MetadataKey.NEW_PRIMARY_CASE_LINK_ID,
 								caseLinkId));
+				CaseLinkDto selected = findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
+				CaseTimelineWriter.append(con, caseId, shaleClientId, actorUserId, CaseTimelineWriter.CASE_LINK_PRIMARY_CHANGED,
+						"made the link '" + safeTimelineLabel(selected == null ? null : selected.displayName(), "Link") + "' primary", null);
 				con.commit();
 				return findCaseLinkDto(con, shaleClientId, caseId, caseLinkId);
 			} catch (Exception e) {
@@ -8638,12 +7474,21 @@ public final class CaseDao {
 				if (!new HashSet<>(ids).equals(expected)) {
 					throw new IllegalArgumentException("Reorder must include each active case link exactly once.");
 				}
+				List<Long> currentOrder = active.stream()
+						.sorted(Comparator.comparingInt(CaseLinkDto::sortOrder).thenComparingLong(CaseLinkDto::caseLinkId))
+						.map(CaseLinkDto::caseLinkId).toList();
+				if (currentOrder.equals(ids)) {
+					con.rollback();
+					return active;
+				}
 				int order = 0;
 				for (Long id : ids) {
 					updateCaseLinkSortOrder(con, shaleClientId, caseId, actorUserId, id, order++);
 				}
 				auditCaseLink(con, shaleClientId, actorUserId, caseId, caseId, EntityActionAuditEvent.Action.REORDERED, Map.of(
 						EntityActionAuditEvent.MetadataKey.REORDERED_LINK_COUNT, ids.size()));
+				CaseTimelineWriter.append(con, caseId, shaleClientId, actorUserId, CaseTimelineWriter.CASE_LINKS_REORDERED,
+						"reordered Case Links", null);
 				con.commit();
 				return listCaseLinks(con, caseId, shaleClientId);
 			} catch (Exception e) {
@@ -8676,6 +7521,8 @@ public final class CaseDao {
 				softDeleteExternalIfUnreferenced(con, shaleClientId, dto.externalLinkId(), actorUserId);
 				auditCaseLink(con, shaleClientId, actorUserId, caseLinkId, caseId, EntityActionAuditEvent.Action.DELETED, Map.of(
 						EntityActionAuditEvent.MetadataKey.EXTERNAL_LINK_ID, dto.externalLinkId()));
+				CaseTimelineWriter.append(con,caseId,shaleClientId,actorUserId,CaseTimelineWriter.CASE_LINK_REMOVED,
+						"removed the link '"+safeTimelineLabel(dto.displayName(),"Link")+"'",null);
 				con.commit();
 			} catch (Exception e) {
 				con.rollback();
@@ -8685,6 +7532,37 @@ public final class CaseDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to delete case link", e);
+		}
+	}
+
+	private static String safeTimelineLabel(String value,String fallback){String v=value==null?"":value.trim();return v.isBlank()?fallback:v.replace("'","’");}
+
+	private static String normalizeTimelineValue(String value) {
+		String normalized = value == null ? "" : value.trim();
+		return normalized.isBlank() ? null : normalized;
+	}
+
+	private static boolean sameCaseLinkValues(CaseLinkDto existing, int linkTypeId, String displayName,
+			String url, String description, Boolean primary, String notes, Integer sortOrder) {
+		return existing != null
+				&& existing.linkTypeId() == linkTypeId
+				&& Objects.equals(normalizeTimelineValue(existing.displayName()), normalizeTimelineValue(displayName))
+				&& Objects.equals(normalizeTimelineValue(existing.url()), normalizeTimelineValue(url))
+				&& Objects.equals(normalizeTimelineValue(existing.description()), normalizeTimelineValue(description))
+				&& (primary == null || existing.primary() == primary)
+				&& Objects.equals(normalizeTimelineValue(existing.notes()), normalizeTimelineValue(notes))
+				&& (sortOrder == null || existing.sortOrder() == sortOrder);
+	}
+
+	private static String contactTimelineLabel(Connection con, int tenant, int contactId) throws SQLException {
+		String sql = "SELECT COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(COALESCE(FirstName,''),' ',COALESCE(LastName,'')))),''),"
+				+ "NULLIF(LTRIM(RTRIM(Name)),'')) FROM dbo.Contacts WHERE Id=? AND ShaleClientId=? AND IsDeleted=0";
+		try (PreparedStatement ps = con.prepareStatement(sql)) {
+			ps.setInt(1, contactId);
+			ps.setInt(2, tenant);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? safeTimelineLabel(rs.getString(1), "Contact #" + contactId) : "Contact #" + contactId;
+			}
 		}
 	}
 
@@ -8698,7 +7576,7 @@ public final class CaseDao {
 				FROM dbo.Contacts ct
 				WHERE ct.ShaleClientId = ? AND ISNULL(ct.IsDeleted, 0) = 0
 				  AND %s IS NOT NULL
-				  AND (? = '' OR LOWER(COALESCE(ct.Name,'') + ' ' + COALESCE(ct.FirstName,'') + ' ' + COALESCE(ct.LastName,'') + ' ' + COALESCE(ct.WorkName,'') + ' ' + COALESCE(ct.EmailPersonal,'') + ' ' + COALESCE(ct.EmailWork,'') + ' ' + COALESCE(ct.EmailOther,'')) LIKE ?)
+				  AND (? = '' OR LOWER(COALESCE(ct.Name,'') + ' ' + COALESCE(ct.FirstName,'') + ' ' + COALESCE(ct.LastName,'') + ' ' + COALESCE(ct.WorkName,'') + ' ' + COALESCE((SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id),'')) LIKE ?)
 				ORDER BY DisplayName ASC, ct.Id ASC
 				"""
 				.formatted(caseLinkShareContactDisplayNameExpression("ct"), caseLinkShareContactDisplayNameExpression("ct"));
@@ -8772,8 +7650,8 @@ public final class CaseDao {
 				SELECT EntityType, EntityId, DisplayName, Email, Phone, OrganizationTypeName
 				FROM (
 				  SELECT 'contact' EntityType, ct.Id EntityId, %s DisplayName,
-				         COALESCE(ct.EmailPersonal,ct.EmailWork,ct.EmailOther) Email,
-				         NULLIF(LTRIM(RTRIM(ct.PhoneCell)),'') Phone,
+				         (SELECT TOP(1) e.EmailAddress FROM dbo.ContactEmailAddresses e WHERE e.ContactId=ct.Id AND e.ShaleClientId=ct.ShaleClientId AND e.IsDeleted=0 ORDER BY e.IsPrimary DESC,e.SortOrder,e.Id) Email,
+				         (SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p WHERE p.ContactId=ct.Id AND p.ShaleClientId=ct.ShaleClientId AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) Phone,
 				         CAST(NULL AS nvarchar(255)) OrganizationTypeName
 				  FROM dbo.CaseParties cp JOIN dbo.Cases c ON c.Id=cp.CaseId
 				  JOIN dbo.Contacts ct ON ct.Id=cp.ContactId
@@ -8988,6 +7866,8 @@ public final class CaseDao {
 				validateActiveContactForTenant(con, tenant, contactId);
 				long shareId = insertCaseLinkShare(con, tenant, actor, caseLinkId, contactId, sharedAt, notes);
 				auditCaseLinkShare(con, tenant, actor, caseLinkId, caseId, contactId, EntityActionAuditEvent.Action.ADDED, shareId);
+				CaseTimelineWriter.append(con, caseId, tenant, actor, CaseTimelineWriter.CASE_LINK_SHARE_ADDED,
+						"shared a Case Link with " + contactTimelineLabel(con, tenant, contactId), null);
 				con.commit();
 				return findCaseLinkShare(con, tenant, caseId, caseLinkId, shareId);
 			} catch (Exception e) {
@@ -9011,8 +7891,16 @@ public final class CaseDao {
 				validateActorForTenant(con, tenant, actor);
 				validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null);
 				validateActiveContactForTenant(con, tenant, contactId);
+				CaseLinkShareDto existing = findCaseLinkShare(con, tenant, caseId, caseLinkId, shareId);
+				if (existing != null && existing.contactId() == contactId && Objects.equals(existing.sharedAt(), sharedAt)
+						&& Objects.equals(normalizeTimelineValue(existing.notes()), normalizeTimelineValue(notes))) {
+					con.rollback();
+					return existing;
+				}
 				updateCaseLinkShareRow(con, tenant, actor, caseLinkId, shareId, contactId, sharedAt, notes, rowVer);
 				auditCaseLinkShare(con, tenant, actor, caseLinkId, caseId, contactId, EntityActionAuditEvent.Action.UPDATED, shareId);
+				CaseTimelineWriter.append(con, caseId, tenant, actor, CaseTimelineWriter.CASE_LINK_SHARE_UPDATED,
+						"updated Case Link sharing for " + contactTimelineLabel(con, tenant, contactId), null);
 				con.commit();
 				return findCaseLinkShare(con, tenant, caseId, caseLinkId, shareId);
 			} catch (Exception e) {
@@ -9036,6 +7924,8 @@ public final class CaseDao {
 				validateCaseLinkForTenant(con, tenant, caseId, caseLinkId, null);
 				softDeleteCaseLinkShare(con, tenant, actor, caseLinkId, shareId, rowVer);
 				auditCaseLinkShare(con, tenant, actor, caseLinkId, caseId, null, EntityActionAuditEvent.Action.REMOVED, shareId);
+				CaseTimelineWriter.append(con, caseId, tenant, actor, CaseTimelineWriter.CASE_LINK_SHARE_REMOVED,
+						"removed a Case Link share", null);
 				con.commit();
 			} catch (Exception e) {
 				con.rollback();

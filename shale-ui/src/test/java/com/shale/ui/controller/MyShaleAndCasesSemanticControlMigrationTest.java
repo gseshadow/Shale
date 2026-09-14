@@ -13,6 +13,8 @@ final class MyShaleAndCasesSemanticControlMigrationTest {
     private final String cases = read("src/main/java/com/shale/ui/controller/CasesController.java");
     private final String myShale = read("src/main/java/com/shale/ui/controller/MyShaleController.java");
     private final String casesFxml = read("src/main/resources/fxml/cases.fxml");
+    private final String myShaleFxml = read("src/main/resources/fxml/my-shale.fxml");
+    private final String sectionTabs = read("src/main/java/com/shale/ui/util/AppSectionTabs.java");
     private final String widgetFactory = read("src/main/java/com/shale/ui/component/factory/DashboardWidgetFactory.java");
 
     MyShaleAndCasesSemanticControlMigrationTest() throws Exception {
@@ -59,7 +61,16 @@ final class MyShaleAndCasesSemanticControlMigrationTest {
 
     @Test
     void myShaleNonTaskControlsAreExplicitlyMigrated() {
-        assertTrue(myShale.contains("ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL"));
+        assertTrue(myShale.contains("AppSectionTabs.buildTabs("),
+                "My Shale section navigation must use the shared specialized tab builder.");
+        assertTrue(myShale.contains("AppSectionTabs.setActive("),
+                "My Shale selection must use the shared specialized active-state contract.");
+        assertTrue(sectionTabs.contains("TAB_BUTTON_STYLE_CLASS = \"app-section-tab\""));
+        assertTrue(sectionTabs.contains("TAB_BUTTON_ACTIVE_STYLE_CLASS = \"app-section-tab-active\""));
+        assertTrue(myShaleFxml.contains("styleClass=\"app-section-tabs-row\""),
+                "My Shale must use the shared section-tab row rather than a page-specific navigation shell.");
+        assertFalse(myShale.contains("ControlStyles.apply(button, ControlStyles.Purpose.NAVIGATION"),
+                "Specialized section tabs must not also receive the competing ordinary navigation-button hierarchy.");
         for (String control : java.util.List.of(
                 "myCasesBoardSearchField", "myCasesBoardStatusFilterChoice", "myCasesBoardSortChoice",
                 "overviewSearchFieldControl", "overviewPriorityChoiceControl", "overviewCaseChoiceControl",

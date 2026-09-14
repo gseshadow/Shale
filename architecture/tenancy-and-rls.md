@@ -27,6 +27,18 @@ RLS protected tables:
 - Categories
 - Priorities
 
+## Authoritative Intake reconciliation
+
+New Intake resolves the tenant-effective date type through the protected `INTAKE` semantic role and
+persists its displayed or edited date/time as a timed `CaseDates` occurrence. Case creation,
+occurrence persistence, and required audits share one tenant-scoped transaction. Runtime Case lists
+read and sort this occurrence; legacy `Cases.CallerDate`/`CallerTime` are reconciliation inputs only.
+
+The 2026-08-14 repair required a null tenant session context plus approved all-tenant administrative
+visibility, still applied explicit tenant equality throughout semantic resolution, and inserted 21
+missing occurrences for tenant 7. It is forward-only and idempotent. It emitted the established
+tenant-owned PHI and entity-action audits and did not insert `CalendarEvents`.
+
 Rules:
 
 - Never bypass tenant filtering.

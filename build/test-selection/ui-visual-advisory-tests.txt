@@ -1,0 +1,9 @@
+# Non-blocking JavaFX visual/geometry tests. Run explicitly with: mvn -Pui-visual test
+**/NewTaskDialogFooterCssRuntimeTest.java
+**/TaskDetailDialogLayoutRegressionTest.java
+**/MaterialRequestCardFactoryRenderingTest.java
+**/CasesToolbarCssRuntimeTest.java
+**/MyShaleControllerBoardLayoutTest.java
+**/SettingsUserManagementVisualTest.java
+**/UserResponsiveLayoutTest.java
+**/SemanticControlCssRuntimeTest.java

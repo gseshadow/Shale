@@ -1,11 +1,14 @@
 package com.shale.ui.controller;
 
-import com.shale.data.dao.ContactDao;
-import com.shale.data.dao.ContactDao.ContactCardSummaryRow;
+import com.shale.core.service.ContactServicePort;
+import com.shale.core.service.ContactServicePort.ContactCardSummary;
 import com.shale.ui.component.ScrollableListRegion;
+import com.shale.ui.component.ShaleFilterMenu;
 import com.shale.ui.component.factory.ContactCardFactory;
 import com.shale.ui.component.factory.ContactCardFactory.ContactCardModel;
 import com.shale.ui.state.AppState;
+import com.shale.ui.services.LiveUpdateEvents;
+import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.UiStateLabels;
 import com.shale.ui.util.ControlStyles;
@@ -17,16 +20,23 @@ import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Button;
 import javafx.scene.layout.FlowPane;
 import javafx.util.Duration;
+import javafx.stage.Window;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ContactsController {
+    private static final Logger LOG = LoggerFactory.getLogger(ContactsController.class);
 
     private static final ContactCardFactory.Variant CONTACTS_CARD_VARIANT = ContactCardFactory.Variant.FULL;
     private static final double CONTACT_CARD_WIDTH = 340;
@@ -45,11 +55,17 @@ public final class ContactsController {
     private Label contactsEmptyStateLabel;
     @FXML
     private Label contactsLoadingStateLabel;
+    @FXML private ShaleFilterMenu contactTypeFilter, specialtyFilter, credentialFilter;
+    @FXML private FlowPane selectedFilterChips;
+    @FXML private Label activeFilterCount;
+    @FXML private Button clearFiltersButton;
+    @FXML private Button addContactButton;
 
     private AppState appState;
-    private ContactDao contactDao;
+    private ContactServicePort contactService;
+    private UiRuntimeBridge runtimeBridge;
     private ContactCardFactory contactCardFactory;
-    private final List<ContactCardSummaryRow> loadedContacts = new ArrayList<>();
+    private final List<ContactCardSummary> loadedContacts = new ArrayList<>();
     private String emptyStateMessage = "No contacts to display yet.";
     private String loadingStateMessage = "Loading contacts…";
     private PauseTransition searchDebounce;
@@ -59,7 +75,11 @@ public final class ContactsController {
     private final int pageSize = 100;
     private boolean loading = false;
     private boolean hasMore = true;
+    private final Set<Integer> selectedContactTypes=new LinkedHashSet<>(), selectedSpecialties=new LinkedHashSet<>(), selectedCredentials=new LinkedHashSet<>();
+    private List<ContactServicePort.Definition> typeOptions=List.of(), specialtyOptions=List.of();
+    private List<ContactServicePort.CredentialDefinition> credentialOptions=List.of();
     private long pageLoadStartedNanos;
+    private Consumer<Integer> onOpenContact;
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "contacts-directory-loader");
@@ -67,15 +87,43 @@ public final class ContactsController {
         return t;
     });
 
-    public void init(AppState appState, ContactDao contactDao, Consumer<Integer> onOpenContact) {
+    public void init(AppState appState, ContactServicePort contactService, UiRuntimeBridge runtimeBridge, Consumer<Integer> onOpenContact) {
         this.appState = appState;
-        this.contactDao = contactDao;
+        this.contactService = contactService;
+        this.runtimeBridge = runtimeBridge;
+        this.onOpenContact = onOpenContact;
+        if (runtimeBridge != null) runtimeBridge.subscribeEntityUpdated(this::handleContactUpdated);
         this.contactCardFactory = new ContactCardFactory(onOpenContact == null ? id -> {
         } : onOpenContact);
+        loadFilterOptions();
     }
+
+    private void loadFilterOptions() {
+        Integer tenant=appState==null?null:appState.getShaleClientId();
+        if(contactService==null||tenant==null||tenant<=0)return;
+        dbExec.submit(()->{ try { var types=contactService.getEffectiveContactTypes(tenant); var specs=contactService.getEffectiveSpecialties(tenant);
+            var creds=contactService.getEffectiveCredentialDefinitions(tenant);
+            Platform.runLater(()->{typeOptions=types;specialtyOptions=specs;credentialOptions=creds; rebuildFilterMenus();});
+        } catch (RuntimeException ex) { LOG.error("Unable to load Contact directory filter definitions for tenant {}", tenant, ex); } });
+    }
+
+    private void rebuildFilterMenus(){
+        contactTypeFilter.setCaption("Contact Type"); specialtyFilter.setCaption("Specialty"); credentialFilter.setCaption("Credential");
+        buildDefinitionMenu(contactTypeFilter,typeOptions,selectedContactTypes);
+        buildDefinitionMenu(specialtyFilter,specialtyOptions,selectedSpecialties);
+        credentialFilter.setOptions(credentialOptions.stream().map(d->new ShaleFilterMenu.Option(d.id(),d.abbreviation()+" — "+d.name(),d.color())).toList(), selectedCredentials, (id,on)->toggle(selectedCredentials,id,on));
+        renderFilterState();
+    }
+    private void buildDefinitionMenu(ShaleFilterMenu menu,List<ContactServicePort.Definition> options,Set<Integer> selected){menu.setOptions(options.stream().map(d->new ShaleFilterMenu.Option(d.id(),d.name(),d.color())).toList(),selected,(id,on)->toggle(selected,id,on));}
+    private void toggle(Set<Integer> selected,int id,boolean on){if(on)selected.add(id);else selected.remove(id);renderFilterState();loadFirstPage();}
+    @FXML private void clearFilters(){selectedContactTypes.clear();selectedSpecialties.clear();selectedCredentials.clear();rebuildFilterMenus();loadFirstPage();}
+    private void renderFilterState(){int count=selectedContactTypes.size()+selectedSpecialties.size()+selectedCredentials.size();if(activeFilterCount!=null)activeFilterCount.setText(count+" filter"+(count==1?"":"s"));if(clearFiltersButton!=null)clearFiltersButton.setDisable(count==0);if(selectedFilterChips!=null){selectedFilterChips.getChildren().clear();typeOptions.forEach(d->chip(d.id(),d.name(),d.color(),selectedContactTypes));specialtyOptions.forEach(d->chip(d.id(),d.name(),d.color(),selectedSpecialties));credentialOptions.forEach(d->chip(d.id(),d.abbreviation(),d.color(),selectedCredentials));}}
+    private void chip(int id,String text,String color,Set<Integer> selected){if(!selected.contains(id))return;Button b=new Button(text+"  ×");b.getStyleClass().add("contact-filter-chip");if(color!=null&&color.matches("#[0-9a-fA-F]{6}"))b.setStyle("-fx-border-color: "+color+"; -fx-background-color: "+color+"22;");b.setOnAction(e->{selected.remove(id);rebuildFilterMenus();loadFirstPage();});selectedFilterChips.getChildren().add(b);}
+    private ContactServicePort.DirectoryFilters filters(){return new ContactServicePort.DirectoryFilters(List.copyOf(selectedContactTypes),List.copyOf(selectedSpecialties),List.copyOf(selectedCredentials));}
 
     @FXML
     private void initialize() {
+        if (addContactButton != null) ControlStyles.apply(addContactButton, ControlStyles.Purpose.PRIMARY);
         if (contactsSearchField != null) {
             ControlStyles.formControl(contactsSearchField);
             searchDebounce = new PauseTransition(SEARCH_DEBOUNCE);
@@ -95,6 +143,15 @@ public final class ContactsController {
         Platform.runLater(() -> {
             wireInfiniteScroll();
             loadFirstPage();
+        });
+    }
+
+    @FXML private void addContact() {
+        if (contactService == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null) return;
+        Window owner=addContactButton==null||addContactButton.getScene()==null?null:addContactButton.getScene().getWindow();
+        new ContactViewController().showCreateEditor(owner,appState,contactService,typeOptions,specialtyOptions,credentialOptions,id->{
+            loadFirstPage();
+            if(onOpenContact!=null)onOpenContact.accept(id);
         });
     }
 
@@ -148,7 +205,7 @@ public final class ContactsController {
 
         final int generationAtSubmit = loadGeneration;
 
-        if (contactDao == null) {
+        if (contactService == null) {
             loadedContacts.clear();
             setEmptyStateMessage("Contacts are unavailable right now.");
             showEmptyState();
@@ -156,7 +213,8 @@ public final class ContactsController {
         }
 
         Integer tenantId = appState == null ? null : appState.getShaleClientId();
-        if (tenantId == null || tenantId <= 0) {
+        Integer actorId = appState == null ? null : appState.getUserId();
+        if (tenantId == null || tenantId <= 0 || actorId == null || actorId <= 0) {
             loadedContacts.clear();
             setEmptyStateMessage("No tenant is selected.");
             showEmptyState();
@@ -166,6 +224,7 @@ public final class ContactsController {
         loading = true;
         final int pageToLoad = currentPage;
         final String queryAtSubmit = normalizedQuery();
+        final ContactServicePort.DirectoryFilters filtersAtSubmit=filters();
         latestRequestedQuery = queryAtSubmit;
         final long queryStarted = PerfLog.start();
         if (pageToLoad == 0) { pageLoadStartedNanos = queryStarted; }
@@ -185,7 +244,7 @@ public final class ContactsController {
                 }
                 long daoStarted = PerfLog.start();
                 PerfLog.log("contacts.search.dao", "start", "generation=" + generationAtSubmit + " page=" + pageToLoad + " tenantId=" + tenantId + " queryLength=" + queryAtSubmit.length());
-                var page = contactDao.findDirectoryContactsPage(tenantId, pageToLoad, pageSize, queryAtSubmit);
+                var page = contactService.getContactDirectoryPage(tenantId, actorId, pageToLoad, pageSize, queryAtSubmit, filtersAtSubmit);
                 PerfLog.logDone("contacts.search.dao", "generation=" + generationAtSubmit + " page=" + pageToLoad + " tenantId=" + tenantId + " rows=" + page.items().size() + " total=" + page.total(), daoStarted);
 
                 Platform.runLater(() -> {
@@ -203,6 +262,7 @@ public final class ContactsController {
                     if (pageToLoad == 0) { PerfLog.logDone("contacts.page", "phase=initialLoad generation=" + generationAtSubmit + " rows=" + loadedContacts.size(), pageLoadStartedNanos); }
                 });
             } catch (RuntimeException ex) {
+                LOG.error("Unable to load Contact directory page {} for tenant {}", pageToLoad, tenantId, ex);
                 Platform.runLater(() -> {
                     if (generationAtSubmit != loadGeneration) {
                         return;
@@ -214,6 +274,13 @@ public final class ContactsController {
                 });
             }
         });
+    }
+
+    private void handleContactUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
+        if (event == null || !LiveUpdateEvents.ENTITY_CONTACT.equals(event.entityType()) || appState == null) return;
+        Integer tenantId = appState.getShaleClientId();
+        if (tenantId == null || event.shaleClientId() != tenantId) return;
+        Platform.runLater(this::loadFirstPage);
     }
 
     private void rerender() {
@@ -234,7 +301,9 @@ public final class ContactsController {
 
         boolean empty = loadedContacts.isEmpty();
         String query = normalizedQuery();
-        if (empty && !query.isBlank()) {
+        if (empty && filters().activeCount()>0) {
+            setEmptyStateMessage("No contacts match the selected filters.");
+        } else if (empty && !query.isBlank()) {
             setEmptyStateMessage("No contacts match your search.");
         } else if (empty) {
             setEmptyStateMessage(emptyStateMessage);
@@ -244,19 +313,17 @@ public final class ContactsController {
         PerfLog.logDone("contacts.render", "cards=" + cards.size() + " loaded=" + loadedContacts.size() + " loading=" + loading + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
     }
 
-    private Node buildCard(ContactCardSummaryRow row) {
-        String displayName = safe(row.displayName()).isBlank() ? "—" : safe(row.displayName());
-        var card = contactCardFactory.create(new ContactCardModel(
-                row.id(),
-                displayName,
-                null,
-                row.email(),
-                row.phone()), CONTACTS_CARD_VARIANT);
+    private Node buildCard(ContactCardSummary row) {
+        var card = contactCardFactory.create(cardModel(row), CONTACTS_CARD_VARIANT);
         card.setMinHeight(CONTACT_CARD_HEIGHT);
-        card.setPrefHeight(CONTACT_CARD_HEIGHT);
         card.setPrefWidth(CONTACT_CARD_WIDTH);
         card.setMaxWidth(CONTACT_CARD_WIDTH);
         return card;
+    }
+
+    static ContactCardModel cardModel(ContactCardSummary row) {
+        String displayName = safe(row.displayName()).isBlank() ? "—" : safe(row.displayName());
+        return new ContactCardModel(row.id(), displayName, null, row.email(), row.phone(),row.classifications());
     }
 
     private Node buildLoadingMoreNode() {

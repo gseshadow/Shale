@@ -3,7 +3,11 @@ package com.shale.ui.controller;
 import com.shale.ui.testutil.JavaFxTestSupport;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.paint.Color;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import org.junit.jupiter.api.Test;
 
@@ -46,6 +50,76 @@ final class MyShaleSectionNavigationSelectionTest {
             assertSelectionAndContent(loaded, "Overview");
             assertEquals(1, selectedCount(loaded.tabs()));
         });
+    }
+
+    @Test
+    void navigationRowProvidesRoomForTheCompleteSharedTabPills() {
+        JavaFxTestSupport.runAndWait(() -> {
+            LoadedMyShale loaded = load();
+            Scene scene = new Scene(loaded.root(), 900, 700);
+            scene.getStylesheets().add(getClass().getResource("/css/app.css").toExternalForm());
+            loaded.root().applyCss();
+            loaded.root().layout();
+
+            ScrollPane scroll = (ScrollPane) loaded.root().lookup(".app-section-tabs-scroll");
+            HBox row = (HBox) scroll.getContent();
+            assertEquals(6, row.getPadding().getTop(), 0.01,
+                    "My Shale must use the shared navigation row's vertical breathing room.");
+            assertEquals(6, row.getPadding().getBottom(), 0.01,
+                    "My Shale must use the shared navigation row's vertical breathing room.");
+            for (Button tab : loaded.tabs().values()) {
+                var tabInViewport = scroll.getViewportBounds().contains(
+                        scroll.sceneToLocal(tab.localToScene(tab.getBoundsInLocal())));
+                assertTrue(tabInViewport, tab.getText() + " must be fully contained without vertical clipping.");
+            }
+        });
+    }
+
+    @Test
+    void navigationResolvesTheSameSharedSelectedAndInactiveSurfacesAsCaseView() {
+        JavaFxTestSupport.runAndWait(() -> {
+            LoadedMyShale myShale = load();
+            FXMLLoader caseLoader = new FXMLLoader(getClass().getResource("/fxml/case.fxml"));
+            Parent caseRoot = caseLoader.load();
+            CaseController caseController = caseLoader.getController();
+            @SuppressWarnings("unchecked")
+            Map<String, Button> caseTabs = (Map<String, Button>) field(caseController, "sectionTabs");
+
+            Parent comparisonRoot = new HBox(myShale.root(), caseRoot);
+            Scene scene = new Scene(comparisonRoot, 1800, 700);
+            scene.getStylesheets().add(getClass().getResource("/css/app.css").toExternalForm());
+            comparisonRoot.applyCss();
+            comparisonRoot.layout();
+
+            Button mySelected = myShale.tabs().get("Overview");
+            Button myInactive = myShale.tabs().get("My Tasks");
+            Button caseSelected = caseTabs.get("Overview");
+            Button caseInactive = caseTabs.get("Details");
+
+            assertTabPaintEquals(caseSelected, mySelected, "selected");
+            assertTabPaintEquals(caseInactive, myInactive, "inactive");
+            for (Button tab : myShale.tabs().values()) {
+                assertFalse(tab.isDisabled(), tab.getText() + " must remain enabled.");
+                assertFalse(tab.getStyleClass().contains("shale-control-button"),
+                        tab.getText() + " must not also opt into the competing ordinary-button hierarchy.");
+                for (Parent parent = tab.getParent(); parent != null; parent = parent.getParent()) {
+                    assertEquals(1.0, parent.getOpacity(), 0.001,
+                            tab.getText() + " must not be washed out by reduced parent opacity.");
+                    assertFalse(parent.isDisabled(), tab.getText() + " must not inherit a disabled parent state.");
+                }
+            }
+        });
+    }
+
+    private static void assertTabPaintEquals(Button expected, Button actual, String state) {
+        Color expectedFill = (Color) expected.getBackground().getFills().getFirst().getFill();
+        Color actualFill = (Color) actual.getBackground().getFills().getFirst().getFill();
+        assertEquals(expectedFill, actualFill, "My Shale " + state + " surface must resolve from the shared tab CSS.");
+        assertEquals(expected.getTextFill(), actual.getTextFill(),
+                "My Shale " + state + " text must resolve from the shared tab CSS.");
+        assertEquals(expected.getBorder().getStrokes().getFirst().getTopStroke(),
+                actual.getBorder().getStrokes().getFirst().getTopStroke(),
+                "My Shale " + state + " border must resolve from the shared tab CSS.");
     }
 
     private static LoadedMyShale load() throws Exception {
