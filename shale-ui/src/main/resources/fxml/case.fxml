@@ -1028,6 +1028,7 @@
 							<Button fx:id="refreshCaseDatesButton" text="Refresh" />
 							<Button fx:id="showRemovedCaseDatesButton"
 								text="Show Removed" />
+							<Button fx:id="manageCaseDateTypesButton" text="Manage Date Types" />
 							<Button fx:id="addCaseDateButton" text="Add Date" />
 						</HBox>
 						<Label fx:id="caseDatesStatusLabel"
