@@ -63,6 +63,7 @@ public final class OrganizationController {
 	@FXML private ChoiceBox<String> relatedCasesSortChoice;
 
 	@FXML private FlowPane organizationTypeChips;
+	@FXML private Button manageOrganizationTypesButton;
 	@FXML private TilePane phoneCards;
 	@FXML private TilePane emailCards;
 	@FXML private VBox addressCards;
@@ -79,6 +80,7 @@ public final class OrganizationController {
 	private CaseSummaryDao caseSummaryDao;
 	private Organization currentOrganization;
 	private OrganizationServicePort.OrganizationTypeProfile currentTypeProfile;
+	private List<OrganizationServicePort.OrganizationTypeDefinition> currentTypeDefinitions=List.of();
 	private OrganizationServicePort.OrganizationStructuredContactProfile currentContactProfile;
 	private int detailLoadGeneration;
 	private ContactExternalActions externalActions = new ContactExternalActions();
@@ -133,6 +135,11 @@ public final class OrganizationController {
 			deleteOrganizationButton.setOnAction(e -> onDeleteOrganization());
 			setVisibleManaged(deleteOrganizationButton, false);
 		}
+		if(manageOrganizationTypesButton!=null){
+			ControlStyles.apply(manageOrganizationTypesButton,ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);
+			manageOrganizationTypesButton.setOnAction(e->onManageOrganizationTypes());
+			setVisibleManaged(manageOrganizationTypesButton,false);
+		}
 		if (reloadRemoteButton != null) {
 			reloadRemoteButton.setOnAction(e -> onReloadRemote());
 		}
@@ -182,6 +189,7 @@ public final class OrganizationController {
 						DETAIL_CACHE.put(cacheKey, loaded);
 					}
 				}
+				List<OrganizationServicePort.OrganizationTypeDefinition> definitions=requestedTenant==null?List.of():organizationService.listEffectiveOrganizationTypes(requestedTenant);
 				OrganizationServicePort.OrganizationTypeProfile types=requestedTenant==null?null:organizationService.getOrganizationTypeProfile(requestedId,requestedTenant).orElse(null);
 				OrganizationServicePort.OrganizationStructuredContactProfile contacts=requestedTenant==null?null:organizationService.findStructuredContactProfile(requestedTenant,requestedId).orElse(null);
 				final Organization loadedForUi = loaded;
@@ -197,7 +205,7 @@ public final class OrganizationController {
 					}
 
 					currentOrganization = loadedForUi;
-					currentTypeProfile=types; currentContactProfile=contacts;
+					currentTypeDefinitions=List.copyOf(definitions); currentTypeProfile=types; currentContactProfile=contacts;
 					awaitingAuthoritativeReloadAfterLocalSave=false;
 					resetRelatedCaseControls();
 					renderFromCurrent();
@@ -260,6 +268,19 @@ public final class OrganizationController {
 				this::applySuccessfulAggregateSave, () -> { editDialogOpen = false; refreshAdminActions(); })
 				.show(dialogOwner(editButton));
 		refreshAdminActions();
+	}
+
+	private void onManageOrganizationTypes(){
+		if(!isAdminUser()||organizationService==null||organizationId==null)return;
+		final int capturedOrganizationId=organizationId;
+		final Integer capturedTenantId=currentTenantId();
+		final Integer actorId=appState==null?null:appState.getUserId();
+		if(capturedTenantId==null||capturedTenantId<=0||actorId==null||actorId<=0)return;
+		new OrganizationTypeManagementLauncher(organizationService,dbExec).open(
+				dialogOwner(manageOrganizationTypesButton),capturedTenantId,actorId,result->{
+					if(result.changed()&&Objects.equals(organizationId,capturedOrganizationId)
+							&&Objects.equals(currentTenantId(),capturedTenantId))loadOrganization();
+				});
 	}
 
 	private void applySuccessfulAggregateSave(OrganizationAggregateResult result) {
@@ -612,12 +633,14 @@ public final class OrganizationController {
 	private void setBusy(boolean busy) {
 		if (editButton != null) editButton.setDisable(busy);
 		if (deleteOrganizationButton != null) deleteOrganizationButton.setDisable(busy);
+		if(manageOrganizationTypesButton!=null)manageOrganizationTypesButton.setDisable(busy);
 	}
 
 	private void refreshAdminActions() {
 		setVisibleManaged(editButton, canEditOrganization() && !editDialogOpen && currentOrganization != null);
 		boolean showDelete = isAdminUser() && currentOrganization != null;
 		setVisibleManaged(deleteOrganizationButton, showDelete);
+		setVisibleManaged(manageOrganizationTypesButton,showDelete);
 	}
 
 	private boolean canEditOrganization() {
