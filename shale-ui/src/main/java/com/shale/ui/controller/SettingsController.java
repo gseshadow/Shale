@@ -139,6 +139,8 @@ public final class SettingsController {
 	private Label linkTypeSettingsStatusLabel;
 	@FXML
 	private VBox caseDateTypeAdministrationSection;
+	@FXML private VBox caseDateRoleMappingsSection;
+	@FXML private Button manageCaseDateTypesButton;
 	@FXML
 	private VBox caseDateTypeCardsContainer;
 	@FXML
@@ -298,6 +300,7 @@ public final class SettingsController {
 		ControlStyles.apply(applyNotificationPreferencesButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 		ControlStyles.apply(resetNotificationPreferencesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		ControlStyles.apply(viewAuditLogButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		if (manageCaseDateTypesButton != null) ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 	}
 
 	private void configureUserManagementSemanticButtons() {
@@ -602,9 +605,33 @@ public final class SettingsController {
 		loadCaseStatusesAsync(null);
 		loadPracticeAreasAsync(null);
 		loadLinkTypesAsync(null);
-		loadCaseDateTypesAsync(null);
+		loadCaseDateRoleMappingsAsync(null);
 		loadRequestLookupsAsync();
 		loadManagedUsersAsync(null);
+	}
+
+	@FXML
+	private void onManageCaseDateTypes(ActionEvent event) {
+		if (!requireAdminLookupManagement("Case Date Types") || caseService == null) return;
+		new CaseDateTypeManagementLauncher(caseService, settingsLoadExecutor, this::publishCaseDateTypeChanged)
+				.open(settingsWindow(event), requireTenantId(), requireActorUserId(), result -> loadCaseDateRoleMappingsAsync("Case Date settings refreshed."));
+	}
+
+	private void loadCaseDateRoleMappingsAsync(String successMessage) {
+		if (caseService == null || caseDateRoleMappingsContainer == null || !isAdminUser()) return;
+		final int generation = ++caseDateTypeLoadGeneration;
+		final int tenantId = requireTenantId(), actorUserId = requireActorUserId();
+		caseDateRoleMappingsContainer.getChildren().setAll(loadingLabel("Loading protected mappings…"));
+		settingsLoadExecutor.submit(() -> {
+			try {
+				List<EffectiveCaseDateTypeDto> types = caseService.listCaseDateTypesForAdministration(tenantId, actorUserId);
+				List<CaseDateSemanticRoleMappingDto> mappings = caseService.listCaseDateSemanticRoleMappings(tenantId, actorUserId);
+				Platform.runLater(() -> { if (generation == caseDateTypeLoadGeneration) { renderCaseDateRoleMappings(mappings, types); setCaseDateTypeMessage(successMessage); } });
+			} catch (RuntimeException ex) {
+				LOG.error("Case Date protected mapping load failed tenantId={} actorId={}", tenantId, actorUserId, ex);
+				Platform.runLater(() -> { if (generation == caseDateTypeLoadGeneration) caseDateRoleMappingsContainer.getChildren().setAll(loadingLabel("Protected mappings could not be loaded.")); });
+			}
+		});
 	}
 
 	private void loadRequestLookupsAsync() {
@@ -1090,7 +1117,7 @@ public final class SettingsController {
 							requireTenantId(), requireActorUserId(), mapping.roleKey(), selected.id(),
 							mapping.tenantMappingId(), mapping.tenantMappingRowVer()));
 					publishCaseDateTypeChanged(selected.id());
-					loadCaseDateTypesAsync("Protected role mapping saved.");
+					loadCaseDateRoleMappingsAsync("Protected role mapping saved.");
 				} catch (RuntimeException ex) {
 					showCaseDateTypeError(ex);
 				}
@@ -1105,7 +1132,7 @@ public final class SettingsController {
 							requireTenantId(), requireActorUserId(), mapping.roleKey(), mapping.tenantMappingId(),
 							mapping.tenantMappingRowVer()));
 					publishCaseDateTypeChanged(mapping.effectiveTypeId());
-					loadCaseDateTypesAsync("Protected role mapping reset to the global default.");
+					loadCaseDateRoleMappingsAsync("Protected role mapping reset to the global default.");
 				} catch (RuntimeException ex) {
 					showCaseDateTypeError(ex);
 				}
@@ -3551,6 +3578,14 @@ public final class SettingsController {
 		if (linkTypeAdministrationSection != null) {
 			linkTypeAdministrationSection.setVisible(visible);
 			linkTypeAdministrationSection.setManaged(visible);
+		}
+		if (caseDateTypeAdministrationSection != null) {
+			caseDateTypeAdministrationSection.setVisible(visible);
+			caseDateTypeAdministrationSection.setManaged(visible);
+		}
+		if (caseDateRoleMappingsSection != null) {
+			caseDateRoleMappingsSection.setVisible(visible);
+			caseDateRoleMappingsSection.setManaged(visible);
 		}
 		if (requestAdministrationSection != null) {
 			requestAdministrationSection.setVisible(visible);
