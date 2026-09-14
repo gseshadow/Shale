@@ -25,6 +25,18 @@ final class LinkTypeManagementContractTest {
         assertTrue(CASE.contains("new LinkTypeManagementLauncher"));
         assertTrue(read("src/main/java/com/shale/ui/controller/LinkTypeManagementLauncher.java").contains("new LinkTypeManagementPane"));
         assertFalse(SETTINGS.contains("listLinkTypesForAdministration"));
+        assertAll(
+                () -> assertFalse(SETTINGS.contains("setLinkTypeMessage")),
+                () -> assertFalse(SETTINGS.contains("LinkTypeViewRow")),
+                () -> assertFalse(SETTINGS.contains("selectedLinkTypeRow")),
+                () -> assertFalse(SETTINGS.contains("linkTypeLoadGeneration")),
+                () -> assertFalse(SETTINGS.contains("loadLinkTypesAsync")),
+                () -> assertFalse(SETTINGS.contains("onAddLinkType")),
+                () -> assertFalse(SETTINGS.contains("onEditLinkType")),
+                () -> assertFalse(SETTINGS.contains("onToggleLinkTypeActive")),
+                () -> assertFalse(SETTINGS.contains("onResetOrRemoveLinkType")),
+                () -> assertFalse(SETTINGS.contains("linkTypeLiveHandler")),
+                () -> assertFalse(SETTINGS.contains("handleLinkTypeLiveEvent")));
     }
 
     @Test void overlayRowsPreserveMaskingAndExposeDistinctActions() {

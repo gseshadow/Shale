@@ -1919,8 +1919,6 @@ public final class SettingsController {
 			setCaseStatusMessage(message);
 		} else if ("Practice Areas".equals(sectionName)) {
 			setPracticeAreaMessage(message);
-		} else if ("Link Types".equals(sectionName)) {
-			setLinkTypeMessage(message);
 		} else if ("Case Date Types".equals(sectionName)) {
 			setCaseDateTypeMessage(message);
 		}
