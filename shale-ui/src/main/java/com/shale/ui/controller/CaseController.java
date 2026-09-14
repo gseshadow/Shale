@@ -2019,7 +2019,7 @@ public class CaseController {
 		}
 		final int openingCaseId = caseId;
 		final int openingTenantId = appState.getShaleClientId();
-		final int openingNavigationGeneration = documentGeneration;
+		final long openingNavigationGeneration = documentGeneration;
 		practiceAreaManagementLauncher.open(managePracticeAreasButton.getScene().getWindow(), openingTenantId, result -> {
 			if (!result.changed() || documentGeneration != openingNavigationGeneration || caseId == null || caseId != openingCaseId || appState == null
 					|| appState.getShaleClientId() == null || appState.getShaleClientId() != openingTenantId) return;

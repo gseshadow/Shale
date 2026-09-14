@@ -31,6 +31,9 @@ final class PracticeAreaManagementMigrationTest {
         assertTrue(cases.contains("Save or cancel the current Case edits"));
         assertTrue(cases.contains("!result.changed()"));
         assertTrue(cases.contains("caseId != openingCaseId"));
+        assertTrue(cases.contains("final long openingNavigationGeneration = documentGeneration"),
+                "The contextual callback must preserve the authoritative long navigation generation without narrowing it to a Case ID type.");
+        assertFalse(cases.contains("final int openingNavigationGeneration = documentGeneration"));
         assertTrue(cases.contains("practiceAreasByTenantCache.remove(openingTenantId)"));
     }
 

@@ -1682,8 +1682,6 @@ public final class SettingsController {
 		String message = "Only admin users can manage " + sectionName.toLowerCase() + ".";
 		if ("Case Statuses".equals(sectionName)) {
 			setCaseStatusMessage(message);
-		} else if ("Practice Areas".equals(sectionName)) {
-			setPracticeAreaMessage(message);
 		} else if ("Case Date Types".equals(sectionName)) {
 			setCaseDateTypeMessage(message);
 		}
