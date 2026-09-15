@@ -1409,6 +1409,10 @@ public final class SettingsController {
 		return value == null ? "" : value;
 	}
 
+	private static String trim(String value) {
+		return value == null ? "" : value.trim();
+	}
+
 	private static String rootMessage(Throwable ex) {
 		Throwable t = ex;
 		while (t.getCause() != null)
