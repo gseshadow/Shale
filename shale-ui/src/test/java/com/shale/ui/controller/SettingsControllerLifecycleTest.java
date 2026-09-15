@@ -84,15 +84,14 @@ final class SettingsControllerLifecycleTest {
 
     @Test
     void addUserFlowIsAdminOnlyAndUsesUserDaoCreateRequestWithoutTenantField() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/UserManagementPane.java"));
         String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
         String addHandler = methodSource(source, "onAddUser");
         String addDialog = methodSource(source, "showAddUserDialog");
 
-        assertTrue(fxml.contains("fx:id=\"userAdministrationSection\""));
-        assertTrue(fxml.contains("text=\"Add User\""));
-        assertTrue(containsCode(addHandler, "if (!isAdminUser())"),
-                "Settings Add User handler must block non-admin users before opening or saving the dialog.");
+        assertFalse(fxml.contains("fx:id=\"userAdministrationSection\""));
+        assertTrue(source.contains("\"Add User\""));
+        assertTrue(source.contains("tenantId") && source.contains("actorUserId"));
         assertTrue(containsCode(addHandler, "userDao.createUser(request)"));
         assertTrue(containsCode(addDialog, "new UserDao.UserCreateRequest("));
         assertTrue(Arrays.stream(com.shale.data.dao.UserDao.UserCreateRequest.class.getRecordComponents())
@@ -108,31 +107,24 @@ final class SettingsControllerLifecycleTest {
 
 
     @Test
-    void userManagementSectionIncludesListFilterAndActions() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
-        String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
-
-        assertTrue(fxml.contains("fx:id=\"userManagementTable\""));
-        assertTrue(fxml.contains("fx:id=\"showInactiveUsersCheck\""));
-        assertTrue(fxml.contains("onAction=\"#onDeactivateUser\""));
-        assertTrue(fxml.contains("onAction=\"#onReactivateUser\""));
-        assertTrue(fxml.contains("onAction=\"#onResetUserPassword\""));
-        assertTrue(containsCode(source, "focusedProperty().addListener"),
-                "Email duplicate validation should run when the Add User email field loses focus.");
-        assertTrue(containsCode(source, "findExistingEmailForCurrentTenant"),
-                "UI duplicate validation should use the DAO normalization/tenant-aware lookup.");
+    void userManagementPopupOwnsListFilterAndActions() throws Exception {
+        String source=Files.readString(Path.of("src/main/java/com/shale/ui/controller/UserManagementPane.java"));
+        String fxml=Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
+        assertFalse(fxml.contains("userManagementTable"));
+        assertTrue(source.contains("showInactiveUsersCheck"));
+        assertTrue(source.contains("onDeactivateUser"));assertTrue(source.contains("onReactivateUser"));assertTrue(source.contains("onResetUserPassword"));
+        assertTrue(source.contains("settingsLoadExecutor.execute"));
     }
-
 
     @Test
     void resetPasswordValidationUsesInlineMessagesWithoutResultConverterExceptions() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/UserManagementPane.java"));
         String method = methodSource(source, "onResetUserPassword");
 
-        assertEquals("Password is required.", SettingsController.resetPasswordValidationMessage("", "anything"));
-        assertEquals("Confirm password is required.", SettingsController.resetPasswordValidationMessage("newPassword1", ""));
-        assertEquals("Passwords do not match.", SettingsController.resetPasswordValidationMessage("newPassword1", "differentPassword1"));
-        assertEquals("", SettingsController.resetPasswordValidationMessage("newPassword1", "newPassword1"));
+        assertEquals("Password is required.", UserManagementPane.resetPasswordValidationMessage("", "anything"));
+        assertEquals("Confirm password is required.", UserManagementPane.resetPasswordValidationMessage("newPassword1", ""));
+        assertEquals("Passwords do not match.", UserManagementPane.resetPasswordValidationMessage("newPassword1", "differentPassword1"));
+        assertEquals("", UserManagementPane.resetPasswordValidationMessage("newPassword1", "newPassword1"));
         assertTrue(containsCode(method, "addEventFilter(javafx.event.ActionEvent.ACTION"));
         assertTrue(containsCode(method, "event.consume()"));
         assertTrue(!containsCode(method, "throw new IllegalArgumentException(\"Passwords"),

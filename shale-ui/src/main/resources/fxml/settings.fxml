@@ -64,13 +64,7 @@
 
       <VBox fx:id="administrationGroup" styleClass="settings-directory-group">
         <Label text="Administration" styleClass="search-section-title settings-group-title"/>
-        <SettingsManagementRow fx:id="userManagementRow" title="User Management" description="Manage users for the current tenant." actionText="Open"/>
-        <VBox fx:id="userAdministrationSection" visible="false" managed="false" spacing="8" styleClass="settings-inline-content strong-panel">
-          <HBox spacing="10" alignment="CENTER_LEFT"><TextField fx:id="userSearchField" promptText="Search name, email, initials, or role" styleClass="shale-form-control" HBox.hgrow="ALWAYS"/><CheckBox fx:id="showInactiveUsersCheck" text="Show inactive users" onAction="#onToggleInactiveUsers"/><Button fx:id="addUserButton" text="Add User" onAction="#onAddUser"/></HBox>
-          <TableView fx:id="userManagementTable" prefHeight="340" minHeight="240" fixedCellSize="36" styleClass="shale-table" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="userNameColumn" text="Name" prefWidth="230" minWidth="190" maxWidth="300"/><TableColumn fx:id="userEmailColumn" text="Email / login" prefWidth="230"/><TableColumn fx:id="userInitialsColumn" text="Initials" prefWidth="70"/><TableColumn fx:id="userRolesColumn" text="Roles" prefWidth="150"/><TableColumn fx:id="userStatusColumn" text="Status" prefWidth="90"/></columns></TableView>
-          <FlowPane hgap="8" vgap="8"><Button fx:id="editUserButton" text="Edit User" onAction="#onEditUser" disable="true"/><Button fx:id="deactivateUserButton" text="Deactivate User" onAction="#onDeactivateUser" disable="true"/><Button fx:id="reactivateUserButton" text="Reactivate User" onAction="#onReactivateUser" disable="true"/><Button fx:id="resetPasswordButton" text="Reset Password" onAction="#onResetUserPassword" disable="true"/><Button fx:id="refreshUsersButton" text="Refresh" onAction="#onRefreshUsers"/><Button fx:id="removeUserButton" text="Remove from Tenant" onAction="#onRemoveUserFromTenant" disable="true"/></FlowPane>
-          <Label fx:id="userManagementStatusLabel" styleClass="search-summary-text" wrapText="true"/>
-        </VBox>
+        <SettingsManagementRow fx:id="userManagementRow" title="User Management" description="Manage users for the current tenant." actionText="Manage"/>
         <SettingsManagementRow fx:id="auditLogRow" title="Audit Log" description="Review PHI audit and entity activity for the current tenant." actionText="Open"/>
       </VBox>
     </VBox>

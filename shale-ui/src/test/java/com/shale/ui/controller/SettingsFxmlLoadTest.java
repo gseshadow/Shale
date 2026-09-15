@@ -87,15 +87,12 @@ final class SettingsFxmlLoadTest {
             assertNotNull(notificationCheck, "Existing Settings notification checkbox fx:id should resolve.");
             assertSame(notificationCheck, injectedField(controller, "taskAssignedToMeCheck"),
                     "Existing Settings notification checkbox should remain injected into its controller field.");
-            CheckBox inactiveUsers = (CheckBox) loader.getNamespace().get("showInactiveUsersCheck");
-            assertNotNull(inactiveUsers, "Existing Settings user-management checkbox should remain wired.");
+            assertNull(loader.getNamespace().get("showInactiveUsersCheck"), "Inline User Management controls must be absent.");
 
             Button auditButton = ((SettingsManagementRow) loader.getNamespace().get("auditLogRow")).getActionButton();
             assertNotNull(auditButton.getOnAction(), "FXML should resolve the audit-log action handler.");
             auditButton.fire();
             assertTrue(!auditOpened.get(), "Non-admin Settings users must not open the audit log.");
-
-            assertNotNull(inactiveUsers.getOnAction(), "Existing Settings controls should keep resolving their handlers.");
 
             Button manageDictionary = ((SettingsManagementRow) loader.getNamespace().get("customDictionaryRow")).getActionButton();
             assertNotNull(manageDictionary, "Custom Dictionary must be presented as one compact Settings action.");
@@ -103,14 +100,13 @@ final class SettingsFxmlLoadTest {
 
             for (String rowId : List.of("customDictionaryRow", "caseStatusesRow", "practiceAreasRow",
                     "linkTypesRow", "caseTeamRolesRow", "caseDatesRow", "requestFieldsRow",
-                    "contactClassificationsRow", "organizationTypesRow")) {
+                    "contactClassificationsRow", "organizationTypesRow", "userManagementRow")) {
                 SettingsManagementRow row = (SettingsManagementRow) loader.getNamespace().get(rowId);
                 assertEquals("Manage", row.getActionText(), rowId + " must visibly identify its popup action.");
                 assertEquals("Manage " + row.getTitle(), row.getActionButton().getAccessibleText(),
                         rowId + " must expose the same action and target to assistive technology.");
             }
-            for (String rowId : List.of("notificationPreferencesRow", "caseDateMappingsRow",
-                    "userManagementRow", "auditLogRow")) {
+            for (String rowId : List.of("notificationPreferencesRow", "caseDateMappingsRow", "auditLogRow")) {
                 assertEquals("Open", ((SettingsManagementRow) loader.getNamespace().get(rowId)).getActionText(),
                         rowId + " must preserve its non-popup action semantics.");
             }
