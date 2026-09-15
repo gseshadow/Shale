@@ -1,6 +1,7 @@
 package com.shale.ui.controller;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -10,6 +11,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -36,6 +38,32 @@ final class SettingsFxmlLoadTest {
     static void startJavaFxToolkit() {
         assumeTrue(hasDisplay(), "JavaFX FXML load test requires a graphical display.");
         JavaFxTestSupport.ensureToolkitStarted();
+    }
+
+    @Test
+    void sharedRowOwnsItsCompleteActionContractAcrossAvailabilityChanges() {
+        JavaFxTestSupport.runAndWait(() -> {
+            SettingsManagementRow row = new SettingsManagementRow();
+            AtomicBoolean opened = new AtomicBoolean();
+            row.configure("Case Statuses", "Manage case statuses.", "Manage", event -> opened.set(true));
+
+            assertEquals("Case Statuses", row.getTitle());
+            assertEquals("Manage case statuses.", row.getDescription());
+            assertEquals("Manage", row.getActionText());
+            assertEquals("Manage Case Statuses", row.getActionButton().getAccessibleText());
+            assertTrue(row.getActionButton().getStyleClass().contains("shale-control-secondary"));
+            assertTrue(row.getActionButton().getStyleClass().contains("shale-control-small"));
+
+            row.setAvailable(false);
+            assertTrue(!row.isVisible() && !row.isManaged());
+            assertTrue(!row.getActionButton().isVisible() && !row.getActionButton().isManaged());
+            assertEquals("Manage", row.getActionText(), "Availability must not erase the action label.");
+            assertTrue(row.getActionButton().getOnAction() == null);
+
+            row.setAvailable(true);
+            row.getActionButton().fire();
+            assertTrue(opened.get(), "Restoring availability must restore the configured action handler.");
+        });
     }
 
     @Test
@@ -72,6 +100,20 @@ final class SettingsFxmlLoadTest {
             Button manageDictionary = ((SettingsManagementRow) loader.getNamespace().get("customDictionaryRow")).getActionButton();
             assertNotNull(manageDictionary, "Custom Dictionary must be presented as one compact Settings action.");
             assertNotNull(manageDictionary.getOnAction(), "The dictionary manager must be created only from the Manage action.");
+
+            for (String rowId : List.of("customDictionaryRow", "caseStatusesRow", "practiceAreasRow",
+                    "linkTypesRow", "caseTeamRolesRow", "caseDatesRow", "requestFieldsRow",
+                    "contactClassificationsRow", "organizationTypesRow")) {
+                SettingsManagementRow row = (SettingsManagementRow) loader.getNamespace().get(rowId);
+                assertEquals("Manage", row.getActionText(), rowId + " must visibly identify its popup action.");
+                assertEquals("Manage " + row.getTitle(), row.getActionButton().getAccessibleText(),
+                        rowId + " must expose the same action and target to assistive technology.");
+            }
+            for (String rowId : List.of("notificationPreferencesRow", "caseDateMappingsRow",
+                    "userManagementRow", "auditLogRow")) {
+                assertEquals("Open", ((SettingsManagementRow) loader.getNamespace().get(rowId)).getActionText(),
+                        rowId + " must preserve its non-popup action semantics.");
+            }
 
             assertNotNull(loader.getNamespace().get("organizationTypesRow"));
         });
