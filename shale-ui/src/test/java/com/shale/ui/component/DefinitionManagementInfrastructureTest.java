@@ -27,7 +27,7 @@ final class DefinitionManagementInfrastructureTest {
                 "component/DefinitionManagementSession.java", "component/CommittedChangeTracker.java")) {
             String source = Files.readString(MAIN.resolve(file));
             for (String forbidden : List.of("CaseService", "ContactService", "OrganizationService", ".dto.",
-                    "CaseDate", "Classification", "OrganizationType")) {
+                    "CaseDate", "Classification", "OrganizationType", "UserDao", "UserManagement")) {
                 assertFalse(source.contains(forbidden), file + " must not depend on " + forbidden);
             }
         }

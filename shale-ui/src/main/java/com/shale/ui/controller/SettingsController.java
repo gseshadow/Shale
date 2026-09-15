@@ -160,38 +160,6 @@ public final class SettingsController {
 	private Button manageContactClassificationsButton;
 	@FXML private SettingsManagementRow organizationTypesRow;
 	private Button manageOrganizationTypesButton;
-	@FXML
-	private TableView<UserManagementViewRow> userManagementTable;
-	@FXML
-	private TableColumn<UserManagementViewRow, UserManagementViewRow> userNameColumn;
-	@FXML
-	private TableColumn<UserManagementViewRow, String> userEmailColumn;
-	@FXML
-	private TableColumn<UserManagementViewRow, String> userInitialsColumn;
-	@FXML
-	private TableColumn<UserManagementViewRow, String> userRolesColumn;
-	@FXML
-	private TableColumn<UserManagementViewRow, String> userStatusColumn;
-	@FXML
-	private CheckBox showInactiveUsersCheck;
-	@FXML
-	private TextField userSearchField;
-	@FXML
-	private Button addUserButton;
-	@FXML
-	private Button editUserButton;
-	@FXML
-	private Button refreshUsersButton;
-	@FXML
-	private Button removeUserButton;
-	@FXML
-	private Button deactivateUserButton;
-	@FXML
-	private Button reactivateUserButton;
-	@FXML
-	private Button resetPasswordButton;
-	@FXML
-	private Label userManagementStatusLabel;
 	@FXML private SettingsManagementRow customDictionaryRow;
 	private Button manageCustomDictionaryButton;
 	@FXML private SettingsManagementRow notificationPreferencesRow;
@@ -223,10 +191,6 @@ public final class SettingsController {
 	private int requestLookupLoadGeneration;
 	private static final PseudoClass SELECTED_CARD = PseudoClass.getPseudoClass("selected");
 	private int caseDateTypeLoadGeneration;
-	private int userManagementLoadGeneration;
-	private final List<UserManagementViewRow> managedUserRows = new ArrayList<>();
-	private final UserCardFactory userManagementCardFactory = new UserCardFactory(null);
-	private boolean userMutationRunning;
 
 	private final ExecutorService settingsLoadExecutor = Executors.newFixedThreadPool(4, runnable ->
 	{
@@ -240,8 +204,6 @@ public final class SettingsController {
 		fxmlReady = true;
 		bindDirectoryRows();
 		configureSettingsSemanticButtons();
-		configureUserManagementSemanticButtons();
-		configureUserManagementTable();
 		configureContactClassifications();
 		configureOrganizationTypes();
 		configureCaseTeamRoles();
@@ -264,7 +226,7 @@ public final class SettingsController {
 		manageOrganizationTypesButton = bind(organizationTypesRow, this::onManageOrganizationTypes);
 		viewAuditLogButton = bind(auditLogRow, this::onViewAuditLog);
 		bind(notificationPreferencesRow, event -> toggleInline(notificationPreferencesContent, notificationPreferencesRow, false));
-		bind(userManagementRow, event -> toggleInline(userAdministrationSection, userManagementRow, true));
+		bind(userManagementRow, this::onManageUsers);
 		bind(caseDateMappingsRow, event -> {
 			boolean opening = !caseDateRoleMappingsContent.isManaged();
 			toggleInline(caseDateRoleMappingsContent, caseDateMappingsRow, false);
@@ -277,11 +239,10 @@ public final class SettingsController {
 		return row.getActionButton();
 	}
 
-	private void toggleInline(VBox content, SettingsManagementRow row, boolean loadUsers) {
+	private void toggleInline(VBox content, SettingsManagementRow row, boolean ignored) {
 		boolean show = !content.isManaged();
 		setVisibleManaged(content, show);
 		row.setActionText(show ? "Close" : "Open");
-		if (show && loadUsers) loadManagedUsersAsync(null);
 	}
 
 	private void configureCustomDictionary() {
@@ -309,16 +270,6 @@ public final class SettingsController {
 		if (manageRequestFieldsButton != null) ControlStyles.apply(manageRequestFieldsButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		if (manageContactClassificationsButton != null) ControlStyles.apply(manageContactClassificationsButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		if (manageCustomDictionaryButton != null) ControlStyles.apply(manageCustomDictionaryButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
-	}
-
-	private void configureUserManagementSemanticButtons() {
-		ControlStyles.apply(addUserButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
-		ControlStyles.apply(editUserButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
-		ControlStyles.apply(deactivateUserButton, ControlStyles.Purpose.DANGER, ControlStyles.Size.STANDARD);
-		ControlStyles.apply(reactivateUserButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
-		ControlStyles.apply(resetPasswordButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
-		ControlStyles.apply(refreshUsersButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.STANDARD);
-		ControlStyles.apply(removeUserButton, ControlStyles.Purpose.DANGER, ControlStyles.Size.STANDARD);
 	}
 
 	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService,
@@ -1431,477 +1382,12 @@ public final class SettingsController {
 	}
 
 	@FXML
-	private void onAddUser() {
-		if (!isAdminUser()) {
-			AppDialogs.showError(null, "Add User", "Only admin users can create users.");
-			return;
-		}
-		showAddUserDialog().ifPresent(request ->
-		{
-			try {
-				userDao.createUser(request);
-				loadManagedUsersAsync(null);
-				AppDialogs.showInfo(null, "Add User", "User added.");
-			} catch (RuntimeException ex) {
-				AppDialogs.showError(null, "Add User", rootMessage(ex));
-			}
-		});
-	}
-
-	private Optional<UserDao.UserCreateRequest> showAddUserDialog() {
-		Dialog<UserDao.UserCreateRequest> dialog = new Dialog<>();
-		dialog.setTitle("Add User");
-		AppDialogs.applySecondaryDialogShell(dialog, "Add User");
-		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
-		TextField firstName = new TextField();
-		TextField lastName = new TextField();
-		TextField email = new TextField();
-		Label emailValidation = new Label("");
-		emailValidation.getStyleClass().add("dialog-error-text");
-		email.focusedProperty().addListener((obs, oldValue, focused) ->
-		{
-			if (!focused)
-				validateAddUserEmail(email, emailValidation);
-		});
-		PasswordField password = new PasswordField();
-		TextField initials = new TextField();
-		ColorPicker colorPicker = new ColorPicker(DEFAULT_STATUS_COLOR);
-		CheckBox attorney = new CheckBox("Attorney");
-		CheckBox admin = new CheckBox("Admin");
-		GridPane grid = new GridPane();
-		grid.setHgap(8);
-		grid.setVgap(8);
-		grid.add(new Label("First Name"), 0, 0);
-		grid.add(firstName, 1, 0);
-		grid.add(new Label("Last Name"), 0, 1);
-		grid.add(lastName, 1, 1);
-		grid.add(new Label("Email"), 0, 2);
-		grid.add(email, 1, 2);
-		grid.add(emailValidation, 1, 3);
-		grid.add(new Label("Temporary Password"), 0, 4);
-		grid.add(password, 1, 4);
-		grid.add(new Label("Initials"), 0, 5);
-		grid.add(initials, 1, 5);
-		grid.add(new Label("Color"), 0, 6);
-		grid.add(colorPicker, 1, 6);
-		grid.add(attorney, 1, 7);
-		grid.add(admin, 1, 8);
-		dialog.getDialogPane().setContent(grid);
-		dialog.setResultConverter(button ->
-		{
-			if (button != ButtonType.OK)
-				return null;
-			String duplicateMessage = validateAddUserEmail(email, emailValidation);
-			if (!duplicateMessage.isBlank())
-				throw new IllegalArgumentException(duplicateMessage);
-			return new UserDao.UserCreateRequest(
-					trim(firstName.getText()),
-					trim(lastName.getText()),
-					trim(email.getText()),
-					password.getText(),
-					fxColorToDb(colorPicker.getValue()),
-					trim(initials.getText()),
-					attorney.isSelected(),
-					admin.isSelected());
-		});
-		try {
-			return dialog.showAndWait();
-		} catch (RuntimeException ex) {
-			AppDialogs.showError(dialog.getOwner(), "Add User", rootMessage(ex));
-			return Optional.empty();
-		}
-	}
-
-	private String validateAddUserEmail(TextField emailField, Label emailValidation) {
-		String normalized = UserDao.normalizeEmail(trim(emailField == null ? null : emailField.getText()));
-		if (normalized.isBlank() || userDao == null) {
-			if (emailValidation != null)
-				emailValidation.setText("");
-			return "";
-		}
-		try {
-			UserDao.ExistingEmailRow existing = userDao.findExistingEmailForCurrentTenant(normalized);
-			String message = existing == null ? "" : UserDao.duplicateEmailMessage(existing.deleted());
-			if (emailValidation != null)
-				emailValidation.setText(message);
-			return message;
-		} catch (RuntimeException ex) {
-			String message = rootMessage(ex);
-			if (emailValidation != null)
-				emailValidation.setText(message);
-			return message;
-		}
-	}
-
-	private void applyUserFilter() {
-		if (userManagementTable == null)
-			return;
-		String q = userSearchField == null ? "" : trim(userSearchField.getText()).toLowerCase(java.util.Locale.ROOT);
-		List<UserManagementViewRow> filtered = managedUserRows.stream().filter(r -> q.isBlank() || r.searchText().contains(q)).toList();
-		userManagementTable.getItems().setAll(filtered);
-		if (filtered.isEmpty())
-			setUserManagementMessage(managedUserRows.isEmpty() ? "No users exist for this tenant." : "No users match the current search.");
-	}
-
-	@FXML
-	private void onRefreshUsers() {
-		loadManagedUsersAsync(null);
-	}
-
-	@FXML
-	private void onRemoveUserFromTenant() {
-		UserManagementViewRow selected = selectedManagedUser();
-		if (selected == null || userMutationRunning)
-			return;
-		String warning = "They will no longer be able to sign in and will disappear from User Management and assignment lists. Historical records will be preserved.";
-		if (!AppDialogs.showConfirmation(null, "Remove from Tenant", "Remove " + selected.name() + " from this tenant?", warning, "Remove from Tenant",
-				AppDialogs.DialogActionKind.DANGER))
-			return;
-		userMutationRunning = true;
-		updateUserActionButtons(selected);
-		setUserManagementMessage("Removing user from tenant…");
-		int removedId = selected.id();
-		int generation = ++userManagementLoadGeneration;
-		settingsLoadExecutor.submit(() ->
-		{
-			try {
-				userDao.removeUserFromTenant(removedId, selected.rowVer());
-				Platform.runLater(() ->
-				{
-					if (generation != userManagementLoadGeneration)
-						return;
-					userMutationRunning = false;
-					managedUserRows.removeIf(r -> r.id() == removedId);
-					applyUserFilter();
-					userManagementTable.getSelectionModel().clearSelection();
-					updateUserActionButtons(null);
-					setUserManagementMessage("User removed from tenant.");
-					loadManagedUsersAsync("User removed from tenant.");
-				});
-			} catch (RuntimeException ex) {
-				Platform.runLater(() ->
-				{
-					if (generation != userManagementLoadGeneration)
-						return;
-					userMutationRunning = false;
-					updateUserActionButtons(selected);
-					AppDialogs.showError(null, "Remove from Tenant", rootMessage(ex));
-					setUserManagementMessage(rootMessage(ex));
-				});
-			}
-		});
-	}
-
-	@FXML
-	private void onEditUser() {
-		UserManagementViewRow selected = selectedManagedUser();
-		if (selected == null || userMutationRunning)
-			return;
-		showEditUserDialog(selected).ifPresent(request ->
-		{
-			userMutationRunning = true;
-			updateUserActionButtons(selected);
-			setUserManagementMessage("Saving changes…");
-			settingsLoadExecutor.submit(() ->
-			{
-				try {
-					var result = userDao.updateManagedUser(request);
-					Platform.runLater(() ->
-					{
-						userMutationRunning = false;
-						loadManagedUsersAsync(result.changed() ? "User updated." : "No changes to save.");
-					});
-				} catch (RuntimeException ex) {
-					Platform.runLater(() ->
-					{
-						userMutationRunning = false;
-						updateUserActionButtons(selected);
-						AppDialogs.showError(null, "Edit User", rootMessage(ex));
-						setUserManagementMessage(rootMessage(ex));
-					});
-				}
-			});
-		});
-	}
-
-	private Optional<UserDao.UserUpdateRequest> showEditUserDialog(UserManagementViewRow row) {
-		Dialog<UserDao.UserUpdateRequest> d = new Dialog<>();
-		d.setTitle("Edit User");
-		AppDialogs.applySecondaryDialogShell(d, "Edit User");
-		ButtonType save = new ButtonType("Save Changes", javafx.scene.control.ButtonBar.ButtonData.OK_DONE), cancel = new ButtonType("Cancel",
-				javafx.scene.control.ButtonBar.ButtonData.CANCEL_CLOSE);
-		d.getDialogPane().getButtonTypes().setAll(save, cancel);
-		TextField first = ControlStyles.formControl(new TextField(row.firstName())), last = ControlStyles.formControl(new TextField(row.lastName())), email = ControlStyles
-				.formControl(new TextField(row.email())), phone = ControlStyles.formControl(new TextField(row.phone())), initials = ControlStyles.formControl(new TextField(row
-						.initials()));
-		ColorPicker color = ControlStyles.formControl(new ColorPicker(dbColorToFx(row.color())));
-		CheckBox attorney = ControlStyles.formControl(new CheckBox("Attorney — eligible for attorney assignments")), admin = ControlStyles.formControl(new CheckBox(
-				"Administrator — may manage tenant settings and users"));
-		attorney.setSelected(row.attorney());
-		admin.setSelected(row.admin());
-		GridPane g = new GridPane();
-		g.setHgap(12);
-		g.setVgap(10);
-		g.add(new Label("Identity"), 0, 0, 2, 1);
-		g.add(new Label("First name"), 0, 1);
-		g.add(first, 1, 1);
-		g.add(new Label("Last name"), 0, 2);
-		g.add(last, 1, 2);
-		g.add(new Label("Email / login"), 0, 3);
-		g.add(email, 1, 3);
-		g.add(new Label("Phone"), 0, 4);
-		g.add(phone, 1, 4);
-		g.add(new Label("Initials"), 0, 5);
-		g.add(initials, 1, 5);
-		g.add(new Label("User color"), 0, 6);
-		g.add(color, 1, 6);
-		g.add(new Label("Application roles"), 0, 7, 2, 1);
-		g.add(attorney, 1, 8);
-		g.add(admin, 1, 9);
-		g.add(new Label("User ID " + row.id() + " · Status " + row.getStatus() + " (managed separately)"), 0, 10, 2, 1);
-		d.getDialogPane().setContent(g);
-		ControlStyles.apply((ButtonBase) d.getDialogPane().lookupButton(save), ControlStyles.Purpose.PRIMARY);
-		ControlStyles.apply((ButtonBase) d.getDialogPane().lookupButton(cancel), ControlStyles.Purpose.SECONDARY);
-		Node saveButton = d.getDialogPane().lookupButton(save);
-		saveButton.addEventFilter(ActionEvent.ACTION, e ->
-		{
-			boolean invalid = trim(first.getText()).isBlank() || trim(last.getText()).isBlank() || !UserDao.normalizeEmail(email.getText()).contains("@");
-			ControlStyles.setInvalid(first, trim(first.getText()).isBlank());
-			ControlStyles.setInvalid(last, trim(last.getText()).isBlank());
-			ControlStyles.setInvalid(email, !UserDao.normalizeEmail(email.getText()).contains("@"));
-			if (invalid)
-				e.consume();
-		});
-		d.setResultConverter(b ->
-		{
-			if (b != save)
-				return null;
-			java.util.Set<Integer> roles = new java.util.HashSet<>();
-			if (admin.isSelected())
-				roles.add(com.shale.core.semantics.RoleSemantics.ROLE_ADMIN);
-			if (attorney.isSelected())
-				roles.add(com.shale.core.semantics.RoleSemantics.ROLE_ATTORNEY);
-			return new UserDao.UserUpdateRequest(row.id(), row.rowVer(), first.getText(), last.getText(), email.getText(), phone.getText(), initials.getText(), fxColorToDb(color
-					.getValue()), roles);
-		});
-		return d.showAndWait();
-	}
-
-	@FXML
-	private void onToggleInactiveUsers() {
-		loadManagedUsersAsync(null);
-	}
-
-	@FXML
-	private void onDeactivateUser() {
-		UserManagementViewRow selected = selectedManagedUser();
-		if (selected == null)
-			return;
-		boolean confirmed = AppDialogs.showConfirmation(null, "Deactivate User", "Deactivate this user?", "This will disable their access while preserving historical records.",
-				"Deactivate", AppDialogs.DialogActionKind.DANGER);
-		if (!confirmed)
-			return;
-		try {
-			userDao.deactivateUser(selected.id());
-			loadManagedUsersAsync("User deactivated.");
-			setUserManagementMessage("User deactivated.");
-		} catch (RuntimeException ex) {
-			AppDialogs.showError(null, "Deactivate User", rootMessage(ex));
-		}
-	}
-
-	@FXML
-	private void onReactivateUser() {
-		UserManagementViewRow selected = selectedManagedUser();
-		if (selected == null)
-			return;
-		try {
-			userDao.reactivateUser(selected.id());
-			loadManagedUsersAsync("User reactivated.");
-			setUserManagementMessage("User reactivated.");
-		} catch (RuntimeException ex) {
-			AppDialogs.showError(null, "Reactivate User", rootMessage(ex));
-		}
-	}
-
-	@FXML
-	private void onResetUserPassword() {
-		UserManagementViewRow selected = selectedManagedUser();
-		if (selected == null)
-			return;
-		Dialog<String> dialog = new Dialog<>();
-		dialog.setTitle("Reset Password");
-		AppDialogs.applySecondaryDialogShell(dialog, "Reset Password");
-		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
-		PasswordField password = new PasswordField();
-		PasswordField confirm = new PasswordField();
-		Label validation = new Label("");
-		validation.getStyleClass().add("dialog-error-text");
-		password.textProperty().addListener((obs, oldValue, newValue) -> validation.setText(""));
-		confirm.textProperty().addListener((obs, oldValue, newValue) -> validation.setText(""));
-		GridPane grid = new GridPane();
-		grid.setHgap(8);
-		grid.setVgap(8);
-		grid.add(new Label("New Password"), 0, 0);
-		grid.add(password, 1, 0);
-		grid.add(new Label("Confirm Password"), 0, 1);
-		grid.add(confirm, 1, 1);
-		grid.add(validation, 1, 2);
-		dialog.getDialogPane().setContent(grid);
-		Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
-		okButton.addEventFilter(javafx.event.ActionEvent.ACTION, event ->
-		{
-			String message = resetPasswordValidationMessage(password.getText(), confirm.getText());
-			if (!message.isBlank()) {
-				validation.setText(message);
-				event.consume();
-			}
-		});
-		dialog.setResultConverter(button -> button == ButtonType.OK ? password.getText() : null);
-		try {
-			dialog.showAndWait().ifPresent(newPassword ->
-			{
-				boolean confirmed = AppDialogs.showConfirmation(null, "Reset Password", "Reset password for " + selected.name() + "?", "Password access will change immediately.",
-						"Reset", AppDialogs.DialogActionKind.PRIMARY);
-				if (!confirmed)
-					return;
-				userDao.resetPassword(selected.id(), newPassword);
-				AppDialogs.showInfo(null, "Reset Password", "Password successfully updated.");
-			});
-		} catch (RuntimeException ex) {
-			AppDialogs.showError(null, "Reset Password", rootMessage(ex));
-		}
-	}
-
-	static String resetPasswordValidationMessage(String password, String confirmPassword) {
-		if (password == null || password.isBlank())
-			return "Password is required.";
-		if (confirmPassword == null || confirmPassword.isBlank())
-			return "Confirm password is required.";
-		if (!Objects.equals(password, confirmPassword))
-			return "Passwords do not match.";
-		return "";
-	}
-
-	private void configureUserManagementTable() {
-		if (userManagementTable == null)
-			return;
-		userNameColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue()));
-		userNameColumn.setCellFactory(column -> new TableCell<>() {
-			@Override
-			protected void updateItem(UserManagementViewRow row, boolean empty) {
-				super.updateItem(row, empty);
-				setText(null);
-				setGraphic(null);
-				pseudoClassStateChanged(PseudoClass.getPseudoClass("inactive"), false);
-				if (empty || row == null)
-					return;
-				UserCard card = userManagementCardFactory.create(
-						new UserCardModel(row.id(), row.name(), row.color(), row.initials()),
-						UserCardFactory.Variant.MINI);
-				card.setInactive(row.deleted());
-				card.setMaxWidth(Double.MAX_VALUE);
-				setGraphic(card);
-			}
-		});
-		userEmailColumn.setCellValueFactory(new PropertyValueFactory<>("email"));
-		userInitialsColumn.setCellValueFactory(new PropertyValueFactory<>("initials"));
-		userRolesColumn.setCellValueFactory(new PropertyValueFactory<>("roles"));
-		userStatusColumn.setCellValueFactory(new PropertyValueFactory<>("status"));
-		userManagementTable.getSelectionModel().selectedItemProperty().addListener((obs, oldRow, newRow) -> updateUserActionButtons(newRow));
-		if (userSearchField != null)
-			userSearchField.textProperty().addListener((obs, o, n) -> applyUserFilter());
-		userManagementTable.setOnMouseClicked(e ->
-		{
-			if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2 && selectedManagedUser() != null)
-				onEditUser();
-		});
-		userManagementTable.setOnKeyPressed(e ->
-		{
-			if (e.getCode() == KeyCode.ENTER && userManagementTable.getSelectionModel().getSelectedItem() != null) {
-				onEditUser();
-				e.consume();
-			}
-		});
-	}
-
-	private void loadManagedUsers() {
-		loadManagedUsersAsync(null);
-	}
-
-	private void loadManagedUsersAsync(String successMessage) {
-		if (userDao == null || userManagementTable == null || !isAdminUser())
-			return;
-		final int generation = ++userManagementLoadGeneration;
-		boolean includeInactive = showInactiveUsersCheck != null && showInactiveUsersCheck.isSelected();
-		int selectedId = userManagementTable.getSelectionModel().getSelectedItem() == null ? 0 : userManagementTable.getSelectionModel().getSelectedItem().id();
-		updateUserActionButtons(userManagementTable.getSelectionModel().getSelectedItem());
-		setUserManagementMessage("Loading users…");
-		settingsLoadExecutor.submit(() ->
-		{
-			try {
-				List<UserManagementViewRow> rows = new ArrayList<>();
-				for (UserDao.UserManagementRow row : userDao.listUsersForManagement(includeInactive))
-					rows.add(new UserManagementViewRow(row));
-				Platform.runLater(() ->
-				{
-					if (generation != userManagementLoadGeneration)
-						return;
-					managedUserRows.clear();
-					managedUserRows.addAll(rows);
-					applyUserFilter();
-					if (selectedId > 0)
-						managedUserRows.stream().filter(r -> r.id() == selectedId).findFirst().ifPresent(userManagementTable.getSelectionModel()::select);
-					updateUserActionButtons(userManagementTable.getSelectionModel().getSelectedItem());
-					setUserManagementMessage(successMessage != null && !successMessage.isBlank() ? successMessage : rows.isEmpty() ? "No users found for this tenant." : "");
-				});
-			} catch (RuntimeException ex) {
-				System.err.println("Failed to load Settings users: " + rootMessage(ex));
-				Platform.runLater(() ->
-				{
-					if (generation != userManagementLoadGeneration)
-						return;
-					userManagementTable.getItems().clear();
-					updateUserActionButtons(null);
-					setUserManagementMessage("Failed to load users. " + rootMessage(ex));
-				});
-			}
-		});
-	}
-
-	private UserManagementViewRow selectedManagedUser() {
-		UserManagementViewRow selected = userManagementTable == null ? null : userManagementTable.getSelectionModel().getSelectedItem();
-		if (selected == null)
-			setUserManagementMessage("Select a user first.");
-		return selected;
-	}
-
-	private void updateUserActionButtons(UserManagementViewRow selected) {
-		boolean has = selected != null && !selected.removed() && !userMutationRunning;
-		boolean self = has && appState != null && appState.getUserId() != null && selected.id() == appState.getUserId();
-		if (editUserButton != null)
-			editUserButton.setDisable(!has);
-		if (deactivateUserButton != null)
-			deactivateUserButton.setDisable(!has || selected.deleted() || self);
-		if (reactivateUserButton != null)
-			reactivateUserButton.setDisable(!has || !selected.deleted());
-		if (resetPasswordButton != null)
-			resetPasswordButton.setDisable(!has || selected.deleted());
-		if (removeUserButton != null)
-			removeUserButton.setDisable(!has || self);
-		if (addUserButton != null)
-			addUserButton.setDisable(userMutationRunning);
-		if (refreshUsersButton != null)
-			refreshUsersButton.setDisable(userMutationRunning);
-	}
-
-	private void setUserManagementMessage(String message) {
-		if (userManagementStatusLabel != null)
-			userManagementStatusLabel.setText(message == null ? "" : message);
-	}
-
-	private static String trim(String value) {
-		return value == null ? "" : value.trim();
+	private void onManageUsers(ActionEvent event) {
+		if (!hasAdminContext() || userDao == null) return;
+		final int tenantId = requireTenantId();
+		final int actorUserId = requireActorUserId();
+		new UserManagementLauncher(userDao, settingsLoadExecutor)
+				.open(settingsWindow(event), tenantId, actorUserId, result -> { });
 	}
 
 	private void setMaterialTypeMessage(String message) {
@@ -2347,94 +1833,6 @@ public final class SettingsController {
 		}
 	}
 
-	public static final class UserManagementViewRow {
-		private final UserDao.UserManagementRow row;
-
-		UserManagementViewRow(UserDao.UserManagementRow row) {
-			this.row = row;
-		}
-
-		public int getId() {
-			return row.id();
-		}
-
-		public int id() {
-			return row.id();
-		}
-
-		public String getName() {
-			return safe(row.name()) + "  (#" + row.id() + ")";
-		}
-
-		public String name() {
-			return safe(row.name());
-		}
-
-		public String getEmail() {
-			return safe(row.email());
-		}
-
-		public String email() {
-			return getEmail();
-		}
-
-		public String firstName() {
-			return safe(row.firstName());
-		}
-
-		public String lastName() {
-			return safe(row.lastName());
-		}
-
-		public String phone() {
-			return safe(row.phone());
-		}
-
-		public String initials() {
-			return safe(row.initials());
-		}
-
-		public String color() {
-			return safe(row.color());
-		}
-
-		public String getInitials() {
-			return initials();
-		}
-
-		public String getRoles() {
-			return (row.admin() ? "Administrator" : "") + (row.admin() && row.attorney() ? ", " : "") + (row.attorney() ? "Attorney" : "");
-		}
-
-		public String getStatus() {
-			return row.deleted() ? "Inactive" : "Active";
-		}
-
-		public boolean deleted() {
-			return row.deleted();
-		}
-
-		public boolean removed() {
-			return row.removed();
-		}
-
-		public boolean admin() {
-			return row.admin();
-		}
-
-		public boolean attorney() {
-			return row.attorney();
-		}
-
-		public byte[] rowVer() {
-			return row.rowVer() == null ? null : row.rowVer().clone();
-		}
-
-		String searchText() {
-			return (name() + " " + email() + " " + initials() + " " + getRoles() + " " + id()).toLowerCase(java.util.Locale.ROOT);
-		}
-	}
-
 	private void loadFromPreferences() {
 		if (notificationPreferencesService == null) {
 			return;
@@ -2484,8 +1882,6 @@ public final class SettingsController {
 		return appState != null && appState.isAdmin();
 	}
 
-	@FXML
-	private VBox userAdministrationSection;
 
 	private boolean hasAdminContext() {
 		return isAdminUser() && appState.getShaleClientId() != null && appState.getShaleClientId() > 0
@@ -2496,9 +1892,8 @@ public final class SettingsController {
 		boolean admin = isAdminUser();
 		setVisibleManaged(auditLogRow, admin);
 		setVisibleManaged(caseDateMappingsRow, admin && caseService != null);
-		setVisibleManaged(userManagementRow, admin && userDao != null);
+		setVisibleManaged(userManagementRow, hasAdminContext() && userDao != null);
 		if (!admin) {
-			setVisibleManaged(userAdministrationSection, false);
 			setVisibleManaged(caseDateRoleMappingsContent, false);
 		}
 		boolean context = hasAdminContext();
