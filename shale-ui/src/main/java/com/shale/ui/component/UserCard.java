@@ -6,6 +6,8 @@ import javafx.geometry.Insets;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.Tooltip;
 import javafx.css.PseudoClass;
 import javafx.scene.paint.Color;
 import com.shale.ui.util.ColorUtil;
@@ -27,6 +29,7 @@ public class UserCard extends HBox {
     private boolean hovered;
 
     public UserCard() {
+        nameLabel.setId("user-card-name-label");
         buildUiMiniDefaults();
         wireEvents();
     }
@@ -40,7 +43,24 @@ public class UserCard extends HBox {
     }
 
     public void setName(String name) {
-        nameLabel.setText(name == null || name.isBlank() ? "—" : name);
+        String displayName = name == null || name.isBlank() ? "—" : name;
+        nameLabel.setText(displayName);
+        if (nameLabel.getTooltip() != null)
+            nameLabel.getTooltip().setText(displayName);
+    }
+
+    /**
+     * Opts a mini card into width supplied by a compact host such as a table cell.
+     * Other shared-card call sites retain their intrinsic sizing.
+     */
+    public void useAvailableWidth() {
+        setMinWidth(0);
+        setMaxWidth(Double.MAX_VALUE);
+        nameLabel.setMinWidth(0);
+        nameLabel.setMaxWidth(Double.MAX_VALUE);
+        nameLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+        nameLabel.setTooltip(new Tooltip(nameLabel.getText()));
+        HBox.setHgrow(nameLabel, Priority.ALWAYS);
     }
 
     public void setBackgroundCssColor(String css) {
