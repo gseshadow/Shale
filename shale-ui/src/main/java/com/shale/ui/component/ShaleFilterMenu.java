@@ -12,6 +12,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.css.PseudoClass;
 import javafx.stage.Popup;
+import com.shale.ui.theme.ThemeManager;
 
 /** A Shale-owned multi-select filter: both trigger and popup avoid native menu chrome. */
 public final class ShaleFilterMenu extends Button {
@@ -32,11 +33,16 @@ public final class ShaleFilterMenu extends Button {
         popup.getContent().add(optionRows);
         popup.setAutoHide(true);
         popup.setOnShown(event -> pseudoClassStateChanged(SHOWING, true));
-        popup.setOnHidden(event -> pseudoClassStateChanged(SHOWING, false));
+        popup.setOnHidden(event -> {
+            pseudoClassStateChanged(SHOWING, false);
+            ThemeManager.application().unregister(optionRows);
+        });
         setOnAction(event -> {
             if (popup.isShowing()) popup.hide();
             else {
-                optionRows.getStylesheets().setAll(getScene().getStylesheets());
+                List<String> inherited = getScene().getStylesheets().stream().toList();
+                optionRows.getStylesheets().setAll(inherited);
+                ThemeManager.application().register(optionRows);
                 var anchor = localToScreen(0, getHeight());
                 popup.show(this, anchor.getX(), anchor.getY());
             }

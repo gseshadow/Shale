@@ -538,8 +538,7 @@ public final class TaskDetailDialog {
         stage.setResizable(true);
 
         Scene scene = new Scene(root);
-        scene.getStylesheets().add(Objects.requireNonNull(
-                TaskDetailDialog.class.getResource("/css/app.css")).toExternalForm());
+        com.shale.ui.theme.ThemeManager.application().register(scene);
         stage.setScene(scene);
         WindowSizingUtil.sizeModalStage(stage, owner, dialogWidth, dialogHeight, minWidth, minHeight);
         String context = safe(timingContext).isBlank() ? "UNKNOWN" : timingContext;

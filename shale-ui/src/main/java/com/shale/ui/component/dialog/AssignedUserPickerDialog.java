@@ -84,7 +84,7 @@ public final class AssignedUserPickerDialog {
         root.setMaxSize(PICKER_PREF_WIDTH, PICKER_MAX_HEIGHT);
 
         Scene scene = new Scene(root, PICKER_PREF_WIDTH, targetHeight);
-        scene.getStylesheets().add(Objects.requireNonNull(cssAnchor.getResource("/css/app.css")).toExternalForm());
+        com.shale.ui.theme.ThemeManager.application().register(scene);
         stage.setScene(scene);
         stage.setResizable(false);
         stage.setMinHeight(PICKER_MIN_HEIGHT);

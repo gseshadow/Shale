@@ -141,7 +141,7 @@ public final class CaseDateOccurrenceDialog {
         VBox caseSection = createCaseSection(associatedCase, navigation::activate);
         VBox body = new VBox(12, caseSection, grid, error, footer); body.setPadding(new Insets(16));
         Scene scene = new Scene(AppDialogs.createSecondaryWindowShell(stage, title, () -> { if (!submitting.get()) stage.close(); }, body));
-        scene.getStylesheets().add(Objects.requireNonNull(CaseDateOccurrenceDialog.class.getResource("/css/app.css")).toExternalForm());
+        com.shale.ui.theme.ThemeManager.application().register(scene);
         stage.setScene(scene); stage.showAndWait();
     }
     private static void setMutationControlsDisabled(boolean disabled, Button save, Button remove, Button cancel,

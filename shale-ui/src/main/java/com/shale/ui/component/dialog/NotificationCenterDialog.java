@@ -216,8 +216,7 @@ public final class NotificationCenterDialog {
 		installResizeHandlers(stage, root);
 
 		Scene scene = new Scene(root, DEFAULT_WIDTH, DEFAULT_HEIGHT);
-		scene.getStylesheets().add(Objects.requireNonNull(
-				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
+		com.shale.ui.theme.ThemeManager.application().register(scene);
 		stage.setScene(scene);
 		long renderElapsedMs = (System.nanoTime() - openStartNanos) / 1_000_000;
 		PerfLog.debug(log, "PERF notifications.center.open.renderReady count={} groups={} elapsedMs={}",
@@ -514,8 +513,7 @@ public final class NotificationCenterDialog {
 				dialogStage::close,
 				body);
 		Scene scene = new Scene(root);
-		scene.getStylesheets().add(Objects.requireNonNull(
-				NotificationCenterDialog.class.getResource("/css/app.css")).toExternalForm());
+		com.shale.ui.theme.ThemeManager.application().register(scene);
 		dialogStage.setScene(scene);
 		dialogStage.showAndWait();
 		return confirmed[0];
