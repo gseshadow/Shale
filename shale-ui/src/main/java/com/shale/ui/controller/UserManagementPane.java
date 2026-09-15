@@ -3,7 +3,17 @@ package com.shale.ui.controller;
 import java.util.*; import java.util.concurrent.Executor; import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger; import org.slf4j.LoggerFactory;
 import com.shale.data.dao.UserDao; import com.shale.ui.component.*; import com.shale.ui.component.dialog.AppDialogs; import com.shale.ui.component.factory.UserCardFactory; import com.shale.ui.component.factory.UserCardFactory.UserCardModel; import com.shale.ui.util.ControlStyles;
-import javafx.application.Platform; import javafx.beans.property.ReadOnlyObjectWrapper; import javafx.geometry.Pos; import javafx.scene.Node; import javafx.scene.control.*; import javafx.scene.control.cell.PropertyValueFactory; import javafx.scene.input.*; import javafx.scene.layout.*; import javafx.scene.paint.Color;
+import javafx.application.Platform;
+import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.css.PseudoClass;
+import javafx.event.ActionEvent;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.input.*;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 
 /** Feature-owned user administration surface. */
 public final class UserManagementPane {
@@ -354,6 +364,10 @@ public final class UserManagementPane {
 
     private static String trim(String value) {
 		return value == null ? "" : value.trim();
+	}
+
+	private static String safe(String value) {
+		return value == null ? "" : value;
 	}
 
     public static final class UserManagementViewRow {
