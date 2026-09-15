@@ -10,9 +10,9 @@ final class SettingsCaseDateTypeAdministrationTest {
     private static final String FXML = read("src/main/resources/fxml/settings.fxml");
 
     @Test void settingsUsesCompactCaseDatesLauncherInsteadOfEagerDefinitionList() {
-        assertTrue(FXML.contains("text=\"Case Dates\""));
-        assertTrue(FXML.contains("fx:id=\"manageCaseDateTypesButton\""));
-        assertTrue(FXML.contains("onAction=\"#onManageCaseDateTypes\""));
+        assertTrue(FXML.contains("title=\"Case Dates\""));
+        assertTrue(FXML.contains("fx:id=\"caseDatesRow\""));
+        assertTrue(SETTINGS.contains("bind(caseDatesRow, this::onManageCaseDateTypes)"));
         assertFalse(FXML.contains("fx:id=\"caseDateTypeCardsContainer\""));
         assertFalse(FXML.contains("fx:id=\"caseDateTypeActionRow\""));
         assertFalse(SETTINGS.replaceAll("\\s+", "").contains("loadAdminSectionsAsync(null);"));
@@ -20,7 +20,7 @@ final class SettingsCaseDateTypeAdministrationTest {
     }
 
     @Test void semanticMappingsRemainASeparateSettingsConcern() {
-        assertTrue(FXML.contains("Protected Case Date mappings"));
+        assertTrue(FXML.contains("Protected Case Date Mappings"));
         assertTrue(FXML.contains("fx:id=\"caseDateRoleMappingsContainer\""));
         assertTrue(SETTINGS.contains("loadCaseDateRoleMappingsAsync"));
         assertTrue(SETTINGS.contains("listCaseDateSemanticRoleMappings"));

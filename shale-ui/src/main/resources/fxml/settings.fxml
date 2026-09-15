@@ -1,203 +1,78 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
+<?import com.shale.ui.component.SettingsManagementRow?>
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.Separator?>
-<?import javafx.scene.control.TextField?>
-<?import javafx.scene.control.ScrollPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
 
-<ScrollPane xmlns="http://javafx.com/javafx/21"
-            xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.shale.ui.controller.SettingsController"
-            fitToWidth="true"
-            hbarPolicy="NEVER"
-            vbarPolicy="AS_NEEDED"
-            styleClass="surface-scroll">
-    <content>
-        <VBox spacing="14" styleClass="cases-content-surface glass-panel data-surface">
-            <padding>
-                <Insets top="16" right="16" bottom="16" left="16"/>
-            </padding>
+<ScrollPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.shale.ui.controller.SettingsController" fitToWidth="true"
+            hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll">
+  <content>
+    <VBox spacing="8" styleClass="cases-content-surface glass-panel data-surface">
+      <padding><Insets top="16" right="16" bottom="16" left="16"/></padding>
+      <Label text="Settings" styleClass="search-title"/>
+      <Label text="Choose an area to review or manage." styleClass="search-summary-text" wrapText="true"/>
 
-            <Label text="Notifications" styleClass="search-section-title"/>
-            <Label text="Control which notifications are generated and when they appear as banners."
-                   styleClass="search-summary-text" wrapText="true"/>
-
-            <VBox spacing="8" styleClass="strong-panel">
-                <padding>
-                    <Insets top="12" right="12" bottom="12" left="12"/>
-                </padding>
-                <Label text="Categories" styleClass="app-dialog-field-label"/>
-                <CheckBox fx:id="taskAssignedToMeCheck" text="Task assigned to me"/>
-                <CheckBox fx:id="taskOverdueCheck" text="Task overdue"/>
-                <CheckBox fx:id="taskDueTodayCheck" text="Task due today"/>
-                <CheckBox fx:id="taskDueTomorrowCheck" text="Task due tomorrow"/>
-                <CheckBox fx:id="appUpdatesCheck" text="App updates"/>
-                <CheckBox fx:id="connectivityCheck" text="Connectivity"/>
-            </VBox>
-
-            <VBox spacing="8" styleClass="strong-panel">
-                <padding>
-                    <Insets top="12" right="12" bottom="12" left="12"/>
-                </padding>
-                <Label text="Banner behavior" styleClass="app-dialog-field-label"/>
-                <CheckBox fx:id="taskOverdueBannerCheck" text="Task overdue banner"/>
-                <CheckBox fx:id="taskDueTodayBannerCheck" text="Task due today banner"/>
-                <CheckBox fx:id="appUpdatesBannerCheck" text="App updates banner"/>
-                <CheckBox fx:id="connectivityBannerCheck" text="Connectivity banner"/>
-            </VBox>
-
-            <Separator/>
-
-            <HBox spacing="10">
-                <Button fx:id="applyNotificationPreferencesButton" text="Apply" onAction="#onApplyNotificationPreferences"/>
-                <Button fx:id="resetNotificationPreferencesButton" text="Reset" onAction="#onResetNotificationPreferences"/>
-                <Label fx:id="notificationSettingsStatusLabel" styleClass="search-summary-text" wrapText="true">
-                    <HBox.margin>
-                        <Insets left="8"/>
-                    </HBox.margin>
-                </Label>
-            </HBox>
-
-            <Separator/>
-
-            <VBox fx:id="customDictionarySection" spacing="8" styleClass="strong-panel">
-                <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
-                <Label text="Custom Dictionary" styleClass="search-section-title"/>
-                <Label text="Manage words accepted by Shale’s spelling tools."
-                       styleClass="search-summary-text" wrapText="true"/>
-                <Button fx:id="manageCustomDictionaryButton" text="Manage" onAction="#onManageCustomDictionary"/>
-            </VBox>
-
-            <Separator/>
-
-            <VBox fx:id="caseStatusAdministrationSection" spacing="8" styleClass="strong-panel">
-                <padding>
-                    <Insets top="12" right="12" bottom="12" left="12"/>
-                </padding>
-                <Label text="Case Statuses" styleClass="search-section-title"/>
-                <Label text="Manage case statuses, colors, workflow state, and order."
-                       styleClass="search-summary-text" wrapText="true"/>
-                <Button fx:id="manageCaseStatusesButton" text="Manage" onAction="#onManageCaseStatuses"/>
-            </VBox>
-
-
-            <VBox fx:id="practiceAreaAdministrationSection" spacing="8" styleClass="strong-panel">
-                <padding>
-                    <Insets top="12" right="12" bottom="12" left="12"/>
-                </padding>
-                <Label text="Practice Areas" styleClass="search-section-title"/>
-                <Label text="Manage practice-area names, colors, and availability."
-                       styleClass="search-summary-text" wrapText="true"/>
-                <Button fx:id="managePracticeAreasButton" text="Manage" onAction="#onManagePracticeAreas"/>
-            </VBox>
-
-
-            <VBox fx:id="linkTypeAdministrationSection" spacing="8" styleClass="strong-panel">
-                <padding>
-                    <Insets top="12" right="12" bottom="12" left="12"/>
-                </padding>
-                <Label text="Link Types" styleClass="search-section-title"/>
-                <Label text="Manage case-link types, colors, and availability."
-                       styleClass="search-summary-text" wrapText="true"/>
-                <Button fx:id="manageLinkTypesButton" text="Manage" onAction="#onManageLinkTypes"/>
-            </VBox>
-
-
-            <VBox fx:id="caseTeamRoleAdministrationSection" spacing="8" styleClass="strong-panel">
-                <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
-                <Label text="Case Team Roles" styleClass="search-section-title"/>
-                <Label text="Manage team roles, colors, and availability." styleClass="search-summary-text" wrapText="true"/>
-                <Button fx:id="manageCaseTeamRolesButton" text="Manage" onAction="#onManageCaseTeamRoles"/>
-            </VBox>
-
-
-            <VBox fx:id="caseDateTypeAdministrationSection" spacing="8" styleClass="strong-panel">
-                <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
-                <Label text="Case Dates" styleClass="search-section-title"/>
-                <Label text="Manage date types, presentation, and protected mappings." styleClass="search-summary-text" wrapText="true"/>
-                <Button fx:id="manageCaseDateTypesButton" text="Manage" onAction="#onManageCaseDateTypes"/>
-            </VBox>
-
-            <VBox fx:id="caseDateRoleMappingsSection" spacing="8" styleClass="strong-panel">
-                <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
-                <Label text="Protected Case Date mappings" styleClass="search-section-title"/>
-                <Label text="Choose which custom type supplies each required compatibility date. Definition records are managed in the Case Dates window." styleClass="search-summary-text" wrapText="true"/>
-                <VBox fx:id="caseDateRoleMappingsContainer" spacing="8" styleClass="shale-density-card-compact"/>
-                <Label fx:id="caseDateTypeSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
-            </VBox>
-
-
-            <VBox fx:id="requestAdministrationSection" spacing="8" styleClass="strong-panel">
-                <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
-                <Label text="Request Fields" styleClass="search-section-title"/>
-                <Label text="Manage material types, request methods, and request statuses."
-                       styleClass="search-summary-text" wrapText="true"/>
-                <Button fx:id="manageRequestFieldsButton" text="Manage" onAction="#onManageRequestFields"/>
-            </VBox>
-
-
-			<VBox fx:id="contactClassificationAdministrationSection" spacing="8" styleClass="strong-panel">
-				<padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
-				<Label text="Contact Classifications" styleClass="search-section-title"/>
-				<Label text="Manage contact types, specialties, and credentials."
-					   styleClass="search-summary-text" wrapText="true"/>
-				<Button fx:id="manageContactClassificationsButton" text="Manage" onAction="#onManageContactClassifications"/>
-			</VBox>
-
-			<VBox fx:id="organizationTypeAdministrationSection" spacing="8" styleClass="strong-panel">
-				<padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
-				<Label text="Organization Types" styleClass="search-section-title"/>
-				<Label text="Manage organization types, colors, and availability." styleClass="search-summary-text" wrapText="true"/>
-				<Button fx:id="manageOrganizationTypesButton" text="Manage" onAction="#onManageOrganizationTypes"/>
-			</VBox>
-
-            <VBox fx:id="userAdministrationSection" spacing="8" styleClass="strong-panel">
-                <padding>
-                    <Insets top="12" right="12" bottom="12" left="12"/>
-                </padding>
-                <Label text="User Management" styleClass="search-section-title"/>
-                <Label text="Manage users for the current tenant. Tenant id is applied from your signed-in session."
-                       styleClass="search-summary-text" wrapText="true"/>
-                <HBox spacing="10" alignment="CENTER_LEFT">
-                    <TextField fx:id="userSearchField" promptText="Search name, email, initials, or role" styleClass="shale-form-control" HBox.hgrow="ALWAYS"/>
-                    <CheckBox fx:id="showInactiveUsersCheck" text="Show inactive users" onAction="#onToggleInactiveUsers" styleClass="shale-form-control"/>
-                    <Button fx:id="addUserButton" text="Add User" onAction="#onAddUser" styleClass="shale-control-button shale-control-primary shale-control-standard"/>
-                </HBox>
-                <TableView fx:id="userManagementTable" prefHeight="340" minHeight="240" fixedCellSize="36" styleClass="shale-table" VBox.vgrow="ALWAYS">
-                    <columns>
-                        <TableColumn fx:id="userNameColumn" text="Name" prefWidth="230" minWidth="190" maxWidth="300"/>
-                        <TableColumn fx:id="userEmailColumn" text="Email / login" prefWidth="230"/>
-                        <TableColumn fx:id="userInitialsColumn" text="Initials" prefWidth="70"/>
-                        <TableColumn fx:id="userRolesColumn" text="Roles" prefWidth="150"/>
-                        <TableColumn fx:id="userStatusColumn" text="Status" prefWidth="90"/>
-                    </columns>
-                </TableView>
-                <HBox spacing="8" alignment="CENTER_LEFT">
-                    <Button fx:id="editUserButton" text="Edit User" onAction="#onEditUser" styleClass="shale-control-button shale-control-secondary shale-control-standard" disable="true"/>
-                    <Button fx:id="deactivateUserButton" text="Deactivate User" onAction="#onDeactivateUser" styleClass="shale-control-button shale-control-danger shale-control-standard" disable="true"/>
-                    <Button fx:id="reactivateUserButton" text="Reactivate User" onAction="#onReactivateUser" styleClass="shale-control-button shale-control-secondary shale-control-standard" disable="true"/>
-                    <Button fx:id="resetPasswordButton" text="Reset Password" onAction="#onResetUserPassword" styleClass="shale-control-button shale-control-secondary shale-control-standard" disable="true"/>
-                    <Button fx:id="refreshUsersButton" text="Refresh" onAction="#onRefreshUsers" styleClass="shale-control-button shale-control-ghost shale-control-standard"/>
-                    <Button fx:id="removeUserButton" text="Remove from Tenant" onAction="#onRemoveUserFromTenant" styleClass="shale-control-button shale-control-danger shale-control-standard" disable="true"/>
-                    <Label fx:id="userManagementStatusLabel" styleClass="search-summary-text" wrapText="true" HBox.hgrow="ALWAYS"/>
-                </HBox>
-            </VBox>
-
-
-            <VBox fx:id="auditSection" spacing="8" styleClass="strong-panel">
-                <padding>
-                    <Insets top="12" right="12" bottom="12" left="12"/>
-                </padding>
-                <Label text="Audit" styleClass="app-dialog-field-label"/>
-                <Button fx:id="viewAuditLogButton"
-                        text="View Audit Log"
-                        onAction="#onViewAuditLog"/>
-            </VBox>
+      <VBox fx:id="personalGroup" styleClass="settings-directory-group">
+        <Label text="Personal" styleClass="search-section-title settings-group-title"/>
+        <SettingsManagementRow fx:id="notificationPreferencesRow" title="Notification Preferences"
+            description="Choose generated notifications and banner behavior." actionText="Open"/>
+        <VBox fx:id="notificationPreferencesContent" visible="false" managed="false" spacing="10" styleClass="settings-inline-content strong-panel">
+          <Label text="Categories" styleClass="app-dialog-field-label"/>
+          <FlowPane hgap="16" vgap="8">
+            <CheckBox fx:id="taskAssignedToMeCheck" text="Task assigned to me"/><CheckBox fx:id="taskOverdueCheck" text="Task overdue"/>
+            <CheckBox fx:id="taskDueTodayCheck" text="Task due today"/><CheckBox fx:id="taskDueTomorrowCheck" text="Task due tomorrow"/>
+            <CheckBox fx:id="appUpdatesCheck" text="App updates"/><CheckBox fx:id="connectivityCheck" text="Connectivity"/>
+          </FlowPane>
+          <Label text="Banner behavior" styleClass="app-dialog-field-label"/>
+          <FlowPane hgap="16" vgap="8">
+            <CheckBox fx:id="taskOverdueBannerCheck" text="Task overdue banner"/><CheckBox fx:id="taskDueTodayBannerCheck" text="Task due today banner"/>
+            <CheckBox fx:id="appUpdatesBannerCheck" text="App updates banner"/><CheckBox fx:id="connectivityBannerCheck" text="Connectivity banner"/>
+          </FlowPane>
+          <HBox spacing="10" alignment="CENTER_LEFT"><Button fx:id="applyNotificationPreferencesButton" text="Apply" onAction="#onApplyNotificationPreferences"/><Button fx:id="resetNotificationPreferencesButton" text="Reset" onAction="#onResetNotificationPreferences"/><Label fx:id="notificationSettingsStatusLabel" styleClass="search-summary-text" wrapText="true" HBox.hgrow="ALWAYS"/></HBox>
         </VBox>
-    </content>
+        <SettingsManagementRow fx:id="customDictionaryRow" title="Custom Dictionary"
+            description="Manage words accepted by Shale’s spelling tools." actionText="Manage"/>
+      </VBox>
+
+      <VBox fx:id="caseConfigurationGroup" styleClass="settings-directory-group">
+        <Label text="Case Configuration" styleClass="search-section-title settings-group-title"/>
+        <SettingsManagementRow fx:id="caseStatusesRow" title="Case Statuses" description="Manage case statuses, colors, workflow state, and order."/>
+        <SettingsManagementRow fx:id="practiceAreasRow" title="Practice Areas" description="Manage practice-area names, colors, and availability."/>
+        <SettingsManagementRow fx:id="linkTypesRow" title="Link Types" description="Manage case-link types, colors, and availability."/>
+        <SettingsManagementRow fx:id="caseTeamRolesRow" title="Case Team Roles" description="Manage team roles, colors, and availability."/>
+        <SettingsManagementRow fx:id="caseDatesRow" title="Case Dates" description="Manage date types and their presentation."/>
+        <SettingsManagementRow fx:id="caseDateMappingsRow" title="Protected Case Date Mappings" description="Associate required semantic roles with eligible Case Date types." actionText="Open"/>
+        <VBox fx:id="caseDateRoleMappingsContent" visible="false" managed="false" spacing="8" styleClass="settings-inline-content strong-panel">
+          <Label text="Protected semantic-role mappings" styleClass="app-dialog-field-label"/>
+          <Label text="Mappings remain separate from definition records and use the authoritative Case Date mapping service." styleClass="search-summary-text" wrapText="true"/>
+          <VBox fx:id="caseDateRoleMappingsContainer" spacing="8" styleClass="shale-density-card-compact"/>
+          <Label fx:id="caseDateTypeSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+        </VBox>
+      </VBox>
+
+      <VBox fx:id="requestConfigurationGroup" styleClass="settings-directory-group">
+        <Label text="Request Configuration" styleClass="search-section-title settings-group-title"/>
+        <SettingsManagementRow fx:id="requestFieldsRow" title="Request Fields" description="Manage material types, request methods, and request statuses."/>
+      </VBox>
+
+      <VBox fx:id="contactOrganizationConfigurationGroup" styleClass="settings-directory-group">
+        <Label text="Contact and Organization Configuration" styleClass="search-section-title settings-group-title"/>
+        <SettingsManagementRow fx:id="contactClassificationsRow" title="Contact Classifications" description="Manage contact types, specialties, and credentials."/>
+        <SettingsManagementRow fx:id="organizationTypesRow" title="Organization Types" description="Manage organization types, colors, and availability."/>
+      </VBox>
+
+      <VBox fx:id="administrationGroup" styleClass="settings-directory-group">
+        <Label text="Administration" styleClass="search-section-title settings-group-title"/>
+        <SettingsManagementRow fx:id="userManagementRow" title="User Management" description="Manage users for the current tenant." actionText="Open"/>
+        <VBox fx:id="userAdministrationSection" visible="false" managed="false" spacing="8" styleClass="settings-inline-content strong-panel">
+          <HBox spacing="10" alignment="CENTER_LEFT"><TextField fx:id="userSearchField" promptText="Search name, email, initials, or role" styleClass="shale-form-control" HBox.hgrow="ALWAYS"/><CheckBox fx:id="showInactiveUsersCheck" text="Show inactive users" onAction="#onToggleInactiveUsers"/><Button fx:id="addUserButton" text="Add User" onAction="#onAddUser"/></HBox>
+          <TableView fx:id="userManagementTable" prefHeight="340" minHeight="240" fixedCellSize="36" styleClass="shale-table" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="userNameColumn" text="Name" prefWidth="230" minWidth="190" maxWidth="300"/><TableColumn fx:id="userEmailColumn" text="Email / login" prefWidth="230"/><TableColumn fx:id="userInitialsColumn" text="Initials" prefWidth="70"/><TableColumn fx:id="userRolesColumn" text="Roles" prefWidth="150"/><TableColumn fx:id="userStatusColumn" text="Status" prefWidth="90"/></columns></TableView>
+          <FlowPane hgap="8" vgap="8"><Button fx:id="editUserButton" text="Edit User" onAction="#onEditUser" disable="true"/><Button fx:id="deactivateUserButton" text="Deactivate User" onAction="#onDeactivateUser" disable="true"/><Button fx:id="reactivateUserButton" text="Reactivate User" onAction="#onReactivateUser" disable="true"/><Button fx:id="resetPasswordButton" text="Reset Password" onAction="#onResetUserPassword" disable="true"/><Button fx:id="refreshUsersButton" text="Refresh" onAction="#onRefreshUsers"/><Button fx:id="removeUserButton" text="Remove from Tenant" onAction="#onRemoveUserFromTenant" disable="true"/></FlowPane>
+          <Label fx:id="userManagementStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+        </VBox>
+        <SettingsManagementRow fx:id="auditLogRow" title="Audit Log" description="Review PHI audit and entity activity for the current tenant." actionText="Open"/>
+      </VBox>
+    </VBox>
+  </content>
 </ScrollPane>

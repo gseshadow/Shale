@@ -19,7 +19,7 @@ final class LinkTypeManagementContractTest {
     @Test void settingsIsCompactLazyAndBothContextsShareTheLauncher() {
         String fxml=read("src/main/resources/fxml/settings.fxml");
         assertTrue(fxml.contains("Manage case-link types, colors, and availability."));
-        assertTrue(fxml.contains("fx:id=\"manageLinkTypesButton\""));
+        assertTrue(fxml.contains("fx:id=\"linkTypesRow\""));
         assertFalse(fxml.contains("fx:id=\"linkTypeCardsContainer\""));
         assertTrue(SETTINGS.contains("new LinkTypeManagementLauncher"));
         assertTrue(CASE.contains("new LinkTypeManagementLauncher"));

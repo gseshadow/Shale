@@ -20,21 +20,19 @@ import javafx.fxml.FXML;
 final class SettingsControllerLifecycleTest {
 
     @Test
-    void initializeLoadsAdminSectionsAsynchronouslyWhenServiceWasInjectedBeforeFxmlInjection() throws Exception {
+    void initializeDoesNotEagerlyLoadAdministrationLists() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
         String initialize = methodSource(source, "initialize");
         String loadAdminSections = methodSource(source, "loadAdminSectionsAsync");
 
-        assertTrue(containsCode(initialize, "loadAdminSectionsAsync();"),
-                "SceneManager injects SettingsController dependencies through the controller factory before FXML initialize(); initialize should start non-blocking section hydration.");
-        assertTrue(containsCode(loadAdminSections, "if (!fxmlReady || !isAdminUser()) return;"),
-                "Settings async hydration must preserve admin-only lookup-management visibility and service access.");
+        assertTrue(!containsCode(initialize, "loadAdminSectionsAsync();"),
+                "Opening Settings must not read any migrated administration list.");
         assertTrue(!containsCode(loadAdminSections, "loadCaseStatusesAsync"),
                 "Settings initialization must not eagerly construct or load the Case Status manager.");
         assertTrue(!containsCode(loadAdminSections, "loadPracticeAreasAsync(null);"),
                 "Settings initialization must not eagerly construct or load the Practice Area manager.");
-        assertTrue(containsCode(loadAdminSections, "loadManagedUsersAsync(null);"),
-                "SettingsController.initialize() should asynchronously populate Settings > User Management for admins when service injection already happened.");
+        assertTrue(!containsCode(loadAdminSections, "loadManagedUsersAsync(null);"),
+                "User Management should load only after its Open action.");
     }
     @Test
     void settingsSectionHydrationUsesBackgroundExecutorAndStaleResultGuards() throws Exception {
@@ -56,17 +54,15 @@ final class SettingsControllerLifecycleTest {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
         String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
 
-        assertTrue(fxml.contains("fx:id=\"caseStatusAdministrationSection\""),
+        assertTrue(fxml.contains("fx:id=\"caseStatusesRow\""),
                 "Case Statuses must be wrapped in a managed section so non-admins do not see an empty gap.");
-        assertTrue(fxml.contains("fx:id=\"practiceAreaAdministrationSection\""),
+        assertTrue(fxml.contains("fx:id=\"practiceAreasRow\""),
                 "Practice Areas must be wrapped in a managed section so non-admins do not see an empty gap.");
         assertTrue(fxml.contains("fx:id=\"taskAssignedToMeCheck\""));
         assertTrue(fxml.contains("fx:id=\"notificationSettingsStatusLabel\""),
                 "General notification settings should remain present for non-admin Settings users.");
-        assertTrue(containsCode(source, "caseStatusAdministrationSection.setVisible(visible)"));
-        assertTrue(containsCode(source, "caseStatusAdministrationSection.setManaged(visible)"));
-        assertTrue(containsCode(source, "practiceAreaAdministrationSection.setVisible(visible)"));
-        assertTrue(containsCode(source, "practiceAreaAdministrationSection.setManaged(visible)"));
+        assertTrue(containsCode(source, "ControlAvailability.apply(manageCaseStatusesButton, caseStatusesRow"));
+        assertTrue(containsCode(source, "ControlAvailability.apply(managePracticeAreasButton, practiceAreasRow"));
     }
 
     @Test
@@ -150,8 +146,8 @@ final class SettingsControllerLifecycleTest {
         String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
         String method = methodSource(source, "onViewAuditLog");
 
-        assertTrue(fxml.contains("fx:id=\"viewAuditLogButton\""));
-        assertTrue(fxml.contains("onAction=\"#onViewAuditLog\""));
+        assertTrue(fxml.contains("fx:id=\"auditLogRow\""));
+        assertTrue(containsCode(source, "bind(auditLogRow, this::onViewAuditLog)"));
         Method handler = SettingsController.class.getDeclaredMethod("onViewAuditLog", ActionEvent.class);
         assertTrue(Modifier.isPrivate(handler.getModifiers()));
         assertEquals(void.class, handler.getReturnType());

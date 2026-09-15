@@ -20,6 +20,7 @@ import com.shale.core.service.MaterialRequestServicePort;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserPreferencesDao;
 import com.shale.ui.notification.NotificationPreferencesService;
+import com.shale.ui.component.SettingsManagementRow;
 import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.testutil.JavaFxTestSupport;
@@ -61,23 +62,18 @@ final class SettingsFxmlLoadTest {
             CheckBox inactiveUsers = (CheckBox) loader.getNamespace().get("showInactiveUsersCheck");
             assertNotNull(inactiveUsers, "Existing Settings user-management checkbox should remain wired.");
 
-            Button auditButton = (Button) loader.getNamespace().get("viewAuditLogButton");
-            assertNotNull(auditButton, "Audit-log action button should be present when audit viewing is supported.");
+            Button auditButton = ((SettingsManagementRow) loader.getNamespace().get("auditLogRow")).getActionButton();
             assertNotNull(auditButton.getOnAction(), "FXML should resolve the audit-log action handler.");
             auditButton.fire();
             assertTrue(!auditOpened.get(), "Non-admin Settings users must not open the audit log.");
 
             assertNotNull(inactiveUsers.getOnAction(), "Existing Settings controls should keep resolving their handlers.");
 
-            Button manageDictionary = (Button) loader.getNamespace().get("manageCustomDictionaryButton");
+            Button manageDictionary = ((SettingsManagementRow) loader.getNamespace().get("customDictionaryRow")).getActionButton();
             assertNotNull(manageDictionary, "Custom Dictionary must be presented as one compact Settings action.");
             assertNotNull(manageDictionary.getOnAction(), "The dictionary manager must be created only from the Manage action.");
 
-            VBox organizationTypes = (VBox) loader.getNamespace().get("organizationTypeAdministrationContent");
-            assertNotNull(organizationTypes,
-                    "Settings must retain the real Organization Type administration host.");
-            assertSame(organizationTypes, injectedField(controller, "organizationTypeAdministrationContent"),
-                    "Organization Type administration host must be injected into SettingsController.");
+            assertNotNull(loader.getNamespace().get("organizationTypesRow"));
         });
     }
 
