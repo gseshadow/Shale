@@ -58,7 +58,9 @@ final class ThemeManagerTest {
 
     @Test
     void unregisterStopsPropagationAndCallsOffFxThreadFailClearly() {
-        StackPane root = JavaFxTestSupport.runAndWait(StackPane::new);
+    	StackPane root = JavaFxTestSupport.runAndWait(() -> {
+    	    return new StackPane();
+    	});
         ThemeManager manager = new ThemeManager();
         JavaFxTestSupport.runAndWait(() -> {
             manager.register(root);
