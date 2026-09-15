@@ -4,6 +4,7 @@ import java.util.*; import java.util.concurrent.Executor; import java.util.concu
 import org.slf4j.Logger; import org.slf4j.LoggerFactory;
 import com.shale.data.dao.UserDao; import com.shale.ui.component.*; import com.shale.ui.component.dialog.AppDialogs; import com.shale.ui.component.factory.UserCardFactory; import com.shale.ui.component.factory.UserCardFactory.UserCardModel; import com.shale.ui.util.ControlStyles;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.css.PseudoClass;
 import javafx.event.ActionEvent;
@@ -18,6 +19,7 @@ import javafx.scene.paint.Color;
 /** Feature-owned user administration surface. */
 public final class UserManagementPane {
  private static final Logger LOG=LoggerFactory.getLogger(UserManagementPane.class); private static final Color DEFAULT_STATUS_COLOR=Color.rgb(108,117,125);
+ private static final double TABLE_CELL_HORIZONTAL_INSETS=20;
  private final UserDao userDao; private final Executor settingsLoadExecutor; private final CommittedChangeTracker changes; private final int tenantId,actorUserId; private final AtomicBoolean disposed=new AtomicBoolean();
  private final VBox root=new VBox(10); private final TableView<UserManagementViewRow> userManagementTable=new TableView<>();
  private final TableColumn<UserManagementViewRow,UserManagementViewRow> userNameColumn=new TableColumn<>("Name"); private final TableColumn<UserManagementViewRow,String> userEmailColumn=new TableColumn<>("Email / login"),userInitialsColumn=new TableColumn<>("Initials"),userRolesColumn=new TableColumn<>("Roles"),userStatusColumn=new TableColumn<>("Status");
@@ -249,27 +251,19 @@ public final class UserManagementPane {
 		if (userManagementTable == null)
 			return;
 		userNameColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue()));
-		userNameColumn.setCellFactory(column -> new TableCell<>() {
-			@Override
-			protected void updateItem(UserManagementViewRow row, boolean empty) {
-				super.updateItem(row, empty);
-				setText(null);
-				setGraphic(null);
-				pseudoClassStateChanged(PseudoClass.getPseudoClass("inactive"), false);
-				if (empty || row == null)
-					return;
-				UserCard card = userManagementCardFactory.create(
-						new UserCardModel(row.id(), row.name(), row.color(), row.initials()),
-						UserCardFactory.Variant.MINI);
-				card.setInactive(row.deleted());
-				card.setMaxWidth(Double.MAX_VALUE);
-				setGraphic(card);
-			}
-		});
+		userNameColumn.setCellFactory(column -> new UserNameCell(userManagementCardFactory));
 		userEmailColumn.setCellValueFactory(new PropertyValueFactory<>("email"));
 		userInitialsColumn.setCellValueFactory(new PropertyValueFactory<>("initials"));
 		userRolesColumn.setCellValueFactory(new PropertyValueFactory<>("roles"));
 		userStatusColumn.setCellValueFactory(new PropertyValueFactory<>("status"));
+		userEmailColumn.setCellFactory(column -> new FullValueTextCell());
+		userRolesColumn.setCellFactory(column -> new FullValueTextCell());
+		configureColumn(userNameColumn,190,230,Double.MAX_VALUE);
+		configureColumn(userEmailColumn,220,270,Double.MAX_VALUE);
+		configureColumn(userInitialsColumn,70,76,100);
+		configureColumn(userRolesColumn,140,190,Double.MAX_VALUE);
+		configureColumn(userStatusColumn,76,88,120);
+		userManagementTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 		userManagementTable.getSelectionModel().selectedItemProperty().addListener((obs, oldRow, newRow) -> updateUserActionButtons(newRow));
 		if (userSearchField != null)
 			userSearchField.textProperty().addListener((obs, o, n) -> applyUserFilter());
@@ -285,6 +279,18 @@ public final class UserManagementPane {
 				e.consume();
 			}
 		});
+	}
+
+	private static void configureColumn(TableColumn<?,?> column,double minimum,double preferred,double maximum){column.setResizable(true);column.setMinWidth(minimum);column.setPrefWidth(preferred);column.setMaxWidth(maximum);}
+
+	static final class UserNameCell extends TableCell<UserManagementViewRow,UserManagementViewRow>{
+		private static final PseudoClass INACTIVE=PseudoClass.getPseudoClass("inactive"); private final UserCardFactory factory;
+		UserNameCell(UserCardFactory factory){this.factory=Objects.requireNonNull(factory);}
+		@Override protected void updateItem(UserManagementViewRow row,boolean empty){super.updateItem(row,empty);setText(null);setGraphic(null);setTooltip(null);setStyle("");pseudoClassStateChanged(INACTIVE,false);if(empty||row==null)return;UserCard card=factory.create(new UserCardModel(row.id(),row.name(),row.color(),row.initials()),UserCardFactory.Variant.MINI);card.setInactive(row.deleted());card.useAvailableWidth();card.prefWidthProperty().bind(Bindings.max(0,widthProperty().subtract(TABLE_CELL_HORIZONTAL_INSETS)));setGraphic(card);setTooltip(new Tooltip(row.name()));}
+	}
+
+	static final class FullValueTextCell extends TableCell<UserManagementViewRow,String>{
+		@Override protected void updateItem(String value,boolean empty){super.updateItem(value,empty);setGraphic(null);setStyle("");if(empty||value==null){setText(null);setTooltip(null);return;}setText(value);setTextOverrun(OverrunStyle.ELLIPSIS);setTooltip(new Tooltip(value));}
 	}
 
     private void loadManagedUsers() {
