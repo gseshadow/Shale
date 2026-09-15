@@ -24,16 +24,17 @@ final class SettingsControllerLifecycleTest {
     void initializeDoesNotEagerlyLoadAdministrationLists() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
         String initialize = methodSource(source, "initialize");
-        String loadAdminSections = methodSource(source, "loadAdminSectionsAsync");
 
-        assertTrue(!containsCode(initialize, "loadAdminSectionsAsync();"),
+        assertFalse(containsCode(initialize, "listCaseDateTypesForAdministration"),
                 "Opening Settings must not read any migrated administration list.");
-        assertTrue(!containsCode(loadAdminSections, "loadCaseStatusesAsync"),
-                "Settings initialization must not eagerly construct or load the Case Status manager.");
-        assertTrue(!containsCode(loadAdminSections, "loadPracticeAreasAsync(null);"),
-                "Settings initialization must not eagerly construct or load the Practice Area manager.");
-        assertTrue(!containsCode(loadAdminSections, "loadManagedUsersAsync(null);"),
-                "User Management should load only after its Open action.");
+        assertFalse(containsCode(initialize, "listMaterialTypesForAdministration"));
+        assertFalse(containsCode(initialize, "listDefinitionsForAdministration"));
+        assertFalse(containsCode(initialize, "loadManagedUsersAsync"));
+        assertFalse(source.contains("loadAdminSectionsAsync"),
+                "A no-op eager-loading compatibility hook must not obscure the lazy Settings contract.");
+        assertFalse(source.contains("caseDateTypeCardsContainer"));
+        assertFalse(source.contains("materialTypeCardsContainer"));
+        assertFalse(source.contains("RequestLookupSelection"));
     }
     @Test
     void settingsSectionHydrationUsesBackgroundExecutorAndStaleResultGuards() throws Exception {
@@ -74,12 +75,10 @@ final class SettingsControllerLifecycleTest {
                 "Lookup-management controller paths should share an admin authorization guard.");
         assertTrue(containsCode(source, "if (!requireAdminLookupManagement(\"Case Statuses\") || caseService == null)"),
                 "The compact Case Status launcher must reject non-admins before opening management.");
-        assertTrue(containsCode(source, "if (!requireAdminLookupManagement(\"Practice Areas\"))"),
+        assertTrue(containsCode(source, "if (!requireAdminLookupManagement(\"Practice Areas\") || caseService == null)"),
                 "Practice area load/edit paths must reject non-admins before service calls.");
         assertTrue(containsCode(source, "new CaseStatusManagementLauncher(caseService, settingsLoadExecutor)"));
-        assertTrue(containsCode(source, "caseService.createPracticeArea"));
-        assertTrue(containsCode(source, "caseService.updatePracticeArea"));
-        assertTrue(containsCode(source, "caseService.deactivatePracticeArea"));
+        assertTrue(containsCode(source, "new PracticeAreaManagementLauncher(caseService, settingsLoadExecutor)"));
     }
 
 

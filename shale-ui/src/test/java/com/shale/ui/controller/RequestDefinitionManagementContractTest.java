@@ -15,7 +15,8 @@ final class RequestDefinitionManagementContractTest {
         assertTrue(FXML.contains("Manage material types, request methods, and request statuses."));
         assertTrue(FXML.contains("fx:id=\"requestFieldsRow\""));
         assertFalse(FXML.contains("materialTypeCardsContainer"));
-        assertFalse(SETTINGS.substring(SETTINGS.indexOf("private void loadAdminSectionsAsync"),SETTINGS.indexOf("private void onManageRequestFields")).contains("loadRequestLookupsAsync"));
+        assertFalse(SETTINGS.contains("loadRequestLookupsAsync"));
+        assertFalse(SETTINGS.contains("RequestLookupSelection"));
     }
     @Test void paneOwnsThreeSemanticCategoriesAndSpecificFields(){
         assertTrue(PANE.contains("tab(\"Material Types\"")); assertTrue(PANE.contains("tab(\"Request Methods\"")); assertTrue(PANE.contains("tab(\"Request Statuses\""));
