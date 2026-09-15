@@ -17,6 +17,7 @@ public final class SettingsManagementRow extends HBox {
     private final Label titleLabel = new Label();
     private final Label descriptionLabel = new Label();
     private final Button actionButton = new Button();
+    private EventHandler<ActionEvent> actionHandler;
 
     public SettingsManagementRow() {
         getStyleClass().add("settings-management-row");
@@ -33,6 +34,7 @@ public final class SettingsManagementRow extends HBox {
         actionButton.setFocusTraversable(true);
         getChildren().addAll(copy, actionButton);
         setAccessibleRole(AccessibleRole.PARENT);
+        setActionText("Manage");
     }
 
     public String getTitle() { return titleLabel.getText(); }
@@ -53,7 +55,19 @@ public final class SettingsManagementRow extends HBox {
         updateAccessibleText();
     }
 
-    public void setOnAction(EventHandler<ActionEvent> handler) { actionButton.setOnAction(handler); }
+    /** Configures the complete presentation and action contract for this directory entry. */
+    public void configure(String title, String description, String actionText,
+            EventHandler<ActionEvent> handler) {
+        setTitle(title);
+        setDescription(description);
+        setActionText(actionText);
+        setOnAction(handler);
+    }
+
+    public void setOnAction(EventHandler<ActionEvent> handler) {
+        actionHandler = handler;
+        actionButton.setOnAction(handler);
+    }
     public Button getActionButton() { return actionButton; }
 
     public void setAvailable(boolean available) {
@@ -61,7 +75,8 @@ public final class SettingsManagementRow extends HBox {
         setManaged(available);
         actionButton.setVisible(available);
         actionButton.setManaged(available);
-        if (!available) actionButton.setOnAction(null);
+        actionButton.setFocusTraversable(available);
+        actionButton.setOnAction(available ? actionHandler : null);
     }
 
     private void updateAccessibleText() {
