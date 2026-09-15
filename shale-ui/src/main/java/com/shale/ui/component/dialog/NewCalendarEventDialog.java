@@ -259,7 +259,7 @@ public final class NewCalendarEventDialog {
         root.setPrefHeight(Region.USE_COMPUTED_SIZE);
         root.setMaxHeight(Region.USE_COMPUTED_SIZE);
         Scene scene = new Scene(root);
-        scene.getStylesheets().add(Objects.requireNonNull(NewCalendarEventDialog.class.getResource("/css/app.css")).toExternalForm());
+        com.shale.ui.theme.ThemeManager.application().register(scene);
         stage.setScene(scene);
         stage.showAndWait();
     }
@@ -289,7 +289,7 @@ public final class NewCalendarEventDialog {
         root.setPrefHeight(Region.USE_COMPUTED_SIZE);
         root.setMaxHeight(Region.USE_COMPUTED_SIZE);
         Scene scene = new Scene(root);
-        scene.getStylesheets().add(Objects.requireNonNull(NewCalendarEventDialog.class.getResource("/css/app.css")).toExternalForm());
+        com.shale.ui.theme.ThemeManager.application().register(scene);
         stage.setScene(scene);
         stage.show();
     }

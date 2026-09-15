@@ -224,8 +224,7 @@ public final class NewTaskDialog {
         stage.setResizable(true);
 
         Scene scene = new Scene(root);
-        scene.getStylesheets().add(Objects.requireNonNull(
-                NewTaskDialog.class.getResource("/css/app.css")).toExternalForm());
+        com.shale.ui.theme.ThemeManager.application().register(scene);
         stage.setScene(scene);
         WindowSizingUtil.sizeModalStage(stage, owner, dialogWidth, dialogHeight, minWidth, minHeight);
         stage.showAndWait();

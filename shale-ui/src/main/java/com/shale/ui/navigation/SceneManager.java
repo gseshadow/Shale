@@ -59,6 +59,7 @@ import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.WindowSizingUtil;
+import com.shale.ui.theme.ThemeManager;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.LoadException;
@@ -731,7 +732,7 @@ public final class SceneManager {
 		body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		VBox shell = AppDialogs.createSecondaryWindowShell(dialogStage, "Audit Log", dialogStage::close, body);
 		Scene scene = new Scene(shell, 1400, 720);
-		scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/css/app.css")).toExternalForm());
+		com.shale.ui.theme.ThemeManager.application().register(scene);
 		dialogStage.setScene(scene);
 		dialogStage.show();
 	}
@@ -941,8 +942,7 @@ public final class SceneManager {
 			VBox.setVgrow(root, Priority.ALWAYS);
 
 			Scene dialogScene = new Scene(dialogRoot);
-			dialogScene.getStylesheets().add(Objects.requireNonNull(
-					getClass().getResource("/css/app.css")).toExternalForm());
+			com.shale.ui.theme.ThemeManager.application().register(dialogScene);
 			dialog.setScene(dialogScene);
 			WindowSizingUtil.sizeModalStage(dialog, stage, 900, 680, 680, 480);
 			dialog.showAndWait();
@@ -977,8 +977,7 @@ public final class SceneManager {
 			VBox.setVgrow(root, Priority.ALWAYS);
 
 			Scene dialogScene = new Scene(dialogRoot);
-			dialogScene.getStylesheets().add(Objects.requireNonNull(
-					getClass().getResource("/css/app.css")).toExternalForm());
+			com.shale.ui.theme.ThemeManager.application().register(dialogScene);
 			dialog.setScene(dialogScene);
 			WindowSizingUtil.sizeModalStage(dialog, stage, 1180, 760);
 			dialog.showAndWait();
@@ -1308,8 +1307,7 @@ public final class SceneManager {
 		Scene scene = stage.getScene();
 		if (scene == null) {
 			scene = new Scene(root);
-			scene.getStylesheets().add(Objects.requireNonNull(
-					getClass().getResource("/css/app.css")).toExternalForm());
+			ThemeManager.application().register(scene);
 			stage.setScene(scene);
 		} else {
 			scene.setRoot(root);

@@ -30,6 +30,7 @@ import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.DialogSizingUtil;
 import com.shale.ui.util.WindowSizingUtil;
+import com.shale.ui.theme.ThemeManager;
 
 public final class AppDialogs {
 	private static final double CONFIRMATION_DIALOG_MIN_WIDTH = 480;
@@ -96,7 +97,11 @@ public final class AppDialogs {
 		if (stage != null) {
 			stage.initStyle(StageStyle.TRANSPARENT);
 			stage.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				if (oldScene != null) {
+					ThemeManager.application().unregister(oldScene);
+				}
 				if (newScene != null) {
+					ThemeManager.application().register(newScene);
 					newScene.setFill(Color.TRANSPARENT);
 				}
 			});
@@ -106,6 +111,7 @@ public final class AppDialogs {
 	public static void applySecondaryWindowChrome(Dialog<?> dialog) {
 		if (dialog != null) {
 			dialog.initStyle(StageStyle.UNDECORATED);
+			installDialogTheme(dialog.getDialogPane());
 		}
 	}
 
@@ -121,10 +127,7 @@ public final class AppDialogs {
 		if (!pane.getStyleClass().contains("secondary-window-shell")) {
 			pane.getStyleClass().add("secondary-window-shell");
 		}
-		String appCss = Objects.requireNonNull(AppDialogs.class.getResource("/css/app.css")).toExternalForm();
-		if (!pane.getStylesheets().contains(appCss)) {
-			pane.getStylesheets().add(appCss);
-		}
+		installDialogTheme(pane);
 		Node header = createSecondaryDialogHeader(dialog, title);
 		pane.setHeader(header);
 		pane.setGraphic(null);
@@ -137,6 +140,11 @@ public final class AppDialogs {
 		if (scene != null) {
 			scene.setFill(Color.TRANSPARENT);
 		}
+	}
+
+	private static void installDialogTheme(DialogPane pane) {
+		if (pane == null) return;
+		ThemeManager.application().register(pane);
 	}
 
 	public static HBox createSecondaryWindowHeader(Stage stage, String title, Runnable onClose) {
@@ -321,8 +329,7 @@ public final class AppDialogs {
 		root.getChildren().add(actionsRow);
 
 		Scene scene = new Scene(root);
-		scene.getStylesheets().add(Objects.requireNonNull(
-				AppDialogs.class.getResource("/css/app.css")).toExternalForm());
+		com.shale.ui.theme.ThemeManager.application().register(scene);
 		stage.setScene(scene);
 		DialogSizingUtil.applyConfirmationDialogSizing(
 				stage,

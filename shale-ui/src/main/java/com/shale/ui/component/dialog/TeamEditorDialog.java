@@ -64,7 +64,7 @@ public final class TeamEditorDialog {
         Region spacer=new Region();HBox.setHgrow(spacer,Priority.ALWAYS);HBox footer=new HBox(10,spacer,cancel,save);footer.getStyleClass().add("case-team-editor-footer");
         VBox body=new VBox(8,heading,support,roleManagement,new Separator(),addLabel,search,results,new Separator(),members,error,footer);body.setPadding(new Insets(16));VBox.setVgrow(members,Priority.ALWAYS);
         VBox shell=AppDialogs.createSecondaryWindowShell(stage,"Case Team",this::requestClose,body);shell.getStyleClass().add("case-team-editor");
-        Scene scene=new Scene(shell,Math.min(760,screenWidth(owner)-60),Math.min(680,screenHeight(owner)-60));scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/css/app.css")).toExternalForm());scene.setOnKeyPressed(e->{if(e.getCode()==KeyCode.ESCAPE){e.consume();requestClose();}});stage.setScene(scene);stage.setMinWidth(520);stage.setMinHeight(480);stage.setOnCloseRequest(e->{e.consume();requestClose();});
+        Scene scene=new Scene(shell,Math.min(760,screenWidth(owner)-60),Math.min(680,screenHeight(owner)-60));com.shale.ui.theme.ThemeManager.application().register(scene);scene.setOnKeyPressed(e->{if(e.getCode()==KeyCode.ESCAPE){e.consume();requestClose();}});stage.setScene(scene);stage.setMinWidth(520);stage.setMinHeight(480);stage.setOnCloseRequest(e->{e.consume();requestClose();});
         refreshMembers();refreshResults();
     }
     public void showAndWait(){stage.showAndWait();}

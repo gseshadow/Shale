@@ -335,8 +335,7 @@ public final class ReportsController {
         DialogPane pane = dialog.getDialogPane();
         pane.setPrefSize(1200, 650);
         pane.setMinSize(800, 420);
-        pane.getStylesheets().add(Objects.requireNonNull(
-                ReportsController.class.getResource("/css/app.css")).toExternalForm());
+        com.shale.ui.theme.ThemeManager.application().register(pane);
         dialog.setResizable(true);
 
         TableView<ReportCaseDetailRowDto> table = new TableView<>();

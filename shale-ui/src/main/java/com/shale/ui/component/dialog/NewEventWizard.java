@@ -130,7 +130,7 @@ public final class NewEventWizard {
             HBox actions = new HBox(8,spacer,save,cancel); actions.setAlignment(Pos.CENTER_RIGHT);
             VBox body = new VBox(14,fields,error,actions); body.setPadding(new Insets(20,24,18,24));
             Scene scene = new Scene(AppDialogs.createSecondaryWindowShell(stage,"New Event",this::close,body),720,680);
-            scene.getStylesheets().add(Objects.requireNonNull(NewEventWizard.class.getResource("/css/app.css")).toExternalForm());
+            com.shale.ui.theme.ThemeManager.application().register(scene);
             scene.setOnKeyPressed(e -> { if (e.getCode()==KeyCode.ESCAPE && !submitting.get()) { close(); e.consume(); } });
             stage.setScene(scene); stage.setMinWidth(620); stage.setMinHeight(600); stage.show(); Platform.runLater(title::requestFocus);
         }
