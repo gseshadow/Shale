@@ -26,11 +26,22 @@ import javafx.stage.Window;
 
 /** Presentation-only shell shared by independently composed definition managers. */
 public final class DefinitionManagementWindow {
+    public enum ContentMode {
+        SCROLLABLE,
+        FIXED
+    }
+
     private DefinitionManagementWindow() {}
 
     public static void show(Window owner, String title, String helpText, Node content,
             BooleanSupplier changed, BooleanSupplier canClose, Runnable dispose, Consumer<DefinitionManagementResult> onClosed) {
+        show(owner, title, helpText, content, ContentMode.SCROLLABLE, changed, canClose, dispose, onClosed);
+    }
+
+    public static void show(Window owner, String title, String helpText, Node content, ContentMode contentMode,
+            BooleanSupplier changed, BooleanSupplier canClose, Runnable dispose, Consumer<DefinitionManagementResult> onClosed) {
         Objects.requireNonNull(content, "content");
+        Objects.requireNonNull(contentMode, "contentMode");
         Objects.requireNonNull(changed, "changed");
         Objects.requireNonNull(canClose, "canClose");
         Objects.requireNonNull(dispose, "dispose");
@@ -50,17 +61,15 @@ public final class DefinitionManagementWindow {
         VBox header = new VBox(6, heading, help);
         header.setPadding(new Insets(16));
 
-        ScrollPane scroll = new ScrollPane(content);
-        scroll.setFitToWidth(true);
-        scroll.getStyleClass().add("transparent-scroll");
-        BorderPane.setMargin(scroll, new Insets(0, 16, 0, 16));
+        Node body = contentMode == ContentMode.SCROLLABLE ? scrollable(content) : content;
+        BorderPane.setMargin(body, new Insets(0, 16, 0, 16));
 
         Button done = ActionButtonFactory.semantic("Done", e -> { if (canClose.getAsBoolean()) dialog.close(); }, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox footer = new HBox(8, spacer, done);
         footer.setPadding(new Insets(12, 16, 16, 16));
-        BorderPane root = new BorderPane(scroll, header, null, footer, null);
+        BorderPane root = new BorderPane(body, header, null, footer, null);
         dialog.getDialogPane().setContent(root);
         dialog.getDialogPane().setPrefSize(900, 700);
         dialog.getDialogPane().lookupButton(ButtonType.CLOSE).setVisible(false);
@@ -76,5 +85,12 @@ public final class DefinitionManagementWindow {
         });
         dialog.show();
         dialog.getDialogPane().requestFocus();
+    }
+
+    private static ScrollPane scrollable(Node content) {
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.setFitToWidth(true);
+        scroll.getStyleClass().add("transparent-scroll");
+        return scroll;
     }
 }
