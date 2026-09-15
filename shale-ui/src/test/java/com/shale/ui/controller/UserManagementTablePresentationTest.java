@@ -13,10 +13,65 @@ import com.shale.ui.component.UserCard;
 import com.shale.ui.testutil.JavaFxTestSupport;
 
 import javafx.scene.control.Label;
+import javafx.scene.control.Button;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 
 final class UserManagementTablePresentationTest {
+    @Test
+    void tableOwnsTheGrowingCenterWhileActionsRemainInAFixedWrappingFooter() {
+        JavaFxTestSupport.runAndWait(() -> {
+            UserManagementPane pane = pane();
+            BorderPane root = assertInstanceOf(BorderPane.class, pane.node());
+            TableView<?> table = field(pane, "userManagementTable");
+            FlowPane toolbar = field(pane, "actionToolbar");
+
+            assertAll(
+                    () -> assertSame(table, root.getCenter(), "only the table should own the flexible center"),
+                    () -> assertSame(root, table.getParent(), "the table must not be nested in another scroll pane"),
+                    () -> assertInstanceOf(VBox.class, toolbar.getParent(),
+                            "the selected-user toolbar should have a dedicated fixed footer parent"),
+                    () -> assertSame(root.getBottom(), toolbar.getParent()),
+                    () -> assertNotSame(table.getParent(), toolbar.getParent()),
+                    () -> assertNull(VBox.getVgrow(toolbar), "the toolbar must not consume table height"),
+                    () -> assertNotEquals(Priority.ALWAYS, VBox.getVgrow(toolbar)),
+                    () -> assertTrue(toolbar.isManaged() && toolbar.isVisible()),
+                    () -> assertEquals(6, toolbar.getChildren().size()),
+                    () -> assertTrue(toolbar.prefHeight(350) > toolbar.prefHeight(900),
+                            "narrow widths should wrap actions into additional rows instead of clipping or scrolling"));
+        });
+    }
+
+    @Test
+    void actionAvailabilityStillTracksSelectionStatusAndCurrentUserProtection() {
+        JavaFxTestSupport.runAndWait(() -> {
+            UserManagementPane pane = pane();
+            TableView<UserManagementPane.UserManagementViewRow> table = field(pane, "userManagementTable");
+            Button edit = field(pane, "editUserButton");
+            Button deactivate = field(pane, "deactivateUserButton");
+            Button reactivate = field(pane, "reactivateUserButton");
+            Button reset = field(pane, "resetPasswordButton");
+            Button remove = field(pane, "removeUserButton");
+            UserManagementPane.UserManagementViewRow active = row(2, "Other", "other@example.test", false, false);
+            UserManagementPane.UserManagementViewRow self = row(11, "Current", "current@example.test", true, false);
+            UserManagementPane.UserManagementViewRow inactive = inactiveRow(3);
+            table.getItems().setAll(active, self, inactive);
+
+            table.getSelectionModel().select(active);
+            assertAll(() -> assertFalse(edit.isDisabled()), () -> assertFalse(deactivate.isDisabled()),
+                    () -> assertTrue(reactivate.isDisabled()), () -> assertFalse(reset.isDisabled()),
+                    () -> assertFalse(remove.isDisabled()));
+            table.getSelectionModel().select(self);
+            assertAll(() -> assertTrue(deactivate.isDisabled()), () -> assertTrue(remove.isDisabled()));
+            table.getSelectionModel().select(inactive);
+            assertAll(() -> assertTrue(deactivate.isDisabled()), () -> assertFalse(reactivate.isDisabled()),
+                    () -> assertTrue(reset.isDisabled()));
+        });
+    }
     @Test
     void readableColumnsAreResizableHaveMinimumsAndUseFlexibleConstrainedPolicy() {
         JavaFxTestSupport.runAndWait(() -> {
@@ -111,6 +166,12 @@ final class UserManagementTablePresentationTest {
             boolean admin, boolean attorney) {
         return new UserManagementPane.UserManagementViewRow(new UserDao.UserManagementRow(id, name, "User", name,
                 email, "", "#336699", "AU", attorney, admin, false, false, new byte[] { 1 }));
+    }
+
+    private static UserManagementPane.UserManagementViewRow inactiveRow(int id) {
+        return new UserManagementPane.UserManagementViewRow(new UserDao.UserManagementRow(id, "Inactive", "User",
+                "Inactive User", "inactive@example.test", "", "#336699", "IU", false, false, true, false,
+                new byte[] { 1 }));
     }
 
     @SuppressWarnings("unchecked")

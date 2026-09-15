@@ -17,7 +17,15 @@ public final class DefinitionManagementSession {
 
     public void show(Window owner, String title, String helpText, Node content,
             BooleanSupplier canClose, Runnable dispose, Consumer<DefinitionManagementResult> onClosed) {
-        DefinitionManagementWindow.show(owner, title, helpText, content, changes::hasCommittedChanges,
+        show(owner, title, helpText, content, DefinitionManagementWindow.ContentMode.SCROLLABLE,
+                canClose, dispose, onClosed);
+    }
+
+    public void show(Window owner, String title, String helpText, Node content,
+            DefinitionManagementWindow.ContentMode contentMode, BooleanSupplier canClose, Runnable dispose,
+            Consumer<DefinitionManagementResult> onClosed) {
+        DefinitionManagementWindow.show(owner, title, helpText, content, Objects.requireNonNull(contentMode),
+                changes::hasCommittedChanges,
                 Objects.requireNonNull(canClose), Objects.requireNonNull(dispose), Objects.requireNonNull(onClosed));
     }
 }

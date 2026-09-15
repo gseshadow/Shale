@@ -53,6 +53,21 @@ final class DefinitionManagementInfrastructureTest {
         assertTrue(window.contains("owner != null && owner.isShowing()"), "a closed owner must not be refocused");
     }
 
+    @Test void contentModesKeepScrollableManagersAsTheDefaultAndAllowViewportOwnedLayouts() throws Exception {
+        String window = read("component/DefinitionManagementWindow.java");
+        String session = read("component/DefinitionManagementSession.java");
+        String userLauncher = read("controller/UserManagementLauncher.java");
+
+        assertTrue(session.contains("ContentMode.SCROLLABLE"),
+                "existing managers must retain the shared outer-scroll behavior by default");
+        assertTrue(window.contains("contentMode == ContentMode.SCROLLABLE ? scrollable(content) : content"),
+                "fixed-layout content must enter the shared viewport without another ScrollPane");
+        assertTrue(userLauncher.contains("DefinitionManagementWindow.ContentMode.FIXED"),
+                "User Management must opt into viewport-owned layout without shared-window feature coupling");
+        assertFalse(window.contains("UserManagementPane"),
+                "the shared window must select layout by mode rather than by feature class");
+    }
+
     private static String read(String relative) throws Exception {
         return Files.readString(MAIN.resolve(relative));
     }
