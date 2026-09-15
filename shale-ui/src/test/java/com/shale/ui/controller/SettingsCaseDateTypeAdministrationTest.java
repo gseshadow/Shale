@@ -15,7 +15,8 @@ final class SettingsCaseDateTypeAdministrationTest {
         assertTrue(SETTINGS.contains("bind(caseDatesRow, this::onManageCaseDateTypes)"));
         assertFalse(FXML.contains("fx:id=\"caseDateTypeCardsContainer\""));
         assertFalse(FXML.contains("fx:id=\"caseDateTypeActionRow\""));
-        assertFalse(SETTINGS.replaceAll("\\s+", "").contains("loadAdminSectionsAsync(null);"));
+        assertFalse(SETTINGS.contains("CaseDateTypeViewRow"));
+        assertFalse(SETTINGS.contains("loadCaseDateTypesAsync"));
         assertTrue(SETTINGS.contains("new CaseDateTypeManagementLauncher"));
     }
 
@@ -28,7 +29,7 @@ final class SettingsCaseDateTypeAdministrationTest {
 
     @Test void launcherAndMappingSectionRemainAdminGated() {
         assertTrue(SETTINGS.contains("if (!requireAdminLookupManagement(\"Case Date Types\")"));
-        assertTrue(SETTINGS.contains("caseDateTypeAdministrationSection.setVisible(visible)"));
-        assertTrue(SETTINGS.contains("caseDateRoleMappingsSection.setVisible(visible)"));
+        assertTrue(SETTINGS.contains("setVisibleManaged(caseDateMappingsRow, admin && caseService != null)"));
+        assertTrue(SETTINGS.contains("setVisibleManaged(caseDateRoleMappingsContent, false)"));
     }
 }
