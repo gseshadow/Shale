@@ -59,7 +59,7 @@ final class SettingsCaseDateSemanticRoleAdministrationTest {
     @Test void allRolesShareOneCompactResponsiveSection() {
         String render = method("private void renderCaseDateRoleMappings");
         String row = method("private VBox buildCaseDateRoleMappingRow");
-        assertTrue(FXML.contains("caseDateTypeAdministrationSection"));
+        assertTrue(FXML.contains("caseDateRoleMappingsContent"));
         assertTrue(FXML.contains("caseDateRoleMappingsContainer"));
         assertTrue(render.contains("FlowPane section = new FlowPane(10, 10)"));
         assertTrue(render.contains("for (CaseDateSemanticRoleMappingDto mapping : mappings)"));
@@ -72,6 +72,24 @@ final class SettingsCaseDateSemanticRoleAdministrationTest {
         assertFalse(row.contains("Global/default"));
         assertFalse(row.contains("Protected system type"));
     }
+
+	@Test void retainedMappingLifecycleOwnsItsStatusAndSanitizedErrors() {
+		String load = method("private void loadCaseDateRoleMappingsAsync");
+		String row = method("private VBox buildCaseDateRoleMappingRow");
+		String message = method("private void setCaseDateMappingMessage");
+		String error = method("private void showCaseDateMappingError");
+		assertTrue(FXML.contains("fx:id=\"caseDateMappingStatusLabel\""));
+		assertTrue(load.contains("setCaseDateMappingMessage(successMessage)"));
+		assertTrue(load.contains("generation == caseDateMappingLoadGeneration"));
+		assertEquals(2, count(row, "showCaseDateMappingError(ex)"));
+		assertTrue(message.contains("caseDateMappingStatusLabel.setText"));
+		assertTrue(error.contains("caseDateRoleMappingsContainer.getScene().getWindow()"));
+		assertTrue(error.contains("The protected Case Date mapping could not be saved."));
+		assertFalse(error.contains("rootMessage"));
+		assertFalse(SOURCE.contains("setCaseDateTypeMessage"));
+		assertFalse(SOURCE.contains("showCaseDateTypeError"));
+		assertFalse(SOURCE.contains("caseDateTypeSettingsStatusLabel"));
+	}
 
     private static int count(String value, String needle) {
         int count = 0, offset = 0;

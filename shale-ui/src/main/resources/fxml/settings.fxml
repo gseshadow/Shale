@@ -47,7 +47,7 @@
           <Label text="Protected semantic-role mappings" styleClass="app-dialog-field-label"/>
           <Label text="Mappings remain separate from definition records and use the authoritative Case Date mapping service." styleClass="search-summary-text" wrapText="true"/>
           <VBox fx:id="caseDateRoleMappingsContainer" spacing="8" styleClass="shale-density-card-compact"/>
-          <Label fx:id="caseDateTypeSettingsStatusLabel" styleClass="search-summary-text" wrapText="true"/>
+          <Label fx:id="caseDateMappingStatusLabel" styleClass="search-summary-text" wrapText="true"/>
         </VBox>
       </VBox>
 
