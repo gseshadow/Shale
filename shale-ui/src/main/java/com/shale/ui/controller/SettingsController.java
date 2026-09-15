@@ -95,7 +95,7 @@ public final class SettingsController {
 	@FXML
 	private VBox caseDateRoleMappingsContainer;
 	@FXML
-	private Label caseDateTypeSettingsStatusLabel;
+	private Label caseDateMappingStatusLabel;
 	@FXML
 	private SettingsManagementRow requestFieldsRow;
 	private Button manageRequestFieldsButton;
@@ -124,7 +124,7 @@ public final class SettingsController {
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
 	private UiRuntimeBridge runtimeBridge;
-	private int caseDateTypeLoadGeneration;
+	private int caseDateMappingLoadGeneration;
 
 	private final ExecutorService settingsLoadExecutor = Executors.newFixedThreadPool(4, runnable ->
 	{
@@ -532,17 +532,17 @@ public final class SettingsController {
 
 	private void loadCaseDateRoleMappingsAsync(String successMessage) {
 		if (caseService == null || caseDateRoleMappingsContainer == null || !isAdminUser()) return;
-		final int generation = ++caseDateTypeLoadGeneration;
+		final int generation = ++caseDateMappingLoadGeneration;
 		final int tenantId = requireTenantId(), actorUserId = requireActorUserId();
 		caseDateRoleMappingsContainer.getChildren().setAll(loadingLabel("Loading protected mappings…"));
 		settingsLoadExecutor.submit(() -> {
 			try {
 				List<EffectiveCaseDateTypeDto> types = caseService.listCaseDateTypesForAdministration(tenantId, actorUserId);
 				List<CaseDateSemanticRoleMappingDto> mappings = caseService.listCaseDateSemanticRoleMappings(tenantId, actorUserId);
-				Platform.runLater(() -> { if (generation == caseDateTypeLoadGeneration) { renderCaseDateRoleMappings(mappings, types); setCaseDateTypeMessage(successMessage); } });
+				Platform.runLater(() -> { if (generation == caseDateMappingLoadGeneration) { renderCaseDateRoleMappings(mappings, types); setCaseDateMappingMessage(successMessage); } });
 			} catch (RuntimeException ex) {
 				LOG.error("Case Date protected mapping load failed tenantId={} actorId={}", tenantId, actorUserId, ex);
-				Platform.runLater(() -> { if (generation == caseDateTypeLoadGeneration) caseDateRoleMappingsContainer.getChildren().setAll(loadingLabel("Protected mappings could not be loaded.")); });
+				Platform.runLater(() -> { if (generation == caseDateMappingLoadGeneration) caseDateRoleMappingsContainer.getChildren().setAll(loadingLabel("Protected mappings could not be loaded.")); });
 			}
 		});
 	}
@@ -615,7 +615,7 @@ public final class SettingsController {
 			{
 				EffectiveCaseDateTypeDto selected = selector.getValue();
 				if (selected == null) {
-					setCaseDateTypeMessage("Select an eligible tenant Case Date Type.");
+					setCaseDateMappingMessage("Select an eligible tenant Case Date Type.");
 					return;
 				}
 				try {
@@ -625,7 +625,7 @@ public final class SettingsController {
 					publishCaseDateTypeChanged(selected.id());
 					loadCaseDateRoleMappingsAsync("Protected role mapping saved.");
 				} catch (RuntimeException ex) {
-					showCaseDateTypeError(ex);
+					showCaseDateMappingError(ex);
 				}
 			}, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.SMALL);
 			actions.getChildren().addAll(selector, save);
@@ -640,7 +640,7 @@ public final class SettingsController {
 					publishCaseDateTypeChanged(mapping.effectiveTypeId());
 					loadCaseDateRoleMappingsAsync("Protected role mapping reset to the global default.");
 				} catch (RuntimeException ex) {
-					showCaseDateTypeError(ex);
+					showCaseDateMappingError(ex);
 				}
 			}, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 			actions.getChildren().add(reset);
@@ -656,13 +656,23 @@ public final class SettingsController {
 		return label;
 	}
 
+	private void setCaseDateMappingMessage(String message) {
+		if (caseDateMappingStatusLabel != null) {
+			caseDateMappingStatusLabel.setText(message == null ? "" : message);
+		}
+	}
+
+	private void showCaseDateMappingError(RuntimeException error) {
+		LOG.error("Protected Case Date mapping mutation failed", error);
+		Window owner = caseDateRoleMappingsContainer == null || caseDateRoleMappingsContainer.getScene() == null
+				? null : caseDateRoleMappingsContainer.getScene().getWindow();
+		AppDialogs.showError(owner, "Protected Case Date Mappings",
+				"The protected Case Date mapping could not be saved. Contact an administrator if the problem continues.");
+	}
+
 	private boolean requireAdminLookupManagement(String sectionName) {
 		if (isAdminUser()) {
 			return true;
-		}
-		String message = "Only admin users can manage " + sectionName.toLowerCase() + ".";
-		if ("Case Date Types".equals(sectionName)) {
-			setCaseDateTypeMessage(message);
 		}
 		return false;
 	}
