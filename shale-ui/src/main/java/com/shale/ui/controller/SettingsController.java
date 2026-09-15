@@ -17,6 +17,7 @@ import com.shale.ui.component.UserCard;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.component.spellcheck.UserDictionarySession;
+import com.shale.ui.component.SettingsManagementRow;
 import com.shale.ui.notification.NotificationPreferenceKey;
 import com.shale.ui.notification.NotificationPreferences;
 import com.shale.ui.notification.NotificationPreferencesService;
@@ -108,20 +109,21 @@ public final class SettingsController {
 	@FXML
 	private Button viewAuditLogButton;
 	@FXML
-	private VBox auditSection;
+	private SettingsManagementRow auditLogRow;
 	@FXML
-	private VBox caseStatusAdministrationSection;
-	@FXML private Button manageCaseStatusesButton;
+	private SettingsManagementRow caseStatusesRow;
+	private Button manageCaseStatusesButton;
 	@FXML
-	private VBox practiceAreaAdministrationSection;
-	@FXML private Button managePracticeAreasButton;
+	private SettingsManagementRow practiceAreasRow;
+	private Button managePracticeAreasButton;
 	@FXML
-	private VBox linkTypeAdministrationSection;
-	@FXML private Button manageLinkTypesButton;
+	private SettingsManagementRow linkTypesRow;
+	private Button manageLinkTypesButton;
 	@FXML
-	private VBox caseDateTypeAdministrationSection;
-	@FXML private VBox caseDateRoleMappingsSection;
-	@FXML private Button manageCaseDateTypesButton;
+	private SettingsManagementRow caseDatesRow;
+	@FXML private SettingsManagementRow caseDateMappingsRow;
+	@FXML private VBox caseDateRoleMappingsContent;
+	private Button manageCaseDateTypesButton;
 	@FXML
 	private VBox caseDateTypeCardsContainer;
 	@FXML
@@ -131,8 +133,8 @@ public final class SettingsController {
 	@FXML
 	private Label caseDateTypeSettingsStatusLabel;
 	@FXML
-	private VBox requestAdministrationSection;
-	@FXML private Button manageRequestFieldsButton;
+	private SettingsManagementRow requestFieldsRow;
+	private Button manageRequestFieldsButton;
 	@FXML
 	private VBox materialTypeCardsContainer;
 	@FXML
@@ -152,12 +154,12 @@ public final class SettingsController {
 	@FXML
 	private Label requestStatusSettingsStatusLabel;
 	@FXML
-	private VBox contactClassificationAdministrationSection;
-	@FXML private VBox caseTeamRoleAdministrationSection;
-	@FXML private Button manageCaseTeamRolesButton;
-	@FXML private Button manageContactClassificationsButton;
-	@FXML private VBox organizationTypeAdministrationSection;
-	@FXML private Button manageOrganizationTypesButton;
+	private SettingsManagementRow contactClassificationsRow;
+	@FXML private SettingsManagementRow caseTeamRolesRow;
+	private Button manageCaseTeamRolesButton;
+	private Button manageContactClassificationsButton;
+	@FXML private SettingsManagementRow organizationTypesRow;
+	private Button manageOrganizationTypesButton;
 	@FXML
 	private TableView<UserManagementViewRow> userManagementTable;
 	@FXML
@@ -190,8 +192,13 @@ public final class SettingsController {
 	private Button resetPasswordButton;
 	@FXML
 	private Label userManagementStatusLabel;
-	@FXML private VBox customDictionarySection;
-	@FXML private Button manageCustomDictionaryButton;
+	@FXML private SettingsManagementRow customDictionaryRow;
+	private Button manageCustomDictionaryButton;
+	@FXML private SettingsManagementRow notificationPreferencesRow;
+	@FXML private VBox notificationPreferencesContent;
+	@FXML private SettingsManagementRow userManagementRow;
+	@FXML private VBox personalGroup, caseConfigurationGroup, requestConfigurationGroup,
+			contactOrganizationConfigurationGroup, administrationGroup;
 
 	private NotificationPreferencesService notificationPreferencesService;
 	private AppState appState;
@@ -231,9 +238,9 @@ public final class SettingsController {
 	@FXML
 	private void initialize() {
 		fxmlReady = true;
+		bindDirectoryRows();
 		configureSettingsSemanticButtons();
 		configureUserManagementSemanticButtons();
-		configureLookupActionRows();
 		configureUserManagementTable();
 		configureContactClassifications();
 		configureOrganizationTypes();
@@ -243,14 +250,45 @@ public final class SettingsController {
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
-		loadAdminSectionsAsync();
+	}
+
+	private void bindDirectoryRows() {
+		manageCustomDictionaryButton = bind(customDictionaryRow, this::onManageCustomDictionary);
+		manageCaseStatusesButton = bind(caseStatusesRow, this::onManageCaseStatuses);
+		managePracticeAreasButton = bind(practiceAreasRow, this::onManagePracticeAreas);
+		manageLinkTypesButton = bind(linkTypesRow, this::onManageLinkTypes);
+		manageCaseTeamRolesButton = bind(caseTeamRolesRow, this::onManageCaseTeamRoles);
+		manageCaseDateTypesButton = bind(caseDatesRow, this::onManageCaseDateTypes);
+		manageRequestFieldsButton = bind(requestFieldsRow, this::onManageRequestFields);
+		manageContactClassificationsButton = bind(contactClassificationsRow, this::onManageContactClassifications);
+		manageOrganizationTypesButton = bind(organizationTypesRow, this::onManageOrganizationTypes);
+		viewAuditLogButton = bind(auditLogRow, this::onViewAuditLog);
+		bind(notificationPreferencesRow, event -> toggleInline(notificationPreferencesContent, notificationPreferencesRow, false));
+		bind(userManagementRow, event -> toggleInline(userAdministrationSection, userManagementRow, true));
+		bind(caseDateMappingsRow, event -> {
+			boolean opening = !caseDateRoleMappingsContent.isManaged();
+			toggleInline(caseDateRoleMappingsContent, caseDateMappingsRow, false);
+			if (opening) loadCaseDateRoleMappingsAsync(null);
+		});
+	}
+
+	private static Button bind(SettingsManagementRow row, javafx.event.EventHandler<ActionEvent> handler) {
+		row.setOnAction(handler);
+		return row.getActionButton();
+	}
+
+	private void toggleInline(VBox content, SettingsManagementRow row, boolean loadUsers) {
+		boolean show = !content.isManaged();
+		setVisibleManaged(content, show);
+		row.setActionText(show ? "Close" : "Open");
+		if (show && loadUsers) loadManagedUsersAsync(null);
 	}
 
 	private void configureCustomDictionary() {
 		if (manageCustomDictionaryButton == null) return;
-		ControlStyles.apply(manageCustomDictionaryButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
-		manageCustomDictionaryButton.setDisable(appState == null || appState.getShaleClientId() == null
-				|| appState.getShaleClientId() <= 0 || appState.getUserId() == null || appState.getUserId() <= 0);
+		boolean available = appState != null && appState.getShaleClientId() != null
+				&& appState.getShaleClientId() > 0 && appState.getUserId() != null && appState.getUserId() > 0;
+		ControlAvailability.apply(manageCustomDictionaryButton, customDictionaryRow, available, this::onManageCustomDictionary);
 	}
 
 	@FXML private void onManageCustomDictionary(ActionEvent event) {
@@ -299,7 +337,6 @@ public final class SettingsController {
 			configureCaseTeamRoles();
 			loadFromPreferences();
 			updateAdminControlsVisibility();
-			loadAdminSectionsAsync();
 		}
 	}
 
@@ -568,14 +605,11 @@ public final class SettingsController {
 		if (event != null && event.getSource() instanceof Node node && node.getScene() != null) {
 			return node.getScene().getWindow();
 		}
-		return auditSection == null || auditSection.getScene() == null ? null : auditSection.getScene().getWindow();
+		return auditLogRow == null || auditLogRow.getScene() == null ? null : auditLogRow.getScene().getWindow();
 	}
 
 	private void loadAdminSectionsAsync() {
-		if (!fxmlReady || !isAdminUser())
-			return;
-		loadCaseDateRoleMappingsAsync(null);
-		loadManagedUsersAsync(null);
+		// Definition administration and user lists are intentionally loaded only after Open/Manage.
 	}
 
 	@FXML
@@ -2460,27 +2494,38 @@ public final class SettingsController {
 
 	private void updateAdminControlsVisibility() {
 		boolean admin = isAdminUser();
-		setVisibleManaged(auditSection, admin);
-		setVisibleManaged(caseStatusAdministrationSection, admin);
-		setVisibleManaged(caseDateRoleMappingsSection, admin && caseService != null);
-		setVisibleManaged(userAdministrationSection, admin && userDao != null);
+		setVisibleManaged(auditLogRow, admin);
+		setVisibleManaged(caseDateMappingsRow, admin && caseService != null);
+		setVisibleManaged(userManagementRow, admin && userDao != null);
+		if (!admin) {
+			setVisibleManaged(userAdministrationSection, false);
+			setVisibleManaged(caseDateRoleMappingsContent, false);
+		}
 		boolean context = hasAdminContext();
-		ControlAvailability.apply(managePracticeAreasButton, practiceAreaAdministrationSection,
+		ControlAvailability.apply(managePracticeAreasButton, practiceAreasRow,
 				context && caseService != null, this::onManagePracticeAreas);
-		ControlAvailability.apply(manageCaseStatusesButton, caseStatusAdministrationSection,
+		ControlAvailability.apply(manageCaseStatusesButton, caseStatusesRow,
 				context && caseService != null, this::onManageCaseStatuses);
-		ControlAvailability.apply(manageLinkTypesButton, linkTypeAdministrationSection,
+		ControlAvailability.apply(manageLinkTypesButton, linkTypesRow,
 				context && caseService != null, this::onManageLinkTypes);
-		ControlAvailability.apply(manageCaseTeamRolesButton, caseTeamRoleAdministrationSection,
+		ControlAvailability.apply(manageCaseTeamRolesButton, caseTeamRolesRow,
 				context && caseService != null, this::onManageCaseTeamRoles);
-		ControlAvailability.apply(manageCaseDateTypesButton, caseDateTypeAdministrationSection,
+		ControlAvailability.apply(manageCaseDateTypesButton, caseDatesRow,
 				context && caseService != null, this::onManageCaseDateTypes);
-		ControlAvailability.apply(manageRequestFieldsButton, requestAdministrationSection,
+		ControlAvailability.apply(manageRequestFieldsButton, requestFieldsRow,
 				context && materialRequestService != null, this::onManageRequestFields);
-		ControlAvailability.apply(manageContactClassificationsButton, contactClassificationAdministrationSection,
+		ControlAvailability.apply(manageContactClassificationsButton, contactClassificationsRow,
 				context && contactService != null, this::onManageContactClassifications);
-		ControlAvailability.apply(manageOrganizationTypesButton, organizationTypeAdministrationSection,
+		ControlAvailability.apply(manageOrganizationTypesButton, organizationTypesRow,
 				context && organizationService != null, this::onManageOrganizationTypes);
+		setVisibleManaged(caseConfigurationGroup, hasManagedChild(caseConfigurationGroup));
+		setVisibleManaged(requestConfigurationGroup, hasManagedChild(requestConfigurationGroup));
+		setVisibleManaged(contactOrganizationConfigurationGroup, hasManagedChild(contactOrganizationConfigurationGroup));
+		setVisibleManaged(administrationGroup, hasManagedChild(administrationGroup));
+	}
+
+	private static boolean hasManagedChild(VBox group) {
+		return group != null && group.getChildren().stream().skip(1).anyMatch(Node::isManaged);
 	}
 
 	private static void setVisibleManaged(Node node, boolean visible) {

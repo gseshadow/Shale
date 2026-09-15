@@ -15,10 +15,9 @@ final class CustomDictionaryManagementContractTest {
         String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
         String settings = read("controller/SettingsController.java");
 
-        assertTrue(fxml.contains("fx:id=\"customDictionarySection\""));
-        assertTrue(fxml.contains("text=\"Manage words accepted by Shale’s spelling tools.\""));
-        assertTrue(fxml.contains("fx:id=\"manageCustomDictionaryButton\"")
-                && fxml.contains("onAction=\"#onManageCustomDictionary\""));
+        assertTrue(fxml.contains("fx:id=\"customDictionaryRow\""));
+        assertTrue(fxml.contains("description=\"Manage words accepted by Shale’s spelling tools.\""));
+        assertTrue(settings.contains("bind(customDictionaryRow, this::onManageCustomDictionary)"));
         for (String obsolete : new String[] { "customDictionaryTable", "customDictionaryWordColumn",
                 "removeCustomDictionaryWordButton", "customDictionaryStatusLabel" }) {
             assertFalse(fxml.contains(obsolete), "the compact Settings row must not retain " + obsolete);

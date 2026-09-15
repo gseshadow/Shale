@@ -14,7 +14,7 @@ final class PracticeAreaManagementMigrationTest {
         String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
         assertTrue(fxml.contains("Manage practice-area names, colors, and availability."));
-        assertTrue(fxml.contains("fx:id=\"managePracticeAreasButton\""));
+        assertTrue(fxml.contains("fx:id=\"practiceAreasRow\""));
         assertFalse(fxml.contains("practiceAreaCardsContainer"));
         assertTrue(controller.contains("new PracticeAreaManagementLauncher"));
         assertFalse(controller.contains("new PracticeAreaManagementPane"));

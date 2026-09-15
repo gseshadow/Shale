@@ -11,9 +11,9 @@ final class RequestDefinitionManagementContractTest {
     private static final String PANE=read("src/main/java/com/shale/ui/controller/RequestDefinitionAdminPane.java");
     private static final String MATERIALS=read("src/main/java/com/shale/ui/controller/CaseMaterialsTabController.java");
     @Test void settingsUsesOneLazyRequestFieldsRow(){
-        assertTrue(FXML.contains("text=\"Request Fields\""));
+        assertTrue(FXML.contains("title=\"Request Fields\""));
         assertTrue(FXML.contains("Manage material types, request methods, and request statuses."));
-        assertTrue(FXML.contains("fx:id=\"manageRequestFieldsButton\""));
+        assertTrue(FXML.contains("fx:id=\"requestFieldsRow\""));
         assertFalse(FXML.contains("materialTypeCardsContainer"));
         assertFalse(SETTINGS.substring(SETTINGS.indexOf("private void loadAdminSectionsAsync"),SETTINGS.indexOf("private void onManageRequestFields")).contains("loadRequestLookupsAsync"));
     }

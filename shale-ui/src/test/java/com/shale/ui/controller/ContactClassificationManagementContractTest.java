@@ -16,9 +16,9 @@ final class ContactClassificationManagementContractTest {
     @Test void settingsUsesCompactLazyManagementRow() {
         String fxml = read("src/main/resources/fxml/settings.fxml");
         String settings = read("src/main/java/com/shale/ui/controller/SettingsController.java");
-        assertTrue(fxml.contains("text=\"Contact Classifications\""));
-        assertTrue(fxml.contains("text=\"Manage contact types, specialties, and credentials.\""));
-        assertTrue(fxml.contains("fx:id=\"manageContactClassificationsButton\" text=\"Manage\""));
+        assertTrue(fxml.contains("title=\"Contact Classifications\""));
+        assertTrue(fxml.contains("description=\"Manage contact types, specialties, and credentials.\""));
+        assertTrue(fxml.contains("fx:id=\"contactClassificationsRow\""));
         assertFalse(fxml.contains("contactClassificationContent"));
         assertFalse(settings.contains("new ContactClassificationAdminPane"),
                 "Settings must not eagerly construct the full manager");

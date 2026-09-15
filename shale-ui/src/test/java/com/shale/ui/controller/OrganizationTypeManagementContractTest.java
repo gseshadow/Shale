@@ -18,10 +18,9 @@ final class OrganizationTypeManagementContractTest {
 
     @Test void settingsIsCompactAndDoesNotEagerlyConstructTheManager() throws Exception {
         var document=DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(SETTINGS.toFile());
-        Element button=element(document,"manageOrganizationTypesButton");
+        Element button=element(document,"organizationTypesRow");
         assertNotNull(button,"Settings must expose the compact Organization Types manager action");
-        assertEquals("Manage",button.getAttribute("text"));
-        assertEquals("#onManageOrganizationTypes",button.getAttribute("onAction"));
+        assertEquals("Manage",button.getAttribute("actionText"));
         String fxml=Files.readString(SETTINGS),controller=Files.readString(SETTINGS_CONTROLLER);
         assertTrue(fxml.contains("Manage organization types, colors, and availability."));
         assertFalse(fxml.contains("organizationTypeAdministrationContent"));
@@ -51,8 +50,8 @@ final class OrganizationTypeManagementContractTest {
     }
 
     private static Element element(org.w3c.dom.Document document,String id){
-        var nodes=document.getElementsByTagName("Button");
-        for(int i=0;i<nodes.getLength();i++){Element e=(Element)nodes.item(i);if(id.equals(e.getAttribute("fx:id")))return e;}
+        for(String tag:new String[]{"SettingsManagementRow","Button"}) { var nodes=document.getElementsByTagName(tag);
+        for(int i=0;i<nodes.getLength();i++){Element e=(Element)nodes.item(i);if(id.equals(e.getAttribute("fx:id")))return e;} }
         return null;
     }
 }
