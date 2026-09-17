@@ -11,42 +11,54 @@
 	fx:controller="com.shale.ui.controller.CaseController"
 	styleClass="app-shell">
 
-	<!-- TOP: Header / Command Bar (slightly tighter) -->
+	<!-- TOP: Phase 2B Case Overview header. The action toolbar remains in Overview. -->
 	<top>
-		<VBox spacing="4.0" BorderPane.alignment="CENTER"
-			styleClass="page-header-surface">
+		<VBox fx:id="caseHeaderSurface" spacing="8.0" BorderPane.alignment="CENTER">
+			<styleClass>
+				<String fx:value="page-header-surface" />
+				<String fx:value="case-header" />
+			</styleClass>
 			<padding>
-				<Insets top="8" right="12" bottom="6" left="12" />
+				<Insets top="16" right="16" bottom="12" left="16" />
 			</padding>
 
 			<!-- Main header row: case title -->
 			<HBox spacing="8.0" alignment="CENTER_LEFT">
 				<Label fx:id="caseTitleLabel" text="Case (Placeholder)"
-					styleClass="functional-heading" />
-				<Region HBox.hgrow="ALWAYS" />
+					wrapText="true" maxWidth="1.7976931348623157E308"
+					styleClass="shale-page-title" HBox.hgrow="ALWAYS" />
 			</HBox>
 
-			<!-- Secondary row: compact metadata -->
-			<FlowPane hgap="8.0" vgap="4.0" alignment="CENTER_LEFT"
-				prefWrapLength="620">
+			<!-- Text facts remain quiet metadata; semantic classifications use their shared factories. -->
+			<FlowPane fx:id="caseMetadataFlow" hgap="8.0" vgap="6.0"
+				alignment="TOP_LEFT" prefWrapLength="760">
+				<styleClass>
+					<String fx:value="case-header-metadata" />
+					<String fx:value="shale-metadata" />
+				</styleClass>
 				<Label fx:id="caseMetadataLabel" text="Case #—"
-					styleClass="functional-metadata" />
-				<Label text="•" style="-fx-opacity: 0.55;" />
+					styleClass="shale-metadata" />
+				<Label text="•" styleClass="case-header-separator" />
 				<HBox spacing="4.0" alignment="CENTER_LEFT">
-					<Label text="Intake by:" style="-fx-opacity: 0.8;" />
+					<Label text="Intake by:" styleClass="shale-metadata-muted" />
 					<StackPane fx:id="intakeTakenByUserHost" />
 				</HBox>
-				<Label text="•" style="-fx-opacity: 0.55;" />
-				<StackPane fx:id="statusHost" />
-				<Label text="•" style="-fx-opacity: 0.55;" />
-				<StackPane fx:id="assignedUserHost" />
-				<Label text="•" style="-fx-opacity: 0.55;" />
+				<Label text="•" styleClass="case-header-separator" />
 				<Label fx:id="lastUpdatedLabel" text="Last updated: —"
-					style="-fx-opacity: 0.7;" />
+					styleClass="shale-metadata-muted" />
+			</FlowPane>
+
+			<FlowPane fx:id="caseClassificationFlow" hgap="8.0" vgap="6.0"
+				alignment="TOP_LEFT" prefWrapLength="760"
+				styleClass="case-header-classifications">
+				<StackPane fx:id="headerPracticeAreaHost" />
+				<StackPane fx:id="statusHost" />
+				<StackPane fx:id="nonEngagementStateHost" />
 			</FlowPane>
 
 			<StackPane fx:id="statusTimelineHost"
-				maxWidth="1.7976931348623157E308" minHeight="48" />
+				maxWidth="1.7976931348623157E308" minHeight="48"
+				styleClass="case-status-history-host" />
 		</VBox>
 	</top>
 

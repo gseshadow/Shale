@@ -113,6 +113,7 @@ import com.shale.ui.component.dialog.CaseDateOccurrenceDialog;
 import com.shale.ui.component.dialog.CaseOverviewEditorDialog;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
 import com.shale.ui.component.dialog.NewTaskDialog;
+import com.shale.ui.util.MetadataChipFactory;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
@@ -233,6 +234,10 @@ public class CaseController {
 	private StackPane statusHost;
 	@FXML
 	private StackPane assignedUserHost;
+	@FXML
+	private StackPane headerPracticeAreaHost;
+	@FXML
+	private StackPane nonEngagementStateHost;
 	@FXML
 	private StackPane statusTimelineHost;
 	@FXML
@@ -1574,6 +1579,7 @@ public class CaseController {
 		renderPrimaryStatusMini(null, "—", null);
 		renderResponsibleAttorneyMini(null, "—", null);
 		renderPracticeAreaMini(null, "—", null);
+		renderNonEngagementState(false);
 
 		if (lastUpdatedLabel != null)
 			lastUpdatedLabel.setText("Last updated: —");
@@ -1744,19 +1750,37 @@ public class CaseController {
 		List<CaseStatusHistoryDto> safeHistory = history == null ? List.of() : history;
 		if (safeHistory.isEmpty()) {
 			Label empty = new Label("No status history");
-			empty.setStyle("-fx-opacity: 0.55; -fx-font-size: 11px;");
+			empty.getStyleClass().add("shale-empty-message");
 			statusTimelineHost.getChildren().add(empty);
 			return;
 		}
 
-		List<StatusTimeline.Item> items = safeHistory.stream().map(item -> {
-			String name = safeText(item.statusName()).isBlank() ? "Status #" + item.statusId() : safeText(item.statusName());
-			StatusTimeline.State state = item.current() ? StatusTimeline.State.CURRENT
-					: item.endDate() != null ? StatusTimeline.State.COMPLETED : StatusTimeline.State.FUTURE;
-			return new StatusTimeline.Item(Integer.toString(item.statusId()), name, item.color(), state,
-					buildStatusTimelineTooltip(item, name));
-		}).toList();
+		List<StatusTimeline.Item> items = toStatusTimelineItems(safeHistory);
 		statusTimelineHost.getChildren().add(StatusTimeline.create(items, StatusTimeline.Variant.OVERVIEW));
+	}
+
+	static List<StatusTimeline.Item> toStatusTimelineItems(List<CaseStatusHistoryDto> history) {
+		List<CaseStatusHistoryDto> safeHistory = history == null ? List.of() : history;
+		int authoritativeCurrentIndex = -1;
+		for (int index = 0; index < safeHistory.size(); index++) {
+			if (safeHistory.get(index).current())
+				authoritativeCurrentIndex = index;
+		}
+		List<StatusTimeline.Item> items = new ArrayList<>(safeHistory.size());
+		for (int index = 0; index < safeHistory.size(); index++) {
+			CaseStatusHistoryDto item = safeHistory.get(index);
+			String name = safeText(item.statusName()).isBlank() ? "Status #" + item.statusId() : safeText(item.statusName());
+			// This is chronological record history, not a predetermined workflow.
+			// Preserve order and repetitions; only the DAO-authoritative open/primary
+			// record latest in the ordered result is current, while every other joined
+			// definition is historical. This also safely contains inconsistent legacy
+			// data with more than one open/primary row to a single visual current state.
+			StatusTimeline.State state = index == authoritativeCurrentIndex ? StatusTimeline.State.CURRENT
+					: StatusTimeline.State.HISTORICAL;
+			items.add(new StatusTimeline.Item(Long.toString(item.caseStatusId()), name, item.color(), state,
+					buildStatusTimelineTooltip(item, name)));
+		}
+		return List.copyOf(items);
 	}
 
 	private static String buildStatusTimelineTooltip(CaseStatusHistoryDto item, String name) {
@@ -7023,9 +7047,6 @@ public class CaseController {
 	}
 
 	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorHex) {
-		if (ovPracticeAreaHost == null)
-			return;
-
 		if (practiceAreaCardFactory == null) {
 			practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea == null ? id ->
 			{
@@ -7039,7 +7060,21 @@ public class CaseController {
 				colorHex
 		);
 
-		ovPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.LARGE));
+		if (headerPracticeAreaHost != null)
+			headerPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.COMPACT));
+		if (ovPracticeAreaHost != null)
+			ovPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.LARGE));
+	}
+
+	private void renderNonEngagementState(Boolean sent) {
+		if (nonEngagementStateHost == null)
+			return;
+		nonEngagementStateHost.getChildren().clear();
+		if (!Boolean.TRUE.equals(sent))
+			return;
+		Label chip = MetadataChipFactory.compact("Non-Engagement Letter Sent");
+		chip.getStyleClass().addAll("shale-semantic-chip", "shale-semantic-chip-info");
+		nonEngagementStateHost.getChildren().add(chip);
 	}
 
 	private Node createOverviewInlineValue(String value, String colorCss) {
@@ -7511,6 +7546,7 @@ public class CaseController {
 			if (statusLabel != null)
 				statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
 			renderLastUpdated(detail.getUpdatedAt());
+			renderNonEngagementState(detail.getNonEngagementLetterSent());
 			renderHeaderTitleFromDetail(detail);
 		}
 

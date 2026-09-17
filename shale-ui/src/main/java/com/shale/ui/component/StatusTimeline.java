@@ -1,6 +1,7 @@
 package com.shale.ui.component;
 
 import com.shale.ui.util.ColorUtil;
+import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -19,7 +20,7 @@ import java.util.List;
  */
 public final class StatusTimeline {
     public enum Variant { OVERVIEW, COMPACT_CARD }
-    public enum State { COMPLETED, CURRENT, FUTURE }
+    public enum State { COMPLETED, CURRENT, HISTORICAL, FUTURE }
     public record Item(String identity, String name, String color, State state, String tooltip) {}
 
     private StatusTimeline() {}
@@ -27,7 +28,7 @@ public final class StatusTimeline {
     public static ScrollPane create(List<Item> source, Variant variant) {
         List<Item> items = source == null ? List.of() : source;
         HBox row = new HBox(0);
-        row.getStyleClass().add("status-timeline__row");
+        row.getStyleClass().addAll("status-timeline__row", "shale-stage-tracker");
         row.setAlignment(Pos.CENTER_LEFT);
         for (int i = 0; i < items.size(); i++) {
             row.getChildren().add(pill(items.get(i), variant));
@@ -46,6 +47,11 @@ public final class StatusTimeline {
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.setPannable(true);
+        if (variant == Variant.OVERVIEW && !items.isEmpty()) {
+            // One post-layout reveal keeps the authoritative latest record practical
+            // to find without animation, listeners, or a refresh feedback loop.
+            Platform.runLater(() -> scroll.setHvalue(scroll.getHmax()));
+        }
         // The timeline is read-only. Leave ordinary clicks unconsumed so an enclosing
         // selectable card receives them; ScrollPane still owns genuine pan gestures.
         return scroll;
@@ -56,18 +62,15 @@ public final class StatusTimeline {
         boolean completed = item.state() == State.COMPLETED;
         boolean current = item.state() == State.CURRENT;
         String storedColor = ColorUtil.normalizeStoredColor(item.color()) == null ? "#E2E8F0" : item.color();
-        String background = ColorUtil.toCssBackgroundColor(storedColor);
-        String textColor = ColorUtil.readableTextColor(storedColor);
         String name = item.name() == null || item.name().isBlank() ? "Unknown" : item.name().trim();
 
-        Label check = new Label("✓");
+        Label check = new Label(current ? "●" : "✓");
         check.getStyleClass().add("status-timeline__check");
-        check.setVisible(completed);
-        check.setManaged(completed);
+        check.setVisible(true);
+        check.setManaged(true);
         check.setMinWidth(compact ? 10 : 14);
         check.setAlignment(Pos.CENTER);
-        check.setStyle("-fx-text-fill: " + textColor + "; -fx-opacity: 0.82; -fx-font-size: "
-                + (compact ? 10 : 13) + "px; -fx-font-weight: bold;");
+        check.setStyle("-fx-text-fill: " + ColorUtil.toCssBackgroundColor(storedColor) + ";");
 
         Label label = new Label(name);
         label.getStyleClass().add("status-timeline__label");
@@ -77,26 +80,21 @@ public final class StatusTimeline {
         label.setMaxWidth(compact ? 150 : 220);
         label.setAlignment(Pos.CENTER);
         label.setTextOverrun(OverrunStyle.ELLIPSIS);
-        label.setStyle("-fx-text-fill: " + textColor + "; -fx-font-size: " + (compact ? 11 : 13)
-                + "px; -fx-font-weight: " + (current ? "bold" : "600") + ";");
 
         HBox pill = new HBox(compact ? 4 : 8, check, label);
-        pill.getStyleClass().addAll("shale-status-pill", "status-timeline__pill",
+        pill.getStyleClass().addAll("shale-stage-item", "status-timeline__pill",
                 current ? "status-timeline__pill--current" : completed
-                        ? "status-timeline__pill--completed" : "status-timeline__pill--future");
+                        ? "status-timeline__pill--completed" : item.state() == State.HISTORICAL
+                        ? "status-timeline__pill--historical" : "status-timeline__pill--future");
         pill.setUserData(item);
         pill.setAlignment(Pos.CENTER);
         pill.setMinHeight(compact ? 26 : 38);
         pill.setMaxHeight(compact ? 26 : 38);
         pill.setMinWidth(compact ? 66 : 112);
         pill.setMaxWidth(compact ? 178 : 270);
-        double radius = compact ? 13 : 20;
-        pill.setStyle("-fx-background-color: " + background + "; -fx-background-radius: " + radius + "; "
-                + "-fx-padding: 0 " + (compact ? 9 : 18) + " 0 " + (completed ? (compact ? 7 : 14) : (compact ? 9 : 18)) + "; "
-                + "-fx-border-color: " + (current ? "rgba(20,35,55,0.62)" : "rgba(0,0,0,0.14)") + "; "
-                + "-fx-border-radius: " + radius + "; -fx-border-width: " + (current ? 1.8 : 0.8) + "; "
-                + (current ? "-fx-effect: dropshadow(gaussian, rgba(31,41,55,0.26), " + (compact ? 6 : 10) + ", 0.2, 0, 1);" : "")
-                + (item.state() == State.FUTURE ? "-fx-opacity: 0.52;" : ""));
+        // Only the validated database color remains inline; theme-owned surface,
+        // border, text, focus, and elevation are owned by the shared stage CSS.
+        pill.setStyle("-shale-stage-data-color: " + ColorUtil.toCssBackgroundColor(storedColor) + ";");
         Tooltip.install(pill, new Tooltip(item.tooltip() == null || item.tooltip().isBlank() ? name : item.tooltip()));
         return pill;
     }
@@ -104,13 +102,11 @@ public final class StatusTimeline {
     private static Node connector(Item preceding, Variant variant) {
         boolean compact = variant == Variant.COMPACT_CARD;
         Region line = new Region();
-        line.getStyleClass().addAll("status-timeline__connector-line",
+        line.getStyleClass().addAll("status-timeline__connector-line", "shale-stage-connector",
                 preceding.state() == State.COMPLETED ? "status-timeline__connector-line--completed" : "status-timeline__connector-line--future");
         line.setMinSize(compact ? 12 : 30, 2);
         line.setPrefSize(compact ? 12 : 30, 2);
         line.setMaxSize(compact ? 12 : 30, 2);
-        line.setStyle("-fx-background-color: " + (preceding.state() == State.COMPLETED
-                ? "rgba(91,103,124,0.62)" : "rgba(91,103,124,0.30)") + "; -fx-background-radius: 2;");
         StackPane connector = new StackPane(line);
         connector.getStyleClass().add("status-timeline__connector");
         connector.setMinSize(compact ? 16 : 38, compact ? 26 : 38);

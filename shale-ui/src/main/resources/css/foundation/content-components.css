@@ -68,7 +68,8 @@
 }
 .shale-avatar-compact { -fx-min-width: 28px; -fx-pref-width: 28px; -fx-max-width: 28px; -fx-min-height: 28px; -fx-pref-height: 28px; -fx-max-height: 28px; }
 
-/* Connected workflow tracker; stage labels must accompany every color state. */
+/* Connected workflow/history tracker; stage labels accompany every color state.
+   Case Overview uses historical/current states without implying completion. */
 .shale-stage-tracker { -fx-alignment: center-left; -fx-spacing: 0; -fx-padding: 8px 4px; }
 .shale-stage-scroll, .shale-stage-scroll > .viewport { -fx-background-color: transparent; }
 .shale-stage-connector { -fx-min-height: 2px; -fx-pref-height: 2px; -fx-background-color: -shale-color-stage-inactive; }
@@ -79,6 +80,38 @@
 .shale-stage-current { -fx-background-color: linear-gradient(to right, -shale-color-action-primary-start, -shale-color-action-primary-end); -fx-border-color: -shale-color-border-selected; -fx-text-fill: -shale-color-text-on-primary; }
 .shale-stage-warning { -fx-background-color: -shale-color-warning-wash; -fx-border-color: -shale-color-warning-border; -fx-text-fill: -shale-color-warning-text; }
 .shale-stage-label-compact { -fx-font-size: 11px; -fx-padding: 4px 8px; }
+
+/* Phase 2B Case header and chronological status-history owner. */
+.case-header { -fx-background-color: -shale-color-elevated-surface; -fx-border-color: -shale-color-border-subtle; }
+.case-header-metadata, .case-header-classifications { -fx-alignment: top-left; }
+.case-header-separator { -fx-text-fill: -shale-color-divider; -fx-font-weight: 800; }
+.case-status-history-host { -fx-alignment: center-left; }
+.status-timeline { -fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0; }
+.status-timeline > .viewport, .status-timeline > .viewport > .content { -fx-background-color: transparent; }
+.status-timeline__row { -fx-padding: 4px 0 6px 0; }
+.status-timeline__pill { -fx-background-color: -shale-color-surface-muted; -fx-border-color: -shale-color-border-subtle; -fx-text-fill: -shale-color-text-secondary; }
+.status-timeline__pill--historical { -fx-background-color: -shale-color-section-surface; -fx-border-color: -shale-color-border-subtle; }
+.status-timeline__pill--completed { -fx-background-color: -shale-color-success-wash; -fx-border-color: -shale-color-success-border; -fx-text-fill: -shale-color-success-text; }
+.status-timeline__pill--future { -fx-opacity: -shale-opacity-disabled; }
+.status-timeline__pill--current {
+    -fx-background-color: linear-gradient(to right, -shale-color-action-primary-start, -shale-color-action-primary-end);
+    -fx-border-color: -shale-stage-data-color, -shale-color-border-selected;
+    -fx-border-insets: 0, -2px;
+    -fx-border-width: 2px, 1px;
+    -fx-text-fill: -shale-color-text-on-primary;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 8, 0.14, 0, 1);
+}
+.status-timeline__check { -fx-font-size: 11px; -fx-font-weight: 900; }
+.status-timeline__label { -fx-font-size: 12px; -fx-font-weight: 650; -fx-text-fill: -shale-color-text-secondary; }
+.status-timeline__pill--completed .status-timeline__label { -fx-text-fill: -shale-color-success-text; }
+.status-timeline__pill--current .status-timeline__label { -fx-font-weight: 800; -fx-text-fill: -shale-color-text-on-primary; }
+.status-timeline__connector-line { -fx-background-color: -shale-color-stage-inactive; -fx-background-radius: 2px; }
+.status-timeline__connector-line--completed { -fx-background-color: -shale-color-stage-complete; }
+.status-timeline .scroll-bar:horizontal { -fx-pref-height: 8px; -fx-background-color: transparent; }
+.status-timeline .scroll-bar:horizontal .track { -fx-background-color: -shale-color-surface-muted; -fx-background-radius: 999px; }
+.status-timeline .scroll-bar:horizontal .thumb { -fx-background-color: -shale-color-border-strong; -fx-background-radius: 999px; }
+.status-timeline .scroll-bar:horizontal .thumb:hover { -fx-background-color: -shale-color-input-hover-border; }
+.status-timeline:focused { -fx-border-color: -shale-color-border-focus; -fx-border-radius: 8px; }
 
 /* Update rail, composer, search, and compact update cards. */
 .shale-update-rail { -fx-spacing: 12px; -fx-padding: 12px; -fx-background-color: -shale-color-section-surface; -fx-background-radius: 14px; }
