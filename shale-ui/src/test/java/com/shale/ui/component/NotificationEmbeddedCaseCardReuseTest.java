@@ -36,7 +36,7 @@ final class NotificationEmbeddedCaseCardReuseTest {
         String embeddedBlock = caseCard.substring(caseCard.indexOf("public void applyEmbeddedMini()"), caseCard.indexOf("public void applyTaskPreview()"));
         String buildBlock = caseCard.substring(caseCard.indexOf("private void buildUi()"), caseCard.indexOf("private void setPracticeAreaBarWidth"));
 
-        assertTrue(buildBlock.contains("getStyleClass().addAll(\"case-card\", \"case-card-neutral\", \"shale-entity-card\", \"shale-entity-card-clickable\", \"shale-interactive-card\")"),
+        assertTrue(buildBlock.contains("getStyleClass().addAll(\"case-card\", \"case-card-tinted\", \"shale-entity-card\", \"shale-entity-card-clickable\", \"shale-interactive-card\")"),
                 "Embedded cards should retain the CaseCard root style classes.");
         assertTrue(embeddedBlock.contains("getStyleClass().add(\"task-related-case-card\")"),
                 "Embedded cards should retain the existing Overview task-related root marker used for click behavior.");
