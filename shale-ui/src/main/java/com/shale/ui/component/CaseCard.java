@@ -303,6 +303,9 @@ public class CaseCard extends VBox {
 
 	public void setPracticeAreaCssColor(String practiceAreaColorCss) {
 		this.practiceAreaColorCss = normalizeColor(practiceAreaColorCss, "#CBD5E1");
+		Color identity = com.shale.ui.util.ColorUtil.toFxColor(this.practiceAreaColorCss);
+		this.practiceAreaWashCss = translucent(identity, 0.28);
+		this.mutedPracticeAreaWashCss = translucent(identity.desaturate(), 0.16);
 		refreshSurfaceStyle();
 	}
 
