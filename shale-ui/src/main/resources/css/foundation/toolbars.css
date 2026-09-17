@@ -9,6 +9,22 @@
     -fx-border-width: 1;
 }
 
+/* Responsive page toolbar: a FlowPane supplied by the page owns wrapping. */
+.cases-toolbar {
+    -fx-padding: 10px 12px;
+    -fx-background-color: -shale-color-section-surface;
+    -fx-border-color: -shale-color-border-subtle;
+}
+
+.cases-toolbar-controls { -fx-alignment: center-left; }
+
+.cases-results-count {
+    -fx-text-fill: -shale-color-text-muted;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-padding: 0 4px;
+}
+
 .shale-toolbar-heading,
 .label.shale-toolbar-heading {
     -fx-font-size: 15px;
@@ -18,10 +34,10 @@
 
 .shale-segmented-control {
     -fx-padding: 2;
-    -fx-background-color: rgba(17, 37, 66, 0.08);
+    -fx-background-color: -shale-color-surface-muted;
     -fx-background-radius: 999;
     -fx-border-radius: 999;
-    -fx-border-color: rgba(17, 37, 66, 0.14);
+    -fx-border-color: -shale-color-border-subtle;
     -fx-border-width: 1;
     -fx-spacing: 0;
 }
@@ -31,7 +47,7 @@
     -fx-min-height: 32;
     -fx-pref-height: 32;
     -fx-padding: 6 14 6 14;
-    -fx-background-color: rgba(248, 250, 252, 0.86);
+    -fx-background-color: -shale-color-card-surface;
     -fx-background-radius: 999;
     -fx-border-radius: 999;
     -fx-border-color: transparent;
@@ -44,34 +60,35 @@
 
 .toggle-button.shale-segment:hover,
 .button.shale-segment:hover {
-    -fx-background-color: rgba(255, 255, 255, 0.96);
-    -fx-border-color: rgba(74, 104, 138, 0.24);
+    -fx-background-color: -shale-color-card-hover;
+    -fx-border-color: -shale-color-border-strong;
 }
 
 .toggle-button.shale-segment:pressed,
 .button.shale-segment:pressed {
-    -fx-background-color: rgba(232, 241, 251, 0.92);
+    -fx-background-color: -shale-color-selected-control-background;
 }
 
 .toggle-button.shale-segment:selected {
-    -fx-background-color: -shale-button-primary-background;
-    -fx-border-color: -shale-button-primary-border;
-    -fx-text-fill: -shale-button-primary-text;
+    -fx-background-color: -shale-color-action-primary-start;
+    -fx-border-color: -shale-color-border-selected;
+    -fx-text-fill: -shale-color-text-on-primary;
 }
 
 .toggle-button.shale-segment:selected:hover {
-    -fx-background-color: -shale-button-primary-hover-background;
-    -fx-border-color: -shale-button-primary-hover-border;
+    -fx-background-color: -shale-color-action-primary-hover-start;
+    -fx-border-color: -shale-color-border-selected;
 }
 
 .toggle-button.shale-segment:selected:pressed {
-    -fx-background-color: -shale-button-primary-pressed-background;
-    -fx-border-color: -shale-button-primary-pressed-border;
+    -fx-background-color: -shale-color-action-primary-pressed;
+    -fx-border-color: -shale-color-border-selected;
 }
 
 .toggle-button.shale-segment:focused,
 .button.shale-segment:focused {
-    -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 8, 0.18, 0, 0);
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.18, 0, 0);
 }
 
 /* Empty State: shared placeholder copy for loading/empty list regions. */

@@ -25,8 +25,10 @@ final class MyShaleAndCasesSemanticControlMigrationTest {
         for (String control : java.util.List.of("casesSearchField", "casesSortChoice", "statusFilterMenuButton")) {
             assertTrue(cases.contains("ControlStyles.formControl(" + control + ")"), control);
         }
-        assertTrue(cases.contains("ControlStyles.apply(cardsViewToggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL)"));
-        assertTrue(cases.contains("ControlStyles.apply(gridViewToggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL)"));
+        assertFalse(cases.contains("ControlStyles.apply(cardsViewToggle"),
+                "The specialized segmented selector must not also use ordinary button semantics.");
+        assertFalse(cases.contains("ControlStyles.apply(gridViewToggle"),
+                "The specialized segmented selector must not also use ordinary button semantics.");
         assertTrue(cases.contains("ControlStyles.apply(columnMenuButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL)"));
         assertTrue(cases.contains("ControlStyles.apply(exportMenuButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL)"));
         assertTrue(casesFxml.contains("styleClass=\"shale-segmented-control\""));
@@ -48,10 +50,12 @@ final class MyShaleAndCasesSemanticControlMigrationTest {
 
 	@Test
 	void casesToolbarKeepsResponsiveAndDataPresentationContracts() throws Exception {
-		assertTrue(casesFxml.contains("<FlowPane hgap=\"10\" vgap=\"8\""));
-		assertTrue(casesFxml.contains("prefWrapLength=\"1040\""));
+		assertTrue(casesFxml.contains("<FlowPane hgap=\"8\" vgap=\"8\""));
+		assertFalse(casesFxml.contains("prefWrapLength=\"1040\""),
+				"Toolbar wrapping must follow available width rather than a fixed page width.");
 		assertTrue(casesFxml.contains("promptText=\"Search cases…\" prefWidth=\"280\""));
 		assertTrue(casesFxml.contains("styleClass=\"shale-segmented-control\""));
+		assertTrue(fxmlElement("ToggleButton", "cardsViewToggle").contains("styleClass=\"shale-segment\""));
 		String indicators = read("src/main/resources/css/foundation/indicators.css");
 		assertTrue(indicators.contains(".shale-indicator-status-pill"));
 		assertTrue(indicators.contains(".shale-status-pill"));

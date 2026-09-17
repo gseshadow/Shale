@@ -33,8 +33,9 @@ final class CaseCardFactoryTortNoticeTest {
         String source = Files.readString(CASE_CARD);
         String factory = Files.readString(FACTORY);
 
-        assertTrue(source.contains("solLabel.setStyle(deadlineLabelStyle(color));"));
-        assertTrue(source.contains("tortNoticeLabel.setStyle(deadlineLabelStyle(color));"));
+        assertTrue(source.contains("applyDeadlineState(solLabel, solDate);"));
+        assertTrue(source.contains("applyDeadlineState(tortNoticeLabel, tortNoticeDeadline);"));
+        assertTrue(source.contains("case-card__deadline-urgent"));
         assertTrue(factory.contains("card.setTortNoticeDeadline(vm.tortNoticeDeadline());"));
     }
 }

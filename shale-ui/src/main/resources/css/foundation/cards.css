@@ -266,3 +266,54 @@
 .shale-interactive-card:hover { -fx-background-color: -shale-color-card-hover; -fx-border-color: -shale-color-border-strong; -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 18, 0.18, 0, 4); }
 .shale-card-selected { -fx-border-color: -shale-color-border-selected; -fx-border-width: 2px; }
 .shale-compact-card { -fx-background-radius: 10px; -fx-border-radius: 10px; -fx-padding: 10px; }
+
+/* Authoritative CaseCard composition. Stored colors are limited to its accent rail and status pill. */
+.case-card-neutral {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2);
+}
+
+.case-card-neutral:hover {
+    -fx-background-color: -shale-color-card-hover;
+    -fx-border-color: -shale-color-border-strong;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 18, 0.16, 0, 4);
+}
+
+.case-card-neutral:pressed { -fx-background-color: -shale-color-selected-control-background; }
+.case-card-neutral:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 9, 0.18, 0, 0);
+}
+.case-card-neutral:disabled { -fx-opacity: -shale-opacity-disabled; -fx-cursor: default; }
+.case-card-neutral.case-card-closed { -fx-opacity: 0.72; -fx-border-style: segments(5px, 3px); }
+.case-card-neutral.case-card-denied { -fx-border-color: -shale-color-danger-border; }
+.case-card-neutral.case-card-non-engagement { -fx-border-width: 1px 1px 1px 3px; }
+.case-card-neutral.shale-card-selected { -fx-border-color: -shale-color-border-selected; -fx-border-width: 2px; }
+
+.case-card__title {
+    -fx-font-size: 14px;
+    -fx-font-weight: 800;
+    -fx-text-fill: -shale-color-text-primary;
+}
+.case-card__title-mini { -fx-font-size: 11px; -fx-font-weight: 700; }
+.case-card__date { -fx-font-size: 11px; -fx-text-fill: -shale-color-text-secondary; }
+.case-card__deadline { -fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-secondary; }
+.case-card__deadline-warning { -fx-text-fill: -shale-color-text-warning; }
+.case-card__deadline-urgent { -fx-text-fill: -shale-color-text-danger; -fx-underline: true; }
+.case-card__non-engagement { -fx-font-size: 10px; }
+
+.cases-content-surface {
+    -fx-padding: 12px;
+    -fx-background-color: transparent;
+}
+
+.cases-content-surface.shale-table {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+}

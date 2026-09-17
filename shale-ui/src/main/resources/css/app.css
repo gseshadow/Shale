@@ -88,27 +88,6 @@
     -fx-border-width: 1;
 }
 
-.cases-page {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent;
-}
-
-.cases-content-surface {
-    -fx-background-color: rgba(238, 247, 255, 0.06);
-    -fx-background-radius: 12;
-    -fx-border-radius: 12;
-    -fx-border-color: rgba(222, 239, 255, 0.16);
-    -fx-border-width: 1;
-}
-
-.cases-filter-bar {
-    -fx-background-color: rgba(245, 249, 253, 0.74);
-    -fx-background-radius: 12;
-    -fx-border-radius: 12;
-    -fx-border-color: rgba(17, 36, 67, 0.16);
-    -fx-border-width: 1;
-}
-
 .section-title {
     -fx-font-weight: 800;
     -fx-text-fill: #e8f2ff;
@@ -122,12 +101,6 @@
 
 .search-summary-text {
     -fx-text-fill: rgba(17, 37, 66, 0.80);
-    -fx-font-weight: 600;
-}
-
-.cases-results-count {
-    -fx-text-fill: rgba(17, 37, 66, 0.72);
-    -fx-font-size: 12px;
     -fx-font-weight: 600;
 }
 
