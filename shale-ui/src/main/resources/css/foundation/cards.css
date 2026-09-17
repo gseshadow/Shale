@@ -353,3 +353,40 @@
     -fx-border-radius: 12px;
     -fx-background-radius: 12px;
 }
+
+/* Authoritative ContactCard: neutral theme surface; classifications retain DB-owned color in chips. */
+.contact-card {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2);
+    -fx-cursor: hand;
+}
+.contact-card:hover {
+    -fx-background-color: -shale-color-card-hover;
+    -fx-border-color: -shale-color-border-strong;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 18, 0.16, 0, 4);
+}
+.contact-card:pressed { -fx-background-color: -shale-color-selected-control-background; }
+.contact-card:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 9, 0.18, 0, 0);
+}
+.contact-card:disabled { -fx-opacity: -shale-opacity-disabled; -fx-cursor: default; }
+.contact-card.shale-card-selected {
+    -fx-background-color: -shale-color-selected-control-background;
+    -fx-border-color: -shale-color-border-selected;
+    -fx-border-width: 2px;
+}
+.contact-card-inactive { -fx-opacity: 0.72; -fx-border-style: segments(5px, 3px); }
+.contact-card-display-only { -fx-cursor: default; }
+.contact-card-display-only:hover { -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2); }
+.contact-card-full { -fx-padding: 16px; -fx-spacing: 12px; }
+.contact-card-compact { -fx-padding: 12px; -fx-spacing: 8px; }
+.contact-card-mini { -fx-padding: 4px 10px; -fx-spacing: 6px; -fx-background-radius: 10px; -fx-border-radius: 10px; }
+.contact-card-compact-mini { -fx-padding: 2px 6px; -fx-spacing: 4px; }
+.contact-card-secondary-mini { -fx-padding: 3px 8px; -fx-spacing: 5px; }
+.contact-card-identity { -fx-spacing: 5px; }
+.contact-card-role { -fx-font-weight: 700; }

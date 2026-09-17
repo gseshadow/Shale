@@ -135,6 +135,37 @@ class ContactCardCredentialProductionPathTest {
 			}
 		});
 	}
+    @Test void authoritativeCardOwnsNeutralSurfaceKeyboardActivationAndCompactCompatibility() throws Exception {
+        String contacts = Files.readString(Path.of("src/main/java/com/shale/ui/controller/ContactsController.java"));
+        String search = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SearchController.java"));
+        String cases = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
+        assertTrue(contacts.contains("contactCardFactory.create(cardModel(row), CONTACTS_CARD_VARIANT)"));
+        assertTrue(search.contains("contactCardFactory.create(toContactCardModel(row), ContactCardFactory.Variant.FULL)"));
+        assertTrue(cases.contains("factory.create(model, variant)"));
+
+        String css = Files.readString(Path.of("src/main/resources/css/foundation/cards.css"));
+        String appCss = Files.readString(Path.of("src/main/resources/css/app.css"));
+        assertTrue(css.contains(".contact-card"));
+        assertTrue(css.contains("-fx-background-color: -shale-color-card-surface"));
+        assertTrue(css.contains(".contact-card:focused"));
+        assertTrue(css.contains(".contact-card.shale-card-selected"));
+        assertFalse(appCss.contains(".contact-card {"), "ContactCard paint belongs to foundation/cards.css");
+
+        JavaFxTestSupport.runAndWait(() -> {
+            java.util.concurrent.atomic.AtomicInteger opened = new java.util.concurrent.atomic.AtomicInteger();
+            ContactCardFactory factory = new ContactCardFactory(opened::set);
+            var full = factory.create(new ContactCardFactory.ContactCardModel(17, "Alex Example", null, null, null, List.of()), ContactCardFactory.Variant.FULL);
+            assertTrue(full.isFocusTraversable());
+            assertTrue(full.getStyleClass().contains("contact-card-full"));
+            assertNull(full.lookup("#contact-card-email-label"), "missing optional email must not create a dominant placeholder row");
+            full.fireEvent(new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "", javafx.scene.input.KeyCode.ENTER, false, false, false, false));
+            assertEquals(17, opened.get());
+            var compact = factory.create(new ContactCardFactory.ContactCardModel(18, "Embedded Contact", "Client", null, "555", List.of()), ContactCardFactory.Variant.COMPACT);
+            assertTrue(compact.getStyleClass().contains("contact-card-compact"));
+            assertTrue(compact.lookupAll(".contact-card-email").isEmpty());
+        });
+    }
+
     private static boolean containsCode(String source, String expected) {
         return source.replaceAll("\\s+", "").contains(expected.replaceAll("\\s+", ""));
     }

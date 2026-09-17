@@ -1,238 +1,178 @@
 package com.shale.ui.component;
 
-import java.util.function.Consumer;
 import java.util.List;
+import java.util.function.Consumer;
+
 import com.shale.core.service.ContactServicePort.ClassificationPresentation;
 
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
-import javafx.scene.input.KeyCode;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
+/** The single reusable Contact summary card used by directory, search, and embedded surfaces. */
 public class ContactCard extends VBox {
-
-    public enum Variant {
-        FULL, COMPACT, MINI
-    }
+    public enum Variant { FULL, COMPACT, MINI }
 
     private final Label nameLabel = new Label();
     private final Label roleLabel = new Label();
     private final Label emailLabel = new Label();
     private final Label phoneLabel = new Label();
-    private List<ClassificationPresentation> classifications=List.of();
-
+    private List<ClassificationPresentation> classifications = List.of();
     private Integer contactId;
     private Consumer<Integer> onOpen;
-    private String backgroundCss;
-    private boolean hovered;
     private boolean suppressPlaceholderLines;
     private boolean interactive = true;
 
     public ContactCard() {
+        getStyleClass().addAll("contact-card", "shale-entity-card");
         nameLabel.setId("contact-card-name-label");
+        roleLabel.setId("contact-card-role-label");
+        emailLabel.setId("contact-card-email-label");
         phoneLabel.setId("contact-card-phone-label");
+        setFocusTraversable(true);
         buildUiMiniDefaults();
         wireEvents();
     }
 
-    public void setContactId(Integer contactId) {
-        this.contactId = contactId;
-    }
-
-    public void setOnOpen(Consumer<Integer> onOpen) {
-        this.onOpen = onOpen;
-    }
-
+    public void setContactId(Integer contactId) { this.contactId = contactId; refreshAccessibility(); }
+    public void setOnOpen(Consumer<Integer> onOpen) { this.onOpen = onOpen; }
     public void setName(String name) {
-        nameLabel.setText(name == null || name.isBlank() ? "—" : name);
+        String value = name == null || name.isBlank() ? "—" : name.strip();
+        nameLabel.setText(value);
+        nameLabel.setTooltip(new Tooltip(value));
+        refreshAccessibility();
+    }
+    public void setRole(String role) { setOptional(roleLabel, role); refreshAccessibility(); }
+    public void setEmail(String email) { setOptional(emailLabel, email); refreshAccessibility(); }
+    public void setPhone(String phone) { setOptional(phoneLabel, phone); refreshAccessibility(); }
+    public void setClassifications(List<ClassificationPresentation> values) {
+        classifications = values == null ? List.of() : List.copyOf(values);
     }
 
-    public void setRole(String role) {
-        String normalized = role == null ? "" : role.trim();
-        roleLabel.setText(normalized);
-        roleLabel.setVisible(!normalized.isBlank());
-        roleLabel.setManaged(!normalized.isBlank());
+    /** Retained compatibility API; Contact surfaces are deliberately theme-owned and neutral. */
+    public void setBackgroundCssColor(String ignored) { setStyle(null); }
+    public void setSuppressPlaceholderLines(boolean value) { suppressPlaceholderLines = value; }
+    public void setInteractive(boolean value) {
+        interactive = value;
+        setFocusTraversable(value);
+        setCursor(value ? Cursor.HAND : Cursor.DEFAULT);
+        getStyleClass().remove("contact-card-display-only");
+        if (!value) getStyleClass().add("contact-card-display-only");
     }
-
-    public void setEmail(String email) {
-        emailLabel.setText(normalizeOptional(email));
+    public void setSelected(boolean selected) {
+        getStyleClass().remove("shale-card-selected");
+        if (selected) getStyleClass().add("shale-card-selected");
     }
-
-    public void setPhone(String phone) {
-        phoneLabel.setText(normalizeOptional(phone));
-    }
-    public void setClassifications(List<ClassificationPresentation> values){classifications=List.copyOf(values);}
-
-    public void setBackgroundCssColor(String css) {
-        backgroundCss = css;
-        refreshSurfaceStyle();
-    }
-
-    public void setSuppressPlaceholderLines(boolean suppressPlaceholderLines) {
-        this.suppressPlaceholderLines = suppressPlaceholderLines;
-    }
-
-    public void setInteractive(boolean interactive) {
-        this.interactive = interactive;
-        setCursor(interactive ? Cursor.HAND : Cursor.DEFAULT);
+    public void setInactive(boolean inactive) {
+        getStyleClass().remove("contact-card-inactive");
+        if (inactive) getStyleClass().add("contact-card-inactive");
     }
 
     public void applyMini() {
-        getChildren().clear();
-        resetNameLabelVariantStyles();
-        nameLabel.getStyleClass().addAll("contact-card-name", "contact-card-name-mini");
-
+        prepareVariant("contact-card-mini", "shale-entity-card-inline", "shale-entity-card-embedded");
+        nameLabel.getStyleClass().setAll("label", "contact-card-name", "contact-card-name-mini");
         setPrefWidth(Region.USE_COMPUTED_SIZE);
         setMaxWidth(Region.USE_COMPUTED_SIZE);
-        setPadding(new Insets(4, 10, 4, 10));
-        setSpacing(6);
-
-        nameLabel.setStyle(null);
-
-        getChildren().add(nameLabel);
+        getChildren().setAll(nameLabel);
     }
-
 
     public void applyCompactMini() {
         applyMini();
-        setPadding(new Insets(2, 6, 2, 6));
-        setSpacing(4);
+        getStyleClass().add("contact-card-compact-mini");
         setMaxWidth(96);
-        resetNameLabelVariantStyles();
-        nameLabel.getStyleClass().addAll("contact-card-name", "contact-card-name-compact-mini");
-        nameLabel.setStyle(null);
-        nameLabel.setWrapText(false);
-        nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
-        nameLabel.setMinWidth(0);
-        nameLabel.setMaxWidth(Double.MAX_VALUE);
+        nameLabel.getStyleClass().setAll("label", "contact-card-name", "contact-card-name-compact-mini");
+        configureEllipsis();
     }
 
     public void applySecondaryMini() {
         applyMini();
-        setPadding(new Insets(3, 8, 3, 8));
-        setSpacing(5);
+        getStyleClass().add("contact-card-secondary-mini");
         setMaxWidth(124);
-        resetNameLabelVariantStyles();
-        nameLabel.getStyleClass().addAll("contact-card-name", "contact-card-name-secondary-mini");
-        nameLabel.setStyle(null);
-        nameLabel.setWrapText(false);
-        nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
-        nameLabel.setMinWidth(0);
-        nameLabel.setMaxWidth(Double.MAX_VALUE);
+        nameLabel.getStyleClass().setAll("label", "contact-card-name", "contact-card-name-secondary-mini");
+        configureEllipsis();
     }
 
-    public void applyCompact() {
-        getChildren().clear();
+    public void applyCompact() { applyDetailed("contact-card-compact", "shale-entity-card-compact"); }
+    public void applyFull() { applyDetailed("contact-card-full", "shale-entity-card-full"); }
 
+    private void applyDetailed(String variantClass, String densityClass) {
+        prepareVariant(variantClass, densityClass);
         setAlignment(Pos.TOP_LEFT);
-        setPrefWidth(280);
-        setMaxWidth(280);
-        setPadding(new Insets(10, 12, 10, 12));
-        setSpacing(7);
-
-        resetNameLabelVariantStyles();
-        nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
-        roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
-        emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
-        phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
+        nameLabel.getStyleClass().setAll("label", "contact-card-name", "shale-subsection-title");
+        roleLabel.getStyleClass().setAll("label", "contact-card-role", "shale-metadata");
+        emailLabel.getStyleClass().setAll("label", "contact-card-email", "shale-metadata-muted");
+        phoneLabel.getStyleClass().setAll("label", "contact-card-phone", "shale-metadata");
+        nameLabel.setWrapText(true);
         emailLabel.setWrapText(true);
         phoneLabel.setWrapText(false);
         phoneLabel.setMinWidth(Region.USE_PREF_SIZE);
 
-        VBox text = new VBox(4, nameLabel);
-        if (roleLabel.isManaged()) {
-            text.getChildren().add(roleLabel);
-        }
-        if (!(suppressPlaceholderLines && "—".equals(emailLabel.getText()))) {
-            text.getChildren().add(emailLabel);
-        }
-        if (!(suppressPlaceholderLines && "—".equals(phoneLabel.getText()))) text.getChildren().add(phoneLabel);
-        getChildren().addAll(text,
-                new ContactClassificationChipGroup(classifications,ContactClassificationChipGroup.Size.COMPACT));
+        VBox identity = new VBox();
+        identity.getStyleClass().add("contact-card-identity");
+        identity.getChildren().add(nameLabel);
+        addIfPresent(identity, roleLabel);
+        addIfPresent(identity, emailLabel);
+        addIfPresent(identity, phoneLabel);
+        getChildren().setAll(identity,
+                new ContactClassificationChipGroup(classifications, ContactClassificationChipGroup.Size.COMPACT));
     }
 
-    public void applyFull() {
+    private void addIfPresent(VBox parent, Label label) {
+        if (!label.getText().isBlank() || !suppressPlaceholderLines) {
+            if (!label.getText().isBlank()) parent.getChildren().add(label);
+        }
+    }
+
+    private void prepareVariant(String... classes) {
         getChildren().clear();
-
-        setAlignment(Pos.TOP_LEFT);
-        setMinWidth(296);
-        setPrefWidth(312);
-        setMaxWidth(312);
-        setPadding(new Insets(14, 16, 14, 16));
-        setSpacing(16);
-
-        resetNameLabelVariantStyles();
-        nameLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: 700; -fx-text-fill: #112542;");
-        roleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
-        emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.76);");
-        phoneLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.82);");
-        emailLabel.setWrapText(true);
-        phoneLabel.setWrapText(false);
-        phoneLabel.setMinWidth(Region.USE_PREF_SIZE);
-
-        VBox text = new VBox(6, nameLabel);
-        if (roleLabel.isManaged()) {
-            text.getChildren().add(roleLabel);
-        }
-        text.getChildren().add(emailLabel);
-        text.getChildren().add(phoneLabel);
-        getChildren().addAll(text,
-                new ContactClassificationChipGroup(classifications,ContactClassificationChipGroup.Size.COMPACT));
-    }
-
-    private void resetNameLabelVariantStyles() {
-        nameLabel.getStyleClass().removeAll("contact-card-name", "contact-card-name-mini", "contact-card-name-compact-mini", "contact-card-name-secondary-mini");
+        getStyleClass().removeAll("contact-card-full", "contact-card-compact", "contact-card-mini",
+                "contact-card-compact-mini", "contact-card-secondary-mini", "shale-entity-card-full",
+                "shale-entity-card-compact", "shale-entity-card-inline", "shale-entity-card-embedded");
+        getStyleClass().addAll(classes);
         nameLabel.setWrapText(false);
         nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.CLIP);
         nameLabel.setMinWidth(Region.USE_COMPUTED_SIZE);
         nameLabel.setMaxWidth(Region.USE_COMPUTED_SIZE);
     }
 
-    private void buildUiMiniDefaults() {
-        setCursor(Cursor.HAND);
-        setBackgroundCssColor(null);
-        applyMini();
+    private void configureEllipsis() {
+        nameLabel.setWrapText(false);
+        nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+        nameLabel.setMinWidth(0);
+        nameLabel.setMaxWidth(Double.MAX_VALUE);
     }
 
+    private void buildUiMiniDefaults() { setCursor(Cursor.HAND); applyMini(); }
     private void wireEvents() {
-        setOnMouseEntered(e -> {
-            if (!interactive) return;
-            hovered = true;
-            setTranslateY(-1.5);
-            refreshSurfaceStyle();
-        });
-        setOnMouseExited(e -> {
-            if (!interactive) return;
-            hovered = false;
-            setTranslateY(0);
-            refreshSurfaceStyle();
-        });
-        setOnMouseClicked(e -> {
-            if (interactive && onOpen != null && contactId != null) {
-                onOpen.accept(contactId);
-            }
-        });
-        setOnKeyPressed(e -> {
-            if (interactive && onOpen != null && contactId != null && (e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE)) {
-                onOpen.accept(contactId);
-                e.consume();
-            }
+        setOnMouseClicked(event -> { if (activate()) event.consume(); });
+        setOnKeyPressed(event -> {
+            if ((event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE) && activate()) event.consume();
         });
     }
-
-    public Node asNode() {
-        return this;
+    private boolean activate() {
+        if (!interactive || onOpen == null || contactId == null) return false;
+        onOpen.accept(contactId);
+        return true;
     }
-
-    private static String normalizeOptional(String value) {
-        return value == null || value.isBlank() ? "—" : value;
+    private void refreshAccessibility() {
+        StringBuilder text = new StringBuilder("Contact: ").append(nameLabel.getText());
+        appendAccessible(text, roleLabel); appendAccessible(text, emailLabel); appendAccessible(text, phoneLabel);
+        setAccessibleText(text.toString());
     }
-
-    private void refreshSurfaceStyle() {
-        setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
+    private static void appendAccessible(StringBuilder text, Label label) {
+        if (!label.getText().isBlank()) text.append(", ").append(label.getText());
     }
+    private static void setOptional(Label label, String value) {
+        String normalized = value == null ? "" : value.strip();
+        label.setText(normalized);
+        label.setVisible(!normalized.isBlank());
+        label.setManaged(!normalized.isBlank());
+        label.setTooltip(normalized.isBlank() ? null : new Tooltip(normalized));
+    }
+    public Node asNode() { return this; }
 }
