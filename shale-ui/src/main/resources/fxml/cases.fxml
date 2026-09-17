@@ -8,7 +8,7 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
 	xmlns:fx="http://javafx.com/fxml/1"
-	fx:controller="com.shale.ui.controller.CasesController" styleClass="app-shell" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
+	fx:controller="com.shale.ui.controller.CasesController" styleClass="app-shell, shell-route-page" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 
 	<top>
 		<FilterPanel>
