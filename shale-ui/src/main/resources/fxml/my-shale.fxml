@@ -16,7 +16,7 @@
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-	fx:controller="com.shale.ui.controller.MyShaleController" styleClass="app-shell">
+		fx:controller="com.shale.ui.controller.MyShaleController" styleClass="app-shell, shell-route-page">
 		<center>
 			<VBox spacing="8" BorderPane.alignment="CENTER" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 				<padding>

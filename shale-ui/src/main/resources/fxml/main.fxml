@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<?import java.lang.String?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
@@ -8,11 +9,15 @@
 
 	<!-- Top bar -->
 	<top>
-		<HBox spacing="12" styleClass="top-bar app-header">
+		<HBox fx:id="topToolbar" spacing="12">
+			<styleClass>
+				<String fx:value="top-bar" />
+				<String fx:value="app-header" />
+			</styleClass>
 			<children>
 				<HBox spacing="12" alignment="CENTER_LEFT" styleClass="shell-leading-actions">
 					<children>
-						<Label text="SHALE" styleClass="app-brand" />
+						<Label fx:id="brandLabel" text="SHALE" styleClass="app-brand" />
 						<Button fx:id="backButton" text="←" onAction="#onBack" disable="true"
 							styleClass="topbar-back-button" />
 					</children>
@@ -56,33 +61,25 @@
 
 	<!-- Left navigation sidebar -->
 	<left>
-		<VBox spacing="6" styleClass="sidebar nav-rail">
+		<VBox fx:id="navigationSidebar" spacing="0">
+			<styleClass>
+				<String fx:value="sidebar" />
+				<String fx:value="nav-rail" />
+			</styleClass>
 			<children>
 				<Label text="Navigation" styleClass="sidebar-header" />
-
-				<Button fx:id="navMyShaleButton" text="My Shale"
-					maxWidth="Infinity" onAction="#onNavMyShale" />
-
-				<Button fx:id="navCasesButton" text="Cases"
-					maxWidth="Infinity" onAction="#onNavCases" />
-
-				<Button fx:id="navContactsButton" text="Contacts"
-					maxWidth="Infinity" onAction="#onNavContacts" />
-
-				<Button fx:id="navOrganizationsButton" text="Organizations"
-					maxWidth="Infinity" onAction="#onNavOrganizations" />
-
-				<Button fx:id="navTeamButton" text="Team" maxWidth="Infinity"
-					onAction="#onNavTeam" />
-
-				<Button fx:id="navReportsButton" text="Reports"
-					maxWidth="Infinity" onAction="#onNavReports" />
-
-				<Button fx:id="navCalendarButton" text="Calendar"
-					maxWidth="Infinity" onAction="#onNavCalendar" />
-
-				<Button fx:id="navSettingsButton" text="Settings"
-					maxWidth="Infinity" onAction="#onNavSettings" />
+				<VBox fx:id="navigationItems" spacing="6" fillWidth="true" styleClass="navigation-items" VBox.vgrow="ALWAYS">
+					<children>
+						<Button fx:id="navMyShaleButton" text="My Shale" maxWidth="Infinity" onAction="#onNavMyShale" />
+						<Button fx:id="navCasesButton" text="Cases" maxWidth="Infinity" onAction="#onNavCases" />
+						<Button fx:id="navContactsButton" text="Contacts" maxWidth="Infinity" onAction="#onNavContacts" />
+						<Button fx:id="navOrganizationsButton" text="Organizations" maxWidth="Infinity" onAction="#onNavOrganizations" />
+						<Button fx:id="navTeamButton" text="Team" maxWidth="Infinity" onAction="#onNavTeam" />
+						<Button fx:id="navReportsButton" text="Reports" maxWidth="Infinity" onAction="#onNavReports" />
+						<Button fx:id="navCalendarButton" text="Calendar" maxWidth="Infinity" onAction="#onNavCalendar" />
+						<Button fx:id="navSettingsButton" text="Settings" maxWidth="Infinity" onAction="#onNavSettings" />
+					</children>
+				</VBox>
 			</children>
 		</VBox>
 	</left>

@@ -9,7 +9,7 @@
 <BorderPane fx:id="caseRootPane"
 	xmlns:fx="http://javafx.com/fxml"
 	fx:controller="com.shale.ui.controller.CaseController"
-	styleClass="app-shell">
+	styleClass="app-shell, shell-route-page">
 
 	<!-- TOP: Phase 2B Case Overview header. The action toolbar remains in Overview. -->
 	<top>

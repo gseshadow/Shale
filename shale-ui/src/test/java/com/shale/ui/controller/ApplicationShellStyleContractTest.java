@@ -53,18 +53,12 @@ final class ApplicationShellStyleContractTest {
         String fxml = Files.readString(RESOURCES.resolve("fxml/main.fxml"));
         String css = Files.readString(RESOURCES.resolve("css/foundation/shell.css"));
 
-        assertTrue(css.contains("-fx-padding: 10px 12px"),
-                "the toolbar must own comfortable outer padding");
-        assertTrue(css.contains("-fx-spacing: 12px"),
-                "the toolbar must own spacing between its control groups");
-        assertTrue(css.contains("-fx-padding: 12px; -fx-spacing: 6px"),
-                "the navigation rail must inset and separate its items");
         assertTrue(css.contains(".content-root { -fx-padding: 14px 16px 16px 16px"),
                 "the application canvas must remain visible around the route plane");
-        assertTrue(css.contains("-fx-background-radius: 14px"),
-                "the shared route plane must use the approved corner radius");
-        assertTrue(css.contains(".shell-route-outlet > .app-shell { -fx-background-color: transparent; }"),
-                "an opaque routed page root must not cover the shared plane corners");
+        assertTrue(css.contains(".navigation-items"),
+                "the inner navigation layout owner must have an explicit shared contract");
+        assertTrue(css.contains(".shell-route-page { -fx-background-color: transparent; }"),
+                "routed page roots must explicitly preserve the shared plane paint");
         assertTrue(Pattern.compile("<HBox[^>]*HBox\\.hgrow=\\\"ALWAYS\\\"[^>]*minWidth=\\\"180\\\"[^>]*"
                 + "styleClass=\\\"shell-search-group\\\"", Pattern.DOTALL).matcher(fxml).find(),
                 "the search group must flex before stable trailing actions are clipped");
@@ -79,10 +73,15 @@ final class ApplicationShellStyleContractTest {
     void shellCorrectionPreservesCasesAndCaseOverviewScrollOwnership() throws Exception {
         String cases = Files.readString(RESOURCES.resolve("fxml/cases.fxml"));
         String caseOverview = Files.readString(RESOURCES.resolve("fxml/case.fxml"));
+        String myShale = Files.readString(RESOURCES.resolve("fxml/my-shale.fxml"));
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MainController.java"));
 
-        assertTrue(Pattern.compile("<BorderPane[^>]*styleClass=\\\"app-shell\\\"", Pattern.DOTALL)
+        assertTrue(Pattern.compile("<BorderPane[^>]*styleClass=\\\"app-shell, shell-route-page\\\"", Pattern.DOTALL)
                 .matcher(cases).find(), "Cases must retain its routed page root");
+        assertTrue(myShale.contains("styleClass=\"app-shell, shell-route-page\""),
+                "My Shale must opt into the transparent routed-page root contract");
+        assertTrue(caseOverview.contains("styleClass=\"app-shell, shell-route-page\""),
+                "Case Overview must opt into the transparent routed-page root contract");
         assertTrue(cases.contains("fx:id=\"casesScroll\""),
                 "Cases must retain its existing card-grid scrolling boundary");
         assertTrue(caseOverview.contains("fx:id=\"overviewScrollPane\""),

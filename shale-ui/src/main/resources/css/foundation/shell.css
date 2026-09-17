@@ -48,12 +48,13 @@
 .sidebar,
 .nav-rail {
     -fx-min-width: 208px; -fx-pref-width: 216px;
-    -fx-padding: 12px; -fx-spacing: 6px;
+    -fx-padding: 12px 0 0 0;
     -fx-background-color: -shale-color-navigation;
     -fx-border-color: transparent -shale-color-border-strong transparent transparent;
     -fx-border-width: 0 1px 0 0;
 }
-.sidebar-header { -fx-padding: 0 10px 8px 10px; -fx-font-size: 11px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-on-dark; }
+.sidebar-header { -fx-padding: 0 22px 8px 22px; -fx-font-size: 11px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-on-dark; }
+.navigation-items { -fx-padding: 0 12px 12px 12px; -fx-spacing: 6px; }
 .section-nav-button {
     -fx-min-height: 40px; -fx-padding: 8px 12px; -fx-alignment: center-left;
     -fx-background-radius: 10px; -fx-border-radius: 10px;
@@ -79,7 +80,7 @@
 .shell-section-header .section-title { -fx-font-size: 24px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
 .shell-route-outlet { -fx-background-color: transparent; }
 /* Routed page roots fill the plane but must not repaint its rounded corners. */
-.shell-route-outlet > .app-shell { -fx-background-color: transparent; }
+.shell-route-page { -fx-background-color: transparent; }
 
 .session-footer {
     -fx-min-height: 44px; -fx-padding: 6px 16px; -fx-spacing: 8px; -fx-alignment: center-left;

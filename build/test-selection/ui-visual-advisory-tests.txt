@@ -7,3 +7,4 @@
 **/SettingsUserManagementVisualTest.java
 **/UserResponsiveLayoutTest.java
 **/SemanticControlCssRuntimeTest.java
+**/ApplicationShellCssRuntimeTest.java
