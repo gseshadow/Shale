@@ -32,7 +32,8 @@ class FunctionalSurfaceContractTest {
         assertTrue(surfaces.contains(".page-header-surface"));
         assertTrue(surfaces.contains(".primary-content-surface"));
         assertTrue(surfaces.contains(".content-surface"));
-        assertTrue(app.contains("radial-gradient("), "the decorative application gradient must remain");
+        assertTrue(app.contains("@import \"foundation/shell.css\";"),
+                "the stable stylesheet entry point must install the shared A.2 shell foundation");
     }
 
     @Test
@@ -58,9 +59,9 @@ class FunctionalSurfaceContractTest {
             StackPane outlet = (StackPane) loader.getNamespace().get("sectionContent");
             assertTrue(surface != null && surface.getBackground() != null);
             Color workspaceColor = (Color) surface.getBackground().getFills().getFirst().getFill();
-            assertTrue(workspaceColor.equals(Color.rgb(190, 208, 220, 0.94)),
-                    "the shared workspace must use the darker semantic functional-content color");
-            assertTrue(workspaceColor.isOpaque() == false);
+            assertTrue(workspaceColor.equals(Color.rgb(248, 251, 255)),
+                    "the shared workspace must use the near-white A.2 content-plane token");
+            assertTrue(workspaceColor.isOpaque());
             assertTrue(isAncestor(surface, outlet), "the routed view outlet must be inside the workspace surface");
 
             for (String view : new String[] {
