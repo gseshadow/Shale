@@ -27,7 +27,7 @@ final class ThemeResourceContractTest {
             assertNotNull(getClass().getResource("/css/" + imports.group(1)),
                     "app.css import must resolve from the classpath: " + imports.group(1));
         }
-        assertEquals(9, importCount, "the stable production entry point retains its nine foundation imports");
+        assertEquals(10, importCount, "the stable production entry point includes the Phase 1B component foundation");
     }
 
     @Test

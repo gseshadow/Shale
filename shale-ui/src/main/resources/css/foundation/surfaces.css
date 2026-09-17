@@ -7,7 +7,7 @@
 
 /* 1. Application Background: root radial blue/teal shell behind the app. */
 .shale-surface-application-background {
-    -fx-background-color: radial-gradient(center 70% 20%, radius 120%, #4cc3b5 0%, #2b6a82 35%, #1b2b4a 70%, #0e1023 100%);
+    -fx-background-color: -shale-color-application-canvas;
 }
 
 /*
@@ -154,3 +154,8 @@
     -fx-border-color: -shale-color-overlay-border;
     -fx-border-width: 1;
 }
+
+/* Phase 1B canonical aliases; legacy surface classes remain supported. */
+.shale-application-surface { -fx-background-color: -shale-color-application-canvas; }
+.shale-content-plane { -fx-background-color: -shale-color-content-plane; -fx-background-radius: 14px; -fx-border-radius: 14px; -fx-border-color: -shale-color-border-subtle; -fx-border-width: 1px; }
+.shale-toolbar { -fx-alignment: center-left; -fx-spacing: 8px; -fx-padding: 8px 12px; -fx-background-color: -shale-color-section-surface; -fx-background-radius: 12px; -fx-border-radius: 12px; -fx-border-color: -shale-color-border-subtle; -fx-border-width: 1px; }

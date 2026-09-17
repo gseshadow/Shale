@@ -271,3 +271,24 @@
 .shale-practice-area-selector-current {
     -fx-padding: 4 0 4 0;
 }
+
+/* MetadataChipFactory owns neutral supplemental chips; semantic modifiers add text-labelled intent. */
+.metadata-chip,
+.shale-semantic-chip {
+    -fx-padding: 3px 8px;
+    -fx-background-radius: 999px;
+    -fx-border-radius: 999px;
+    -fx-border-width: 1px;
+    -fx-background-color: -shale-color-chip-neutral-background;
+    -fx-border-color: -shale-color-chip-neutral-border;
+    -fx-text-fill: -shale-color-chip-neutral-text;
+    -fx-font-size: 11px;
+    -fx-font-weight: 700;
+}
+.metadata-chip-compact { -fx-padding: 3px 8px; -fx-font-size: 11px; }
+.metadata-chip-small { -fx-padding: 2px 7px; -fx-font-size: 10px; }
+.shale-semantic-chip-success { -fx-background-color: -shale-color-success-wash; -fx-border-color: -shale-color-success-border; -fx-text-fill: -shale-color-success-text; }
+.shale-semantic-chip-warning { -fx-background-color: -shale-color-warning-wash; -fx-border-color: -shale-color-warning-border; -fx-text-fill: -shale-color-warning-text; }
+.shale-semantic-chip-danger { -fx-background-color: -shale-color-danger-wash; -fx-border-color: -shale-color-danger-border; -fx-text-fill: -shale-color-danger-text; }
+.shale-semantic-chip-info { -fx-background-color: -shale-color-info-wash; -fx-border-color: -shale-color-info-border; -fx-text-fill: -shale-color-info-text; }
+.shale-semantic-chip-inactive { -fx-opacity: -shale-opacity-disabled; }
