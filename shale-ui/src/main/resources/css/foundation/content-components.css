@@ -114,7 +114,11 @@
     -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 8, 0.14, 0, 1);
 }
 .status-timeline__check { -fx-font-size: 11px; -fx-font-weight: 900; }
-.status-timeline__label { -fx-font-size: 12px; -fx-font-weight: 650; -fx-text-fill: -shale-color-text-secondary; }
+.status-timeline__label {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -shale-color-text-secondary;
+}
 .status-timeline__pill--completed .status-timeline__label { -fx-text-fill: -shale-color-success-text; }
 .status-timeline__pill--current .status-timeline__label { -fx-font-weight: 800; -fx-text-fill: -shale-color-text-on-primary; }
 .status-timeline__connector-line { -fx-background-color: -shale-color-stage-inactive; -fx-background-radius: 2px; }

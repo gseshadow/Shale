@@ -69,6 +69,7 @@
     -fx-border-color: -shale-color-border-selected; -fx-text-fill: -shale-color-text-on-primary; -fx-font-weight: 800;
 }
 
+
 .content-root { -fx-padding: 14px 16px 16px 16px; -fx-background-color: -shale-color-application-canvas; }
 .primary-content-surface {
     -fx-padding: 16px; -fx-spacing: 10px;
@@ -80,7 +81,13 @@
 .shell-section-header .section-title { -fx-font-size: 24px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
 .shell-route-outlet { -fx-background-color: transparent; }
 /* Routed page roots fill the plane but must not repaint its rounded corners. */
-.shell-route-page { -fx-background-color: transparent; }
+.shell-route-page {
+    -fx-background-color: transparent;
+}
+
+.app-shell.shell-route-page {
+    -fx-background-color: transparent;
+}
 
 .session-footer {
     -fx-min-height: 44px; -fx-padding: 6px 16px; -fx-spacing: 8px; -fx-alignment: center-left;
