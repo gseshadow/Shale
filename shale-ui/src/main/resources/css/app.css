@@ -7,6 +7,7 @@
 @import "foundation/forms.css";
 @import "foundation/tables.css";
 @import "foundation/toolbars.css";
+@import "foundation/content-components.css";
 
 .root {
     -fx-font-size: 14px;
@@ -246,72 +247,6 @@
     -fx-font-weight: 800;
 }
 
-.app-section-tab {
-    -fx-padding: 6 10 6 10;
-    -fx-min-height: 30;
-    -fx-background-radius: 999;
-    -fx-border-radius: 999;
-    -fx-background-color: -shale-color-section-tab-surface;
-    -fx-border-color: rgba(38, 75, 119, 0.20);
-    -fx-border-width: 1;
-    -fx-text-fill: -shale-color-section-tab-text;
-    -fx-font-weight: 600;
-    -fx-cursor: hand;
-}
-
-.app-section-tab:hover {
-    -fx-background-color: -shale-color-section-tab-hover-surface;
-    -fx-border-color: rgba(38, 75, 119, 0.34);
-}
-
-.app-section-tab:pressed {
-    -fx-background-color: -shale-color-section-tab-pressed-surface;
-    -fx-border-color: rgba(38, 75, 119, 0.46);
-}
-
-.app-section-tab:focused {
-    -fx-border-color: #386db7;
-    -fx-effect: dropshadow(gaussian, rgba(56, 109, 183, 0.42), 5, 0.22, 0, 0);
-}
-
-.app-section-tab-active {
-    -fx-background-color: -shale-color-section-tab-selected-surface;
-    -fx-border-color: #9fc4ff;
-    -fx-text-fill: -shale-color-section-tab-selected-text;
-    -fx-font-weight: 800;
-}
-
-.app-section-tab-active:focused {
-    -fx-border-color: white;
-}
-
-.app-section-tab-active:hover {
-    -fx-background-color: #3f72bd;
-}
-
-.app-section-tab-active:pressed {
-    -fx-background-color: #3565aa;
-}
-
-.app-section-tab:disabled {
-    -fx-opacity: 0.48;
-    -fx-cursor: default;
-}
-
-.app-section-tabs-scroll,
-.app-section-tabs-scroll > .viewport {
-    -fx-background-color: transparent;
-}
-
-.app-section-tabs-scroll {
-    -fx-background-insets: 0;
-}
-
-.app-section-tabs-row {
-    -fx-padding: 6 0 6 0;
-}
-
-
 /*
  * Button hierarchy: Primary Button, Secondary Button, Destructive Button,
  * Toolbar Button, Pill Button, and Icon Button retain existing selectors while
@@ -358,26 +293,6 @@
 
 
 /* Neutral design-system metadata chips. */
-.metadata-chip {
-    -fx-background-color: rgba(17, 37, 66, 0.07);
-    -fx-background-radius: 999;
-    -fx-border-radius: 999;
-    -fx-border-color: rgba(17, 37, 66, 0.12);
-    -fx-border-width: 1;
-    -fx-text-fill: rgba(17, 37, 66, 0.76);
-    -fx-font-weight: 700;
-}
-
-.metadata-chip-compact {
-    -fx-padding: 3 8 3 8;
-    -fx-font-size: 11px;
-}
-
-.metadata-chip-small {
-    -fx-padding: 2 7 2 7;
-    -fx-font-size: 10px;
-}
-
 /* App-wide toolbar/action button system (phase rollout by opting in via style class). */
 .app-toolbar-button {
     -fx-min-height: 40;

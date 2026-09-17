@@ -381,6 +381,63 @@ These features should naturally inherit the Shale design language through shared
 
 A future contributor should be able to add a screen by choosing the correct surface layer, composing shared primitives, selecting appropriate density, and applying semantic tokens. If a new primitive is required, it should be designed as a reusable addition to the Shale system rather than as a one-off screen style.
 
+## A.2 application-wide visual direction
+
+The refined colorful A.2 direction is Shale's application-wide visual system. It combines deep navy
+application chrome, a quiet cool-blue canvas, white or near-white working surfaces, crisp navy type,
+strong blue primary actions, and a selective purple accent. Color expresses Shale identity, action
+priority, and named semantic or data state; it is not general decoration. The result should remain
+approachable at moderate density without glow, glassmorphism, decorative waves, spreadsheet-like detail
+grids, or a generic monochrome legal-SaaS appearance.
+
+Primary cards use a 12–14px radius, inner controls use an 8–12px radius, standard controls are 36–40px
+high, and compact icon actions are 28–32px square. Layouts should follow the existing 4/8/12/16/24
+spacing rhythm. Cards use the single restrained `-shale-color-card-shadow` elevation; cards, detail rows,
+inputs, update cards, dialogs, and page backgrounds never use gradients. Gradients are reserved for
+Primary actions, selected global navigation, and the current workflow stage.
+
+### Canonical opt-in component vocabulary
+
+New screens compose existing JavaFX nodes and factories with these semantic classes rather than adding
+page-local paint or typography:
+
+* `shale-page-title`, `shale-section-title`, `shale-subsection-title`, `shale-body-text`,
+  `shale-field-label`, `shale-field-value`, `shale-metadata`, `shale-metadata-muted`, and
+  `shale-inline-action` define type hierarchy.
+* Existing `shale-surface-*` classes remain valid. `shale-application-surface`, `shale-content-plane`,
+  and `shale-toolbar` provide the A.2 canvas, content, and toolbar aliases.
+* `shale-content-card`, `shale-section-card`, `shale-interactive-card`, `shale-card-selected`, and
+  `shale-compact-card` extend the established entity-card surfaces; they do not replace card factories.
+* `ControlStyles` and `ActionButtonFactory.semantic(...)` remain authoritative for Primary, Secondary,
+  Ghost, Danger, Navigation, Standard, Small, and icon-only actions. Feature classes such as
+  `shale-inline-management-action`, `shale-composer-action`, and `shale-update-edit-action` refine those
+  semantic controls rather than acting as another button system.
+* `AppSectionTabs` remains the owner of `app-section-tab` and `app-section-tab-active`; the optional
+  `app-section-tab-compact` class only changes density.
+* `MetadataChipFactory`, existing status/practice-area/link-type/classification factories, and their
+  readable-foreground logic remain authoritative. `shale-semantic-chip` plus the `-success`, `-warning`,
+  `-danger`, `-info`, and `-inactive` modifiers supply theme-defined semantic states and neutral fallback.
+  Database-defined colors continue to identify stored data and must not be replaced by theme colors.
+* `shale-property-row` (compact/comfortable/interactive/accent variants), `shale-person-row`, and
+  `shale-avatar` provide detail and person presentation without imposing fixed responsive column widths.
+* `shale-stage-tracker`, connector and stage-state classes provide labelled connected history;
+  `shale-stage-current` is the only workflow-stage gradient.
+* `shale-update-rail`, `shale-update-composer`, `shale-update-search`, `shale-update-card`, and their
+  author/timestamp/body/state classes provide the reusable Updates vocabulary without changing update
+  behavior or enhanced-text ownership.
+
+Selector ownership follows foundation concerns: `surfaces.css` owns planes/toolbars, `cards.css` owns
+cards, `buttons.css` owns semantic actions, `indicators.css` owns chips/badges, and
+`content-components.css` owns typography, tabs, detail/person rows, stages, and update presentation.
+Component rules use looked-up semantic paint only. Light and dark theme sheets redefine that paint;
+component rules are never duplicated per theme.
+
+Legacy surface, entity-card, button, tab, metadata-chip, and indicator class names remain compatibility
+contracts while callers are deliberately migrated. Case Overview, its stage history and Updates rail,
+the application-shell instances around it, and all other page layouts are intentionally deferred to
+subsequent migration phases. Native context menus, rich-text context menus, and Task hover popups remain
+outside this vocabulary until their lifecycle and popup ownership are addressed.
+
 ### Link Type indicators
 
 Case Link Type settings use a reusable `LinkTypeIndicatorFactory` modeled on the existing practice-area pill treatment. The indicator accepts database-driven colors from seeded `#RRGGBB` values and existing stored `0xRRGGBBAA` values, preserving the Shale compact pill/card visual language instead of introducing a separate link-type visual system.

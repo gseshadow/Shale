@@ -38,3 +38,30 @@ Phase 1A specifically supports the custom `ShaleFilterMenu` popup root. Native c
 context menus, and Task hover-popup visual migration remain deferred. Phase 1B should migrate remaining raw
 color selectors to looked-up colors and visually verify each screen in both themes without changing the
 central lifecycle contract.
+
+## Phase 1B semantic paint vocabulary
+
+Phase 1B adds a matching canonical vocabulary to both theme resources. New shared component work uses these
+roles; `foundation/colors.css` and older names remain compatibility fallbacks for unmigrated screens:
+
+* surfaces: application canvas/chrome, navigation/default/hover/selected, content plane, section, card,
+  card hover, elevated, input, muted, and overlay/dialog;
+* text: primary, secondary, muted, disabled, on-dark, on-primary, link/hover, danger, success, and warning;
+* boundaries: subtle/strong border, divider, input/hover, focus, danger, and selected;
+* actions: Primary gradient endpoints and states, Secondary states/text, Danger wash/states/text, icon hover,
+  and selected-control background;
+* semantic presentation: neutral chip, success/warning/danger/info washes/borders/text, neutral avatar,
+  inactive/complete/current stage, and update-card roles; and
+* interaction state: focus ring, selection, validation error, disabled opacity, and the one card-shadow color.
+
+The canonical names begin with `-shale-color-` (plus `-shale-opacity-disabled`). Theme files contain paint
+only; all geometry, typography, state selectors, and component composition live in the stable foundation
+stylesheets loaded by `app.css`. Existing names such as `-shale-color-content-surface`,
+`-shale-color-dialog-surface`, `-shale-button-*`, `-shale-control-*`, and `-shale-indicator-*` remain active
+compatibility aliases/fallbacks. They are not the vocabulary for new component paint, and heavily used
+legacy tokens have not been globally repointed.
+
+Solid token pairs are automatically contrast-checked for normal text and essential focus/action boundaries.
+Primary and current-stage gradients, plus authoritative database colors, require visual review because their
+paint is dynamic; readable text/labels remain mandatory so hue never carries meaning alone. Dark theme has
+full token parity but remains technical support rather than a claim that every legacy page is migrated.
