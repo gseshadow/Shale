@@ -4723,9 +4723,34 @@ public class CaseController {
 	// Overview loading
 	// ----------------------------
 	private void configureOverviewAdministrationControls() {
-		if(editOverviewButton!=null){ControlStyles.apply(editOverviewButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.STANDARD);editOverviewButton.setOnAction(e->overviewEditorLauncher.run());refreshOverviewAdminAction();}
+		if(editOverviewButton!=null){ControlStyles.apply(editOverviewButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);editOverviewButton.setOnAction(e->overviewEditorLauncher.run());refreshOverviewAdminAction();}
+		if(generateSummaryMenuButton!=null) ControlStyles.apply(generateSummaryMenuButton,ControlStyles.Purpose.PRIMARY,ControlStyles.Size.SMALL);
+		if(deleteCaseButton!=null) ControlStyles.apply(deleteCaseButton,ControlStyles.Purpose.DANGER,ControlStyles.Size.SMALL);
+		java.util.stream.Stream.of(editCaseNameButton,editCaseNumberButton,changePracticeAreaButton,changeStatusButton,
+				changeResponsibleAttorneyButton,changePrimaryLegalAssistantButton,editDescriptionButton)
+				.filter(Objects::nonNull).forEach(this::configureOverviewEditAction);
+		configureOverviewManagementAction(managePracticeAreasButton);
+		configureOverviewManagementAction(manageCaseStatusesButton);
 		configuredOverviewDates.getStyleClass().add("case-overview-configured-dates");
 		if(overviewDetailsGrid!=null){List<Node> remove=overviewDetailsGrid.getChildren().stream().filter(n->{Integer r=GridPane.getRowIndex(n);return r!=null&&r>=4&&r<=8;}).toList();overviewDetailsGrid.getChildren().removeAll(remove);for(Node n:overviewDetailsGrid.getChildren()){Integer r=GridPane.getRowIndex(n);if(r!=null&&r>=9)GridPane.setRowIndex(n,r-4);}overviewDetailsGrid.add(configuredOverviewDates,0,4,3,1);}
+	}
+
+	private void configureOverviewEditAction(Button action) {
+		if(action==null)return;
+		ControlStyles.apply(action,ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);
+		action.setAccessibleText("Edit "+switch(action.getId()==null?"":action.getId()){
+			case "editCaseNameButton"->"case name";case "editCaseNumberButton"->"case number";
+			case "changePracticeAreaButton"->"practice area";case "changeStatusButton"->"case status";
+			case "changeResponsibleAttorneyButton"->"responsible attorney";
+			case "changePrimaryLegalAssistantButton"->"primary legal assistant";
+			case "editDescriptionButton"->"description";default->"case detail";});
+		action.setTooltip(new Tooltip(action.getAccessibleText()));
+	}
+
+	private void configureOverviewManagementAction(Button action) {
+		if(action==null)return;
+		ControlStyles.apply(action,ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);
+		action.getStyleClass().add("shale-inline-action");
 	}
 
 	void refreshOverviewAdminAction() {
@@ -4743,7 +4768,7 @@ public class CaseController {
 		caseDateExecutor.submit(()->{try{CaseOverviewDateConfigurationDto config=caseService.getCaseOverviewDateConfiguration(activeCase,tenant,actor);List<EffectiveCaseDateTypeDto> types=caseService.listEffectiveCaseDateTypes(tenant,actor);List<CaseDateDto> values=caseService.listCaseDatesForCase(activeCase,tenant,actor);Platform.runLater(()->{if(caseId==null||caseId.longValue()!=activeCase||generation!=overviewConfigurationGeneration)return;overviewDateConfiguration=config;effectiveCaseDateTypes=types==null?List.of():List.copyOf(types);overviewConfiguredDateValues=values==null?List.of():List.copyOf(values);renderConfiguredOverviewDates();});}catch(RuntimeException ex){LOG.error("Case Overview configuration load failed tenantId={} actorId={} caseId={}",tenant,actor,activeCase,ex);Platform.runLater(()->{if(generation==overviewConfigurationGeneration)configuredOverviewDates.getChildren().setAll(new Label("Overview dates could not be loaded."));});}});
 	}
 
-	private void renderConfiguredOverviewDates(){configuredOverviewDates.getChildren().clear();if(overviewDateConfiguration==null)return;for(EffectiveCaseDateTypeDto type:overviewDateConfiguration.visibleDateTypes()){CaseDateDto value=overviewConfiguredDateValues.stream().filter(d->d.caseDateTypeId()==type.id()).sorted(Comparator.comparing(CaseDateDto::startsAt).thenComparingLong(CaseDateDto::id)).findFirst().orElse(null);Region color=new Region();color.getStyleClass().add("case-overview-date-color");color.setStyle("-fx-background-color: "+type.color()+";");Label name=new Label(type.name());name.getStyleClass().add("case-overview-row-label");name.setMinWidth(150);Label display=new Label(value==null?"—":formatCaseDateOccurrence(value));display.getStyleClass().add("case-overview-row-value");HBox.setHgrow(display,Priority.ALWAYS);Button action=ActionButtonFactory.semantic(value==null?"Add":"Edit",e->openOverviewDate(type,value),ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);action.setAccessibleText((value==null?"Add ":"Edit ")+type.name());HBox row=new HBox(10,color,name,display,action);row.getStyleClass().add("case-overview-configured-date-row");configuredOverviewDates.getChildren().add(row);}}
+	private void renderConfiguredOverviewDates(){configuredOverviewDates.getChildren().clear();if(overviewDateConfiguration==null)return;for(EffectiveCaseDateTypeDto type:overviewDateConfiguration.visibleDateTypes()){CaseDateDto value=overviewConfiguredDateValues.stream().filter(d->d.caseDateTypeId()==type.id()).sorted(Comparator.comparing(CaseDateDto::startsAt).thenComparingLong(CaseDateDto::id)).findFirst().orElse(null);Region color=new Region();color.getStyleClass().add("case-overview-date-color");String accent=ColorUtil.toCssBackgroundColorOrNull(type.color());if(accent!=null)color.setStyle("-fx-background-color: "+accent+";");color.setAccessibleText(type.name()+" color accent");Label name=new Label(type.name());name.getStyleClass().add("shale-property-row-label");name.setMinWidth(150);Label display=new Label(value==null?"—":formatCaseDateOccurrence(value));display.setWrapText(true);display.getStyleClass().add("shale-property-row-value");HBox.setHgrow(display,Priority.ALWAYS);Button action=ActionButtonFactory.semantic("✎",e->openOverviewDate(type,value),ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);action.setAccessibleText((value==null?"Add ":"Edit ")+type.name());action.setTooltip(new Tooltip(action.getAccessibleText()));HBox row=new HBox(10,color,name,display,action);row.getStyleClass().addAll("case-overview-configured-date-row","shale-property-row","shale-property-row-compact");configuredOverviewDates.getChildren().add(row);}}
 
 	private void openOverviewDate(EffectiveCaseDateTypeDto type,CaseDateDto value){if(value!=null){openCaseDateDialog(value);return;}List<EffectiveCaseDateTypeDto> ordered=new ArrayList<>();ordered.add(type);effectiveCaseDateTypes.stream().filter(t->t.id()!=type.id()).forEach(ordered::add);effectiveCaseDateTypes=List.copyOf(ordered);openCaseDateDialog(null);}
 
@@ -6971,21 +6996,12 @@ public class CaseController {
 	// ----------------------------
 
 	private void renderResponsibleAttorneyMini(Integer userId, String displayName, String userColorCss) {
-		UserCardModel model = new UserCardModel(
-				userId,
-				(displayName == null || displayName.isBlank()) ? "—" : displayName,
-				userColorCss,
-				null
-		);
-
 		var headerCard = createHeaderUserMini(userId, displayName, userColorCss);
 
 		if (assignedUserHost != null)
 			assignedUserHost.getChildren().setAll(headerCard);
-		if (ovResponsibleAttorneyHost != null) {
-			ensureUserCardFactory();
-			ovResponsibleAttorneyHost.getChildren().setAll(userCardFactory.create(model, Variant.COMPACT));
-		}
+		if (ovResponsibleAttorneyHost != null)
+			ovResponsibleAttorneyHost.getChildren().setAll(createOverviewPersonRow(displayName, userColorCss, "Not assigned"));
 	}
 
 	private Node createHeaderUserMini(Integer userId, String displayName, String userColorCss) {
@@ -7007,21 +7023,22 @@ public class CaseController {
 	}
 
 	private void renderPrimaryLegalAssistantMini(Integer userId, String displayName, String userColorCss) {
-		if (userCardFactory == null) {
-			userCardFactory = new UserCardFactory(onOpenUser == null ? id ->
-			{
-			} : onOpenUser);
-		}
-
-		UserCardModel model = new UserCardModel(
-				userId,
-				(displayName == null || displayName.isBlank()) ? "—" : displayName,
-				userColorCss,
-				null
-		);
-
 		if (ovPrimaryLegalAssistantHost != null)
-			ovPrimaryLegalAssistantHost.getChildren().setAll(userCardFactory.create(model, Variant.COMPACT));
+			ovPrimaryLegalAssistantHost.getChildren().setAll(createOverviewPersonRow(displayName, userColorCss, "Not assigned"));
+	}
+
+	private Node createOverviewPersonRow(String displayName,String userColorCss,String emptyText){
+		String name=safeText(displayName).trim();
+		if(name.isBlank()){
+			Label empty=new Label(emptyText);empty.getStyleClass().add("shale-person-empty");
+			HBox row=new HBox(empty);row.getStyleClass().add("shale-person-row");return row;
+		}
+		String initials=java.util.Arrays.stream(name.split("\\s+")).filter(part->!part.isBlank()).limit(2)
+				.map(part->part.substring(0,1).toUpperCase(Locale.ROOT)).collect(Collectors.joining());
+		Label avatar=new Label(initials);avatar.getStyleClass().addAll("shale-avatar","shale-avatar-compact");
+		String avatarColor=ColorUtil.toCssBackgroundColorOrNull(userColorCss);if(avatarColor!=null)avatar.setStyle("-fx-background-color: "+avatarColor+";");
+		avatar.setAccessibleText(name+" avatar");Label personName=new Label(name);personName.setWrapText(true);personName.getStyleClass().add("shale-person-name");
+		HBox row=new HBox(10,avatar,personName);row.getStyleClass().add("shale-person-row");return row;
 	}
 
 	private void renderPrimaryStatusMini(Integer statusId, String statusName, String statusColorCss) {
@@ -7043,7 +7060,7 @@ public class CaseController {
 		if (statusHost != null)
 			statusHost.getChildren().setAll(headerBadge);
 		if (ovCaseStatusHost != null)
-			ovCaseStatusHost.getChildren().setAll(StatusIndicatorFactory.createStatusPill(statusName, statusColorCss, PillSize.LARGE));
+			ovCaseStatusHost.getChildren().setAll(StatusIndicatorFactory.createStatusPill(statusName, statusColorCss, PillSize.COMPACT));
 	}
 
 	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorHex) {
@@ -7063,7 +7080,7 @@ public class CaseController {
 		if (headerPracticeAreaHost != null)
 			headerPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.COMPACT));
 		if (ovPracticeAreaHost != null)
-			ovPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.LARGE));
+			ovPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.COMPACT));
 	}
 
 	private void renderNonEngagementState(Boolean sent) {
