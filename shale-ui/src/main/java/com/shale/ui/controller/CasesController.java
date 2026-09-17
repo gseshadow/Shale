@@ -265,8 +265,6 @@ public final class CasesController {
 		if (casesSearchField != null) ControlStyles.formControl(casesSearchField);
 		if (casesSortChoice != null) ControlStyles.formControl(casesSortChoice);
 		if (statusFilterMenuButton != null) ControlStyles.formControl(statusFilterMenuButton);
-		if (cardsViewToggle != null) ControlStyles.apply(cardsViewToggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
-		if (gridViewToggle != null) ControlStyles.apply(gridViewToggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 		if (columnMenuButton != null) ControlStyles.apply(columnMenuButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		if (exportMenuButton != null) ControlStyles.apply(exportMenuButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 	}

@@ -10,6 +10,7 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.input.KeyCode;
@@ -25,7 +26,7 @@ import javafx.scene.input.MouseButton;
  */
 public class CaseCard extends VBox {
 
-	private static final double FULL_CARD_MIN_WIDTH = 340;
+	private static final double FULL_CARD_MIN_WIDTH = 280;
 	private static final double FULL_CARD_PREF_WIDTH = 380;
 	private static final double FULL_CARD_MAX_WIDTH = 420;
 
@@ -34,6 +35,7 @@ public class CaseCard extends VBox {
 	private final Label solLabel = new Label();
 	private final Label tortNoticeLabel = new Label();
 	private final Label statusLabel = new Label();
+	private final Label nonEngagementLabel = new Label("Non-engagement sent");
 	private final Region practiceAreaBar = new Region();
 	private final ContactCard attorneyMiniCard = new ContactCard();
 
@@ -41,6 +43,7 @@ public class CaseCard extends VBox {
 	private final VBox bodyPane = new VBox(6);
 	private final HBox headerRow = new HBox(8);
 	private final HBox bottomRow = new HBox(8);
+	private final HBox indicatorRow = new HBox(6);
 	private final HBox attorneyRow = new HBox(0);
 	private final VBox datesBox = new VBox(2);
 	private final Region bodySpacer = new Region();
@@ -57,10 +60,6 @@ public class CaseCard extends VBox {
 	private String statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
 	private LocalDate solDate;
 	private LocalDate tortNoticeDeadline;
-	private boolean hovered;
-	private boolean embeddedMini;
-	private boolean relatedEmbedded;
-	private boolean taskPreview;
 
 	public CaseCard() {
 		super(6);
@@ -74,9 +73,6 @@ public class CaseCard extends VBox {
 	}
 
 	public void applyMini() {
-		embeddedMini = true;
-		relatedEmbedded = false;
-		taskPreview = false;
 		getStyleClass().removeAll("case-card-full", "case-card-compact");
 		getStyleClass().add("case-card-compact");
 		setSpacing(2);
@@ -96,7 +92,7 @@ public class CaseCard extends VBox {
 		bottomRow.setVisible(false);
 		bodySpacer.setManaged(false);
 		bodySpacer.setVisible(false);
-		titleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+		titleLabel.getStyleClass().add("case-card__title-mini");
 		titleLabel.setWrapText(false);
 		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		titleLabel.setMinWidth(0);
@@ -112,7 +108,6 @@ public class CaseCard extends VBox {
 
 	public void applyEmbeddedMini() {
 		applyMini();
-		relatedEmbedded = true;
 		getStyleClass().add("task-related-case-card");
 		attorneyMiniCard.setManaged(true);
 		attorneyMiniCard.setVisible(true);
@@ -122,9 +117,6 @@ public class CaseCard extends VBox {
 	}
 
 	public void applyTaskPreview() {
-		embeddedMini = true;
-		relatedEmbedded = false;
-		taskPreview = true;
 		getStyleClass().removeAll("case-card-full", "case-card-compact");
 		getStyleClass().add("case-card-compact");
 		setSpacing(2);
@@ -147,7 +139,7 @@ public class CaseCard extends VBox {
 		bottomRow.setVisible(false);
 		statusLabel.setManaged(false);
 		statusLabel.setVisible(false);
-		titleLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+		titleLabel.getStyleClass().add("case-card__title-mini");
 		titleLabel.setWrapText(false);
 		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		titleLabel.setMinWidth(0);
@@ -159,9 +151,6 @@ public class CaseCard extends VBox {
 	}
 
 	public void applyCompact() {
-		embeddedMini = false;
-		relatedEmbedded = false;
-		taskPreview = false;
 		getStyleClass().removeAll("case-card-full", "case-card-compact");
 		getStyleClass().add("case-card-full");
 		setSpacing(6);
@@ -181,16 +170,17 @@ public class CaseCard extends VBox {
 		bottomRow.setVisible(true);
 		bodySpacer.setManaged(true);
 		bodySpacer.setVisible(true);
-		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+		titleLabel.getStyleClass().remove("case-card__title-mini");
 		statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
-		statusLabel.setManaged(true);
-		statusLabel.setVisible(true);
+		statusLabel.setManaged(!statusName.isBlank());
+		statusLabel.setVisible(!statusName.isBlank());
 		bodyPane.setAlignment(Pos.TOP_LEFT);
 		headerRow.setAlignment(Pos.TOP_LEFT);
 		attorneyMiniCard.applySecondaryMini();
 		headerRow.getChildren().setAll(titleLabel);
 		attorneyRow.getChildren().setAll(attorneySpacer, attorneyMiniCard);
-		bottomRow.getChildren().setAll(datesBox, bottomSpacer, statusLabel);
+		indicatorRow.getChildren().setAll(nonEngagementLabel, statusLabel);
+		bottomRow.getChildren().setAll(datesBox, bottomSpacer, indicatorRow);
 		bodyPane.getChildren().setAll(headerRow, attorneyRow, bodySpacer, bottomRow);
 		bottomRow.setSpacing(8);
 		refreshSurfaceStyle();
@@ -219,20 +209,31 @@ public class CaseCard extends VBox {
 	public void setTitle(String name) {
 		String text = (name == null || name.isBlank()) ? "(no name)" : name;
 		titleLabel.setText(text);
+		titleLabel.setAccessibleText("Case: " + text);
+		titleLabel.setTooltip(new Tooltip(text));
 	}
 
 	public void setResponsibleAttorney(String responsibleAttorney) {
-		String text = (responsibleAttorney == null || responsibleAttorney.isBlank()) ? "—" : responsibleAttorney.trim();
+		boolean show = responsibleAttorney != null && !responsibleAttorney.isBlank();
+		String text = show ? responsibleAttorney.trim() : "";
 		attorneyMiniCard.setName(text);
+		attorneyRow.setManaged(show);
+		attorneyRow.setVisible(show);
 	}
 
 	public void setIntakeDate(LocalDate intakeDate) {
-		intakeLabel.setText("Intake: " + (intakeDate == null ? "" : intakeDate.toString()));
+		boolean show = intakeDate != null;
+		intakeLabel.setText(show ? "Intake: " + intakeDate : "");
+		intakeLabel.setManaged(show);
+		intakeLabel.setVisible(show);
 	}
 
 	public void setSolDate(LocalDate solDate) {
 		this.solDate = solDate;
-		solLabel.setText("SOL: " + (solDate == null ? "" : solDate.toString()));
+		boolean show = solDate != null;
+		solLabel.setText(show ? "SOL: " + solDate : "");
+		solLabel.setManaged(show);
+		solLabel.setVisible(show);
 		refreshSolStyle();
 	}
 
@@ -258,8 +259,21 @@ public class CaseCard extends VBox {
 
 	public void setStatus(String statusName) {
 		this.statusName = statusName == null ? "" : statusName.trim();
-		statusLabel.setText(this.statusName.isBlank() ? "—" : this.statusName);
+		boolean show = !this.statusName.isBlank();
+		statusLabel.setText(this.statusName);
+		statusLabel.setAccessibleText(show ? "Case status: " + this.statusName : "Case status unavailable");
+		statusLabel.setManaged(show);
+		statusLabel.setVisible(show);
+		setLifecycleStyle("case-card-closed", normalizedStatusContains("closed", "inactive"));
+		setLifecycleStyle("case-card-denied", normalizedStatusContains("denied", "declined", "rejected"));
 		refreshSurfaceStyle();
+	}
+
+	public void setNonEngagementLetterSent(Boolean sent) {
+		boolean show = Boolean.TRUE.equals(sent);
+		nonEngagementLabel.setManaged(show);
+		nonEngagementLabel.setVisible(show);
+		setLifecycleStyle("case-card-non-engagement", show);
 	}
 
 	public void setStatusCssColor(String statusColorCss) {
@@ -312,14 +326,20 @@ public class CaseCard extends VBox {
 	 */
 
 	private void buildUi() {
-		getStyleClass().addAll("case-card", "shale-entity-card", "shale-entity-card-clickable");
+		getStyleClass().addAll("case-card", "case-card-neutral", "shale-entity-card", "shale-entity-card-clickable", "shale-interactive-card");
 		practiceAreaBar.getStyleClass().addAll("case-card__practice-area-bar", "shale-indicator-practice-area");
 		bodyPane.getStyleClass().add("case-card__body");
 		bottomRow.getStyleClass().add("case-card__bottom-row");
 		statusLabel.getStyleClass().addAll("case-card__status-label", "shale-status-pill", "shale-status-pill-compact");
+		nonEngagementLabel.getStyleClass().addAll("case-card__non-engagement", "shale-semantic-chip", "shale-semantic-chip-warning");
+		nonEngagementLabel.setManaged(false);
+		nonEngagementLabel.setVisible(false);
+		titleLabel.getStyleClass().add("case-card__title");
+		intakeLabel.getStyleClass().addAll("case-card__date", "shale-metadata");
+		solLabel.getStyleClass().addAll("case-card__deadline", "shale-metadata");
+		tortNoticeLabel.getStyleClass().addAll("case-card__deadline", "shale-metadata");
 		attorneyMiniCard.getStyleClass().add("case-card__attorney-mini-card");
 		setBackgroundCssColor(null);
-		intakeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.78);");
 		refreshSolStyle();
 		refreshTortNoticeStyle();
 		tortNoticeLabel.setManaged(false);
@@ -345,7 +365,9 @@ public class CaseCard extends VBox {
 		titleLabel.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(titleLabel, Priority.ALWAYS);
 		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);
-		bottomRow.getChildren().setAll(datesBox, bottomSpacer, statusLabel);
+		indicatorRow.setAlignment(Pos.CENTER_RIGHT);
+		indicatorRow.getChildren().setAll(nonEngagementLabel, statusLabel);
+		bottomRow.getChildren().setAll(datesBox, bottomSpacer, indicatorRow);
 		bodyPane.getChildren().setAll(headerRow, bodySpacer, bottomRow);
 		getChildren().setAll(cardRow);
 		cardRow.getChildren().setAll(practiceAreaBar, bodyPane);
@@ -365,14 +387,6 @@ public class CaseCard extends VBox {
 	}
 
 	private void wireEvents() {
-		setOnMouseEntered(e -> {
-			hovered = true;
-			refreshSurfaceStyle();
-		});
-		setOnMouseExited(e -> {
-			hovered = false;
-			refreshSurfaceStyle();
-		});
 		setOnMouseClicked(e ->
 		{
 			if (e.getButton() == MouseButton.PRIMARY && e.isStillSincePress() && !isEmbeddedAction(e.getTarget())
@@ -409,9 +423,7 @@ public class CaseCard extends VBox {
 	}
 
 	private void refreshSurfaceStyle() {
-		setStyle(relatedEmbedded
-				? CardSurfaceStyles.embeddedCardContainerStyle(statusGradientCss(), hovered)
-				: CardSurfaceStyles.cardContainerStyle(taskPreview ? statusTintCss() : statusGradientCss(), hovered));
+		setStyle("");
 		practiceAreaBar.setStyle("""
 				-fx-background-color: %s;
 				-fx-background-radius: 999;
@@ -429,48 +441,31 @@ public class CaseCard extends VBox {
 		return normalized == null ? "#F1F5F9" : normalized;
 	}
 
-	private String statusTintCss() {
-		String normalized = statusName == null ? "" : statusName.trim().toLowerCase(java.util.Locale.ROOT);
-		if (normalized.contains("prelitigation") || normalized.contains("pre-litigation"))
-			return "#EFF6FF";
-		if (normalized.contains("accepted"))
-			return "#F0FDF4";
-		if (normalized.contains("denied"))
-			return "#FEF2F2";
-		if (normalized.contains("closed"))
-			return "#F8FAFC";
-		return "#FFFFFF";
-	}
-
-	private String statusGradientCss() {
-		return EntityCardGradientStyles.caseStrengthGradient(statusColorCss, embeddedMini);
-	}
-
 	private void refreshSolStyle() {
-		String color = solUrgencyColor(solDate);
-		solLabel.setStyle(deadlineLabelStyle(color));
+		applyDeadlineState(solLabel, solDate);
 	}
 
 	private void refreshTortNoticeStyle() {
-		String color = solUrgencyColor(tortNoticeDeadline);
-		tortNoticeLabel.setStyle(deadlineLabelStyle(color));
+		applyDeadlineState(tortNoticeLabel, tortNoticeDeadline);
 	}
 
-	private static String deadlineLabelStyle(String color) {
-		return "-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: " + color + ";";
+	private static void applyDeadlineState(Label label, LocalDate deadline) {
+		label.getStyleClass().removeAll("case-card__deadline-warning", "case-card__deadline-urgent");
+		if (deadline == null) return;
+		long days = ChronoUnit.DAYS.between(LocalDate.now(), deadline);
+		if (days < 30) label.getStyleClass().add("case-card__deadline-urgent");
+		else if (days <= 180) label.getStyleClass().add("case-card__deadline-warning");
 	}
 
-	private static String solUrgencyColor(LocalDate solDate) {
-		if (solDate == null)
-			return "rgba(17,37,66,0.72)";
-		long days = ChronoUnit.DAYS.between(LocalDate.now(), solDate);
-		if (days < 30)
-			return "#DC2626";
-		if (days <= 90)
-			return "#EA580C";
-		if (days <= 180)
-			return "#B45309";
-		return "#15803D";
+	private boolean normalizedStatusContains(String... terms) {
+		String normalized = statusName.toLowerCase(java.util.Locale.ROOT);
+		for (String term : terms) if (normalized.contains(term)) return true;
+		return false;
+	}
+
+	private void setLifecycleStyle(String styleClass, boolean enabled) {
+		getStyleClass().remove(styleClass);
+		if (enabled) getStyleClass().add(styleClass);
 	}
 
 	public static String readableTextColor(String backgroundColor) {
