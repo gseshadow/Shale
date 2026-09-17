@@ -58,8 +58,8 @@ public class CaseCard extends VBox {
 	private String statusName = "";
 	private String attorneyColorCss;
 	private String practiceAreaColorCss = "#CBD5E1";
-	private String practiceAreaWashCss = "rgba(203,213,225,0.22)";
-	private String mutedPracticeAreaWashCss = "rgba(207,211,217,0.14)";
+	private String practiceAreaWashCss = "rgba(203,213,225,0.28)";
+	private String mutedPracticeAreaWashCss = "rgba(207,211,217,0.16)";
 	private String statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
 	private LocalDate solDate;
 	private LocalDate tortNoticeDeadline;
@@ -292,8 +292,8 @@ public class CaseCard extends VBox {
 	public void setPracticeAreaCssColor(String practiceAreaColorCss) {
 		this.practiceAreaColorCss = normalizeColor(practiceAreaColorCss, "#CBD5E1");
 		Color identity = com.shale.ui.util.ColorUtil.toFxColor(this.practiceAreaColorCss);
-		this.practiceAreaWashCss = translucent(identity, 0.22);
-		this.mutedPracticeAreaWashCss = translucent(identity.desaturate(), 0.14);
+		this.practiceAreaWashCss = translucent(identity, 0.28);
+		this.mutedPracticeAreaWashCss = translucent(identity.desaturate(), 0.16);
 		refreshSurfaceStyle();
 	}
 
