@@ -54,6 +54,18 @@
 .shale-property-row-icon { -fx-fill: -shale-color-text-secondary; }
 .shale-property-row-accent { -fx-border-color: transparent transparent transparent -shale-color-border-selected; -fx-border-width: 0 0 0 3px; }
 
+/* Phase 2C Case Details composition; shared primitives continue to own paint and control geometry. */
+.case-details-card { -fx-spacing: 10px; -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2); }
+.case-details-toolbar { -fx-alignment: center-left; -fx-padding: 0 0 6px 0; }
+.case-details-grid { -fx-background-color: transparent; }
+.case-details-grid > .shale-property-row-label,
+.case-details-grid > .shale-property-row-value {
+    -fx-padding: 10px 4px;
+    -fx-border-color: transparent transparent -shale-color-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+.case-details-grid > .shale-property-row-value { -fx-alignment: center-left; }
+
 /* Person rows and neutral avatar fallback; authoritative user colors may override avatar paint. */
 .shale-person-row { -fx-alignment: center-left; -fx-spacing: 10px; -fx-padding: 6px 4px; }
 .shale-person-row:hover.shale-person-row-interactive { -fx-background-color: -shale-color-card-hover; -fx-background-radius: 10px; }
