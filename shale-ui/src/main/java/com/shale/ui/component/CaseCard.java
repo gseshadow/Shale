@@ -20,8 +20,8 @@ import javafx.scene.input.MouseButton;
 /**
  * CaseCard - reusable VBox "card" for rendering a case summary.
  *
- * Case card surface with a soft practice-area identity wash, practice-area accent
- * bar, compact status chip, and responsible-attorney color dot.
+ * Case card surface with a soft status identity wash, practice-area accent bar,
+ * compact status chip, and responsible-attorney color dot.
  *
  * The host screen wires navigation via setOnOpen(...)
  */
@@ -30,6 +30,9 @@ public class CaseCard extends VBox {
 	private static final double FULL_CARD_MIN_WIDTH = 280;
 	private static final double FULL_CARD_PREF_WIDTH = 380;
 	private static final double FULL_CARD_MAX_WIDTH = 420;
+	public static final double FULL_CARD_HEIGHT = 160;
+	private static final double FULL_CARD_INDICATOR_WIDTH = 127;
+	private static final double FULL_CARD_INDICATOR_HEIGHT = 72;
 
 	private final Label titleLabel = new Label();
 	private final Label intakeLabel = new Label();
@@ -44,7 +47,7 @@ public class CaseCard extends VBox {
 	private final VBox bodyPane = new VBox(6);
 	private final HBox headerRow = new HBox(8);
 	private final HBox bottomRow = new HBox(8);
-	private final HBox indicatorRow = new HBox(6);
+	private final VBox indicatorRow = new VBox(4);
 	private final HBox attorneyRow = new HBox(0);
 	private final VBox datesBox = new VBox(2);
 	private final Region bodySpacer = new Region();
@@ -58,8 +61,8 @@ public class CaseCard extends VBox {
 	private String statusName = "";
 	private String attorneyColorCss;
 	private String practiceAreaColorCss = "#CBD5E1";
-	private String practiceAreaWashCss = "rgba(203,213,225,0.28)";
-	private String mutedPracticeAreaWashCss = "rgba(207,211,217,0.16)";
+	private String statusWashCss = "rgba(241,245,249,0.28)";
+	private String mutedStatusWashCss = "rgba(241,245,249,0.16)";
 	private String statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
 	private LocalDate solDate;
 	private LocalDate tortNoticeDeadline;
@@ -83,6 +86,7 @@ public class CaseCard extends VBox {
 		setMinWidth(0);
 		setPrefWidth(210);
 		setMaxWidth(210);
+		useComputedHeight();
 		bodyPane.setSpacing(0);
 		bodyPane.setPadding(new Insets(5, 7, 5, 8));
 		practiceAreaBar.setPrefWidth(3);
@@ -127,6 +131,7 @@ public class CaseCard extends VBox {
 		setMinWidth(0);
 		setPrefWidth(210);
 		setMaxWidth(Double.MAX_VALUE);
+		useComputedHeight();
 		bodyPane.setSpacing(0);
 		bodyPane.setPadding(new Insets(5, 8, 5, 8));
 		bodyPane.setAlignment(Pos.CENTER_LEFT);
@@ -161,6 +166,9 @@ public class CaseCard extends VBox {
 		setMinWidth(FULL_CARD_MIN_WIDTH);
 		setPrefWidth(FULL_CARD_PREF_WIDTH);
 		setMaxWidth(FULL_CARD_MAX_WIDTH);
+		setMinHeight(FULL_CARD_HEIGHT);
+		setPrefHeight(FULL_CARD_HEIGHT);
+		setMaxHeight(FULL_CARD_HEIGHT);
 		bodyPane.setSpacing(5);
 		bodyPane.setPadding(new Insets(12, 14, 11, 16));
 		setPracticeAreaBarWidth(7);
@@ -264,6 +272,7 @@ public class CaseCard extends VBox {
 		this.statusName = statusName == null ? "" : statusName.trim();
 		boolean show = !this.statusName.isBlank();
 		statusLabel.setText(this.statusName);
+		statusLabel.setTooltip(show ? new Tooltip(this.statusName) : null);
 		statusLabel.setAccessibleText(show ? "Case status: " + this.statusName : "Case status unavailable");
 		statusLabel.setManaged(show);
 		statusLabel.setVisible(show);
@@ -281,6 +290,9 @@ public class CaseCard extends VBox {
 
 	public void setStatusCssColor(String statusColorCss) {
 		this.statusColorCss = normalizeColor(statusColorCss, "#F1F5F9");
+		Color identity = com.shale.ui.util.ColorUtil.toFxColor(this.statusColorCss);
+		this.statusWashCss = translucent(identity, 0.28);
+		this.mutedStatusWashCss = translucent(identity.desaturate(), 0.16);
 		refreshSurfaceStyle();
 	}
 
@@ -354,6 +366,9 @@ public class CaseCard extends VBox {
 		datesBox.getChildren().setAll(intakeLabel, solLabel, tortNoticeLabel);
 
 		VBox.setVgrow(bodySpacer, Priority.ALWAYS);
+		VBox.setVgrow(cardRow, Priority.ALWAYS);
+		cardRow.setMinHeight(0);
+		cardRow.setMaxHeight(Double.MAX_VALUE);
 		HBox.setHgrow(bodyPane, Priority.ALWAYS);
 		HBox.setHgrow(headerSpacer, Priority.ALWAYS);
 		HBox.setHgrow(attorneySpacer, Priority.ALWAYS);
@@ -363,15 +378,18 @@ public class CaseCard extends VBox {
 		attorneyRow.setAlignment(Pos.CENTER_RIGHT);
 		bottomRow.setAlignment(Pos.BOTTOM_LEFT);
 		statusLabel.setWrapText(true);
-		statusLabel.setMaxWidth(128);
+		statusLabel.setMaxWidth(FULL_CARD_INDICATOR_WIDTH);
 		statusLabel.setAlignment(Pos.CENTER_RIGHT);
-		datesBox.setMinWidth(118);
+		datesBox.setMinWidth(100);
 		datesBox.setFillWidth(true);
 		titleLabel.setMinWidth(0);
 		titleLabel.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(titleLabel, Priority.ALWAYS);
 		headerRow.getChildren().setAll(titleLabel, headerSpacer, attorneyMiniCard);
-		indicatorRow.setAlignment(Pos.CENTER_RIGHT);
+		indicatorRow.setAlignment(Pos.BOTTOM_RIGHT);
+		indicatorRow.setMinSize(FULL_CARD_INDICATOR_WIDTH, FULL_CARD_INDICATOR_HEIGHT);
+		indicatorRow.setPrefSize(FULL_CARD_INDICATOR_WIDTH, FULL_CARD_INDICATOR_HEIGHT);
+		indicatorRow.setMaxSize(FULL_CARD_INDICATOR_WIDTH, FULL_CARD_INDICATOR_HEIGHT);
 		indicatorRow.getChildren().setAll(nonEngagementLabel, statusLabel);
 		bottomRow.getChildren().setAll(datesBox, bottomSpacer, indicatorRow);
 		bodyPane.getChildren().setAll(headerRow, bodySpacer, bottomRow);
@@ -390,6 +408,12 @@ public class CaseCard extends VBox {
 		practiceAreaBar.setMinWidth(width);
 		practiceAreaBar.setPrefWidth(width);
 		practiceAreaBar.setMaxWidth(width);
+	}
+
+	private void useComputedHeight() {
+		setMinHeight(Region.USE_COMPUTED_SIZE);
+		setPrefHeight(Region.USE_COMPUTED_SIZE);
+		setMaxHeight(Region.USE_COMPUTED_SIZE);
 	}
 
 	private void wireEvents() {
@@ -433,7 +457,7 @@ public class CaseCard extends VBox {
 				-shale-case-accent: %s;
 				-shale-case-wash: %s;
 				-shale-case-muted-wash: %s;
-				""".formatted(practiceAreaColorCss, practiceAreaWashCss, mutedPracticeAreaWashCss));
+				""".formatted(statusColorCss, statusWashCss, mutedStatusWashCss));
 		practiceAreaBar.setStyle("""
 				-fx-background-color: %s;
 				-fx-background-radius: 999;

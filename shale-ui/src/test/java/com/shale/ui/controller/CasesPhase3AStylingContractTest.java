@@ -83,9 +83,9 @@ final class CasesPhase3AStylingContractTest {
             assertTrue(card.lookupAll(".case-card__practice-area-bar").stream()
                     .anyMatch(node -> node.getStyle().contains("#3366AA")),
                     "The compact accent must retain its authoritative database color.");
-            assertTrue(card.getStyle().contains("-shale-case-accent: #3366AA"),
-                    "The authoritative Practice Area color must feed the shared card composition.");
-            assertTrue(card.getStyle().contains("rgba(51,102,170,0.28)"),
+            assertTrue(card.getStyle().contains("-shale-case-accent: #AA3344"),
+                    "The authoritative current Case Status color must feed the shared card composition.");
+            assertTrue(card.getStyle().contains("rgba(170,51,68,0.28)"),
                     "The ordinary card wash must retain a visible, restrained amount of identity color.");
             assertTrue(card.lookupAll(".case-card__deadline-urgent").size() == 1,
                     "An urgent deadline must have a labelled semantic state in addition to color.");
@@ -95,18 +95,18 @@ final class CasesPhase3AStylingContractTest {
     }
 
     @Test
-    void invalidOrAbsentPracticeAreaColorsUseTheNeutralIdentityFallback() {
+    void invalidOrAbsentStatusColorsUseTheNeutralIdentityFallback() {
         JavaFxTestSupport.runAndWait(() -> {
             var factory = new CaseCardFactory(id -> { });
             for (String invalid : new String[] {"", "not-a-color"}) {
                 var model = new CaseCardFactory.CaseCardModel(18, "Fallback Case", null,
-                        null, null, "", "", false, "Open", "#228855", invalid);
+                        null, null, "", "", false, "Open", invalid, "#228855");
                 CaseCard card = assertInstanceOf(CaseCard.class,
                         factory.create(model, CaseCardFactory.Variant.COMPACT));
 
-                assertTrue(card.getStyle().contains("-shale-case-accent: #CBD5E1"),
-                        "Missing and invalid Practice Area colors must use the neutral fallback.");
-                assertTrue(card.getStyle().contains("rgba(203,213,225,0.28)"),
+                assertTrue(card.getStyle().contains("-shale-case-accent: #F1F5F9"),
+                        "Missing and invalid Case Status colors must use the neutral fallback.");
+                assertTrue(card.getStyle().contains("rgba(241,245,249,0.28)"),
                         "The fallback must still produce a pleasant, visible card-wide wash.");
             }
         });

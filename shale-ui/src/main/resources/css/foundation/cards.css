@@ -268,10 +268,10 @@
 .shale-compact-card { -fx-background-radius: 10px; -fx-border-radius: 10px; -fx-padding: 10px; }
 
 /*
- * Authoritative CaseCard composition. The database Practice Area color supplies
- * the identity wash and accent rail; the canonical theme surface remains the
- * readable base beneath the translucent wash. JavaFX paints later BackgroundFill
- * entries over earlier entries, so the gradient must follow the opaque base.
+ * Authoritative CaseCard composition. The database Case Status color supplies
+ * the identity wash; Practice Area remains the narrow accent rail. The canonical
+ * theme surface stays beneath the translucent wash. JavaFX paints later
+ * BackgroundFill entries over earlier entries, so the gradient follows the base.
  */
 .case-card-tinted {
     -fx-background-color:
@@ -317,6 +317,17 @@
         linear-gradient(to right, -shale-case-wash 0%, -shale-case-wash 58%, transparent 100%);
     -fx-border-color: -shale-color-border-selected;
     -fx-border-width: 2px;
+}
+.case-card-tinted.case-card-closed:hover {
+    -fx-background-color:
+        -shale-color-card-hover,
+        linear-gradient(to right, -shale-case-muted-wash 0%, -shale-case-muted-wash 58%, transparent 100%);
+}
+.case-card-tinted.case-card-closed:pressed,
+.case-card-tinted.case-card-closed.shale-card-selected {
+    -fx-background-color:
+        -shale-color-selected-control-background,
+        linear-gradient(to right, -shale-case-muted-wash 0%, -shale-case-muted-wash 58%, transparent 100%);
 }
 
 .case-card__title {
