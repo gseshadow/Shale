@@ -20,8 +20,8 @@ import javafx.scene.input.MouseButton;
 /**
  * CaseCard - reusable VBox "card" for rendering a case summary.
  *
- * Case card surface with a soft status identity wash, practice-area accent bar,
- * compact status chip, and responsible-attorney color dot.
+ * Case card surface with a soft status identity wash, practice-area accent bar, compact
+ * status chip, and responsible-attorney color dot.
  *
  * The host screen wires navigation via setOnOpen(...)
  */
@@ -303,9 +303,6 @@ public class CaseCard extends VBox {
 
 	public void setPracticeAreaCssColor(String practiceAreaColorCss) {
 		this.practiceAreaColorCss = normalizeColor(practiceAreaColorCss, "#CBD5E1");
-		Color identity = com.shale.ui.util.ColorUtil.toFxColor(this.practiceAreaColorCss);
-		this.practiceAreaWashCss = translucent(identity, 0.28);
-		this.mutedPracticeAreaWashCss = translucent(identity.desaturate(), 0.16);
 		refreshSurfaceStyle();
 	}
 
@@ -425,7 +422,8 @@ public class CaseCard extends VBox {
 				e.consume();
 			}
 		});
-		setOnKeyPressed(e -> {
+		setOnKeyPressed(e ->
+		{
 			if ((e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE)
 					&& onOpen != null && caseId != null) {
 				onOpen.accept(caseId);
@@ -438,7 +436,8 @@ public class CaseCard extends VBox {
 		Node node = target instanceof Node n ? n : null;
 		while (node != null && node != this) {
 			if (node instanceof javafx.scene.control.ButtonBase || node instanceof javafx.scene.control.TextInputControl
-					|| node instanceof javafx.scene.control.ComboBoxBase<?> || node instanceof javafx.scene.control.Hyperlink) return true;
+					|| node instanceof javafx.scene.control.ComboBoxBase<?> || node instanceof javafx.scene.control.Hyperlink)
+				return true;
 			node = node.getParent();
 		}
 		return false;
@@ -491,21 +490,27 @@ public class CaseCard extends VBox {
 
 	private static void applyDeadlineState(Label label, LocalDate deadline) {
 		label.getStyleClass().removeAll("case-card__deadline-warning", "case-card__deadline-urgent");
-		if (deadline == null) return;
+		if (deadline == null)
+			return;
 		long days = ChronoUnit.DAYS.between(LocalDate.now(), deadline);
-		if (days < 30) label.getStyleClass().add("case-card__deadline-urgent");
-		else if (days <= 180) label.getStyleClass().add("case-card__deadline-warning");
+		if (days < 30)
+			label.getStyleClass().add("case-card__deadline-urgent");
+		else if (days <= 180)
+			label.getStyleClass().add("case-card__deadline-warning");
 	}
 
 	private boolean normalizedStatusContains(String... terms) {
 		String normalized = statusName.toLowerCase(java.util.Locale.ROOT);
-		for (String term : terms) if (normalized.contains(term)) return true;
+		for (String term : terms)
+			if (normalized.contains(term))
+				return true;
 		return false;
 	}
 
 	private void setLifecycleStyle(String styleClass, boolean enabled) {
 		getStyleClass().remove(styleClass);
-		if (enabled) getStyleClass().add(styleClass);
+		if (enabled)
+			getStyleClass().add(styleClass);
 	}
 
 	public static String readableTextColor(String backgroundColor) {
