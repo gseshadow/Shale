@@ -2,6 +2,7 @@ package com.shale.ui.component;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 import java.util.function.Consumer;
 
 import javafx.geometry.Insets;
@@ -19,8 +20,8 @@ import javafx.scene.input.MouseButton;
 /**
  * CaseCard - reusable VBox "card" for rendering a case summary.
  *
- * Case card surface with a neutral main body, practice-area accent bar, compact
- * status chip, and responsible-attorney color dot.
+ * Case card surface with a soft practice-area identity wash, practice-area accent
+ * bar, compact status chip, and responsible-attorney color dot.
  *
  * The host screen wires navigation via setOnOpen(...)
  */
@@ -57,6 +58,8 @@ public class CaseCard extends VBox {
 	private String statusName = "";
 	private String attorneyColorCss;
 	private String practiceAreaColorCss = "#CBD5E1";
+	private String practiceAreaWashCss = "rgba(203,213,225,0.28)";
+	private String mutedPracticeAreaWashCss = "rgba(207,211,217,0.16)";
 	private String statusLabelBaseStyle = "-fx-font-size: 12px; -fx-font-weight: 800;";
 	private LocalDate solDate;
 	private LocalDate tortNoticeDeadline;
@@ -288,6 +291,9 @@ public class CaseCard extends VBox {
 
 	public void setPracticeAreaCssColor(String practiceAreaColorCss) {
 		this.practiceAreaColorCss = normalizeColor(practiceAreaColorCss, "#CBD5E1");
+		Color identity = com.shale.ui.util.ColorUtil.toFxColor(this.practiceAreaColorCss);
+		this.practiceAreaWashCss = translucent(identity, 0.28);
+		this.mutedPracticeAreaWashCss = translucent(identity.desaturate(), 0.16);
 		refreshSurfaceStyle();
 	}
 
@@ -326,7 +332,7 @@ public class CaseCard extends VBox {
 	 */
 
 	private void buildUi() {
-		getStyleClass().addAll("case-card", "case-card-neutral", "shale-entity-card", "shale-entity-card-clickable", "shale-interactive-card");
+		getStyleClass().addAll("case-card", "case-card-tinted", "shale-entity-card", "shale-entity-card-clickable", "shale-interactive-card");
 		practiceAreaBar.getStyleClass().addAll("case-card__practice-area-bar", "shale-indicator-practice-area");
 		bodyPane.getStyleClass().add("case-card__body");
 		bottomRow.getStyleClass().add("case-card__bottom-row");
@@ -423,7 +429,11 @@ public class CaseCard extends VBox {
 	}
 
 	private void refreshSurfaceStyle() {
-		setStyle("");
+		setStyle("""
+				-shale-case-accent: %s;
+				-shale-case-wash: %s;
+				-shale-case-muted-wash: %s;
+				""".formatted(practiceAreaColorCss, practiceAreaWashCss, mutedPracticeAreaWashCss));
 		practiceAreaBar.setStyle("""
 				-fx-background-color: %s;
 				-fx-background-radius: 999;
@@ -431,6 +441,12 @@ public class CaseCard extends VBox {
 		bodyPane.setStyle("-fx-background-color: transparent;");
 		statusLabel.setStyle(StatusPillStyles.pillStyle(statusLabelBaseStyle, statusColorCss));
 		attorneyMiniCard.setBackgroundCssColor(attorneyColorCss);
+	}
+
+	private static String translucent(Color color, double opacity) {
+		return String.format(Locale.ROOT, "rgba(%d,%d,%d,%.2f)",
+				Math.round(color.getRed() * 255), Math.round(color.getGreen() * 255),
+				Math.round(color.getBlue() * 255), opacity);
 	}
 
 	public static String normalizeColor(String dbColor, String fallback) {
