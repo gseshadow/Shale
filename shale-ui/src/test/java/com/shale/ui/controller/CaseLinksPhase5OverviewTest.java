@@ -47,7 +47,9 @@ final class CaseLinksPhase5OverviewTest {
         assertTrue(source.contains("resetOverviewPrimaryLinkState();"));
         assertTrue(source.contains("overviewPrimaryLinkLoadedOnce && !overviewPrimaryLinkStale"));
         assertTrue(source.contains("primary == null ? Optional.empty() : primary"));
-        assertTrue(source.contains("renderOverviewPrimaryLinkFailure(\"Failed to load primary link. \" + rootMessage(ex))"));
+        assertTrue(source.contains("renderOverviewPrimaryLinkFailure(\"Primary Link could not be loaded. Try refreshing the case.\")"));
+        assertFalse(source.contains("renderOverviewPrimaryLinkFailure(\"Failed to load primary link. \" + rootMessage(ex))"),
+                "Primary Link failures must not expose internal exception details");
         assertFalse(source.contains("listCaseLinks(activeCaseId, tenantId).stream"));
         assertFalse(source.contains("caseDao.getPrimaryCaseLink"));
     }

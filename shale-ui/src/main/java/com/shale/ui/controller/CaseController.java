@@ -1091,9 +1091,14 @@ public class CaseController {
 			detChangePracticeAreaButton.setOnAction(e -> onDetailsChangePracticeArea());
 		if (btnEditTeam != null)
 			btnEditTeam.setOnAction(e -> onEditTeam());
-		if (submitCaseUpdateButton != null)
+		if (submitCaseUpdateButton != null) {
+			ControlStyles.apply(submitCaseUpdateButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+			submitCaseUpdateButton.getStyleClass().add("shale-composer-action");
 			submitCaseUpdateButton.setOnAction(e -> onSubmitCaseUpdate());
+		}
 		if (caseUpdatesSearchField != null) {
+			ControlStyles.formControl(caseUpdatesSearchField);
+			caseUpdatesSearchField.setAccessibleText("Search case updates");
 			caseUpdatesSearchField.textProperty().addListener((obs, oldText, newText) -> applyCaseUpdateFilter());
 		}
 		if (deleteCaseButton != null) {
@@ -2317,7 +2322,8 @@ public class CaseController {
 			} catch (RuntimeException ex) {
 				Platform.runLater(() -> {
 					if (caseId == null || caseId != activeCaseId || generation != overviewPrimaryLinkLoadGeneration) return;
-					renderOverviewPrimaryLinkFailure("Failed to load primary link. " + rootMessage(ex));
+					LOG.error("Primary Link load failed caseId={}", activeCaseId, ex);
+					renderOverviewPrimaryLinkFailure("Primary Link could not be loaded. Try refreshing the case.");
 				});
 			}
 		}, "case-overview-primary-link-load-" + activeCaseId).start();
@@ -2325,12 +2331,12 @@ public class CaseController {
 
 	private void renderOverviewPrimaryLinkLoading() {
 		if (ovPrimaryLinkBox != null) ovPrimaryLinkBox.getChildren().clear();
-		showOverviewPrimaryLinkMessage("Loading primary link…");
+		showOverviewPrimaryLinkMessage("Loading primary link…", "shale-loading-message");
 	}
 
 	private void renderOverviewPrimaryLinkFailure(String message) {
 		if (ovPrimaryLinkBox != null) ovPrimaryLinkBox.getChildren().clear();
-		showOverviewPrimaryLinkMessage(message);
+		showOverviewPrimaryLinkMessage(message, "shale-error-message");
 	}
 
 	private void renderOverviewPrimaryLinkState() {
@@ -2340,7 +2346,7 @@ public class CaseController {
 		if (overviewPrimaryLink.isEmpty()) {
 			Label empty = new Label("No primary link has been selected for this case.");
 			empty.setWrapText(true);
-			empty.getStyleClass().add("case-overview-row-value");
+			empty.getStyleClass().addAll("shale-empty-message", "primary-link-empty");
 			ovPrimaryLinkBox.getChildren().add(empty);
 			return;
 		}
@@ -2349,9 +2355,11 @@ public class CaseController {
 				() -> onOpenOverviewPrimaryLink(link), () -> onEditCaseLink(link), null, null), onOpenContact));
 	}
 
-	private void showOverviewPrimaryLinkMessage(String message) {
+	private void showOverviewPrimaryLinkMessage(String message, String stateStyleClass) {
 		if (ovPrimaryLinkStatusLabel != null) {
 			ovPrimaryLinkStatusLabel.setText(message == null ? "" : message);
+			ovPrimaryLinkStatusLabel.getStyleClass().removeAll("shale-loading-message", "shale-error-message");
+			if (stateStyleClass != null) ovPrimaryLinkStatusLabel.getStyleClass().add(stateStyleClass);
 			setVisibleManaged(ovPrimaryLinkStatusLabel, message != null && !message.isBlank());
 		}
 	}
@@ -4242,8 +4250,8 @@ public class CaseController {
 		}
 		caseUpdatesPane.setManaged(true);
 		caseUpdatesPane.setVisible(true);
-		caseUpdatesPane.setMaxWidth(Region.USE_COMPUTED_SIZE);
-		caseUpdatesPane.setPrefWidth(320.0);
+		caseUpdatesPane.setMaxWidth(420.0);
+		caseUpdatesPane.setPrefWidth(336.0);
 		VBox.setVgrow(caseUpdatesPane, Priority.ALWAYS);
 		if (caseRootPane.getRight() != caseUpdatesPane) {
 			caseRootPane.setRight(caseUpdatesPane);
@@ -6634,6 +6642,7 @@ public class CaseController {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
+		showCaseUpdatesState("Loading updates…", "shale-update-loading");
 
 		new Thread(() ->
 		{
@@ -6656,7 +6665,8 @@ public class CaseController {
 				{
 					caseUpdatesLoading = false;
 					caseUpdatesStale = true;
-					showError("Failed to load case updates. " + ex.getMessage());
+					LOG.error("Case Updates load failed caseId={}", activeCaseId, ex);
+					showCaseUpdatesState("Updates could not be loaded. Try refreshing the case.", "shale-update-error");
 				});
 			}
 		}, "case-updates-load-" + activeCaseId).start();
@@ -6694,7 +6704,8 @@ public class CaseController {
 		if (visibleUpdates.isEmpty()) {
 			Label empty = new Label(searchQuery.isBlank() ? "No updates yet." : "No updates found.");
 			empty.setWrapText(true);
-			empty.setStyle("-fx-opacity: 0.7;");
+			empty.getStyleClass().add("shale-update-empty");
+			empty.setAccessibleText(searchQuery.isBlank() ? "This case has no updates." : "No updates match the current search.");
 			caseUpdatesFeedBox.getChildren().add(empty);
 			if (caseUpdatesScrollPane != null)
 				caseUpdatesScrollPane.setVvalue(0.0);
@@ -6711,6 +6722,14 @@ public class CaseController {
 		if (caseUpdatesScrollPane != null)
 			caseUpdatesScrollPane.setVvalue(0.0);
 		PerfLog.logDone("RENDER", "panel=case_updates page=case_view caseId=" + caseId + " childCount=" + caseUpdatesFeedBox.getChildren().size(), renderStartNanos);
+	}
+
+	private void showCaseUpdatesState(String message, String styleClass) {
+		if (caseUpdatesFeedBox == null) return;
+		Label state = new Label(message);
+		state.setWrapText(true);
+		state.getStyleClass().add(styleClass);
+		caseUpdatesFeedBox.getChildren().setAll(state);
 	}
 
 	private boolean caseUpdateMatchesSearch(CaseUpdateDto dto, String searchQuery) {
@@ -6804,7 +6823,8 @@ public class CaseController {
 			} catch (Exception ex) {
 				runOnFx(() ->
 				{
-					showError("Failed to save case update. " + ex.getMessage());
+					LOG.error("Case Update create failed caseId={}", activeCaseId, ex);
+					showError("The update could not be saved. Check your connection and try again.");
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
 				});
@@ -6849,7 +6869,7 @@ public class CaseController {
 
 	private Node createCaseUpdateCardInternal(CaseUpdateDto dto) {
 		Label authorLabel = new Label(safeAuthorName(dto));
-		authorLabel.setStyle("-fx-font-weight: bold;");
+		authorLabel.getStyleClass().add("shale-update-author");
 		authorLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		authorLabel.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(authorLabel, javafx.scene.layout.Priority.ALWAYS);
@@ -6858,27 +6878,43 @@ public class CaseController {
 		HBox rightActions = new HBox();
 		rightActions.setAlignment(Pos.CENTER_RIGHT);
 		if (canEditCaseUpdate(dto)) {
-			Button editButton = new Button("Edit");
+			Button editButton = ActionButtonFactory.semantic("✎", null,
+					ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+			editButton.getStyleClass().add("shale-update-edit-action");
+			editButton.setAccessibleText("Edit update");
+			editButton.setTooltip(new Tooltip("Edit update"));
 			editButton.setDisable(savingCaseUpdateEdit);
 			editButton.setOnAction(e -> startEditingCaseUpdate(dto, editButton));
 			rightActions.getChildren().add(editButton);
 		}
 
-		HBox topRow = new HBox(8, authorLabel, rightActions);
+		Label avatar = new Label(authorInitials(dto));
+		avatar.getStyleClass().addAll("shale-avatar", "shale-avatar-compact");
+		avatar.setAccessibleText(safeAuthorName(dto) + " avatar");
+		HBox topRow = new HBox(8, avatar, authorLabel, rightActions);
 		topRow.setAlignment(Pos.CENTER_LEFT);
+		topRow.getStyleClass().add("shale-update-card-header");
 
 		Label metadataLabel = new Label(buildCaseUpdateMetadata(dto));
 		metadataLabel.setWrapText(true);
-		metadataLabel.setStyle("-fx-opacity: 0.75; -fx-font-size: 11px;");
+		metadataLabel.getStyleClass().add("shale-update-timestamp");
 
 		Label noteLabel = new Label(NarrativeMarkdownCodec.plainText(safeText(dto.getNoteText())));
 		noteLabel.setWrapText(true);
+		noteLabel.setMaxWidth(Double.MAX_VALUE);
+		noteLabel.getStyleClass().add("shale-update-body");
 		bodyBox = new VBox(noteLabel);
 
-		VBox card = new VBox(4, topRow, metadataLabel, bodyBox);
-		card.setPadding(new Insets(10, 12, 10, 12));
-		card.getStyleClass().addAll("secondary-panel", "shale-entity-card", "shale-entity-card-embedded");
+		VBox card = new VBox(topRow, metadataLabel, bodyBox);
+		card.getStyleClass().add("shale-update-card");
 		return card;
+	}
+
+	private static String authorInitials(CaseUpdateDto dto) {
+		return java.util.Arrays.stream(safeAuthorName(dto).split("\\s+"))
+				.filter(part -> !part.isBlank()).limit(2)
+				.map(part -> part.substring(0, 1).toUpperCase(Locale.ROOT))
+				.collect(Collectors.joining());
 	}
 
 	private String buildCaseUpdateMetadata(CaseUpdateDto dto) {
@@ -6969,7 +7005,8 @@ public class CaseController {
 				runOnFx(() ->
 				{
 					savingCaseUpdateEdit = false;
-					showError("Failed to save case update. " + ex.getMessage());
+					LOG.error("Case Update edit failed caseId={} updateId={}", activeCaseId, caseUpdateId, ex);
+					showError("The update changes could not be saved. Check your connection and try again.");
 					renderCaseUpdates(caseUpdates);
 				});
 			}

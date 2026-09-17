@@ -325,27 +325,13 @@
 
 							<VBox fx:id="ovPrimaryLinkSection" spacing="5">
 								<styleClass>
-									<String fx:value="shale-surface-section" />
-									<String fx:value="case-overview-section" />
-									<String fx:value="case-overview-section-region" />
-									<String
-										fx:value="case-overview-section-region-case-details" />
+									<String fx:value="shale-section-card" />
+									<String fx:value="primary-link-section" />
 								</styleClass>
 								<HBox spacing="8" alignment="CENTER_LEFT"
-									styleClass="case-overview-section-header">
-									<Region>
-										<styleClass>
-											<String fx:value="shale-indicator-practice-area" />
-											<String fx:value="case-overview-section-accent" />
-											<String
-												fx:value="case-overview-section-accent-case-details" />
-										</styleClass>
-									</Region>
-									<Label text="🔗" styleClass="case-overview-section-icon" />
+									styleClass="primary-link-heading">
 									<Label text="Primary Link"
-										styleClass="case-overview-section-title" />
-									<Region HBox.hgrow="ALWAYS"
-										styleClass="case-overview-section-line" />
+										styleClass="shale-section-title" />
 								</HBox>
 								<VBox fx:id="ovPrimaryLinkBox" spacing="6" />
 								<Label fx:id="ovPrimaryLinkStatusLabel"
@@ -1157,38 +1143,33 @@
 	</center>
 
 	<right>
-		<VBox fx:id="caseUpdatesPane" spacing="10.0" minWidth="300.0"
-			prefWidth="320.0" maxWidth="360.0"
-			styleClass="case-right-pane strong-panel"
+		<VBox fx:id="caseUpdatesPane" minWidth="300.0"
+			prefWidth="336.0" maxWidth="420.0"
+			styleClass="shale-update-rail"
 			BorderPane.alignment="TOP_LEFT">
-			<padding>
-				<Insets top="10" right="12" bottom="12" left="10" />
-			</padding>
+			<HBox alignment="CENTER_LEFT" styleClass="shale-update-heading">
+				<Label text="Updates" styleClass="shale-section-title" />
+			</HBox>
 
-			<Label text="Updates"
-				style="-fx-font-size: 15px; -fx-font-weight: bold;" />
+			<VBox spacing="8" styleClass="shale-update-composer">
+				<EnhancedTextArea fx:id="caseUpdatesComposerArea"
+					editorTitle="Case Update" promptText="Add a case update..."
+					expandable="true" spellCheckEnabled="true" prefRowCount="4"
+					minHeight="96" prefHeight="96" maxHeight="180"
+					maxWidth="1.7976931348623157E308" />
 
-			<EnhancedTextArea fx:id="caseUpdatesComposerArea"
-				editorTitle="Case Update" promptText="Add a case update..."
-				expandable="true" spellCheckEnabled="true" prefRowCount="4"
-				minHeight="90" prefHeight="90" maxWidth="1.7976931348623157E308" />
-
-			<Button fx:id="submitCaseUpdateButton" text="Submit"
-				maxWidth="Infinity">
-				<styleClass>
-					<String fx:value="app-toolbar-button" />
-					<String fx:value="app-toolbar-button-primary" />
-				</styleClass>
-			</Button>
+				<Button fx:id="submitCaseUpdateButton" text="Submit"
+					maxWidth="Infinity" />
+			</VBox>
 
 			<TextField fx:id="caseUpdatesSearchField"
-				promptText="Search updates..." />
+				promptText="Search updates..." styleClass="shale-update-search" />
 
 			<ScrollPane fx:id="caseUpdatesScrollPane"
 				fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS"
-				styleClass="transparent-scroll">
+				styleClass="transparent-scroll shale-update-list-scroll">
 				<VBox fx:id="caseUpdatesFeedBox" spacing="8.0"
-					styleClass="secondary-panel">
+					styleClass="shale-update-feed">
 					<padding>
 						<Insets top="2" right="2" bottom="2" left="2" />
 					</padding>

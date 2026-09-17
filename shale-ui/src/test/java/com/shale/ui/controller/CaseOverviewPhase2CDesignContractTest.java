@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 class CaseOverviewPhase2CDesignContractTest {
     @Test
-    void detailsCardAndToolbarComposeCanonicalA2ContractsWithoutMigratingDeferredSections() throws Exception {
+    void detailsCardAndToolbarComposeCanonicalA2ContractsWhilePreservingLaterSections() throws Exception {
         String fxml = Files.readString(Path.of("src/main/resources/fxml/case.fxml"));
         int details = fxml.indexOf("fx:id=\"overviewActionToolbar\"");
         int primaryLink = fxml.indexOf("fx:id=\"ovPrimaryLinkSection\"");
@@ -23,9 +23,12 @@ class CaseOverviewPhase2CDesignContractTest {
         assertTrue(migrated.indexOf("editOverviewButton") < migrated.indexOf("generateSummaryMenuButton"));
         assertTrue(migrated.indexOf("generateSummaryMenuButton") < migrated.indexOf("deleteCaseButton"));
 
-        String deferred = fxml.substring(primaryLink);
-        assertTrue(deferred.contains("case-overview-section-region-case-details"),
-                "Primary Link and subsequent Overview sections remain on their pre-2C presentation");
+        String primarySection = fxml.substring(primaryLink, fxml.indexOf("fx:id=\"ovPartiesBox\"", primaryLink));
+        assertTrue(primarySection.contains("shale-section-card") && primarySection.contains("primary-link-section"),
+                "Phase 2D migrates Primary Link without changing the completed Case Details contract");
+        String laterSections = fxml.substring(fxml.indexOf("fx:id=\"ovPartiesBox\"", primaryLink));
+        assertTrue(laterSections.contains("case-overview-section-region-parties"),
+                "subsequent deferred Overview sections retain their existing presentation");
     }
 
     @Test
