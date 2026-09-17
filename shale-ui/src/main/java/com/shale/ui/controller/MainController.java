@@ -10,6 +10,7 @@ import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.services.UpdateFlowCoordinator;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
+import com.shale.ui.util.ControlStyles;
 
 import java.util.List;
 import javafx.beans.binding.Bindings;
@@ -51,6 +52,9 @@ public final class MainController {
 
 	@FXML
 	private Button notificationBellButton;
+
+	@FXML
+	private Button profileButton;
 
 	// Sidebar nav buttons
 	@FXML
@@ -125,6 +129,7 @@ public final class MainController {
 	private void initialize() {
 		System.out.println("MainController.initialize()");// TODO remove
 		styleNavigationButtons();
+		styleShellControls();
 		highlightNav(navMyShaleButton);
 
 		if (globalSearchField != null) {
@@ -133,6 +138,14 @@ public final class MainController {
 
 		refreshSessionLabel();
 		bindNotificationShell();
+	}
+
+	private void styleShellControls() {
+		ControlStyles.formControl(globalSearchField);
+		ControlStyles.apply(globalSearchButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(newIntakeButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(logoutButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		ControlStyles.apply(profileButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
 	}
 
 	@FXML
@@ -189,6 +202,13 @@ public final class MainController {
 	@FXML
 	private void onNewIntake() {
 		sceneManager.showNewIntakeDialog(caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"));
+	}
+
+	@FXML
+	private void onProfile() {
+		if (appState != null && appState.getUserId() != null && appState.getUserId() > 0) {
+			sceneManager.openUserProfile(appState.getUserId());
+		}
 	}
 
 	@FXML

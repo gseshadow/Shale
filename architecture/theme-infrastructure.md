@@ -65,3 +65,17 @@ Solid token pairs are automatically contrast-checked for normal text and essenti
 Primary and current-stage gradients, plus authoritative database colors, require visual review because their
 paint is dynamic; readable text/labels remain mandatory so hue never carries meaning alone. Dark theme has
 full token parity but remains technical support rather than a claim that every legacy page is migrated.
+
+## Phase 2A shared application shell
+
+The application frame around routed desktop pages is the first consumer of the A.2 vocabulary. The shared
+`main.fxml` shell owns the pale application canvas, navy-to-blue top chrome, deep-navy navigation rail,
+near-white route plane, selected-navigation state, signed-in footer, and the global search, intake,
+notification, profile, and logout controls. Its stable geometry and state selectors live in
+`foundation/shell.css`; paint continues to come exclusively from the light and dark canonical tokens.
+
+Ordinary shell actions, including the profile navigation action, use `ControlStyles`, while global navigation,
+the back affordance, and notification bell retain narrowly scoped shell classes for their specialized interaction. Routed page
+content remains inside the shared content plane but continues to own its internal scrolling. Case section
+navigation remains owned by `AppSectionTabs` and its horizontal scroll boundary, so this phase does not move
+or restyle Case Overview content, the case header, stage history, detail areas, Primary Link, or Updates rail.

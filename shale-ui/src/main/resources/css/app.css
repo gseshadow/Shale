@@ -8,6 +8,7 @@
 @import "foundation/tables.css";
 @import "foundation/toolbars.css";
 @import "foundation/content-components.css";
+@import "foundation/shell.css";
 
 .root {
     -fx-font-size: 14px;
@@ -69,75 +70,13 @@
     -fx-border-width: 1;
 }
 
-/* App header */
-.app-header,
-.top-bar {
-    -fx-background-color: rgba(8, 19, 41, 0.26);
-    -fx-background-radius: 0 0 14 14;
-    -fx-border-color: rgba(235, 245, 255, 0.14);
-    -fx-border-width: 0 0 1 0;
-}
-.top-bar .label {
-    -fx-text-fill: #e9f1ff;
-}
-.app-title {
-    -fx-font-size: 18px;
-    -fx-font-weight: 800;
-}
-.user-email {
-    -fx-font-weight: 600;
-}
-
-
-.topbar-back-button {
-    -fx-min-width: 32;
-    -fx-min-height: 32;
-    -fx-pref-width: 32;
-    -fx-pref-height: 32;
-    -fx-max-width: 32;
-    -fx-max-height: 32;
-    -fx-padding: 0 0 1 0;
-    -fx-background-radius: 999;
-    -fx-border-radius: 999;
-    -fx-background-color: #4b7fce;
-    -fx-border-color: rgba(255, 255, 255, 0.22);
-    -fx-border-width: 1;
-    -fx-text-fill: white;
-    -fx-font-size: 19px;
-    -fx-font-weight: 800;
-    -fx-alignment: center;
-    -fx-content-display: center;
-    -fx-cursor: hand;
-}
-
-.topbar-back-button:hover {
-    -fx-background-color: #5b8fe0;
-}
-
-.topbar-back-button:pressed {
-    -fx-background-color: #3f6fbc;
-}
-
-.topbar-back-button:disabled {
-    -fx-background-color: -shale-button-disabled-background;
-    -fx-border-color: -shale-button-disabled-border;
-    -fx-text-fill: rgba(255, 255, 255, 0.92);
-}
-
 /* Navigation rail and shell wrappers */
-.nav-rail,
-.sidebar,
 .case-nav-pane {
     -fx-background-color: -shale-color-navigation-surface;
     -fx-background-radius: 14;
     -fx-border-radius: 14;
     -fx-border-color: -shale-color-navigation-border;
     -fx-border-width: 1;
-}
-
-.content-root {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent;
 }
 
 .shale-surface,
@@ -170,7 +109,6 @@
     -fx-border-width: 1;
 }
 
-.sidebar-header,
 .section-title {
     -fx-font-weight: 800;
     -fx-text-fill: #e8f2ff;
@@ -222,29 +160,6 @@
 
 .secondary-panel.incident-section-panel {
     -fx-background-color: rgba(244, 234, 246, 0.72); /* very light lavender/rose */
-}
-
-.section-nav-button {
-    -fx-padding: 10 14 10 14;
-    -fx-min-height: 40;
-    -fx-background-radius: 999;
-    -fx-border-radius: 999;
-    -fx-background-color: rgba(14, 34, 65, 0.62);
-    -fx-border-color: rgba(232, 242, 255, 0.16);
-    -fx-border-width: 1;
-    -fx-text-fill: #f4f8ff;
-    -fx-font-weight: 600;
-    -fx-cursor: hand;
-}
-.section-nav-button:hover {
-    -fx-background-color: rgba(31, 64, 108, 0.82);
-    -fx-border-color: rgba(232, 242, 255, 0.28);
-}
-.section-nav-button-active {
-    -fx-background-color: rgba(72, 122, 193, 0.95);
-    -fx-border-color: rgba(255, 255, 255, 0.38);
-    -fx-text-fill: white;
-    -fx-font-weight: 800;
 }
 
 /*
@@ -1048,17 +963,6 @@
     -fx-text-fill: rgba(233, 241, 255, 0.58);
 }
 
-.session-footer {
-    -fx-background-color: rgba(8, 19, 41, 0.26);
-    -fx-background-radius: 14 14 0 0;
-    -fx-border-color: rgba(235, 245, 255, 0.14);
-    -fx-border-width: 1 0 0 0;
-}
-
-.session-footer .label {
-    -fx-text-fill: #e9f1ff;
-}
-
 .notification-banner-host {
     -fx-background-color: rgba(241, 247, 255, 0.85);
     -fx-background-radius: 999;
@@ -1073,16 +977,9 @@
     -fx-font-weight: 700;
 }
 
-.notification-bell-button {
-    -fx-background-radius: 999;
-    -fx-padding: 6 12 6 12;
-    -fx-font-weight: 700;
-    -fx-cursor: hand;
-}
-
 .notification-bell-button-unread {
-    -fx-background-color: -shale-indicator-unread-strong-background;
-    -fx-text-fill: white;
+    -fx-background-color: -shale-color-navigation-selected;
+    -fx-text-fill: -shale-color-text-on-primary;
 }
 
 .notification-window-root {
