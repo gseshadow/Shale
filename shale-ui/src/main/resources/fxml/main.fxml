@@ -10,22 +10,32 @@
 	<top>
 		<HBox spacing="12" styleClass="top-bar app-header">
 			<children>
-				<Label text="SHALE" styleClass="app-brand" />
-				<Button fx:id="backButton" text="←" onAction="#onBack" disable="true"
-					styleClass="topbar-back-button" />
-				<!-- Global search -->
-				<TextField fx:id="globalSearchField"
-					promptText="Search cases, contacts, tasks..." HBox.hgrow="ALWAYS"
-					styleClass="global-search-field" />
-				<Button fx:id="globalSearchButton" text="Search"
-					onAction="#onGlobalSearch" />
+				<HBox spacing="12" alignment="CENTER_LEFT" styleClass="shell-leading-actions">
+					<children>
+						<Label text="SHALE" styleClass="app-brand" />
+						<Button fx:id="backButton" text="←" onAction="#onBack" disable="true"
+							styleClass="topbar-back-button" />
+					</children>
+				</HBox>
+				<!-- Global search owns the flexible middle width and shrinks before trailing actions. -->
+				<HBox spacing="8" alignment="CENTER_LEFT" HBox.hgrow="ALWAYS"
+					minWidth="180" maxWidth="620" styleClass="shell-search-group">
+					<children>
+						<TextField fx:id="globalSearchField"
+							promptText="Search cases, contacts, tasks..." HBox.hgrow="ALWAYS"
+							minWidth="120" styleClass="global-search-field" />
+						<Button fx:id="globalSearchButton" text="Search"
+							onAction="#onGlobalSearch" />
+					</children>
+				</HBox>
 
 				<Button fx:id="newIntakeButton" text="New Intake"
 					onAction="#onNewIntake" />
 
 
 				<Region HBox.hgrow="ALWAYS" />
-				<HBox spacing="8" alignment="CENTER_RIGHT">
+				<HBox spacing="8" alignment="CENTER_RIGHT" minWidth="-Infinity"
+					styleClass="shell-trailing-actions">
 					<children>
 						<HBox fx:id="notificationBannerHost" spacing="8" alignment="CENTER_LEFT"
 							styleClass="notification-banner-host" visible="false" managed="false">
