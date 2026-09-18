@@ -117,6 +117,19 @@
 .organization-profile-primary { -fx-fill-width: true; }
 .organization-profile-contact-card, .organization-profile-related-card { -fx-fill-width: true; }
 .organization-profile-related-card .case-card { -fx-max-width: 100000px; }
+
+/* Contact profile: neutral identity surface; classifications retain their own database colors. */
+.contact-profile-header {
+    -fx-background-color: -shale-color-page-header-surface;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-width: 0 0 1px 0;
+}
+.contact-profile-avatar { -fx-min-width: 40px; -fx-pref-width: 40px; -fx-max-width: 40px; -fx-min-height: 40px; -fx-pref-height: 40px; -fx-max-height: 40px; }
+.contact-profile-avatar-text { -fx-text-fill: -shale-color-avatar-neutral-text; -fx-font-size: 12px; -fx-font-weight: 800; }
+.contact-profile-toolbar { -fx-padding: 2px 0 0 0; }
+.contact-profile-identity-card, .contact-profile-methods-card, .contact-profile-related-card { -fx-fill-width: true; }
+.contact-profile-related-card .case-card { -fx-max-width: 100000px; }
+.contact-profile-header .contact-classification-chip-group { -fx-alignment: top-left; }
 .case-status-history-host { -fx-alignment: center-left; }
 .status-timeline { -fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0; }
 .status-timeline > .viewport, .status-timeline > .viewport > .content { -fx-background-color: transparent; }

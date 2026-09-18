@@ -292,3 +292,17 @@
 .shale-semantic-chip-danger { -fx-background-color: -shale-color-danger-wash; -fx-border-color: -shale-color-danger-border; -fx-text-fill: -shale-color-danger-text; }
 .shale-semantic-chip-info { -fx-background-color: -shale-color-info-wash; -fx-border-color: -shale-color-info-border; -fx-text-fill: -shale-color-info-text; }
 .shale-semantic-chip-inactive { -fx-opacity: -shale-opacity-disabled; }
+/* Structured contact-method metadata uses theme paint; stored classifications do not. */
+.contact-point-badge {
+    -fx-background-color: -shale-color-chip-neutral-background;
+    -fx-background-radius: 999px;
+    -fx-padding: 3px 7px;
+    -fx-font-size: 10px;
+    -fx-font-weight: 800;
+    -fx-text-fill: -shale-color-text-secondary;
+}
+.contact-point-primary {
+    -fx-background-color: -shale-color-success-wash;
+    -fx-text-fill: -shale-color-success-text;
+}
+.contact-point-legacy { -fx-background-color: -shale-color-warning-wash; -fx-text-fill: -shale-color-warning-text; }

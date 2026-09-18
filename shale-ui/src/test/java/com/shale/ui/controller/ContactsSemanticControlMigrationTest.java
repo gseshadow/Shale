@@ -94,8 +94,8 @@ final class ContactsSemanticControlMigrationTest {
                     inspect("/fxml/contacts.fxml", 560, 700);
                     Parent detail = inspect("/fxml/contact.fxml", 1280, 800);
                     inspect("/fxml/contact.fxml", 700, 760);
-                    requireStyles(detail, "contact-profile-panel", "case-main-surface", "contact-profile-panel");
-                    requireStyles(detail, "contact-classifications-panel", "secondary-panel", "contact-classifications-panel");
+                    requireStyles(detail, "contact-profile-identity-card", "shale-section-card", "contact-profile-identity-card");
+                    requireStyles(detail, "contact-classifications-panel", "shale-section-card", "contact-classifications-panel");
                     requireStyle(detail, "editButton", Button.class, "shale-control-secondary");
                     requireStyle(detail, "deleteContactButton", Button.class, "shale-control-danger");
                     requireControl(detail, "conditionValue", javafx.scene.control.Label.class);
