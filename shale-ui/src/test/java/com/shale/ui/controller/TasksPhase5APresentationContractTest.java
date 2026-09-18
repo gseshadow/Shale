@@ -13,10 +13,20 @@ final class TasksPhase5APresentationContractTest {
     @Test
     void dedicatedRouteReusesMyShaleTaskBoardRatherThanForkingItsMarkup() throws Exception {
         String mainFxml = read("src/main/resources/fxml/main.fxml");
+        String mainController = read("src/main/java/com/shale/ui/controller/MainController.java");
         String sceneManager = read("src/main/java/com/shale/ui/navigation/SceneManager.java");
         String controller = read("src/main/java/com/shale/ui/controller/MyShaleController.java");
 
-        assertTrue(mainFxml.contains("fx:id=\"navTasksButton\"") && mainFxml.contains("onAction=\"#onNavTasks\""));
+        assertFalse(mainFxml.contains("navTasksButton") || mainFxml.contains("onAction=\"#onNavTasks\"")
+                        || mainController.contains("navTasksButton") || mainController.contains("onNavTasks"),
+                "Tasks must not have a dedicated main-sidebar control or sidebar-only controller wiring.");
+        assertTrue(sceneManager.contains("public void openTasksView()")
+                        && sceneManager.contains("navigateTo(AppRoute.tasks(), true)"),
+                "Programmatic Tasks navigation must keep recording the dedicated route.");
+        assertTrue(sceneManager.contains("case TASKS -> mainController.showTasksView();")
+                        && mainController.contains("public void showTasksView()")
+                        && mainController.contains("highlightNav(null)"),
+                "Tasks routes, including back-stack restoration, must still render without selecting a sidebar item.");
         assertTrue(sceneManager.contains("return createMyShaleView(onOpenCase, onOpenUser, true);"),
                 "Tasks must compose the already-authoritative My Shale board and handlers.");
         assertTrue(controller.contains("configureDedicatedTasksMode()"));
