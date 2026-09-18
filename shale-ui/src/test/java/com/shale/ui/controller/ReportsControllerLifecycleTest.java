@@ -71,4 +71,32 @@ final class ReportsControllerLifecycleTest {
         assertTrue(source.contains("if (isCurrentLoad(generation, shaleClientId)) applyRows(rows)"));
         assertTrue(source.contains("if (!isCurrentLoad(generation, shaleClientId)) return;"));
     }
+
+    @Test
+    void reportsUseShellHeaderAndOwnFocusedThemeAwarePresentation() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/ReportsController.java"));
+        String fxml = Files.readString(Path.of("src/main/resources/fxml/reports.fxml"));
+        String main = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MainController.java"));
+        String appCss = Files.readString(Path.of("src/main/resources/css/app.css"));
+        String reportsCss = Files.readString(Path.of("src/main/resources/css/foundation/reports.css"));
+
+        assertTrue(main.contains("setSectionHeader(\"Reports\", \"Analyze case activity and status trends.\", true)"),
+                "Reports must retain the canonical shell-owned title, subtitle, and visible header surface.");
+        assertFalse(fxml.contains("text=\"Case Status Report\""),
+                "The routed Reports content must not duplicate the shell title.");
+        assertTrue(appCss.contains("@import \"foundation/reports.css\";"),
+                "Reports presentation must be imported through the stable application stylesheet.");
+        assertTrue(reportsCss.contains("-shale-color-card-surface")
+                        && reportsCss.contains("-shale-color-section-surface")
+                        && reportsCss.contains("-shale-color-text-primary"),
+                "Reports surfaces and text must resolve through theme-owned semantic paint.");
+        assertFalse(reportsCss.matches("(?s).*#[0-9a-fA-F]{3,8}.*"),
+                "The focused Reports owner must not embed light-only or dark-only paint.");
+        assertTrue(source.contains("ReportState.NOT_RUN"));
+        assertTrue(source.contains("ReportState.LOADING"));
+        assertTrue(source.contains("ReportState.FILTERED_EMPTY"));
+        assertTrue(source.contains("ReportState.VALIDATION"));
+        assertTrue(source.contains("ReportState.FAILURE"));
+        assertTrue(source.contains("ReportState.UNAVAILABLE"));
+    }
 }

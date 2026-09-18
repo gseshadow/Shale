@@ -9,6 +9,7 @@
 @import "foundation/toolbars.css";
 @import "foundation/content-components.css";
 @import "foundation/calendar.css";
+@import "foundation/reports.css";
 @import "foundation/shell.css";
 
 .root {

@@ -17,6 +17,8 @@ import javafx.beans.property.ReadOnlyLongWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
+import javafx.css.PseudoClass;
+import javafx.geometry.Orientation;
 import javafx.scene.chart.PieChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckMenuItem;
@@ -36,6 +38,7 @@ import javafx.scene.Node;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.control.SplitPane;
 
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
@@ -53,6 +56,14 @@ import javafx.stage.FileChooser;
 import java.io.File;
 
 public final class ReportsController {
+    private static final double STACKED_RESULTS_BREAKPOINT = 860;
+    private static final PseudoClass NOT_RUN_STATE = PseudoClass.getPseudoClass("not-run");
+    private static final PseudoClass LOADING_STATE = PseudoClass.getPseudoClass("loading");
+    private static final PseudoClass EMPTY_STATE = PseudoClass.getPseudoClass("empty");
+    private static final PseudoClass FILTERED_EMPTY_STATE = PseudoClass.getPseudoClass("filtered-empty");
+    private static final PseudoClass VALIDATION_STATE = PseudoClass.getPseudoClass("validation");
+    private static final PseudoClass FAILURE_STATE = PseudoClass.getPseudoClass("failure");
+    private static final PseudoClass UNAVAILABLE_STATE = PseudoClass.getPseudoClass("unavailable");
     private static final DecimalFormat PERCENT_FORMAT = new DecimalFormat("0.0");
     private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -70,6 +81,8 @@ public final class ReportsController {
     @FXML private StatisticCard totalCasesCard;
     @FXML private StatisticCard visibleStatusesCard;
     @FXML private StatisticCard largestStatusCard;
+    @FXML private BorderPane reportsRoot;
+    @FXML private SplitPane reportResultsSplit;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "reports-loader");
@@ -103,6 +116,12 @@ public final class ReportsController {
         ControlStyles.apply(refreshButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
         ControlStyles.apply(showAllResultsButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
         ControlStyles.apply(exportButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+        if (reportsRoot != null && reportResultsSplit != null) {
+            reportsRoot.widthProperty().addListener((observable, oldWidth, newWidth) ->
+                    updateResultOrientation(newWidth.doubleValue()));
+            updateResultOrientation(reportsRoot.getWidth());
+        }
+        setReportStatus("Preparing report…", ReportState.NOT_RUN);
         if (caseStatusColumn != null) {
             caseStatusColumn.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().caseStatus()));
         }
@@ -130,7 +149,7 @@ public final class ReportsController {
         }
         Integer shaleClientId = appState.getShaleClientId();
         if (shaleClientId == null || shaleClientId <= 0) {
-            setStatus("No tenant is selected.");
+            setReportStatus("No tenant is selected.", ReportState.UNAVAILABLE);
             return;
         }
         setLoading(true);
@@ -147,7 +166,7 @@ public final class ReportsController {
                 Platform.runLater(() -> {
                     if (!isCurrentLoad(generation, shaleClientId)) return;
                     clearReport();
-                    setStatus("Unable to load case statuses. Please try again.");
+                    setReportStatus("Unable to load case statuses. Please try again.", ReportState.FAILURE);
                     setLoading(false);
                 });
             }
@@ -164,12 +183,12 @@ public final class ReportsController {
         List<Integer> selectedStatusIds = selectedStatusIds();
         long generation = loadGeneration.incrementAndGet();
         if (shaleClientId == null || shaleClientId <= 0) {
-            setStatus("No tenant is selected.");
+            setReportStatus("No tenant is selected.", ReportState.UNAVAILABLE);
             return;
         }
         if (selectedStatusIds.isEmpty()) {
             clearReport();
-            setStatus("No case statuses selected.");
+            setReportStatus("Select at least one case status, then apply the filters.", ReportState.VALIDATION);
             updateStatusFilterText();
             setLoading(false);
             return;
@@ -183,7 +202,7 @@ public final class ReportsController {
                 Platform.runLater(() -> {
                     if (!isCurrentLoad(generation, shaleClientId)) return;
                     clearReport();
-                    setStatus("Unable to load report. Please try again.");
+                    setReportStatus("Unable to load report. Please try again.", ReportState.FAILURE);
                 });
             } finally {
                 Platform.runLater(() -> { if (isCurrentLoad(generation, shaleClientId)) setLoading(false); });
@@ -229,14 +248,14 @@ public final class ReportsController {
         reportRowsBySliceName.clear();
         long total = safeRows.stream().mapToLong(CaseStatusReportRowDto::caseCount).sum();
         if (safeRows.isEmpty()) {
-            setStatus("No case statuses selected.");
+            setReportStatus("No case statuses selected.", ReportState.EMPTY);
             return;
         }
         if (total <= 0) {
-            setStatus("No cases found for this filter.");
+            setReportStatus("No cases found for this filter.", ReportState.FILTERED_EMPTY);
             return;
         }
-        setStatus("");
+        setReportStatus("", ReportState.SUCCESS);
         Map<String, String> colorsBySliceName = new LinkedHashMap<>();
         List<PieChart.Data> slices = new ArrayList<>();
         for (CaseStatusReportRowDto row : safeRows) {
@@ -302,7 +321,7 @@ public final class ReportsController {
         if (row == null || row.caseCount() <= 0 || appState == null || caseDao == null) return;
         Integer shaleClientId = appState.getShaleClientId();
         if (shaleClientId == null || shaleClientId <= 0) {
-            setStatus("No tenant is selected.");
+            setReportStatus("No tenant is selected.", ReportState.UNAVAILABLE);
             return;
         }
         LocalDate startDate = startDatePicker == null ? null : startDatePicker.getValue();
@@ -319,7 +338,7 @@ public final class ReportsController {
                     showCaseDetailsDialog(row.caseStatus(), startDate, endDate, rows, criteria); });
             } catch (RuntimeException ex) {
                 Platform.runLater(() -> { if (isCurrentLoad(generation, shaleClientId))
-                    setStatus("Unable to load cases for " + row.caseStatus() + ". Please try again."); });
+                    setReportStatus("Unable to load cases for " + row.caseStatus() + ". Please try again.", ReportState.FAILURE); });
             } finally {
                 Platform.runLater(() -> { if (isCurrentLoad(generation, shaleClientId)) setLoading(false); });
             }
@@ -373,7 +392,7 @@ public final class ReportsController {
     private void onExport() {
         if (appState == null) return;
         Integer tenantId = appState.getShaleClientId();
-        if (tenantId == null || tenantId <= 0) { setStatus("No tenant is selected."); return; }
+        if (tenantId == null || tenantId <= 0) { setReportStatus("No tenant is selected.", ReportState.UNAVAILABLE); return; }
         exportReport(new CaseExportService.ReportCriteria(tenantId,
                 startDatePicker == null ? null : startDatePicker.getValue(),
                 endDatePicker == null ? null : endDatePicker.getValue(), selectedStatusIds()),
@@ -510,10 +529,34 @@ public final class ReportsController {
         if (refreshButton != null) refreshButton.setDisable(loading);
         if (showAllResultsButton != null) showAllResultsButton.setDisable(loading);
         if (exportButton != null) exportButton.setDisable(loading || exportInProgress);
-        if (loading) setStatus("Loading report…");
+        if (loading) setReportStatus("Loading report…", ReportState.LOADING);
     }
 
-    private void setStatus(String text) {
-        if (statusLabel != null) statusLabel.setText(text == null ? "" : text);
+    private void updateResultOrientation(double width) {
+        if (reportResultsSplit == null) return;
+        Orientation orientation = width > 0 && width < STACKED_RESULTS_BREAKPOINT
+                ? Orientation.VERTICAL : Orientation.HORIZONTAL;
+        if (reportResultsSplit.getOrientation() != orientation) {
+            reportResultsSplit.setOrientation(orientation);
+            reportResultsSplit.setDividerPositions(orientation == Orientation.VERTICAL ? 0.52 : 0.48);
+        }
+    }
+
+    private void setReportStatus(String text, ReportState state) {
+        if (statusLabel == null) return;
+        statusLabel.setText(text == null ? "" : text);
+        statusLabel.setVisible(text != null && !text.isBlank());
+        statusLabel.setManaged(statusLabel.isVisible());
+        statusLabel.pseudoClassStateChanged(NOT_RUN_STATE, state == ReportState.NOT_RUN);
+        statusLabel.pseudoClassStateChanged(LOADING_STATE, state == ReportState.LOADING);
+        statusLabel.pseudoClassStateChanged(EMPTY_STATE, state == ReportState.EMPTY);
+        statusLabel.pseudoClassStateChanged(FILTERED_EMPTY_STATE, state == ReportState.FILTERED_EMPTY);
+        statusLabel.pseudoClassStateChanged(VALIDATION_STATE, state == ReportState.VALIDATION);
+        statusLabel.pseudoClassStateChanged(FAILURE_STATE, state == ReportState.FAILURE);
+        statusLabel.pseudoClassStateChanged(UNAVAILABLE_STATE, state == ReportState.UNAVAILABLE);
+    }
+
+    private enum ReportState {
+        NOT_RUN, LOADING, SUCCESS, EMPTY, FILTERED_EMPTY, VALIDATION, FAILURE, UNAVAILABLE
     }
 }

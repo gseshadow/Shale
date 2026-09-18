@@ -3,12 +3,16 @@ package com.shale.ui.controller;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Bounds;
+import javafx.geometry.Orientation;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.SplitPane;
 import javafx.scene.layout.FlowPane;
+import com.shale.ui.theme.Theme;
+import com.shale.ui.theme.ThemeManager;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -43,6 +47,11 @@ final class ReportsSemanticControlMigrationTest {
         assertFalse(fxml.contains("app-toolbar-button"), "migrated actions must not retain legacy toolbar geometry");
         assertFalse(fxml.contains("shale-date-picker"), "report dates must not retain the legacy capsule class");
         assertTrue(fxml.contains("<FlowPane fx:id=\"reportFilterToolbar\" hgap=\"10\" vgap=\"8\""));
+        assertTrue(fxml.contains("styleClass=\"shale-toolbar, reports-filter-toolbar\""));
+        assertTrue(fxml.contains("styleClass=\"shale-section-card, reports-result-card\""));
+        assertTrue(fxml.contains("styleClass=\"shale-table, reports-status-table\""));
+        assertFalse(fxml.contains("page-heading"), "the shell, not Reports FXML, must own the canonical page heading");
+        assertFalse(fxml.matches("(?s).*#[0-9a-fA-F]{3,8}.*"), "Reports FXML must not own theme paint");
         assertTrue(source.contains("-fx-pie-color:"), "status colors remain scoped to chart data");
         assertFalse(source.contains("ControlStyles.Purpose.DANGER"), "Reports has no destructive action");
     }
@@ -95,9 +104,16 @@ final class ReportsSemanticControlMigrationTest {
                 try {
                     Parent root = FXMLLoader.load(requireResource("/fxml/reports.fxml"));
                     Scene scene = new Scene(root, 1280, 800);
-                    scene.getStylesheets().add(requireResource("/css/app.css").toExternalForm());
-                    assertLayout(root, 1280);
-                    assertLayout(root, 640);
+                    ThemeManager themes = new ThemeManager();
+                    themes.register(scene);
+                    for (Theme theme : Theme.values()) {
+                        themes.setActiveTheme(theme);
+                        assertLayout(root, 1280, Orientation.HORIZONTAL);
+                        assertLayout(root, 640, Orientation.VERTICAL);
+                        require(root.lookup(".reports-result-card").getBackground() != null
+                                        && !root.lookup(".reports-result-card").getBackground().getFills().isEmpty(),
+                                theme + " result card has a computed themed surface");
+                    }
                 } catch (Throwable thrown) {
                     failure.set(thrown);
                 } finally {
@@ -109,7 +125,7 @@ final class ReportsSemanticControlMigrationTest {
             if (failure.get() != null) throw new AssertionError("Reports rendering failed", failure.get());
         }
 
-        private static void assertLayout(Parent root, double width) {
+        private static void assertLayout(Parent root, double width, Orientation expectedOrientation) {
             root.resize(width, 800);
             root.applyCss();
             root.layout();
@@ -120,11 +136,13 @@ final class ReportsSemanticControlMigrationTest {
             Button showAll = (Button) root.lookup("#showAllResultsButton");
             Button export = (Button) root.lookup("#exportButton");
             FlowPane toolbar = (FlowPane) root.lookup("#reportFilterToolbar");
+            SplitPane results = (SplitPane) root.lookup("#reportResultsSplit");
             require(List.of(start, end, statuses).stream().allMatch(c -> c.getStyleClass().contains("shale-form-control")), "shared form classes");
             require(radius(start) == 8 && radius(end) == 8 && radius(statuses) == 8, "rounded rectangle form geometry");
             require(apply.getStyleClass().contains("shale-control-primary"), "Apply primary");
             require(showAll.getStyleClass().contains("shale-control-secondary") && export.getStyleClass().contains("shale-control-secondary"), "supporting actions secondary");
             require(apply.getHeight() == showAll.getHeight() && showAll.getHeight() == export.getHeight(), "action height alignment");
+            require(results.getOrientation() == expectedOrientation, "results stack responsively at " + width);
             for (var child : toolbar.getChildren()) {
                 Bounds bounds = child.getBoundsInParent();
                 require(bounds.getMinX() >= -0.01 && bounds.getMaxX() <= toolbar.getWidth() + 0.01, "toolbar child clipped at " + width);
