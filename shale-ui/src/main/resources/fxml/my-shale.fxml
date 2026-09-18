@@ -15,7 +15,8 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
 	fx:controller="com.shale.ui.controller.MyShaleController"
-	styleClass="app-shell, shell-route-page, my-shale-page">
+	styleClass="app-shell, shell-route-page, my-shale-page"
+	maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 	<center>
 		<VBox spacing="12" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 			<padding><Insets top="16" right="16" bottom="16" left="16" /></padding>
@@ -33,7 +34,8 @@
 						styleClass="shale-loading-placeholder" />
 					<ScrollPane fx:id="overviewScroll" fitToWidth="true" pannable="true" hbarPolicy="NEVER"
 						vbarPolicy="AS_NEEDED" styleClass="surface-scroll, my-shale-page-scroll" VBox.vgrow="ALWAYS">
-						<content><VBox fx:id="overviewMainRow" spacing="12" fillWidth="true" /></content>
+						<content><VBox fx:id="overviewMainRow" spacing="12" fillWidth="true"
+							maxWidth="1.7976931348623157E308" /></content>
 					</ScrollPane>
 				</VBox>
 
