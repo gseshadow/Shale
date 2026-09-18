@@ -118,6 +118,41 @@
     -fx-font-weight: 600;
 }
 
+/* Organization Card: the authoritative primary type supplies identity paint. */
+.organization-card {
+    -shale-organization-type-accent: -shale-color-chip-neutral-border;
+    -shale-organization-type-wash: -shale-color-chip-neutral-background;
+    -fx-background-color: linear-gradient(to right, -shale-organization-type-wash 0%, -shale-color-card-surface 72%);
+    -fx-border-color: -shale-organization-type-accent -shale-color-card-border -shale-color-card-border -shale-organization-type-accent;
+    -fx-border-width: 1px 1px 1px 4px;
+    -fx-border-insets: 0;
+    -fx-alignment: top-left;
+}
+
+.organization-card:hover {
+    -fx-background-color: linear-gradient(to right, -shale-organization-type-wash 0%, -shale-color-card-hover-surface 76%);
+    -fx-border-color: -shale-organization-type-accent -shale-color-card-hover-border -shale-color-card-hover-border -shale-organization-type-accent;
+}
+
+.organization-card:pressed { -fx-opacity: 0.94; }
+.organization-card:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 9, 0.18, 0, 0);
+}
+.organization-card-removed { -fx-opacity: 0.72; }
+.organization-card-removed:hover { -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 18, 0.18, 0, 4); }
+.organization-card-content { -fx-fill-width: true; }
+.organization-card-name-full { -fx-font-size: 15px; -fx-font-weight: 800; }
+.organization-card-name-compact { -fx-font-size: 14px; -fx-font-weight: 700; }
+.organization-card-classification-region { -fx-min-height: 48px; -fx-pref-height: 48px; -fx-alignment: top-left; }
+.organization-card-compact .organization-card-classification-region { -fx-min-height: 26px; -fx-pref-height: 26px; }
+.organization-card-avatar {
+    -fx-fill: -shale-color-avatar-neutral-background;
+    -fx-stroke: -shale-color-card-border;
+    -fx-stroke-width: 1;
+}
+.organization-card-mini { -fx-border-width: 1px 1px 1px 3px; }
+
 /* Case Link Card variants: Link Type identity drives the wash and accent rail. */
 .case-link-card {
     -fx-background-color: linear-gradient(to right, -shale-link-type-wash 0%, -shale-color-card-surface 44%, -shale-color-card-surface 100%);

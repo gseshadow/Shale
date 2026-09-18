@@ -168,12 +168,19 @@
 .shale-filter-option:hover, .shale-filter-option:focused { -fx-background-color: -shale-color-card-hover; }
 .shale-filter-option:selected { -fx-background-color: -shale-color-selected-control-background; -fx-font-weight: 800; }
 
-/* Compatibility for the Organizations directory until its A.2 migration. */
-.contact-filter-controls { -fx-alignment: center-left; -fx-padding: 0; }
-.contact-filter-clear {
-    -fx-background-color: transparent; -fx-border-color: transparent;
-    -fx-text-fill: -shale-color-text-link; -fx-font-weight: 800; -fx-cursor: hand;
+/* Organizations shares the responsive directory contract while retaining its own selector namespace. */
+.organizations-page-header { -fx-padding: 16px 16px 4px 16px; }
+.organizations-toolbar {
+    -fx-padding: 10px 12px;
+    -fx-background-color: -shale-color-section-surface;
+    -fx-border-color: -shale-color-border-subtle;
 }
-.contact-filter-clear:hover { -fx-background-color: -shale-color-card-hover; -fx-background-radius: 8px; }
-.contact-filter-clear:focused { -fx-border-color: -shale-color-border-focus; -fx-border-radius: 8px; }
-.contact-filter-clear:disabled { -fx-opacity: -shale-opacity-disabled; }
+.organizations-toolbar-controls { -fx-alignment: center-left; }
+.organizations-results-count {
+    -fx-text-fill: -shale-color-text-muted;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-padding: 0 4px;
+}
+.organizations-selected-filters { -fx-padding: 0 2px 4px 2px; }
+.organizations-content-surface { -fx-padding: 12px; -fx-background-color: transparent; }

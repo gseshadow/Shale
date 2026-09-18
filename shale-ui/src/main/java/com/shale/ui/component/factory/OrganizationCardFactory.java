@@ -68,7 +68,10 @@ public class OrganizationCardFactory {
 		OrganizationCard card=create(model,variant);
 		if(presentation==null)return card;
 		card.setSuppressPlaceholderLines(true);
-		card.setTypes(presentation.types());card.setStructuredPhone(presentation.phone(),presentation.phoneNormalized(),presentation.phoneExtension());
+		card.setTypes(presentation.types());
+		card.setPrimaryTypeColor(presentation.types().stream().filter(t -> t.primary())
+				.findFirst().map(t -> t.color()).orElse(null));
+		card.setStructuredPhone(presentation.phone(),presentation.phoneNormalized(),presentation.phoneExtension());
 		card.setEmail(presentation.email());card.setAddress(presentation.address());card.setWebsite(presentation.website());
 		switch(variant){case FULL->card.applyFull();case COMPACT->card.applyCompact();case MINI->card.applyMini();}return card;
 	}

@@ -60,15 +60,17 @@ final class OrganizationCardMiniStyleTest {
     }
 
     @Test
-    void fullAndCompactRetainExistingInlineTitleColorsAndClearMiniClasses() throws IOException {
+    void fullAndCompactUseThemeOwnedTitleClassesAndClearMiniClasses() throws IOException {
         String source = Files.readString(ORGANIZATION_CARD);
         String compactBlock = source.substring(source.indexOf("public void applyCompact()"), source.indexOf("public void applyFull()"));
         String fullBlock = source.substring(source.indexOf("public void applyFull()"), source.indexOf("public Node asNode()"));
 
         assertTrue(compactBlock.contains("resetNameLabelVariantStyles()"));
-        assertTrue(compactBlock.contains("nameLabel.setStyle(\"-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;\")"));
+        assertTrue(compactBlock.contains("organization-card-name-compact"));
+        assertFalse(compactBlock.contains("-fx-text-fill"));
         assertTrue(fullBlock.contains("resetNameLabelVariantStyles()"));
-        assertTrue(fullBlock.contains("nameLabel.setStyle(\"-fx-font-size: 15px; -fx-font-weight: 700; -fx-text-fill: #112542;\")"));
+        assertTrue(fullBlock.contains("organization-card-name-full"));
+        assertFalse(fullBlock.contains("-fx-text-fill"));
     }
 
     @Test

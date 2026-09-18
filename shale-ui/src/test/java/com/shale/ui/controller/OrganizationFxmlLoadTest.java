@@ -39,6 +39,7 @@ final class OrganizationFxmlLoadTest {
             assertInjected(loader, controller, "organizationsFlow", FlowPane.class);
             assertInjected(loader, controller, "addOrganizationButton", Button.class);
             assertInjected(loader, controller, "showRemovedOrganizationsButton", Button.class);
+            assertInjected(loader, controller, "organizationsResultCount", javafx.scene.control.Label.class);
             assertNotNull(root.lookup("#organizationTypeFilter"),
                     "Organizations directory must inject the structured Organization Type filter.");
         });

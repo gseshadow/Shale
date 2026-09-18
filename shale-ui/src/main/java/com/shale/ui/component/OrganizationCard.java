@@ -10,12 +10,14 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.Button;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
 import com.shale.ui.util.ContactExternalActions;
+import com.shale.ui.util.ColorUtil;
 import com.shale.data.dao.OrganizationDao.OrganizationCardType;
 
 public class OrganizationCard extends HBox {
@@ -31,8 +33,6 @@ public class OrganizationCard extends HBox {
 
 	private Integer organizationId;
 	private Consumer<Integer> onOpen;
-	private String backgroundCss;
-	private boolean hovered;
 	private boolean suppressPlaceholderLines;
 	private List<OrganizationCardType> types=List.of();
 	private ContactExternalActions externalActions=new ContactExternalActions();
@@ -54,7 +54,8 @@ public class OrganizationCard extends HBox {
 	}
 
 	public void setName(String name) {
-		nameLabel.setText(fallback(name));
+		String resolved=fallback(name);nameLabel.setText(resolved);nameLabel.setTooltip(new Tooltip(resolved));
+		setAccessibleText("Organization: "+resolved);
 	}
 
 	public void setOrganizationType(Integer organizationTypeId, String organizationTypeName) {
@@ -124,8 +125,15 @@ public class OrganizationCard extends HBox {
 	}
 
 	public void setBackgroundCssColor(String css) {
-		backgroundCss = css;
-		refreshSurfaceStyle();
+		setPrimaryTypeColor(css);
+	}
+
+	/** Applies only authoritative primary-definition color; null/invalid values retain the theme fallback. */
+	public void setPrimaryTypeColor(String storedColor) {
+		String normalized=ColorUtil.normalizeStoredColor(storedColor);
+		if(normalized==null){setStyle("");return;}
+		String color="#"+normalized.substring(0,6);
+		setStyle("-shale-organization-type-accent: "+color+"; -shale-organization-type-wash: "+ColorUtil.toCssRgba(color,.14)+";");
 	}
 
 	public void setSuppressPlaceholderLines(boolean suppressPlaceholderLines) {
@@ -143,6 +151,7 @@ public class OrganizationCard extends HBox {
 		setSpacing(6);
 
 		nameLabel.setStyle(null);
+		setVariantClasses("organization-card-mini", "shale-entity-card-inline", "shale-entity-card-embedded");
 		getChildren().add(nameLabel);
 	}
 
@@ -156,13 +165,15 @@ public class OrganizationCard extends HBox {
 		Node avatar = buildAvatar(18);
 
 		resetNameLabelVariantStyles();
-		nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
-		typeLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
-		phoneLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
+		nameLabel.getStyleClass().addAll("organization-card-name","organization-card-name-compact");
+		nameLabel.setStyle(null);
+		nameLabel.setMaxWidth(Double.MAX_VALUE);
 
 		VBox text = new VBox(4, nameLabel);
-		text.getChildren().add(typeChips());
+		text.getStyleClass().add("organization-card-content");HBox.setHgrow(text,javafx.scene.layout.Priority.ALWAYS);
+		text.getChildren().add(classificationRegion());
 		if (!(suppressPlaceholderLines && "Phone: —".equals(phoneLabel.getText()))) text.getChildren().add(methodCard(phoneLabel,"Phone","Call",phoneAction));
+		setVariantClasses("organization-card-compact", "shale-entity-card-compact");
 		getChildren().addAll(avatar, text);
 	}
 
@@ -173,25 +184,24 @@ public class OrganizationCard extends HBox {
 		setMinWidth(320);
 		setPrefWidth(340);
 		setMaxWidth(340);
+		setMinHeight(300);
 		setPadding(new Insets(14, 16, 14, 16));
 		setSpacing(14);
 
 		Node avatar = buildAvatar(28);
 
 		resetNameLabelVariantStyles();
-		nameLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: 700; -fx-text-fill: #112542;");
-		typeLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.62);");
-		phoneLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.82);");
-		emailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.76);");
-		websiteLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.74);");
-		addressLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
-		notesLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.66);");
+		nameLabel.getStyleClass().addAll("organization-card-name","organization-card-name-full");
+		nameLabel.setStyle(null);
+		nameLabel.setWrapText(true);
+		nameLabel.setMaxWidth(Double.MAX_VALUE);
 		emailLabel.setWrapText(true);
 		websiteLabel.setWrapText(true);
 		addressLabel.setWrapText(true);
 		notesLabel.setWrapText(true);
 
-		VBox text = new VBox(5, nameLabel, typeChips());
+		VBox text = new VBox(7, nameLabel, classificationRegion());
+		text.getStyleClass().add("organization-card-content");HBox.setHgrow(text,javafx.scene.layout.Priority.ALWAYS);
 		if(removed){Label badge=new Label("Removed");badge.getStyleClass().add("lifecycle-removed-badge");text.getChildren().add(1,badge);}
 		if(!phoneLabel.getText().endsWith("—"))text.getChildren().add(methodCard(phoneLabel,"Phone","Call",phoneAction));
 		if(!emailLabel.getText().endsWith("—"))text.getChildren().add(methodCard(emailLabel,"Email","Email",emailAction));
@@ -202,6 +212,7 @@ public class OrganizationCard extends HBox {
 		}
 		if(removed&&restoreAction!=null){Button restore=com.shale.ui.util.ActionButtonFactory.semantic("Restore Organization",e->restoreAction.run(),com.shale.ui.util.ControlStyles.Purpose.PRIMARY,com.shale.ui.util.ControlStyles.Size.SMALL);text.getChildren().add(restore);}
 
+		setVariantClasses("organization-card-full", "shale-entity-card-full");
 		getChildren().addAll(avatar, text);
 	}
 
@@ -214,23 +225,14 @@ public class OrganizationCard extends HBox {
 	}
 
 	private void buildUiMiniDefaults() {
+		getStyleClass().addAll("organization-card","shale-entity-card","shale-entity-card-clickable");
+		notesLabel.getStyleClass().add("shale-metadata-muted");
 		setCursor(Cursor.HAND);
 		setFocusTraversable(true);
-		setBackgroundCssColor(null);
 		applyMini();
 	}
 
 	private void wireEvents() {
-		setOnMouseEntered(e -> {
-			hovered = true;
-			setTranslateY(-1.5);
-			refreshSurfaceStyle();
-		});
-		setOnMouseExited(e -> {
-			hovered = false;
-			setTranslateY(0);
-			refreshSurfaceStyle();
-		});
 		setOnMouseClicked(e -> {
 			if (!removed && onOpen != null && organizationId != null) {
 				onOpen.accept(organizationId);
@@ -239,18 +241,17 @@ public class OrganizationCard extends HBox {
 		setOnKeyPressed(e->{if(!removed&&e.getTarget()==this&&onOpen!=null&&organizationId!=null&&(e.getCode()==KeyCode.ENTER||e.getCode()==KeyCode.SPACE)){onOpen.accept(organizationId);e.consume();}});
 	}
 	private Node typeChips(){return new ClassificationChipGroup(types.stream().sorted(java.util.Comparator.comparing(OrganizationCardType::primary).reversed().thenComparingInt(OrganizationCardType::sortOrder).thenComparingLong(OrganizationCardType::assignmentId)).map(t->new ClassificationChipGroup.Chip(t.label(),t.color(),"Organization Type",t.definitionId(),t.primary())).toList(),ClassificationChipGroup.Size.COMPACT);}
+	private Node classificationRegion(){StackPane region=new StackPane(typeChips());region.getStyleClass().add("organization-card-classification-region");region.setAlignment(Pos.TOP_LEFT);return region;}
 	private static Node methodCard(Label source,String kind,String actionText,Runnable action){String value=source.getText().replaceFirst("^[^:]+: ","");return new ContactMethodDisplayCard(value,kind,false,action==null?null:actionText,()->{try{action.run();}catch(RuntimeException ignored){}});}
 
 	private Node buildAvatar(double radius) {
 		Circle c = new Circle(radius);
-		c.setStyle("-fx-fill: rgba(255,255,255,0.55); -fx-stroke: rgba(0,0,0,0.10);");
+		c.getStyleClass().add("organization-card-avatar");
 		avatarHolder.getChildren().setAll(c);
 		return avatarHolder;
 	}
 
-	private void refreshSurfaceStyle() {
-		setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered&&!removed)+(removed?"-fx-opacity: 0.82;":""));
-	}
+	private void setVariantClasses(String... classes){getStyleClass().removeAll("organization-card-full","organization-card-compact","organization-card-mini","shale-entity-card-full","shale-entity-card-compact","shale-entity-card-inline","shale-entity-card-embedded");getStyleClass().addAll(classes);}
 
 	private static String fallback(String value) {
 		return value == null || value.isBlank() ? "—" : value;
