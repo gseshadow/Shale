@@ -21,12 +21,12 @@
 			<padding><Insets top="16" right="16" bottom="16" left="16" /></padding>
 
 			<VBox spacing="4" styleClass="my-shale-page-header">
-				<Label text="My Shale" styleClass="shale-page-title" />
-				<Label text="Overview of your tasks, assigned cases, and recent activity."
+				<Label fx:id="pageTitleLabel" text="My Shale" styleClass="shale-page-title" />
+				<Label fx:id="pageSubtitleLabel" text="Overview of your tasks, assigned cases, and recent activity."
 					wrapText="true" styleClass="shale-metadata-muted" />
 			</VBox>
 
-			<ScrollPane minHeight="-Infinity" prefViewportHeight="42" fitToHeight="true" fitToWidth="false"
+			<ScrollPane fx:id="sectionTabsScroll" minHeight="-Infinity" prefViewportHeight="42" fitToHeight="true" fitToWidth="false"
 				hbarPolicy="AS_NEEDED" vbarPolicy="NEVER" pannable="true" styleClass="app-section-tabs-scroll">
 				<HBox fx:id="sectionTabsBar" spacing="8" alignment="CENTER_LEFT" styleClass="app-section-tabs-row" />
 			</ScrollPane>

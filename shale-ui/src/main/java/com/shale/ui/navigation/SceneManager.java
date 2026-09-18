@@ -407,6 +407,10 @@ public final class SceneManager {
 		navigateTo(AppRoute.myShale(), true);
 	}
 
+	public void openTasksView() {
+		navigateTo(AppRoute.tasks(), true);
+	}
+
 	public void openCasesListView() {
 		navigateTo(AppRoute.casesList(), true);
 	}
@@ -536,6 +540,7 @@ public final class SceneManager {
 		try {
 			switch (route.type()) {
 			case MY_SHALE -> mainController.showMyShaleView();
+			case TASKS -> mainController.showTasksView();
 			case CASES_LIST -> mainController.showCasesListView();
 			case CONTACTS_LIST -> mainController.showContactsListView();
 			case ORGANIZATIONS_LIST -> mainController.showOrganizationsListView();
@@ -829,6 +834,11 @@ public final class SceneManager {
 	}
 
 	public Parent createMyShaleView(Consumer<Integer> onOpenCase, Consumer<Integer> onOpenUser) {
+		return createMyShaleView(onOpenCase, onOpenUser, false);
+	}
+
+	private Parent createMyShaleView(Consumer<Integer> onOpenCase, Consumer<Integer> onOpenUser,
+			boolean dedicatedTasksMode) {
 		return load("/fxml/my-shale.fxml", controller ->
 		{
 			MyShaleController c = (MyShaleController) controller;
@@ -855,8 +865,20 @@ public final class SceneManager {
 					onOpenCase,
 					onOpenUser,
 					phiReadAuditService);
+			if (dedicatedTasksMode) {
+				c.configureDedicatedTasksMode();
+			}
 			return c;
 		});
+	}
+
+	/**
+	 * Builds the dedicated Tasks destination from the same authoritative task-board
+	 * markup and controller used by My Shale. This intentionally avoids a second
+	 * task collection implementation drifting from My Shale's filters and cards.
+	 */
+	public Parent createTasksView(Consumer<Integer> onOpenCase, Consumer<Integer> onOpenUser) {
+		return createMyShaleView(onOpenCase, onOpenUser, true);
 	}
 
 	private void openNotificationCenterFromDashboard() {

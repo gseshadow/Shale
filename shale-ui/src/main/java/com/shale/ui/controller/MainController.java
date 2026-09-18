@@ -59,6 +59,8 @@ public final class MainController {
 	// Sidebar nav buttons
 	@FXML
 	private Button navMyShaleButton;
+	@FXML
+	private Button navTasksButton;
 
 	@FXML
 	private Button navCasesButton;
@@ -162,6 +164,11 @@ public final class MainController {
 	@FXML
 	private void onNavMyShale() {
 		sceneManager.openMyShaleView();
+	}
+
+	@FXML
+	private void onNavTasks() {
+		sceneManager.openTasksView();
 	}
 
 	@FXML
@@ -334,6 +341,15 @@ public final class MainController {
 		sectionContent.getChildren().setAll(myShaleRoot);
 	}
 
+	public void showTasksView() {
+		highlightNav(navTasksButton);
+		setSectionHeader("Tasks", "Review and manage your assigned and created tasks.", true);
+		Node tasksRoot = sceneManager.createTasksView(
+				caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"),
+				sceneManager::openUserProfile);
+		sectionContent.getChildren().setAll(tasksRoot);
+	}
+
 	public void showCasesListView() {
 		highlightNav(navCasesButton);
 		setSectionHeader("Cases", "Browse, search, and manage cases.", true);
@@ -448,6 +464,7 @@ public final class MainController {
 	private List<Button> getNavigationButtons() {
 		return List.of(
 				navMyShaleButton,
+				navTasksButton,
 				navCasesButton,
 				navContactsButton,
 				navOrganizationsButton,
@@ -472,6 +489,7 @@ public final class MainController {
 			return;
 
 		navMyShaleButton.setDisable(false);
+		navTasksButton.setDisable(false);
 		navCasesButton.setDisable(false);
 		navContactsButton.setDisable(false);
 		navOrganizationsButton.setDisable(false);
