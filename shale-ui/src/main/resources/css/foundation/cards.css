@@ -185,11 +185,32 @@
 .organization-card-name-compact { -fx-font-size: 14px; -fx-font-weight: 700; }
 .organization-card-classification-region { -fx-min-height: 48px; -fx-pref-height: 48px; -fx-alignment: top-left; }
 .organization-card-compact .organization-card-classification-region { -fx-min-height: 26px; -fx-pref-height: 26px; }
+.organization-card-contact-summary { -fx-hgap: 6px; -fx-vgap: 6px; }
+.organization-card-summary-box {
+    -fx-min-height: 49px;
+    -fx-pref-height: 49px;
+    -fx-max-height: 49px;
+    -fx-padding: 5px 7px;
+    -fx-background-color: -shale-color-card-embedded-surface;
+    -fx-background-radius: 8px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 8px;
+}
+.organization-card-summary-label {
+    -fx-font-size: 10px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -shale-color-text-muted;
+}
+.organization-card-summary-value {
+    -fx-font-size: 11px;
+    -fx-text-fill: -shale-color-text-secondary;
+}
 .organization-card-avatar {
     -fx-fill: -shale-color-avatar-neutral-background;
     -fx-stroke: -shale-color-card-border;
     -fx-stroke-width: 1;
 }
+.organization-card-avatar-initials { -fx-font-size: 12px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-secondary; }
 .organization-card-mini { -fx-border-width: 1px 1px 1px 3px; }
 
 /* Case Link Card variants: Link Type identity drives the wash and accent rail. */
