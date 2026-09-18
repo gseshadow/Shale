@@ -31,8 +31,9 @@ public final class ContactMethodDisplayCard extends VBox {
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
             actionButton = new Button(actionText);
-            actionButton.setAccessibleText(actionText);
-            actionButton.setTooltip(new Tooltip(actionText));
+            String actionDescription = actionText + " " + valueLabel.getText();
+            actionButton.setAccessibleText(actionDescription);
+            actionButton.setTooltip(new Tooltip(actionDescription));
             ControlStyles.apply(actionButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
             actionButton.setOnAction(event -> { event.consume(); action.run(); });
             actionButton.addEventHandler(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);

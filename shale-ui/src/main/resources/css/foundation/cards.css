@@ -96,6 +96,18 @@
     -fx-spacing: 6;
 }
 
+/* Structured read-only contact methods shared by Contact and Organization profiles. */
+.contact-point-card {
+    -fx-background-color: -shale-color-card-embedded-surface;
+    -fx-background-radius: 10px;
+    -fx-border-color: -shale-color-card-border;
+    -fx-border-radius: 10px;
+    -fx-padding: 10px 11px;
+    -fx-max-width: 100000px;
+}
+.contact-point-value { -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; -fx-wrap-text: true; }
+.contact-point-card.removed { -fx-opacity: -shale-opacity-disabled; -fx-border-style: segments(5px, 4px); }
+
 
 .contact-card-name,
 .organization-card-name {

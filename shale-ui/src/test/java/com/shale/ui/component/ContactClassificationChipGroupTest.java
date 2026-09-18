@@ -27,4 +27,18 @@ class ContactClassificationChipGroupTest {
             assertTrue(empty.getChildren().isEmpty()); assertFalse(empty.isManaged());
         });
     }
+
+    @Test void lifecycleAwareGroupRetainsHistoricalTextAndNonColorAccessibilityCue() {
+        JavaFxTestSupport.runAndWait(() -> {
+            var group = ContactClassificationChipGroup.withLifecycle(List.of(
+                    new ContactClassificationChipGroup.Item("Retired Type", "#123456", "Contact Type", 9, true),
+                    new ContactClassificationChipGroup.Item("Active Specialty", "#654321", "Specialty", 10, false)),
+                    ContactClassificationChipGroup.Size.STANDARD);
+            Label historical = (Label) group.getChildren().get(0);
+            assertTrue(historical.getText().contains("Inactive"));
+            assertTrue(historical.getAccessibleText().contains("inactive or historical"));
+            assertTrue(historical.getStyleClass().contains("shale-semantic-chip-inactive"));
+            assertEquals(2, group.getChildren().size(), "no assignment may be discarded by the header adapter");
+        });
+    }
 }

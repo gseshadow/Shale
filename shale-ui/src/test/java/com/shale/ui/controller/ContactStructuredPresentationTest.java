@@ -33,7 +33,7 @@ final class ContactStructuredPresentationTest {
         assertTrue(view.contains("fx:id=\"structuredFullNameValue\""));
         assertTrue(view.contains("fx:id=\"preferredNameValue\""));
         assertTrue(view.contains("Related Cases"));assertTrue(view.contains("Links Shared With This Contact"));
-        assertTrue(view.contains("Classifications"));assertTrue(view.contains("ScrollPane fitToWidth=\"true\" hbarPolicy=\"NEVER\""));
+        assertTrue(view.contains("Classifications"));assertTrue(view.contains("fitToWidth=\"true\" hbarPolicy=\"NEVER\""));
         assertTrue(source.contains("ContactExternalActions.telephone"));
         assertTrue(source.contains("ContactExternalActions.email"));
         assertTrue(source.contains("ContactExternalActions.maps"));

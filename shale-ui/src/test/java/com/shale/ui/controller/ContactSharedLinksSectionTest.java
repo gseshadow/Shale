@@ -33,9 +33,9 @@ final class ContactSharedLinksSectionTest {
         assertTrue(sidebar != null, "Expected relatedSidebar in contact.fxml");
 
         List<Element> sections = childElements(sidebar).stream()
-                .filter(element -> hasStyleClass(element, "secondary-panel"))
+                .filter(element -> hasStyleClass(element, "shale-section-card"))
                 .toList();
-        assertEquals(2, sections.size(), "relatedSidebar must contain exactly two sibling secondary panels");
+        assertEquals(2, sections.size(), "relatedSidebar must contain exactly two sibling section cards");
         assertSection(sections.get(0), "Related Cases", "relatedCasesContainer");
         assertSection(sections.get(1), "Links Shared With This Contact", "sharedLinksContainer");
     }
@@ -60,7 +60,7 @@ final class ContactSharedLinksSectionTest {
     }
 
     private static boolean hasStyleClass(Element element, String styleClass) {
-        return List.of(element.getAttribute("styleClass").split("\\s+")).contains(styleClass);
+        return List.of(element.getAttribute("styleClass").split("[,\\s]+" )).contains(styleClass);
     }
 
     private static List<Element> childElements(Element parent) {
