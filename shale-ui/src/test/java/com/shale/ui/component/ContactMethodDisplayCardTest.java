@@ -36,18 +36,16 @@ final class ContactMethodDisplayCardTest {
         });
     }
 
-    @Test void organizationCardActionDoesNotNavigateAndUnsafeWebsiteHasNoButton() {
+    @Test void fullOrganizationCardUsesReadOnlySummariesWithoutExternalActions() {
         JavaFxTestSupport.runAndWait(() -> {
             AtomicInteger launches=new AtomicInteger(),navigations=new AtomicInteger();
             OrganizationCard card=new OrganizationCard();card.setOrganizationId(7);card.setOnOpen(id->navigations.incrementAndGet());
             card.setExternalActions(new ContactExternalActions(uri->launches.incrementAndGet()));
             card.setName("Example");card.setStructuredPhone("(555) 010-1000","+15550101000",null);
             card.setWebsite("javascript:alert(1)");card.applyFull();
-            var methodCards=card.lookupAll(".contact-point-card");assertEquals(2,methodCards.size());
-            Button call=(Button)card.lookup(".contact-point-card .shale-control-button");assertNotNull(call);
-            call.fire();assertEquals(1,launches.get());assertEquals(0,navigations.get());
-            long websiteButtons=methodCards.stream().map(n->(ContactMethodDisplayCard)n).filter(c->c.valueLabel().getText().contains("javascript:")).filter(c->c.actionButton()!=null).count();
-            assertEquals(0,websiteButtons);
+            assertEquals(2,card.lookupAll(".organization-card-summary-box").size());
+            assertTrue(card.lookupAll(".organization-card-summary-box .button").isEmpty());
+            assertEquals(0,launches.get());assertEquals(0,navigations.get());
         });
     }
 }

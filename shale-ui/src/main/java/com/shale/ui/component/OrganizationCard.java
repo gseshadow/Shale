@@ -10,17 +10,24 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.Button;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
 import com.shale.ui.util.ContactExternalActions;
 import com.shale.ui.util.ColorUtil;
 import com.shale.data.dao.OrganizationDao.OrganizationCardType;
 
 public class OrganizationCard extends HBox {
+	public static final double FULL_CARD_HEIGHT = 250;
 
 	private final Label nameLabel = new Label();
 	private final Label typeLabel = new Label();
@@ -29,6 +36,7 @@ public class OrganizationCard extends HBox {
 	private final Label websiteLabel = new Label();
 	private final Label addressLabel = new Label();
 	private final Label notesLabel = new Label();
+	private final Label initialsLabel = new Label();
 	private final StackPane avatarHolder = new StackPane();
 
 	private Integer organizationId;
@@ -55,7 +63,8 @@ public class OrganizationCard extends HBox {
 
 	public void setName(String name) {
 		String resolved=fallback(name);nameLabel.setText(resolved);nameLabel.setTooltip(new Tooltip(resolved));
-		setAccessibleText("Organization: "+resolved);
+		initialsLabel.setText(initials(resolved));
+		updateAccessibleText();
 	}
 
 	public void setOrganizationType(Integer organizationTypeId, String organizationTypeName) {
@@ -63,6 +72,7 @@ public class OrganizationCard extends HBox {
 		if (!resolvedName.isEmpty()) {
 			typeLabel.setText("Type: " + resolvedName);
 			types=List.of(new OrganizationCardType(0,organizationTypeId==null?0:organizationTypeId,resolvedName,"#6C757D",true,0));
+			updateAccessibleText();
 			return;
 		}
 
@@ -72,7 +82,13 @@ public class OrganizationCard extends HBox {
 	public void setPhone(String phone) {
 		phoneLabel.setText("Phone: " + fallback(phone));
 	}
-	public void setStructuredPhone(String display,String normalized,String extension){setPhone(display);phoneAction=null;if(normalized!=null)try{var target=ContactExternalActions.telephone(normalized,extension);phoneAction=()->externalActions.open(target);}catch(IllegalArgumentException ignored){}}
+	public void setStructuredPhone(String display,String normalized,String extension){
+		String value=display;
+		if(value!=null&&extension!=null&&!extension.isBlank()&&!value.toLowerCase().matches(".*(?:ext\\.?|x)\\s*"+java.util.regex.Pattern.quote(extension.trim())+".*"))
+			value=value+" ext. "+extension.trim();
+		setPhone(value);
+		phoneAction=null;if(normalized!=null)try{var target=ContactExternalActions.telephone(normalized,extension);phoneAction=()->externalActions.open(target);}catch(IllegalArgumentException ignored){}
+	}
 
 	public void setEmail(String email) {
 		emailLabel.setText("Email: " + fallback(email));
@@ -83,9 +99,9 @@ public class OrganizationCard extends HBox {
 		websiteLabel.setText("Web: " + fallback(website));
 		websiteAction=null;try{var target=ContactExternalActions.website(website);websiteAction=()->externalActions.open(target);}catch(IllegalArgumentException ignored){}
 	}
-	public void setTypes(List<OrganizationCardType> values){types=List.copyOf(values);}
+	public void setTypes(List<OrganizationCardType> values){types=List.copyOf(values);updateAccessibleText();}
 	public void setExternalActions(ContactExternalActions actions){externalActions=java.util.Objects.requireNonNull(actions);}
-	public void setRemoved(boolean removed,Runnable restoreAction){this.removed=removed;this.restoreAction=restoreAction;if(removed){getStyleClass().add("organization-card-removed");setCursor(Cursor.DEFAULT);phoneAction=emailAction=addressAction=websiteAction=null;}}
+	public void setRemoved(boolean removed,Runnable restoreAction){this.removed=removed;this.restoreAction=restoreAction;if(removed){getStyleClass().add("organization-card-removed");setCursor(Cursor.DEFAULT);}}
 
 	public void setAddress(String address1, String address2, String city, String state, String postalCode, String country) {
 		List<String> parts = new ArrayList<>();
@@ -142,6 +158,7 @@ public class OrganizationCard extends HBox {
 
 	public void applyMini() {
 		getChildren().clear();
+		setClip(null);
 		resetNameLabelVariantStyles();
 		nameLabel.getStyleClass().addAll("organization-card-name", "organization-card-name-mini");
 
@@ -157,6 +174,7 @@ public class OrganizationCard extends HBox {
 
 	public void applyCompact() {
 		getChildren().clear();
+		setClip(null);
 
 		setAlignment(Pos.TOP_LEFT);
 		setPadding(new Insets(10, 12, 10, 12));
@@ -184,7 +202,10 @@ public class OrganizationCard extends HBox {
 		setMinWidth(320);
 		setPrefWidth(340);
 		setMaxWidth(340);
-		setMinHeight(300);
+		setMinHeight(FULL_CARD_HEIGHT);
+		setPrefHeight(FULL_CARD_HEIGHT);
+		setMaxHeight(FULL_CARD_HEIGHT);
+		Rectangle boundsClip=new Rectangle();boundsClip.widthProperty().bind(widthProperty());boundsClip.heightProperty().bind(heightProperty());boundsClip.setArcWidth(28);boundsClip.setArcHeight(28);setClip(boundsClip);
 		setPadding(new Insets(14, 16, 14, 16));
 		setSpacing(14);
 
@@ -195,21 +216,13 @@ public class OrganizationCard extends HBox {
 		nameLabel.setStyle(null);
 		nameLabel.setWrapText(true);
 		nameLabel.setMaxWidth(Double.MAX_VALUE);
-		emailLabel.setWrapText(true);
-		websiteLabel.setWrapText(true);
-		addressLabel.setWrapText(true);
 		notesLabel.setWrapText(true);
 
 		VBox text = new VBox(7, nameLabel, classificationRegion());
 		text.getStyleClass().add("organization-card-content");HBox.setHgrow(text,javafx.scene.layout.Priority.ALWAYS);
 		if(removed){Label badge=new Label("Removed");badge.getStyleClass().add("lifecycle-removed-badge");text.getChildren().add(1,badge);}
-		if(!phoneLabel.getText().endsWith("—"))text.getChildren().add(methodCard(phoneLabel,"Phone","Call",phoneAction));
-		if(!emailLabel.getText().endsWith("—"))text.getChildren().add(methodCard(emailLabel,"Email","Email",emailAction));
-		if(!addressLabel.getText().endsWith("—"))text.getChildren().add(methodCard(addressLabel,"Address","Open in Maps",addressAction));
-		if(!websiteLabel.getText().endsWith("—"))text.getChildren().add(methodCard(websiteLabel,"Website","Open Website",websiteAction));
-		if (!notesLabel.getText().isBlank()) {
-			text.getChildren().add(notesLabel);
-		}
+		GridPane summary=contactSummary();
+		if(!summary.getChildren().isEmpty())text.getChildren().add(summary);
 		if(removed&&restoreAction!=null){Button restore=com.shale.ui.util.ActionButtonFactory.semantic("Restore Organization",e->restoreAction.run(),com.shale.ui.util.ControlStyles.Purpose.PRIMARY,com.shale.ui.util.ControlStyles.Size.SMALL);text.getChildren().add(restore);}
 
 		setVariantClasses("organization-card-full", "shale-entity-card-full");
@@ -243,11 +256,36 @@ public class OrganizationCard extends HBox {
 	private Node typeChips(){return new ClassificationChipGroup(types.stream().sorted(java.util.Comparator.comparing(OrganizationCardType::primary).reversed().thenComparingInt(OrganizationCardType::sortOrder).thenComparingLong(OrganizationCardType::assignmentId)).map(t->new ClassificationChipGroup.Chip(t.label(),t.color(),"Organization Type",t.definitionId(),t.primary())).toList(),ClassificationChipGroup.Size.COMPACT);}
 	private Node classificationRegion(){StackPane region=new StackPane(typeChips());region.getStyleClass().add("organization-card-classification-region");region.setAlignment(Pos.TOP_LEFT);return region;}
 	private static Node methodCard(Label source,String kind,String actionText,Runnable action){String value=source.getText().replaceFirst("^[^:]+: ","");return new ContactMethodDisplayCard(value,kind,false,action==null?null:actionText,()->{try{action.run();}catch(RuntimeException ignored){}});}
+	private GridPane contactSummary(){
+		GridPane grid=new GridPane();grid.getStyleClass().add("organization-card-contact-summary");
+		ColumnConstraints left=new ColumnConstraints();left.setPercentWidth(50);left.setHgrow(Priority.ALWAYS);
+		ColumnConstraints right=new ColumnConstraints();right.setPercentWidth(50);right.setHgrow(Priority.ALWAYS);
+		grid.getColumnConstraints().addAll(left,right);
+		int index=0;
+		for(var item:List.of(new SummaryValue(phoneLabel,"Phone",false),new SummaryValue(emailLabel,"Email",false),new SummaryValue(addressLabel,"Address",true),new SummaryValue(websiteLabel,"Website",false))){
+			if(item.source().getText().endsWith("—"))continue;
+			Node box=summaryBox(item.source(),item.kind(),item.twoLines());
+			grid.add(box,index%2,index/2);GridPane.setHgrow(box,Priority.ALWAYS);index++;
+		}
+		return grid;
+	}
+	private static Node summaryBox(Label source,String kind,boolean twoLines){
+		String value=source.getText().replaceFirst("^[^:]+: ","");
+		Label semantic=new Label(kind);semantic.getStyleClass().add("organization-card-summary-label");
+		Label display=new Label(value);display.getStyleClass().add("organization-card-summary-value");display.setMinWidth(0);display.setMaxWidth(Double.MAX_VALUE);
+		display.setTooltip(new Tooltip(value));display.setAccessibleText(kind+": "+value);
+		display.setTextOverrun(OverrunStyle.ELLIPSIS);display.setWrapText(twoLines);
+		if(twoLines){display.setMinHeight(Region.USE_PREF_SIZE);display.setPrefHeight(32);display.setMaxHeight(32);}
+		VBox box=new VBox(2,semantic,display);box.getStyleClass().add("organization-card-summary-box");box.setMinWidth(0);box.setMaxWidth(Double.MAX_VALUE);
+		return box;
+	}
+	private record SummaryValue(Label source,String kind,boolean twoLines){}
 
 	private Node buildAvatar(double radius) {
 		Circle c = new Circle(radius);
 		c.getStyleClass().add("organization-card-avatar");
-		avatarHolder.getChildren().setAll(c);
+		initialsLabel.getStyleClass().add("organization-card-avatar-initials");
+		avatarHolder.getChildren().setAll(c,initialsLabel);
 		return avatarHolder;
 	}
 
@@ -256,6 +294,8 @@ public class OrganizationCard extends HBox {
 	private static String fallback(String value) {
 		return value == null || value.isBlank() ? "—" : value;
 	}
+	private void updateAccessibleText(){String name=fallback(nameLabel.getText());String typeText=types.stream().map(OrganizationCardType::label).filter(java.util.Objects::nonNull).filter(v->!v.isBlank()).reduce((a,b)->a+", "+b).orElse("");setAccessibleText("Organization: "+name+(typeText.isBlank()?"":". Organization Types: "+typeText));}
+	private static String initials(String value){String[] words=value.trim().split("\\s+");if(words.length==0||value.equals("—"))return "?";String first=words[0].substring(0,1);String last=words.length>1?words[words.length-1].substring(0,1):"";return (first+last).toUpperCase();}
 
 	private static String joinNonBlank(String separator, String... values) {
 		List<String> filtered = new ArrayList<>();
