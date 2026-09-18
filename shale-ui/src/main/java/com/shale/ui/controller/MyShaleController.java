@@ -161,6 +161,10 @@ public final class MyShaleController {
 	@FXML
 	private Label myTasksEmptyLabel;
 	@FXML
+	private Label myTasksErrorLabel;
+	@FXML
+	private Label myTasksResultCount;
+	@FXML
 	private HBox sectionTabsBar;
 	@FXML
 	private VBox overviewSectionPane;
@@ -190,6 +194,10 @@ public final class MyShaleController {
 	private Label myCasesLoadingLabel;
 	@FXML
 	private Label myCasesBoardEmptyLabel;
+	@FXML
+	private Label myCasesErrorLabel;
+	@FXML
+	private Label myCasesResultCount;
 	@FXML
 	private TextField myCasesBoardSearchField;
 	@FXML
@@ -243,6 +251,7 @@ public final class MyShaleController {
 	private Integer cachedCasesUserId;
 	private Integer cachedCasesTenantId;
 	private boolean myCasesLoadFailed;
+	private boolean myTasksLoadFailed;
 	private boolean caseStatusOptionsInitialized;
 	private boolean loadingRecentCaseActivity;
 	private boolean recentCaseActivityLoadFailed;
@@ -855,6 +864,7 @@ public final class MyShaleController {
 		if (loadingMyTasks && !force) return;
 		loadingOverview = true;
 		loadingMyTasks = true;
+		myTasksLoadFailed = false;
 		renderActiveTaskViews();
 		Integer tenant = appState.getShaleClientId();
 		Integer user = appState.getUserId();
@@ -915,6 +925,7 @@ public final class MyShaleController {
 				runOnFx(() -> {
 					if (!isCurrentTaskLoad(generation, tenantAtSubmit, userAtSubmit)) return;
 					loadingOverview = loadingMyTasks = false;
+					myTasksLoadFailed = true;
 					myTasksDirty = true;
 					renderActiveTaskViews();
 					showTaskActionError("Failed to load your tasks.");
@@ -946,6 +957,7 @@ public final class MyShaleController {
 		cachedTasksTenantId = tenant;
 		myTasksLoadedOnce = true;
 		myTasksDirty = false;
+		myTasksLoadFailed = false;
 		loadingOverview = loadingMyTasks = false;
 		syncMyTaskCaseFilterOptions();
 		renderActiveTaskViews();
@@ -1083,7 +1095,6 @@ public final class MyShaleController {
 				});
 			} catch (Exception ex) {
 				log.warn("My cases board load failed userId={}: {}", userIdValue, ex.getMessage());
-				ex.printStackTrace();
 				runOnFx(() -> {
 					if (generationAtSubmit != myCasesBoardLoadGeneration
 							|| appState == null || !Objects.equals(appState.getUserId(), userIdValue)
@@ -1116,19 +1127,21 @@ public final class MyShaleController {
 		PerfLog.log("RENDER", "start", "panel=my_cases_board page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		if (loadingMyCases) {
 			myCasesBoardList.getChildren().clear();
-			myCasesBoardEmptyLabel.setText("Loading your cases...");
-			setVisibleManaged(myCasesBoardEmptyLabel, true);
+			setVisibleManaged(myCasesBoardEmptyLabel, false);
+			setVisibleManaged(myCasesErrorLabel, false);
 			setVisibleManaged(myCasesBoardScroll, false);
-			setVisibleManaged(myCasesLoadingLabel, false);
+			setVisibleManaged(myCasesLoadingLabel, true);
+			updateResultCount(myCasesResultCount, 0);
 			PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale state=loading childCount=0", renderStartNanos);
 			return;
 		}
 		myCasesBoardList.getChildren().clear();
 		setVisibleManaged(myCasesLoadingLabel, false);
 		if (myCasesLoadFailed) {
-			myCasesBoardEmptyLabel.setText("Unable to load assigned cases.");
-			setVisibleManaged(myCasesBoardEmptyLabel, true);
+			setVisibleManaged(myCasesBoardEmptyLabel, false);
+			setVisibleManaged(myCasesErrorLabel, true);
 			setVisibleManaged(myCasesBoardScroll, false);
+			updateResultCount(myCasesResultCount, 0);
 			log.debug("My Cases board rendered state=error");
 			lastMyCasesBoardRenderSignature = "error";
 			PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale state=error childCount=0", renderStartNanos);
@@ -1203,8 +1216,11 @@ public final class MyShaleController {
 		}
 
 		boolean hasAnyCards = cardCount > 0;
+		updateResultCount(myCasesResultCount, cardCount);
 		if (!hasAnyCards) {
-			myCasesBoardEmptyLabel.setText("No assigned cases found.");
+			boolean filtered = (searchQuery != null && !searchQuery.isBlank()) || selectedStatusId != null;
+			myCasesBoardEmptyLabel.setText(filtered ? "No cases match the selected filters." : "No cases assigned to you yet.");
+			setVisibleManaged(myCasesErrorLabel, false);
 			setVisibleManaged(myCasesBoardEmptyLabel, true);
 			setVisibleManaged(myCasesBoardScroll, false);
 			log.debug("My Cases board rendered state=empty");
@@ -1214,6 +1230,7 @@ public final class MyShaleController {
 		}
 
 		setVisibleManaged(myCasesBoardEmptyLabel, false);
+		setVisibleManaged(myCasesErrorLabel, false);
 		setVisibleManaged(myCasesBoardScroll, true);
 		String renderSignature = renderSignature("board", laneCount, cardCount, searchQuery, selectedStatusId);
 		if (Objects.equals(lastMyCasesBoardRenderSignature, renderSignature)
@@ -1359,7 +1376,7 @@ public final class MyShaleController {
 	}
 
 	private void renderMyTasks() {
-		if (myTasksList == null || myTasksEmptyLabel == null || myTasksScroll == null) {
+		if (myTasksList == null || myTasksEmptyLabel == null || myTasksScroll == null || myTasksLoadingLabel == null) {
 			return;
 		}
 		updateMyTasksViewToggleStyles();
@@ -1369,21 +1386,33 @@ public final class MyShaleController {
 			if (grid != null) {
 				grid.getChildren().clear();
 			}
-			myTasksEmptyLabel.setText("Loading your tasks...");
-			setVisibleManaged(myTasksEmptyLabel, true);
+			setVisibleManaged(myTasksEmptyLabel, false);
+			setVisibleManaged(myTasksErrorLabel, false);
+			setVisibleManaged(myTasksLoadingLabel, true);
 			setVisibleManaged(myTasksScroll, false);
+			updateResultCount(myTasksResultCount, 0);
 			suppressMyTasksScrollTopRightCornerOverlay();
 			return;
 		}
 		long renderStartNanos = PerfLog.start();
 		PerfLog.log("RENDER", "start", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		myTasksList.getChildren().clear();
+		setVisibleManaged(myTasksLoadingLabel, false);
+		if (myTasksLoadFailed) {
+			setVisibleManaged(myTasksEmptyLabel, false);
+			setVisibleManaged(myTasksErrorLabel, true);
+			setVisibleManaged(myTasksScroll, false);
+			updateResultCount(myTasksResultCount, 0);
+			return;
+		}
+		setVisibleManaged(myTasksErrorLabel, false);
 
 		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
 		List<CaseTaskListItemDto> taskFiltered = filterAndRankMyTasks(myTasks, selectedPriorityFilterId(), searchQuery).stream()
 				.filter(task -> matchesSelectedMyTaskStatus(task, selectedMyTaskStatusFilter()))
 				.toList();
 		List<CaseTaskListItemDto> filteredTasks = applyCaseColumnFilter(taskFiltered, selectedCaseFilterId());
+		updateResultCount(myTasksResultCount, filteredTasks.size());
 		if (myTasks == null || myTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
@@ -1397,7 +1426,7 @@ public final class MyShaleController {
 		if (filteredTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
-			myTasksEmptyLabel.setText("No tasks found.");
+			myTasksEmptyLabel.setText("No tasks match the selected filters.");
 			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
@@ -1546,9 +1575,16 @@ public final class MyShaleController {
 		PerfLog.log("RENDER", "start", "panel=overview page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		if (loadingOverview) {
 			Label loadingLabel = new Label("Loading your overview...");
-			loadingLabel.getStyleClass().add("muted-text");
+			loadingLabel.getStyleClass().add("shale-loading-placeholder");
 			overviewMainRow.getChildren().setAll(loadingLabel);
 			PerfLog.logDone("RENDER", "panel=overview page=my_shale state=loading childCount=1", renderStartNanos);
+			return;
+		}
+		if (myTasksLoadFailed) {
+			Label errorLabel = new Label("Unable to load your task overview.");
+			errorLabel.getStyleClass().add("shale-error-state");
+			overviewMainRow.getChildren().setAll(errorLabel);
+			PerfLog.logDone("RENDER", "panel=overview page=my_shale state=error childCount=1", renderStartNanos);
 			return;
 		}
 		ensureOverviewContentShell();
@@ -1564,16 +1600,20 @@ public final class MyShaleController {
 				&& overviewSearchFieldControl != null) {
 			return;
 		}
-		HBox dashboard = new HBox(12);
+		FlowPane dashboard = new FlowPane(12, 12);
 		dashboard.getStyleClass().add("my-shale-overview-dashboard");
 		dashboard.setAlignment(Pos.TOP_LEFT);
 		dashboard.setMaxWidth(Double.MAX_VALUE);
+		dashboard.setPrefWrapLength(1080);
+		dashboard.prefWrapLengthProperty().bind(overviewScroll.viewportBoundsProperty()
+				.map(bounds -> Math.max(320, bounds.getWidth() - 2)));
 
 		VBox sections = new VBox(10);
 		sections.getStyleClass().add("my-shale-overview-primary-column");
 		sections.setFillWidth(true);
 		sections.setMaxWidth(Double.MAX_VALUE);
-		HBox.setHgrow(sections, Priority.ALWAYS);
+		sections.setMinWidth(320);
+		sections.setPrefWidth(680);
 
 		VBox widgets = new VBox(10);
 		widgets.getStyleClass().add("my-shale-overview-briefing-column");
@@ -1581,9 +1621,6 @@ public final class MyShaleController {
 		widgets.setMinWidth(300);
 		widgets.setPrefWidth(360);
 		widgets.setMaxWidth(430);
-
-		sections.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.68));
-		widgets.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.32));
 
 		sections.getChildren().add(buildOverviewControlBar());
 		widgets.getChildren().setAll(buildOverviewDashboardWidgets());
@@ -2608,15 +2645,15 @@ public final class MyShaleController {
 	}
 
 	private Node buildOverviewControlBar() {
-		HBox controls = new HBox(8);
+		FlowPane controls = new FlowPane(8, 8);
 		controls.setAlignment(Pos.CENTER_LEFT);
-		controls.getStyleClass().add("glass-panel");
-		controls.setPadding(new javafx.geometry.Insets(8, 10, 8, 10));
+		controls.getStyleClass().addAll("shale-toolbar", "my-shale-toolbar");
+		controls.setMaxWidth(Double.MAX_VALUE);
 
 		overviewSearchFieldControl = new TextField(safe(overviewSearchText));
 		ControlStyles.formControl(overviewSearchFieldControl);
 		overviewSearchFieldControl.setPromptText("Search title, case, or creator…");
-		HBox.setHgrow(overviewSearchFieldControl, Priority.ALWAYS);
+		overviewSearchFieldControl.setPrefWidth(280);
 		overviewSearchFieldControl.textProperty().addListener((obs, oldV, newV) -> {
 			if (suppressOverviewControlEvents) {
 				return;
@@ -2893,11 +2930,13 @@ public final class MyShaleController {
 	private Node buildOverviewTaskSection(String title, List<CaseTaskListItemDto> tasks, String emptyState, boolean prominent) {
 		VBox section = new VBox(8);
 		section.setFillWidth(true);
-		section.getStyleClass().add(prominent ? "strong-panel" : "glass-panel");
-		section.setPadding(new javafx.geometry.Insets(10));
+		section.getStyleClass().addAll("shale-section-card", "my-shale-overview-task-section");
+		if (prominent) {
+			section.getStyleClass().add("my-shale-overview-task-section-prominent");
+		}
 
 		Label header = new Label(title + " (" + (tasks == null ? 0 : tasks.size()) + ")");
-		header.getStyleClass().add(prominent ? "page-heading" : "sidebar-header");
+		header.getStyleClass().add(prominent ? "shale-section-title" : "shale-subsection-title");
 		section.getChildren().add(header);
 
 		FlowPane taskCards = new FlowPane();
@@ -2909,7 +2948,7 @@ public final class MyShaleController {
 				.subtract((OVERVIEW_SECTION_HORIZONTAL_PADDING * 2) + 2));
 		if (tasks == null || tasks.isEmpty()) {
 			Label emptyLabel = new Label(emptyState);
-			emptyLabel.getStyleClass().add("lane-empty-state");
+			emptyLabel.getStyleClass().add("shale-empty-state");
 			taskCards.getChildren().add(emptyLabel);
 		} else {
 			for (CaseTaskListItemDto task : tasks) {
@@ -3961,6 +4000,14 @@ public final class MyShaleController {
 		}
 		node.setVisible(visible);
 		node.setManaged(visible);
+	}
+
+	private static void updateResultCount(Label label, int count) {
+		if (label == null) {
+			return;
+		}
+		int safeCount = Math.max(0, count);
+		label.setText(safeCount + (safeCount == 1 ? " result" : " results"));
 	}
 
 	private static void runOnFx(Runnable runnable) {

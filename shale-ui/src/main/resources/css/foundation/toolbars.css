@@ -110,6 +110,24 @@
     -fx-font-weight: 700;
 }
 
+/* Failure is intentionally distinct from loading and both empty-state kinds. */
+.shale-error-state,
+.label.shale-error-state {
+    -fx-text-fill: -shale-color-text-danger;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-padding: 10 8 10 8;
+}
+
+/* My Shale toolbars wrap at the node level; controls keep shared form ownership. */
+.my-shale-toolbar { -fx-padding: 10px 12px; }
+.my-shale-search-row { -fx-alignment: center-left; }
+.my-shale-results-count {
+    -fx-text-fill: -shale-color-text-muted;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
 /* Contacts directory uses the shared wrapping toolbar and result-count vocabulary. */
 .contacts-page-header { -fx-padding: 16px 16px 4px 16px; }
 .contacts-toolbar {

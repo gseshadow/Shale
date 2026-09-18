@@ -314,6 +314,19 @@
 .shale-card-selected { -fx-border-color: -shale-color-border-selected; -fx-border-width: 2px; }
 .shale-compact-card { -fx-background-radius: 10px; -fx-border-radius: 10px; -fx-padding: 10px; }
 
+/* My Shale composes shared sections and entity cards without a page-local card system. */
+.my-shale-section { -fx-padding: 16px; -fx-spacing: 12px; }
+.my-shale-overview-dashboard { -fx-alignment: top-left; }
+.my-shale-overview-primary-column { -fx-spacing: 12px; }
+.my-shale-overview-briefing-column { -fx-spacing: 12px; }
+.my-shale-overview-task-section { -fx-padding: 12px; -fx-spacing: 8px; }
+.my-shale-overview-task-section-prominent { -fx-background-color: -shale-color-card-surface; }
+.dashboard-widget { -fx-spacing: 8px; }
+.dashboard-widget-header { -fx-padding: 0 0 2px 0; }
+.dashboard-widget-badge { -fx-padding: 2px 8px; }
+.dashboard-widget-content { -fx-padding: 4px 0 0 0; -fx-alignment: center-left; -fx-min-height: 34px; }
+.my-shale-board-content { -fx-background-color: transparent; }
+
 /*
  * Authoritative CaseCard composition. The database Case Status color supplies
  * the identity wash; Practice Area remains the narrow accent rail. The canonical
