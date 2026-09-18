@@ -84,6 +84,33 @@
     -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 24, 0.2, 0, 8);
 }
 
+/* Task Card: priority owns the restrained card wash; status remains the labelled
+ * database-colored pill and due proximity remains the narrow, labelled rail. */
+.task-card { -fx-alignment: top-left; }
+.task-card:pressed { -fx-opacity: 0.94; }
+.task-card:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 9, 0.18, 0, 0);
+}
+.task-card:completed { -fx-opacity: 0.78; }
+.task-card:overdue .task-card__due {
+    -fx-font-weight: 800;
+    -fx-underline: true;
+    -fx-text-fill: -shale-color-text-danger;
+}
+.task-card:due-soon .task-card__due {
+    -fx-font-weight: 800;
+    -fx-text-fill: -shale-color-text-warning;
+}
+.task-card__title { -fx-text-fill: -shale-color-text-primary; }
+.task-card__creator { -fx-text-fill: -shale-color-text-muted; }
+.task-card__metadata { -fx-text-fill: -shale-color-text-muted; }
+.task-card__description { -fx-text-fill: -shale-color-text-secondary; }
+.task-card__completed-cue {
+    -fx-font-weight: 700;
+    -fx-text-fill: -shale-color-text-success;
+}
+
 /* Entity Card embedded variant: nested/related-card surface. */
 .shale-entity-card-embedded,
 .shale-embedded-card-surface {

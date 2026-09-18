@@ -167,6 +167,12 @@ public final class MyShaleController {
 	@FXML
 	private HBox sectionTabsBar;
 	@FXML
+	private ScrollPane sectionTabsScroll;
+	@FXML
+	private Label pageTitleLabel;
+	@FXML
+	private Label pageSubtitleLabel;
+	@FXML
 	private VBox overviewSectionPane;
 	@FXML
 	private VBox tasksSectionPane;
@@ -318,6 +324,7 @@ public final class MyShaleController {
 	}
 
 	private MyTasksSource myTasksSource = MyTasksSource.ASSIGNED_TO_ME;
+	private boolean dedicatedTasksMode;
 
 	private final ExecutorService casesDbExec = Executors.newSingleThreadExecutor(r ->
 	{
@@ -518,10 +525,7 @@ public final class MyShaleController {
 			renderMyCasesBoard();
 		});
 
-		Platform.runLater(() ->
-		{
-			onSectionSelected(SECTION_OVERVIEW);
-		});
+		Platform.runLater(() -> onSectionSelected(dedicatedTasksMode ? SECTION_TASKS : SECTION_OVERVIEW));
 
 		if (myCasesSectionPane != null) {
 			myCasesSectionPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -531,6 +535,20 @@ public final class MyShaleController {
 			});
 		}
 		subscribeLiveCaseUpdates();
+	}
+
+	/**
+	 * Presents the existing My Tasks board as the dedicated Tasks route. The board,
+	 * filters, preferences, handlers, card factory, and scroll owner stay singular;
+	 * only the surrounding route chrome and initially selected section change.
+	 */
+	public void configureDedicatedTasksMode() {
+		dedicatedTasksMode = true;
+		if (pageTitleLabel != null) pageTitleLabel.setText("Tasks");
+		if (pageSubtitleLabel != null) pageSubtitleLabel.setText("Review and manage your assigned and created tasks.");
+		setVisibleManaged(sectionTabsScroll, false);
+		unsubscribeLiveCaseUpdates();
+		onSectionSelected(SECTION_TASKS);
 	}
 
 	private void applyMyTasksSemanticControls() {
@@ -707,6 +725,9 @@ public final class MyShaleController {
 	}
 
 	private void subscribeLiveCaseUpdates() {
+		if (dedicatedTasksMode) {
+			return;
+		}
 		if (runtimeBridge == null) {
 			log.debug("My Cases live subscribe skipped: runtimeBridge is null");
 			return;

@@ -25,6 +25,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Tooltip;
+import javafx.scene.AccessibleRole;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -108,6 +110,9 @@ public final class TaskCard extends VBox {
 	private String dueAccentCss;
 	private String statusColorCss = "#F1F5F9";
 	private boolean hovered;
+	private boolean completed;
+	private boolean overdue;
+	private boolean dueSoon;
 	private boolean fullExpanded;
 	private String fullDescription = "";
 	private Popup taskDetailsPopup;
@@ -146,6 +151,8 @@ public final class TaskCard extends VBox {
 
 	public void setTitle(String title) {
 		titleLabel.setText((title == null || title.isBlank()) ? "Untitled task" : title.trim());
+		setAccessibleText("Task: " + titleLabel.getText());
+		titleLabel.setTooltip(new Tooltip(titleLabel.getText()));
 		refreshTaskDetailsTooltip();
 	}
 
@@ -189,11 +196,14 @@ public final class TaskCard extends VBox {
 	}
 
 	public void setCompleted(boolean completed) {
+		this.completed = completed;
 		completedLabel.setManaged(completed);
 		completedLabel.setVisible(completed);
 		completedLabel.setText(completed ? "Completed" : "");
 		toggleCompleteButton.setText(completed ? "Mark Incomplete" : "Complete");
 		setOpacity(completed ? 0.9 : 1.0);
+		pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("completed"), completed);
+		refreshDuePresentation();
 	}
 
 	public void setAssignees(List<AssignedUserModel> users) {
@@ -225,7 +235,8 @@ public final class TaskCard extends VBox {
 		}
 		if (safeUsers.size() > maxVisible) {
 			Label moreLabel = new Label("+" + (safeUsers.size() - maxVisible) + " more");
-			moreLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(17,37,66,0.62);");
+			moreLabel.getStyleClass().add("task-card__metadata");
+			moreLabel.setStyle("-fx-font-size: 10px;");
 			cards.getChildren().add(moreLabel);
 		}
 		assigneeHost.getChildren().setAll(cards);
@@ -260,7 +271,21 @@ public final class TaskCard extends VBox {
 
 	public void setBorderByDueState(LocalDateTime dueAt, LocalDateTime completedAt) {
 		dueAccentCss = DueProximityStyles.accentColor(dueAt, completedAt);
+		LocalDateTime now = LocalDateTime.now();
+		overdue = completedAt == null && dueAt != null && dueAt.isBefore(now);
+		dueSoon = completedAt == null && dueAt != null && !overdue && !dueAt.isAfter(now.plusDays(1));
+		pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("overdue"), overdue);
+		pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("due-soon"), dueSoon);
+		refreshDuePresentation();
 		refreshSurfaceStyle();
+	}
+
+	private void refreshDuePresentation() {
+		if (dueAtValue == null) return;
+		String date = (currentVariant == Variant.COMPACT ? DUE_DATE_COMPACT_FORMAT : DUE_DATE_FORMAT).format(dueAtValue);
+		String cue = overdue ? "Overdue · Due " : dueSoon ? "Due soon · Due " : "Due ";
+		dueLabel.setText(cue + date);
+		dueLabel.setAccessibleText((completed ? "Completed. " : "") + dueLabel.getText());
 	}
 
 	public void applyMini() {
@@ -288,9 +313,9 @@ public final class TaskCard extends VBox {
 		setMinWidth(COMPACT_CARD_WIDTH);
 		setPrefWidth(COMPACT_CARD_WIDTH);
 		setMaxWidth(COMPACT_CARD_WIDTH);
-		titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: #112542;");
-		dueLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
-		createdByLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 500; -fx-text-fill: rgba(17,37,66,0.62);");
+		titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700;");
+		dueLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600;");
+		createdByLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 500;");
 		titleLabel.setWrapText(false);
 		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		titleLabel.setMinWidth(0);
@@ -300,7 +325,7 @@ public final class TaskCard extends VBox {
 		dueLabel.setWrapText(false);
 		compactTitleRow.setAlignment(Pos.CENTER_LEFT);
 		configureRelatedSections();
-		completedLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
+		completedLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700;");
 		compactMetadataRow.setAlignment(Pos.TOP_LEFT);
 		compactMetadataRow.getStyleClass().setAll("app-taskcard-compact-meta-row");
 		caseSection.getStyleClass().setAll("app-taskcard-compact-meta-section");
@@ -348,18 +373,18 @@ public final class TaskCard extends VBox {
 		fullHeaderText.getChildren().setAll(titleLabel, dueLabel);
 		setDueAt(dueAtValue);
 		configureRelatedSections();
-		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700;");
 		titleLabel.setWrapText(false);
 		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		titleLabel.setMinWidth(0);
 		titleLabel.setMaxWidth(Double.MAX_VALUE);
-		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
+		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600;");
 		dueLabel.setWrapText(false);
 		dueLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
-		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 500; -fx-text-fill: rgba(17,37,66,0.62);");
-		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
+		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 500;");
+		descriptionLabel.setStyle("-fx-font-size: 12px;");
 		descriptionLabel.setWrapText(true);
-		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
+		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700;");
 		setSpacing(6);
 		setPadding(new Insets(8, 10, 8, 10));
 		setAlignment(Pos.TOP_LEFT);
@@ -384,6 +409,15 @@ public final class TaskCard extends VBox {
 		HBox.setHgrow(bodyPane, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(dueAccentBar, javafx.scene.layout.Priority.NEVER);
 		getStyleClass().addAll("task-card", "shale-entity-card", "shale-entity-card-clickable");
+		setFocusTraversable(true);
+		setAccessibleRole(AccessibleRole.BUTTON);
+		titleLabel.getStyleClass().add("task-card__title");
+		dueLabel.getStyleClass().add("task-card__due");
+		createdByLabel.getStyleClass().add("task-card__creator");
+		descriptionLabel.getStyleClass().add("task-card__description");
+		completedLabel.getStyleClass().add("task-card__completed-cue");
+		caseSectionLabel.getStyleClass().add("task-card__metadata");
+		teamSectionLabel.getStyleClass().add("task-card__metadata");
 		dueAccentBar.getStyleClass().add("task-card__due-accent-bar");
 		bodyPane.getStyleClass().add("task-card__body");
 		statusPill.getStyleClass().addAll("task-card__status-pill", "shale-status-pill", "shale-status-pill-compact");
@@ -443,6 +477,12 @@ public final class TaskCard extends VBox {
 				return;
 			}
 			if (onOpen != null && taskId != null) {
+				onOpen.accept(taskId);
+			}
+		});
+		setOnKeyPressed(e -> {
+			if ((e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) && onOpen != null && taskId != null) {
+				e.consume();
 				onOpen.accept(taskId);
 			}
 		});
@@ -652,8 +692,8 @@ public final class TaskCard extends VBox {
 		caseSection.getChildren().setAll(caseSectionLabel, relatedCaseHost);
 		teamSection.getChildren().setAll(teamSectionLabel, assigneeHost);
 		String sectionLabelStyle = currentVariant == Variant.COMPACT || currentVariant == Variant.COMPACT_FLUID
-				? "-fx-font-size: 9px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);"
-				: "-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);";
+				? "-fx-font-size: 9px; -fx-font-weight: 700;"
+				: "-fx-font-size: 10px; -fx-font-weight: 700;";
 		caseSectionLabel.setStyle(sectionLabelStyle);
 		teamSectionLabel.setStyle(sectionLabelStyle);
 		relatedCaseHost.setAlignment(Pos.CENTER_LEFT);
