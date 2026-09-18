@@ -176,6 +176,7 @@ public final class SettingsController {
 	private void toggleInline(VBox content, SettingsManagementRow row, boolean ignored) {
 		boolean show = !content.isManaged();
 		setVisibleManaged(content, show);
+		row.setExpanded(show);
 		row.setActionText(show ? "Close" : "Open");
 	}
 
