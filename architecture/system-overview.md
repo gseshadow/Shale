@@ -29,12 +29,15 @@ Primary entities:
 
 Navigation:
 My Shale
-Tasks
 Cases
 Contacts
 Organizations
 Team
+Reports
+Calendar
 Settings
+
+The dedicated Tasks route remains available for internal, deep-link, and back-stack navigation, but it is not a shared main-sidebar destination. My Shale exposes task work through its My Tasks tab.
 
 ## New Intake date authority
 

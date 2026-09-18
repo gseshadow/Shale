@@ -71,7 +71,6 @@
 				<VBox fx:id="navigationItems" spacing="6" fillWidth="true" styleClass="navigation-items" VBox.vgrow="ALWAYS">
 					<children>
 						<Button fx:id="navMyShaleButton" text="My Shale" maxWidth="Infinity" onAction="#onNavMyShale" />
-						<Button fx:id="navTasksButton" text="Tasks" maxWidth="Infinity" onAction="#onNavTasks" />
 						<Button fx:id="navCasesButton" text="Cases" maxWidth="Infinity" onAction="#onNavCases" />
 						<Button fx:id="navContactsButton" text="Contacts" maxWidth="Infinity" onAction="#onNavContacts" />
 						<Button fx:id="navOrganizationsButton" text="Organizations" maxWidth="Infinity" onAction="#onNavOrganizations" />
