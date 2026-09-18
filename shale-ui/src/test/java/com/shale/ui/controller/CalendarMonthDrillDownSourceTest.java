@@ -38,7 +38,7 @@ final class CalendarMonthDrillDownSourceTest {
     @Test
     void monthDrillDownControlsRemainAccessibleLinkStyledButtons() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+        String css = Files.readString(Path.of("src/main/resources/css/foundation/calendar.css"));
 
         assertTrue(source.contains("new Button(String.valueOf(day.getDayOfMonth()))"),
                 "The day number should retain Button semantics for keyboard activation.");
