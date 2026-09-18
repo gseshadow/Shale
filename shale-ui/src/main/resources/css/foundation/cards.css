@@ -184,6 +184,10 @@
 }
 
 .organization-card:pressed { -fx-opacity: 0.94; }
+.organization-card:selected {
+    -fx-border-color: -shale-organization-type-accent -shale-color-primary-accent -shale-color-primary-accent -shale-organization-type-accent;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 9, 0.18, 0, 0);
+}
 .organization-card:focused {
     -fx-border-color: -shale-color-border-focus;
     -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 9, 0.18, 0, 0);
@@ -195,6 +199,7 @@
 .organization-card-name-compact { -fx-font-size: 14px; -fx-font-weight: 700; }
 .organization-card-classification-region { -fx-min-height: 42px; -fx-pref-height: 42px; -fx-max-height: 42px; -fx-alignment: top-left; }
 .organization-card-compact .organization-card-classification-region { -fx-min-height: 26px; -fx-pref-height: 26px; }
+.organization-card-compact .organization-card-summary-box { -fx-min-height: 34px; -fx-pref-height: 34px; -fx-max-height: 34px; }
 .organization-card-contact-summary { -fx-hgap: 6px; -fx-vgap: 6px; }
 .organization-card-summary-box {
     -fx-min-height: 42px;

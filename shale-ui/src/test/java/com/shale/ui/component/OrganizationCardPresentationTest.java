@@ -111,15 +111,44 @@ final class OrganizationCardPresentationTest {
         });
     }
 
-    @Test void compactAndMiniDoNotInheritTheFullCardHeight() {
+    @Test void compactUsesItsOwnStableHeightAndReadOnlyPrioritySummary() {
         JavaFxTestSupport.runAndWait(()->{
             var factory=new OrganizationCardFactory(id->{});
-            OrganizationCard compact=factory.create(MODEL,OrganizationCardFactory.Variant.COMPACT);
+            OrganizationCard compact=factory.create(MODEL,
+                    presentation(List.of(new OrganizationCardType(1,1,"Hospital","#336699",true,0)),
+                            null,"team@example.com","10 Main Street","example.com"),
+                    OrganizationCardFactory.Variant.COMPACT);
             OrganizationCard mini=factory.create(MODEL,OrganizationCardFactory.Variant.MINI);
             assertNotEquals(CaseCard.FULL_CARD_HEIGHT,compact.getPrefHeight());
             assertNotEquals(CaseCard.FULL_CARD_HEIGHT,mini.getPrefHeight());
-            assertEquals(Double.MAX_VALUE,compact.getMaxHeight());
+            assertEquals(OrganizationCard.COMPACT_CARD_HEIGHT,compact.getMinHeight());
+            assertEquals(OrganizationCard.COMPACT_CARD_HEIGHT,compact.getPrefHeight());
+            assertEquals(OrganizationCard.COMPACT_CARD_HEIGHT,compact.getMaxHeight());
             assertEquals(Double.MAX_VALUE,mini.getMaxHeight());
+            assertEquals(1, compact.lookupAll(".organization-card-summary-box").size());
+            assertEquals("Email", ((Label) ((VBox) compact.lookup(".organization-card-summary-box")).getChildren().getFirst()).getText());
+            assertTrue(compact.lookupAll(".button").isEmpty(), "embedded Organization cards must not render external actions");
+        });
+    }
+
+    @Test void directoryOverviewAndPartiesVariantsSharePrimaryIdentityPaint() {
+        JavaFxTestSupport.runAndWait(() -> {
+            var presentation = presentation(List.of(
+                    new OrganizationCardType(2, 8, "Secondary", "#CC7722", false, 0),
+                    new OrganizationCardType(1, 7, "Primary", "#2277AA", true, 4)), "555-0100");
+            var factory = new OrganizationCardFactory(id -> {});
+            OrganizationCard directory = factory.create(MODEL, presentation, OrganizationCardFactory.Variant.FULL);
+            OrganizationCard overview = factory.create(MODEL, presentation, OrganizationCardFactory.Variant.COMPACT);
+            OrganizationCard parties = factory.create(MODEL, presentation, OrganizationCardFactory.Variant.COMPACT);
+            StackPane root = new StackPane(directory, overview, parties);
+            Scene scene = new Scene(root, 1200, 700); new ThemeManager().register(scene); root.applyCss(); root.layout();
+            assertEquals(directory.getStyle(), overview.getStyle());
+            assertEquals(overview.getStyle(), parties.getStyle());
+            assertEquals(directory.getBackground().getFills().getLast().getFill(), overview.getBackground().getFills().getLast().getFill());
+            assertEquals(overview.getBackground().getFills().getLast().getFill(), parties.getBackground().getFills().getLast().getFill());
+            assertEquals(2, chips(overview).getChildren().size());
+            assertEquals(OrganizationCard.COMPACT_CARD_HEIGHT, overview.getHeight(), .51);
+            assertEquals(OrganizationCard.COMPACT_CARD_HEIGHT, parties.getHeight(), .51);
         });
     }
 

@@ -21,11 +21,14 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
+import javafx.css.PseudoClass;
 import com.shale.ui.util.ContactExternalActions;
 import com.shale.ui.util.ColorUtil;
 import com.shale.data.dao.OrganizationDao.OrganizationCardType;
 
 public class OrganizationCard extends HBox {
+	public static final double COMPACT_CARD_HEIGHT = 112;
+	private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
 	private final Label nameLabel = new Label();
 	private final Label typeLabel = new Label();
 	private final Label phoneLabel = new Label();
@@ -98,7 +101,8 @@ public class OrganizationCard extends HBox {
 	}
 	public void setTypes(List<OrganizationCardType> values){types=List.copyOf(values);updateAccessibleText();}
 	public void setExternalActions(ContactExternalActions actions){externalActions=java.util.Objects.requireNonNull(actions);}
-	public void setRemoved(boolean removed,Runnable restoreAction){this.removed=removed;this.restoreAction=restoreAction;if(removed){getStyleClass().add("organization-card-removed");setCursor(Cursor.DEFAULT);}}
+	public void setRemoved(boolean removed,Runnable restoreAction){this.removed=removed;this.restoreAction=restoreAction;getStyleClass().remove("organization-card-removed");if(removed){getStyleClass().add("organization-card-removed");setCursor(Cursor.DEFAULT);}else setCursor(Cursor.HAND);updateAccessibleText();}
+	public void setSelected(boolean selected){pseudoClassStateChanged(SELECTED,selected);}
 
 	public void setAddress(String address1, String address2, String city, String state, String postalCode, String country) {
 		List<String> parts = new ArrayList<>();
@@ -179,6 +183,9 @@ public class OrganizationCard extends HBox {
 		setAlignment(Pos.TOP_LEFT);
 		setPadding(new Insets(10, 12, 10, 12));
 		setSpacing(12);
+		setMinHeight(COMPACT_CARD_HEIGHT);
+		setPrefHeight(COMPACT_CARD_HEIGHT);
+		setMaxHeight(COMPACT_CARD_HEIGHT);
 
 		Node avatar = buildAvatar(18);
 
@@ -190,7 +197,8 @@ public class OrganizationCard extends HBox {
 		VBox text = new VBox(4, nameLabel);
 		text.getStyleClass().add("organization-card-content");HBox.setHgrow(text,javafx.scene.layout.Priority.ALWAYS);
 		text.getChildren().add(classificationRegion());
-		if (!(suppressPlaceholderLines && "Phone: —".equals(phoneLabel.getText()))) text.getChildren().add(methodCard(phoneLabel,"Phone","Call",phoneAction));
+		Node summary = firstCompactSummary();
+		if (summary != null) text.getChildren().add(summary);
 		setVariantClasses("organization-card-compact", "shale-entity-card-compact");
 		getChildren().addAll(avatar, text);
 	}
@@ -271,6 +279,13 @@ public class OrganizationCard extends HBox {
 		}
 		return grid;
 	}
+	private Node firstCompactSummary() {
+		for (var item : List.of(new SummaryValue(phoneLabel, "Phone"), new SummaryValue(emailLabel, "Email"),
+				new SummaryValue(addressLabel, "Address"), new SummaryValue(websiteLabel, "Website"))) {
+			if (!item.source().getText().endsWith("—")) return summaryBox(item.source(), item.kind());
+		}
+		return null;
+	}
 	private static Node summaryBox(Label source,String kind){
 		String value=source.getText().replaceFirst("^[^:]+: ","");
 		Label semantic=new Label(kind);semantic.getStyleClass().add("organization-card-summary-label");
@@ -295,7 +310,7 @@ public class OrganizationCard extends HBox {
 	private static String fallback(String value) {
 		return value == null || value.isBlank() ? "—" : value;
 	}
-	private void updateAccessibleText(){String name=fallback(nameLabel.getText());String typeText=types.stream().map(OrganizationCardType::label).filter(java.util.Objects::nonNull).filter(v->!v.isBlank()).reduce((a,b)->a+", "+b).orElse("");setAccessibleText("Organization: "+name+(typeText.isBlank()?"":". Organization Types: "+typeText));}
+	private void updateAccessibleText(){String name=fallback(nameLabel.getText());String typeText=types.stream().map(OrganizationCardType::label).filter(java.util.Objects::nonNull).filter(v->!v.isBlank()).reduce((a,b)->a+", "+b).orElse("");setAccessibleText("Organization: "+name+(typeText.isBlank()?"":". Organization Types: "+typeText)+(removed?". Removed":""));}
 	private static String initials(String value){String[] words=value.trim().split("\\s+");if(words.length==0||value.equals("—"))return "?";String first=words[0].substring(0,1);String last=words.length>1?words[words.length-1].substring(0,1):"";return (first+last).toUpperCase();}
 
 	private static String joinNonBlank(String separator, String... values) {

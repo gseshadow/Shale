@@ -819,6 +819,8 @@ public class CaseController {
 	private LocalDate draftSolDate;
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
 	private List<CasePartyDto> caseParties = List.of();
+	private Map<Integer, OrganizationDao.OrganizationCardPresentation> casePartyOrganizationPresentations = Map.of();
+	private int casePartiesLoadGeneration;
 	private boolean partiesLoadedOnce = false;
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> caseTaskAssignedUsers = java.util.Map.of();
@@ -3577,7 +3579,8 @@ public class CaseController {
 					null
 			);
 			OrganizationCardFactory.Variant variant = OrganizationCardFactory.Variant.COMPACT;
-			OrganizationCard card = factory.create(model, variant);
+			OrganizationCard card = factory.create(model,
+					casePartyOrganizationPresentations.get(party.getOrganizationId().intValue()), variant);
 			card.setSuppressPlaceholderLines(true);
 			card.setMinWidth(partiesCardWidth);
 			card.setPrefWidth(partiesCardWidth);
@@ -3605,6 +3608,15 @@ public class CaseController {
 		fallback.setStyle("-fx-font-weight: bold;");
 		fallback.setWrapText(true);
 		return fallback;
+	}
+
+	private Map<Integer, OrganizationDao.OrganizationCardPresentation> loadCasePartyOrganizationPresentations(List<CasePartyDto> parties) {
+		if (organizationDao == null || appState == null || appState.getShaleClientId() == null || parties == null) return Map.of();
+		List<Integer> organizationIds = parties.stream().filter(Objects::nonNull)
+				.filter(p -> "organization".equalsIgnoreCase(safeText(p.getEntityType())))
+				.map(CasePartyDto::getOrganizationId).filter(Objects::nonNull).map(Long::intValue).distinct().toList();
+		return organizationIds.isEmpty() ? Map.of()
+				: organizationDao.findCardPresentations(appState.getShaleClientId(), organizationIds);
 	}
 
 	static ContactCardFactory.ContactCardModel toContactCardModel(CasePartyDto party) {
@@ -3889,13 +3901,23 @@ public class CaseController {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
+		final int generation = ++casePartiesLoadGeneration;
 		new Thread(() ->
 		{
 			try {
 				List<CasePartyDto> refreshed = caseDao.listCaseParties(activeCaseId);
+				Map<Integer, OrganizationDao.OrganizationCardPresentation> loadedPresentations = Map.of();
+				try {
+					loadedPresentations = loadCasePartyOrganizationPresentations(refreshed);
+				} catch (RuntimeException ex) {
+					LOG.warn("Case party Organization presentation refresh failed caseId={}", activeCaseId, ex);
+				}
+				Map<Integer, OrganizationDao.OrganizationCardPresentation> organizationPresentations = loadedPresentations;
 				runOnFx(() ->
 				{
+					if (caseId == null || caseId.longValue() != activeCaseId || generation != casePartiesLoadGeneration) return;
 					caseParties = refreshed == null ? List.of() : refreshed;
+					casePartyOrganizationPresentations = organizationPresentations;
 					partiesLoadedOnce = true;
 					renderPartiesSection();
 					if (currentOverview != null) {
@@ -4802,6 +4824,7 @@ public class CaseController {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
+		final int partiesGeneration = ++casePartiesLoadGeneration;
 		loadOverviewConfigurationAsync();
 		loadCompatibilityDatesAsync(activeCaseId);
 		caseUpdatesStale = true;
@@ -4833,15 +4856,26 @@ public class CaseController {
 			}
 			final List<CasePartyDto> parties = loadedParties;
 			final boolean partiesReady = partiesLoadSucceeded;
+			Map<Integer, OrganizationDao.OrganizationCardPresentation> loadedOrganizationPresentations = Map.of();
+			if (partiesReady) {
+				try {
+					loadedOrganizationPresentations = loadCasePartyOrganizationPresentations(parties);
+				} catch (RuntimeException ex) {
+					LOG.warn("Case party Organization presentation load failed caseId={}", activeCaseId, ex);
+				}
+			}
+			final Map<Integer, OrganizationDao.OrganizationCardPresentation> organizationPresentations = loadedOrganizationPresentations;
 
 			runOnFx(() ->
 			{
+				if (caseId == null || caseId.longValue() != activeCaseId || partiesGeneration != casePartiesLoadGeneration) return;
 				if (overview == null || detail == null) {
 					handleMissingCase();
 					return;
 				}
 
 				caseParties = parties == null ? List.of() : parties;
+				casePartyOrganizationPresentations = organizationPresentations;
 				partiesLoadedOnce = partiesReady;
 				renderPartiesSection();
 				CaseOverviewDto effectiveOverview = applyCallerFromCaseParties(overview, caseParties);
