@@ -55,6 +55,7 @@ public final class OrganizationsController {
 	@FXML private ShaleFilterMenu organizationTypeFilter;
 	@FXML private FlowPane selectedFilterChips;
 	@FXML private Label activeFilterCount;
+	@FXML private Label organizationsResultCount;
 	@FXML private Button clearFiltersButton;
 	@FXML private ComboBox<String> organizationSort;
 	@FXML private Button showRemovedOrganizationsButton;
@@ -81,6 +82,7 @@ public final class OrganizationsController {
 	private OrganizationDao.OrganizationSearchCriteria activeCriteria;
 	private OrganizationDao.OrganizationLifecycleMode lifecycleMode=OrganizationDao.OrganizationLifecycleMode.ACTIVE_ONLY;
 	private boolean restoreInProgress;
+	private long totalResults;
 
 	private final List<DirectoryOrganizationRow> loaded = new ArrayList<>();
 	private Map<Integer,OrganizationDao.OrganizationCardPresentation> cardPresentations=Map.of();
@@ -225,6 +227,8 @@ public final class OrganizationsController {
 		hasMore = true;
 
 		loaded.clear();
+		totalResults=0;
+		if(organizationsResultCount!=null)organizationsResultCount.setText("0 results");
 		cardPresentations=Map.of();
 		if (organizationsFlow != null) {
 			organizationsFlow.getChildren().clear();
@@ -285,6 +289,7 @@ public final class OrganizationsController {
 					}
 
 					loaded.addAll(page.items());
+					totalResults=page.total();
 					var merged=new java.util.HashMap<>(cardPresentations);merged.putAll(pagePresentation);cardPresentations=Map.copyOf(merged);
 					currentPage++;
 					hasMore = loaded.size() < page.total();
@@ -318,6 +323,7 @@ public final class OrganizationsController {
 				.toList();
 
 		organizationsFlow.getChildren().setAll(cards);
+		if(organizationsResultCount!=null)organizationsResultCount.setText(totalResults+" result"+(totalResults==1?"":"s"));
 		updateLoadingState(false);
 		updateEmptyState(loaded.isEmpty());
 		PerfLog.logDone("organizations.render", "cards=" + cards.size() + " loaded=" + loaded.size() + " loading=" + loading + " fxThread=" + Platform.isFxApplicationThread(), renderStarted);
