@@ -160,8 +160,14 @@
 /* Organization Card: the authoritative primary type supplies identity paint. */
 .organization-card {
     -shale-organization-type-accent: -shale-color-chip-neutral-border;
-    -shale-organization-type-wash: -shale-color-chip-neutral-background;
-    -fx-background-color: linear-gradient(to right, -shale-organization-type-wash 0%, -shale-color-card-surface 72%);
+    -shale-organization-type-wash-strong: -shale-color-chip-neutral-background;
+    -shale-organization-type-wash-medium: -shale-color-chip-neutral-background;
+    -shale-organization-type-wash-light: -shale-color-chip-neutral-background;
+    -fx-background-color: -shale-color-card-surface,
+        linear-gradient(to right,
+            -shale-organization-type-wash-strong 0%,
+            -shale-organization-type-wash-medium 58%,
+            -shale-organization-type-wash-light 100%);
     -fx-border-color: -shale-organization-type-accent -shale-color-card-border -shale-color-card-border -shale-organization-type-accent;
     -fx-border-width: 1px 1px 1px 4px;
     -fx-border-insets: 0;
@@ -169,7 +175,11 @@
 }
 
 .organization-card:hover {
-    -fx-background-color: linear-gradient(to right, -shale-organization-type-wash 0%, -shale-color-card-hover-surface 76%);
+    -fx-background-color: -shale-color-card-hover-surface,
+        linear-gradient(to right,
+            -shale-organization-type-wash-strong 0%,
+            -shale-organization-type-wash-medium 64%,
+            -shale-organization-type-wash-light 100%);
     -fx-border-color: -shale-organization-type-accent -shale-color-card-hover-border -shale-color-card-hover-border -shale-organization-type-accent;
 }
 
@@ -183,14 +193,14 @@
 .organization-card-content { -fx-fill-width: true; }
 .organization-card-name-full { -fx-font-size: 15px; -fx-font-weight: 800; }
 .organization-card-name-compact { -fx-font-size: 14px; -fx-font-weight: 700; }
-.organization-card-classification-region { -fx-min-height: 48px; -fx-pref-height: 48px; -fx-alignment: top-left; }
+.organization-card-classification-region { -fx-min-height: 42px; -fx-pref-height: 42px; -fx-max-height: 42px; -fx-alignment: top-left; }
 .organization-card-compact .organization-card-classification-region { -fx-min-height: 26px; -fx-pref-height: 26px; }
 .organization-card-contact-summary { -fx-hgap: 6px; -fx-vgap: 6px; }
 .organization-card-summary-box {
-    -fx-min-height: 49px;
-    -fx-pref-height: 49px;
-    -fx-max-height: 49px;
-    -fx-padding: 5px 7px;
+    -fx-min-height: 42px;
+    -fx-pref-height: 42px;
+    -fx-max-height: 42px;
+    -fx-padding: 4px 6px;
     -fx-background-color: -shale-color-card-embedded-surface;
     -fx-background-radius: 8px;
     -fx-border-color: -shale-color-border-subtle;

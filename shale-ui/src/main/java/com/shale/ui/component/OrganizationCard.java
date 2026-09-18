@@ -17,7 +17,6 @@ import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Circle;
@@ -27,8 +26,6 @@ import com.shale.ui.util.ColorUtil;
 import com.shale.data.dao.OrganizationDao.OrganizationCardType;
 
 public class OrganizationCard extends HBox {
-	public static final double FULL_CARD_HEIGHT = 250;
-
 	private final Label nameLabel = new Label();
 	private final Label typeLabel = new Label();
 	private final Label phoneLabel = new Label();
@@ -149,7 +146,10 @@ public class OrganizationCard extends HBox {
 		String normalized=ColorUtil.normalizeStoredColor(storedColor);
 		if(normalized==null){setStyle("");return;}
 		String color="#"+normalized.substring(0,6);
-		setStyle("-shale-organization-type-accent: "+color+"; -shale-organization-type-wash: "+ColorUtil.toCssRgba(color,.14)+";");
+		setStyle("-shale-organization-type-accent: "+color
+				+"; -shale-organization-type-wash-strong: "+ColorUtil.toCssRgba(color,.20)
+				+"; -shale-organization-type-wash-medium: "+ColorUtil.toCssRgba(color,.13)
+				+"; -shale-organization-type-wash-light: "+ColorUtil.toCssRgba(color,.07)+";");
 	}
 
 	public void setSuppressPlaceholderLines(boolean suppressPlaceholderLines) {
@@ -197,32 +197,33 @@ public class OrganizationCard extends HBox {
 
 	public void applyFull() {
 		getChildren().clear();
+		phoneAction=emailAction=addressAction=websiteAction=null;
 
 		setAlignment(Pos.TOP_LEFT);
 		setMinWidth(320);
 		setPrefWidth(340);
 		setMaxWidth(340);
-		setMinHeight(FULL_CARD_HEIGHT);
-		setPrefHeight(FULL_CARD_HEIGHT);
-		setMaxHeight(FULL_CARD_HEIGHT);
+		setMinHeight(CaseCard.FULL_CARD_HEIGHT);
+		setPrefHeight(CaseCard.FULL_CARD_HEIGHT);
+		setMaxHeight(CaseCard.FULL_CARD_HEIGHT);
 		Rectangle boundsClip=new Rectangle();boundsClip.widthProperty().bind(widthProperty());boundsClip.heightProperty().bind(heightProperty());boundsClip.setArcWidth(28);boundsClip.setArcHeight(28);setClip(boundsClip);
-		setPadding(new Insets(14, 16, 14, 16));
-		setSpacing(14);
+		setPadding(new Insets(10, 12, 10, 12));
+		setSpacing(10);
 
-		Node avatar = buildAvatar(28);
+		Node avatar = buildAvatar(22);
 
 		resetNameLabelVariantStyles();
 		nameLabel.getStyleClass().addAll("organization-card-name","organization-card-name-full");
 		nameLabel.setStyle(null);
 		nameLabel.setWrapText(true);
 		nameLabel.setMaxWidth(Double.MAX_VALUE);
+		nameLabel.setMaxHeight(36);
 		notesLabel.setWrapText(true);
 
-		VBox text = new VBox(7, nameLabel, classificationRegion());
+		VBox text = new VBox(5, nameLabel, classificationRegion());
 		text.getStyleClass().add("organization-card-content");HBox.setHgrow(text,javafx.scene.layout.Priority.ALWAYS);
 		if(removed){Label badge=new Label("Removed");badge.getStyleClass().add("lifecycle-removed-badge");text.getChildren().add(1,badge);}
-		GridPane summary=contactSummary();
-		if(!summary.getChildren().isEmpty())text.getChildren().add(summary);
+		if(!removed){GridPane summary=contactSummary();if(!summary.getChildren().isEmpty())text.getChildren().add(summary);}
 		if(removed&&restoreAction!=null){Button restore=com.shale.ui.util.ActionButtonFactory.semantic("Restore Organization",e->restoreAction.run(),com.shale.ui.util.ControlStyles.Purpose.PRIMARY,com.shale.ui.util.ControlStyles.Size.SMALL);text.getChildren().add(restore);}
 
 		setVariantClasses("organization-card-full", "shale-entity-card-full");
@@ -262,24 +263,24 @@ public class OrganizationCard extends HBox {
 		ColumnConstraints right=new ColumnConstraints();right.setPercentWidth(50);right.setHgrow(Priority.ALWAYS);
 		grid.getColumnConstraints().addAll(left,right);
 		int index=0;
-		for(var item:List.of(new SummaryValue(phoneLabel,"Phone",false),new SummaryValue(emailLabel,"Email",false),new SummaryValue(addressLabel,"Address",true),new SummaryValue(websiteLabel,"Website",false))){
+		for(var item:List.of(new SummaryValue(phoneLabel,"Phone"),new SummaryValue(emailLabel,"Email"),new SummaryValue(addressLabel,"Address"),new SummaryValue(websiteLabel,"Website"))){
 			if(item.source().getText().endsWith("—"))continue;
-			Node box=summaryBox(item.source(),item.kind(),item.twoLines());
+			Node box=summaryBox(item.source(),item.kind());
 			grid.add(box,index%2,index/2);GridPane.setHgrow(box,Priority.ALWAYS);index++;
+			if(index==2)break;
 		}
 		return grid;
 	}
-	private static Node summaryBox(Label source,String kind,boolean twoLines){
+	private static Node summaryBox(Label source,String kind){
 		String value=source.getText().replaceFirst("^[^:]+: ","");
 		Label semantic=new Label(kind);semantic.getStyleClass().add("organization-card-summary-label");
 		Label display=new Label(value);display.getStyleClass().add("organization-card-summary-value");display.setMinWidth(0);display.setMaxWidth(Double.MAX_VALUE);
 		display.setTooltip(new Tooltip(value));display.setAccessibleText(kind+": "+value);
-		display.setTextOverrun(OverrunStyle.ELLIPSIS);display.setWrapText(twoLines);
-		if(twoLines){display.setMinHeight(Region.USE_PREF_SIZE);display.setPrefHeight(32);display.setMaxHeight(32);}
+		display.setTextOverrun(OverrunStyle.ELLIPSIS);display.setWrapText(false);
 		VBox box=new VBox(2,semantic,display);box.getStyleClass().add("organization-card-summary-box");box.setMinWidth(0);box.setMaxWidth(Double.MAX_VALUE);
 		return box;
 	}
-	private record SummaryValue(Label source,String kind,boolean twoLines){}
+	private record SummaryValue(Label source,String kind){}
 
 	private Node buildAvatar(double radius) {
 		Circle c = new Circle(radius);
