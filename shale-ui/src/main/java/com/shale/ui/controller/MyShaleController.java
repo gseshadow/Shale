@@ -106,6 +106,9 @@ public final class MyShaleController {
 	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 416;
 	private static final double OVERVIEW_CARD_GAP = 10;
 	private static final double OVERVIEW_SECTION_HORIZONTAL_PADDING = 10;
+	private static final double OVERVIEW_COLUMN_GAP = 12;
+	private static final double OVERVIEW_PRIMARY_SHARE = 0.625;
+	private static final double OVERVIEW_TWO_COLUMN_BREAKPOINT = 800;
 	private static final String OVERVIEW_SORT_DUE_ASC = "Due Date (earliest first)";
 	private static final String OVERVIEW_SORT_DUE_DESC = "Due Date (latest first)";
 	private static final String OVERVIEW_SORT_PRIORITY = "Priority";
@@ -1615,27 +1618,32 @@ public final class MyShaleController {
 				&& overviewSearchFieldControl != null) {
 			return;
 		}
-		FlowPane dashboard = new FlowPane(12, 12);
+		FlowPane dashboard = new FlowPane(OVERVIEW_COLUMN_GAP, 12);
 		dashboard.getStyleClass().add("my-shale-overview-dashboard");
 		dashboard.setAlignment(Pos.TOP_LEFT);
+		dashboard.setMinWidth(0);
 		dashboard.setMaxWidth(Double.MAX_VALUE);
-		dashboard.setPrefWrapLength(1080);
 		dashboard.prefWrapLengthProperty().bind(overviewScroll.viewportBoundsProperty()
-				.map(bounds -> Math.max(320, bounds.getWidth() - 2)));
+				.map(bounds -> Math.max(0, bounds.getWidth())));
 
 		VBox sections = new VBox(10);
 		sections.getStyleClass().add("my-shale-overview-primary-column");
 		sections.setFillWidth(true);
+		sections.setMinWidth(0);
 		sections.setMaxWidth(Double.MAX_VALUE);
-		sections.setMinWidth(320);
-		sections.setPrefWidth(680);
 
 		VBox widgets = new VBox(10);
 		widgets.getStyleClass().add("my-shale-overview-briefing-column");
 		widgets.setFillWidth(true);
-		widgets.setMinWidth(300);
-		widgets.setPrefWidth(360);
-		widgets.setMaxWidth(430);
+		widgets.setMinWidth(0);
+		widgets.setMaxWidth(Double.MAX_VALUE);
+
+		sections.prefWidthProperty().bind(Bindings.createDoubleBinding(
+				() -> overviewColumnWidths(overviewScroll.getViewportBounds().getWidth())[0],
+				overviewScroll.viewportBoundsProperty()));
+		widgets.prefWidthProperty().bind(Bindings.createDoubleBinding(
+				() -> overviewColumnWidths(overviewScroll.getViewportBounds().getWidth())[1],
+				overviewScroll.viewportBoundsProperty()));
 
 		sections.getChildren().add(buildOverviewControlBar());
 		widgets.getChildren().setAll(buildOverviewDashboardWidgets());
@@ -1643,6 +1651,16 @@ public final class MyShaleController {
 		overviewWidgetsContainer = widgets;
 		dashboard.getChildren().setAll(sections, widgets);
 		overviewMainRow.getChildren().setAll(dashboard);
+	}
+
+	static double[] overviewColumnWidths(double viewportWidth) {
+		double available = Double.isFinite(viewportWidth) ? Math.max(0, viewportWidth) : 0;
+		if (available < OVERVIEW_TWO_COLUMN_BREAKPOINT) {
+			return new double[] {available, available};
+		}
+		double distributable = Math.max(0, available - OVERVIEW_COLUMN_GAP);
+		double primary = distributable * OVERVIEW_PRIMARY_SHARE;
+		return new double[] {primary, distributable - primary};
 	}
 
 	private void renderOverviewSections(List<CaseTaskListItemDto> overviewSource) {
@@ -2945,6 +2963,7 @@ public final class MyShaleController {
 	private Node buildOverviewTaskSection(String title, List<CaseTaskListItemDto> tasks, String emptyState, boolean prominent) {
 		VBox section = new VBox(8);
 		section.setFillWidth(true);
+		section.setMaxWidth(Double.MAX_VALUE);
 		section.getStyleClass().addAll("shale-section-card", "my-shale-overview-task-section");
 		if (prominent) {
 			section.getStyleClass().add("my-shale-overview-task-section-prominent");
