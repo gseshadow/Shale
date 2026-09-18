@@ -11,7 +11,11 @@ import javafx.scene.paint.Color;
 /** Domain-neutral, presentation-only group for database-colored classifications. */
 public class ClassificationChipGroup extends FlowPane {
     public enum Size { COMPACT, STANDARD }
-    public record Chip(String label, String color, String category, long definitionId, boolean primary) { }
+    public record Chip(String label, String color, String category, long definitionId, boolean primary, boolean inactive) {
+        public Chip(String label, String color, String category, long definitionId, boolean primary) {
+            this(label, color, category, definitionId, primary, false);
+        }
+    }
     private static final Color FALLBACK = Color.web("#6C757D");
 
     public ClassificationChipGroup(List<Chip> values, Size size) {
@@ -25,17 +29,21 @@ public class ClassificationChipGroup extends FlowPane {
 
     private static Label chip(Chip value, Size size) {
         String text = value.label() == null || value.label().isBlank() ? "Unknown" : value.label().trim();
-        Label label = new Label(value.primary() ? text + " · Primary" : text);
+        String suffix = (value.primary() ? " · Primary" : "") + (value.inactive() ? " · Inactive" : "");
+        Label label = new Label(text + suffix);
         label.getStyleClass().addAll("contact-classification-chip",
                 size == Size.COMPACT ? "contact-classification-chip-compact" : "contact-classification-chip-standard");
         if (value.primary()) label.getStyleClass().add("classification-chip-primary");
+        if (value.inactive()) label.getStyleClass().add("shale-semantic-chip-inactive");
         Color color = parse(value.color());
         String rgb = hex(color), foreground = luminance(color) > .52 ? "#112542" : "#FFFFFF";
         label.setStyle("-fx-background-color: " + rgba(color, size == Size.COMPACT ? .16 : .20)
                 + "; -fx-border-color: " + rgb + "; -fx-text-fill: " + foreground + ";");
         String category = value.category() == null || value.category().isBlank() ? "Classification" : value.category();
-        label.setAccessibleText(category + ": " + text + (value.primary() ? ", primary" : ""));
-        label.setTooltip(new Tooltip(category + (value.primary() ? " · Primary" : "")));
+        label.setAccessibleText(category + ": " + text + (value.primary() ? ", primary" : "")
+                + (value.inactive() ? ", inactive or historical" : ""));
+        label.setTooltip(new Tooltip(category + (value.primary() ? " · Primary" : "")
+                + (value.inactive() ? " · Inactive or historical" : "")));
         label.getProperties().put("classificationDefinitionId", value.definitionId());
         label.getProperties().put("classificationPrimary", value.primary());
         return label;
