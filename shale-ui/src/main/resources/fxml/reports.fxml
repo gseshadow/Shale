@@ -1,47 +1,59 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.chart.PieChart?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import com.shale.ui.component.StatisticCard?>
-<?import javafx.geometry.Insets?>
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.shale.ui.controller.ReportsController" styleClass="app-shell">
+            fx:id="reportsRoot" fx:controller="com.shale.ui.controller.ReportsController"
+            styleClass="app-shell, reports-page-root">
+    <padding><Insets top="16" right="16" bottom="16" left="16" /></padding>
     <top>
-        <VBox spacing="10" styleClass="strong-panel">
-            <padding><Insets top="10" right="10" bottom="10" left="10" /></padding>
-            <Label text="Case Status Report" styleClass="page-heading" />
+        <VBox spacing="12" styleClass="reports-page-summary">
+            <!-- The application shell owns the one canonical Reports title and subtitle. -->
             <FlowPane fx:id="reportFilterToolbar" hgap="10" vgap="8" alignment="CENTER_LEFT"
-                      prefWrapLength="1040" styleClass="shale-filter-panel">
-                <HBox spacing="6" alignment="CENTER_LEFT">
-                    <Label text="Start date" />
+                      prefWrapLength="1040" styleClass="shale-toolbar, reports-filter-toolbar">
+                <VBox spacing="4" styleClass="reports-filter-group">
+                    <Label text="Start date" styleClass="shale-field-label" />
                     <DatePicker fx:id="startDatePicker" />
-                </HBox>
-                <HBox spacing="6" alignment="CENTER_LEFT">
-                    <Label text="End date" />
+                </VBox>
+                <VBox spacing="4" styleClass="reports-filter-group">
+                    <Label text="End date" styleClass="shale-field-label" />
                     <DatePicker fx:id="endDatePicker" />
-                </HBox>
-                <MenuButton fx:id="statusFilterMenuButton" text="Statuses (0/0)" />
+                </VBox>
+                <VBox spacing="4" styleClass="reports-filter-group">
+                    <Label text="Case statuses" styleClass="shale-field-label" />
+                    <MenuButton fx:id="statusFilterMenuButton" text="Statuses (0/0)" />
+                </VBox>
                 <Button fx:id="refreshButton" text="Apply" onAction="#onRefresh" />
                 <Button fx:id="showAllResultsButton" text="Show all results" onAction="#onShowAllResults" />
                 <Button fx:id="exportButton" text="Export" onAction="#onExport" />
-                <Label fx:id="statusLabel" styleClass="search-summary-text" />
             </FlowPane>
-            <HBox fx:id="summaryMetricsBox" spacing="10" alignment="CENTER_LEFT">
-                <StatisticCard fx:id="totalCasesCard" HBox.hgrow="ALWAYS" />
-                <StatisticCard fx:id="visibleStatusesCard" HBox.hgrow="ALWAYS" />
-                <StatisticCard fx:id="largestStatusCard" HBox.hgrow="ALWAYS" />
-            </HBox>
+            <Label fx:id="statusLabel" styleClass="reports-state-message, shale-metadata" wrapText="true" />
+            <FlowPane fx:id="summaryMetricsBox" hgap="10" vgap="10" alignment="CENTER_LEFT"
+                      prefWrapLength="1040" styleClass="reports-summary-cards">
+                <StatisticCard fx:id="totalCasesCard" />
+                <StatisticCard fx:id="visibleStatusesCard" />
+                <StatisticCard fx:id="largestStatusCard" />
+            </FlowPane>
         </VBox>
     </top>
     <center>
-        <SplitPane dividerPositions="0.48">
-            <TableView fx:id="statusReportTable" styleClass="shale-table">
-                <columns>
-                    <TableColumn fx:id="caseStatusColumn" text="Case Status" prefWidth="260" />
-                    <TableColumn fx:id="caseCountColumn" text="Case Count" prefWidth="140" />
-                </columns>
-            </TableView>
-            <PieChart fx:id="statusPieChart" title="Cases by Current Status" />
+        <SplitPane fx:id="reportResultsSplit" dividerPositions="0.48" styleClass="reports-results-split">
+            <VBox spacing="8" styleClass="shale-section-card, reports-result-card">
+                <Label text="Status comparison" styleClass="shale-subsection-title" />
+                <TableView fx:id="statusReportTable" styleClass="shale-table, reports-status-table" VBox.vgrow="ALWAYS">
+                    <placeholder><Label text="No report results to display." styleClass="shale-empty-state" /></placeholder>
+                    <columns>
+                        <TableColumn fx:id="caseStatusColumn" text="Case Status" prefWidth="260" />
+                        <TableColumn fx:id="caseCountColumn" text="Case Count" prefWidth="140" styleClass="reports-numeric-column" />
+                    </columns>
+                </TableView>
+            </VBox>
+            <VBox spacing="8" styleClass="shale-section-card, reports-result-card">
+                <Label text="Status distribution" styleClass="shale-subsection-title" />
+                <PieChart fx:id="statusPieChart" title="Cases by Current Status" VBox.vgrow="ALWAYS" />
+            </VBox>
         </SplitPane>
     </center>
 </BorderPane>
