@@ -32,6 +32,21 @@ final class SettingsDirectoryContractTest {
                 .contains("ControlStyles.Purpose.SECONDARY"));
     }
 
+    @Test void phase5dPresentationIsFeatureOwnedAndDoesNotDuplicateTheShellHeader() throws Exception {
+        String fxml = Files.readString(FXML);
+        String app = Files.readString(Path.of("src/main/resources/css/app.css"));
+        String settings = Files.readString(Path.of("src/main/resources/css/foundation/settings.css"));
+
+        assertTrue(app.contains("@import \"foundation/settings.css\";"));
+        assertTrue(fxml.contains("styleClass=\"settings-workspace\""));
+        assertFalse(fxml.contains("text=\"Settings\""),
+                "The routed Settings view must not duplicate the canonical shell-owned title.");
+        assertTrue(settings.contains("-shale-color-card-surface"));
+        assertTrue(settings.contains("-shale-color-text-primary"));
+        assertFalse(settings.matches("(?s).*(#[0-9a-fA-F]{3,8}|rgba?\\().*"),
+                "Settings paint must resolve from shared theme tokens rather than page-local colors.");
+    }
+
     private static List<String> titles(org.w3c.dom.Document document, String groupId) {
         Element group = byId(document, groupId);
         var nodes = group.getElementsByTagName("SettingsManagementRow");

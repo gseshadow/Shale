@@ -11,9 +11,11 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.css.PseudoClass;
 
 /** Shared presentation primitive for a single Settings directory entry. */
 public final class SettingsManagementRow extends HBox {
+    private static final PseudoClass EXPANDED = PseudoClass.getPseudoClass("expanded");
     private final Label titleLabel = new Label();
     private final Label descriptionLabel = new Label();
     private final Button actionButton = new Button();
@@ -69,6 +71,11 @@ public final class SettingsManagementRow extends HBox {
         actionButton.setOnAction(handler);
     }
     public Button getActionButton() { return actionButton; }
+
+    /** Marks an inline Settings workspace as open without changing its action contract. */
+    public void setExpanded(boolean expanded) {
+        pseudoClassStateChanged(EXPANDED, expanded);
+    }
 
     public void setAvailable(boolean available) {
         setVisible(available);

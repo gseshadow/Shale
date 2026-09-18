@@ -103,7 +103,8 @@ class FunctionalSurfaceContractTest {
             for (Theme theme : Theme.values()) {
                 themes.setActiveTheme(theme);
                 for (String view : new String[] {
-                        "my-shale.fxml", "cases.fxml", "contacts.fxml", "organizations.fxml", "team.fxml"
+                        "my-shale.fxml", "cases.fxml", "contacts.fxml", "organizations.fxml", "team.fxml",
+                        "settings.fxml"
                 }) {
                     Parent destination = FXMLLoader.load(getClass().getResource("/fxml/" + view));
                     outlet.getChildren().setAll(destination, tokenProbe);
@@ -138,7 +139,7 @@ class FunctionalSurfaceContractTest {
 
     @Test
     void directoryRoutesDoNotDuplicateTheShellOwnedTitleAndSubtitle() throws IOException {
-        for (String view : new String[] {"my-shale.fxml", "contacts.fxml", "organizations.fxml"}) {
+        for (String view : new String[] {"my-shale.fxml", "contacts.fxml", "organizations.fxml", "settings.fxml"}) {
             String fxml = read(view);
             assertTrue(!fxml.contains("shale-page-title"), view + " must not duplicate the shell-owned title");
         }

@@ -10,6 +10,7 @@
 @import "foundation/content-components.css";
 @import "foundation/calendar.css";
 @import "foundation/reports.css";
+@import "foundation/settings.css";
 @import "foundation/shell.css";
 
 .root {
@@ -2085,39 +2086,3 @@
 .case-team-search-initials { -fx-min-width: 28px; -fx-pref-width: 28px; -fx-min-height: 28px; -fx-alignment: center; -fx-background-radius: 999px; -fx-text-fill: white; -fx-font-size: 10px; -fx-font-weight: bold; }
 .case-team-search-add { -fx-text-fill: -shale-button-dialog-primary-background; -fx-font-size: 11px; -fx-font-weight: bold; }
 .classification-chip-primary { -fx-font-weight: 700; }
-/* Compact Settings directory entries share one structural and semantic treatment. */
-.settings-directory-group {
-    -fx-spacing: 6;
-}
-
-.settings-group-title {
-    -fx-padding: 10 0 2 2;
-}
-
-.settings-management-row {
-    -fx-min-height: 64;
-    -fx-spacing: 16;
-    -fx-padding: 10 12;
-    -fx-background-color: rgba(255, 255, 255, 0.62);
-    -fx-background-radius: 10;
-    -fx-border-color: rgba(23, 66, 77, 0.14);
-    -fx-border-radius: 10;
-}
-
-.settings-management-copy {
-    -fx-spacing: 3;
-    -fx-min-width: 180;
-}
-
-.settings-management-title {
-    -fx-font-weight: 700;
-    -fx-text-fill: #173f4b;
-}
-
-.settings-management-description {
-    -fx-text-fill: #536b73;
-}
-
-.settings-inline-content {
-    -fx-padding: 8 12 14 12;
-}
