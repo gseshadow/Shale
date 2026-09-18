@@ -230,14 +230,16 @@ final class MyShaleControllerBoardLayoutTest {
     }
 
     @Test
-    void overviewDashboardKeepsCompactTwoColumnBriefingOrderAndStates() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+	void overviewDashboardKeepsResponsiveBriefingOrderAndDistinctStates() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+		String css = Files.readString(Path.of("src/main/resources/css/foundation/cards.css"));
 
-        assertTrue(source.contains("sections.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.68))"),
-                "Overview task column should remain near the requested 65-70% width");
-        assertTrue(source.contains("widgets.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.32))"),
-                "Overview briefing column should remain near the requested 30-35% width");
+		assertTrue(source.contains("FlowPane dashboard = new FlowPane(12, 12)"),
+				"Overview columns should wrap instead of forcing page-level horizontal scrolling");
+		assertTrue(source.contains("sections.setPrefWidth(680)") && source.contains("widgets.setPrefWidth(360)"),
+				"Overview should retain the established primary/briefing emphasis at wide widths");
+		assertTrue(source.contains("dashboard.prefWrapLengthProperty().bind(overviewScroll.viewportBoundsProperty()"),
+				"Overview wrapping should follow the authoritative page-scroll viewport");
         int radarIndex = source.indexOf("buildCaseRadarWidget()");
         int datesIndex = source.indexOf("buildImportantDatesWidget()");
         int notificationsIndex = source.indexOf("buildNotificationsWidget()");
@@ -250,13 +252,11 @@ final class MyShaleControllerBoardLayoutTest {
         assertTrue(source.contains("No upcoming important dates."));
         assertTrue(source.contains("You’re all caught up."));
         assertTrue(source.contains("No recent case activity."));
-        assertTrue(source.contains("No case summary available."));
-        assertTrue(css.contains(".dashboard-widget"));
-        assertTrue(css.contains("-fx-padding: 10 12 12 12"),
-                "Dashboard widget shell should keep compact padding");
-        assertTrue(css.contains("-fx-min-height: 34"),
-                "Dashboard state rows should avoid unnecessary vertical sprawl");
-    }
+		assertTrue(source.contains("No case summary available."));
+		assertTrue(css.contains(".dashboard-widget"));
+		assertTrue(css.contains("-fx-min-height: 34"),
+				"Dashboard state rows should avoid unnecessary vertical sprawl");
+	}
 
     @Test
     void overviewWidgetRefreshHooksAreCoalescedAndActivityRiskIsDocumented() throws Exception {
