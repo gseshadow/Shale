@@ -169,10 +169,6 @@ public final class MyShaleController {
 	@FXML
 	private ScrollPane sectionTabsScroll;
 	@FXML
-	private Label pageTitleLabel;
-	@FXML
-	private Label pageSubtitleLabel;
-	@FXML
 	private VBox overviewSectionPane;
 	@FXML
 	private VBox tasksSectionPane;
@@ -544,8 +540,6 @@ public final class MyShaleController {
 	 */
 	public void configureDedicatedTasksMode() {
 		dedicatedTasksMode = true;
-		if (pageTitleLabel != null) pageTitleLabel.setText("Tasks");
-		if (pageSubtitleLabel != null) pageSubtitleLabel.setText("Review and manage your assigned and created tasks.");
 		setVisibleManaged(sectionTabsScroll, false);
 		unsubscribeLiveCaseUpdates();
 		onSectionSelected(SECTION_TASKS);

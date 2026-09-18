@@ -17,8 +17,8 @@ final class MyShalePhase4BPresentationContractTest {
     void dashboardComposesSharedHeaderTabsToolbarsSectionsAndWrappingControls() throws Exception {
         String fxml = Files.readString(FXML);
 
-        assertTrue(fxml.contains("styleClass=\"shale-page-title\""));
-        assertTrue(fxml.contains("styleClass=\"shale-metadata-muted\""));
+        assertFalse(fxml.contains("my-shale-page-header"),
+                "The shared shell owns the route title and subtitle; the dashboard must not duplicate them.");
         assertTrue(fxml.contains("styleClass=\"app-section-tabs-row\""));
         assertTrue(fxml.contains("styleClass=\"shale-section-card, my-shale-section\""));
         assertTrue(fxml.contains("styleClass=\"shale-toolbar, my-shale-toolbar\""));
