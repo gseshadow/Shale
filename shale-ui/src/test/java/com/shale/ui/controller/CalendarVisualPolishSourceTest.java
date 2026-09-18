@@ -11,7 +11,7 @@ class CalendarVisualPolishSourceTest {
     @Test
     void calendarDayStatesUseScopedPseudoClassesForTodayAndWeekend() throws Exception {
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+        String css = Files.readString(Path.of("src/main/resources/css/foundation/calendar.css"));
 
         assertTrue(controller.contains("PseudoClass.getPseudoClass(\"today\")"));
         assertTrue(controller.contains("PseudoClass.getPseudoClass(\"weekend\")"));
@@ -27,7 +27,7 @@ class CalendarVisualPolishSourceTest {
     @Test
     void timedGridKeepsHourAndHalfHourVisualClassesDistinct() throws Exception {
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+        String css = Files.readString(Path.of("src/main/resources/css/foundation/calendar.css"));
 
         assertTrue(controller.contains("PseudoClass.getPseudoClass(\"hour\")"));
         assertTrue(controller.contains("PseudoClass.getPseudoClass(\"half-hour\")"));
@@ -40,7 +40,7 @@ class CalendarVisualPolishSourceTest {
     @Test
     void allDayCollapseBehaviorRemainsWhileSectionGetsScopedEmptyStyling() throws Exception {
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+        String css = Files.readString(Path.of("src/main/resources/css/foundation/calendar.css"));
 
         assertTrue(controller.contains("allDayCollapsed = !allDayCollapsed"));
         assertTrue(controller.contains("createAllDaySection(grouped.getOrDefault(day, List.of()), allDayCollapsed)"));
@@ -82,5 +82,24 @@ class CalendarVisualPolishSourceTest {
         assertTrue(noCalendars >= 0 && noLayers > noCalendars && switchView > noLayers);
         assertTrue(controller.contains("applyFiltersAndRender()"));
         assertFalse(controller.contains("loadCurrentRange(true); applyCalendarDayState"));
+    }
+
+    @Test
+    void monthAndResultStatesAreExplicitAndThemeOwned() throws Exception {
+        String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
+        String fxml = Files.readString(Path.of("src/main/resources/fxml/calendar.fxml"));
+        String appCss = Files.readString(Path.of("src/main/resources/css/app.css"));
+        String css = Files.readString(Path.of("src/main/resources/css/foundation/calendar.css"));
+
+        assertTrue(appCss.contains("@import \"foundation/calendar.css\";"));
+        assertTrue(controller.contains("PseudoClass.getPseudoClass(\"selected-date\")"));
+        assertTrue(controller.contains("PseudoClass.getPseudoClass(\"focused-date\")"));
+        assertTrue(controller.contains("PseudoClass.getPseudoClass(\"adjacent-month\")"));
+        assertTrue(css.contains(".calendar-month-day-cell:selected-date"));
+        assertTrue(css.contains(".calendar-month-day-cell:focused-date"));
+        assertTrue(css.contains(".calendar-month-day-cell:adjacent-month"));
+        assertTrue(fxml.contains("fx:id=\"calendarStateLabel\""));
+        assertTrue(controller.contains("No events match the current filters."));
+        assertTrue(controller.contains("No events in this period."));
     }
 }

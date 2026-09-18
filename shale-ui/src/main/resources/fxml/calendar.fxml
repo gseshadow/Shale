@@ -84,7 +84,8 @@
                 </FlowPane>
 
                 <Label fx:id="calendarLoadingLabel" text="Loading week..." styleClass="shale-loading-placeholder" visible="false" managed="false" />
-                <Label fx:id="calendarErrorLabel" styleClass="error" visible="false" managed="false" />
+                <Label fx:id="calendarStateLabel" styleClass="shale-empty-state, calendar-state-message" visible="false" managed="false" />
+                <Label fx:id="calendarErrorLabel" styleClass="shale-error-state, calendar-state-message" visible="false" managed="false" />
 
                 <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED" VBox.vgrow="ALWAYS" styleClass="shell-transparent">
                     <content>

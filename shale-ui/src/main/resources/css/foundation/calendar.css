@@ -1,0 +1,132 @@
+/* Dedicated Calendar presentation. Geometry is stable; paint is theme-owned. */
+.calendar-page-root { -fx-alignment: stretch; }
+.calendar-main-content { -fx-min-width: 480px; }
+.calendar-week-board { -fx-alignment: top-left; -fx-fill-height: true; }
+
+.calendar-overlay-sidebar {
+    -fx-min-width: 200px; -fx-pref-width: 220px; -fx-max-width: 240px;
+    -fx-padding: 12px; -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 14px; -fx-border-radius: 14px;
+    -fx-border-color: -shale-color-border-subtle; -fx-border-width: 1px;
+}
+.calendar-overlay-actions { -fx-padding: 0 0 2px 0; }
+.calendar-overlay-list-scroll, .calendar-overlay-list-scroll > .viewport {
+    -fx-background-color: transparent; -fx-background: transparent;
+}
+.calendar-overlay-list-scroll { -fx-border-color: transparent; -fx-padding: 0; -fx-fit-to-width: true; }
+.calendar-overlay-list { -fx-padding: 1px 2px 1px 0; }
+.calendar-sidebar-section-heading {
+    -fx-text-fill: -shale-color-text-muted; -fx-font-size: 11px; -fx-font-weight: 900;
+    -fx-padding: 8px 0 2px 2px;
+}
+.calendar-sidebar-layers-section {
+    -fx-padding: 10px 0 0 0; -fx-border-color: -shale-color-divider transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+}
+.calendar-sidebar-layers-section .check-box { -fx-padding: 3px 4px; }
+.toggle-button.calendar-overlay-row {
+    -fx-background-color: transparent; -fx-background-radius: 9px; -fx-border-radius: 9px;
+    -fx-border-width: 1px; -fx-border-color: transparent; -fx-padding: 6px 8px;
+    -fx-cursor: hand; -fx-alignment: center-left; -fx-content-display: graphic-only;
+}
+.toggle-button.calendar-overlay-row:hover { -fx-background-color: -shale-color-card-hover; -fx-border-color: -shale-color-border-subtle; }
+.toggle-button.calendar-overlay-row:selected { -fx-background-color: -shale-color-selected-control-background; -fx-border-color: -shale-color-border-selected; -fx-font-weight: 900; }
+.toggle-button.calendar-overlay-row:focused { -fx-border-color: -shale-color-border-focus; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.16, 0, 0); }
+.calendar-overlay-row-label { -fx-text-fill: -shale-color-text-primary; -fx-font-size: 12px; -fx-font-weight: 700; }
+.toggle-button.calendar-overlay-row:selected .calendar-overlay-row-label { -fx-font-weight: 900; }
+.calendar-overlay-color-marker, .calendar-overlay-shared-marker { -fx-font-size: 11px; -fx-min-width: 12px; -fx-pref-width: 12px; }
+.calendar-overlay-shared-marker { -fx-text-fill: -shale-color-text-muted; }
+.calendar-overlay-row-check { -fx-text-fill: -shale-color-text-link; -fx-font-size: 13px; -fx-font-weight: 900; -fx-min-width: 14px; -fx-pref-width: 14px; }
+
+.calendar-toolbar {
+    -fx-padding: 9px 10px; -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 12px; -fx-border-radius: 12px;
+    -fx-border-color: -shale-color-border-subtle; -fx-border-width: 1px;
+}
+.calendar-toolbar-group { -fx-alignment: center-left; -fx-padding: 0 2px; }
+.calendar-toolbar-nav, .calendar-toolbar-actions {
+    -fx-border-color: transparent -shale-color-divider transparent transparent;
+    -fx-border-width: 0 1px 0 0; -fx-padding: 0 10px 0 0;
+}
+.calendar-toolbar-range { -fx-padding: 0 2px 0 4px; -fx-min-width: 128px; -fx-font-size: 16px; -fx-font-weight: 900; }
+.button.calendar-toolbar-icon-button { -fx-min-width: 30px; -fx-pref-width: 30px; -fx-padding: 5px 0; }
+.calendar-toolbar-view-selector { -fx-max-width: Infinity; }
+.calendar-toolbar-search { -fx-pref-width: 150px; }
+.calendar-toolbar-filter { -fx-pref-width: 140px; }
+.calendar-state-message { -fx-background-color: -shale-color-section-surface; -fx-background-radius: 9px; -fx-border-radius: 9px; -fx-border-color: -shale-color-border-subtle; -fx-border-width: 1px; }
+.calendar-state-message:filtered-empty { -fx-border-color: -shale-color-info-border; }
+
+.calendar-day-lane {
+    -fx-background-color: -shale-color-card-surface; -fx-background-radius: 9px;
+    -fx-border-radius: 9px; -fx-border-color: -shale-color-border-subtle; -fx-border-width: 1px;
+}
+.calendar-day-header {
+    -fx-padding: 7px 8px; -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 9px; -fx-border-radius: 9px;
+    -fx-border-color: -shale-color-border-subtle; -fx-border-width: 1px;
+}
+.calendar-day-header .label { -fx-text-fill: -shale-color-text-primary; }
+.calendar-day-header .label:first-child { -fx-font-weight: 800; -fx-font-size: 12px; }
+.calendar-day-header .label:last-child { -fx-font-size: 11px; -fx-text-fill: -shale-color-text-muted; }
+.calendar-day-header:weekend, .calendar-month-day-cell:weekend, .calendar-timed-day-cell:weekend { -fx-background-color: -shale-color-surface-muted; }
+.calendar-day-header:today, .calendar-month-day-cell:today {
+    -fx-background-color: -shale-color-info-wash; -fx-border-color: -shale-color-border-selected; -fx-border-width: 2px;
+}
+.calendar-day-header:today .label:first-child, .calendar-day-header:today .label:last-child { -fx-font-weight: 900; -fx-text-fill: -shale-color-info-text; }
+.calendar-month-day-cell { -fx-min-width: 112px; -fx-pref-width: 128px; -fx-min-height: 108px; -fx-pref-height: 118px; }
+.calendar-month-day-cell:adjacent-month { -fx-opacity: 0.58; }
+.calendar-month-day-cell:selected-date { -fx-background-color: -shale-color-selection; -fx-border-color: -shale-color-border-selected; }
+.calendar-month-day-cell:focused-date { -fx-border-color: -shale-color-border-focus; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.16, 0, 0); }
+.calendar-month-day-cell:today .button.calendar-month-day-link { -fx-font-weight: 900; -fx-border-color: -shale-color-border-selected; }
+.calendar-timed-day-cell:today { -fx-background-color: -shale-color-info-wash; }
+
+.button.calendar-month-day-link, .button.calendar-month-more-link {
+    -fx-background-color: transparent; -fx-background-insets: 0; -fx-background-radius: 8px;
+    -fx-border-color: transparent; -fx-border-width: 1px; -fx-border-radius: 8px;
+    -fx-padding: 1px 5px; -fx-cursor: hand; -fx-alignment: center-left;
+}
+.button.calendar-month-day-link { -fx-min-height: 20px; -fx-pref-height: 20px; -fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; }
+.button.calendar-month-more-link { -fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-link; -fx-padding: 1px 4px; }
+.button.calendar-month-day-link:hover, .button.calendar-month-more-link:hover { -fx-background-color: -shale-color-card-hover; -fx-border-color: -shale-color-border-subtle; }
+.button.calendar-month-day-link:focused, .button.calendar-month-more-link:focused { -fx-border-color: -shale-color-border-focus; }
+.button.calendar-month-more-link:hover > .text { -fx-underline: true; }
+
+.calendar-all-day-section {
+    -fx-background-color: -shale-color-section-surface; -fx-background-radius: 10px;
+    -fx-border-radius: 10px; -fx-border-color: -shale-color-divider; -fx-padding: 6px 7px;
+}
+.calendar-all-day-label, .calendar-all-day-summary { -fx-text-fill: -shale-color-text-secondary; -fx-font-size: 11px; -fx-font-weight: 700; }
+.calendar-all-day-empty { -fx-text-fill: -shale-color-text-muted; -fx-font-size: 11px; -fx-font-weight: 700; -fx-padding: 2px 0; }
+.button.calendar-disclosure-toggle { -fx-min-width: 20px; -fx-pref-width: 20px; -fx-min-height: 20px; -fx-pref-height: 20px; -fx-padding: 0 4px; }
+.calendar-timed-grid .calendar-timed-day-cell { -fx-padding: 2px 4px; }
+.calendar-timed-grid .calendar-timed-day-cell:hour { -fx-border-color: -shale-color-divider transparent transparent -shale-color-border-subtle; -fx-border-width: 1px 0 0 1px; }
+.calendar-timed-grid .calendar-timed-day-cell:half-hour { -fx-border-color: transparent transparent transparent -shale-color-border-subtle; -fx-border-width: 1px 0 0 1px; }
+.calendar-timed-grid .calendar-time-gutter-label { -fx-padding: 0 8px 0 0; -fx-text-fill: -shale-color-text-muted; -fx-font-size: 11px; }
+.calendar-now-line { -fx-stroke: -shale-color-text-danger; -fx-stroke-width: 2px; }
+.calendar-now-dot { -fx-fill: -shale-color-text-danger; }
+
+.calendar-event-card {
+    -fx-background-color: -shale-color-card-surface; -fx-background-radius: 8px;
+    -fx-border-radius: 8px; -fx-border-color: -shale-color-card-border; -fx-border-width: 1px;
+    -fx-padding: 4px 6px; -fx-min-width: 0;
+}
+.calendar-event-card .label { -fx-text-fill: -shale-color-text-primary; }
+.calendar-event-card:hover { -fx-background-color: -shale-color-card-hover; -fx-border-color: -shale-color-border-strong; }
+.calendar-event-card:focused { -fx-border-color: -shale-color-border-focus; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.14, 0, 0); }
+.calendar-event-card-past { -fx-opacity: 0.72; }
+.calendar-event-card-today { -fx-border-color: -shale-color-border-selected; }
+.calendar-event-card-badges { -fx-alignment: center-left; }
+.calendar-event-badge { -fx-background-color: -shale-color-chip-neutral-background; -fx-background-radius: 8px; -fx-padding: 1px 6px; -fx-font-size: 10px; -fx-font-weight: 700; }
+.calendar-event-type-badge { -fx-background-color: -shale-color-info-wash; -fx-text-fill: -shale-color-info-text; }
+.calendar-event-category-badge { -fx-background-color: -shale-color-chip-neutral-background; -fx-text-fill: -shale-color-chip-neutral-text; }
+.calendar-event-overdue { -fx-border-color: -shale-color-danger-border; }
+.calendar-event-overdue-badge { -fx-background-color: -shale-color-danger-wash; -fx-text-fill: -shale-color-danger-text; }
+.label.calendar-event-time { -fx-font-weight: 800; -fx-font-size: 11px; }
+.label.calendar-event-title { -fx-font-size: 12px; -fx-font-weight: 700; -fx-text-overrun: ellipsis; -fx-wrap-text: false; }
+.label.calendar-event-related { -fx-font-size: 10px; -fx-text-fill: -shale-color-text-muted; }
+.calendar-all-day-bubble { -fx-padding: 4px 6px 4px 0; -fx-min-height: 24px; -fx-pref-height: 24px; -fx-max-height: 24px; -fx-alignment: center-left; -fx-spacing: 4px; }
+.label.calendar-all-day-title { -fx-font-size: 11px; -fx-font-weight: 700; -fx-text-overrun: ellipsis; -fx-wrap-text: false; }
+.label.calendar-all-day-meta { -fx-font-size: 10px; -fx-text-fill: -shale-color-text-muted; -fx-text-overrun: ellipsis; -fx-wrap-text: false; }
+.calendar-event-owner-marker, .calendar-event-shared-marker { -fx-font-size: 9px; -fx-font-weight: 900; -fx-padding: 0 2px; -fx-alignment: top-center; }
+.calendar-event-shared-marker { -fx-text-fill: -shale-color-text-muted; }
+.calendar-event-card-user-owned { -fx-border-color: -shale-color-border-strong; }

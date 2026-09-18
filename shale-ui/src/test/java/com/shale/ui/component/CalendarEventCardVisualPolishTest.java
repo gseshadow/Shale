@@ -11,7 +11,7 @@ class CalendarEventCardVisualPolishTest {
     @Test
     void sharedAndUserOwnedCalendarEventsUseDistinctScopedCues() throws Exception {
         String factory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/CalendarEventCardFactory.java"));
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+        String css = Files.readString(Path.of("src/main/resources/css/foundation/calendar.css"));
 
         assertTrue(factory.contains("calendar-event-card-shared"));
         assertTrue(factory.contains("calendar-event-card-user-owned"));
@@ -34,5 +34,19 @@ class CalendarEventCardVisualPolishTest {
         assertTrue(factory.contains("buildOwnershipMarker(item)"));
         assertTrue(factory.contains("normalizeStoredColor(item.assignedUserColor())"));
         assertFalse(factory.contains("buildAccentBar(item.assignedUserColor())"));
+    }
+
+    @Test
+    void temporalAndAccessibilityCuesDoNotReplaceAuthoritativeColors() throws Exception {
+        String factory = Files.readString(Path.of("src/main/java/com/shale/ui/component/factory/CalendarEventCardFactory.java"));
+        String css = Files.readString(Path.of("src/main/resources/css/foundation/calendar.css"));
+
+        assertTrue(factory.contains("calendar-event-timed"));
+        assertTrue(factory.contains("calendar-event-all-day"));
+        assertTrue(factory.contains("calendar-event-overdue"));
+        assertTrue(factory.contains("! Overdue"));
+        assertTrue(factory.contains("card.setAccessibleText(buildAccessibleDescription(item))"));
+        assertTrue(factory.contains("buildAccentBar(item.colorHex())"));
+        assertTrue(css.contains(".calendar-event-overdue-badge"));
     }
 }

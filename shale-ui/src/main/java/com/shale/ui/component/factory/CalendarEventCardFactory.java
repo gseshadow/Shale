@@ -1,6 +1,7 @@
 package com.shale.ui.component.factory;
 
 import com.shale.core.model.CalendarFeedItem;
+import com.shale.core.model.CalendarFeedCategory;
 import com.shale.ui.util.ColorUtil;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -25,7 +26,7 @@ public final class CalendarEventCardFactory {
         Objects.requireNonNull(item, "item");
 
         HBox card = new HBox(0);
-        card.getStyleClass().add("calendar-event-card");
+        card.getStyleClass().addAll("calendar-event-card", "calendar-event-timed");
         card.setFillHeight(true);
         applyOwnershipStyle(card, item);
         applyCalendarItemTooltip(card, item);
@@ -60,6 +61,12 @@ public final class CalendarEventCardFactory {
         categoryBadge.getStyleClass().addAll("calendar-event-badge", "calendar-event-category-badge");
 
         badges.getChildren().addAll(typeBadge, categoryBadge);
+        if (isOverdue(item, now)) {
+            card.getStyleClass().add("calendar-event-overdue");
+            Label overdueBadge = new Label("! Overdue");
+            overdueBadge.getStyleClass().addAll("calendar-event-badge", "calendar-event-overdue-badge");
+            badges.getChildren().add(overdueBadge);
+        }
 
         Label time = new Label(resolveTime(item));
         time.getStyleClass().add("calendar-event-time");
@@ -87,13 +94,14 @@ public final class CalendarEventCardFactory {
         applyTimedContentDensity(card.getHeight(), relatedSummary, badges);
         HBox.setHgrow(content, Priority.ALWAYS);
         card.getChildren().add(content);
+        card.setAccessibleText(buildAccessibleDescription(item));
 
         return card;
     }
 
     public Node createAllDayBubble(CalendarFeedItem item) {
         HBox card = new HBox(6);
-        card.getStyleClass().addAll("calendar-event-card", "calendar-all-day-bubble");
+        card.getStyleClass().addAll("calendar-event-card", "calendar-all-day-bubble", "calendar-event-all-day");
         applyOwnershipStyle(card, item);
         applyCalendarItemTooltip(card, item);
         Region accentBar = buildAccentBar(item.colorHex());
@@ -113,12 +121,19 @@ public final class CalendarEventCardFactory {
         subtitle.setMaxWidth(120);
 
         card.getChildren().add(title);
+        if (isOverdue(item, LocalDateTime.now())) {
+            card.getStyleClass().add("calendar-event-overdue");
+            Label overdue = new Label("! Overdue");
+            overdue.getStyleClass().addAll("calendar-event-badge", "calendar-event-overdue-badge");
+            card.getChildren().add(overdue);
+        }
         if (!subtitle.getText().isBlank()) {
             Label separator = new Label("·");
             separator.getStyleClass().add("calendar-all-day-meta");
             card.getChildren().addAll(separator, subtitle);
         }
         HBox.setHgrow(title, Priority.ALWAYS);
+        card.setAccessibleText(buildAccessibleDescription(item));
         return card;
     }
 
@@ -157,12 +172,11 @@ public final class CalendarEventCardFactory {
         String normalized = ColorUtil.normalizeStoredColor(item.assignedUserColor());
         if (normalized == null) return;
         String rgb = normalized.substring(0, 6);
-        card.setStyle("-fx-background-color: #ffffff, rgba(" +
+        card.setStyle("-fx-background-color: rgba(" +
                 Integer.parseInt(rgb.substring(0, 2), 16) + "," +
                 Integer.parseInt(rgb.substring(2, 4), 16) + "," +
                 Integer.parseInt(rgb.substring(4, 6), 16) + ",0.10);" +
-                " -fx-background-insets: 0, 0;" +
-                " -fx-background-radius: 8, 8;");
+                " -fx-background-radius: 8;");
     }
 
     public static void applyCalendarItemTooltip(Node card, CalendarFeedItem item) {
@@ -194,6 +208,27 @@ public final class CalendarEventCardFactory {
         String details = normalizeTooltipValue(item == null ? null : item.details());
         if (details.isBlank()) return title;
         return title + "\n" + details;
+    }
+
+    static String buildAccessibleDescription(CalendarFeedItem item) {
+        if (item == null) return "Calendar event";
+        StringBuilder text = new StringBuilder(resolveType(item)).append(": ").append(safe(item.title()));
+        text.append(". ").append(resolveTime(item));
+        String category = resolveCategory(item);
+        if (!category.isBlank()) text.append(". Category: ").append(category);
+        String related = resolveRelatedSummary(item);
+        if (!related.isBlank()) text.append(". ").append(related);
+        return text.toString();
+    }
+
+    private static boolean isOverdue(CalendarFeedItem item, LocalDateTime now) {
+        if (item == null || item.startsAt() == null || now == null) return false;
+        boolean pastDue = item.allDay()
+                ? item.startsAt().toLocalDate().isBefore(now.toLocalDate())
+                : item.startsAt().isBefore(now);
+        if (!pastDue) return false;
+        CalendarFeedCategory category = CalendarFeedCategory.classify(item);
+        return category == CalendarFeedCategory.TASKS || category == CalendarFeedCategory.CASE_DEADLINES;
     }
 
     private static boolean isPersistedCalendarEvent(CalendarFeedItem item) {
