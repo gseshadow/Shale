@@ -16,11 +16,6 @@
     styleClass="app-shell, shell-route-page, contacts-page">
     <top>
         <VBox spacing="12" styleClass="contacts-page-header">
-            <VBox spacing="4">
-                <Label text="Contacts" styleClass="shale-page-title" />
-                <Label text="Search and browse the people connected to your work."
-                    wrapText="true" styleClass="shale-metadata-muted" />
-            </VBox>
             <FilterPanel styleClass="shale-filter-panel, shale-toolbar, contacts-toolbar">
                 <left>
                     <FlowPane hgap="8" vgap="8" alignment="CENTER_LEFT" styleClass="contacts-toolbar-controls">

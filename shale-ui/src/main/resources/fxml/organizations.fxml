@@ -15,11 +15,6 @@
 
 	<top>
 		<VBox spacing="12" styleClass="organizations-page-header">
-			<VBox spacing="4">
-				<Label text="Organizations" styleClass="shale-page-title" />
-				<Label text="Search and browse the organizations connected to your work."
-					wrapText="true" styleClass="shale-metadata-muted" />
-			</VBox>
 			<FilterPanel styleClass="shale-filter-panel, shale-toolbar, organizations-toolbar">
 				<left><FlowPane hgap="8" vgap="8" alignment="CENTER_LEFT" styleClass="organizations-toolbar-controls">
 					<TextField fx:id="organizationsSearchField" promptText="Search organizations…" prefWidth="280" />

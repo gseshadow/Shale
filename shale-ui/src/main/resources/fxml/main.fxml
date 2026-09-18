@@ -93,7 +93,7 @@
 				<VBox spacing="6" styleClass="primary-content-surface" VBox.vgrow="ALWAYS"
 					maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 					<children>
-						<VBox fx:id="sectionHeaderBox" spacing="2" styleClass="shell-section-header">
+						<VBox fx:id="sectionHeaderBox" spacing="2" styleClass="shell-page-header, shell-section-header">
 							<children>
 								<Label fx:id="sectionTitleLabel" text="My Shale"
 									styleClass="section-title" />

@@ -77,7 +77,15 @@
     -fx-border-color: -shale-color-border-subtle; -fx-border-radius: 14px; -fx-border-width: 1px;
     -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 10, 0.10, 0, 2);
 }
-.shell-section-header { -fx-padding: 2px 4px 8px 4px; }
+.shell-page-header {
+    -fx-padding: 12px 14px;
+    -fx-background-color: -shale-color-page-header-surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 12px;
+    -fx-border-width: 1px;
+}
+.shell-section-header { -fx-padding: 12px 14px; }
 .shell-section-header .section-title { -fx-font-size: 24px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
 .shell-route-outlet { -fx-background-color: transparent; }
 /* Routed page roots fill the plane but must not repaint its rounded corners. */
