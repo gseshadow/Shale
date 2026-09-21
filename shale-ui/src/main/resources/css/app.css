@@ -12,6 +12,7 @@
 @import "foundation/reports.css";
 @import "foundation/settings.css";
 @import "foundation/management.css";
+@import "foundation/task-windows.css";
 @import "foundation/shell.css";
 
 .root {

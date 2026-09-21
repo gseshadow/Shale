@@ -45,6 +45,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
@@ -98,25 +99,31 @@ public final class TaskDetailDialog {
         Label message = new Label("Update task fields, assigned users, completion, or delete the task.");
         message.getStyleClass().add("app-dialog-message");
         Label createdByLabel = new Label("Created by: " + displayCreatedBy(model.createdByDisplayName()));
-        createdByLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.75);");
+        createdByLabel.getStyleClass().add("task-window-metadata");
+        createdByLabel.setAccessibleText(createdByLabel.getText());
 
         TextField titleField = new TextField(safe(model.title()));
         ControlStyles.formControl(titleField);
+        titleField.setAccessibleText("Task title, required");
         EnhancedTextArea descriptionArea = new EnhancedTextArea();
         descriptionArea.setText(safe(model.description()));
         descriptionArea.setPrefRowCount(4);
         descriptionArea.setEditorTitle("Task Description");
+        descriptionArea.setAccessibleText("Task description");
 
         DatePicker dueDatePicker = new DatePicker(model.dueAt() == null ? null : model.dueAt().toLocalDate());
         ControlStyles.formControl(dueDatePicker);
+        dueDatePicker.setAccessibleText("Task due date");
         TextField dueTimeField = new TextField(displayDueTime(model.dueAt()));
         ControlStyles.formControl(dueTimeField);
+        dueTimeField.setAccessibleText("Task due time");
         dueTimeField.setPromptText("HH:mm (optional)");
         dueTimeField.setPrefColumnCount(8);
         HBox dueRow = new HBox(8, dueDatePicker, dueTimeField);
 
         ComboBox<TaskStatusOptionDto> statusCombo = new ComboBox<>();
         ControlStyles.formControl(statusCombo);
+        statusCombo.setAccessibleText("Task status, required");
         statusCombo.setMaxWidth(Double.MAX_VALUE);
         statusCombo.getStyleClass().add("app-toolbar-select");
         List<TaskStatusOptionDto> safeStatuses = statuses == null ? List.of() : statuses;
@@ -142,6 +149,7 @@ public final class TaskDetailDialog {
 
         ComboBox<TaskPriorityOptionDto> priorityCombo = new ComboBox<>();
         ControlStyles.formControl(priorityCombo);
+        priorityCombo.setAccessibleText("Task priority, required");
         priorityCombo.setMaxWidth(Double.MAX_VALUE);
         priorityCombo.getStyleClass().add("app-toolbar-select");
         List<TaskPriorityOptionDto> safePriorities = priorities == null ? List.of() : priorities;
@@ -157,15 +165,19 @@ public final class TaskDetailDialog {
         setVisibleManaged(coreLoadingLabel, needsCoreHydration);
 
         Label errorLabel = new Label();
-        errorLabel.setStyle("-fx-text-fill: #b42318;");
+        errorLabel.getStyleClass().add("task-window-error");
+        errorLabel.setWrapText(true);
+        errorLabel.setAccessibleRole(javafx.scene.AccessibleRole.TEXT);
         errorLabel.setVisible(false);
         errorLabel.setManaged(false);
 
-        VBox relatedCaseSection = new VBox(4);
+        VBox relatedCaseSection = new VBox(6);
+        relatedCaseSection.getStyleClass().addAll("task-window-section", "task-window-case-section");
+        relatedCaseSection.setAccessibleText("Related case");
         String relatedCaseName = safe(model.caseName()).trim();
         if (model.caseId() > 0 && !relatedCaseName.isBlank()) {
-            Label relatedCaseLabel = new Label("Case:");
-            relatedCaseLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+            Label relatedCaseLabel = new Label("Case");
+            relatedCaseLabel.getStyleClass().add("task-window-section-title");
             CaseCardFactory caseCardFactory = new CaseCardFactory(closeAndOpenCase);
             var caseCard = caseCardFactory.create(
                     new CaseCardModel(
@@ -188,10 +200,10 @@ public final class TaskDetailDialog {
 
         VBox assignedTeamSection = new VBox(6);
         Label assignedTeamLabel = new Label("Assigned");
-        assignedTeamLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        assignedTeamLabel.getStyleClass().add("task-window-section-title");
         Button addAssignedUserButton = new Button("Add Assignee");
         ControlStyles.apply(addAssignedUserButton, ControlStyles.Purpose.SECONDARY);
-        addAssignedUserButton.setFocusTraversable(false);
+        addAssignedUserButton.setAccessibleText("Add assigned user");
         Region assignedHeaderSpacer = new Region();
         HBox.setHgrow(assignedHeaderSpacer, Priority.ALWAYS);
         HBox assignedTeamHeader = new HBox(8, assignedTeamLabel, assignedHeaderSpacer, addAssignedUserButton);
@@ -227,7 +239,7 @@ public final class TaskDetailDialog {
                     busyMutationUi::refresh,
                     () -> assignmentEditor == null ? List.<AssignedTeamMember>of() : assignmentEditor.removeAndReload(userId),
                     refreshed -> renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, refreshed, removeAssignedUserRef[0]),
-                    ex -> showError(errorLabel, "Failed to remove assigned user. " + rootCauseMessage(ex)));
+                    ex -> showError(errorLabel, "Assigned user could not be removed. Please try again."));
         };
         renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, initialAssignedTeamMembers, removeAssignedUserRef[0]);
         addAssignedUserButton.setOnAction(e -> {
@@ -247,8 +259,9 @@ public final class TaskDetailDialog {
                     busyMutationUi::refresh,
                     () -> assignmentEditor == null ? List.<AssignedTeamMember>of() : assignmentEditor.addAndReload(user.id()),
                     refreshed -> renderAssignedTeam(assignedTeamList, assignedTeamCardFactory, refreshed, removeAssignedUserRef[0]),
-                    ex -> showError(errorLabel, "Failed to add assigned user. " + rootCauseMessage(ex)));
+                    ex -> showError(errorLabel, "Assigned user could not be added. Please try again."));
         });
+        assignedTeamSection.getStyleClass().addAll("task-window-section", "task-window-assignees-section");
         assignedTeamSection.getChildren().setAll(assignedTeamHeader, assignedLoadingLabel, assignedTeamScrollPane);
 
         VBox formContent = new VBox(8,
@@ -262,26 +275,30 @@ public final class TaskDetailDialog {
                 new Label("Due date/time"), dueRow,
                 assignedTeamSection,
                 errorLabel);
-        formContent.setPadding(new Insets(8, 2, 4, 2));
+        formContent.getStyleClass().addAll("task-window-panel", "task-window-details-panel");
+        formContent.setPadding(new Insets(18));
         HBox.setHgrow(formContent, Priority.ALWAYS);
 
         VBox historyPanel = new VBox(8);
         Label historyLabel = new Label("History");
-        historyLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        historyLabel.setText("Task Activity");
+        historyLabel.getStyleClass().add("task-window-section-title");
         TextArea noteComposer = new TextArea();
         ControlStyles.formControl(noteComposer);
+        noteComposer.setAccessibleText("New task note");
         noteComposer.setPromptText("Add note...");
         noteComposer.setPrefRowCount(3);
         noteComposer.setWrapText(true);
         Button addNoteButton = new Button("Add Note");
         ControlStyles.apply(addNoteButton, ControlStyles.Purpose.PRIMARY);
+        addNoteButton.setAccessibleText("Add task note");
         Label uncommittedNoteWarningLabel = new Label("You have an unadded note. Click Add Note or clear the text to continue.");
-        uncommittedNoteWarningLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #b42318;");
+        uncommittedNoteWarningLabel.getStyleClass().add("task-window-error");
         uncommittedNoteWarningLabel.setWrapText(true);
         uncommittedNoteWarningLabel.setVisible(false);
         uncommittedNoteWarningLabel.setManaged(false);
         Label notesErrorLabel = new Label();
-        notesErrorLabel.setStyle("-fx-text-fill: #b42318;");
+        notesErrorLabel.getStyleClass().add("task-window-error");
         notesErrorLabel.setVisible(false);
         notesErrorLabel.setManaged(false);
         VBox historyList = new VBox(8);
@@ -340,7 +357,7 @@ public final class TaskDetailDialog {
                         notesErrorLabel.setManaged(false);
                         notesErrorLabel.setVisible(false);
                     },
-                    ex -> showError(notesErrorLabel, "Failed to add note. " + rootCauseMessage(ex)));
+                    ex -> showError(notesErrorLabel, "The note could not be added. Please try again."));
         });
         noteComposer.textProperty().addListener((obs, oldText, newText) -> {
             if (!noteComposer.getPseudoClassStates().contains(javafx.css.PseudoClass.getPseudoClass("invalid"))) return;
@@ -357,7 +374,8 @@ public final class TaskDetailDialog {
         historyPanel.setPrefWidth(320);
         historyPanel.setMinWidth(280);
         historyPanel.setMaxWidth(360);
-        historyPanel.setPadding(new Insets(8, 2, 4, 8));
+        historyPanel.getStyleClass().addAll("task-window-panel", "task-window-activity-panel");
+        historyPanel.setPadding(new Insets(18));
         VBox.setVgrow(historyPanel, Priority.ALWAYS);
 
         VBox rightRail = new VBox(8, historyPanel);
@@ -366,21 +384,49 @@ public final class TaskDetailDialog {
         rightRail.setMaxWidth(380);
         VBox.setVgrow(historyPanel, Priority.ALWAYS);
 
-        HBox contentColumns = new HBox(12, formContent, rightRail);
-        HBox.setHgrow(formContent, Priority.ALWAYS);
-        contentColumns.setAlignment(Pos.TOP_LEFT);
-        contentColumns.setPadding(new Insets(0, 24, 0, 24));
-        contentColumns.setMinHeight(Region.USE_PREF_SIZE);
+        ScrollPane taskContentScrollPane = new ScrollPane(formContent);
+        taskContentScrollPane.setFitToWidth(true);
+        taskContentScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        taskContentScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        taskContentScrollPane.getStyleClass().addAll("transparent-scroll", "task-window-details-scroll");
+        HBox.setHgrow(taskContentScrollPane, Priority.ALWAYS);
 
-        ScrollPane contentScrollPane = new ScrollPane(contentColumns);
-        contentScrollPane.setFitToWidth(true);
-        contentScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        contentScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        contentScrollPane.getStyleClass().add("transparent-scroll");
-        VBox.setVgrow(contentScrollPane, Priority.ALWAYS);
+        HBox contentColumns = new HBox(16, taskContentScrollPane, rightRail);
+        contentColumns.getStyleClass().add("task-window-workspace");
+        contentColumns.setAlignment(Pos.TOP_LEFT);
+        StackPane workspace = new StackPane(contentColumns);
+        workspace.setPadding(new Insets(0, 24, 0, 24));
+        VBox stackedColumns = new VBox(16);
+        stackedColumns.getStyleClass().add("task-window-workspace-narrow");
+        final boolean[] narrowWorkspace = { false };
+        workspace.widthProperty().addListener((observable, oldWidth, newWidth) -> {
+            boolean narrow = newWidth.doubleValue() < 760;
+            if (narrow == narrowWorkspace[0]) {
+                return;
+            }
+            narrowWorkspace[0] = narrow;
+            if (narrow) {
+                contentColumns.getChildren().clear();
+                rightRail.setMinWidth(0);
+                rightRail.setPrefWidth(Region.USE_COMPUTED_SIZE);
+                rightRail.setMaxWidth(Double.MAX_VALUE);
+                stackedColumns.getChildren().setAll(taskContentScrollPane, rightRail);
+                workspace.getChildren().setAll(stackedColumns);
+            } else {
+                stackedColumns.getChildren().clear();
+                rightRail.setMinWidth(300);
+                rightRail.setPrefWidth(340);
+                rightRail.setMaxWidth(380);
+                contentColumns.getChildren().setAll(taskContentScrollPane, rightRail);
+                HBox.setHgrow(taskContentScrollPane, Priority.ALWAYS);
+                workspace.getChildren().setAll(contentColumns);
+            }
+        });
+        VBox.setVgrow(workspace, Priority.ALWAYS);
 
         Button deleteButton = new Button("Delete");
         ControlStyles.apply(deleteButton, ControlStyles.Purpose.DANGER);
+        deleteButton.setAccessibleText("Delete task");
         deleteButton.setOnAction(e -> {
             boolean confirmed = AppDialogs.showConfirmation(
                     stage,
@@ -398,6 +444,7 @@ public final class TaskDetailDialog {
 
         Button cancelButton = new Button("Cancel");
         ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
+        cancelButton.setAccessibleText("Cancel and close task details");
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> {
             if (hasUncommittedNoteText(noteComposer)) {
@@ -417,6 +464,8 @@ public final class TaskDetailDialog {
 
         Button completionToggleButton = new Button(completionToggleLabel(completedState[0]));
         ControlStyles.apply(completionToggleButton, ControlStyles.Purpose.SECONDARY);
+        completionToggleButton.getStyleClass().add("task-window-completion-action");
+        completionToggleButton.setAccessibleText("Change task completion state");
         completionToggleButton.setMinWidth(132);
         completionToggleButton.setOnAction(e -> {
             if (!completedState[0]) {
@@ -439,6 +488,7 @@ public final class TaskDetailDialog {
 
         Button saveButton = new Button("Save");
         ControlStyles.apply(saveButton, ControlStyles.Purpose.PRIMARY);
+        saveButton.setAccessibleText("Save task changes");
         saveButton.setDefaultButton(true);
         final boolean[] validationVisible = new boolean[] { false };
         Runnable updateInvalid = () -> {
@@ -522,14 +572,16 @@ public final class TaskDetailDialog {
 
         VBox headerContent = new VBox(8, heading, message);
         headerContent.setPadding(new Insets(22, 24, 0, 24));
-        VBox body = new VBox(14, headerContent, contentScrollPane, actions);
+        headerContent.getStyleClass().add("task-window-header");
+        VBox body = new VBox(14, headerContent, workspace, actions);
+        body.getStyleClass().addAll("task-window-root", "task-detail-window");
         body.setPadding(Insets.EMPTY);
-        VBox.setVgrow(contentScrollPane, Priority.ALWAYS);
+        VBox.setVgrow(workspace, Priority.ALWAYS);
         VBox root = AppDialogs.createSecondaryWindowShell(stage, "Task Details", stage::close, body);
         VBox.setVgrow(body, Priority.ALWAYS);
         double dialogWidth = WindowSizingUtil.cappedModalWidth(owner, 980);
         double dialogHeight = WindowSizingUtil.cappedModalHeight(owner, 720);
-        double minWidth = Math.min(760, dialogWidth);
+        double minWidth = Math.min(620, dialogWidth);
         double minHeight = Math.min(480, dialogHeight);
         root.setMinWidth(minWidth);
         root.setPrefWidth(dialogWidth);
@@ -600,7 +652,7 @@ public final class TaskDetailDialog {
                             setVisibleManaged(coreLoadingLabel, false);
                         },
                         ex -> {
-                            showError(errorLabel, "Failed to load task details. " + rootCauseMessage(ex));
+                            showError(errorLabel, "Task details could not be loaded. Close this window and try again.");
                             setVisibleManaged(coreLoadingLabel, false);
                         });
             } else {
@@ -621,7 +673,7 @@ public final class TaskDetailDialog {
                     ex -> {
                         setVisibleManaged(assignedLoadingLabel, false);
                         addAssignedUserButton.setDisable(false);
-                        showError(errorLabel, "Failed to load assigned users. " + rootCauseMessage(ex));
+                        showError(errorLabel, "Assigned users could not be loaded. Please try again later.");
                     });
             loadSectionAsync(
                     context,
@@ -646,7 +698,7 @@ public final class TaskDetailDialog {
                     ex -> {
                         loadingActivityState[0] = false;
                         setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
-                        showError(errorLabel, "Failed to load activity. " + rootCauseMessage(ex));
+                        showError(errorLabel, "Task activity could not be loaded. Please try again later.");
                     });
             loadSectionAsync(
                     context,
@@ -675,7 +727,7 @@ public final class TaskDetailDialog {
                         setVisibleManaged(historyLoadingLabel, loadingActivityState[0] || loadingNotesState[0]);
                         noteComposer.setDisable(false);
                         addNoteButton.setDisable(false);
-                        showError(notesErrorLabel, "Failed to load notes. " + rootCauseMessage(ex));
+                        showError(notesErrorLabel, "Task notes could not be loaded. Please try again later.");
                     });
         });
         if (initialAssignedTeamMembers.isEmpty()) {
@@ -751,7 +803,8 @@ public final class TaskDetailDialog {
         spinner.setPrefSize(16, 16);
         Label label = new Label(text, spinner);
         label.setGraphicTextGap(8);
-        label.setStyle("-fx-text-fill: rgba(17,37,66,0.72); -fx-font-size: 12px;");
+        label.getStyleClass().add("task-window-loading");
+        label.setAccessibleText(text);
         return label;
     }
 
@@ -921,9 +974,15 @@ public final class TaskDetailDialog {
     }
 
     private static void showError(Label errorLabel, String message) {
-        errorLabel.setText(message);
+        errorLabel.setText(sanitizeFeedback(message));
+        errorLabel.setAccessibleText(sanitizeFeedback(message));
         errorLabel.setManaged(true);
         errorLabel.setVisible(true);
+    }
+
+    static String sanitizeFeedback(String message) {
+        String safeMessage = safe(message).replaceAll("(?is)(select|insert|update|delete)\\s+.+", "").trim();
+        return safeMessage.isBlank() ? "The task could not be updated. Please try again." : safeMessage;
     }
 
     private static String completionToggleLabel(boolean completed) {
@@ -1024,7 +1083,7 @@ public final class TaskDetailDialog {
         List<AssignedTeamMember> safeMembers = members == null ? List.of() : members;
         if (safeMembers.isEmpty()) {
             Label emptyLabel = new Label("No users assigned");
-            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            emptyLabel.getStyleClass().add("task-window-empty");
             assignedTeamList.getChildren().add(emptyLabel);
             return;
         }
@@ -1059,7 +1118,7 @@ public final class TaskDetailDialog {
         List<HistoryFeedItem> items = mergeHistoryItems(safeActivities, safeNotes);
         if (items.isEmpty()) {
             Label empty = new Label("No history yet.");
-            empty.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            empty.getStyleClass().add("task-window-empty");
             historyList.getChildren().add(empty);
             return;
         }
@@ -1101,7 +1160,7 @@ public final class TaskDetailDialog {
         }
         Label messageLabel = new Label(message);
         messageLabel.setWrapText(true);
-        messageLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.72);");
+        messageLabel.getStyleClass().add("task-window-activity-message");
         VBox content = new VBox(1, messageLabel);
 
         String actor = safe(entry.actorDisplayName()).trim();
@@ -1109,7 +1168,7 @@ public final class TaskDetailDialog {
             actor = "System";
         }
         Label metaLabel = new Label(actor + " · " + formatDateTime(entry.occurredAt()));
-        metaLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(17,37,66,0.56);");
+        metaLabel.getStyleClass().add("task-window-activity-meta");
         content.getChildren().add(metaLabel);
 
         VBox row = new VBox(content);
@@ -1129,7 +1188,7 @@ public final class TaskDetailDialog {
             Runnable rerender) {
         Label authorLabel = new Label((safe(entry.userDisplayName()).trim().isBlank() ? "Unknown user" : entry.userDisplayName())
                 + " · " + formatDateTime(entry.createdAt()));
-        authorLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: rgba(17,37,66,0.70);");
+        authorLabel.getStyleClass().add("task-window-activity-meta");
 
         String updated = "";
         if (entry.updatedAt() != null && !entry.updatedAt().equals(entry.createdAt())) {
@@ -1185,7 +1244,7 @@ public final class TaskDetailDialog {
                                 notesErrorLabel.setManaged(false);
                                 notesErrorLabel.setVisible(false);
                             },
-                            ex -> showError(notesErrorLabel, "Failed to update note. " + rootCauseMessage(ex)));
+                            ex -> showError(notesErrorLabel, "The note could not be updated. Please try again."));
                 });
                 editArea.textProperty().addListener((obs, oldText, newText) ->
                         ControlStyles.setInvalid(editArea, safe(newText).trim().isBlank()));
@@ -1200,7 +1259,7 @@ public final class TaskDetailDialog {
         VBox card = new VBox(cardContent);
         card.setPadding(new Insets(10, 12, 10, 12));
         card.getStyleClass().add("secondary-panel");
-        card.setStyle("-fx-background-color: rgba(52, 110, 201, 0.22);");
+        card.getStyleClass().add("task-window-note-card");
         return card;
     }
 
