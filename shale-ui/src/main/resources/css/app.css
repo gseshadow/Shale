@@ -1522,15 +1522,6 @@
     -fx-padding: 5 0 5 0;
 }
 
-.case-radar-row-actionable {
-    -fx-cursor: hand;
-}
-
-.case-radar-row-actionable:hover {
-    -fx-background-color: -shale-color-card-hover;
-    -fx-background-radius: 8;
-}
-
 .case-radar-severity-dot {
     -fx-min-width: 8;
     -fx-min-height: 8;
@@ -1582,15 +1573,6 @@
 
 .important-date-row {
     -fx-padding: 5 0 5 0;
-}
-
-.important-date-row-actionable {
-    -fx-cursor: hand;
-}
-
-.important-date-row-actionable:hover {
-    -fx-background-color: -shale-color-card-hover;
-    -fx-background-radius: 8;
 }
 
 .important-date-date {

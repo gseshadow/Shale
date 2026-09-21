@@ -49,6 +49,12 @@
 .shale-property-row-comfortable { -fx-spacing: 16px; -fx-padding: 12px 8px; }
 .shale-property-row-interactive { -fx-cursor: hand; -fx-background-radius: 10px; }
 .shale-property-row-interactive:hover { -fx-background-color: -shale-color-card-hover; }
+
+/* Compact semantic row activation shared by dashboard/list presentation. */
+.shale-actionable-row { -fx-cursor: hand; }
+.shale-actionable-row:hover { -fx-background-color: -shale-color-card-hover; -fx-background-radius: 8px; }
+.shale-actionable-row:pressed { -fx-background-color: -shale-color-selected-control-background; }
+.shale-actionable-row:focused { -fx-border-color: -shale-color-border-focus; -fx-border-radius: 8px; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.15, 0, 0); }
 .shale-property-row-label { -fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-muted; }
 .shale-property-row-value { -fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: -shale-color-text-primary; }
 .shale-property-row-icon { -fx-fill: -shale-color-text-secondary; }

@@ -140,8 +140,10 @@ final class MyShaleControllerBoardLayoutTest {
 				"Important Date rows should decide clickability from explicit supported actions");
 		assertTrue(source.contains("isCaseRadarRowActionable"),
 				"Case Radar rows should decide clickability from explicit supported actions");
-		assertTrue(css.contains(".case-radar-row-actionable") && css.contains(".important-date-row-actionable"),
-				"Only actionable dashboard rows should get pointer/hover styling");
+		String foundation = Files.readString(Path.of("src/main/resources/css/foundation/content-components.css"));
+		assertTrue(source.contains("case-radar-row-actionable") && source.contains("important-date-row-actionable")
+				&& foundation.contains(".shale-actionable-row:hover"),
+				"Only actionable dashboard rows should opt into the shared pointer/hover styling");
 		assertTrue(!css.contains(".case-radar-row {\n    -fx-padding: 5 0 5 0;\n    -fx-cursor: hand;")
 				&& !css.contains(".important-date-row {\n    -fx-padding: 5 0 5 0;\n    -fx-cursor: hand;"),
 				"Base dashboard rows without actions should not show the hand cursor");
