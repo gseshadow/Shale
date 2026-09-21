@@ -43,9 +43,14 @@ final class CaseUpdatesNarrativeEditorTest {
                 "The existing blank-update validation must remain before persistence");
         assertTrue(submit.contains("caseDao.addCaseNote(activeCaseId, activeClientId, trimmedText, createdByUserId)"),
                 "A single Submit must pass the current inline text to the authoritative Case Update DAO path");
+        assertTrue(submit.contains("caseUpdateSubmissionInFlight.compareAndSet(false, true)"),
+                "Submit must reject a second activation while the authoritative write is in flight");
+        assertTrue(submit.contains("caseUpdatesComposerArea.setDisable(true)"),
+                "The visible draft should communicate that submission is in progress");
         assertTrue(submit.contains("caseUpdatesComposerArea.setText(\"\")")
-                        && submit.contains("renderCaseUpdates(updates)"),
-                "A successful Submit must clear the draft and refresh saved updates");
+                        && submit.contains("renderCaseUpdates(updates)")
+                        && submit.contains("caseUpdatesComposerArea.requestFocus()"),
+                "A successful Submit must clear the draft, refresh saved updates, and restore sensible focus");
         String failure = submit.substring(submit.indexOf("} catch (Exception ex)"));
         assertFalse(failure.contains("caseUpdatesComposerArea.setText(\"\")"),
                 "A failed persistence attempt must retain the inline draft for retry");

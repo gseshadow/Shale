@@ -1162,8 +1162,15 @@
 					maxWidth="Infinity" />
 			</VBox>
 
-			<TextField fx:id="caseUpdatesSearchField"
-				promptText="Search updates..." styleClass="shale-update-search" />
+			<HBox alignment="CENTER_LEFT" spacing="6" styleClass="shale-update-search-row">
+				<Label text="⌕" mouseTransparent="true" focusTraversable="false"
+					styleClass="shale-update-search-icon" />
+				<TextField fx:id="caseUpdatesSearchField"
+					promptText="Search updates…" styleClass="shale-search-field"
+					HBox.hgrow="ALWAYS" maxWidth="Infinity" />
+				<Button fx:id="clearCaseUpdatesSearchButton" text="Clear"
+					visible="false" managed="false" />
+			</HBox>
 
 			<ScrollPane fx:id="caseUpdatesScrollPane"
 				fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS"
