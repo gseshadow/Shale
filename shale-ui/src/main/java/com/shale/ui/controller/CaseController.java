@@ -512,6 +512,8 @@ public class CaseController {
 	@FXML
 	private TextField caseUpdatesSearchField;
 	@FXML
+	private Button clearCaseUpdatesSearchButton;
+	@FXML
 	private VBox caseUpdatesPane;
 	@FXML
 	private ScrollPane caseUpdatesScrollPane;
@@ -831,6 +833,7 @@ public class CaseController {
 	private boolean caseUpdatesLoadedOnce;
 	private boolean caseUpdatesStale = true;
 	private boolean caseUpdatesLoading;
+	private final AtomicBoolean caseUpdateSubmissionInFlight = new AtomicBoolean(false);
 	private List<CaseTaskService.TaskActivityItem> caseTaskActivityEvents = List.of();
 	@FXML
 	private VBox caseTaskActivityPane;
@@ -1101,7 +1104,21 @@ public class CaseController {
 		if (caseUpdatesSearchField != null) {
 			ControlStyles.formControl(caseUpdatesSearchField);
 			caseUpdatesSearchField.setAccessibleText("Search case updates");
-			caseUpdatesSearchField.textProperty().addListener((obs, oldText, newText) -> applyCaseUpdateFilter());
+			caseUpdatesSearchField.textProperty().addListener((obs, oldText, newText) -> {
+				setVisibleManaged(clearCaseUpdatesSearchButton, newText != null && !newText.isBlank());
+				applyCaseUpdateFilter();
+			});
+		}
+		if (clearCaseUpdatesSearchButton != null) {
+			ControlStyles.apply(clearCaseUpdatesSearchButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+			clearCaseUpdatesSearchButton.setAccessibleText("Clear case updates search");
+			clearCaseUpdatesSearchButton.setTooltip(new Tooltip("Clear case updates search"));
+			clearCaseUpdatesSearchButton.setOnAction(e -> {
+				if (caseUpdatesSearchField != null) {
+					caseUpdatesSearchField.clear();
+					caseUpdatesSearchField.requestFocus();
+				}
+			});
 		}
 		if (deleteCaseButton != null) {
 			deleteCaseButton.setOnAction(e -> onDeleteCase());
@@ -6676,7 +6693,7 @@ public class CaseController {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
-		showCaseUpdatesState("Loading updates…", "shale-update-loading");
+		showCaseUpdatesState("Loading updates…", "shale-loading-message");
 
 		new Thread(() ->
 		{
@@ -6700,7 +6717,7 @@ public class CaseController {
 					caseUpdatesLoading = false;
 					caseUpdatesStale = true;
 					LOG.error("Case Updates load failed caseId={}", activeCaseId, ex);
-					showCaseUpdatesState("Updates could not be loaded. Try refreshing the case.", "shale-update-error");
+					showCaseUpdatesState("Updates could not be loaded. Try refreshing the case.", "shale-error-message");
 				});
 			}
 		}, "case-updates-load-" + activeCaseId).start();
@@ -6736,9 +6753,9 @@ public class CaseController {
 						.toList();
 
 		if (visibleUpdates.isEmpty()) {
-			Label empty = new Label(searchQuery.isBlank() ? "No updates yet." : "No updates found.");
+			Label empty = new Label(searchQuery.isBlank() ? "No updates yet." : "No updates match the current search.");
 			empty.setWrapText(true);
-			empty.getStyleClass().add("shale-update-empty");
+			empty.getStyleClass().add(searchQuery.isBlank() ? "shale-empty-message" : "shale-filtered-empty-message");
 			empty.setAccessibleText(searchQuery.isBlank() ? "This case has no updates." : "No updates match the current search.");
 			caseUpdatesFeedBox.getChildren().add(empty);
 			if (caseUpdatesScrollPane != null)
@@ -6823,12 +6840,16 @@ public class CaseController {
 			showError("Update text is required.");
 			return;
 		}
+		if (!caseUpdateSubmissionInFlight.compareAndSet(false, true)) {
+			return;
+		}
 
 		final long activeCaseId = caseId.longValue();
 		final int activeClientId = shaleClientId;
 		final Integer createdByUserId = appState.getUserId();
 
 		submitCaseUpdateButton.setDisable(true);
+		if (caseUpdatesComposerArea != null) caseUpdatesComposerArea.setDisable(true);
 		clearError();
 
 		new Thread(() ->
@@ -6840,8 +6861,12 @@ public class CaseController {
 				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
 				runOnFx(() ->
 				{
-					if (caseId == null || caseId.longValue() != activeCaseId)
+					caseUpdateSubmissionInFlight.set(false);
+					if (caseId == null || caseId.longValue() != activeCaseId) {
+						if (submitCaseUpdateButton != null) submitCaseUpdateButton.setDisable(false);
+						if (caseUpdatesComposerArea != null) caseUpdatesComposerArea.setDisable(false);
 						return;
+					}
 					if (caseUpdatesComposerArea != null) {
 						caseUpdatesComposerArea.setText("");
 						caseUpdatesComposerArea.setDisable(false);
@@ -6852,15 +6877,21 @@ public class CaseController {
 					refreshLastUpdatedLabelAsync();
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
+					if (caseUpdatesComposerArea != null) caseUpdatesComposerArea.requestFocus();
 					handleMedicalRecordsRequestedSafeguardAfterSavedUpdate(activeCaseId, activeClientId, trimmedText);
 				});
 			} catch (Exception ex) {
 				runOnFx(() ->
 				{
+					caseUpdateSubmissionInFlight.set(false);
 					LOG.error("Case Update create failed caseId={}", activeCaseId, ex);
 					showError("The update could not be saved. Check your connection and try again.");
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
+					if (caseUpdatesComposerArea != null) {
+						caseUpdatesComposerArea.setDisable(false);
+						caseUpdatesComposerArea.requestFocus();
+					}
 				});
 			}
 		}, "case-updates-submit-" + activeCaseId).start();

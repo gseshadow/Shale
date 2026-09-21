@@ -45,7 +45,9 @@ final class CaseOverviewPhase2DDesignContractTest {
         assertTrue(rail.contains("styleClass=\"shale-update-rail\""));
         assertTrue(rail.contains("styleClass=\"shale-section-title\""));
         assertTrue(rail.contains("styleClass=\"shale-update-composer\""));
-        assertTrue(rail.contains("styleClass=\"shale-update-search\""));
+        assertTrue(rail.contains("styleClass=\"shale-update-search-row\""));
+        assertTrue(rail.contains("styleClass=\"shale-search-field\""));
+        assertTrue(rail.contains("fx:id=\"clearCaseUpdatesSearchButton\""));
         assertTrue(rail.contains("styleClass=\"transparent-scroll shale-update-list-scroll\""));
         assertTrue(rail.contains("VBox.vgrow=\"ALWAYS\""));
         assertEquals(1, count(rail, "<ScrollPane"), "the update feed should have one independent scroll host");
@@ -56,9 +58,9 @@ final class CaseOverviewPhase2DDesignContractTest {
     @Test
     void distinctStatesAndCreatorOnlyEditRemainExplicit() throws Exception {
         String source = Files.readString(CONTROLLER);
-        assertTrue(source.contains("Loading updates…\", \"shale-update-loading"));
+        assertTrue(source.contains("Loading updates…\", \"shale-loading-message"));
         assertTrue(source.contains("Updates could not be loaded. Try refreshing the case."));
-        assertTrue(source.contains("searchQuery.isBlank() ? \"No updates yet.\" : \"No updates found.\""));
+        assertTrue(source.contains("searchQuery.isBlank() ? \"No updates yet.\" : \"No updates match the current search.\""));
         assertTrue(source.contains("actorUserId.intValue() == createdByUserId.intValue()"));
         assertTrue(source.contains("if (canEditCaseUpdate(dto))"));
         assertFalse(source.contains("createdByDisplayName().equals"),
@@ -70,7 +72,7 @@ final class CaseOverviewPhase2DDesignContractTest {
         String css = Files.readString(COMPONENTS);
         String app = Files.readString(APP);
         for (String selector : new String[] { ".shale-update-rail", ".shale-update-composer",
-                ".shale-update-search", ".shale-update-card", ".primary-link-section" }) {
+                ".shale-update-search-row", ".shale-update-card", ".primary-link-section" }) {
             assertEquals(1, count(css, selector + " {"), "expected one foundation owner for " + selector);
             assertFalse(app.contains(selector), "app.css must not compete for " + selector);
         }
