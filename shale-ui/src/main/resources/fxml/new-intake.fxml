@@ -6,236 +6,116 @@
 <?import javafx.scene.layout.*?>
 <?import com.shale.ui.component.EnhancedTextArea?>
 
-<VBox xmlns="http://javafx.com/javafx"
-      xmlns:fx="http://javafx.com/fxml"
-      fx:controller="com.shale.ui.controller.NewIntakeController"
-      spacing="12"
-      prefWidth="1160" prefHeight="900"
-      styleClass="form-surface">
-
-    <padding>
-        <Insets top="14" right="14" bottom="14" left="14" />
-    </padding>
-
-    <children>
-        <Label fx:id="validationLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
-
-        <ScrollPane fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.shale.ui.controller.NewIntakeController"
+            prefWidth="1160" prefHeight="900" minWidth="680" minHeight="620"
+            styleClass="form-surface new-intake-root">
+    <top>
+        <Label fx:id="validationLabel" wrapText="true" visible="false" managed="false"
+               accessibleRole="TEXT" styleClass="new-intake-feedback shale-error-message" />
+    </top>
+    <center>
+        <ScrollPane fx:id="intakeScrollPane" fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED"
+                    BorderPane.alignment="CENTER" styleClass="new-intake-scroll">
             <content>
-                <HBox spacing="20" maxWidth="1140" fillHeight="true">
-                    <padding>
-                        <Insets top="8" right="4" bottom="8" left="4" />
-                    </padding>
-
-                    <VBox spacing="14" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308">
-                        <VBox spacing="10" styleClass="secondary-panel caller-section-panel" style="-fx-background-color: #e6f2ff;" maxWidth="1.7976931348623157E308">
-                            <Label text="Caller" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                            <Label fx:id="callerReuseLabel" text="Client information will be reused for caller details." style="-fx-opacity: 0.75;" visible="false" managed="false" wrapText="true" />
-
-                            <GridPane fx:id="callerFieldsGrid" hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
-                                <columnConstraints>
-                                    <ColumnConstraints minWidth="180" prefWidth="220" />
-                                    <ColumnConstraints minWidth="230" hgrow="ALWAYS" fillWidth="true" />
-                                </columnConstraints>
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="0">
-                                    <Label text="First Name" />
-                                    <Label fx:id="callerFirstNameRequiredIndicator" text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <TextField fx:id="callerFirstNameField" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1">
-                                    <Label text="Last Name" />
-                                    <Label fx:id="callerLastNameRequiredIndicator" text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <TextField fx:id="callerLastNameField" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="2">
-                                    <Label text="Phone Number" />
-                                    <Label fx:id="callerPhoneRequiredIndicator" text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <TextField fx:id="callerPhoneField" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Address" GridPane.rowIndex="3" />
-                                <TextField fx:id="callerAddressField" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Email" GridPane.rowIndex="4" />
-                                <TextField fx:id="callerEmailField" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
+                <GridPane fx:id="intakeWorkspace" hgap="16" vgap="16" maxWidth="1.7976931348623157E308"
+                          styleClass="new-intake-workspace">
+                    <columnConstraints>
+                        <ColumnConstraints fx:id="leftWorkspaceColumn" percentWidth="45" hgrow="ALWAYS" fillWidth="true" />
+                        <ColumnConstraints fx:id="rightWorkspaceColumn" percentWidth="55" hgrow="ALWAYS" fillWidth="true" />
+                    </columnConstraints>
+                    <children>
+                        <VBox fx:id="callerSection" spacing="12" maxWidth="1.7976931348623157E308"
+                              GridPane.columnIndex="0" GridPane.rowIndex="0"
+                              styleClass="shale-section-card new-intake-section caller-section-panel">
+                            <Label text="Caller" styleClass="shale-section-title" />
+                            <Label fx:id="callerReuseLabel" text="Client information will be reused for caller details."
+                                   visible="false" managed="false" wrapText="true" styleClass="shale-metadata-muted" />
+                            <GridPane fx:id="callerFieldsGrid" hgap="12" vgap="10" maxWidth="1.7976931348623157E308" styleClass="new-intake-fields-grid">
+                                <columnConstraints><ColumnConstraints minWidth="120" prefWidth="145"/><ColumnConstraints minWidth="160" hgrow="ALWAYS" fillWidth="true"/></columnConstraints>
+                                <HBox spacing="4" alignment="CENTER_LEFT"><Label text="First Name" styleClass="shale-field-label"/><Label fx:id="callerFirstNameRequiredIndicator" text="*" accessibleText="required" styleClass="new-intake-required"/></HBox>
+                                <TextField fx:id="callerFirstNameField" accessibleText="Caller first name, required" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1"><Label text="Last Name" styleClass="shale-field-label"/><Label fx:id="callerLastNameRequiredIndicator" text="*" accessibleText="required" styleClass="new-intake-required"/></HBox>
+                                <TextField fx:id="callerLastNameField" accessibleText="Caller last name, required" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="2"><Label text="Phone Number" styleClass="shale-field-label"/><Label fx:id="callerPhoneRequiredIndicator" text="*" accessibleText="required" styleClass="new-intake-required"/></HBox>
+                                <TextField fx:id="callerPhoneField" accessibleText="Caller phone number, required" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <Label text="Address" styleClass="shale-field-label" GridPane.rowIndex="3"/><TextField fx:id="callerAddressField" accessibleText="Caller address" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <Label text="Email" styleClass="shale-field-label" GridPane.rowIndex="4"/><TextField fx:id="callerEmailField" accessibleText="Caller email" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
                             </GridPane>
                         </VBox>
 
-                        <VBox spacing="10" styleClass="secondary-panel client-section-panel" style="-fx-background-color: #e9f8ec;" maxWidth="1.7976931348623157E308">
-                            <Label text="Client" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                            <CheckBox fx:id="callerIsClientCheckBox" text="Caller is Client" />
-                            <GridPane hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
-                                <columnConstraints>
-                                    <ColumnConstraints minWidth="180" prefWidth="220" />
-                                    <ColumnConstraints minWidth="230" hgrow="ALWAYS" fillWidth="true" />
-                                </columnConstraints>
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="0">
-                                    <Label text="First Name" />
-                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <TextField fx:id="clientFirstNameField" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1">
-                                    <Label text="Last Name" />
-                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <TextField fx:id="clientLastNameField" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Address" GridPane.rowIndex="2" />
-                                <TextField fx:id="clientAddressField" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="3">
-                                    <Label text="Phone Number" />
-                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <TextField fx:id="clientPhoneField" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Email" GridPane.rowIndex="4" />
-                                <TextField fx:id="clientEmailField" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Date of Birth" GridPane.rowIndex="5" />
-                                <DatePicker fx:id="clientDateOfBirthPicker" GridPane.rowIndex="5" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Deceased" GridPane.rowIndex="6" />
-                                <CheckBox fx:id="clientDeceasedCheckBox" GridPane.rowIndex="6" GridPane.columnIndex="1" />
-
-                                <Label text="Client Condition" GridPane.rowIndex="7" />
-                                <EnhancedTextArea fx:id="clientConditionArea" editorTitle="Client Condition" prefRowCount="3" promptText="Relevant medical condition or client circumstances" GridPane.rowIndex="7" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-                            </GridPane>
-                        </VBox>
-                    </VBox>
-
-                    <VBox spacing="14" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308">
-                        <VBox spacing="10" styleClass="secondary-panel case-section-panel" style="-fx-background-color: #fff4d9;" maxWidth="1.7976931348623157E308">
-                            <Label text="Case" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                            <GridPane hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
-                                <columnConstraints>
-                                    <ColumnConstraints minWidth="180" prefWidth="220" />
-                                    <ColumnConstraints minWidth="230" hgrow="ALWAYS" fillWidth="true" />
-                                </columnConstraints>
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="0">
-                                    <Label text="Case Name" />
-                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <TextField fx:id="caseNameField" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1">
-                                    <Label text="Time of Intake" />
-                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <TextField fx:id="timeOfIntakeField" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Estate Case" GridPane.rowIndex="2" />
-                                <CheckBox fx:id="estateCaseCheckBox" GridPane.rowIndex="2" GridPane.columnIndex="1" />
+                        <VBox fx:id="clientSection" spacing="12" maxWidth="1.7976931348623157E308"
+                              GridPane.columnIndex="0" GridPane.rowIndex="1"
+                              styleClass="shale-section-card new-intake-section client-section-panel">
+                            <Label text="Client" styleClass="shale-section-title"/>
+                            <CheckBox fx:id="callerIsClientCheckBox" text="Caller is Client" accessibleText="Caller is Client"/>
+                            <GridPane hgap="12" vgap="10" maxWidth="1.7976931348623157E308" styleClass="new-intake-fields-grid">
+                                <columnConstraints><ColumnConstraints minWidth="120" prefWidth="145"/><ColumnConstraints minWidth="160" hgrow="ALWAYS" fillWidth="true"/></columnConstraints>
+                                <HBox spacing="4" alignment="CENTER_LEFT"><Label text="First Name" styleClass="shale-field-label"/><Label text="*" accessibleText="required" styleClass="new-intake-required"/></HBox><TextField fx:id="clientFirstNameField" accessibleText="Client first name, required" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1"><Label text="Last Name" styleClass="shale-field-label"/><Label text="*" accessibleText="required" styleClass="new-intake-required"/></HBox><TextField fx:id="clientLastNameField" accessibleText="Client last name, required" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <Label text="Address" styleClass="shale-field-label" GridPane.rowIndex="2"/><TextField fx:id="clientAddressField" accessibleText="Client address" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="3"><Label text="Phone Number" styleClass="shale-field-label"/><Label text="*" accessibleText="required" styleClass="new-intake-required"/></HBox><TextField fx:id="clientPhoneField" accessibleText="Client phone number, required" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <Label text="Email" styleClass="shale-field-label" GridPane.rowIndex="4"/><TextField fx:id="clientEmailField" accessibleText="Client email" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <Label text="Date of Birth" styleClass="shale-field-label" GridPane.rowIndex="5"/><DatePicker fx:id="clientDateOfBirthPicker" accessibleText="Client date of birth" GridPane.rowIndex="5" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <Label text="Deceased" styleClass="shale-field-label" GridPane.rowIndex="6"/><CheckBox fx:id="clientDeceasedCheckBox" accessibleText="Client deceased" GridPane.rowIndex="6" GridPane.columnIndex="1"/>
+                                <Label text="Client Condition" styleClass="shale-field-label" GridPane.rowIndex="7"/><EnhancedTextArea fx:id="clientConditionArea" accessibleText="Client condition" editorTitle="Client Condition" prefRowCount="3" promptText="Relevant medical condition or client circumstances" GridPane.rowIndex="7" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
                             </GridPane>
                         </VBox>
 
-                        <VBox spacing="10" styleClass="secondary-panel parties-section-panel" style="-fx-background-color: #f3edff;" maxWidth="1.7976931348623157E308">
-                            <HBox alignment="CENTER_LEFT" spacing="8">
-                                <Label text="Parties" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                                <Region HBox.hgrow="ALWAYS" />
-                                <Button fx:id="addPartyButton" text="Add Party">
-                                    <styleClass>
-                                        <String fx:value="button" />
-                                        <String fx:value="app-toolbar-button" />
-                                        <String fx:value="app-toolbar-button-primary" />
-                                    </styleClass>
-                                </Button>
-                            </HBox>
-                            <Label fx:id="partiesEmptyLabel" text="No pending parties yet." style="-fx-opacity: 0.75;" wrapText="true" />
-                            <VBox fx:id="partiesListBox" spacing="8" maxWidth="1.7976931348623157E308" />
-                        </VBox>
-
-                        <VBox spacing="10" styleClass="secondary-panel incident-section-panel" style="-fx-background-color: #fde8ec;" maxWidth="1.7976931348623157E308">
-                            <Label text="Incident" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                            <GridPane hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
-                                <columnConstraints>
-                                    <ColumnConstraints minWidth="250" prefWidth="290" />
-                                    <ColumnConstraints minWidth="250" hgrow="ALWAYS" fillWidth="true" />
-                                </columnConstraints>
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="0">
-                                    <Label text="Practice Area" />
-                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <HBox spacing="12" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308">
-                                    <StackPane fx:id="practiceAreaHost" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
-                                    <Button fx:id="selectPracticeAreaButton" text="Change" minWidth="90">
-                                        <styleClass>
-                                            <String fx:value="button" />
-                                            <String fx:value="app-toolbar-button" />
-                                            <String fx:value="app-toolbar-button-primary" />
-                                        </styleClass>
-                                    </Button>
-                                </HBox>
-
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1">
-                                    <Label text="Status" />
-                                    <Label text="*" style="-fx-text-fill: #b42318; -fx-font-weight: bold;" />
-                                </HBox>
-                                <HBox spacing="12" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308">
-                                    <StackPane fx:id="statusHost" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
-                                    <Button fx:id="selectStatusButton" text="Change" minWidth="90">
-                                        <styleClass>
-                                            <String fx:value="button" />
-                                            <String fx:value="app-toolbar-button" />
-                                            <String fx:value="app-toolbar-button-primary" />
-                                        </styleClass>
-                                    </Button>
-                                </HBox>
-
-                                <Label text="Description" GridPane.rowIndex="2" GridPane.columnSpan="2" />
-                                <EnhancedTextArea fx:id="descriptionArea" editorTitle="Description" prefRowCount="4" promptText="Detailed description of the matter" GridPane.rowIndex="3" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
-
-                                <Label text="Summary" GridPane.rowIndex="4" GridPane.columnSpan="2" />
-                                <EnhancedTextArea fx:id="summaryArea" editorTitle="Summary" prefRowCount="4" promptText="Concise intake summary" GridPane.rowIndex="5" GridPane.columnSpan="2" maxWidth="1.7976931348623157E308" />
-
+                        <VBox fx:id="caseSection" spacing="12" maxWidth="1.7976931348623157E308"
+                              GridPane.columnIndex="1" GridPane.rowIndex="0"
+                              styleClass="shale-section-card new-intake-section case-section-panel">
+                            <Label text="Case" styleClass="shale-section-title"/>
+                            <GridPane hgap="12" vgap="10" maxWidth="1.7976931348623157E308" styleClass="new-intake-fields-grid">
+                                <columnConstraints><ColumnConstraints minWidth="140" prefWidth="160"/><ColumnConstraints minWidth="180" hgrow="ALWAYS" fillWidth="true"/></columnConstraints>
+                                <HBox spacing="4" alignment="CENTER_LEFT"><Label text="Case Name" styleClass="shale-field-label"/><Label text="*" accessibleText="required" styleClass="new-intake-required"/></HBox><TextField fx:id="caseNameField" accessibleText="Case name, required" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1"><Label text="Time of Intake" styleClass="shale-field-label"/><Label text="*" accessibleText="required" styleClass="new-intake-required"/></HBox><TextField fx:id="timeOfIntakeField" accessibleText="Time of intake, required" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                <Label text="Estate Case" styleClass="shale-field-label" GridPane.rowIndex="2"/><CheckBox fx:id="estateCaseCheckBox" accessibleText="Estate case" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="3"><Label text="Practice Area" styleClass="shale-field-label"/><Label text="*" accessibleText="required" styleClass="new-intake-required"/></HBox>
+                                <HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"><StackPane fx:id="practiceAreaHost" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308"/><Button fx:id="selectPracticeAreaButton" text="Change" accessibleText="Change practice area"/></HBox>
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="4"><Label text="Status" styleClass="shale-field-label"/><Label text="*" accessibleText="required" styleClass="new-intake-required"/></HBox>
+                                <HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"><StackPane fx:id="statusHost" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308"/><Button fx:id="selectStatusButton" text="Change" accessibleText="Change case status"/></HBox>
                             </GridPane>
                         </VBox>
 
-                        <VBox fx:id="datesSection" spacing="10" styleClass="secondary-panel dates-section-panel" maxWidth="1.7976931348623157E308">
-                            <HBox alignment="CENTER_LEFT" spacing="8">
-                                <Label text="Dates" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                                <Region HBox.hgrow="ALWAYS" />
-                                <HBox fx:id="datesAdminActions" spacing="8" />
-                            </HBox>
-                            <Label fx:id="datesStatusLabel" text="Loading date fields…" style="-fx-opacity: 0.75;" wrapText="true" />
-                            <GridPane fx:id="legacyDatesGrid" visible="false" managed="false" hgap="16" vgap="10" maxWidth="1.7976931348623157E308">
-                                <columnConstraints><ColumnConstraints minWidth="250" prefWidth="290"/><ColumnConstraints minWidth="250" hgrow="ALWAYS" fillWidth="true"/></columnConstraints>
-                                <Label text="Date of Medical Negligence" wrapText="true" GridPane.rowIndex="0"/><DatePicker fx:id="dateMedicalNegligencePicker" GridPane.rowIndex="0" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
-                                <Label text="Date Medical Negligence Was Discovered" wrapText="true" GridPane.rowIndex="1"/><DatePicker fx:id="dateMedicalNegligenceDiscoveredPicker" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
-                                <Label text="Date of Injury" GridPane.rowIndex="2"/><DatePicker fx:id="dateOfInjuryPicker" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
-                                <Label text="Statute of Limitations" wrapText="true" GridPane.rowIndex="3"/><DatePicker fx:id="statuteOfLimitationsPicker" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
-                                <Label text="Tort Claims Notice" GridPane.rowIndex="4"/><DatePicker fx:id="tortClaimsNoticePicker" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
-                            </GridPane>
-                            <VBox fx:id="configuredDatesBox" spacing="10" visible="false" managed="false"/>
-                            <VBox fx:id="datesCustomizationBox" spacing="10" visible="false" managed="false"/>
+                        <VBox fx:id="partiesSection" spacing="12" maxWidth="1.7976931348623157E308"
+                              GridPane.columnIndex="1" GridPane.rowIndex="1"
+                              styleClass="shale-section-card new-intake-section new-intake-parties-section">
+                            <HBox alignment="CENTER_LEFT" spacing="8"><Label text="Parties" styleClass="shale-section-title"/><Region HBox.hgrow="ALWAYS"/><Button fx:id="addPartyButton" text="Add Party" accessibleText="Add a pending case party"/></HBox>
+                            <Label fx:id="partiesEmptyLabel" text="No pending parties yet." wrapText="true" styleClass="shale-empty-message"/>
+                            <VBox fx:id="partiesListBox" spacing="8" maxWidth="1.7976931348623157E308"/>
                         </VBox>
-                    </VBox>
-                </HBox>
+
+                        <VBox fx:id="incidentSection" spacing="12" maxWidth="1.7976931348623157E308"
+                              GridPane.columnIndex="1" GridPane.rowIndex="2"
+                              styleClass="shale-section-card new-intake-section incident-section-panel">
+                            <Label text="Incident" styleClass="shale-section-title"/>
+                            <Label text="Description" styleClass="shale-field-label"/><EnhancedTextArea fx:id="descriptionArea" accessibleText="Incident description" editorTitle="Description" prefRowCount="4" promptText="Detailed description of the matter" maxWidth="1.7976931348623157E308"/>
+                            <Label text="Summary" styleClass="shale-field-label"/><EnhancedTextArea fx:id="summaryArea" accessibleText="Incident summary" editorTitle="Summary" prefRowCount="4" promptText="Concise intake summary" maxWidth="1.7976931348623157E308"/>
+                            <VBox fx:id="datesSection" spacing="10" maxWidth="1.7976931348623157E308" styleClass="new-intake-dates-section">
+                                <HBox alignment="CENTER_LEFT" spacing="8"><Label text="Dates" styleClass="shale-subsection-title"/><Region HBox.hgrow="ALWAYS"/><HBox fx:id="datesAdminActions" spacing="8"/></HBox>
+                                <Label fx:id="datesStatusLabel" text="Loading date fields…" wrapText="true" styleClass="shale-metadata-muted"/>
+                                <GridPane fx:id="legacyDatesGrid" visible="false" managed="false" hgap="12" vgap="10" maxWidth="1.7976931348623157E308" styleClass="new-intake-fields-grid">
+                                    <columnConstraints><ColumnConstraints minWidth="180" prefWidth="220"/><ColumnConstraints minWidth="160" hgrow="ALWAYS" fillWidth="true"/></columnConstraints>
+                                    <Label text="Date of Medical Negligence" wrapText="true" styleClass="shale-field-label"/><DatePicker fx:id="dateMedicalNegligencePicker" accessibleText="Date of medical negligence" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                    <Label text="Date Medical Negligence Was Discovered" wrapText="true" styleClass="shale-field-label" GridPane.rowIndex="1"/><DatePicker fx:id="dateMedicalNegligenceDiscoveredPicker" accessibleText="Date medical negligence was discovered" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                    <Label text="Date of Injury" styleClass="shale-field-label" GridPane.rowIndex="2"/><DatePicker fx:id="dateOfInjuryPicker" accessibleText="Date of injury" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                    <Label text="Statute of Limitations" wrapText="true" styleClass="shale-field-label" GridPane.rowIndex="3"/><DatePicker fx:id="statuteOfLimitationsPicker" accessibleText="Statute of limitations" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                    <Label text="Tort Claims Notice" styleClass="shale-field-label" GridPane.rowIndex="4"/><DatePicker fx:id="tortClaimsNoticePicker" accessibleText="Tort claims notice" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
+                                </GridPane>
+                                <VBox fx:id="configuredDatesBox" spacing="10" visible="false" managed="false"/>
+                                <VBox fx:id="datesCustomizationBox" spacing="10" visible="false" managed="false"/>
+                            </VBox>
+                        </VBox>
+                    </children>
+                </GridPane>
             </content>
         </ScrollPane>
-
-        <HBox spacing="10" alignment="CENTER_RIGHT">
-            <Button fx:id="cancelButton" text="Cancel" cancelButton="true" onAction="#onCancel">
-                <styleClass>
-                    <String fx:value="button" />
-                    <String fx:value="app-toolbar-button" />
-                    <String fx:value="app-toolbar-button-neutral" />
-                </styleClass>
-            </Button>
-            <Button fx:id="createIntakeButton" text="Create Intake" onAction="#onCreateIntake">
-                <styleClass>
-                    <String fx:value="button" />
-                    <String fx:value="app-toolbar-button" />
-                    <String fx:value="app-toolbar-button-primary" />
-                </styleClass>
-            </Button>
+    </center>
+    <bottom>
+        <HBox fx:id="intakeActionBar" spacing="10" alignment="CENTER_RIGHT" styleClass="new-intake-action-bar">
+            <Button fx:id="cancelButton" text="Cancel" cancelButton="true" onAction="#onCancel" accessibleText="Cancel New Intake"/>
+            <Button fx:id="createIntakeButton" text="Create Intake" onAction="#onCreateIntake" accessibleText="Create Intake"/>
         </HBox>
-    </children>
-</VBox>
+    </bottom>
+</BorderPane>

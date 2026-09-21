@@ -40,6 +40,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.geometry.Insets;
@@ -83,6 +84,14 @@ public final class NewIntakeController {
 	private static final String INVALID_DATE_PROPERTY = "shale.newIntake.invalidDate";
 
 	@FXML private Label validationLabel;
+	@FXML private GridPane intakeWorkspace;
+	@FXML private ColumnConstraints leftWorkspaceColumn;
+	@FXML private ColumnConstraints rightWorkspaceColumn;
+	@FXML private VBox callerSection;
+	@FXML private VBox clientSection;
+	@FXML private VBox caseSection;
+	@FXML private VBox partiesSection;
+	@FXML private VBox incidentSection;
 
 	@FXML private TextField caseNameField;
 	@FXML private TextField timeOfIntakeField;
@@ -156,6 +165,8 @@ public final class NewIntakeController {
 	private Consumer<Integer> onCaseCreated;
 	private boolean saving;
 	private boolean successfulCompletion;
+	private Boolean narrowIntakeLayout;
+	private static final double INTAKE_STACK_BREAKPOINT = 900.0;
 	private final ExecutorService intakeSaveExecutor = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "new-intake-save");
 		t.setDaemon(true);
@@ -231,6 +242,9 @@ public final class NewIntakeController {
 
 	@FXML
 	private void initialize() {
+		intakeWorkspace.widthProperty().addListener((observable, oldWidth, newWidth) ->
+				configureResponsiveWorkspace(newWidth.doubleValue()));
+		Platform.runLater(() -> configureResponsiveWorkspace(intakeWorkspace.getWidth()));
 		datesSection.sceneProperty().addListener((observable, oldScene, newScene) -> {
 			if (newScene != null) datesViewAttached = true;
 		});
@@ -239,6 +253,13 @@ public final class NewIntakeController {
 		ControlStyles.apply(selectPracticeAreaButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		ControlStyles.apply(selectStatusButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		if (addPartyButton != null) ControlStyles.apply(addPartyButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		List.of(caseNameField, timeOfIntakeField, clientFirstNameField, clientLastNameField,
+				clientAddressField, clientPhoneField, clientEmailField, callerFirstNameField,
+				callerLastNameField, callerPhoneField, callerAddressField, callerEmailField)
+				.forEach(ControlStyles::formControl);
+		ControlStyles.formControl(callerIsClientCheckBox);
+		ControlStyles.formControl(clientDeceasedCheckBox);
+		ControlStyles.formControl(estateCaseCheckBox);
 		timeOfIntakeField.setText(LocalTime.now().format(TIME_FORMAT));
 		List.of(clientDateOfBirthPicker, dateMedicalNegligencePicker,
 				dateMedicalNegligenceDiscoveredPicker, dateOfInjuryPicker,
@@ -278,6 +299,37 @@ public final class NewIntakeController {
 
 		Platform.runLater(this::autoGenerateCaseName);
 		Platform.runLater(this::captureInitialSnapshot);
+	}
+
+	/** Reparents sections only when the supported wide/stacked breakpoint is crossed. */
+	private void configureResponsiveWorkspace(double width) {
+		boolean narrow = width > 0 && width < INTAKE_STACK_BREAKPOINT;
+		if (narrowIntakeLayout != null && narrowIntakeLayout == narrow) return;
+		narrowIntakeLayout = narrow;
+		if (narrow) {
+			intakeWorkspace.getColumnConstraints().setAll(leftWorkspaceColumn);
+			leftWorkspaceColumn.setPercentWidth(100);
+			placeSection(callerSection, 0, 0);
+			placeSection(clientSection, 0, 1);
+			placeSection(caseSection, 0, 2);
+			placeSection(partiesSection, 0, 3);
+			placeSection(incidentSection, 0, 4);
+		} else {
+			leftWorkspaceColumn.setPercentWidth(45);
+			rightWorkspaceColumn.setPercentWidth(55);
+			intakeWorkspace.getColumnConstraints().setAll(leftWorkspaceColumn, rightWorkspaceColumn);
+			placeSection(callerSection, 0, 0);
+			placeSection(clientSection, 0, 1);
+			placeSection(caseSection, 1, 0);
+			placeSection(partiesSection, 1, 1);
+			placeSection(incidentSection, 1, 2);
+		}
+	}
+
+	private static void placeSection(Node section, int column, int row) {
+		GridPane.setColumnIndex(section, column);
+		GridPane.setRowIndex(section, row);
+		GridPane.setHgrow(section, Priority.ALWAYS);
 	}
 
 	private void configureDatesAuthorization() {
@@ -538,20 +590,23 @@ public final class NewIntakeController {
 			final int index = i;
 			PartyAddWorkflowDialog.AddPartyDraft party = pendingParties.get(i);
 			Label title = new Label(resolvePendingDisplayName(party));
-			title.setStyle("-fx-font-weight: bold;");
+			title.getStyleClass().add("shale-person-name");
 			String roleLabel = partyRoleLabelsById.getOrDefault(party.partyRoleId(), "Role " + party.partyRoleId());
 			String sideKey = safeTrim(party.side()).toLowerCase();
 			String sideLabel = partySideLabelsByKey.getOrDefault(sideKey, sideKey.isBlank() ? "Unaffiliated" : sideKey);
 			Label meta = new Label(roleLabel + " · " + sideLabel + (party.primary() ? " · Primary" : ""));
-			meta.setStyle("-fx-opacity: 0.85;");
+			meta.getStyleClass().add("shale-person-metadata");
 			VBox text = new VBox(4, title, meta);
 			if (!safeTrim(party.notes()).isBlank()) {
 				Label notes = new Label(safeTrim(party.notes()));
 				notes.setWrapText(true);
+				notes.getStyleClass().add("shale-body-text");
 				text.getChildren().add(notes);
 			}
 			Button removeButton = new Button("Remove");
-			removeButton.getStyleClass().add("button-secondary");
+			ControlStyles.apply(removeButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+			removeButton.setAccessibleText("Remove " + resolvePendingDisplayName(party) + " from pending parties");
+			removeButton.setTooltip(new javafx.scene.control.Tooltip("Remove pending party"));
 			removeButton.setOnAction(e -> {
 				pendingParties.remove(index);
 				renderPendingParties();
@@ -561,7 +616,7 @@ public final class NewIntakeController {
 			HBox actions = new HBox(8, spacer, removeButton);
 			VBox card = new VBox(6, text, actions);
 			card.setPadding(new Insets(10, 12, 10, 12));
-			card.getStyleClass().add("secondary-panel");
+			card.getStyleClass().addAll("shale-surface-card-embedded", "new-intake-party-card");
 			partiesListBox.getChildren().add(card);
 		}
 	}
@@ -1387,8 +1442,11 @@ public final class NewIntakeController {
 
 	private void setSaving(boolean saving) {
 		this.saving = saving;
-		if (createIntakeButton != null)
+		if (createIntakeButton != null) {
 			createIntakeButton.setDisable(saving);
+			createIntakeButton.setText(saving ? "Creating…" : "Create Intake");
+			createIntakeButton.setAccessibleText(saving ? "Creating Intake, please wait" : "Create Intake");
+		}
 		if (cancelButton != null)
 			cancelButton.setDisable(saving);
 		if (selectPracticeAreaButton != null)
@@ -1553,14 +1611,16 @@ public final class NewIntakeController {
 
 	private void showValidation(String message) {
 		validationLabel.setText(message);
-		validationLabel.setTextFill(javafx.scene.paint.Paint.valueOf("#b42318"));
+		validationLabel.getStyleClass().remove("new-intake-feedback-success");
+		if (!validationLabel.getStyleClass().contains("shale-error-message")) validationLabel.getStyleClass().add("shale-error-message");
 		validationLabel.setVisible(true);
 		validationLabel.setManaged(true);
 	}
 
 	private void showSuccess(String message) {
 		validationLabel.setText(message);
-		validationLabel.setTextFill(javafx.scene.paint.Paint.valueOf("#157347"));
+		validationLabel.getStyleClass().remove("shale-error-message");
+		if (!validationLabel.getStyleClass().contains("new-intake-feedback-success")) validationLabel.getStyleClass().add("new-intake-feedback-success");
 		validationLabel.setVisible(true);
 		validationLabel.setManaged(true);
 	}
