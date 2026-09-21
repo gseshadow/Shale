@@ -15,10 +15,15 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public final class TaskDueDateNotificationGenerator {
+	private static final Logger log = LoggerFactory.getLogger(TaskDueDateNotificationGenerator.class);
 	private static final long CADENCE_MINUTES = 30;
 
 	private final TaskDao taskDao;
@@ -30,6 +35,11 @@ public final class TaskDueDateNotificationGenerator {
 	private final Clock clock;
 	private final ZoneId zoneId;
 	private ScheduledExecutorService scheduler;
+	private ScheduledFuture<?> scheduled;
+	private long generation;
+	private Session session;
+
+	private record Session(int tenantId, int userId, long generation) {}
 
 	public TaskDueDateNotificationGenerator(
 			TaskDao taskDao,
@@ -60,19 +70,30 @@ public final class TaskDueDateNotificationGenerator {
 		this.zoneId = Objects.requireNonNull(zoneId, "zoneId");
 	}
 
-	public void start() {
+	public synchronized void start() {
 		if (scheduler != null && !scheduler.isShutdown()) {
 			return;
 		}
+		Integer tenantId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (tenantId == null || tenantId <= 0 || userId == null || userId <= 0) return;
+		long token = ++generation;
+		session = new Session(tenantId, userId, token);
 		scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
 			Thread t = new Thread(r, "task-due-notification-generator");
 			t.setDaemon(true);
 			return t;
 		});
-		scheduler.scheduleAtFixedRate(this::runSafely, CADENCE_MINUTES, CADENCE_MINUTES, TimeUnit.MINUTES);
+		scheduled = scheduler.scheduleAtFixedRate(() -> runSafely(token), CADENCE_MINUTES, CADENCE_MINUTES, TimeUnit.MINUTES);
 	}
 
-	public void stop() {
+	public synchronized void stop() {
+		generation++;
+		session = null;
+		if (scheduled != null) {
+			scheduled.cancel(true);
+			scheduled = null;
+		}
 		if (scheduler != null) {
 			scheduler.shutdownNow();
 			scheduler = null;
@@ -80,31 +101,38 @@ public final class TaskDueDateNotificationGenerator {
 	}
 
 	public void runOnce() {
-		runSafely();
+		long token;
+		synchronized (this) {
+			if (session == null) return;
+			token = session.generation();
+		}
+		runSafely(token);
 	}
 
-	private void runSafely() {
+	private void runSafely(long token) {
 		try {
-			Integer shaleClientId = appState.getShaleClientId();
-			if (shaleClientId == null || shaleClientId <= 0) {
-				return;
-			}
+			Session captured = activeSession(token);
+			if (captured == null) return;
+			int shaleClientId = captured.tenantId();
 			LocalDate today = LocalDate.now(clock.withZone(zoneId));
+			if (!active(token)) return;
 			List<TaskDueNotificationCandidate> candidates = taskDao.listDueNotificationCandidates(shaleClientId);
 			for (TaskDueNotificationCandidate candidate : candidates) {
+				if (!active(token)) return;
 				DueState state = classifyDueState(candidate, today);
 				if (state == null) {
 					continue;
 				}
 				List<Integer> recipients = recipientResolver.resolveTaskDueNotificationRecipients(candidate);
 				for (Integer recipientUserId : recipients) {
+					if (!active(token)) return;
 					if (recipientUserId == null || recipientUserId <= 0) {
 						continue;
 					}
-					if (!isDueStateEnabled(state, recipientUserId)) {
-						continue;
-					}
-						String eventKey = state.eventKey(candidate.taskId(), recipientUserId, today);
+				if (!isDueStateEnabled(state, recipientUserId)) {
+					continue;
+				}
+					String eventKey = state.eventKey(candidate.taskId(), recipientUserId, today);
 					notificationDao.createTaskDueDateNotification(
 							candidate.shaleClientId(),
 							recipientUserId,
@@ -117,24 +145,43 @@ public final class TaskDueDateNotificationGenerator {
 							eventKey);
 				}
 			}
+			if (!active(token)) return;
 			for (MaterialRequestDueNotificationCandidate candidate : materialRequestDao.listDueNotificationCandidates(shaleClientId, today)) {
+				if (!active(token)) return;
 				for (Integer recipient : candidate.recipientUserIds()) {
-				String eventKey = "material-request:" + candidate.requestId() + ":due:" + candidate.dueAt() + ":" + recipient;
+					if (!active(token)) return;
+					String eventKey = "material-request:" + candidate.requestId() + ":due:" + candidate.dueAt() + ":" + recipient;
 					notificationDao.createMaterialRequestDueNotification(candidate.shaleClientId(), recipient,
 							"Material request due", "A material request is due: " + candidate.title(), candidate.requestId(), eventKey);
 				}
-				}
+			}
 			LocalDateTime now=LocalDateTime.now(clock.withZone(zoneId));
+			if (!active(token)) return;
 			for(MaterialRequestFollowUpNotificationCandidate candidate:materialRequestDao.listFollowUpNotificationCandidates(shaleClientId,now)){
+				if (!active(token)) return;
 				for(Integer recipient:candidate.recipientUserIds()){
-				String eventKey="material-request:"+candidate.requestId()+":follow-up:"+candidate.nextFollowUpAt()+":"+recipient;
+					if (!active(token)) return;
+					String eventKey="material-request:"+candidate.requestId()+":follow-up:"+candidate.nextFollowUpAt()+":"+recipient;
 					notificationDao.createMaterialRequestFollowUpNotification(candidate.shaleClientId(),recipient,"Material request follow-up",
 							"Follow up on "+candidate.title()+" in its case.",candidate.requestId(),eventKey);
 				}
-				}
-		} catch (Exception ex) {
-			System.err.println("Task due-date generator failed: " + ex.getMessage());
+			}
+		} catch (RuntimeException ex) {
+			if (active(token)) {
+				log.error("Task due-date generator failed for active session", ex);
+			}
 		}
+	}
+
+	private synchronized Session activeSession(long token) {
+		if (session == null || generation != token || session.generation() != token) return null;
+		Integer tenantId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		return Objects.equals(tenantId, session.tenantId()) && Objects.equals(userId, session.userId()) ? session : null;
+	}
+
+	private boolean active(long token) {
+		return activeSession(token) != null && !Thread.currentThread().isInterrupted();
 	}
 
 	private boolean isDueStateEnabled(DueState state, int recipientUserId) {
