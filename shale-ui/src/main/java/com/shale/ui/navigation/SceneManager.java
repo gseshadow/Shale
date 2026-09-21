@@ -1065,7 +1065,7 @@ public final class SceneManager {
 			Scene dialogScene = new Scene(dialogRoot);
 			com.shale.ui.theme.ThemeManager.application().register(dialogScene);
 			dialog.setScene(dialogScene);
-			WindowSizingUtil.sizeModalStage(dialog, stage, 1180, 760);
+			WindowSizingUtil.sizeModalStage(dialog, stage, 1180, 760, 680, 620);
 			dialog.showAndWait();
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to open New Intake dialog", e);

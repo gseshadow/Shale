@@ -187,3 +187,37 @@
     -fx-prompt-text-fill: -shale-control-prompt-text;
     -fx-font-weight: 600;
 }
+
+/* Phase 8A New Intake composes the shared form, section-card, and typography vocabulary. */
+.new-intake-root {
+    -fx-background-color: -shale-color-content-plane;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-padding: 16px;
+}
+.new-intake-feedback { -fx-padding: 10px 12px; }
+.new-intake-feedback-success { -fx-text-fill: -shale-color-success-text; -fx-font-weight: 700; }
+.new-intake-scroll, .new-intake-scroll > .viewport { -fx-background-color: transparent; }
+.new-intake-scroll { -fx-background-insets: 0; -fx-padding: 0; }
+.new-intake-workspace { -fx-padding: 8px 4px 16px 4px; }
+.new-intake-section {
+    -fx-padding: 16px;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2);
+}
+.new-intake-fields-grid { -fx-alignment: top-left; }
+.new-intake-required { -fx-text-fill: -shale-color-validation-error; -fx-font-weight: 800; }
+.new-intake-parties-section {
+    -fx-background-color: -shale-color-parties-section-surface;
+    -fx-border-color: -shale-color-parties-section-border;
+}
+.new-intake-party-card { -fx-padding: 10px 12px; }
+.new-intake-dates-section {
+    -fx-padding: 14px 0 0 0;
+    -fx-border-color: -shale-color-divider transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+}
+.new-intake-action-bar {
+    -fx-padding: 14px 0 0 0;
+    -fx-border-color: -shale-color-divider transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+    -fx-background-color: -shale-color-content-plane;
+}

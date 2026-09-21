@@ -110,6 +110,8 @@
     -shale-color-focus-ring: rgba(114, 174, 255, 0.42);
     -shale-color-selection: #294d75;
     -shale-color-validation-error: #ff7187;
+    -shale-color-parties-section-surface: #30284a;
+    -shale-color-parties-section-border: #7962ad;
     -shale-opacity-disabled: 0.52;
     -shale-color-card-shadow: rgba(0, 0, 0, 0.32);
 }
