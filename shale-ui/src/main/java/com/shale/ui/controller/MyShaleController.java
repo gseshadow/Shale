@@ -58,6 +58,7 @@ import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.AccessibleRole;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
@@ -66,6 +67,8 @@ import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -226,6 +229,7 @@ public final class MyShaleController {
 	private Runnable onOpenNotificationCenter;
 	private Consumer<Integer> onOpenCase;
 	private Consumer<Integer> onOpenUser;
+	private Consumer<Long> onOpenTask = this::showTaskDetailPopup;
 	private CaseCardFactory caseCardFactory;
 	private TaskCardFactory taskCardFactory;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
@@ -2231,12 +2235,16 @@ public final class MyShaleController {
 				.count();
 	}
 
-	private Node buildCaseRadarRow(CaseRadarRow row) {
+	Node buildCaseRadarRow(CaseRadarRow row) {
 		HBox radarRow = new HBox(8);
 		radarRow.getStyleClass().addAll("case-radar-row", "case-radar-row-" + row.severity().styleSuffix());
 		if (isCaseRadarRowActionable(row)) {
 			radarRow.getStyleClass().add("case-radar-row-actionable");
-			radarRow.setOnMouseClicked(event -> onCaseRadarRowClicked(row));
+			configureActionableRow(
+					radarRow,
+					caseRadarAccessibleName(row),
+					caseRadarTooltip(row),
+					() -> onCaseRadarRowClicked(row));
 		}
 		radarRow.setAlignment(Pos.CENTER_LEFT);
 		radarRow.setMaxWidth(Double.MAX_VALUE);
@@ -2266,6 +2274,23 @@ public final class MyShaleController {
 		return radarRow;
 	}
 
+	private static String caseRadarAccessibleName(CaseRadarRow row) {
+		String item = row.label() + ", " + row.count();
+		return switch (row.action()) {
+			case OVERDUE_TASKS -> "Show " + item + " in My Tasks";
+			case SOL_DUE_14_DAYS, SOL_DUE_15_TO_30_DAYS,
+					TORT_NOTICE_DUE_14_DAYS, TORT_NOTICE_DUE_15_TO_30_DAYS,
+					INACTIVE_ASSIGNED_CASES, RECENTLY_UPDATED_ASSIGNED_CASES -> "Show " + item + " in My Cases";
+			case NONE -> item;
+		};
+	}
+
+	private static String caseRadarTooltip(CaseRadarRow row) {
+		return row.action() == CaseRadarAction.OVERDUE_TASKS
+				? "Open overdue work in My Tasks"
+				: "Open matching cases in My Cases";
+	}
+
 	private boolean isCaseRadarRowActionable(CaseRadarRow row) {
 		return row != null && row.action() != null && row.action() != CaseRadarAction.NONE;
 	}
@@ -2287,7 +2312,7 @@ public final class MyShaleController {
 		}
 	}
 
-	private void showOverdueTasksInMyTasks() {
+	void showOverdueTasksInMyTasks() {
 		if (myTasksSourceChoice != null) {
 			myTasksSourceChoice.getSelectionModel().select(MyTasksSource.ASSIGNED_TO_ME);
 		} else {
@@ -2304,6 +2329,9 @@ public final class MyShaleController {
 		}
 		if (myTasksCaseFilterChoice != null) {
 			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
+		}
+		if (myTasksStatusFilterChoice != null) {
+			myTasksStatusFilterChoice.getSelectionModel().select(ALL_ACTIVE_TASK_STATUSES_OPTION);
 		}
 		if (showCompletedMyTasks) {
 			showCompletedMyTasks = false;
@@ -2519,12 +2547,16 @@ public final class MyShaleController {
 		return date != null && start != null && end != null && !date.isBefore(start) && !date.isAfter(end);
 	}
 
-	private Node buildImportantDateRow(ImportantDateItem item) {
+	Node buildImportantDateRow(ImportantDateItem item) {
 		HBox row = new HBox(8);
 		row.getStyleClass().addAll("important-date-row", "important-date-row-" + item.severity().styleSuffix());
 		if (isImportantDateActionable(item)) {
 			row.getStyleClass().add("important-date-row-actionable");
-			row.setOnMouseClicked(event -> onImportantDateClicked(item));
+			configureActionableRow(
+					row,
+					importantDateAccessibleName(item),
+					importantDateTooltip(item),
+					() -> onImportantDateClicked(item));
 		}
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.setMaxWidth(Double.MAX_VALUE);
@@ -2544,6 +2576,47 @@ public final class MyShaleController {
 
 		row.getChildren().addAll(date, type, title);
 		return row;
+	}
+
+	private static String importantDateAccessibleName(ImportantDateItem item) {
+		String title = safe(item.title()).isBlank() ? "Untitled" : safe(item.title()).trim();
+		String date = item.date() == null ? "date unavailable" : IMPORTANT_DATE_LABEL_FORMATTER.format(item.date());
+		return switch (item.type()) {
+			case TASK -> "Open Task Details for " + title + ", due " + date;
+			case SOL -> "Open case " + title + " for statute of limitations deadline " + date;
+			case TORT_NOTICE -> "Open case " + title + " for tort notice deadline " + date;
+			case CALENDAR -> title;
+		};
+	}
+
+	private static String importantDateTooltip(ImportantDateItem item) {
+		return item.type() == ImportantDateType.TASK ? "Open Task Details" : "Open Case";
+	}
+
+	/**
+	 * Applies the same semantic mouse and keyboard activation contract used by Shale's
+	 * entity cards while leaving destination ownership with this controller.
+	 */
+	private static void configureActionableRow(HBox row, String accessibleName, String tooltip, Runnable action) {
+		row.getStyleClass().add("shale-actionable-row");
+		row.setFocusTraversable(true);
+		row.setAccessibleRole(AccessibleRole.BUTTON);
+		row.setAccessibleText(accessibleName);
+		if (tooltip != null && !tooltip.isBlank()) {
+			Tooltip.install(row, new Tooltip(tooltip));
+		}
+		row.setOnMouseClicked(event -> {
+			if (!event.isConsumed() && event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 1) {
+				action.run();
+				event.consume();
+			}
+		});
+		row.setOnKeyPressed(event -> {
+			if (!event.isConsumed() && (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE)) {
+				action.run();
+				event.consume();
+			}
+		});
 	}
 
 	private String formatImportantDateLabel(LocalDate date) {
@@ -3758,7 +3831,9 @@ public final class MyShaleController {
 	}
 
 	private void openTask(Long taskId) {
-		showTaskDetailPopup(taskId);
+		if (taskId != null && taskId > 0 && onOpenTask != null) {
+			onOpenTask.accept(taskId);
+		}
 	}
 
 	private void onToggleMyTaskComplete(Long taskId) {
@@ -4130,7 +4205,7 @@ public final class MyShaleController {
 		}
 	}
 
-	private enum CaseRadarSeverity {
+	enum CaseRadarSeverity {
 		CRITICAL("critical"),
 		WARNING("warning"),
 		POSITIVE("positive"),
@@ -4156,7 +4231,7 @@ public final class MyShaleController {
 		}
 	}
 
-	private enum CaseRadarAction {
+	enum CaseRadarAction {
 		NONE,
 		OVERDUE_TASKS,
 		SOL_DUE_14_DAYS,
@@ -4172,11 +4247,11 @@ public final class MyShaleController {
 		DUE_15_TO_30_DAYS
 	}
 
-	private record CaseRadarRow(CaseRadarSeverity severity, String label, long count, String helperText, CaseRadarAction action) {
+	record CaseRadarRow(CaseRadarSeverity severity, String label, long count, String helperText, CaseRadarAction action) {
 	}
 
 
-	private enum ImportantDateType {
+	enum ImportantDateType {
 		TASK("Task", "task"),
 		SOL("SOL", "sol"),
 		TORT_NOTICE("Tort Notice", "tort-notice"),
