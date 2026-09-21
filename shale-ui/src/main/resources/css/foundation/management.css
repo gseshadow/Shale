@@ -1,0 +1,88 @@
+/* A.2 vocabulary shared by Settings-launched management windows. */
+.dialog-pane.management-window {
+    -fx-background-color: -shale-color-dialog-surface;
+    -fx-min-width: 680px;
+    -fx-min-height: 520px;
+}
+
+.management-window-header {
+    -fx-padding: 12px 16px 8px 16px;
+    -fx-background-color: -shale-color-section-surface;
+    -fx-border-color: transparent transparent -shale-color-divider transparent;
+}
+
+.management-window-help,
+.management-result-count { -fx-text-fill: -shale-color-text-secondary; }
+
+.management-window-content {
+    -fx-padding: 4px;
+    -fx-spacing: 12px;
+    -fx-background-color: transparent;
+}
+
+.management-window-scroll,
+.management-window-scroll > .viewport { -fx-background-color: transparent; }
+.management-window-scroll { -fx-border-color: transparent; -fx-padding: 0; }
+
+.management-window-footer {
+    -fx-padding: 12px 16px 16px 16px;
+    -fx-background-color: -shale-color-dialog-surface;
+    -fx-border-color: -shale-color-divider transparent transparent transparent;
+}
+
+.management-window .shale-card-surface,
+.management-window .shale-entity-card,
+.management-window .contact-classification-card {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-border-color: -shale-color-card-border;
+}
+.management-window .contact-classification-card-subdued { -fx-opacity: 1; }
+.management-window .contact-classification-card-subdued .label {
+    -fx-text-fill: -shale-color-text-secondary;
+}
+.management-window .contact-classification-metadata,
+.management-window .contact-classification-description,
+.management-window .contact-classification-dialog-context,
+.management-window .contact-classification-field-help {
+    -fx-text-fill: -shale-color-text-secondary;
+}
+.management-window .contact-classification-status-loading {
+    -fx-background-color: -shale-color-info-wash;
+    -fx-border-color: -shale-color-info-border;
+    -fx-text-fill: -shale-color-info-text;
+}
+.management-window .contact-classification-status-error,
+.management-window .contact-classification-status-stale,
+.management-window .dialog-error-text,
+.management-window .contact-classification-editor-error {
+    -fx-background-color: -shale-color-danger-wash;
+    -fx-border-color: -shale-color-danger-border;
+    -fx-text-fill: -shale-color-danger-text;
+}
+.management-window .contact-classification-empty {
+    -fx-background-color: -shale-color-surface-muted;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-text-fill: -shale-color-text-secondary;
+}
+.management-window .table-view,
+.management-window .list-view { -fx-background-color: -shale-color-card-surface; }
+.management-window .table-row-cell:selected,
+.management-window .list-cell:selected {
+    -fx-background-color: -shale-color-selection;
+    -fx-text-fill: -shale-color-text-primary;
+}
+.management-window :focused { -fx-focus-color: -shale-color-focus-ring; }
+
+.audit-management-root {
+    -fx-background-color: -shale-color-content-plane;
+    -fx-padding: 16px;
+    -fx-spacing: 12px;
+}
+.audit-management-toolbar,
+.audit-management-filters {
+    -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 12px;
+    -fx-padding: 12px;
+}
