@@ -101,6 +101,37 @@
     -fx-alignment: center-left;
 }
 
+.settings-appearance-selector {
+    -fx-spacing: 8px;
+    -fx-alignment: center-left;
+}
+
+.settings-appearance-selector > .toggle-button {
+    -fx-min-width: 96px;
+    -fx-min-height: 36px;
+    -fx-background-color: -shale-color-input-surface;
+    -fx-border-color: -shale-color-input-border;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-cursor: hand;
+}
+
+.settings-appearance-selector > .toggle-button:hover {
+    -fx-border-color: -shale-color-input-hover-border;
+}
+
+.settings-appearance-selector > .toggle-button:selected {
+    -fx-background-color: -shale-color-selected-control-background;
+    -fx-border-color: -shale-color-border-selected;
+    -fx-font-weight: 700;
+}
+
+.settings-appearance-selector > .toggle-button:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8px, 0.16, 0, 0);
+}
+
 .settings-state-message {
     -fx-padding: 8px 10px;
     -fx-background-color: -shale-color-card-surface;

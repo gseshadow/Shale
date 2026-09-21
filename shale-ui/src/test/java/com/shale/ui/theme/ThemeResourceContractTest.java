@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +29,7 @@ final class ThemeResourceContractTest {
             assertNotNull(getClass().getResource("/css/" + imports.group(1)),
                     "app.css import must resolve from the classpath: " + imports.group(1));
         }
-        assertEquals(10, importCount, "the stable production entry point includes the Phase 1B component foundation");
+        assertEquals(14, importCount, "the stable production entry point includes every established foundation stylesheet");
     }
 
     @Test
@@ -44,6 +46,16 @@ final class ThemeResourceContractTest {
             assertTrue(!css.contains("--"), "JavaFX CSS must not use browser custom properties");
         }
     }
+
+	@Test
+	void lightAndDarkExposeExactlyTheSameSemanticColorContract() throws IOException {
+		Pattern token = Pattern.compile("(?m)^\\s*(-shale-color-[a-z0-9-]+)\\s*:");
+		Set<String> light = token.matcher(read(Theme.LIGHT.stylesheetResource())).results()
+				.map(match -> match.group(1)).collect(Collectors.toSet());
+		Set<String> dark = token.matcher(read(Theme.DARK.stylesheetResource())).results()
+				.map(match -> match.group(1)).collect(Collectors.toSet());
+		assertEquals(light, dark, "Light and Dark must expose an identical semantic paint contract");
+	}
 
     private String read(String path) throws IOException {
         var resource = getClass().getResource(path);

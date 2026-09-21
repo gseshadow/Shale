@@ -8,6 +8,8 @@ import com.shale.ui.state.AppState;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 public final class UserPreferencesService {
@@ -16,7 +18,8 @@ public final class UserPreferencesService {
 
 	private final UserPreferencesDao userPreferencesDao;
 	private final AppState appState;
-	private final Map<Integer, Map<String, UserPreferenceRow>> cacheByUser = new ConcurrentHashMap<>();
+	private final Map<UserScope, Map<String, UserPreferenceRow>> cacheByUser = new ConcurrentHashMap<>();
+	private record UserScope(int tenantId, int userId) { }
 
 	public UserPreferencesService(UserPreferencesDao userPreferencesDao, AppState appState) {
 		this.userPreferencesDao = Objects.requireNonNull(userPreferencesDao, "userPreferencesDao");
@@ -54,6 +57,22 @@ public final class UserPreferencesService {
 		upsertForCurrentUser(key, value, TYPE_STRING);
 	}
 
+	/** Captures authenticated authority before dispatch and rejects a stale user switch. */
+	public CompletableFuture<Void> putStringAsync(String key, String value, Executor executor) {
+		Objects.requireNonNull(executor, "executor");
+		Integer userId = appState.getUserId();
+		Integer tenantId = appState.getShaleClientId();
+		if (userId == null || userId <= 0 || tenantId == null || tenantId <= 0) {
+			return CompletableFuture.failedFuture(new SecurityException("An authenticated user is required."));
+		}
+		return CompletableFuture.runAsync(() -> {
+			if (!Objects.equals(userId, appState.getUserId()) || !Objects.equals(tenantId, appState.getShaleClientId()))
+				throw new SecurityException("The authenticated preference session changed.");
+			userPreferencesDao.upsertPreference(tenantId, userId, key, value, TYPE_STRING, userId);
+			cacheByUser.remove(new UserScope(tenantId, userId));
+		}, executor);
+	}
+
 	public Map<String, String> listStrings() {
 		Map<String, UserPreferenceRow> all = loadAllForCurrentUser();
 		return all.entrySet().stream()
@@ -63,7 +82,8 @@ public final class UserPreferencesService {
 	public void refreshCurrentUser() {
 		Integer userId = appState.getUserId();
 		if (userId != null && userId > 0) {
-			cacheByUser.remove(userId);
+			Integer tenantId = appState.getShaleClientId();
+			if (tenantId != null && tenantId > 0) cacheByUser.remove(new UserScope(tenantId, userId));
 		}
 	}
 
@@ -83,7 +103,7 @@ public final class UserPreferencesService {
 				value,
 				type,
 				userId);
-		cacheByUser.remove(userId);
+		cacheByUser.remove(new UserScope(shaleClientId, userId));
 	}
 
 	private UserPreferenceRow getRowForCurrentUser(String key) {
@@ -99,7 +119,7 @@ public final class UserPreferencesService {
 		if (userId == null || userId <= 0 || shaleClientId == null || shaleClientId <= 0) {
 			return Map.of();
 		}
-		return cacheByUser.computeIfAbsent(userId, ignored ->
+		return cacheByUser.computeIfAbsent(new UserScope(shaleClientId, userId), ignored ->
 		{
 			var list = userPreferencesDao.listPreferencesForUser(shaleClientId, userId);
 			return list.stream()

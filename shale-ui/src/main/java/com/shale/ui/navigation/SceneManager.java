@@ -60,6 +60,8 @@ import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.WindowSizingUtil;
 import com.shale.ui.theme.ThemeManager;
+import com.shale.ui.theme.Theme;
+import com.shale.ui.theme.AppearancePreferenceService;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.LoadException;
@@ -122,6 +124,7 @@ public final class SceneManager {
 	private final ConnectivityNotificationProducer connectivityNotificationProducer;
 	private final SystemUpdateNotificationProducer systemUpdateNotificationProducer;
 	private final NotificationPreferencesService notificationPreferencesService;
+	private final AppearancePreferenceService appearancePreferenceService;
 	private CalendarController calendarController;
 	private Integer pendingCalendarNotificationEventId;
 	private PendingCaseDateRoute pendingCaseDateRoute;
@@ -159,6 +162,7 @@ public final class SceneManager {
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
 		this.notificationCenterService = createNotificationCenterService();
 		UserPreferencesService userPreferencesService = new UserPreferencesService(new UserPreferencesDao(dbSessionProvider), appState);
+		this.appearancePreferenceService = new AppearancePreferenceService(userPreferencesService);
 		this.notificationPreferencesService = new NotificationPreferencesService(appState, userPreferencesService);
 		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState, notificationPreferencesService);
 		this.notificationPollingService = new NotificationPollingService(
@@ -204,6 +208,8 @@ public final class SceneManager {
 	}
 
 	public void showLogin() {
+		if (!Platform.isFxApplicationThread()) throw new IllegalStateException("Login presentation must run on the JavaFX application thread.");
+		ThemeManager.application().setActiveTheme(Theme.LIGHT);
 		notificationStartupGeneration.incrementAndGet();
 		notificationBadgeCountGeneration.incrementAndGet();
 		Future<?> badgeCountFuture = notificationBadgeCountFuture;
@@ -229,6 +235,20 @@ public final class SceneManager {
 			return c;
 		});
 		setScene(root, "Shale — Sign in");
+	}
+
+	/** Loads on the caller's worker thread; no JavaFX work or user-supplied identity crosses this boundary. */
+	public Theme loadAppearanceForAuthenticatedUser() {
+		return appearancePreferenceService.loadForCurrentUser();
+	}
+
+	/** Applies only while the authenticated identity that initiated the load is still current. */
+	public boolean applyAppearanceBeforeMain(Theme theme, int expectedUserId, int expectedTenantId) {
+		if (!Platform.isFxApplicationThread()) throw new IllegalStateException("Appearance must be applied on the JavaFX application thread.");
+		if (!Objects.equals(appState.getUserId(), expectedUserId)
+				|| !Objects.equals(appState.getShaleClientId(), expectedTenantId)) return false;
+		ThemeManager.application().setActiveTheme(theme);
+		return true;
 	}
 
 	public void showMain() {
@@ -713,7 +733,7 @@ public final class SceneManager {
 		return load("/fxml/settings.fxml", controller ->
 		{
 			SettingsController c = (SettingsController) controller;
-			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new MaterialRequestServiceAdapter(
+			c.init(notificationPreferencesService, appearancePreferenceService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new MaterialRequestServiceAdapter(
 					new MaterialRequestDao(dbSessionProvider)), new ContactServiceAdapter(new ContactDao(dbSessionProvider)),
 					new OrganizationServiceAdapter(new OrganizationDao(dbSessionProvider),new CaseSummaryDao(dbSessionProvider)),new UserDao(dbSessionProvider), runtimeBridge);
 			return c;

@@ -56,6 +56,19 @@ final class ThemeManagerTest {
         });
     }
 
+	@Test
+	void nullSelectionAndMalformedStoredValuesResolveToLight() {
+		assertEquals(Theme.LIGHT, Theme.fromStoredValue(null));
+		assertEquals(Theme.LIGHT, Theme.fromStoredValue("unknown"));
+		assertEquals(Theme.DARK, Theme.fromStoredValue(" dark "));
+		JavaFxTestSupport.runAndWait(() -> {
+			ThemeManager manager = new ThemeManager();
+			manager.setActiveTheme(Theme.DARK);
+			manager.setActiveTheme(null);
+			assertEquals(Theme.LIGHT, manager.getActiveTheme());
+		});
+	}
+
     @Test
     void unregisterStopsPropagationAndCallsOffFxThreadFailClearly() {
     	StackPane root = JavaFxTestSupport.runAndWait(() -> {

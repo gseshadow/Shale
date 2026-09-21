@@ -8,8 +8,19 @@
             hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll settings-scroll">
   <content>
     <VBox styleClass="settings-workspace">
+      <fx:define><ToggleGroup fx:id="appearanceThemeGroup"/></fx:define>
       <VBox fx:id="personalGroup" styleClass="settings-directory-group shale-section-card">
         <Label text="Personal" styleClass="shale-subsection-title settings-group-title"/>
+        <SettingsManagementRow fx:id="appearanceRow" title="Appearance"
+            description="Choose Shale’s color theme." actionText="Open"/>
+        <VBox fx:id="appearanceContent" visible="false" managed="false" styleClass="settings-inline-content">
+          <Label text="Color theme" styleClass="app-dialog-field-label"/>
+          <HBox styleClass="settings-appearance-selector">
+            <ToggleButton fx:id="lightThemeButton" text="Light" toggleGroup="$appearanceThemeGroup" onAction="#onAppearanceSelected" accessibleText="Use Light color theme"/>
+            <ToggleButton fx:id="darkThemeButton" text="Dark" toggleGroup="$appearanceThemeGroup" onAction="#onAppearanceSelected" accessibleText="Use Dark color theme"/>
+          </HBox>
+          <Label fx:id="appearanceStatusLabel" styleClass="settings-state-message" wrapText="true"/>
+        </VBox>
         <SettingsManagementRow fx:id="notificationPreferencesRow" title="Notification Preferences"
             description="Choose generated notifications and banner behavior." actionText="Open"/>
         <VBox fx:id="notificationPreferencesContent" visible="false" managed="false" styleClass="settings-inline-content">
