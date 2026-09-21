@@ -66,7 +66,9 @@ import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
@@ -279,6 +281,10 @@ public final class MyShaleController {
 	private String overviewSortMode = OVERVIEW_SORT_DUE_ASC;
 	private VBox overviewSectionsContainer;
 	private VBox overviewWidgetsContainer;
+	private GridPane overviewDashboard;
+	private ColumnConstraints overviewPrimaryColumnConstraint;
+	private ColumnConstraints overviewBriefingColumnConstraint;
+	private boolean overviewColumnsStacked;
 	private TextField overviewSearchFieldControl;
 	private ChoiceBox<PriorityFilterOption> overviewPriorityChoiceControl;
 	private ChoiceBox<CaseFilterOption> overviewCaseChoiceControl;
@@ -1618,13 +1624,13 @@ public final class MyShaleController {
 				&& overviewSearchFieldControl != null) {
 			return;
 		}
-		FlowPane dashboard = new FlowPane(OVERVIEW_COLUMN_GAP, 12);
+		GridPane dashboard = new GridPane();
 		dashboard.getStyleClass().add("my-shale-overview-dashboard");
 		dashboard.setAlignment(Pos.TOP_LEFT);
+		dashboard.setHgap(OVERVIEW_COLUMN_GAP);
+		dashboard.setVgap(12);
 		dashboard.setMinWidth(0);
 		dashboard.setMaxWidth(Double.MAX_VALUE);
-		dashboard.prefWrapLengthProperty().bind(overviewScroll.viewportBoundsProperty()
-				.map(bounds -> Math.max(0, bounds.getWidth())));
 
 		VBox sections = new VBox(10);
 		sections.getStyleClass().add("my-shale-overview-primary-column");
@@ -1638,19 +1644,64 @@ public final class MyShaleController {
 		widgets.setMinWidth(0);
 		widgets.setMaxWidth(Double.MAX_VALUE);
 
-		sections.prefWidthProperty().bind(Bindings.createDoubleBinding(
-				() -> overviewColumnWidths(overviewScroll.getViewportBounds().getWidth())[0],
-				overviewScroll.viewportBoundsProperty()));
-		widgets.prefWidthProperty().bind(Bindings.createDoubleBinding(
-				() -> overviewColumnWidths(overviewScroll.getViewportBounds().getWidth())[1],
-				overviewScroll.viewportBoundsProperty()));
+		GridPane.setHgrow(sections, Priority.ALWAYS);
+		GridPane.setHgrow(widgets, Priority.ALWAYS);
+		GridPane.setFillWidth(sections, true);
+		GridPane.setFillWidth(widgets, true);
+		GridPane.setColumnIndex(sections, 0);
+		GridPane.setRowIndex(sections, 0);
+		GridPane.setColumnIndex(widgets, 1);
+		GridPane.setRowIndex(widgets, 0);
+
+		ColumnConstraints primary = new ColumnConstraints();
+		primary.setPercentWidth(OVERVIEW_PRIMARY_SHARE * 100);
+		primary.setHgrow(Priority.ALWAYS);
+		primary.setFillWidth(true);
+		ColumnConstraints briefing = new ColumnConstraints();
+		briefing.setPercentWidth((1 - OVERVIEW_PRIMARY_SHARE) * 100);
+		briefing.setHgrow(Priority.ALWAYS);
+		briefing.setFillWidth(true);
+		dashboard.getColumnConstraints().setAll(primary, briefing);
 
 		sections.getChildren().add(buildOverviewControlBar());
 		widgets.getChildren().setAll(buildOverviewDashboardWidgets());
+		overviewDashboard = dashboard;
+		overviewPrimaryColumnConstraint = primary;
+		overviewBriefingColumnConstraint = briefing;
 		overviewSectionsContainer = sections;
 		overviewWidgetsContainer = widgets;
 		dashboard.getChildren().setAll(sections, widgets);
 		overviewMainRow.getChildren().setAll(dashboard);
+		overviewScroll.viewportBoundsProperty().addListener((observable, oldBounds, newBounds) ->
+				updateOverviewColumnLayout(newBounds.getWidth()));
+		updateOverviewColumnLayout(overviewScroll.getViewportBounds().getWidth());
+	}
+
+	private void updateOverviewColumnLayout(double viewportWidth) {
+		if (overviewDashboard == null || overviewSectionsContainer == null || overviewWidgetsContainer == null) {
+			return;
+		}
+		boolean stackColumns = viewportWidth < OVERVIEW_TWO_COLUMN_BREAKPOINT;
+		if (stackColumns == overviewColumnsStacked) {
+			return;
+		}
+		overviewColumnsStacked = stackColumns;
+		GridPane.setColumnIndex(overviewSectionsContainer, 0);
+		GridPane.setRowIndex(overviewSectionsContainer, 0);
+		if (stackColumns) {
+			GridPane.setColumnIndex(overviewWidgetsContainer, 0);
+			GridPane.setRowIndex(overviewWidgetsContainer, 1);
+			overviewPrimaryColumnConstraint.setPercentWidth(100);
+			overviewDashboard.getColumnConstraints().setAll(overviewPrimaryColumnConstraint);
+		} else {
+			GridPane.setColumnIndex(overviewWidgetsContainer, 1);
+			GridPane.setRowIndex(overviewWidgetsContainer, 0);
+			overviewPrimaryColumnConstraint.setPercentWidth(OVERVIEW_PRIMARY_SHARE * 100);
+			overviewBriefingColumnConstraint.setPercentWidth((1 - OVERVIEW_PRIMARY_SHARE) * 100);
+			overviewDashboard.getColumnConstraints().setAll(
+					overviewPrimaryColumnConstraint,
+					overviewBriefingColumnConstraint);
+		}
 	}
 
 	static double[] overviewColumnWidths(double viewportWidth) {

@@ -1,6 +1,8 @@
 package com.shale.ui.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDateTime;
@@ -20,8 +22,10 @@ import com.shale.ui.theme.ThemeManager;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 
 final class MyShaleControllerBoardLayoutTest {
@@ -246,13 +250,15 @@ final class MyShaleControllerBoardLayoutTest {
 		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 		String css = Files.readString(Path.of("src/main/resources/css/foundation/cards.css"));
 
-		assertTrue(source.contains("FlowPane dashboard = new FlowPane(OVERVIEW_COLUMN_GAP, 12)"),
-				"Overview columns should wrap instead of forcing page-level horizontal scrolling");
+		assertTrue(source.contains("GridPane dashboard = new GridPane()"),
+				"Overview columns should use deterministic GridPane coordinates");
+		assertFalse(source.contains("FlowPane dashboard = new FlowPane(OVERVIEW_COLUMN_GAP, 12)"),
+				"The Overview host must not delegate wrapping to FlowPane");
 		assertTrue(source.contains("OVERVIEW_PRIMARY_SHARE = 0.625")
-						&& source.contains("overviewColumnWidths(overviewScroll.getViewportBounds().getWidth())"),
-				"Overview should distribute the viewport responsively with primary-column emphasis");
-		assertTrue(source.contains("dashboard.prefWrapLengthProperty().bind(overviewScroll.viewportBoundsProperty()"),
-				"Overview wrapping should follow the authoritative page-scroll viewport");
+						&& source.contains("updateOverviewColumnLayout(newBounds.getWidth())"),
+				"Overview should switch explicit GridPane coordinates at the viewport breakpoint");
+		assertFalse(source.contains("dashboard.prefWrapLengthProperty()"),
+				"The GridPane Overview host must not retain FlowPane wrap-length behavior");
 		assertTrue(source.contains("widgets.setMaxWidth(Double.MAX_VALUE)"),
 				"The briefing column must not retain its former 430px total-width cap");
         int radarIndex = source.indexOf("buildCaseRadarWidget()");
@@ -290,15 +296,18 @@ final class MyShaleControllerBoardLayoutTest {
 	}
 
 	@Test
-	void renderedOverviewFillsThemeManagedViewportAtRepresentativeWidths() {
+	void renderedOverviewUsesGridCoordinatesAndPreservesColumnsAcrossBreakpointChanges() {
 		JavaFxTestSupport.runAndWait(() -> {
-			for (double sceneWidth : List.of(760.0, 1100.0, 1366.0, 1600.0, 1920.0)) {
+			for (double sceneWidth : List.of(760.0, 1600.0, 1920.0)) {
 				FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/my-shale.fxml"));
 				Parent root = loader.load();
 				MyShaleController controller = loader.getController();
 				Method ensureShell = MyShaleController.class.getDeclaredMethod("ensureOverviewContentShell");
 				ensureShell.setAccessible(true);
 				ensureShell.invoke(controller);
+				Method renderSections = MyShaleController.class.getDeclaredMethod("renderOverviewSections", List.class);
+				renderSections.setAccessible(true);
+				renderSections.invoke(controller, List.of());
 
 				Scene scene = new Scene(root, sceneWidth, 900);
 				ThemeManager.application().register(scene);
@@ -309,7 +318,11 @@ final class MyShaleControllerBoardLayoutTest {
 				VBox content = field(controller, "overviewMainRow", VBox.class);
 				VBox primary = field(controller, "overviewSectionsContainer", VBox.class);
 				VBox briefing = field(controller, "overviewWidgetsContainer", VBox.class);
-				FlowPane dashboard = (FlowPane) root.lookup(".my-shale-overview-dashboard");
+				Object dashboardNode = root.lookup(".my-shale-overview-dashboard");
+				GridPane dashboard = assertInstanceOf(GridPane.class, dashboardNode,
+						"The production Overview dashboard host must be a GridPane.");
+				assertFalse(dashboardNode instanceof FlowPane,
+						"The production Overview dashboard host must not remain a FlowPane.");
 				double viewportWidth = scroll.getViewportBounds().getWidth();
 
 				assertTrue(content.getWidth() >= viewportWidth - 2,
@@ -317,18 +330,57 @@ final class MyShaleControllerBoardLayoutTest {
 				assertTrue(dashboard.getWidth() >= viewportWidth * 0.90,
 						"Overview host must use at least 90% of its viewport at " + sceneWidth + "px.");
 				if (viewportWidth >= 800) {
-					assertEquals(primary.getLayoutY(), briefing.getLayoutY(), 1.5,
+					assertEquals(0, GridPane.getColumnIndex(primary));
+					assertEquals(0, GridPane.getRowIndex(primary));
+					assertEquals(1, GridPane.getColumnIndex(briefing));
+					assertEquals(0, GridPane.getRowIndex(briefing));
+					assertEquals(2, dashboard.getColumnConstraints().size());
+					assertEquals(primary.getBoundsInParent().getMinY(), briefing.getBoundsInParent().getMinY(), 1.5,
 							"Desktop columns must remain side by side at " + sceneWidth + "px.");
-					assertTrue(primary.getWidth() > briefing.getWidth() && briefing.getWidth() > 300,
-							"Both desktop columns must grow while retaining primary emphasis.");
+					assertTrue(briefing.getBoundsInParent().getMinX() > primary.getBoundsInParent().getMaxX(),
+							"The briefing column must render to the right of the primary column.");
+					double allocatedWidth = primary.getWidth() + briefing.getWidth();
+					assertEquals(0.625, primary.getWidth() / allocatedWidth, 0.015);
+					assertEquals(0.375, briefing.getWidth() / allocatedWidth, 0.015);
 				} else {
-					assertTrue(briefing.getLayoutY() >= primary.getBoundsInParent().getMaxY() - 1,
+					assertEquals(0, GridPane.getColumnIndex(primary));
+					assertEquals(0, GridPane.getRowIndex(primary));
+					assertEquals(0, GridPane.getColumnIndex(briefing));
+					assertEquals(1, GridPane.getRowIndex(briefing));
+					assertEquals(1, dashboard.getColumnConstraints().size());
+					assertEquals(100, dashboard.getColumnConstraints().get(0).getPercentWidth(), 0.01);
+					assertTrue(briefing.getBoundsInParent().getMinY() >= primary.getBoundsInParent().getMaxY() - 1,
 							"The briefing column must stack below primary at narrow width.");
 					assertEquals(viewportWidth, primary.getWidth(), 2.5);
 					assertEquals(viewportWidth, briefing.getWidth(), 2.5);
 				}
-				System.out.printf("My Shale %.0fpx: viewport=%.1f dashboard=%.1f primary=%.1f briefing=%.1f%n",
-						sceneWidth, viewportWidth, dashboard.getWidth(), primary.getWidth(), briefing.getWidth());
+				assertEquals(List.of("Today’s Tasks", "Upcoming", "Later"), directSectionTitles(primary),
+						"Task sections must remain in the primary column below its filter toolbar.");
+				assertEquals(List.of("Case Radar", "Important Dates", "Recent Case Activity", "Notifications", "My Case Summary"),
+						directSectionTitles(briefing), "Briefing widgets must retain their production order.");
+				int primaryChildren = primary.getChildren().size();
+				int briefingChildren = briefing.getChildren().size();
+				Method updateColumns = MyShaleController.class.getDeclaredMethod("updateOverviewColumnLayout", double.class);
+				updateColumns.setAccessible(true);
+				updateColumns.invoke(controller, 700.0);
+				root.layout();
+				updateColumns.invoke(controller, 1600.0);
+				root.layout();
+				updateColumns.invoke(controller, viewportWidth);
+				root.layout();
+				assertEquals(primaryChildren, primary.getChildren().size(), "Breakpoint changes must not duplicate task sections.");
+				assertEquals(briefingChildren, briefing.getChildren().size(), "Breakpoint changes must not duplicate widgets.");
+				assertTrue(dashboard.getChildren().containsAll(List.of(primary, briefing))
+						&& dashboard.getChildren().size() == 2, "Breakpoint changes must preserve both column nodes.");
+				assertEquals(ScrollPane.ScrollBarPolicy.NEVER, scroll.getHbarPolicy());
+				assertTrue(scroll.lookupAll(".scroll-bar").stream()
+						.filter(ScrollBar.class::isInstance).map(ScrollBar.class::cast)
+						.filter(bar -> bar.getOrientation() == javafx.geometry.Orientation.HORIZONTAL)
+						.noneMatch(Node::isVisible), "No horizontal scrollbar may appear.");
+				System.out.printf("My Shale %.0fpx: viewport=%.1f dashboard=%.1f primary=[%.1f,%.1f %.1fx%.1f] briefing=[%.1f,%.1f %.1fx%.1f]%n",
+						sceneWidth, viewportWidth, dashboard.getWidth(),
+						primary.getBoundsInParent().getMinX(), primary.getBoundsInParent().getMinY(), primary.getWidth(), primary.getHeight(),
+						briefing.getBoundsInParent().getMinX(), briefing.getBoundsInParent().getMinY(), briefing.getWidth(), briefing.getHeight());
 
 				Method selectSection = MyShaleController.class.getDeclaredMethod("applySectionSelectionState", String.class);
 				selectSection.setAccessible(true);
@@ -345,6 +397,18 @@ final class MyShaleControllerBoardLayoutTest {
 				ThemeManager.application().unregister(scene);
 			}
 		});
+	}
+
+	private static List<String> directSectionTitles(VBox column) {
+		return column.getChildren().stream()
+				.map(node -> node.lookup(".dashboard-widget-title") != null
+						? node.lookup(".dashboard-widget-title")
+						: node instanceof VBox box && !box.getChildren().isEmpty() ? box.getChildren().get(0) : null)
+				.filter(javafx.scene.control.Labeled.class::isInstance)
+				.map(javafx.scene.control.Labeled.class::cast)
+				.map(javafx.scene.control.Labeled::getText)
+				.map(text -> text.replaceFirst(" \\(\\d+\\)$", ""))
+				.toList();
 	}
 
 	private static <T> T field(Object target, String name, Class<T> type) throws Exception {
