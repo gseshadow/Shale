@@ -32,12 +32,12 @@
     -shale-color-border: rgba(15.0, 35.0, 66.0, 0.16);
 
     /* Phase 1B canonical semantic paint vocabulary. */
-    -shale-color-application-canvas: rgba(0, 0, 0, 0.00);
     -shale-color-application-chrome: #0b234d;
     -shale-color-navigation: #102f5d;
     -shale-color-navigation-hover: #173f76;
     -shale-color-navigation-selected: #1677f2;
     -shale-color-application-canvas: rgba(205, 220, 237, 0.25);
+    -shale-color-content-plane: #f8fafd;
     -shale-color-section-surface: #f2f6fc;
     -shale-color-card-surface: #ffffff;
     -shale-color-card-hover: #f5f9ff;

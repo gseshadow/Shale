@@ -118,6 +118,17 @@ LTRIM(RTRIM(CONCAT(u.name_first, ' ', u.name_last)))
 
 ---
 
+## dbo.UserPreferences
+
+Reusable strict-tenant per-user key/value preferences. The composite `(ShaleClientId, UserId, PreferenceKey)`
+is unique and runtime reads/writes always include both authenticated identifiers. Phase 7 reuses this table for
+`appearance.theme`, constrains that key to `ValueType = STRING` and `PreferenceValue IN ('LIGHT','DARK')`, and
+adds the existing strict `sec.fn_FilterByTenant` predicate through `TenantFilter`. Missing, inaccessible, or
+malformed Appearance data is interpreted by the application as Light. Appearance does not add `RowVer`; the
+existing preference store's last-write-wins upsert contract remains authoritative.
+
+---
+
 ## dbo.Cases
 
 Primary case table.

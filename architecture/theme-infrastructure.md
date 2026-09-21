@@ -79,3 +79,16 @@ the back affordance, and notification bell retain narrowly scoped shell classes 
 content remains inside the shared content plane but continues to own its internal scrolling. Case section
 navigation remains owned by `AppSectionTabs` and its horizontal scroll boundary, so this phase does not move
 or restyle Case Overview content, the case header, stage history, detail areas, Primary Link, or Updates rail.
+
+## Phase 7 authenticated Appearance preference
+
+Light remains the unauthenticated and failure-safe default. The existing `dbo.UserPreferences` store owns the
+typed `appearance.theme` value (`LIGHT` or `DARK`) for the current tenant/user; no theme-specific table or
+machine-local preference is used. Authentication resolves the value on its worker thread and applies it through
+`ThemeManager` on the JavaFX thread before constructing or revealing the main shell. Identity checks discard a
+completion belonging to a prior session. Logout/login presentation resets the manager to Light.
+
+Settings > Personal exposes only Light and Dark. Selection previews immediately and persistence is asynchronous.
+Failure restores the last confirmed theme and reports a sanitized inline error. This personal presentation
+preference is intentionally not written to the entity-action audit log: it changes no domain, administrative,
+authorization, or sensitive data, while `UpdatedAt`/`UpdatedByUserId` retain store-level provenance.

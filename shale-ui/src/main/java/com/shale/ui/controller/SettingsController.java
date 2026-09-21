@@ -23,13 +23,19 @@ import com.shale.ui.state.AppState;
 import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.ControlAvailability;
+import com.shale.ui.theme.AppearancePreferenceService;
+import com.shale.ui.theme.Theme;
+import com.shale.ui.theme.ThemeManager;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.WeakChangeListener;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Button;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.Node;
 import javafx.stage.Window;
 import javafx.scene.layout.HBox;
@@ -110,11 +116,23 @@ public final class SettingsController {
 	private Button manageCustomDictionaryButton;
 	@FXML private SettingsManagementRow notificationPreferencesRow;
 	@FXML private VBox notificationPreferencesContent;
+	@FXML private SettingsManagementRow appearanceRow;
+	@FXML private VBox appearanceContent;
+	@FXML private ToggleButton lightThemeButton, darkThemeButton;
+	@FXML private Label appearanceStatusLabel;
 	@FXML private SettingsManagementRow userManagementRow;
 	@FXML private VBox personalGroup, caseConfigurationGroup, requestConfigurationGroup,
 			contactOrganizationConfigurationGroup, administrationGroup;
 
 	private NotificationPreferencesService notificationPreferencesService;
+	private AppearancePreferenceService appearancePreferenceService;
+	private Theme confirmedAppearance = Theme.LIGHT;
+	private boolean restoringAppearance;
+	private int appearanceSaveGeneration;
+	private Integer appearanceUserId, appearanceTenantId;
+	private boolean appearanceThemeListenerInstalled;
+	private final ChangeListener<Theme> appearanceThemeListener = (observable, previous, current) ->
+			selectAppearance(current == null ? Theme.LIGHT : current);
 	private AppState appState;
 	private CaseServicePort caseService;
 	private MaterialRequestServicePort materialRequestService;
@@ -132,6 +150,12 @@ public final class SettingsController {
 		thread.setDaemon(true);
 		return thread;
 	});
+	private final ExecutorService appearanceSaveExecutor = Executors.newSingleThreadExecutor(runnable ->
+	{
+		Thread thread = new Thread(runnable, "appearance-preference-saver");
+		thread.setDaemon(true);
+		return thread;
+	});
 
 	@FXML
 	private void initialize() {
@@ -146,6 +170,7 @@ public final class SettingsController {
 		if (notificationPreferencesService != null) {
 			loadFromPreferences();
 		}
+		if (appearancePreferenceService != null) configureAppearance();
 	}
 
 	private void bindDirectoryRows() {
@@ -160,12 +185,65 @@ public final class SettingsController {
 		manageOrganizationTypesButton = bind(organizationTypesRow, this::onManageOrganizationTypes);
 		viewAuditLogButton = bind(auditLogRow, this::onViewAuditLog);
 		bind(notificationPreferencesRow, event -> toggleInline(notificationPreferencesContent, notificationPreferencesRow, false));
+		bind(appearanceRow, event -> toggleInline(appearanceContent, appearanceRow, false));
 		bind(userManagementRow, this::onManageUsers);
 		bind(caseDateMappingsRow, event -> {
 			boolean opening = !caseDateRoleMappingsContent.isManaged();
 			toggleInline(caseDateRoleMappingsContent, caseDateMappingsRow, false);
 			if (opening) loadCaseDateRoleMappingsAsync(null);
 		});
+	}
+
+	@FXML
+	private void onAppearanceSelected(ActionEvent event) {
+		if (restoringAppearance || appearancePreferenceService == null) return;
+		Theme selected = event != null && event.getSource() == darkThemeButton ? Theme.DARK : Theme.LIGHT;
+		if (selected == ThemeManager.application().getActiveTheme()) {
+			selectAppearance(selected);
+			return;
+		}
+		ThemeManager.application().setActiveTheme(selected);
+		selectAppearance(selected);
+		appearanceStatusLabel.setText("Saving appearance…");
+		int generation = ++appearanceSaveGeneration;
+		appearancePreferenceService.saveForCurrentUser(selected, appearanceSaveExecutor).whenComplete((ignored, failure) ->
+				Platform.runLater(() -> finishAppearanceSave(generation, selected, failure)));
+	}
+
+	private void finishAppearanceSave(int generation, Theme selected, Throwable failure) {
+		if (generation != appearanceSaveGeneration) return;
+		if (appState == null || !Objects.equals(appearanceUserId, appState.getUserId())
+				|| !Objects.equals(appearanceTenantId, appState.getShaleClientId())) return;
+		if (failure == null) {
+			confirmedAppearance = selected;
+			appearanceStatusLabel.setText("Appearance saved.");
+			return;
+		}
+		LOG.warn("Appearance preference could not be saved; restoring the confirmed theme.");
+		restoringAppearance = true;
+		try {
+			ThemeManager.application().setActiveTheme(confirmedAppearance);
+			selectAppearance(confirmedAppearance);
+			appearanceStatusLabel.setText("Appearance could not be saved. Your previous theme was restored.");
+		} finally {
+			restoringAppearance = false;
+		}
+	}
+
+	private void configureAppearance() {
+		appearanceUserId = appState == null ? null : appState.getUserId();
+		appearanceTenantId = appState == null ? null : appState.getShaleClientId();
+		confirmedAppearance = ThemeManager.application().getActiveTheme();
+		selectAppearance(confirmedAppearance);
+		if (!appearanceThemeListenerInstalled) {
+			appearanceThemeListenerInstalled = true;
+			ThemeManager.application().activeThemeProperty().addListener(new WeakChangeListener<>(appearanceThemeListener));
+		}
+	}
+
+	private void selectAppearance(Theme theme) {
+		if (lightThemeButton != null) lightThemeButton.setSelected(theme != Theme.DARK);
+		if (darkThemeButton != null) darkThemeButton.setSelected(theme == Theme.DARK);
 	}
 
 	private static Button bind(SettingsManagementRow row, javafx.event.EventHandler<ActionEvent> handler) {
@@ -224,6 +302,17 @@ public final class SettingsController {
 			loadFromPreferences();
 			updateAdminControlsVisibility();
 		}
+	}
+
+	public void init(NotificationPreferencesService notificationPreferencesService,
+			AppearancePreferenceService appearancePreferenceService, AppState appState, Runnable onOpenAuditLog,
+			CaseServicePort caseService, MaterialRequestServicePort materialRequestService,
+			ContactServicePort contactService, OrganizationServicePort organizationService,
+			UserDao userDao, UiRuntimeBridge runtimeBridge) {
+		this.appearancePreferenceService = Objects.requireNonNull(appearancePreferenceService, "appearancePreferenceService");
+		init(notificationPreferencesService, appState, onOpenAuditLog, caseService, materialRequestService,
+				contactService, organizationService, userDao, runtimeBridge);
+		if (fxmlReady) configureAppearance();
 	}
 
 	public void init(NotificationPreferencesService notificationPreferencesService, AppState appState, Runnable onOpenAuditLog, CaseServicePort caseService,

@@ -9,7 +9,6 @@ import java.util.Objects;
 import java.util.WeakHashMap;
 
 import javafx.application.Platform;
-import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.collections.ObservableList;
@@ -60,7 +59,7 @@ public final class ThemeManager {
 
     public void setActiveTheme(Theme theme) {
         requireFxThread();
-        Theme requested = Objects.requireNonNull(theme, "theme");
+        Theme requested = theme == null ? Theme.LIGHT : theme;
         if (requested == activeTheme.get()) return;
         activeTheme.set(requested);
         for (Object target : liveTargets()) install(target);

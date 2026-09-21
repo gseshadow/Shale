@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 
 public final class UserPreferencesDao {
+	private static final String APPEARANCE_THEME_KEY = "appearance.theme";
 	private final DbSessionProvider db;
 
 	public UserPreferencesDao(DbSessionProvider db) {
@@ -63,6 +64,7 @@ public final class UserPreferencesDao {
 		if (preferenceKey == null || preferenceKey.isBlank()) {
 			return;
 		}
+		validatePreferenceValue(preferenceKey, preferenceValue, valueType);
 		upsertPreferences(
 				shaleClientId,
 				userId,
@@ -102,6 +104,7 @@ public final class UserPreferencesDao {
 				if (key == null || key.isBlank() || value == null) {
 					continue;
 				}
+				validatePreferenceValue(key, value.value(), value.valueType());
 
 				update.setString(1, value.value());
 				update.setString(2, value.valueType());
@@ -124,6 +127,13 @@ public final class UserPreferencesDao {
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to upsert user preferences", e);
+		}
+	}
+
+	private static void validatePreferenceValue(String key, String value, String valueType) {
+		if (APPEARANCE_THEME_KEY.equals(key)
+				&& (!("LIGHT".equals(value) || "DARK".equals(value)) || !"STRING".equals(valueType))) {
+			throw new IllegalArgumentException("Appearance theme must be LIGHT or DARK.");
 		}
 	}
 
