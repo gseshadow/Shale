@@ -22,6 +22,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
+import javafx.stage.Stage;
 import javafx.stage.Window;
 
 /** Presentation-only shell shared by independently composed definition managers. */
@@ -53,13 +54,11 @@ public final class DefinitionManagementWindow {
         AppDialogs.applySecondaryDialogShell(dialog, title);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
 
-        Label heading = new Label(title);
-        heading.getStyleClass().add("app-dialog-title");
         Label help = new Label(helpText);
-        help.getStyleClass().add("search-summary-text");
+        help.getStyleClass().addAll("search-summary-text", "management-window-help");
         help.setWrapText(true);
-        VBox header = new VBox(6, heading, help);
-        header.setPadding(new Insets(16));
+        VBox header = new VBox(help);
+        header.getStyleClass().add("management-window-header");
 
         Node body = contentMode == ContentMode.SCROLLABLE ? scrollable(content) : content;
         BorderPane.setMargin(body, new Insets(0, 16, 0, 16));
@@ -68,10 +67,14 @@ public final class DefinitionManagementWindow {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox footer = new HBox(8, spacer, done);
-        footer.setPadding(new Insets(12, 16, 16, 16));
+        footer.getStyleClass().add("management-window-footer");
         BorderPane root = new BorderPane(body, header, null, footer, null);
+        root.getStyleClass().add("management-window-content");
+        content.getStyleClass().add("management-manager-root");
+        dialog.getDialogPane().getStyleClass().add("management-window");
         dialog.getDialogPane().setContent(root);
         dialog.getDialogPane().setPrefSize(900, 700);
+        dialog.getDialogPane().setMinSize(680, 520);
         dialog.getDialogPane().lookupButton(ButtonType.CLOSE).setVisible(false);
         dialog.getDialogPane().lookupButton(ButtonType.CLOSE).setManaged(false);
 
@@ -83,6 +86,12 @@ public final class DefinitionManagementWindow {
             onClosed.accept(new DefinitionManagementResult(changed.getAsBoolean()));
             if (owner != null && owner.isShowing()) owner.requestFocus();
         });
+        dialog.setOnShown(e -> {
+            Window window = dialog.getDialogPane().getScene().getWindow();
+            if (window instanceof Stage stage) {
+                com.shale.ui.util.WindowSizingUtil.sizeModalStage(stage, owner, 900, 700, 680, 520);
+            }
+        });
         dialog.show();
         dialog.getDialogPane().requestFocus();
     }
@@ -90,7 +99,7 @@ public final class DefinitionManagementWindow {
     private static ScrollPane scrollable(Node content) {
         ScrollPane scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
-        scroll.getStyleClass().add("transparent-scroll");
+        scroll.getStyleClass().addAll("transparent-scroll", "management-window-scroll");
         return scroll;
     }
 }

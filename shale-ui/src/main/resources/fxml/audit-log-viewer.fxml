@@ -16,20 +16,18 @@
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.shale.ui.controller.AuditLogViewerController"
       spacing="10"
-      styleClass="glass-panel">
+      styleClass="audit-management-root">
     <padding>
         <Insets top="12" right="12" bottom="12" left="12"/>
     </padding>
 
-    <Label text="Audit Log" styleClass="search-section-title"/>
-
-    <HBox spacing="8" alignment="CENTER_LEFT">
+        <HBox spacing="8" alignment="CENTER_LEFT" styleClass="audit-management-toolbar">
         <Label text="View"/>
         <ComboBox fx:id="modeComboBox" prefWidth="160"/>
     </HBox>
     <Label text="Read-only audit entries. Newest entries appear first." styleClass="search-summary-text" wrapText="true"/>
 
-    <GridPane hgap="8" vgap="8">
+    <GridPane hgap="8" vgap="8" styleClass="audit-management-filters">
         <columnConstraints>
             <javafx.scene.layout.ColumnConstraints percentWidth="16"/>
             <javafx.scene.layout.ColumnConstraints percentWidth="17"/>
@@ -64,7 +62,7 @@
         </Label>
     </HBox>
 
-    <TableView fx:id="auditTable" VBox.vgrow="ALWAYS">
+    <TableView fx:id="auditTable" styleClass="shale-table" VBox.vgrow="ALWAYS">
         <columns>
             <TableColumn fx:id="entryDateColumn" text="EntryDate" prefWidth="170"/>
             <TableColumn fx:id="userIdColumn" text="User / UserId" prefWidth="150"/>

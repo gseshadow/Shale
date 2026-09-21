@@ -68,6 +68,26 @@ final class DefinitionManagementInfrastructureTest {
                 "the shared window must select layout by mode rather than by feature class");
     }
 
+    @Test void sharedWindowOwnsOneTitleThemeAndA2ManagementVocabulary() throws Exception {
+        String window = read("component/DefinitionManagementWindow.java");
+        String appCss = Files.readString(Path.of("src/main/resources/css/app.css"));
+        String managementCss = Files.readString(Path.of("src/main/resources/css/foundation/management.css"));
+
+        assertTrue(window.contains("applySecondaryDialogShell(dialog, title)"),
+                "the themed secondary shell must own the canonical title");
+        assertFalse(window.contains("new Label(title)"),
+                "manager content must not duplicate the title already owned by the shell");
+        assertTrue(window.contains("Modality.WINDOW_MODAL"), "manager modality must remain window-modal");
+        assertTrue(window.contains("sizeModalStage(stage, owner, 900, 700, 680, 520)"),
+                "manager sizing must be owner-screen aware and retain usable minimums");
+        assertTrue(appCss.contains("@import \"foundation/management.css\";"),
+                "the focused management foundation must be loaded by the theme entry point");
+        for (String selector : List.of(".management-window", ".management-window-header",
+                ".management-window-content", ".management-window-footer", ".audit-management-root")) {
+            assertTrue(managementCss.contains(selector), "missing shared management selector " + selector);
+        }
+    }
+
     private static String read(String relative) throws Exception {
         return Files.readString(MAIN.resolve(relative));
     }
