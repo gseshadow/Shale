@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -32,6 +33,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	private volatile LiveBus liveBus;
 	private volatile Integer lastUserId;
 	private volatile Integer lastShaleClientId;
+	private final AtomicLong sessionGeneration = new AtomicLong();
 
 	public DesktopUiRuntimeBridge(
 			LiveEventDispatcher dispatcher,
@@ -45,6 +47,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	@Override
 	public void onLoginSuccess(int userId, int shaleClientId, String email) {
+		long generation = sessionGeneration.incrementAndGet();
 
 		log.info("Login success: userId={} tenantId={} emailConfigured={}", userId, shaleClientId, email != null && !email.isBlank());
 
@@ -53,10 +56,10 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		lastUserId = userId;
 		lastShaleClientId = shaleClientId;
 
-		tryConnectLiveBus(shaleClientId, userId);
+		tryConnectLiveBus(shaleClientId, userId, generation);
 	}
 
-	private void tryConnectLiveBus(int shaleClientId, int userId) {
+	private void tryConnectLiveBus(int shaleClientId, int userId, long generation) {
 		if (negotiateEndpointUrl == null || negotiateEndpointUrl.isBlank()) {
 			log.info("LiveBus disabled: negotiate endpoint is not configured.");
 			return;
@@ -75,6 +78,10 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			bus.connectAndJoin()
 					.whenComplete((ok, ex) ->
 					{
+						if (generation != sessionGeneration.get()) {
+							bus.shutdown();
+							return;
+						}
 						if (ex != null) {
 							log.warn("LiveBus connect failed: {}", ex.getMessage());
 							dispatcher.dispatchConnectivity(false, "Connect failed");
@@ -91,6 +98,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	@Override
 	public void onLogout() {
+		sessionGeneration.incrementAndGet();
 		LiveBus bus = liveBus;
 		liveBus = null;
 		if (bus != null) {

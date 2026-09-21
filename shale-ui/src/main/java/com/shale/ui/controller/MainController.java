@@ -232,19 +232,7 @@ public final class MainController {
 
 	@FXML
 	private void onLogout() {
-		System.out.println("MainController.onLogout()");// TODO remove
-
-		runtimeBridge.onLogout();
-
-		if (appState != null) {
-			appState.setUserId(0);
-			appState.setShaleClientId(0);
-			appState.setUserEmail(null);
-			appState.setAdmin(false);
-			appState.setAttorney(false);
-		}
-
-		sceneManager.showLogin();
+		sceneManager.logout();
 	}
 
 	@FXML
