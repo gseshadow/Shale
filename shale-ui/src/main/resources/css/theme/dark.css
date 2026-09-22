@@ -112,6 +112,14 @@
     -shale-color-validation-error: #ff7187;
     -shale-color-parties-section-surface: #30284a;
     -shale-color-parties-section-border: #7962ad;
+    -shale-color-intake-caller-surface: #20364f;
+    -shale-color-intake-caller-border: #42698f;
+    -shale-color-intake-client-surface: #203f36;
+    -shale-color-intake-client-border: #437a67;
+    -shale-color-intake-case-surface: #443a28;
+    -shale-color-intake-case-border: #806b42;
+    -shale-color-intake-incident-surface: #422d45;
+    -shale-color-intake-incident-border: #79547d;
     -shale-opacity-disabled: 0.52;
     -shale-color-card-shadow: rgba(0, 0, 0, 0.32);
 }

@@ -79,6 +79,7 @@
                         </VBox>
 
                         <VBox fx:id="partiesSection" spacing="12" maxWidth="1.7976931348623157E308"
+                              maxHeight="-Infinity" GridPane.valignment="TOP"
                               GridPane.columnIndex="1" GridPane.rowIndex="1"
                               styleClass="shale-section-card new-intake-section new-intake-parties-section">
                             <HBox alignment="CENTER_LEFT" spacing="8"><Label text="Parties" styleClass="shale-section-title"/><Region HBox.hgrow="ALWAYS"/><Button fx:id="addPartyButton" text="Add Party" accessibleText="Add a pending case party"/></HBox>

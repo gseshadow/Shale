@@ -92,6 +92,8 @@ public final class NewIntakeController {
 	@FXML private VBox caseSection;
 	@FXML private VBox partiesSection;
 	@FXML private VBox incidentSection;
+	private final VBox wideLeftIntakeColumn = new VBox(16);
+	private final VBox wideRightIntakeColumn = new VBox(16);
 
 	@FXML private TextField caseNameField;
 	@FXML private TextField timeOfIntakeField;
@@ -306,6 +308,9 @@ public final class NewIntakeController {
 		boolean narrow = width > 0 && width < INTAKE_STACK_BREAKPOINT;
 		if (narrowIntakeLayout != null && narrowIntakeLayout == narrow) return;
 		narrowIntakeLayout = narrow;
+		intakeWorkspace.getChildren().clear();
+		wideLeftIntakeColumn.getChildren().clear();
+		wideRightIntakeColumn.getChildren().clear();
 		if (narrow) {
 			intakeWorkspace.getColumnConstraints().setAll(leftWorkspaceColumn);
 			leftWorkspaceColumn.setPercentWidth(100);
@@ -318,11 +323,10 @@ public final class NewIntakeController {
 			leftWorkspaceColumn.setPercentWidth(45);
 			rightWorkspaceColumn.setPercentWidth(55);
 			intakeWorkspace.getColumnConstraints().setAll(leftWorkspaceColumn, rightWorkspaceColumn);
-			placeSection(callerSection, 0, 0);
-			placeSection(clientSection, 0, 1);
-			placeSection(caseSection, 1, 0);
-			placeSection(partiesSection, 1, 1);
-			placeSection(incidentSection, 1, 2);
+			wideLeftIntakeColumn.getChildren().setAll(callerSection, clientSection);
+			wideRightIntakeColumn.getChildren().setAll(caseSection, partiesSection, incidentSection);
+			placeSection(wideLeftIntakeColumn, 0, 0);
+			placeSection(wideRightIntakeColumn, 1, 0);
 		}
 	}
 
@@ -330,6 +334,7 @@ public final class NewIntakeController {
 		GridPane.setColumnIndex(section, column);
 		GridPane.setRowIndex(section, row);
 		GridPane.setHgrow(section, Priority.ALWAYS);
+		GridPane.setVgrow(section, Priority.NEVER);
 	}
 
 	private void configureDatesAuthorization() {
