@@ -18,7 +18,7 @@
       xmlns:fx="http://javafx.com/fxml"
       fx:controller="com.shale.ui.controller.CalendarController"
       spacing="12"
-      styleClass="content-root shell-transparent calendar-page-root">
+      styleClass="content-root, shell-transparent, calendar-page-root">
     <children>
         <VBox fx:id="calendarOverlaySidebar" spacing="10" styleClass="calendar-overlay-sidebar">
             <children>
@@ -38,10 +38,10 @@
                 <VBox spacing="6" styleClass="calendar-sidebar-layers-section">
                     <children>
                         <Label text="Layers" styleClass="calendar-sidebar-section-heading" />
-                        <CheckBox fx:id="eventsLayerCheckBox" text="Events" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
-                        <CheckBox fx:id="tasksLayerCheckBox" text="Tasks" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
-                        <CheckBox fx:id="deadlinesLayerCheckBox" text="Deadlines" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
-                        <CheckBox fx:id="caseDatesLayerCheckBox" text="Case Dates" mnemonicParsing="false" styleClass="notification-filter-check calendar-layer-check" />
+                        <CheckBox fx:id="eventsLayerCheckBox" text="Events" mnemonicParsing="false" styleClass="notification-filter-check, calendar-layer-check" />
+                        <CheckBox fx:id="tasksLayerCheckBox" text="Tasks" mnemonicParsing="false" styleClass="notification-filter-check, calendar-layer-check" />
+                        <CheckBox fx:id="deadlinesLayerCheckBox" text="Deadlines" mnemonicParsing="false" styleClass="notification-filter-check, calendar-layer-check" />
+                        <CheckBox fx:id="caseDatesLayerCheckBox" text="Case Dates" mnemonicParsing="false" styleClass="notification-filter-check, calendar-layer-check" />
                     </children>
                 </VBox>
             </children>
@@ -49,20 +49,20 @@
 
         <VBox spacing="12" HBox.hgrow="ALWAYS" styleClass="calendar-main-content">
             <children>
-                <FlowPane hgap="8" vgap="8" alignment="CENTER_LEFT" styleClass="shale-filter-panel calendar-toolbar">
+                <FlowPane hgap="8" vgap="8" alignment="CENTER_LEFT" styleClass="shale-filter-panel, calendar-toolbar">
                     <children>
-                        <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group calendar-toolbar-nav">
+                        <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group, calendar-toolbar-nav">
                             <children>
                                 <Button fx:id="todayButton" text="Today" onAction="#onToday" />
                                 <Button fx:id="prevWeekButton" text="◀" onAction="#onPreviousWeek" styleClass="calendar-toolbar-icon-button" />
                                 <Button fx:id="nextWeekButton" text="▶" onAction="#onNextWeek" styleClass="calendar-toolbar-icon-button" />
-                                <Label fx:id="weekRangeLabel" styleClass="search-section-title shale-toolbar-heading calendar-toolbar-range" />
+                                <Label fx:id="weekRangeLabel" styleClass="search-section-title, shale-toolbar-heading, calendar-toolbar-range" />
                             </children>
                         </HBox>
-                        <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group calendar-toolbar-actions">
+                        <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group, calendar-toolbar-actions">
                             <children>
                                 <Button fx:id="newEventButton" text="New Event" onAction="#onNewEvent" />
-                                <HBox fx:id="viewModeSelector" styleClass="shale-segmented-control calendar-toolbar-view-selector">
+                                <HBox fx:id="viewModeSelector" styleClass="shale-segmented-control, calendar-toolbar-view-selector">
                                     <children>
                                         <ToggleButton fx:id="weekViewButton" text="Week" styleClass="shale-segment" />
                                         <ToggleButton fx:id="fiveDayViewButton" text="5 Day" styleClass="shale-segment" />
@@ -72,7 +72,7 @@
                                 </HBox>
                             </children>
                         </HBox>
-                        <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group calendar-toolbar-filters">
+                        <HBox spacing="6" alignment="CENTER_LEFT" styleClass="calendar-toolbar-group, calendar-toolbar-filters">
                             <children>
                                 <TextField fx:id="searchTextField" promptText="Search" prefWidth="150" styleClass="calendar-toolbar-search" />
                                 <ComboBox fx:id="caseFilterCombo" promptText="All cases" prefWidth="150" styleClass="calendar-toolbar-filter" />

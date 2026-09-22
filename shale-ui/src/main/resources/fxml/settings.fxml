@@ -5,12 +5,12 @@
 
 <ScrollPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.shale.ui.controller.SettingsController" fitToWidth="true"
-            hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll settings-scroll">
+            hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll, settings-scroll">
   <content>
     <VBox styleClass="settings-workspace">
       <fx:define><ToggleGroup fx:id="appearanceThemeGroup"/></fx:define>
-      <VBox fx:id="personalGroup" styleClass="settings-directory-group shale-section-card">
-        <Label text="Personal" styleClass="shale-subsection-title settings-group-title"/>
+      <VBox fx:id="personalGroup" styleClass="settings-directory-group, shale-section-card">
+        <Label text="Personal" styleClass="shale-subsection-title, settings-group-title"/>
         <SettingsManagementRow fx:id="appearanceRow" title="Appearance"
             description="Choose Shale’s color theme." actionText="Open"/>
         <VBox fx:id="appearanceContent" visible="false" managed="false" styleClass="settings-inline-content">
@@ -41,8 +41,8 @@
             description="Manage words accepted by Shale’s spelling tools." actionText="Manage"/>
       </VBox>
 
-      <VBox fx:id="caseConfigurationGroup" styleClass="settings-directory-group shale-section-card">
-        <Label text="Case Configuration" styleClass="shale-subsection-title settings-group-title"/>
+      <VBox fx:id="caseConfigurationGroup" styleClass="settings-directory-group, shale-section-card">
+        <Label text="Case Configuration" styleClass="shale-subsection-title, settings-group-title"/>
         <SettingsManagementRow fx:id="caseStatusesRow" title="Case Statuses" description="Manage case statuses, colors, workflow state, and order."/>
         <SettingsManagementRow fx:id="practiceAreasRow" title="Practice Areas" description="Manage practice-area names, colors, and availability."/>
         <SettingsManagementRow fx:id="linkTypesRow" title="Link Types" description="Manage case-link types, colors, and availability."/>
@@ -57,19 +57,19 @@
         </VBox>
       </VBox>
 
-      <VBox fx:id="requestConfigurationGroup" styleClass="settings-directory-group shale-section-card">
-        <Label text="Request Configuration" styleClass="shale-subsection-title settings-group-title"/>
+      <VBox fx:id="requestConfigurationGroup" styleClass="settings-directory-group, shale-section-card">
+        <Label text="Request Configuration" styleClass="shale-subsection-title, settings-group-title"/>
         <SettingsManagementRow fx:id="requestFieldsRow" title="Request Fields" description="Manage material types, request methods, and request statuses."/>
       </VBox>
 
-      <VBox fx:id="contactOrganizationConfigurationGroup" styleClass="settings-directory-group shale-section-card">
-        <Label text="Contact and Organization Configuration" styleClass="shale-subsection-title settings-group-title"/>
+      <VBox fx:id="contactOrganizationConfigurationGroup" styleClass="settings-directory-group, shale-section-card">
+        <Label text="Contact and Organization Configuration" styleClass="shale-subsection-title, settings-group-title"/>
         <SettingsManagementRow fx:id="contactClassificationsRow" title="Contact Classifications" description="Manage contact types, specialties, and credentials."/>
         <SettingsManagementRow fx:id="organizationTypesRow" title="Organization Types" description="Manage organization types, colors, and availability."/>
       </VBox>
 
-      <VBox fx:id="administrationGroup" styleClass="settings-directory-group shale-section-card">
-        <Label text="Administration" styleClass="shale-subsection-title settings-group-title"/>
+      <VBox fx:id="administrationGroup" styleClass="settings-directory-group, shale-section-card">
+        <Label text="Administration" styleClass="shale-subsection-title, settings-group-title"/>
         <SettingsManagementRow fx:id="userManagementRow" title="User Management" description="Manage users for the current tenant." actionText="Manage"/>
         <SettingsManagementRow fx:id="auditLogRow" title="Audit Log" description="Review PHI audit and entity activity for the current tenant." actionText="Open"/>
       </VBox>

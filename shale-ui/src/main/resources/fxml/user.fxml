@@ -81,7 +81,7 @@
                             <ScrollPane fx:id="userDetailsScroll" fitToWidth="true" fitToHeight="false" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
                                 <content>
                                     <VBox spacing="10" maxWidth="1.7976931348623157E308">
-                                        <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
+                                        <Label fx:id="errorLabel" styleClass="shale-error-message" wrapText="true" visible="false" managed="false" />
 
                                         <GridPane hgap="10" vgap="10" style="-fx-alignment: TOP_LEFT;" maxWidth="1.7976931348623157E308">
                                             <columnConstraints>
@@ -163,7 +163,7 @@
                                 <Region HBox.hgrow="ALWAYS" />
                             </HBox>
                             <FlowPane hgap="8" vgap="8" prefWrapLength="356" alignment="CENTER_LEFT">
-                                <TextField fx:id="assignedTasksSearchField" promptText="Search assigned tasks" prefWidth="220" minWidth="190" styleClass="text-field shale-form-control" />
+                                <TextField fx:id="assignedTasksSearchField" promptText="Search assigned tasks" prefWidth="220" minWidth="190" styleClass="text-field, shale-form-control" />
                                 <ChoiceBox fx:id="assignedTasksSortChoice" prefWidth="180" minWidth="140" maxWidth="180">
                                     <styleClass>
                                         <String fx:value="choice-box" />

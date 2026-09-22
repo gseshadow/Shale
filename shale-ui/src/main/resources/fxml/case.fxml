@@ -1174,7 +1174,7 @@
 
 			<ScrollPane fx:id="caseUpdatesScrollPane"
 				fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS"
-				styleClass="transparent-scroll shale-update-list-scroll">
+				styleClass="transparent-scroll, shale-update-list-scroll">
 				<VBox fx:id="caseUpdatesFeedBox" spacing="8.0"
 					styleClass="shale-update-feed">
 					<padding>
