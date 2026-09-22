@@ -47,6 +47,7 @@ final class RichTextExpandedEditor extends VBox {
 
     RichTextExpandedEditor(String markdown, LocalSpellChecker checker, boolean spellCheck) {
         this.checker = checker; this.spellCheck = spellCheck;
+        TransientPopupSupport.style(contextMenu, "rich-text-context-menu");
         getStyleClass().add("rich-text-expanded-editor");
         ToolBar toolbar = new ToolBar(); toolbar.getStyleClass().add("narrative-editor-toolbar");
         ToggleButton bold = formatToggle("B", "Bold", "Bold (Ctrl+B)", () -> toggleFormat(NarrativeDocument.Format.BOLD));
@@ -207,11 +208,15 @@ final class RichTextExpandedEditor extends VBox {
             MenuItem add = new MenuItem("Add to dictionary"); add.setOnAction(x -> persistWord(hit.word()));
             menu.getItems().addAll(new SeparatorMenuItem(), ignore, add, new SeparatorMenuItem());
         }
-        MenuItem cut = new MenuItem("Cut"); cut.setDisable(area.getSelection().getLength() == 0); cut.setOnAction(x -> area.cut());
+        MenuItem undo = new MenuItem("Undo"); undo.setDisable(!area.isUndoAvailable()); undo.setOnAction(x -> area.undo());
+        MenuItem redo = new MenuItem("Redo"); redo.setDisable(!area.isRedoAvailable()); redo.setOnAction(x -> area.redo());
+        MenuItem cut = new MenuItem("Cut"); cut.setDisable(!area.isEditable() || area.getSelection().getLength() == 0); cut.setOnAction(x -> area.cut());
         MenuItem copy = new MenuItem("Copy"); copy.setDisable(area.getSelection().getLength() == 0); copy.setOnAction(x -> area.copy());
-        MenuItem paste = new MenuItem("Paste"); paste.setDisable(!Clipboard.getSystemClipboard().hasString()); paste.setOnAction(x -> area.paste());
+        MenuItem paste = new MenuItem("Paste"); paste.setDisable(!area.isEditable() || !Clipboard.getSystemClipboard().hasString()); paste.setOnAction(x -> area.paste());
+        MenuItem delete = new MenuItem("Delete"); delete.setDisable(!area.isEditable() || area.getSelection().getLength() == 0); delete.setOnAction(x -> area.replaceSelection(""));
         MenuItem selectAll = new MenuItem("Select All"); selectAll.setDisable(area.getLength() == 0); selectAll.setOnAction(x -> area.selectAll());
-        menu.getItems().addAll(cut, copy, paste, selectAll);
+        menu.getItems().addAll(undo, redo, new SeparatorMenuItem(), cut, copy, paste, delete,
+                new SeparatorMenuItem(), selectAll);
     }
 
     private void persistWord(String word) {
