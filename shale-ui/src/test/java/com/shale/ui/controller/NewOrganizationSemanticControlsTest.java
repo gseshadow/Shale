@@ -22,7 +22,10 @@ final class NewOrganizationSemanticControlsTest {
         assertTrue(create.contains("OrganizationAggregateEditor.forCreate"));
         assertTrue(edit.contains("OrganizationAggregateEditor.forEdit"));
         for(String legacy:List.of("phoneField","faxField","emailField","websiteField","address1Field","address2Field","cityField","stateField","postalCodeField","countryField"))assertFalse(fxml.contains(legacy),"legacy scalar control must be removed: "+legacy);
-        assertTrue(fxml.contains("contact-editor-surface")&&fxml.contains("contact-editor-section-scroll"));
+        assertTrue(fxml.contains("entity-editor-root, contact-editor-surface")
+                && fxml.contains("entity-editor-scroll, contact-editor-section-scroll"));
+        assertFalse(fxml.contains("styleClass=\"entity-editor-root contact-editor-surface\""),
+                "multiple FXML style classes must be comma-separated, never parsed as one class");
     }
 
     @Test void createStageStartsEmptyAndOwnsAllFourStructuredCollections() {
