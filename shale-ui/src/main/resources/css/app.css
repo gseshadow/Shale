@@ -19,6 +19,7 @@
 @import "foundation/entity-editor-windows.css";
 @import "foundation/team-windows.css";
 @import "foundation/user-windows.css";
+@import "foundation/utility-dialogs.css";
 @import "foundation/shell.css";
 
 .root {
