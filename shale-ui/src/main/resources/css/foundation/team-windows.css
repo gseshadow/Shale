@@ -1,0 +1,48 @@
+/* A.2 Case Team editor vocabulary. Dynamic user/role colors remain database-owned. */
+.team-window-root { -fx-background-color: -shale-color-dialog-surface; }
+.team-window-body { -fx-padding: 16px 18px 14px 18px; -fx-spacing: 12px; }
+.team-window-guidance { -fx-text-fill: -shale-color-text-secondary; }
+.team-window-workspace { -fx-background-color: transparent; -fx-padding: 0; }
+.team-window-workspace > .split-pane-divider { -fx-background-color: transparent; -fx-padding: 0 5px; }
+.team-window-region {
+    -fx-background-color: -shale-color-section-surface; -fx-background-radius: 12px;
+    -fx-border-color: -shale-color-border-subtle; -fx-border-radius: 12px; -fx-padding: 12px;
+}
+.team-window-search-region, .team-window-assigned-region { -fx-min-width: 0; -fx-min-height: 180px; }
+.team-window-region-title, .team-window-member-name { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 800; }
+.team-window-region-guidance, .team-window-roleless { -fx-text-fill: -shale-color-text-muted; }
+.team-window-search-field:focused { -fx-border-color: -shale-color-border-focus; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 7, .16, 0, 0); }
+.team-window-results, .team-window-members {
+    -fx-background-color: -shale-color-content-surface; -fx-background-radius: 9px;
+    -fx-border-color: -shale-color-border-subtle; -fx-border-radius: 9px; -fx-padding: 3px;
+}
+.team-window-results .list-cell, .team-window-members .list-cell { -fx-background-color: transparent; -fx-padding: 4px; }
+.team-window-result-card { -fx-alignment: center-left; -fx-background-radius: 8px; -fx-border-radius: 8px; -fx-padding: 2px; }
+.team-window-results .list-cell:hover .team-window-result-card { -fx-background-color: -shale-color-card-hover; }
+.team-window-results .list-cell:pressed .team-window-result-card { -fx-background-color: -shale-color-selected-control-background; }
+.team-window-results .list-cell:selected .team-window-result-card { -fx-border-color: -shale-color-border-selected; }
+.team-window-results:focused .list-cell:selected .team-window-result-card,
+.team-window-member-card:focus-within { -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, .16, 0, 0); }
+.team-window-result-add { -fx-text-fill: -shale-color-action-primary-start; -fx-font-size: 11px; -fx-font-weight: 800; }
+.team-window-member-card {
+    -fx-background-color: -shale-color-card-surface; -fx-background-radius: 10px;
+    -fx-border-color: -shale-color-card-border; -fx-border-radius: 10px; -fx-padding: 10px;
+}
+.team-window-member-card:hover { -fx-border-color: -shale-color-input-hover-border; }
+.team-window-role-area { -fx-padding: 1px 0 2px 0; }
+.team-window-role-chip {
+    -fx-alignment: center-left; -fx-background-color: -shale-color-content-surface;
+    -fx-background-radius: 999px; -fx-border-radius: 999px; -fx-padding: 2px 4px 2px 9px;
+}
+.team-window-role-chip-inactive { -fx-opacity: -shale-opacity-disabled; -fx-border-color: -shale-color-warning-border; -fx-font-style: italic; }
+.team-window-role-chip-active { -fx-border-color: -shale-color-border-subtle; }
+.team-window-empty, .team-window-filtered-empty, .team-window-loading { -fx-text-fill: -shale-color-text-muted; -fx-padding: 12px; }
+.team-window-validation, .team-window-failure, .team-window-concurrency {
+    -fx-background-color: -shale-color-danger-wash; -fx-background-radius: 8px;
+    -fx-border-color: -shale-color-danger-border; -fx-border-radius: 8px; -fx-padding: 8px;
+    -fx-text-fill: -shale-color-danger-text;
+}
+.team-window-warning { -fx-background-color: -shale-color-warning-wash; -fx-border-color: -shale-color-warning-border; }
+.team-window-footer { -fx-padding: 11px 0 0 0; -fx-border-color: -shale-color-border-subtle transparent transparent transparent; }
+.team-window-root .button:disabled, .team-window-root .menu-button:disabled { -fx-opacity: -shale-opacity-disabled; }
+.team-window-pending-removal { -fx-opacity: -shale-opacity-disabled; -fx-border-color: -shale-color-danger-border; }

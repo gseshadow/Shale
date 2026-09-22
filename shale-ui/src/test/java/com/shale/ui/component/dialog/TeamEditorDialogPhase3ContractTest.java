@@ -1,12 +1,89 @@
 package com.shale.ui.component.dialog;
-import static org.junit.jupiter.api.Assertions.*;
-import java.nio.file.*;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import org.junit.jupiter.api.Test;
+
 class TeamEditorDialogPhase3ContractTest {
- private static final Path ROOT=Path.of("..").toAbsolutePath().normalize();
- private static String read(String p)throws Exception{return Files.readString(ROOT.resolve(p)).replace("\r\n","\n");}
- @Test void dialogHasSingleSearchMemberListInlineRolesStableFooterAndDirtyCloseProtection()throws Exception{String s=read("shale-ui/src/main/java/com/shale/ui/component/dialog/TeamEditorDialog.java");assertTrue(s.contains("Add team member"));assertTrue(s.contains("No roles assigned"));assertTrue(s.contains("+ Add role"));assertTrue(s.contains("Remove member"));assertTrue(s.contains("stage.setOnCloseRequest"));assertTrue(s.contains("KeyCode.ESCAPE"));assertTrue(s.contains("confirmDiscard()"));assertFalse(s.contains("lvAvailable"));assertFalse(s.contains("cbPrimary"));assertFalse(s.contains("Selected member role"));}
- @Test void browseResultsRemainVisibleBoundedVirtualizedAndSupportMouseAndKeyboardAdd()throws Exception{String s=read("shale-ui/src/main/java/com/shale/ui/component/dialog/TeamEditorDialog.java");assertTrue(s.contains("new ListView<>()"),"search results must use JavaFX's virtualized list");assertTrue(s.contains("results.setFixedCellSize(48)"));assertTrue(s.contains("results.setPrefHeight(146)"));assertTrue(s.contains("No matching users"));assertTrue(s.contains("results.setOnMouseClicked"));assertTrue(s.contains("KeyCode.ENTER"));assertFalse(s.contains("results.setVisible(false)"),"empty or unfiltered results must remain in the dialog layout");assertTrue(s.indexOf("results")<s.indexOf("members.setCellFactory"),"bounded results must precede the independently growing assigned-member list");assertTrue(s.indexOf("members")<s.indexOf("footer"),"assigned members must remain above the stable footer");}
- @Test void saveUsesOneCompleteActorAwareCommandAndPreventsDoubleSubmit()throws Exception{String s=read("shale-ui/src/main/java/com/shale/ui/component/dialog/TeamEditorDialog.java");assertTrue(s.contains("saving.compareAndSet(false,true)"));assertTrue(s.contains("service.updateCaseTeam(new CaseTeamUpdateCommand"));assertTrue(s.contains("catch(RuntimeException ex)"));assertTrue(s.contains("setSaving(false)"));}
- @Test void overviewReadsAuthoritativeMembershipsOnceAndShowsAllRolesIncludingRoleless()throws Exception{String s=read("shale-ui/src/main/java/com/shale/ui/controller/CaseController.java");assertTrue(s.contains("listCaseTeamMemberships"));assertTrue(s.contains("renderAuthoritativeTeam"));assertTrue(s.contains("No roles assigned"));assertTrue(s.contains("member.roles().stream()"));}
+    private static final Path ROOT = Path.of("..").toAbsolutePath().normalize();
+
+    private static String read(String path) throws Exception {
+        return Files.readString(ROOT.resolve(path)).replace("\r\n", "\n");
+    }
+
+    @Test
+    void editorRetainsStageOwnerModalityCanonicalTitleThemeAndDirtyCloseContract() throws Exception {
+        String source = read("shale-ui/src/main/java/com/shale/ui/component/dialog/TeamEditorDialog.java");
+        assertTrue(source.contains("stage.initOwner(Objects.requireNonNull(owner))"));
+        assertTrue(source.contains("stage.initModality(Modality.APPLICATION_MODAL)"));
+        assertTrue(source.contains("static final String TITLE = \"Edit Case Team\""));
+        assertTrue(source.contains("createSecondaryWindowShell(stage, TITLE"));
+        assertTrue(source.contains("ThemeManager.application().register(scene)"));
+        assertTrue(source.contains("ThemeManager.application().unregister(scene)"));
+        assertTrue(source.contains("stage.setOnCloseRequest"));
+        assertTrue(source.contains("confirmDiscard()"));
+    }
+
+    @Test
+    void twoOwnedBoundedRegionsStackAtNarrowWidthsAboveStableFooter() throws Exception {
+        String source = read("shale-ui/src/main/java/com/shale/ui/component/dialog/TeamEditorDialog.java");
+        assertTrue(source.contains("new SplitPane(searchRegion, assignedRegion)"));
+        assertTrue(source.contains("Orientation.VERTICAL : Orientation.HORIZONTAL"));
+        assertTrue(source.contains("results.setMinHeight(150)"));
+        assertTrue(source.contains("results.setPrefHeight(220)"));
+        assertTrue(source.contains("VBox.setVgrow(results, Priority.ALWAYS)"));
+        assertTrue(source.contains("VBox.setVgrow(members, Priority.ALWAYS)"));
+        assertTrue(source.indexOf("workspace, error, footer") > 0,
+                "footer must remain outside both independently scrolling regions");
+        assertFalse(source.contains("FlowPane(searchRegion"), "major panel ownership must not depend on wrapping");
+    }
+
+    @Test
+    void candidatesUseSharedMiniUserCardsAndAccessibleSingleActivation() throws Exception {
+        String source = read("shale-ui/src/main/java/com/shale/ui/component/dialog/TeamEditorDialog.java");
+        assertTrue(source.contains("UserCardFactory.Variant.MINI"));
+        assertTrue(source.contains("KeyCode.ENTER || event.getCode() == KeyCode.SPACE"));
+        assertTrue(source.contains("Available users search results"));
+        assertTrue(source.contains("No users match this search."));
+        assertTrue(source.contains("No available users."));
+        assertFalse(source.contains("results.setOnMouseClicked"),
+                "the shared card must own pointer activation so one click cannot add twice");
+    }
+
+    @Test
+    void saveUsesOneCompleteActorAwareCommandAndRejectsClosedOrDuplicateCompletion() throws Exception {
+        String source = read("shale-ui/src/main/java/com/shale/ui/component/dialog/TeamEditorDialog.java");
+        assertTrue(source.contains("saving.compareAndSet(false, true)"));
+        assertTrue(source.contains("service.updateCaseTeam(new CaseTeamUpdateCommand"));
+        assertTrue(source.contains("if (closing || !stage.isShowing()) return"));
+        assertTrue(source.contains("setSaving(false)"));
+    }
+
+    @Test
+    void a2TeamVocabularyIsScopedTokenDrivenAndImported() throws Exception {
+        String css = read("shale-ui/src/main/resources/css/foundation/team-windows.css");
+        String app = read("shale-ui/src/main/resources/css/app.css");
+        assertTrue(app.contains("@import \"foundation/team-windows.css\""));
+        assertTrue(css.contains(".team-window-root"));
+        assertTrue(css.contains(".team-window-search-region"));
+        assertTrue(css.contains(".team-window-assigned-region"));
+        assertTrue(css.contains(".team-window-role-chip-inactive"));
+        assertTrue(css.contains(".team-window-filtered-empty"));
+        assertTrue(css.contains(".team-window-concurrency"));
+        assertTrue(css.contains("-shale-color-"));
+        assertFalse(css.matches("(?s).*#[0-9a-fA-F]{3,8}.*"), "team-window paint must use semantic tokens");
+    }
+
+    @Test
+    void overviewStillReadsAuthoritativeMembershipsOnceAndShowsRolelessAndAllRoles() throws Exception {
+        String source = read("shale-ui/src/main/java/com/shale/ui/controller/CaseController.java");
+        assertTrue(source.contains("listCaseTeamMemberships"));
+        assertTrue(source.contains("renderAuthoritativeTeam"));
+        assertTrue(source.contains("No roles assigned"));
+        assertTrue(source.contains("member.roles().stream()"));
+    }
 }

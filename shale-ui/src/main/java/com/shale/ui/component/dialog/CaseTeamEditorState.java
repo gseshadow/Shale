@@ -43,7 +43,7 @@ public final class CaseTeamEditorState {
         this.baseline=fingerprint();
     }
     public List<Member> members(){return List.copyOf(members.values());}
-    public List<CaseDao.UserRow> search(String text){String q=text==null?"":text.strip().toLowerCase(Locale.ROOT);return users.stream().filter(u->!members.containsKey(u.id())).filter(u->q.isEmpty()||u.displayName().toLowerCase(Locale.ROOT).contains(q)).toList();}
+    public List<CaseDao.UserRow> search(String text){String q=text==null?"":text.strip().toLowerCase(Locale.ROOT);return users.stream().filter(u->!members.containsKey(u.id())).filter(u->q.isEmpty()||u.displayName().toLowerCase(Locale.ROOT).contains(q)||initials(u.displayName()).toLowerCase(Locale.ROOT).startsWith(q)).toList();}
     public Member addMember(CaseDao.UserRow user){if(user==null||members.containsKey(user.id()))return members.get(user==null?-1:user.id());Member m=new Member(0,user,null);members.put(user.id(),m);return m;}
     public void removeMember(int userId){members.remove(userId);}
     public boolean addRole(int userId,int roleId,boolean confirmMove){Member target=members.get(userId);CaseTeamRoleDefinitionDto d=definitions.get(roleId);if(target==null||d==null||!d.active()||d.deleted()||target.roleIds.contains(roleId))return false;
@@ -55,5 +55,6 @@ public final class CaseTeamEditorState {
     public CaseTeamRoleDefinitionDto definition(int id){return definitions.get(id);} public boolean dirty(){return !baseline.equals(fingerprint());}
     public Member responsibleAttorney(){for(Member m:members.values())for(int id:m.roleIds){CaseTeamRoleDefinitionDto d=definitions.get(id);if(d!=null&&RESPONSIBLE_ATTORNEY.equals(d.systemKey()))return m;}return null;}
     private String fingerprint(){StringBuilder b=new StringBuilder();members.values().stream().sorted(Comparator.comparingInt(m->m.user.id())).forEach(m->{b.append(m.user.id()).append(':');m.roleIds.stream().sorted().forEach(id->b.append(id).append(','));b.append(';');});return b.toString();}
+    private static String initials(String name){if(name==null||name.isBlank())return "";StringBuilder b=new StringBuilder();for(String part:name.strip().split("\\s+"))if(!part.isBlank())b.append(part.charAt(0));return b.toString();}
     private static byte[] copy(byte[] v){return v==null?null:v.clone();}
 }
