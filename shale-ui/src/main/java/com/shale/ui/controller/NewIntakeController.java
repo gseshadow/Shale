@@ -1394,15 +1394,8 @@ public final class NewIntakeController {
 	}
 
 	private boolean confirmDiscard() {
-		Optional<Boolean> decision = AppDialogs.showChoice(
-				stage,
-				"Discard New Intake?",
-				"Discard New Intake?",
-				"You have unsaved information in this intake. Canceling will discard it. Do you want to continue?",
-				List.of(
-						AppDialogs.DialogAction.cancel("Keep Editing", false),
-						AppDialogs.DialogAction.of("Discard", true, AppDialogs.DialogActionKind.DANGER, true, false)));
-		return decision.orElse(false);
+		return AppDialogs.showDiscardConfirmation(stage, "Discard New Intake?", "Discard New Intake?",
+				"You have unsaved information in this intake. Canceling will discard it. Do you want to continue?");
 	}
 
 	private boolean hasUnsavedChanges() {

@@ -1,0 +1,41 @@
+/* A.2 shared utility dialogs. All rules are opt-in to avoid workflow-window leakage. */
+.utility-dialog-root {
+    -fx-background-color: -shale-color-overlay-dialog;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 14px;
+    -fx-background-radius: 14px;
+}
+
+.utility-dialog-root .app-dialog-header,
+.utility-dialog-root .enhanced-text-area-dialog-content {
+    -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 12px;
+    -fx-padding: 16px;
+}
+
+.utility-dialog-root .app-dialog-title,
+.utility-dialog-root .secondary-window-title { -fx-text-fill: -shale-color-text-primary; }
+.utility-dialog-root .app-dialog-message,
+.utility-dialog-root .enhanced-text-area-dialog-hint { -fx-text-fill: -shale-color-text-secondary; }
+.utility-dialog-root.utility-dialog-information { -fx-border-color: -shale-color-info-border; }
+.utility-dialog-root.utility-dialog-warning { -fx-border-color: -shale-color-warning-border; }
+.utility-dialog-root.utility-dialog-danger,
+.utility-dialog-root.utility-dialog-discard,
+.utility-dialog-root.utility-dialog-error { -fx-border-color: -shale-color-danger-border; }
+
+.utility-dialog-root .app-dialog-actions,
+.utility-dialog-root > .button-bar {
+    -fx-background-color: -shale-color-overlay-dialog;
+    -fx-padding: 12px 0 0 0;
+}
+
+.enhanced-text-dialog-root .enhanced-text-area-dialog-content { -fx-spacing: 8px; }
+.enhanced-text-dialog-root .enhanced-text-area-dialog-editor {
+    -fx-background-color: -shale-color-input-surface;
+    -fx-border-color: -shale-color-input-border;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+}
+.enhanced-text-dialog-root .enhanced-text-area-dialog-editor:focused {
+    -fx-border-color: -shale-color-border-focus;
+}

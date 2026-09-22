@@ -40,11 +40,17 @@ public final class AppDialogs {
 	}
 
 	public static void showInfo(Window owner, String title, String message) {
-		showMessage(owner, title, null, message, "OK", DialogActionKind.PRIMARY);
+		showMessage(owner, title, null, message, "OK", DialogActionKind.PRIMARY, "utility-dialog-information");
+	}
+
+	public static void showWarning(Window owner, String title, String message) {
+		showMessage(owner, title, "Review required", message, "OK", DialogActionKind.PRIMARY,
+				"utility-dialog-warning");
 	}
 
 	public static void showError(Window owner, String title, String message) {
-		showMessage(owner, title, "Something went wrong", message, "OK", DialogActionKind.DANGER);
+		showMessage(owner, title, "Something went wrong", message, "OK", DialogActionKind.PRIMARY,
+				"utility-dialog-error");
 	}
 
 	public static boolean showConfirmation(
@@ -55,10 +61,30 @@ public final class AppDialogs {
 			String confirmText,
 			DialogActionKind confirmKind) {
 		List<DialogAction<Boolean>> actions = List.of(
-				DialogAction.cancel("Cancel", false),
-				DialogAction.of(confirmText, true, confirmKind, true, false));
-		Optional<Boolean> result = showDialog(owner, title, heading, message, null, actions, 420);
+				DialogAction.of("Cancel", false, DialogActionKind.SECONDARY,
+						confirmKind == DialogActionKind.DANGER, true),
+				DialogAction.of(confirmText, true, confirmKind,
+						confirmKind != DialogActionKind.DANGER, false));
+		Optional<Boolean> result = showDialog(owner, title, heading, message, null, actions, 420,
+				confirmKind == DialogActionKind.DANGER ? "utility-dialog-danger" : "utility-dialog-confirmation");
 		return result.orElse(false);
+	}
+
+	/** A destructive decision is deliberately cancel-default; Enter cannot destroy by accident. */
+	public static boolean showDestructiveConfirmation(Window owner, String title, String heading,
+			String message, String destructiveText) {
+		return showChoice(owner, title, heading, message, List.of(
+				DialogAction.cancel("Cancel", false),
+				DialogAction.of(destructiveText, true, DialogActionKind.DANGER, false, false)), 420,
+				"utility-dialog-danger").orElse(false);
+	}
+
+	/** Preserves the established dirty-close vocabulary and safe default. */
+	public static boolean showDiscardConfirmation(Window owner, String title, String heading, String message) {
+		return showChoice(owner, title, heading, message, List.of(
+				DialogAction.of("Keep Editing", false, DialogActionKind.SECONDARY, true, true),
+				DialogAction.of("Discard", true, DialogActionKind.DANGER, false, false)), 460,
+				"utility-dialog-discard").orElse(false);
 	}
 
 	public static <T> Optional<T> showChoice(
@@ -77,7 +103,12 @@ public final class AppDialogs {
 			String message,
 			List<DialogAction<T>> actions,
 			double minWidth) {
-		return showDialog(owner, title, heading, message, null, actions, minWidth);
+		return showDialog(owner, title, heading, message, null, actions, minWidth, "utility-dialog-choice");
+	}
+
+	private static <T> Optional<T> showChoice(Window owner, String title, String heading, String message,
+			List<DialogAction<T>> actions, double minWidth, String semanticClass) {
+		return showDialog(owner, title, heading, message, null, actions, minWidth, semanticClass);
 	}
 
 	public static Stage createModalStage(Window owner, String title) {
@@ -112,6 +143,7 @@ public final class AppDialogs {
 		if (dialog != null) {
 			dialog.initStyle(StageStyle.UNDECORATED);
 			installDialogTheme(dialog.getDialogPane());
+			installDialogThemeCleanup(dialog);
 		}
 	}
 
@@ -128,6 +160,7 @@ public final class AppDialogs {
 			pane.getStyleClass().add("secondary-window-shell");
 		}
 		installDialogTheme(pane);
+		installDialogThemeCleanup(dialog);
 		Node header = createSecondaryDialogHeader(dialog, title);
 		pane.setHeader(header);
 		pane.setGraphic(null);
@@ -145,6 +178,11 @@ public final class AppDialogs {
 	private static void installDialogTheme(DialogPane pane) {
 		if (pane == null) return;
 		ThemeManager.application().register(pane);
+	}
+
+	private static void installDialogThemeCleanup(Dialog<?> dialog) {
+		dialog.addEventHandler(javafx.scene.control.DialogEvent.DIALOG_HIDDEN,
+				event -> ThemeManager.application().unregister(dialog.getDialogPane()));
 	}
 
 	public static HBox createSecondaryWindowHeader(Stage stage, String title, Runnable onClose) {
@@ -275,9 +313,10 @@ public final class AppDialogs {
 			String heading,
 			String message,
 			String buttonText,
-			DialogActionKind buttonKind) {
+			DialogActionKind buttonKind,
+			String semanticClass) {
 		showDialog(owner, title, heading, message, null,
-				List.of(DialogAction.of(buttonText, null, buttonKind, true, true)), 400);
+				List.of(DialogAction.of(buttonText, null, buttonKind, true, true)), 400, semanticClass);
 	}
 
 	private static <T> Optional<T> showDialog(
@@ -287,12 +326,13 @@ public final class AppDialogs {
 			String message,
 			VBox customContent,
 			List<DialogAction<T>> actions,
-			double minWidth) {
+			double minWidth,
+			String semanticClass) {
 		Stage stage = createModalStage(owner, title);
 		ResultHolder<T> result = new ResultHolder<>();
 
 		VBox root = new VBox(18);
-		root.getStyleClass().add("app-dialog-root");
+		root.getStyleClass().addAll("app-dialog-root", "utility-dialog-root", semanticClass);
 		root.setPadding(new Insets(18));
 		double safePrefWidth = Math.max(CONFIRMATION_DIALOG_MIN_WIDTH, minWidth);
 		root.setMinWidth(CONFIRMATION_DIALOG_MIN_WIDTH);
@@ -338,7 +378,11 @@ public final class AppDialogs {
 				safePrefWidth,
 				CONFIRMATION_DIALOG_MIN_WIDTH,
 				CONFIRMATION_DIALOG_MIN_HEIGHT);
-		stage.showAndWait();
+		try {
+			stage.showAndWait();
+		} finally {
+			ThemeManager.application().unregister(scene);
+		}
 		return Optional.ofNullable(result.value);
 	}
 
