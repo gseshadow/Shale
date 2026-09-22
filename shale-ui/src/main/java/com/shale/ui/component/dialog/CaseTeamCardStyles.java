@@ -16,9 +16,10 @@ final class CaseTeamCardStyles {
     static String memberCardStyle(String configuredColor) {
         String color = resolvedUserColor(configuredColor);
         return "-fx-background-color: linear-gradient(to right, "
-                + ColorUtil.toCssRgba(color, 0.24) + " 0%, "
-                + ColorUtil.toCssRgba(color, 0.08) + " 24%, "
-                + "rgba(255,255,255,0.94) 62%, rgba(255,255,255,0.98) 100%);";
+                + ColorUtil.toCssRgba(color, 0.18) + " 0%, "
+                + ColorUtil.toCssRgba(color, 0.07) + " 18%, "
+                + "-shale-color-card-surface 58%, -shale-color-card-surface 100%);"
+                + "-fx-border-color: " + ColorUtil.toCssRgba(color, 0.55) + ";";
     }
 
     static String accentStyle(String configuredColor) {
