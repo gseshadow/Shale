@@ -20,6 +20,7 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import com.shale.ui.util.WindowSizingUtil;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -125,14 +126,18 @@ public final class NewEventWizard {
             add(fields,row++,"Title",title); add(fields,row++,"Assign to Case",caseField); add(fields,row++,"Type",type);
             add(fields,row++,"Start Date",startDate); add(fields,row++,"End Date",endDate); add(fields,row++,"Time and Duration",timing);
             add(fields,row++,"All Day",allDay); add(fields,row,"Notes",notes);
-            error.getStyleClass().add("form-validation-message"); error.setWrapText(true); hide(error);
+            error.getStyleClass().addAll("form-validation-message", "calendar-dialog-validation"); error.setWrapText(true); error.setAccessibleText("Event validation status"); hide(error);
             Region spacer = new Region(); HBox.setHgrow(spacer,Priority.ALWAYS);
-            HBox actions = new HBox(8,spacer,save,cancel); actions.setAlignment(Pos.CENTER_RIGHT);
-            VBox body = new VBox(14,fields,error,actions); body.setPadding(new Insets(20,24,18,24));
-            Scene scene = new Scene(AppDialogs.createSecondaryWindowShell(stage,"New Event",this::close,body),720,680);
+            HBox actions = new HBox(8,spacer,cancel,save); actions.setAlignment(Pos.CENTER_RIGHT); actions.getStyleClass().add("calendar-dialog-footer");
+            fields.getStyleClass().add("calendar-dialog-section");
+            VBox form = new VBox(14,fields,error); form.getStyleClass().add("calendar-wizard-content");
+            ScrollPane scroll = new ScrollPane(form); scroll.setFitToWidth(true); scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER); scroll.getStyleClass().add("calendar-dialog-scroll");
+            VBox body = new VBox(14,scroll,actions); VBox.setVgrow(scroll,Priority.ALWAYS); body.setPadding(new Insets(20,24,18,24)); body.getStyleClass().add("calendar-dialog-content");
+            VBox root=AppDialogs.createSecondaryWindowShell(stage,"New Event",this::close,body); root.getStyleClass().addAll("calendar-dialog-root","calendar-wizard-shell");
+            Scene scene = new Scene(root);
             com.shale.ui.theme.ThemeManager.application().register(scene);
             scene.setOnKeyPressed(e -> { if (e.getCode()==KeyCode.ESCAPE && !submitting.get()) { close(); e.consume(); } });
-            stage.setScene(scene); stage.setMinWidth(620); stage.setMinHeight(600); stage.show(); Platform.runLater(title::requestFocus);
+            stage.setScene(scene); WindowSizingUtil.sizeModalStage(stage,owner,720,680,560,480); stage.show(); Platform.runLater(title::requestFocus);
         }
 
         public boolean isShowing(){ return stage.isShowing(); }
@@ -166,13 +171,14 @@ public final class NewEventWizard {
             type.setOnAction(e->activateTypeCandidate());
             type.setOnHidden(e->deferTypeListRestoration());
             type.addEventFilter(KeyEvent.KEY_PRESSED,this::handleTypeActivationKey);
-            allDay.setAccessibleText("All Day"); notes.setPrefRowCount(4); notes.setWrapText(true);
+            startDate.setAccessibleText("Start date, required"); endDate.setAccessibleText("End date");
+            allDay.setAccessibleText("All day event"); notes.setAccessibleText("Event notes"); notes.setPrefRowCount(4); notes.setWrapText(true);
             for(Control c:List.of(title,type,startDate,endDate,allDay,notes,caseSearch)) ControlStyles.formControl(c);
             allDay.selectedProperty().addListener((o,a,b)->updateTimedControls());
             CaseCardFactory cards = new CaseCardFactory(this::commitCaseId);
             caseSearch.setPromptText("Search cases"); caseSearch.setAccessibleText("Search cases");
             caseSearch.textProperty().addListener((o,a,b)->refreshCaseFilter());
-            caseList.setAccessibleText("Case search results"); caseList.setPrefHeight(190);
+            caseList.setAccessibleText("Case search results. Press Enter or Space to select a case."); caseList.setPrefHeight(190); caseField.getStyleClass().add("calendar-case-selection");
             caseList.setCellFactory(v->new ListCell<>() { @Override protected void updateItem(NewCalendarEventDialog.CaseOption x,boolean empty){
                 super.updateItem(x,empty); setText(null); setGraphic(empty||x==null?null:cards.create(new CaseCardFactory.CaseCardModel(
                         x.caseId(),x.displayName(),null,null,x.responsibleAttorney(),x.responsibleAttorneyColor(),x.nonEngagementLetterSent()),CaseCardFactory.Variant.MINI)); }});

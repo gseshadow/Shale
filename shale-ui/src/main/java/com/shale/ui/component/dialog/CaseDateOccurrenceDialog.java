@@ -31,12 +31,15 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import com.shale.ui.util.WindowSizingUtil;
 
 public final class CaseDateOccurrenceDialog {
     private CaseDateOccurrenceDialog() {}
@@ -56,6 +59,7 @@ public final class CaseDateOccurrenceDialog {
         ColorCodedComboBox<TypeChoice> typeBox = new ColorCodedComboBox<>(TypeChoice::name, TypeChoice::color, TypeChoice::secondaryText);
         ControlStyles.formControl(typeBox);
         typeBox.setPromptText("Choose a date type");
+        typeBox.setAccessibleText("Case Date type, required");
         List<TypeChoice> choices = safeTypes.stream().map(TypeChoice::effective).toList();
         typeBox.getItems().setAll(choices);
         TypeChoice historical = null;
@@ -76,10 +80,11 @@ public final class CaseDateOccurrenceDialog {
             TimeDurationInput.TimedValue value = TimeDurationInput.fromTimestamps(existing.startsAt(), existing.endsAt());
             timing.setTimedValue(value.startTime(), value.durationMinutes());
         }
-        CheckBox allDay = new CheckBox("All day"); allDay.setSelected(existing == null || existing.allDay());
-        TextArea notes = new TextArea(existing == null ? "" : safe(existing.notes())); notes.setPrefRowCount(4); notes.setWrapText(true);
+        CheckBox allDay = new CheckBox("All day"); allDay.setAccessibleText("All day Case Date"); allDay.setSelected(existing == null || existing.allDay());
+        startDate.setAccessibleText("Start date, required"); endDate.setAccessibleText("End date");
+        TextArea notes = new TextArea(existing == null ? "" : safe(existing.notes())); notes.setAccessibleText("Case Date notes"); notes.setPrefRowCount(4); notes.setWrapText(true);
         ControlStyles.formControl(occurrenceTitle); ControlStyles.formControl(startDate); ControlStyles.formControl(endDate); ControlStyles.formControl(notes);
-        Label error = new Label(); error.getStyleClass().add("form-validation-message"); error.setWrapText(true); error.setVisible(false); error.setManaged(false);
+        Label error = new Label(); error.getStyleClass().addAll("form-validation-message", "calendar-dialog-validation"); error.setAccessibleText("Case Date validation status"); error.setWrapText(true); error.setVisible(false); error.setManaged(false);
         Button save = ActionButtonFactory.semantic("Save", e -> {}, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
         Button remove = existing == null ? null : ActionButtonFactory.semantic("Remove", e -> {}, ControlStyles.Purpose.DANGER, ControlStyles.Size.STANDARD);
         Button cancel = ActionButtonFactory.semantic("Cancel", e -> { if (!submitting.get()) stage.close(); }, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
@@ -133,16 +138,20 @@ public final class CaseDateOccurrenceDialog {
         });
         stage.getScene();
         GridPane grid = createEditorGrid(typeBox,occurrenceTitle,startDate,timing,endDate,allDay,notes);
-        HBox footer = new HBox(8); if (remove != null) footer.getChildren().add(remove); footer.getChildren().addAll(reload, cancel, save); footer.setAlignment(Pos.CENTER_RIGHT);
+        HBox footer = new HBox(8); if (remove != null) footer.getChildren().add(remove); Region footerSpacer=new Region(); HBox.setHgrow(footerSpacer,Priority.ALWAYS); footer.getChildren().addAll(footerSpacer,reload, cancel, save); footer.setAlignment(Pos.CENTER_RIGHT); footer.getStyleClass().add("calendar-dialog-footer");
         CaseNavigationGate navigation = new CaseNavigationGate(associatedCase.id(), dirty::get, submitting::get,
                 () -> AppDialogs.showConfirmation(stage, "Discard Changes?", "Discard unsaved changes?",
                         "Navigating to the Case will discard changes in this Case Date.", "Discard Changes",
                         AppDialogs.DialogActionKind.DANGER), stage::close, onOpenCase);
         VBox caseSection = createCaseSection(associatedCase, navigation::activate);
-        VBox body = new VBox(12, caseSection, grid, error, footer); body.setPadding(new Insets(16));
-        Scene scene = new Scene(AppDialogs.createSecondaryWindowShell(stage, title, () -> { if (!submitting.get()) stage.close(); }, body));
+        grid.getStyleClass().add("calendar-dialog-section");
+        VBox scrollContent=new VBox(12,caseSection,grid,error); scrollContent.getStyleClass().add("calendar-dialog-content");
+        ScrollPane scroll=new ScrollPane(scrollContent); scroll.setFitToWidth(true); scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER); scroll.getStyleClass().add("calendar-dialog-scroll");
+        VBox body = new VBox(12, scroll, footer); VBox.setVgrow(scroll,Priority.ALWAYS); body.setPadding(new Insets(16));
+        VBox root=AppDialogs.createSecondaryWindowShell(stage, title, () -> { if (!submitting.get()) stage.close(); }, body); root.getStyleClass().add("calendar-dialog-root");
+        Scene scene = new Scene(root);
         com.shale.ui.theme.ThemeManager.application().register(scene);
-        stage.setScene(scene); stage.showAndWait();
+        stage.setScene(scene); WindowSizingUtil.sizeModalStage(stage,owner,720,680,560,480); stage.showAndWait();
     }
     private static void setMutationControlsDisabled(boolean disabled, Button save, Button remove, Button cancel,
             Button reload, Node editor) {
@@ -161,6 +170,7 @@ public final class CaseDateOccurrenceDialog {
         card.setFocusTraversable(true);
         label.setLabelFor(card);
         VBox section = new VBox(6, label, card);
+        section.getStyleClass().add("calendar-associated-case");
         section.setFillWidth(true);
         return section;
     }
