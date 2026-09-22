@@ -1,0 +1,57 @@
+/* A.2 Material Request create/detail/edit secondary-window vocabulary. */
+.request-window-root {
+    -fx-background-color: -shale-color-dialog-surface;
+    -fx-fill-width: true;
+}
+.request-window-form-surface,
+.request-window-section {
+    -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 12;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+}
+.request-window-field-grid {
+    -fx-hgap: 12;
+    -fx-vgap: 12;
+}
+.request-window-field-grid > .label {
+    -fx-text-fill: -shale-color-text-secondary;
+    -fx-font-weight: 600;
+}
+.request-window-scroll,
+.request-window-scroll > .viewport,
+.request-window-scroll > .corner {
+    -fx-background-color: transparent;
+}
+.request-window-validation {
+    -fx-text-fill: -shale-color-text-danger;
+    -fx-wrap-text: true;
+}
+.request-window-footer {
+    -fx-padding: 12 0 0 0;
+    -fx-border-color: -shale-color-divider transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+    -fx-min-height: 52;
+}
+.request-window-section:focused,
+.request-window-form-surface:focused {
+    -fx-border-color: -shale-color-border-focus;
+}
+.request-window-section:disabled,
+.request-window-form-surface:disabled {
+    -fx-opacity: -shale-opacity-disabled;
+}
+.request-window-loading,
+.request-window-empty {
+    -fx-text-fill: -shale-color-text-muted;
+}
+.request-window-failure,
+.request-window-concurrency {
+    -fx-text-fill: -shale-color-text-danger;
+}
+.request-window-concurrency {
+    -fx-background-color: -shale-color-warning-wash;
+    -fx-background-radius: 8;
+    -fx-padding: 8 12;
+}
