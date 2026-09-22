@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
@@ -60,4 +62,23 @@ final class PartyWindowPhase8FPresentationContractTest {
         assertTrue(add.contains("setAccessibleText(\"Matching party entities\")"), "Results must have an accessible identity");
         assertFalse(add.contains("setStyle("), "Party workflow must not own hard-coded page paint");
     }
+
+	@Test
+	void everyPartyWindowSelectorIsRootScopedAndCannotRestyleIntake() throws Exception {
+		String css = read("src/main/resources/css/foundation/party-windows.css")
+				.replaceAll("(?s)/\\*.*?\\*/", "");
+		Matcher rules = Pattern.compile("(?s)([^{}]+)\\{").matcher(css);
+		while (rules.find()) {
+			for (String selector : rules.group(1).split(",")) {
+				String normalized = selector.trim();
+				assertTrue(normalized.startsWith(".party-window-root"),
+						"Party CSS leaked an unscoped selector: " + normalized);
+			}
+		}
+		for (String generic : new String[] {".dialog-pane", ".button", ".label", ".scroll-pane",
+				".text-field", ".combo-box", ".check-box", ".form-"}) {
+			assertFalse(Pattern.compile("(?m)^\\s*" + Pattern.quote(generic)).matcher(css).find(),
+					"Party CSS must not start an unrelated generic selector: " + generic);
+		}
+	}
 }

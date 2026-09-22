@@ -103,6 +103,14 @@
     -shale-color-validation-error: #df334d;
     -shale-color-parties-section-surface: #f3edff;
     -shale-color-parties-section-border: #cdb9f5;
+    -shale-color-intake-caller-surface: #e6f2ff;
+    -shale-color-intake-caller-border: #b8d1f2;
+    -shale-color-intake-client-surface: #e9f8ec;
+    -shale-color-intake-client-border: #b8dfc7;
+    -shale-color-intake-case-surface: #fff4d9;
+    -shale-color-intake-case-border: #e4d2a7;
+    -shale-color-intake-incident-surface: #fde8ec;
+    -shale-color-intake-incident-border: #d9bfdf;
     -shale-opacity-disabled: 0.52;
     -shale-color-card-shadow: rgba(11.0, 35.0, 77.0, 0.14);
 }

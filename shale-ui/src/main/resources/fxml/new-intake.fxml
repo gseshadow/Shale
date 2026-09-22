@@ -9,10 +9,10 @@
 <BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
             fx:controller="com.shale.ui.controller.NewIntakeController"
             prefWidth="1160" prefHeight="900" minWidth="680" minHeight="620"
-            styleClass="form-surface new-intake-root">
+            styleClass="form-surface, new-intake-root">
     <top>
         <Label fx:id="validationLabel" wrapText="true" visible="false" managed="false"
-               accessibleRole="TEXT" styleClass="new-intake-feedback shale-error-message" />
+               accessibleRole="TEXT" styleClass="new-intake-feedback, shale-error-message" />
     </top>
     <center>
         <ScrollPane fx:id="intakeScrollPane" fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED"
@@ -27,7 +27,7 @@
                     <children>
                         <VBox fx:id="callerSection" spacing="12" maxWidth="1.7976931348623157E308"
                               GridPane.columnIndex="0" GridPane.rowIndex="0"
-                              styleClass="shale-section-card new-intake-section caller-section-panel">
+                              styleClass="shale-section-card, new-intake-section, caller-section-panel">
                             <Label text="Caller" styleClass="shale-section-title" />
                             <Label fx:id="callerReuseLabel" text="Client information will be reused for caller details."
                                    visible="false" managed="false" wrapText="true" styleClass="shale-metadata-muted" />
@@ -46,7 +46,7 @@
 
                         <VBox fx:id="clientSection" spacing="12" maxWidth="1.7976931348623157E308"
                               GridPane.columnIndex="0" GridPane.rowIndex="1"
-                              styleClass="shale-section-card new-intake-section client-section-panel">
+                              styleClass="shale-section-card, new-intake-section, client-section-panel">
                             <Label text="Client" styleClass="shale-section-title"/>
                             <CheckBox fx:id="callerIsClientCheckBox" text="Caller is Client" accessibleText="Caller is Client"/>
                             <GridPane hgap="12" vgap="10" maxWidth="1.7976931348623157E308" styleClass="new-intake-fields-grid">
@@ -64,7 +64,7 @@
 
                         <VBox fx:id="caseSection" spacing="12" maxWidth="1.7976931348623157E308"
                               GridPane.columnIndex="1" GridPane.rowIndex="0"
-                              styleClass="shale-section-card new-intake-section case-section-panel">
+                              styleClass="shale-section-card, new-intake-section, case-section-panel">
                             <Label text="Case" styleClass="shale-section-title"/>
                             <GridPane hgap="12" vgap="10" maxWidth="1.7976931348623157E308" styleClass="new-intake-fields-grid">
                                 <columnConstraints><ColumnConstraints minWidth="140" prefWidth="160"/><ColumnConstraints minWidth="180" hgrow="ALWAYS" fillWidth="true"/></columnConstraints>
@@ -80,7 +80,7 @@
 
                         <VBox fx:id="partiesSection" spacing="12" maxWidth="1.7976931348623157E308"
                               GridPane.columnIndex="1" GridPane.rowIndex="1"
-                              styleClass="shale-section-card new-intake-section new-intake-parties-section">
+                              styleClass="shale-section-card, new-intake-section, new-intake-parties-section">
                             <HBox alignment="CENTER_LEFT" spacing="8"><Label text="Parties" styleClass="shale-section-title"/><Region HBox.hgrow="ALWAYS"/><Button fx:id="addPartyButton" text="Add Party" accessibleText="Add a pending case party"/></HBox>
                             <Label fx:id="partiesEmptyLabel" text="No pending parties yet." wrapText="true" styleClass="shale-empty-message"/>
                             <VBox fx:id="partiesListBox" spacing="8" maxWidth="1.7976931348623157E308"/>
@@ -88,7 +88,7 @@
 
                         <VBox fx:id="incidentSection" spacing="12" maxWidth="1.7976931348623157E308"
                               GridPane.columnIndex="1" GridPane.rowIndex="2"
-                              styleClass="shale-section-card new-intake-section incident-section-panel">
+                              styleClass="shale-section-card, new-intake-section, incident-section-panel">
                             <Label text="Incident" styleClass="shale-section-title"/>
                             <Label text="Description" styleClass="shale-field-label"/><EnhancedTextArea fx:id="descriptionArea" accessibleText="Incident description" editorTitle="Description" prefRowCount="4" promptText="Detailed description of the matter" maxWidth="1.7976931348623157E308"/>
                             <Label text="Summary" styleClass="shale-field-label"/><EnhancedTextArea fx:id="summaryArea" accessibleText="Incident summary" editorTitle="Summary" prefRowCount="4" promptText="Concise intake summary" maxWidth="1.7976931348623157E308"/>
