@@ -199,13 +199,29 @@
 .new-intake-scroll, .new-intake-scroll > .viewport { -fx-background-color: transparent; }
 .new-intake-scroll { -fx-background-insets: 0; -fx-padding: 0; }
 .new-intake-workspace { -fx-padding: 8px 4px 16px 4px; }
-.new-intake-section {
+.new-intake-root .new-intake-section {
     -fx-padding: 16px;
     -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2);
 }
+.new-intake-root .caller-section-panel {
+    -fx-background-color: -shale-color-intake-caller-surface;
+    -fx-border-color: -shale-color-intake-caller-border;
+}
+.new-intake-root .client-section-panel {
+    -fx-background-color: -shale-color-intake-client-surface;
+    -fx-border-color: -shale-color-intake-client-border;
+}
+.new-intake-root .case-section-panel {
+    -fx-background-color: -shale-color-intake-case-surface;
+    -fx-border-color: -shale-color-intake-case-border;
+}
+.new-intake-root .incident-section-panel {
+    -fx-background-color: -shale-color-intake-incident-surface;
+    -fx-border-color: -shale-color-intake-incident-border;
+}
 .new-intake-fields-grid { -fx-alignment: top-left; }
 .new-intake-required { -fx-text-fill: -shale-color-validation-error; -fx-font-weight: 800; }
-.new-intake-parties-section {
+.new-intake-root .new-intake-parties-section {
     -fx-background-color: -shale-color-parties-section-surface;
     -fx-border-color: -shale-color-parties-section-border;
 }

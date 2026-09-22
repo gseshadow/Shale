@@ -1,5 +1,5 @@
 /* A.2 Add Party and case-party secondary-window vocabulary. */
-.dialog-pane.secondary-window-shell.party-window-shell {
+.party-window-root.dialog-pane.secondary-window-shell.party-window-shell {
     -fx-background-color: -shale-color-dialog-surface;
 }
 
@@ -9,22 +9,22 @@
     -fx-min-width: 0;
 }
 
-.party-window-step-title {
+.party-window-root .party-window-step-title {
     -fx-font-size: 18px;
     -fx-font-weight: 700;
     -fx-text-fill: -shale-color-text-primary;
 }
 
-.party-window-guidance {
+.party-window-root .party-window-guidance {
     -fx-text-fill: -shale-color-text-secondary;
     -fx-wrap-text: true;
 }
 
-.party-window-entity-kind {
+.party-window-root .party-window-entity-kind {
     -fx-alignment: center;
 }
 
-.party-window-section {
+.party-window-root .party-window-section {
     -fx-background-color: -shale-color-section-surface;
     -fx-background-radius: 12;
     -fx-border-color: -shale-color-border-subtle;
@@ -33,23 +33,23 @@
     -fx-padding: 14;
 }
 
-.party-window-field-grid {
+.party-window-root .party-window-field-grid {
     -fx-hgap: 12;
     -fx-vgap: 12;
 }
 
-.party-window-field-grid > .label {
+.party-window-root .party-window-field-grid > .label {
     -fx-text-fill: -shale-color-text-secondary;
     -fx-font-weight: 600;
 }
 
-.party-window-scroll,
-.party-window-scroll > .viewport,
-.party-window-scroll > .corner {
+.party-window-root .party-window-scroll,
+.party-window-root .party-window-scroll > .viewport,
+.party-window-root .party-window-scroll > .corner {
     -fx-background-color: transparent;
 }
 
-.party-window-results {
+.party-window-root .party-window-results {
     -fx-background-color: -shale-color-card-surface;
     -fx-background-radius: 12;
     -fx-border-color: -shale-color-card-border;
@@ -57,53 +57,53 @@
     -fx-border-width: 1;
 }
 
-.party-window-results .list-cell {
+.party-window-root .party-window-results .list-cell {
     -fx-background-color: transparent;
     -fx-text-fill: -shale-color-text-primary;
     -fx-padding: 10 12;
 }
 
-.party-window-results .list-cell:hover {
+.party-window-root .party-window-results .list-cell:hover {
     -fx-background-color: -shale-color-card-hover-surface;
 }
 
-.party-window-results .list-cell:selected {
+.party-window-root .party-window-results .list-cell:selected {
     -fx-background-color: -shale-color-selection-surface;
     -fx-text-fill: -shale-color-text-primary;
     -fx-font-weight: 700;
 }
 
-.party-window-results:focused {
+.party-window-root .party-window-results:focused {
     -fx-border-color: -shale-color-border-focus;
 }
 
-.party-window-results:disabled,
-.party-window-section:disabled {
+.party-window-root .party-window-results:disabled,
+.party-window-root .party-window-section:disabled {
     -fx-opacity: -shale-opacity-disabled;
 }
 
-.party-window-loading,
-.party-window-empty,
-.party-window-filtered-empty {
+.party-window-root .party-window-loading,
+.party-window-root .party-window-empty,
+.party-window-root .party-window-filtered-empty {
     -fx-text-fill: -shale-color-text-muted;
 }
 
-.party-window-validation,
-.party-window-failure,
-.party-window-concurrency {
+.party-window-root .party-window-validation,
+.party-window-root .party-window-failure,
+.party-window-root .party-window-concurrency {
     -fx-text-fill: -shale-color-text-danger;
     -fx-wrap-text: true;
 }
 
-.party-window-duplicate,
-.party-window-already-added {
+.party-window-root .party-window-duplicate,
+.party-window-root .party-window-already-added {
     -fx-background-color: -shale-color-warning-wash;
     -fx-background-radius: 8;
     -fx-padding: 8 12;
     -fx-wrap-text: true;
 }
 
-.party-window-selected {
+.party-window-root .party-window-selected {
     -fx-background-color: -shale-color-selection-surface;
     -fx-background-radius: 12;
     -fx-border-color: -shale-color-border-focus;
@@ -111,7 +111,7 @@
     -fx-border-width: 1;
 }
 
-.party-window-footer {
+.party-window-root .party-window-footer {
     -fx-min-height: 52;
     -fx-padding: 12 0 0 0;
     -fx-border-color: -shale-color-divider transparent transparent transparent;

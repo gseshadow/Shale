@@ -3967,7 +3967,7 @@ public class CaseController {
 
 		Dialog<PartyEditorResult> dialog = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(dialog, "Edit Party");
-		dialog.getDialogPane().getStyleClass().add("party-window-shell");
+		dialog.getDialogPane().getStyleClass().addAll("party-window-root", "party-window-shell");
 		dialog.setTitle("Edit Party");
 		dialog.initOwner(organizationDialogOwner());
 		dialog.setResizable(true);
@@ -4113,7 +4113,7 @@ public class CaseController {
 		grid.add(new Label("Notes"), 0, 5);
 		grid.add(notesArea, 1, 5);
 		VBox editorSurface = new VBox(grid);
-		editorSurface.getStyleClass().addAll("party-window-root", "party-window-section");
+		editorSurface.getStyleClass().add("party-window-section");
 		ScrollPane editorScroll = new ScrollPane(editorSurface);
 		editorScroll.getStyleClass().add("party-window-scroll");
 		editorScroll.setFitToWidth(true);

@@ -120,7 +120,7 @@ public final class PartyAddWorkflowDialog {
 
 		Dialog<AddPartyDraft> dialog = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(dialog, dialogTitle);
-		dialog.getDialogPane().getStyleClass().add("party-window-shell");
+		dialog.getDialogPane().getStyleClass().addAll("party-window-root", "party-window-shell");
 		dialog.setTitle(dialogTitle);
 		dialog.setResizable(true);
 		dialog.getDialogPane().setPrefSize(820, 660);
@@ -237,7 +237,6 @@ public final class PartyAddWorkflowDialog {
 		});
 
 		VBox contentBox = new VBox(10);
-		contentBox.getStyleClass().add("party-window-root");
 		contentBox.setAlignment(Pos.TOP_CENTER);
 		contentBox.setPadding(new Insets(16));
 		contentBox.getChildren().addAll(titleLabel, subtitleLabel);
