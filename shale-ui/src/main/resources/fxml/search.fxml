@@ -16,7 +16,7 @@
     <center>
         <StackPane>
             <children>
-                <ScrollPane fitToWidth="true" pannable="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll transparent-scroll">
+                <ScrollPane fitToWidth="true" pannable="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll, transparent-scroll">
                     <content>
                         <VBox spacing="16" fillWidth="true">
                             <padding>

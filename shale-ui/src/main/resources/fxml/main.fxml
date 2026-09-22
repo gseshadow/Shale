@@ -50,7 +50,7 @@
 							</children>
 						</HBox>
 						<Button fx:id="notificationBellButton" text="🔔"
-							onAction="#onOpenNotificationCenter" styleClass="notification-bell-button shell-icon-button" />
+							onAction="#onOpenNotificationCenter" styleClass="notification-bell-button, shell-icon-button" />
 						<Button fx:id="profileButton" text="Profile" onAction="#onProfile"
 							styleClass="profile-button" />
 					</children>

@@ -84,6 +84,14 @@ final class SettingsFxmlLoadTest {
             Parent root = assertDoesNotThrow((org.junit.jupiter.api.function.ThrowingSupplier<Parent>) loader::load);
             SettingsController controller = loader.getController();
             assertNotNull(controller);
+            javafx.scene.control.ScrollPane settingsScroll = (javafx.scene.control.ScrollPane) loader.getNamespace().get("settingsScroll");
+            assertTrue(settingsScroll.getStyleClass().containsAll(List.of("surface-scroll", "settings-scroll")),
+                    "FXMLLoader must create separate runtime classes for the Settings scroll owner.");
+            SettingsManagementRow customDictionaryRow =
+                    (SettingsManagementRow) loader.getNamespace().get("customDictionaryRow");
+            javafx.scene.Parent personalGroup = (javafx.scene.Parent) customDictionaryRow.getParent();
+            assertTrue(personalGroup.getStyleClass().containsAll(List.of("settings-directory-group", "shale-section-card")),
+                    "FXMLLoader must create separate runtime classes for Settings section cards.");
             CheckBox notificationCheck = (CheckBox) loader.getNamespace().get("taskAssignedToMeCheck");
             assertNotNull(notificationCheck, "Existing Settings notification checkbox fx:id should resolve.");
             assertSame(notificationCheck, injectedField(controller, "taskAssignedToMeCheck"),
