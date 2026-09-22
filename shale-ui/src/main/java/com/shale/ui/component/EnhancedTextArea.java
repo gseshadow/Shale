@@ -188,6 +188,7 @@ public class EnhancedTextArea extends VBox {
 
     private ContextMenu spellingMenu() {
         ContextMenu menu = new ContextMenu();
+        TransientPopupSupport.style(menu, "rich-text-context-menu");
         menu.setOnShowing(event -> {
             menu.getItems().clear();
             WordRange target = selectedOrCaretWord();
@@ -207,7 +208,11 @@ public class EnhancedTextArea extends VBox {
             MenuItem cut = item("Cut", editor::cut, editor.isEditable() && !editor.getSelectedText().isEmpty());
             MenuItem copy = item("Copy", editor::copy, !editor.getSelectedText().isEmpty());
             MenuItem paste = item("Paste", editor::paste, editor.isEditable() && Clipboard.getSystemClipboard().hasString());
-            menu.getItems().addAll(undo, redo, new SeparatorMenuItem(), cut, copy, paste);
+            MenuItem delete = item("Delete", () -> editor.replaceSelection(""),
+                    editor.isEditable() && !editor.getSelectedText().isEmpty());
+            MenuItem selectAll = item("Select All", editor::selectAll, !editor.getText().isEmpty());
+            menu.getItems().addAll(undo, redo, new SeparatorMenuItem(), cut, copy, paste, delete,
+                    new SeparatorMenuItem(), selectAll);
         });
         return menu;
     }
