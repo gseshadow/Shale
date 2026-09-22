@@ -18,6 +18,7 @@
 @import "foundation/calendar-windows.css";
 @import "foundation/entity-editor-windows.css";
 @import "foundation/team-windows.css";
+@import "foundation/user-windows.css";
 @import "foundation/shell.css";
 
 .root {

@@ -26,7 +26,7 @@ public final class UserManagementPane {
  private final CheckBox showInactiveUsersCheck=new CheckBox("Show inactive users"); private final TextField userSearchField=ControlStyles.formControl(new TextField());
  private final Button addUserButton=new Button("Add User"),editUserButton=new Button("Edit User"),refreshUsersButton=new Button("Refresh"),removeUserButton=new Button("Remove from Tenant"),deactivateUserButton=new Button("Deactivate User"),reactivateUserButton=new Button("Reactivate User"),resetPasswordButton=new Button("Reset Password"); private final Label userManagementStatusLabel=new Label(); private final FlowPane actionToolbar=new FlowPane(8,8);
  private int userManagementLoadGeneration; private final List<UserManagementViewRow> managedUserRows=new ArrayList<>(); private final UserCardFactory userManagementCardFactory=new UserCardFactory(null); private boolean userMutationRunning;
- UserManagementPane(UserDao dao,Executor executor,CommittedChangeTracker changes,int tenantId,int actorUserId){this.userDao=Objects.requireNonNull(dao);this.settingsLoadExecutor=Objects.requireNonNull(executor);this.changes=Objects.requireNonNull(changes);if(tenantId<=0||actorUserId<=0)throw new IllegalArgumentException("Tenant and actor context are required.");this.tenantId=tenantId;this.actorUserId=actorUserId;userSearchField.setPromptText("Search name, email, initials, or role");HBox.setHgrow(userSearchField,Priority.ALWAYS);HBox filters=new HBox(10,userSearchField,showInactiveUsersCheck);filters.setAlignment(Pos.CENTER_LEFT);VBox header=new VBox(10,filters,addUserButton);userManagementTable.getColumns().setAll(userNameColumn,userEmailColumn,userInitialsColumn,userRolesColumn,userStatusColumn);userManagementTable.setFixedCellSize(36);userManagementTable.setMinHeight(120);userManagementTable.setPrefHeight(430);userManagementTable.setMaxHeight(Double.MAX_VALUE);userManagementTable.getStyleClass().add("shale-table");actionToolbar.getChildren().setAll(editUserButton,deactivateUserButton,reactivateUserButton,resetPasswordButton,refreshUsersButton,removeUserButton);actionToolbar.setAlignment(Pos.CENTER_LEFT);VBox footer=new VBox(8,actionToolbar,userManagementStatusLabel);root.setTop(header);root.setCenter(userManagementTable);root.setBottom(footer);BorderPane.setMargin(userManagementTable,new javafx.geometry.Insets(10,0,10,0));root.getStyleClass().add("strong-panel");addUserButton.setOnAction(e->onAddUser());editUserButton.setOnAction(e->onEditUser());refreshUsersButton.setOnAction(e->onRefreshUsers());removeUserButton.setOnAction(e->onRemoveUserFromTenant());deactivateUserButton.setOnAction(e->onDeactivateUser());reactivateUserButton.setOnAction(e->onReactivateUser());resetPasswordButton.setOnAction(e->onResetUserPassword());showInactiveUsersCheck.setOnAction(e->onToggleInactiveUsers());configureSemanticButtons();configureUserManagementTable();updateUserActionButtons(null);}
+ UserManagementPane(UserDao dao,Executor executor,CommittedChangeTracker changes,int tenantId,int actorUserId){this.userDao=Objects.requireNonNull(dao);this.settingsLoadExecutor=Objects.requireNonNull(executor);this.changes=Objects.requireNonNull(changes);if(tenantId<=0||actorUserId<=0)throw new IllegalArgumentException("Tenant and actor context are required.");this.tenantId=tenantId;this.actorUserId=actorUserId;userSearchField.setPromptText("Search name, email, initials, or role");HBox.setHgrow(userSearchField,Priority.ALWAYS);HBox filters=new HBox(10,userSearchField,showInactiveUsersCheck);filters.setAlignment(Pos.CENTER_LEFT);VBox header=new VBox(10,filters,addUserButton);header.getStyleClass().add("user-window-section");userManagementTable.getColumns().setAll(userNameColumn,userEmailColumn,userInitialsColumn,userRolesColumn,userStatusColumn);userManagementTable.setFixedCellSize(36);userManagementTable.setMinHeight(120);userManagementTable.setPrefHeight(430);userManagementTable.setMaxHeight(Double.MAX_VALUE);userManagementTable.getStyleClass().add("shale-table");actionToolbar.getChildren().setAll(editUserButton,deactivateUserButton,reactivateUserButton,resetPasswordButton,refreshUsersButton,removeUserButton);actionToolbar.setAlignment(Pos.CENTER_LEFT);VBox footer=new VBox(8,actionToolbar,userManagementStatusLabel);footer.getStyleClass().add("user-window-footer");userManagementStatusLabel.getStyleClass().add("user-window-metadata");root.setTop(header);root.setCenter(userManagementTable);root.setBottom(footer);BorderPane.setMargin(userManagementTable,new javafx.geometry.Insets(10,0,10,0));root.getStyleClass().addAll("strong-panel","user-window-root","user-management-window");addUserButton.setOnAction(e->onAddUser());editUserButton.setOnAction(e->onEditUser());refreshUsersButton.setOnAction(e->onRefreshUsers());removeUserButton.setOnAction(e->onRemoveUserFromTenant());deactivateUserButton.setOnAction(e->onDeactivateUser());reactivateUserButton.setOnAction(e->onReactivateUser());resetPasswordButton.setOnAction(e->onResetUserPassword());showInactiveUsersCheck.setOnAction(e->onToggleInactiveUsers());configureSemanticButtons();configureUserManagementTable();updateUserActionButtons(null);}
  Node node(){return root;} boolean mutationInFlight(){return userMutationRunning;} void open(){loadManagedUsersAsync(null);} void dispose(){disposed.set(true);userManagementLoadGeneration++;} int tenantId(){return tenantId;} int actorUserId(){return actorUserId;}
  private void configureSemanticButtons(){ControlStyles.apply(addUserButton,ControlStyles.Purpose.PRIMARY);ControlStyles.apply(editUserButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(deactivateUserButton,ControlStyles.Purpose.DANGER);ControlStyles.apply(reactivateUserButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(resetPasswordButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(refreshUsersButton,ControlStyles.Purpose.GHOST);ControlStyles.apply(removeUserButton,ControlStyles.Purpose.DANGER);}
  private static String fxColorToDb(Color c){Color x=c==null?DEFAULT_STATUS_COLOR:c;return String.format("#%02X%02X%02X",byteOf(x.getRed()),byteOf(x.getGreen()),byteOf(x.getBlue()));} private static int byteOf(double v){return Math.max(0,Math.min(255,(int)Math.round(v*255)));} private static Color dbColorToFx(String v){try{return v!=null&&v.matches("(?i)^#[0-9a-f]{6}$")?Color.web(v):DEFAULT_STATUS_COLOR;}catch(RuntimeException e){return DEFAULT_STATUS_COLOR;}} private static String rootMessage(Throwable ex){return "User management operation could not be completed.";}
@@ -37,23 +37,29 @@ public final class UserManagementPane {
 		Dialog<UserDao.UserCreateRequest> dialog = new Dialog<>();
 		dialog.setTitle("Add User");
 		AppDialogs.applySecondaryDialogShell(dialog, "Add User");
+		dialog.getDialogPane().getStyleClass().addAll("user-window", "user-create-window");
 		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
-		TextField firstName = new TextField();
-		TextField lastName = new TextField();
-		TextField email = new TextField();
+		TextField firstName = ControlStyles.formControl(new TextField());
+		TextField lastName = ControlStyles.formControl(new TextField());
+		TextField email = ControlStyles.formControl(new TextField());
 		Label emailValidation = new Label("");
-		emailValidation.getStyleClass().add("dialog-error-text");
+		emailValidation.getStyleClass().addAll("dialog-error-text", "user-window-validation");
+		emailValidation.setWrapText(true);
 		email.focusedProperty().addListener((obs, oldValue, focused) ->
 		{
 			if (!focused)
 				validateAddUserEmail(email, emailValidation);
 		});
-		PasswordField password = new PasswordField();
-		TextField initials = new TextField();
-		ColorPicker colorPicker = new ColorPicker(DEFAULT_STATUS_COLOR);
+		PasswordField password = ControlStyles.formControl(new PasswordField());
+		TextField initials = ControlStyles.formControl(new TextField());
+		ColorPicker colorPicker = ControlStyles.formControl(new ColorPicker(DEFAULT_STATUS_COLOR));
+		colorPicker.setAccessibleText("User color preview and selector");
+		colorPicker.getStyleClass().add("user-window-color-preview");
 		CheckBox attorney = new CheckBox("Attorney");
 		CheckBox admin = new CheckBox("Admin");
+		attorney.getStyleClass().add("user-window-role-row"); admin.getStyleClass().add("user-window-role-row");
 		GridPane grid = new GridPane();
+		grid.getStyleClass().addAll("user-window-section", "user-window-identity-section");
 		grid.setHgap(8);
 		grid.setVgap(8);
 		grid.add(new Label("First Name"), 0, 0);
@@ -71,7 +77,11 @@ public final class UserManagementPane {
 		grid.add(colorPicker, 1, 6);
 		grid.add(attorney, 1, 7);
 		grid.add(admin, 1, 8);
-		dialog.getDialogPane().setContent(grid);
+		Label guidance=new Label("Create an active user in the current tenant. Temporary password and application roles are administrator-only."); guidance.getStyleClass().add("user-window-guidance"); guidance.setWrapText(true);
+		VBox content=new VBox(12,guidance,grid); content.getStyleClass().add("user-window-root");
+		dialog.getDialogPane().setContent(content);
+		styleDialogLabels(grid);
+		configureDialogButtons(dialog, ButtonType.OK, ButtonType.CANCEL);
 		dialog.setResultConverter(button ->
 		{
 			if (button != ButtonType.OK)
@@ -121,6 +131,7 @@ public final class UserManagementPane {
 		Dialog<UserDao.UserUpdateRequest> d = new Dialog<>();
 		d.setTitle("Edit User");
 		AppDialogs.applySecondaryDialogShell(d, "Edit User");
+		d.getDialogPane().getStyleClass().addAll("user-window", "user-admin-edit-window");
 		ButtonType save = new ButtonType("Save Changes", javafx.scene.control.ButtonBar.ButtonData.OK_DONE), cancel = new ButtonType("Cancel",
 				javafx.scene.control.ButtonBar.ButtonData.CANCEL_CLOSE);
 		d.getDialogPane().getButtonTypes().setAll(save, cancel);
@@ -128,11 +139,15 @@ public final class UserManagementPane {
 				.formControl(new TextField(row.email())), phone = ControlStyles.formControl(new TextField(row.phone())), initials = ControlStyles.formControl(new TextField(row
 						.initials()));
 		ColorPicker color = ControlStyles.formControl(new ColorPicker(dbColorToFx(row.color())));
+		color.setAccessibleText("User color preview and selector");
+		color.getStyleClass().add("user-window-color-preview");
 		CheckBox attorney = ControlStyles.formControl(new CheckBox("Attorney — eligible for attorney assignments")), admin = ControlStyles.formControl(new CheckBox(
 				"Administrator — may manage tenant settings and users"));
 		attorney.setSelected(row.attorney());
 		admin.setSelected(row.admin());
+		attorney.getStyleClass().add("user-window-role-row"); admin.getStyleClass().add("user-window-role-row");
 		GridPane g = new GridPane();
+		g.getStyleClass().addAll("user-window-section", "user-window-identity-section");
 		g.setHgap(12);
 		g.setVgap(10);
 		g.add(new Label("Identity"), 0, 0, 2, 1);
@@ -152,7 +167,11 @@ public final class UserManagementPane {
 		g.add(attorney, 1, 8);
 		g.add(admin, 1, 9);
 		g.add(new Label("User ID " + row.id() + " · Status " + row.getStatus() + " (managed separately)"), 0, 10, 2, 1);
-		d.getDialogPane().setContent(g);
+		Label guidance=new Label("Update this user's identity, contact information, appearance, and application roles. Lifecycle and password actions remain separate."); guidance.getStyleClass().add("user-window-guidance"); guidance.setWrapText(true);
+		VBox content=new VBox(12,guidance,g); content.getStyleClass().add("user-window-root");
+		d.getDialogPane().setContent(content);
+		styleDialogLabels(g);
+		g.getChildren().stream().filter(n->n instanceof Label label&&label.getText()!=null&&label.getText().startsWith("User ID ")).forEach(n->n.getStyleClass().add("user-window-metadata"));
 		ControlStyles.apply((ButtonBase) d.getDialogPane().lookupButton(save), ControlStyles.Purpose.PRIMARY);
 		ControlStyles.apply((ButtonBase) d.getDialogPane().lookupButton(cancel), ControlStyles.Purpose.SECONDARY);
 		Node saveButton = d.getDialogPane().lookupButton(save);
@@ -195,14 +214,17 @@ public final class UserManagementPane {
 		Dialog<String> dialog = new Dialog<>();
 		dialog.setTitle("Reset Password");
 		AppDialogs.applySecondaryDialogShell(dialog, "Reset Password");
+		dialog.getDialogPane().getStyleClass().addAll("user-window", "user-security-window");
 		dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK, ButtonType.CANCEL);
 		PasswordField password = new PasswordField();
 		PasswordField confirm = new PasswordField();
 		Label validation = new Label("");
-		validation.getStyleClass().add("dialog-error-text");
+		validation.getStyleClass().addAll("dialog-error-text", "user-window-validation");
+		validation.setWrapText(true);
 		password.textProperty().addListener((obs, oldValue, newValue) -> validation.setText(""));
 		confirm.textProperty().addListener((obs, oldValue, newValue) -> validation.setText(""));
 		GridPane grid = new GridPane();
+		grid.getStyleClass().addAll("user-window-section", "user-window-security-section");
 		grid.setHgap(8);
 		grid.setVgap(8);
 		grid.add(new Label("New Password"), 0, 0);
@@ -210,7 +232,11 @@ public final class UserManagementPane {
 		grid.add(new Label("Confirm Password"), 0, 1);
 		grid.add(confirm, 1, 1);
 		grid.add(validation, 1, 2);
-		dialog.getDialogPane().setContent(grid);
+		Label guidance=new Label("Set a new password for the selected user. The change takes effect immediately after confirmation."); guidance.getStyleClass().add("user-window-guidance"); guidance.setWrapText(true);
+		VBox content=new VBox(12,guidance,grid); content.getStyleClass().add("user-window-root");
+		dialog.getDialogPane().setContent(content);
+		styleDialogLabels(grid);
+		configureDialogButtons(dialog, ButtonType.OK, ButtonType.CANCEL);
 		Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
 		okButton.addEventFilter(javafx.event.ActionEvent.ACTION, event ->
 		{
@@ -463,5 +489,8 @@ public final class UserManagementPane {
             return (name() + " " + email() + " " + initials() + " " + getRoles() + " " + id()).toLowerCase(java.util.Locale.ROOT);
         }
     }
+
+    private static void styleDialogLabels(GridPane grid){for(Node node:grid.getChildren())if(node instanceof Label label&&!label.getStyleClass().contains("dialog-error-text"))label.getStyleClass().add("user-window-field-label");}
+    private static void configureDialogButtons(Dialog<?> dialog,ButtonType primary,ButtonType secondary){ControlStyles.apply((ButtonBase)dialog.getDialogPane().lookupButton(primary),ControlStyles.Purpose.PRIMARY);ControlStyles.apply((ButtonBase)dialog.getDialogPane().lookupButton(secondary),ControlStyles.Purpose.SECONDARY);}
 
 }
