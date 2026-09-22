@@ -3967,17 +3967,27 @@ public class CaseController {
 
 		Dialog<PartyEditorResult> dialog = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(dialog, "Edit Party");
+		dialog.getDialogPane().getStyleClass().add("party-window-shell");
 		dialog.setTitle("Edit Party");
 		dialog.initOwner(organizationDialogOwner());
+		dialog.setResizable(true);
 		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
 		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
 
 		ChoiceBox<String> entityTypeChoice = new ChoiceBox<>();
+		entityTypeChoice.setAccessibleText("Party entity type");
 		entityTypeChoice.getItems().addAll("Contact", "Organization");
 
 		ChoiceBox<PartyEntityOption> entityChoice = new ChoiceBox<>();
+		entityChoice.setAccessibleText("Party entity, required");
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
+		roleChoice.setAccessibleText("Party role, required");
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
+		sideChoice.setAccessibleText("Party affiliation, required");
+		ControlStyles.formControl(entityTypeChoice);
+		ControlStyles.formControl(entityChoice);
+		ControlStyles.formControl(roleChoice);
+		ControlStyles.formControl(sideChoice);
 		sideChoice.getItems().addAll(data == null ? List.of() : data.sideOptions());
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override
@@ -3993,6 +4003,7 @@ public class CaseController {
 
 		CheckBox primaryCheck = new CheckBox("Primary");
 		TextArea notesArea = new TextArea();
+		notesArea.setAccessibleText("Party notes");
 		notesArea.setPrefRowCount(3);
 		notesArea.setWrapText(true);
 
@@ -4087,6 +4098,7 @@ public class CaseController {
 		notesArea.setText(safeText(existing.getNotes()));
 
 		GridPane grid = new GridPane();
+		grid.getStyleClass().add("party-window-field-grid");
 		grid.setHgap(10);
 		grid.setVgap(10);
 		grid.add(new Label("Entity Type"), 0, 0);
@@ -4100,9 +4112,17 @@ public class CaseController {
 		grid.add(primaryCheck, 1, 4);
 		grid.add(new Label("Notes"), 0, 5);
 		grid.add(notesArea, 1, 5);
-		dialog.getDialogPane().setContent(grid);
+		VBox editorSurface = new VBox(grid);
+		editorSurface.getStyleClass().addAll("party-window-root", "party-window-section");
+		ScrollPane editorScroll = new ScrollPane(editorSurface);
+		editorScroll.getStyleClass().add("party-window-scroll");
+		editorScroll.setFitToWidth(true);
+		editorScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		dialog.getDialogPane().setContent(editorScroll);
 
 		Node saveButton = dialog.getDialogPane().lookupButton(saveType);
+		ControlStyles.apply((Button) saveButton, ControlStyles.Purpose.PRIMARY);
+		ControlStyles.apply((Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
 		saveButton.disableProperty().bind(
 				entityChoice.valueProperty().isNull()
 						.or(roleChoice.valueProperty().isNull())
@@ -4130,6 +4150,11 @@ public class CaseController {
 			if (entity == null || role == null || side == null)
 				return null;
 			return new PartyEditorResult(entity.entityType, entity.id, role.id, side.value, primaryCheck.isSelected(), notesArea.getText());
+		});
+		dialog.setOnShown(event -> {
+			if (dialog.getDialogPane().getScene().getWindow() instanceof Stage stage) {
+				WindowSizingUtil.sizeModalStage(stage, organizationDialogOwner(), 720, 560, 560, 400);
+			}
 		});
 
 		return dialog.showAndWait().orElse(null);
