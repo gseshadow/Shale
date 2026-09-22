@@ -36,6 +36,7 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.util.ExternalBrowserHelper;
 import com.shale.ui.util.ContactExternalActions;
 import com.shale.ui.util.PerfLog;
+import com.shale.ui.util.WindowSizingUtil;
 import com.shale.ui.state.AppState;
 
 import javafx.application.Platform;
@@ -66,6 +67,8 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.TilePane;
 import javafx.stage.Window;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 
 public final class ContactViewController {
 
@@ -408,15 +411,15 @@ public final class ContactViewController {
     }
 
     private void showProfileEditor(){
-        Dialog<Void> dialog=new Dialog<>();AppDialogs.applySecondaryDialogShell(dialog,createMode?"Add Contact":"Edit Contact");dialog.initOwner(createMode?editorOwner:dialogOwner(editButton));
+        Dialog<Void> dialog=new Dialog<>();AppDialogs.applySecondaryDialogShell(dialog,createMode?"Add Contact":"Edit Contact");Window owner=createMode?editorOwner:dialogOwner(editButton);if(owner!=null)dialog.initOwner(owner);dialog.initModality(Modality.WINDOW_MODAL);dialog.setResizable(true);
         ButtonType save=new ButtonType(createMode?"Create Contact":"Save Changes",ButtonData.OK_DONE),reload=new ButtonType("Reload",ButtonData.OTHER);dialog.getDialogPane().getButtonTypes().add(save);if(!createMode)dialog.getDialogPane().getButtonTypes().add(reload);dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
         var p=classificationProfile;var sn=p.structuredName();
         TextField display=new TextField(safe(p.legacyDisplayName())),prefix=new TextField(safe(sn.prefix())),first=new TextField(safe(sn.firstName())),middle=new TextField(safe(sn.middleName())),last=new TextField(safe(sn.lastName())),preferred=new TextField(safe(sn.preferredName())),suffix=new TextField(safe(sn.suffix()));
         DatePicker birth=new DatePicker(p.dateOfBirth());EnhancedTextArea condition=contactNarrativeEditor(p.condition(),"Condition",4);EnhancedTextArea notes=contactNarrativeEditor(p.notes(),"Contact Notes",6);CheckBox deceased=new CheckBox("This contact is deceased");deceased.setSelected(p.deceased());
-        Label preview=new Label();preview.setWrapText(true);preview.getStyleClass().add("contact-editor-name-preview");
+        Label preview=new Label();preview.setWrapText(true);preview.getStyleClass().addAll("contact-editor-name-preview","entity-editor-guidance");
         for(javafx.scene.control.Control field:List.of(display,prefix,first,middle,last,preferred,suffix,birth,deceased)){ControlStyles.formControl(field);field.setMaxWidth(Double.MAX_VALUE);}
         condition.setMaxWidth(Double.MAX_VALUE);notes.setMaxWidth(Double.MAX_VALUE);
-        GridPane details=new GridPane();details.setHgap(12);details.setVgap(9);details.getStyleClass().add("contact-editor-name-form");ColumnConstraints left=new ColumnConstraints();left.setPercentWidth(50);left.setHgrow(Priority.ALWAYS);ColumnConstraints right=new ColumnConstraints();right.setPercentWidth(50);right.setHgrow(Priority.ALWAYS);details.getColumnConstraints().addAll(left,right);
+        GridPane details=new GridPane();details.setHgap(12);details.setVgap(9);details.getStyleClass().add("contact-editor-name-form");ColumnConstraints left=new ColumnConstraints();left.setPercentWidth(50);left.setHgrow(Priority.ALWAYS);ColumnConstraints right=new ColumnConstraints();right.setPercentWidth(50);right.setHgrow(Priority.ALWAYS);details.getColumnConstraints().addAll(left,right);details.getStyleClass().add("entity-editor-identity");
         details.add(formField("Display Name",display),0,0,2,1);details.add(formField("Prefix",prefix),0,1);details.add(formField("First Name",first),1,1);details.add(formField("Middle Name",middle),0,2);details.add(formField("Last Name",last),1,2);details.add(formField("Preferred Name",preferred),0,3);details.add(formField("Suffix",suffix),1,3);details.add(preview,0,4,2,1);details.add(formField("Date of Birth",birth),0,5);details.add(formField("Condition",condition),0,6,2,1);details.add(deceased,0,7,2,1);details.add(formField("Notes",notes),0,8,2,1);
         PhoneEditor phones=new PhoneEditor(p.phoneNumbers());EmailEditor emails=new EmailEditor(p.emailAddresses());AddressEditor addresses=new AddressEditor(p.addresses());
         SelectionEditor<ContactServicePort.Definition> types=new SelectionEditor<>(effectiveTypes,p.contactTypes(),ContactServicePort.Definition::id,ContactServicePort.Definition::name,ContactServicePort.Definition::color);SelectionEditor<ContactServicePort.Definition> specs=new SelectionEditor<>(effectiveSpecialties,p.specialties(),ContactServicePort.Definition::id,ContactServicePort.Definition::name,ContactServicePort.Definition::color);final CredentialEditor[] credentialEditor=new CredentialEditor[1];Runnable previewer=()->{List<ContactServicePort.AssignedCredential> selected=credentialEditor[0]==null?p.credentials():credentialEditor[0].previewCredentials();preview.setText("Displayed as: "+com.shale.core.service.ContactNamePresentation.effectiveDisplayName(display.getText(),selected)+"\nStructured-name preview: "+com.shale.core.service.ContactNamePresentation.structuredFullName(new ContactServicePort.StructuredName(prefix.getText(),first.getText(),middle.getText(),last.getText(),preferred.getText(),suffix.getText()),selected));};CredentialEditor creds=new CredentialEditor(effectiveCredentials,p.credentials(),previewer);credentialEditor[0]=creds;
@@ -425,9 +428,9 @@ public final class ContactViewController {
         for(TextField f:List.of(prefix,first,middle,last,suffix))f.textProperty().addListener((o,a,b)->composeBase.run());
         for(TextField f:List.of(display,preferred))f.textProperty().addListener((o,a,b)->previewer.run());previewer.run();
         VBox classifications=new VBox(10,heading("Contact Types"),types.box,heading("Specialties"),specs.box,heading("Credentials"),creds.box);
-        StackPane content=new StackPane();content.getStyleClass().add("contact-editor-content");List<Node> sections=List.of(sectionScroll(details),sectionScroll(phones.box),sectionScroll(emails.box),sectionScroll(addresses.box),sectionScroll(classifications));content.getChildren().addAll(sections);sections.forEach(n->{n.setVisible(false);n.setManaged(false);});
-        ToggleGroup group=new ToggleGroup();HBox navigation=new HBox(4);navigation.getStyleClass().add("contact-editor-navigation");String[] names={"Details","Phones","Emails","Addresses","Classifications"};for(int i=0;i<names.length;i++){final int index=i;ToggleButton button=new ToggleButton(names[i]);button.setToggleGroup(group);button.getStyleClass().add("contact-editor-navigation-button");button.setMaxWidth(Double.MAX_VALUE);HBox.setHgrow(button,Priority.ALWAYS);button.setOnAction(e->showEditorSection(sections,index));navigation.getChildren().add(button);}((ToggleButton)navigation.getChildren().get(0)).setSelected(true);showEditorSection(sections,0);group.selectedToggleProperty().addListener((o,old,n)->{if(n==null&&old!=null)old.setSelected(true);});
-        Label status=new Label();status.setWrapText(true);status.getStyleClass().add("dialog-error-text");status.setVisible(false);status.setManaged(false);VBox shell=new VBox(10,navigation,status,content);shell.getStyleClass().add("contact-editor-surface");VBox.setVgrow(content,Priority.ALWAYS);dialog.getDialogPane().setContent(shell);dialog.getDialogPane().getStyleClass().add("contact-editor-dialog");dialog.getDialogPane().setPrefSize(900,680);
+        StackPane content=new StackPane();content.getStyleClass().addAll("contact-editor-content","entity-editor-content");List<Node> sections=List.of(sectionScroll(details),sectionScroll(phones.box),sectionScroll(emails.box),sectionScroll(addresses.box),sectionScroll(classifications));content.getChildren().addAll(sections);sections.forEach(n->{n.setVisible(false);n.setManaged(false);n.getStyleClass().add("entity-editor-section");});
+        ToggleGroup group=new ToggleGroup();HBox navigation=new HBox(4);navigation.getStyleClass().addAll("contact-editor-navigation","entity-editor-navigation");String[] names={"Details","Phones","Emails","Addresses","Classifications"};for(int i=0;i<names.length;i++){final int index=i;ToggleButton button=new ToggleButton(names[i]);button.setToggleGroup(group);button.getStyleClass().addAll("contact-editor-navigation-button","entity-editor-navigation-button");button.setMaxWidth(Double.MAX_VALUE);HBox.setHgrow(button,Priority.ALWAYS);button.setOnAction(e->showEditorSection(sections,index));navigation.getChildren().add(button);}((ToggleButton)navigation.getChildren().get(0)).setSelected(true);showEditorSection(sections,0);group.selectedToggleProperty().addListener((o,old,n)->{if(n==null&&old!=null)old.setSelected(true);});
+        Label status=new Label();status.setWrapText(true);status.getStyleClass().addAll("dialog-error-text","entity-editor-feedback");status.setVisible(false);status.setManaged(false);VBox shell=new VBox(10,navigation,status,content);shell.getStyleClass().addAll("contact-editor-surface","entity-editor-root");VBox.setVgrow(content,Priority.ALWAYS);dialog.getDialogPane().setContent(shell);dialog.getDialogPane().getStyleClass().addAll("contact-editor-dialog","entity-editor-dialog");dialog.getDialogPane().setPrefSize(900,680);dialog.setOnShown(e->{if(dialog.getDialogPane().getScene().getWindow() instanceof Stage stage)WindowSizingUtil.sizeModalStage(stage,owner,900,680,680,480);});
         Button saveButton=(Button)dialog.getDialogPane().lookupButton(save);ControlStyles.apply(saveButton,ControlStyles.Purpose.PRIMARY);ControlStyles.apply((Button)dialog.getDialogPane().lookupButton(ButtonType.CANCEL),ControlStyles.Purpose.SECONDARY);if(!createMode)ControlStyles.apply((Button)dialog.getDialogPane().lookupButton(reload),ControlStyles.Purpose.SECONDARY);
         saveButton.addEventFilter(javafx.event.ActionEvent.ACTION,e->{
             e.consume();if(saveInFlight)return;
@@ -455,7 +458,7 @@ public final class ContactViewController {
                 command.shaleClientId(),command.contactId(),command.actorUserId(),failure.getClass().getName()),failure);
     }
     private static VBox formField(String label,Node field){Label caption=new Label(label);caption.setLabelFor(field);caption.getStyleClass().add("contact-editor-field-label");VBox box=new VBox(4,caption,field);box.setFillWidth(true);GridPane.setHgrow(box,Priority.ALWAYS);return box;}
-    private static ScrollPane sectionScroll(Node node){ScrollPane scroll=new ScrollPane(node);scroll.setFitToWidth(true);scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);scroll.getStyleClass().add("contact-editor-section-scroll");return scroll;}
+    private static ScrollPane sectionScroll(Node node){ScrollPane scroll=new ScrollPane(node);scroll.setFitToWidth(true);scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);scroll.getStyleClass().addAll("contact-editor-section-scroll","entity-editor-scroll");return scroll;}
     private static void showEditorSection(List<Node> sections,int selected){for(int i=0;i<sections.size();i++){boolean active=i==selected;sections.get(i).setVisible(active);sections.get(i).setManaged(active);}}
     private static String structuredPreview(String...v){return java.util.Arrays.stream(v).map(ContactViewController::safeText).filter(Objects::nonNull).collect(java.util.stream.Collectors.joining(" "));}
 
