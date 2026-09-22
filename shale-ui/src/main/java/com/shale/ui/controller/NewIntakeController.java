@@ -314,6 +314,8 @@ public final class NewIntakeController {
 		if (narrow) {
 			intakeWorkspace.getColumnConstraints().setAll(leftWorkspaceColumn);
 			leftWorkspaceColumn.setPercentWidth(100);
+			intakeWorkspace.getChildren().setAll(
+					callerSection, clientSection, caseSection, partiesSection, incidentSection);
 			placeSection(callerSection, 0, 0);
 			placeSection(clientSection, 0, 1);
 			placeSection(caseSection, 0, 2);
@@ -325,6 +327,7 @@ public final class NewIntakeController {
 			intakeWorkspace.getColumnConstraints().setAll(leftWorkspaceColumn, rightWorkspaceColumn);
 			wideLeftIntakeColumn.getChildren().setAll(callerSection, clientSection);
 			wideRightIntakeColumn.getChildren().setAll(caseSection, partiesSection, incidentSection);
+			intakeWorkspace.getChildren().setAll(wideLeftIntakeColumn, wideRightIntakeColumn);
 			placeSection(wideLeftIntakeColumn, 0, 0);
 			placeSection(wideRightIntakeColumn, 1, 0);
 		}

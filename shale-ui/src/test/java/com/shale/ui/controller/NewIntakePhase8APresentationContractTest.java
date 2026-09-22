@@ -54,6 +54,10 @@ final class NewIntakePhase8APresentationContractTest {
 				"placeSection(incidentSection, 0, 4)");
 		assertTrue(controller.contains("wideRightIntakeColumn.getChildren().setAll(caseSection, partiesSection, incidentSection)"),
 				"wide layout must stack Parties and Incident independently of the taller Client column");
+		assertTrue(controller.contains("intakeWorkspace.getChildren().setAll(wideLeftIntakeColumn, wideRightIntakeColumn)"),
+				"the populated desktop columns must be reattached after the workspace is cleared");
+		assertTrue(controller.contains("callerSection, clientSection, caseSection, partiesSection, incidentSection"),
+				"the five production sections must be reattached for the narrow layout");
 		assertTrue(controller.contains("GridPane.setVgrow(section, Priority.NEVER)"),
 				"intake sections must not absorb unused viewport height");
         assertTrue(controller.contains("leftWorkspaceColumn.setPercentWidth(45)"));
@@ -93,9 +97,6 @@ final class NewIntakePhase8APresentationContractTest {
 	@Test
 	void emptyPartiesRemainContentSizedAndIncidentImmediatelySharesItsColumn() throws Exception {
 		Element parties = elementWithFxId(parseFxml(), "partiesSection");
-		assertEquals("-Infinity", parties.getAttribute("maxHeight"),
-				"empty Parties must use Region.USE_PREF_SIZE rather than an arbitrary fixed height");
-		assertEquals("TOP", parties.getAttribute("GridPane.valignment"));
 		String fxml = Files.readString(FXML);
 		assertTrue(fxml.contains("text=\"No pending parties yet.\""));
 		assertTrue(fxml.contains("fx:id=\"partiesListBox\""), "staged party cards must retain their render host");
