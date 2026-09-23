@@ -993,12 +993,24 @@ public final class MyShaleController {
 		refreshRecentCaseActivity();
 	}
 
-	private void applyPriorities(int generation, int tenant, int user, Map<Integer, String> priorities) {
-		if (!isCurrentTaskLoad(generation, tenant, user)) return;
-		myTaskPrioritiesById = priorities == null ? Map.of() : Map.copyOf(priorities);
-		taskPrioritiesHydrated = true;
-		syncMyTaskPriorityFilterOptions();
-		logHydrationIfComplete(generation);
+	private void applyPriorities(
+	        int generation,
+	        int tenant,
+	        int user,
+	        Map<Integer, String> priorities) {
+
+	    if (!isCurrentTaskLoad(generation, tenant, user)) {
+	        return;
+	    }
+
+	    myTaskPrioritiesById =
+	            priorities == null ? Map.of() : Map.copyOf(priorities);
+	    taskPrioritiesHydrated = true;
+
+	    syncMyTaskPriorityFilterOptions();
+	    renderActiveTaskViews();
+
+	    logHydrationIfComplete(generation);
 	}
 
 	private void applyStatuses(int generation, int tenant, int user, List<TaskStatusOptionDto> statuses) {

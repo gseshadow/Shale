@@ -209,19 +209,12 @@
 }
 
 .case-main-surface,
-
 .form-surface {
-
-    -fx-background-color: rgba(245.0, 249.0, 253.0, 0.78);
-
+    -fx-background-color: -shale-color-dialog-surface;
     -fx-background-radius: 12.0;
-
     -fx-border-radius: 12.0;
-
-    -fx-border-color: rgba(15.0, 34.0, 65.0, 0.18);
-
+    -fx-border-color: -shale-color-dialog-border;
     -fx-border-width: 1.0;
-
 }
 
 .secondary-panel {
@@ -1275,17 +1268,11 @@
 }
 
 .app-dialog-root {
-
-    -fx-background-color: rgba(243.0, 248.0, 253.0, 0.96);
-
+    -fx-background-color: -shale-color-overlay-dialog;
     -fx-background-radius: 16.0;
-
     -fx-border-radius: 16.0;
-
-    -fx-border-color: rgba(13.0, 33.0, 64.0, 0.18);
-
+    -fx-border-color: -shale-color-dialog-border;
     -fx-border-width: 1.0;
-
 }
 
 .secondary-window-shell {
@@ -1355,21 +1342,14 @@
 }
 
 .app-dialog-title {
-
     -fx-font-size: 18.0px;
-
     -fx-font-weight: 800;
-
-    -fx-text-fill: #112542;
-
+    -fx-text-fill: -shale-color-text-primary;
 }
 
 .app-dialog-message {
-
-    -fx-text-fill: rgba(17.0, 37.0, 66.0, 0.82);
-
+    -fx-text-fill: -shale-color-text-secondary;
     -fx-line-spacing: 1.0px;
-
 }
 
 .app-dialog-actions {
@@ -1379,15 +1359,11 @@
 }
 
 .app-dialog-action-bar {
-
     -fx-padding: 12.0 24.0 18.0 24.0;
-
-    -fx-background-color: #F8FAFD;
-
-    -fx-border-color: rgba(78.0, 112.0, 154.0, 0.2) transparent transparent transparent;
-
+    -fx-background-color: -shale-color-overlay-dialog;
+    -fx-border-color:
+        -shale-color-dialog-border transparent transparent transparent;
     -fx-border-width: 1.0 0.0 0.0 0.0;
-
 }
 
 .app-dialog-button {
@@ -2251,53 +2227,37 @@
 /* Compact, light field-edit dialogs used by Overview edit popups. */
 
 .dialog-pane.secondary-window-shell,
-
 .secondary-window-shell {
-
-    -fx-background-color: #F8FAFD;
-
-    -fx-border-color: rgba(78.0, 112.0, 154.0, 0.2);
-
+    -fx-background-color: -shale-color-overlay-dialog;
+    -fx-border-color: -shale-color-dialog-border;
 }
 
 .dialog-pane.secondary-window-shell > .header-panel,
-
 .secondary-window-header {
-
-    -fx-background-color: linear-gradient(to bottom, #F7FAFC, #EEF5FB);
-
+    -fx-background-color: linear-gradient(
+        to bottom,
+        -shale-color-elevated-surface,
+        -shale-color-section-surface
+    );
     -fx-background-radius: 14.0 14.0 0.0 0.0;
-
     -fx-padding: 6.0 10.0 6.0 12.0;
-
     -fx-min-height: 52.0;
-
     -fx-pref-height: 54.0;
-
 }
 
 .secondary-window-title {
-
-    -fx-text-fill: #173653;
-
+    -fx-text-fill: -shale-color-text-primary;
     -fx-font-size: 14.0px;
-
     -fx-font-weight: 800;
-
 }
 
 .secondary-window-close {
-
-    -fx-text-fill: rgba(23.0, 54.0, 83.0, 0.72);
-
+    -fx-text-fill: -shale-color-text-muted;
 }
 
 .dialog-pane.secondary-window-shell > .content,
-
 .dialog-pane.secondary-window-shell > .button-bar {
-
-    -fx-background-color: #F8FAFD;
-
+    -fx-background-color: -shale-color-overlay-dialog;
 }
 
 .dialog-pane.secondary-window-shell > .button-bar {
@@ -2313,26 +2273,19 @@
 
 
 .dialog-pane.secondary-window-shell.case-link-dialog-shell {
-
-    -fx-background-color: #F8FAFD;
-
+    -fx-background-color: -shale-color-overlay-dialog;
     -fx-background-radius: 14.0;
-
     -fx-border-radius: 14.0;
-
 }
 
 .dialog-pane.secondary-window-shell.case-link-dialog-shell > .content {
-
-    -fx-background-color: #F8FAFD;
-
+    -fx-background-color: -shale-color-overlay-dialog;
     -fx-background-radius: 0.0;
-
 }
 
 .dialog-pane.secondary-window-shell.case-link-dialog-shell > .button-bar {
 
-    -fx-background-color: #F8FAFD;
+    -fx-background-color: -shale-color-overlay-dialog;
 
     -fx-background-radius: 0.0 0.0 14.0 14.0;
 

@@ -2227,7 +2227,7 @@ public class CaseController {
 
 	static String caseDateCardAccentStyle(String storedColor) {
 		String normalized = ColorUtil.normalizeStoredColor(storedColor);
-		return normalized == null ? "" : "-shale-case-date-type-wash: " + ColorUtil.toCssRgba(normalized, 0.12) + ";";
+		return normalized == null ? "" : "-shale-case-date-type-wash: " + ColorUtil.toCssRgba(normalized, 0.50) + ";";
 	}
 
 	private String formatCaseDateOccurrence(CaseDateDto d) { if (d == null || d.startsAt() == null) return "—"; DateTimeFormatter df = DateTimeFormatter.ofPattern("MMM d, yyyy"); DateTimeFormatter dtf = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a"); if (d.allDay()) { String s = d.startsAt().toLocalDate().format(df); return d.endsAt() == null ? s : s + " – " + d.endsAt().toLocalDate().format(df); } String s = d.startsAt().format(dtf); return d.endsAt() == null ? s : s + " – " + d.endsAt().format(dtf); }
