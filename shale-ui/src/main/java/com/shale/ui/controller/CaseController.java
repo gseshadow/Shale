@@ -2210,16 +2210,24 @@ public class CaseController {
 	}
 
 	private Node createCaseDateCard(CaseDateDto date, boolean removed) {
-		Label title = new Label(safe(date.displayTitle())); title.setStyle("-fx-font-weight: 700; -fx-font-size: 13px;");
-		Label when = new Label(formatCaseDateOccurrence(date)); when.setStyle("-fx-opacity: 0.78;");
+		Label title = new Label(safe(date.displayTitle())); title.getStyleClass().add("case-date-card__title");
+		Label when = new Label(formatCaseDateOccurrence(date)); when.getStyleClass().add("case-date-card__metadata");
 		VBox text = new VBox(3, title, when);
-		if (isHistoricalCaseDateType(date)) { Label h = new Label("Historical/inactive type"); h.setStyle("-fx-opacity: 0.65; -fx-font-size: 11px;"); text.getChildren().add(h); }
-		if (!removed && !safeText(date.notes()).isBlank()) { Label n = new Label(date.notes()); n.setWrapText(true); n.setStyle("-fx-opacity: 0.75;"); text.getChildren().add(n); }
+		if (isHistoricalCaseDateType(date)) { Label h = new Label("Historical/inactive type"); h.getStyleClass().add("case-date-card__historical"); text.getChildren().add(h); }
+		if (!removed && !safeText(date.notes()).isBlank()) { Label n = new Label(date.notes()); n.setWrapText(true); n.getStyleClass().add("case-date-card__notes"); text.getChildren().add(n); }
 		Button edit = ActionButtonFactory.semantic("Edit", e -> openCaseDateDialog(date), ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL); edit.setAccessibleText("Edit case date");
 		Button remove = ActionButtonFactory.semantic("Remove", e -> onRemoveCaseDate(date), ControlStyles.Purpose.DANGER, ControlStyles.Size.SMALL); remove.setAccessibleText("Remove case date");
 		Button restore = ActionButtonFactory.semantic("Restore", e -> onRestoreCaseDate(date), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL); restore.setAccessibleText("Restore case date");
 		HBox actions = removed ? new HBox(6, restore) : new HBox(6, edit, remove); actions.setAlignment(Pos.CENTER_RIGHT);
-		Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); HBox row = new HBox(12, text, spacer, actions); row.setAlignment(Pos.CENTER_LEFT); row.setPadding(new Insets(10)); row.setStyle("-fx-background-color: rgba(248,250,252,0.96); -fx-background-radius: 12; -fx-border-color: rgba(74,104,138,0.24); -fx-border-radius: 12;" + (removed ? " -fx-opacity: 0.72;" : "")); return row;
+		Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); HBox row = new HBox(12, text, spacer, actions); row.setAlignment(Pos.CENTER_LEFT);
+		row.getStyleClass().addAll("case-date-card", removed ? "case-date-card--removed" : "case-date-card--active");
+		row.setStyle(caseDateCardAccentStyle(date.color()));
+		return row;
+	}
+
+	static String caseDateCardAccentStyle(String storedColor) {
+		String normalized = ColorUtil.normalizeStoredColor(storedColor);
+		return normalized == null ? "" : "-shale-case-date-type-wash: " + ColorUtil.toCssRgba(normalized, 0.12) + ";";
 	}
 
 	private String formatCaseDateOccurrence(CaseDateDto d) { if (d == null || d.startsAt() == null) return "—"; DateTimeFormatter df = DateTimeFormatter.ofPattern("MMM d, yyyy"); DateTimeFormatter dtf = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a"); if (d.allDay()) { String s = d.startsAt().toLocalDate().format(df); return d.endsAt() == null ? s : s + " – " + d.endsAt().toLocalDate().format(df); } String s = d.startsAt().format(dtf); return d.endsAt() == null ? s : s + " – " + d.endsAt().format(dtf); }
