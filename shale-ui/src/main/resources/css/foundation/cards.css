@@ -53,6 +53,28 @@
     -fx-background-color: -shale-color-card-surface;
 }
 
+/* Case View Dates cards start from the themed card plane and end in a restrained
+ * wash supplied by the authoritative Case Date Type color. The semantic info
+ * wash is the safe fallback when production data has no usable color. */
+.case-date-card {
+    -shale-case-date-type-wash: -shale-color-info-wash;
+    -fx-background-color: linear-gradient(to right,
+        -shale-color-card-surface 0%,
+        -shale-color-card-surface 48%,
+        -shale-case-date-type-wash 100%);
+    -fx-background-radius: 12;
+    -fx-border-color: -shale-color-card-border;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 10;
+}
+
+.case-date-card--removed { -fx-opacity: 0.78; }
+.case-date-card__title { -fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; }
+.case-date-card__metadata { -fx-text-fill: -shale-color-text-secondary; }
+.case-date-card__notes { -fx-text-fill: -shale-color-text-secondary; }
+.case-date-card__historical { -fx-font-size: 11px; -fx-text-fill: -shale-color-text-muted; }
+
 /* Entity Card inline variant: small inline relationship previews. */
 .shale-entity-card-inline {
     -fx-padding: 8 10 8 10;
