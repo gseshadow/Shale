@@ -635,6 +635,49 @@ public final class UserDao {
 		}
 	}
 
+	/**
+	 * Authoritative firm-wide eligibility check for the current database actor.
+	 * ADMIN and ATTORNEY deliberately continue to resolve from dbo.Users flags;
+	 * tenant-defined roles resolve from active assignment rows.
+	 */
+	public boolean currentActorHasFirmWideRole(int shaleClientId, int firmWideRoleDefinitionId) {
+		if (shaleClientId <= 0 || firmWideRoleDefinitionId <= 0) {
+			throw new IllegalArgumentException("shaleClientId and firmWideRoleDefinitionId must be > 0");
+		}
+		try (Connection con = db.requireConnection()) {
+			verifyTenantMatchesSession(con, shaleClientId);
+			Integer actorUserId = requireCurrentPrincipalUserId(con);
+			String sql = """
+					SELECT CASE WHEN EXISTS (
+					  SELECT 1
+					  FROM dbo.Users u
+					  JOIN dbo.FirmWideRoleDefinitions d
+					    ON d.Id=? AND d.ShaleClientId=u.ShaleClientId
+					   AND d.IsActive=1 AND d.IsDeleted=0
+					  LEFT JOIN dbo.UserFirmWideRoleAssignments a
+					    ON a.ShaleClientId=u.ShaleClientId AND a.UserId=u.Id
+					   AND a.FirmWideRoleDefinitionId=d.Id AND a.IsDeleted=0
+					  WHERE u.Id=? AND u.ShaleClientId=?
+					    AND COALESCE(u.is_deleted,0)=0 AND COALESCE(u.IsRemoved,0)=0
+					    AND ((d.SystemKey='ADMIN' AND COALESCE(u.is_admin,0)=1)
+					      OR (d.SystemKey='ATTORNEY' AND COALESCE(u.is_attorney,0)=1)
+					      OR (d.SystemKey NOT IN ('ADMIN','ATTORNEY') AND a.Id IS NOT NULL))
+					) THEN 1 ELSE 0 END
+					""";
+			try (PreparedStatement ps = con.prepareStatement(sql)) {
+				ps.setInt(1, firmWideRoleDefinitionId);
+				ps.setInt(2, actorUserId);
+				ps.setInt(3, shaleClientId);
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next()) throw new IllegalStateException("Firm-wide role eligibility query returned no result.");
+					return rs.getBoolean(1);
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("Failed to check firm-wide role eligibility", e);
+		}
+	}
+
 	public List<UserRoleRow> listAssignableRoles(int userId, int shaleClientId) {
 		if (userId <= 0 || shaleClientId <= 0) {
 			throw new IllegalArgumentException("userId and shaleClientId must be > 0");

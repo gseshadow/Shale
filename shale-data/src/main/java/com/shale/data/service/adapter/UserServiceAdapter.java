@@ -53,4 +53,9 @@ public final class UserServiceAdapter implements UserServicePort {
                 row.admin(),
                 row.attorney()));
     }
+
+    @Override
+    public boolean currentActorHasFirmWideRole(int shaleClientId, int firmWideRoleDefinitionId) {
+        return userDao.currentActorHasFirmWideRole(shaleClientId, firmWideRoleDefinitionId);
+    }
 }

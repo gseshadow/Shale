@@ -8,6 +8,13 @@ public interface UserServicePort {
 
     Optional<UserDetail> getUserDetail(int userId, int shaleClientId);
 
+    /**
+     * Checks the authenticated actor's current, active firm-wide membership against
+     * authoritative database state. This operation is intentionally unrelated to
+     * case-team membership and does not rely on login-time role claims.
+     */
+    boolean currentActorHasFirmWideRole(int shaleClientId, int firmWideRoleDefinitionId);
+
     record UserSummary(
             int id,
             String firstName,
