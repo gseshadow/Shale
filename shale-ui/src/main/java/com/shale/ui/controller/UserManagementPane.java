@@ -2,7 +2,7 @@ package com.shale.ui.controller;
 
 import java.util.*; import java.util.concurrent.Executor; import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger; import org.slf4j.LoggerFactory;
-import com.shale.data.dao.UserDao; import com.shale.ui.component.*; import com.shale.ui.component.dialog.AppDialogs; import com.shale.ui.component.factory.UserCardFactory; import com.shale.ui.component.factory.UserCardFactory.UserCardModel; import com.shale.ui.util.ControlStyles;
+import com.shale.data.dao.UserDao; import com.shale.data.service.adapter.UserServiceAdapter; import com.shale.core.service.UserServicePort; import com.shale.ui.component.*; import com.shale.ui.component.dialog.AppDialogs; import com.shale.ui.component.factory.UserCardFactory; import com.shale.ui.component.factory.UserCardFactory.UserCardModel; import com.shale.ui.util.ControlStyles;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -20,18 +20,21 @@ import javafx.scene.paint.Color;
 public final class UserManagementPane {
  private static final Logger LOG=LoggerFactory.getLogger(UserManagementPane.class); private static final Color DEFAULT_STATUS_COLOR=Color.rgb(108,117,125);
  private static final double TABLE_CELL_HORIZONTAL_INSETS=20;
- private final UserDao userDao; private final Executor settingsLoadExecutor; private final CommittedChangeTracker changes; private final int tenantId,actorUserId; private final AtomicBoolean disposed=new AtomicBoolean();
+ private final UserDao userDao; private final UserServicePort userService; private final Executor settingsLoadExecutor; private final CommittedChangeTracker changes; private final int tenantId,actorUserId; private final AtomicBoolean disposed=new AtomicBoolean();
  private final BorderPane root=new BorderPane(); private final TableView<UserManagementViewRow> userManagementTable=new TableView<>();
  private final TableColumn<UserManagementViewRow,UserManagementViewRow> userNameColumn=new TableColumn<>("Name"); private final TableColumn<UserManagementViewRow,String> userEmailColumn=new TableColumn<>("Email / login"),userInitialsColumn=new TableColumn<>("Initials"),userRolesColumn=new TableColumn<>("Roles"),userStatusColumn=new TableColumn<>("Status");
  private final CheckBox showInactiveUsersCheck=new CheckBox("Show inactive users"); private final TextField userSearchField=ControlStyles.formControl(new TextField());
- private final Button addUserButton=new Button("Add User"),editUserButton=new Button("Edit User"),refreshUsersButton=new Button("Refresh"),removeUserButton=new Button("Remove from Tenant"),deactivateUserButton=new Button("Deactivate User"),reactivateUserButton=new Button("Reactivate User"),resetPasswordButton=new Button("Reset Password"); private final Label userManagementStatusLabel=new Label(); private final FlowPane actionToolbar=new FlowPane(8,8);
+ private final Button addUserButton=new Button("Add User"),defineRoleButton=new Button("Define Role"),editUserButton=new Button("Edit User"),refreshUsersButton=new Button("Refresh"),removeUserButton=new Button("Remove from Tenant"),deactivateUserButton=new Button("Deactivate User"),reactivateUserButton=new Button("Reactivate User"),resetPasswordButton=new Button("Reset Password"); private final Label userManagementStatusLabel=new Label(); private final FlowPane actionToolbar=new FlowPane(8,8);
  private int userManagementLoadGeneration; private final List<UserManagementViewRow> managedUserRows=new ArrayList<>(); private final UserCardFactory userManagementCardFactory=new UserCardFactory(null); private boolean userMutationRunning;
- UserManagementPane(UserDao dao,Executor executor,CommittedChangeTracker changes,int tenantId,int actorUserId){this.userDao=Objects.requireNonNull(dao);this.settingsLoadExecutor=Objects.requireNonNull(executor);this.changes=Objects.requireNonNull(changes);if(tenantId<=0||actorUserId<=0)throw new IllegalArgumentException("Tenant and actor context are required.");this.tenantId=tenantId;this.actorUserId=actorUserId;userSearchField.setPromptText("Search name, email, initials, or role");HBox.setHgrow(userSearchField,Priority.ALWAYS);HBox filters=new HBox(10,userSearchField,showInactiveUsersCheck);filters.setAlignment(Pos.CENTER_LEFT);VBox header=new VBox(10,filters,addUserButton);header.getStyleClass().add("user-window-section");userManagementTable.getColumns().setAll(userNameColumn,userEmailColumn,userInitialsColumn,userRolesColumn,userStatusColumn);userManagementTable.setFixedCellSize(36);userManagementTable.setMinHeight(120);userManagementTable.setPrefHeight(430);userManagementTable.setMaxHeight(Double.MAX_VALUE);userManagementTable.getStyleClass().add("shale-table");actionToolbar.getChildren().setAll(editUserButton,deactivateUserButton,reactivateUserButton,resetPasswordButton,refreshUsersButton,removeUserButton);actionToolbar.setAlignment(Pos.CENTER_LEFT);VBox footer=new VBox(8,actionToolbar,userManagementStatusLabel);footer.getStyleClass().add("user-window-footer");userManagementStatusLabel.getStyleClass().add("user-window-metadata");root.setTop(header);root.setCenter(userManagementTable);root.setBottom(footer);BorderPane.setMargin(userManagementTable,new javafx.geometry.Insets(10,0,10,0));root.getStyleClass().addAll("strong-panel","user-window-root","user-management-window");addUserButton.setOnAction(e->onAddUser());editUserButton.setOnAction(e->onEditUser());refreshUsersButton.setOnAction(e->onRefreshUsers());removeUserButton.setOnAction(e->onRemoveUserFromTenant());deactivateUserButton.setOnAction(e->onDeactivateUser());reactivateUserButton.setOnAction(e->onReactivateUser());resetPasswordButton.setOnAction(e->onResetUserPassword());showInactiveUsersCheck.setOnAction(e->onToggleInactiveUsers());configureSemanticButtons();configureUserManagementTable();updateUserActionButtons(null);}
+ private volatile List<UserServicePort.FirmWideRoleDefinition> firmWideRoles=List.of(); private final Map<Integer,List<UserServicePort.FirmWideRoleAssignment>> assignmentsByUser=new HashMap<>();
+ UserManagementPane(UserDao dao,Executor executor,CommittedChangeTracker changes,int tenantId,int actorUserId){this.userDao=Objects.requireNonNull(dao);this.userService=new UserServiceAdapter(dao);this.settingsLoadExecutor=Objects.requireNonNull(executor);this.changes=Objects.requireNonNull(changes);if(tenantId<=0||actorUserId<=0)throw new IllegalArgumentException("Tenant and actor context are required.");this.tenantId=tenantId;this.actorUserId=actorUserId;userSearchField.setPromptText("Search name, email, initials, or role");HBox.setHgrow(userSearchField,Priority.ALWAYS);HBox filters=new HBox(10,userSearchField,showInactiveUsersCheck);filters.setAlignment(Pos.CENTER_LEFT);HBox createActions=new HBox(8,addUserButton,defineRoleButton);VBox header=new VBox(10,filters,createActions);header.getStyleClass().add("user-window-section");userManagementTable.getColumns().setAll(userNameColumn,userEmailColumn,userInitialsColumn,userRolesColumn,userStatusColumn);userManagementTable.setFixedCellSize(36);userManagementTable.setMinHeight(120);userManagementTable.setPrefHeight(430);userManagementTable.setMaxHeight(Double.MAX_VALUE);userManagementTable.getStyleClass().add("shale-table");actionToolbar.getChildren().setAll(editUserButton,deactivateUserButton,reactivateUserButton,resetPasswordButton,refreshUsersButton,removeUserButton);actionToolbar.setAlignment(Pos.CENTER_LEFT);VBox footer=new VBox(8,actionToolbar,userManagementStatusLabel);footer.getStyleClass().add("user-window-footer");userManagementStatusLabel.getStyleClass().add("user-window-metadata");root.setTop(header);root.setCenter(userManagementTable);root.setBottom(footer);BorderPane.setMargin(userManagementTable,new javafx.geometry.Insets(10,0,10,0));root.getStyleClass().addAll("strong-panel","user-window-root","user-management-window");addUserButton.setOnAction(e->onAddUser());defineRoleButton.setOnAction(e->onDefineRole());editUserButton.setOnAction(e->onEditUser());refreshUsersButton.setOnAction(e->onRefreshUsers());removeUserButton.setOnAction(e->onRemoveUserFromTenant());deactivateUserButton.setOnAction(e->onDeactivateUser());reactivateUserButton.setOnAction(e->onReactivateUser());resetPasswordButton.setOnAction(e->onResetUserPassword());showInactiveUsersCheck.setOnAction(e->onToggleInactiveUsers());configureSemanticButtons();configureUserManagementTable();updateUserActionButtons(null);}
  Node node(){return root;} boolean mutationInFlight(){return userMutationRunning;} void open(){loadManagedUsersAsync(null);} void dispose(){disposed.set(true);userManagementLoadGeneration++;} int tenantId(){return tenantId;} int actorUserId(){return actorUserId;}
- private void configureSemanticButtons(){ControlStyles.apply(addUserButton,ControlStyles.Purpose.PRIMARY);ControlStyles.apply(editUserButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(deactivateUserButton,ControlStyles.Purpose.DANGER);ControlStyles.apply(reactivateUserButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(resetPasswordButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(refreshUsersButton,ControlStyles.Purpose.GHOST);ControlStyles.apply(removeUserButton,ControlStyles.Purpose.DANGER);}
+ private void configureSemanticButtons(){ControlStyles.apply(addUserButton,ControlStyles.Purpose.PRIMARY);ControlStyles.apply(defineRoleButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(editUserButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(deactivateUserButton,ControlStyles.Purpose.DANGER);ControlStyles.apply(reactivateUserButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(resetPasswordButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(refreshUsersButton,ControlStyles.Purpose.GHOST);ControlStyles.apply(removeUserButton,ControlStyles.Purpose.DANGER);}
  private static String fxColorToDb(Color c){Color x=c==null?DEFAULT_STATUS_COLOR:c;return String.format("#%02X%02X%02X",byteOf(x.getRed()),byteOf(x.getGreen()),byteOf(x.getBlue()));} private static int byteOf(double v){return Math.max(0,Math.min(255,(int)Math.round(v*255)));} private static Color dbColorToFx(String v){try{return v!=null&&v.matches("(?i)^#[0-9a-f]{6}$")?Color.web(v):DEFAULT_STATUS_COLOR;}catch(RuntimeException e){return DEFAULT_STATUS_COLOR;}} private static String rootMessage(Throwable ex){return "User management operation could not be completed.";}
 
     private void onAddUser() { showAddUserDialog().ifPresent(request -> mutate("Adding user…", "User added.", () -> userDao.createUser(request))); }
+
+    private void onDefineRole(){TextInputDialog d=new TextInputDialog();d.setTitle("Define Firm-wide Role");d.setHeaderText("Create a tenant-defined firm-wide role");d.setContentText("Role name");AppDialogs.applySecondaryDialogShell(d,"Define Firm-wide Role");configureDialogButtons(d,ButtonType.OK,ButtonType.CANCEL);d.showAndWait().map(String::trim).filter(n->!n.isEmpty()).ifPresent(name->mutate("Creating role…","Firm-wide role created.",()->userService.createFirmWideRole(new UserServicePort.CreateFirmWideRoleCommand(tenantId,actorUserId,name))));}
 
     private Optional<UserDao.UserCreateRequest> showAddUserDialog() {
 		Dialog<UserDao.UserCreateRequest> dialog = new Dialog<>();
@@ -125,10 +128,11 @@ public final class UserManagementPane {
 
     private void onRemoveUserFromTenant() { UserManagementViewRow selected=selectedManagedUser();if(selected==null||userMutationRunning)return;if(AppDialogs.showConfirmation(null,"Remove from Tenant","Remove "+selected.name()+" from this tenant?","They will no longer be able to sign in. Historical records will be preserved.","Remove from Tenant",AppDialogs.DialogActionKind.DANGER))mutate("Removing user from tenant…","User removed from tenant.",()->userDao.removeUserFromTenant(selected.id(),selected.rowVer()));}
 
-    private void onEditUser() { UserManagementViewRow selected=selectedManagedUser();if(selected==null||userMutationRunning)return;showEditUserDialog(selected).ifPresent(request->mutate("Saving changes…","User updated.",()->userDao.updateManagedUser(request)));}
+    private record UserEdit(UserDao.UserUpdateRequest profile,Set<Integer> customRoleIds){}
+    private void onEditUser() { UserManagementViewRow selected=selectedManagedUser();if(selected==null||userMutationRunning)return;showEditUserDialog(selected).ifPresent(request->mutate("Saving changes…","User updated.",()->{userDao.updateManagedUser(request.profile());reconcileCustomRoles(selected.id(),request.customRoleIds());}));}
 
-    private Optional<UserDao.UserUpdateRequest> showEditUserDialog(UserManagementViewRow row) {
-		Dialog<UserDao.UserUpdateRequest> d = new Dialog<>();
+    private Optional<UserEdit> showEditUserDialog(UserManagementViewRow row) {
+		Dialog<UserEdit> d = new Dialog<>();
 		d.setTitle("Edit User");
 		AppDialogs.applySecondaryDialogShell(d, "Edit User");
 		d.getDialogPane().getStyleClass().addAll("user-window", "user-admin-edit-window");
@@ -166,7 +170,8 @@ public final class UserManagementPane {
 		g.add(new Label("Application roles"), 0, 7, 2, 1);
 		g.add(attorney, 1, 8);
 		g.add(admin, 1, 9);
-		g.add(new Label("User ID " + row.id() + " · Status " + row.getStatus() + " (managed separately)"), 0, 10, 2, 1);
+		VBox customRoles=new VBox(6);Set<Integer> selectedCustom=new HashSet<>();List<UserServicePort.FirmWideRoleAssignment> existing=assignmentsByUser.getOrDefault(row.id(),List.of());for(UserServicePort.FirmWideRoleDefinition role:firmWideRoles){if(role.builtIn()||role.deleted())continue;CheckBox box=ControlStyles.formControl(new CheckBox(role.name()+(role.active()?"":" (inactive)")));boolean assigned=existing.stream().anyMatch(a->a.definitionId()==role.id()&&!a.deleted());box.setSelected(assigned);box.setDisable(!role.active()&&!assigned);box.selectedProperty().addListener((o,was,is)->{if(is)selectedCustom.add(role.id());else selectedCustom.remove(role.id());});if(assigned)selectedCustom.add(role.id());customRoles.getChildren().add(box);}g.add(new Label("Tenant-defined roles"),0,10);g.add(customRoles,1,10);
+		g.add(new Label("User ID " + row.id() + " · Status " + row.getStatus() + " (managed separately)"), 0, 11, 2, 1);
 		Label guidance=new Label("Update this user's identity, contact information, appearance, and application roles. Lifecycle and password actions remain separate."); guidance.getStyleClass().add("user-window-guidance"); guidance.setWrapText(true);
 		VBox content=new VBox(12,guidance,g); content.getStyleClass().add("user-window-root");
 		d.getDialogPane().setContent(content);
@@ -193,11 +198,13 @@ public final class UserManagementPane {
 				roles.add(com.shale.core.semantics.RoleSemantics.ROLE_ADMIN);
 			if (attorney.isSelected())
 				roles.add(com.shale.core.semantics.RoleSemantics.ROLE_ATTORNEY);
-			return new UserDao.UserUpdateRequest(row.id(), row.rowVer(), first.getText(), last.getText(), email.getText(), phone.getText(), initials.getText(), fxColorToDb(color
-					.getValue()), roles);
+			return new UserEdit(new UserDao.UserUpdateRequest(row.id(), row.rowVer(), first.getText(), last.getText(), email.getText(), phone.getText(), initials.getText(), fxColorToDb(color
+					.getValue()), roles),Set.copyOf(selectedCustom));
 		});
 		return d.showAndWait();
 	}
+
+    private void reconcileCustomRoles(int userId,Set<Integer> desired){List<UserServicePort.FirmWideRoleAssignment> old=assignmentsByUser.getOrDefault(userId,List.of());for(UserServicePort.FirmWideRoleDefinition role:firmWideRoles){if(role.builtIn())continue;UserServicePort.FirmWideRoleAssignment active=old.stream().filter(a->a.definitionId()==role.id()&&!a.deleted()).findFirst().orElse(null);if(desired.contains(role.id())&&active==null){UserServicePort.FirmWideRoleAssignment removed=old.stream().filter(a->a.definitionId()==role.id()&&a.deleted()).findFirst().orElse(null);if(removed==null)userService.assignFirmWideRole(new UserServicePort.FirmWideRoleAssignmentCommand(tenantId,actorUserId,userId,role.id()));else userService.restoreFirmWideRoleAssignment(new UserServicePort.FirmWideRoleAssignmentLifecycleCommand(tenantId,actorUserId,removed.id(),removed.rowVer()));}else if(!desired.contains(role.id())&&active!=null)userService.removeFirmWideRoleAssignment(new UserServicePort.FirmWideRoleAssignmentLifecycleCommand(tenantId,actorUserId,active.id(),active.rowVer()));}}
 
     private void onToggleInactiveUsers() {
 		loadManagedUsersAsync(null);
@@ -334,14 +341,16 @@ public final class UserManagementPane {
 		settingsLoadExecutor.execute(() ->
 		{
 			try {
+				List<UserServicePort.FirmWideRoleDefinition> loadedRoles=userService.listFirmWideRolesForAdministration(tenantId,actorUserId);
 				List<UserManagementViewRow> rows = new ArrayList<>();
-				for (UserDao.UserManagementRow row : userDao.listUsersForManagement(includeInactive))
-					rows.add(new UserManagementViewRow(row));
+				Map<Integer,List<UserServicePort.FirmWideRoleAssignment>> loadedAssignments=new HashMap<>();
+				for (UserDao.UserManagementRow row : userDao.listUsersForManagement(includeInactive)){List<UserServicePort.FirmWideRoleAssignment> assignments=userService.listUserFirmWideRoleAssignments(tenantId,actorUserId,row.id());loadedAssignments.put(row.id(),assignments);Set<Integer> effectiveIds=loadedRoles.stream().filter(r->r.active()&&!r.deleted()).map(UserServicePort.FirmWideRoleDefinition::id).collect(java.util.stream.Collectors.toSet());rows.add(new UserManagementViewRow(row,assignments.stream().filter(a->effectiveIds.contains(a.definitionId())).toList()));}
 				Platform.runLater(() ->
 				{
 					if (disposed.get() || generation != userManagementLoadGeneration)
 						return;
 					managedUserRows.clear();
+					firmWideRoles=loadedRoles;assignmentsByUser.clear();assignmentsByUser.putAll(loadedAssignments);
 					managedUserRows.addAll(rows);
 					applyUserFilter();
 					if (selectedId > 0)
@@ -385,6 +394,7 @@ public final class UserManagementPane {
 			removeUserButton.setDisable(!has || self);
 		if (addUserButton != null)
 			addUserButton.setDisable(userMutationRunning);
+		defineRoleButton.setDisable(userMutationRunning);
 		if (refreshUsersButton != null)
 			refreshUsersButton.setDisable(userMutationRunning);
 	}
@@ -405,9 +415,9 @@ public final class UserManagementPane {
     public static final class UserManagementViewRow {
         private final UserDao.UserManagementRow row;
 
-        UserManagementViewRow(UserDao.UserManagementRow row) {
-            this.row = row;
-        }
+        private final List<UserServicePort.FirmWideRoleAssignment> assignments;
+        UserManagementViewRow(UserDao.UserManagementRow row) {this(row,List.of());}
+        UserManagementViewRow(UserDao.UserManagementRow row,List<UserServicePort.FirmWideRoleAssignment> assignments) {this.row = row;this.assignments=List.copyOf(assignments);}
 
         public int getId() {
             return row.id();
@@ -458,7 +468,7 @@ public final class UserManagementPane {
         }
 
         public String getRoles() {
-            return (row.admin() ? "Administrator" : "") + (row.admin() && row.attorney() ? ", " : "") + (row.attorney() ? "Attorney" : "");
+            List<String> names=new ArrayList<>();if(row.admin())names.add("Administrator");if(row.attorney())names.add("Attorney");assignments.stream().filter(a->!a.deleted()).map(UserServicePort.FirmWideRoleAssignment::roleName).forEach(names::add);return String.join(", ",names);
         }
 
         public String getStatus() {

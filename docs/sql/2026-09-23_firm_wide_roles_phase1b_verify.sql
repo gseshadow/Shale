@@ -1,0 +1,8 @@
+/* READ ONLY. Run after the Phase 1A foundation and Phase 1B audit allowlist; never from the application. */
+SET NOCOUNT ON;
+SELECT CASE WHEN OBJECT_ID(N'dbo.FirmWideRoleDefinitions',N'U') IS NULL THEN 1 ELSE 0 END AS FindingCount, N'FirmWideRoleDefinitions missing' AS Finding;
+SELECT CASE WHEN OBJECT_ID(N'dbo.UserFirmWideRoleAssignments',N'U') IS NULL THEN 1 ELSE 0 END AS FindingCount, N'UserFirmWideRoleAssignments missing' AS Finding;
+SELECT COUNT(*) AS FindingCount,N'Built-in assignment violations' AS Finding FROM dbo.UserFirmWideRoleAssignments a JOIN dbo.FirmWideRoleDefinitions d ON d.Id=a.FirmWideRoleDefinitionId AND d.ShaleClientId=a.ShaleClientId WHERE d.SystemKey IN('ADMIN','ATTORNEY');
+SELECT COUNT(*) AS FindingCount,N'Cross-tenant assignment relationships' AS Finding FROM dbo.UserFirmWideRoleAssignments a LEFT JOIN dbo.Users u ON u.id=a.UserId AND u.ShaleClientId=a.ShaleClientId LEFT JOIN dbo.FirmWideRoleDefinitions d ON d.Id=a.FirmWideRoleDefinitionId AND d.ShaleClientId=a.ShaleClientId WHERE u.id IS NULL OR d.Id IS NULL;
+SELECT COUNT(*) AS FindingCount,N'Duplicate active assignments' AS Finding FROM(SELECT ShaleClientId,UserId,FirmWideRoleDefinitionId FROM dbo.UserFirmWideRoleAssignments WHERE IsDeleted=0 GROUP BY ShaleClientId,UserId,FirmWideRoleDefinitionId HAVING COUNT(*)>1)x;
+SELECT CASE WHEN EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.EntityActionAuditLog') AND name=N'CK_EntityActionAuditLog_EntityType' AND is_disabled=0 AND is_not_trusted=0 AND CHARINDEX(N'''FIRM_WIDE_ROLE''',definition)>0 AND CHARINDEX(N'''USER_FIRM_WIDE_ROLE''',definition)>0) THEN 0 ELSE 1 END AS FindingCount,N'Phase 1B trusted audit vocabulary missing' AS Finding;

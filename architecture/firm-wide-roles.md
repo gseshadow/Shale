@@ -84,3 +84,18 @@ The design should prefer stable `(ShaleClientId, FormKey, FieldKey)` policy refe
 `FormConfigurationDao.replace` merely to stabilize generated row IDs unless analysis demonstrates
 that those stable tenant/form/field keys cannot safely express policy identity, history, concurrency,
 and replacement behavior.
+
+## Phase 1B administration (2026-09-23)
+
+Tenant administrators can create, rename, activate/deactivate, and soft-delete tenant-defined firm-wide role definitions and can add, remove, and explicitly restore user assignments. Every operation verifies the requested tenant and actor against SQL session context, requires an active nonremoved administrator, applies row-version concurrency to existing rows, and appends an entity-action audit event on the mutation transaction before commit. Definition deletion never deletes or rewrites assignment history; inactive or deleted definitions simply cease to grant eligibility.
+
+User Management reads built-in membership from `Users.is_admin` and `Users.is_attorney` and reads tenant-defined membership from active `UserFirmWideRoleAssignments`, allowing several coherent roles per user. The assignment APIs reject built-in definitions, reinforced by the Phase 1A trigger. No operation reads or writes `CaseUsers`, `CaseTeamRoleDefinitions`, or `CaseTeamMemberRoles`; Case Team administration remains independent. Eligibility remains a nonsensitive authorization predicate and is intentionally not read-audited. Administrative reads expose role identity/lifecycle and assignment identity only and are not PHI reads; all definition and assignment mutations are entity-action audited without names, row versions, or DTO payloads.
+
+Exact deployment order:
+
+1. Apply and verify `docs/sql/2026-09-23_firm_wide_roles_foundation_phase1a.sql` as documented above (if not already deployed).
+2. Apply `docs/sql/2026-09-23_firm_wide_roles_audit_allowlist_phase1b.sql` manually with an approved database migration principal.
+3. Run the read-only `docs/sql/2026-09-23_firm_wide_roles_phase1b_verify.sql`; every `FindingCount` must be zero.
+4. Deploy the Phase 1B application binaries. Application-first deployment is unsupported because audit inserts require the new allowlist values.
+
+Phase 1B does not implement field-confirmation policy, Case Date confirmation, case-attention badges, notifications, or any Case Team role/assignment mutation.
