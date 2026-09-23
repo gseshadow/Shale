@@ -1,8 +1,8 @@
 /* Phase 1A light token overrides. Values intentionally match the production fallback palette. */
 .root {
-    -shale-color-application-background-start: #4cc3b5;
-    -shale-color-application-background-mid: #2b6a82;
-    -shale-color-application-background-end: #0e1023;
+    -shale-color-application-background-start: #c6e8ec;
+    -shale-color-application-background-mid: #b4d4e3;
+    -shale-color-application-background-end: #a7bdd3;
     -shale-color-navigation-surface: rgba(238.0, 248.0, 255.0, 0.08);
     -shale-color-navigation-border: rgba(223.0, 240.0, 255.0, 0.18);
     -shale-color-glass-container-surface: rgba(238.0, 247.0, 255.0, 0.1);
@@ -10,7 +10,7 @@
     -shale-color-overlay-surface: rgba(236.0, 246.0, 255.0, 0.16);
     -shale-color-overlay-border: rgba(223.0, 239.0, 255.0, 0.24);
     -shale-color-content-surface: rgba(242.0, 248.0, 255.0, 0.64);
-    -shale-color-page-header-surface: rgba(239.0, 246.0, 253.0, 0.9);
+    -shale-color-page-header-surface: rgba(232.0, 242.0, 252.0, 1.0);
     -shale-color-functional-content-surface: rgba(190.0, 208.0, 220.0, 0.94);
     -shale-color-card-hover-surface: rgba(255.0,255.0,255.0,0.985);
     -shale-color-card-border: rgba(74.0, 104.0, 138.0, 0.24);
@@ -32,18 +32,18 @@
     -shale-color-border: rgba(15.0, 35.0, 66.0, 0.16);
 
     /* Phase 1B canonical semantic paint vocabulary. */
-    -shale-color-application-chrome: #0b234d;
-    -shale-color-navigation: #102f5d;
-    -shale-color-navigation-hover: #173f76;
+    -shale-color-application-chrome: #245f94;
+    -shale-color-navigation: #2e679d;
+    -shale-color-navigation-hover: #3978ae;
     -shale-color-navigation-selected: #1677f2;
-    -shale-color-application-canvas: rgba(205, 220, 237, 0.25);
-    -shale-color-content-plane: #f8fafd;
-    -shale-color-section-surface: #f2f6fc;
-    -shale-color-card-surface: #ffffff;
-    -shale-color-card-hover: #f5f9ff;
-    -shale-color-elevated-surface: #ffffff;
-    -shale-color-input-surface: #ffffff;
-    -shale-color-surface-muted: #e8eff8;
+    -shale-color-application-canvas: rgba(225, 238, 249, 0.58);
+    -shale-color-content-plane:  rgba(214.0, 230.0, 246.0, 1.0);
+    -shale-color-section-surface: rgba(232.0, 241.0, 251.0, 1.0);
+    -shale-color-card-surface:  rgba(249.0, 251.0, 254.0, 1.0);
+    -shale-color-card-hover: rgba(241.0, 246.0, 253.0, 1.0);
+    -shale-color-elevated-surface: rgba(247.0, 250.0, 255.0, 1.0);
+    -shale-color-input-surface:  rgba(251.0, 253.0, 255.0, 1.0);
+    -shale-color-surface-muted: rgba(223.0, 234.0, 245.0, 1.0);
     -shale-color-overlay-dialog: #ffffff;
     -shale-color-text-primary: #10213d;
     -shale-color-text-secondary: #425674;
@@ -56,11 +56,11 @@
     -shale-color-text-danger: #b4233a;
     -shale-color-text-success: #176b42;
     -shale-color-text-warning: #76500a;
-    -shale-color-border-subtle: #d6e1f0;
-    -shale-color-border-strong: #aebed3;
-    -shale-color-divider: #dce5f1;
-    -shale-color-input-border: #bdcbe0;
-    -shale-color-input-hover-border: #8099ba;
+    -shale-color-border-subtle: rgba(203.0, 219.0, 234.0, 1.0);
+    -shale-color-border-strong:  rgba(159.0, 181.0, 204.0, 1.0);
+    -shale-color-divider: rgba(210.0, 223.0, 236.0, 1.0);
+    -shale-color-input-border: rgba(180.0, 199.0, 218.0, 1.0);
+    -shale-color-input-hover-border: #cbdbea;
     -shale-color-border-focus: #1677f2;
     -shale-color-danger-border: #df334d;
     -shale-color-border-selected: #1677f2;
@@ -96,8 +96,8 @@
     -shale-color-stage-inactive: #b8c6d8;
     -shale-color-stage-complete: #39966a;
     -shale-color-stage-current-fallback: #1677f2;
-    -shale-color-update-card-surface: #ffffff;
-    -shale-color-update-card-border: #d6e1f0;
+    -shale-color-update-card-surface: rgba(249.0, 251.0, 254.0, 1.0);
+    -shale-color-update-card-border: rgba(203.0, 219.0, 234.0, 1.0);
     -shale-color-focus-ring: rgba(22.0, 119.0, 242.0, 0.34);
     -shale-color-selection: #dcecff;
     -shale-color-validation-error: #df334d;

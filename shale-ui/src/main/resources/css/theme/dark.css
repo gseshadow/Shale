@@ -122,4 +122,18 @@
     -shale-color-intake-incident-border: #79547d;
     -shale-opacity-disabled: 0.52;
     -shale-color-card-shadow: rgba(0, 0, 0, 0.32);
+
+-fx-base: -shale-color-section-surface;
+-fx-background: -shale-color-content-plane;
+-fx-control-inner-background: -shale-color-input-surface;
+
+-fx-text-base-color: -shale-color-text-primary;
+-fx-text-background-color: -shale-color-text-primary;
+-fx-text-inner-color: -shale-color-text-primary;
+
+-fx-accent: -shale-color-border-selected;
+-fx-focus-color: -shale-color-border-focus;
+-fx-faint-focus-color: -shale-color-focus-ring;
+
+
 }
