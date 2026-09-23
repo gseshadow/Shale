@@ -48,16 +48,31 @@ authorization predicate rather than a PHI/value view and is intentionally not au
 
 ### Deployment and verification
 
-1. Back up and review prerequisites, then manually apply
-   `docs/sql/2026-09-23_firm_wide_roles_foundation_phase1a.sql`.
-2. Run the separate read-only
-   `docs/sql/2026-09-23_firm_wide_roles_foundation_phase1a_verify.sql`; every finding/violation count
-   must be zero.
-3. Deploy the application. Do not deploy application code first because its eligibility query expects
+1. In a fresh query under the approved `sysadmin`/`db_owner` migration principal—not
+   `shale_app` or `shale_runtime`—leave both `ShaleClientId` and `PrincipalUserId` session context
+   unset. Run verification in `ALL_TENANT` mode with its acknowledgement left `0`. Record the visible
+   tenant inventory/count and inspect the enabled `TenantFilter` predicates plus deployed predicate
+   functions independently.
+2. Reconcile that output with an independently approved tenant inventory. Only then set the exact
+   database name, independently obtained expected tenant count, and operator acknowledgement on a
+   reviewed execution copy. A mismatch or hidden tenant blocks execution before the transaction.
+3. Manually apply `docs/sql/2026-09-23_firm_wide_roles_foundation_phase1a.sql` in that same kind of
+   fresh all-tenant administrative session. The checked-in defaults cannot mutate production.
+4. Rerun `docs/sql/2026-09-23_firm_wide_roles_foundation_phase1a_verify.sql` in authoritative
+   `ALL_TENANT` mode with the approved values. The visible and expected tenant counts must match;
+   missing tables, missing/inactive/deleted built-ins, built-in assignment violations, cross-tenant
+   violations, duplicate active assignments, and missing/inexact RLS predicate counts must all be
+   zero. Optional `TENANT` mode is explicitly non-authoritative and reports only the matching session
+   tenant; it cannot establish deployment completion.
+5. Deploy the application. Do not deploy application code first because its eligibility query expects
    both new tables.
 
-The migration is forward-only, transactional, guarded, and rerunnable. It must not be executed by the
-application or as part of automated tests.
+The migration is forward-only, transactional, guarded, and rerunnable. On rerun it inventories the
+exact required columns, trusted constraints and their relationships, default constraints, index keys
+and filters, enabled built-in guard trigger behavior, and exact strict RLS predicate. Familiar names
+with incompatible definitions fail closed. The binary-collated `SystemKey` check enforces actual
+uppercase ASCII keys regardless of the database's default collation. The migration must not be
+executed by the application or as part of automated tests.
 
 ## Next-phase constraints
 
