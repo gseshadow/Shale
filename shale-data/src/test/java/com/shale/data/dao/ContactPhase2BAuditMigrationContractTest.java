@@ -61,6 +61,9 @@ final class ContactPhase2BAuditMigrationContractTest {
         assertTrue(organizations.contains("('ORGANIZATION_TYPE'), ('ORGANIZATION_ORGANIZATION_TYPE')"));
         complete.addAll(AuditEntityTypeMigrationChain.declaredAllowlist(organizations));
 		complete.addAll(AuditEntityTypeMigrationChain.declaredAllowlist(Files.readString(AuditEntityTypeMigrationChain.ORGANIZATIONS_PHASE_3C)));
+        String firmWideRoles=Files.readString(AuditEntityTypeMigrationChain.FIRM_WIDE_ROLES);
+        assertTrue(firmWideRoles.contains("''FIRM_WIDE_ROLE''")&&firmWideRoles.contains("''USER_FIRM_WIDE_ROLE''"));
+        complete.addAll(Set.of("FIRM_WIDE_ROLE","USER_FIRM_WIDE_ROLE"));
         assertEquals(AuditEntityTypeMigrationChain.currentlyRequiredVocabulary(),complete,
                 "every chronological successor must preserve the deployed vocabulary and add only its intended tokens");
         assertEquals(List.of(AuditEntityTypeMigrationChain.PHASE_1C,AuditEntityTypeMigrationChain.PHASE_2B,
