@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import com.shale.core.dto.CaseDateDto;
 import com.shale.core.dto.CaseDateConfirmationDto;
+import com.shale.core.dto.FieldConfirmationPolicyDto;
 import com.shale.core.dto.MigratedCaseDateProjectionDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.model.CaseDateSemanticRole;
@@ -69,6 +70,14 @@ public interface CaseServicePort {
 	List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
 
 	List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId);
+
+	default FieldConfirmationPolicyDto setFieldConfirmationPolicy(SetFieldConfirmationPolicyCommand command) {
+		throw unsupportedCaseLinkOperation("setFieldConfirmationPolicy");
+	}
+
+	default void confirmCaseDate(ConfirmCaseDateCommand command) {
+		throw unsupportedCaseLinkOperation("confirmCaseDate");
+	}
 
 	default CaseOverviewDateConfigurationDto getCaseOverviewDateConfiguration(long caseId, int shaleClientId, int actorUserId) {
 		throw new UnsupportedOperationException("Case Overview date configuration is unavailable.");
@@ -280,6 +289,21 @@ public interface CaseServicePort {
 	record RestoreCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId, byte[] expectedRowVer) {
 		public RestoreCaseDateCommand { expectedRowVer = copyRowVer(expectedRowVer); }
 		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record SetFieldConfirmationPolicyCommand(int shaleClientId, int actorUserId, String formKey, String fieldKey,
+			boolean requiresConfirmation, Integer requiredFirmWideRoleDefinitionId, Long expectedPolicyId,
+			byte[] expectedPolicyRowVer) {
+		public SetFieldConfirmationPolicyCommand { expectedPolicyRowVer = copyRowVer(expectedPolicyRowVer); }
+		@Override public byte[] expectedPolicyRowVer() { return copyRowVer(expectedPolicyRowVer); }
+	}
+
+	record ConfirmCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId,
+			long requirementId, long expectedBusinessValueRevision, byte[] expectedCaseDateRowVer,
+			byte[] expectedRequirementRowVer) {
+		public ConfirmCaseDateCommand { expectedCaseDateRowVer=copyRowVer(expectedCaseDateRowVer); expectedRequirementRowVer=copyRowVer(expectedRequirementRowVer); }
+		@Override public byte[] expectedCaseDateRowVer(){return copyRowVer(expectedCaseDateRowVer);}
+		@Override public byte[] expectedRequirementRowVer(){return copyRowVer(expectedRequirementRowVer);}
 	}
 
 	record AddCaseNoteCommand(
