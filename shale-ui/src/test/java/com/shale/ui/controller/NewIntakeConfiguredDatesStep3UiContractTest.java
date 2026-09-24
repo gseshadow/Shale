@@ -27,13 +27,12 @@ class NewIntakeConfiguredDatesStep3UiContractTest {
         assertTrue(s.contains("Reload the form before submitting again."));
     }
 
-    @Test void customizationUsesSharedRequiredControlAndCancelDiscardsDraft() throws Exception {
+    @Test void customizationUsesAnOwnerBoundStagedDialog() throws Exception {
         String s=source();
-        assertTrue(s.contains("ControlStyles.formControl(new CheckBox(\"Required\"))"));
-        assertTrue(s.contains("NewIntakeDatesConfiguration.withRequired(selection, newValue)"));
-        assertTrue(s.contains("new Selection(selector.getValue(), false)"));
-        assertTrue(s.contains("private void cancelDatesCustomization()"));
-        assertTrue(s.contains("stagedDateSelections.clear();"));
+        assertTrue(s.contains("new NewIntakeDatesCustomizationDialog(stage)"));
+        assertTrue(s.contains("datesCustomizationDialog.setOnSave(this::saveDatesCustomization)"));
+        assertTrue(s.contains("datesCustomizationDialog.close()"));
+        assertFalse(s.contains("datesCustomizationBox"));
     }
 
     @Test void requiredDatesAreMarkedValidatedAndFocusedBeforeCreate() throws Exception {
