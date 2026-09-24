@@ -76,4 +76,21 @@ class NewIntakeConfiguredDatesStep3ContractTest {
         assertEquals(1, create.split("con.commit\\(\\)", -1).length - 1);
         assertTrue(create.contains("configuredDates.size()"));
     }
+
+    @Test void everyCreatedConfiguredValueEvaluatesItsTypePolicyBeforeTheOwningCommit() throws Exception {
+        String create=method(source(), "public NewIntakeCreateResult createIntake");
+        int loop=create.indexOf("for (ConfiguredDateValue date : configuredDates)");
+        int insert=create.indexOf("insertConfiguredCaseDate(con, request, caseId, date, intakeTypeId)",loop);
+        int evaluate=create.indexOf("fieldConfirmationDao.evaluateCaseDate(con, request.shaleClientId(), request.createdByUserId()",insert);
+        int commit=create.indexOf("con.commit()",evaluate);
+        assertAll(
+                () -> assertTrue(loop>=0, "New Intake must visit every nonblank configured date."),
+                () -> assertTrue(insert>loop, "The configured occurrence must exist before policy evaluation."),
+                () -> assertTrue(evaluate>insert, "Each inserted occurrence must evaluate its own effective type policy."),
+                () -> assertTrue(commit>evaluate, "Policy requirements and eligible auto-confirmation must share the intake transaction."),
+                () -> assertTrue(create.contains("caseDateId, date.caseDateTypeId(), 1"),
+                        "Evaluation must snapshot the inserted type and initial business revision."),
+                () -> assertTrue(create.contains("con.rollback()"),
+                        "A policy or auto-confirmation failure must roll back the complete intake."));
+    }
 }
