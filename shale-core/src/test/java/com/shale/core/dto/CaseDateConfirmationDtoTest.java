@@ -14,7 +14,7 @@ class CaseDateConfirmationDtoTest {
                 ()->assertEquals(CaseDateConfirmationDto.Status.CONFIRMED,new CaseDateConfirmationDto(date(),2,CaseDateConfirmationDto.Status.CONFIRMED,10L,new byte[]{1},11L,3L,20,5,"User",LocalDateTime.now()).status()));
     }
     @Test void rejectsContradictoryState(){
-        assertThrows(IllegalArgumentException.class,()->new CaseDateConfirmationDto(date(),1,CaseDateConfirmationDto.Status.NOT_REQUIRED,10L,null,null,null,null,null,null,null,null));
+        assertThrows(IllegalArgumentException.class,()->new CaseDateConfirmationDto(date(),1,CaseDateConfirmationDto.Status.NOT_REQUIRED,10L,null,null,null,null,null,null,null));
         assertThrows(IllegalArgumentException.class,()->new CaseDateConfirmationDto(date(),1,CaseDateConfirmationDto.Status.CONFIRMED,10L,new byte[]{1},11L,1L,20,null,null,null));
     }
 }
