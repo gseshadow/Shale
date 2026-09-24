@@ -16,6 +16,7 @@ import com.shale.ui.controller.support.NewIntakeDatesConfiguration.ConfiguredDat
 import com.shale.ui.controller.support.NewIntakeDatesConfiguration.Selection;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.FormConfigurationDto;
+import com.shale.core.dto.FieldConfirmationPolicyDto;
 import com.shale.core.model.CaseDateSemanticRole;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.FormConfigurationServicePort;
@@ -153,6 +154,7 @@ public final class NewIntakeController {
 	private final Map<String, LocalDate> preservedConfiguredDateValues = new LinkedHashMap<>();
 	private Integer intakeCaseDateTypeId;
 	private final List<Selection> stagedDateSelections = new ArrayList<>();
+	private List<CaseServicePort.ConfirmationRole> confirmationRoles = List.of();
 	private long datesLoadGeneration;
 	private boolean datesViewClosed;
 	private boolean datesViewAttached;
@@ -362,7 +364,9 @@ public final class NewIntakeController {
 		CompletableFuture.supplyAsync(() -> new DatesLoad(
 				formConfigurationService.load(tenant, actor, NewIntakeDatesConfiguration.FORM_KEY),
 				caseService.listEffectiveCaseDateTypes(tenant, actor),
-				caseService.resolveEffectiveCaseDateTypeId(tenant, actor, CaseDateSemanticRole.INTAKE)), datesExecutor)
+				caseService.resolveEffectiveCaseDateTypeId(tenant, actor, CaseDateSemanticRole.INTAKE),
+				isAuthorizedDatesAdmin()?caseService.listFieldConfirmationPolicies(tenant,actor,NewIntakeDatesConfiguration.FORM_KEY):List.of(),
+				isAuthorizedDatesAdmin()?caseService.listConfirmationRoles(tenant,actor):List.of()), datesExecutor)
 				.whenComplete((result, failure) -> Platform.runLater(() -> {
 					if (isDatesResultStale(generation)) return;
 					if (failure != null) {
@@ -374,6 +378,8 @@ public final class NewIntakeController {
 					loadedDatesConfiguration = result.configuration();
 					effectiveDateTypes = result.types();
 					intakeCaseDateTypeId = result.intakeCaseDateTypeId();
+					loadedConfirmationPolicies=result.policies();
+					confirmationRoles=result.roles();
 					datesReloadRequired = false;
 					renderDatesNormalMode();
 				}));
@@ -413,6 +419,8 @@ public final class NewIntakeController {
 		if (datesReloadRequired) { loadDatesConfiguration(); return; }
 		stagedDateSelections.clear();
 		stagedDateSelections.addAll(NewIntakeDatesConfiguration.selections(loadedDatesConfiguration, effectiveDateTypes));
+		Map<String,FieldConfirmationPolicyDto> policies=currentPolicies().stream().collect(java.util.stream.Collectors.toMap(FieldConfirmationPolicyDto::fieldKey,java.util.function.Function.identity()));
+		for(int i=0;i<stagedDateSelections.size();i++){Selection s=stagedDateSelections.get(i);FieldConfirmationPolicyDto p=policies.get(NewIntakeDatesConfiguration.fieldKey(s.type().id()));if(p!=null)stagedDateSelections.set(i,new Selection(s.type(),s.required(),p.requiresConfirmation(),p.requiredFirmWideRoleDefinitionId(),p));}
 		renderDatesCustomization();
 	}
 
@@ -438,12 +446,15 @@ public final class NewIntakeController {
 			required.setSelected(selection.required());
 			required.setAccessibleHelp("Choose whether " + selection.type().name() + " must be completed on New Intake.");
 			required.selectedProperty().addListener((observable, oldValue, newValue) ->
-					stagedDateSelections.set(index, NewIntakeDatesConfiguration.withRequired(selection, newValue)));
+					stagedDateSelections.set(index, NewIntakeDatesConfiguration.withRequired(stagedDateSelections.get(index), newValue)));
+			CheckBox confirmation=ControlStyles.formControl(new CheckBox("Requires confirmation"));
+			ComboBox<CaseServicePort.ConfirmationRole> role=ControlStyles.formControl(new ComboBox<>());
+			boolean supported=isConfirmationField(selection.type());confirmation.setSelected(selection.requiresConfirmation());role.getItems().setAll(confirmationRoles);role.setConverter(new javafx.util.StringConverter<>(){public String toString(CaseServicePort.ConfirmationRole v){return v==null?"":v.name();}public CaseServicePort.ConfirmationRole fromString(String v){return null;}});role.getSelectionModel().select(confirmationRoles.stream().filter(r->Objects.equals(r.id(),selection.roleDefinitionId())).findFirst().orElse(null));confirmation.setDisable(!supported);role.setDisable(!supported||!confirmation.isSelected());confirmation.setAccessibleHelp(supported?"Require confirmation by an active firm-wide role; this is independent of Required.":"Confirmation is available for Statute of Limitations and Tort Notice Deadline fields.");confirmation.selectedProperty().addListener((o,was,is)->{role.setDisable(!is);stagedDateSelections.set(index,NewIntakeDatesConfiguration.withConfirmation(stagedDateSelections.get(index),is,role.getValue()==null?null:role.getValue().id()));});role.valueProperty().addListener((o,was,is)->stagedDateSelections.set(index,NewIntakeDatesConfiguration.withConfirmation(stagedDateSelections.get(index),confirmation.isSelected(),is==null?null:is.id())));
 			Button up = ActionButtonFactory.semantic("Up", e -> moveDateSelection(index, -1), ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 			Button down = ActionButtonFactory.semantic("Down", e -> moveDateSelection(index, 1), ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 			Button remove = ActionButtonFactory.semantic("Remove", e -> { stagedDateSelections.remove(index); renderDatesCustomization(); }, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 			up.setDisable(i == 0); down.setDisable(i == stagedDateSelections.size() - 1);
-			datesCustomizationBox.getChildren().add(new HBox(8, name, required, up, down, remove));
+			datesCustomizationBox.getChildren().add(new HBox(8, name, required, confirmation, role, up, down, remove));
 		}
 		Button save = ActionButtonFactory.semantic("Save", e -> saveDatesCustomization(), ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 		Button cancel = ActionButtonFactory.semantic("Cancel", e -> cancelDatesCustomization(), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
@@ -462,6 +473,7 @@ public final class NewIntakeController {
 
 	private void saveDatesCustomization() {
 		if (!isAuthorizedDatesAdmin() || datesReloadRequired || formConfigurationService == null) return;
+		if(stagedDateSelections.stream().anyMatch(s->isConfirmationField(s.type())&&s.requiresConfirmation()&&s.roleDefinitionId()==null)){String message="Select an active firm-wide role for every field that requires confirmation.";datesStatusLabel.setText(message);AppDialogs.showError(stage,"Customize New Intake",message);return;}
 		int tenant = appState.getShaleClientId(), actor = appState.getUserId();
 		byte[] rowVer = loadedDatesConfiguration == null ? null : loadedDatesConfiguration.rowVer();
 		var command = new FormConfigurationServicePort.ReplaceCommand(tenant, actor,
@@ -469,7 +481,7 @@ public final class NewIntakeController {
 				List.of(NewIntakeDatesConfiguration.draft(List.copyOf(stagedDateSelections))), rowVer);
 		datesCustomizationBox.setDisable(true);
 		long generation = ++datesLoadGeneration;
-		CompletableFuture.supplyAsync(() -> formConfigurationService.replace(command), datesExecutor)
+		CompletableFuture.supplyAsync(() -> {var saved=formConfigurationService.replace(command);for(Selection s:stagedDateSelections){if(!isConfirmationField(s.type()))continue;FieldConfirmationPolicyDto p=s.policy();if(p!=null&&p.requiresConfirmation()==s.requiresConfirmation()&&Objects.equals(p.requiredFirmWideRoleDefinitionId(),s.requiresConfirmation()?s.roleDefinitionId():null))continue;caseService.setFieldConfirmationPolicy(new CaseServicePort.SetFieldConfirmationPolicyCommand(tenant,actor,NewIntakeDatesConfiguration.FORM_KEY,NewIntakeDatesConfiguration.fieldKey(s.type().id()),s.requiresConfirmation(),s.requiresConfirmation()?s.roleDefinitionId():null,p==null?null:p.id(),p==null?null:p.rowVer()));}return saved;}, datesExecutor)
 				.whenComplete((saved, failure) -> Platform.runLater(() -> {
 					if (isDatesResultStale(generation)) return;
 					datesCustomizationBox.setDisable(false);
@@ -477,13 +489,13 @@ public final class NewIntakeController {
 						datesReloadRequired = isConfigurationConflict(failure);
 						String message = datesReloadRequired
 								? "The form configuration changed elsewhere. Reload it explicitly before editing again."
-								: "The form configuration could not be saved.";
+								: policyErrorMessage(failure);
 						datesStatusLabel.setText(message);
 						AppDialogs.showError(stage, "Customize New Intake", message);
 						if (datesReloadRequired) configureReloadAction();
 						return;
 					}
-					loadedDatesConfiguration = saved; renderDatesNormalMode();
+					loadedDatesConfiguration = saved; loadDatesConfiguration();
 				}));
 	}
 
@@ -497,17 +509,23 @@ public final class NewIntakeController {
 
 	static boolean isConfigurationConflict(Throwable failure) {
 		for (Throwable current = failure; current != null; current = current.getCause())
-			if (current instanceof IllegalStateException && "Form configuration changed.".equals(current.getMessage())) return true;
+			if (current instanceof IllegalStateException && ("Form configuration changed.".equals(current.getMessage())
+					|| (current.getMessage()!=null&&current.getMessage().contains("Confirmation policy changed")))) return true;
 		return false;
 	}
+
+	static String policyErrorMessage(Throwable failure){for(Throwable current=failure;current!=null;current=current.getCause()){String m=current.getMessage();if(m!=null&&(m.contains("firm-wide role")||m.contains("active role")))return "The selected confirming role is no longer active. Reload the configuration and choose an active firm-wide role.";}return "The form configuration and confirmation policy could not be saved. No existing date confirmation history was changed.";}
 
 	private boolean isDatesResultStale(long generation) {
 		return datesViewClosed || generation != datesLoadGeneration
 				|| (datesViewAttached && datesSection.getScene() == null);
 	}
 
+	private List<FieldConfirmationPolicyDto> loadedConfirmationPolicies=List.of();
+	private List<FieldConfirmationPolicyDto> currentPolicies(){return loadedConfirmationPolicies;}
+	private static boolean isConfirmationField(EffectiveCaseDateTypeDto type){return type!=null&&("STATUTE_OF_LIMITATIONS".equals(type.systemKey())||"TORT_NOTICE_DEADLINE".equals(type.systemKey()));}
 	private record DatesLoad(FormConfigurationDto configuration, List<EffectiveCaseDateTypeDto> types,
-			int intakeCaseDateTypeId) {}
+			int intakeCaseDateTypeId,List<FieldConfirmationPolicyDto> policies,List<CaseServicePort.ConfirmationRole> roles) {}
 	public record ConfiguredDateInput(int caseDateTypeId, String fieldKey, boolean required, DatePicker input) {
 		public LocalDate value() { return input.getValue(); }
 	}

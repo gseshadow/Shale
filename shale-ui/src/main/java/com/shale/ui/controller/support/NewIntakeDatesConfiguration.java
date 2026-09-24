@@ -2,6 +2,7 @@ package com.shale.ui.controller.support;
 
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.FormConfigurationDto;
+import com.shale.core.dto.FieldConfirmationPolicyDto;
 import com.shale.core.service.FormConfigurationServicePort.FieldDraft;
 import com.shale.core.service.FormConfigurationServicePort.SectionDraft;
 import java.util.ArrayList;
@@ -68,7 +69,12 @@ public final class NewIntakeDatesConfiguration {
     /** Returns a new draft selection with only its required state changed. */
     public static Selection withRequired(Selection selection, boolean required) {
         if (selection == null) throw new IllegalArgumentException("Selection is required.");
-        return new Selection(selection.type(), required);
+        return new Selection(selection.type(), required, selection.requiresConfirmation(), selection.roleDefinitionId(), selection.policy());
+    }
+
+    public static Selection withConfirmation(Selection selection, boolean required, Integer roleId) {
+        if (selection == null) throw new IllegalArgumentException("Selection is required.");
+        return new Selection(selection.type(), selection.required(), required, required ? roleId : null, selection.policy());
     }
 
     public static LocalDate initialValue(String fieldKey, int caseDateTypeId, Integer intakeCaseDateTypeId,
@@ -92,5 +98,8 @@ public final class NewIntakeDatesConfiguration {
     }
 
     public record ConfiguredDate(String fieldKey, EffectiveCaseDateTypeDto type, boolean required) {}
-    public record Selection(EffectiveCaseDateTypeDto type, boolean required) {}
+    public record Selection(EffectiveCaseDateTypeDto type, boolean required, boolean requiresConfirmation,
+            Integer roleDefinitionId, FieldConfirmationPolicyDto policy) {
+        public Selection(EffectiveCaseDateTypeDto type, boolean required) { this(type, required, false, null, null); }
+    }
 }

@@ -75,6 +75,19 @@ public interface CaseServicePort {
 		throw unsupportedCaseLinkOperation("setFieldConfirmationPolicy");
 	}
 
+	default List<FieldConfirmationPolicyDto> listFieldConfirmationPolicies(int shaleClientId, int actorUserId,
+			String formKey) {
+		throw unsupportedCaseLinkOperation("listFieldConfirmationPolicies");
+	}
+
+	default List<ConfirmationRole> listConfirmationRoles(int shaleClientId, int actorUserId) {
+		throw unsupportedCaseLinkOperation("listConfirmationRoles");
+	}
+
+	default boolean currentActorHasConfirmationRole(int shaleClientId, int actorUserId, int roleDefinitionId) {
+		throw unsupportedCaseLinkOperation("currentActorHasConfirmationRole");
+	}
+
 	default void confirmCaseDate(ConfirmCaseDateCommand command) {
 		throw unsupportedCaseLinkOperation("confirmCaseDate");
 	}
@@ -305,6 +318,8 @@ public interface CaseServicePort {
 		@Override public byte[] expectedCaseDateRowVer(){return copyRowVer(expectedCaseDateRowVer);}
 		@Override public byte[] expectedRequirementRowVer(){return copyRowVer(expectedRequirementRowVer);}
 	}
+
+	record ConfirmationRole(int id, String name) { }
 
 	record AddCaseNoteCommand(
 			long caseId,
