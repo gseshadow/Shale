@@ -67,6 +67,9 @@ final class ContactPhase2BAuditMigrationContractTest {
         String fieldConfirmation=Files.readString(AuditEntityTypeMigrationChain.FIELD_CONFIRMATION);
         assertTrue(fieldConfirmation.contains("''FIELD_CONFIRMATION_POLICY''")&&fieldConfirmation.contains("''SAVED_VALUE_CONFIRMATION''"));
         complete.addAll(Set.of("FIELD_CONFIRMATION_POLICY","SAVED_VALUE_CONFIRMATION"));
+        String presentation=Files.readString(AuditEntityTypeMigrationChain.CASE_DATE_PRESENTATION);
+        assertTrue(presentation.contains("''CASE_DATE_PRESENTATION_CONFIGURATION''"));
+        complete.add("CASE_DATE_PRESENTATION_CONFIGURATION");
         assertEquals(AuditEntityTypeMigrationChain.currentlyRequiredVocabulary(),complete,
                 "every chronological successor must preserve the deployed vocabulary and add only its intended tokens");
         assertEquals(List.of(AuditEntityTypeMigrationChain.PHASE_1C,AuditEntityTypeMigrationChain.PHASE_2B,

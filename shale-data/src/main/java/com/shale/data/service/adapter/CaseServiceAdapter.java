@@ -55,6 +55,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	private final CaseTeamMembershipDao caseTeamMembershipDao;
 	private final com.shale.data.dao.CaseOverviewConfigurationDao caseOverviewConfigurationDao;
 	private final com.shale.data.dao.FieldConfirmationDao fieldConfirmationDao;
+	private final com.shale.data.dao.CaseDatePresentationConfigurationDao caseDatePresentationConfigurationDao;
 
 	public CaseServiceAdapter(CaseDao caseDao) {
 		this.caseGateway = new DaoCaseGateway(caseDao, new CaseDateDao(caseDao.dbSessionProvider()), new CaseSummaryDao(caseDao.dbSessionProvider()));
@@ -62,6 +63,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		this.caseTeamMembershipDao = new CaseTeamMembershipDao(caseDao.dbSessionProvider());
 		this.caseOverviewConfigurationDao = new com.shale.data.dao.CaseOverviewConfigurationDao(caseDao.dbSessionProvider());
 		this.fieldConfirmationDao = new com.shale.data.dao.FieldConfirmationDao(caseDao.dbSessionProvider());
+		this.caseDatePresentationConfigurationDao = new com.shale.data.dao.CaseDatePresentationConfigurationDao(caseDao.dbSessionProvider());
 	}
 
 	public CaseServiceAdapter(CaseDao caseDao, CaseDateDao caseDateDao) {
@@ -70,6 +72,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		this.caseTeamMembershipDao = new CaseTeamMembershipDao(caseDao.dbSessionProvider());
 		this.caseOverviewConfigurationDao = new com.shale.data.dao.CaseOverviewConfigurationDao(caseDao.dbSessionProvider());
 		this.fieldConfirmationDao = new com.shale.data.dao.FieldConfirmationDao(caseDao.dbSessionProvider());
+		this.caseDatePresentationConfigurationDao = new com.shale.data.dao.CaseDatePresentationConfigurationDao(caseDao.dbSessionProvider());
 	}
 
 	CaseServiceAdapter(CaseGateway caseGateway) {
@@ -78,6 +81,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		this.caseTeamMembershipDao = null;
 		this.caseOverviewConfigurationDao = null;
 		this.fieldConfirmationDao = null;
+		this.caseDatePresentationConfigurationDao = null;
 	}
 
 	@Override public FieldConfirmationPolicyDto setFieldConfirmationPolicy(SetFieldConfirmationPolicyCommand c){
@@ -107,6 +111,10 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override public com.shale.core.dto.CaseOverviewAdministrationDto getCaseOverviewAdministration(long caseId,int tenant,int actor){return requireOverviewConfigurationDao().getAdministration(caseId,tenant,actor);}
 	@Override public CaseOverviewMutationResult updateCaseOverview(UpdateCaseOverviewCommand c){return requireOverviewConfigurationDao().update(c);}
 	private com.shale.data.dao.CaseOverviewConfigurationDao requireOverviewConfigurationDao(){if(caseOverviewConfigurationDao==null)throw new UnsupportedOperationException("Case Overview configuration is unavailable from this test gateway.");return caseOverviewConfigurationDao;}
+	@Override public com.shale.core.dto.CaseDatePresentationConfigurationDto getCaseDatePresentationConfiguration(int t,int a,com.shale.core.model.CaseDatePresentationPurpose p){return requireCaseDatePresentationConfigurationDao().get(t,a,p);}
+	@Override public com.shale.core.dto.CaseDatePresentationConfigurationDto replaceCaseDatePresentationConfiguration(ReplaceCaseDatePresentationConfigurationCommand c){return requireCaseDatePresentationConfigurationDao().replace(c);}
+	@Override public List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> resolveCaseDatePresentation(long caseId,int t,int a,com.shale.core.model.CaseDatePresentationPurpose p){return requireCaseDatePresentationConfigurationDao().resolve(caseId,t,a,p);}
+	private com.shale.data.dao.CaseDatePresentationConfigurationDao requireCaseDatePresentationConfigurationDao(){if(caseDatePresentationConfigurationDao==null)throw new UnsupportedOperationException("Case Date presentation configuration is unavailable from this test gateway.");return caseDatePresentationConfigurationDao;}
 
 	@Override public List<CaseTeamRoleDefinitionDto> listCaseTeamRolesForAdministration(int tenant,int actor){ return requireCaseTeamRoleDao().listForAdministration(tenant,actor); }
 	@Override public CaseTeamRoleDefinitionDto createCaseTeamRole(CaseTeamRoleCommand c){ return requireCaseTeamRoleDao().create(c); }

@@ -215,10 +215,12 @@ public final class CaseDao {
 	private final DbSessionProvider db;
 	private final PhiAuditService phiAuditService;
 	private final EntityActionAuditDao entityActionAuditDao = new EntityActionAuditDao();
+	private final FieldConfirmationDao fieldConfirmationDao;
 
 	public CaseDao(DbSessionProvider dbSessionProvider) {
 		this.db = Objects.requireNonNull(dbSessionProvider, "dbSessionProvider");
 		this.phiAuditService = new PhiAuditService(new AuditLogDao(this.db));
+		this.fieldConfirmationDao = new FieldConfirmationDao(this.db);
 	}
 
 	public DbSessionProvider dbSessionProvider() {
@@ -480,7 +482,8 @@ public final class CaseDao {
 			for(NewIntakePendingParty pending:request.pendingParties()==null?List.<NewIntakePendingParty>of():request.pendingParties()) addPendingPartyForMerge(con,existingCaseId,request,pending,now);
 			normalizeCasePartyRelationshipPrimaries(con,existingCaseId,request.shaleClientId());
 			int createdDates=0; for(ConfiguredDateValue date:dates) if(!hasActiveCaseDate(con,existingCaseId,date.caseDateTypeId(),request.shaleClientId())) {
-				long id=insertConfiguredCaseDate(con,request,existingCaseId,date,intakeTypeId); auditCreatedCaseDate(con,request,existingCaseId,id,date,intakeTypeId); createdDates++; }
+				long id=insertConfiguredCaseDate(con,request,existingCaseId,date,intakeTypeId); auditCreatedCaseDate(con,request,existingCaseId,id,date,intakeTypeId);
+				fieldConfirmationDao.evaluateCaseDate(con,request.shaleClientId(),request.createdByUserId(),id,date.caseDateTypeId(),1); createdDates++; }
 			con.commit(); return new NewIntakeCreateResult(existingCaseId,clientId,callerId,createdDates);
 		} catch(Exception e) { if(con!=null)try{con.rollback();}catch(SQLException ignored){} throw e instanceof RuntimeException r?r:new RuntimeException("Failed to merge intake.",e); }
 		finally { if(con!=null){try{con.setAutoCommit(true);}catch(SQLException ignored){} try{con.close();}catch(SQLException ignored){}} }
@@ -621,6 +624,8 @@ public final class CaseDao {
 			for (ConfiguredDateValue date : configuredDates) {
 				long caseDateId = insertConfiguredCaseDate(con, request, caseId, date, intakeTypeId);
 				auditCreatedCaseDate(con, request, caseId, caseDateId, date, intakeTypeId);
+				fieldConfirmationDao.evaluateCaseDate(con, request.shaleClientId(), request.createdByUserId(),
+						caseDateId, date.caseDateTypeId(), 1);
 			}
 			System.out.println("[IntakeCreate] primary status linked caseId=" + caseId + " statusId=" + request.statusId());
 
