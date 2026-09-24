@@ -27,7 +27,7 @@ BEGIN TRY
   ALTER TABLE dbo.CaseDates ADD ValueRevision bigint NOT NULL
    CONSTRAINT DF_CaseDates_ValueRevision DEFAULT(1) WITH VALUES;
  IF OBJECT_ID(N'dbo.CK_CaseDates_ValueRevision',N'C') IS NULL
-  ALTER TABLE dbo.CaseDates WITH CHECK ADD CONSTRAINT CK_CaseDates_ValueRevision CHECK(ValueRevision>0);
+  EXEC sys.sp_executesql N'ALTER TABLE dbo.CaseDates WITH CHECK ADD CONSTRAINT CK_CaseDates_ValueRevision CHECK(ValueRevision>0)';
  IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CaseDates') AND name=N'UX_CaseDates_Id_Tenant')
   CREATE UNIQUE INDEX UX_CaseDates_Id_Tenant ON dbo.CaseDates(Id,ShaleClientId);
 

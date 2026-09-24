@@ -58,3 +58,17 @@ registration during form replacement, validate active firm-wide roles and actor 
 resolve protected SOL/TCN semantics, increment `ValueRevision` only for the four defined business
 properties, snapshot the current policy on new/edited values, and atomically append allowlisted
 entity-action audit events. It must not backfill existing dates.
+
+## Phase 2B: transactional policy and Case Date behavior (2026-09-24)
+
+Phase 2B adds backend operations only. An active same-tenant administrator replaces the current policy for a registered `(FormKey, FieldKey)` using its identity and `RowVer`. Replacement supersedes the immutable predecessor and inserts the next revision; it never edits requirements or confirmations. Disabled policies store no role. Enabled policies require an active, nondeleted same-tenant firm-wide role. Form replacement continues registering stable field identities and does not couple `IsRequired` to confirmation.
+
+`FieldConfirmationDao.evaluateCaseDate` is the connection-accepting participant used by all authoritative Case Date writers: New Intake/configured-date and duplicate-merge aggregates, web creation, existing-case aggregate/compatibility edits, standalone create/update/restore, and Calendar routes delegating to those operations. SOL/TCN applicability comes only from protected semantic-role mappings. Creates evaluate revision 1; type/start/end/all-day changes and restoration advance `ValueRevision` and evaluate the new revision. Presentation-only changes do not. Deletion preserves history. Unchanged values and policy changes never backfill dates.
+
+Eligibility is queried in the owning transaction from active Users and roles, legacy built-in ADMIN/ATTORNEY flags, or active tenant-defined assignments. Case Team tables and client claims are not consulted. Manual confirmation locks and validates the active occurrence, current target/revision, Case Date and requirement row versions, tenant/session actor, and snapshotted role.
+
+Policy and confirmation mutations append allowlisted entity-action events on the same connection. Metadata contains only safe identities/state; dates, notes, DTOs, SQL, and row versions remain excluded. Existing PHI audit behavior is unchanged. Any domain, confirmation, parent-Case, PHI-audit, or entity-action-audit failure rolls the owning transaction back.
+
+Exact deployment order: (1) apply corrected Phase 2A, whose post-column CHECK uses `sp_executesql`; (2) run its read-only verification and require all eight findings to be zero; (3) apply `2026-09-24_field_confirmation_audit_allowlist_phase2b.sql`; (4) run `2026-09-24_field_confirmation_phase2b_verify.sql` unchanged and require every finding to be zero; (5) deploy backend binaries. Application-first deployment is unsupported.
+
+Deferred: Settings policy controls; Case Overview and Case Dates status/actions; case-attention badges; notifications; and controlled production activation of SOL/TCN policies.
