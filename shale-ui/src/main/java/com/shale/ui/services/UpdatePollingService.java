@@ -3,6 +3,7 @@ package com.shale.ui.services;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -13,6 +14,8 @@ public final class UpdatePollingService {
 	private final Consumer<UiUpdateLauncher.UpdateCheckResult> resultConsumer;
 	private final long pollMinutes;
 	private ScheduledExecutorService scheduler;
+	private ScheduledFuture<?> scheduled;
+	private long generation;
 
 	public UpdatePollingService(
 			UiUpdateLauncher updateLauncher,
@@ -29,7 +32,7 @@ public final class UpdatePollingService {
 		this.pollMinutes = pollMinutes;
 	}
 
-	public void start() {
+	public synchronized void start() {
 		if (scheduler != null && !scheduler.isShutdown()) {
 			System.out.println("[UpdatePoll] start skipped: poller already running");
 			return;
@@ -40,10 +43,16 @@ public final class UpdatePollingService {
 			return t;
 		});
 		System.out.println("[UpdatePoll] poller started: cadence=" + pollMinutes + "m");
-		scheduler.scheduleAtFixedRate(this::runSafely, pollMinutes, pollMinutes, TimeUnit.MINUTES);
+		long token = ++generation;
+		scheduled = scheduler.scheduleAtFixedRate(() -> runSafely(token), pollMinutes, pollMinutes, TimeUnit.MINUTES);
 	}
 
-	public void stop() {
+	public synchronized void stop() {
+		generation++;
+		if (scheduled != null) {
+			scheduled.cancel(true);
+			scheduled = null;
+		}
 		if (scheduler != null) {
 			scheduler.shutdownNow();
 			scheduler = null;
@@ -51,13 +60,19 @@ public final class UpdatePollingService {
 		}
 	}
 
-	private void runSafely() {
+	private void runSafely(long token) {
 		try {
+			if (!active(token)) return;
 			UiUpdateLauncher.UpdateCheckResult result = updateLauncher.checkForUpdate();
+			if (!active(token)) return;
 			System.out.println("[UpdatePoll] check complete: updateAvailable=" + result.updateAvailable() + ", mandatory=" + result.mandatory());
 			resultConsumer.accept(result);
 		} catch (RuntimeException ex) {
 			System.err.println("[UpdatePoll] check failed: " + ex.getMessage());
 		}
+	}
+
+	private synchronized boolean active(long token) {
+		return scheduler != null && !scheduler.isShutdown() && generation == token;
 	}
 }

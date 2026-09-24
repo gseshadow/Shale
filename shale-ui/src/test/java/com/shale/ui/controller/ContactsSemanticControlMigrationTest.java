@@ -29,8 +29,22 @@ final class ContactsSemanticControlMigrationTest {
         String detail = read("src/main/java/com/shale/ui/controller/ContactViewController.java");
         String create = read("src/main/java/com/shale/ui/component/dialog/CreateContactDialog.java");
         String fxml = read("src/main/resources/fxml/contact.fxml");
+        String listFxml = read("src/main/resources/fxml/contacts.fxml");
+        String toolbarCss = read("src/main/resources/css/foundation/toolbars.css");
+        String appCss = read("src/main/resources/css/app.css");
 
         assertTrue(list.contains("ControlStyles.formControl(contactsSearchField)"));
+        assertTrue(list.contains("ControlStyles.apply(addContactButton, ControlStyles.Purpose.PRIMARY)"));
+        assertTrue(list.contains("ControlStyles.apply(clearFiltersButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL)"));
+        assertTrue(listFxml.contains("shale-page-title"));
+        assertTrue(listFxml.contains("contactsResultCount"));
+        assertTrue(listFxml.contains("contacts-toolbar-controls"));
+        assertTrue(listFxml.contains("onAction=\"#addContact\""));
+        assertTrue(listFxml.contains("onAction=\"#clearFilters\""));
+        assertTrue(toolbarCss.contains(".contacts-toolbar"));
+        assertTrue(toolbarCss.contains(".shale-filter-trigger"));
+        assertFalse(appCss.contains(".contact-filter-controls"), "directory toolbar styling must not remain page-local in app.css");
+        assertFalse(listFxml.matches("(?s).*#[0-9a-fA-F]{6}.*"), "Contacts FXML must not contain hard-coded theme paint");
         assertTrue(detail.contains("ControlStyles.apply(saveButton,ControlStyles.Purpose.PRIMARY)"));
         assertTrue(detail.contains("ControlStyles.apply(editButton, ControlStyles.Purpose.SECONDARY)"));
         assertTrue(detail.contains("ControlStyles.apply(deleteContactButton, ControlStyles.Purpose.DANGER)"));
@@ -80,8 +94,8 @@ final class ContactsSemanticControlMigrationTest {
                     inspect("/fxml/contacts.fxml", 560, 700);
                     Parent detail = inspect("/fxml/contact.fxml", 1280, 800);
                     inspect("/fxml/contact.fxml", 700, 760);
-                    requireStyles(detail, "contact-profile-panel", "case-main-surface", "contact-profile-panel");
-                    requireStyles(detail, "contact-classifications-panel", "secondary-panel", "contact-classifications-panel");
+                    requireStyles(detail, "contact-profile-identity-card", "shale-section-card", "contact-profile-identity-card");
+                    requireStyles(detail, "contact-classifications-panel", "shale-section-card", "contact-classifications-panel");
                     requireStyle(detail, "editButton", Button.class, "shale-control-secondary");
                     requireStyle(detail, "deleteContactButton", Button.class, "shale-control-danger");
                     requireControl(detail, "conditionValue", javafx.scene.control.Label.class);

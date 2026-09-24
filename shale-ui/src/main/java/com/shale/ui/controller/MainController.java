@@ -10,6 +10,7 @@ import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.services.UpdateFlowCoordinator;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
+import com.shale.ui.util.ControlStyles;
 
 import java.util.List;
 import javafx.beans.binding.Bindings;
@@ -51,6 +52,9 @@ public final class MainController {
 
 	@FXML
 	private Button notificationBellButton;
+
+	@FXML
+	private Button profileButton;
 
 	// Sidebar nav buttons
 	@FXML
@@ -125,6 +129,7 @@ public final class MainController {
 	private void initialize() {
 		System.out.println("MainController.initialize()");// TODO remove
 		styleNavigationButtons();
+		styleShellControls();
 		highlightNav(navMyShaleButton);
 
 		if (globalSearchField != null) {
@@ -133,6 +138,14 @@ public final class MainController {
 
 		refreshSessionLabel();
 		bindNotificationShell();
+	}
+
+	private void styleShellControls() {
+		ControlStyles.formControl(globalSearchField);
+		ControlStyles.apply(globalSearchButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(newIntakeButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(logoutButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		ControlStyles.apply(profileButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
 	}
 
 	@FXML
@@ -192,6 +205,13 @@ public final class MainController {
 	}
 
 	@FXML
+	private void onProfile() {
+		if (appState != null && appState.getUserId() != null && appState.getUserId() > 0) {
+			sceneManager.openUserProfile(appState.getUserId());
+		}
+	}
+
+	@FXML
 	private void onBack() {
 		sceneManager.goBack();
 	}
@@ -212,19 +232,7 @@ public final class MainController {
 
 	@FXML
 	private void onLogout() {
-		System.out.println("MainController.onLogout()");// TODO remove
-
-		runtimeBridge.onLogout();
-
-		if (appState != null) {
-			appState.setUserId(0);
-			appState.setShaleClientId(0);
-			appState.setUserEmail(null);
-			appState.setAdmin(false);
-			appState.setAttorney(false);
-		}
-
-		sceneManager.showLogin();
+		sceneManager.logout();
 	}
 
 	@FXML
@@ -312,6 +320,15 @@ public final class MainController {
 				caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"),
 				sceneManager::openUserProfile);
 		sectionContent.getChildren().setAll(myShaleRoot);
+	}
+
+	public void showTasksView() {
+		highlightNav(null);
+		setSectionHeader("Tasks", "Review and manage your assigned and created tasks.", true);
+		Node tasksRoot = sceneManager.createTasksView(
+				caseId -> sceneManager.openCaseProfile(caseId, "OVERVIEW"),
+				sceneManager::openUserProfile);
+		sectionContent.getChildren().setAll(tasksRoot);
 	}
 
 	public void showCasesListView() {

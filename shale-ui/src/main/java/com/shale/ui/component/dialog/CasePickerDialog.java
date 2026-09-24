@@ -77,7 +77,7 @@ final class CasePickerDialog {
         body.setPadding(new Insets(18));
         VBox root = AppDialogs.createSecondaryWindowShell(stage, "Select Case", stage::close, body);
         Scene scene = new Scene(root, 460, 580);
-        scene.getStylesheets().add(Objects.requireNonNull(CasePickerDialog.class.getResource("/css/app.css")).toExternalForm());
+        com.shale.ui.theme.ThemeManager.application().register(scene);
         stage.setScene(scene);
 
         AtomicInteger generation = new AtomicInteger();

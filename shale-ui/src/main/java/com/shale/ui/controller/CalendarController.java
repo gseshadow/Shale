@@ -35,7 +35,6 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.css.PseudoClass;
 import javafx.scene.shape.Rectangle;
-import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
 import javafx.util.Duration;
@@ -69,6 +68,9 @@ public final class CalendarController {
     private static final PseudoClass WEEKEND_PSEUDO_CLASS = PseudoClass.getPseudoClass("weekend");
     private static final PseudoClass HOUR_PSEUDO_CLASS = PseudoClass.getPseudoClass("hour");
     private static final PseudoClass HALF_HOUR_PSEUDO_CLASS = PseudoClass.getPseudoClass("half-hour");
+    private static final PseudoClass SELECTED_DATE_PSEUDO_CLASS = PseudoClass.getPseudoClass("selected-date");
+    private static final PseudoClass FOCUSED_DATE_PSEUDO_CLASS = PseudoClass.getPseudoClass("focused-date");
+    private static final PseudoClass ADJACENT_MONTH_PSEUDO_CLASS = PseudoClass.getPseudoClass("adjacent-month");
     private static final CalendarCaseFilterOptions.CaseOption ALL_CASES_OPTION = CalendarCaseFilterOptions.ALL_CASES;
     private static final EventTypeFilterOption ALL_TYPES_OPTION = new EventTypeFilterOption("", "All types");
     static final String CASE_DATES_LAYER_PREFERENCE = "calendar.layer.case_dates.visible";
@@ -84,6 +86,7 @@ public final class CalendarController {
     @FXML private Label weekRangeLabel;
     @FXML private Label calendarLoadingLabel;
     @FXML private Label calendarErrorLabel;
+    @FXML private Label calendarStateLabel;
     @FXML private HBox weekBoard;
     @FXML private TextField searchTextField;
     @FXML private ComboBox<CalendarCaseFilterOptions.CaseOption> caseFilterCombo;
@@ -516,7 +519,9 @@ public final class CalendarController {
 
     private void renderCurrentShell() { weekRangeLabel.setText(currentRangeLabel()); renderCurrent(List.of()); }
     private void applyFiltersAndRender() {
-        renderCurrent(filterItems(loadedItems));
+        List<CalendarFeedItem> visibleItems = filterItems(loadedItems);
+        updateCalendarState(visibleItems);
+        renderCurrent(visibleItems);
     }
     private List<CalendarFeedItem> filterItems(List<CalendarFeedItem> items) {
         String search = safe(searchText).toLowerCase(Locale.ROOT);
@@ -589,6 +594,25 @@ public final class CalendarController {
                 || !Objects.equals(sourceFilter, CalendarFeedSourceFilter.defaults())
                 || !Objects.equals(calendarOverlaySelection, CalendarOverlaySelection.defaults(currentUserId()));
         clearFiltersButton.setDisable(!dirty);
+    }
+
+    private void updateCalendarState(List<CalendarFeedItem> visibleItems) {
+        if (calendarStateLabel == null) return;
+        boolean filtered = hasActiveFilters();
+        boolean empty = visibleItems == null || visibleItems.isEmpty();
+        calendarStateLabel.setText(filtered ? "No events match the current filters." : "No events in this period.");
+        calendarStateLabel.setVisible(empty);
+        calendarStateLabel.setManaged(empty);
+        calendarStateLabel.pseudoClassStateChanged(PseudoClass.getPseudoClass("filtered-empty"), empty && filtered);
+        calendarStateLabel.pseudoClassStateChanged(PseudoClass.getPseudoClass("true-empty"), empty && !filtered);
+    }
+
+    private boolean hasActiveFilters() {
+        return !safe(searchTextField == null ? searchText : searchTextField.getText()).trim().isBlank()
+                || selectedCaseId != null
+                || !safe(selectedEventTypeKey).isBlank()
+                || !Objects.equals(sourceFilter, CalendarFeedSourceFilter.defaults())
+                || !Objects.equals(calendarOverlaySelection, CalendarOverlaySelection.defaults(currentUserId()));
     }
 
     private void renderWeekLike(List<CalendarFeedItem> items, boolean fiveDay) {
@@ -670,9 +694,18 @@ public final class CalendarController {
         weekBoard.getChildren().clear(); LocalDate monthStart = selectedDate.withDayOfMonth(1); LocalDate gridStart = weekStartFor(monthStart);
         Map<LocalDate, List<CalendarFeedItem>> grouped = groupAndSort(items, gridStart, 42); GridPane grid = new GridPane(); grid.setHgap(6); grid.setVgap(6);
         for (int i = 0; i < 42; i++) {
-            LocalDate day = gridStart.plusDays(i); VBox cell = new VBox(2); cell.getStyleClass().add("calendar-day-lane"); cell.getStyleClass().add("calendar-month-day-cell"); applyCalendarDayState(cell, day, LocalDate.now()); cell.setPadding(new Insets(6));
+            LocalDate day = gridStart.plusDays(i); VBox cell = new VBox(2); cell.getStyleClass().add("calendar-day-lane"); cell.getStyleClass().add("calendar-month-day-cell"); applyCalendarDayState(cell, day, LocalDate.now());
+            boolean selected = day.equals(selectedDate);
+            boolean adjacent = !day.getMonth().equals(monthStart.getMonth());
+            cell.pseudoClassStateChanged(SELECTED_DATE_PSEUDO_CLASS, selected);
+            cell.pseudoClassStateChanged(ADJACENT_MONTH_PSEUDO_CLASS, adjacent);
+            if (selected) cell.getStyleClass().add("calendar-day-selected");
+            if (adjacent) cell.getStyleClass().add("calendar-day-adjacent-month");
+            cell.setPadding(new Insets(6));
             configureMonthDayCellDrillDown(cell, day);
             Button dayButton = createMonthDayButton(day);
+            dayButton.focusedProperty().addListener((obs, wasFocused, focused) ->
+                    cell.pseudoClassStateChanged(FOCUSED_DATE_PSEUDO_CLASS, focused));
             cell.getChildren().add(dayButton); List<CalendarFeedItem> dayItems = grouped.getOrDefault(day, List.of());
             for (int j = 0; j < Math.min(3, dayItems.size()); j++) { Node bubble = calendarEventCardFactory.createAllDayBubble(dayItems.get(j)); configureCalendarCardClick(bubble, dayItems.get(j)); cell.getChildren().add(bubble); }
             if (dayItems.size() > 3) cell.getChildren().add(createMonthMoreButton(day, dayItems.size() - 3));
@@ -1017,13 +1050,10 @@ public final class CalendarController {
 
         Circle dot = new Circle(4);
         dot.getStyleClass().add("calendar-now-dot");
-        dot.setFill(Color.RED);
         dot.setMouseTransparent(true);
 
         Line line = new Line();
         line.getStyleClass().add("calendar-now-line");
-        line.setStroke(Color.RED);
-        line.setStrokeWidth(2);
         line.setMouseTransparent(true);
 
         overlay.getChildren().addAll(line, dot);
@@ -1219,7 +1249,23 @@ public final class CalendarController {
     private String currentRangeLabel() { return switch (selectedViewMode()) { case VIEW_MONTH -> MONTH_RANGE_FORMAT.format(selectedDate); case VIEW_DAY -> WEEK_RANGE_FORMAT.format(selectedDate); default -> WEEK_RANGE_FORMAT.format(currentRangeStart()) + " - " + WEEK_RANGE_FORMAT.format(currentRangeEndInclusive()); }; }
     private static String safe(String value) { return value == null ? "" : value; }
     private static String formatHourLabel(int hour24) { int hour12 = hour24 % 12; if (hour12 == 0) hour12 = 12; return hour12 + (hour24 < 12 ? " AM" : " PM"); }
-    private void setLoading(boolean loading) { calendarLoadingLabel.setVisible(loading); calendarLoadingLabel.setManaged(loading); }
-    private void showError(String text) { boolean has = text != null && !text.isBlank(); calendarErrorLabel.setText(has ? text : ""); calendarErrorLabel.setVisible(has); calendarErrorLabel.setManaged(has); }
+    private void setLoading(boolean loading) {
+        calendarLoadingLabel.setVisible(loading);
+        calendarLoadingLabel.setManaged(loading);
+        if (loading && calendarStateLabel != null) {
+            calendarStateLabel.setVisible(false);
+            calendarStateLabel.setManaged(false);
+        }
+    }
+    private void showError(String text) {
+        boolean has = text != null && !text.isBlank();
+        calendarErrorLabel.setText(has ? text : "");
+        calendarErrorLabel.setVisible(has);
+        calendarErrorLabel.setManaged(has);
+        if (has && calendarStateLabel != null) {
+            calendarStateLabel.setVisible(false);
+            calendarStateLabel.setManaged(false);
+        }
+    }
     private record EventTypeFilterOption(String matchKey, String displayName) { boolean isAll() { return safe(matchKey).isBlank(); } }
 }

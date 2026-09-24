@@ -1,0 +1,44 @@
+/* A.2 Calendar and Case Date workflow-window foundation. */
+.calendar-dialog-root { -fx-background-color: -shale-color-overlay-dialog; }
+.calendar-dialog-content,
+.calendar-wizard-content { -fx-background-color: transparent; }
+.calendar-dialog-scroll,
+.calendar-dialog-scroll > .viewport { -fx-background-color: transparent; }
+.calendar-dialog-section,
+.calendar-associated-case,
+.calendar-type-choice-card {
+    -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 12;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 12;
+}
+.calendar-dialog-section-title,
+.calendar-step-indicator {
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+    -fx-text-fill: -shale-color-text-secondary;
+}
+.calendar-dialog-metadata,
+.calendar-dialog-loading,
+.calendar-dialog-empty { -fx-font-size: 12px; -fx-text-fill: -shale-color-text-muted; }
+.calendar-dialog-empty { -fx-font-style: italic; }
+.calendar-dialog-validation,
+.calendar-dialog-error { -fx-font-size: 12px; -fx-text-fill: -shale-color-validation-error; }
+.calendar-dialog-warning { -fx-text-fill: -shale-color-warning-text; }
+.calendar-dialog-footer {
+    -fx-padding: 12 0 0 0;
+    -fx-border-color: -shale-color-divider transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+.calendar-dialog-root .text-area:focused,
+.calendar-dialog-root .date-picker:focused,
+.calendar-dialog-root .combo-box:focused,
+.calendar-dialog-root .list-view:focused {
+    -fx-border-color: -shale-color-focus-ring;
+}
+.calendar-dialog-root .calendar-type-choice-card:selected {
+    -fx-border-color: -shale-color-border-selected;
+    -fx-border-width: 2;
+}

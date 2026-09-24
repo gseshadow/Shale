@@ -7,6 +7,7 @@ import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ControlStyles;
+import com.shale.ui.util.WindowSizingUtil;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.application.Platform;
@@ -234,63 +235,63 @@ public final class NewCalendarEventDialog {
         public void showLoadError(String message){ showError(errorLabel, message); }
     }
     private static void showStage(Stage stage, String shellTitle, String headingText, VBox content, Button leftAction, Button cancelButton, Button saveButton) {
-        Label heading = new Label(headingText);
-        heading.getStyleClass().add("app-dialog-title");
         Label message = new Label("Title, type, and date are required.");
-        message.getStyleClass().add("app-dialog-message");
+        message.getStyleClass().addAll("app-dialog-message", "calendar-dialog-metadata");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox actions = leftAction == null ? new HBox(10, spacer, cancelButton, saveButton) : new HBox(10, leftAction, spacer, cancelButton, saveButton);
-        actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.setAlignment(Pos.CENTER_RIGHT); actions.getStyleClass().add("calendar-dialog-footer");
         ScrollPane formScroll = new ScrollPane(content);
         formScroll.setFitToWidth(true);
         formScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         formScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         formScroll.setMinViewportHeight(360);
         formScroll.setPrefViewportHeight(500);
-        formScroll.getStyleClass().add("calendar-day-scroll");
+        formScroll.getStyleClass().add("calendar-dialog-scroll");
 
-        VBox body = new VBox(12, heading, message, formScroll, actions);
+        VBox body = new VBox(12, message, formScroll, actions); body.getStyleClass().add("calendar-dialog-content");
         VBox.setVgrow(formScroll, Priority.ALWAYS);
         body.setPadding(new Insets(20, 24, 16, 24));
         VBox root = AppDialogs.createSecondaryWindowShell(stage, shellTitle, stage::close, body);
+        root.getStyleClass().add("calendar-dialog-root");
         root.setMinWidth(680);
         root.setPrefWidth(760);
         root.setPrefHeight(Region.USE_COMPUTED_SIZE);
         root.setMaxHeight(Region.USE_COMPUTED_SIZE);
         Scene scene = new Scene(root);
-        scene.getStylesheets().add(Objects.requireNonNull(NewCalendarEventDialog.class.getResource("/css/app.css")).toExternalForm());
+        com.shale.ui.theme.ThemeManager.application().register(scene);
         stage.setScene(scene);
+        WindowSizingUtil.sizeModalStage(stage, stage.getOwner(), 760, 700, 560, 480);
         stage.showAndWait();
     }
 
     private static void showStageNonBlocking(Stage stage, String shellTitle, String headingText, VBox content, Button leftAction, Button cancelButton, Button saveButton) {
-        Label heading = new Label(headingText);
-        heading.getStyleClass().add("app-dialog-title");
         Label message = new Label("Title, type, and date are required.");
-        message.getStyleClass().add("app-dialog-message");
+        message.getStyleClass().addAll("app-dialog-message", "calendar-dialog-metadata");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox actions = leftAction == null ? new HBox(10, spacer, cancelButton, saveButton) : new HBox(10, leftAction, spacer, cancelButton, saveButton);
-        actions.setAlignment(Pos.CENTER_RIGHT);
+        actions.setAlignment(Pos.CENTER_RIGHT); actions.getStyleClass().add("calendar-dialog-footer");
         ScrollPane formScroll = new ScrollPane(content);
         formScroll.setFitToWidth(true);
         formScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         formScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         formScroll.setMinViewportHeight(360);
         formScroll.setPrefViewportHeight(500);
-        formScroll.getStyleClass().add("calendar-day-scroll");
-        VBox body = new VBox(12, heading, message, formScroll, actions);
+        formScroll.getStyleClass().add("calendar-dialog-scroll");
+        VBox body = new VBox(12, message, formScroll, actions); body.getStyleClass().add("calendar-dialog-content");
         VBox.setVgrow(formScroll, Priority.ALWAYS);
         body.setPadding(new Insets(20, 24, 16, 24));
         VBox root = AppDialogs.createSecondaryWindowShell(stage, shellTitle, stage::close, body);
+        root.getStyleClass().add("calendar-dialog-root");
         root.setMinWidth(680);
         root.setPrefWidth(760);
         root.setPrefHeight(Region.USE_COMPUTED_SIZE);
         root.setMaxHeight(Region.USE_COMPUTED_SIZE);
         Scene scene = new Scene(root);
-        scene.getStylesheets().add(Objects.requireNonNull(NewCalendarEventDialog.class.getResource("/css/app.css")).toExternalForm());
+        com.shale.ui.theme.ThemeManager.application().register(scene);
         stage.setScene(scene);
+        WindowSizingUtil.sizeModalStage(stage, stage.getOwner(), 760, 700, 560, 480);
         stage.show();
     }
 

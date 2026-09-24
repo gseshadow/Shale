@@ -43,6 +43,7 @@ import com.shale.core.dto.CaseOverviewDateConfigurationDto;
 import com.shale.core.dto.CaseTeamMembershipDto;
 import com.shale.core.dto.CaseTeamRoleDefinitionDto;
 import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.CaseDateConfirmationDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.CaseLinkDto;
 import com.shale.core.dto.CaseLinkContactOptionDto;
@@ -81,6 +82,7 @@ import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.ContactCard;
+import com.shale.ui.component.CaseDateConfirmationView;
 import com.shale.ui.component.OrganizationCard;
 import com.shale.ui.component.StatusTimeline;
 import com.shale.ui.component.UserSelectionField;
@@ -113,6 +115,7 @@ import com.shale.ui.component.dialog.CaseDateOccurrenceDialog;
 import com.shale.ui.component.dialog.CaseOverviewEditorDialog;
 import com.shale.ui.component.dialog.NewCalendarEventDialog;
 import com.shale.ui.component.dialog.NewTaskDialog;
+import com.shale.ui.util.MetadataChipFactory;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.TaskCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
@@ -132,6 +135,7 @@ import com.shale.ui.util.ActionButtonFactory;
 import com.shale.ui.util.AppSectionTabs;
 import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.ControlStyles;
+import com.shale.ui.util.ControlAvailability;
 import com.shale.ui.util.ExternalBrowserHelper;
 import com.shale.core.util.CaseLinkUrlNormalizer;
 import com.shale.ui.util.PerfLog;
@@ -233,6 +237,10 @@ public class CaseController {
 	@FXML
 	private StackPane assignedUserHost;
 	@FXML
+	private StackPane headerPracticeAreaHost;
+	@FXML
+	private StackPane nonEngagementStateHost;
+	@FXML
 	private StackPane statusTimelineHost;
 	@FXML
 	private Label lastUpdatedLabel;
@@ -256,6 +264,9 @@ public class CaseController {
 	private final VBox configuredOverviewDates = new VBox();
 	private CaseOverviewDateConfigurationDto overviewDateConfiguration;
 	private List<CaseDateDto> overviewConfiguredDateValues = List.of();
+	private Map<Long, CaseDateConfirmationDto> caseDateConfirmations = Map.of();
+	private Map<Integer, String> confirmationRoleNames = Map.of();
+	private Set<Integer> actorConfirmationRoles = Set.of();
 	private int overviewConfigurationGeneration;
 	private Runnable overviewEditorLauncher = this::openOverviewEditor;
 	@FXML
@@ -292,10 +303,12 @@ public class CaseController {
 	private Button refreshCaseDatesButton;
 	@FXML
 	private Button showRemovedCaseDatesButton;
+	@FXML private Button manageCaseDateTypesButton;
 	@FXML
 	private VBox caseLinksTabPane;
 	@FXML
 	private VBox caseLinksCardsBox;
+	@FXML private Button manageLinkTypesButton;
 	@FXML
 	private Label caseLinksStatusLabel;
 	@FXML
@@ -485,6 +498,8 @@ public class CaseController {
 	private StackPane ovPracticeAreaHost;
 	@FXML
 	private Button changePracticeAreaButton;
+	@FXML private Button managePracticeAreasButton;
+	@FXML private Button manageCaseStatusesButton;
 	@FXML
 	private Button changeOpposingCounselButton;
 	@FXML
@@ -501,6 +516,8 @@ public class CaseController {
 	private Button submitCaseUpdateButton;
 	@FXML
 	private TextField caseUpdatesSearchField;
+	@FXML
+	private Button clearCaseUpdatesSearchButton;
 	@FXML
 	private VBox caseUpdatesPane;
 	@FXML
@@ -715,6 +732,11 @@ public class CaseController {
 	private boolean showRemovedCaseDates;
 	private int caseDatesLoadGeneration;
 	private CaseDateOccurrenceEditorLauncher caseDateOccurrenceEditorLauncher;
+	private CaseDateTypeManagementLauncher caseDateTypeManagementLauncher;
+	private LinkTypeManagementLauncher linkTypeManagementLauncher;
+	private CaseTeamRoleManagementLauncher caseTeamRoleManagementLauncher;
+	private PracticeAreaManagementLauncher practiceAreaManagementLauncher;
+	private CaseStatusManagementLauncher caseStatusManagementLauncher;
 	private final Set<Integer> openingCaseCalendarEventIds = new HashSet<>();
 
 	private final ExecutorService caseLinkExecutor = Executors.newFixedThreadPool(2, new ThreadFactory() {
@@ -804,6 +826,8 @@ public class CaseController {
 	private LocalDate draftSolDate;
 	private java.util.Map<Integer, CaseDao.UserRow> tenantUserById; // used to render team from draft
 	private List<CasePartyDto> caseParties = List.of();
+	private Map<Integer, OrganizationDao.OrganizationCardPresentation> casePartyOrganizationPresentations = Map.of();
+	private int casePartiesLoadGeneration;
 	private boolean partiesLoadedOnce = false;
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> caseTaskAssignedUsers = java.util.Map.of();
@@ -814,6 +838,7 @@ public class CaseController {
 	private boolean caseUpdatesLoadedOnce;
 	private boolean caseUpdatesStale = true;
 	private boolean caseUpdatesLoading;
+	private final AtomicBoolean caseUpdateSubmissionInFlight = new AtomicBoolean(false);
 	private List<CaseTaskService.TaskActivityItem> caseTaskActivityEvents = List.of();
 	@FXML
 	private VBox caseTaskActivityPane;
@@ -935,9 +960,17 @@ public class CaseController {
 				() -> new CaseDateOccurrenceEditorLauncher.Context(appState == null || appState.getShaleClientId() == null ? 0 : appState.getShaleClientId(), appState == null || appState.getUserId() == null ? 0 : appState.getUserId(), this.caseId == null ? 0 : this.caseId, caseDatesTabPane != null && caseDatesTabPane.getScene() != null),
 				this::caseDatesOwner, result -> { long savedCaseId = result.context().caseId(); refreshCaseDateViewsAfterLocalMutation(savedCaseId, isMigratedCaseDateSystemKey(result.date().typeSystemKey())); if (runtimeBridge != null) runtimeBridge.publishCaseDatesChanged(savedCaseId, result.context().tenantId(), result.context().actorId(), result.removed() ? LiveUpdateEvents.CHANGE_REMOVED : LiveUpdateEvents.CHANGE_UPDATED); loadCaseDatesAsync(); },
 				this::showCaseDatesMessage, open -> { caseDateEditorOpen = open; if (!open) applyDeferredCaseDatesRefresh(); }, id -> this.onOpenCase.accept(id));
+		this.caseDateTypeManagementLauncher = caseService == null ? null : new CaseDateTypeManagementLauncher(caseService, caseDateExecutor,
+				typeId -> { if (this.runtimeBridge != null && this.appState != null && this.appState.getShaleClientId() != null && this.appState.getUserId() != null) this.runtimeBridge.publishCaseDateTypeChanged(typeId, this.appState.getShaleClientId(), this.appState.getUserId()); });
+		this.linkTypeManagementLauncher = caseService == null ? null : new LinkTypeManagementLauncher(caseService, caseDateExecutor,
+				(typeId, change) -> { if (this.runtimeBridge != null && this.appState != null && this.appState.getShaleClientId() != null && this.appState.getUserId() != null) { this.runtimeBridge.publishLinkTypeChanged(typeId, this.appState.getShaleClientId(), this.appState.getUserId(), change); this.runtimeBridge.publishEntityAuditActivityAdded(null, this.appState.getShaleClientId(), this.appState.getUserId()); } }, runtimeBridge);
+		this.caseTeamRoleManagementLauncher = caseService == null ? null : new CaseTeamRoleManagementLauncher(caseService,caseDateExecutor);
+		this.practiceAreaManagementLauncher = caseService == null ? null : new PracticeAreaManagementLauncher(caseService, caseDateExecutor);
+		this.caseStatusManagementLauncher = caseService == null ? null : new CaseStatusManagementLauncher(caseService, caseDateExecutor);
 		this.organizationDao = organizationDao;
 		this.contactDao = contactDao;
 		this.appState = appState;
+		refreshContextualDefinitionManagementActions();
 		refreshOverviewAdminAction();
 		this.runtimeBridge = runtimeBridge;
 		this.caseDocumentService = (caseDao == null || caseSummaryDao == null || contactDao == null) ? null : new CaseDocumentService(caseDao, caseSummaryDao, contactDao);
@@ -1036,6 +1069,7 @@ public class CaseController {
 		clearError();
 		wireLiveRefreshLifecycle();
 		configureOverviewAdministrationControls();
+		configureContextualDefinitionManagementButtons();
 
 		if (changeResponsibleAttorneyButton != null)
 			changeResponsibleAttorneyButton.setOnAction(e -> onEditResponsibleAttorneyField());
@@ -1067,10 +1101,29 @@ public class CaseController {
 			detChangePracticeAreaButton.setOnAction(e -> onDetailsChangePracticeArea());
 		if (btnEditTeam != null)
 			btnEditTeam.setOnAction(e -> onEditTeam());
-		if (submitCaseUpdateButton != null)
+		if (submitCaseUpdateButton != null) {
+			ControlStyles.apply(submitCaseUpdateButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+			submitCaseUpdateButton.getStyleClass().add("shale-composer-action");
 			submitCaseUpdateButton.setOnAction(e -> onSubmitCaseUpdate());
+		}
 		if (caseUpdatesSearchField != null) {
-			caseUpdatesSearchField.textProperty().addListener((obs, oldText, newText) -> applyCaseUpdateFilter());
+			ControlStyles.formControl(caseUpdatesSearchField);
+			caseUpdatesSearchField.setAccessibleText("Search case updates");
+			caseUpdatesSearchField.textProperty().addListener((obs, oldText, newText) -> {
+				setVisibleManaged(clearCaseUpdatesSearchButton, newText != null && !newText.isBlank());
+				applyCaseUpdateFilter();
+			});
+		}
+		if (clearCaseUpdatesSearchButton != null) {
+			ControlStyles.apply(clearCaseUpdatesSearchButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+			clearCaseUpdatesSearchButton.setAccessibleText("Clear case updates search");
+			clearCaseUpdatesSearchButton.setTooltip(new Tooltip("Clear case updates search"));
+			clearCaseUpdatesSearchButton.setOnAction(e -> {
+				if (caseUpdatesSearchField != null) {
+					caseUpdatesSearchField.clear();
+					caseUpdatesSearchField.requestFocus();
+				}
+			});
 		}
 		if (deleteCaseButton != null) {
 			deleteCaseButton.setOnAction(e -> onDeleteCase());
@@ -1555,6 +1608,7 @@ public class CaseController {
 		renderPrimaryStatusMini(null, "—", null);
 		renderResponsibleAttorneyMini(null, "—", null);
 		renderPracticeAreaMini(null, "—", null);
+		renderNonEngagementState(false);
 
 		if (lastUpdatedLabel != null)
 			lastUpdatedLabel.setText("Last updated: —");
@@ -1725,19 +1779,37 @@ public class CaseController {
 		List<CaseStatusHistoryDto> safeHistory = history == null ? List.of() : history;
 		if (safeHistory.isEmpty()) {
 			Label empty = new Label("No status history");
-			empty.setStyle("-fx-opacity: 0.55; -fx-font-size: 11px;");
+			empty.getStyleClass().add("shale-empty-message");
 			statusTimelineHost.getChildren().add(empty);
 			return;
 		}
 
-		List<StatusTimeline.Item> items = safeHistory.stream().map(item -> {
-			String name = safeText(item.statusName()).isBlank() ? "Status #" + item.statusId() : safeText(item.statusName());
-			StatusTimeline.State state = item.current() ? StatusTimeline.State.CURRENT
-					: item.endDate() != null ? StatusTimeline.State.COMPLETED : StatusTimeline.State.FUTURE;
-			return new StatusTimeline.Item(Integer.toString(item.statusId()), name, item.color(), state,
-					buildStatusTimelineTooltip(item, name));
-		}).toList();
+		List<StatusTimeline.Item> items = toStatusTimelineItems(safeHistory);
 		statusTimelineHost.getChildren().add(StatusTimeline.create(items, StatusTimeline.Variant.OVERVIEW));
+	}
+
+	static List<StatusTimeline.Item> toStatusTimelineItems(List<CaseStatusHistoryDto> history) {
+		List<CaseStatusHistoryDto> safeHistory = history == null ? List.of() : history;
+		int authoritativeCurrentIndex = -1;
+		for (int index = 0; index < safeHistory.size(); index++) {
+			if (safeHistory.get(index).current())
+				authoritativeCurrentIndex = index;
+		}
+		List<StatusTimeline.Item> items = new ArrayList<>(safeHistory.size());
+		for (int index = 0; index < safeHistory.size(); index++) {
+			CaseStatusHistoryDto item = safeHistory.get(index);
+			String name = safeText(item.statusName()).isBlank() ? "Status #" + item.statusId() : safeText(item.statusName());
+			// This is chronological record history, not a predetermined workflow.
+			// Preserve order and repetitions; only the DAO-authoritative open/primary
+			// record latest in the ordered result is current, while every other joined
+			// definition is historical. This also safely contains inconsistent legacy
+			// data with more than one open/primary row to a single visual current state.
+			StatusTimeline.State state = index == authoritativeCurrentIndex ? StatusTimeline.State.CURRENT
+					: StatusTimeline.State.HISTORICAL;
+			items.add(new StatusTimeline.Item(Long.toString(item.caseStatusId()), name, item.color(), state,
+					buildStatusTimelineTooltip(item, name)));
+		}
+		return List.copyOf(items);
 	}
 
 	private static String buildStatusTimelineTooltip(CaseStatusHistoryDto item, String name) {
@@ -1979,6 +2051,102 @@ public class CaseController {
 		if (addCaseDateButton != null) { ControlStyles.apply(addCaseDateButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD); addCaseDateButton.setAccessibleText("Add case date"); addCaseDateButton.setOnAction(e -> openCaseDateDialog(null)); }
 		if (refreshCaseDatesButton != null) { ControlStyles.apply(refreshCaseDatesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD); refreshCaseDatesButton.setAccessibleText("Refresh case dates"); refreshCaseDatesButton.setOnAction(e -> loadCaseDatesAsync()); }
 		if (showRemovedCaseDatesButton != null) { ControlStyles.apply(showRemovedCaseDatesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL); showRemovedCaseDatesButton.setAccessibleText("Show removed case dates"); showRemovedCaseDatesButton.setOnAction(e -> { showRemovedCaseDates = !showRemovedCaseDates; updateRemovedCaseDatesVisibility(); if (showRemovedCaseDates) loadCaseDatesAsync(); }); }
+		if (manageCaseDateTypesButton != null) ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		refreshContextualDefinitionManagementActions();
+	}
+
+	private void configureContextualDefinitionManagementButtons() {
+		if (managePracticeAreasButton != null) {
+			ControlStyles.apply(managePracticeAreasButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		}
+		if (manageCaseStatusesButton != null) ControlStyles.apply(manageCaseStatusesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		if (manageCaseDateTypesButton != null) {
+			ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		}
+		if (manageLinkTypesButton != null) {
+			ControlStyles.apply(manageLinkTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+		}
+	}
+
+	private void refreshContextualDefinitionManagementActions() {
+		boolean base = appState != null && appState.isAdmin() && caseId != null && caseService != null
+				&& appState.getShaleClientId() != null && appState.getShaleClientId() > 0;
+		ControlAvailability.apply(managePracticeAreasButton, base && practiceAreaManagementLauncher != null,
+				e -> openPracticeAreaManagement());
+		boolean actorAvailable = base && appState.getUserId() != null && appState.getUserId() > 0;
+		ControlAvailability.apply(manageCaseStatusesButton, actorAvailable && caseStatusManagementLauncher != null,
+				e -> openCaseStatusManagement());
+		ControlAvailability.apply(manageCaseDateTypesButton, actorAvailable && caseDateTypeManagementLauncher != null,
+				e -> openCaseDateTypeManagement());
+		ControlAvailability.apply(manageLinkTypesButton, actorAvailable && linkTypeManagementLauncher != null,
+				e -> openLinkTypeManagement());
+	}
+
+	private void openPracticeAreaManagement() {
+		if (appState == null || !appState.isAdmin() || practiceAreaManagementLauncher == null || caseId == null
+				|| appState.getShaleClientId() == null) return;
+		if (editMode || detailsEditMode) {
+			AppDialogs.showError(managePracticeAreasButton.getScene().getWindow(), "Practice Areas", "Save or cancel the current Case edits before managing Practice Areas.");
+			return;
+		}
+		final int openingCaseId = caseId;
+		final int openingTenantId = appState.getShaleClientId();
+		final long openingNavigationGeneration = documentGeneration;
+		practiceAreaManagementLauncher.open(managePracticeAreasButton.getScene().getWindow(), openingTenantId, result -> {
+			if (!result.changed() || documentGeneration != openingNavigationGeneration || caseId == null || caseId != openingCaseId || appState == null
+					|| appState.getShaleClientId() == null || appState.getShaleClientId() != openingTenantId) return;
+			practiceAreasByTenantCache.remove(openingTenantId);
+			reloadCurrentCaseForViewMode();
+		});
+	}
+
+	private void openCaseStatusManagement() {
+		if (appState == null || !appState.isAdmin() || caseStatusManagementLauncher == null || caseId == null
+				|| appState.getShaleClientId() == null || appState.getUserId() == null) return;
+		if (editMode || detailsEditMode) {
+			AppDialogs.showError(manageCaseStatusesButton.getScene().getWindow(), "Case Statuses",
+					"Save or cancel the current Case edits before managing Case Statuses.");
+			return;
+		}
+		final int openingCaseId = caseId;
+		final int openingTenantId = appState.getShaleClientId();
+		final long openingNavigationGeneration = documentGeneration;
+		caseStatusManagementLauncher.open(manageCaseStatusesButton.getScene().getWindow(), openingTenantId,
+				appState.getUserId(), result -> {
+			if (!result.changed() || documentGeneration != openingNavigationGeneration || caseId == null
+					|| caseId != openingCaseId || appState == null || appState.getShaleClientId() == null
+					|| appState.getShaleClientId() != openingTenantId) return;
+			statusesByTenantCache.remove(openingTenantId);
+			reloadCurrentCaseForViewMode();
+		});
+	}
+
+	private void openCaseDateTypeManagement() {
+		if (appState == null || !appState.isAdmin() || caseDateTypeManagementLauncher == null || caseId == null
+				|| appState.getShaleClientId() == null || appState.getUserId() == null) return;
+		final int openingCaseId = caseId;
+		caseDateTypeManagementLauncher.open(caseDatesOwner(), appState.getShaleClientId(), appState.getUserId(), result -> {
+			if (!result.changed() || caseId == null || caseId != openingCaseId) return;
+			caseDatesStale = true;
+			loadCaseDatesAsync();
+			loadOverviewConfigurationAsync();
+			compatibilityDates.invalidate();
+			loadCompatibilityDatesAsync(openingCaseId);
+		});
+	}
+
+	private void openLinkTypeManagement() {
+		if (appState == null || !appState.isAdmin() || linkTypeManagementLauncher == null || caseId == null
+				|| appState.getShaleClientId() == null || appState.getUserId() == null) return;
+		final int openingCaseId = caseId;
+		final int openingTenantId = appState.getShaleClientId();
+		linkTypeManagementLauncher.open(caseLinksOwner(), openingTenantId, appState.getUserId(), result -> {
+			if (!result.changed() || caseId == null || caseId != openingCaseId || appState == null
+					|| appState.getShaleClientId() == null || appState.getShaleClientId() != openingTenantId) return;
+			caseLinksStale = true;
+			loadCaseLinksAsync("Link types refreshed.");
+			invalidateOverviewPrimaryLinkAfterCaseLinkMutation();
+		});
 	}
 
 	private void resetCaseDatesState() {
@@ -2013,12 +2181,20 @@ public class CaseController {
 			try {
 				List<EffectiveCaseDateTypeDto> types = caseService.listEffectiveCaseDateTypes(tenantId, actorId);
 				List<CaseDateDto> active = caseService.listCaseDatesForCase(activeCaseId, tenantId, actorId);
+				List<CaseDateConfirmationDto> confirmations = caseService.listCaseDateConfirmationsForCase(activeCaseId, tenantId, actorId);
+				List<CaseServicePort.ConfirmationRole> roles = caseService.listConfirmationRoles(tenantId, actorId);
+				Set<Integer> eligible = confirmations.stream().filter(c -> c.status()==CaseDateConfirmationDto.Status.PENDING)
+						.map(CaseDateConfirmationDto::requiredFirmWideRoleDefinitionId).filter(Objects::nonNull)
+						.filter(role -> caseService.currentActorHasConfirmationRole(tenantId, actorId, role)).collect(Collectors.toSet());
 				List<CaseDateDto> removed = showRemovedCaseDates ? caseService.listDeletedCaseDatesForCase(activeCaseId, tenantId, actorId) : List.of();
 				Platform.runLater(() -> {
 					try {
 						if (!isCaseDatesCurrent(activeCaseId, generation)) return;
 						effectiveCaseDateTypes = types == null ? List.of() : List.copyOf(types);
-						caseDates = sortCaseDates(active); removedCaseDates = sortCaseDates(removed); caseDatesLoadedOnce = true; caseDatesStale = false; renderCaseDates(null);
+						caseDates = sortCaseDates(active); removedCaseDates = sortCaseDates(removed);
+						caseDateConfirmations=confirmations.stream().collect(Collectors.toUnmodifiableMap(c->c.caseDate().id(),Function.identity()));
+						confirmationRoleNames=roles.stream().collect(Collectors.toUnmodifiableMap(CaseServicePort.ConfirmationRole::id,CaseServicePort.ConfirmationRole::name));
+						actorConfirmationRoles=Set.copyOf(eligible);caseDatesLoadedOnce = true; caseDatesStale = false; renderCaseDates(null);
 					} catch (RuntimeException uiEx) {
 						logCaseDatesLoadFailure(operation + ".render", tenantId, actorId, activeCaseId, generation, started, uiEx);
 						if (isCaseDatesCurrent(activeCaseId, generation)) renderCaseDatesFailure();
@@ -2047,16 +2223,35 @@ public class CaseController {
 	}
 
 	private Node createCaseDateCard(CaseDateDto date, boolean removed) {
-		Label title = new Label(safe(date.displayTitle())); title.setStyle("-fx-font-weight: 700; -fx-font-size: 13px;");
-		Label when = new Label(formatCaseDateOccurrence(date)); when.setStyle("-fx-opacity: 0.78;");
+		Label title = new Label(safe(date.displayTitle())); title.getStyleClass().add("case-date-card__title");
+		Label when = new Label(formatCaseDateOccurrence(date)); when.getStyleClass().add("case-date-card__metadata");
 		VBox text = new VBox(3, title, when);
-		if (isHistoricalCaseDateType(date)) { Label h = new Label("Historical/inactive type"); h.setStyle("-fx-opacity: 0.65; -fx-font-size: 11px;"); text.getChildren().add(h); }
-		if (!removed && !safeText(date.notes()).isBlank()) { Label n = new Label(date.notes()); n.setWrapText(true); n.setStyle("-fx-opacity: 0.75;"); text.getChildren().add(n); }
+		CaseDateConfirmationDto confirmation=removed?null:caseDateConfirmations.get(date.id());
+		if(confirmation!=null&&confirmation.status()!=CaseDateConfirmationDto.Status.NOT_REQUIRED)
+			text.getChildren().add(CaseDateConfirmationView.create(confirmation,confirmationRoleNames.get(confirmation.requiredFirmWideRoleDefinitionId()),actorConfirmationRoles.contains(confirmation.requiredFirmWideRoleDefinitionId()),()->confirmCaseDate(confirmation)));
+		if (isHistoricalCaseDateType(date)) { Label h = new Label("Historical/inactive type"); h.getStyleClass().add("case-date-card__historical"); text.getChildren().add(h); }
+		if (!removed && !safeText(date.notes()).isBlank()) { Label n = new Label(date.notes()); n.setWrapText(true); n.getStyleClass().add("case-date-card__notes"); text.getChildren().add(n); }
 		Button edit = ActionButtonFactory.semantic("Edit", e -> openCaseDateDialog(date), ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL); edit.setAccessibleText("Edit case date");
 		Button remove = ActionButtonFactory.semantic("Remove", e -> onRemoveCaseDate(date), ControlStyles.Purpose.DANGER, ControlStyles.Size.SMALL); remove.setAccessibleText("Remove case date");
 		Button restore = ActionButtonFactory.semantic("Restore", e -> onRestoreCaseDate(date), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL); restore.setAccessibleText("Restore case date");
 		HBox actions = removed ? new HBox(6, restore) : new HBox(6, edit, remove); actions.setAlignment(Pos.CENTER_RIGHT);
-		Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); HBox row = new HBox(12, text, spacer, actions); row.setAlignment(Pos.CENTER_LEFT); row.setPadding(new Insets(10)); row.setStyle("-fx-background-color: rgba(248,250,252,0.96); -fx-background-radius: 12; -fx-border-color: rgba(74,104,138,0.24); -fx-border-radius: 12;" + (removed ? " -fx-opacity: 0.72;" : "")); return row;
+		Region spacer = new Region(); HBox.setHgrow(spacer, Priority.ALWAYS); HBox row = new HBox(12, text, spacer, actions); row.setAlignment(Pos.CENTER_LEFT);
+		row.getStyleClass().addAll("case-date-card", removed ? "case-date-card--removed" : "case-date-card--active");
+		row.setStyle(caseDateCardAccentStyle(date.color()));
+		return row;
+	}
+
+	private void confirmCaseDate(CaseDateConfirmationDto confirmation){
+		if(confirmation==null||confirmation.status()!=CaseDateConfirmationDto.Status.PENDING||caseService==null||appState==null||caseId==null)return;
+		int tenant=appState.getShaleClientId(),actor=appState.getUserId();long activeCase=caseId;
+		caseDateExecutor.submit(()->{try{caseService.confirmCaseDate(new CaseServicePort.ConfirmCaseDateCommand(tenant,actor,activeCase,confirmation.caseDate().id(),confirmation.confirmationRequirementId(),confirmation.businessValueRevision(),confirmation.caseDate().rowVer(),confirmation.confirmationRequirementRowVer()));Platform.runLater(()->{if(caseId!=null&&caseId.longValue()==activeCase){loadCaseDatesAsync();loadOverviewConfigurationAsync();publishCaseDatesChanged(activeCase,LiveUpdateEvents.CHANGE_UPDATED);}});}catch(RuntimeException ex){LOG.warn("Case Date confirmation failed tenantId={} actorId={} caseId={} caseDateId={}",tenant,actor,activeCase,confirmation.caseDate().id());Platform.runLater(()->{if(caseId!=null&&caseId.longValue()==activeCase){AppDialogs.showError(caseDatesOwner(),"Confirm Case Date",confirmationFailureMessage(ex));loadCaseDatesAsync();loadOverviewConfigurationAsync();}});}});
+	}
+
+	static String confirmationFailureMessage(Throwable failure){String message=rootMessage(failure);if(message.contains("stale")||message.contains("changed"))return "This date or confirmation changed. Shale reloaded the current value; review it before trying again.";if(message.contains("role")||message.contains("eligible"))return "Your firm-wide role no longer permits this confirmation. Shale reloaded the current value.";return "The date could not be confirmed. Shale reloaded the current value; please try again.";}
+
+	static String caseDateCardAccentStyle(String storedColor) {
+		String normalized = ColorUtil.normalizeStoredColor(storedColor);
+		return normalized == null ? "" : "-shale-case-date-type-wash: " + ColorUtil.toCssRgba(normalized, 0.50) + ";";
 	}
 
 	private String formatCaseDateOccurrence(CaseDateDto d) { if (d == null || d.startsAt() == null) return "—"; DateTimeFormatter df = DateTimeFormatter.ofPattern("MMM d, yyyy"); DateTimeFormatter dtf = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a"); if (d.allDay()) { String s = d.startsAt().toLocalDate().format(df); return d.endsAt() == null ? s : s + " – " + d.endsAt().toLocalDate().format(df); } String s = d.startsAt().format(dtf); return d.endsAt() == null ? s : s + " – " + d.endsAt().format(dtf); }
@@ -2178,7 +2373,8 @@ public class CaseController {
 			} catch (RuntimeException ex) {
 				Platform.runLater(() -> {
 					if (caseId == null || caseId != activeCaseId || generation != overviewPrimaryLinkLoadGeneration) return;
-					renderOverviewPrimaryLinkFailure("Failed to load primary link. " + rootMessage(ex));
+					LOG.error("Primary Link load failed caseId={}", activeCaseId, ex);
+					renderOverviewPrimaryLinkFailure("Primary Link could not be loaded. Try refreshing the case.");
 				});
 			}
 		}, "case-overview-primary-link-load-" + activeCaseId).start();
@@ -2186,12 +2382,12 @@ public class CaseController {
 
 	private void renderOverviewPrimaryLinkLoading() {
 		if (ovPrimaryLinkBox != null) ovPrimaryLinkBox.getChildren().clear();
-		showOverviewPrimaryLinkMessage("Loading primary link…");
+		showOverviewPrimaryLinkMessage("Loading primary link…", "shale-loading-message");
 	}
 
 	private void renderOverviewPrimaryLinkFailure(String message) {
 		if (ovPrimaryLinkBox != null) ovPrimaryLinkBox.getChildren().clear();
-		showOverviewPrimaryLinkMessage(message);
+		showOverviewPrimaryLinkMessage(message, "shale-error-message");
 	}
 
 	private void renderOverviewPrimaryLinkState() {
@@ -2201,7 +2397,7 @@ public class CaseController {
 		if (overviewPrimaryLink.isEmpty()) {
 			Label empty = new Label("No primary link has been selected for this case.");
 			empty.setWrapText(true);
-			empty.getStyleClass().add("case-overview-row-value");
+			empty.getStyleClass().addAll("shale-empty-message", "primary-link-empty");
 			ovPrimaryLinkBox.getChildren().add(empty);
 			return;
 		}
@@ -2210,9 +2406,11 @@ public class CaseController {
 				() -> onOpenOverviewPrimaryLink(link), () -> onEditCaseLink(link), null, null), onOpenContact));
 	}
 
-	private void showOverviewPrimaryLinkMessage(String message) {
+	private void showOverviewPrimaryLinkMessage(String message, String stateStyleClass) {
 		if (ovPrimaryLinkStatusLabel != null) {
 			ovPrimaryLinkStatusLabel.setText(message == null ? "" : message);
+			ovPrimaryLinkStatusLabel.getStyleClass().removeAll("shale-loading-message", "shale-error-message");
+			if (stateStyleClass != null) ovPrimaryLinkStatusLabel.getStyleClass().add(stateStyleClass);
 			setVisibleManaged(ovPrimaryLinkStatusLabel, message != null && !message.isBlank());
 		}
 	}
@@ -3430,7 +3628,8 @@ public class CaseController {
 					null
 			);
 			OrganizationCardFactory.Variant variant = OrganizationCardFactory.Variant.COMPACT;
-			OrganizationCard card = factory.create(model, variant);
+			OrganizationCard card = factory.create(model,
+					casePartyOrganizationPresentations.get(party.getOrganizationId().intValue()), variant);
 			card.setSuppressPlaceholderLines(true);
 			card.setMinWidth(partiesCardWidth);
 			card.setPrefWidth(partiesCardWidth);
@@ -3458,6 +3657,15 @@ public class CaseController {
 		fallback.setStyle("-fx-font-weight: bold;");
 		fallback.setWrapText(true);
 		return fallback;
+	}
+
+	private Map<Integer, OrganizationDao.OrganizationCardPresentation> loadCasePartyOrganizationPresentations(List<CasePartyDto> parties) {
+		if (organizationDao == null || appState == null || appState.getShaleClientId() == null || parties == null) return Map.of();
+		List<Integer> organizationIds = parties.stream().filter(Objects::nonNull)
+				.filter(p -> "organization".equalsIgnoreCase(safeText(p.getEntityType())))
+				.map(CasePartyDto::getOrganizationId).filter(Objects::nonNull).map(Long::intValue).distinct().toList();
+		return organizationIds.isEmpty() ? Map.of()
+				: organizationDao.findCardPresentations(appState.getShaleClientId(), organizationIds);
 	}
 
 	static ContactCardFactory.ContactCardModel toContactCardModel(CasePartyDto party) {
@@ -3742,13 +3950,23 @@ public class CaseController {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
+		final int generation = ++casePartiesLoadGeneration;
 		new Thread(() ->
 		{
 			try {
 				List<CasePartyDto> refreshed = caseDao.listCaseParties(activeCaseId);
+				Map<Integer, OrganizationDao.OrganizationCardPresentation> loadedPresentations = Map.of();
+				try {
+					loadedPresentations = loadCasePartyOrganizationPresentations(refreshed);
+				} catch (RuntimeException ex) {
+					LOG.warn("Case party Organization presentation refresh failed caseId={}", activeCaseId, ex);
+				}
+				Map<Integer, OrganizationDao.OrganizationCardPresentation> organizationPresentations = loadedPresentations;
 				runOnFx(() ->
 				{
+					if (caseId == null || caseId.longValue() != activeCaseId || generation != casePartiesLoadGeneration) return;
 					caseParties = refreshed == null ? List.of() : refreshed;
+					casePartyOrganizationPresentations = organizationPresentations;
 					partiesLoadedOnce = true;
 					renderPartiesSection();
 					if (currentOverview != null) {
@@ -3781,17 +3999,27 @@ public class CaseController {
 
 		Dialog<PartyEditorResult> dialog = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(dialog, "Edit Party");
+		dialog.getDialogPane().getStyleClass().addAll("party-window-root", "party-window-shell");
 		dialog.setTitle("Edit Party");
 		dialog.initOwner(organizationDialogOwner());
+		dialog.setResizable(true);
 		ButtonType saveType = new ButtonType("Save", ButtonData.OK_DONE);
 		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
 
 		ChoiceBox<String> entityTypeChoice = new ChoiceBox<>();
+		entityTypeChoice.setAccessibleText("Party entity type");
 		entityTypeChoice.getItems().addAll("Contact", "Organization");
 
 		ChoiceBox<PartyEntityOption> entityChoice = new ChoiceBox<>();
+		entityChoice.setAccessibleText("Party entity, required");
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
+		roleChoice.setAccessibleText("Party role, required");
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
+		sideChoice.setAccessibleText("Party affiliation, required");
+		ControlStyles.formControl(entityTypeChoice);
+		ControlStyles.formControl(entityChoice);
+		ControlStyles.formControl(roleChoice);
+		ControlStyles.formControl(sideChoice);
 		sideChoice.getItems().addAll(data == null ? List.of() : data.sideOptions());
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
 			@Override
@@ -3807,6 +4035,7 @@ public class CaseController {
 
 		CheckBox primaryCheck = new CheckBox("Primary");
 		TextArea notesArea = new TextArea();
+		notesArea.setAccessibleText("Party notes");
 		notesArea.setPrefRowCount(3);
 		notesArea.setWrapText(true);
 
@@ -3901,6 +4130,7 @@ public class CaseController {
 		notesArea.setText(safeText(existing.getNotes()));
 
 		GridPane grid = new GridPane();
+		grid.getStyleClass().add("party-window-field-grid");
 		grid.setHgap(10);
 		grid.setVgap(10);
 		grid.add(new Label("Entity Type"), 0, 0);
@@ -3914,9 +4144,17 @@ public class CaseController {
 		grid.add(primaryCheck, 1, 4);
 		grid.add(new Label("Notes"), 0, 5);
 		grid.add(notesArea, 1, 5);
-		dialog.getDialogPane().setContent(grid);
+		VBox editorSurface = new VBox(grid);
+		editorSurface.getStyleClass().add("party-window-section");
+		ScrollPane editorScroll = new ScrollPane(editorSurface);
+		editorScroll.getStyleClass().add("party-window-scroll");
+		editorScroll.setFitToWidth(true);
+		editorScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		dialog.getDialogPane().setContent(editorScroll);
 
 		Node saveButton = dialog.getDialogPane().lookupButton(saveType);
+		ControlStyles.apply((Button) saveButton, ControlStyles.Purpose.PRIMARY);
+		ControlStyles.apply((Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL), ControlStyles.Purpose.SECONDARY);
 		saveButton.disableProperty().bind(
 				entityChoice.valueProperty().isNull()
 						.or(roleChoice.valueProperty().isNull())
@@ -3944,6 +4182,11 @@ public class CaseController {
 			if (entity == null || role == null || side == null)
 				return null;
 			return new PartyEditorResult(entity.entityType, entity.id, role.id, side.value, primaryCheck.isSelected(), notesArea.getText());
+		});
+		dialog.setOnShown(event -> {
+			if (dialog.getDialogPane().getScene().getWindow() instanceof Stage stage) {
+				WindowSizingUtil.sizeModalStage(stage, organizationDialogOwner(), 720, 560, 560, 400);
+			}
 		});
 
 		return dialog.showAndWait().orElse(null);
@@ -4103,8 +4346,8 @@ public class CaseController {
 		}
 		caseUpdatesPane.setManaged(true);
 		caseUpdatesPane.setVisible(true);
-		caseUpdatesPane.setMaxWidth(Region.USE_COMPUTED_SIZE);
-		caseUpdatesPane.setPrefWidth(320.0);
+		caseUpdatesPane.setMaxWidth(420.0);
+		caseUpdatesPane.setPrefWidth(336.0);
 		VBox.setVgrow(caseUpdatesPane, Priority.ALWAYS);
 		if (caseRootPane.getRight() != caseUpdatesPane) {
 			caseRootPane.setRight(caseUpdatesPane);
@@ -4584,9 +4827,34 @@ public class CaseController {
 	// Overview loading
 	// ----------------------------
 	private void configureOverviewAdministrationControls() {
-		if(editOverviewButton!=null){ControlStyles.apply(editOverviewButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.STANDARD);editOverviewButton.setOnAction(e->overviewEditorLauncher.run());refreshOverviewAdminAction();}
+		if(editOverviewButton!=null){ControlStyles.apply(editOverviewButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);editOverviewButton.setOnAction(e->overviewEditorLauncher.run());refreshOverviewAdminAction();}
+		if(generateSummaryMenuButton!=null) ControlStyles.apply(generateSummaryMenuButton,ControlStyles.Purpose.PRIMARY,ControlStyles.Size.SMALL);
+		if(deleteCaseButton!=null) ControlStyles.apply(deleteCaseButton,ControlStyles.Purpose.DANGER,ControlStyles.Size.SMALL);
+		java.util.stream.Stream.of(editCaseNameButton,editCaseNumberButton,changePracticeAreaButton,changeStatusButton,
+				changeResponsibleAttorneyButton,changePrimaryLegalAssistantButton,editDescriptionButton)
+				.filter(Objects::nonNull).forEach(this::configureOverviewEditAction);
+		configureOverviewManagementAction(managePracticeAreasButton);
+		configureOverviewManagementAction(manageCaseStatusesButton);
 		configuredOverviewDates.getStyleClass().add("case-overview-configured-dates");
 		if(overviewDetailsGrid!=null){List<Node> remove=overviewDetailsGrid.getChildren().stream().filter(n->{Integer r=GridPane.getRowIndex(n);return r!=null&&r>=4&&r<=8;}).toList();overviewDetailsGrid.getChildren().removeAll(remove);for(Node n:overviewDetailsGrid.getChildren()){Integer r=GridPane.getRowIndex(n);if(r!=null&&r>=9)GridPane.setRowIndex(n,r-4);}overviewDetailsGrid.add(configuredOverviewDates,0,4,3,1);}
+	}
+
+	private void configureOverviewEditAction(Button action) {
+		if(action==null)return;
+		ControlStyles.apply(action,ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);
+		action.setAccessibleText("Edit "+switch(action.getId()==null?"":action.getId()){
+			case "editCaseNameButton"->"case name";case "editCaseNumberButton"->"case number";
+			case "changePracticeAreaButton"->"practice area";case "changeStatusButton"->"case status";
+			case "changeResponsibleAttorneyButton"->"responsible attorney";
+			case "changePrimaryLegalAssistantButton"->"primary legal assistant";
+			case "editDescriptionButton"->"description";default->"case detail";});
+		action.setTooltip(new Tooltip(action.getAccessibleText()));
+	}
+
+	private void configureOverviewManagementAction(Button action) {
+		if(action==null)return;
+		ControlStyles.apply(action,ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);
+		action.getStyleClass().add("shale-inline-action");
 	}
 
 	void refreshOverviewAdminAction() {
@@ -4601,10 +4869,10 @@ public class CaseController {
 		if(caseService==null||appState==null||caseId==null||appState.getShaleClientId()==null||appState.getUserId()==null)return;
 		long activeCase=caseId;int tenant=appState.getShaleClientId(),actor=appState.getUserId(),generation=++overviewConfigurationGeneration;
 		configuredOverviewDates.getChildren().setAll(new Label("Loading overview dates…"));
-		caseDateExecutor.submit(()->{try{CaseOverviewDateConfigurationDto config=caseService.getCaseOverviewDateConfiguration(activeCase,tenant,actor);List<EffectiveCaseDateTypeDto> types=caseService.listEffectiveCaseDateTypes(tenant,actor);List<CaseDateDto> values=caseService.listCaseDatesForCase(activeCase,tenant,actor);Platform.runLater(()->{if(caseId==null||caseId.longValue()!=activeCase||generation!=overviewConfigurationGeneration)return;overviewDateConfiguration=config;effectiveCaseDateTypes=types==null?List.of():List.copyOf(types);overviewConfiguredDateValues=values==null?List.of():List.copyOf(values);renderConfiguredOverviewDates();});}catch(RuntimeException ex){LOG.error("Case Overview configuration load failed tenantId={} actorId={} caseId={}",tenant,actor,activeCase,ex);Platform.runLater(()->{if(generation==overviewConfigurationGeneration)configuredOverviewDates.getChildren().setAll(new Label("Overview dates could not be loaded."));});}});
+		caseDateExecutor.submit(()->{try{CaseOverviewDateConfigurationDto config=caseService.getCaseOverviewDateConfiguration(activeCase,tenant,actor);List<EffectiveCaseDateTypeDto> types=caseService.listEffectiveCaseDateTypes(tenant,actor);List<CaseDateDto> values=caseService.listCaseDatesForCase(activeCase,tenant,actor);List<CaseDateConfirmationDto> confirmations=caseService.listCaseDateConfirmationsForCase(activeCase,tenant,actor);List<CaseServicePort.ConfirmationRole> roles=caseService.listConfirmationRoles(tenant,actor);Set<Integer> eligible=confirmations.stream().filter(c->c.status()==CaseDateConfirmationDto.Status.PENDING).map(CaseDateConfirmationDto::requiredFirmWideRoleDefinitionId).filter(Objects::nonNull).filter(role->caseService.currentActorHasConfirmationRole(tenant,actor,role)).collect(Collectors.toSet());Platform.runLater(()->{if(caseId==null||caseId.longValue()!=activeCase||generation!=overviewConfigurationGeneration)return;overviewDateConfiguration=config;effectiveCaseDateTypes=types==null?List.of():List.copyOf(types);overviewConfiguredDateValues=values==null?List.of():List.copyOf(values);caseDateConfirmations=confirmations.stream().collect(Collectors.toUnmodifiableMap(c->c.caseDate().id(),Function.identity()));confirmationRoleNames=roles.stream().collect(Collectors.toUnmodifiableMap(CaseServicePort.ConfirmationRole::id,CaseServicePort.ConfirmationRole::name));actorConfirmationRoles=Set.copyOf(eligible);renderConfiguredOverviewDates();if(compatibilityDates.isLoaded())renderCompatibilityDates();});}catch(RuntimeException ex){LOG.error("Case Overview configuration load failed tenantId={} actorId={} caseId={}",tenant,actor,activeCase,ex);Platform.runLater(()->{if(generation==overviewConfigurationGeneration)configuredOverviewDates.getChildren().setAll(new Label("Overview dates could not be loaded."));});}});
 	}
 
-	private void renderConfiguredOverviewDates(){configuredOverviewDates.getChildren().clear();if(overviewDateConfiguration==null)return;for(EffectiveCaseDateTypeDto type:overviewDateConfiguration.visibleDateTypes()){CaseDateDto value=overviewConfiguredDateValues.stream().filter(d->d.caseDateTypeId()==type.id()).sorted(Comparator.comparing(CaseDateDto::startsAt).thenComparingLong(CaseDateDto::id)).findFirst().orElse(null);Region color=new Region();color.getStyleClass().add("case-overview-date-color");color.setStyle("-fx-background-color: "+type.color()+";");Label name=new Label(type.name());name.getStyleClass().add("case-overview-row-label");name.setMinWidth(150);Label display=new Label(value==null?"—":formatCaseDateOccurrence(value));display.getStyleClass().add("case-overview-row-value");HBox.setHgrow(display,Priority.ALWAYS);Button action=ActionButtonFactory.semantic(value==null?"Add":"Edit",e->openOverviewDate(type,value),ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);action.setAccessibleText((value==null?"Add ":"Edit ")+type.name());HBox row=new HBox(10,color,name,display,action);row.getStyleClass().add("case-overview-configured-date-row");configuredOverviewDates.getChildren().add(row);}}
+	private void renderConfiguredOverviewDates(){configuredOverviewDates.getChildren().clear();if(overviewDateConfiguration==null)return;for(EffectiveCaseDateTypeDto type:overviewDateConfiguration.visibleDateTypes()){CaseDateDto value=overviewConfiguredDateValues.stream().filter(d->d.caseDateTypeId()==type.id()).sorted(Comparator.comparing(CaseDateDto::startsAt).thenComparingLong(CaseDateDto::id)).findFirst().orElse(null);Region color=new Region();color.getStyleClass().add("case-overview-date-color");String accent=ColorUtil.toCssBackgroundColorOrNull(type.color());if(accent!=null)color.setStyle("-fx-background-color: "+accent+";");color.setAccessibleText(type.name()+" color accent");Label name=new Label(type.name());name.getStyleClass().add("shale-property-row-label");name.setMinWidth(150);Label display=new Label(value==null?"—":formatCaseDateOccurrence(value));display.setWrapText(true);display.getStyleClass().add("shale-property-row-value");HBox.setHgrow(display,Priority.ALWAYS);VBox valueBox=new VBox(4,display);CaseDateConfirmationDto confirmation=value==null?null:caseDateConfirmations.get(value.id());if(confirmation!=null&&confirmation.status()!=CaseDateConfirmationDto.Status.NOT_REQUIRED)valueBox.getChildren().add(CaseDateConfirmationView.create(confirmation,confirmationRoleNames.get(confirmation.requiredFirmWideRoleDefinitionId()),actorConfirmationRoles.contains(confirmation.requiredFirmWideRoleDefinitionId()),()->confirmCaseDate(confirmation)));HBox.setHgrow(valueBox,Priority.ALWAYS);Button action=ActionButtonFactory.semantic("✎",e->openOverviewDate(type,value),ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);action.setAccessibleText((value==null?"Add ":"Edit ")+type.name());action.setTooltip(new Tooltip(action.getAccessibleText()));HBox row=new HBox(10,color,name,valueBox,action);row.getStyleClass().addAll("case-overview-configured-date-row","shale-property-row","shale-property-row-compact");configuredOverviewDates.getChildren().add(row);}}
 
 	private void openOverviewDate(EffectiveCaseDateTypeDto type,CaseDateDto value){if(value!=null){openCaseDateDialog(value);return;}List<EffectiveCaseDateTypeDto> ordered=new ArrayList<>();ordered.add(type);effectiveCaseDateTypes.stream().filter(t->t.id()!=type.id()).forEach(ordered::add);effectiveCaseDateTypes=List.copyOf(ordered);openCaseDateDialog(null);}
 
@@ -4630,6 +4898,7 @@ public class CaseController {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
+		final int partiesGeneration = ++casePartiesLoadGeneration;
 		loadOverviewConfigurationAsync();
 		loadCompatibilityDatesAsync(activeCaseId);
 		caseUpdatesStale = true;
@@ -4661,15 +4930,26 @@ public class CaseController {
 			}
 			final List<CasePartyDto> parties = loadedParties;
 			final boolean partiesReady = partiesLoadSucceeded;
+			Map<Integer, OrganizationDao.OrganizationCardPresentation> loadedOrganizationPresentations = Map.of();
+			if (partiesReady) {
+				try {
+					loadedOrganizationPresentations = loadCasePartyOrganizationPresentations(parties);
+				} catch (RuntimeException ex) {
+					LOG.warn("Case party Organization presentation load failed caseId={}", activeCaseId, ex);
+				}
+			}
+			final Map<Integer, OrganizationDao.OrganizationCardPresentation> organizationPresentations = loadedOrganizationPresentations;
 
 			runOnFx(() ->
 			{
+				if (caseId == null || caseId.longValue() != activeCaseId || partiesGeneration != casePartiesLoadGeneration) return;
 				if (overview == null || detail == null) {
 					handleMissingCase();
 					return;
 				}
 
 				caseParties = parties == null ? List.of() : parties;
+				casePartyOrganizationPresentations = organizationPresentations;
 				partiesLoadedOnce = partiesReady;
 				renderPartiesSection();
 				CaseOverviewDto effectiveOverview = applyCallerFromCaseParties(overview, caseParties);
@@ -4807,6 +5087,7 @@ public class CaseController {
 	private void setCompatibilityDate(Label label, DatePicker picker, CompatibilityCaseDateState state) {
 		LocalDate date = state == null || state.startsAt() == null ? null : state.startsAt().toLocalDate();
 		if (label != null) label.setText(formatDate(date));
+		if(label!=null&&label.getParent() instanceof GridPane parent){parent.getChildren().removeIf(n->n.getUserData()==label);CaseDateConfirmationDto c=state==null||state.occurrenceId()==null?null:caseDateConfirmations.get(state.occurrenceId());if(c!=null&&c.status()!=CaseDateConfirmationDto.Status.NOT_REQUIRED){Node marker=CaseDateConfirmationView.create(c,confirmationRoleNames.get(c.requiredFirmWideRoleDefinitionId()),actorConfirmationRoles.contains(c.requiredFirmWideRoleDefinitionId()),()->confirmCaseDate(c));marker.setUserData(label);parent.add(marker,2,GridPane.getRowIndex(label)==null?0:GridPane.getRowIndex(label));}}
 		if (picker != null) picker.setValue(date);
 	}
 
@@ -6393,6 +6674,8 @@ public class CaseController {
 							allUsers, baseline, roles, () -> {
 								publishCaseFieldUpdated(activeCaseId, "teamChanged", 1);
 								reloadCurrentCaseForViewMode();
+							},caseTeamRoleManagementLauncher,appState.isAdmin(),()->{
+								if(loadGeneration==documentGeneration&&caseId!=null&&caseId.longValue()==activeCaseId)reloadCurrentCaseForViewMode();
 							});
 					dlg.showAndWait();
 				});
@@ -6468,6 +6751,7 @@ public class CaseController {
 		if (caseDao == null || caseId == null)
 			return;
 		final long activeCaseId = caseId.longValue();
+		showCaseUpdatesState("Loading updates…", "shale-loading-message");
 
 		new Thread(() ->
 		{
@@ -6490,7 +6774,8 @@ public class CaseController {
 				{
 					caseUpdatesLoading = false;
 					caseUpdatesStale = true;
-					showError("Failed to load case updates. " + ex.getMessage());
+					LOG.error("Case Updates load failed caseId={}", activeCaseId, ex);
+					showCaseUpdatesState("Updates could not be loaded. Try refreshing the case.", "shale-error-message");
 				});
 			}
 		}, "case-updates-load-" + activeCaseId).start();
@@ -6526,9 +6811,10 @@ public class CaseController {
 						.toList();
 
 		if (visibleUpdates.isEmpty()) {
-			Label empty = new Label(searchQuery.isBlank() ? "No updates yet." : "No updates found.");
+			Label empty = new Label(searchQuery.isBlank() ? "No updates yet." : "No updates match the current search.");
 			empty.setWrapText(true);
-			empty.setStyle("-fx-opacity: 0.7;");
+			empty.getStyleClass().add(searchQuery.isBlank() ? "shale-empty-message" : "shale-filtered-empty-message");
+			empty.setAccessibleText(searchQuery.isBlank() ? "This case has no updates." : "No updates match the current search.");
 			caseUpdatesFeedBox.getChildren().add(empty);
 			if (caseUpdatesScrollPane != null)
 				caseUpdatesScrollPane.setVvalue(0.0);
@@ -6545,6 +6831,14 @@ public class CaseController {
 		if (caseUpdatesScrollPane != null)
 			caseUpdatesScrollPane.setVvalue(0.0);
 		PerfLog.logDone("RENDER", "panel=case_updates page=case_view caseId=" + caseId + " childCount=" + caseUpdatesFeedBox.getChildren().size(), renderStartNanos);
+	}
+
+	private void showCaseUpdatesState(String message, String styleClass) {
+		if (caseUpdatesFeedBox == null) return;
+		Label state = new Label(message);
+		state.setWrapText(true);
+		state.getStyleClass().add(styleClass);
+		caseUpdatesFeedBox.getChildren().setAll(state);
 	}
 
 	private boolean caseUpdateMatchesSearch(CaseUpdateDto dto, String searchQuery) {
@@ -6575,7 +6869,7 @@ public class CaseController {
 			showError("Case updates are unavailable.");
 			return;
 		}
-		if (submitCaseUpdateButton == null) {
+		if (caseUpdatesComposerArea == null || submitCaseUpdateButton == null) {
 			showError("Case updates controls are unavailable.");
 			return;
 		}
@@ -6586,7 +6880,7 @@ public class CaseController {
 			return;
 		}
 
-		EnhancedTextArea.openEditor(dialogOwner(submitCaseUpdateButton), "Add Case Update", "", this::saveNewCaseUpdate);
+		saveNewCaseUpdate(caseUpdatesComposerArea.getText());
 	}
 
 	private void saveNewCaseUpdate(String noteText) {
@@ -6604,12 +6898,16 @@ public class CaseController {
 			showError("Update text is required.");
 			return;
 		}
+		if (!caseUpdateSubmissionInFlight.compareAndSet(false, true)) {
+			return;
+		}
 
 		final long activeCaseId = caseId.longValue();
 		final int activeClientId = shaleClientId;
 		final Integer createdByUserId = appState.getUserId();
 
 		submitCaseUpdateButton.setDisable(true);
+		if (caseUpdatesComposerArea != null) caseUpdatesComposerArea.setDisable(true);
 		clearError();
 
 		new Thread(() ->
@@ -6621,8 +6919,12 @@ public class CaseController {
 				List<CaseUpdateDto> updates = caseDao.listCaseUpdates(activeCaseId);
 				runOnFx(() ->
 				{
-					if (caseId == null || caseId.longValue() != activeCaseId)
+					caseUpdateSubmissionInFlight.set(false);
+					if (caseId == null || caseId.longValue() != activeCaseId) {
+						if (submitCaseUpdateButton != null) submitCaseUpdateButton.setDisable(false);
+						if (caseUpdatesComposerArea != null) caseUpdatesComposerArea.setDisable(false);
 						return;
+					}
 					if (caseUpdatesComposerArea != null) {
 						caseUpdatesComposerArea.setText("");
 						caseUpdatesComposerArea.setDisable(false);
@@ -6633,14 +6935,21 @@ public class CaseController {
 					refreshLastUpdatedLabelAsync();
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
+					if (caseUpdatesComposerArea != null) caseUpdatesComposerArea.requestFocus();
 					handleMedicalRecordsRequestedSafeguardAfterSavedUpdate(activeCaseId, activeClientId, trimmedText);
 				});
 			} catch (Exception ex) {
 				runOnFx(() ->
 				{
-					showError("Failed to save case update. " + ex.getMessage());
+					caseUpdateSubmissionInFlight.set(false);
+					LOG.error("Case Update create failed caseId={}", activeCaseId, ex);
+					showError("The update could not be saved. Check your connection and try again.");
 					if (submitCaseUpdateButton != null)
 						submitCaseUpdateButton.setDisable(false);
+					if (caseUpdatesComposerArea != null) {
+						caseUpdatesComposerArea.setDisable(false);
+						caseUpdatesComposerArea.requestFocus();
+					}
 				});
 			}
 		}, "case-updates-submit-" + activeCaseId).start();
@@ -6683,7 +6992,7 @@ public class CaseController {
 
 	private Node createCaseUpdateCardInternal(CaseUpdateDto dto) {
 		Label authorLabel = new Label(safeAuthorName(dto));
-		authorLabel.setStyle("-fx-font-weight: bold;");
+		authorLabel.getStyleClass().add("shale-update-author");
 		authorLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		authorLabel.setMaxWidth(Double.MAX_VALUE);
 		HBox.setHgrow(authorLabel, javafx.scene.layout.Priority.ALWAYS);
@@ -6692,27 +7001,43 @@ public class CaseController {
 		HBox rightActions = new HBox();
 		rightActions.setAlignment(Pos.CENTER_RIGHT);
 		if (canEditCaseUpdate(dto)) {
-			Button editButton = new Button("Edit");
+			Button editButton = ActionButtonFactory.semantic("✎", null,
+					ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+			editButton.getStyleClass().add("shale-update-edit-action");
+			editButton.setAccessibleText("Edit update");
+			editButton.setTooltip(new Tooltip("Edit update"));
 			editButton.setDisable(savingCaseUpdateEdit);
 			editButton.setOnAction(e -> startEditingCaseUpdate(dto, editButton));
 			rightActions.getChildren().add(editButton);
 		}
 
-		HBox topRow = new HBox(8, authorLabel, rightActions);
+		Label avatar = new Label(authorInitials(dto));
+		avatar.getStyleClass().addAll("shale-avatar", "shale-avatar-compact");
+		avatar.setAccessibleText(safeAuthorName(dto) + " avatar");
+		HBox topRow = new HBox(8, avatar, authorLabel, rightActions);
 		topRow.setAlignment(Pos.CENTER_LEFT);
+		topRow.getStyleClass().add("shale-update-card-header");
 
 		Label metadataLabel = new Label(buildCaseUpdateMetadata(dto));
 		metadataLabel.setWrapText(true);
-		metadataLabel.setStyle("-fx-opacity: 0.75; -fx-font-size: 11px;");
+		metadataLabel.getStyleClass().add("shale-update-timestamp");
 
 		Label noteLabel = new Label(NarrativeMarkdownCodec.plainText(safeText(dto.getNoteText())));
 		noteLabel.setWrapText(true);
+		noteLabel.setMaxWidth(Double.MAX_VALUE);
+		noteLabel.getStyleClass().add("shale-update-body");
 		bodyBox = new VBox(noteLabel);
 
-		VBox card = new VBox(4, topRow, metadataLabel, bodyBox);
-		card.setPadding(new Insets(10, 12, 10, 12));
-		card.getStyleClass().addAll("secondary-panel", "shale-entity-card", "shale-entity-card-embedded");
+		VBox card = new VBox(topRow, metadataLabel, bodyBox);
+		card.getStyleClass().add("shale-update-card");
 		return card;
+	}
+
+	private static String authorInitials(CaseUpdateDto dto) {
+		return java.util.Arrays.stream(safeAuthorName(dto).split("\\s+"))
+				.filter(part -> !part.isBlank()).limit(2)
+				.map(part -> part.substring(0, 1).toUpperCase(Locale.ROOT))
+				.collect(Collectors.joining());
 	}
 
 	private String buildCaseUpdateMetadata(CaseUpdateDto dto) {
@@ -6803,7 +7128,8 @@ public class CaseController {
 				runOnFx(() ->
 				{
 					savingCaseUpdateEdit = false;
-					showError("Failed to save case update. " + ex.getMessage());
+					LOG.error("Case Update edit failed caseId={} updateId={}", activeCaseId, caseUpdateId, ex);
+					showError("The update changes could not be saved. Check your connection and try again.");
 					renderCaseUpdates(caseUpdates);
 				});
 			}
@@ -6830,21 +7156,12 @@ public class CaseController {
 	// ----------------------------
 
 	private void renderResponsibleAttorneyMini(Integer userId, String displayName, String userColorCss) {
-		UserCardModel model = new UserCardModel(
-				userId,
-				(displayName == null || displayName.isBlank()) ? "—" : displayName,
-				userColorCss,
-				null
-		);
-
 		var headerCard = createHeaderUserMini(userId, displayName, userColorCss);
 
 		if (assignedUserHost != null)
 			assignedUserHost.getChildren().setAll(headerCard);
-		if (ovResponsibleAttorneyHost != null) {
-			ensureUserCardFactory();
-			ovResponsibleAttorneyHost.getChildren().setAll(userCardFactory.create(model, Variant.COMPACT));
-		}
+		if (ovResponsibleAttorneyHost != null)
+			ovResponsibleAttorneyHost.getChildren().setAll(createOverviewPersonRow(displayName, userColorCss, "Not assigned"));
 	}
 
 	private Node createHeaderUserMini(Integer userId, String displayName, String userColorCss) {
@@ -6866,21 +7183,22 @@ public class CaseController {
 	}
 
 	private void renderPrimaryLegalAssistantMini(Integer userId, String displayName, String userColorCss) {
-		if (userCardFactory == null) {
-			userCardFactory = new UserCardFactory(onOpenUser == null ? id ->
-			{
-			} : onOpenUser);
-		}
-
-		UserCardModel model = new UserCardModel(
-				userId,
-				(displayName == null || displayName.isBlank()) ? "—" : displayName,
-				userColorCss,
-				null
-		);
-
 		if (ovPrimaryLegalAssistantHost != null)
-			ovPrimaryLegalAssistantHost.getChildren().setAll(userCardFactory.create(model, Variant.COMPACT));
+			ovPrimaryLegalAssistantHost.getChildren().setAll(createOverviewPersonRow(displayName, userColorCss, "Not assigned"));
+	}
+
+	private Node createOverviewPersonRow(String displayName,String userColorCss,String emptyText){
+		String name=safeText(displayName).trim();
+		if(name.isBlank()){
+			Label empty=new Label(emptyText);empty.getStyleClass().add("shale-person-empty");
+			HBox row=new HBox(empty);row.getStyleClass().add("shale-person-row");return row;
+		}
+		String initials=java.util.Arrays.stream(name.split("\\s+")).filter(part->!part.isBlank()).limit(2)
+				.map(part->part.substring(0,1).toUpperCase(Locale.ROOT)).collect(Collectors.joining());
+		Label avatar=new Label(initials);avatar.getStyleClass().addAll("shale-avatar","shale-avatar-compact");
+		String avatarColor=ColorUtil.toCssBackgroundColorOrNull(userColorCss);if(avatarColor!=null)avatar.setStyle("-fx-background-color: "+avatarColor+";");
+		avatar.setAccessibleText(name+" avatar");Label personName=new Label(name);personName.setWrapText(true);personName.getStyleClass().add("shale-person-name");
+		HBox row=new HBox(10,avatar,personName);row.getStyleClass().add("shale-person-row");return row;
 	}
 
 	private void renderPrimaryStatusMini(Integer statusId, String statusName, String statusColorCss) {
@@ -6902,13 +7220,10 @@ public class CaseController {
 		if (statusHost != null)
 			statusHost.getChildren().setAll(headerBadge);
 		if (ovCaseStatusHost != null)
-			ovCaseStatusHost.getChildren().setAll(StatusIndicatorFactory.createStatusPill(statusName, statusColorCss, PillSize.LARGE));
+			ovCaseStatusHost.getChildren().setAll(StatusIndicatorFactory.createStatusPill(statusName, statusColorCss, PillSize.COMPACT));
 	}
 
 	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorHex) {
-		if (ovPracticeAreaHost == null)
-			return;
-
 		if (practiceAreaCardFactory == null) {
 			practiceAreaCardFactory = new PracticeAreaCardFactory(onOpenPracticeArea == null ? id ->
 			{
@@ -6922,7 +7237,21 @@ public class CaseController {
 				colorHex
 		);
 
-		ovPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.LARGE));
+		if (headerPracticeAreaHost != null)
+			headerPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.COMPACT));
+		if (ovPracticeAreaHost != null)
+			ovPracticeAreaHost.getChildren().setAll(PracticeAreaIndicatorFactory.createPracticeAreaPill(name, colorHex, PracticeAreaIndicatorFactory.PillSize.COMPACT));
+	}
+
+	private void renderNonEngagementState(Boolean sent) {
+		if (nonEngagementStateHost == null)
+			return;
+		nonEngagementStateHost.getChildren().clear();
+		if (!Boolean.TRUE.equals(sent))
+			return;
+		Label chip = MetadataChipFactory.compact("Non-Engagement Letter Sent");
+		chip.getStyleClass().addAll("shale-semantic-chip", "shale-semantic-chip-info");
+		nonEngagementStateHost.getChildren().add(chip);
 	}
 
 	private Node createOverviewInlineValue(String value, String colorCss) {
@@ -7394,6 +7723,7 @@ public class CaseController {
 			if (statusLabel != null)
 				statusLabel.setText("Status: " + safe(detail.getCaseStatus()));
 			renderLastUpdated(detail.getUpdatedAt());
+			renderNonEngagementState(detail.getNonEngagementLetterSent());
 			renderHeaderTitleFromDetail(detail);
 		}
 

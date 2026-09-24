@@ -12,6 +12,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.CaseDateConfirmationDto;
+import com.shale.core.dto.FieldConfirmationPolicyDto;
 import com.shale.core.dto.MigratedCaseDateProjectionDto;
 import java.util.Collection;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
@@ -52,12 +54,14 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	private final CaseTeamRoleDefinitionDao caseTeamRoleDao;
 	private final CaseTeamMembershipDao caseTeamMembershipDao;
 	private final com.shale.data.dao.CaseOverviewConfigurationDao caseOverviewConfigurationDao;
+	private final com.shale.data.dao.FieldConfirmationDao fieldConfirmationDao;
 
 	public CaseServiceAdapter(CaseDao caseDao) {
 		this.caseGateway = new DaoCaseGateway(caseDao, new CaseDateDao(caseDao.dbSessionProvider()), new CaseSummaryDao(caseDao.dbSessionProvider()));
 		this.caseTeamRoleDao = new CaseTeamRoleDefinitionDao(caseDao.dbSessionProvider());
 		this.caseTeamMembershipDao = new CaseTeamMembershipDao(caseDao.dbSessionProvider());
 		this.caseOverviewConfigurationDao = new com.shale.data.dao.CaseOverviewConfigurationDao(caseDao.dbSessionProvider());
+		this.fieldConfirmationDao = new com.shale.data.dao.FieldConfirmationDao(caseDao.dbSessionProvider());
 	}
 
 	public CaseServiceAdapter(CaseDao caseDao, CaseDateDao caseDateDao) {
@@ -65,6 +69,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		this.caseTeamRoleDao = new CaseTeamRoleDefinitionDao(caseDao.dbSessionProvider());
 		this.caseTeamMembershipDao = new CaseTeamMembershipDao(caseDao.dbSessionProvider());
 		this.caseOverviewConfigurationDao = new com.shale.data.dao.CaseOverviewConfigurationDao(caseDao.dbSessionProvider());
+		this.fieldConfirmationDao = new com.shale.data.dao.FieldConfirmationDao(caseDao.dbSessionProvider());
 	}
 
 	CaseServiceAdapter(CaseGateway caseGateway) {
@@ -72,6 +77,28 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		this.caseTeamRoleDao = null;
 		this.caseTeamMembershipDao = null;
 		this.caseOverviewConfigurationDao = null;
+		this.fieldConfirmationDao = null;
+	}
+
+	@Override public FieldConfirmationPolicyDto setFieldConfirmationPolicy(SetFieldConfirmationPolicyCommand c){
+		if(fieldConfirmationDao==null)throw new UnsupportedOperationException("Field confirmation administration is unavailable from this test gateway.");
+		return fieldConfirmationDao.setPolicy(c);
+	}
+	@Override public List<FieldConfirmationPolicyDto> listFieldConfirmationPolicies(int tenant,int actor){
+		if(fieldConfirmationDao==null)throw new UnsupportedOperationException("Field confirmation administration is unavailable from this test gateway.");
+		return fieldConfirmationDao.listPolicies(tenant,actor);
+	}
+	@Override public List<ConfirmationRole> listConfirmationRoles(int tenant,int actor){
+		if(fieldConfirmationDao==null)throw new UnsupportedOperationException("Field confirmation administration is unavailable from this test gateway.");
+		return fieldConfirmationDao.listRoles(tenant,actor);
+	}
+	@Override public boolean currentActorHasConfirmationRole(int tenant,int actor,int role){
+		if(fieldConfirmationDao==null)return false;
+		return fieldConfirmationDao.actorHasRole(tenant,actor,role);
+	}
+	@Override public void confirmCaseDate(ConfirmCaseDateCommand c){
+		if(fieldConfirmationDao==null)throw new UnsupportedOperationException("Case Date confirmation is unavailable from this test gateway.");
+		fieldConfirmationDao.confirmCaseDate(c);
 	}
 
 	@Override public com.shale.core.dto.CaseOverviewDateConfigurationDto getCaseOverviewDateConfiguration(long caseId,int tenant,int actor){return requireOverviewConfigurationDao().get(caseId,tenant,actor);}
@@ -398,6 +425,14 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		validatePositive(shaleClientId, "ShaleClientId");
 		validatePositive(actorUserId, "ActorUserId");
 		return caseGateway.listCaseDatesForCase(caseId, shaleClientId, actorUserId);
+	}
+
+	@Override
+	public List<CaseDateConfirmationDto> listCaseDateConfirmationsForCase(long caseId, int shaleClientId, int actorUserId) {
+		validatePositive(caseId, "CaseId");
+		validatePositive(shaleClientId, "ShaleClientId");
+		validatePositive(actorUserId, "ActorUserId");
+		return caseGateway.listCaseDateConfirmationsForCase(caseId, shaleClientId, actorUserId);
 	}
 
 	@Override
@@ -967,6 +1002,10 @@ public final class CaseServiceAdapter implements CaseServicePort {
 			throw unsupportedCaseLinkGatewayOperation("listCaseDatesForCase");
 		}
 
+		default List<CaseDateConfirmationDto> listCaseDateConfirmationsForCase(long caseId, int shaleClientId, int actorUserId) {
+			throw unsupportedCaseLinkGatewayOperation("listCaseDateConfirmationsForCase");
+		}
+
 		default Map<Long, MigratedCaseDateProjectionDto> projectMigratedCaseDates(Collection<Long> caseIds, int tenant, int actor) {
 			throw unsupportedCaseLinkGatewayOperation("projectMigratedCaseDates");
 		}
@@ -1278,6 +1317,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override
 		public List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) {
 			return caseDateDao.listCaseDatesForCase(caseId, shaleClientId, actorUserId);
+		}
+
+		@Override
+		public List<CaseDateConfirmationDto> listCaseDateConfirmationsForCase(long caseId, int shaleClientId, int actorUserId) {
+			return caseDateDao.listCaseDateConfirmationsForCase(caseId, shaleClientId, actorUserId);
 		}
 
 		@Override

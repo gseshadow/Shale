@@ -52,10 +52,10 @@ final class CasesToolbarCssRuntimeTest {
                     intakeDate.getItems().add("Intake Date (newest first)");
                     intakeDate.getSelectionModel().selectFirst();
 
-                    ToggleButton cards = ControlStyles.apply(new ToggleButton("Cards"),
-                            ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
-                    ToggleButton list = ControlStyles.apply(new ToggleButton("List"),
-                            ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
+                    ToggleButton cards = new ToggleButton("Cards");
+                    ToggleButton list = new ToggleButton("List");
+                    cards.getStyleClass().add("shale-segment");
+                    list.getStyleClass().add("shale-segment");
                     cards.setSelected(true);
                     HBox segmented = new HBox(cards, list);
                     segmented.getStyleClass().add("shale-segmented-control");

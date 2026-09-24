@@ -9,6 +9,22 @@
     -fx-border-width: 1;
 }
 
+/* Responsive page toolbar: a FlowPane supplied by the page owns wrapping. */
+.cases-toolbar {
+    -fx-padding: 10px 12px;
+    -fx-background-color: -shale-color-section-surface;
+    -fx-border-color: -shale-color-border-subtle;
+}
+
+.cases-toolbar-controls { -fx-alignment: center-left; }
+
+.cases-results-count {
+    -fx-text-fill: -shale-color-text-muted;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-padding: 0 4px;
+}
+
 .shale-toolbar-heading,
 .label.shale-toolbar-heading {
     -fx-font-size: 15px;
@@ -18,10 +34,10 @@
 
 .shale-segmented-control {
     -fx-padding: 2;
-    -fx-background-color: rgba(17, 37, 66, 0.08);
+    -fx-background-color: -shale-color-surface-muted;
     -fx-background-radius: 999;
     -fx-border-radius: 999;
-    -fx-border-color: rgba(17, 37, 66, 0.14);
+    -fx-border-color: -shale-color-border-subtle;
     -fx-border-width: 1;
     -fx-spacing: 0;
 }
@@ -31,7 +47,7 @@
     -fx-min-height: 32;
     -fx-pref-height: 32;
     -fx-padding: 6 14 6 14;
-    -fx-background-color: rgba(248, 250, 252, 0.86);
+    -fx-background-color: -shale-color-card-surface;
     -fx-background-radius: 999;
     -fx-border-radius: 999;
     -fx-border-color: transparent;
@@ -44,34 +60,35 @@
 
 .toggle-button.shale-segment:hover,
 .button.shale-segment:hover {
-    -fx-background-color: rgba(255, 255, 255, 0.96);
-    -fx-border-color: rgba(74, 104, 138, 0.24);
+    -fx-background-color: -shale-color-card-hover;
+    -fx-border-color: -shale-color-border-strong;
 }
 
 .toggle-button.shale-segment:pressed,
 .button.shale-segment:pressed {
-    -fx-background-color: rgba(232, 241, 251, 0.92);
+    -fx-background-color: -shale-color-selected-control-background;
 }
 
 .toggle-button.shale-segment:selected {
-    -fx-background-color: -shale-button-primary-background;
-    -fx-border-color: -shale-button-primary-border;
-    -fx-text-fill: -shale-button-primary-text;
+    -fx-background-color: -shale-color-action-primary-start;
+    -fx-border-color: -shale-color-border-selected;
+    -fx-text-fill: -shale-color-text-on-primary;
 }
 
 .toggle-button.shale-segment:selected:hover {
-    -fx-background-color: -shale-button-primary-hover-background;
-    -fx-border-color: -shale-button-primary-hover-border;
+    -fx-background-color: -shale-color-action-primary-hover-start;
+    -fx-border-color: -shale-color-border-selected;
 }
 
 .toggle-button.shale-segment:selected:pressed {
-    -fx-background-color: -shale-button-primary-pressed-background;
-    -fx-border-color: -shale-button-primary-pressed-border;
+    -fx-background-color: -shale-color-action-primary-pressed;
+    -fx-border-color: -shale-color-border-selected;
 }
 
 .toggle-button.shale-segment:focused,
 .button.shale-segment:focused {
-    -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 8, 0.18, 0, 0);
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.18, 0, 0);
 }
 
 /* Empty State: shared placeholder copy for loading/empty list regions. */
@@ -92,3 +109,96 @@
     -fx-font-style: italic;
     -fx-font-weight: 700;
 }
+
+/* Failure is intentionally distinct from loading and both empty-state kinds. */
+.shale-error-state,
+.label.shale-error-state {
+    -fx-text-fill: -shale-color-text-danger;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-padding: 10 8 10 8;
+}
+
+/* My Shale toolbars wrap at the node level; controls keep shared form ownership. */
+.my-shale-toolbar { -fx-padding: 10px 12px; }
+.my-shale-search-row { -fx-alignment: center-left; }
+.my-shale-results-count {
+    -fx-text-fill: -shale-color-text-muted;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+/* Contacts directory uses the shared wrapping toolbar and result-count vocabulary. */
+.contacts-page-header { -fx-padding: 16px 16px 4px 16px; }
+.contacts-toolbar {
+    -fx-padding: 10px 12px;
+    -fx-background-color: -shale-color-section-surface;
+    -fx-border-color: -shale-color-border-subtle;
+}
+.contacts-toolbar-controls { -fx-alignment: center-left; }
+.contacts-results-count {
+    -fx-text-fill: -shale-color-text-muted;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-padding: 0 4px;
+}
+.contacts-selected-filters { -fx-padding: 0 2px 4px 2px; }
+.contacts-content-surface { -fx-padding: 12px; -fx-background-color: transparent; }
+.contact-filter-count {
+    -fx-background-color: -shale-color-chip-neutral-background;
+    -fx-background-radius: 999px;
+    -fx-padding: 5px 9px;
+    -fx-text-fill: -shale-color-chip-neutral-text;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
+}
+.contact-filter-chip {
+    -fx-background-radius: 999px; -fx-border-radius: 999px; -fx-border-width: 1px;
+    -fx-padding: 4px 9px; -fx-font-size: 11px; -fx-font-weight: 700;
+    -fx-text-fill: -shale-color-text-primary; -fx-cursor: hand;
+}
+.contact-filter-chip:hover { -fx-opacity: 0.82; }
+.contact-filter-chip:focused { -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 7, 0.16, 0, 0); }
+
+/* Shared color-aware filter popup used by Contacts and future directory toolbars. */
+.shale-filter-trigger {
+    -fx-min-height: 36px; -fx-pref-height: 36px; -fx-padding: 0 11px;
+    -fx-background-color: -shale-color-input-surface; -fx-background-radius: 10px;
+    -fx-border-color: -shale-color-input-border; -fx-border-radius: 10px;
+    -fx-text-fill: -shale-color-text-primary; -fx-cursor: hand;
+}
+.shale-filter-trigger:hover { -fx-background-color: -shale-color-card-hover; -fx-border-color: -shale-color-input-hover-border; }
+.shale-filter-trigger:armed, .shale-filter-trigger:showing { -fx-background-color: -shale-color-selected-control-background; -fx-border-color: -shale-color-border-focus; }
+.shale-filter-trigger:focused { -fx-border-color: -shale-color-border-focus; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 7, 0.14, 0, 0); }
+.shale-filter-trigger:disabled { -fx-opacity: -shale-opacity-disabled; }
+.shale-filter-trigger-content > .label { -fx-text-fill: -shale-color-text-primary; -fx-font-size: 12px; -fx-font-weight: 700; }
+.shale-filter-popup {
+    -fx-min-width: 210px; -fx-padding: 7px; -fx-background-color: -shale-color-overlay-dialog;
+    -fx-background-radius: 10px; -fx-border-color: -shale-color-border-strong; -fx-border-radius: 10px;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 16, 0.14, 0, 5);
+}
+.shale-filter-option {
+    -fx-alignment: center-left; -fx-padding: 8px 10px; -fx-background-color: transparent;
+    -fx-background-radius: 7px; -fx-border-color: transparent transparent transparent -shale-definition-color;
+    -fx-border-width: 0 0 0 3px; -fx-border-radius: 7px; -fx-text-fill: -shale-color-text-primary;
+    -fx-font-weight: 600; -fx-cursor: hand;
+}
+.shale-filter-option:hover, .shale-filter-option:focused { -fx-background-color: -shale-color-card-hover; }
+.shale-filter-option:selected { -fx-background-color: -shale-color-selected-control-background; -fx-font-weight: 800; }
+
+/* Organizations shares the responsive directory contract while retaining its own selector namespace. */
+.organizations-page-header { -fx-padding: 16px 16px 4px 16px; }
+.organizations-toolbar {
+    -fx-padding: 10px 12px;
+    -fx-background-color: -shale-color-section-surface;
+    -fx-border-color: -shale-color-border-subtle;
+}
+.organizations-toolbar-controls { -fx-alignment: center-left; }
+.organizations-results-count {
+    -fx-text-fill: -shale-color-text-muted;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-padding: 0 4px;
+}
+.organizations-selected-filters { -fx-padding: 0 2px 4px 2px; }
+.organizations-content-surface { -fx-padding: 12px; -fx-background-color: transparent; }

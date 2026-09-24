@@ -1,7 +1,9 @@
 package com.shale.ui.controller;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -10,6 +12,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -20,6 +23,7 @@ import com.shale.core.service.MaterialRequestServicePort;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserPreferencesDao;
 import com.shale.ui.notification.NotificationPreferencesService;
+import com.shale.ui.component.SettingsManagementRow;
 import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.testutil.JavaFxTestSupport;
@@ -35,6 +39,32 @@ final class SettingsFxmlLoadTest {
     static void startJavaFxToolkit() {
         assumeTrue(hasDisplay(), "JavaFX FXML load test requires a graphical display.");
         JavaFxTestSupport.ensureToolkitStarted();
+    }
+
+    @Test
+    void sharedRowOwnsItsCompleteActionContractAcrossAvailabilityChanges() {
+        JavaFxTestSupport.runAndWait(() -> {
+            SettingsManagementRow row = new SettingsManagementRow();
+            AtomicBoolean opened = new AtomicBoolean();
+            row.configure("Case Statuses", "Manage case statuses.", "Manage", event -> opened.set(true));
+
+            assertEquals("Case Statuses", row.getTitle());
+            assertEquals("Manage case statuses.", row.getDescription());
+            assertEquals("Manage", row.getActionText());
+            assertEquals("Manage Case Statuses", row.getActionButton().getAccessibleText());
+            assertTrue(row.getActionButton().getStyleClass().contains("shale-control-secondary"));
+            assertTrue(row.getActionButton().getStyleClass().contains("shale-control-small"));
+
+            row.setAvailable(false);
+            assertTrue(!row.isVisible() && !row.isManaged());
+            assertTrue(!row.getActionButton().isVisible() && !row.getActionButton().isManaged());
+            assertEquals("Manage", row.getActionText(), "Availability must not erase the action label.");
+            assertTrue(row.getActionButton().getOnAction() == null);
+
+            row.setAvailable(true);
+            row.getActionButton().fire();
+            assertTrue(opened.get(), "Restoring availability must restore the configured action handler.");
+        });
     }
 
     @Test
@@ -54,26 +84,43 @@ final class SettingsFxmlLoadTest {
             Parent root = assertDoesNotThrow((org.junit.jupiter.api.function.ThrowingSupplier<Parent>) loader::load);
             SettingsController controller = loader.getController();
             assertNotNull(controller);
+            javafx.scene.control.ScrollPane settingsScroll = (javafx.scene.control.ScrollPane) loader.getNamespace().get("settingsScroll");
+            assertTrue(settingsScroll.getStyleClass().containsAll(List.of("surface-scroll", "settings-scroll")),
+                    "FXMLLoader must create separate runtime classes for the Settings scroll owner.");
+            SettingsManagementRow customDictionaryRow =
+                    (SettingsManagementRow) loader.getNamespace().get("customDictionaryRow");
+            javafx.scene.Parent personalGroup = (javafx.scene.Parent) customDictionaryRow.getParent();
+            assertTrue(personalGroup.getStyleClass().containsAll(List.of("settings-directory-group", "shale-section-card")),
+                    "FXMLLoader must create separate runtime classes for Settings section cards.");
             CheckBox notificationCheck = (CheckBox) loader.getNamespace().get("taskAssignedToMeCheck");
             assertNotNull(notificationCheck, "Existing Settings notification checkbox fx:id should resolve.");
             assertSame(notificationCheck, injectedField(controller, "taskAssignedToMeCheck"),
                     "Existing Settings notification checkbox should remain injected into its controller field.");
-            CheckBox inactiveUsers = (CheckBox) loader.getNamespace().get("showInactiveUsersCheck");
-            assertNotNull(inactiveUsers, "Existing Settings user-management checkbox should remain wired.");
+            assertNull(loader.getNamespace().get("showInactiveUsersCheck"), "Inline User Management controls must be absent.");
 
-            Button auditButton = (Button) loader.getNamespace().get("viewAuditLogButton");
-            assertNotNull(auditButton, "Audit-log action button should be present when audit viewing is supported.");
+            Button auditButton = ((SettingsManagementRow) loader.getNamespace().get("auditLogRow")).getActionButton();
             assertNotNull(auditButton.getOnAction(), "FXML should resolve the audit-log action handler.");
             auditButton.fire();
             assertTrue(!auditOpened.get(), "Non-admin Settings users must not open the audit log.");
 
-            assertNotNull(inactiveUsers.getOnAction(), "Existing Settings controls should keep resolving their handlers.");
+            Button manageDictionary = ((SettingsManagementRow) loader.getNamespace().get("customDictionaryRow")).getActionButton();
+            assertNotNull(manageDictionary, "Custom Dictionary must be presented as one compact Settings action.");
+            assertNotNull(manageDictionary.getOnAction(), "The dictionary manager must be created only from the Manage action.");
 
-            VBox organizationTypes = (VBox) loader.getNamespace().get("organizationTypeAdministrationContent");
-            assertNotNull(organizationTypes,
-                    "Settings must retain the real Organization Type administration host.");
-            assertSame(organizationTypes, injectedField(controller, "organizationTypeAdministrationContent"),
-                    "Organization Type administration host must be injected into SettingsController.");
+            for (String rowId : List.of("customDictionaryRow", "caseStatusesRow", "practiceAreasRow",
+                    "linkTypesRow", "caseTeamRolesRow", "caseDatesRow", "requestFieldsRow",
+                    "contactClassificationsRow", "organizationTypesRow", "userManagementRow")) {
+                SettingsManagementRow row = (SettingsManagementRow) loader.getNamespace().get(rowId);
+                assertEquals("Manage", row.getActionText(), rowId + " must visibly identify its popup action.");
+                assertEquals("Manage " + row.getTitle(), row.getActionButton().getAccessibleText(),
+                        rowId + " must expose the same action and target to assistive technology.");
+            }
+            for (String rowId : List.of("notificationPreferencesRow", "caseDateMappingsRow", "auditLogRow")) {
+                assertEquals("Open", ((SettingsManagementRow) loader.getNamespace().get(rowId)).getActionText(),
+                        rowId + " must preserve its non-popup action semantics.");
+            }
+
+            assertNotNull(loader.getNamespace().get("organizationTypesRow"));
         });
     }
 

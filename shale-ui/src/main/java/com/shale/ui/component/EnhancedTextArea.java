@@ -33,6 +33,7 @@ import javafx.stage.Window;
 
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Reusable plain-text multiline editor with transactional pop-out editing and offline spelling assistance. */
 public class EnhancedTextArea extends VBox {
@@ -157,6 +158,8 @@ public class EnhancedTextArea extends VBox {
         String resolvedTitle = title == null || title.isBlank() ? "Edit text" : title;
         dialog.setTitle(resolvedTitle);
         AppDialogs.applySecondaryDialogShell(dialog, resolvedTitle);
+        dialog.getDialogPane().getStyleClass().addAll("utility-dialog-root", "enhanced-text-dialog-root");
+        dialog.getDialogPane().setAccessibleText(resolvedTitle + ". Expanded multiline text editor.");
         RichTextExpandedEditor expanded = new RichTextExpandedEditor(currentValue, UserDictionarySession.current().checker(), spellCheck);
         expanded.setPrefSize(760, 440);
         Label shortcutHint = new Label("Ctrl+Enter to Apply");
@@ -174,7 +177,9 @@ public class EnhancedTextArea extends VBox {
         expanded.area().addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
             if (new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN).match(event)) { apply.fire(); event.consume(); }
         });
-        dialog.setResultConverter(button -> button == APPLY ? expanded.markdown() : null);
+		AtomicBoolean applied = new AtomicBoolean();
+        dialog.setResultConverter(button -> button == APPLY && applied.compareAndSet(false, true)
+				? expanded.markdown() : null);
         dialog.setOnShown(event -> Platform.runLater(() -> expanded.area().requestFocus()));
         dialog.setOnHidden(event -> expanded.dispose());
         Optional<String> result = dialog.showAndWait();
@@ -183,6 +188,7 @@ public class EnhancedTextArea extends VBox {
 
     private ContextMenu spellingMenu() {
         ContextMenu menu = new ContextMenu();
+        TransientPopupSupport.style(menu, "rich-text-context-menu");
         menu.setOnShowing(event -> {
             menu.getItems().clear();
             WordRange target = selectedOrCaretWord();
@@ -202,7 +208,11 @@ public class EnhancedTextArea extends VBox {
             MenuItem cut = item("Cut", editor::cut, editor.isEditable() && !editor.getSelectedText().isEmpty());
             MenuItem copy = item("Copy", editor::copy, !editor.getSelectedText().isEmpty());
             MenuItem paste = item("Paste", editor::paste, editor.isEditable() && Clipboard.getSystemClipboard().hasString());
-            menu.getItems().addAll(undo, redo, new SeparatorMenuItem(), cut, copy, paste);
+            MenuItem delete = item("Delete", () -> editor.replaceSelection(""),
+                    editor.isEditable() && !editor.getSelectedText().isEmpty());
+            MenuItem selectAll = item("Select All", editor::selectAll, !editor.getText().isEmpty());
+            menu.getItems().addAll(undo, redo, new SeparatorMenuItem(), cut, copy, paste, delete,
+                    new SeparatorMenuItem(), selectAll);
         });
         return menu;
     }

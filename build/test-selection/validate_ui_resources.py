@@ -25,6 +25,11 @@ def main() -> int:
                 errors.append(f"{fxml.relative_to(ROOT)}: duplicate fx:id {fx_id!r}")
             if fx_id:
                 ids.add(fx_id)
+            style_class = element.attrib.get("styleClass")
+            if style_class and any(character.isspace() for character in style_class) and "," not in style_class:
+                errors.append(
+                    f"{fxml.relative_to(ROOT)}: styleClass {style_class!r} uses whitespace instead of JavaFX collection commas"
+                )
 
     for css in sorted((RESOURCES / "css").rglob("*.css")):
         text = css.read_text(encoding="utf-8")

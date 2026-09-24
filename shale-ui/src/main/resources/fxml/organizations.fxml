@@ -10,25 +10,32 @@
 
 <BorderPane xmlns="http://javafx.com/javafx/21"
 	xmlns:fx="http://javafx.com/fxml/1"
-	fx:controller="com.shale.ui.controller.OrganizationsController" styleClass="app-shell">
+	fx:controller="com.shale.ui.controller.OrganizationsController"
+	styleClass="app-shell, shell-route-page, organizations-page">
 
 	<top>
-		<FilterPanel><left><FlowPane hgap="8" vgap="8" styleClass="contact-filter-controls">
-			<Button fx:id="addOrganizationButton" text="Add Organization" />
-			<TextField fx:id="organizationsSearchField" promptText="Search organizations…" prefWidth="250" />
-			<ShaleFilterMenu fx:id="organizationTypeFilter" />
-			<Button fx:id="showRemovedOrganizationsButton" text="Show removed" onAction="#toggleRemovedOrganizations" />
-			<ComboBox fx:id="organizationSort" prefWidth="120" />
-			<Label fx:id="activeFilterCount" text="0 filters" styleClass="contact-filter-count" />
-			<Button fx:id="clearFiltersButton" text="Clear Filters" onAction="#clearFilters" styleClass="contact-filter-clear" />
-		</FlowPane></left><right><FlowPane fx:id="selectedFilterChips" hgap="6" vgap="6" /></right></FilterPanel>
+		<VBox spacing="12" styleClass="organizations-page-header">
+			<FilterPanel styleClass="shale-filter-panel, shale-toolbar, organizations-toolbar">
+				<left><FlowPane hgap="8" vgap="8" alignment="CENTER_LEFT" styleClass="organizations-toolbar-controls">
+					<TextField fx:id="organizationsSearchField" promptText="Search organizations…" prefWidth="280" />
+					<ShaleFilterMenu fx:id="organizationTypeFilter" />
+					<Button fx:id="showRemovedOrganizationsButton" text="Show removed" onAction="#toggleRemovedOrganizations" />
+					<ComboBox fx:id="organizationSort" prefWidth="140" />
+					<Label fx:id="activeFilterCount" text="0 filters" styleClass="contact-filter-count" />
+					<Button fx:id="clearFiltersButton" text="Clear All" onAction="#clearFilters" />
+					<Button fx:id="addOrganizationButton" text="Add Organization" />
+				</FlowPane></left>
+				<right><Label fx:id="organizationsResultCount" text="0 results" styleClass="organizations-results-count" /></right>
+			</FilterPanel>
+			<FlowPane fx:id="selectedFilterChips" hgap="6" vgap="6" styleClass="organizations-selected-filters" />
+		</VBox>
 	</top>
 
 	<center>
 		<ScrollableListRegion fx:id="organizationsListRegion">
 			<content>
 				<FlowPane fx:id="organizationsFlow" hgap="16" vgap="16"
-					prefWrapLength="1040" styleClass="cases-content-surface glass-panel data-surface">
+					prefWrapLength="1040" styleClass="organizations-content-surface">
 					<padding>
 						<Insets top="16" right="16" bottom="16" left="16" />
 					</padding>

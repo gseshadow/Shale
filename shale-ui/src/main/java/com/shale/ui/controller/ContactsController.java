@@ -58,6 +58,7 @@ public final class ContactsController {
     @FXML private ShaleFilterMenu contactTypeFilter, specialtyFilter, credentialFilter;
     @FXML private FlowPane selectedFilterChips;
     @FXML private Label activeFilterCount;
+    @FXML private Label contactsResultCount;
     @FXML private Button clearFiltersButton;
     @FXML private Button addContactButton;
 
@@ -79,6 +80,7 @@ public final class ContactsController {
     private List<ContactServicePort.Definition> typeOptions=List.of(), specialtyOptions=List.of();
     private List<ContactServicePort.CredentialDefinition> credentialOptions=List.of();
     private long pageLoadStartedNanos;
+    private long totalResults;
     private Consumer<Integer> onOpenContact;
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
@@ -124,6 +126,7 @@ public final class ContactsController {
     @FXML
     private void initialize() {
         if (addContactButton != null) ControlStyles.apply(addContactButton, ControlStyles.Purpose.PRIMARY);
+        if (clearFiltersButton != null) ControlStyles.apply(clearFiltersButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
         if (contactsSearchField != null) {
             ControlStyles.formControl(contactsSearchField);
             searchDebounce = new PauseTransition(SEARCH_DEBOUNCE);
@@ -190,6 +193,8 @@ public final class ContactsController {
         loading = false;
         hasMore = true;
         loadedContacts.clear();
+        totalResults = 0;
+        updateResultCount();
         if (contactsFlow != null) {
             contactsFlow.getChildren().clear();
         }
@@ -253,6 +258,8 @@ public final class ContactsController {
                         return;
                     }
                     loadedContacts.addAll(page.items());
+                    totalResults = page.total();
+                    updateResultCount();
                     currentPage++;
                     hasMore = loadedContacts.size() < page.total();
                     loading = false;
@@ -316,6 +323,7 @@ public final class ContactsController {
     private Node buildCard(ContactCardSummary row) {
         var card = contactCardFactory.create(cardModel(row), CONTACTS_CARD_VARIANT);
         card.setMinHeight(CONTACT_CARD_HEIGHT);
+        card.setMinWidth(260);
         card.setPrefWidth(CONTACT_CARD_WIDTH);
         card.setMaxWidth(CONTACT_CARD_WIDTH);
         return card;
@@ -395,6 +403,11 @@ public final class ContactsController {
             return "";
         }
         return contactsSearchField.getText().trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private void updateResultCount() {
+        if (contactsResultCount == null) return;
+        contactsResultCount.setText(totalResults + " result" + (totalResults == 1 ? "" : "s"));
     }
 
     private static String safe(String value) {

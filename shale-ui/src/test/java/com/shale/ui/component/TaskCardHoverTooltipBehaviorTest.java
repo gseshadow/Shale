@@ -24,8 +24,8 @@ final class TaskCardHoverTooltipBehaviorTest {
     @Test
     void hoverPopupUsesCaseStatusStyleTextPopupWithTitleAndOptionalDescription() {
         assertTrue(taskCard.contains("buildTaskDetailsPopup(String title, String description)"));
-        assertTrue(taskCard.contains("content.setWrapText(true)"));
-        assertTrue(taskCard.contains("content.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH)"));
+        assertTrue(taskCard.contains("heading.setWrapText(true)"));
+        assertTrue(taskCard.contains("task-hover-popup"));
         assertTrue(taskCard.contains("normalizedTitle + \"\\n\\n\" + displayedDescription"));
     }
 
@@ -40,13 +40,11 @@ final class TaskCardHoverTooltipBehaviorTest {
     }
 
     @Test
-    void longHoverDescriptionsAreMultilineTruncatedWithoutScrollbars() {
-        assertTrue(taskCard.contains("TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_LINES = 8"));
-        assertTrue(taskCard.contains("descriptionForTooltip(description)"));
-        assertTrue(taskCard.contains("wrappedDescriptionLineCount(candidate) <= TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_LINES"));
-        assertTrue(taskCard.contains("appendInlineEllipsis"));
-        assertFalse(taskCard.contains("new ScrollPane"));
-        assertFalse(taskCard.contains("ScrollBarPolicy"));
+    void longHoverDescriptionsRemainCompleteAndUseBoundedVerticalScrolling() {
+        assertTrue(taskCard.contains("Label details = new Label(normalizedDescription)"));
+        assertTrue(taskCard.contains("scroll.setMaxHeight(260)"));
+        assertTrue(taskCard.contains("ScrollBarPolicy.NEVER"));
+        assertTrue(taskCard.contains("ScrollBarPolicy.AS_NEEDED"));
     }
 
     @Test
@@ -66,17 +64,15 @@ final class TaskCardHoverTooltipBehaviorTest {
     }
 
     @Test
-    void hoverPopupUsesLatestCursorScreenCoordinatesWithSmallOffset() {
-        assertTrue(taskCard.contains("captureTaskDetailsPopupPointer(e.getScreenX(), e.getScreenY())"));
-        assertTrue(taskCard.contains("setOnMouseMoved(e -> captureTaskDetailsPopupPointer(e.getScreenX(), e.getScreenY()))"));
-        assertTrue(taskCard.contains("latestTaskDetailsPopupScreenX + TASK_DETAILS_POPUP_CURSOR_OFFSET"));
-        assertTrue(taskCard.contains("latestTaskDetailsPopupScreenY + TASK_DETAILS_POPUP_CURSOR_OFFSET"));
+    void hoverPopupAnchorsToCardWithoutChangingCardGeometry() {
+        assertTrue(taskCard.contains("localToScreen(getBoundsInLocal())"));
+        assertTrue(taskCard.contains("cardBounds.getMaxX() + TASK_DETAILS_POPUP_CURSOR_OFFSET"));
     }
 
     @Test
     void hoverPopupCorrectsOnlyForScreenEdgesAfterInitialCursorPlacement() {
-        assertTrue(taskCard.contains("correctTaskDetailsPopupForScreenEdges(requestedX, requestedY)"));
-        assertTrue(taskCard.contains("Screen.getScreensForRectangle(requestedX, requestedY, 1, 1)"));
+        assertTrue(taskCard.contains("correctTaskDetailsPopupForScreenEdges(cardBounds)"));
+        assertTrue(taskCard.contains("Screen.getScreensForRectangle(anchor.getMinX()"));
         assertTrue(taskCard.contains("popupWindow.setX"));
         assertTrue(taskCard.contains("popupWindow.setY"));
     }

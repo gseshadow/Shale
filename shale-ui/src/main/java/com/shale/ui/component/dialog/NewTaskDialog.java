@@ -50,7 +50,8 @@ public final class NewTaskDialog {
         ResultHolder result = new ResultHolder();
 
         Label heading = new Label("Create task");
-        heading.getStyleClass().add("app-dialog-title");
+        heading.getStyleClass().addAll("app-dialog-title", "task-window-title");
+        heading.setAccessibleText("Create a new task");
 
         Label message = new Label("Title is required. Description and due date are optional.");
         message.getStyleClass().add("app-dialog-message");
@@ -58,6 +59,7 @@ public final class NewTaskDialog {
         Label titleLabel = new Label("Title");
         TextField titleField = new TextField();
         ControlStyles.formControl(titleField);
+        titleField.setAccessibleText("Task title, required");
         titleField.setPromptText("Task title");
 
         Label descriptionLabel = new Label("Description");
@@ -65,13 +67,16 @@ public final class NewTaskDialog {
         descriptionArea.setPromptText("Optional");
         descriptionArea.setPrefRowCount(4);
         descriptionArea.setEditorTitle("Task Description");
+        descriptionArea.setAccessibleText("Task description");
 
         Label dueLabel = new Label("Due date/time");
         DatePicker dueDatePicker = new DatePicker();
         ControlStyles.formControl(dueDatePicker);
+        dueDatePicker.setAccessibleText("Task due date");
         dueDatePicker.setPromptText("Optional");
         TextField dueTimeField = new TextField();
         ControlStyles.formControl(dueTimeField);
+        dueTimeField.setAccessibleText("Task due time");
         dueTimeField.setPromptText("HH:mm (optional)");
         dueTimeField.setPrefColumnCount(8);
         HBox dueRow = new HBox(8, dueDatePicker, dueTimeField);
@@ -79,6 +84,7 @@ public final class NewTaskDialog {
         Label priorityLabel = new Label("Priority");
         ComboBox<TaskPriorityOptionDto> priorityComboBox = new ComboBox<>();
         ControlStyles.formControl(priorityComboBox);
+        priorityComboBox.setAccessibleText("Task priority");
         priorityComboBox.setMaxWidth(Double.MAX_VALUE);
         priorityComboBox.setPromptText("Select priority");
         List<TaskPriorityOptionDto> safePriorities = availablePriorities == null ? List.of() : availablePriorities;
@@ -90,9 +96,10 @@ public final class NewTaskDialog {
         List<CaseTaskService.AssignableUserOption> safeAssignees = availableAssignees == null ? List.of() : availableAssignees;
         VBox assignedSection = new VBox(6);
         Label assignedLabel = new Label("Assigned");
-        assignedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);");
+        assignedLabel.getStyleClass().add("task-window-section-title");
         Button addAssignedButton = new Button("Add");
         ControlStyles.apply(addAssignedButton, ControlStyles.Purpose.SECONDARY);
+        addAssignedButton.setAccessibleText("Add assigned user");
         Region assignedSpacer = new Region();
         HBox.setHgrow(assignedSpacer, Priority.ALWAYS);
         HBox assignedHeader = new HBox(8, assignedLabel, assignedSpacer, addAssignedButton);
@@ -128,10 +135,12 @@ public final class NewTaskDialog {
             selectedAssignedUsers.put(user.id(), user);
             renderAssignedUsers(assignedList, assignedUserFactory, selectedAssignedUsers.values().stream().toList(), removeAssignedRef[0]);
         });
+        assignedSection.getStyleClass().addAll("task-window-section", "task-window-assignees-section");
         assignedSection.getChildren().setAll(assignedHeader, assignedScrollPane);
 
         Label errorLabel = new Label();
-        errorLabel.setStyle("-fx-text-fill: #b42318;");
+        errorLabel.getStyleClass().add("task-window-error");
+        errorLabel.setWrapText(true);
         errorLabel.setVisible(false);
         errorLabel.setManaged(false);
 
@@ -146,7 +155,8 @@ public final class NewTaskDialog {
                 dueLabel,
                 dueRow,
                 errorLabel);
-        content.setPadding(new Insets(6, 24, 2, 24));
+        content.getStyleClass().addAll("task-window-panel", "task-window-form");
+        content.setPadding(new Insets(18));
         content.setMinHeight(Region.USE_PREF_SIZE);
 
         ScrollPane contentScrollPane = new ScrollPane(content);
@@ -158,11 +168,13 @@ public final class NewTaskDialog {
 
         Button cancelButton = new Button("Cancel");
         ControlStyles.apply(cancelButton, ControlStyles.Purpose.SECONDARY);
+        cancelButton.setAccessibleText("Cancel new task");
         cancelButton.setCancelButton(true);
         cancelButton.setOnAction(e -> stage.close());
 
         Button createButton = new Button("Create Task");
         ControlStyles.apply(createButton, ControlStyles.Purpose.PRIMARY);
+        createButton.setAccessibleText("Create task");
         createButton.setDefaultButton(true);
         createButton.setOnAction(e -> {
             String title = titleField.getText() == null ? "" : titleField.getText().trim();
@@ -207,8 +219,10 @@ public final class NewTaskDialog {
         actions.setMaxWidth(Double.MAX_VALUE);
 
         VBox headerContent = new VBox(8, heading, message);
+        headerContent.getStyleClass().add("task-window-header");
         headerContent.setPadding(new Insets(22, 24, 0, 24));
         VBox body = new VBox(14, headerContent, contentScrollPane, actions);
+        body.getStyleClass().addAll("task-window-root", "new-task-window");
         body.setPadding(Insets.EMPTY);
         VBox.setVgrow(contentScrollPane, Priority.ALWAYS);
         VBox root = AppDialogs.createSecondaryWindowShell(stage, "New Task", stage::close, body);
@@ -224,8 +238,7 @@ public final class NewTaskDialog {
         stage.setResizable(true);
 
         Scene scene = new Scene(root);
-        scene.getStylesheets().add(Objects.requireNonNull(
-                NewTaskDialog.class.getResource("/css/app.css")).toExternalForm());
+        com.shale.ui.theme.ThemeManager.application().register(scene);
         stage.setScene(scene);
         WindowSizingUtil.sizeModalStage(stage, owner, dialogWidth, dialogHeight, minWidth, minHeight);
         stage.showAndWait();
@@ -254,6 +267,7 @@ public final class NewTaskDialog {
 
     private static void showError(Label errorLabel, String message) {
         errorLabel.setText(message);
+        errorLabel.setAccessibleText(message);
         errorLabel.setManaged(true);
         errorLabel.setVisible(true);
     }
@@ -298,7 +312,7 @@ public final class NewTaskDialog {
         assignedList.getChildren().clear();
         if (users == null || users.isEmpty()) {
             Label emptyLabel = new Label("No users assigned");
-            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.70);");
+            emptyLabel.getStyleClass().add("task-window-empty");
             assignedList.getChildren().add(emptyLabel);
             return;
         }
@@ -313,6 +327,7 @@ public final class NewTaskDialog {
             Button removeButton = new Button("Remove");
             ControlStyles.apply(removeButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
             int userId = user.id();
+            removeButton.setAccessibleText("Remove " + user.displayName() + " from task");
             removeButton.setOnAction(e -> onRemove.accept(userId));
             HBox row = new HBox(8, card, removeButton);
             row.setAlignment(Pos.CENTER_LEFT);

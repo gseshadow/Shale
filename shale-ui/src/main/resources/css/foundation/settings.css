@@ -1,0 +1,142 @@
+/* Phase 5D Settings workspace. Business/data colors remain controller-owned. */
+.settings-scroll,
+.settings-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.settings-scroll {
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.settings-workspace {
+    -fx-spacing: 12px;
+    -fx-padding: 16px;
+    -fx-background-color: transparent;
+}
+
+.settings-directory-group {
+    -fx-spacing: 6px;
+    -fx-padding: 14px;
+    -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 12px;
+    -fx-border-width: 1px;
+}
+
+.settings-group-title {
+    -fx-padding: 0 2px 4px 2px;
+    -fx-font-size: 15px;
+    -fx-font-weight: 800;
+    -fx-text-fill: -shale-color-text-primary;
+}
+
+.settings-management-row {
+    -fx-min-height: 64px;
+    -fx-spacing: 16px;
+    -fx-padding: 10px 12px;
+    -fx-alignment: center-left;
+    -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 10px;
+    -fx-border-color: -shale-color-card-border;
+    -fx-border-radius: 10px;
+    -fx-border-width: 1px;
+}
+
+.settings-management-row:hover {
+    -fx-background-color: -shale-color-card-hover;
+    -fx-border-color: -shale-color-card-hover-border;
+}
+
+.settings-management-row:expanded {
+    -fx-border-color: -shale-color-border-selected;
+    -fx-border-width: 1px 1px 1px 3px;
+}
+
+.settings-management-row:disabled {
+    -fx-opacity: 0.62;
+}
+
+.settings-management-row:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-button-focus-ring, 8px, 0.16, 0, 0);
+}
+
+.settings-management-copy {
+    -fx-spacing: 3px;
+    -fx-min-width: 180px;
+}
+
+.settings-management-title {
+    -fx-font-weight: 700;
+    -fx-text-fill: -shale-color-text-primary;
+}
+
+.settings-management-description {
+    -fx-text-fill: -shale-color-text-secondary;
+}
+
+.settings-inline-content {
+    -fx-padding: 12px;
+    -fx-spacing: 10px;
+    -fx-background-color: -shale-color-surface-muted;
+    -fx-background-radius: 10px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 10px;
+    -fx-border-width: 1px;
+}
+
+.settings-inline-content > .label,
+.settings-inline-content .check-box {
+    -fx-text-fill: -shale-color-text-primary;
+}
+
+.settings-inline-content .search-summary-text {
+    -fx-text-fill: -shale-color-text-secondary;
+}
+
+.settings-inline-actions {
+    -fx-spacing: 10px;
+    -fx-alignment: center-left;
+}
+
+.settings-appearance-selector {
+    -fx-spacing: 8px;
+    -fx-alignment: center-left;
+}
+
+.settings-appearance-selector > .toggle-button {
+    -fx-min-width: 96px;
+    -fx-min-height: 36px;
+    -fx-background-color: -shale-color-input-surface;
+    -fx-border-color: -shale-color-input-border;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-text-fill: -shale-color-text-primary;
+    -fx-cursor: hand;
+}
+
+.settings-appearance-selector > .toggle-button:hover {
+    -fx-border-color: -shale-color-input-hover-border;
+}
+
+.settings-appearance-selector > .toggle-button:selected {
+    -fx-background-color: -shale-color-selected-control-background;
+    -fx-border-color: -shale-color-border-selected;
+    -fx-font-weight: 700;
+}
+
+.settings-appearance-selector > .toggle-button:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8px, 0.16, 0, 0);
+}
+
+.settings-state-message {
+    -fx-padding: 8px 10px;
+    -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 8px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 8px;
+    -fx-text-fill: -shale-color-text-secondary;
+}

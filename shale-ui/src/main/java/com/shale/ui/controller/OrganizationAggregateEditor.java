@@ -60,6 +60,7 @@ public final class OrganizationAggregateEditor extends VBox {
             List<OrganizationServicePort.OrganizationWebsite> websiteRows) {
         setSpacing(14);
         setPadding(new javafx.geometry.Insets(4));
+        getStyleClass().add("entity-editor-content");
         baselineName = initialName;
         baselineNotes = initialNotes;
         name.setText(initialName);
@@ -107,7 +108,7 @@ public final class OrganizationAggregateEditor extends VBox {
     private GridPane detailsGrid() { GridPane grid=new GridPane();grid.setHgap(14);grid.setVgap(9);grid.getColumnConstraints().addAll(new ColumnConstraints(130,150,180),grow());ControlStyles.formControl(name);add(grid,0,"Name",name);return grid; }
     private static ColumnConstraints grow(){ColumnConstraints c=new ColumnConstraints();c.setHgrow(Priority.ALWAYS);c.setFillWidth(true);return c;}
     private static TextField field(){TextField f=new TextField();f.setMaxWidth(Double.MAX_VALUE);return f;}
-    private static VBox section(String title,Node body){Label heading=new Label(title);heading.getStyleClass().add("contact-editor-section-heading");return new VBox(9,heading,body);}
+    private static VBox section(String title,Node body){Label heading=new Label(title);heading.getStyleClass().add("contact-editor-section-heading");VBox section=new VBox(9,heading,body);section.getStyleClass().add("entity-editor-section");return section;}
     private static VBox subsection(String title,Node body){return section(title,body);}
     private static void add(GridPane grid,int row,String text,Node field){Label label=new Label(text);label.setLabelFor(field);label.getStyleClass().add("contact-editor-field-label");grid.add(label,0,row);grid.add(field,1,row);GridPane.setHgrow(field,Priority.ALWAYS);}
     private static String safe(String value){return value==null?"":value.trim();}
@@ -127,7 +128,7 @@ public final class OrganizationAggregateEditor extends VBox {
         List<T> active(){return items.stream().filter(x->!deleted(x)).sorted(Comparator.comparingInt(this::order)).toList();}
         void move(T x,int delta){List<T>a=active();int i=a.indexOf(x),j=i+delta;if(i<0||j<0||j>=a.size())return;T y=a.get(j);int old=order(x);order(x,order(y));order(y,old);render();}
         void normalize(){int i=0;for(T x:active())order(x,i++);}
-        VBox shell(T x,String display,String kind,Runnable edit){HBox badges=new HBox(6,badge(kind));if(primary(x))badges.getChildren().add(badge("Primary"));if(deleted(x))badges.getChildren().add(badge("Removed · Historical"));Label value=new Label(safe(display));value.setWrapText(true);value.getStyleClass().add("contact-point-value");Button editButton=small("Edit",edit,ControlStyles.Purpose.SECONDARY), primaryButton=small("Make Primary",()->makePrimary(x),ControlStyles.Purpose.SECONDARY), up=small("Move Up",()->move(x,-1),ControlStyles.Purpose.SECONDARY), down=small("Move Down",()->move(x,1),ControlStyles.Purpose.SECONDARY), remove=small(deleted(x)?"Restore":"Remove",()->toggle(x),deleted(x)?ControlStyles.Purpose.SECONDARY:ControlStyles.Purpose.DANGER);primaryButton.setVisible(!deleted(x)&&!primary(x));primaryButton.setManaged(primaryButton.isVisible());up.setDisable(deleted(x)||order(x)==0);down.setDisable(deleted(x)||order(x)>=active().size()-1);VBox card=new VBox(7,badges,value,new HBox(6,editButton,primaryButton,up,down,remove));card.getStyleClass().add("contact-point-card");if(deleted(x))card.getStyleClass().add("removed");return card;}
+        VBox shell(T x,String display,String kind,Runnable edit){HBox badges=new HBox(6,badge(kind));if(primary(x))badges.getChildren().add(badge("Primary"));if(deleted(x))badges.getChildren().add(badge("Removed · Historical"));Label value=new Label(safe(display));value.setWrapText(true);value.getStyleClass().add("contact-point-value");Button editButton=small("Edit",edit,ControlStyles.Purpose.SECONDARY), primaryButton=small("Make Primary",()->makePrimary(x),ControlStyles.Purpose.SECONDARY), up=small("Move Up",()->move(x,-1),ControlStyles.Purpose.SECONDARY), down=small("Move Down",()->move(x,1),ControlStyles.Purpose.SECONDARY), remove=small(deleted(x)?"Restore":"Remove",()->toggle(x),deleted(x)?ControlStyles.Purpose.SECONDARY:ControlStyles.Purpose.DANGER);primaryButton.setVisible(!deleted(x)&&!primary(x));primaryButton.setManaged(primaryButton.isVisible());up.setDisable(deleted(x)||order(x)==0);down.setDisable(deleted(x)||order(x)>=active().size()-1);VBox card=new VBox(7,badges,value,new HBox(6,editButton,primaryButton,up,down,remove));card.getStyleClass().addAll("contact-point-card","entity-editor-child-row");card.setAccessibleText(kind+" "+safe(display)+(primary(x)?", primary":"")+(deleted(x)?", removed historical record":""));if(deleted(x))card.getStyleClass().add("removed");return card;}
     }
     private static Label badge(String text){Label label=new Label(text);label.getStyleClass().add("contact-point-badge");return label;}
     private static Label empty(String text){Label label=new Label(text);label.getStyleClass().add("shale-empty-state");return label;}

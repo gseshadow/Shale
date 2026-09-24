@@ -187,3 +187,62 @@
     -fx-prompt-text-fill: -shale-control-prompt-text;
     -fx-font-weight: 600;
 }
+
+/* Phase 8A New Intake composes the shared form, section-card, and typography vocabulary. */
+.new-intake-root {
+    -fx-background-color: -shale-color-content-plane;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-padding: 16px;
+}
+.new-intake-feedback { -fx-padding: 10px 12px; }
+.new-intake-feedback-success { -fx-text-fill: -shale-color-success-text; -fx-font-weight: 700; }
+.new-intake-scroll, .new-intake-scroll > .viewport { -fx-background-color: transparent; }
+.new-intake-scroll { -fx-background-insets: 0; -fx-padding: 0; }
+.new-intake-workspace { -fx-padding: 8px 4px 16px 4px; }
+.new-intake-root .new-intake-section {
+    -fx-padding: 16px;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2);
+}
+.new-intake-root .caller-section-panel {
+    -fx-background-color: -shale-color-intake-caller-surface;
+    -fx-border-color: -shale-color-intake-caller-border;
+}
+.new-intake-root .client-section-panel {
+    -fx-background-color: -shale-color-intake-client-surface;
+    -fx-border-color: -shale-color-intake-client-border;
+}
+.new-intake-root .case-section-panel {
+    -fx-background-color: -shale-color-intake-case-surface;
+    -fx-border-color: -shale-color-intake-case-border;
+}
+.new-intake-root .incident-section-panel {
+    -fx-background-color: -shale-color-intake-incident-surface;
+    -fx-border-color: -shale-color-intake-incident-border;
+}
+.new-intake-fields-grid { -fx-alignment: top-left; }
+.new-intake-required { -fx-text-fill: -shale-color-validation-error; -fx-font-weight: 800; }
+.new-intake-root .new-intake-parties-section {
+    -fx-background-color: -shale-color-parties-section-surface;
+    -fx-border-color: -shale-color-parties-section-border;
+}
+.new-intake-party-card { -fx-padding: 10px 12px; }
+.new-intake-dates-section {
+    -fx-padding: 14px 0 0 0;
+    -fx-border-color: -shale-color-divider transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+}
+.new-intake-customization-dialog { -fx-background-color: -shale-color-content-plane; }
+.new-intake-customization-scroll { -fx-background-color: transparent; -fx-background: transparent; }
+.new-intake-customization-row {
+    -fx-padding: 14px;
+    -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 12px;
+}
+.new-intake-action-bar {
+    -fx-padding: 14px 0 0 0;
+    -fx-border-color: -shale-color-divider transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+    -fx-background-color: -shale-color-content-plane;
+}

@@ -59,6 +59,9 @@ import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.WindowSizingUtil;
+import com.shale.ui.theme.ThemeManager;
+import com.shale.ui.theme.Theme;
+import com.shale.ui.theme.AppearancePreferenceService;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.fxml.LoadException;
@@ -121,6 +124,7 @@ public final class SceneManager {
 	private final ConnectivityNotificationProducer connectivityNotificationProducer;
 	private final SystemUpdateNotificationProducer systemUpdateNotificationProducer;
 	private final NotificationPreferencesService notificationPreferencesService;
+	private final AppearancePreferenceService appearancePreferenceService;
 	private CalendarController calendarController;
 	private Integer pendingCalendarNotificationEventId;
 	private PendingCaseDateRoute pendingCaseDateRoute;
@@ -136,6 +140,10 @@ public final class SceneManager {
 	private final AtomicLong notificationBadgeCountGeneration = new AtomicLong(0);
 	private volatile Future<?> notificationBadgeCountFuture;
 	private volatile Future<?> notificationStartupFuture;
+	private boolean authenticatedProducersActive;
+	private Integer activeTenantId;
+	private Integer activeUserId;
+	private boolean logoutInProgress;
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -158,6 +166,7 @@ public final class SceneManager {
 		this.updateLauncher = Objects.requireNonNull(updateLauncher);
 		this.notificationCenterService = createNotificationCenterService();
 		UserPreferencesService userPreferencesService = new UserPreferencesService(new UserPreferencesDao(dbSessionProvider), appState);
+		this.appearancePreferenceService = new AppearancePreferenceService(userPreferencesService);
 		this.notificationPreferencesService = new NotificationPreferencesService(appState, userPreferencesService);
 		this.durableNotificationService = new DurableNotificationService(new NotificationDao(dbSessionProvider), appState, notificationPreferencesService);
 		this.notificationPollingService = new NotificationPollingService(
@@ -203,6 +212,31 @@ public final class SceneManager {
 	}
 
 	public void showLogin() {
+		if (!Platform.isFxApplicationThread()) throw new IllegalStateException("Login presentation must run on the JavaFX application thread.");
+		stopSessionOwnedWork();
+		showLoginSurface();
+	}
+
+	/** The single authoritative authenticated-session teardown entry point. */
+	public void logout() {
+		if (!Platform.isFxApplicationThread()) throw new IllegalStateException("Logout must run on the JavaFX application thread.");
+		if (logoutInProgress) return;
+		logoutInProgress = true;
+		stopSessionOwnedWork();
+		runtimeBridge.onLogout();
+		appState.setUserId(0);
+		appState.setShaleClientId(0);
+		appState.setUserEmail(null);
+		appState.setAdmin(false);
+		appState.setAttorney(false);
+		showLoginSurface();
+		logoutInProgress = false;
+	}
+
+	private void stopSessionOwnedWork() {
+		authenticatedProducersActive = false;
+		activeTenantId = null;
+		activeUserId = null;
 		notificationStartupGeneration.incrementAndGet();
 		notificationBadgeCountGeneration.incrementAndGet();
 		Future<?> badgeCountFuture = notificationBadgeCountFuture;
@@ -221,6 +255,10 @@ public final class SceneManager {
 		notificationPollingService.stop();
 		updatePollingService.stop();
 		notificationCenterService.clearAll();
+	}
+
+	private void showLoginSurface() {
+		ThemeManager.application().setActiveTheme(Theme.LIGHT);
 		var root = load("/fxml/login.fxml", controller ->
 		{
 			LoginController c = (LoginController) controller;
@@ -228,6 +266,20 @@ public final class SceneManager {
 			return c;
 		});
 		setScene(root, "Shale — Sign in");
+	}
+
+	/** Loads on the caller's worker thread; no JavaFX work or user-supplied identity crosses this boundary. */
+	public Theme loadAppearanceForAuthenticatedUser() {
+		return appearancePreferenceService.loadForCurrentUser();
+	}
+
+	/** Applies only while the authenticated identity that initiated the load is still current. */
+	public boolean applyAppearanceBeforeMain(Theme theme, int expectedUserId, int expectedTenantId) {
+		if (!Platform.isFxApplicationThread()) throw new IllegalStateException("Appearance must be applied on the JavaFX application thread.");
+		if (!Objects.equals(appState.getUserId(), expectedUserId)
+				|| !Objects.equals(appState.getShaleClientId(), expectedTenantId)) return false;
+		ThemeManager.application().setActiveTheme(theme);
+		return true;
 	}
 
 	public void showMain() {
@@ -243,24 +295,32 @@ public final class SceneManager {
 		});
 		setScene(root, "Shale");
 		Platform.runLater(() -> System.out.println("[StartupTiming] main shell visible"));
-		startNotificationBadgeCountAsync();
-		notificationPreferencesService.refreshActivePreferences();
-		connectivityNotificationProducer.start();
-		taskDueDateNotificationGenerator.start();
-		Integer pollingTenantId = appState.getShaleClientId();
-		Integer pollingUserId = appState.getUserId();
-		if (pollingTenantId != null && pollingTenantId > 0 && pollingUserId != null && pollingUserId > 0) {
-			notificationPollingService.start(pollingTenantId, pollingUserId);
-		}
-		liveUpdateNotificationBridge.start();
-		updatePollingService.start();
-		startNotificationBootstrapAsync();
+		startSessionOwnedWork();
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
 		showRouteInternal(AppRoute.myShale());
 		notifyBackAvailabilityChanged();
 		long showMainEndMs = (System.nanoTime() - showMainStartNanos) / 1_000_000;
 		System.out.println("[StartupTiming] showMain critical path complete in " + showMainEndMs + " ms");
+	}
+
+	private void startSessionOwnedWork() {
+		Integer tenantId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (tenantId == null || tenantId <= 0 || userId == null || userId <= 0) return;
+		if (authenticatedProducersActive && Objects.equals(activeTenantId, tenantId) && Objects.equals(activeUserId, userId)) return;
+		stopSessionOwnedWork();
+		authenticatedProducersActive = true;
+		activeTenantId = tenantId;
+		activeUserId = userId;
+		startNotificationBadgeCountAsync();
+		notificationPreferencesService.refreshActivePreferences();
+		connectivityNotificationProducer.start();
+		taskDueDateNotificationGenerator.start();
+		notificationPollingService.start(tenantId, userId);
+		liveUpdateNotificationBridge.start();
+		updatePollingService.start();
+		startNotificationBootstrapAsync();
 	}
 
 	private void startNotificationBadgeCountAsync() {
@@ -279,6 +339,7 @@ public final class SceneManager {
 			long startNanos = System.nanoTime();
 			PerfLog.debug(log, "PERF notifications.badge.count.start tenantId={} userId={} generation={}", shaleClientId, userId, generation);
 			try {
+				if (!isActiveBadgeSession(generation, shaleClientId, userId)) return;
 				int unreadCount = durableNotificationService.countUnread(shaleClientId, userId);
 				long queryElapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
 				if (!isActiveBadgeSession(generation, shaleClientId, userId)) {
@@ -299,7 +360,8 @@ public final class SceneManager {
 							shaleClientId, userId, generation, unreadCount, elapsedMs);
 				});
 			} catch (RuntimeException ex) {
-				log.error("Notification badge count load failed tenantId={} userId={} generation={}", shaleClientId, userId, generation, ex);
+				if (isActiveBadgeSession(generation, shaleClientId, userId))
+					log.error("Notification badge count load failed tenantId={} userId={} generation={}", shaleClientId, userId, generation, ex);
 			}
 		});
 	}
@@ -316,8 +378,10 @@ public final class SceneManager {
 			long bootstrapStartNanos = System.nanoTime();
 			PerfLog.debug(log, "PERF notifications.bootstrap.full.start tenantId={} userId={} generation={}", shaleClientId, userId, generation);
 			try {
+				if (!isActiveSession(generation, shaleClientId, userId)) return;
 				long dueStartNanos = System.nanoTime();
 				taskDueDateNotificationGenerator.runOnce();
+				if (!isActiveSession(generation, shaleClientId, userId)) return;
 				long dueElapsedMs = (System.nanoTime() - dueStartNanos) / 1_000_000;
 				PerfLog.debug(log, "PERF notifications.bootstrap.dueDate.done tenantId={} userId={} generation={} elapsedMs={}",
 						shaleClientId, userId, generation, dueElapsedMs);
@@ -348,7 +412,8 @@ public final class SceneManager {
 							shaleClientId, userId, generation, unread.size(), bootstrapElapsedMs);
 				});
 			} catch (RuntimeException ex) {
-				log.error("Notification full bootstrap failed tenantId={} userId={} generation={}", shaleClientId, userId, generation, ex);
+				if (isActiveSession(generation, shaleClientId, userId))
+					log.error("Notification full bootstrap failed tenantId={} userId={} generation={}", shaleClientId, userId, generation, ex);
 			}
 		});
 	}
@@ -404,6 +469,10 @@ public final class SceneManager {
 
 	public void openMyShaleView() {
 		navigateTo(AppRoute.myShale(), true);
+	}
+
+	public void openTasksView() {
+		navigateTo(AppRoute.tasks(), true);
 	}
 
 	public void openCasesListView() {
@@ -535,6 +604,7 @@ public final class SceneManager {
 		try {
 			switch (route.type()) {
 			case MY_SHALE -> mainController.showMyShaleView();
+			case TASKS -> mainController.showTasksView();
 			case CASES_LIST -> mainController.showCasesListView();
 			case CONTACTS_LIST -> mainController.showContactsListView();
 			case ORGANIZATIONS_LIST -> mainController.showOrganizationsListView();
@@ -707,7 +777,7 @@ public final class SceneManager {
 		return load("/fxml/settings.fxml", controller ->
 		{
 			SettingsController c = (SettingsController) controller;
-			c.init(notificationPreferencesService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new MaterialRequestServiceAdapter(
+			c.init(notificationPreferencesService, appearancePreferenceService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new MaterialRequestServiceAdapter(
 					new MaterialRequestDao(dbSessionProvider)), new ContactServiceAdapter(new ContactDao(dbSessionProvider)),
 					new OrganizationServiceAdapter(new OrganizationDao(dbSessionProvider),new CaseSummaryDao(dbSessionProvider)),new UserDao(dbSessionProvider), runtimeBridge);
 			return c;
@@ -731,7 +801,7 @@ public final class SceneManager {
 		body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 		VBox shell = AppDialogs.createSecondaryWindowShell(dialogStage, "Audit Log", dialogStage::close, body);
 		Scene scene = new Scene(shell, 1400, 720);
-		scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/css/app.css")).toExternalForm());
+		com.shale.ui.theme.ThemeManager.application().register(scene);
 		dialogStage.setScene(scene);
 		dialogStage.show();
 	}
@@ -828,6 +898,11 @@ public final class SceneManager {
 	}
 
 	public Parent createMyShaleView(Consumer<Integer> onOpenCase, Consumer<Integer> onOpenUser) {
+		return createMyShaleView(onOpenCase, onOpenUser, false);
+	}
+
+	private Parent createMyShaleView(Consumer<Integer> onOpenCase, Consumer<Integer> onOpenUser,
+			boolean dedicatedTasksMode) {
 		return load("/fxml/my-shale.fxml", controller ->
 		{
 			MyShaleController c = (MyShaleController) controller;
@@ -854,8 +929,20 @@ public final class SceneManager {
 					onOpenCase,
 					onOpenUser,
 					phiReadAuditService);
+			if (dedicatedTasksMode) {
+				c.configureDedicatedTasksMode();
+			}
 			return c;
 		});
+	}
+
+	/**
+	 * Builds the dedicated Tasks destination from the same authoritative task-board
+	 * markup and controller used by My Shale. This intentionally avoids a second
+	 * task collection implementation drifting from My Shale's filters and cards.
+	 */
+	public Parent createTasksView(Consumer<Integer> onOpenCase, Consumer<Integer> onOpenUser) {
+		return createMyShaleView(onOpenCase, onOpenUser, true);
 	}
 
 	private void openNotificationCenterFromDashboard() {
@@ -941,8 +1028,7 @@ public final class SceneManager {
 			VBox.setVgrow(root, Priority.ALWAYS);
 
 			Scene dialogScene = new Scene(dialogRoot);
-			dialogScene.getStylesheets().add(Objects.requireNonNull(
-					getClass().getResource("/css/app.css")).toExternalForm());
+			com.shale.ui.theme.ThemeManager.application().register(dialogScene);
 			dialog.setScene(dialogScene);
 			WindowSizingUtil.sizeModalStage(dialog, stage, 900, 680, 680, 480);
 			dialog.showAndWait();
@@ -977,10 +1063,9 @@ public final class SceneManager {
 			VBox.setVgrow(root, Priority.ALWAYS);
 
 			Scene dialogScene = new Scene(dialogRoot);
-			dialogScene.getStylesheets().add(Objects.requireNonNull(
-					getClass().getResource("/css/app.css")).toExternalForm());
+			com.shale.ui.theme.ThemeManager.application().register(dialogScene);
 			dialog.setScene(dialogScene);
-			WindowSizingUtil.sizeModalStage(dialog, stage, 1180, 760);
+			WindowSizingUtil.sizeModalStage(dialog, stage, 1180, 760, 680, 620);
 			dialog.showAndWait();
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to open New Intake dialog", e);
@@ -1308,8 +1393,7 @@ public final class SceneManager {
 		Scene scene = stage.getScene();
 		if (scene == null) {
 			scene = new Scene(root);
-			scene.getStylesheets().add(Objects.requireNonNull(
-					getClass().getResource("/css/app.css")).toExternalForm());
+			ThemeManager.application().register(scene);
 			stage.setScene(scene);
 		} else {
 			scene.setRoot(root);

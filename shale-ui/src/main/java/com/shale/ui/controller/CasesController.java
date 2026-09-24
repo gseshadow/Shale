@@ -28,6 +28,7 @@ import com.shale.data.dao.CaseSummaryDao;
 import com.shale.data.dao.CaseSummaryDao.CaseGridRow;
 import com.shale.data.dao.CaseDao.CaseSort;
 import com.shale.ui.component.factory.CaseCardFactory;
+import com.shale.ui.component.TransientPopupSupport;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.dialog.NewTaskDialog;
 import com.shale.ui.controller.support.CaseListUiSupport;
@@ -265,8 +266,6 @@ public final class CasesController {
 		if (casesSearchField != null) ControlStyles.formControl(casesSearchField);
 		if (casesSortChoice != null) ControlStyles.formControl(casesSortChoice);
 		if (statusFilterMenuButton != null) ControlStyles.formControl(statusFilterMenuButton);
-		if (cardsViewToggle != null) ControlStyles.apply(cardsViewToggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
-		if (gridViewToggle != null) ControlStyles.apply(gridViewToggle, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 		if (columnMenuButton != null) ControlStyles.apply(columnMenuButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		if (exportMenuButton != null) ControlStyles.apply(exportMenuButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 	}
@@ -395,23 +394,35 @@ public final class CasesController {
 	}
 
 	private ContextMenu createCaseRowContextMenu(TableRow<CaseCardVm> row) {
+		java.util.concurrent.atomic.AtomicReference<CaseCardVm> target = new java.util.concurrent.atomic.AtomicReference<>();
 		MenuItem open = new MenuItem("Open Case");
-		open.setOnAction(e -> openCase(row.getItem()));
+		open.setOnAction(e -> openCase(currentContextTarget(row, target)));
 
 		MenuItem copyName = new MenuItem("Copy Case Name");
-		copyName.setOnAction(e -> copyToClipboard(row.getItem() == null ? "" : row.getItem().name));
+		copyName.setOnAction(e -> { CaseCardVm vm = currentContextTarget(row, target); if (vm != null) copyToClipboard(vm.name); });
 
 		MenuItem copyNumber = new MenuItem("Copy Case Number");
-		copyNumber.setOnAction(e -> copyCaseNumber(row.getItem()));
+		copyNumber.setOnAction(e -> copyCaseNumber(currentContextTarget(row, target)));
 
 		MenuItem createTask = new MenuItem("Create Task");
-		createTask.setOnAction(e -> createTaskForCase(row.getItem()));
+		createTask.setOnAction(e -> createTaskForCase(currentContextTarget(row, target)));
 
 		MenuItem addUpdate = new MenuItem("Add Case Update");
-		addUpdate.setOnAction(e -> addCaseUpdate(row.getItem()));
+		addUpdate.setOnAction(e -> addCaseUpdate(currentContextTarget(row, target)));
 
-		return new ContextMenu(open, new SeparatorMenuItem(), copyName, copyNumber,
+		ContextMenu menu = new ContextMenu(open, new SeparatorMenuItem(), copyName, copyNumber,
 				new SeparatorMenuItem(), createTask, addUpdate);
+		TransientPopupSupport.style(menu);
+		menu.setOnShowing(e -> target.set(row.getItem()));
+		menu.setOnHidden(e -> target.set(null));
+		return menu;
+	}
+
+	private static CaseCardVm currentContextTarget(TableRow<CaseCardVm> row,
+			java.util.concurrent.atomic.AtomicReference<CaseCardVm> target) {
+		CaseCardVm captured = target.get();
+		CaseCardVm current = row.getItem();
+		return captured != null && current != null && captured.id == current.id ? captured : null;
 	}
 
 	private void openSelectedCase() {

@@ -19,7 +19,7 @@
     -fx-border-radius: 14;
     -fx-border-color: -shale-color-card-border;
     -fx-border-width: 1;
-    -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.14), 18, 0.18, 0, 4);
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 18, 0.18, 0, 4);
 }
 
 /* Elevated Card Surface: default card surface with current card elevation. */
@@ -29,7 +29,7 @@
     -fx-border-radius: 14;
     -fx-border-color: -shale-color-card-border;
     -fx-border-width: 1;
-    -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.14), 18, 0.18, 0, 4);
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 18, 0.18, 0, 4);
 }
 
 /* Entity Card full variant: comfortable full-size entity summaries. */
@@ -52,6 +52,28 @@
 .case-date-custom-card {
     -fx-background-color: -shale-color-card-surface;
 }
+
+/* Case View Dates cards start from the themed card plane and end in a restrained
+ * wash supplied by the authoritative Case Date Type color. The semantic info
+ * wash is the safe fallback when production data has no usable color. */
+.case-date-card {
+    -shale-case-date-type-wash: -shale-color-info-wash;
+    -fx-background-color: linear-gradient(to right,
+        -shale-color-card-surface 0%,
+        -shale-color-card-surface 48%,
+        -shale-case-date-type-wash 100%);
+    -fx-background-radius: 12;
+    -fx-border-color: -shale-color-card-border;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 10;
+}
+
+.case-date-card--removed { -fx-opacity: 0.78; }
+.case-date-card__title { -fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; }
+.case-date-card__metadata { -fx-text-fill: -shale-color-text-secondary; }
+.case-date-card__notes { -fx-text-fill: -shale-color-text-secondary; }
+.case-date-card__historical { -fx-font-size: 11px; -fx-text-fill: -shale-color-text-muted; }
 
 /* Entity Card inline variant: small inline relationship previews. */
 .shale-entity-card-inline {
@@ -81,7 +103,34 @@
 .shale-entity-card-selectable:hover {
     -fx-background-color: -shale-color-card-hover-surface;
     -fx-border-color: -shale-color-card-hover-border;
-    -fx-effect: dropshadow(gaussian, rgba(7, 23, 44, 0.18), 24, 0.2, 0, 8);
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 24, 0.2, 0, 8);
+}
+
+/* Task Card: priority owns the restrained card wash; status remains the labelled
+ * database-colored pill and due proximity remains the narrow, labelled rail. */
+.task-card { -fx-alignment: top-left; }
+.task-card:pressed { -fx-opacity: 0.94; }
+.task-card:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 9, 0.18, 0, 0);
+}
+.task-card:completed { -fx-opacity: 0.78; }
+.task-card:overdue .task-card__due {
+    -fx-font-weight: 800;
+    -fx-underline: true;
+    -fx-text-fill: -shale-color-text-danger;
+}
+.task-card:due-soon .task-card__due {
+    -fx-font-weight: 800;
+    -fx-text-fill: -shale-color-text-warning;
+}
+.task-card__title { -fx-text-fill: -shale-color-text-primary; }
+.task-card__creator { -fx-text-fill: -shale-color-text-muted; }
+.task-card__metadata { -fx-text-fill: -shale-color-text-muted; }
+.task-card__description { -fx-text-fill: -shale-color-text-secondary; }
+.task-card__completed-cue {
+    -fx-font-weight: 700;
+    -fx-text-fill: -shale-color-text-success;
 }
 
 /* Entity Card embedded variant: nested/related-card surface. */
@@ -95,6 +144,18 @@
     -fx-padding: 10;
     -fx-spacing: 6;
 }
+
+/* Structured read-only contact methods shared by Contact and Organization profiles. */
+.contact-point-card {
+    -fx-background-color: -shale-color-card-embedded-surface;
+    -fx-background-radius: 10px;
+    -fx-border-color: -shale-color-card-border;
+    -fx-border-radius: 10px;
+    -fx-padding: 10px 11px;
+    -fx-max-width: 100000px;
+}
+.contact-point-value { -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; -fx-wrap-text: true; }
+.contact-point-card.removed { -fx-opacity: -shale-opacity-disabled; -fx-border-style: segments(5px, 4px); }
 
 
 .contact-card-name,
@@ -117,6 +178,77 @@
     -fx-font-size: 11px;
     -fx-font-weight: 600;
 }
+
+/* Organization Card: the authoritative primary type supplies identity paint. */
+.organization-card {
+    -shale-organization-type-accent: -shale-color-chip-neutral-border;
+    -shale-organization-type-wash-strong: -shale-color-chip-neutral-background;
+    -shale-organization-type-wash-medium: -shale-color-chip-neutral-background;
+    -shale-organization-type-wash-light: -shale-color-chip-neutral-background;
+    -fx-background-color: -shale-color-card-surface,
+        linear-gradient(to right,
+            -shale-organization-type-wash-strong 0%,
+            -shale-organization-type-wash-medium 58%,
+            -shale-organization-type-wash-light 100%);
+    -fx-border-color: -shale-organization-type-accent -shale-color-card-border -shale-color-card-border -shale-organization-type-accent;
+    -fx-border-width: 1px 1px 1px 4px;
+    -fx-border-insets: 0;
+    -fx-alignment: top-left;
+}
+
+.organization-card:hover {
+    -fx-background-color: -shale-color-card-hover-surface,
+        linear-gradient(to right,
+            -shale-organization-type-wash-strong 0%,
+            -shale-organization-type-wash-medium 64%,
+            -shale-organization-type-wash-light 100%);
+    -fx-border-color: -shale-organization-type-accent -shale-color-card-hover-border -shale-color-card-hover-border -shale-organization-type-accent;
+}
+
+.organization-card:pressed { -fx-opacity: 0.94; }
+.organization-card:selected {
+    -fx-border-color: -shale-organization-type-accent -shale-color-primary-accent -shale-color-primary-accent -shale-organization-type-accent;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 9, 0.18, 0, 0);
+}
+.organization-card:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 9, 0.18, 0, 0);
+}
+.organization-card-removed { -fx-opacity: 0.72; }
+.organization-card-removed:hover { -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 18, 0.18, 0, 4); }
+.organization-card-content { -fx-fill-width: true; }
+.organization-card-name-full { -fx-font-size: 15px; -fx-font-weight: 800; }
+.organization-card-name-compact { -fx-font-size: 14px; -fx-font-weight: 700; }
+.organization-card-classification-region { -fx-min-height: 42px; -fx-pref-height: 42px; -fx-max-height: 42px; -fx-alignment: top-left; }
+.organization-card-compact .organization-card-classification-region { -fx-min-height: 26px; -fx-pref-height: 26px; }
+.organization-card-compact .organization-card-summary-box { -fx-min-height: 34px; -fx-pref-height: 34px; -fx-max-height: 34px; }
+.organization-card-contact-summary { -fx-hgap: 6px; -fx-vgap: 6px; }
+.organization-card-summary-box {
+    -fx-min-height: 42px;
+    -fx-pref-height: 42px;
+    -fx-max-height: 42px;
+    -fx-padding: 4px 6px;
+    -fx-background-color: -shale-color-card-embedded-surface;
+    -fx-background-radius: 8px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 8px;
+}
+.organization-card-summary-label {
+    -fx-font-size: 10px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -shale-color-text-muted;
+}
+.organization-card-summary-value {
+    -fx-font-size: 11px;
+    -fx-text-fill: -shale-color-text-secondary;
+}
+.organization-card-avatar {
+    -fx-fill: -shale-color-avatar-neutral-background;
+    -fx-stroke: -shale-color-card-border;
+    -fx-stroke-width: 1;
+}
+.organization-card-avatar-initials { -fx-font-size: 12px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-secondary; }
+.organization-card-mini { -fx-border-width: 1px 1px 1px 3px; }
 
 /* Case Link Card variants: Link Type identity drives the wash and accent rail. */
 .case-link-card {
@@ -255,3 +387,151 @@
 .case-link-contact-cell-selected {
     -fx-background-color: -shale-color-card-hover-surface;
 }
+
+/* General content cards extend, rather than replace, the entity-card surface. */
+.shale-content-card, .shale-section-card {
+    -fx-background-color: -shale-color-card-surface; -fx-background-radius: 14px; -fx-border-radius: 14px;
+    -fx-border-color: -shale-color-border-subtle; -fx-border-width: 1px; -fx-padding: 16px;
+}
+.shale-section-card { -fx-background-color: -shale-color-section-surface; }
+.shale-interactive-card { -fx-cursor: hand; }
+.shale-interactive-card:hover { -fx-background-color: -shale-color-card-hover; -fx-border-color: -shale-color-border-strong; -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 18, 0.18, 0, 4); }
+.shale-card-selected { -fx-border-color: -shale-color-border-selected; -fx-border-width: 2px; }
+.shale-compact-card { -fx-background-radius: 10px; -fx-border-radius: 10px; -fx-padding: 10px; }
+
+/* My Shale composes shared sections and entity cards without a page-local card system. */
+.my-shale-section { -fx-padding: 16px; -fx-spacing: 12px; }
+.my-shale-overview-dashboard { -fx-alignment: top-left; }
+.my-shale-overview-primary-column { -fx-spacing: 12px; }
+.my-shale-overview-briefing-column { -fx-spacing: 12px; }
+.my-shale-overview-task-section { -fx-padding: 12px; -fx-spacing: 8px; }
+.my-shale-overview-task-section-prominent { -fx-background-color: -shale-color-card-surface; }
+.dashboard-widget { -fx-spacing: 8px; }
+.dashboard-widget-header { -fx-padding: 0 0 2px 0; }
+.dashboard-widget-badge { -fx-padding: 2px 8px; }
+.dashboard-widget-content { -fx-padding: 4px 0 0 0; -fx-alignment: center-left; -fx-min-height: 34px; }
+.my-shale-board-content { -fx-background-color: transparent; }
+
+/*
+ * Authoritative CaseCard composition. The database Case Status color supplies
+ * the identity wash; Practice Area remains the narrow accent rail. The canonical
+ * theme surface stays beneath the translucent wash. JavaFX paints later
+ * BackgroundFill entries over earlier entries, so the gradient follows the base.
+ */
+.case-card-tinted {
+    -fx-background-color:
+        -shale-color-card-surface,
+        linear-gradient(to right, -shale-case-wash 0%, -shale-case-wash 52%, transparent 100%);
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2);
+}
+
+.case-card-tinted:hover {
+    -fx-background-color:
+        -shale-color-card-hover,
+        linear-gradient(to right, -shale-case-wash 0%, -shale-case-wash 58%, transparent 100%);
+    -fx-border-color: -shale-color-border-strong;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 18, 0.16, 0, 4);
+}
+
+.case-card-tinted:pressed {
+    -fx-background-color:
+        -shale-color-selected-control-background,
+        linear-gradient(to right, -shale-case-wash 0%, -shale-case-wash 58%, transparent 100%);
+}
+.case-card-tinted:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 9, 0.18, 0, 0);
+}
+.case-card-tinted:disabled { -fx-opacity: -shale-opacity-disabled; -fx-cursor: default; }
+.case-card-tinted.case-card-closed {
+    -fx-background-color:
+        -shale-color-card-surface,
+        linear-gradient(to right, -shale-case-muted-wash 0%, -shale-case-muted-wash 52%, transparent 100%);
+    -fx-opacity: 0.82;
+    -fx-border-style: segments(5px, 3px);
+}
+.case-card-tinted.case-card-denied { -fx-border-color: -shale-color-danger-border; }
+.case-card-tinted.case-card-non-engagement { -fx-border-width: 1px 1px 1px 3px; }
+.case-card-tinted.shale-card-selected {
+    -fx-background-color:
+        -shale-color-selected-control-background,
+        linear-gradient(to right, -shale-case-wash 0%, -shale-case-wash 58%, transparent 100%);
+    -fx-border-color: -shale-color-border-selected;
+    -fx-border-width: 2px;
+}
+.case-card-tinted.case-card-closed:hover {
+    -fx-background-color:
+        -shale-color-card-hover,
+        linear-gradient(to right, -shale-case-muted-wash 0%, -shale-case-muted-wash 58%, transparent 100%);
+}
+.case-card-tinted.case-card-closed:pressed,
+.case-card-tinted.case-card-closed.shale-card-selected {
+    -fx-background-color:
+        -shale-color-selected-control-background,
+        linear-gradient(to right, -shale-case-muted-wash 0%, -shale-case-muted-wash 58%, transparent 100%);
+}
+
+.case-card__title {
+    -fx-font-size: 14px;
+    -fx-font-weight: 800;
+    -fx-text-fill: -shale-color-text-primary;
+}
+.case-card__title-mini { -fx-font-size: 11px; -fx-font-weight: 700; }
+.case-card__date { -fx-font-size: 11px; -fx-text-fill: -shale-color-text-secondary; }
+.case-card__deadline { -fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-secondary; }
+.case-card__deadline-warning { -fx-text-fill: -shale-color-text-warning; }
+.case-card__deadline-urgent { -fx-text-fill: -shale-color-text-danger; -fx-underline: true; }
+.case-card__non-engagement { -fx-font-size: 10px; }
+
+.cases-content-surface {
+    -fx-padding: 12px;
+    -fx-background-color: transparent;
+}
+
+.cases-content-surface.shale-table {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+}
+
+/* Authoritative ContactCard: neutral theme surface; classifications retain DB-owned color in chips. */
+.contact-card {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2);
+    -fx-cursor: hand;
+}
+.contact-card:hover {
+    -fx-background-color: -shale-color-card-hover;
+    -fx-border-color: -shale-color-border-strong;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 18, 0.16, 0, 4);
+}
+.contact-card:pressed { -fx-background-color: -shale-color-selected-control-background; }
+.contact-card:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 9, 0.18, 0, 0);
+}
+.contact-card:disabled { -fx-opacity: -shale-opacity-disabled; -fx-cursor: default; }
+.contact-card.shale-card-selected {
+    -fx-background-color: -shale-color-selected-control-background;
+    -fx-border-color: -shale-color-border-selected;
+    -fx-border-width: 2px;
+}
+.contact-card-inactive { -fx-opacity: 0.72; -fx-border-style: segments(5px, 3px); }
+.contact-card-display-only { -fx-cursor: default; }
+.contact-card-display-only:hover { -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2); }
+.contact-card-full { -fx-padding: 16px; -fx-spacing: 12px; }
+.contact-card-compact { -fx-padding: 12px; -fx-spacing: 8px; }
+.contact-card-mini { -fx-padding: 4px 10px; -fx-spacing: 6px; -fx-background-radius: 10px; -fx-border-radius: 10px; }
+.contact-card-compact-mini { -fx-padding: 2px 6px; -fx-spacing: 4px; }
+.contact-card-secondary-mini { -fx-padding: 3px 8px; -fx-spacing: 5px; }
+.contact-card-identity { -fx-spacing: 5px; }
+.contact-card-role { -fx-font-weight: 700; }

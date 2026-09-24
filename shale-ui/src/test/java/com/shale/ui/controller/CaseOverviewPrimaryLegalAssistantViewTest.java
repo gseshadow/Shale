@@ -21,19 +21,20 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
         assertTrue(legalAssistant > responsible, "Primary legal assistant should follow Responsible attorney");
         assertTrue(description > legalAssistant, "Description should follow Primary legal assistant");
         assertTrue(fxml.contains("fx:id=\"ovPrimaryLegalAssistantHost\""));
-        assertTrue(fxml.contains("text=\"Primary legal assistant\" styleClass=\"case-overview-row-label\" GridPane.rowIndex=\"10\""));
-        assertTrue(fxml.contains("text=\"Description\" styleClass=\"case-overview-row-label\" GridPane.rowIndex=\"11\""));
+        assertTrue(fxml.substring(legalAssistant, description).contains("styleClass=\"shale-property-row-label\""));
+        assertTrue(fxml.substring(legalAssistant, description).contains("GridPane.rowIndex=\"10\""));
+        assertTrue(fxml.substring(description).contains("styleClass=\"shale-property-row-label\""));
+        assertTrue(fxml.substring(description).contains("GridPane.rowIndex=\"11\""));
     }
 
     @Test
-    void controllerRendersPrimaryLegalAssistantWithSharedUserCardFactoryAndEmptyState() throws Exception {
+    void controllerRendersPrimaryLegalAssistantWithCompactPersonRowAndEmptyState() throws Exception {
         String source = caseControllerSource();
         String renderer = method(source, "private void renderPrimaryLegalAssistantMini", "private void renderPrimaryStatusMini");
 
-        assertTrue(renderer.contains("new UserCardFactory"));
-        assertTrue(renderer.contains("new UserCardModel"));
-        assertTrue(renderer.contains("displayName == null || displayName.isBlank()) ? \"—\" : displayName"));
-        assertTrue(renderer.contains("userCardFactory.create(model, Variant.COMPACT)"));
+        assertTrue(renderer.contains("createOverviewPersonRow(displayName, userColorCss, \"Not assigned\")"));
+        assertTrue(source.contains("shale-person-row"));
+        assertTrue(source.contains("shale-avatar-compact"));
         assertTrue(source.contains("dto.getPrimaryLegalAssistantUserId()"));
         assertTrue(source.contains("dto.getPrimaryLegalAssistant()"));
         assertTrue(source.contains("dto.getPrimaryLegalAssistantColor()"));

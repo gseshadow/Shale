@@ -11,6 +11,7 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.services.UpdateFlowCoordinator;
 import com.shale.ui.state.AppState;
+import com.shale.ui.theme.Theme;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -20,8 +21,11 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class LoginController {
+	private static final Logger LOG = LoggerFactory.getLogger(LoginController.class);
 	@FXML
 	private TextField emailField;
 	@FXML
@@ -149,17 +153,28 @@ public final class LoginController {
 				appState.setAttorney(result.attorney());
 
 				runtimeBridge.onLoginSuccess(result.userId(), result.shaleClientId(), result.email());
+				Theme appearance;
+				try {
+					appearance = sceneManager.loadAppearanceForAuthenticatedUser();
+				} catch (RuntimeException preferenceFailure) {
+					LOG.warn("Appearance preference could not be loaded; using Light for this authenticated session.");
+					appearance = Theme.LIGHT;
+				}
+				final Theme resolvedAppearance = appearance;
 
 				UiUpdateLauncher.UpdateCheckResult updateCheck;
 				try {
 					updateCheck = updateLauncher.checkForUpdate();
 				} catch (RuntimeException updateCheckError) {
 					Platform.runLater(() -> sceneManager.showError("Update check failed: " + updateCheckError.getMessage()));
-					Platform.runLater(sceneManager::showMain);
+					Platform.runLater(() -> {
+						if (sceneManager.applyAppearanceBeforeMain(resolvedAppearance, result.userId(), result.shaleClientId())) sceneManager.showMain();
+					});
 					return;
 				}
 
 				Platform.runLater(() -> {
+					if (!sceneManager.applyAppearanceBeforeMain(resolvedAppearance, result.userId(), result.shaleClientId())) return;
 					sceneManager.onUpdateCheckCompleted(updateCheck);
 					handlePostLoginFlow(updateCheck);
 				});

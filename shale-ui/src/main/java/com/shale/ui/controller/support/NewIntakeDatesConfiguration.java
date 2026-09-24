@@ -71,6 +71,7 @@ public final class NewIntakeDatesConfiguration {
         return new Selection(selection.type(), required);
     }
 
+
     public static LocalDate initialValue(String fieldKey, int caseDateTypeId, Integer intakeCaseDateTypeId,
             LocalDate today, Map<String, LocalDate> preservedUserValues) {
         if (preservedUserValues != null && preservedUserValues.containsKey(fieldKey))

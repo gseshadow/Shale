@@ -31,7 +31,7 @@ class ContactClassificationAdminPaneTest {
         assertFalse(ContactClassificationAdminPane.validSystemKey("_doctor"));
     }
 
-    @Test void keepsAllThreeLazyCategoryTabsInOneTabPane() {
+    @Test void keepsAllThreeCategoriesInOneManagementPaneForUnauthorizedPreview() {
         JavaFxTestSupport.runAndWait(() -> {
             ContactServicePort service = (ContactServicePort) Proxy.newProxyInstance(
                     getClass().getClassLoader(), new Class<?>[] { ContactServicePort.class },

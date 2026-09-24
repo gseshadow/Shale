@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Optional;
 
 import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.CaseDateConfirmationDto;
+import com.shale.core.dto.FieldConfirmationPolicyDto;
 import com.shale.core.dto.MigratedCaseDateProjectionDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.model.CaseDateSemanticRole;
@@ -69,6 +71,26 @@ public interface CaseServicePort {
 
 	List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId);
 
+	default FieldConfirmationPolicyDto setFieldConfirmationPolicy(SetFieldConfirmationPolicyCommand command) {
+		throw unsupportedCaseLinkOperation("setFieldConfirmationPolicy");
+	}
+
+	default List<FieldConfirmationPolicyDto> listFieldConfirmationPolicies(int shaleClientId, int actorUserId) {
+		throw unsupportedCaseLinkOperation("listFieldConfirmationPolicies");
+	}
+
+	default List<ConfirmationRole> listConfirmationRoles(int shaleClientId, int actorUserId) {
+		throw unsupportedCaseLinkOperation("listConfirmationRoles");
+	}
+
+	default boolean currentActorHasConfirmationRole(int shaleClientId, int actorUserId, int roleDefinitionId) {
+		throw unsupportedCaseLinkOperation("currentActorHasConfirmationRole");
+	}
+
+	default void confirmCaseDate(ConfirmCaseDateCommand command) {
+		throw unsupportedCaseLinkOperation("confirmCaseDate");
+	}
+
 	default CaseOverviewDateConfigurationDto getCaseOverviewDateConfiguration(long caseId, int shaleClientId, int actorUserId) {
 		throw new UnsupportedOperationException("Case Overview date configuration is unavailable.");
 	}
@@ -102,6 +124,11 @@ public interface CaseServicePort {
 	void resetCaseDateSemanticRoleMapping(ResetCaseDateSemanticRoleMappingCommand command);
 
 	List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId);
+
+	/** Current-value confirmation state; absence of a workflow is explicitly NOT_REQUIRED. */
+	default List<CaseDateConfirmationDto> listCaseDateConfirmationsForCase(long caseId, int shaleClientId, int actorUserId) {
+		throw new UnsupportedOperationException("Case Date confirmation reads are unavailable.");
+	}
 
 	/** Batch read boundary for list-style consumers of the nine migrated authoritative meanings. */
 	default Map<Long, MigratedCaseDateProjectionDto> projectMigratedCaseDates(
@@ -275,6 +302,23 @@ public interface CaseServicePort {
 		public RestoreCaseDateCommand { expectedRowVer = copyRowVer(expectedRowVer); }
 		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
 	}
+
+	record SetFieldConfirmationPolicyCommand(int shaleClientId, int actorUserId, int caseDateTypeId,
+			boolean requiresConfirmation, Integer requiredFirmWideRoleDefinitionId, Long expectedPolicyId,
+			byte[] expectedPolicyRowVer) {
+		public SetFieldConfirmationPolicyCommand { expectedPolicyRowVer = copyRowVer(expectedPolicyRowVer); }
+		@Override public byte[] expectedPolicyRowVer() { return copyRowVer(expectedPolicyRowVer); }
+	}
+
+	record ConfirmCaseDateCommand(int shaleClientId, int actorUserId, long caseId, long caseDateId,
+			long requirementId, long expectedBusinessValueRevision, byte[] expectedCaseDateRowVer,
+			byte[] expectedRequirementRowVer) {
+		public ConfirmCaseDateCommand { expectedCaseDateRowVer=copyRowVer(expectedCaseDateRowVer); expectedRequirementRowVer=copyRowVer(expectedRequirementRowVer); }
+		@Override public byte[] expectedCaseDateRowVer(){return copyRowVer(expectedCaseDateRowVer);}
+		@Override public byte[] expectedRequirementRowVer(){return copyRowVer(expectedRequirementRowVer);}
+	}
+
+	record ConfirmationRole(int id, String name) { }
 
 	record AddCaseNoteCommand(
 			long caseId,

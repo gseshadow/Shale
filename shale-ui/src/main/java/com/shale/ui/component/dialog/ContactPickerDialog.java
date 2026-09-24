@@ -136,8 +136,7 @@ public final class ContactPickerDialog<T> {
 		root.setMinWidth(460);
 
 		Scene scene = new Scene(root);
-		scene.getStylesheets().add(Objects.requireNonNull(
-				getClass().getResource("/css/app.css")).toExternalForm());
+		com.shale.ui.theme.ThemeManager.application().register(scene);
 		stage.setScene(scene);
 	}
 

@@ -1,0 +1,43 @@
+/* Phase 8K: only Shale-owned transient surfaces opt into this vocabulary. */
+.shale-context-menu {
+    -fx-background-color: -shale-color-overlay-dialog;
+    -fx-background-radius: 10;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 6;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 14, 0.14, 0, 4);
+}
+
+.shale-context-menu .menu-item { -fx-background-radius: 7; -fx-padding: 7 12; }
+.shale-context-menu .menu-item .label { -fx-text-fill: -shale-color-text-primary; }
+.shale-context-menu .menu-item:hover,
+.shale-context-menu .menu-item:focused { -fx-background-color: -shale-color-card-hover; }
+.shale-context-menu .menu-item:pressed { -fx-background-color: -shale-color-selected-control-background; }
+.shale-context-menu .menu-item:disabled { -fx-opacity: -shale-opacity-disabled; }
+.shale-context-menu .menu-item:focused { -fx-border-color: -shale-color-border-focus; -fx-border-radius: 7; }
+.shale-context-menu .separator:horizontal .line { -fx-border-color: -shale-color-divider transparent transparent transparent; }
+.shale-context-menu .left-container .check,
+.shale-context-menu .left-container .radio { -fx-background-color: -shale-color-text-link; }
+.shale-context-menu .right-container .arrow { -fx-background-color: -shale-color-text-secondary; }
+.shale-context-menu .accelerator-text { -fx-text-fill: -shale-color-text-muted; }
+.shale-context-menu .menu-item.shale-menu-danger .label { -fx-text-fill: -shale-color-text-danger; }
+.rich-text-context-menu .menu-item:focused { -fx-border-color: -shale-color-border-focus; }
+
+.task-hover-popup {
+    -fx-background-color: -shale-color-overlay-dialog;
+    -fx-background-radius: 10;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 14, 0.14, 0, 4);
+    -fx-padding: 12;
+    -fx-spacing: 8;
+    -fx-min-width: 160;
+    -fx-max-width: 360;
+}
+.task-hover-popup .task-hover-title { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 800; }
+.task-hover-popup .task-hover-description { -fx-text-fill: -shale-color-text-secondary; -fx-line-spacing: 1; }
+.task-hover-popup .task-hover-description-scroll,
+.task-hover-popup .task-hover-description-scroll > .viewport { -fx-background-color: transparent; }
+.task-hover-popup .task-hover-description-scroll { -fx-padding: 0; -fx-border-color: transparent; }

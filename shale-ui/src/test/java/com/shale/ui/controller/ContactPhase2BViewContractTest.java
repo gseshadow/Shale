@@ -3,7 +3,6 @@ package com.shale.ui.controller;
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.*;
 import java.util.List;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 final class ContactPhase2BViewContractTest {
@@ -22,7 +21,7 @@ final class ContactPhase2BViewContractTest {
         assertTrue(fxml.contains("Classifications"));
         assertTrue(fxml.contains("relatedCasesContainer"));
         assertTrue(fxml.contains("sharedLinksContainer"));
-        assertTrue(fxml.contains("ScrollPane fitToWidth=\"true\" hbarPolicy=\"NEVER\""));
+        assertTrue(fxml.contains("fitToWidth=\"true\" hbarPolicy=\"NEVER\""));
     }
 
     @Test void controllerRendersAuthoritativeColoredHistoricalChipsAndAccessibleCredentials() throws Exception {
@@ -39,9 +38,9 @@ final class ContactPhase2BViewContractTest {
 
     @Test void profilePanelsApplyBothSemanticSurfaceClasses() throws Exception {
         String fxml=view();
-        assertTrue(Pattern.compile("<String fx:value=\"case-main-surface\"\\s*/>\\s*<String fx:value=\"contact-profile-panel\"",Pattern.DOTALL).matcher(fxml).find());
-        assertTrue(Pattern.compile("<String fx:value=\"secondary-panel\"\\s*/>\\s*<String fx:value=\"contact-classifications-panel\"",Pattern.DOTALL).matcher(fxml).find());
-        assertFalse(fxml.contains("styleClass=\"case-main-surface contact-profile-panel\""));
+        assertTrue(fxml.contains("shale-section-card, contact-profile-identity-card"));
+        assertTrue(fxml.contains("shale-section-card, contact-classifications-panel"));
+        assertTrue(fxml.contains("styleClass=\"shale-property-row, shale-property-row-comfortable\""));
     }
 
     @Test void aggregateEditorUsesSegmentedNavigationAndStyledCompactRows() throws Exception {

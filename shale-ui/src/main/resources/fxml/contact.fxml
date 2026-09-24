@@ -2,161 +2,129 @@
 
 <?import java.lang.String?>
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.DatePicker?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ScrollPane?>
-<?import javafx.scene.control.TextArea?>
-<?import javafx.scene.control.TextField?>
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.layout.ColumnConstraints?>
-<?import javafx.scene.layout.GridPane?>
-<?import javafx.scene.layout.FlowPane?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Region?>
-<?import javafx.scene.layout.StackPane?>
-<?import javafx.scene.layout.TilePane?>
-<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
 
-<BorderPane fx:id="rootPane" xmlns="http://javafx.com/javafx/21"
-    xmlns:fx="http://javafx.com/fxml/1"
-    fx:controller="com.shale.ui.controller.ContactViewController" styleClass="app-shell">
-
+<BorderPane fx:id="rootPane" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="com.shale.ui.controller.ContactViewController" styleClass="app-shell, shell-route-page">
     <top>
-        <VBox spacing="4.0" BorderPane.alignment="CENTER" styleClass="page-header-surface">
-            <padding>
-                <Insets top="8" right="12" bottom="6" left="12" />
-            </padding>
-
-            <HBox spacing="8.0" alignment="CENTER_LEFT">
-                <Label fx:id="contactTitleLabel" text="Contact" styleClass="functional-heading" />
-                <Region HBox.hgrow="ALWAYS" />
-                <Button fx:id="editButton" text="Edit Contact" visible="false" managed="false" />
-                <Button fx:id="deleteContactButton" text="Delete Contact" visible="false" managed="false">
-                    <styleClass>
-                        <String fx:value="button" />
-                    </styleClass>
-                </Button>
+        <VBox spacing="10" BorderPane.alignment="CENTER" styleClass="page-header-surface, contact-profile-header">
+            <padding><Insets top="16" right="16" bottom="14" left="16"/></padding>
+            <HBox spacing="12" alignment="CENTER_LEFT">
+                <StackPane minWidth="40" prefWidth="40" maxWidth="40" minHeight="40" prefHeight="40" maxHeight="40"
+                    styleClass="shale-avatar, contact-profile-avatar">
+                    <Label fx:id="contactAvatarLabel" text="C" styleClass="contact-profile-avatar-text"/>
+                </StackPane>
+                <VBox spacing="3" minWidth="0" HBox.hgrow="ALWAYS">
+                    <Label fx:id="contactTitleLabel" text="Contact" wrapText="true" minWidth="0"
+                        maxWidth="1.7976931348623157E308" styleClass="shale-page-title"/>
+                    <Label text="Contact profile" styleClass="shale-metadata-muted"/>
+                </VBox>
             </HBox>
-
-            <HBox spacing="8.0" alignment="CENTER_LEFT">
-                <Label fx:id="contactSubtitleLabel" text="Contact #—" styleClass="functional-metadata" />
-                <Label text="•" style="-fx-opacity: 0.55;" />
-                <Label fx:id="lastUpdatedLabel" text="Last updated: —" styleClass="functional-metadata" />
-            </HBox>
-            <VBox fx:id="headerClassificationHost" />
+            <VBox fx:id="headerClassificationHost"/>
+            <FlowPane hgap="8" vgap="8" alignment="CENTER_LEFT" prefWrapLength="820" styleClass="shale-toolbar, contact-profile-toolbar">
+                <Label fx:id="removedStateLabel" text="Removed contact" visible="false" managed="false"
+                    styleClass="shale-semantic-chip, shale-semantic-chip-danger"/>
+                <Label fx:id="contactSubtitleLabel" text="Contact #—" styleClass="shale-metadata"/>
+                <Label fx:id="lastUpdatedLabel" text="Last updated: —" styleClass="shale-metadata-muted"/>
+                <Button fx:id="manageClassificationsButton" text="Manage Classifications" visible="false" managed="false"/>
+                <Button fx:id="editButton" text="Edit Contact" visible="false" managed="false"/>
+                <Button fx:id="deleteContactButton" text="Delete Contact" visible="false" managed="false"/>
+            </FlowPane>
         </VBox>
     </top>
-
     <center>
-        <StackPane BorderPane.alignment="CENTER">
-            <padding>
-                <Insets top="10" right="12" bottom="12" left="12" />
-            </padding>
+        <ScrollPane fx:id="profileScrollPane" fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll">
+            <GridPane fx:id="profileGrid" hgap="16" vgap="16" alignment="TOP_LEFT">
+                <columnConstraints>
+                    <ColumnConstraints percentWidth="63" hgrow="ALWAYS" fillWidth="true"/>
+                    <ColumnConstraints percentWidth="37" hgrow="ALWAYS" fillWidth="true"/>
+                </columnConstraints>
+                <padding><Insets top="14" right="14" bottom="18" left="14"/></padding>
 
-            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll">
-                <GridPane fx:id="profileGrid" hgap="16" vgap="16" alignment="TOP_LEFT">
-                    <columnConstraints>
-                        <ColumnConstraints percentWidth="63" hgrow="ALWAYS" fillWidth="true" />
-                        <ColumnConstraints percentWidth="37" hgrow="ALWAYS" fillWidth="true" />
-                    </columnConstraints>
-                    <padding>
-                        <Insets top="12" right="12" bottom="12" left="12" />
-                    </padding>
-
-                    <VBox spacing="14" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0">
-                        <styleClass>
-                            <String fx:value="case-main-surface" />
-                            <String fx:value="contact-profile-panel" />
-                        </styleClass>
-                        <padding><Insets top="14" right="14" bottom="14" left="14" /></padding>
-
-                        <Label text="Contact Information" styleClass="contact-section-title" />
-                        <Label fx:id="errorLabel" styleClass="dialog-error-text" wrapText="true" visible="false" managed="false" />
-
-                        <VBox spacing="8" styleClass="contact-personal-details">
-                            <Label text="Personal Details" styleClass="contact-subsection-title" />
-                            <GridPane hgap="14" vgap="4" styleClass="case-overview-rows contact-information-rows">
-                                <columnConstraints>
-                                    <ColumnConstraints minWidth="130" prefWidth="155" />
-                                    <ColumnConstraints hgrow="ALWAYS" fillWidth="true" />
-                                </columnConstraints>
-                                <Label text="Full Name" styleClass="case-overview-row-label" GridPane.rowIndex="0" />
-                                <Label fx:id="structuredFullNameValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="0" GridPane.columnIndex="1" />
-                                <Label fx:id="preferredNameLabel" text="Preferred Name" styleClass="case-overview-row-label" GridPane.rowIndex="1" />
-                                <Label fx:id="preferredNameValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="1" GridPane.columnIndex="1" />
-                                <Label text="Date of Birth" styleClass="case-overview-row-label" GridPane.rowIndex="2" />
-                                <Label fx:id="dateOfBirthValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="2" GridPane.columnIndex="1" />
-                                <Label text="Deceased" styleClass="case-overview-row-label" GridPane.rowIndex="3" />
-                                <Label fx:id="deceasedValue" text="—" wrapText="true" styleClass="case-overview-row-value" GridPane.rowIndex="3" GridPane.columnIndex="1" />
-                                <Label text="Condition" styleClass="case-overview-row-label" GridPane.rowIndex="4" />
-                                <Label fx:id="conditionValue" text="—" wrapText="true" styleClass="case-overview-row-value contact-condition-value" GridPane.rowIndex="4" GridPane.columnIndex="1" />
-                            </GridPane>
-                        </VBox>
-
-                        <VBox spacing="10" styleClass="contact-methods-surface">
-                            <Label text="Contact Methods" styleClass="contact-subsection-title" />
-                            <Label text="Phone Numbers" styleClass="contact-group-label" />
-                            <TilePane fx:id="phoneCards" hgap="8" vgap="8" prefColumns="2" tileAlignment="TOP_LEFT" />
-                            <Label text="Email Addresses" styleClass="contact-group-label contact-method-category" />
-                            <TilePane fx:id="emailCards" hgap="8" vgap="8" prefColumns="2" tileAlignment="TOP_LEFT" />
-                            <Label text="Addresses" styleClass="contact-group-label contact-method-category" />
-                            <VBox fx:id="addressCards" spacing="8" />
-                        </VBox>
-                    </VBox>
-                    <VBox spacing="10" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0" GridPane.rowIndex="1">
-                        <styleClass>
-                            <String fx:value="secondary-panel" />
-                            <String fx:value="contact-classifications-panel" />
-                        </styleClass>
-                        <padding>
-                            <Insets top="14" right="14" bottom="14" left="14" />
-                        </padding>
-                        <Label text="Classifications" styleClass="contact-section-title" />
-                        <Label text="Contact Types" styleClass="contact-group-label" />
-                        <FlowPane fx:id="contactTypeChips" hgap="6" vgap="6" />
-                        <Label text="Specialties" styleClass="contact-group-label" />
-                        <FlowPane fx:id="specialtyChips" hgap="6" vgap="6" />
-                        <Label text="Credentials" styleClass="contact-group-label" />
-                        <FlowPane fx:id="credentialChips" hgap="6" vgap="6" />
+                <VBox spacing="14" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0">
+                    <VBox spacing="10" styleClass="shale-section-card, contact-profile-identity-card">
+                        <Label text="Identity" styleClass="shale-section-title"/>
+                        <Label fx:id="errorLabel" wrapText="true" visible="false" managed="false" styleClass="shale-error-message"/>
+                        <HBox fx:id="fullNameRow" styleClass="shale-property-row, shale-property-row-comfortable">
+                            <Label text="Full Name" minWidth="112" styleClass="shale-property-row-label"/>
+                            <Label fx:id="structuredFullNameValue" wrapText="true" minWidth="0" maxWidth="1.7976931348623157E308"
+                                styleClass="shale-property-row-value" HBox.hgrow="ALWAYS"/>
+                        </HBox>
+                        <HBox fx:id="preferredNameRow" styleClass="shale-property-row, shale-property-row-comfortable">
+                            <Label fx:id="preferredNameLabel" text="Preferred Name" minWidth="112" styleClass="shale-property-row-label"/>
+                            <Label fx:id="preferredNameValue" wrapText="true" minWidth="0" maxWidth="1.7976931348623157E308"
+                                styleClass="shale-property-row-value" HBox.hgrow="ALWAYS"/>
+                        </HBox>
+                        <HBox fx:id="dateOfBirthRow" styleClass="shale-property-row, shale-property-row-comfortable">
+                            <Label text="Date of Birth" minWidth="112" styleClass="shale-property-row-label"/>
+                            <Label fx:id="dateOfBirthValue" wrapText="true" styleClass="shale-property-row-value" HBox.hgrow="ALWAYS"/>
+                        </HBox>
+                        <HBox fx:id="deceasedRow" styleClass="shale-property-row, shale-property-row-comfortable">
+                            <Label text="Lifecycle" minWidth="112" styleClass="shale-property-row-label"/>
+                            <Label fx:id="deceasedValue" wrapText="true" styleClass="shale-property-row-value" HBox.hgrow="ALWAYS"/>
+                        </HBox>
+                        <HBox fx:id="conditionRow" styleClass="shale-property-row, shale-property-row-comfortable">
+                            <Label text="Condition" minWidth="112" styleClass="shale-property-row-label"/>
+                            <Label fx:id="conditionValue" wrapText="true" minWidth="0" maxWidth="1.7976931348623157E308"
+                                styleClass="shale-property-row-value" HBox.hgrow="ALWAYS"/>
+                        </HBox>
                     </VBox>
 
-                    <VBox fx:id="relatedSidebar" spacing="16" GridPane.columnIndex="1">
-                        <VBox spacing="8" styleClass="secondary-panel" maxWidth="1.7976931348623157E308">
-                            <HBox spacing="8" alignment="CENTER_LEFT">
-                                <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                                <Region HBox.hgrow="ALWAYS" />
-                            </HBox>
-                            <StackPane>
-                                <VBox fx:id="relatedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
-                                <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false" />
-                            </StackPane>
+                    <VBox fx:id="contactMethodsSection" spacing="12" styleClass="shale-section-card, contact-profile-methods-card">
+                        <Label text="Contact Methods" styleClass="shale-section-title"/>
+                        <VBox fx:id="phoneSection" spacing="8" styleClass="contact-method-section">
+                            <Label text="Phone Numbers" styleClass="shale-subsection-title"/>
+                            <TilePane fx:id="phoneCards" hgap="10" vgap="10" prefColumns="2" tileAlignment="TOP_LEFT"/>
                         </VBox>
-                        <VBox spacing="8" styleClass="secondary-panel" maxWidth="1.7976931348623157E308">
-                            <HBox spacing="8" alignment="CENTER_LEFT">
-                                <Label text="Links Shared With This Contact" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                                <Region HBox.hgrow="ALWAYS" />
-                            </HBox>
-                            <StackPane>
-                                <VBox fx:id="sharedLinksContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308" />
-                                <Label fx:id="sharedLinksStatusLabel" text="Loading shared links…" wrapText="true" visible="false" managed="false" />
-                            </StackPane>
+                        <VBox fx:id="emailSection" spacing="8" styleClass="contact-method-section">
+                            <Label text="Email Addresses" styleClass="shale-subsection-title"/>
+                            <TilePane fx:id="emailCards" hgap="10" vgap="10" prefColumns="2" tileAlignment="TOP_LEFT"/>
+                        </VBox>
+                        <VBox fx:id="addressSection" spacing="8" styleClass="contact-method-section">
+                            <Label text="Addresses" styleClass="shale-subsection-title"/>
+                            <VBox fx:id="addressCards" spacing="8"/>
                         </VBox>
                     </VBox>
 
-                    <VBox fx:id="notesSection" spacing="8" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0" GridPane.columnSpan="2" GridPane.rowIndex="2">
-                        <styleClass>
-                            <String fx:value="secondary-panel" />
-                            <String fx:value="contact-notes-panel" />
-                        </styleClass>
-                        <padding><Insets top="14" right="14" bottom="14" left="14" /></padding>
-                        <Label text="Notes" styleClass="contact-section-title" />
-                        <Label fx:id="notesValue" text="No notes provided." wrapText="true" maxWidth="1.7976931348623157E308" styleClass="case-overview-row-value contact-notes-value" />
+                    <VBox spacing="10" styleClass="shale-section-card, contact-classifications-panel">
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <Label text="Classifications &amp; Credentials" styleClass="shale-section-title"/>
+                        </HBox>
+                        <Label text="Contact Types" styleClass="shale-subsection-title"/>
+                        <FlowPane fx:id="contactTypeChips" hgap="6" vgap="6" alignment="TOP_LEFT"/>
+                        <Label text="Specialties" styleClass="shale-subsection-title"/>
+                        <FlowPane fx:id="specialtyChips" hgap="6" vgap="6" alignment="TOP_LEFT"/>
+                        <Label text="Credentials" styleClass="shale-subsection-title"/>
+                        <FlowPane fx:id="credentialChips" hgap="6" vgap="6" alignment="TOP_LEFT"/>
                     </VBox>
-                </GridPane>
-            </ScrollPane>
-        </StackPane>
+                </VBox>
+
+                <VBox fx:id="relatedSidebar" spacing="16" GridPane.columnIndex="1">
+                    <VBox spacing="10" styleClass="shale-section-card, contact-profile-related-card" maxWidth="1.7976931348623157E308">
+                        <Label text="Related Cases" styleClass="shale-section-title"/>
+                        <StackPane>
+                            <VBox fx:id="relatedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308"/>
+                            <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false"
+                                wrapText="true" styleClass="shale-empty-message"/>
+                        </StackPane>
+                    </VBox>
+                    <VBox spacing="10" styleClass="shale-section-card, contact-profile-related-card" maxWidth="1.7976931348623157E308">
+                        <Label text="Links Shared With This Contact" wrapText="true" styleClass="shale-section-title"/>
+                        <StackPane>
+                            <VBox fx:id="sharedLinksContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308"/>
+                            <Label fx:id="sharedLinksStatusLabel" text="Loading shared links…" wrapText="true" visible="false" managed="false"
+                                styleClass="shale-loading-message"/>
+                        </StackPane>
+                    </VBox>
+                </VBox>
+
+                <VBox fx:id="notesSection" spacing="8" maxWidth="1.7976931348623157E308" GridPane.columnIndex="0" GridPane.columnSpan="2" GridPane.rowIndex="2"
+                    styleClass="shale-section-card, contact-notes-panel">
+                    <Label text="Notes" styleClass="shale-section-title"/>
+                    <Label fx:id="notesValue" wrapText="true" minWidth="0" maxWidth="1.7976931348623157E308" styleClass="shale-body-text"/>
+                </VBox>
+            </GridPane>
+        </ScrollPane>
     </center>
-
 </BorderPane>

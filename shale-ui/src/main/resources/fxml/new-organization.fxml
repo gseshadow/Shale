@@ -4,11 +4,11 @@
 <?import javafx.scene.layout.*?>
 <VBox xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.shale.ui.controller.NewOrganizationController" spacing="10"
-      prefWidth="900" prefHeight="680" styleClass="contact-editor-surface">
+      prefWidth="900" prefHeight="680" styleClass="entity-editor-root, contact-editor-surface">
     <padding><Insets top="14" right="14" bottom="14" left="14"/></padding>
-    <Label fx:id="validationLabel" styleClass="dialog-error-text" wrapText="true" visible="false" managed="false"/>
-    <ScrollPane fx:id="editorScroll" fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS" styleClass="contact-editor-section-scroll"/>
-    <HBox spacing="10" alignment="CENTER_RIGHT">
+    <Label fx:id="validationLabel" styleClass="entity-editor-feedback, dialog-error-text" wrapText="true" visible="false" managed="false"/>
+    <ScrollPane fx:id="editorScroll" fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS" styleClass="entity-editor-scroll, contact-editor-section-scroll"/>
+    <HBox spacing="10" alignment="CENTER_RIGHT" styleClass="entity-editor-footer">
         <Button fx:id="cancelButton" text="Cancel" onAction="#onCancel"/>
         <Button fx:id="createOrganizationButton" text="Create Organization" onAction="#onCreateOrganization"/>
     </HBox>

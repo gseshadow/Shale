@@ -53,7 +53,7 @@ class CalendarOverlaySidebarSourceTest {
         assertTrue(controller.contains("setFocusTraversable(true)"));
         assertTrue(controller.contains("setAccessibleText(accessibleText)"));
         assertTrue(controller.contains("selected ? \"✓\" : \"\""));
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+        String css = Files.readString(Path.of("src/main/resources/css/foundation/calendar.css"));
         assertTrue(css.contains(".toggle-button.calendar-overlay-row:selected"));
         assertTrue(css.contains(".calendar-overlay-row-check"));
     }
@@ -73,7 +73,7 @@ class CalendarOverlaySidebarSourceTest {
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CalendarController.java"));
         assertTrue(controller.contains("shared ? \"◈\" : \"●\""));
         assertTrue(controller.contains("if (!shared && userColorCss != null)"));
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+        String css = Files.readString(Path.of("src/main/resources/css/foundation/calendar.css"));
         assertTrue(css.contains(".calendar-overlay-shared-marker"));
         assertTrue(css.contains(".toggle-button.calendar-overlay-row:selected"));
         assertTrue(css.contains(".calendar-overlay-row-check"));

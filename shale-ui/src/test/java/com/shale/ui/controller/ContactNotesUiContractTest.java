@@ -20,7 +20,8 @@ class ContactNotesUiContractTest {
         assertTrue(controller.contains("classificationProfile=result.profile()"));
         assertTrue(fxml.contains("fx:id=\"notesSection\""));
         assertTrue(fxml.contains("fx:id=\"notesValue\""));
-        assertTrue(fxml.contains("text=\"No notes provided.\""));
+        assertTrue(fxml.contains("fx:id=\"notesSection\""));
+        assertTrue(controller.contains("setVisibleManaged(notesSection, hasNotes)"));
         assertTrue(fxml.contains("wrapText=\"true\""));
         assertFalse(fxml.contains("fx:id=\"notesValue\" editorTitle="));
         assertTrue(fxml.indexOf("fx:id=\"notesSection\"") > fxml.indexOf("fx:id=\"sharedLinksContainer\""));

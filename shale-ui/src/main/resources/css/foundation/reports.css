@@ -1,0 +1,168 @@
+/* Dedicated Reports presentation. Business state, data colors, and chart values remain controller-owned. */
+.reports-page-root {
+    -fx-background-color: transparent;
+}
+
+.reports-page-summary {
+    -fx-padding: 0 0 12px 0;
+}
+
+.reports-filter-toolbar {
+    -fx-hgap: 10px;
+    -fx-vgap: 8px;
+}
+
+.reports-filter-group {
+    -fx-alignment: center-left;
+    -fx-min-width: 150px;
+}
+
+.reports-filter-group > .shale-form-control {
+    -fx-pref-width: 172px;
+}
+
+.reports-filter-toolbar > .button {
+    -fx-alignment: center;
+    -fx-translate-y: 8px;
+}
+
+.reports-state-message {
+    -fx-min-height: 0;
+    -fx-padding: 0 4px;
+}
+
+.reports-state-message:loading {
+    -fx-text-fill: -shale-color-text-secondary;
+    -fx-font-weight: 700;
+}
+
+.reports-state-message:not-run {
+    -fx-text-fill: -shale-color-text-muted;
+}
+
+.reports-state-message:empty,
+.reports-state-message:filtered-empty {
+    -fx-text-fill: -shale-color-text-muted;
+    -fx-font-style: italic;
+}
+
+.reports-state-message:validation,
+.reports-state-message:unavailable,
+.reports-state-message:failure {
+    -fx-padding: 8px 10px;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+}
+
+.reports-state-message:validation {
+    -fx-background-color: -shale-color-warning-wash;
+    -fx-border-color: -shale-color-warning-border;
+    -fx-text-fill: -shale-color-warning-text;
+}
+
+.reports-state-message:unavailable,
+.reports-state-message:failure {
+    -fx-background-color: -shale-color-danger-wash;
+    -fx-border-color: -shale-color-danger-border;
+    -fx-text-fill: -shale-color-text-danger;
+    -fx-font-weight: 700;
+}
+
+.reports-summary-cards > .statistic-card {
+    -fx-min-width: 190px;
+    -fx-pref-width: 240px;
+    -fx-max-width: 320px;
+    -fx-padding: 12px 14px;
+    -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-width: 1px;
+    -fx-effect: none;
+}
+
+.reports-summary-cards .statistic-card-title {
+    -fx-text-fill: -shale-color-text-muted;
+}
+
+.reports-summary-cards .statistic-card-value {
+    -fx-text-fill: -shale-color-text-primary;
+}
+
+.reports-summary-cards .statistic-card-subtitle {
+    -fx-text-fill: -shale-color-text-secondary;
+}
+
+.reports-results-split {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.reports-results-split > .split-pane-divider {
+    -fx-padding: 0 5px;
+    -fx-background-color: transparent;
+}
+
+.reports-result-card {
+    -fx-padding: 12px;
+    -fx-min-width: 0;
+    -fx-min-height: 260px;
+    -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-width: 1px;
+}
+
+.table-view.reports-status-table {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-border-color: -shale-color-border-subtle;
+}
+
+.table-view.reports-status-table .column-header-background {
+    -fx-background-color: -shale-color-section-surface;
+}
+
+.table-view.reports-status-table .column-header,
+.table-view.reports-status-table .filler {
+    -fx-border-color: transparent transparent -shale-color-divider transparent;
+}
+
+.table-view.reports-status-table .table-row-cell,
+.table-view.reports-status-table .table-row-cell:odd {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-border-color: transparent transparent -shale-color-divider transparent;
+}
+
+.table-view.reports-status-table .table-row-cell:hover {
+    -fx-background-color: -shale-color-card-hover;
+}
+
+.table-view.reports-status-table .table-row-cell:selected {
+    -fx-background-color: -shale-color-selection;
+    -fx-border-color: transparent transparent -shale-color-border-selected transparent;
+}
+
+.table-view.reports-status-table:focused {
+    -fx-border-color: -shale-color-border-focus;
+}
+
+.table-view.reports-status-table .reports-numeric-column {
+    -fx-alignment: center-right;
+}
+
+.reports-result-card .chart {
+    -fx-background-color: transparent;
+    -fx-padding: 4px;
+}
+
+.reports-result-card .chart-title,
+.reports-result-card .chart-legend-item {
+    -fx-text-fill: -shale-color-text-primary;
+}
+
+.reports-result-card .chart-legend {
+    -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 8px;
+    -fx-padding: 8px;
+}

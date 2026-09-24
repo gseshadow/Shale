@@ -1,0 +1,188 @@
+/*
+ * Shale A.2 reusable content vocabulary.
+ *
+ * This file owns opt-in typography, section tabs, detail/person rows, workflow
+ * stages, and update/composer presentation. Paint comes exclusively from the
+ * active theme. Layout-specific sizing and business state remain with callers.
+ */
+
+/* Semantic typography */
+.shale-page-title { -fx-font-size: 24px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
+.shale-section-title { -fx-font-size: 18px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
+.shale-subsection-title { -fx-font-size: 15px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; }
+.shale-body-text { -fx-font-size: 14px; -fx-font-weight: 400; -fx-text-fill: -shale-color-text-primary; }
+.shale-field-label { -fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-muted; }
+.shale-field-value { -fx-font-size: 14px; -fx-font-weight: 600; -fx-text-fill: -shale-color-text-primary; }
+.shale-metadata { -fx-font-size: 12px; -fx-font-weight: 600; -fx-text-fill: -shale-color-text-secondary; }
+.shale-metadata-muted { -fx-font-size: 12px; -fx-font-weight: 500; -fx-text-fill: -shale-color-text-muted; }
+.shale-inline-action { -fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-link; -fx-cursor: hand; }
+.shale-inline-action:hover { -fx-text-fill: -shale-color-text-link-hover; -fx-underline: true; }
+.shale-empty-message, .shale-filtered-empty-message, .shale-loading-message, .shale-error-message { -fx-font-size: 12px; -fx-padding: 12px; }
+.shale-empty-message { -fx-text-fill: -shale-color-text-muted; -fx-font-style: italic; }
+.shale-filtered-empty-message { -fx-text-fill: -shale-color-info-text; -fx-font-style: italic; }
+.shale-loading-message { -fx-text-fill: -shale-color-text-secondary; -fx-font-weight: 600; }
+.shale-error-message { -fx-text-fill: -shale-color-text-danger; -fx-font-weight: 600; }
+
+/* AppSectionTabs remains the Java owner; this file is its sole CSS owner. */
+.app-section-tab {
+    -fx-min-height: 32px; -fx-padding: 6px 12px; -fx-background-radius: 10px; -fx-border-radius: 10px;
+    -fx-background-color: -shale-color-selected-control-background; -fx-border-color: -shale-color-border-subtle;
+    -fx-border-width: 1px; -fx-text-fill: -shale-color-text-secondary; -fx-font-weight: 700; -fx-cursor: hand;
+}
+.app-section-tab:hover { -fx-background-color: -shale-color-card-hover; -fx-border-color: -shale-color-border-strong; }
+.app-section-tab:pressed { -fx-background-color: -shale-color-surface-muted; }
+.app-section-tab:focused { -fx-border-color: -shale-color-border-focus; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.15, 0, 0); }
+.app-section-tab-active { -fx-background-color: -shale-color-action-primary-start; -fx-border-color: -shale-color-border-selected; -fx-text-fill: -shale-color-text-on-primary; }
+.app-section-tab-active:hover { -fx-background-color: -shale-color-action-primary-hover-start; }
+.app-section-tab-active:pressed { -fx-background-color: -shale-color-action-primary-pressed; }
+.app-section-tab:disabled { -fx-opacity: -shale-opacity-disabled; -fx-cursor: default; }
+.app-section-tab-compact { -fx-min-height: 28px; -fx-padding: 4px 10px; -fx-font-size: 11px; }
+.app-section-tabs-scroll, .app-section-tabs-scroll > .viewport { -fx-background-color: transparent; }
+.app-section-tabs-scroll { -fx-background-insets: 0; }
+.app-section-tabs-row { -fx-padding: 6px 0; }
+
+/* Property/detail rows: callers determine columns and responsive layout. */
+.shale-property-row {
+    -fx-alignment: center-left; -fx-spacing: 12px; -fx-padding: 10px 4px;
+    -fx-border-color: transparent transparent -shale-color-divider transparent; -fx-border-width: 0 0 1px 0;
+}
+.shale-property-row-compact { -fx-spacing: 8px; -fx-padding: 6px 4px; }
+.shale-property-row-comfortable { -fx-spacing: 16px; -fx-padding: 12px 8px; }
+.shale-property-row-interactive { -fx-cursor: hand; -fx-background-radius: 10px; }
+.shale-property-row-interactive:hover { -fx-background-color: -shale-color-card-hover; }
+
+/* Compact semantic row activation shared by dashboard/list presentation. */
+.shale-actionable-row { -fx-cursor: hand; }
+.shale-actionable-row:hover { -fx-background-color: -shale-color-card-hover; -fx-background-radius: 8px; }
+.shale-actionable-row:pressed { -fx-background-color: -shale-color-selected-control-background; }
+.shale-actionable-row:focused { -fx-border-color: -shale-color-border-focus; -fx-border-radius: 8px; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.15, 0, 0); }
+.shale-property-row-label { -fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-muted; }
+.shale-property-row-value { -fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: -shale-color-text-primary; }
+.shale-property-row-icon { -fx-fill: -shale-color-text-secondary; }
+.shale-property-row-accent { -fx-border-color: transparent transparent transparent -shale-color-border-selected; -fx-border-width: 0 0 0 3px; }
+
+/* Phase 2C Case Details composition; shared primitives continue to own paint and control geometry. */
+.case-details-card { -fx-spacing: 10px; -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2); }
+.case-details-toolbar { -fx-alignment: center-left; -fx-padding: 0 0 6px 0; }
+.case-details-grid { -fx-background-color: transparent; }
+.case-details-grid > .shale-property-row-label,
+.case-details-grid > .shale-property-row-value {
+    -fx-padding: 10px 4px;
+    -fx-border-color: transparent transparent -shale-color-divider transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+.case-details-grid > .shale-property-row-value { -fx-alignment: center-left; }
+
+/* Person rows and neutral avatar fallback; authoritative user colors may override avatar paint. */
+.shale-person-row { -fx-alignment: center-left; -fx-spacing: 10px; -fx-padding: 6px 4px; }
+.shale-person-row:hover.shale-person-row-interactive { -fx-background-color: -shale-color-card-hover; -fx-background-radius: 10px; }
+.shale-person-row-inactive { -fx-opacity: -shale-opacity-disabled; }
+.shale-person-name { -fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; }
+.shale-person-metadata, .shale-person-empty { -fx-font-size: 11px; -fx-text-fill: -shale-color-text-muted; }
+.shale-person-empty { -fx-font-style: italic; }
+.shale-avatar {
+    -fx-min-width: 32px; -fx-pref-width: 32px; -fx-max-width: 32px; -fx-min-height: 32px; -fx-pref-height: 32px; -fx-max-height: 32px;
+    -fx-alignment: center; -fx-background-radius: 999px; -fx-background-color: -shale-color-avatar-neutral-background;
+    -fx-text-fill: -shale-color-avatar-neutral-text; -fx-font-size: 11px; -fx-font-weight: 800;
+}
+.shale-avatar-compact { -fx-min-width: 28px; -fx-pref-width: 28px; -fx-max-width: 28px; -fx-min-height: 28px; -fx-pref-height: 28px; -fx-max-height: 28px; }
+
+/* Connected workflow/history tracker; stage labels accompany every color state.
+   Case Overview uses historical/current states without implying completion. */
+.shale-stage-tracker { -fx-alignment: center-left; -fx-spacing: 0; -fx-padding: 8px 4px; }
+.shale-stage-scroll, .shale-stage-scroll > .viewport { -fx-background-color: transparent; }
+.shale-stage-connector { -fx-min-height: 2px; -fx-pref-height: 2px; -fx-background-color: -shale-color-stage-inactive; }
+.shale-stage-connector-complete { -fx-background-color: -shale-color-stage-complete; }
+.shale-stage-item { -fx-padding: 6px 10px; -fx-background-radius: 999px; -fx-border-radius: 999px; -fx-border-width: 1px; -fx-font-weight: 700; }
+.shale-stage-inactive { -fx-background-color: -shale-color-surface-muted; -fx-border-color: -shale-color-stage-inactive; -fx-text-fill: -shale-color-text-muted; }
+.shale-stage-complete { -fx-background-color: -shale-color-success-wash; -fx-border-color: -shale-color-stage-complete; -fx-text-fill: -shale-color-success-text; }
+.shale-stage-current { -fx-background-color: linear-gradient(to right, -shale-color-action-primary-start, -shale-color-action-primary-end); -fx-border-color: -shale-color-border-selected; -fx-text-fill: -shale-color-text-on-primary; }
+.shale-stage-warning { -fx-background-color: -shale-color-warning-wash; -fx-border-color: -shale-color-warning-border; -fx-text-fill: -shale-color-warning-text; }
+.shale-stage-label-compact { -fx-font-size: 11px; -fx-padding: 4px 8px; }
+
+/* Phase 2B Case header and chronological status-history owner. */
+.case-header { -fx-background-color: -shale-color-elevated-surface; -fx-border-color: -shale-color-border-subtle; }
+.case-header-metadata, .case-header-classifications { -fx-alignment: top-left; }
+.case-header-separator { -fx-text-fill: -shale-color-divider; -fx-font-weight: 800; }
+
+/* Organization profile: primary database classification supplies only identity paint. */
+.organization-profile-header {
+    -shale-organization-profile-accent: -shale-color-chip-neutral-border;
+    -shale-organization-profile-wash: -shale-color-chip-neutral-background;
+    -fx-background-color: -shale-color-page-header-surface,
+        linear-gradient(to right, -shale-organization-profile-wash 0%, transparent 72%);
+    -fx-border-color: -shale-organization-profile-accent -shale-color-border-subtle
+        -shale-color-border-subtle -shale-organization-profile-accent;
+    -fx-border-width: 1px 1px 1px 5px;
+}
+.organization-profile-header-removed {
+    -fx-border-style: segments(7px, 5px);
+    -fx-opacity: 0.86;
+}
+.organization-profile-classifications { -fx-alignment: top-left; }
+.organization-profile-toolbar { -fx-padding: 2px 0 0 0; }
+.organization-profile-primary { -fx-fill-width: true; }
+.organization-profile-contact-card, .organization-profile-related-card { -fx-fill-width: true; }
+.organization-profile-related-card .case-card { -fx-max-width: 100000px; }
+
+/* Contact profile: neutral identity surface; classifications retain their own database colors. */
+.contact-profile-header {
+    -fx-background-color: -shale-color-page-header-surface;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-width: 0 0 1px 0;
+}
+.contact-profile-avatar { -fx-min-width: 40px; -fx-pref-width: 40px; -fx-max-width: 40px; -fx-min-height: 40px; -fx-pref-height: 40px; -fx-max-height: 40px; }
+.contact-profile-avatar-text { -fx-text-fill: -shale-color-avatar-neutral-text; -fx-font-size: 12px; -fx-font-weight: 800; }
+.contact-profile-toolbar { -fx-padding: 2px 0 0 0; }
+.contact-profile-identity-card, .contact-profile-methods-card, .contact-profile-related-card { -fx-fill-width: true; }
+.contact-profile-related-card .case-card { -fx-max-width: 100000px; }
+.contact-profile-header .contact-classification-chip-group { -fx-alignment: top-left; }
+.case-status-history-host { -fx-alignment: center-left; }
+.status-timeline { -fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0; }
+.status-timeline > .viewport, .status-timeline > .viewport > .content { -fx-background-color: transparent; }
+.status-timeline__row { -fx-padding: 4px 0 6px 0; }
+.status-timeline__pill { -fx-background-color: -shale-color-surface-muted; -fx-border-color: -shale-color-border-subtle; -fx-text-fill: -shale-color-text-secondary; }
+.status-timeline__pill--historical { -fx-background-color: -shale-color-section-surface; -fx-border-color: -shale-color-border-subtle; }
+.status-timeline__pill--completed { -fx-background-color: -shale-color-success-wash; -fx-border-color: -shale-color-success-border; -fx-text-fill: -shale-color-success-text; }
+.status-timeline__pill--future { -fx-opacity: -shale-opacity-disabled; }
+.status-timeline__pill--current {
+    -fx-background-color: linear-gradient(to right, -shale-color-action-primary-start, -shale-color-action-primary-end);
+    -fx-border-color: -shale-stage-data-color, -shale-color-border-selected;
+    -fx-border-insets: 0, -2px;
+    -fx-border-width: 2px, 1px;
+    -fx-text-fill: -shale-color-text-on-primary;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 8, 0.14, 0, 1);
+}
+.status-timeline__check { -fx-font-size: 11px; -fx-font-weight: 900; }
+.status-timeline__label {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: -shale-color-text-secondary;
+}
+.status-timeline__pill--completed .status-timeline__label { -fx-text-fill: -shale-color-success-text; }
+.status-timeline__pill--current .status-timeline__label { -fx-font-weight: 800; -fx-text-fill: -shale-color-text-on-primary; }
+.status-timeline__connector-line { -fx-background-color: -shale-color-stage-inactive; -fx-background-radius: 2px; }
+.status-timeline__connector-line--completed { -fx-background-color: -shale-color-stage-complete; }
+.status-timeline .scroll-bar:horizontal { -fx-pref-height: 8px; -fx-background-color: transparent; }
+.status-timeline .scroll-bar:horizontal .track { -fx-background-color: -shale-color-surface-muted; -fx-background-radius: 999px; }
+.status-timeline .scroll-bar:horizontal .thumb { -fx-background-color: -shale-color-border-strong; -fx-background-radius: 999px; }
+.status-timeline .scroll-bar:horizontal .thumb:hover { -fx-background-color: -shale-color-input-hover-border; }
+.status-timeline:focused { -fx-border-color: -shale-color-border-focus; -fx-border-radius: 8px; }
+
+/* Update rail, composer, search, and compact update cards. */
+.shale-update-rail { -fx-spacing: 12px; -fx-padding: 16px; -fx-background-color: -shale-color-section-surface; -fx-background-radius: 14px; -fx-border-radius: 14px; -fx-border-color: -shale-color-border-subtle; -fx-border-width: 1px; -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2); }
+.shale-update-heading { -fx-padding: 0 0 2px 0; }
+.shale-update-composer { -fx-spacing: 8px; -fx-padding: 12px; -fx-background-color: -shale-color-elevated-surface; -fx-background-radius: 12px; -fx-border-radius: 12px; -fx-border-color: -shale-color-border-subtle; -fx-border-width: 1px; }
+.shale-update-search-row { -fx-alignment: center-left; }
+.shale-update-search-icon { -fx-font-size: 16px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-muted; }
+.shale-update-list-scroll, .shale-update-list-scroll > .viewport, .shale-update-feed { -fx-background-color: transparent; -fx-background: transparent; }
+.shale-update-card { -fx-spacing: 8px; -fx-padding: 12px; -fx-background-color: -shale-color-update-card-surface; -fx-background-radius: 12px; -fx-border-radius: 12px; -fx-border-color: -shale-color-update-card-border; -fx-border-width: 1px; }
+.shale-update-card-header { -fx-alignment: center-left; }
+.shale-update-author { -fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; }
+.shale-update-timestamp { -fx-font-size: 11px; -fx-text-fill: -shale-color-text-muted; }
+.shale-update-body { -fx-font-size: 13px; -fx-text-fill: -shale-color-text-primary; }
+
+/* Phase 2D Primary Link composition. The shared Case Link factory owns the nested entity card. */
+.primary-link-section { -fx-spacing: 10px; -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 12, 0.12, 0, 2); }
+.primary-link-heading { -fx-padding: 0 0 4px 0; }
+.primary-link-section .case-overview-primary-link-card { -fx-background-color: -shale-color-card-surface; }

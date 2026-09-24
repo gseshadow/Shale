@@ -1,6 +1,8 @@
 package com.shale.ui.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDateTime;
@@ -8,327 +10,488 @@ import java.util.List;
 import java.util.Map;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
+import com.shale.ui.testutil.JavaFxTestSupport;
+import com.shale.ui.theme.ThemeManager;
+
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.ScrollBar;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.VBox;
+
 final class MyShaleControllerBoardLayoutTest {
 
-    @Test
-    void singleTaskLaneUsesViewportWithoutExceedingReadableMaximum() {
-        assertEquals(260.0, MyShaleController.responsiveSingleTaskLaneWidth(0), 0.01);
-        assertEquals(225.0, MyShaleController.responsiveSingleTaskLaneWidth(180), 0.01);
-        assertEquals(400.0, MyShaleController.responsiveSingleTaskLaneWidth(400), 0.01);
-        assertEquals(430.0, MyShaleController.responsiveSingleTaskLaneWidth(560), 0.01);
-        assertEquals(430.0, MyShaleController.responsiveSingleTaskLaneWidth(1400), 0.01);
-    }
+	@Test
+	void singleTaskLaneUsesViewportWithoutExceedingReadableMaximum() {
+		assertEquals(260.0, MyShaleController.responsiveSingleTaskLaneWidth(0), 0.01);
+		assertEquals(225.0, MyShaleController.responsiveSingleTaskLaneWidth(180), 0.01);
+		assertEquals(400.0, MyShaleController.responsiveSingleTaskLaneWidth(400), 0.01);
+		assertEquals(430.0, MyShaleController.responsiveSingleTaskLaneWidth(560), 0.01);
+		assertEquals(430.0, MyShaleController.responsiveSingleTaskLaneWidth(1400), 0.01);
+	}
 
-    @Test
-    void taskLaneResponsivenessOnlyAppliesToOneExpandedBoardLane() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+	@Test
+	void taskLaneResponsivenessOnlyAppliesToOneExpandedBoardLane() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 
-        assertTrue(source.contains("orderedLanes.size() == 1 && !isCollapsedLane"),
-                "Collapsed and multi-lane boards must retain their established compact widths.");
-        assertTrue(source.contains("myTasksScroll.viewportBoundsProperty()"),
-                "The sole expanded lane must update when its viewport is resized.");
-        assertTrue(source.contains("TASKS_SINGLE_LANE_MAX_WIDTH = 430"));
-        assertTrue(source.contains("new LaneBoardLayout.LaneWidth(")
-                        && source.contains("TASKS_CASE_COLUMN_MIN_WIDTH")
-                        && source.contains("TASKS_CASE_COLUMN_PREF_WIDTH")
-                        && source.contains("TASKS_CASE_COLUMN_MAX_WIDTH"),
-                "All lanes should still originate with the established multi-lane width constraints.");
-        assertTrue(source.contains("renderMyTasksGrid") && source.contains("setMyTasksViewMode"),
-                "Board/Grid switching should continue rebuilding through the existing render path.");
-    }
+		assertTrue(source.contains("orderedLanes.size() == 1 && !isCollapsedLane"),
+				"Collapsed and multi-lane boards must retain their established compact widths.");
+		assertTrue(source.contains("myTasksScroll.viewportBoundsProperty()"),
+				"The sole expanded lane must update when its viewport is resized.");
+		assertTrue(source.contains("TASKS_SINGLE_LANE_MAX_WIDTH = 430"));
+		assertTrue(source.contains("new LaneBoardLayout.LaneWidth(")
+				&& source.contains("TASKS_CASE_COLUMN_MIN_WIDTH")
+				&& source.contains("TASKS_CASE_COLUMN_PREF_WIDTH")
+				&& source.contains("TASKS_CASE_COLUMN_MAX_WIDTH"),
+				"All lanes should still originate with the established multi-lane width constraints.");
+		assertTrue(source.contains("renderMyTasksGrid") && source.contains("setMyTasksViewMode"),
+				"Board/Grid switching should continue rebuilding through the existing render path.");
+	}
 
-    @Test
-    void caseRadarReplacesPlaceholderAndKeepsUrgentRowsFirst() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+	@Test
+	void caseRadarReplacesPlaceholderAndKeepsUrgentRowsFirst() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 
-        assertTrue(source.contains("buildCaseRadarWidget()"),
-                "Overview dashboard should render the live Case Radar widget instead of a placeholder");
-        assertTrue(source.contains("Overdue tasks"),
-                "Case Radar should include overdue tasks as the first attention row");
-        assertTrue(source.indexOf("Overdue tasks") < source.indexOf("SOL due ≤ 14 days"),
-                "Overdue tasks should appear before SOL warning rows");
-        assertTrue(source.contains("activeAssignedCaseRadarSource"),
-                "Case Radar should reuse loaded assigned case board data with terminal status filtering");
-        assertTrue(source.contains("INACTIVE_CASE_DAYS = 45"),
-                "Case Radar should count inactive assigned cases from Cases.UpdatedAt");
-        assertTrue(source.contains("RECENTLY_UPDATED_CASE_DAYS = 7"),
-                "Case Radar should count recently updated assigned cases from Cases.UpdatedAt");
-        assertTrue(source.contains("rows.sort(Comparator.comparingInt(row -> row.severity().sortOrder()))"),
-                "Case Radar should keep urgent/warning rows before positive informational rows");
-    }
+		assertTrue(source.contains("buildCaseRadarWidget()"),
+				"Overview dashboard should render the live Case Radar widget instead of a placeholder");
+		assertTrue(source.contains("Overdue tasks"),
+				"Case Radar should include overdue tasks as the first attention row");
+		assertTrue(source.indexOf("Overdue tasks") < source.indexOf("SOL due ≤ 14 days"),
+				"Overdue tasks should appear before SOL warning rows");
+		assertTrue(source.contains("activeAssignedCaseRadarSource"),
+				"Case Radar should reuse loaded assigned case board data with terminal status filtering");
+		assertTrue(source.contains("INACTIVE_CASE_DAYS = 45"),
+				"Case Radar should count inactive assigned cases from Cases.UpdatedAt");
+		assertTrue(source.contains("RECENTLY_UPDATED_CASE_DAYS = 7"),
+				"Case Radar should count recently updated assigned cases from Cases.UpdatedAt");
+		assertTrue(source.contains("rows.sort(Comparator.comparingInt(row -> row.severity().sortOrder()))"),
+				"Case Radar should keep urgent/warning rows before positive informational rows");
+	}
 
-    @Test
-    void importantDatesWidgetUsesLoadedSourcesAndKeepsChronologicalCap() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+	@Test
+	void importantDatesWidgetUsesLoadedSourcesAndKeepsChronologicalCap() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 
-        assertTrue(source.contains("buildImportantDatesWidget()"),
-                "Overview dashboard should render the live Important Dates widget instead of a placeholder");
-        assertTrue(source.contains("IMPORTANT_DATES_WINDOW_DAYS = 30"),
-                "Important Dates should use the requested today-through-30-days window");
-        assertTrue(source.contains("IMPORTANT_DATES_ROW_LIMIT = 10"),
-                "Important Dates rendering should be capped at 10 visible rows");
-        assertTrue(source.contains("overviewEligibleTasks(myTasks)"),
-                "Important Dates should reuse already loaded assigned task data");
-        assertTrue(source.contains("activeAssignedCaseRadarSource()"),
-                "Important Dates should reuse active assigned case data with terminal status filtering");
-        assertTrue(source.contains("TORT_NOTICE"),
-                "Important Dates should include Tort Notice deadlines from the assigned case model");
-        assertTrue(source.contains("TODO: Add Calendar important dates"),
-                "Calendar integration should remain a TODO until a reliable My Shale loaded path exists");
-        assertTrue(source.contains("DashboardWidgetFactory.widget"),
-                "Important Dates should be built with DashboardWidgetFactory");
-    }
+		assertTrue(source.contains("buildImportantDatesWidget()"),
+				"Overview dashboard should render the live Important Dates widget instead of a placeholder");
+		assertTrue(source.contains("IMPORTANT_DATES_WINDOW_DAYS = 30"),
+				"Important Dates should use the requested today-through-30-days window");
+		assertTrue(source.contains("IMPORTANT_DATES_ROW_LIMIT = 10"),
+				"Important Dates rendering should be capped at 10 visible rows");
+		assertTrue(source.contains("overviewEligibleTasks(myTasks)"),
+				"Important Dates should reuse already loaded assigned task data");
+		assertTrue(source.contains("activeAssignedCaseRadarSource()"),
+				"Important Dates should reuse active assigned case data with terminal status filtering");
+		assertTrue(source.contains("TORT_NOTICE"),
+				"Important Dates should include Tort Notice deadlines from the assigned case model");
+		assertTrue(source.contains("TODO: Add Calendar important dates"),
+				"Calendar integration should remain a TODO until a reliable My Shale loaded path exists");
+		assertTrue(source.contains("DashboardWidgetFactory.widget"),
+				"Important Dates should be built with DashboardWidgetFactory");
+	}
 
-    @Test
-    void dashboardRowsOnlyExposeWorkingActions() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+	@Test
+	void dashboardRowsOnlyExposeWorkingActions() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+		String css = Files.readString(Path.of("src/main/resources/css/app.css"));
 
-        assertTrue(source.contains("CaseRadarAction.OVERDUE_TASKS"),
-                "Overdue Case Radar rows should have an explicit action instead of a no-op click handler");
-        assertTrue(source.contains("CaseRadarAction.SOL_DUE_14_DAYS")
-                        && source.contains("CaseRadarAction.SOL_DUE_15_TO_30_DAYS"),
-                "SOL Case Radar rows should have explicit deadline actions");
-        assertTrue(source.contains("CaseRadarAction.TORT_NOTICE_DUE_14_DAYS")
-                        && source.contains("CaseRadarAction.TORT_NOTICE_DUE_15_TO_30_DAYS"),
-                "Tort Notice Case Radar rows should have explicit deadline actions");
-        assertTrue(source.contains("onSectionSelected(SECTION_TASKS)"),
-                "Overdue Case Radar rows should navigate to the existing My Tasks section");
-        assertTrue(source.contains("MY_TASKS_SORT_DUE_ASC"),
-                "Overdue Case Radar navigation should reuse existing due-date sorting to surface overdue work");
-        assertTrue(source.contains("showDeadlineCasesInMyCases(SORT_SOL"),
-                "Clicking SOL radar rows should switch to My Cases using SOL soonest sorting");
-        assertTrue(source.contains("showDeadlineCasesInMyCases(SORT_TORT_NOTICE"),
-                "Clicking Tort Notice radar rows should switch to My Cases using Tort Notice soonest sorting");
-        assertTrue(source.contains("CaseRadarAction.INACTIVE_ASSIGNED_CASES")
-                        && source.contains("CaseRadarAction.RECENTLY_UPDATED_ASSIGNED_CASES"),
-                "UpdatedAt Case Radar rows should use explicit action hooks");
-        assertTrue(source.contains("showUpdatedAtCasesInMyCases(SORT_UPDATED_OLDEST)")
-                        && source.contains("showUpdatedAtCasesInMyCases(SORT_UPDATED_NEWEST)"),
-                "UpdatedAt Case Radar actions should reuse My Cases with the supported UpdatedAt sorts");
-        assertTrue(source.contains("myCasesBoardSearchField.clear()")
-                        && source.contains("myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION)"),
-                "Deadline radar actions should clear unrelated My Cases board search/status filters");
-        assertTrue(source.contains("TODO: Apply an existing My Cases deadline/window filter"),
-                "Deadline radar actions should keep an explicit TODO until a reusable deadline/window filter exists");
-        assertTrue(source.contains("case TASK -> openTask(item.taskId())"),
-                "Task Important Dates should reuse the existing task detail opening path");
-        assertTrue(source.contains("case SOL, TORT_NOTICE -> onOpenCase.accept(item.caseId().intValue())"),
-                "Case deadline Important Dates should reuse the existing case navigation callback");
-        assertTrue(source.contains("isImportantDateActionable"),
-                "Important Date rows should decide clickability from explicit supported actions");
-        assertTrue(source.contains("isCaseRadarRowActionable"),
-                "Case Radar rows should decide clickability from explicit supported actions");
-        assertTrue(css.contains(".case-radar-row-actionable") && css.contains(".important-date-row-actionable"),
-                "Only actionable dashboard rows should get pointer/hover styling");
-        assertTrue(!css.contains(".case-radar-row {\n    -fx-padding: 5 0 5 0;\n    -fx-cursor: hand;")
-                        && !css.contains(".important-date-row {\n    -fx-padding: 5 0 5 0;\n    -fx-cursor: hand;"),
-                "Base dashboard rows without actions should not show the hand cursor");
-    }
+		assertTrue(source.contains("CaseRadarAction.OVERDUE_TASKS"),
+				"Overdue Case Radar rows should have an explicit action instead of a no-op click handler");
+		assertTrue(source.contains("CaseRadarAction.SOL_DUE_14_DAYS")
+				&& source.contains("CaseRadarAction.SOL_DUE_15_TO_30_DAYS"),
+				"SOL Case Radar rows should have explicit deadline actions");
+		assertTrue(source.contains("CaseRadarAction.TORT_NOTICE_DUE_14_DAYS")
+				&& source.contains("CaseRadarAction.TORT_NOTICE_DUE_15_TO_30_DAYS"),
+				"Tort Notice Case Radar rows should have explicit deadline actions");
+		assertTrue(source.contains("onSectionSelected(SECTION_TASKS)"),
+				"Overdue Case Radar rows should navigate to the existing My Tasks section");
+		assertTrue(source.contains("MY_TASKS_SORT_DUE_ASC"),
+				"Overdue Case Radar navigation should reuse existing due-date sorting to surface overdue work");
+		assertTrue(source.contains("showDeadlineCasesInMyCases(SORT_SOL"),
+				"Clicking SOL radar rows should switch to My Cases using SOL soonest sorting");
+		assertTrue(source.contains("showDeadlineCasesInMyCases(SORT_TORT_NOTICE"),
+				"Clicking Tort Notice radar rows should switch to My Cases using Tort Notice soonest sorting");
+		assertTrue(source.contains("CaseRadarAction.INACTIVE_ASSIGNED_CASES")
+				&& source.contains("CaseRadarAction.RECENTLY_UPDATED_ASSIGNED_CASES"),
+				"UpdatedAt Case Radar rows should use explicit action hooks");
+		assertTrue(source.contains("showUpdatedAtCasesInMyCases(SORT_UPDATED_OLDEST)")
+				&& source.contains("showUpdatedAtCasesInMyCases(SORT_UPDATED_NEWEST)"),
+				"UpdatedAt Case Radar actions should reuse My Cases with the supported UpdatedAt sorts");
+		assertTrue(source.contains("myCasesBoardSearchField.clear()")
+				&& source.contains("myCasesBoardStatusFilterChoice.getSelectionModel().select(ALL_BOARD_STATUSES_OPTION)"),
+				"Deadline radar actions should clear unrelated My Cases board search/status filters");
+		assertTrue(source.contains("TODO: Apply an existing My Cases deadline/window filter"),
+				"Deadline radar actions should keep an explicit TODO until a reusable deadline/window filter exists");
+		assertTrue(source.contains("case TASK -> openTask(item.taskId())"),
+				"Task Important Dates should reuse the existing task detail opening path");
+		assertTrue(source.contains("case SOL, TORT_NOTICE -> onOpenCase.accept(item.caseId().intValue())"),
+				"Case deadline Important Dates should reuse the existing case navigation callback");
+		assertTrue(source.contains("isImportantDateActionable"),
+				"Important Date rows should decide clickability from explicit supported actions");
+		assertTrue(source.contains("isCaseRadarRowActionable"),
+				"Case Radar rows should decide clickability from explicit supported actions");
+		String foundation = Files.readString(Path.of("src/main/resources/css/foundation/content-components.css"));
+		assertTrue(source.contains("case-radar-row-actionable") && source.contains("important-date-row-actionable")
+				&& foundation.contains(".shale-actionable-row:hover"),
+				"Only actionable dashboard rows should opt into the shared pointer/hover styling");
+		assertTrue(!css.contains(".case-radar-row {\n    -fx-padding: 5 0 5 0;\n    -fx-cursor: hand;")
+				&& !css.contains(".important-date-row {\n    -fx-padding: 5 0 5 0;\n    -fx-cursor: hand;"),
+				"Base dashboard rows without actions should not show the hand cursor");
+	}
 
-    @Test
-    void myCaseSummaryRowsNavigateToExistingMyCasesStatusFilter() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+	@Test
+	void myCaseSummaryRowsNavigateToExistingMyCasesStatusFilter() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+		String css = Files.readString(Path.of("src/main/resources/css/app.css"));
 
-        assertTrue(source.contains("isMyCaseSummaryRowActionable"),
-                "My Case Summary rows should use an explicit action check instead of implicit label matching");
-        assertTrue(source.contains("my-case-summary-row-actionable"),
-                "Only actionable My Case Summary rows should receive actionable styling");
-        assertTrue(source.contains("onMyCaseSummaryStatusClicked"),
-                "My Case Summary rows should have an explicit click handler");
-        assertTrue(source.contains("onSectionSelected(SECTION_MY_CASES)"),
-                "Clicking a My Case Summary row should switch to the existing My Cases section");
-        assertTrue(source.contains("pendingMyCaseSummaryStatusFilterId = row.statusId()"),
-                "The click handler should carry the row's effective StatusId, not display text");
-        assertTrue(source.contains("applyPendingMyCaseSummaryStatusFilter()"),
-                "Summary clicks should safely defer the status filter selection until filter options are available");
-        assertTrue(source.contains("myCasesBoardStatusFilterChoice.getSelectionModel().select(matching.get())"),
-                "Summary clicks should select the existing My Cases status filter control");
-        assertTrue(source.contains("Objects.equals(option.statusId(), statusId)"),
-                "The status filter should be matched by StatusId");
-        assertTrue(source.contains("renderMyCasesBoard()"),
-                "Selecting the status should reuse normal My Cases board rendering and sorting");
-        assertTrue(!css.contains(".my-case-summary-row {\n    -fx-padding: 5 0 5 0;\n    -fx-cursor: hand;"),
-                "Base My Case Summary rows without actions should not show the hand cursor");
-        assertTrue(css.contains(".my-case-summary-row-actionable") && css.contains(".my-case-summary-row-actionable:hover"),
-                "Actionable My Case Summary rows should have pointer and hover affordances");
-    }
+		assertTrue(source.contains("isMyCaseSummaryRowActionable"),
+				"My Case Summary rows should use an explicit action check instead of implicit label matching");
+		assertTrue(source.contains("my-case-summary-row-actionable"),
+				"Only actionable My Case Summary rows should receive actionable styling");
+		assertTrue(source.contains("onMyCaseSummaryStatusClicked"),
+				"My Case Summary rows should have an explicit click handler");
+		assertTrue(source.contains("onSectionSelected(SECTION_MY_CASES)"),
+				"Clicking a My Case Summary row should switch to the existing My Cases section");
+		assertTrue(source.contains("pendingMyCaseSummaryStatusFilterId = row.statusId()"),
+				"The click handler should carry the row's effective StatusId, not display text");
+		assertTrue(source.contains("applyPendingMyCaseSummaryStatusFilter()"),
+				"Summary clicks should safely defer the status filter selection until filter options are available");
+		assertTrue(source.contains("myCasesBoardStatusFilterChoice.getSelectionModel().select(matching.get())"),
+				"Summary clicks should select the existing My Cases status filter control");
+		assertTrue(source.contains("Objects.equals(option.statusId(), statusId)"),
+				"The status filter should be matched by StatusId");
+		assertTrue(source.contains("renderMyCasesBoard()"),
+				"Selecting the status should reuse normal My Cases board rendering and sorting");
+		assertTrue(!css.contains(".my-case-summary-row {\n    -fx-padding: 5 0 5 0;\n    -fx-cursor: hand;"),
+				"Base My Case Summary rows without actions should not show the hand cursor");
+		assertTrue(css.contains(".my-case-summary-row-actionable") && css.contains(".my-case-summary-row-actionable:hover"),
+				"Actionable My Case Summary rows should have pointer and hover affordances");
+	}
 
-    @Test
-    void updatedAtIsCarriedThroughAssignedCaseModelAndSorts() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
-        String dao = Files.readString(Path.of("../shale-data/src/main/java/com/shale/data/dao/CaseSummaryDao.java"));
+	@Test
+	void updatedAtIsCarriedThroughAssignedCaseModelAndSorts() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+		String dao = Files.readString(Path.of("../shale-data/src/main/java/com/shale/data/dao/CaseSummaryDao.java"));
 
-        assertTrue(dao.contains("c.CreatedAt, c.UpdatedAt"),
-                "Authoritative assigned-case query should select Cases.UpdatedAt");
-        assertTrue(source.contains("summary.updatedAt()"),
-                "MyShaleController should carry projection UpdatedAt into CaseCardVm");
-        assertTrue(source.contains("final LocalDateTime updatedAt"),
-                "Assigned-case VM should retain UpdatedAt for radar and sorting");
-        assertTrue(source.contains("SORT_UPDATED_OLDEST") && source.contains("SORT_UPDATED_NEWEST"),
-                "My Cases should expose narrow UpdatedAt sort options for radar click-through");
-        assertTrue(source.contains("caseVm.updatedAt != null && caseVm.updatedAt.toLocalDate().isBefore(inactiveBefore)"),
-                "Inactive assigned case counts should be based on UpdatedAt before the 45-day cutoff");
-        assertTrue(source.contains("!date.isBefore(recentSince) && !date.isAfter(effectiveToday)"),
-                "Recently updated assigned case counts should include the seven-day through-today window");
-    }
+		assertTrue(dao.contains("c.CreatedAt, c.UpdatedAt"),
+				"Authoritative assigned-case query should select Cases.UpdatedAt");
+		assertTrue(source.contains("summary.updatedAt()"),
+				"MyShaleController should carry projection UpdatedAt into CaseCardVm");
+		assertTrue(source.contains("final LocalDateTime updatedAt"),
+				"Assigned-case VM should retain UpdatedAt for radar and sorting");
+		assertTrue(source.contains("SORT_UPDATED_OLDEST") && source.contains("SORT_UPDATED_NEWEST"),
+				"My Cases should expose narrow UpdatedAt sort options for radar click-through");
+		assertTrue(source.contains("caseVm.updatedAt != null && caseVm.updatedAt.toLocalDate().isBefore(inactiveBefore)"),
+				"Inactive assigned case counts should be based on UpdatedAt before the 45-day cutoff");
+		assertTrue(source.contains("!date.isBefore(recentSince) && !date.isAfter(effectiveToday)"),
+				"Recently updated assigned case counts should include the seven-day through-today window");
+	}
 
-    @Test
-    void notificationsWidgetReusesCenterServiceAndKeepsCompactUnreadFirstBriefing() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
-        String sceneManager = Files.readString(Path.of("src/main/java/com/shale/ui/navigation/SceneManager.java"));
-        String compactSceneManager = sceneManager.replaceAll("\\s+", " ");
+	@Test
+	void notificationsWidgetReusesCenterServiceAndKeepsCompactUnreadFirstBriefing() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+		String sceneManager = Files.readString(Path.of("src/main/java/com/shale/ui/navigation/SceneManager.java"));
+		String compactSceneManager = sceneManager.replaceAll("\\s+", " ");
 
-        assertTrue(source.contains("buildNotificationsWidget()"),
-                "Overview dashboard should render the live Notifications widget instead of the placeholder");
-        assertTrue(source.contains("NotificationCenterService notificationCenterService"),
-                "Notifications widget should reuse the existing NotificationCenterService path");
-        assertTrue(source.contains("getNotificationsNewestFirst()"),
-                "Notifications widget should reuse the existing hydrated notification list instead of issuing duplicate queries");
-        assertTrue(source.contains("NOTIFICATIONS_ROW_LIMIT = 10"),
-                "Notifications widget should cap visible rows at 10");
-        assertTrue(source.contains("Comparator.comparing(AppNotification::isUnread).reversed()"),
-                "Notifications widget should prefer unread notifications first");
-        assertTrue(source.contains("notificationCenterService.getUnreadCount()"),
-                "Notifications widget should display the existing unread badge count");
-        assertTrue(source.contains("You’re all caught up."),
-                "Notifications widget should keep the requested empty state");
-        assertTrue(source.contains("TODO: Add recent-read durable notifications"),
-                "Recent-read support should remain an explicit TODO until the existing service exposes it");
-        assertTrue(source.contains("notificationCenterService.markRead(notification)"),
-                "Notification row clicks should reuse the existing mark-read behavior");
-        assertTrue(compactSceneManager.contains("notificationCenterService, this::openNotificationCenterFromDashboard"),
-                "My Shale should receive the existing notification center service and View All route from SceneManager");
-    }
+		assertTrue(source.contains("buildNotificationsWidget()"),
+				"Overview dashboard should render the live Notifications widget instead of the placeholder");
+		assertTrue(source.contains("NotificationCenterService notificationCenterService"),
+				"Notifications widget should reuse the existing NotificationCenterService path");
+		assertTrue(source.contains("getNotificationsNewestFirst()"),
+				"Notifications widget should reuse the existing hydrated notification list instead of issuing duplicate queries");
+		assertTrue(source.contains("NOTIFICATIONS_ROW_LIMIT = 10"),
+				"Notifications widget should cap visible rows at 10");
+		assertTrue(source.contains("Comparator.comparing(AppNotification::isUnread).reversed()"),
+				"Notifications widget should prefer unread notifications first");
+		assertTrue(source.contains("notificationCenterService.getUnreadCount()"),
+				"Notifications widget should display the existing unread badge count");
+		assertTrue(source.contains("You’re all caught up."),
+				"Notifications widget should keep the requested empty state");
+		assertTrue(source.contains("TODO: Add recent-read durable notifications"),
+				"Recent-read support should remain an explicit TODO until the existing service exposes it");
+		assertTrue(source.contains("notificationCenterService.markRead(notification)"),
+				"Notification row clicks should reuse the existing mark-read behavior");
+		assertTrue(compactSceneManager.contains("notificationCenterService, this::openNotificationCenterFromDashboard"),
+				"My Shale should receive the existing notification center service and View All route from SceneManager");
+	}
 
-    @Test
-    void recentCaseActivityWidgetUsesExistingSourcesAndDashboardFactory() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+	@Test
+	void recentCaseActivityWidgetUsesExistingSourcesAndDashboardFactory() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
 
-        assertTrue(source.contains("buildRecentCaseActivityWidget()"),
-                "Overview dashboard should render the live Recent Case Activity widget instead of a placeholder");
-        assertTrue(source.contains("RECENT_CASE_ACTIVITY_ROW_LIMIT = 10"),
-                "Recent Case Activity should cap visible rows at 10");
-        assertTrue(source.contains("caseDao.listRecentCaseUpdatesForAssignedCases"),
-                "Recent Case Activity should use the tenant-scoped assigned-case batch Case Updates DAO path");
-        assertTrue(!source.contains("caseDao.listCaseUpdates(caseVm.id, tenantId)"),
-                "Recent Case Activity should not load CaseUpdates once per assigned case");
-        assertTrue(source.contains("taskActivitiesForAssignedCases(myTasks, caseNamesById)"),
-                "Recent Case Activity should reuse already loaded assigned-task models for task activity");
-        assertTrue(Pattern.compile("return\\s+DashboardWidgetFactory\\.widget\\(\\s*\"Recent Case Activity\"",
-                        Pattern.DOTALL).matcher(source).find(),
-                "Recent Case Activity should be built with DashboardWidgetFactory");
-        assertTrue(source.contains("No recent case activity."),
-                "Recent Case Activity should keep the requested empty state");
-        assertTrue(source.contains("TODO: Navigate to the case detail activity/update/task anchor"),
-                "Row click behavior should leave a clear future deep-link hook");
-    }
+		assertTrue(source.contains("buildRecentCaseActivityWidget()"),
+				"Overview dashboard should render the live Recent Case Activity widget instead of a placeholder");
+		assertTrue(source.contains("RECENT_CASE_ACTIVITY_ROW_LIMIT = 10"),
+				"Recent Case Activity should cap visible rows at 10");
+		assertTrue(source.contains("caseDao.listRecentCaseUpdatesForAssignedCases"),
+				"Recent Case Activity should use the tenant-scoped assigned-case batch Case Updates DAO path");
+		assertTrue(!source.contains("caseDao.listCaseUpdates(caseVm.id, tenantId)"),
+				"Recent Case Activity should not load CaseUpdates once per assigned case");
+		assertTrue(source.contains("taskActivitiesForAssignedCases(myTasks, caseNamesById)"),
+				"Recent Case Activity should reuse already loaded assigned-task models for task activity");
+		assertTrue(Pattern.compile("return\\s+DashboardWidgetFactory\\.widget\\(\\s*\"Recent Case Activity\"",
+				Pattern.DOTALL).matcher(source).find(),
+				"Recent Case Activity should be built with DashboardWidgetFactory");
+		assertTrue(source.contains("No recent case activity."),
+				"Recent Case Activity should keep the requested empty state");
+		assertTrue(source.contains("TODO: Navigate to the case detail activity/update/task anchor"),
+				"Row click behavior should leave a clear future deep-link hook");
+	}
 
-    @Test
-    void overviewDashboardKeepsCompactTwoColumnBriefingOrderAndStates() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
-        String css = Files.readString(Path.of("src/main/resources/css/app.css"));
+	@Test
+	void overviewDashboardKeepsResponsiveBriefingOrderAndDistinctStates() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+		String css = Files.readString(Path.of("src/main/resources/css/foundation/cards.css"));
 
-        assertTrue(source.contains("sections.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.68))"),
-                "Overview task column should remain near the requested 65-70% width");
-        assertTrue(source.contains("widgets.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.32))"),
-                "Overview briefing column should remain near the requested 30-35% width");
-        int radarIndex = source.indexOf("buildCaseRadarWidget()");
-        int datesIndex = source.indexOf("buildImportantDatesWidget()");
-        int notificationsIndex = source.indexOf("buildNotificationsWidget()");
-        int activityIndex = source.indexOf("buildRecentCaseActivityWidget()");
-        int summaryIndex = source.indexOf("buildMyCaseSummaryWidget()");
-        assertTrue(radarIndex > 0 && radarIndex < datesIndex && datesIndex < activityIndex
-                        && activityIndex < notificationsIndex && notificationsIndex < summaryIndex,
-                "Right-column widgets should keep the requested briefing order");
-        assertTrue(source.contains("No urgent items."));
-        assertTrue(source.contains("No upcoming important dates."));
-        assertTrue(source.contains("You’re all caught up."));
-        assertTrue(source.contains("No recent case activity."));
-        assertTrue(source.contains("No case summary available."));
-        assertTrue(css.contains(".dashboard-widget"));
-        assertTrue(css.contains("-fx-padding: 10 12 12 12"),
-                "Dashboard widget shell should keep compact padding");
-        assertTrue(css.contains("-fx-min-height: 34"),
-                "Dashboard state rows should avoid unnecessary vertical sprawl");
-    }
+		assertTrue(source.contains("GridPane dashboard = new GridPane()"),
+				"Overview columns should use deterministic GridPane coordinates");
+		assertFalse(source.contains("FlowPane dashboard = new FlowPane(OVERVIEW_COLUMN_GAP, 12)"),
+				"The Overview host must not delegate wrapping to FlowPane");
+		assertTrue(source.contains("OVERVIEW_PRIMARY_SHARE = 0.625")
+				&& source.contains("updateOverviewColumnLayout(newBounds.getWidth())"),
+				"Overview should switch explicit GridPane coordinates at the viewport breakpoint");
+		assertFalse(source.contains("dashboard.prefWrapLengthProperty()"),
+				"The GridPane Overview host must not retain FlowPane wrap-length behavior");
+		assertTrue(source.contains("widgets.setMaxWidth(Double.MAX_VALUE)"),
+				"The briefing column must not retain its former 430px total-width cap");
+		int radarIndex = source.indexOf("buildCaseRadarWidget()");
+		int datesIndex = source.indexOf("buildImportantDatesWidget()");
+		int notificationsIndex = source.indexOf("buildNotificationsWidget()");
+		int activityIndex = source.indexOf("buildRecentCaseActivityWidget()");
+		int summaryIndex = source.indexOf("buildMyCaseSummaryWidget()");
+		assertTrue(radarIndex > 0 && radarIndex < datesIndex && datesIndex < activityIndex
+				&& activityIndex < notificationsIndex && notificationsIndex < summaryIndex,
+				"Right-column widgets should keep the requested briefing order");
+		assertTrue(source.contains("No urgent items."));
+		assertTrue(source.contains("No upcoming important dates."));
+		assertTrue(source.contains("You’re all caught up."));
+		assertTrue(source.contains("No recent case activity."));
+		assertTrue(source.contains("No case summary available."));
+		assertTrue(css.contains(".dashboard-widget"));
+		assertTrue(css.contains("-fx-min-height: 34"),
+				"Dashboard state rows should avoid unnecessary vertical sprawl");
+	}
 
-    @Test
-    void overviewWidgetRefreshHooksAreCoalescedAndActivityRiskIsDocumented() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+	@Test
+	void overviewColumnAllocationUsesAllAvailableWidthAndStacksBelowTheBreakpoint() {
+		double[] desktop = MyShaleController.overviewColumnWidths(1600);
+		assertEquals(992.5, desktop[0], 0.01);
+		assertEquals(595.5, desktop[1], 0.01);
+		assertEquals(1600, desktop[0] + 12 + desktop[1], 0.01,
+				"Desktop columns and their intentional gap must consume the complete viewport width.");
+		assertEquals(0.625, desktop[0] / (desktop[0] + desktop[1]), 0.001,
+				"The primary column should retain roughly five-eighths emphasis.");
 
-        assertTrue(source.contains("requestOverviewWidgetRefresh()"),
-                "Notification-driven widget refreshes should be coalesced to reduce duplicate renders");
-        assertTrue(source.contains("overviewWidgetRenderQueued"),
-                "Coalesced refreshes should track pending JavaFX render work");
-        assertTrue(source.contains("subscribeCaseUpdated(liveCaseUpdatedHandler)"));
-        assertTrue(source.contains("handleLiveCaseUpdatedEvent"));
-        assertTrue(source.contains("refreshMyCasesBoard(true)"),
-                "Accepted Case updates should invalidate and reload the authoritative assigned-case snapshot.");
-        assertTrue(source.contains("refreshRecentCaseActivity()"),
-                "Live case updates and assigned task/case loads should keep the activity widget independently refreshable");
-        assertTrue(source.contains("activeAssignedCaseRadarSource()"),
-                "Recent activity should skip terminal assigned cases through the existing active assigned case source");
-        assertTrue(source.contains("caseDao.listRecentCaseUpdatesForAssignedCases"),
-                "Recent activity should use the tenant-scoped batch Case Updates path");
-        assertTrue(!source.contains("TODO: Replace this per-case CaseUpdates loop with a tenant-scoped batch activity read"),
-                "The documented N+1 CaseUpdates loop should be removed after the batch path is available");
-    }
+		double[] narrow = MyShaleController.overviewColumnWidths(720);
+		assertEquals(720, narrow[0], 0.01);
+		assertEquals(720, narrow[1], 0.01,
+				"Each wrapped column must fill the viewport at supported narrow widths.");
+	}
 
-    @Test
-    void recentCaseActivitySortsNewestFirstAndPrefersCaseUpdatesOnTies() {
-        LocalDateTime now = LocalDateTime.of(2026, 7, 2, 12, 0);
-        List<MyShaleController.RecentCaseActivityItem> sorted = MyShaleController.sortRecentCaseActivities(List.of(
-                new MyShaleController.RecentCaseActivityItem(MyShaleController.RecentCaseActivityType.TASK_CREATED, "+", "Task assigned", "Beta", now.minusDays(1), 2L, 20L),
-                new MyShaleController.RecentCaseActivityItem(MyShaleController.RecentCaseActivityType.TASK_COMPLETED, "✓", "Task completed", "Gamma", now, 3L, 30L),
-                new MyShaleController.RecentCaseActivityItem(MyShaleController.RecentCaseActivityType.CASE_UPDATE, "•", "Case update added", "Alpha", now, 1L, 10L)
-        ));
+	@Test
+	void renderedOverviewUsesGridCoordinatesAndPreservesColumnsAcrossBreakpointChanges() {
+		JavaFxTestSupport.runAndWait(() ->
+		{
+			for (double sceneWidth : List.of(760.0, 1600.0, 1920.0)) {
+				FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/my-shale.fxml"));
+				Parent root = loader.load();
+				MyShaleController controller = loader.getController();
+				Method ensureShell = MyShaleController.class.getDeclaredMethod("ensureOverviewContentShell");
+				ensureShell.setAccessible(true);
+				ensureShell.invoke(controller);
+				Method renderSections = MyShaleController.class.getDeclaredMethod("renderOverviewSections", List.class);
+				renderSections.setAccessible(true);
+				renderSections.invoke(controller, List.of());
 
-        assertEquals(MyShaleController.RecentCaseActivityType.CASE_UPDATE, sorted.get(0).type());
-        assertEquals(MyShaleController.RecentCaseActivityType.TASK_COMPLETED, sorted.get(1).type());
-        assertEquals(MyShaleController.RecentCaseActivityType.TASK_CREATED, sorted.get(2).type());
-    }
+				Scene scene = new Scene(root, sceneWidth, 900);
+				ThemeManager.application().register(scene);
+				root.applyCss();
+				root.layout();
 
-    @Test
-    void recentCaseActivityTaskSourceOnlyIncludesAssignedCases() {
-        LocalDateTime now = LocalDateTime.of(2026, 7, 2, 12, 0);
-        var included = new com.shale.core.dto.CaseTaskListItemDto(
-                10, 7, 100, "Included", null, null, null, null, null, null,
-                "Review records", null, null, null, null, null, null, null, null, null, null, now, now, false);
-        var excluded = new com.shale.core.dto.CaseTaskListItemDto(
-                11, 7, 200, "Excluded", null, null, null, null, null, null,
-                "Outside case", null, null, null, null, null, null, null, null, null, null, now, now, false);
+				ScrollPane scroll = field(controller, "overviewScroll", ScrollPane.class);
+				VBox content = field(controller, "overviewMainRow", VBox.class);
+				VBox primary = field(controller, "overviewSectionsContainer", VBox.class);
+				VBox briefing = field(controller, "overviewWidgetsContainer", VBox.class);
+				Object dashboardNode = root.lookup(".my-shale-overview-dashboard");
+				GridPane dashboard = assertInstanceOf(GridPane.class, dashboardNode,
+						"The production Overview dashboard host must be a GridPane.");
+				assertFalse(dashboardNode instanceof FlowPane,
+						"The production Overview dashboard host must not remain a FlowPane.");
+				double viewportWidth = scroll.getViewportBounds().getWidth();
 
-        List<MyShaleController.RecentCaseActivityItem> activities = MyShaleController.taskActivitiesForAssignedCases(
-                List.of(included, excluded),
-                Map.of(100L, "Included"));
+				assertTrue(content.getWidth() >= viewportWidth - 2,
+						"Scroll content must fill the page viewport at " + sceneWidth + "px.");
+				assertTrue(dashboard.getWidth() >= viewportWidth * 0.90,
+						"Overview host must use at least 90% of its viewport at " + sceneWidth + "px.");
+				if (viewportWidth >= 800) {
+					assertEquals(0, GridPane.getColumnIndex(primary));
+					assertEquals(0, GridPane.getRowIndex(primary));
+					assertEquals(1, GridPane.getColumnIndex(briefing));
+					assertEquals(0, GridPane.getRowIndex(briefing));
+					assertEquals(2, dashboard.getColumnConstraints().size());
+					assertEquals(primary.getBoundsInParent().getMinY(), briefing.getBoundsInParent().getMinY(), 1.5,
+							"Desktop columns must remain side by side at " + sceneWidth + "px.");
+					assertTrue(briefing.getBoundsInParent().getMinX() > primary.getBoundsInParent().getMaxX(),
+							"The briefing column must render to the right of the primary column.");
+					double allocatedWidth = primary.getWidth() + briefing.getWidth();
+					assertEquals(0.625, primary.getWidth() / allocatedWidth, 0.015);
+					assertEquals(0.375, briefing.getWidth() / allocatedWidth, 0.015);
+				} else {
+					assertEquals(0, GridPane.getColumnIndex(primary));
+					assertEquals(0, GridPane.getRowIndex(primary));
+					assertEquals(0, GridPane.getColumnIndex(briefing));
+					assertEquals(1, GridPane.getRowIndex(briefing));
+					assertEquals(1, dashboard.getColumnConstraints().size());
+					assertEquals(100, dashboard.getColumnConstraints().get(0).getPercentWidth(), 0.01);
+					assertTrue(briefing.getBoundsInParent().getMinY() >= primary.getBoundsInParent().getMaxY() - 1,
+							"The briefing column must stack below primary at narrow width.");
+					assertEquals(viewportWidth, primary.getWidth(), 2.5);
+					assertEquals(viewportWidth, briefing.getWidth(), 2.5);
+				}
+				assertEquals(List.of("Today’s Tasks", "Upcoming", "Later"), directSectionTitles(primary),
+						"Task sections must remain in the primary column below its filter toolbar.");
+				assertEquals(List.of("Case Radar", "Important Dates", "Recent Case Activity", "Notifications", "My Case Summary"),
+						directSectionTitles(briefing), "Briefing widgets must retain their production order.");
+				int primaryChildren = primary.getChildren().size();
+				int briefingChildren = briefing.getChildren().size();
+				Method updateColumns = MyShaleController.class.getDeclaredMethod("updateOverviewColumnLayout", double.class);
+				updateColumns.setAccessible(true);
+				updateColumns.invoke(controller, 700.0);
+				root.layout();
+				updateColumns.invoke(controller, 1600.0);
+				root.layout();
+				updateColumns.invoke(controller, viewportWidth);
+				root.layout();
+				assertEquals(primaryChildren, primary.getChildren().size(), "Breakpoint changes must not duplicate task sections.");
+				assertEquals(briefingChildren, briefing.getChildren().size(), "Breakpoint changes must not duplicate widgets.");
+				assertTrue(dashboard.getChildren().containsAll(List.of(primary, briefing))
+						&& dashboard.getChildren().size() == 2, "Breakpoint changes must preserve both column nodes.");
+				assertEquals(ScrollPane.ScrollBarPolicy.NEVER, scroll.getHbarPolicy());
+				assertTrue(scroll.lookupAll(".scroll-bar").stream()
+						.filter(ScrollBar.class::isInstance).map(ScrollBar.class::cast)
+						.filter(bar -> bar.getOrientation() == javafx.geometry.Orientation.HORIZONTAL)
+						.noneMatch(Node::isVisible), "No horizontal scrollbar may appear.");
+				System.out.printf("My Shale %.0fpx: viewport=%.1f dashboard=%.1f primary=[%.1f,%.1f %.1fx%.1f] briefing=[%.1f,%.1f %.1fx%.1f]%n",
+						sceneWidth, viewportWidth, dashboard.getWidth(),
+						primary.getBoundsInParent().getMinX(), primary.getBoundsInParent().getMinY(), primary.getWidth(), primary.getHeight(),
+						briefing.getBoundsInParent().getMinX(), briefing.getBoundsInParent().getMinY(), briefing.getWidth(), briefing.getHeight());
 
-        assertEquals(1, activities.size());
-        assertEquals("Included", activities.get(0).caseName());
-        assertTrue(activities.get(0).summary().contains("Review records"));
-    }
+				Method selectSection = MyShaleController.class.getDeclaredMethod("applySectionSelectionState", String.class);
+				selectSection.setAccessible(true);
+				VBox tasksPane = field(controller, "tasksSectionPane", VBox.class);
+				VBox casesPane = field(controller, "myCasesSectionPane", VBox.class);
+				selectSection.invoke(controller, "My Tasks");
+				root.layout();
+				assertEquals(field(controller, "sectionContentStack", javafx.scene.layout.StackPane.class).getWidth(),
+						tasksPane.getWidth(), 1.5, "My Tasks must fill the routed content host.");
+				selectSection.invoke(controller, "My Cases");
+				root.layout();
+				assertEquals(field(controller, "sectionContentStack", javafx.scene.layout.StackPane.class).getWidth(),
+						casesPane.getWidth(), 1.5, "My Cases must fill the routed content host.");
+				ThemeManager.application().unregister(scene);
+			}
+		});
+	}
 
-    @Test
-    void myCasesBoardUsesWiderStatusColumnsAndHorizontalScroll() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+	private static List<String> directSectionTitles(VBox column) {
+		return column.getChildren().stream()
+				.map(node -> node.lookup(".dashboard-widget-title") != null
+						? node.lookup(".dashboard-widget-title")
+						: node instanceof VBox box && !box.getChildren().isEmpty() ? box.getChildren().get(0) : null)
+				.filter(javafx.scene.control.Labeled.class::isInstance)
+				.map(javafx.scene.control.Labeled.class::cast)
+				.map(javafx.scene.control.Labeled::getText)
+				.map(text -> text.replaceFirst(" \\(\\d+\\)$", ""))
+				.toList();
+	}
 
-        assertTrue(source.contains("MY_CASES_STATUS_COLUMN_MIN_WIDTH = 336"),
-                "My Cases board lane minimum width should be widened from the previous 245px value");
-        assertTrue(source.contains("MY_CASES_STATUS_COLUMN_PREF_WIDTH = 376"),
-                "My Cases board lane preferred width should be widened from the previous 280px value");
-        assertTrue(source.contains("MY_CASES_STATUS_COLUMN_MAX_WIDTH = 416"),
-                "My Cases board lane maximum width should be widened from the previous 320px value");
-        assertTrue(source.contains("myCasesBoardScroll.setFitToWidth(false)"),
-                "The board should horizontally scroll instead of fitting/compressing all status lanes into the viewport");
-        assertTrue(source.contains("myCasesBoardScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED)"));
-        assertTrue(source.contains("body.setFillWidth(true)"));
-        assertTrue(source.contains("buildMyCasesBoardCard"));
-        assertTrue(source.contains("region.setMaxWidth(Double.MAX_VALUE)"),
-                "Board cards should be allowed to fill the widened status lane body");
-    }
+	private static <T> T field(Object target, String name, Class<T> type) throws Exception {
+		Field field = target.getClass().getDeclaredField(name);
+		field.setAccessible(true);
+		return type.cast(field.get(target));
+	}
+
+	@Test
+	void overviewWidgetRefreshHooksAreCoalescedAndActivityRiskIsDocumented() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+
+		assertTrue(source.contains("requestOverviewWidgetRefresh()"),
+				"Notification-driven widget refreshes should be coalesced to reduce duplicate renders");
+		assertTrue(source.contains("overviewWidgetRenderQueued"),
+				"Coalesced refreshes should track pending JavaFX render work");
+		assertTrue(source.contains("subscribeCaseUpdated(liveCaseUpdatedHandler)"));
+		assertTrue(source.contains("handleLiveCaseUpdatedEvent"));
+		assertTrue(source.contains("refreshMyCasesBoard(true)"),
+				"Accepted Case updates should invalidate and reload the authoritative assigned-case snapshot.");
+		assertTrue(source.contains("refreshRecentCaseActivity()"),
+				"Live case updates and assigned task/case loads should keep the activity widget independently refreshable");
+		assertTrue(source.contains("activeAssignedCaseRadarSource()"),
+				"Recent activity should skip terminal assigned cases through the existing active assigned case source");
+		assertTrue(source.contains("caseDao.listRecentCaseUpdatesForAssignedCases"),
+				"Recent activity should use the tenant-scoped batch Case Updates path");
+		assertTrue(!source.contains("TODO: Replace this per-case CaseUpdates loop with a tenant-scoped batch activity read"),
+				"The documented N+1 CaseUpdates loop should be removed after the batch path is available");
+	}
+
+	@Test
+	void recentCaseActivitySortsNewestFirstAndPrefersCaseUpdatesOnTies() {
+		LocalDateTime now = LocalDateTime.of(2026, 7, 2, 12, 0);
+		List<MyShaleController.RecentCaseActivityItem> sorted = MyShaleController.sortRecentCaseActivities(List.of(
+				new MyShaleController.RecentCaseActivityItem(MyShaleController.RecentCaseActivityType.TASK_CREATED, "+", "Task assigned", "Beta", now.minusDays(1), 2L, 20L),
+				new MyShaleController.RecentCaseActivityItem(MyShaleController.RecentCaseActivityType.TASK_COMPLETED, "✓", "Task completed", "Gamma", now, 3L, 30L),
+				new MyShaleController.RecentCaseActivityItem(MyShaleController.RecentCaseActivityType.CASE_UPDATE, "•", "Case update added", "Alpha", now, 1L, 10L)
+		));
+
+		assertEquals(MyShaleController.RecentCaseActivityType.CASE_UPDATE, sorted.get(0).type());
+		assertEquals(MyShaleController.RecentCaseActivityType.TASK_COMPLETED, sorted.get(1).type());
+		assertEquals(MyShaleController.RecentCaseActivityType.TASK_CREATED, sorted.get(2).type());
+	}
+
+	@Test
+	void recentCaseActivityTaskSourceOnlyIncludesAssignedCases() {
+		LocalDateTime now = LocalDateTime.of(2026, 7, 2, 12, 0);
+		var included = new com.shale.core.dto.CaseTaskListItemDto(
+				10, 7, 100, "Included", null, null, null, null, null, null,
+				"Review records", null, null, null, null, null, null, null, null, null, null, now, now, false);
+		var excluded = new com.shale.core.dto.CaseTaskListItemDto(
+				11, 7, 200, "Excluded", null, null, null, null, null, null,
+				"Outside case", null, null, null, null, null, null, null, null, null, null, now, now, false);
+
+		List<MyShaleController.RecentCaseActivityItem> activities = MyShaleController.taskActivitiesForAssignedCases(
+				List.of(included, excluded),
+				Map.of(100L, "Included"));
+
+		assertEquals(1, activities.size());
+		assertEquals("Included", activities.get(0).caseName());
+		assertTrue(activities.get(0).summary().contains("Review records"));
+	}
+
+	@Test
+	void myCasesBoardUsesWiderStatusColumnsAndHorizontalScroll() throws Exception {
+		String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+
+		assertTrue(source.contains("MY_CASES_STATUS_COLUMN_MIN_WIDTH = 336"),
+				"My Cases board lane minimum width should be widened from the previous 245px value");
+		assertTrue(source.contains("MY_CASES_STATUS_COLUMN_PREF_WIDTH = 376"),
+				"My Cases board lane preferred width should be widened from the previous 280px value");
+		assertTrue(source.contains("MY_CASES_STATUS_COLUMN_MAX_WIDTH = 416"),
+				"My Cases board lane maximum width should be widened from the previous 320px value");
+		assertTrue(source.contains("myCasesBoardScroll.setFitToWidth(false)"),
+				"The board should horizontally scroll instead of fitting/compressing all status lanes into the viewport");
+		assertTrue(source.contains("myCasesBoardScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED)"));
+		assertTrue(source.contains("body.setFillWidth(true)"));
+		assertTrue(source.contains("buildMyCasesBoardCard"));
+		assertTrue(source.contains("region.setMaxWidth(Double.MAX_VALUE)"),
+				"Board cards should be allowed to fill the widened status lane body");
+	}
 }

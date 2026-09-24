@@ -58,6 +58,7 @@ import javafx.beans.binding.Bindings;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.AccessibleRole;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
@@ -66,7 +67,11 @@ import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.MouseButton;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
@@ -106,6 +111,9 @@ public final class MyShaleController {
 	private static final double MY_CASES_STATUS_COLUMN_MAX_WIDTH = 416;
 	private static final double OVERVIEW_CARD_GAP = 10;
 	private static final double OVERVIEW_SECTION_HORIZONTAL_PADDING = 10;
+	private static final double OVERVIEW_COLUMN_GAP = 12;
+	private static final double OVERVIEW_PRIMARY_SHARE = 0.625;
+	private static final double OVERVIEW_TWO_COLUMN_BREAKPOINT = 800;
 	private static final String OVERVIEW_SORT_DUE_ASC = "Due Date (earliest first)";
 	private static final String OVERVIEW_SORT_DUE_DESC = "Due Date (latest first)";
 	private static final String OVERVIEW_SORT_PRIORITY = "Priority";
@@ -161,7 +169,13 @@ public final class MyShaleController {
 	@FXML
 	private Label myTasksEmptyLabel;
 	@FXML
+	private Label myTasksErrorLabel;
+	@FXML
+	private Label myTasksResultCount;
+	@FXML
 	private HBox sectionTabsBar;
+	@FXML
+	private ScrollPane sectionTabsScroll;
 	@FXML
 	private VBox overviewSectionPane;
 	@FXML
@@ -191,6 +205,10 @@ public final class MyShaleController {
 	@FXML
 	private Label myCasesBoardEmptyLabel;
 	@FXML
+	private Label myCasesErrorLabel;
+	@FXML
+	private Label myCasesResultCount;
+	@FXML
 	private TextField myCasesBoardSearchField;
 	@FXML
 	private ChoiceBox<String> myCasesBoardSortChoice;
@@ -211,6 +229,7 @@ public final class MyShaleController {
 	private Runnable onOpenNotificationCenter;
 	private Consumer<Integer> onOpenCase;
 	private Consumer<Integer> onOpenUser;
+	private Consumer<Long> onOpenTask = this::showTaskDetailPopup;
 	private CaseCardFactory caseCardFactory;
 	private TaskCardFactory taskCardFactory;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
@@ -243,6 +262,7 @@ public final class MyShaleController {
 	private Integer cachedCasesUserId;
 	private Integer cachedCasesTenantId;
 	private boolean myCasesLoadFailed;
+	private boolean myTasksLoadFailed;
 	private boolean caseStatusOptionsInitialized;
 	private boolean loadingRecentCaseActivity;
 	private boolean recentCaseActivityLoadFailed;
@@ -265,6 +285,10 @@ public final class MyShaleController {
 	private String overviewSortMode = OVERVIEW_SORT_DUE_ASC;
 	private VBox overviewSectionsContainer;
 	private VBox overviewWidgetsContainer;
+	private GridPane overviewDashboard;
+	private ColumnConstraints overviewPrimaryColumnConstraint;
+	private ColumnConstraints overviewBriefingColumnConstraint;
+	private boolean overviewColumnsStacked;
 	private TextField overviewSearchFieldControl;
 	private ChoiceBox<PriorityFilterOption> overviewPriorityChoiceControl;
 	private ChoiceBox<CaseFilterOption> overviewCaseChoiceControl;
@@ -309,6 +333,7 @@ public final class MyShaleController {
 	}
 
 	private MyTasksSource myTasksSource = MyTasksSource.ASSIGNED_TO_ME;
+	private boolean dedicatedTasksMode;
 
 	private final ExecutorService casesDbExec = Executors.newSingleThreadExecutor(r ->
 	{
@@ -509,10 +534,7 @@ public final class MyShaleController {
 			renderMyCasesBoard();
 		});
 
-		Platform.runLater(() ->
-		{
-			onSectionSelected(SECTION_OVERVIEW);
-		});
+		Platform.runLater(() -> onSectionSelected(dedicatedTasksMode ? SECTION_TASKS : SECTION_OVERVIEW));
 
 		if (myCasesSectionPane != null) {
 			myCasesSectionPane.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -522,6 +544,18 @@ public final class MyShaleController {
 			});
 		}
 		subscribeLiveCaseUpdates();
+	}
+
+	/**
+	 * Presents the existing My Tasks board as the dedicated Tasks route. The board,
+	 * filters, preferences, handlers, card factory, and scroll owner stay singular;
+	 * only the surrounding route chrome and initially selected section change.
+	 */
+	public void configureDedicatedTasksMode() {
+		dedicatedTasksMode = true;
+		setVisibleManaged(sectionTabsScroll, false);
+		unsubscribeLiveCaseUpdates();
+		onSectionSelected(SECTION_TASKS);
 	}
 
 	private void applyMyTasksSemanticControls() {
@@ -698,6 +732,9 @@ public final class MyShaleController {
 	}
 
 	private void subscribeLiveCaseUpdates() {
+		if (dedicatedTasksMode) {
+			return;
+		}
 		if (runtimeBridge == null) {
 			log.debug("My Cases live subscribe skipped: runtimeBridge is null");
 			return;
@@ -855,6 +892,7 @@ public final class MyShaleController {
 		if (loadingMyTasks && !force) return;
 		loadingOverview = true;
 		loadingMyTasks = true;
+		myTasksLoadFailed = false;
 		renderActiveTaskViews();
 		Integer tenant = appState.getShaleClientId();
 		Integer user = appState.getUserId();
@@ -915,6 +953,7 @@ public final class MyShaleController {
 				runOnFx(() -> {
 					if (!isCurrentTaskLoad(generation, tenantAtSubmit, userAtSubmit)) return;
 					loadingOverview = loadingMyTasks = false;
+					myTasksLoadFailed = true;
 					myTasksDirty = true;
 					renderActiveTaskViews();
 					showTaskActionError("Failed to load your tasks.");
@@ -946,6 +985,7 @@ public final class MyShaleController {
 		cachedTasksTenantId = tenant;
 		myTasksLoadedOnce = true;
 		myTasksDirty = false;
+		myTasksLoadFailed = false;
 		loadingOverview = loadingMyTasks = false;
 		syncMyTaskCaseFilterOptions();
 		renderActiveTaskViews();
@@ -953,12 +993,24 @@ public final class MyShaleController {
 		refreshRecentCaseActivity();
 	}
 
-	private void applyPriorities(int generation, int tenant, int user, Map<Integer, String> priorities) {
-		if (!isCurrentTaskLoad(generation, tenant, user)) return;
-		myTaskPrioritiesById = priorities == null ? Map.of() : Map.copyOf(priorities);
-		taskPrioritiesHydrated = true;
-		syncMyTaskPriorityFilterOptions();
-		logHydrationIfComplete(generation);
+	private void applyPriorities(
+	        int generation,
+	        int tenant,
+	        int user,
+	        Map<Integer, String> priorities) {
+
+	    if (!isCurrentTaskLoad(generation, tenant, user)) {
+	        return;
+	    }
+
+	    myTaskPrioritiesById =
+	            priorities == null ? Map.of() : Map.copyOf(priorities);
+	    taskPrioritiesHydrated = true;
+
+	    syncMyTaskPriorityFilterOptions();
+	    renderActiveTaskViews();
+
+	    logHydrationIfComplete(generation);
 	}
 
 	private void applyStatuses(int generation, int tenant, int user, List<TaskStatusOptionDto> statuses) {
@@ -1083,7 +1135,6 @@ public final class MyShaleController {
 				});
 			} catch (Exception ex) {
 				log.warn("My cases board load failed userId={}: {}", userIdValue, ex.getMessage());
-				ex.printStackTrace();
 				runOnFx(() -> {
 					if (generationAtSubmit != myCasesBoardLoadGeneration
 							|| appState == null || !Objects.equals(appState.getUserId(), userIdValue)
@@ -1116,19 +1167,21 @@ public final class MyShaleController {
 		PerfLog.log("RENDER", "start", "panel=my_cases_board page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		if (loadingMyCases) {
 			myCasesBoardList.getChildren().clear();
-			myCasesBoardEmptyLabel.setText("Loading your cases...");
-			setVisibleManaged(myCasesBoardEmptyLabel, true);
+			setVisibleManaged(myCasesBoardEmptyLabel, false);
+			setVisibleManaged(myCasesErrorLabel, false);
 			setVisibleManaged(myCasesBoardScroll, false);
-			setVisibleManaged(myCasesLoadingLabel, false);
+			setVisibleManaged(myCasesLoadingLabel, true);
+			updateResultCount(myCasesResultCount, 0);
 			PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale state=loading childCount=0", renderStartNanos);
 			return;
 		}
 		myCasesBoardList.getChildren().clear();
 		setVisibleManaged(myCasesLoadingLabel, false);
 		if (myCasesLoadFailed) {
-			myCasesBoardEmptyLabel.setText("Unable to load assigned cases.");
-			setVisibleManaged(myCasesBoardEmptyLabel, true);
+			setVisibleManaged(myCasesBoardEmptyLabel, false);
+			setVisibleManaged(myCasesErrorLabel, true);
 			setVisibleManaged(myCasesBoardScroll, false);
+			updateResultCount(myCasesResultCount, 0);
 			log.debug("My Cases board rendered state=error");
 			lastMyCasesBoardRenderSignature = "error";
 			PerfLog.logDone("RENDER", "panel=my_cases_board page=my_shale state=error childCount=0", renderStartNanos);
@@ -1203,8 +1256,11 @@ public final class MyShaleController {
 		}
 
 		boolean hasAnyCards = cardCount > 0;
+		updateResultCount(myCasesResultCount, cardCount);
 		if (!hasAnyCards) {
-			myCasesBoardEmptyLabel.setText("No assigned cases found.");
+			boolean filtered = (searchQuery != null && !searchQuery.isBlank()) || selectedStatusId != null;
+			myCasesBoardEmptyLabel.setText(filtered ? "No cases match the selected filters." : "No cases assigned to you yet.");
+			setVisibleManaged(myCasesErrorLabel, false);
 			setVisibleManaged(myCasesBoardEmptyLabel, true);
 			setVisibleManaged(myCasesBoardScroll, false);
 			log.debug("My Cases board rendered state=empty");
@@ -1214,6 +1270,7 @@ public final class MyShaleController {
 		}
 
 		setVisibleManaged(myCasesBoardEmptyLabel, false);
+		setVisibleManaged(myCasesErrorLabel, false);
 		setVisibleManaged(myCasesBoardScroll, true);
 		String renderSignature = renderSignature("board", laneCount, cardCount, searchQuery, selectedStatusId);
 		if (Objects.equals(lastMyCasesBoardRenderSignature, renderSignature)
@@ -1359,7 +1416,7 @@ public final class MyShaleController {
 	}
 
 	private void renderMyTasks() {
-		if (myTasksList == null || myTasksEmptyLabel == null || myTasksScroll == null) {
+		if (myTasksList == null || myTasksEmptyLabel == null || myTasksScroll == null || myTasksLoadingLabel == null) {
 			return;
 		}
 		updateMyTasksViewToggleStyles();
@@ -1369,21 +1426,33 @@ public final class MyShaleController {
 			if (grid != null) {
 				grid.getChildren().clear();
 			}
-			myTasksEmptyLabel.setText("Loading your tasks...");
-			setVisibleManaged(myTasksEmptyLabel, true);
+			setVisibleManaged(myTasksEmptyLabel, false);
+			setVisibleManaged(myTasksErrorLabel, false);
+			setVisibleManaged(myTasksLoadingLabel, true);
 			setVisibleManaged(myTasksScroll, false);
+			updateResultCount(myTasksResultCount, 0);
 			suppressMyTasksScrollTopRightCornerOverlay();
 			return;
 		}
 		long renderStartNanos = PerfLog.start();
 		PerfLog.log("RENDER", "start", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		myTasksList.getChildren().clear();
+		setVisibleManaged(myTasksLoadingLabel, false);
+		if (myTasksLoadFailed) {
+			setVisibleManaged(myTasksEmptyLabel, false);
+			setVisibleManaged(myTasksErrorLabel, true);
+			setVisibleManaged(myTasksScroll, false);
+			updateResultCount(myTasksResultCount, 0);
+			return;
+		}
+		setVisibleManaged(myTasksErrorLabel, false);
 
 		String searchQuery = normalizeSearchQuery(myTasksSearchField == null ? null : myTasksSearchField.getText());
 		List<CaseTaskListItemDto> taskFiltered = filterAndRankMyTasks(myTasks, selectedPriorityFilterId(), searchQuery).stream()
 				.filter(task -> matchesSelectedMyTaskStatus(task, selectedMyTaskStatusFilter()))
 				.toList();
 		List<CaseTaskListItemDto> filteredTasks = applyCaseColumnFilter(taskFiltered, selectedCaseFilterId());
+		updateResultCount(myTasksResultCount, filteredTasks.size());
 		if (myTasks == null || myTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
@@ -1397,7 +1466,7 @@ public final class MyShaleController {
 		if (filteredTasks.isEmpty()) {
 			setVisibleManaged(myTasksEmptyLabel, true);
 			setVisibleManaged(myTasksScroll, false);
-			myTasksEmptyLabel.setText("No tasks found.");
+			myTasksEmptyLabel.setText("No tasks match the selected filters.");
 			suppressMyTasksScrollTopRightCornerOverlay();
 			PerfLog.logDone("RENDER", "panel=my_tasks page=my_shale userId=" + (appState == null ? null : appState.getUserId()) + " childCount=0", renderStartNanos);
 			return;
@@ -1546,9 +1615,16 @@ public final class MyShaleController {
 		PerfLog.log("RENDER", "start", "panel=overview page=my_shale userId=" + (appState == null ? null : appState.getUserId()));
 		if (loadingOverview) {
 			Label loadingLabel = new Label("Loading your overview...");
-			loadingLabel.getStyleClass().add("muted-text");
+			loadingLabel.getStyleClass().add("shale-loading-placeholder");
 			overviewMainRow.getChildren().setAll(loadingLabel);
 			PerfLog.logDone("RENDER", "panel=overview page=my_shale state=loading childCount=1", renderStartNanos);
+			return;
+		}
+		if (myTasksLoadFailed) {
+			Label errorLabel = new Label("Unable to load your task overview.");
+			errorLabel.getStyleClass().add("shale-error-state");
+			overviewMainRow.getChildren().setAll(errorLabel);
+			PerfLog.logDone("RENDER", "panel=overview page=my_shale state=error childCount=1", renderStartNanos);
 			return;
 		}
 		ensureOverviewContentShell();
@@ -1564,33 +1640,94 @@ public final class MyShaleController {
 				&& overviewSearchFieldControl != null) {
 			return;
 		}
-		HBox dashboard = new HBox(12);
+		GridPane dashboard = new GridPane();
 		dashboard.getStyleClass().add("my-shale-overview-dashboard");
 		dashboard.setAlignment(Pos.TOP_LEFT);
+		dashboard.setHgap(OVERVIEW_COLUMN_GAP);
+		dashboard.setVgap(12);
+		dashboard.setMinWidth(0);
 		dashboard.setMaxWidth(Double.MAX_VALUE);
 
 		VBox sections = new VBox(10);
 		sections.getStyleClass().add("my-shale-overview-primary-column");
 		sections.setFillWidth(true);
+		sections.setMinWidth(0);
 		sections.setMaxWidth(Double.MAX_VALUE);
-		HBox.setHgrow(sections, Priority.ALWAYS);
 
 		VBox widgets = new VBox(10);
 		widgets.getStyleClass().add("my-shale-overview-briefing-column");
 		widgets.setFillWidth(true);
-		widgets.setMinWidth(300);
-		widgets.setPrefWidth(360);
-		widgets.setMaxWidth(430);
+		widgets.setMinWidth(0);
+		widgets.setMaxWidth(Double.MAX_VALUE);
 
-		sections.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.68));
-		widgets.prefWidthProperty().bind(dashboard.widthProperty().multiply(0.32));
+		GridPane.setHgrow(sections, Priority.ALWAYS);
+		GridPane.setHgrow(widgets, Priority.ALWAYS);
+		GridPane.setFillWidth(sections, true);
+		GridPane.setFillWidth(widgets, true);
+		GridPane.setColumnIndex(sections, 0);
+		GridPane.setRowIndex(sections, 0);
+		GridPane.setColumnIndex(widgets, 1);
+		GridPane.setRowIndex(widgets, 0);
+
+		ColumnConstraints primary = new ColumnConstraints();
+		primary.setPercentWidth(OVERVIEW_PRIMARY_SHARE * 100);
+		primary.setHgrow(Priority.ALWAYS);
+		primary.setFillWidth(true);
+		ColumnConstraints briefing = new ColumnConstraints();
+		briefing.setPercentWidth((1 - OVERVIEW_PRIMARY_SHARE) * 100);
+		briefing.setHgrow(Priority.ALWAYS);
+		briefing.setFillWidth(true);
+		dashboard.getColumnConstraints().setAll(primary, briefing);
 
 		sections.getChildren().add(buildOverviewControlBar());
 		widgets.getChildren().setAll(buildOverviewDashboardWidgets());
+		overviewDashboard = dashboard;
+		overviewPrimaryColumnConstraint = primary;
+		overviewBriefingColumnConstraint = briefing;
 		overviewSectionsContainer = sections;
 		overviewWidgetsContainer = widgets;
 		dashboard.getChildren().setAll(sections, widgets);
 		overviewMainRow.getChildren().setAll(dashboard);
+		overviewScroll.viewportBoundsProperty().addListener((observable, oldBounds, newBounds) ->
+				updateOverviewColumnLayout(newBounds.getWidth()));
+		updateOverviewColumnLayout(overviewScroll.getViewportBounds().getWidth());
+	}
+
+	private void updateOverviewColumnLayout(double viewportWidth) {
+		if (overviewDashboard == null || overviewSectionsContainer == null || overviewWidgetsContainer == null) {
+			return;
+		}
+		boolean stackColumns = viewportWidth < OVERVIEW_TWO_COLUMN_BREAKPOINT;
+		if (stackColumns == overviewColumnsStacked) {
+			return;
+		}
+		overviewColumnsStacked = stackColumns;
+		GridPane.setColumnIndex(overviewSectionsContainer, 0);
+		GridPane.setRowIndex(overviewSectionsContainer, 0);
+		if (stackColumns) {
+			GridPane.setColumnIndex(overviewWidgetsContainer, 0);
+			GridPane.setRowIndex(overviewWidgetsContainer, 1);
+			overviewPrimaryColumnConstraint.setPercentWidth(100);
+			overviewDashboard.getColumnConstraints().setAll(overviewPrimaryColumnConstraint);
+		} else {
+			GridPane.setColumnIndex(overviewWidgetsContainer, 1);
+			GridPane.setRowIndex(overviewWidgetsContainer, 0);
+			overviewPrimaryColumnConstraint.setPercentWidth(OVERVIEW_PRIMARY_SHARE * 100);
+			overviewBriefingColumnConstraint.setPercentWidth((1 - OVERVIEW_PRIMARY_SHARE) * 100);
+			overviewDashboard.getColumnConstraints().setAll(
+					overviewPrimaryColumnConstraint,
+					overviewBriefingColumnConstraint);
+		}
+	}
+
+	static double[] overviewColumnWidths(double viewportWidth) {
+		double available = Double.isFinite(viewportWidth) ? Math.max(0, viewportWidth) : 0;
+		if (available < OVERVIEW_TWO_COLUMN_BREAKPOINT) {
+			return new double[] {available, available};
+		}
+		double distributable = Math.max(0, available - OVERVIEW_COLUMN_GAP);
+		double primary = distributable * OVERVIEW_PRIMARY_SHARE;
+		return new double[] {primary, distributable - primary};
 	}
 
 	private void renderOverviewSections(List<CaseTaskListItemDto> overviewSource) {
@@ -2110,12 +2247,16 @@ public final class MyShaleController {
 				.count();
 	}
 
-	private Node buildCaseRadarRow(CaseRadarRow row) {
+	Node buildCaseRadarRow(CaseRadarRow row) {
 		HBox radarRow = new HBox(8);
 		radarRow.getStyleClass().addAll("case-radar-row", "case-radar-row-" + row.severity().styleSuffix());
 		if (isCaseRadarRowActionable(row)) {
 			radarRow.getStyleClass().add("case-radar-row-actionable");
-			radarRow.setOnMouseClicked(event -> onCaseRadarRowClicked(row));
+			configureActionableRow(
+					radarRow,
+					caseRadarAccessibleName(row),
+					caseRadarTooltip(row),
+					() -> onCaseRadarRowClicked(row));
 		}
 		radarRow.setAlignment(Pos.CENTER_LEFT);
 		radarRow.setMaxWidth(Double.MAX_VALUE);
@@ -2145,6 +2286,23 @@ public final class MyShaleController {
 		return radarRow;
 	}
 
+	private static String caseRadarAccessibleName(CaseRadarRow row) {
+		String item = row.label() + ", " + row.count();
+		return switch (row.action()) {
+			case OVERDUE_TASKS -> "Show " + item + " in My Tasks";
+			case SOL_DUE_14_DAYS, SOL_DUE_15_TO_30_DAYS,
+					TORT_NOTICE_DUE_14_DAYS, TORT_NOTICE_DUE_15_TO_30_DAYS,
+					INACTIVE_ASSIGNED_CASES, RECENTLY_UPDATED_ASSIGNED_CASES -> "Show " + item + " in My Cases";
+			case NONE -> item;
+		};
+	}
+
+	private static String caseRadarTooltip(CaseRadarRow row) {
+		return row.action() == CaseRadarAction.OVERDUE_TASKS
+				? "Open overdue work in My Tasks"
+				: "Open matching cases in My Cases";
+	}
+
 	private boolean isCaseRadarRowActionable(CaseRadarRow row) {
 		return row != null && row.action() != null && row.action() != CaseRadarAction.NONE;
 	}
@@ -2166,7 +2324,7 @@ public final class MyShaleController {
 		}
 	}
 
-	private void showOverdueTasksInMyTasks() {
+	void showOverdueTasksInMyTasks() {
 		if (myTasksSourceChoice != null) {
 			myTasksSourceChoice.getSelectionModel().select(MyTasksSource.ASSIGNED_TO_ME);
 		} else {
@@ -2183,6 +2341,9 @@ public final class MyShaleController {
 		}
 		if (myTasksCaseFilterChoice != null) {
 			myTasksCaseFilterChoice.getSelectionModel().select(ALL_CASES_OPTION);
+		}
+		if (myTasksStatusFilterChoice != null) {
+			myTasksStatusFilterChoice.getSelectionModel().select(ALL_ACTIVE_TASK_STATUSES_OPTION);
 		}
 		if (showCompletedMyTasks) {
 			showCompletedMyTasks = false;
@@ -2398,12 +2559,16 @@ public final class MyShaleController {
 		return date != null && start != null && end != null && !date.isBefore(start) && !date.isAfter(end);
 	}
 
-	private Node buildImportantDateRow(ImportantDateItem item) {
+	Node buildImportantDateRow(ImportantDateItem item) {
 		HBox row = new HBox(8);
 		row.getStyleClass().addAll("important-date-row", "important-date-row-" + item.severity().styleSuffix());
 		if (isImportantDateActionable(item)) {
 			row.getStyleClass().add("important-date-row-actionable");
-			row.setOnMouseClicked(event -> onImportantDateClicked(item));
+			configureActionableRow(
+					row,
+					importantDateAccessibleName(item),
+					importantDateTooltip(item),
+					() -> onImportantDateClicked(item));
 		}
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.setMaxWidth(Double.MAX_VALUE);
@@ -2423,6 +2588,47 @@ public final class MyShaleController {
 
 		row.getChildren().addAll(date, type, title);
 		return row;
+	}
+
+	private static String importantDateAccessibleName(ImportantDateItem item) {
+		String title = safe(item.title()).isBlank() ? "Untitled" : safe(item.title()).trim();
+		String date = item.date() == null ? "date unavailable" : IMPORTANT_DATE_LABEL_FORMATTER.format(item.date());
+		return switch (item.type()) {
+			case TASK -> "Open Task Details for " + title + ", due " + date;
+			case SOL -> "Open case " + title + " for statute of limitations deadline " + date;
+			case TORT_NOTICE -> "Open case " + title + " for tort notice deadline " + date;
+			case CALENDAR -> title;
+		};
+	}
+
+	private static String importantDateTooltip(ImportantDateItem item) {
+		return item.type() == ImportantDateType.TASK ? "Open Task Details" : "Open Case";
+	}
+
+	/**
+	 * Applies the same semantic mouse and keyboard activation contract used by Shale's
+	 * entity cards while leaving destination ownership with this controller.
+	 */
+	private static void configureActionableRow(HBox row, String accessibleName, String tooltip, Runnable action) {
+		row.getStyleClass().add("shale-actionable-row");
+		row.setFocusTraversable(true);
+		row.setAccessibleRole(AccessibleRole.BUTTON);
+		row.setAccessibleText(accessibleName);
+		if (tooltip != null && !tooltip.isBlank()) {
+			Tooltip.install(row, new Tooltip(tooltip));
+		}
+		row.setOnMouseClicked(event -> {
+			if (!event.isConsumed() && event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 1) {
+				action.run();
+				event.consume();
+			}
+		});
+		row.setOnKeyPressed(event -> {
+			if (!event.isConsumed() && (event.getCode() == KeyCode.ENTER || event.getCode() == KeyCode.SPACE)) {
+				action.run();
+				event.consume();
+			}
+		});
 	}
 
 	private String formatImportantDateLabel(LocalDate date) {
@@ -2608,15 +2814,15 @@ public final class MyShaleController {
 	}
 
 	private Node buildOverviewControlBar() {
-		HBox controls = new HBox(8);
+		FlowPane controls = new FlowPane(8, 8);
 		controls.setAlignment(Pos.CENTER_LEFT);
-		controls.getStyleClass().add("glass-panel");
-		controls.setPadding(new javafx.geometry.Insets(8, 10, 8, 10));
+		controls.getStyleClass().addAll("shale-toolbar", "my-shale-toolbar");
+		controls.setMaxWidth(Double.MAX_VALUE);
 
 		overviewSearchFieldControl = new TextField(safe(overviewSearchText));
 		ControlStyles.formControl(overviewSearchFieldControl);
 		overviewSearchFieldControl.setPromptText("Search title, case, or creator…");
-		HBox.setHgrow(overviewSearchFieldControl, Priority.ALWAYS);
+		overviewSearchFieldControl.setPrefWidth(280);
 		overviewSearchFieldControl.textProperty().addListener((obs, oldV, newV) -> {
 			if (suppressOverviewControlEvents) {
 				return;
@@ -2893,11 +3099,14 @@ public final class MyShaleController {
 	private Node buildOverviewTaskSection(String title, List<CaseTaskListItemDto> tasks, String emptyState, boolean prominent) {
 		VBox section = new VBox(8);
 		section.setFillWidth(true);
-		section.getStyleClass().add(prominent ? "strong-panel" : "glass-panel");
-		section.setPadding(new javafx.geometry.Insets(10));
+		section.setMaxWidth(Double.MAX_VALUE);
+		section.getStyleClass().addAll("shale-section-card", "my-shale-overview-task-section");
+		if (prominent) {
+			section.getStyleClass().add("my-shale-overview-task-section-prominent");
+		}
 
 		Label header = new Label(title + " (" + (tasks == null ? 0 : tasks.size()) + ")");
-		header.getStyleClass().add(prominent ? "page-heading" : "sidebar-header");
+		header.getStyleClass().add(prominent ? "shale-section-title" : "shale-subsection-title");
 		section.getChildren().add(header);
 
 		FlowPane taskCards = new FlowPane();
@@ -2909,7 +3118,7 @@ public final class MyShaleController {
 				.subtract((OVERVIEW_SECTION_HORIZONTAL_PADDING * 2) + 2));
 		if (tasks == null || tasks.isEmpty()) {
 			Label emptyLabel = new Label(emptyState);
-			emptyLabel.getStyleClass().add("lane-empty-state");
+			emptyLabel.getStyleClass().add("shale-empty-state");
 			taskCards.getChildren().add(emptyLabel);
 		} else {
 			for (CaseTaskListItemDto task : tasks) {
@@ -3634,7 +3843,9 @@ public final class MyShaleController {
 	}
 
 	private void openTask(Long taskId) {
-		showTaskDetailPopup(taskId);
+		if (taskId != null && taskId > 0 && onOpenTask != null) {
+			onOpenTask.accept(taskId);
+		}
 	}
 
 	private void onToggleMyTaskComplete(Long taskId) {
@@ -3963,6 +4174,14 @@ public final class MyShaleController {
 		node.setManaged(visible);
 	}
 
+	private static void updateResultCount(Label label, int count) {
+		if (label == null) {
+			return;
+		}
+		int safeCount = Math.max(0, count);
+		label.setText(safeCount + (safeCount == 1 ? " result" : " results"));
+	}
+
 	private static void runOnFx(Runnable runnable) {
 		if (Platform.isFxApplicationThread()) {
 			runnable.run();
@@ -3998,7 +4217,7 @@ public final class MyShaleController {
 		}
 	}
 
-	private enum CaseRadarSeverity {
+	enum CaseRadarSeverity {
 		CRITICAL("critical"),
 		WARNING("warning"),
 		POSITIVE("positive"),
@@ -4024,7 +4243,7 @@ public final class MyShaleController {
 		}
 	}
 
-	private enum CaseRadarAction {
+	enum CaseRadarAction {
 		NONE,
 		OVERDUE_TASKS,
 		SOL_DUE_14_DAYS,
@@ -4040,11 +4259,11 @@ public final class MyShaleController {
 		DUE_15_TO_30_DAYS
 	}
 
-	private record CaseRadarRow(CaseRadarSeverity severity, String label, long count, String helperText, CaseRadarAction action) {
+	record CaseRadarRow(CaseRadarSeverity severity, String label, long count, String helperText, CaseRadarAction action) {
 	}
 
 
-	private enum ImportantDateType {
+	enum ImportantDateType {
 		TASK("Task", "task"),
 		SOL("SOL", "sol"),
 		TORT_NOTICE("Tort Notice", "tort-notice"),

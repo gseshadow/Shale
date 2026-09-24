@@ -28,8 +28,10 @@ import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ControlStyles;
+import com.shale.ui.util.ControlAvailability;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ContactExternalActions;
+import com.shale.ui.util.ColorUtil;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -63,6 +65,7 @@ public final class OrganizationController {
 	@FXML private ChoiceBox<String> relatedCasesSortChoice;
 
 	@FXML private FlowPane organizationTypeChips;
+	@FXML private Button manageOrganizationTypesButton;
 	@FXML private TilePane phoneCards;
 	@FXML private TilePane emailCards;
 	@FXML private VBox addressCards;
@@ -72,6 +75,12 @@ public final class OrganizationController {
 	@FXML private VBox addressSection;
 	@FXML private VBox websiteSection;
 	@FXML private Label notesValue;
+	@FXML private VBox notesSection;
+	@FXML private VBox organizationHeaderSurface;
+	@FXML private Label removedStateLabel;
+	@FXML private FlowPane profileColumns;
+	@FXML private VBox profilePrimaryColumn;
+	@FXML private VBox profileRelatedColumn;
 
 	private Integer organizationId;
 	private OrganizationDao organizationDao;
@@ -79,6 +88,7 @@ public final class OrganizationController {
 	private CaseSummaryDao caseSummaryDao;
 	private Organization currentOrganization;
 	private OrganizationServicePort.OrganizationTypeProfile currentTypeProfile;
+	private List<OrganizationServicePort.OrganizationTypeDefinition> currentTypeDefinitions=List.of();
 	private OrganizationServicePort.OrganizationStructuredContactProfile currentContactProfile;
 	private int detailLoadGeneration;
 	private ContactExternalActions externalActions = new ContactExternalActions();
@@ -111,6 +121,7 @@ public final class OrganizationController {
 			Consumer<Integer> onOpenCase,
 			Runnable onOrganizationDeleted) {
 		this.organizationId = organizationId;
+		this.currentOrganization = null;
 		this.organizationDao = organizationDao;
 		this.organizationService = Objects.requireNonNull(organizationService,"organizationService");
 		this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
@@ -119,6 +130,7 @@ public final class OrganizationController {
 		this.onOpenCase = onOpenCase;
 		this.onOrganizationDeleted = onOrganizationDeleted;
 		this.caseCardFactory = new CaseCardFactory(onOpenCase);
+		refreshAdminActions();
 	}
 
 	@FXML
@@ -133,7 +145,12 @@ public final class OrganizationController {
 			deleteOrganizationButton.setOnAction(e -> onDeleteOrganization());
 			setVisibleManaged(deleteOrganizationButton, false);
 		}
+		if(manageOrganizationTypesButton!=null){
+			ControlStyles.apply(manageOrganizationTypesButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);
+			ControlAvailability.apply(manageOrganizationTypesButton,false,e->onManageOrganizationTypes());
+		}
 		if (reloadRemoteButton != null) {
+			ControlStyles.apply(reloadRemoteButton, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 			reloadRemoteButton.setOnAction(e -> onReloadRemote());
 		}
 		CaseListFilterSortSupport.initializeControls(relatedCasesSearchField, relatedCasesSortChoice, this::renderRelatedCases);
@@ -142,6 +159,10 @@ public final class OrganizationController {
 		refreshAdminActions();
 		if(phoneCards!=null)phoneCards.widthProperty().addListener((o,a,b)->configureMethodTiles(phoneCards));
 		if(emailCards!=null)emailCards.widthProperty().addListener((o,a,b)->configureMethodTiles(emailCards));
+		if (profileColumns != null) {
+			profileColumns.widthProperty().addListener((observable, oldWidth, newWidth) -> configureProfileColumns(newWidth.doubleValue()));
+			Platform.runLater(() -> configureProfileColumns(profileColumns.getWidth()));
+		}
 
 		if (organizationTitleLabel != null) {
 			organizationTitleLabel.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -182,6 +203,7 @@ public final class OrganizationController {
 						DETAIL_CACHE.put(cacheKey, loaded);
 					}
 				}
+				List<OrganizationServicePort.OrganizationTypeDefinition> definitions=requestedTenant==null?List.of():organizationService.listEffectiveOrganizationTypes(requestedTenant);
 				OrganizationServicePort.OrganizationTypeProfile types=requestedTenant==null?null:organizationService.getOrganizationTypeProfile(requestedId,requestedTenant).orElse(null);
 				OrganizationServicePort.OrganizationStructuredContactProfile contacts=requestedTenant==null?null:organizationService.findStructuredContactProfile(requestedTenant,requestedId).orElse(null);
 				final Organization loadedForUi = loaded;
@@ -197,7 +219,7 @@ public final class OrganizationController {
 					}
 
 					currentOrganization = loadedForUi;
-					currentTypeProfile=types; currentContactProfile=contacts;
+					currentTypeDefinitions=List.copyOf(definitions); currentTypeProfile=types; currentContactProfile=contacts;
 					awaitingAuthoritativeReloadAfterLocalSave=false;
 					resetRelatedCaseControls();
 					renderFromCurrent();
@@ -260,6 +282,19 @@ public final class OrganizationController {
 				this::applySuccessfulAggregateSave, () -> { editDialogOpen = false; refreshAdminActions(); })
 				.show(dialogOwner(editButton));
 		refreshAdminActions();
+	}
+
+	private void onManageOrganizationTypes(){
+		if(!isAdminUser()||organizationService==null||organizationId==null)return;
+		final int capturedOrganizationId=organizationId;
+		final Integer capturedTenantId=currentTenantId();
+		final Integer actorId=appState==null?null:appState.getUserId();
+		if(capturedTenantId==null||capturedTenantId<=0||actorId==null||actorId<=0)return;
+		new OrganizationTypeManagementLauncher(organizationService,dbExec).open(
+				dialogOwner(manageOrganizationTypesButton),capturedTenantId,actorId,result->{
+					if(result.changed()&&Objects.equals(organizationId,capturedOrganizationId)
+							&&Objects.equals(currentTenantId(),capturedTenantId))loadOrganization();
+				});
 	}
 
 	private void applySuccessfulAggregateSave(OrganizationAggregateResult result) {
@@ -443,8 +478,16 @@ public final class OrganizationController {
 
 		organizationTitleLabel.setText(fallback(o.getName()));
 		renderTypeChips();
+		applyHeaderIdentity();
 		renderContactInformation();
-		notesValue.setText(NarrativeMarkdownCodec.plainText(fallback(o.getNotes())));
+		String notes = NarrativeMarkdownCodec.plainText(safeText(o.getNotes()));
+		notesValue.setText(notes);
+		showGroup(notesSection, !notes.isBlank());
+		showGroup(removedStateLabel, o.isDeleted());
+		if (organizationHeaderSurface != null) {
+			organizationHeaderSurface.getStyleClass().remove("organization-profile-header-removed");
+			if (o.isDeleted()) organizationHeaderSurface.getStyleClass().add("organization-profile-header-removed");
+		}
 
 		if (o.getUpdatedAt() != null) {
 			String formatted = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a")
@@ -462,9 +505,24 @@ public final class OrganizationController {
 	private void renderTypeChips(){
 		if(organizationTypeChips==null)return;
 		List<ClassificationChipGroup.Chip> chips=currentTypeProfile==null?List.of():currentTypeProfile.assignments().stream()
-				.filter(a->!a.historical()).sorted(Comparator.comparing(OrganizationServicePort.AssignedOrganizationType::primary).reversed().thenComparingInt(OrganizationServicePort.AssignedOrganizationType::sortOrder).thenComparingLong(OrganizationServicePort.AssignedOrganizationType::assignmentId))
-				.map(a->new ClassificationChipGroup.Chip(a.definition().name(),a.definition().color(),"Organization Type",a.definition().organizationTypeId(),a.primary())).toList();
+				.sorted(Comparator.comparing(OrganizationServicePort.AssignedOrganizationType::primary).reversed().thenComparingInt(OrganizationServicePort.AssignedOrganizationType::sortOrder).thenComparingLong(OrganizationServicePort.AssignedOrganizationType::assignmentId))
+				.map(a->new ClassificationChipGroup.Chip(a.definition().name(),a.definition().color(),"Organization Type",a.definition().organizationTypeId(),a.primary(),a.historical())).toList();
 		organizationTypeChips.getChildren().setAll(new ClassificationChipGroup(chips,ClassificationChipGroup.Size.STANDARD));
+	}
+
+	private void applyHeaderIdentity() {
+		if (organizationHeaderSurface == null) return;
+		String storedColor = currentTypeProfile == null ? null : currentTypeProfile.assignments().stream()
+				.filter(OrganizationServicePort.AssignedOrganizationType::primary)
+				.findFirst().map(a -> a.definition().color()).orElse(null);
+		String normalized = ColorUtil.normalizeStoredColor(storedColor);
+		if (normalized == null) {
+			organizationHeaderSurface.setStyle("");
+			return;
+		}
+		String color = "#" + normalized.substring(0, 6);
+		organizationHeaderSurface.setStyle("-shale-organization-profile-accent: " + color
+				+ "; -shale-organization-profile-wash: " + ColorUtil.toCssRgba(color, .13) + ";");
 	}
 
 	private void renderContactInformation(){
@@ -490,6 +548,12 @@ public final class OrganizationController {
 	private static boolean safeWebsite(String value){try{ContactExternalActions.website(value);return true;}catch(IllegalArgumentException ex){return false;}}
 	private static <T> Comparator<T> contactOrder(java.util.function.Predicate<T> primary,java.util.function.ToIntFunction<T> order,java.util.function.ToLongFunction<T> id){return Comparator.<T,Boolean>comparing(primary::test).reversed().thenComparingInt(order).thenComparingLong(id);}
 	private static void configureMethodTiles(TilePane pane){double width=pane.getWidth();boolean two=width>=600;pane.setPrefColumns(two?2:1);pane.setPrefTileWidth(two?Math.max(250,(width-pane.getHgap())/2):Math.max(250,width));}
+	private void configureProfileColumns(double width) {
+		if (profilePrimaryColumn == null || profileRelatedColumn == null || width <= 0) return;
+		double usable = Math.max(280, width - 28);
+		profilePrimaryColumn.setPrefWidth(width < 920 ? usable : 760);
+		profileRelatedColumn.setPrefWidth(width < 430 ? usable : 380);
+	}
 
 	private void renderRelatedCases() {
 		if (!Platform.isFxApplicationThread()) {
@@ -612,17 +676,22 @@ public final class OrganizationController {
 	private void setBusy(boolean busy) {
 		if (editButton != null) editButton.setDisable(busy);
 		if (deleteOrganizationButton != null) deleteOrganizationButton.setDisable(busy);
+		if(manageOrganizationTypesButton!=null)manageOrganizationTypesButton.setDisable(busy);
 	}
 
 	private void refreshAdminActions() {
 		setVisibleManaged(editButton, canEditOrganization() && !editDialogOpen && currentOrganization != null);
-		boolean showDelete = isAdminUser() && currentOrganization != null;
+		boolean activeOrganization = currentOrganization != null && !currentOrganization.isDeleted();
+		boolean showDelete = isAdminUser() && activeOrganization;
 		setVisibleManaged(deleteOrganizationButton, showDelete);
+		boolean managementAvailable=showDelete&&organizationService!=null&&currentTenantId()!=null
+				&&currentTenantId()>0&&appState.getUserId()!=null&&appState.getUserId()>0;
+		ControlAvailability.apply(manageOrganizationTypesButton,managementAvailable,e->onManageOrganizationTypes());
 	}
 
 	private boolean canEditOrganization() {
 		Integer userId = appState == null ? null : appState.getUserId();
-		return userId != null && userId > 0;
+		return userId != null && userId > 0 && currentOrganization != null && !currentOrganization.isDeleted();
 	}
 
 	private boolean isAdminUser() {

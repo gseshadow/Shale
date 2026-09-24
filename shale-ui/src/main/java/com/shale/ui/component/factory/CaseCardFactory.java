@@ -34,6 +34,7 @@ public final class CaseCardFactory {
 		card.setIntakeDate(vm.intakeDate());
 		card.setSolDate(vm.solDate());
 		card.setTortNoticeDeadline(vm.tortNoticeDeadline());
+		card.setNonEngagementLetterSent(vm.nonEngagementLetterSent());
 
 		card.setStatus(vm.primaryStatusName());
 		card.setStatusCssColor(CaseCard.normalizeColor(vm.primaryStatusColor(), STATUS_FALLBACK_CSS));

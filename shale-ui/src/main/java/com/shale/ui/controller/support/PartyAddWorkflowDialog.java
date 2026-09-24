@@ -3,6 +3,8 @@ package com.shale.ui.controller.support;
 import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.util.ControlStyles;
+import com.shale.ui.util.WindowSizingUtil;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -13,11 +15,13 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 import javafx.stage.Window;
 
 import java.util.List;
@@ -116,7 +120,11 @@ public final class PartyAddWorkflowDialog {
 
 		Dialog<AddPartyDraft> dialog = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(dialog, dialogTitle);
+		dialog.getDialogPane().getStyleClass().addAll("party-window-root", "party-window-shell");
 		dialog.setTitle(dialogTitle);
+		dialog.setResizable(true);
+		dialog.getDialogPane().setPrefSize(820, 660);
+		dialog.getDialogPane().setMinSize(560, 360);
 		if (owner != null) {
 			dialog.initOwner(owner);
 		}
@@ -129,9 +137,10 @@ public final class PartyAddWorkflowDialog {
 		Node cancelButton = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
 
 		Label titleLabel = new Label();
-		titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: 700;");
+		titleLabel.getStyleClass().add("party-window-step-title");
 		Label subtitleLabel = new Label();
 		subtitleLabel.setWrapText(true);
+		subtitleLabel.getStyleClass().add("party-window-guidance");
 
 		Button createNewButton = new Button("Create New");
 		Button selectExistingButton = new Button("Select Existing");
@@ -142,18 +151,26 @@ public final class PartyAddWorkflowDialog {
 		Button organizationButton = new Button("Organization");
 		contactButton.setMinWidth(200);
 		organizationButton.setMinWidth(200);
-		applyToolbarButtonClasses(createNewButton, "app-toolbar-button-primary");
-		applyToolbarButtonClasses(selectExistingButton, "app-toolbar-button-primary");
-		applyToolbarButtonClasses(contactButton, "app-toolbar-button-primary");
-		applyToolbarButtonClasses(organizationButton, "app-toolbar-button-primary");
-		applyToolbarButtonClasses(asButton(addButton), "app-toolbar-button-primary");
-		applyToolbarButtonClasses(asButton(backButton), "app-toolbar-button-neutral");
-		applyToolbarButtonClasses(asButton(cancelButton), "app-toolbar-button-neutral");
+		ControlStyles.apply(createNewButton, ControlStyles.Purpose.PRIMARY);
+		ControlStyles.apply(selectExistingButton, ControlStyles.Purpose.PRIMARY);
+		ControlStyles.apply(contactButton, ControlStyles.Purpose.PRIMARY);
+		ControlStyles.apply(organizationButton, ControlStyles.Purpose.PRIMARY);
+		ControlStyles.apply(asButton(addButton), ControlStyles.Purpose.PRIMARY);
+		ControlStyles.apply(asButton(backButton), ControlStyles.Purpose.SECONDARY);
+		ControlStyles.apply(asButton(cancelButton), ControlStyles.Purpose.SECONDARY);
+		createNewButton.setAccessibleText("Create a new party entity");
+		selectExistingButton.setAccessibleText("Select an existing party entity");
+		contactButton.setAccessibleText("Use a Contact as the party");
+		organizationButton.setAccessibleText("Use an Organization as the party");
 
 		TextField createFirstNameField = new TextField();
+		createFirstNameField.setAccessibleText("Contact first name");
 		TextField createLastNameField = new TextField();
+		createLastNameField.setAccessibleText("Contact last name");
 		TextField createOrganizationNameField = new TextField();
+		createOrganizationNameField.setAccessibleText("Organization name");
 		ChoiceBox<OrganizationDao.OrganizationTypeRow> createOrganizationTypeChoice = new ChoiceBox<>();
+		createOrganizationTypeChoice.setAccessibleText("Organization type, required");
 		createOrganizationTypeChoice.getItems().setAll(organizationTypes);
 		applyToolbarSelectClasses(createOrganizationTypeChoice);
 		createOrganizationTypeChoice.setConverter(new javafx.util.StringConverter<>() {
@@ -165,6 +182,7 @@ public final class PartyAddWorkflowDialog {
 		}
 
 		ChoiceBox<PartyRoleOption> roleChoice = new ChoiceBox<>();
+		roleChoice.setAccessibleText("Party role, required");
 		partyRoles.stream().map(r -> new PartyRoleOption(r.id(), toPartyRoleLabel(r.name(), r.id()))).forEach(roleChoice.getItems()::add);
 		applyToolbarSelectClasses(roleChoice);
 		roleChoice.setConverter(new javafx.util.StringConverter<>() {
@@ -180,6 +198,7 @@ public final class PartyAddWorkflowDialog {
 		}
 
 		ChoiceBox<PartySideOption> sideChoice = new ChoiceBox<>();
+		sideChoice.setAccessibleText("Party affiliation, required");
 		sideChoice.getItems().addAll(sideOptions);
 		applyToolbarSelectClasses(sideChoice);
 		sideChoice.setConverter(new javafx.util.StringConverter<>() {
@@ -193,18 +212,27 @@ public final class PartyAddWorkflowDialog {
 
 		CheckBox primaryCheck = new CheckBox("Primary");
 		TextArea notesArea = new TextArea();
+		notesArea.setAccessibleText("Party notes");
 		notesArea.setPrefRowCount(3);
 		notesArea.setWrapText(true);
 
 		TextField searchField = new TextField();
 		searchField.setPromptText("Search by name");
+		searchField.setAccessibleText("Search existing parties by name");
 		javafx.scene.control.ListView<PartyEntityOption> existingList = new javafx.scene.control.ListView<>();
+		existingList.getStyleClass().add("party-window-results");
+		existingList.setAccessibleText("Matching party entities");
 		existingList.setPrefHeight(260);
+		Label resultsPlaceholder = new Label("No party entities are available.");
+		resultsPlaceholder.getStyleClass().add("party-window-empty");
+		resultsPlaceholder.setWrapText(true);
+		existingList.setPlaceholder(resultsPlaceholder);
 		existingList.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
 			@Override
 			protected void updateItem(PartyEntityOption item, boolean empty) {
 				super.updateItem(item, empty);
 				setText(empty || item == null ? null : item.label());
+				setAccessibleText(empty || item == null ? null : item.label());
 			}
 		});
 
@@ -212,7 +240,12 @@ public final class PartyAddWorkflowDialog {
 		contentBox.setAlignment(Pos.TOP_CENTER);
 		contentBox.setPadding(new Insets(16));
 		contentBox.getChildren().addAll(titleLabel, subtitleLabel);
-		dialog.getDialogPane().setContent(contentBox);
+		ScrollPane workflowScroll = new ScrollPane(contentBox);
+		workflowScroll.getStyleClass().add("party-window-scroll");
+		workflowScroll.setFitToWidth(true);
+		workflowScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		workflowScroll.setPannable(false);
+		dialog.getDialogPane().setContent(workflowScroll);
 
 		Runnable refreshExistingList = () -> {
 			String query = safeText(searchField.getText()).toLowerCase(Locale.ROOT);
@@ -238,6 +271,10 @@ public final class PartyAddWorkflowDialog {
 			if (!query.isBlank()) {
 				options = options.stream().filter(o -> safeText(o.label()).toLowerCase(Locale.ROOT).contains(query)).toList();
 			}
+			resultsPlaceholder.setText(query.isBlank()
+					? "No " + ("organization".equals(state.entityType) ? "organizations" : "contacts") + " are available."
+					: "No " + ("organization".equals(state.entityType) ? "organizations" : "contacts") + " match this search.");
+			resultsPlaceholder.getStyleClass().setAll(query.isBlank() ? "party-window-empty" : "party-window-filtered-empty");
 			existingList.getItems().setAll(options);
 			if (state.selectedEntity != null) {
 				existingList.getItems().stream()
@@ -290,22 +327,21 @@ public final class PartyAddWorkflowDialog {
 				titleLabel.setText("Step 1");
 				subtitleLabel.setText("Create new or select from existing");
 				HBox choices = new HBox(14, createNewButton, selectExistingButton);
+				choices.getStyleClass().add("party-window-entity-kind");
 				choices.setAlignment(Pos.CENTER);
 				contentBox.getChildren().add(choices);
-				dialog.getDialogPane().setPrefSize(560, 260);
-				dialog.getDialogPane().setMinSize(560, 260);
 			} else if (state.step == 2) {
 				titleLabel.setText("Step 2");
 				subtitleLabel.setText("Contact or Organization");
 				HBox choices = new HBox(14, contactButton, organizationButton);
+				choices.getStyleClass().add("party-window-entity-kind");
 				choices.setAlignment(Pos.CENTER);
 				contentBox.getChildren().add(choices);
-				dialog.getDialogPane().setPrefSize(560, 260);
-				dialog.getDialogPane().setMinSize(560, 260);
 			} else if ("create".equals(state.mode)) {
 				titleLabel.setText("Step 3: Create New");
 				subtitleLabel.setText("Enter party details");
 				GridPane form = new GridPane();
+				form.getStyleClass().add("party-window-field-grid");
 				form.setHgap(10);
 				form.setVgap(10);
 				if ("organization".equals(state.entityType)) {
@@ -328,16 +364,16 @@ public final class PartyAddWorkflowDialog {
 					form.add(sideChoice, 1, 3);
 				}
 				VBox formHost = new VBox(form);
+				formHost.getStyleClass().add("party-window-section");
 				formHost.setAlignment(Pos.TOP_LEFT);
 				formHost.setPadding(new Insets(8, 20, 8, 20));
 				contentBox.getChildren().add(formHost);
-				dialog.getDialogPane().setPrefSize(720, 420);
-				dialog.getDialogPane().setMinSize(720, 420);
 			} else {
 				titleLabel.setText("Step 3: Select Existing");
 				subtitleLabel.setText("Choose an existing contact or organization");
 				refreshExistingList.run();
 				GridPane relationships = new GridPane();
+				relationships.getStyleClass().add("party-window-field-grid");
 				relationships.setHgap(10);
 				relationships.setVgap(10);
 				relationships.add(new Label("Party Role"), 0, 0);
@@ -348,14 +384,10 @@ public final class PartyAddWorkflowDialog {
 				relationships.add(new Label("Notes"), 0, 3);
 				relationships.add(notesArea, 1, 3);
 				VBox relationshipsHost = new VBox(relationships);
+				relationshipsHost.getStyleClass().add("party-window-section");
 				relationshipsHost.setAlignment(Pos.TOP_LEFT);
 				relationshipsHost.setPadding(new Insets(8, 20, 8, 20));
 				contentBox.getChildren().addAll(searchField, existingList, relationshipsHost);
-				dialog.getDialogPane().setPrefSize(820, 660);
-				dialog.getDialogPane().setMinSize(820, 660);
-			}
-			if (dialog.getDialogPane().getScene() != null && dialog.getDialogPane().getScene().getWindow() != null) {
-				dialog.getDialogPane().getScene().getWindow().sizeToScene();
 			}
 			refreshAddButtonState.run();
 		};
@@ -412,6 +444,11 @@ public final class PartyAddWorkflowDialog {
 		notesArea.textProperty().addListener((obs, ov, nv) -> refreshAddButtonState.run());
 
 		renderStep.run();
+		dialog.setOnShown(event -> {
+			if (dialog.getDialogPane().getScene().getWindow() instanceof Stage stage) {
+				WindowSizingUtil.sizeModalStage(stage, owner, 820, 660, 560, 360);
+			}
+		});
 
 		dialog.setResultConverter(button -> {
 			if (button != addType) {
@@ -497,9 +534,7 @@ public final class PartyAddWorkflowDialog {
 		if (choiceBox == null) {
 			return;
 		}
-		if (!choiceBox.getStyleClass().contains("app-toolbar-select")) {
-			choiceBox.getStyleClass().add("app-toolbar-select");
-		}
+		ControlStyles.formControl(choiceBox);
 	}
 
 	private static void setVisibleManaged(Node node, boolean visible) {

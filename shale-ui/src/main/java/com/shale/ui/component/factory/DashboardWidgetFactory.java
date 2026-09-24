@@ -31,7 +31,7 @@ public final class DashboardWidgetFactory {
 			boolean loading,
 			boolean empty) {
 		VBox widget = new VBox(10);
-		widget.getStyleClass().addAll("dashboard-widget", "shale-card-surface", "shale-entity-card-compact");
+		widget.getStyleClass().addAll("dashboard-widget", "shale-section-card", "shale-compact-card");
 		widget.setFillWidth(true);
 		widget.setMaxWidth(Double.MAX_VALUE);
 
@@ -40,7 +40,7 @@ public final class DashboardWidgetFactory {
 		header.getStyleClass().add("dashboard-widget-header");
 
 		Label titleLabel = new Label(title == null ? "" : title);
-		titleLabel.getStyleClass().add("dashboard-widget-title");
+		titleLabel.getStyleClass().addAll("dashboard-widget-title", "shale-subsection-title");
 
 		header.getChildren().add(titleLabel);
 		if (badgeText != null && !badgeText.isBlank()) {
@@ -76,7 +76,7 @@ public final class DashboardWidgetFactory {
 	}
 
 	public static Label errorState(String text) {
-		return stateLabel(text, "dashboard-widget-error", "shale-empty-state");
+		return stateLabel(text, "dashboard-widget-error", "shale-error-state");
 	}
 
 	private static Label stateLabel(String text, String... styleClasses) {

@@ -11,16 +11,16 @@ public final class DesktopRuntimeSessionProvider implements DbSessionProvider {
 
 	private RuntimeSessionService runtime;
 
-	public void setRuntime(RuntimeSessionService runtime) {
+	public synchronized void setRuntime(RuntimeSessionService runtime) {
 		this.runtime = Objects.requireNonNull(runtime, "runtime");
 	}
 
-	public void clear() {
+	public synchronized void clear() {
 		this.runtime = null;
 	}
 
 	@Override
-	public Connection requireConnection() {
+	public synchronized Connection requireConnection() {
 		if (runtime == null) {
 			throw new IllegalStateException("Database access requested before login");
 		}

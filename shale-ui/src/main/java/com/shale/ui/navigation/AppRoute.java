@@ -7,6 +7,7 @@ public record AppRoute(RouteType type, Integer entityId, String sectionKey, Stri
 
     public enum RouteType {
         MY_SHALE,
+		TASKS,
         CASES_LIST,
         CONTACTS_LIST,
         ORGANIZATIONS_LIST,
@@ -30,6 +31,10 @@ public record AppRoute(RouteType type, Integer entityId, String sectionKey, Stri
     public static AppRoute myShale() {
         return new AppRoute(RouteType.MY_SHALE, null, null, null);
     }
+
+	public static AppRoute tasks() {
+		return new AppRoute(RouteType.TASKS, null, null, null);
+	}
 
     public static AppRoute casesList() {
         return new AppRoute(RouteType.CASES_LIST, null, null, null);

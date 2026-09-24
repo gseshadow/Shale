@@ -1,109 +1,83 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import java.lang.String?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<BorderPane xmlns="http://javafx.com/javafx/21"
-    xmlns:fx="http://javafx.com/fxml/1"
-    fx:controller="com.shale.ui.controller.OrganizationController" styleClass="app-shell">
-
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+    fx:controller="com.shale.ui.controller.OrganizationController" styleClass="app-shell, shell-route-page">
     <top>
-        <VBox spacing="6.0" BorderPane.alignment="CENTER" styleClass="page-header-surface">
-            <padding>
-                <Insets top="10" right="12" bottom="8" left="12" />
-            </padding>
-
-            <HBox spacing="8.0" alignment="CENTER_LEFT">
-                <VBox spacing="6" HBox.hgrow="ALWAYS">
-                    <Label fx:id="organizationTitleLabel" text="Organization" wrapText="true" styleClass="functional-heading" />
-                    <FlowPane fx:id="organizationTypeChips" hgap="6" vgap="6" />
-                </VBox>
-                <Region HBox.hgrow="ALWAYS" />
-                <Button fx:id="editButton" text="Edit Organization" visible="false" managed="false" />
-                <Button fx:id="deleteOrganizationButton" text="Delete Organization" visible="false" managed="false"
-                    styleClass="button app-toolbar-button app-toolbar-button-danger" />
-            </HBox>
-
-            <HBox spacing="10.0" alignment="CENTER_LEFT">
-                <Region HBox.hgrow="ALWAYS" />
-                <Label fx:id="lastUpdatedLabel" text="Last updated: —" styleClass="functional-metadata" />
-            </HBox>
+        <VBox fx:id="organizationHeaderSurface" spacing="9" BorderPane.alignment="CENTER">
+            <styleClass><String fx:value="page-header-surface"/><String fx:value="organization-profile-header"/></styleClass>
+            <padding><Insets top="16" right="16" bottom="14" left="16"/></padding>
+            <Label fx:id="organizationTitleLabel" text="Organization" wrapText="true"
+                maxWidth="1.7976931348623157E308" styleClass="shale-page-title"/>
+            <Label text="Organization profile" styleClass="shale-metadata-muted"/>
+            <FlowPane fx:id="organizationTypeChips" hgap="6" vgap="6" alignment="TOP_LEFT" prefWrapLength="760"
+                styleClass="organization-profile-classifications"/>
+            <FlowPane hgap="8" vgap="8" alignment="CENTER_LEFT" prefWrapLength="760" styleClass="organization-profile-toolbar">
+                <Label fx:id="removedStateLabel" text="Removed organization" visible="false" managed="false"
+                    styleClass="shale-semantic-chip, shale-semantic-chip-danger"/>
+                <Label fx:id="lastUpdatedLabel" text="Last updated: —" styleClass="shale-metadata-muted"/>
+                <Button fx:id="manageOrganizationTypesButton" text="Manage Organization Types" visible="false" managed="false"/>
+                <Button fx:id="editButton" text="Edit Organization" visible="false" managed="false"/>
+                <Button fx:id="deleteOrganizationButton" text="Delete Organization" visible="false" managed="false"/>
+            </FlowPane>
         </VBox>
     </top>
-
     <center>
-        <StackPane BorderPane.alignment="CENTER">
-            <padding>
-                <Insets top="10" right="12" bottom="12" left="12" />
-            </padding>
-
-            <HBox spacing="16" maxWidth="1360" alignment="TOP_LEFT">
-                <padding>
-                    <Insets top="12" right="12" bottom="12" left="12" />
-                </padding>
-
-                <VBox spacing="10" styleClass="case-main-surface" minWidth="640" prefWidth="820" maxWidth="1.7976931348623157E308" HBox.hgrow="ALWAYS">
-                    <padding>
-                        <Insets top="12" right="12" bottom="12" left="12" />
-                    </padding>
-
-                    <Label fx:id="errorLabel" textFill="#b42318" wrapText="true" visible="false" managed="false" />
-
-                    <HBox fx:id="remoteUpdateBanner" spacing="8" alignment="CENTER_LEFT" visible="false" managed="false">
-                        <Label text="This organization was updated elsewhere." style="-fx-text-fill: #b42318;" />
-                        <Button fx:id="reloadRemoteButton" text="Reload" />
+        <ScrollPane fx:id="profileScrollPane" fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll">
+            <FlowPane fx:id="profileColumns" hgap="16" vgap="16" alignment="TOP_LEFT" prefWrapLength="1180">
+                <padding><Insets top="14" right="14" bottom="18" left="14"/></padding>
+                <VBox fx:id="profilePrimaryColumn" spacing="12" minWidth="0" prefWidth="760" maxWidth="900" styleClass="organization-profile-primary">
+                    <Label fx:id="errorLabel" wrapText="true" visible="false" managed="false" styleClass="shale-error-message"/>
+                    <HBox fx:id="remoteUpdateBanner" spacing="8" alignment="CENTER_LEFT" visible="false" managed="false"
+                        styleClass="shale-section-card">
+                        <Label text="This organization was updated elsewhere." wrapText="true" styleClass="shale-error-message"/>
+                        <Button fx:id="reloadRemoteButton" text="Reload"/>
                     </HBox>
-
-                    <VBox spacing="12" styleClass="organization-profile-sections">
-                        <Label text="Contact Information" styleClass="functional-heading" />
+                    <VBox spacing="12" styleClass="shale-section-card, organization-profile-contact-card">
+                        <Label text="Contact Information" styleClass="shale-section-title"/>
                         <VBox fx:id="phoneSection" spacing="8" styleClass="contact-method-section">
-                            <Label text="Phone Numbers" styleClass="case-overview-row-label" />
-                            <TilePane fx:id="phoneCards" hgap="10" vgap="10" prefColumns="2" />
+                            <Label text="Phone Numbers" styleClass="shale-subsection-title"/>
+                            <TilePane fx:id="phoneCards" hgap="10" vgap="10" prefColumns="2"/>
                         </VBox>
                         <VBox fx:id="emailSection" spacing="8" styleClass="contact-method-section">
-                            <Label text="Email Addresses" styleClass="case-overview-row-label" />
-                            <TilePane fx:id="emailCards" hgap="10" vgap="10" prefColumns="2" />
+                            <Label text="Email Addresses" styleClass="shale-subsection-title"/>
+                            <TilePane fx:id="emailCards" hgap="10" vgap="10" prefColumns="2"/>
                         </VBox>
                         <VBox fx:id="addressSection" spacing="8" styleClass="contact-method-section">
-                            <Label text="Addresses" styleClass="case-overview-row-label" />
-                            <VBox fx:id="addressCards" spacing="8" />
+                            <Label text="Addresses" styleClass="shale-subsection-title"/>
+                            <VBox fx:id="addressCards" spacing="8"/>
                         </VBox>
                         <VBox fx:id="websiteSection" spacing="8" styleClass="contact-method-section">
-                            <Label text="Websites" styleClass="case-overview-row-label" />
-                            <VBox fx:id="websiteCards" spacing="8" />
-                        </VBox>
-                        <VBox spacing="6" styleClass="contact-method-section">
-                            <Label text="Notes" styleClass="case-overview-row-label" />
-                            <Label fx:id="notesValue" text="—" wrapText="true" styleClass="case-overview-row-value" />
+                            <Label text="Websites" styleClass="shale-subsection-title"/>
+                            <VBox fx:id="websiteCards" spacing="8"/>
                         </VBox>
                     </VBox>
+                    <VBox fx:id="notesSection" spacing="8" styleClass="shale-section-card">
+                        <Label text="Notes" styleClass="shale-section-title"/>
+                        <HBox styleClass="shale-property-row, shale-property-row-comfortable">
+                            <Label text="Notes" minWidth="92" styleClass="shale-property-row-label"/>
+                            <Label fx:id="notesValue" wrapText="true" minWidth="0" maxWidth="1.7976931348623157E308"
+                                styleClass="shale-property-row-value" HBox.hgrow="ALWAYS"/>
+                        </HBox>
+                    </VBox>
                 </VBox>
-
-                <VBox prefWidth="460" minWidth="400" maxWidth="560" maxHeight="1.7976931348623157E308" spacing="10" styleClass="secondary-panel">
-                    <padding>
-                        <Insets top="12" right="12" bottom="12" left="12" />
-                    </padding>
-                    <HBox spacing="8" alignment="CENTER_LEFT">
-                        <Label text="Related Cases" style="-fx-font-weight: bold; -fx-opacity: 0.9;" />
-                    </HBox>
-                    <HBox spacing="8" alignment="CENTER_LEFT">
-                        <TextField fx:id="relatedCasesSearchField" promptText="Search related cases…" HBox.hgrow="ALWAYS" />
-                        <ChoiceBox fx:id="relatedCasesSortChoice" prefWidth="180" />
-                    </HBox>
-                    <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="surface-scroll" VBox.vgrow="ALWAYS">
-                        <StackPane>
-                            <VBox fx:id="relatedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308">
-                                <padding>
-                                    <Insets right="8" />
-                                </padding>
-                            </VBox>
-                            <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false" />
-                        </StackPane>
-                    </ScrollPane>
+                <VBox fx:id="profileRelatedColumn" prefWidth="380" minWidth="0" maxWidth="480" spacing="10" styleClass="shale-section-card, organization-profile-related-card">
+                    <Label text="Related Cases" styleClass="shale-section-title"/>
+                    <FlowPane hgap="8" vgap="8" alignment="CENTER_LEFT" prefWrapLength="350">
+                        <TextField fx:id="relatedCasesSearchField" promptText="Search related cases…" prefWidth="230"/>
+                        <ChoiceBox fx:id="relatedCasesSortChoice" prefWidth="180"/>
+                    </FlowPane>
+                    <StackPane>
+                        <VBox fx:id="relatedCasesContainer" spacing="10" fillWidth="true" maxWidth="1.7976931348623157E308"/>
+                        <Label fx:id="relatedCasesEmptyLabel" text="No related cases" visible="false" managed="false"
+                            wrapText="true" styleClass="shale-empty-message"/>
+                    </StackPane>
                 </VBox>
-            </HBox>
-        </StackPane>
+            </FlowPane>
+        </ScrollPane>
     </center>
-
 </BorderPane>

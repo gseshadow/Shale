@@ -53,4 +53,19 @@ public final class UserServiceAdapter implements UserServicePort {
                 row.admin(),
                 row.attorney()));
     }
+
+    @Override
+    public boolean currentActorHasFirmWideRole(int shaleClientId, int firmWideRoleDefinitionId) {
+        return userDao.currentActorHasFirmWideRole(shaleClientId, firmWideRoleDefinitionId);
+    }
+
+    @Override public List<FirmWideRoleDefinition> listFirmWideRolesForAdministration(int tenant,int actor){return userDao.listFirmWideRolesForAdministration(tenant,actor);}
+    @Override public List<FirmWideRoleAssignment> listUserFirmWideRoleAssignments(int tenant,int actor,int user){return userDao.listUserFirmWideRoleAssignments(tenant,actor,user);}
+    @Override public FirmWideRoleDefinition createFirmWideRole(CreateFirmWideRoleCommand command){return userDao.createFirmWideRole(command);}
+    @Override public FirmWideRoleDefinition renameFirmWideRole(RenameFirmWideRoleCommand command){return userDao.renameFirmWideRole(command);}
+    @Override public FirmWideRoleDefinition setFirmWideRoleActive(FirmWideRoleLifecycleCommand command,boolean active){return userDao.setFirmWideRoleActive(command,active);}
+    @Override public void deleteFirmWideRole(FirmWideRoleLifecycleCommand command){userDao.deleteFirmWideRole(command);}
+    @Override public FirmWideRoleAssignment assignFirmWideRole(FirmWideRoleAssignmentCommand command){return userDao.assignFirmWideRole(command);}
+    @Override public void removeFirmWideRoleAssignment(FirmWideRoleAssignmentLifecycleCommand command){userDao.removeFirmWideRoleAssignment(command);}
+    @Override public FirmWideRoleAssignment restoreFirmWideRoleAssignment(FirmWideRoleAssignmentLifecycleCommand command){return userDao.restoreFirmWideRoleAssignment(command);}
 }

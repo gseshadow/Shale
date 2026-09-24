@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.OrganizationServicePort.OrganizationTypeDefinition;
-import com.shale.ui.state.AppState;
+import com.shale.ui.component.CommittedChangeTracker;
 import com.shale.ui.testutil.JavaFxTestSupport;
 
 import javafx.scene.Node;
@@ -139,6 +139,6 @@ final class OrganizationTypeAdminPaneTest {
         OrganizationServicePort service = (OrganizationServicePort) Proxy.newProxyInstance(
                 OrganizationTypeAdminPaneTest.class.getClassLoader(), new Class<?>[] { OrganizationServicePort.class },
                 (proxy, method, arguments) -> { throw new AssertionError("unauthorized test pane must not call " + method.getName()); });
-        return new OrganizationTypeAdminPane(service, new AppState());
+        return new OrganizationTypeAdminPane(service, 7, 42, ignored -> { }, new CommittedChangeTracker());
     }
 }

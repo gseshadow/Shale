@@ -1,5 +1,6 @@
 package com.shale.ui.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,21 +35,37 @@ final class CaseUpdatesNarrativeEditorTest {
                 "The existing Submit action must remain authoritative for creation");
         assertTrue(submit.contains("caseUpdatesComposerArea.getText()"),
                 "Submit must read the current inline draft, including popup-applied changes");
+        assertTrue(submit.contains("saveNewCaseUpdate(caseUpdatesComposerArea.getText())"),
+                "The first Submit must pass the visible composer value directly to persistence");
         assertFalse(submit.contains("EnhancedTextArea.openEditor"),
                 "Submit must not be replaced by a popup-only Add workflow");
         assertTrue(submit.contains("trimmedText.isBlank()") && submit.contains("Update text is required."),
                 "The existing blank-update validation must remain before persistence");
         assertTrue(submit.contains("caseDao.addCaseNote(activeCaseId, activeClientId, trimmedText, createdByUserId)"),
-                "Submit must retain the authoritative Case Update DAO save path and actor context");
+                "A single Submit must pass the current inline text to the authoritative Case Update DAO path");
+        assertTrue(submit.contains("caseUpdateSubmissionInFlight.compareAndSet(false, true)"),
+                "Submit must reject a second activation while the authoritative write is in flight");
+        assertTrue(submit.contains("caseUpdatesComposerArea.setDisable(true)"),
+                "The visible draft should communicate that submission is in progress");
         assertTrue(submit.contains("caseUpdatesComposerArea.setText(\"\")")
-                        && submit.contains("renderCaseUpdates(updates)"),
-                "A successful Submit must clear the draft and refresh saved updates");
+                        && submit.contains("renderCaseUpdates(updates)")
+                        && submit.contains("caseUpdatesComposerArea.requestFocus()"),
+                "A successful Submit must clear the draft, refresh saved updates, and restore sensible focus");
+        String failure = submit.substring(submit.indexOf("} catch (Exception ex)"));
+        assertFalse(failure.contains("caseUpdatesComposerArea.setText(\"\")"),
+                "A failed persistence attempt must retain the inline draft for retry");
     }
 
     @Test
     void composerPopupApplyChangesOnlyDraftAndCancelLeavesItUntouched() {
         EnhancedTextArea composer = new EnhancedTextArea();
-        composer.setText("Order records from UNM");
+        composer.setText("test");
+        assertEquals("test", composer.getText(),
+                "Text typed into the inline composer must be its authoritative submitted value");
+
+        var expanded = composer.createExpandedEdit();
+        assertEquals("test", expanded.draft(),
+                "Expanding must initialize the editor from the current inline text");
 
         var applied = composer.createExpandedEdit();
         applied.setDraft("**Order** records from UNM");
@@ -91,6 +108,15 @@ final class CaseUpdatesNarrativeEditorTest {
 
         assertTrue(card.contains("NarrativeMarkdownCodec.plainText(safeText(dto.getNoteText()))"),
                 "Read-only cards must use Shale's shared syntax-free narrative projection");
+        assertTrue(card.contains("shale-update-card")
+                        && card.contains("shale-update-author")
+                        && card.contains("shale-update-timestamp")
+                        && card.contains("shale-update-body"),
+                "Update cards should compose the shared Phase 1B presentation contract");
+        assertTrue(card.contains("ControlStyles.Purpose.GHOST")
+                        && card.contains("shale-update-edit-action")
+                        && card.contains("setAccessibleText(\"Edit update\")"),
+                "Creator Edit should use the accessible canonical compact icon action");
         assertTrue("Important\n• Call client".equals(
                         NarrativeMarkdownCodec.plainText("**Important**\n- Call client")),
                 "Supported formatting should render without exposing Markdown syntax");

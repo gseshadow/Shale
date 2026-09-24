@@ -1,0 +1,75 @@
+/* A.2 Task Detail and New Task secondary-window foundation. */
+.task-window-root {
+    -fx-background-color: -shale-color-overlay-dialog;
+}
+.task-window-header {
+    -fx-background-color: -shale-color-page-header-surface;
+    -fx-border-color: transparent transparent -shale-color-divider transparent;
+    -fx-border-width: 0 0 1 0;
+}
+.task-window-title,
+.task-detail-dialog-heading {
+    -fx-text-fill: -shale-color-text-primary;
+}
+.task-window-workspace { -fx-fill-height: true; }
+.task-window-panel,
+.task-window-section {
+    -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 12;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+}
+.task-window-section { -fx-padding: 12; }
+.task-window-section-title {
+    -fx-font-size: 12px;
+    -fx-font-weight: 800;
+    -fx-text-fill: -shale-color-text-secondary;
+}
+.task-window-metadata,
+.task-window-loading,
+.task-window-empty {
+    -fx-font-size: 12px;
+    -fx-text-fill: -shale-color-text-muted;
+}
+.task-window-empty { -fx-font-style: italic; -fx-padding: 8; }
+.task-window-error {
+    -fx-font-size: 12px;
+    -fx-text-fill: -shale-color-validation-error;
+}
+.task-window-details-scroll,
+.task-window-details-scroll > .viewport,
+.task-window-activity-panel .scroll-pane,
+.task-window-activity-panel .scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+.task-window-details-scroll { -fx-min-width: 360; }
+.task-window-activity-panel { -fx-min-height: 260; }
+.task-detail-dialog-action-bar,
+.new-task-dialog-action-bar {
+    -fx-border-color: -shale-color-divider transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
+.task-window-activity-message {
+    -fx-font-size: 12px;
+    -fx-text-fill: -shale-color-text-secondary;
+}
+.task-window-activity-meta {
+    -fx-font-size: 10.5px;
+    -fx-text-fill: -shale-color-text-muted;
+}
+.task-window-note-card {
+    -fx-background-color: -shale-color-info-wash;
+    -fx-background-radius: 10;
+    -fx-border-color: -shale-color-info-border;
+    -fx-border-radius: 10;
+}
+.task-window-completion-action {
+    -fx-background-color: -shale-color-success-wash;
+    -fx-border-color: -shale-color-success-border;
+    -fx-text-fill: -shale-color-success-text;
+}
+.task-window-completion-action:hover {
+    -fx-background-color: -shale-color-success-border;
+}

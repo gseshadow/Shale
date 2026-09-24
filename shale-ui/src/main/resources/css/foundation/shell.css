@@ -1,0 +1,114 @@
+/*
+ * A.2 application-shell composition. Theme resources own every paint value;
+ * this file owns only the shared frame geometry and interaction states.
+ */
+.app-shell {
+    -fx-background-color: -shale-color-application-canvas;
+}
+
+.app-header,
+.top-bar {
+    -fx-min-height: 64px;
+    -fx-padding: 10px 12px;
+    -fx-spacing: 12px;
+    -fx-alignment: center-left;
+    -fx-background-color: linear-gradient(to right,
+        -shale-color-application-chrome, -shale-color-action-primary-start);
+    -fx-border-color: transparent transparent -shale-color-border-selected transparent;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.app-brand { -fx-font-size: 20px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-on-dark; }
+.app-header .label { -fx-text-fill: -shale-color-text-on-dark; }
+.shell-leading-actions, .shell-search-group, .shell-trailing-actions { -fx-alignment: center-left; }
+
+.topbar-back-button {
+    -fx-min-width: 32px; -fx-pref-width: 32px; -fx-max-width: 32px;
+    -fx-min-height: 32px; -fx-pref-height: 32px; -fx-max-height: 32px;
+    -fx-padding: 0 0 1px 0; -fx-font-size: 18px; -fx-font-weight: 800;
+    -fx-background-radius: 10px; -fx-border-radius: 10px;
+    -fx-background-color: -shale-color-navigation-hover;
+    -fx-border-color: -shale-color-border-strong; -fx-border-width: 1px;
+    -fx-text-fill: -shale-color-text-on-dark; -fx-cursor: hand;
+}
+.topbar-back-button:hover { -fx-background-color: -shale-color-navigation-selected; }
+.topbar-back-button:focused { -fx-border-color: -shale-color-border-focus; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.15, 0, 0); }
+.topbar-back-button:disabled { -fx-opacity: -shale-opacity-disabled; }
+
+.global-search-field {
+    -fx-min-height: 40px; -fx-pref-height: 40px;
+    -fx-padding: 8px 12px;
+    -fx-background-color: -shale-color-input-surface; -fx-background-radius: 12px;
+    -fx-border-color: -shale-color-input-border; -fx-border-radius: 12px; -fx-border-width: 1px;
+    -fx-text-fill: -shale-color-text-primary; -fx-prompt-text-fill: -shale-color-text-muted;
+}
+.global-search-field:hover { -fx-border-color: -shale-color-input-hover-border; }
+.global-search-field:focused { -fx-border-color: -shale-color-border-focus; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.15, 0, 0); }
+
+.sidebar,
+.nav-rail {
+    -fx-min-width: 208px; -fx-pref-width: 216px;
+    -fx-padding: 12px 0 0 0;
+    -fx-background-color: -shale-color-navigation;
+    -fx-border-color: transparent -shale-color-border-strong transparent transparent;
+    -fx-border-width: 0 1px 0 0;
+}
+.sidebar-header { -fx-padding: 0 22px 8px 22px; -fx-font-size: 11px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-on-dark; }
+.navigation-items { -fx-padding: 0 12px 12px 12px; -fx-spacing: 6px; }
+.section-nav-button {
+    -fx-min-height: 40px; -fx-padding: 8px 12px; -fx-alignment: center-left;
+    -fx-background-radius: 10px; -fx-border-radius: 10px;
+    -fx-background-color: transparent; -fx-border-color: transparent; -fx-border-width: 1px;
+    -fx-text-fill: -shale-color-text-on-dark; -fx-font-weight: 600; -fx-cursor: hand;
+}
+.section-nav-button:hover { -fx-background-color: -shale-color-navigation-hover; }
+.section-nav-button:focused { -fx-border-color: -shale-color-border-focus; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.15, 0, 0); }
+.section-nav-button-active,
+.section-nav-button-active:hover {
+    -fx-background-color: linear-gradient(to right, -shale-color-navigation-selected, -shale-color-action-primary-end);
+    -fx-border-color: -shale-color-border-selected; -fx-text-fill: -shale-color-text-on-primary; -fx-font-weight: 800;
+}
+
+
+.content-root { -fx-padding: 14px 16px 16px 16px; -fx-background-color: -shale-color-application-canvas; }
+.primary-content-surface {
+    -fx-padding: 16px; -fx-spacing: 10px;
+    -fx-background-color: -shale-color-content-plane; -fx-background-radius: 14px;
+    -fx-border-color: -shale-color-border-subtle; -fx-border-radius: 14px; -fx-border-width: 1px;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 10, 0.10, 0, 2);
+}
+.shell-page-header {
+    -fx-padding: 12px 14px;
+    -fx-background-color: -shale-color-page-header-surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 12px;
+    -fx-border-width: 1px;
+}
+.shell-section-header { -fx-padding: 12px 14px; }
+.shell-section-header .section-title { -fx-font-size: 24px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
+.shell-route-outlet { -fx-background-color: transparent; }
+/* Routed page roots fill the plane but must not repaint its rounded corners. */
+.shell-route-page {
+    -fx-background-color: transparent;
+}
+
+.app-shell.shell-route-page {
+    -fx-background-color: transparent;
+}
+
+.session-footer {
+    -fx-min-height: 44px; -fx-padding: 6px 16px; -fx-spacing: 8px; -fx-alignment: center-left;
+    -fx-background-color: -shale-color-application-chrome;
+    -fx-border-color: -shale-color-border-strong transparent transparent transparent; -fx-border-width: 1px 0 0 0;
+}
+.session-footer .label { -fx-text-fill: -shale-color-text-on-dark; }
+.user-email { -fx-font-weight: 700; }
+
+.shell-icon-button, .profile-button {
+    -fx-min-height: 36px; -fx-background-radius: 10px; -fx-border-radius: 10px;
+    -fx-background-color: -shale-color-navigation-hover; -fx-border-color: -shale-color-border-strong; -fx-border-width: 1px;
+    -fx-text-fill: -shale-color-text-on-dark; -fx-font-weight: 700; -fx-cursor: hand;
+}
+.shell-icon-button:hover, .profile-button:hover { -fx-background-color: -shale-color-navigation-selected; }
+.shell-icon-button:focused, .profile-button:focused { -fx-border-color: -shale-color-border-focus; -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.15, 0, 0); }

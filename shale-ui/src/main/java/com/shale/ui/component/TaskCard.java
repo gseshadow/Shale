@@ -21,17 +21,18 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Cursor;
+import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Tooltip;
+import javafx.scene.AccessibleRole;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.layout.VBox;
-import javafx.scene.text.Font;
-import javafx.scene.text.Text;
 import javafx.stage.Popup;
 import javafx.stage.Screen;
 import javafx.stage.Window;
@@ -46,8 +47,6 @@ public final class TaskCard extends VBox {
 	private static final DateTimeFormatter DUE_DATE_COMPACT_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
 	private static final double COMPACT_CARD_WIDTH = 280;
 	private static final double TASK_DETAILS_TOOLTIP_MAX_WIDTH = 360;
-	private static final int TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_LINES = 8;
-	private static final double TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE = 12;
 	private static final Duration TASK_DETAILS_TOOLTIP_HIDE_DELAY = Duration.millis(120);
 	private static final Duration TASK_DETAILS_POPUP_SHOW_DELAY = Duration.millis(400);
 	private static final double TASK_DETAILS_POPUP_CURSOR_OFFSET = 10;
@@ -108,15 +107,16 @@ public final class TaskCard extends VBox {
 	private String dueAccentCss;
 	private String statusColorCss = "#F1F5F9";
 	private boolean hovered;
+	private boolean completed;
+	private boolean overdue;
+	private boolean dueSoon;
 	private boolean fullExpanded;
 	private String fullDescription = "";
 	private Popup taskDetailsPopup;
-	private Label taskDetailsPopupContent;
+	private Parent taskDetailsPopupContent;
 	private final PauseTransition taskDetailsPopupHideDelay = new PauseTransition(TASK_DETAILS_TOOLTIP_HIDE_DELAY);
 	private final PauseTransition taskDetailsPopupShowDelay = new PauseTransition(TASK_DETAILS_POPUP_SHOW_DELAY);
 	private boolean taskDetailsPopupMouseOver;
-	private double latestTaskDetailsPopupScreenX;
-	private double latestTaskDetailsPopupScreenY;
 
 	public TaskCard() {
 		setCursor(Cursor.HAND);
@@ -146,6 +146,8 @@ public final class TaskCard extends VBox {
 
 	public void setTitle(String title) {
 		titleLabel.setText((title == null || title.isBlank()) ? "Untitled task" : title.trim());
+		setAccessibleText("Task: " + titleLabel.getText());
+		titleLabel.setTooltip(new Tooltip(titleLabel.getText()));
 		refreshTaskDetailsTooltip();
 	}
 
@@ -189,11 +191,14 @@ public final class TaskCard extends VBox {
 	}
 
 	public void setCompleted(boolean completed) {
+		this.completed = completed;
 		completedLabel.setManaged(completed);
 		completedLabel.setVisible(completed);
 		completedLabel.setText(completed ? "Completed" : "");
 		toggleCompleteButton.setText(completed ? "Mark Incomplete" : "Complete");
 		setOpacity(completed ? 0.9 : 1.0);
+		pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("completed"), completed);
+		refreshDuePresentation();
 	}
 
 	public void setAssignees(List<AssignedUserModel> users) {
@@ -225,7 +230,8 @@ public final class TaskCard extends VBox {
 		}
 		if (safeUsers.size() > maxVisible) {
 			Label moreLabel = new Label("+" + (safeUsers.size() - maxVisible) + " more");
-			moreLabel.setStyle("-fx-font-size: 10px; -fx-text-fill: rgba(17,37,66,0.62);");
+			moreLabel.getStyleClass().add("task-card__metadata");
+			moreLabel.setStyle("-fx-font-size: 10px;");
 			cards.getChildren().add(moreLabel);
 		}
 		assigneeHost.getChildren().setAll(cards);
@@ -260,7 +266,21 @@ public final class TaskCard extends VBox {
 
 	public void setBorderByDueState(LocalDateTime dueAt, LocalDateTime completedAt) {
 		dueAccentCss = DueProximityStyles.accentColor(dueAt, completedAt);
+		LocalDateTime now = LocalDateTime.now();
+		overdue = completedAt == null && dueAt != null && dueAt.isBefore(now);
+		dueSoon = completedAt == null && dueAt != null && !overdue && !dueAt.isAfter(now.plusDays(1));
+		pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("overdue"), overdue);
+		pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("due-soon"), dueSoon);
+		refreshDuePresentation();
 		refreshSurfaceStyle();
+	}
+
+	private void refreshDuePresentation() {
+		if (dueAtValue == null) return;
+		String date = (currentVariant == Variant.COMPACT ? DUE_DATE_COMPACT_FORMAT : DUE_DATE_FORMAT).format(dueAtValue);
+		String cue = overdue ? "Overdue · Due " : dueSoon ? "Due soon · Due " : "Due ";
+		dueLabel.setText(cue + date);
+		dueLabel.setAccessibleText((completed ? "Completed. " : "") + dueLabel.getText());
 	}
 
 	public void applyMini() {
@@ -288,9 +308,9 @@ public final class TaskCard extends VBox {
 		setMinWidth(COMPACT_CARD_WIDTH);
 		setPrefWidth(COMPACT_CARD_WIDTH);
 		setMaxWidth(COMPACT_CARD_WIDTH);
-		titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700; -fx-text-fill: #112542;");
-		dueLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
-		createdByLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 500; -fx-text-fill: rgba(17,37,66,0.62);");
+		titleLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 700;");
+		dueLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 600;");
+		createdByLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 500;");
 		titleLabel.setWrapText(false);
 		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		titleLabel.setMinWidth(0);
@@ -300,7 +320,7 @@ public final class TaskCard extends VBox {
 		dueLabel.setWrapText(false);
 		compactTitleRow.setAlignment(Pos.CENTER_LEFT);
 		configureRelatedSections();
-		completedLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
+		completedLabel.setStyle("-fx-font-size: 10px; -fx-font-weight: 700;");
 		compactMetadataRow.setAlignment(Pos.TOP_LEFT);
 		compactMetadataRow.getStyleClass().setAll("app-taskcard-compact-meta-row");
 		caseSection.getStyleClass().setAll("app-taskcard-compact-meta-section");
@@ -348,18 +368,18 @@ public final class TaskCard extends VBox {
 		fullHeaderText.getChildren().setAll(titleLabel, dueLabel);
 		setDueAt(dueAtValue);
 		configureRelatedSections();
-		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700; -fx-text-fill: #112542;");
+		titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700;");
 		titleLabel.setWrapText(false);
 		titleLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
 		titleLabel.setMinWidth(0);
 		titleLabel.setMaxWidth(Double.MAX_VALUE);
-		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600; -fx-text-fill: rgba(17,37,66,0.72);");
+		dueLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 600;");
 		dueLabel.setWrapText(false);
 		dueLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
-		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 500; -fx-text-fill: rgba(17,37,66,0.62);");
-		descriptionLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: rgba(17,37,66,0.78);");
+		createdByLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 500;");
+		descriptionLabel.setStyle("-fx-font-size: 12px;");
 		descriptionLabel.setWrapText(true);
-		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700; -fx-text-fill: rgba(22,101,52,0.95);");
+		completedLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: 700;");
 		setSpacing(6);
 		setPadding(new Insets(8, 10, 8, 10));
 		setAlignment(Pos.TOP_LEFT);
@@ -384,6 +404,15 @@ public final class TaskCard extends VBox {
 		HBox.setHgrow(bodyPane, javafx.scene.layout.Priority.ALWAYS);
 		HBox.setHgrow(dueAccentBar, javafx.scene.layout.Priority.NEVER);
 		getStyleClass().addAll("task-card", "shale-entity-card", "shale-entity-card-clickable");
+		setFocusTraversable(true);
+		setAccessibleRole(AccessibleRole.BUTTON);
+		titleLabel.getStyleClass().add("task-card__title");
+		dueLabel.getStyleClass().add("task-card__due");
+		createdByLabel.getStyleClass().add("task-card__creator");
+		descriptionLabel.getStyleClass().add("task-card__description");
+		completedLabel.getStyleClass().add("task-card__completed-cue");
+		caseSectionLabel.getStyleClass().add("task-card__metadata");
+		teamSectionLabel.getStyleClass().add("task-card__metadata");
 		dueAccentBar.getStyleClass().add("task-card__due-accent-bar");
 		bodyPane.getStyleClass().add("task-card__body");
 		statusPill.getStyleClass().addAll("task-card__status-pill", "shale-status-pill", "shale-status-pill-compact");
@@ -425,10 +454,8 @@ public final class TaskCard extends VBox {
 			hovered = true;
 			setTranslateY(-1.5);
 			refreshSurfaceStyle();
-			captureTaskDetailsPopupPointer(e.getScreenX(), e.getScreenY());
 			scheduleTaskDetailsPopupShow();
 		});
-		setOnMouseMoved(e -> captureTaskDetailsPopupPointer(e.getScreenX(), e.getScreenY()));
 		setOnMouseExited(e ->
 		{
 			hovered = false;
@@ -446,6 +473,12 @@ public final class TaskCard extends VBox {
 				onOpen.accept(taskId);
 			}
 		});
+		setOnKeyPressed(e -> {
+			if ((e.getCode() == KeyCode.ENTER || e.getCode() == KeyCode.SPACE) && onOpen != null && taskId != null) {
+				e.consume();
+				onOpen.accept(taskId);
+			}
+		});
 		taskDetailsPopupShowDelay.setOnFinished(e -> {
 			if (hovered) {
 				showTaskDetailsPopup();
@@ -458,11 +491,11 @@ public final class TaskCard extends VBox {
 		});
 		sceneProperty().addListener((obs, oldScene, newScene) -> {
 			if (newScene == null) {
-				hideTaskDetailsPopup();
+				disposeTaskDetailsPopup();
 			} else {
 				Window window = newScene.getWindow();
 				if (window != null) {
-					window.setOnHidden(e -> hideTaskDetailsPopup());
+					window.addEventHandler(javafx.stage.WindowEvent.WINDOW_HIDDEN, e -> disposeTaskDetailsPopup());
 				}
 			}
 		});
@@ -485,7 +518,7 @@ public final class TaskCard extends VBox {
 	private void refreshTaskDetailsTooltip() {
 		hideTaskDetailsPopup();
 		taskDetailsPopup = buildTaskDetailsPopup(titleLabel.getText(), fullDescription);
-		taskDetailsPopupContent = (Label) taskDetailsPopup.getContent().getFirst();
+		taskDetailsPopupContent = (Parent) taskDetailsPopup.getContent().getFirst();
 		taskDetailsPopupContent.setOnMouseEntered(e -> {
 			taskDetailsPopupHideDelay.stop();
 			taskDetailsPopupMouseOver = true;
@@ -498,11 +531,6 @@ public final class TaskCard extends VBox {
 
 	Popup getTaskDetailsPopupForTesting() {
 		return taskDetailsPopup;
-	}
-
-	private void captureTaskDetailsPopupPointer(double screenX, double screenY) {
-		latestTaskDetailsPopupScreenX = screenX;
-		latestTaskDetailsPopupScreenY = screenY;
 	}
 
 	private void scheduleTaskDetailsPopupShow() {
@@ -525,25 +553,28 @@ public final class TaskCard extends VBox {
 		if (taskDetailsPopup.isShowing()) {
 			return;
 		}
-		double requestedX = latestTaskDetailsPopupScreenX + TASK_DETAILS_POPUP_CURSOR_OFFSET;
-		double requestedY = latestTaskDetailsPopupScreenY + TASK_DETAILS_POPUP_CURSOR_OFFSET;
+		javafx.geometry.Bounds cardBounds = localToScreen(getBoundsInLocal());
+		if (cardBounds == null) return;
+		double requestedX = cardBounds.getMaxX() + TASK_DETAILS_POPUP_CURSOR_OFFSET;
+		double requestedY = cardBounds.getMinY();
+		TransientPopupSupport.register(taskDetailsPopupContent);
 		taskDetailsPopup.show(this, requestedX, requestedY);
 		taskDetailsPopup.getScene().getRoot().applyCss();
 		taskDetailsPopup.getScene().getRoot().autosize();
 		taskDetailsPopup.getScene().getRoot().layout();
-		correctTaskDetailsPopupForScreenEdges(requestedX, requestedY);
+		correctTaskDetailsPopupForScreenEdges(cardBounds);
 	}
 
-	private void correctTaskDetailsPopupForScreenEdges(double requestedX, double requestedY) {
+	private void correctTaskDetailsPopupForScreenEdges(javafx.geometry.Bounds anchor) {
 		Window popupWindow = taskDetailsPopup.getScene().getWindow();
-		Rectangle2D bounds = Screen.getScreensForRectangle(requestedX, requestedY, 1, 1).stream()
+		Rectangle2D bounds = Screen.getScreensForRectangle(anchor.getMinX(), anchor.getMinY(), anchor.getWidth(), anchor.getHeight()).stream()
 				.findFirst()
 				.orElse(Screen.getPrimary())
 				.getVisualBounds();
-		double correctedX = Math.min(requestedX, bounds.getMaxX() - popupWindow.getWidth() - TASK_DETAILS_POPUP_CURSOR_OFFSET);
-		double correctedY = Math.min(requestedY, bounds.getMaxY() - popupWindow.getHeight() - TASK_DETAILS_POPUP_CURSOR_OFFSET);
-		popupWindow.setX(Math.max(bounds.getMinX() + TASK_DETAILS_POPUP_CURSOR_OFFSET, correctedX));
-		popupWindow.setY(Math.max(bounds.getMinY() + TASK_DETAILS_POPUP_CURSOR_OFFSET, correctedY));
+		TransientPopupSupport.PopupPosition position = TransientPopupSupport.position(anchor,
+				popupWindow.getWidth(), popupWindow.getHeight(), bounds, TASK_DETAILS_POPUP_CURSOR_OFFSET);
+		popupWindow.setX(position.x());
+		popupWindow.setY(position.y());
 	}
 
 	private void scheduleTaskDetailsPopupHide() {
@@ -555,84 +586,54 @@ public final class TaskCard extends VBox {
 		taskDetailsPopupHideDelay.stop();
 		if (taskDetailsPopup != null) {
 			taskDetailsPopup.hide();
+			TransientPopupSupport.unregister(taskDetailsPopupContent);
 		}
 	}
 
+	private void disposeTaskDetailsPopup() {
+		hideTaskDetailsPopup();
+		if (taskDetailsPopup != null) taskDetailsPopup.getContent().clear();
+		taskDetailsPopup = null;
+		taskDetailsPopupContent = null;
+		fullDescription = "";
+		taskDetailsPopupMouseOver = false;
+	}
+
 	static Popup buildTaskDetailsPopup(String title, String description) {
-		Label content = new Label(buildTaskDetailsTooltipText(title, description));
-		content.getStyleClass().add("tooltip");
-		content.setWrapText(true);
-		content.setPrefWidth(tooltipWidthForText(content.getText()));
-		content.setMaxWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
-		content.setStyle("-fx-font-size: 12px; -fx-line-spacing: 1px;");
+		String normalizedTitle = title == null || title.isBlank() ? "Untitled task" : title.trim();
+		String normalizedDescription = normalizeTaskDetailsText(description);
+		Label heading = new Label(normalizedTitle);
+		heading.getStyleClass().add("task-hover-title");
+		heading.setWrapText(true);
+		VBox content = new VBox(heading);
+		content.getStyleClass().add("task-hover-popup");
+		content.setAccessibleRole(AccessibleRole.TEXT);
+		content.setAccessibleText(buildTaskDetailsTooltipText(title, description));
+		if (!normalizedDescription.isBlank()) {
+			Label details = new Label(normalizedDescription);
+			details.getStyleClass().add("task-hover-description");
+			details.setWrapText(true);
+			javafx.scene.control.ScrollPane scroll = new javafx.scene.control.ScrollPane(details);
+			scroll.getStyleClass().add("task-hover-description-scroll");
+			scroll.setFitToWidth(true);
+			scroll.setHbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
+			scroll.setVbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.AS_NEEDED);
+			scroll.setMaxHeight(260);
+			content.getChildren().add(scroll);
+		}
 
 		Popup popup = new Popup();
 		popup.setAutoFix(true);
 		popup.setAutoHide(false);
 		popup.getContent().setAll(content);
+		popup.setOnHidden(event -> TransientPopupSupport.unregister(content));
 		return popup;
 	}
 
 	static String buildTaskDetailsTooltipText(String title, String description) {
 		String normalizedTitle = title == null || title.isBlank() ? "Untitled task" : title.trim();
-		String displayedDescription = descriptionForTooltip(description);
+		String displayedDescription = normalizeTaskDetailsText(description);
 		return displayedDescription.isBlank() ? normalizedTitle : normalizedTitle + "\n\n" + displayedDescription;
-	}
-
-	static double tooltipWidthForText(String text) {
-		String normalized = text == null ? "" : text;
-		double widestLine = 0;
-		for (String line : normalized.split("\n", -1)) {
-			Text measuringText = new Text(line);
-			measuringText.setFont(Font.font(TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE));
-			widestLine = Math.max(widestLine, measuringText.getLayoutBounds().getWidth());
-		}
-		return Math.min(TASK_DETAILS_TOOLTIP_MAX_WIDTH, Math.max(160, widestLine + 34));
-	}
-
-	static String descriptionForTooltip(String text) {
-		String normalized = normalizeTaskDetailsText(text);
-		if (normalized.isBlank() || wrappedDescriptionLineCount(normalized) <= TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_LINES) {
-			return normalized;
-		}
-		int low = 0;
-		int high = normalized.length();
-		String best = "...";
-		while (low <= high) {
-			int mid = (low + high) >>> 1;
-			String candidate = appendInlineEllipsis(normalized.substring(0, mid));
-			if (wrappedDescriptionLineCount(candidate) <= TASK_DETAILS_TOOLTIP_MAX_DESCRIPTION_LINES) {
-				best = candidate;
-				low = mid + 1;
-			} else {
-				high = mid - 1;
-			}
-		}
-		return best;
-	}
-
-	static int wrappedDescriptionLineCount(String text) {
-		String normalized = normalizeTaskDetailsText(text);
-		if (normalized.isBlank()) {
-			return 0;
-		}
-		Text measuringText = new Text(normalized);
-		measuringText.setFont(Font.font(TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE));
-		measuringText.setWrappingWidth(TASK_DETAILS_TOOLTIP_MAX_WIDTH);
-		double lineHeight = Font.font(TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE).getSize() + 5;
-		return Math.max(1, (int) Math.ceil(measuringText.getLayoutBounds().getHeight() / lineHeight));
-	}
-
-	static double estimatedTooltipDescriptionHeight(String text) {
-		return wrappedDescriptionLineCount(text) * (TASK_DETAILS_TOOLTIP_DESCRIPTION_FONT_SIZE + 5);
-	}
-
-	private static String appendInlineEllipsis(String text) {
-		String trimmed = text.stripTrailing();
-		while (!trimmed.isBlank() && (trimmed.endsWith(".") || trimmed.endsWith(",") || trimmed.endsWith(";") || trimmed.endsWith(":"))) {
-			trimmed = trimmed.substring(0, trimmed.length() - 1).stripTrailing();
-		}
-		return trimmed.isBlank() ? "..." : trimmed + "...";
 	}
 
 	static String normalizeTaskDetailsText(String text) {
@@ -652,8 +653,8 @@ public final class TaskCard extends VBox {
 		caseSection.getChildren().setAll(caseSectionLabel, relatedCaseHost);
 		teamSection.getChildren().setAll(teamSectionLabel, assigneeHost);
 		String sectionLabelStyle = currentVariant == Variant.COMPACT || currentVariant == Variant.COMPACT_FLUID
-				? "-fx-font-size: 9px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);"
-				: "-fx-font-size: 10px; -fx-font-weight: 700; -fx-text-fill: rgba(17,37,66,0.62);";
+				? "-fx-font-size: 9px; -fx-font-weight: 700;"
+				: "-fx-font-size: 10px; -fx-font-weight: 700;";
 		caseSectionLabel.setStyle(sectionLabelStyle);
 		teamSectionLabel.setStyle(sectionLabelStyle);
 		relatedCaseHost.setAlignment(Pos.CENTER_LEFT);

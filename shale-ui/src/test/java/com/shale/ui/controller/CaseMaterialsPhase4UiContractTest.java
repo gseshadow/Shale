@@ -71,13 +71,13 @@ final class CaseMaterialsPhase4UiContractTest {
   @Test void requestTabNewRequestActionIsHeaderStyledAndCreatesThroughService() {
     String requestController = MAT.substring(MAT.indexOf("final class CaseMaterialRequestsTabController"), MAT.indexOf("final class CaseMaterialItemsTabController"));
     String materialsUi = MAT.substring(MAT.indexOf("final class MaterialsUi"));
-    int headerAction = requestController.indexOf("Button add=semanticButton(ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD, \"New Request\",null)");
-    int rootSection = requestController.indexOf("section(title,add,status,list)");
+    int headerAction = requestController.indexOf("Button newRequestButton=semanticButton(ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD, \"New Request\",null)");
+    int rootSection = requestController.indexOf("section(title,newRequestButton,status,list)");
     int listCreation = requestController.indexOf("list=new VBox(10)");
     assertTrue(headerAction >= 0);
     assertTrue(rootSection > headerAction);
     assertTrue(listCreation >= 0 && headerAction > listCreation);
-    assertTrue(requestController.contains("add.setOnAction(e->openNewRequestWindow())"));
+    assertTrue(requestController.contains("newRequestButton.setOnAction(e->openNewRequestWindow())"));
     assertTrue(materialsUi.contains("ActionButtonFactory.primary(s,null)"));
     assertTrue(requestController.contains("AppDialogs.createModalStage(owner.get(),\"New Request\")"));
     assertTrue(requestController.contains("AppDialogs.createSecondaryWindowShell(stage,\"New Request\",stage::close,body)"));
