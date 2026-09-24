@@ -50,16 +50,15 @@ authorization predicate rather than a PHI/value view and is intentionally not au
 
 1. In a fresh query under the approved `sysadmin`/`db_owner` migration principal—not
    `shale_app` or `shale_runtime`—leave both `ShaleClientId` and `PrincipalUserId` session context
-   unset. Run verification in `ALL_TENANT` mode with its acknowledgement left `0`. Record the visible
-   tenant inventory/count and inspect the enabled `TenantFilter` predicates plus deployed predicate
-   functions independently.
-2. Reconcile that output with an independently approved tenant inventory. Only then set the exact
-   database name, independently obtained expected tenant count, and operator acknowledgement on a
-   reviewed execution copy. A mismatch or hidden tenant blocks execution before the transaction.
+   unset. Run the read-only verification unchanged. Record the visible tenant inventory/count and
+   inspect the enabled `TenantFilter` predicates plus deployed predicate functions independently.
+2. Reconcile that output with an independently approved tenant inventory. A mismatch or hidden
+   tenant blocks migration execution. The verified 2026-09-23 production run exposed tenants 7, 8,
+   and 9 and all Phase 1A finding counts were zero.
 3. Manually apply `docs/sql/2026-09-23_firm_wide_roles_foundation_phase1a.sql` in that same kind of
    fresh all-tenant administrative session. The checked-in defaults cannot mutate production.
-4. Rerun `docs/sql/2026-09-23_firm_wide_roles_foundation_phase1a_verify.sql` in authoritative
-   `ALL_TENANT` mode with the approved values. The visible and expected tenant counts must match;
+4. Rerun `docs/sql/2026-09-23_firm_wide_roles_foundation_phase1a_verify.sql` unchanged in the
+   authoritative all-tenant session. The visible inventory must match the independently approved inventory;
    missing tables, missing/inactive/deleted built-ins, built-in assignment violations, cross-tenant
    violations, duplicate active assignments, and missing/inexact RLS predicate counts must all be
    zero. Optional `TENANT` mode is explicitly non-authoritative and reports only the matching session
@@ -97,5 +96,7 @@ Exact deployment order:
 2. Apply `docs/sql/2026-09-23_firm_wide_roles_audit_allowlist_phase1b.sql` manually with an approved database migration principal.
 3. Run the read-only `docs/sql/2026-09-23_firm_wide_roles_phase1b_verify.sql`; every `FindingCount` must be zero.
 4. Deploy the Phase 1B application binaries. Application-first deployment is unsupported because audit inserts require the new allowlist values.
+
+The verified 2026-09-23 production execution reported zero for every Phase 1B `FindingCount`.
 
 Phase 1B does not implement field-confirmation policy, Case Date confirmation, case-attention badges, notifications, or any Case Team role/assignment mutation.

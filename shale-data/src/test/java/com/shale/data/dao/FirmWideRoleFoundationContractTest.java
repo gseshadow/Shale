@@ -24,7 +24,7 @@ final class FirmWideRoleFoundationContractTest {
             ()->assertTrue(verify.contains("ViolationCount")));
     }
 
-    @Test void allTenantExecutionFailsClosedBeforeWritesWithoutIndependentOperatorApproval()throws Exception{
+    @Test void migrationFailsClosedBeforeWritesAndVerificationRunsUnchangedOnApprovedAdminConnection()throws Exception{
         String sql=read(MIGRATION),verify=read(VERIFY);
         int gate=sql.indexOf("BEGIN TRY");
         assertAll("all-tenant execution gate",
@@ -36,7 +36,10 @@ final class FirmWideRoleFoundationContractTest {
             ()->assertTrue(sql.indexOf("IS_SRVROLEMEMBER(N'sysadmin')")<gate),
             ()->assertTrue(sql.indexOf("@VisibleTenantCount<>@ExpectedTenantCount")<gate),
             ()->assertTrue(verify.contains("VISIBLE_TENANT_INVENTORY_RECONCILE_INDEPENDENTLY")),
-            ()->assertTrue(verify.contains("Pass 1 complete: independently reconcile visibility")));
+            ()->assertFalse(verify.contains("REPLACE_WITH_APPROVED_DATABASE")),
+            ()->assertFalse(verify.contains("ExpectedTenantCount")),
+            ()->assertFalse(verify.contains("OperatorAcknowledgement")),
+            ()->assertTrue(verify.contains("tenant IDs 7, 8, and 9")));
     }
 
     @Test void schemaSupportsManyRolesAndEnforcesStrictSameTenantRelationshipsAndLifecycle()throws Exception{
@@ -79,14 +82,14 @@ final class FirmWideRoleFoundationContractTest {
     }
 
 
-    @Test void verificationSeparatesAuthoritativeAllTenantFromOptionalTenantScopedResults()throws Exception{
+    @Test void verificationIsAuthoritativeAllTenantReadOnlyAndReportsInventory()throws Exception{
         String verify=read(VERIFY);
         assertAll("verification visibility cannot silently pass",
-            ()->assertTrue(verify.contains("@VerificationMode varchar(16)='ALL_TENANT'")),
-            ()->assertTrue(verify.contains("@VisibleTenantCount<>@ExpectedTenantCount")),
-            ()->assertTrue(verify.contains("TENANT_SCOPED_DATA_NON_AUTHORITATIVE")),
-            ()->assertTrue(verify.contains("NON_AUTHORITATIVE: results cover only the explicit session tenant.")),
-            ()->assertTrue(verify.contains("TRY_CONVERT(int,SESSION_CONTEXT(N'ShaleClientId'))<>@TenantScopedVerificationTenantId")));
+            ()->assertTrue(verify.contains("VISIBLE_TENANT_INVENTORY_RECONCILE_INDEPENDENTLY")),
+            ()->assertTrue(verify.contains("SESSION_CONTEXT(N'ShaleClientId') IS NOT NULL")),
+            ()->assertTrue(verify.contains("IS_SRVROLEMEMBER(N'sysadmin')")),
+            ()->assertTrue(verify.contains("ALL_TENANT_DATA")),
+            ()->assertFalse(verify.contains("@TenantScopedVerificationTenantId")));
     }
 
     @Test void eligibilityUsesCurrentActorAuthoritativeLifecycleDataAndNeverCaseTeamState()throws Exception{
