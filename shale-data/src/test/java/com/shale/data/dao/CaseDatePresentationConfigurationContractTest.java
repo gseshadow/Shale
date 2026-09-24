@@ -3,6 +3,7 @@ package com.shale.data.dao;
 import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.*;
 import java.util.List;
+import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import org.junit.jupiter.api.Test;
 
 /** Protects the tenant default foundation before any card/Overview reader cutover. */
@@ -52,9 +53,20 @@ final class CaseDatePresentationConfigurationContractTest {
           ()->assertTrue(s.contains("UQ_CaseDatePresentationConfigurations_TenantPurpose")),
           ()->assertTrue(s.contains("UQ_CaseDatePresentationSelections_ConfigOrder")),
           ()->assertTrue(s.contains("WHEN 'INTAKE' THEN 0 WHEN 'STATUTE_OF_LIMITATIONS' THEN 1 ELSE 2")),
-          ()->assertTrue(s.contains("('SYSTEM:date_of_injury',0),('SYSTEM:date_of_medical_negligence',1),('SYSTEM:intake',2),('SYSTEM:statute_of_limitations',3),('SYSTEM:tort_notice_deadline',4)")),
+          ()->assertTrue(s.contains("Mirror CaseOverviewConfigurationDao.defaults")),
+          ()->assertTrue(s.contains("ROW_NUMBER() OVER(PARTITION BY ShaleClientId ORDER BY OriginalSortOrder)-1 CompactSortOrder")),
+          ()->assertFalse(s.contains("Every tenant must receive the five established Overview defaults.")),
+          ()->assertTrue(s.contains("A required protected Case Date mapping is missing or ambiguous.")),
+          ()->assertTrue(s.contains("A tenant Case Date overlay family is ambiguous.")),
           ()->assertFalse(s.contains("UPDATE dbo.CaseDates")),
           ()->assertFalse(s.contains("UPDATE dbo.CaseDateTypeSemanticRoleMappings")));
+    }
+
+    @Test void builtInOnlyTenantOmitsUnavailableOptionalOverviewTypesButRetainsRequiredDefaults(){
+        var effective=List.of(type(1,"intake"),type(2,"statute_of_limitations"),type(3,"tort_notice_deadline"));
+        assertEquals(List.of("intake","statute_of_limitations","tort_notice_deadline"),
+                CaseOverviewConfigurationDao.defaults(effective).stream().map(EffectiveCaseDateTypeDto::systemKey).toList(),
+                "a built-in-only tenant must preserve its actual three-date uncustomized Overview rather than fail on optional types");
     }
 
     @Test void servicePortDefaultsFailClosedAndProductionAdapterDelegates()throws Exception{
@@ -79,4 +91,20 @@ final class CaseDatePresentationConfigurationContractTest {
           ()->assertTrue(audit.contains("BEGIN TRANSACTION")),
           ()->assertTrue(audit.contains("XACT_STATE()<>0 ROLLBACK")));
     }
+
+    @Test void failurePreflightReportsRollbackStateAndEveryIneligibleCandidateReason()throws Exception{
+        String preflight=read("docs/sql/2026-09-24_case_date_presentation_configuration_phase1_preflight.sql");
+        assertAll(
+          ()->assertTrue(preflight.contains("ROLLED_BACK_OR_NEVER_APPLIED")),
+          ()->assertTrue(preflight.contains("OBJECTS_PRESENT_REVIEW_ROWS")),
+          ()->assertTrue(preflight.contains("TypeOwnerTenantId")),
+          ()->assertTrue(preflight.contains("GLOBAL_NOT_RUNTIME_VISIBLE")),
+          ()->assertTrue(preflight.contains("TENANT_RESET_MARKER")),
+          ()->assertTrue(preflight.contains("INACTIVE_EFFECTIVE_WINNER")),
+          ()->assertTrue(preflight.contains("SHADOWED_OR_AMBIGUOUS_TENANT_ROW")),
+          ()->assertFalse(preflight.matches("(?is).*(INSERT|UPDATE|DELETE|MERGE|ALTER|CREATE|DROP)\\s+dbo\\..*"),
+                  "preflight may use temp tables but must never mutate a durable dbo object"));
+    }
+
+    private static EffectiveCaseDateTypeDto type(int id,String key){return new EffectiveCaseDateTypeDto(id,null,key,key,null,"OTHER","#123456",false,id,true,false,EffectiveCaseDateTypeDto.Origin.GLOBAL,new byte[]{1});}
 }

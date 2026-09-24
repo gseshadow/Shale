@@ -61,12 +61,15 @@ WHERE cd.ShaleClientId = @TenantId AND cd.CaseId = @CaseId AND cd.IsDeleted = 0
 
 Seed defaults from semantics, not from global ids. The card default is ordered Intake, SOL, then TCN, matching
 the actual current card display. The Overview
-default is the current uncustomized order from `CaseOverviewConfigurationDao`: date of injury, medical
-negligence, Intake, SOL, TCN. For each tenant, resolve the effective semantic mapping using the same
+default is the current uncustomized candidate order from `CaseOverviewConfigurationDao`: date of injury,
+medical negligence, Intake, SOL, TCN. Its existing `defaults(...)` implementation filters that ordered
+candidate list through the tenant's runtime-effective types, so unavailable optional types are omitted
+and the remaining order is compacted. For each tenant, resolve the effective semantic mapping using the same
 precedence as runtime (active, non-deleted tenant mapping first, otherwise the active global mapping),
 join its mapped type, and store that type's stable identity. Thus a tenant semantic override seeds the
 tenant meaning, while `SYSTEM:` matching still includes occurrences stored against the original global
-type. A missing or ambiguous effective mapping is a migration blocker; it is never silently omitted.
+type. Missing or ambiguous required Intake resolution and ambiguous/corrupt type state are migration
+blockers. An optional candidate absent from the runtime-effective list is omitted, exactly as it is today.
 
 Existing per-case `CaseOverviewConfigurations` parents and ordered selections are not rewritten. This
 preserves customized layouts, retained inactive selections, and explicit-empty configurations. Only cases

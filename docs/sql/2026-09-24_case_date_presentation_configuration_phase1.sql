@@ -30,6 +30,14 @@ BEGIN TRY
  IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.CaseDatePresentationSelections') AND name=N'IX_CaseDatePresentationSelections_TenantConfigOrder')
   CREATE INDEX IX_CaseDatePresentationSelections_TenantConfigOrder ON dbo.CaseDatePresentationSelections(ShaleClientId,CaseDatePresentationConfigurationId,SortOrder) INCLUDE(SelectionIdentity);
 
+ /* Never use ROW_NUMBER to conceal corrupt/ambiguous protected mappings or overlay definitions. */
+ IF EXISTS(SELECT 1 FROM dbo.ShaleClients sc CROSS JOIN(VALUES('INTAKE'),('STATUTE_OF_LIMITATIONS'),('TORT_NOTICE_DEADLINE'))r(RoleKey)
+  OUTER APPLY(SELECT COUNT_BIG(*) TenantCount FROM dbo.CaseDateTypeSemanticRoleMappings m WHERE m.ShaleClientId=sc.Id AND m.SemanticRoleKey=r.RoleKey AND m.IsActive=1 AND m.IsDeleted=0)tc
+  OUTER APPLY(SELECT COUNT_BIG(*) GlobalCount FROM dbo.CaseDateTypeSemanticRoleMappings m WHERE m.ShaleClientId IS NULL AND m.SemanticRoleKey=r.RoleKey AND m.IsActive=1 AND m.IsDeleted=0)gc
+  WHERE tc.TenantCount>1 OR (tc.TenantCount=0 AND gc.GlobalCount<>1)) THROW 57207,'A required protected Case Date mapping is missing or ambiguous.',1;
+ IF EXISTS(SELECT 1 FROM dbo.CaseDateTypes t WHERE t.ShaleClientId IS NOT NULL AND t.IsDeleted=0 AND t.SystemKey IN('date_of_injury','date_of_medical_negligence','intake','statute_of_limitations','tort_notice_deadline') GROUP BY t.ShaleClientId,t.SystemKey HAVING COUNT_BIG(*)>1)
+  THROW 57208,'A tenant Case Date overlay family is ambiguous.',1;
+
  IF OBJECT_ID(N'sec.fn_FilterByTenant',N'IF') IS NULL THROW 57201,'Strict tenant RLS predicate is missing.',1;
  DECLARE @policyId int=(SELECT object_id FROM sys.security_policies WHERE name=N'TenantFilter'); IF @policyId IS NULL THROW 57202,'TenantFilter policy is missing.',1;
  DECLARE @policy nvarchar(517)=(SELECT QUOTENAME(SCHEMA_NAME(schema_id))+N'.'+QUOTENAME(name) FROM sys.security_policies WHERE object_id=@policyId);
@@ -56,12 +64,21 @@ BEGIN TRY
  WHERE NOT EXISTS(SELECT 1 FROM dbo.CaseDatePresentationSelections s WHERE s.CaseDatePresentationConfigurationId=c.Id);
  IF EXISTS(SELECT 1 FROM dbo.CaseDatePresentationConfigurations c WHERE c.Purpose='CASE_CARD' AND (SELECT COUNT(*) FROM dbo.CaseDatePresentationSelections s WHERE s.CaseDatePresentationConfigurationId=c.Id)<>3) THROW 57204,'Every tenant must resolve the three current card meanings.',1;
 
- /* The established uncustomized Overview order is identity-based and independent of per-case overrides. */
+ /* Mirror CaseOverviewConfigurationDao.defaults: optional unavailable types are omitted, then order is compacted. */
+ ;WITH desired AS(
+  SELECT c.ShaleClientId,c.Id ConfigurationId,v.SystemKey,v.OriginalSortOrder
+  FROM dbo.CaseDatePresentationConfigurations c CROSS JOIN(VALUES('date_of_injury',0),('date_of_medical_negligence',1),('intake',2),('statute_of_limitations',3),('tort_notice_deadline',4))v(SystemKey,OriginalSortOrder)
+  WHERE c.Purpose='CASE_OVERVIEW'),
+ visible AS(
+  SELECT d.*,t.Id TypeId,t.IsActive,t.IsDeleted,
+   ROW_NUMBER() OVER(PARTITION BY d.ShaleClientId,d.SystemKey ORDER BY CASE WHEN t.ShaleClientId=d.ShaleClientId AND t.IsDeleted=0 THEN 0 ELSE 1 END,t.Id) rn
+  FROM desired d JOIN dbo.CaseDateTypes t ON t.SystemKey=d.SystemKey
+  WHERE t.ShaleClientId=d.ShaleClientId OR (t.ShaleClientId IS NULL AND EXISTS(SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings m WHERE m.CaseDateTypeId=t.Id AND m.ShaleClientId IS NULL AND m.IsActive=1 AND m.IsDeleted=0))),
+ eligible AS(SELECT *,ROW_NUMBER() OVER(PARTITION BY ShaleClientId ORDER BY OriginalSortOrder)-1 CompactSortOrder FROM visible WHERE rn=1 AND IsActive=1 AND IsDeleted=0)
  INSERT dbo.CaseDatePresentationSelections(ShaleClientId,CaseDatePresentationConfigurationId,SelectionIdentity,SortOrder)
- SELECT c.ShaleClientId,c.Id,v.IdentityValue,v.SortOrder FROM dbo.CaseDatePresentationConfigurations c
- CROSS JOIN(VALUES('SYSTEM:date_of_injury',0),('SYSTEM:date_of_medical_negligence',1),('SYSTEM:intake',2),('SYSTEM:statute_of_limitations',3),('SYSTEM:tort_notice_deadline',4))v(IdentityValue,SortOrder)
- WHERE c.Purpose='CASE_OVERVIEW' AND NOT EXISTS(SELECT 1 FROM dbo.CaseDatePresentationSelections s WHERE s.CaseDatePresentationConfigurationId=c.Id);
- IF EXISTS(SELECT 1 FROM dbo.CaseDatePresentationConfigurations c WHERE c.Purpose='CASE_OVERVIEW' AND (SELECT COUNT(*) FROM dbo.CaseDatePresentationSelections s WHERE s.CaseDatePresentationConfigurationId=c.Id)<>5) THROW 57205,'Every tenant must receive the five established Overview defaults.',1;
+ SELECT e.ShaleClientId,e.ConfigurationId,CONCAT('SYSTEM:',e.SystemKey),e.CompactSortOrder FROM eligible e
+ WHERE NOT EXISTS(SELECT 1 FROM dbo.CaseDatePresentationSelections s WHERE s.CaseDatePresentationConfigurationId=e.ConfigurationId);
+ IF EXISTS(SELECT 1 FROM dbo.CaseDatePresentationConfigurations c WHERE c.Purpose='CASE_OVERVIEW' AND NOT EXISTS(SELECT 1 FROM dbo.CaseDatePresentationSelections s WHERE s.CaseDatePresentationConfigurationId=c.Id AND s.SelectionIdentity='SYSTEM:intake')) THROW 57205,'Every tenant must resolve the required Intake Overview default.',1;
  IF EXISTS(SELECT 1 FROM dbo.CaseDatePresentationSelections s WHERE s.SelectionIdentity LIKE 'SYSTEM:%' AND NOT EXISTS(
   SELECT 1 FROM dbo.CaseDateTypes t WHERE (t.ShaleClientId=s.ShaleClientId OR t.ShaleClientId IS NULL) AND t.SystemKey IS NOT NULL
    AND LOWER(LTRIM(RTRIM(t.SystemKey)))=SUBSTRING(s.SelectionIdentity,8,160) AND t.IsActive=1 AND t.IsDeleted=0))
