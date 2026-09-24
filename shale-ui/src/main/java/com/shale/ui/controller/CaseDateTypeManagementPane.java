@@ -2,6 +2,10 @@ package com.shale.ui.controller;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.IntConsumer;
@@ -10,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import com.shale.core.dto.FieldConfirmationPolicyDto;
 import com.shale.core.service.CaseServicePort;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.CommittedChangeTracker;
@@ -24,6 +29,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
@@ -51,6 +57,9 @@ public final class CaseDateTypeManagementPane {
     private final Button edit;
     private final Button toggle;
     private final Button remove;
+    private final Button confirmation;
+    private Map<String, FieldConfirmationPolicyDto> policies = Map.of();
+    private List<CaseServicePort.ConfirmationRole> roles = List.of();
     private volatile boolean disposed;
     private int loadGeneration;
     private EffectiveCaseDateTypeDto selected;
@@ -63,9 +72,10 @@ public final class CaseDateTypeManagementPane {
         edit = button("Edit", ControlStyles.Purpose.SECONDARY, () -> editDefinition(selected));
         toggle = button("Activate/Deactivate", ControlStyles.Purpose.GHOST, this::toggleSelected);
         remove = button("Remove", ControlStyles.Purpose.DANGER, this::removeSelected);
+        confirmation = button("Confirmation policy", ControlStyles.Purpose.SECONDARY, this::editConfirmationPolicy);
         status.getStyleClass().add("search-summary-text"); status.setWrapText(true);
         cards.setPrefWrapLength(820);
-        root.getChildren().addAll(new HBox(8, add, edit, toggle, remove), status, cards);
+        root.getChildren().addAll(new HBox(8, add, edit, toggle, remove, confirmation), status, cards);
         updateActions();
         reload(null);
     }
@@ -86,7 +96,9 @@ public final class CaseDateTypeManagementPane {
         executor.execute(() -> {
             try {
                 List<EffectiveCaseDateTypeDto> loaded = service.listCaseDateTypesForAdministration(tenantId, actorId);
-                Platform.runLater(() -> applyLoad(generation, loaded, successMessage));
+                List<FieldConfirmationPolicyDto> loadedPolicies = service.listFieldConfirmationPolicies(tenantId, actorId);
+                List<CaseServicePort.ConfirmationRole> loadedRoles = service.listConfirmationRoles(tenantId, actorId);
+                Platform.runLater(() -> { policies=loadedPolicies.stream().collect(Collectors.toUnmodifiableMap(FieldConfirmationPolicyDto::caseDateTypePolicyKey, p->p)); roles=loadedRoles; applyLoad(generation, loaded, successMessage); });
             } catch (RuntimeException ex) {
                 LOG.error("Case Date Type administration load failed tenantId={} actorId={}", tenantId, actorId, ex);
                 Platform.runLater(() -> { if (current(generation)) status.setText("Case date types could not be loaded. Try again."); });
@@ -108,7 +120,7 @@ public final class CaseDateTypeManagementPane {
 
     static List<EffectiveCaseDateTypeDto> manageableRows(List<EffectiveCaseDateTypeDto> loaded, int tenantId) {
         if (loaded == null) return List.of();
-        return loaded.stream().filter(r -> isManageable(r, tenantId))
+        return loaded.stream().filter(r -> isManageable(r, tenantId) || r != null && r.shaleClientId() == null && r.active() && !r.deleted())
                 .sorted(Comparator.comparing(EffectiveCaseDateTypeDto::name, String.CASE_INSENSITIVE_ORDER).thenComparingInt(EffectiveCaseDateTypeDto::id)).toList();
     }
 
@@ -130,7 +142,10 @@ public final class CaseDateTypeManagementPane {
         HBox heading = new HBox(8, dot, name); heading.setAlignment(Pos.CENTER_LEFT);
         Label details = new Label((row.active() ? "Active" : "Inactive") + " · " + row.calendarCategory() + " · " + (row.supportsTime() ? "Timed or all-day" : "All-day only"));
         details.getStyleClass().add("search-summary-text"); details.setWrapText(true);
-        card.getChildren().addAll(heading, details);
+        FieldConfirmationPolicyDto policy=policies.get(policyKey(row));
+        Label policyLabel=new Label(policy!=null&&policy.requiresConfirmation()?"Requires confirmation":"Confirmation not required");
+        policyLabel.getStyleClass().add("search-summary-text");
+        card.getChildren().addAll(heading, details, policyLabel);
         card.setOnMouseClicked(e -> select(row));
         card.setOnKeyPressed(e -> { if (e.getCode() == javafx.scene.input.KeyCode.SPACE || e.getCode() == javafx.scene.input.KeyCode.ENTER) select(row); });
         return card;
@@ -139,9 +154,31 @@ public final class CaseDateTypeManagementPane {
     private void select(EffectiveCaseDateTypeDto row) { selected = row; updateActions(); status.setText(""); }
     private void updateActions() {
         boolean enabled = selected != null && !mutationInFlight.get();
-        edit.setDisable(!enabled); toggle.setDisable(!enabled); remove.setDisable(!enabled);
+        boolean definitionEditable=enabled&&isManageable(selected,tenantId);
+        edit.setDisable(!definitionEditable); toggle.setDisable(!definitionEditable); remove.setDisable(!definitionEditable);
+        confirmation.setDisable(!enabled || !selected.active() || selected.deleted());
         toggle.setText(selected == null ? "Activate/Deactivate" : lifecycleActionLabel(selected));
     }
+
+    private void editConfirmationPolicy() {
+        EffectiveCaseDateTypeDto type=selected;if(type==null||mutationInFlight.get())return;
+        FieldConfirmationPolicyDto current=policies.get(policyKey(type));
+        Dialog<Boolean> dialog=new Dialog<>();AppDialogs.applySecondaryDialogShell(dialog,"Case Date Type Settings");
+        dialog.getDialogPane().getButtonTypes().setAll(ButtonType.OK,ButtonType.CANCEL);
+        CheckBox required=ControlStyles.formControl(new CheckBox("Requires confirmation"));required.setSelected(current!=null&&current.requiresConfirmation());
+        ComboBox<CaseServicePort.ConfirmationRole> role=ControlStyles.formControl(new ComboBox<>());role.getItems().setAll(roles);role.setPromptText("Select confirming role");
+        role.setConverter(new javafx.util.StringConverter<>(){public String toString(CaseServicePort.ConfirmationRole r){return r==null?"":r.name();}public CaseServicePort.ConfirmationRole fromString(String s){return null;}});
+        if(current!=null)role.getSelectionModel().select(roles.stream().filter(r->Objects.equals(r.id(),current.requiredFirmWideRoleDefinitionId())).findFirst().orElse(null));
+        role.setDisable(!required.isSelected());required.selectedProperty().addListener((o,a,b)->role.setDisable(!b));
+        Label help=new Label("This tenant-wide policy applies whenever this resulting Case Date Type is created, changed, or restored. It is independent of New Intake Required.");help.setWrapText(true);
+        dialog.getDialogPane().setContent(new VBox(10,new Label(type.name()),required,role,help));
+        Button save=(Button)dialog.getDialogPane().lookupButton(ButtonType.OK);ControlStyles.apply(save,ControlStyles.Purpose.PRIMARY);
+        save.addEventFilter(javafx.event.ActionEvent.ACTION,e->{if(required.isSelected()&&role.getValue()==null)e.consume();});
+        dialog.setResultConverter(b->b==ButtonType.OK?Boolean.TRUE:null);
+        dialog.showAndWait().ifPresent(ignored->mutate("Confirmation policy updated.",()->{service.setFieldConfirmationPolicy(new CaseServicePort.SetFieldConfirmationPolicyCommand(tenantId,actorId,type.id(),required.isSelected(),required.isSelected()?role.getValue().id():null,current==null?null:current.id(),current==null?null:current.rowVer()));return type.id();}));
+    }
+
+    static String policyKey(EffectiveCaseDateTypeDto type){return type.systemKey()==null?"TYPE:"+type.id():"SYSTEM:"+type.systemKey().trim().toLowerCase(Locale.ROOT);}
 
     private void editDefinition(EffectiveCaseDateTypeDto existing) {
         if (mutationInFlight.get()) return;
