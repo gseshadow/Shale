@@ -15,6 +15,21 @@ public final class FieldConfirmationDao {
     public FieldConfirmationDao(DbSessionProvider db){this(db,new EntityActionAuditDao());}
     FieldConfirmationDao(DbSessionProvider db,EntityActionAuditDao audit){this.db=Objects.requireNonNull(db);this.audit=Objects.requireNonNull(audit);}
 
+    public List<FieldConfirmationPolicyDto> listPolicies(int tenant,int actor,String formKey){
+        requireKey(formKey,"formKey");
+        String sql="SELECT Id,ShaleClientId,FormKey,FieldKey,PolicyRevision,RequiresConfirmation,RequiredFirmWideRoleDefinitionId,RowVer FROM dbo.FieldConfirmationPolicies WHERE ShaleClientId=? AND FormKey=? AND SupersededAt IS NULL ORDER BY FieldKey";
+        try(Connection con=db.requireConnection();PreparedStatement ps=con.prepareStatement(sql)){verifySession(con,tenant,actor,true);ps.setInt(1,tenant);ps.setString(2,formKey);try(ResultSet rs=ps.executeQuery()){List<FieldConfirmationPolicyDto> out=new ArrayList<>();while(rs.next())out.add(dto(rs));return List.copyOf(out);}}
+        catch(SQLException e){throw new IllegalStateException("Confirmation policies could not be loaded.",e);}
+    }
+
+    public List<com.shale.core.service.CaseServicePort.ConfirmationRole> listRoles(int tenant,int actor){
+        String sql="SELECT Id,Name FROM dbo.FirmWideRoleDefinitions WHERE ShaleClientId=? AND IsActive=1 AND IsDeleted=0 ORDER BY Name,Id";
+        try(Connection con=db.requireConnection();PreparedStatement ps=con.prepareStatement(sql)){verifySession(con,tenant,actor,false);ps.setInt(1,tenant);try(ResultSet rs=ps.executeQuery()){List<com.shale.core.service.CaseServicePort.ConfirmationRole> out=new ArrayList<>();while(rs.next())out.add(new com.shale.core.service.CaseServicePort.ConfirmationRole(rs.getInt(1),rs.getString(2)));return List.copyOf(out);}}
+        catch(SQLException e){throw new IllegalStateException("Firm-wide confirmation roles could not be loaded.",e);}
+    }
+
+    public boolean actorHasRole(int tenant,int actor,int role){try(Connection con=db.requireConnection()){verifySession(con,tenant,actor,false);return hasRole(con,tenant,actor,role);}catch(SQLException e){throw new IllegalStateException("Confirmation eligibility could not be checked.",e);}}
+
     public FieldConfirmationPolicyDto setPolicy(SetFieldConfirmationPolicyCommand c){
         requireKey(c.formKey(),"formKey"); requireKey(c.fieldKey(),"fieldKey");
         if(c.requiresConfirmation()&&c.requiredFirmWideRoleDefinitionId()==null)throw new IllegalArgumentException("An active firm-wide role is required.");
@@ -85,7 +100,8 @@ public final class FieldConfirmationDao {
     private static void requireActiveRole(Connection con,int t,int r)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.FirmWideRoleDefinitions WHERE Id=? AND ShaleClientId=? AND IsActive=1 AND IsDeleted=0")){ps.setInt(1,r);ps.setInt(2,t);try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalArgumentException("The selected firm-wide role is inactive or belongs to another tenant.");}}}
     private static Policy lockPolicy(Connection con,int t,String f,String k)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT Id,PolicyRevision,FormKey,FieldKey,RequiresConfirmation,RequiredFirmWideRoleDefinitionId,RowVer FROM dbo.FieldConfirmationPolicies WITH(UPDLOCK,HOLDLOCK) WHERE ShaleClientId=? AND FormKey=? AND FieldKey=? AND SupersededAt IS NULL")){ps.setInt(1,t);ps.setString(2,f);ps.setString(3,k);try(ResultSet rs=ps.executeQuery()){return rs.next()?policy(rs):null;}}}
     private static Policy policy(ResultSet rs)throws SQLException{return new Policy(rs.getLong(1),rs.getLong(2),rs.getString(3),rs.getString(4),rs.getBoolean(5),(Integer)rs.getObject(6),rs.getBytes(7));}
-    private static FieldConfirmationPolicyDto find(Connection con,long id)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT Id,ShaleClientId,FormKey,FieldKey,PolicyRevision,RequiresConfirmation,RequiredFirmWideRoleDefinitionId,RowVer FROM dbo.FieldConfirmationPolicies WHERE Id=?")){ps.setLong(1,id);try(ResultSet rs=ps.executeQuery()){rs.next();return new FieldConfirmationPolicyDto(rs.getLong(1),rs.getInt(2),rs.getString(3),rs.getString(4),rs.getLong(5),rs.getBoolean(6),(Integer)rs.getObject(7),rs.getBytes(8));}}}
+    private static FieldConfirmationPolicyDto find(Connection con,long id)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT Id,ShaleClientId,FormKey,FieldKey,PolicyRevision,RequiresConfirmation,RequiredFirmWideRoleDefinitionId,RowVer FROM dbo.FieldConfirmationPolicies WHERE Id=?")){ps.setLong(1,id);try(ResultSet rs=ps.executeQuery()){rs.next();return dto(rs);}}}
+    private static FieldConfirmationPolicyDto dto(ResultSet rs)throws SQLException{return new FieldConfirmationPolicyDto(rs.getLong(1),rs.getInt(2),rs.getString(3),rs.getString(4),rs.getLong(5),rs.getBoolean(6),(Integer)rs.getObject(7),rs.getBytes(8));}
     private record Policy(long id,long revision,String formKey,String fieldKey,boolean required,Integer roleId,byte[] rowVer){}
     private static boolean has(byte[] b){return b!=null&&b.length>0;}private static void requireToken(byte[] b,String n){if(!has(b))throw new IllegalArgumentException(n+" is required.");}
     private static void requireKey(String s,String n){if(s==null||s.isBlank())throw new IllegalArgumentException(n+" is required.");}
