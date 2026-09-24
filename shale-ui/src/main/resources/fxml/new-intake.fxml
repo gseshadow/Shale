@@ -105,7 +105,6 @@
                                     <Label text="Tort Claims Notice" styleClass="shale-field-label" GridPane.rowIndex="4"/><DatePicker fx:id="tortClaimsNoticePicker" accessibleText="Tort claims notice" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
                                 </GridPane>
                                 <VBox fx:id="configuredDatesBox" spacing="10" visible="false" managed="false"/>
-                                <VBox fx:id="datesCustomizationBox" spacing="10" visible="false" managed="false"/>
                             </VBox>
                         </VBox>
                     </children>

@@ -18,10 +18,13 @@ final class FieldConfirmationPhase2CUiContractTest {
 
     @Test void settingsUsesVersionedPolicyAndFirmWideRoleSelector() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/NewIntakeController.java"));
+        String dialog = Files.readString(Path.of("src/main/java/com/shale/ui/controller/support/NewIntakeDatesCustomizationDialog.java"));
         assertAll(
                 () -> assertTrue(source.contains("SetFieldConfirmationPolicyCommand")),
-                () -> assertTrue(source.contains("p==null?null:p.rowVer()"), "policy save carries the expected concurrency token"),
-                () -> assertTrue(source.contains("ComboBox<CaseServicePort.ConfirmationRole>"), "role selector cannot contain Case Team roles"),
+                () -> assertTrue(source.contains("policy == null ? null : policy.rowVer()"), "policy save carries the expected concurrency token"),
+                () -> assertTrue(dialog.contains("ComboBox<CaseServicePort.ConfirmationRole>"), "role selector cannot contain Case Team roles"),
+                () -> assertTrue(source.contains("CaseDateSemanticRole.STATUTE_OF_LIMITATIONS"), "SOL uses its effective semantic mapping"),
+                () -> assertTrue(source.contains("CaseDateSemanticRole.TORT_NOTICE_DEADLINE"), "TCN uses its effective semantic mapping"),
                 () -> assertTrue(source.contains("The selected confirming role is no longer active")),
                 () -> assertTrue(source.contains("Confirmation policy changed"), "stale policy requires an explicit reload"));
     }
