@@ -84,9 +84,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		if(fieldConfirmationDao==null)throw new UnsupportedOperationException("Field confirmation administration is unavailable from this test gateway.");
 		return fieldConfirmationDao.setPolicy(c);
 	}
-	@Override public List<FieldConfirmationPolicyDto> listFieldConfirmationPolicies(int tenant,int actor,String formKey){
+	@Override public List<FieldConfirmationPolicyDto> listFieldConfirmationPolicies(int tenant,int actor){
 		if(fieldConfirmationDao==null)throw new UnsupportedOperationException("Field confirmation administration is unavailable from this test gateway.");
-		return fieldConfirmationDao.listPolicies(tenant,actor,formKey);
+		return fieldConfirmationDao.listPolicies(tenant,actor);
 	}
 	@Override public List<ConfirmationRole> listConfirmationRoles(int tenant,int actor){
 		if(fieldConfirmationDao==null)throw new UnsupportedOperationException("Field confirmation administration is unavailable from this test gateway.");

@@ -1,7 +1,6 @@
 package com.shale.ui.controller.support;
 
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
-import com.shale.core.service.CaseServicePort;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.controller.support.NewIntakeDatesConfiguration.Selection;
 import com.shale.ui.util.ActionButtonFactory;
@@ -11,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Consumer;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -24,7 +22,6 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
-import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -45,11 +42,8 @@ public final class NewIntakeDatesCustomizationDialog {
     private final Button reloadButton;
     private final List<Selection> selections = new ArrayList<>();
     private List<EffectiveCaseDateTypeDto> availableTypes = List.of();
-    private List<CaseServicePort.ConfirmationRole> roles = List.of();
-    private Set<Integer> protectedTypeIds = Set.of();
     private Consumer<List<Selection>> saveHandler = ignored -> {};
     private Runnable reloadHandler = () -> {};
-    private boolean rolesAvailable;
 
     public NewIntakeDatesCustomizationDialog(Window owner) {
         AppDialogs.applySecondaryDialogShell(dialog, "Customize New Intake Form");
@@ -94,7 +88,7 @@ public final class NewIntakeDatesCustomizationDialog {
         HBox actions = new HBox(10, reloadButton, spacer, cancelButton, saveButton);
         actions.setAlignment(Pos.CENTER_RIGHT);
 
-        Label guidance = new Label("Choose the fields shown on New Intake, their order, and any confirmation policy.");
+        Label guidance = new Label("Choose the fields shown on New Intake, their order, and whether each field is required.");
         guidance.setWrapText(true);
         VBox content = new VBox(12, guidance, status, addBar, scroll, actions);
         content.setPadding(new Insets(16));
@@ -117,24 +111,12 @@ public final class NewIntakeDatesCustomizationDialog {
     public void setOnSave(Consumer<List<Selection>> handler) { saveHandler = Objects.requireNonNull(handler); }
     public void setOnReload(Runnable handler) { reloadHandler = Objects.requireNonNull(handler); }
 
-    public void showConfiguration(List<Selection> current, List<EffectiveCaseDateTypeDto> types,
-            List<CaseServicePort.ConfirmationRole> confirmationRoles, Set<Integer> protectedIds,
-            boolean roleLoadSucceeded) {
-        selections.clear();
-        selections.addAll(current == null ? List.of() : current);
+    public void showConfiguration(List<Selection> current, List<EffectiveCaseDateTypeDto> types) {
+        selections.clear(); selections.addAll(current == null ? List.of() : current);
         availableTypes = types == null ? List.of() : List.copyOf(types);
-        roles = confirmationRoles == null ? List.of() : List.copyOf(confirmationRoles);
-        protectedTypeIds = protectedIds == null ? Set.of() : Set.copyOf(protectedIds);
-        rolesAvailable = roleLoadSucceeded;
-        status.setText(roleLoadSucceeded
-                ? "Changes are staged until Save. Required and Requires confirmation are independent."
-                : "Confirming roles could not be loaded. Reload the configuration before saving a confirmation policy.");
-        status.getStyleClass().remove("dialog-error-text");
-        if (!roleLoadSucceeded) status.getStyleClass().add("dialog-error-text");
-        reloadButton.setVisible(!roleLoadSucceeded);
-        reloadButton.setManaged(!roleLoadSucceeded);
-        saveButton.setDisable(!roleLoadSucceeded);
-        render();
+        status.setText("Changes are staged until Save. Required controls whether intake may be submitted without a value.");
+        status.getStyleClass().remove("dialog-error-text"); reloadButton.setVisible(false); reloadButton.setManaged(false);
+        saveButton.setDisable(false); render();
     }
 
     public void showLoadError(String message) {
@@ -161,10 +143,6 @@ public final class NewIntakeDatesCustomizationDialog {
     }
 
     public List<Selection> snapshot() { return List.copyOf(selections); }
-    public static boolean supportsConfirmation(int typeId, Set<Integer> protectedIds) {
-        return protectedIds != null && protectedIds.contains(typeId);
-    }
-
     private void addSelected() {
         EffectiveCaseDateTypeDto selected = addSelector.getValue();
         if (selected == null) return;
@@ -196,30 +174,6 @@ public final class NewIntakeDatesCustomizationDialog {
         required.selectedProperty().addListener((obs, oldValue, value) -> selections.set(index,
                 NewIntakeDatesConfiguration.withRequired(selections.get(index), value)));
 
-        boolean supported = supportsConfirmation(selection.type().id(), protectedTypeIds);
-        CheckBox confirmation = ControlStyles.formControl(new CheckBox("Requires confirmation"));
-        confirmation.setSelected(supported && selection.requiresConfirmation());
-        confirmation.setDisable(!supported);
-        confirmation.setAccessibleText(selection.type().name() + " requires confirmation");
-        if (!supported) confirmation.setTooltip(new Tooltip("Confirmation applies only to the tenant-effective Statute of Limitations and Tort Notice Deadline fields."));
-
-        ComboBox<CaseServicePort.ConfirmationRole> role = ControlStyles.formControl(new ComboBox<>());
-        role.setPromptText(rolesAvailable ? "Select confirming role" : "Roles unavailable — reload");
-        role.setMaxWidth(Double.MAX_VALUE);
-        role.setConverter(roleConverter());
-        role.getItems().setAll(roles);
-        role.getSelectionModel().select(roles.stream()
-                .filter(candidate -> Objects.equals(candidate.id(), selection.roleDefinitionId())).findFirst().orElse(null));
-        role.setDisable(!supported || !confirmation.isSelected() || !rolesAvailable);
-        role.setAccessibleText("Confirming role for " + selection.type().name());
-        confirmation.selectedProperty().addListener((obs, oldValue, value) -> {
-            role.setDisable(!value || !rolesAvailable);
-            selections.set(index, NewIntakeDatesConfiguration.withConfirmation(selections.get(index), value,
-                    role.getValue() == null ? null : role.getValue().id()));
-        });
-        role.valueProperty().addListener((obs, oldValue, value) -> selections.set(index,
-                NewIntakeDatesConfiguration.withConfirmation(selections.get(index), confirmation.isSelected(),
-                        value == null ? null : value.id())));
 
         Button up = action("Move up", "Move " + selection.type().name() + " up", () -> move(index, -1));
         Button down = action("Move down", "Move " + selection.type().name() + " down", () -> move(index, 1));
@@ -227,16 +181,9 @@ public final class NewIntakeDatesCustomizationDialog {
         up.setDisable(index == 0);
         down.setDisable(index == selections.size() - 1);
 
-        GridPane controls = new GridPane();
-        controls.setHgap(14);
-        controls.setVgap(8);
-        controls.add(required, 0, 0);
-        controls.add(confirmation, 1, 0);
-        controls.add(role, 2, 0);
-        GridPane.setHgrow(role, Priority.ALWAYS);
         HBox ordering = new HBox(8, up, down, remove);
         ordering.setAlignment(Pos.CENTER_LEFT);
-        VBox card = new VBox(10, name, controls, ordering);
+        VBox card = new VBox(10, name, required, ordering);
         card.getStyleClass().add("new-intake-customization-row");
         return card;
     }
@@ -271,10 +218,4 @@ public final class NewIntakeDatesCustomizationDialog {
         };
     }
 
-    private static StringConverter<CaseServicePort.ConfirmationRole> roleConverter() {
-        return new StringConverter<>() {
-            @Override public String toString(CaseServicePort.ConfirmationRole value) { return value == null ? "" : value.name(); }
-            @Override public CaseServicePort.ConfirmationRole fromString(String value) { return null; }
-        };
-    }
 }

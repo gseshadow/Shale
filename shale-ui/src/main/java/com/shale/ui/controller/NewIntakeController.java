@@ -16,8 +16,8 @@ import com.shale.ui.controller.support.NewIntakeDatesCustomizationDialog;
 import com.shale.ui.controller.support.NewIntakeDatesConfiguration.ConfiguredDate;
 import com.shale.ui.controller.support.NewIntakeDatesConfiguration.Selection;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
-import com.shale.core.dto.FormConfigurationDto;
 import com.shale.core.dto.FieldConfirmationPolicyDto;
+import com.shale.core.dto.FormConfigurationDto;
 import com.shale.core.model.CaseDateSemanticRole;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.FormConfigurationServicePort;
@@ -362,7 +362,8 @@ public final class NewIntakeController {
 		CompletableFuture.supplyAsync(() -> new DatesLoad(
 				formConfigurationService.load(tenant, actor, NewIntakeDatesConfiguration.FORM_KEY),
 				caseService.listEffectiveCaseDateTypes(tenant, actor),
-				caseService.resolveEffectiveCaseDateTypeId(tenant, actor, CaseDateSemanticRole.INTAKE)), datesExecutor)
+				caseService.resolveEffectiveCaseDateTypeId(tenant, actor, CaseDateSemanticRole.INTAKE),
+				caseService.listFieldConfirmationPolicies(tenant, actor)), datesExecutor)
 				.whenComplete((result, failure) -> Platform.runLater(() -> {
 					if (isDatesResultStale(generation)) return;
 					if (failure != null) {
@@ -373,6 +374,7 @@ public final class NewIntakeController {
 					}
 					loadedDatesConfiguration = result.configuration();
 					effectiveDateTypes = result.types();
+					loadedTypePolicies = result.policies().stream().collect(Collectors.toUnmodifiableMap(FieldConfirmationPolicyDto::caseDateTypePolicyKey, p -> p));
 					intakeCaseDateTypeId = result.intakeCaseDateTypeId();
 					datesReloadRequired = false;
 					renderDatesNormalMode();
@@ -389,6 +391,9 @@ public final class NewIntakeController {
 				: saved ? "Date fields configured for this tenant." : "Using active Case Date Types for this tenant.");
 		for (ConfiguredDate field : fields) {
 			Label label = new Label(field.type().name() + (field.required() ? " *" : ""));
+			FieldConfirmationPolicyDto policy=loadedTypePolicies.get(CaseDateTypeManagementPane.policyKey(field.type()));
+			Label policyLabel=new Label(policy!=null&&policy.requiresConfirmation()?"Saved values require confirmation":"");
+			policyLabel.getStyleClass().add("shale-metadata-muted");
 			DatePicker picker = ControlStyles.formControl(new DatePicker());
 			configureDatePicker(picker);
 			String fieldKey = field.fieldKey();
@@ -399,7 +404,7 @@ public final class NewIntakeController {
 				preservedConfiguredDateValues.put(fieldKey, newValue);
 				if (newValue != null) ControlStyles.setInvalid(picker, false);
 			});
-			HBox row = new HBox(16, label, picker); row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+			HBox row = new HBox(16, label, picker, policyLabel); row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 			HBox.setHgrow(picker, Priority.ALWAYS); picker.setMaxWidth(Double.MAX_VALUE);
 			configuredDatesBox.getChildren().add(row);
 			configuredDateInputs.put(field.fieldKey(), new ConfiguredDateInput(field.type().id(), field.fieldKey(), field.required(), picker));
@@ -422,15 +427,7 @@ public final class NewIntakeController {
 		CompletableFuture.supplyAsync(() -> {
 			FormConfigurationDto configuration = formConfigurationService.load(tenant, actor, NewIntakeDatesConfiguration.FORM_KEY);
 			List<EffectiveCaseDateTypeDto> types = caseService.listEffectiveCaseDateTypes(tenant, actor);
-			List<FieldConfirmationPolicyDto> policies = caseService.listFieldConfirmationPolicies(tenant, actor, NewIntakeDatesConfiguration.FORM_KEY);
-			int sol = caseService.resolveEffectiveCaseDateTypeId(tenant, actor, CaseDateSemanticRole.STATUTE_OF_LIMITATIONS);
-			int tcn = caseService.resolveEffectiveCaseDateTypeId(tenant, actor, CaseDateSemanticRole.TORT_NOTICE_DEADLINE);
-			try {
-				return new CustomizationLoad(configuration, types, policies,
-						caseService.listConfirmationRoles(tenant, actor), java.util.Set.of(sol, tcn), true);
-			} catch (RuntimeException roleFailure) {
-				return new CustomizationLoad(configuration, types, policies, List.of(), java.util.Set.of(sol, tcn), false);
-			}
+			return new CustomizationLoad(configuration, types);
 		}, datesExecutor).whenComplete((result, failure) -> Platform.runLater(() -> {
 			if (generation != datesLoadGeneration || datesCustomizationDialog == null || !datesCustomizationDialog.isShowing()) return;
 			if (failure != null) {
@@ -439,28 +436,14 @@ public final class NewIntakeController {
 			}
 			loadedDatesConfiguration = result.configuration();
 			effectiveDateTypes = result.types();
-			loadedConfirmationPolicies = result.policies();
-			List<Selection> selections = new ArrayList<>(NewIntakeDatesConfiguration.selections(result.configuration(), result.types()));
-			Map<String, FieldConfirmationPolicyDto> policies = result.policies().stream().collect(Collectors.toMap(
-					FieldConfirmationPolicyDto::fieldKey, java.util.function.Function.identity()));
-			for (int i = 0; i < selections.size(); i++) {
-				Selection selection = selections.get(i);
-				FieldConfirmationPolicyDto policy = policies.get(NewIntakeDatesConfiguration.fieldKey(selection.type().id()));
-				if (policy != null) selections.set(i, new Selection(selection.type(), selection.required(),
-						policy.requiresConfirmation(), policy.requiredFirmWideRoleDefinitionId(), policy));
-			}
 			datesReloadRequired = false;
-			datesCustomizationDialog.showConfiguration(selections, result.types(), result.roles(),
-					result.protectedTypeIds(), result.rolesAvailable());
+			datesCustomizationDialog.showConfiguration(NewIntakeDatesConfiguration.selections(result.configuration(), result.types()), result.types());
 		}));
 	}
 
 	private void saveDatesCustomization(List<Selection> selections) {
 		if (!isAuthorizedDatesAdmin() || datesReloadRequired || formConfigurationService == null || datesCustomizationDialog == null) return;
-		if (selections.stream().anyMatch(selection -> selection.requiresConfirmation() && selection.roleDefinitionId() == null)) {
-			datesCustomizationDialog.showSaveError("Select an active firm-wide role for every field that requires confirmation.", false);
-			return;
-		}
+
 		int tenant = appState.getShaleClientId(), actor = appState.getUserId();
 		byte[] rowVer = loadedDatesConfiguration == null ? null : loadedDatesConfiguration.rowVer();
 		var command = new FormConfigurationServicePort.ReplaceCommand(tenant, actor,
@@ -470,16 +453,6 @@ public final class NewIntakeController {
 		long generation = ++datesLoadGeneration;
 		CompletableFuture.supplyAsync(() -> {
 			var saved = formConfigurationService.replace(command);
-			for (Selection selection : selections) {
-				if (!isConfirmationField(selection.type().id(), selections)) continue;
-				FieldConfirmationPolicyDto policy = selection.policy();
-				if (policy != null && policy.requiresConfirmation() == selection.requiresConfirmation()
-						&& Objects.equals(policy.requiredFirmWideRoleDefinitionId(), selection.requiresConfirmation() ? selection.roleDefinitionId() : null)) continue;
-				caseService.setFieldConfirmationPolicy(new CaseServicePort.SetFieldConfirmationPolicyCommand(tenant, actor,
-						NewIntakeDatesConfiguration.FORM_KEY, NewIntakeDatesConfiguration.fieldKey(selection.type().id()),
-						selection.requiresConfirmation(), selection.requiresConfirmation() ? selection.roleDefinitionId() : null,
-						policy == null ? null : policy.id(), policy == null ? null : policy.rowVer()));
-			}
 			return saved;
 		}, datesExecutor).whenComplete((saved, failure) -> Platform.runLater(() -> {
 			if (generation != datesLoadGeneration || datesCustomizationDialog == null) return;
@@ -496,12 +469,6 @@ public final class NewIntakeController {
 			datesCustomizationDialog = null;
 			loadDatesConfiguration();
 		}));
-	}
-
-	private boolean isConfirmationField(int typeId, List<Selection> selections) {
-		return selections.stream().filter(selection -> selection.type().id() == typeId)
-				.anyMatch(Selection::requiresConfirmation) || currentPolicies().stream()
-				.anyMatch(policy -> policy.fieldKey().equals(NewIntakeDatesConfiguration.fieldKey(typeId)));
 	}
 
 	private void configureReloadAction() {
@@ -526,13 +493,10 @@ public final class NewIntakeController {
 				|| (datesViewAttached && datesSection.getScene() == null);
 	}
 
-	private List<FieldConfirmationPolicyDto> loadedConfirmationPolicies=List.of();
-	private List<FieldConfirmationPolicyDto> currentPolicies(){return loadedConfirmationPolicies;}
+	private Map<String,FieldConfirmationPolicyDto> loadedTypePolicies=Map.of();
 	private record DatesLoad(FormConfigurationDto configuration, List<EffectiveCaseDateTypeDto> types,
-			int intakeCaseDateTypeId) {}
-	private record CustomizationLoad(FormConfigurationDto configuration, List<EffectiveCaseDateTypeDto> types,
-			List<FieldConfirmationPolicyDto> policies, List<CaseServicePort.ConfirmationRole> roles,
-			java.util.Set<Integer> protectedTypeIds, boolean rolesAvailable) {}
+			int intakeCaseDateTypeId, List<FieldConfirmationPolicyDto> policies) {}
+	private record CustomizationLoad(FormConfigurationDto configuration, List<EffectiveCaseDateTypeDto> types) {}
 	public record ConfiguredDateInput(int caseDateTypeId, String fieldKey, boolean required, DatePicker input) {
 		public LocalDate value() { return input.getValue(); }
 	}

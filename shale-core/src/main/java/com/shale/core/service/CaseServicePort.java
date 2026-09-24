@@ -75,8 +75,7 @@ public interface CaseServicePort {
 		throw unsupportedCaseLinkOperation("setFieldConfirmationPolicy");
 	}
 
-	default List<FieldConfirmationPolicyDto> listFieldConfirmationPolicies(int shaleClientId, int actorUserId,
-			String formKey) {
+	default List<FieldConfirmationPolicyDto> listFieldConfirmationPolicies(int shaleClientId, int actorUserId) {
 		throw unsupportedCaseLinkOperation("listFieldConfirmationPolicies");
 	}
 
@@ -304,7 +303,7 @@ public interface CaseServicePort {
 		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
 	}
 
-	record SetFieldConfirmationPolicyCommand(int shaleClientId, int actorUserId, String formKey, String fieldKey,
+	record SetFieldConfirmationPolicyCommand(int shaleClientId, int actorUserId, int caseDateTypeId,
 			boolean requiresConfirmation, Integer requiredFirmWideRoleDefinitionId, Long expectedPolicyId,
 			byte[] expectedPolicyRowVer) {
 		public SetFieldConfirmationPolicyCommand { expectedPolicyRowVer = copyRowVer(expectedPolicyRowVer); }
