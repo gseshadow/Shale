@@ -124,7 +124,7 @@ BEGIN TRY
  (N'UserFirmWideRoleAssignments',N'FirmWideRoleDefinitionId',N'int',4,0,0),(N'UserFirmWideRoleAssignments',N'IsDeleted',N'bit',1,0,0),(N'UserFirmWideRoleAssignments',N'CreatedAt',N'datetime2',8,0,0),
  (N'UserFirmWideRoleAssignments',N'CreatedByUserId',N'int',4,0,0),(N'UserFirmWideRoleAssignments',N'DeletedAt',N'datetime2',8,1,0),(N'UserFirmWideRoleAssignments',N'DeletedByUserId',N'int',4,1,0),
  (N'UserFirmWideRoleAssignments',N'RowVer',N'timestamp',8,0,0);
- IF EXISTS(SELECT 1 FROM @ExpectedColumns e LEFT JOIN sys.tables st ON st.name=e.TableName AND SCHEMA_NAME(st.schema_id)=N'dbo' LEFT JOIN sys.columns c ON c.object_id=st.object_id AND c.name=e.ColumnName LEFT JOIN sys.types ty ON ty.user_type_id=c.user_type_id WHERE c.column_id IS NULL OR ty.name<>e.TypeName OR c.max_length<>e.MaxLength OR c.is_nullable<>e.IsNullable OR c.is_identity<>e.IsIdentity)
+ IF EXISTS(SELECT 1 FROM @ExpectedColumns e LEFT JOIN sys.tables st ON st.name COLLATE DATABASE_DEFAULT=e.TableName AND SCHEMA_NAME(st.schema_id)=N'dbo' LEFT JOIN sys.columns c ON c.object_id=st.object_id AND c.name COLLATE DATABASE_DEFAULT=e.ColumnName LEFT JOIN sys.types ty ON ty.user_type_id=c.user_type_id WHERE c.column_id IS NULL OR ty.name COLLATE DATABASE_DEFAULT<>e.TypeName OR c.max_length<>e.MaxLength OR c.is_nullable<>e.IsNullable OR c.is_identity<>e.IsIdentity)
   THROW 56816,'A required firm-wide role column is missing or incompatible.',1;
 
  DECLARE @RequiredConstraints table(TableName sysname,ConstraintName sysname,ConstraintKind char(2));
@@ -136,7 +136,7 @@ BEGIN TRY
  (N'UserFirmWideRoleAssignments',N'FK_UserFirmWideRoleAssignments_UserTenant','F'),(N'UserFirmWideRoleAssignments',N'FK_UserFirmWideRoleAssignments_DefinitionTenant','F'),
  (N'UserFirmWideRoleAssignments',N'FK_UserFirmWideRoleAssignments_CreatedByTenant','F'),(N'UserFirmWideRoleAssignments',N'FK_UserFirmWideRoleAssignments_DeletedByTenant','F'),
  (N'UserFirmWideRoleAssignments',N'CK_UserFirmWideRoleAssignments_Lifecycle','C');
- IF EXISTS(SELECT 1 FROM @RequiredConstraints e LEFT JOIN sys.tables t ON t.name=e.TableName AND SCHEMA_NAME(t.schema_id)=N'dbo' LEFT JOIN sys.objects o ON o.parent_object_id=t.object_id AND o.name=e.ConstraintName AND o.type=e.ConstraintKind WHERE o.object_id IS NULL)
+ IF EXISTS(SELECT 1 FROM @RequiredConstraints e LEFT JOIN sys.tables t ON t.name COLLATE DATABASE_DEFAULT=e.TableName AND SCHEMA_NAME(t.schema_id)=N'dbo' LEFT JOIN sys.objects o ON o.parent_object_id=t.object_id AND o.name COLLATE DATABASE_DEFAULT=e.ConstraintName AND o.type COLLATE DATABASE_DEFAULT=e.ConstraintKind WHERE o.object_id IS NULL)
   THROW 56818,'A required firm-wide role constraint is missing or has the wrong kind.',1;
  IF EXISTS(SELECT 1 FROM sys.foreign_keys fk WHERE fk.parent_object_id IN(OBJECT_ID(N'dbo.FirmWideRoleDefinitions'),OBJECT_ID(N'dbo.UserFirmWideRoleAssignments')) AND (fk.is_disabled=1 OR fk.is_not_trusted=1))
   THROW 56819,'Firm-wide role foreign keys must be enabled and trusted.',1;
@@ -164,7 +164,7 @@ BEGIN TRY
  (N'FirmWideRoleDefinitions',N'DF_FirmWideRoleDefinitions_CreatedAt',N'CreatedAt',N'(SYSUTCDATETIME())'),
  (N'UserFirmWideRoleAssignments',N'DF_UserFirmWideRoleAssignments_IsDeleted',N'IsDeleted',N'((0))'),
  (N'UserFirmWideRoleAssignments',N'DF_UserFirmWideRoleAssignments_CreatedAt',N'CreatedAt',N'(SYSUTCDATETIME())');
- IF EXISTS(SELECT 1 FROM @ExpectedDefaults e LEFT JOIN sys.tables t ON t.name=e.TableName AND SCHEMA_NAME(t.schema_id)=N'dbo' LEFT JOIN sys.columns c ON c.object_id=t.object_id AND c.name=e.ColumnName LEFT JOIN sys.default_constraints dc ON dc.parent_object_id=t.object_id AND dc.parent_column_id=c.column_id AND dc.name=e.ConstraintName WHERE dc.object_id IS NULL OR UPPER(REPLACE(dc.definition,N' ',N''))<>e.NormalizedDefinition)
+ IF EXISTS(SELECT 1 FROM @ExpectedDefaults e LEFT JOIN sys.tables t ON t.name COLLATE DATABASE_DEFAULT=e.TableName AND SCHEMA_NAME(t.schema_id)=N'dbo' LEFT JOIN sys.columns c ON c.object_id=t.object_id AND c.name COLLATE DATABASE_DEFAULT=e.ColumnName LEFT JOIN sys.default_constraints dc ON dc.parent_object_id=t.object_id AND dc.parent_column_id=c.column_id AND dc.name COLLATE DATABASE_DEFAULT=e.ConstraintName WHERE dc.object_id IS NULL OR UPPER(REPLACE(dc.definition,N' ',N'')) COLLATE DATABASE_DEFAULT<>e.NormalizedDefinition)
   THROW 56826,'A required firm-wide role default constraint is missing or incompatible.',1;
  DECLARE @SystemKeyCheck nvarchar(max)=(SELECT definition FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.FirmWideRoleDefinitions') AND name=N'CK_FirmWideRoleDefinitions_SystemKey');
  IF @SystemKeyCheck NOT LIKE N'%Latin1_General_100_BIN2%' OR @SystemKeyCheck NOT LIKE N'%UPPER%' OR CHARINDEX(N'%[^A-Z0-9_]%',@SystemKeyCheck)=0 OR @SystemKeyCheck NOT LIKE N'%LEN%'
@@ -182,7 +182,7 @@ BEGIN TRY
  (N'UserFirmWideRoleAssignments',N'PK_UserFirmWideRoleAssignments',1,NULL,N'Id'),
  (N'UserFirmWideRoleAssignments',N'UX_UserFirmWideRoleAssignments_Active',1,N'(IsDeleted=(0))',N'ShaleClientId,UserId,FirmWideRoleDefinitionId'),
  (N'UserFirmWideRoleAssignments',N'IX_UserFirmWideRoleAssignments_Eligibility',0,NULL,N'ShaleClientId,FirmWideRoleDefinitionId,UserId,IsDeleted');
- IF EXISTS(SELECT 1 FROM @ExpectedIndexes e LEFT JOIN sys.tables t ON t.name=e.TableName AND SCHEMA_NAME(t.schema_id)=N'dbo' LEFT JOIN sys.indexes i ON i.object_id=t.object_id AND i.name=e.IndexName OUTER APPLY(SELECT STRING_AGG(CONVERT(nvarchar(max),c.name),N',') WITHIN GROUP(ORDER BY ic.key_ordinal) KeyColumns FROM sys.index_columns ic JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id WHERE ic.object_id=i.object_id AND ic.index_id=i.index_id AND ic.key_ordinal>0)k WHERE i.index_id IS NULL OR i.is_unique<>e.IsUnique OR i.is_disabled=1 OR k.KeyColumns<>e.KeyColumns OR ISNULL(REPLACE(REPLACE(REPLACE(i.filter_definition,N'[',N''),N']',N''),N' ',N''),N'')<>ISNULL(e.FilterText,N''))
+ IF EXISTS(SELECT 1 FROM @ExpectedIndexes e LEFT JOIN sys.tables t ON t.name COLLATE DATABASE_DEFAULT=e.TableName AND SCHEMA_NAME(t.schema_id)=N'dbo' LEFT JOIN sys.indexes i ON i.object_id=t.object_id AND i.name COLLATE DATABASE_DEFAULT=e.IndexName OUTER APPLY(SELECT STRING_AGG(CONVERT(nvarchar(max),c.name),N',') WITHIN GROUP(ORDER BY ic.key_ordinal) KeyColumns FROM sys.index_columns ic JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id WHERE ic.object_id=i.object_id AND ic.index_id=i.index_id AND ic.key_ordinal>0)k WHERE i.index_id IS NULL OR i.is_unique<>e.IsUnique OR i.is_disabled=1 OR k.KeyColumns COLLATE DATABASE_DEFAULT<>e.KeyColumns OR ISNULL(REPLACE(REPLACE(REPLACE(i.filter_definition,N'[',N''),N']',N''),N' ',N''),N'') COLLATE DATABASE_DEFAULT<>ISNULL(e.FilterText,N''))
   THROW 56822,'A required firm-wide role index is missing or incompatible.',1;
 
  /* Built-ins must never acquire a second assignment authority. */

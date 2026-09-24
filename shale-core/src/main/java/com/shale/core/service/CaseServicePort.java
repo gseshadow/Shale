@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.CaseDateConfirmationDto;
 import com.shale.core.dto.MigratedCaseDateProjectionDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.model.CaseDateSemanticRole;
@@ -102,6 +103,11 @@ public interface CaseServicePort {
 	void resetCaseDateSemanticRoleMapping(ResetCaseDateSemanticRoleMappingCommand command);
 
 	List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId);
+
+	/** Current-value confirmation state; absence of a workflow is explicitly NOT_REQUIRED. */
+	default List<CaseDateConfirmationDto> listCaseDateConfirmationsForCase(long caseId, int shaleClientId, int actorUserId) {
+		throw new UnsupportedOperationException("Case Date confirmation reads are unavailable.");
+	}
 
 	/** Batch read boundary for list-style consumers of the nine migrated authoritative meanings. */
 	default Map<Long, MigratedCaseDateProjectionDto> projectMigratedCaseDates(

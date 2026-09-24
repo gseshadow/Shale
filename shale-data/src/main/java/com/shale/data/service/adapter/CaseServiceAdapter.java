@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.CaseDateConfirmationDto;
 import com.shale.core.dto.MigratedCaseDateProjectionDto;
 import java.util.Collection;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
@@ -398,6 +399,14 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		validatePositive(shaleClientId, "ShaleClientId");
 		validatePositive(actorUserId, "ActorUserId");
 		return caseGateway.listCaseDatesForCase(caseId, shaleClientId, actorUserId);
+	}
+
+	@Override
+	public List<CaseDateConfirmationDto> listCaseDateConfirmationsForCase(long caseId, int shaleClientId, int actorUserId) {
+		validatePositive(caseId, "CaseId");
+		validatePositive(shaleClientId, "ShaleClientId");
+		validatePositive(actorUserId, "ActorUserId");
+		return caseGateway.listCaseDateConfirmationsForCase(caseId, shaleClientId, actorUserId);
 	}
 
 	@Override
@@ -967,6 +976,10 @@ public final class CaseServiceAdapter implements CaseServicePort {
 			throw unsupportedCaseLinkGatewayOperation("listCaseDatesForCase");
 		}
 
+		default List<CaseDateConfirmationDto> listCaseDateConfirmationsForCase(long caseId, int shaleClientId, int actorUserId) {
+			throw unsupportedCaseLinkGatewayOperation("listCaseDateConfirmationsForCase");
+		}
+
 		default Map<Long, MigratedCaseDateProjectionDto> projectMigratedCaseDates(Collection<Long> caseIds, int tenant, int actor) {
 			throw unsupportedCaseLinkGatewayOperation("projectMigratedCaseDates");
 		}
@@ -1278,6 +1291,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override
 		public List<CaseDateDto> listCaseDatesForCase(long caseId, int shaleClientId, int actorUserId) {
 			return caseDateDao.listCaseDatesForCase(caseId, shaleClientId, actorUserId);
+		}
+
+		@Override
+		public List<CaseDateConfirmationDto> listCaseDateConfirmationsForCase(long caseId, int shaleClientId, int actorUserId) {
+			return caseDateDao.listCaseDateConfirmationsForCase(caseId, shaleClientId, actorUserId);
 		}
 
 		@Override

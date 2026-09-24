@@ -1,6 +1,7 @@
 package com.shale.data.dao;
 
 import com.shale.core.dto.CaseDateDto;
+import com.shale.core.dto.CaseDateConfirmationDto;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
 import com.shale.core.dto.MigratedCaseDateProjectionDto;
 import com.shale.core.dto.CaseDateSemanticRoleMappingDto;
@@ -155,6 +156,53 @@ public final class CaseDateDao {
             try (ResultSet rs = ps.executeQuery()) { List<CaseDateDto> out = new ArrayList<>(); while (rs.next()) out.add(mapDate(rs)); return List.copyOf(out); }
         } catch (SQLException e) { throw fail(e); }
     }
+
+    /**
+     * Reads workflow state only for each occurrence's current ValueRevision. An occurrence
+     * without a requirement row has never entered this workflow and is NOT_REQUIRED; an
+     * active policy by itself is intentionally not consulted retroactively.
+     */
+    public List<CaseDateConfirmationDto> listCaseDateConfirmationsForCase(long caseId, int tenant, int actor) {
+        List<CaseDateDto> dates = listCaseDatesForCase(caseId, tenant, actor);
+        if (dates.isEmpty()) return List.of();
+        String placeholders = String.join(",", Collections.nCopies(dates.size(), "?"));
+        String sql = """
+                SELECT cd.Id,cd.ValueRevision,r.Id ConfirmationRequirementId,r.FieldConfirmationPolicyId,
+                       r.PolicyRevisionSnapshot,r.RequiredFirmWideRoleDefinitionId,
+                       confirmation.ConfirmedByUserId,confirmation.ConfirmedAt,
+                       COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))),''),CONCAT('User #',confirmation.ConfirmedByUserId)) ConfirmedByDisplayName
+                FROM dbo.CaseDates cd
+                LEFT JOIN dbo.CaseDateConfirmationTargets target ON target.CaseDateId=cd.Id
+                     AND target.ShaleClientId=cd.ShaleClientId AND target.BusinessValueRevision=cd.ValueRevision
+                LEFT JOIN dbo.SavedValueConfirmationRequirements r ON r.Id=target.ConfirmationRequirementId
+                     AND r.ShaleClientId=target.ShaleClientId AND r.TargetType='CASE_DATE'
+                LEFT JOIN dbo.SavedValueConfirmations confirmation ON confirmation.ConfirmationRequirementId=r.Id
+                     AND confirmation.ShaleClientId=r.ShaleClientId
+                LEFT JOIN dbo.Users u ON u.id=confirmation.ConfirmedByUserId AND u.ShaleClientId=confirmation.ShaleClientId
+                WHERE cd.ShaleClientId=? AND cd.CaseId=? AND cd.IsDeleted=0 AND cd.Id IN (""" + placeholders + ")";
+        Map<Long, ConfirmationRead> states = new HashMap<>();
+        try (Connection con=db.requireConnection(); PreparedStatement ps=con.prepareStatement(sql)) {
+            verifyTenant(con,tenant); validateActor(con,tenant,actor); validateCase(con,tenant,caseId);
+            int p=1; ps.setInt(p++,tenant); ps.setLong(p++,caseId);
+            for (CaseDateDto date:dates) ps.setLong(p++,date.id());
+            try(ResultSet rs=ps.executeQuery()){while(rs.next()) states.put(rs.getLong("Id"),new ConfirmationRead(
+                    rs.getLong("ValueRevision"),(Long)rs.getObject("ConfirmationRequirementId"),
+                    (Long)rs.getObject("FieldConfirmationPolicyId"),(Long)rs.getObject("PolicyRevisionSnapshot"),
+                    (Integer)rs.getObject("RequiredFirmWideRoleDefinitionId"),(Integer)rs.getObject("ConfirmedByUserId"),
+                    rs.getString("ConfirmedByDisplayName"),ldt(rs,"ConfirmedAt")));}
+        } catch(SQLException e){throw fail(e);}
+        return dates.stream().map(date -> {
+            ConfirmationRead s=states.get(date.id());
+            if(s==null) throw new IllegalStateException("Case Date confirmation projection was incomplete.");
+            CaseDateConfirmationDto.Status status=s.requirementId()==null?CaseDateConfirmationDto.Status.NOT_REQUIRED:
+                    s.confirmedBy()==null?CaseDateConfirmationDto.Status.PENDING:CaseDateConfirmationDto.Status.CONFIRMED;
+            return new CaseDateConfirmationDto(date,s.valueRevision(),status,s.requirementId(),s.policyId(),s.policyRevision(),
+                    s.roleId(),s.confirmedBy(),s.confirmedByName(),s.confirmedAt());
+        }).toList();
+    }
+
+    private record ConfirmationRead(long valueRevision,Long requirementId,Long policyId,Long policyRevision,
+            Integer roleId,Integer confirmedBy,String confirmedByName,LocalDateTime confirmedAt){}
 
     /**
      * Set-oriented authoritative projection for list-style consumers. Input order is

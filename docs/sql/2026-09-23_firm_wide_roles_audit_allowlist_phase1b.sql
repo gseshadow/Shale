@@ -17,8 +17,10 @@ BEGIN TRY
   IF CHARINDEX(N'''FIRM_WIDE_ROLE''',@definition)=0 SET @replacement+=N' OR [EntityType]=''FIRM_WIDE_ROLE''';
   IF CHARINDEX(N'''USER_FIRM_WIDE_ROLE''',@definition)=0 SET @replacement+=N' OR [EntityType]=''USER_FIRM_WIDE_ROLE''';
   SET @replacement+=N')';
-  EXEC(N'ALTER TABLE dbo.EntityActionAuditLog DROP CONSTRAINT '+QUOTENAME(@name));
-  EXEC(N'ALTER TABLE dbo.EntityActionAuditLog WITH CHECK ADD CONSTRAINT '+QUOTENAME(@name)+N' CHECK '+@replacement);
+  DECLARE @dropSql nvarchar(max)=N'ALTER TABLE dbo.EntityActionAuditLog DROP CONSTRAINT '+QUOTENAME(@name);
+  DECLARE @addSql nvarchar(max)=N'ALTER TABLE dbo.EntityActionAuditLog WITH CHECK ADD CONSTRAINT '+QUOTENAME(@name)+N' CHECK '+@replacement;
+  EXEC sys.sp_executesql @dropSql;
+  EXEC sys.sp_executesql @addSql;
  END;
  IF NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=@id AND name=@name AND is_disabled=0 AND is_not_trusted=0 AND CHARINDEX(N'''FIRM_WIDE_ROLE''',definition)>0 AND CHARINDEX(N'''USER_FIRM_WIDE_ROLE''',definition)>0)
   THROW 56913,'Phase 1B audit vocabulary was not installed as a trusted constraint.',1;
