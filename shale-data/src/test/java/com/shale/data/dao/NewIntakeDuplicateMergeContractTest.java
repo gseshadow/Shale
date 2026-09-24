@@ -56,5 +56,22 @@ final class NewIntakeDuplicateMergeContractTest {
         assertTrue(method.contains("phiAuditService") || source().contains("fillBlankCaseScalars"));
     }
 
+    @Test void mergeEvaluatesPoliciesOnlyForInsertedMissingDatesInsideItsTransaction() throws Exception {
+        String method=method(source(),"public NewIntakeCreateResult mergeIntake");
+        int missing=method.indexOf("if(!hasActiveCaseDate");
+        int insert=method.indexOf("insertConfiguredCaseDate(con,request,existingCaseId,date,intakeTypeId)",missing);
+        int evaluate=method.indexOf("fieldConfirmationDao.evaluateCaseDate(con,request.shaleClientId(),request.createdByUserId()",insert);
+        int commit=method.indexOf("con.commit()",evaluate);
+        assertAll(
+                () -> assertTrue(missing>=0, "Merge must preserve an existing active value rather than replacing it."),
+                () -> assertTrue(insert>missing, "Only a missing selected type may be inserted."),
+                () -> assertTrue(evaluate>insert, "Every newly inserted merge value must evaluate confirmation policy."),
+                () -> assertTrue(commit>evaluate, "Requirement creation and auto-confirmation must precede merge commit."),
+                () -> assertTrue(method.contains("id,date.caseDateTypeId(),1"),
+                        "Merge must snapshot the inserted type and initial business revision."),
+                () -> assertTrue(method.contains("con.rollback()"),
+                        "Policy evaluation failure must roll back the merge and its audits."));
+    }
+
     private static String method(String source,String signature){int start=source.indexOf(signature);assertTrue(start>=0);int open=source.indexOf('{',start),depth=0;for(int i=open;i<source.length();i++){char c=source.charAt(i);if(c=='{')depth++;else if(c=='}'&&--depth==0)return source.substring(start,i+1);}throw new AssertionError("unterminated method");}
 }
