@@ -31,6 +31,8 @@ final class AuditEntityTypeMigrationChain {
             "2026-09-23_firm_wide_roles_audit_allowlist_phase1b.sql");
     static final Path FIELD_CONFIRMATION = Path.of("..", "docs", "sql",
             "2026-09-24_field_confirmation_audit_allowlist_phase2b.sql");
+    static final Path CASE_DATE_PRESENTATION = Path.of("..", "docs", "sql",
+            "2026-09-24_case_date_presentation_audit_allowlist_phase1.sql");
     static final Path CURRENT = ORGANIZATIONS_PHASE_3C;
     static final Set<String> USER_MANAGEMENT_SEEDED = Set.of(
             "CASE", "LINK_TYPE", "CASE_LINK", "CASE_LINK_SHARE", "MATERIAL_TYPE", "MATERIAL_REQUEST",

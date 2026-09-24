@@ -2,7 +2,8 @@
 
 ## Scope and fixed product decisions
 
-This is a design and migration order, not an implemented schema change. Intake remains the protected
+The Phase 1 configuration foundation described here is implemented; card and Overview runtime cutover
+remains deferred. Intake remains the protected
 `INTAKE` workflow identity and New Intake continues to require it, but presentation configurations may
 omit it. Existing New Intake form selections, My Shale SOL/TCN warnings and legacy report/export columns
 remain unchanged during this phase. Active SOL and TCN semantic-role mappings must not be retired yet.
@@ -11,6 +12,10 @@ The firm owns two ordered defaults: a case-card selection and an uncustomized Ca
 A per-case Overview configuration remains an override, including a configuration with zero selection
 rows (an explicit empty display). Absence of its parent `CaseOverviewConfigurations` row means “inherit
 the firm Overview default”; an existing parent with no children means “show no dates.”
+
+The foundation schema names are `dbo.CaseDatePresentationConfigurations` (one tenant-owned parent per
+`CASE_CARD` or `CASE_OVERVIEW`) and `dbo.CaseDatePresentationSelections` (ordered stable identities).
+Administrative replacement is audited as `CASE_DATE_PRESENTATION_CONFIGURATION`.
 
 ## Selection identity and occurrence matching
 
@@ -54,7 +59,8 @@ WHERE cd.ShaleClientId = @TenantId AND cd.CaseId = @CaseId AND cd.IsDeleted = 0
 
 ## Initial firm defaults
 
-Seed defaults from semantics, not from global ids. The card default is ordered SOL then TCN. The Overview
+Seed defaults from semantics, not from global ids. The card default is ordered Intake, SOL, then TCN, matching
+the actual current card display. The Overview
 default is the current uncustomized order from `CaseOverviewConfigurationDao`: date of injury, medical
 negligence, Intake, SOL, TCN. For each tenant, resolve the effective semantic mapping using the same
 precedence as runtime (active, non-deleted tenant mapping first, otherwise the active global mapping),
@@ -105,7 +111,8 @@ continue to show every occurrence.
 
 1. **Inventory only:** materialize tenant-effective mapping/type identities and proposed defaults into temp
    tables. Fail on missing/duplicate winners and invalid `TYPE:` ownership.
-2. **Schema:** add tenant firm card/default-Overview parent and ordered-selection tables with strict tenant
+2. **Foundation implemented:** add `dbo.CaseDatePresentationConfigurations` and
+   `dbo.CaseDatePresentationSelections` for tenant firm card/default-Overview parents and ordered selections with strict tenant
    FKs/RLS, filtered uniqueness, RowVer, and audit support. Do not touch semantic mappings.
 3. **Seed:** insert one row per tenant and ordered identity in one transaction. Do not create per-case rows.
 4. **Compatibility release:** dual-read configuration only (new firm defaults plus existing per-case override),
@@ -168,7 +175,8 @@ configuration/read path; it must not delete or rewrite occurrences, per-case ove
 
 ## Audit compatibility and remaining decision
 
-Firm-default administration is a meaningful tenant administrative mutation. Its DAO must own one
+Firm-default administration is a meaningful tenant administrative mutation. It uses the
+`CASE_DATE_PRESENTATION_CONFIGURATION` entity type. Its DAO must own one
 transaction and append the existing entity-action audit event on the same connection, recording only
 purpose and ordering count (never dates, labels, RowVer, or serialized selections). Reads and automatic
 inheritance are not audited because they reveal no new sensitive value and make no mutation. Existing
