@@ -302,14 +302,12 @@ public final class NotificationCardFactory {
 		return caseCardFactory.create(new CaseCardFactory.CaseCardModel(
 				caseId,
 				caseName == null ? "Case #" + caseId : caseName,
-				null,
-				null,
 				item.getCaseResponsibleAttorney(),
 				item.getCaseResponsibleAttorneyColor(),
 				item.getCaseNonEngagementLetterSent(),
 				item.getCasePrimaryStatusName(),
 				item.getCasePrimaryStatusColor(),
-				item.getCasePracticeAreaColor()), CaseCardFactory.Variant.EMBEDDED);
+				item.getCasePracticeAreaColor(), List.of()), CaseCardFactory.Variant.EMBEDDED);
 	}
 
 	private static String resolveCategory(AppNotification item) {

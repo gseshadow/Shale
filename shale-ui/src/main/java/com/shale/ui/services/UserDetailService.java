@@ -113,6 +113,14 @@ public final class UserDetailService {
 				+ " serviceRowsReceived=" + (rows == null ? 0 : rows.size()));
 		return rows;
 	}
+	public java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> loadAssignedCaseCardDates(
+			int shaleClientId, int actorUserId, List<CaseRow> rows) {
+		return loadCaseCardDates(shaleClientId, actorUserId, rows.stream().map(CaseRow::id).toList());
+	}
+	public java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> loadCaseCardDates(
+			int shaleClientId, int actorUserId, java.util.Collection<? extends Number> caseIds) {
+		return caseSummaryDao.resolveCardDates(caseIds, shaleClientId, actorUserId);
+	}
 
 	private static CaseRow toCaseRow(CaseGridRow row) {
 		var summary = row.summary();

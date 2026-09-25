@@ -183,14 +183,12 @@ public final class TaskDetailDialog {
                     new CaseCardModel(
                             model.caseId(),
                             relatedCaseName,
-                            null,
-                            null,
                             model.caseResponsibleAttorney(),
                             model.caseResponsibleAttorneyColor(),
                             model.caseNonEngagementLetterSent(),
                             model.casePrimaryStatusName(),
                             model.casePrimaryStatusColor(),
-                            model.casePracticeAreaColor()),
+                            model.casePracticeAreaColor(), model.casePresentationDates()),
                     CaseCardFactory.Variant.EMBEDDED);
             relatedCaseSection.getChildren().setAll(relatedCaseLabel, caseCard);
         } else {

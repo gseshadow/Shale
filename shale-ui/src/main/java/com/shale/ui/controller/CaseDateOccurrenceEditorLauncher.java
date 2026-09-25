@@ -11,6 +11,7 @@ import javafx.application.Platform;
 import javafx.stage.Window;
 
 import java.util.Map;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -63,6 +64,8 @@ final class CaseDateOccurrenceEditorLauncher {
         try {
             Optional<CaseDateDto> loaded = caseService.getCaseDate(caseDateId, captured.tenantId(), captured.actorId());
             Optional<CaseOverviewDto> caseOverview = caseService.getCaseOverview(captured.caseId(), captured.tenantId());
+            var cardDates = caseService.resolveCaseDatePresentation(captured.caseId(), captured.tenantId(), captured.actorId(),
+                    com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD);
             var types = caseService.listEffectiveCaseDateTypes(captured.tenantId(), captured.actorId());
             Platform.runLater(() -> {
                 if (!isCurrent(captured, caseDateId, generation)) { opening.remove(caseDateId, generation); return; }
@@ -75,7 +78,7 @@ final class CaseDateOccurrenceEditorLauncher {
                 CaseDateDto existing = loaded.get();
                 try {
                     onDialogState.accept(true);
-                    CaseDateOccurrenceDialog.show(owner.get(), "Edit Date", types, existing, toCaseCardModel(caseOverview.get()), onOpenCase,
+                    CaseDateOccurrenceDialog.show(owner.get(), "Edit Date", types, existing, toCaseCardModel(caseOverview.get(), cardDates), onOpenCase,
                             input -> save(captured, existing, input),
                             () -> remove(captured, existing),
                             () -> Platform.runLater(() -> { opening.remove(caseDateId, generation); open(captured.caseId(), caseDateId); }));
@@ -108,11 +111,13 @@ final class CaseDateOccurrenceEditorLauncher {
     }
 
     static CaseCardModel toCaseCardModel(CaseOverviewDto overview) {
+		return toCaseCardModel(overview, List.of());
+	}
+    static CaseCardModel toCaseCardModel(CaseOverviewDto overview, List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> dates) {
         Objects.requireNonNull(overview, "overview");
-        return new CaseCardModel(overview.getCaseId(), overview.getCaseName(), overview.getIntakeDate(),
-                overview.getSolDate(), overview.getTortNoticeDeadline(), overview.getResponsibleAttorney(),
+        return new CaseCardModel(overview.getCaseId(), overview.getCaseName(), overview.getResponsibleAttorney(),
                 overview.getResponsibleAttorneyColor(), false, overview.getCaseStatus(),
-                overview.getPrimaryStatusColor(), overview.getPracticeAreaColor());
+                overview.getPrimaryStatusColor(), overview.getPracticeAreaColor(), com.shale.ui.component.factory.CaseCardFactory.toPresentationDates(dates));
     }
 
     private java.util.concurrent.CompletionStage<String> save(Context captured, CaseDateDto existing,

@@ -95,6 +95,6 @@ final class TaskCardStatusPrecedenceTest {
         return new TaskCardFactory.TaskCardModel(
                 1L, null, null, null, null, null, null, null, null,
                 "Task", null, null, statusName, statusColorHex, null,
-                null, completedAt, List.of());
+                null, completedAt, List.of(), List.of());
     }
 }

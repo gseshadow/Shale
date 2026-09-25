@@ -125,6 +125,7 @@ public final class ContactViewController {
     private Runnable onContactDeleted;
     private CaseCardFactory caseCardFactory;
     private List<RelatedCaseRow> relatedCases = List.of();
+    private java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> relatedCaseDates = java.util.Map.of();
     private PhiReadAuditService phiReadAuditService;
     private int detailLoadGeneration = 0;
     private int sharedLinksLoadGeneration = 0;
@@ -291,6 +292,9 @@ public final class ContactViewController {
                 List<ContactServicePort.Definition> specialties=contactService==null?List.of():contactService.getEffectiveSpecialties(tenantId);
                 List<ContactServicePort.CredentialDefinition> credentials=contactService==null?List.of():contactService.getEffectiveCredentialDefinitions(tenantId);
                 List<RelatedCaseRow> loadedRelatedCases = snapshot.relatedCases();
+                var loadedRelatedCaseDates = caseService == null ? java.util.Map.<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>>of()
+                        : caseService.resolveCaseDatePresentations(loadedRelatedCases.stream().map(r -> r.summary().caseId()).toList(),
+                                tenantId, appState.getUserId(), com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD);
                 Platform.runLater(() -> {
                     if (disposed||generation != detailLoadGeneration || contactId != requestedContactId) {
                         PerfLog.logDone("contacts.detail", "phase=discard generation=" + generation + " reason=stale", loadStarted);
@@ -308,6 +312,7 @@ public final class ContactViewController {
                     currentContact = row;
                     classificationProfile=profile;effectiveTypes=types;effectiveSpecialties=specialties;effectiveCredentials=credentials;
                     relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
+                    relatedCaseDates = loadedRelatedCaseDates;
                     long renderStarted = PerfLog.start();
                     renderFromCurrent();
                     renderRelatedCases();
@@ -766,7 +771,7 @@ public final class ContactViewController {
     }
 
     private Node createRelatedCaseCard(RelatedCaseRow row) {
-        Node card = caseCardFactory.create(toRelatedCaseCardModel(row), CaseCardFactory.Variant.FULL);
+        Node card = caseCardFactory.create(toRelatedCaseCardModel(row, relatedCaseDates.getOrDefault(row.summary().caseId(), List.of())), CaseCardFactory.Variant.FULL);
         if (card instanceof Region region) {
             region.setMaxWidth(Double.MAX_VALUE);
             region.setPrefWidth(380);
@@ -781,18 +786,18 @@ public final class ContactViewController {
     }
 
     static CaseCardModel toRelatedCaseCardModel(RelatedCaseRow row) {
+        return toRelatedCaseCardModel(row, List.of());
+    }
+    static CaseCardModel toRelatedCaseCardModel(RelatedCaseRow row, List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> dates) {
         return new CaseCardModel(
                 row.summary().caseId(),
                 row.summary().caseName(),
-                row.intakeDate(),
-                row.statuteOfLimitationsDate(),
-                row.tortClaimsNoticeDeadline(),
                 row.summary().responsibleAttorneyName(),
                 row.summary().responsibleAttorneyColor(),
                 row.nonEngagementLetterSent(),
                 row.summary().primaryStatusName(),
                 row.summary().primaryStatusColor(),
-                row.practiceAreaColor());
+                row.practiceAreaColor(), CaseCardFactory.toPresentationDates(dates));
     }
 
 

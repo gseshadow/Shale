@@ -15,6 +15,7 @@ import javafx.scene.paint.Paint;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -113,8 +114,8 @@ final class CaseCardComputedBackgroundTest {
             boolean nonEngagement, String attorney, LocalDate intake, LocalDate sol) {
         CaseCardFactory factory = new CaseCardFactory(id -> { });
         CaseCard card = assertInstanceOf(CaseCard.class, factory.create(new CaseCardModel(
-                name.hashCode(), name, intake, sol, null, attorney, "#27856F", nonEngagement,
-                statusName, statusColor, practiceAreaColor), CaseCardFactory.Variant.COMPACT));
+                name.hashCode(), name, attorney, "#27856F", nonEngagement,
+                statusName, statusColor, practiceAreaColor, List.of()), CaseCardFactory.Variant.COMPACT));
         card.setAccessibleText(name);
         return card;
     }
