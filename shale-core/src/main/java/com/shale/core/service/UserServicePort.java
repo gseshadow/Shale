@@ -19,6 +19,10 @@ public interface UserServicePort {
 
     List<FirmWideRoleAssignment> listUserFirmWideRoleAssignments(int shaleClientId, int actorUserId, int userId);
 
+    List<FirmWideRoleDefinition> listFirmWideRolesForUserView(int shaleClientId, int actorUserId);
+
+    List<FirmWideRoleAssignment> listUserFirmWideRoleAssignmentsForView(int shaleClientId, int actorUserId, int userId);
+
     FirmWideRoleDefinition createFirmWideRole(CreateFirmWideRoleCommand command);
 
     FirmWideRoleDefinition renameFirmWideRole(RenameFirmWideRoleCommand command);
