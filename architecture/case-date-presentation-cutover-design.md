@@ -101,8 +101,10 @@ continue to show every occurrence.
 4. Preserve My Shale warning labels and behavior, but source its SOL/TCN dates and sorts from the firm card
    selections until a separately approved warning policy exists. This compatibility is required before
    mappings can retire.
-5. Keep `MigratedCaseDateKey`, server/React fixed SOL/TCN detail fields, New Intake, confirmation policy
-   identity, Calendar, and generic Case Dates on stable type/SystemKey identity. Remove any remaining
+5. Keep `MigratedCaseDateKey`, server/React fixed SOL/TCN detail fields, New Intake, Calendar, and generic
+   Case Dates on stable type/SystemKey identity. Confirmation-policy identity follows the resulting
+   tenant-effective Case Date Type (`SYSTEM:` overlay family or tenant-owned `TYPE:`), never the SOL/TCN
+   semantic-role mapping. Remove any remaining
    SOL/TCN mutation that resolves through a semantic role before retirement.
 6. Keep legacy report/export DTO columns and headings, but feed them from the selected deterministic card
    projection. Inventory external SQL/report consumers separately; an unknown direct mapping reader blocks

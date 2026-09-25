@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.*;
 import java.util.List;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import com.shale.core.dto.CaseDatePresentationSelectionDto;
 import org.junit.jupiter.api.Test;
 
 /** Protects the tenant default foundation before any card/Overview reader cutover. */
@@ -70,6 +71,19 @@ final class CaseDatePresentationConfigurationContractTest {
         assertEquals(List.of("intake","statute_of_limitations","tort_notice_deadline"),
                 CaseOverviewConfigurationDao.defaults(effective).stream().map(EffectiveCaseDateTypeDto::systemKey).toList(),
                 "a built-in-only tenant must preserve its actual three-date uncustomized Overview rather than fail on optional types");
+    }
+
+    @Test void firmOverviewDefaultsPreserveSelectionOrderHistoricalPresentationAndExplicitEmpty(){
+        var current=type(11,"intake");
+        var historical=new EffectiveCaseDateTypeDto(12,7,null,"Former deadline",null,"OTHER","#654321",false,2,false,true,
+                EffectiveCaseDateTypeDto.Origin.TENANT_CREATED,new byte[]{2});
+        var selections=List.of(
+                new CaseDatePresentationSelectionDto("TYPE:12",0,historical,true),
+                new CaseDatePresentationSelectionDto("SYSTEM:intake",1,current,false));
+        assertEquals(List.of(historical,current),CaseOverviewConfigurationDao.selectionTypes(selections),
+                "Overview inheritance must use each selection's tenant-effective or historical presentation in saved order");
+        assertEquals(List.of(),CaseOverviewConfigurationDao.selectionTypes(List.of()),
+                "an explicitly empty firm Overview selection must remain empty");
     }
 
     @Test void servicePortDefaultsFailClosedAndProductionAdapterDelegates()throws Exception{

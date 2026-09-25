@@ -890,7 +890,7 @@ public final class CasesController {
 						.map(this::toViewModel)
 						.toList();
 				var cardDates=caseSummaryDao.resolveCardDates(newItems.stream().map(v->v.id).toList(),tenantId,appState.getUserId());
-				newItems.forEach(v->v.presentationDates=toPresentationDates(cardDates.getOrDefault(v.id,List.of())));
+				newItems.forEach(v->v.presentationDates=CaseCardFactory.toPresentationDates(cardDates.getOrDefault(v.id,List.of())));
 				PerfLog.logDone("DAO_MAP", "operation=cases-load phase=projection-merge-dto-map pageIndex="
 						+ pageToLoad + " resultCount=" + newItems.size(), mapStartNanos);
 				PerfLog.logDone("CTRL", "operation=cases-load boundary=complete-background loadGeneration="
@@ -1247,9 +1247,6 @@ public final class CasesController {
 		return caseCardFactory.create(new CaseCardModel(
 				vm.id,
 				vm.name,
-				vm.intakeDate,
-				vm.solDate,
-				vm.tortClaimsNoticeDeadline,
 				vm.responsibleAttorney,
 				vm.responsibleAttorneyColor,
 				vm.nonEngagementLetterSent,
@@ -1258,11 +1255,6 @@ public final class CasesController {
 				vm.practiceAreaColor,
 				vm.presentationDates
 		));
-	}
-
-	private static List<CaseCardFactory.PresentationDate> toPresentationDates(List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> values){
-		return values.stream().filter(v->v.caseDateId()!=null&&v.startsAt()!=null).map(v->new CaseCardFactory.PresentationDate(
-				v.selectionIdentity(),v.displaySystemKey(),v.displayName(),v.startsAt().toLocalDate(),false)).toList();
 	}
 
 	private static void runOnFx(Runnable runnable) {

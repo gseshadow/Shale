@@ -137,8 +137,12 @@ public final class CaseOverviewConfigurationDao {
     static void rejectDuplicates(List<Integer> ids){if(ids==null)throw new IllegalArgumentException("orderedCaseDateTypeIds is required.");if(new HashSet<>(ids).size()!=ids.size()||ids.stream().anyMatch(Objects::isNull))throw new IllegalArgumentException("Duplicate Case Date Types are not allowed.");}
     static List<EffectiveCaseDateTypeDto> defaults(List<EffectiveCaseDateTypeDto> types){Map<String,EffectiveCaseDateTypeDto> byKey=new HashMap<>();for(var t:types)if(t.systemKey()!=null)byKey.put(t.systemKey().toLowerCase(Locale.ROOT),t);return DEFAULT_KEYS.stream().map(byKey::get).filter(Objects::nonNull).toList();}
     private List<EffectiveCaseDateTypeDto> firmOverviewDefaults(int tenant,int actor){
-        return presentationDefaults.get(tenant,actor,com.shale.core.model.CaseDatePresentationPurpose.CASE_OVERVIEW)
-                .selections().stream().map(com.shale.core.dto.CaseDatePresentationSelectionDto::displayType).toList();
+        return selectionTypes(presentationDefaults.get(tenant,actor,
+                com.shale.core.model.CaseDatePresentationPurpose.CASE_OVERVIEW).selections());
+    }
+    static List<EffectiveCaseDateTypeDto> selectionTypes(List<com.shale.core.dto.CaseDatePresentationSelectionDto> selections){
+        Objects.requireNonNull(selections,"selections");
+        return selections.stream().map(com.shale.core.dto.CaseDatePresentationSelectionDto::type).toList();
     }
     private record Config(long id,byte[] rowVer){} private record CaseIntake(Integer userId,String name,boolean active,byte[] rowVer){} private record User(int id,String name){}
     private static CaseOverviewAdministrationDto administration(CaseOverviewDateConfigurationDto config,List<EffectiveCaseDateTypeDto> types,CaseIntake intake){return new CaseOverviewAdministrationDto(config,types,intake.userId,intake.name,intake.userId==null||intake.active,intake.rowVer);}

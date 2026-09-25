@@ -269,19 +269,19 @@ public final class SearchController {
 	}
 
 	private void showResults(SearchService.SearchResults results) {
-		renderCases(results.cases());
-		renderDeletedCases(results.deletedCases());
+		renderCases(results.cases(), results.caseCardDates());
+		renderDeletedCases(results.deletedCases(), results.caseCardDates());
 		renderContacts(results.contacts());
 		renderOrganizations(results.organizations());
 		renderUsers(results.users());
-		renderTasks(results.tasks());
+		renderTasks(results.tasks(), results.caseCardDates());
 		renderCalendarEvents(results.calendarEvents());
 		if (searchSummaryLabel != null && results.hasFailures()) {
 			searchSummaryLabel.setText(results.hasAnyResults() ? "Some search result sections could not be loaded." : "Unable to load search results right now.");
 		}
 	}
 
-	private void renderDeletedCases(List<CaseSummaryDao.DeletedCaseRow> deletedCases) {
+	private void renderDeletedCases(List<CaseSummaryDao.DeletedCaseRow> deletedCases, java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> dates) {
 		boolean authorized = canViewDeletedCasesInSearch();
 		if (deletedCasesSection != null) {
 			deletedCasesSection.setVisible(authorized);
@@ -292,7 +292,7 @@ public final class SearchController {
 		}
 		List<Node> cards = new ArrayList<>(deletedCases.size());
 		for (CaseSummaryDao.DeletedCaseRow row : deletedCases) {
-			Node card = caseCardFactory.create(toCaseCardModel(row), CaseCardFactory.Variant.COMPACT);
+			Node card = caseCardFactory.create(toCaseCardModel(row, dates.getOrDefault(row.summary().caseId(), List.of())), CaseCardFactory.Variant.COMPACT);
 			if (card instanceof Region region) {
 				region.setPrefWidth(CASE_CARD_WIDTH);
 				region.setMaxWidth(CASE_CARD_WIDTH);
@@ -311,13 +311,13 @@ public final class SearchController {
 		updateSectionState(deletedCasesFlow, deletedCasesEmptyLabel, cards.isEmpty());
 	}
 
-	private void renderCases(List<CaseSummaryDao.SearchCaseRow> cases) {
+	private void renderCases(List<CaseSummaryDao.SearchCaseRow> cases, java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> dates) {
 		if (casesFlow == null) {
 			return;
 		}
 		List<Node> cards = new ArrayList<>(cases.size());
 		for (CaseSummaryDao.SearchCaseRow row : cases) {
-			Node card = caseCardFactory.create(toCaseCardModel(row), CaseCardFactory.Variant.COMPACT);
+			Node card = caseCardFactory.create(toCaseCardModel(row, dates.getOrDefault(row.summary().caseId(), List.of())), CaseCardFactory.Variant.COMPACT);
 			if (card instanceof Region region) {
 				region.setPrefWidth(CASE_CARD_WIDTH);
 				region.setMaxWidth(CASE_CARD_WIDTH);
@@ -335,28 +335,27 @@ public final class SearchController {
 	}
 
 	static CaseCardModel toCaseCardModel(CaseSummaryDao.SearchCaseRow row) {
+		return toCaseCardModel(row, List.of());
+	}
+	static CaseCardModel toCaseCardModel(CaseSummaryDao.SearchCaseRow row, List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> dates) {
 		var summary = row.summary();
-		return new CaseCardModel(summary.caseId(), summary.caseName(), row.intakeDate(),
-				row.statuteOfLimitationsDate(), row.tortClaimsNoticeDeadline(),
+		return new CaseCardModel(summary.caseId(), summary.caseName(),
 				summary.responsibleAttorneyName(), summary.responsibleAttorneyColor(),
 				row.nonEngagementLetterSent(), summary.primaryStatusName(), summary.primaryStatusColor(),
-				row.practiceAreaColor());
+				row.practiceAreaColor(), CaseCardFactory.toPresentationDates(dates));
 	}
 
-	private static CaseCardModel toCaseCardModel(CaseSummaryDao.DeletedCaseRow row) {
+	private static CaseCardModel toCaseCardModel(CaseSummaryDao.DeletedCaseRow row, List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> dates) {
 		var summary = row.summary();
 		return new CaseCardModel(
 				summary.caseId(),
 				summary.caseName(),
-				row.intakeDate(),
-				row.statuteOfLimitationsDate(),
-				row.tortClaimsNoticeDeadline(),
 				summary.responsibleAttorneyName(),
 				summary.responsibleAttorneyColor(),
 				row.nonEngagementLetterSent(),
 				summary.primaryStatusName(),
 				summary.primaryStatusColor(),
-				row.practiceAreaColor());
+				row.practiceAreaColor(), CaseCardFactory.toPresentationDates(dates));
 	}
 
 	private void renderContacts(List<ContactDao.DirectoryContactRow> contacts) {
@@ -420,7 +419,7 @@ public final class SearchController {
 		updateSectionState(usersFlow, usersEmptyLabel, cards.isEmpty());
 	}
 
-	private void renderTasks(List<TaskDao.GlobalSearchTaskRow> tasks) {
+	private void renderTasks(List<TaskDao.GlobalSearchTaskRow> tasks, java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> caseDates) {
 		if (tasksFlow == null)
 			return;
 		List<Node> cards = tasks.stream().map(row ->
@@ -447,7 +446,7 @@ public final class SearchController {
 					row.priorityColorHex(),
 					row.dueAt(),
 					row.completedAt(),
-					assignedUsers), TaskCardFactory.Variant.FULL, true);
+					assignedUsers, CaseCardFactory.toPresentationDates(caseDates.getOrDefault(row.caseId(), List.of()))), TaskCardFactory.Variant.FULL, true);
 			card.setPrefWidth(TASK_CARD_WIDTH);
 			card.setMaxWidth(TASK_CARD_WIDTH);
 			return (Node) card;

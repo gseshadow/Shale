@@ -155,7 +155,7 @@ class UserAssignedTaskCardLayoutTest {
                 "Optional description " + id, "A very long task creator display name",
                 "Open", "#DBEAFE", "#F59E0B", LocalDateTime.now().plusDays(1), null,
                 List.of(new TaskCardFactory.AssignedUserModel(7,
-                        "A very long assigned user display name", "#7C3AED"))),
+                        "A very long assigned user display name", "#7C3AED")), List.of()),
                 TaskCardFactory.Variant.USER_ASSIGNED_TASKS, true);
     }
 

@@ -228,8 +228,10 @@ public final class UserController {
 	private List<RoleMembership> assignableRoles = List.of();
 	private RoleLoadState roleLoadState = RoleLoadState.IDLE;
 	private List<CaseRow> assignedCases = List.of();
+	private java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> assignedCaseCardDates = java.util.Map.of();
 	private List<AssignedUserTaskRow> assignedTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedTaskUsers = java.util.Map.of();
+	private java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> assignedTaskCaseDates = java.util.Map.of();
 	private boolean showCompletedTasks;
 	private long userLoadSequence;
 	private long rolesRefreshSequence;
@@ -640,6 +642,8 @@ public final class UserController {
 				long assignedCasesStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadAssignedCases page=user_view userId=" + targetUserId);
 				List<CaseRow> loaded = userDetailService.loadAssignedCases(targetShaleClientId, targetUserId);
+				var loadedCardDates = userDetailService.loadAssignedCaseCardDates(targetShaleClientId,
+						appState.getUserId(), loaded == null ? List.of() : loaded);
 				PerfLog.logDone("DAO", "method=loadAssignedCases page=user_view userId=" + targetUserId + " rows=" + (loaded == null ? 0 : loaded.size()), assignedCasesStartNanos);
 				Platform.runLater(() ->
 				{
@@ -652,6 +656,7 @@ public final class UserController {
 						return;
 					}
 					assignedCases = loaded == null ? List.of() : List.copyOf(loaded);
+					assignedCaseCardDates = loadedCardDates;
 					if (userDetailCache != null && userDetailCache.matches(targetUserId, targetShaleClientId)) {
 						userDetailCache.assignedCases = assignedCases;
 					}
@@ -708,6 +713,9 @@ public final class UserController {
 				long assignedTasksStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=loadAssignedTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId);
 				List<AssignedUserTaskRow> loaded = userDetailService.loadAssignedTasks(tenantId, targetUserId);
+				var loadedCaseDates = userDetailService.loadCaseCardDates(tenantId, appState.getUserId(),
+						(loaded == null ? List.<AssignedUserTaskRow>of() : loaded).stream().map(AssignedUserTaskRow::caseId)
+								.filter(java.util.Objects::nonNull).distinct().toList());
 				PerfLog.logDone("DAO", "method=loadAssignedTasks page=user_view userId=" + targetUserId + " organizationId=" + tenantId + " rows=" + (loaded == null ? 0
 						: loaded.size()), assignedTasksStartNanos);
 				List<Long> taskIds = (loaded == null ? List.<AssignedUserTaskRow>of() : loaded).stream()
@@ -735,6 +743,7 @@ public final class UserController {
 					}
 					assignedTasks = loaded == null ? List.of() : List.copyOf(loaded);
 					assignedTaskUsers = usersByTask;
+					assignedTaskCaseDates = loadedCaseDates;
 					if (userDetailCache != null && userDetailCache.matches(targetUserId, tenantId)) {
 						userDetailCache.assignedTasks = assignedTasks;
 						userDetailCache.assignedTaskUsers = assignedTaskUsers;
@@ -1493,7 +1502,8 @@ public final class UserController {
 				row.priorityColorHex(),
 				row.dueAt(),
 				row.completedAt(),
-				assignedTaskUsers.getOrDefault(row.taskId(), List.of()));
+				assignedTaskUsers.getOrDefault(row.taskId(), List.of()),
+				CaseCardFactory.toPresentationDates(assignedTaskCaseDates.getOrDefault(row.caseId(), List.of())));
 		return taskCardFactory.create(model, TaskCardFactory.Variant.USER_ASSIGNED_TASKS, true);
 	}
 
@@ -1561,15 +1571,13 @@ public final class UserController {
 		Node card = caseCardFactory.create(new CaseCardModel(
 				Math.toIntExact(row.id()),
 				row.name(),
-				row.intakeDate(),
-				row.statuteOfLimitationsDate(),
-				row.tortClaimsNoticeDeadline(),
 				row.responsibleAttorneyName(),
 				row.responsibleAttorneyColor(),
 				row.nonEngagementLetterSent(),
 				row.primaryStatusName(),
 				row.primaryStatusColor(),
-				row.practiceAreaColor()), CaseCardFactory.Variant.FULL);
+				row.practiceAreaColor(), CaseCardFactory.toPresentationDates(
+						assignedCaseCardDates.getOrDefault(row.id(), List.of()))), CaseCardFactory.Variant.FULL);
 		if (card instanceof Region region) {
 			region.setMaxWidth(Double.MAX_VALUE);
 			region.setPrefWidth(380);

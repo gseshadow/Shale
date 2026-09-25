@@ -86,6 +86,7 @@ public final class OrganizationController {
 	private OrganizationDao organizationDao;
 	private OrganizationServicePort organizationService;
 	private CaseSummaryDao caseSummaryDao;
+	private java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> relatedCaseDates = java.util.Map.of();
 	private Organization currentOrganization;
 	private OrganizationServicePort.OrganizationTypeProfile currentTypeProfile;
 	private List<OrganizationServicePort.OrganizationTypeDefinition> currentTypeDefinitions=List.of();
@@ -255,11 +256,14 @@ public final class OrganizationController {
 				PerfLog.log("organizations.relatedCases.dao", "start", "organizationId=" + organizationId);
 				List<RelatedCaseRow> loadedRelatedCases = caseSummaryDao.listActiveRelatedToOrganization(
 						requestedTenantId == null ? 0 : requestedTenantId, requestedOrganizationId);
+				var loadedDates = caseSummaryDao.resolveCardDates(loadedRelatedCases.stream().map(r -> r.summary().caseId()).toList(),
+						requestedTenantId, appState.getUserId());
 				int rowCount = loadedRelatedCases == null ? 0 : loadedRelatedCases.size();
 				Platform.runLater(() -> {
 					if (generation != relatedCasesLoadGeneration || !Objects.equals(organizationId, requestedOrganizationId)
 							|| !Objects.equals(currentTenantId(), requestedTenantId)) return;
 					relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
+					relatedCaseDates = loadedDates;
 					renderRelatedCases();
 					PerfLog.logDone("organizations.relatedCases.load", "organizationId=" + organizationId + " rows=" + rowCount, relatedStarted);
 				});
@@ -601,7 +605,7 @@ public final class OrganizationController {
 	}
 
 	private Node createRelatedCaseCardContainer(RelatedCaseRow row) {
-		Node card = caseCardFactory.create(toRelatedCaseCardModel(row), CaseCardFactory.Variant.FULL);
+		Node card = caseCardFactory.create(toRelatedCaseCardModel(row, relatedCaseDates.getOrDefault(row.summary().caseId(), List.of())), CaseCardFactory.Variant.FULL);
 		if (card instanceof Region region) {
 			region.setMaxWidth(Double.MAX_VALUE);
 			region.setPrefWidth(380);
@@ -614,18 +618,18 @@ public final class OrganizationController {
 	}
 
 	static CaseCardModel toRelatedCaseCardModel(RelatedCaseRow row) {
+		return toRelatedCaseCardModel(row, List.of());
+	}
+	static CaseCardModel toRelatedCaseCardModel(RelatedCaseRow row, List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> dates) {
 		return new CaseCardModel(
 				row.summary().caseId(),
 				row.summary().caseName(),
-				row.intakeDate(),
-				row.statuteOfLimitationsDate(),
-				row.tortClaimsNoticeDeadline(),
 				row.summary().responsibleAttorneyName(),
 				row.summary().responsibleAttorneyColor(),
 				row.nonEngagementLetterSent(),
 				row.summary().primaryStatusName(),
 				row.summary().primaryStatusColor(),
-				row.practiceAreaColor()
+				row.practiceAreaColor(), CaseCardFactory.toPresentationDates(dates)
 		);
 	}
 
