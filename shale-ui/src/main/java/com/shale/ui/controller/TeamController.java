@@ -29,7 +29,7 @@ import java.util.function.Consumer;
 
 public final class TeamController {
 
-	private static final UserCardFactory.Variant TEAM_CARD_VARIANT = UserCardFactory.Variant.FULL;
+	private static final UserCardFactory.Variant TEAM_CARD_VARIANT = UserCardFactory.Variant.TEAM_ACCENTED;
 	private static final double TEAM_CARD_WIDTH = 320;
 	private static final double TEAM_CARD_HEIGHT = 72;
 
