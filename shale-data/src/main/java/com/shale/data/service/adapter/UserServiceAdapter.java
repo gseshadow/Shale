@@ -61,6 +61,8 @@ public final class UserServiceAdapter implements UserServicePort {
 
     @Override public List<FirmWideRoleDefinition> listFirmWideRolesForAdministration(int tenant,int actor){return userDao.listFirmWideRolesForAdministration(tenant,actor);}
     @Override public List<FirmWideRoleAssignment> listUserFirmWideRoleAssignments(int tenant,int actor,int user){return userDao.listUserFirmWideRoleAssignments(tenant,actor,user);}
+    @Override public List<FirmWideRoleDefinition> listFirmWideRolesForUserView(int tenant,int actor){return userDao.listFirmWideRolesForUserView(tenant,actor);}
+    @Override public List<FirmWideRoleAssignment> listUserFirmWideRoleAssignmentsForView(int tenant,int actor,int user){return userDao.listUserFirmWideRoleAssignmentsForView(tenant,actor,user);}
     @Override public FirmWideRoleDefinition createFirmWideRole(CreateFirmWideRoleCommand command){return userDao.createFirmWideRole(command);}
     @Override public FirmWideRoleDefinition renameFirmWideRole(RenameFirmWideRoleCommand command){return userDao.renameFirmWideRole(command);}
     @Override public FirmWideRoleDefinition setFirmWideRoleActive(FirmWideRoleLifecycleCommand command,boolean active){return userDao.setFirmWideRoleActive(command,active);}

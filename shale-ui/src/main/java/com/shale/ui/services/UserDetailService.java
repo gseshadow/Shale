@@ -11,7 +11,14 @@ import com.shale.data.dao.TaskDao.AssignedUserTaskRow;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.UserDao.UserDetailRow;
 import com.shale.data.dao.UserDao.UserProfileUpdateRequest;
-import com.shale.data.dao.UserDao.UserRoleRow;
+import com.shale.core.semantics.RoleSemantics;
+import com.shale.core.service.UserServicePort;
+import com.shale.core.service.UserServicePort.FirmWideRoleAssignment;
+import com.shale.core.service.UserServicePort.FirmWideRoleDefinition;
+import com.shale.data.service.adapter.UserServiceAdapter;
+
+import java.util.ArrayList;
+import java.util.Set;
 import com.shale.ui.util.PerfLog;
 
 public final class UserDetailService {
@@ -21,11 +28,17 @@ public final class UserDetailService {
 	private final UserDao userDao;
 	private final CaseSummaryDao caseSummaryDao;
 	private final TaskDao taskDao;
+	private final UserServicePort userService;
 
 	public UserDetailService(UserDao userDao, CaseSummaryDao caseSummaryDao, TaskDao taskDao) {
+		this(userDao, caseSummaryDao, taskDao, new UserServiceAdapter(userDao));
+	}
+
+	public UserDetailService(UserDao userDao, CaseSummaryDao caseSummaryDao, TaskDao taskDao, UserServicePort userService) {
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
 		this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
 		this.taskDao = Objects.requireNonNull(taskDao, "taskDao");
+		this.userService = Objects.requireNonNull(userService, "userService");
 	}
 
 	public UserDetailRow loadUser(int userId, int shaleClientId) {
@@ -36,33 +49,57 @@ public final class UserDetailService {
 		return row;
 	}
 
-	public List<UserRoleRow> loadAssignedRoles(int targetUserId, int shaleClientId) {
-		long startNanos = PerfLog.start();
-		PerfLog.log("DAO", "start", "method=listAssignedRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId);
-		List<UserRoleRow> rows = userDao.listAssignedRoles(targetUserId, shaleClientId);
-		PerfLog.logDone("DAO", "method=listAssignedRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows=" + (rows == null ? 0 : rows.size()), startNanos);
-		return rows;
+	public RoleSnapshot loadFirmWideRoles(UserDetailRow target, int actorUserId, boolean administrator) {
+		Objects.requireNonNull(target, "target");
+		List<FirmWideRoleDefinition> definitions = userService.listFirmWideRolesForUserView(target.shaleClientId(), actorUserId);
+		List<FirmWideRoleAssignment> history = userService.listUserFirmWideRoleAssignmentsForView(target.shaleClientId(), actorUserId, target.id());
+		return composeRoleSnapshot(target, definitions, history, administrator);
 	}
 
-	public List<UserRoleRow> loadAssignableRoles(int targetUserId, int shaleClientId) {
-		long startNanos = PerfLog.start();
-		PerfLog.log("DAO", "start", "method=listAssignableRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId);
-		List<UserRoleRow> rows = userDao.listAssignableRoles(targetUserId, shaleClientId);
-		PerfLog.logDone("DAO", "method=listAssignableRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows=" + (rows == null ? 0 : rows.size()), startNanos);
-		return rows;
+	static RoleSnapshot composeRoleSnapshot(UserDetailRow target, List<FirmWideRoleDefinition> definitions,
+			List<FirmWideRoleAssignment> history, boolean administrator) {
+		List<RoleMembership> assigned = new ArrayList<>();
+		List<RoleMembership> available = new ArrayList<>();
+		for (FirmWideRoleDefinition definition : definitions) {
+			boolean builtInAssigned = "ADMIN".equals(definition.systemKey()) ? target.admin()
+					: "ATTORNEY".equals(definition.systemKey()) && target.attorney();
+			FirmWideRoleAssignment active = history.stream().filter(a -> a.definitionId() == definition.id() && !a.deleted()).findFirst().orElse(null);
+			FirmWideRoleAssignment removed = history.stream().filter(a -> a.definitionId() == definition.id() && a.deleted()).findFirst().orElse(null);
+			RoleMembership role = new RoleMembership(definition, active != null ? active : removed);
+			if (definition.builtIn() ? builtInAssigned : active != null) assigned.add(role);
+			else if (administrator) available.add(role);
+		}
+		return new RoleSnapshot(List.copyOf(assigned), List.copyOf(available));
 	}
 
-	public boolean updateBasicProfile(UserProfileUpdateRequest request) {
-		return userDao.updateBasicProfile(request);
+	public boolean updateBasicProfile(UserProfileUpdateRequest request) { return userDao.updateBasicProfile(request); }
+
+	public void addRoleToUser(UserDetailRow target, RoleMembership role, int actorUserId) {
+		if (role.definition().builtIn()) updateBuiltInRole(target, role.definition(), true);
+		else if (role.assignment() != null && role.assignment().deleted())
+			userService.restoreFirmWideRoleAssignment(new UserServicePort.FirmWideRoleAssignmentLifecycleCommand(target.shaleClientId(), actorUserId, role.assignment().id(), role.assignment().rowVer()));
+		else userService.assignFirmWideRole(new UserServicePort.FirmWideRoleAssignmentCommand(target.shaleClientId(), actorUserId, target.id(), role.definition().id()));
 	}
 
-	public boolean addRoleToUser(int userId, int roleId, int shaleClientId) {
-		return userDao.addRoleToUser(userId, roleId, shaleClientId);
+	public void removeRoleFromUser(UserDetailRow target, RoleMembership role, int actorUserId) {
+		if (role.definition().builtIn()) updateBuiltInRole(target, role.definition(), false);
+		else if (role.assignment() != null)
+			userService.removeFirmWideRoleAssignment(new UserServicePort.FirmWideRoleAssignmentLifecycleCommand(target.shaleClientId(), actorUserId, role.assignment().id(), role.assignment().rowVer()));
 	}
 
-	public boolean removeRoleFromUser(int userId, int roleId, int shaleClientId) {
-		return userDao.removeRoleFromUser(userId, roleId, shaleClientId);
+	private void updateBuiltInRole(UserDetailRow target, FirmWideRoleDefinition definition, boolean enabled) {
+		Set<Integer> roles = new java.util.HashSet<>();
+		if (target.admin()) roles.add(RoleSemantics.ROLE_ADMIN);
+		if (target.attorney()) roles.add(RoleSemantics.ROLE_ATTORNEY);
+		int roleId = "ADMIN".equals(definition.systemKey()) ? RoleSemantics.ROLE_ADMIN : RoleSemantics.ROLE_ATTORNEY;
+		if (enabled) roles.add(roleId); else roles.remove(roleId);
+		userDao.updateManagedUser(new UserDao.UserUpdateRequest(target.id(), target.rowVer(), target.firstName(), target.lastName(), target.email(), target.phone(), target.initials(), target.color(), roles));
 	}
+
+	public record RoleMembership(FirmWideRoleDefinition definition, FirmWideRoleAssignment assignment) {
+		public String name() { return definition.name(); }
+	}
+	public record RoleSnapshot(List<RoleMembership> assigned, List<RoleMembership> available) { }
 
 	public List<CaseRow> loadAssignedCases(int shaleClientId, int userId) {
 		System.out.println("[TRACE ASSIGNED_CASES][UserDetailService.loadAssignedCases] "

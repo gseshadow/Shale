@@ -4,7 +4,8 @@ import com.shale.data.dao.CaseDao.CaseRow;
 import com.shale.data.dao.TaskDao.AssignedUserTaskRow;
 import com.shale.data.dao.UserDao.UserDetailRow;
 import com.shale.data.dao.UserDao.UserProfileUpdateRequest;
-import com.shale.data.dao.UserDao.UserRoleRow;
+import com.shale.ui.services.UserDetailService.RoleMembership;
+import com.shale.ui.services.UserDetailService.RoleSnapshot;
 import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
@@ -223,8 +224,9 @@ public final class UserController {
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
 	private boolean liveSubscribed;
 	private UserDetailRow currentUser;
-	private List<UserRoleRow> assignedRoles = List.of();
-	private List<UserRoleRow> assignableRoles = List.of();
+	private List<RoleMembership> assignedRoles = List.of();
+	private List<RoleMembership> assignableRoles = List.of();
+	private RoleLoadState roleLoadState = RoleLoadState.IDLE;
 	private List<CaseRow> assignedCases = List.of();
 	private List<AssignedUserTaskRow> assignedTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> assignedTaskUsers = java.util.Map.of();
@@ -568,51 +570,34 @@ public final class UserController {
 	}
 
 	private void refreshRolesAsync() {
-		if (userDetailService == null || currentUser == null) {
-			assignedRoles = List.of();
-			assignableRoles = List.of();
-			renderRoles();
-			return;
+		if (userDetailService == null || currentUser == null || appState == null || appState.getUserId() == null) {
+			assignedRoles = List.of(); assignableRoles = List.of(); roleLoadState = RoleLoadState.ERROR; renderRoles(); return;
 		}
-
-		final int targetUserId = currentUser.id();
-		final int shaleClientId = currentUser.shaleClientId();
+		final UserDetailRow target = currentUser;
+		final int actorUserId = appState.getUserId();
 		final long requestId = ++rolesRefreshSequence;
-		dbExec.submit(() ->
-		{
+		roleLoadState = RoleLoadState.LOADING; renderRoles();
+		dbExec.submit(() -> {
 			try {
-				long assignedRolesStartNanos = PerfLog.start();
-				PerfLog.log("DAO", "start", "method=loadAssignedRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId);
-				List<UserRoleRow> loadedAssigned = userDetailService.loadAssignedRoles(targetUserId, shaleClientId);
-				PerfLog.logDone("DAO", "method=loadAssignedRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows=" + (loadedAssigned == null
-						? 0
-						: loadedAssigned.size()), assignedRolesStartNanos);
-				long assignableRolesStartNanos = PerfLog.start();
-				List<UserRoleRow> loadedAssignable = canManageRoles()
-						? userDetailService.loadAssignableRoles(targetUserId, shaleClientId)
-						: List.of();
-				PerfLog.logDone("DAO", "method=loadAssignableRoles page=user_view userId=" + targetUserId + " organizationId=" + shaleClientId + " rows="
-						+ (loadedAssignable == null ? 0 : loadedAssignable.size()), assignableRolesStartNanos);
-				Platform.runLater(() ->
-				{
-					if (requestId != rolesRefreshSequence || currentUser == null || currentUser.id() != targetUserId) {
-						PerfLog.log("CTRL", "stale", "panel=roles page=user_view userId=" + targetUserId + " requestId=" + requestId);
-						return;
-					}
-					assignedRoles = loadedAssigned == null ? List.of() : List.copyOf(loadedAssigned);
-					assignableRoles = loadedAssignable == null ? List.of() : List.copyOf(loadedAssignable);
-					renderRoles();
+				RoleSnapshot loaded = userDetailService.loadFirmWideRoles(target, actorUserId, isAdminViewer());
+				Platform.runLater(() -> {
+					if (!isCurrentRoleRequest(requestId, target)) return;
+					assignedRoles = loaded.assigned(); assignableRoles = loaded.available(); roleLoadState = RoleLoadState.LOADED;
+					clearError(); renderRoles();
 				});
 			} catch (Exception ex) {
-				Platform.runLater(() ->
-				{
-					assignedRoles = List.of();
-					assignableRoles = List.of();
-					renderRoles();
-					setError("Failed to load roles for this user.");
+				Platform.runLater(() -> {
+					if (!isCurrentRoleRequest(requestId, target)) return;
+					assignedRoles = List.of(); assignableRoles = List.of(); roleLoadState = RoleLoadState.ERROR;
+					renderRoles(); setError("Failed to load roles for this user. Select Retry to try again.");
 				});
 			}
 		});
+	}
+
+	private boolean isCurrentRoleRequest(long requestId, UserDetailRow target) {
+		return requestId == rolesRefreshSequence && currentUser != null && currentUser.id() == target.id()
+				&& currentUser.shaleClientId() == target.shaleClientId();
 	}
 
 	private void refreshAssignedCasesAsync() {
@@ -1142,16 +1127,20 @@ public final class UserController {
 			setError("User details are unavailable.");
 			return;
 		}
+		if (roleLoadState != RoleLoadState.LOADED) {
+			setError("Roles are still loading or could not be loaded. Retry the role load before adding a role.");
+			return;
+		}
 		if (assignableRoles.isEmpty()) {
 			AppDialogs.showInfo(dialogOwner(addRoleButton), "Roles", "No additional roles are available for this user.");
 			return;
 		}
 
-		ContactPickerDialog<UserRoleRow> picker = new ContactPickerDialog<>(
+		ContactPickerDialog<RoleMembership> picker = new ContactPickerDialog<>(
 				dialogOwner(addRoleButton),
 				"Add Role",
 				assignableRoles,
-				role -> role == null ? "" : fallback(role.roleName()),
+				role -> role == null ? "" : fallback(role.name()),
 				null);
 
 		var selected = picker.showAndWait();
@@ -1159,26 +1148,24 @@ public final class UserController {
 			return;
 		}
 
-		UserRoleRow chosen = selected.get();
+		RoleMembership chosen = selected.get();
+		UserDetailRow target = currentUser;
 		setBusy(true);
 		dbExec.submit(() ->
 		{
 			try {
-				boolean added = userDetailService.addRoleToUser(currentUser.id(), chosen.roleId(), currentUser.shaleClientId());
+				userDetailService.addRoleToUser(target, chosen, appState.getUserId());
 				Platform.runLater(() ->
 				{
+					if (!sameUser(target)) return;
 					setBusy(false);
-					if (!added) {
-						setError("Role could not be added. It may already be assigned.");
-						refreshRolesAsync();
-						return;
-					}
 					clearError();
-					refreshRolesAsync();
+					refreshProfileAndRolesAsync(target);
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() ->
 				{
+					if (!sameUser(target)) return;
 					setBusy(false);
 					setError("Failed to add role to this user.");
 				});
@@ -1186,7 +1173,7 @@ public final class UserController {
 		});
 	}
 
-	private void onRemoveRole(UserRoleRow role) {
+	private void onRemoveRole(RoleMembership role) {
 		if (!canManageRoles()) {
 			setError("Only admin users can manage roles.");
 			return;
@@ -1199,35 +1186,50 @@ public final class UserController {
 				dialogOwner(addRoleButton),
 				"Remove Role",
 				"Remove this role from the user?",
-				fallback(role.roleName()),
+				fallback(role.name()),
 				"Remove Role",
 				AppDialogs.DialogActionKind.DANGER);
 		if (!confirmed) {
 			return;
 		}
 
+		UserDetailRow target = currentUser;
 		setBusy(true);
 		dbExec.submit(() ->
 		{
 			try {
-				boolean removed = userDetailService.removeRoleFromUser(currentUser.id(), role.roleId(), currentUser.shaleClientId());
+				userDetailService.removeRoleFromUser(target, role, appState.getUserId());
 				Platform.runLater(() ->
 				{
+					if (!sameUser(target)) return;
 					setBusy(false);
-					if (!removed) {
-						setError("Role could not be removed from this user.");
-						refreshRolesAsync();
-						return;
-					}
 					clearError();
-					refreshRolesAsync();
+					refreshProfileAndRolesAsync(target);
 				});
 			} catch (Exception ex) {
 				Platform.runLater(() ->
 				{
+					if (!sameUser(target)) return;
 					setBusy(false);
 					setError("Failed to remove role from this user.");
 				});
+			}
+		});
+	}
+
+	private boolean sameUser(UserDetailRow target) { return currentUser != null && target != null && currentUser.id() == target.id() && currentUser.shaleClientId() == target.shaleClientId(); }
+
+	private void refreshProfileAndRolesAsync(UserDetailRow target) {
+		dbExec.submit(() -> {
+			try {
+				UserDetailRow loaded = userDetailService.loadUser(target.id(), target.shaleClientId());
+				Platform.runLater(() -> {
+					if (!sameUser(target)) return;
+					if (loaded == null) { roleLoadState = RoleLoadState.ERROR; renderRoles(); setError("Role changed, but the user profile could not be refreshed. Select Retry."); return; }
+					currentUser = loaded; renderFromCurrent(); refreshRolesAsync();
+				});
+			} catch (Exception ex) {
+				Platform.runLater(() -> { if (sameUser(target)) { roleLoadState = RoleLoadState.ERROR; renderRoles(); setError("Role changed, but refresh failed. Select Retry."); } });
 			}
 		});
 	}
@@ -1266,27 +1268,30 @@ public final class UserController {
 		if (rolesFlow == null) {
 			return;
 		}
-		List<Node> cards = assignedRoles.stream()
-				.map(this::createRoleNode)
-				.toList();
+		List<Node> cards = assignedRoles.stream().map(this::createRoleNode).toList();
+		if (roleLoadState == RoleLoadState.LOADING) cards = List.of(new Label("Loading roles…"));
+		else if (roleLoadState == RoleLoadState.ERROR) {
+			Button retry = new Button("Retry"); ControlStyles.apply(retry, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+			retry.setOnAction(e -> refreshRolesAsync()); cards = List.of(new HBox(8, new Label("Roles could not be loaded."), retry));
+		}
 		rolesFlow.getChildren().setAll(cards);
 
-		boolean empty = cards.isEmpty();
+		boolean empty = cards.isEmpty() && roleLoadState == RoleLoadState.LOADED;
 		if (rolesEmptyLabel != null) {
 			rolesEmptyLabel.setVisible(empty);
 			rolesEmptyLabel.setManaged(empty);
 		}
-		setVisibleManaged(addRoleButton, canManageRoles());
+		setVisibleManaged(addRoleButton, canManageRoles() && roleLoadState == RoleLoadState.LOADED);
 	}
 
-	private Node createRoleNode(UserRoleRow role) {
-		Label roleLabel = new Label(fallback(role == null ? null : role.roleName()));
+	private Node createRoleNode(RoleMembership role) {
+		Label roleLabel = new Label(fallback(role == null ? null : role.name()));
 		roleLabel.setStyle("-fx-font-weight: 600;");
 
 		HBox row;
 		if (canManageRoles()) {
 			Button removeButton = new Button("Remove");
-			removeButton.getStyleClass().addAll("app-toolbar-button", "app-toolbar-button-danger", "app-toolbar-button-compact");
+			ControlStyles.apply(removeButton, ControlStyles.Purpose.DANGER, ControlStyles.Size.SMALL);
 			removeButton.setOnAction(e -> onRemoveRole(role));
 			Region spacer = new Region();
 			HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -2141,6 +2146,8 @@ public final class UserController {
 			return this.userId == userId && this.shaleClientId == shaleClientId;
 		}
 	}
+
+	private enum RoleLoadState { IDLE, LOADING, LOADED, ERROR }
 
 	private enum UserField {
 		FIRST_NAME {
