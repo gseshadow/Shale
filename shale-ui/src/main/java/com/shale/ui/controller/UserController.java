@@ -27,6 +27,7 @@ import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.state.AppState;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.services.UserDetailService;
 import com.shale.ui.util.PerfLog;
 import com.shale.ui.util.ColorUtil;
@@ -222,6 +223,7 @@ public final class UserController {
 	private CaseCardFactory caseCardFactory;
 	private TaskCardFactory taskCardFactory;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
+	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> casePresentationUpdatedHandler;
 	private boolean liveSubscribed;
 	private UserDetailRow currentUser;
 	private List<RoleMembership> assignedRoles = List.of();
@@ -500,6 +502,14 @@ public final class UserController {
 		}
 		liveCaseUpdatedHandler = this::handleLiveCaseUpdatedEvent;
 		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		casePresentationUpdatedHandler = event -> {
+			if (event != null && currentUser != null && LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION.equals(event.entityType())
+					&& event.shaleClientId() == currentUser.shaleClientId()) {
+				Object purpose=event.patch()==null?null:event.patch().get("purpose");
+				if (com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD.name().equals(String.valueOf(purpose))) Platform.runLater(this::refreshAssignedCasesAsync);
+			}
+		};
+		runtimeBridge.subscribeEntityUpdated(casePresentationUpdatedHandler);
 		liveSubscribed = true;
 	}
 
@@ -508,6 +518,7 @@ public final class UserController {
 			return;
 		}
 		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		if (casePresentationUpdatedHandler != null) runtimeBridge.unsubscribeEntityUpdated(casePresentationUpdatedHandler);
 		liveSubscribed = false;
 	}
 

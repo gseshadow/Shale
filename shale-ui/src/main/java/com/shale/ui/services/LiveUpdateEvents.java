@@ -14,6 +14,8 @@ public final class LiveUpdateEvents {
     /** PHI-free invalidation for any committed dbo.CaseDates occurrence mutation. */
     public static final String ENTITY_CASE_DATES = "CaseDates";
     public static final String ENTITY_CASE_DATE_TYPES = "CaseDateTypes";
+    /** Tenant-wide invalidation for Case Card or inherited Overview presentation defaults. */
+    public static final String ENTITY_CASE_DATE_PRESENTATION = "CaseDatePresentationConfiguration";
 
     public static final String CHANGE_CREATED = "CREATED";
     public static final String CHANGE_UPDATED = "UPDATED";
@@ -70,6 +72,13 @@ public final class LiveUpdateEvents {
         StringBuilder json = new StringBuilder("{");
         append(json, "caseId", caseId);
         append(json, "change", change);
+        return json.append('}').toString();
+    }
+
+    public static String caseDatePresentationPatch(String purpose) {
+        StringBuilder json = new StringBuilder("{");
+        append(json, "purpose", purpose);
+        append(json, "change", CHANGE_REORDERED);
         return json.append('}').toString();
     }
 

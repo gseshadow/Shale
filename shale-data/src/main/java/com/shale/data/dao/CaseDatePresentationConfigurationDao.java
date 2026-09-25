@@ -16,7 +16,7 @@ public final class CaseDatePresentationConfigurationDao {
 
     public CaseDatePresentationConfigurationDto get(int tenant,int actor,CaseDatePresentationPurpose purpose){
         Objects.requireNonNull(purpose,"purpose");
-        try(Connection con=db.requireConnection()){verifySession(con,tenant,actor,false);return read(con,tenant,purpose);}
+        try(Connection con=db.requireConnection()){verifySession(con,tenant,actor,true);return read(con,tenant,purpose);}
         catch(SQLException e){throw new IllegalStateException("Case Date presentation configuration could not be loaded.",e);}
     }
 

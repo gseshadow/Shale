@@ -26,6 +26,7 @@ import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.ControlAvailability;
@@ -408,6 +409,12 @@ public final class OrganizationController {
 	}
 
 	private void handleLiveOrganizationUpdatedEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
+		if (event != null && appState != null && LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION.equals(event.entityType())
+				&& java.util.Objects.equals(appState.getShaleClientId(), event.shaleClientId())) {
+			Object purpose=event.patch()==null?null:event.patch().get("purpose");
+			if (com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD.name().equals(String.valueOf(purpose))) runOnFx(this::loadRelatedCasesSafe);
+			return;
+		}
 		if (shouldIgnoreLiveEvent(event)) {
 			return;
 		}

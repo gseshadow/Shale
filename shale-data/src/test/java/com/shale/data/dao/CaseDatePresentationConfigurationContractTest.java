@@ -35,6 +35,13 @@ final class CaseDatePresentationConfigurationContractTest {
           ()->assertTrue(s.contains("con.rollback()")));
     }
 
+    @Test void administrationLoadIsAlsoAdminAuthorized()throws Exception{
+        String s=read("shale-data/src/main/java/com/shale/data/dao/CaseDatePresentationConfigurationDao.java");
+        String get=s.substring(s.indexOf("public CaseDatePresentationConfigurationDto get"),s.indexOf("public CaseDatePresentationConfigurationDto replace"));
+        assertTrue(get.contains("verifySession(con,tenant,actor,true)"),
+                "historical configuration reads are administrator-only, not merely UI-hidden");
+    }
+
     @Test void resolverMatchesGlobalOrTenantStoredTypeWithoutRewritingAndKeepsHistoryReadable()throws Exception{
         String s=read("shale-data/src/main/java/com/shale/data/dao/CaseDatePresentationConfigurationDao.java");
         assertAll(

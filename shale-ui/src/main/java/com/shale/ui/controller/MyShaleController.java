@@ -44,6 +44,7 @@ import com.shale.ui.notification.NotificationCenterService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.AppSectionTabs;
@@ -234,6 +235,7 @@ public final class MyShaleController {
 	private CaseCardFactory caseCardFactory;
 	private TaskCardFactory taskCardFactory;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
+	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> casePresentationUpdatedHandler;
 	private boolean liveSubscribed;
 	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 
@@ -748,6 +750,14 @@ public final class MyShaleController {
 
 		liveCaseUpdatedHandler = this::handleLiveCaseUpdatedEvent;
 		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		casePresentationUpdatedHandler = event -> {
+			if (event != null && appState != null && LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION.equals(event.entityType())
+					&& java.util.Objects.equals(appState.getShaleClientId(), event.shaleClientId())) {
+				Object purpose=event.patch()==null?null:event.patch().get("purpose");
+				if (com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD.name().equals(String.valueOf(purpose))) Platform.runLater(this::refreshMyCasesBoard);
+			}
+		};
+		runtimeBridge.subscribeEntityUpdated(casePresentationUpdatedHandler);
 		liveSubscribed = true;
 		log.debug("My Cases live subscribed to case updates");
 	}
@@ -757,6 +767,7 @@ public final class MyShaleController {
 			return;
 		}
 		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		if (casePresentationUpdatedHandler != null) runtimeBridge.unsubscribeEntityUpdated(casePresentationUpdatedHandler);
 		liveSubscribed = false;
 		log.debug("My Cases live unsubscribed from case updates");
 	}

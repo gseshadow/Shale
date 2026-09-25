@@ -196,9 +196,15 @@ public final class ContactViewController {
     public void setContactService(ContactServicePort service){this.contactService=Objects.requireNonNull(service);refreshContactActions();}
 
     private void handleSharedLinksLiveEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
-        if (event == null || appState == null || !LiveUpdateEvents.ENTITY_CASE_LINK_SHARE.equals(event.entityType())) return;
+        if (event == null || appState == null) return;
         Integer tenantId = appState.getShaleClientId();
         if (tenantId == null || event.shaleClientId() != tenantId) return;
+        if (LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION.equals(event.entityType())) {
+            Object purpose=event.patch()==null?null:event.patch().get("purpose");
+            if (com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD.name().equals(String.valueOf(purpose))) Platform.runLater(this::loadContact);
+            return;
+        }
+        if (!LiveUpdateEvents.ENTITY_CASE_LINK_SHARE.equals(event.entityType())) return;
         Object rawContactId = event.patch() == null ? null : event.patch().get("contactId");
         long eventContactId;
         try { eventContactId = rawContactId instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(rawContactId)); }
