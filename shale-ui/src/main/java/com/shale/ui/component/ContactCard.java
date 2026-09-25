@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import com.shale.core.service.ContactServicePort.ClassificationPresentation;
+import com.shale.ui.util.ColorUtil;
 
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -55,7 +56,19 @@ public class ContactCard extends VBox {
     }
 
     /** Retained compatibility API; Contact surfaces are deliberately theme-owned and neutral. */
-    public void setBackgroundCssColor(String ignored) { setStyle(null); }
+    public void setBackgroundCssColor(String storedColor) {
+        String normalized = ColorUtil.toCssBackgroundColorOrNull(storedColor);
+
+        if (normalized == null) {
+            setStyle(null);
+            return;
+        }
+
+        setStyle(
+            "-fx-background-color: " + ColorUtil.toCssRgba(normalized, 0.90) + ";"
+            + "-fx-border-color: " + normalized + ";"
+        );
+    }
     public void setSuppressPlaceholderLines(boolean value) { suppressPlaceholderLines = value; }
     public void setInteractive(boolean value) {
         interactive = value;

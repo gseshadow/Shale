@@ -42,7 +42,15 @@ ORDER BY p.TenantId,p.Purpose,p.OriginalSortOrder,CASE WHEN t.ShaleClientId=p.Te
  SELECT p.TenantId,p.Purpose,p.SelectionIdentity,p.OriginalSortOrder,t.Id,t.ShaleClientId,t.SystemKey,t.IsActive,t.IsDeleted,
   ROW_NUMBER() OVER(PARTITION BY p.TenantId,p.Purpose,p.SelectionIdentity ORDER BY CASE WHEN t.ShaleClientId=p.TenantId AND t.IsDeleted=0 THEN 0 ELSE 1 END,t.Id) rn
  FROM #Proposed p JOIN dbo.CaseDateTypes t ON LOWER(LTRIM(RTRIM(t.SystemKey)))=SUBSTRING(p.SelectionIdentity,8,160)
- WHERE t.ShaleClientId=p.TenantId OR (t.ShaleClientId IS NULL AND EXISTS(SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings m WHERE m.CaseDateTypeId=t.Id AND m.ShaleClientId IS NULL AND m.IsActive=1 AND m.IsDeleted=0)))
+WHERE t.ShaleClientId = p.TenantId
+   OR (t.ShaleClientId IS NULL AND EXISTS (
+       SELECT 1
+       FROM dbo.CaseDateTypeSemanticRoleMappings m
+       WHERE m.CaseDateTypeId = t.Id
+         AND m.ShaleClientId IS NULL
+         AND m.IsActive = 1
+         AND m.IsDeleted = 0
+   ))
 )
 SELECT p.TenantId,p.Purpose,p.SelectionIdentity,p.OriginalSortOrder,v.Id EffectiveCaseDateTypeId,v.ShaleClientId EffectiveOwnerTenantId,v.IsActive,v.IsDeleted,
  CASE WHEN v.Id IS NULL THEN 'NO_RUNTIME_VISIBLE_DEFINITION' WHEN v.IsDeleted=1 THEN 'DELETED_EFFECTIVE_WINNER' WHEN v.IsActive=0 THEN 'INACTIVE_EFFECTIVE_WINNER' ELSE 'ELIGIBLE' END Finding

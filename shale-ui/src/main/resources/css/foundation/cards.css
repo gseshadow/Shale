@@ -108,7 +108,11 @@
 
 /* Task Card: priority owns the restrained card wash; status remains the labelled
  * database-colored pill and due proximity remains the narrow, labelled rail. */
-.task-card { -fx-alignment: top-left; }
+.task-card {
+    -fx-alignment: top-left;
+    -fx-border-color: -shale-color-card-hover-border;
+    -fx-border-width: 1.25;
+}
 .task-card:pressed { -fx-opacity: 0.94; }
 .task-card:focused {
     -fx-border-color: -shale-color-border-focus;
@@ -125,8 +129,13 @@
     -fx-text-fill: -shale-color-text-warning;
 }
 .task-card__title { -fx-text-fill: -shale-color-text-primary; }
-.task-card__creator { -fx-text-fill: -shale-color-text-muted; }
-.task-card__metadata { -fx-text-fill: -shale-color-text-muted; }
+.task-card__creator {
+    -fx-text-fill: -shale-color-text-primary;
+}
+
+.task-card__metadata {
+    -fx-text-fill: -shale-color-text-primary;
+}
 .task-card__description { -fx-text-fill: -shale-color-text-secondary; }
 .task-card__completed-cue {
     -fx-font-weight: 700;
