@@ -304,8 +304,19 @@ public final class UserController {
 		System.out.println("[TRACE ASSIGNED_CASES][UserController.init] selectedUserId=" + userId);
 	}
 
+	private boolean firmWideRoleRefreshSubscribed;
+	private FirmWideRoleDefinitionRefresh.Listener firmWideRoleRefreshListener;
+
 	@FXML
 	private void initialize() {
+		if (!firmWideRoleRefreshSubscribed) {
+			firmWideRoleRefreshSubscribed = true;
+			firmWideRoleRefreshListener = tenantId -> {
+				if (currentUser != null && currentUser.shaleClientId() == tenantId) refreshRolesAsync();
+			};
+			FirmWideRoleDefinitionRefresh.subscribe(firmWideRoleRefreshListener);
+		}
+
 		if (editButton != null) {
 			editButton.setOnAction(e -> onEdit());
 			setVisibleManaged(editButton, false);

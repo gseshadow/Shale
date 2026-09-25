@@ -6,7 +6,7 @@ constructed only after its Settings action passes the existing authorization/con
 
 ## Shared window contract
 
-Ten managers use `DefinitionManagementSession` and `DefinitionManagementWindow`. They remain JavaFX `Dialog`
+Eleven managers use `DefinitionManagementSession` and `DefinitionManagementWindow`. They remain JavaFX `Dialog`
 windows owned by the launching window with `WINDOW_MODAL` modality. `AppDialogs.applySecondaryDialogShell`
 owns the one canonical title and registers the `DialogPane` weakly with `ThemeManager`; the content therefore
 inherits the authenticated theme immediately and follows later Light/Dark changes. The shared shell is 900 by
@@ -32,6 +32,7 @@ Feature panes retain their own authoritative state, editors, commands, confirmat
 | Contact Classifications | `onManageContactClassifications` → `ContactClassificationManagementLauncher` → `ContactClassificationAdminPane` | family tabs/cards; optional historical toggle; modal editor; inline state feedback | Add, Edit/Save, Activate, Deactivate, Remove, Restore/Restore Override, Reset to Global, Refresh; administrator gate | All three families, abbreviation/order, overlays, assignment compatibility, RowVer, and database colors retained. |
 | Organization Types | `onManageOrganizationTypes` → `OrganizationTypeManagementLauncher` → `OrganizationTypeAdminPane` | active/inactive/removed card regions; modal editor; inline status | Add, Edit/Save, Activate, Deactivate, Remove, Restore, Refresh; administrator gate | SystemKey, description, color, order, overlay ownership, RowVer, and legacy ID compatibility retained. |
 | User Management | `onManageUsers` → `UserManagementLauncher` → `UserManagementPane` | independently scrolling `TableView`; search and inactive filter; add/edit/reset dialogs; footer status | Add User, Edit/Save Changes, Deactivate/Reactivate, Remove from Tenant, Reset Password, Cancel, Refresh; administrator/context gate | Fixed viewport mode, tenant isolation, password contract, RowVer updates, and confirmations unchanged. |
+| Firm-wide Roles | `onManageFirmWideRoles` → `FirmWideRoleManagementLauncher` → `FirmWideRoleAdminPane` | definition cards; active/inactive/deleted status; modal name editor; inline state feedback | Add, Rename, Activate, Deactivate, Delete, Refresh; administrator/context gate | Protected Administrator/Attorney membership remains flag-owned; tenant-defined lifecycle uses UserServicePort, RowVer, tenant/actor authorization, and existing transactional entity-action audits. Assignment history remains intact. |
 | Audit Log | `onViewAuditLog` → `SceneManager.showAuditLogViewer` → `audit-log-viewer.fxml` / `AuditLogViewerController` | routed read-only `TableView`; mode and six existing filters; status near toolbar | Apply, Clear Filters; administrator gate | Intentionally remains an embedded routed pane rather than a modal. Query, tenant scope, newest-first ordering, 500-row limit, and read-only behavior remain unchanged; duplicate content title removed because the route shell owns it. |
 
 Appearance, Notification Preferences, and Protected Case Date Mappings remain inline Settings content and are

@@ -28,7 +28,7 @@ import javafx.scene.layout.VBox;
 
 final class DefinitionManagementVisibilityTest {
     private static final String[] ROWS = {"caseDatesRow", "contactClassificationsRow", "organizationTypesRow",
-            "linkTypesRow", "requestFieldsRow", "caseTeamRolesRow", "practiceAreasRow"};
+            "linkTypesRow", "requestFieldsRow", "caseTeamRolesRow", "practiceAreasRow", "firmWideRolesRow"};
 
     @BeforeAll static void toolkit() { assumeTrue(hasDisplay()); JavaFxTestSupport.ensureToolkitStarted(); }
 

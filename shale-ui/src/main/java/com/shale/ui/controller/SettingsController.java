@@ -12,6 +12,7 @@ import com.shale.core.service.MaterialRequestServicePort;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.data.dao.UserDao;
+import com.shale.data.service.adapter.UserServiceAdapter;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.spellcheck.UserDictionarySession;
 import com.shale.ui.component.SettingsManagementRow;
@@ -121,6 +122,8 @@ public final class SettingsController {
 	@FXML private ToggleButton lightThemeButton, darkThemeButton;
 	@FXML private Label appearanceStatusLabel;
 	@FXML private SettingsManagementRow userManagementRow;
+	@FXML private SettingsManagementRow firmWideRolesRow;
+	private Button manageFirmWideRolesButton;
 	@FXML private VBox personalGroup, caseConfigurationGroup, requestConfigurationGroup,
 			contactOrganizationConfigurationGroup, administrationGroup;
 
@@ -187,6 +190,7 @@ public final class SettingsController {
 		bind(notificationPreferencesRow, event -> toggleInline(notificationPreferencesContent, notificationPreferencesRow, false));
 		bind(appearanceRow, event -> toggleInline(appearanceContent, appearanceRow, false));
 		bind(userManagementRow, this::onManageUsers);
+		manageFirmWideRolesButton = bind(firmWideRolesRow, this::onManageFirmWideRoles);
 		bind(caseDateMappingsRow, event -> {
 			boolean opening = !caseDateRoleMappingsContent.isManaged();
 			toggleInline(caseDateRoleMappingsContent, caseDateMappingsRow, false);
@@ -782,6 +786,14 @@ public final class SettingsController {
 	}
 
 	@FXML
+	private void onManageFirmWideRoles(ActionEvent event) {
+		if (!requireAdminLookupManagement("Firm-wide Roles") || userDao == null) return;
+		new FirmWideRoleManagementLauncher(new UserServiceAdapter(userDao), settingsLoadExecutor)
+				.open(settingsWindow(event), requireTenantId(), requireActorUserId(), result -> {
+					if (result.changed()) FirmWideRoleDefinitionRefresh.publish(requireTenantId());
+				});
+	}
+
 	private void onManageUsers(ActionEvent event) {
 		if (!hasAdminContext() || userDao == null) return;
 		final int tenantId = requireTenantId();
@@ -857,6 +869,8 @@ public final class SettingsController {
 		setVisibleManaged(auditLogRow, admin);
 		setVisibleManaged(caseDateMappingsRow, admin && caseService != null);
 		setVisibleManaged(userManagementRow, hasAdminContext() && userDao != null);
+		ControlAvailability.apply(manageFirmWideRolesButton, firmWideRolesRow,
+				hasAdminContext() && userDao != null, this::onManageFirmWideRoles);
 		if (!admin) {
 			setVisibleManaged(caseDateRoleMappingsContent, false);
 		}
