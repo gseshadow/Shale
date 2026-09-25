@@ -37,9 +37,12 @@ final class CaseDatePresentationConfigurationContractTest {
     @Test void resolverMatchesGlobalOrTenantStoredTypeWithoutRewritingAndKeepsHistoryReadable()throws Exception{
         String s=read("shale-data/src/main/java/com/shale/data/dao/CaseDatePresentationConfigurationDao.java");
         assertAll(
-          ()->assertTrue(s.contains("stored.ShaleClientId=c.ShaleClientId OR stored.ShaleClientId IS NULL")),
+          ()->assertTrue(s.contains("stored.ShaleClientId=? OR stored.ShaleClientId IS NULL")),
           ()->assertTrue(s.contains("LOWER(LTRIM(RTRIM(stored.SystemKey)))=SUBSTRING(s.SelectionIdentity,8,160)")),
           ()->assertTrue(s.contains("ORDER BY cd.StartsAt,cd.Id")),
+          ()->assertTrue(s.contains("NOT EXISTS(SELECT 1 FROM dbo.CaseOverviewConfigurations"), "missing parent inherits the firm Overview default"),
+          ()->assertTrue(s.contains("JOIN dbo.CaseOverviewConfigurations o"), "an existing parent, including one with zero children, overrides the default"),
+          ()->assertTrue(s.contains("resolveForCases(Collection"), "collection reads must be set based"),
           ()->assertFalse(s.contains("UPDATE dbo.CaseDates")),
           ()->assertTrue(s.contains("CASE WHEN t.IsActive=1 AND t.IsDeleted=0 THEN 0 ELSE 1 END Historical")),
           ()->assertTrue(s.contains("not active and tenant-effective")));
@@ -76,7 +79,8 @@ final class CaseDatePresentationConfigurationContractTest {
           ()->assertTrue(port.contains("Case Date presentation configuration is unavailable.")),
           ()->assertTrue(adapter.contains("requireCaseDatePresentationConfigurationDao().get(t,a,p)")),
           ()->assertTrue(adapter.contains("requireCaseDatePresentationConfigurationDao().replace(c)")),
-          ()->assertTrue(adapter.contains("requireCaseDatePresentationConfigurationDao().resolve(caseId,t,a,p)")));
+          ()->assertTrue(adapter.contains("requireCaseDatePresentationConfigurationDao().resolve(caseId,t,a,p)")),
+          ()->assertTrue(adapter.contains("resolveForCases(ids,t,a,p)")));
     }
 
     @Test void verificationIsRowLevelAndAuditVocabularyIsForwardOnly()throws Exception{

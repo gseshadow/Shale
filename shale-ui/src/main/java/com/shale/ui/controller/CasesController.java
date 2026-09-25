@@ -889,6 +889,8 @@ public final class CasesController {
 				List<CaseCardVm> newItems = page.items().stream()
 						.map(this::toViewModel)
 						.toList();
+				var cardDates=caseSummaryDao.resolveCardDates(newItems.stream().map(v->v.id).toList(),tenantId,appState.getUserId());
+				newItems.forEach(v->v.presentationDates=toPresentationDates(cardDates.getOrDefault(v.id,List.of())));
 				PerfLog.logDone("DAO_MAP", "operation=cases-load phase=projection-merge-dto-map pageIndex="
 						+ pageToLoad + " resultCount=" + newItems.size(), mapStartNanos);
 				PerfLog.logDone("CTRL", "operation=cases-load boundary=complete-background loadGeneration="
@@ -1253,8 +1255,14 @@ public final class CasesController {
 				vm.nonEngagementLetterSent,
 				vm.primaryStatusName,
 				vm.primaryStatusColor,
-				vm.practiceAreaColor
+				vm.practiceAreaColor,
+				vm.presentationDates
 		));
+	}
+
+	private static List<CaseCardFactory.PresentationDate> toPresentationDates(List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> values){
+		return values.stream().filter(v->v.caseDateId()!=null&&v.startsAt()!=null).map(v->new CaseCardFactory.PresentationDate(
+				v.selectionIdentity(),v.displaySystemKey(),v.displayName(),v.startsAt().toLocalDate(),false)).toList();
 	}
 
 	private static void runOnFx(Runnable runnable) {
@@ -1299,6 +1307,7 @@ public final class CasesController {
 		final String description;
 		final LocalDate dateOfIncident;
 		final LocalDate tortClaimsNoticeDeadline;
+		List<CaseCardFactory.PresentationDate> presentationDates=List.of();
 
 		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId, String responsibleAttorney,
 				String responsibleAttorneyColor, Boolean nonEngagementLetterSent, String primaryStatusName, String primaryStatusColor, String practiceAreaColor, String clientName,

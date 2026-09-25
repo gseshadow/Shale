@@ -1,8 +1,11 @@
 package com.shale.ui.component;
 
+import com.shale.ui.component.factory.CaseCardFactory;
+
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
+import java.util.List;
 import java.util.function.Consumer;
 
 import javafx.geometry.Insets;
@@ -255,6 +258,24 @@ public class CaseCard extends VBox {
 		tortNoticeLabel.setManaged(show);
 		tortNoticeLabel.setVisible(show);
 		refreshTortNoticeStyle();
+	}
+
+	/** Replaces the legacy fixed date rows with the tenant's ordered card presentation. */
+	public void setPresentationDates(List<CaseCardFactory.PresentationDate> dates) {
+		datesBox.getChildren().clear();
+		for (CaseCardFactory.PresentationDate date : dates == null ? List.<CaseCardFactory.PresentationDate>of() : dates) {
+			if (date == null || date.date() == null) continue;
+			Label label = new Label(date.displayName() + ": " + date.date());
+			label.getStyleClass().addAll("case-card__date", "shale-metadata");
+			String key = date.systemKey() == null ? "" : date.systemKey().strip().toLowerCase(Locale.ROOT);
+			if (key.equals("statute_of_limitations") || key.equals("tort_notice_deadline"))
+				label.getStyleClass().add("case-card__deadline");
+			if (date.pendingConfirmation()) {
+				label.setText(label.getText() + " · Pending confirmation");
+				label.getStyleClass().add("case-card__date-pending");
+			}
+			datesBox.getChildren().add(label);
+		}
 	}
 
 	/**

@@ -16,6 +16,8 @@ import java.util.Objects;
 import com.shale.core.dto.CaseSummaryProjection;
 import com.shale.core.dto.CaseStatusReportRowDto;
 import com.shale.core.dto.ReportCaseDetailRowDto;
+import com.shale.core.dto.SelectedCaseDateOccurrenceDto;
+import com.shale.core.model.CaseDatePresentationPurpose;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.semantics.RoleSemantics;
 import org.slf4j.Logger;
@@ -107,6 +109,12 @@ public final class CaseSummaryDao {
 
 	public CaseSummaryDao(DbSessionProvider db) {
 		this.db = Objects.requireNonNull(db, "db");
+	}
+
+	/** One bounded presentation query for a complete desktop card page/collection. */
+	public java.util.Map<Long,List<SelectedCaseDateOccurrenceDto>> resolveCardDates(
+			java.util.Collection<? extends Number> caseIds,int tenant,int actor) {
+		return new CaseDatePresentationConfigurationDao(db).resolveForCases(caseIds,tenant,actor,CaseDatePresentationPurpose.CASE_CARD);
 	}
 
 	/** Status-grain aggregate for the desktop report; eligibility is shared with its detail query. */

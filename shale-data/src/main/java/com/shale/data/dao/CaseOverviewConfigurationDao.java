@@ -18,6 +18,7 @@ public final class CaseOverviewConfigurationDao {
             "intake", "statute_of_limitations", "tort_notice_deadline");
     private final DbSessionProvider db;
     private final CaseDateDao caseDates;
+    private final CaseDatePresentationConfigurationDao presentationDefaults;
     private final EntityActionAuditDao audits;
 
     public CaseOverviewConfigurationDao(DbSessionProvider db) {
@@ -25,6 +26,7 @@ public final class CaseOverviewConfigurationDao {
     }
     CaseOverviewConfigurationDao(DbSessionProvider db, CaseDateDao caseDates, EntityActionAuditDao audits) {
         this.db=Objects.requireNonNull(db); this.caseDates=Objects.requireNonNull(caseDates); this.audits=Objects.requireNonNull(audits);
+        this.presentationDefaults=new CaseDatePresentationConfigurationDao(db);
     }
 
     public CaseOverviewDateConfigurationDto get(long caseId,int tenant,int actor) {
@@ -32,7 +34,7 @@ public final class CaseOverviewConfigurationDao {
         try(Connection con=db.requireConnection()) {
             verifyTenant(con,tenant); validateActor(con,tenant,actor); validateCase(con,tenant,caseId);
             Config config=findConfig(con,tenant,caseId);
-            if(config==null) return new CaseOverviewDateConfigurationDto(caseId,false,defaults(effective),null);
+            if(config==null) return new CaseOverviewDateConfigurationDto(caseId,false,firmOverviewDefaults(tenant,actor),null);
             return new CaseOverviewDateConfigurationDto(caseId,true,readSelected(con,tenant,config.id,effective),config.rowVer);
         } catch(SQLException e){throw failure(e);}
     }
@@ -43,7 +45,7 @@ public final class CaseOverviewConfigurationDao {
             verifyTenant(con,tenant); validateAdmin(con,tenant,actor);
             CaseIntake intake=readIntake(con,tenant,caseId); Config config=findConfig(con,tenant,caseId);
             CaseOverviewDateConfigurationDto resolved=config==null
-                    ?new CaseOverviewDateConfigurationDto(caseId,false,defaults(effective),null)
+                    ?new CaseOverviewDateConfigurationDto(caseId,false,firmOverviewDefaults(tenant,actor),null)
                     :new CaseOverviewDateConfigurationDto(caseId,true,readSelected(con,tenant,config.id,effective),config.rowVer);
             return administration(resolved,effective,intake);
         } catch(SQLException e){throw failure(e);}
@@ -134,6 +136,10 @@ public final class CaseOverviewConfigurationDao {
 
     static void rejectDuplicates(List<Integer> ids){if(ids==null)throw new IllegalArgumentException("orderedCaseDateTypeIds is required.");if(new HashSet<>(ids).size()!=ids.size()||ids.stream().anyMatch(Objects::isNull))throw new IllegalArgumentException("Duplicate Case Date Types are not allowed.");}
     static List<EffectiveCaseDateTypeDto> defaults(List<EffectiveCaseDateTypeDto> types){Map<String,EffectiveCaseDateTypeDto> byKey=new HashMap<>();for(var t:types)if(t.systemKey()!=null)byKey.put(t.systemKey().toLowerCase(Locale.ROOT),t);return DEFAULT_KEYS.stream().map(byKey::get).filter(Objects::nonNull).toList();}
+    private List<EffectiveCaseDateTypeDto> firmOverviewDefaults(int tenant,int actor){
+        return presentationDefaults.get(tenant,actor,com.shale.core.model.CaseDatePresentationPurpose.CASE_OVERVIEW)
+                .selections().stream().map(com.shale.core.dto.CaseDatePresentationSelectionDto::displayType).toList();
+    }
     private record Config(long id,byte[] rowVer){} private record CaseIntake(Integer userId,String name,boolean active,byte[] rowVer){} private record User(int id,String name){}
     private static CaseOverviewAdministrationDto administration(CaseOverviewDateConfigurationDto config,List<EffectiveCaseDateTypeDto> types,CaseIntake intake){return new CaseOverviewAdministrationDto(config,types,intake.userId,intake.name,intake.userId==null||intake.active,intake.rowVer);}
     private static Config findConfig(Connection c,int t,long caseId)throws SQLException{try(PreparedStatement p=c.prepareStatement("SELECT Id,RowVer FROM dbo.CaseOverviewConfigurations WHERE ShaleClientId=? AND CaseId=?")){p.setInt(1,t);p.setLong(2,caseId);try(ResultSet r=p.executeQuery()){return r.next()?new Config(r.getLong(1),r.getBytes(2)):null;}}}
