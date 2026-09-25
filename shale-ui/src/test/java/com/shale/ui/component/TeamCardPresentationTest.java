@@ -15,6 +15,12 @@ import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.testutil.JavaFxTestSupport;
 
+import javafx.scene.AccessibleRole;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.control.Label;
+import javafx.scene.shape.Circle;
+
 class TeamCardPresentationTest {
 
     private static final Path CARDS_CSS = Path.of("src/main/resources/css/foundation/cards.css");
@@ -69,8 +75,81 @@ class TeamCardPresentationTest {
                             "the stored light user color must drive the gradient"),
                     () -> assertTrue(light.getStyle().contains("-shale-user-name-foreground: #172033"),
                             "pale colors need the shared readable dark foreground"),
+                    () -> assertTrue(light.getStyle().contains("-shale-user-avatar-background: #FFFF00FF"),
+                            "the avatar needs the authoritative persisted light color as a solid fill"),
+                    () -> assertTrue(light.getStyle().contains("-shale-user-avatar-foreground: #172033"),
+                            "the avatar initials need the shared readable dark foreground"),
                     () -> assertTrue(dark.getStyle().contains("-shale-user-name-foreground: white"),
-                            "dark colors need the shared readable light foreground"));
+                            "dark colors need the shared readable light foreground"),
+                    () -> assertTrue(dark.getStyle().contains("-shale-user-avatar-background: #07172CFF"),
+                            "the avatar needs the authoritative persisted dark color as a solid fill"),
+                    () -> assertTrue(dark.getStyle().contains("-shale-user-avatar-foreground: white"),
+                            "dark avatar colors need the shared readable light foreground"));
+        });
+    }
+
+    @Test
+    void initialsComeFromUnicodeSafeFirstAndLastMeaningfulNameWords() {
+        JavaFxTestSupport.runAndWait(() -> {
+            UserCardFactory factory = new UserCardFactory(id -> { });
+            String[][] examples = {
+                    { "Brian Downing", "BD" },
+                    { "Isela Anchondo", "IA" },
+                    { "Pauline Guillen-Montano", "PG" },
+                    { "Assistant CCO", "AC" },
+                    { "Cher", "C" },
+                    { "  Mary   Jane   Watson  ", "MW" },
+                    { "\u2003Nora\u2003\u2003Jones\u2003", "NJ" },
+                    { "élise 李", "É李" },
+                    { "\uD801\uDC28 test", "\uD801\uDC00T" },
+                    { "", "?" }
+            };
+
+            for (int i = 0; i < examples.length; i++) {
+                UserCard card = factory.create(new UserCardModel(i, examples[i][0], "#1677F2", null),
+                        UserCardFactory.Variant.TEAM_ACCENTED);
+                Label initials = (Label) findById(card, "user-card-avatar-initials");
+                assertEquals(examples[i][1], initials.getText(),
+                        "initials must use Unicode-safe first/last meaningful name characters for " + examples[i][0]);
+                assertTrue(initials.getText().codePointCount(0, initials.getText().length()) <= 2,
+                        "initials must never exceed two Unicode characters");
+            }
+        });
+    }
+
+    @Test
+    void initialsRemainInsideTheExistingAvatarWithoutCreatingAnAccessibleTarget() {
+        JavaFxTestSupport.runAndWait(() -> {
+            UserCard card = new UserCardFactory(id -> { }).create(
+                    new UserCardModel(1, "Ada Lovelace", "#00FFFF", null),
+                    UserCardFactory.Variant.TEAM_ACCENTED);
+            Label initials = (Label) findById(card, "user-card-avatar-initials");
+            Circle circle = (Circle) findByStyleClass(card, "user-card-avatar-circle");
+
+            assertAll(
+                    () -> assertEquals(26.0, circle.getRadius(), "the existing full-card avatar size must remain unchanged"),
+                    () -> assertEquals(initials.getParent(), circle.getParent(),
+                            "StackPane must center the initials over the existing circle"),
+                    () -> assertTrue(initials.isMouseTransparent(), "initials must not change the card click target"),
+                    () -> assertFalse(initials.isFocusTraversable(), "initials must not become a keyboard target"),
+                    () -> assertEquals(AccessibleRole.NODE, initials.getAccessibleRole(),
+                            "initials must not announce a duplicate abbreviated identity"),
+                    () -> assertEquals("User: Ada Lovelace", card.getAccessibleText(),
+                            "the full card identity must remain authoritative"));
+        });
+    }
+
+    @Test
+    void initialsAreScopedToTeamAccentedCards() {
+        JavaFxTestSupport.runAndWait(() -> {
+            UserCardFactory factory = new UserCardFactory(id -> { });
+            for (UserCardFactory.Variant variant : new UserCardFactory.Variant[] {
+                    UserCardFactory.Variant.FULL, UserCardFactory.Variant.COMPACT, UserCardFactory.Variant.MINI }) {
+                UserCard card = factory.create(new UserCardModel(1, "Ada Lovelace", "#00FFFF", null), variant);
+                assertEquals(null, findById(card, "user-card-avatar-initials"),
+                        "non-Team UserCard variants must not gain the initials label: " + variant);
+                assertFalse(card.getStyleClass().contains("user-card-team-accented"));
+            }
         });
     }
 
@@ -87,6 +166,16 @@ class TeamCardPresentationTest {
                                 "invalid data must not override semantic surface or text tokens"));
             }
         });
+    }
+
+    @Test
+    void invalidColorFallbacksRemainThemeSemantic() throws Exception {
+        String css = Files.readString(CARDS_CSS);
+        assertAll(
+                () -> assertTrue(css.contains("-shale-user-avatar-background: -shale-color-avatar-neutral-background;")),
+                () -> assertTrue(css.contains("-shale-user-avatar-foreground: -shale-color-avatar-neutral-text;")),
+                () -> assertTrue(css.contains("-fx-fill: -shale-user-avatar-background;")),
+                () -> assertTrue(css.contains("-fx-text-fill: -shale-user-avatar-foreground;")));
     }
 
     @Test
@@ -118,5 +207,27 @@ class TeamCardPresentationTest {
                         "the shared entity-card contract must retain the semantic card shadow"),
                 () -> assertFalse(teamRule.matches("(?s).*#[0-9a-fA-F]{3,8}.*"),
                         "the Team rule must not introduce a fixed light-theme edge or shadow"));
+    }
+
+    private static Node findById(Node root, String id) {
+        if (id.equals(root.getId())) return root;
+        if (root instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                Node found = findById(child, id);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static Node findByStyleClass(Node root, String styleClass) {
+        if (root.getStyleClass().contains(styleClass)) return root;
+        if (root instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                Node found = findByStyleClass(child, styleClass);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 }
