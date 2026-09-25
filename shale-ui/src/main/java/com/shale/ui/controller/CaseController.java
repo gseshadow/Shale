@@ -832,6 +832,7 @@ public class CaseController {
 	private boolean partiesLoadedOnce = false;
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> caseTaskAssignedUsers = java.util.Map.of();
+	private List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> caseTaskCardDates = List.of();
 	private boolean caseTasksLoadedOnce;
 	private boolean caseTasksStale = true;
 	private boolean showCompletedCaseTasks;
@@ -4288,6 +4289,8 @@ public class CaseController {
 						activeCaseId,
 						shaleClientId,
 						selectedCaseTaskSort());
+				List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> taskCardDates = caseService.resolveCaseDatePresentation(
+						activeCaseId, shaleClientId, appState.getUserId(), com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD);
 				PerfLog.logDone("DAO", "method=loadTasksForCase page=case_view caseId=" + activeCaseId + " rows=" + (tasks == null ? 0 : tasks.size()), taskLoadStartNanos);
 				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
 						.map(CaseTaskListItemDto::id)
@@ -4313,6 +4316,7 @@ public class CaseController {
 					}
 					caseTasks = tasks == null ? List.of() : tasks;
 					caseTaskAssignedUsers = assignedByTask;
+					caseTaskCardDates = taskCardDates;
 					caseTasksLoadedOnce = true;
 					caseTasksStale = false;
 					renderTasksSection();
@@ -4396,7 +4400,7 @@ public class CaseController {
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
-					caseTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+					caseTaskAssignedUsers.getOrDefault(task.id(), List.of()), CaseCardFactory.toPresentationDates(caseTaskCardDates));
 			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.COMPACT, true));
 		}
 

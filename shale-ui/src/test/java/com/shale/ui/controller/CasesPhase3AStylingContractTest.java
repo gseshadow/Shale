@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -68,9 +69,10 @@ final class CasesPhase3AStylingContractTest {
     void factoryProducesDataDrivenTintWhileKeepingDatabaseIndicatorsAndSemanticStates() {
         JavaFxTestSupport.runAndWait(() -> {
             var factory = new CaseCardFactory(id -> { });
-            var model = new CaseCardFactory.CaseCardModel(17, "Long Case Name", LocalDate.now(),
-                    LocalDate.now().plusDays(10), LocalDate.now().plusDays(90), "Attorney", "#228855", true,
-                    "Denied", "#AA3344", "#3366AA");
+            var model = new CaseCardFactory.CaseCardModel(17, "Long Case Name", "Attorney", "#228855", true,
+                    "Denied", "#AA3344", "#3366AA", List.of(
+                    new CaseCardFactory.PresentationDate("TYPE:1", null, "Deadline", LocalDate.now().plusDays(10), false),
+                    new CaseCardFactory.PresentationDate("TYPE:2", null, "Deadline", LocalDate.now().plusDays(90), false)));
             CaseCard card = assertInstanceOf(CaseCard.class,
                     factory.create(model, CaseCardFactory.Variant.COMPACT));
 
@@ -99,8 +101,8 @@ final class CasesPhase3AStylingContractTest {
         JavaFxTestSupport.runAndWait(() -> {
             var factory = new CaseCardFactory(id -> { });
             for (String invalid : new String[] {"", "not-a-color"}) {
-                var model = new CaseCardFactory.CaseCardModel(18, "Fallback Case", null,
-                        null, null, "", "", false, "Open", invalid, "#228855");
+                var model = new CaseCardFactory.CaseCardModel(18, "Fallback Case", "", "", false,
+                        "Open", invalid, "#228855", List.of());
                 CaseCard card = assertInstanceOf(CaseCard.class,
                         factory.create(model, CaseCardFactory.Variant.COMPACT));
 

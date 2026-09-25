@@ -61,10 +61,15 @@ public final class CaseDatePresentationConfigurationDao {
           SELECT s.CaseId,s.SelectionIdentity,s.SortOrder,picked.Id,picked.CaseDateTypeId,picked.StartsAt,picked.EndsAt,picked.AllDay,
                  COALESCE(displayType.Id,picked.CaseDateTypeId),COALESCE(displayType.Name,picked.StoredName),
                  COALESCE(displayType.Color,picked.StoredColor),COALESCE(displayType.SystemKey,picked.StoredSystemKey),
-                 COALESCE(displayType.SupportsTime,picked.StoredSupportsTime,0)
+                 COALESCE(displayType.SupportsTime,picked.StoredSupportsTime,0),
+                 CASE WHEN EXISTS(SELECT 1 FROM dbo.CaseDateConfirmationTargets ct
+                   JOIN dbo.SavedValueConfirmationRequirements cr ON cr.Id=ct.ConfirmationRequirementId AND cr.ShaleClientId=ct.ShaleClientId
+                   LEFT JOIN dbo.SavedValueConfirmations cc ON cc.ConfirmationRequirementId=cr.Id AND cc.ShaleClientId=cr.ShaleClientId
+                   WHERE ct.ShaleClientId=? AND ct.CaseDateId=picked.Id AND ct.BusinessValueRevision=picked.ValueRevision
+                     AND cc.Id IS NULL) THEN 1 ELSE 0 END
           FROM selections s
           OUTER APPLY (SELECT TOP(1) cd.Id,cd.CaseDateTypeId,cd.StartsAt,cd.EndsAt,cd.AllDay,
-                         stored.Name StoredName,stored.Color StoredColor,stored.SystemKey StoredSystemKey,stored.SupportsTime StoredSupportsTime
+                         stored.Name StoredName,stored.Color StoredColor,stored.SystemKey StoredSystemKey,stored.SupportsTime StoredSupportsTime,cd.ValueRevision
             FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes stored ON stored.Id=cd.CaseDateTypeId
             WHERE cd.ShaleClientId=? AND cd.CaseId=s.CaseId AND cd.IsDeleted=0 AND
              ((s.SelectionIdentity LIKE 'SYSTEM:%%' AND stored.SystemKey IS NOT NULL
@@ -80,7 +85,7 @@ public final class CaseDatePresentationConfigurationDao {
             ORDER BY CASE WHEN x.ShaleClientId=? THEN 0 ELSE 1 END,x.Id) displayType
           ORDER BY s.CaseId,s.SortOrder,s.TieId
           """.formatted(values);
-        try(Connection con=db.requireConnection()){verifySession(con,tenant,actor,false);try(PreparedStatement ps=con.prepareStatement(sql)){int p=1;for(long id:ids)ps.setLong(p++,id);ps.setInt(p++,tenant);ps.setString(p++,purpose.name());ps.setString(p++,purpose.name());ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setString(p++,purpose.name());ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p,tenant);try(ResultSet rs=ps.executeQuery()){Map<Long,List<SelectedCaseDateOccurrenceDto>> mutable=new LinkedHashMap<>();for(long id:ids)mutable.put(id,new ArrayList<>());while(rs.next()){long caseId=rs.getLong(1);Long id=(Long)rs.getObject(4);Integer type=(Integer)rs.getObject(5);Timestamp start=rs.getTimestamp(6),end=rs.getTimestamp(7);mutable.computeIfAbsent(caseId,k->new ArrayList<>()).add(new SelectedCaseDateOccurrenceDto(rs.getString(2),rs.getInt(3),id,type,start==null?null:start.toLocalDateTime(),end==null?null:end.toLocalDateTime(),id==null?null:rs.getBoolean(8),(Integer)rs.getObject(9),rs.getString(10),rs.getString(11),rs.getString(12),rs.getBoolean(13)));}Map<Long,List<SelectedCaseDateOccurrenceDto>> out=new LinkedHashMap<>();mutable.forEach((k,v)->out.put(k,List.copyOf(v)));return Map.copyOf(out);}}}
+        try(Connection con=db.requireConnection()){verifySession(con,tenant,actor,false);try(PreparedStatement ps=con.prepareStatement(sql)){int p=1;for(long id:ids)ps.setLong(p++,id);ps.setInt(p++,tenant);ps.setString(p++,purpose.name());ps.setString(p++,purpose.name());ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setString(p++,purpose.name());ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p,tenant);try(ResultSet rs=ps.executeQuery()){Map<Long,List<SelectedCaseDateOccurrenceDto>> mutable=new LinkedHashMap<>();for(long id:ids)mutable.put(id,new ArrayList<>());while(rs.next()){long caseId=rs.getLong(1);Long id=(Long)rs.getObject(4);Integer type=(Integer)rs.getObject(5);Timestamp start=rs.getTimestamp(6),end=rs.getTimestamp(7);mutable.computeIfAbsent(caseId,k->new ArrayList<>()).add(new SelectedCaseDateOccurrenceDto(rs.getString(2),rs.getInt(3),id,type,start==null?null:start.toLocalDateTime(),end==null?null:end.toLocalDateTime(),id==null?null:rs.getBoolean(8),(Integer)rs.getObject(9),rs.getString(10),rs.getString(11),rs.getString(12),rs.getBoolean(13),rs.getBoolean(14)));}Map<Long,List<SelectedCaseDateOccurrenceDto>> out=new LinkedHashMap<>();mutable.forEach((k,v)->out.put(k,List.copyOf(v)));return Map.copyOf(out);}}}
         catch(SQLException e){throw new IllegalStateException("Case Date presentation could not be resolved.",e);}
     }
 

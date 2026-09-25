@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Function;
@@ -75,8 +76,18 @@ public final class SearchService {
 		List<Organization> organizations = provider("organizations", failures, () -> sortResults(organizationDao.searchOrganizations(searchQuery.rawQuery()), row -> scoreOrganization(row, searchQuery), Organization::getName, row -> Integer.toString(Objects.requireNonNullElse(row.getId(), 0))));
 		List<UserDao.DirectoryUserRow> users = provider("users", failures, () -> sortResults(userDao.searchUsers(shaleClientId, searchQuery.rawQuery()), row -> scoreUser(row, searchQuery), UserDao.DirectoryUserRow::displayName, row -> Integer.toString(row.id())));
 		List<TaskDao.GlobalSearchTaskRow> tasks = provider("tasks", failures, () -> sortResults(taskDao.searchTasks(shaleClientId, searchQuery.rawQuery()), row -> weightedTextScore(searchQuery, row.title(), CASE_NAME_WEIGHT), TaskDao.GlobalSearchTaskRow::title, row -> Long.toString(row.taskId())));
+		List<Long> cardCaseIds = java.util.stream.Stream.of(cases.stream().map(row -> row.summary().caseId()),
+				deletedCases.stream().map(row -> row.summary().caseId()), tasks.stream().map(TaskDao.GlobalSearchTaskRow::caseId).filter(id -> id > 0))
+				.flatMap(java.util.function.Function.identity()).distinct().toList();
+		Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> caseCardDates = providerMap("caseCardDates", failures,
+				() -> caseSummaryDao.resolveCardDates(cardCaseIds, shaleClientId, Objects.requireNonNull(currentUserId)));
 		List<CalendarEventDao.GlobalSearchCalendarEventRow> calendarEvents = provider("calendarEvents", failures, () -> sortResults(calendarEventDao.searchCalendarEvents(shaleClientId, searchQuery.rawQuery()), row -> weightedTextScore(searchQuery, row.title(), CASE_NAME_WEIGHT), CalendarEventDao.GlobalSearchCalendarEventRow::title, row -> Integer.toString(row.calendarEventId())));
-		return new SearchResults(searchQuery.rawQuery(), cases, deletedCases, contacts, organizations, users, tasks, calendarEvents, failures);
+		return new SearchResults(searchQuery.rawQuery(), cases, deletedCases, caseCardDates, contacts, organizations, users, tasks, calendarEvents, failures);
+	}
+
+	private static <K,V> Map<K,V> providerMap(String provider, List<ProviderFailure> failures, java.util.function.Supplier<Map<K,V>> loader) {
+		try { return Map.copyOf(loader.get()); }
+		catch (RuntimeException ex) { failures.add(new ProviderFailure(provider, ex.getClass().getName(), ex.getMessage())); return Map.of(); }
 	}
 
 	private ContactDao.DirectoryContactRow credentialAware(ContactDao.DirectoryContactRow row) {
@@ -272,6 +283,7 @@ public final class SearchService {
 			String query,
 			List<CaseSummaryDao.SearchCaseRow> cases,
 			List<CaseSummaryDao.DeletedCaseRow> deletedCases,
+			Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> caseCardDates,
 			List<ContactDao.DirectoryContactRow> contacts,
 			List<Organization> organizations,
 			List<UserDao.DirectoryUserRow> users,
@@ -282,6 +294,7 @@ public final class SearchService {
 			query = query == null ? "" : query;
 			cases = List.copyOf(cases == null ? List.of() : cases);
 			deletedCases = List.copyOf(deletedCases == null ? List.of() : deletedCases);
+			caseCardDates = Map.copyOf(caseCardDates == null ? Map.of() : caseCardDates);
 			contacts = List.copyOf(contacts == null ? List.of() : contacts);
 			organizations = List.copyOf(organizations == null ? List.of() : organizations);
 			users = List.copyOf(users == null ? List.of() : users);
@@ -294,7 +307,7 @@ public final class SearchService {
 		public boolean hasAnyResults() { return !(cases.isEmpty() && deletedCases.isEmpty() && contacts.isEmpty() && organizations.isEmpty() && users.isEmpty() && tasks.isEmpty() && calendarEvents.isEmpty()); }
 
 		public static SearchResults empty(String query) {
-			return new SearchResults(query, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+			return new SearchResults(query, List.of(), List.of(), Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
 		}
 	}
 	public record ProviderFailure(String provider, String exceptionClass, String message) { }

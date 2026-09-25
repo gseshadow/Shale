@@ -46,10 +46,10 @@ final class CaseCardFactoryTortNoticeTest {
         var dates=List.of(
                 new com.shale.ui.component.factory.CaseCardFactory.PresentationDate("TYPE:42",null,"Mediation",LocalDate.of(2027,2,3),false),
                 new com.shale.ui.component.factory.CaseCardFactory.PresentationDate("SYSTEM:intake","intake","Intake",LocalDate.of(2026,9,1),true));
-        var model=new com.shale.ui.component.factory.CaseCardFactory.CaseCardModel(1,"A",null,null,null,"","",false,"","","",dates);
+        var model=new com.shale.ui.component.factory.CaseCardFactory.CaseCardModel(1,"A","","",false,"","","",dates);
         assertEquals(List.of("Mediation","Intake"),model.presentationDates().stream().map(com.shale.ui.component.factory.CaseCardFactory.PresentationDate::displayName).toList());
         assertTrue(model.presentationDates().get(1).pendingConfirmation());
-        var empty=new com.shale.ui.component.factory.CaseCardFactory.CaseCardModel(1,"A",null,null,null,"","",false,"","","",List.of());
+        var empty=new com.shale.ui.component.factory.CaseCardFactory.CaseCardModel(1,"A","","",false,"","","",List.of());
         assertNotNull(empty.presentationDates(),"an explicitly empty configuration must not fall back to fixed Intake/SOL/TCN rows");
         assertTrue(empty.presentationDates().isEmpty());
     }
