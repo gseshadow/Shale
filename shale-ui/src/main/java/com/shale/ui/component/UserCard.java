@@ -8,6 +8,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Tooltip;
+import javafx.scene.AccessibleRole;
 import javafx.css.PseudoClass;
 import javafx.scene.paint.Color;
 import com.shale.ui.util.ColorUtil;
@@ -26,10 +27,15 @@ public class UserCard extends HBox {
     private Integer userId;
     private Consumer<Integer> onOpen;
     private String backgroundCss;
+    private String teamAccentStyle;
     private boolean hovered;
+    private boolean inactive;
 
     public UserCard() {
         nameLabel.setId("user-card-name-label");
+        nameLabel.getStyleClass().add("user-card-name");
+        setFocusTraversable(true);
+        setAccessibleRole(AccessibleRole.BUTTON);
         buildUiMiniDefaults();
         wireEvents();
     }
@@ -45,6 +51,7 @@ public class UserCard extends HBox {
     public void setName(String name) {
         String displayName = name == null || name.isBlank() ? "—" : name;
         nameLabel.setText(displayName);
+        updateAccessibleText();
         if (nameLabel.getTooltip() != null)
             nameLabel.getTooltip().setText(displayName);
     }
@@ -75,11 +82,40 @@ public class UserCard extends HBox {
 
     public void setSecondaryMetadata(String metadata) {
         secondaryLabel.setText(metadata == null ? "" : metadata.trim());
+        updateAccessibleText();
     }
 
     public void setInactive(boolean inactive) {
+        this.inactive = inactive;
         pseudoClassStateChanged(INACTIVE, inactive);
-        setAccessibleText((inactive ? "Inactive user: " : "User: ") + nameLabel.getText() + (secondaryLabel.getText().isBlank() ? "" : ", " + secondaryLabel.getText()));
+        updateAccessibleText();
+    }
+
+    /** Applies the Team directory's opt-in treatment without changing other UserCard callers. */
+    public void applyTeamAccent(String storedColor) {
+        String color = ColorUtil.toCssBackgroundColorOrNull(storedColor);
+        getStyleClass().addAll("user-card", "shale-entity-card", "shale-entity-card-clickable",
+                "user-card-team-accented");
+        teamAccentStyle = color == null ? null : """
+                -shale-user-accent-strong: %s;
+                -shale-user-accent-sustained: %s;
+                -shale-user-accent-medium: %s;
+                -shale-user-accent-light: %s;
+                -shale-user-accent-clear: %s;
+                -shale-user-name-foreground: %s;
+                """.formatted(
+                ColorUtil.toCssRgba(color, 0.72),
+                ColorUtil.toCssRgba(color, 0.68),
+                ColorUtil.toCssRgba(color, 0.40),
+                ColorUtil.toCssRgba(color, 0.16),
+                ColorUtil.toCssRgba(color, 0.00),
+                ColorUtil.readableTextColor(color));
+        refreshSurfaceStyle();
+    }
+
+    private void updateAccessibleText() {
+        setAccessibleText((inactive ? "Inactive user: " : "User: ") + nameLabel.getText()
+                + (secondaryLabel.getText().isBlank() ? "" : ", " + secondaryLabel.getText()));
     }
 
     private static String normalizeInitials(String value) {
@@ -172,6 +208,7 @@ public class UserCard extends HBox {
     }
 
     private void refreshSurfaceStyle() {
-        setStyle(CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
+        setStyle(getStyleClass().contains("user-card-team-accented") ? teamAccentStyle
+                : CardSurfaceStyles.cardContainerStyle(backgroundCss, hovered));
     }
 }
