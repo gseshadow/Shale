@@ -61,7 +61,8 @@ final class CaseDaoCasesGridQueryTest {
         assertTrue(query.contains("cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId"));
         assertTrue(query.contains("cd.IsDeleted=0"));
         assertTrue(query.contains("effective.SemanticRoleKey='INTAKE'"));
-        assertTrue(query.contains("effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS'"));
+        assertTrue(query.contains("LOWER(LTRIM(RTRIM(t.SystemKey)))='statute_of_limitations'"));
+        assertFalse(query.contains("effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS'"));
         assertTrue(ordering.contains("dates.IntakeDate"));
         assertTrue(ordering.contains("dates.StatuteDate"));
         for (String legacy : new String[] { "c.CallerDate", "c.DateOfInjury", "c.StatuteOfLimitations", "c.TortNoticeDeadline" })

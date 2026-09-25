@@ -192,3 +192,25 @@ There is no remaining product decision blocking the confirmation fix or this des
 implementation is blocked only on approval of the concrete schema/object names and audit entity type;
 SOL/TCN mapping retirement is additionally blocked until external report consumers are inventoried and
 the row-level verification above is clean.
+
+## Desktop SOL/TCN identity cutover (2026-09-25)
+
+The desktop list boundary now treats SOL and TCN as ordinary Case Date Type families identified by
+`SYSTEM:statute_of_limitations` and `SYSTEM:tort_notice_deadline`; it does not consult the card or
+Overview presentation selections. The cut-over paths are the legacy `CaseDao` Cases-list pagination
+boundary and the desktop `CaseSummaryDao` grid, assigned board, User Detail, deleted search, global
+search, and Contact/Organization related-case projections. These set-based projections select the
+earliest `StartsAt` (with `CaseDates.Id` as the paging-sort tie breaker where an occurrence row is
+selected), retain established null ordering and Case-id pagination tie breakers, and require an active
+tenant-effective type winner. A non-deleted tenant overlay masks the global definition even when the
+overlay is inactive; a deleted overlay falls back to the global definition. Stored historical family
+occurrences remain readable while the effective family is available.
+
+Intake continues to resolve through its protected semantic role. SOL/TCN semantic mappings also remain
+active because report/detail export projections, the desktop Documents compatibility lookup, server/React
+fixed compatibility projections and editors, confirmation-policy applicability, mapping administration,
+and migration/verification tooling still read or manage them. Those paths were deliberately not changed
+in this desktop presentation slice. The next safe boundary is a separately verified report/export and
+server compatibility cutover, followed by fixed-editor and confirmation-policy review. Mapping retirement
+is not safe until those readers and writers plus external SQL consumers have been inventoried, converted,
+and soaked with row-level verification.

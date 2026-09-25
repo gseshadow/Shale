@@ -249,8 +249,8 @@ public final class CaseSummaryDao {
 				 FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
 				OUTER APPLY (SELECT
 				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
-				 MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
-				 MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+				 MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='statute_of_limitations' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='statute_of_limitations' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+				 MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='tort_notice_deadline' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='tort_notice_deadline' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) TortDate
 				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
 				  AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
 				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
@@ -484,8 +484,8 @@ public final class CaseSummaryDao {
 				 FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
 				OUTER APPLY (SELECT
 				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
-				 MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
-				 MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+				 MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='statute_of_limitations' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='statute_of_limitations' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+				 MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='tort_notice_deadline' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='tort_notice_deadline' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) TortDate
 				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
 				  AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
 				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
@@ -599,8 +599,8 @@ public final class CaseSummaryDao {
 				 FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
 				OUTER APPLY (SELECT
 				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
-				 MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
-				 MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+				 MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='statute_of_limitations' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='statute_of_limitations' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+				 MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='tort_notice_deadline' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='tort_notice_deadline' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) TortDate
 				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
 				  AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
 				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
@@ -744,8 +744,8 @@ public final class CaseSummaryDao {
 				 FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
 				OUTER APPLY (SELECT
 				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
-				 MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
-				 MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+				 MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='statute_of_limitations' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='statute_of_limitations' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+				 MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='tort_notice_deadline' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='tort_notice_deadline' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) TortDate
 				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
 				  AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
 				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
@@ -804,8 +804,8 @@ public final class CaseSummaryDao {
 				OUTER APPLY (SELECT
 				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
 				 MAX(CASE WHEN t.SystemKey='date_of_injury' THEN CAST(cd.StartsAt AS date) END) InjuryDate,
-				 MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
-				 MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+				 MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='statute_of_limitations' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='statute_of_limitations' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+				 MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='tort_notice_deadline' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='tort_notice_deadline' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) TortDate
 				 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
 				  AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
 				 OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
@@ -921,9 +921,9 @@ public final class CaseSummaryDao {
 			 OUTER APPLY (
 			  SELECT
 			   MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
-			   MAX(CASE WHEN effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS' THEN CAST(cd.StartsAt AS date) END) StatuteDate,
+			   MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='statute_of_limitations' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='statute_of_limitations' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) StatuteDate,
 			   MAX(CASE WHEN t.SystemKey='date_of_injury' THEN CAST(cd.StartsAt AS date) END) InjuryDate,
-			   MAX(CASE WHEN effective.SemanticRoleKey='TORT_NOTICE_DEADLINE' THEN CAST(cd.StartsAt AS date) END) TortDate
+			   MIN(CASE WHEN LOWER(LTRIM(RTRIM(t.SystemKey)))='tort_notice_deadline' AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='tort_notice_deadline' AND candidate.IsDeleted=0 AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL) ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC) AND effective_type.IsActive=1 THEN CAST(cd.StartsAt AS date) END) TortDate
 			  FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
 			   AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
 			  OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
