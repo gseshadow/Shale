@@ -1837,6 +1837,8 @@ public final class UserController {
 								detail.casePrimaryStatusName(),
 								detail.casePrimaryStatusColor(),
 								detail.casePracticeAreaColor(),
+								CaseCardFactory.toPresentationDates(assignedTaskCaseDates.getOrDefault(
+										detail.caseId(), List.of())),
 								detail.title(),
 								detail.description(),
 								detail.dueAt(),

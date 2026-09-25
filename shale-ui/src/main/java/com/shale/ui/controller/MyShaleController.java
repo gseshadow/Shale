@@ -3929,6 +3929,8 @@ public final class MyShaleController {
 				summary.map(CaseTaskListItemDto::casePrimaryStatusName).orElse(""),
 				summary.map(CaseTaskListItemDto::casePrimaryStatusColor).orElse(""),
 				summary.map(CaseTaskListItemDto::casePracticeAreaColor).orElse(""),
+				CaseCardFactory.toPresentationDates(taskCaseCardDates.getOrDefault(
+						summary.map(CaseTaskListItemDto::caseId).orElse(0L), List.of())),
 				summary.map(CaseTaskListItemDto::title).orElse(""),
 				summary.map(CaseTaskListItemDto::description).orElse(""),
 				summary.map(CaseTaskListItemDto::dueAt).orElse(null),

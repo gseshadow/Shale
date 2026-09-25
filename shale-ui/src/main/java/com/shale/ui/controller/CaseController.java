@@ -97,6 +97,7 @@ import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
 import com.shale.ui.component.ColorCodedComboBox;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
+import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
@@ -4567,6 +4568,7 @@ public class CaseController {
 				summary.map(CaseTaskListItemDto::casePrimaryStatusName).orElse(""),
 				summary.map(CaseTaskListItemDto::casePrimaryStatusColor).orElse(""),
 				summary.map(CaseTaskListItemDto::casePracticeAreaColor).orElse(""),
+				CaseCardFactory.toPresentationDates(caseTaskCardDates),
 				summary.map(CaseTaskListItemDto::title).orElse(""),
 				summary.map(CaseTaskListItemDto::description).orElse(""),
 				summary.map(CaseTaskListItemDto::dueAt).orElse(null),

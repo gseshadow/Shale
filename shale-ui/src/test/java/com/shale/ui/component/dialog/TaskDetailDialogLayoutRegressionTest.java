@@ -46,7 +46,7 @@ final class TaskDetailDialogLayoutRegressionTest {
 
     private static TaskDetailDialog.TaskDetailModel modelWithTitle(String title) {
         return new TaskDetailDialog.TaskDetailModel(
-                1L, 0, "", "", "", false, "", "", "",
+                1L, 0, "", "", "", false, "", "", "", List.of(),
                 title, "", null, null, null, "Creator", List.of(), List.of(), List.of(), false);
     }
 }
