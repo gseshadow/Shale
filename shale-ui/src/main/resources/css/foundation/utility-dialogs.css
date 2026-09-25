@@ -39,3 +39,17 @@
 .enhanced-text-dialog-root .enhanced-text-area-dialog-editor:focused {
     -fx-border-color: -shale-color-border-focus;
 }
+
+/* Updater handoff uses the shared modal surface without a dismiss action. */
+.dialog-pane.update-launch-dialog {
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
+}
+.update-launch-dialog .update-launch-content {
+    -fx-background-color: -shale-color-section-surface;
+    -fx-background-radius: 12px;
+    -fx-padding: 22px;
+}
+.update-launch-dialog .progress-indicator { -fx-progress-color: -shale-color-primary-accent; }
+.update-launch-dialog .app-dialog-title { -fx-text-fill: -shale-color-text-primary; }
+.update-launch-dialog .app-dialog-message { -fx-text-fill: -shale-color-text-secondary; }
