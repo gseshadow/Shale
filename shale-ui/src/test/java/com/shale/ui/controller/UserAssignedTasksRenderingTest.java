@@ -54,6 +54,8 @@ final class UserAssignedTasksRenderingTest {
                 "The managed row and body must shrink to the viewport width and compute their full content height.");
         assertFalse(method.contains("setPrefHeight(120)") || method.contains("setMaxHeight(120)"),
                 "The assigned-task fix must not replace the defect with an oversized fixed card height.");
+        assertTrue(method.contains("8 + USER_ASSIGNED_VISUAL_BOTTOM_INSET"),
+                "Only the User Assigned Tasks variant should reserve room for the embedded card's visual shadow edge.");
     }
 
     @Test

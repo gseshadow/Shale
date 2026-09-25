@@ -46,6 +46,7 @@ public final class TaskCard extends VBox {
 	private static final DateTimeFormatter DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
 	private static final DateTimeFormatter DUE_DATE_COMPACT_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy");
 	private static final double COMPACT_CARD_WIDTH = 280;
+	private static final double USER_ASSIGNED_VISUAL_BOTTOM_INSET = 10;
 	private static final double TASK_DETAILS_TOOLTIP_MAX_WIDTH = 360;
 	private static final Duration TASK_DETAILS_TOOLTIP_HIDE_DELAY = Duration.millis(120);
 	private static final Duration TASK_DETAILS_POPUP_SHOW_DELAY = Duration.millis(400);
@@ -385,6 +386,11 @@ public final class TaskCard extends VBox {
 		myTasksMetadataBlock.setMinHeight(Region.USE_COMPUTED_SIZE);
 		myTasksMetadataBlock.setPrefHeight(Region.USE_COMPUTED_SIZE);
 		myTasksMetadataBlock.setMaxHeight(Region.USE_COMPUTED_SIZE);
+		myTasksMetadataBlock.getStyleClass().setAll("app-taskcard-user-assigned-metadata");
+		// The nested CaseCard/ContactCard shadows are part of boundsInLocal, but JavaFX
+		// intentionally excludes effects from managed layoutBounds. Extend this card's
+		// painted surface over that visual edge without changing list spacing or fixing height.
+		setPadding(new Insets(8, 10, 8 + USER_ASSIGNED_VISUAL_BOTTOM_INSET, 10));
 		renderRelatedCaseCard();
 	}
 
