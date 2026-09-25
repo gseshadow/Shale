@@ -40,7 +40,7 @@ import javafx.stage.Window;
 public final class TaskCard extends VBox {
 
 	public enum Variant {
-		FULL, MY_TASKS, COMPACT, COMPACT_FLUID, MINI
+		FULL, MY_TASKS, USER_ASSIGNED_TASKS, COMPACT, COMPACT_FLUID, MINI
 	}
 
 	private static final DateTimeFormatter DUE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
@@ -363,6 +363,31 @@ public final class TaskCard extends VBox {
 		renderRelatedCaseCard();
 	}
 
+	/**
+	 * Fluid list variant used by User View's vertically scrolling Assigned Tasks
+	 * column. Unlike the My Shale board variant, every container in this path
+	 * participates in managed, computed-height layout and can shrink to the
+	 * ScrollPane viewport after its vertical bar consumes width.
+	 */
+	public void applyUserAssignedTasks() {
+		applyMyTasks();
+		currentVariant = Variant.USER_ASSIGNED_TASKS;
+
+		setMinHeight(Region.USE_COMPUTED_SIZE);
+		setPrefHeight(Region.USE_COMPUTED_SIZE);
+		setMaxHeight(Region.USE_COMPUTED_SIZE);
+		cardRow.setMinSize(0, Region.USE_COMPUTED_SIZE);
+		cardRow.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		cardRow.setMaxSize(Double.MAX_VALUE, Region.USE_COMPUTED_SIZE);
+		bodyPane.setMinSize(0, Region.USE_COMPUTED_SIZE);
+		bodyPane.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		bodyPane.setMaxSize(Double.MAX_VALUE, Region.USE_COMPUTED_SIZE);
+		myTasksMetadataBlock.setMinHeight(Region.USE_COMPUTED_SIZE);
+		myTasksMetadataBlock.setPrefHeight(Region.USE_COMPUTED_SIZE);
+		myTasksMetadataBlock.setMaxHeight(Region.USE_COMPUTED_SIZE);
+		renderRelatedCaseCard();
+	}
+
 	public void applyFull() {
 		currentVariant = Variant.FULL;
 		fullHeaderText.getChildren().setAll(titleLabel, dueLabel);
@@ -505,7 +530,8 @@ public final class TaskCard extends VBox {
 
 	private void setFullExpanded(boolean expanded) {
 		fullExpanded = expanded;
-		if (currentVariant == Variant.FULL || currentVariant == Variant.MY_TASKS) {
+		if (currentVariant == Variant.FULL || currentVariant == Variant.MY_TASKS
+				|| currentVariant == Variant.USER_ASSIGNED_TASKS) {
 			fullExpandedContent.setManaged(expanded);
 			fullExpandedContent.setVisible(expanded);
 			expandDetailsButton.setText(expanded ? "−" : "+");
@@ -659,7 +685,7 @@ public final class TaskCard extends VBox {
 		teamSectionLabel.setStyle(sectionLabelStyle);
 		relatedCaseHost.setAlignment(Pos.CENTER_LEFT);
 		relatedCaseHost.setMinWidth(0);
-		relatedCaseHost.setMaxWidth(currentVariant == Variant.MY_TASKS ? Double.MAX_VALUE : Region.USE_PREF_SIZE);
+		relatedCaseHost.setMaxWidth(isFluidRelatedCaseVariant() ? Double.MAX_VALUE : Region.USE_PREF_SIZE);
 		assigneeHost.setAlignment(Pos.CENTER_LEFT);
 		assigneeHost.setMaxWidth(Region.USE_PREF_SIZE);
 	}
@@ -679,7 +705,7 @@ public final class TaskCard extends VBox {
 						relatedCaseResponsibleAttorneyColor, relatedCaseNonEngagementLetterSent,
 						relatedCasePrimaryStatusName, relatedCasePrimaryStatusColor, relatedCasePracticeAreaColor),
 				CaseCardFactory.Variant.EMBEDDED);
-		if (caseCard instanceof Region region && currentVariant == Variant.MY_TASKS) {
+		if (caseCard instanceof Region region && isFluidRelatedCaseVariant()) {
 			region.setMinWidth(0);
 			region.setPrefWidth(Region.USE_COMPUTED_SIZE);
 			region.setMaxWidth(Double.MAX_VALUE);
@@ -697,6 +723,10 @@ public final class TaskCard extends VBox {
 		relatedCaseHost.setVisible(true);
 		caseSection.setManaged(true);
 		caseSection.setVisible(true);
+	}
+
+	private boolean isFluidRelatedCaseVariant() {
+		return currentVariant == Variant.MY_TASKS || currentVariant == Variant.USER_ASSIGNED_TASKS;
 	}
 
 	private void refreshSurfaceStyle() {
