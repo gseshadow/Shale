@@ -1478,7 +1478,7 @@ public final class UserController {
 				row.dueAt(),
 				row.completedAt(),
 				assignedTaskUsers.getOrDefault(row.taskId(), List.of()));
-		return taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true);
+		return taskCardFactory.create(model, TaskCardFactory.Variant.USER_ASSIGNED_TASKS, true);
 	}
 
 	private String normalizedAssignedTaskQuery() {

@@ -16,7 +16,7 @@ public final class TaskCardFactory {
     public static final String COMPLETED_STATUS_FALLBACK_COLOR = "#DCFCE7";
 
     public enum Variant {
-        FULL, MY_TASKS, COMPACT, COMPACT_FLUID, MINI
+        FULL, MY_TASKS, USER_ASSIGNED_TASKS, COMPACT, COMPACT_FLUID, MINI
     }
 
     public record TaskCardModel(
@@ -131,6 +131,7 @@ public final class TaskCardFactory {
         switch (variant) {
             case FULL -> card.applyFull();
             case MY_TASKS -> card.applyMyTasks();
+            case USER_ASSIGNED_TASKS -> card.applyUserAssignedTasks();
             case COMPACT -> card.applyCompact();
             case COMPACT_FLUID -> card.applyCompactFluid();
             case MINI -> card.applyMini();
