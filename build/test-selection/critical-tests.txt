@@ -4,6 +4,7 @@ com.shale.data.service.adapter.AuthServiceAdapterTest
 com.shale.data.dao.CaseAggregateTransactionTest
 com.shale.data.dao.CaseDateDaoMutationContractTest
 com.shale.data.dao.CaseLifecycleAuditContractTest
+com.shale.data.dao.FieldConfirmationDaoTriggerIntegrationTest
 com.shale.data.dao.ContactAggregateMutationContractTest
 com.shale.data.dao.ContactMutationContractTest
 com.shale.data.dao.EntityActionAuditEventTest
