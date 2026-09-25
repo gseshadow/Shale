@@ -42,8 +42,8 @@ final class CaseSummaryUserDetailContractTest {
         assertAll(
             ()->assertTrue(body.contains("FROM dbo.CaseDates")),
             ()->assertTrue(body.contains("CaseDateTypeSemanticRoleMappings")),
-            ()->assertTrue(body.contains("m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL")),
-            ()->assertTrue(body.contains("CASE WHEN m.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,m.Id DESC")),
+            ()->assertTrue(body.contains("candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL")),
+            ()->assertTrue(body.contains("CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC")),
             ()->assertTrue(body.contains("t.SystemKey='date_of_injury'")),
             ()->assertTrue(body.contains("cd.IsDeleted=0")),
             ()->assertTrue(body.contains("localDate(rs,\"IntakeDate\")")),
