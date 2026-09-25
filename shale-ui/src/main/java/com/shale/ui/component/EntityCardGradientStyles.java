@@ -11,16 +11,21 @@ final class EntityCardGradientStyles {
 
 	static String caseStrengthGradient(String cssColor, boolean embeddedMini) {
 	    if (embeddedMini) {
-	        return "linear-gradient(to right, "
-	                + "-shale-color-elevated-surface 0%, "
-	                + "-shale-color-elevated-surface 76%, "
-	                + cssColor + " 100%)";
+	        return "-shale-color-elevated-surface, "
+	                + "linear-gradient(to right, "
+	                + ColorUtil.toCssRgba(cssColor, 0.48) + " 0%, "
+	                + ColorUtil.toCssRgba(cssColor, 0.44) + " 70%, "
+	                + ColorUtil.toCssRgba(cssColor, 0.20) + " 92%, "
+	                + ColorUtil.toCssRgba(cssColor, 0.00) + " 100%)";
 	    }
 
-	    return "linear-gradient(to right, "
-	            + "-shale-color-elevated-surface 0%, "
-	            + "-shale-color-elevated-surface 30%, "
-	            + cssColor + " 100%)";
+	    return "-shale-color-elevated-surface, "
+	            + "linear-gradient(to right, "
+	            + ColorUtil.toCssRgba(cssColor, 0.58) + " 0%, "
+	            + ColorUtil.toCssRgba(cssColor, 0.54) + " 65%, "
+	            + ColorUtil.toCssRgba(cssColor, 0.34) + " 84%, "
+	            + ColorUtil.toCssRgba(cssColor, 0.14) + " 96%, "
+	            + ColorUtil.toCssRgba(cssColor, 0.00) + " 100%)";
 	}
 
 	private static String tintStop(String cssColor, double weight) {

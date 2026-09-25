@@ -9,7 +9,7 @@ import com.shale.ui.util.ColorUtil;
 public class UserCardFactory {
 
 	public enum Variant {
-		FULL, COMPACT, MINI
+		FULL, COMPACT, MINI, TEAM_ACCENTED
 	}
 
 	public record UserCardModel(
@@ -40,6 +40,10 @@ public class UserCardFactory {
 		case FULL -> card.applyFull();
 		case COMPACT -> card.applyCompact();
 		case MINI -> card.applyMini();
+		case TEAM_ACCENTED -> {
+			card.applyFull();
+			card.applyTeamAccent(model.colorCss());
+		}
 		}
 
 		return card;

@@ -99,6 +99,21 @@ public interface CaseServicePort {
 		throw new UnsupportedOperationException("Case Overview date configuration mutation is unavailable.");
 	}
 
+	default com.shale.core.dto.CaseDatePresentationConfigurationDto getCaseDatePresentationConfiguration(
+			int shaleClientId, int actorUserId, com.shale.core.model.CaseDatePresentationPurpose purpose) {
+		throw new UnsupportedOperationException("Case Date presentation configuration is unavailable.");
+	}
+
+	default com.shale.core.dto.CaseDatePresentationConfigurationDto replaceCaseDatePresentationConfiguration(
+			ReplaceCaseDatePresentationConfigurationCommand command) {
+		throw new UnsupportedOperationException("Case Date presentation configuration mutation is unavailable.");
+	}
+
+	default List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> resolveCaseDatePresentation(
+			long caseId, int shaleClientId, int actorUserId, com.shale.core.model.CaseDatePresentationPurpose purpose) {
+		throw new UnsupportedOperationException("Case Date presentation resolution is unavailable.");
+	}
+
 	default IntakeTakenByMutationResult updateIntakeTakenBy(UpdateIntakeTakenByCommand command) {
 		throw new UnsupportedOperationException("Intake By mutation is unavailable.");
 	}
@@ -533,6 +548,16 @@ public interface CaseServicePort {
 			expectedRowVer = copyRowVer(expectedRowVer);
 		}
 		@Override public byte[] expectedRowVer() { return copyRowVer(expectedRowVer); }
+	}
+
+	record ReplaceCaseDatePresentationConfigurationCommand(int shaleClientId, int actorUserId,
+			com.shale.core.model.CaseDatePresentationPurpose purpose, List<String> orderedSelectionIdentities,
+			byte[] expectedRowVer) {
+		public ReplaceCaseDatePresentationConfigurationCommand {
+			orderedSelectionIdentities=orderedSelectionIdentities==null?List.of():List.copyOf(orderedSelectionIdentities);
+			expectedRowVer=copyRowVer(expectedRowVer);
+		}
+		@Override public byte[] expectedRowVer(){return copyRowVer(expectedRowVer);}
 	}
 
 	record UpdateIntakeTakenByCommand(int shaleClientId, int actorUserId, long caseId,

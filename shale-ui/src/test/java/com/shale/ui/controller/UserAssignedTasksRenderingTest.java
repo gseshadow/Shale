@@ -11,13 +11,15 @@ import org.junit.jupiter.api.Test;
 final class UserAssignedTasksRenderingTest {
 
     @Test
-    void userAssignedTasksReuseMyShaleFullSizedTaskCardFactoryPath() throws Exception {
+    void userAssignedTasksUseDedicatedFluidFullSizedTaskCardFactoryPath() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/UserController.java"));
 
         assertTrue(source.contains("new TaskCardFactory(this::openTask, this::onToggleAssignedTaskComplete, onOpenCase, this::onOpenUserFromTask)"),
                 "User assigned tasks should keep the shared task factory wired to task detail, completion, case, and user navigation handlers.");
-        assertTrue(source.contains("taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true)"),
-                "User assigned tasks should use the same full-sized MY_TASKS variant used by the My Shale task grid.");
+        assertTrue(source.contains("taskCardFactory.create(model, TaskCardFactory.Variant.USER_ASSIGNED_TASKS, true)"),
+                "User assigned tasks need the dedicated computed-height, viewport-width list variant.");
+        assertFalse(source.contains("taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true)"),
+                "User assigned-task sizing must not change the My Shale board variant.");
         assertFalse(source.contains("create(model, TaskCardFactory.Variant.COMPACT_FLUID"),
                 "User assigned tasks should not use the old compact-fluid card path.");
     }
@@ -34,6 +36,26 @@ final class UserAssignedTasksRenderingTest {
                 "The actual assigned task title should be passed into TaskCardModel as the card title.");
         assertFalse(method.contains("\"Task #\" + row.taskId()"),
                 "Task number should not be used as a fallback heading when a valid title exists.");
+    }
+
+    @Test
+    void assignedTaskVariantOwnsComputedHeightWithoutChangingMyShaleVariant() throws Exception {
+        String taskCard = Files.readString(Path.of("src/main/java/com/shale/ui/component/TaskCard.java"));
+        int methodStart = taskCard.indexOf("public void applyUserAssignedTasks()");
+        int methodEnd = taskCard.indexOf("public void applyFull()", methodStart);
+        assertTrue(methodStart >= 0 && methodEnd > methodStart, "Expected the User Assigned Tasks variant to exist.");
+        String method = taskCard.substring(methodStart, methodEnd);
+
+        assertTrue(method.contains("setPrefHeight(Region.USE_COMPUTED_SIZE)")
+                        && method.contains("setMaxHeight(Region.USE_COMPUTED_SIZE)"),
+                "The card must derive its height from managed title, due/status, case, attorney, and optional metadata content.");
+        assertTrue(method.contains("cardRow.setMinSize(0, Region.USE_COMPUTED_SIZE)")
+                        && method.contains("bodyPane.setMinSize(0, Region.USE_COMPUTED_SIZE)"),
+                "The managed row and body must shrink to the viewport width and compute their full content height.");
+        assertFalse(method.contains("setPrefHeight(120)") || method.contains("setMaxHeight(120)"),
+                "The assigned-task fix must not replace the defect with an oversized fixed card height.");
+        assertTrue(method.contains("8 + USER_ASSIGNED_VISUAL_BOTTOM_INSET"),
+                "Only the User Assigned Tasks variant should reserve room for the embedded card's visual shadow edge.");
     }
 
     @Test

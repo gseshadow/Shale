@@ -106,9 +106,59 @@
     -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 24, 0.2, 0, 8);
 }
 
+/* Team View opts the shared UserCard into an authoritative user-color wash.
+ * JavaFX paints later background layers above earlier ones, so the opaque
+ * semantic surface must precede the transparent dynamic gradient. */
+.user-card-team-accented {
+    -shale-user-accent-strong: transparent;
+    -shale-user-accent-sustained: transparent;
+    -shale-user-accent-medium: transparent;
+    -shale-user-accent-light: transparent;
+    -shale-user-accent-clear: transparent;
+    -shale-user-name-foreground: -shale-color-text-primary;
+    -shale-user-avatar-background: -shale-color-avatar-neutral-background;
+    -shale-user-avatar-foreground: -shale-color-avatar-neutral-text;
+    -fx-background-color:
+        -shale-color-elevated-surface,
+        linear-gradient(to right,
+            -shale-user-accent-strong 0%,
+            -shale-user-accent-sustained 65%,
+            -shale-user-accent-medium 84%,
+            -shale-user-accent-light 96%,
+            -shale-user-accent-clear 100%);
+    -fx-border-color: -shale-color-card-hover-border;
+    -fx-border-width: 1.25;
+}
+.user-card-team-accented:hover {
+    -fx-background-color:
+        -shale-color-elevated-surface,
+        linear-gradient(to right,
+            -shale-user-accent-strong 0%,
+            -shale-user-accent-sustained 65%,
+            -shale-user-accent-medium 84%,
+            -shale-user-accent-light 96%,
+            -shale-user-accent-clear 100%);
+}
+.user-card-team-accented .user-card-name {
+    -fx-text-fill: -shale-user-name-foreground;
+}
+.user-card-team-accented .user-card-avatar-circle {
+    -fx-fill: -shale-user-avatar-background;
+    -fx-stroke: -shale-color-border-subtle;
+}
+.user-card-team-accented .user-card-avatar-initials {
+    -fx-font-size: 16px;
+    -fx-font-weight: 800;
+    -fx-text-fill: -shale-user-avatar-foreground;
+}
+
 /* Task Card: priority owns the restrained card wash; status remains the labelled
  * database-colored pill and due proximity remains the narrow, labelled rail. */
-.task-card { -fx-alignment: top-left; }
+.task-card {
+    -fx-alignment: top-left;
+    -fx-border-color: -shale-color-card-hover-border;
+    -fx-border-width: 1.25;
+}
 .task-card:pressed { -fx-opacity: 0.94; }
 .task-card:focused {
     -fx-border-color: -shale-color-border-focus;
@@ -125,8 +175,13 @@
     -fx-text-fill: -shale-color-text-warning;
 }
 .task-card__title { -fx-text-fill: -shale-color-text-primary; }
-.task-card__creator { -fx-text-fill: -shale-color-text-muted; }
-.task-card__metadata { -fx-text-fill: -shale-color-text-muted; }
+.task-card__creator {
+    -fx-text-fill: -shale-color-text-primary;
+}
+
+.task-card__metadata {
+    -fx-text-fill: -shale-color-text-primary;
+}
 .task-card__description { -fx-text-fill: -shale-color-text-secondary; }
 .task-card__completed-cue {
     -fx-font-weight: 700;
