@@ -2,6 +2,7 @@ package com.shale.ui.component.factory;
 
 import java.time.LocalDate;
 import java.util.Objects;
+import java.util.List;
 import java.util.function.Consumer;
 
 import com.shale.ui.component.CaseCard;
@@ -34,6 +35,7 @@ public final class CaseCardFactory {
 		card.setIntakeDate(vm.intakeDate());
 		card.setSolDate(vm.solDate());
 		card.setTortNoticeDeadline(vm.tortNoticeDeadline());
+		if (vm.presentationDates() != null) card.setPresentationDates(vm.presentationDates());
 		card.setNonEngagementLetterSent(vm.nonEngagementLetterSent());
 
 		card.setStatus(vm.primaryStatusName());
@@ -70,8 +72,15 @@ public final class CaseCardFactory {
 			Boolean nonEngagementLetterSent,
 			String primaryStatusName,
 			String primaryStatusColor,
-			String practiceAreaColor
+			String practiceAreaColor,
+			List<PresentationDate> presentationDates
 	) {
+		public CaseCardModel(long id,String name,LocalDate intakeDate,LocalDate solDate,LocalDate tortNoticeDeadline,
+				String responsibleAttorney,String responsibleAttorneyColor,Boolean nonEngagementLetterSent,
+				String primaryStatusName,String primaryStatusColor,String practiceAreaColor) {
+			this(id,name,intakeDate,solDate,tortNoticeDeadline,responsibleAttorney,responsibleAttorneyColor,
+					nonEngagementLetterSent,primaryStatusName,primaryStatusColor,practiceAreaColor,null);
+		}
 		public CaseCardModel(long id, String name, LocalDate intakeDate, LocalDate solDate, String responsibleAttorney,
 				String responsibleAttorneyColor, Boolean nonEngagementLetterSent) {
 			this(id, name, intakeDate, solDate, null, responsibleAttorney, responsibleAttorneyColor, nonEngagementLetterSent, "", "", "");
@@ -98,6 +107,12 @@ public final class CaseCardFactory {
 			primaryStatusName = Objects.requireNonNullElse(primaryStatusName, "");
 			primaryStatusColor = Objects.requireNonNullElse(primaryStatusColor, "");
 			practiceAreaColor = Objects.requireNonNullElse(practiceAreaColor, "");
+			presentationDates = presentationDates == null ? null : List.copyOf(presentationDates);
 		}
+	}
+
+	public record PresentationDate(String selectionIdentity,String systemKey,String displayName,
+			LocalDate date,boolean pendingConfirmation) {
+		public PresentationDate { displayName=Objects.requireNonNullElse(displayName,""); }
 	}
 }

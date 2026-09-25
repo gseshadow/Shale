@@ -38,22 +38,49 @@ public final class CaseDatePresentationConfigurationDao {
     }
 
     public List<SelectedCaseDateOccurrenceDto> resolve(long caseId,int tenant,int actor,CaseDatePresentationPurpose purpose){
-        Objects.requireNonNull(purpose,"purpose");String sql="""
-          SELECT s.SelectionIdentity,s.SortOrder,picked.Id,picked.CaseDateTypeId,picked.StartsAt,picked.EndsAt,picked.AllDay
-          FROM dbo.CaseDatePresentationConfigurations c
-          JOIN dbo.CaseDatePresentationSelections s ON s.ShaleClientId=c.ShaleClientId AND s.CaseDatePresentationConfigurationId=c.Id
-          OUTER APPLY (SELECT TOP(1) cd.Id,cd.CaseDateTypeId,cd.StartsAt,cd.EndsAt,cd.AllDay
+        return resolveForCases(List.of(caseId),tenant,actor,purpose).getOrDefault(caseId,List.of());
+    }
+
+    /** Resolves a whole card page/collection in one set-based query (never one query per card). */
+    public Map<Long,List<SelectedCaseDateOccurrenceDto>> resolveForCases(Collection<? extends Number> caseIds,int tenant,int actor,CaseDatePresentationPurpose purpose){
+        Objects.requireNonNull(purpose,"purpose");if(caseIds==null||caseIds.isEmpty())return Map.of();
+        List<Long> ids=caseIds.stream().map(Number::longValue).distinct().toList();
+        String values=String.join(",",Collections.nCopies(ids.size(),"(?)"));String sql="""
+          WITH requested(CaseId) AS (SELECT v.CaseId FROM (VALUES %s) v(CaseId)), selections AS (
+            SELECT r.CaseId,s.SelectionIdentity,s.SortOrder,s.Id TieId
+            FROM requested r JOIN dbo.CaseDatePresentationConfigurations c ON c.ShaleClientId=? AND c.Purpose=?
+            JOIN dbo.CaseDatePresentationSelections s ON s.ShaleClientId=c.ShaleClientId AND s.CaseDatePresentationConfigurationId=c.Id
+            WHERE ?='CASE_CARD' OR NOT EXISTS(SELECT 1 FROM dbo.CaseOverviewConfigurations o WHERE o.ShaleClientId=? AND o.CaseId=r.CaseId)
+            UNION ALL
+            SELECT r.CaseId,CASE WHEN NULLIF(LTRIM(RTRIM(t.SystemKey)),'') IS NULL THEN 'TYPE:'+CONVERT(varchar(20),t.Id)
+                  ELSE 'SYSTEM:'+LOWER(LTRIM(RTRIM(t.SystemKey))) END,s.SortOrder,s.Id
+            FROM requested r JOIN dbo.CaseOverviewConfigurations o ON o.ShaleClientId=? AND o.CaseId=r.CaseId
+            JOIN dbo.CaseOverviewDateSelections s ON s.ShaleClientId=o.ShaleClientId AND s.CaseOverviewConfigurationId=o.Id
+            JOIN dbo.CaseDateTypes t ON t.Id=s.CaseDateTypeId AND (t.ShaleClientId=o.ShaleClientId OR t.ShaleClientId IS NULL)
+            WHERE ?='CASE_OVERVIEW')
+          SELECT s.CaseId,s.SelectionIdentity,s.SortOrder,picked.Id,picked.CaseDateTypeId,picked.StartsAt,picked.EndsAt,picked.AllDay,
+                 COALESCE(displayType.Id,picked.CaseDateTypeId),COALESCE(displayType.Name,picked.StoredName),
+                 COALESCE(displayType.Color,picked.StoredColor),COALESCE(displayType.SystemKey,picked.StoredSystemKey),
+                 COALESCE(displayType.SupportsTime,picked.StoredSupportsTime,0)
+          FROM selections s
+          OUTER APPLY (SELECT TOP(1) cd.Id,cd.CaseDateTypeId,cd.StartsAt,cd.EndsAt,cd.AllDay,
+                         stored.Name StoredName,stored.Color StoredColor,stored.SystemKey StoredSystemKey,stored.SupportsTime StoredSupportsTime
             FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes stored ON stored.Id=cd.CaseDateTypeId
-            WHERE cd.ShaleClientId=c.ShaleClientId AND cd.CaseId=? AND cd.IsDeleted=0 AND
-             ((s.SelectionIdentity LIKE 'SYSTEM:%' AND stored.SystemKey IS NOT NULL
+            WHERE cd.ShaleClientId=? AND cd.CaseId=s.CaseId AND cd.IsDeleted=0 AND
+             ((s.SelectionIdentity LIKE 'SYSTEM:%%' AND stored.SystemKey IS NOT NULL
                AND LOWER(LTRIM(RTRIM(stored.SystemKey)))=SUBSTRING(s.SelectionIdentity,8,160)
-               AND (stored.ShaleClientId=c.ShaleClientId OR stored.ShaleClientId IS NULL))
-              OR (s.SelectionIdentity LIKE 'TYPE:%' AND stored.Id=TRY_CONVERT(int,SUBSTRING(s.SelectionIdentity,6,20))
-               AND stored.ShaleClientId=c.ShaleClientId))
+               AND (stored.ShaleClientId=? OR stored.ShaleClientId IS NULL))
+              OR (s.SelectionIdentity LIKE 'TYPE:%%' AND stored.Id=TRY_CONVERT(int,SUBSTRING(s.SelectionIdentity,6,20)) AND stored.ShaleClientId=?))
             ORDER BY cd.StartsAt,cd.Id) picked
-          WHERE c.ShaleClientId=? AND c.Purpose=? ORDER BY s.SortOrder,s.Id
-          """;
-        try(Connection con=db.requireConnection()){verifySession(con,tenant,actor,false);validateCase(con,tenant,caseId);try(PreparedStatement ps=con.prepareStatement(sql)){ps.setLong(1,caseId);ps.setInt(2,tenant);ps.setString(3,purpose.name());try(ResultSet rs=ps.executeQuery()){List<SelectedCaseDateOccurrenceDto> out=new ArrayList<>();while(rs.next()){Long id=(Long)rs.getObject(3);Integer type=(Integer)rs.getObject(4);out.add(new SelectedCaseDateOccurrenceDto(rs.getString(1),rs.getInt(2),id,type,id==null?null:rs.getTimestamp(5).toLocalDateTime(),id==null||rs.getTimestamp(6)==null?null:rs.getTimestamp(6).toLocalDateTime(),id==null?null:rs.getBoolean(7)));}return List.copyOf(out);}}}
+          OUTER APPLY (SELECT TOP(1) x.Id,x.Name,x.Color,x.SystemKey,x.SupportsTime FROM dbo.CaseDateTypes x
+            WHERE x.IsActive=1 AND x.IsDeleted=0 AND
+             ((s.SelectionIdentity LIKE 'SYSTEM:%%' AND x.SystemKey IS NOT NULL AND LOWER(LTRIM(RTRIM(x.SystemKey)))=SUBSTRING(s.SelectionIdentity,8,160)
+                AND (x.ShaleClientId=? OR x.ShaleClientId IS NULL))
+              OR (s.SelectionIdentity LIKE 'TYPE:%%' AND x.Id=TRY_CONVERT(int,SUBSTRING(s.SelectionIdentity,6,20)) AND x.ShaleClientId=?))
+            ORDER BY CASE WHEN x.ShaleClientId=? THEN 0 ELSE 1 END,x.Id) displayType
+          ORDER BY s.CaseId,s.SortOrder,s.TieId
+          """.formatted(values);
+        try(Connection con=db.requireConnection()){verifySession(con,tenant,actor,false);try(PreparedStatement ps=con.prepareStatement(sql)){int p=1;for(long id:ids)ps.setLong(p++,id);ps.setInt(p++,tenant);ps.setString(p++,purpose.name());ps.setString(p++,purpose.name());ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setString(p++,purpose.name());ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p++,tenant);ps.setInt(p,tenant);try(ResultSet rs=ps.executeQuery()){Map<Long,List<SelectedCaseDateOccurrenceDto>> mutable=new LinkedHashMap<>();for(long id:ids)mutable.put(id,new ArrayList<>());while(rs.next()){long caseId=rs.getLong(1);Long id=(Long)rs.getObject(4);Integer type=(Integer)rs.getObject(5);Timestamp start=rs.getTimestamp(6),end=rs.getTimestamp(7);mutable.computeIfAbsent(caseId,k->new ArrayList<>()).add(new SelectedCaseDateOccurrenceDto(rs.getString(2),rs.getInt(3),id,type,start==null?null:start.toLocalDateTime(),end==null?null:end.toLocalDateTime(),id==null?null:rs.getBoolean(8),(Integer)rs.getObject(9),rs.getString(10),rs.getString(11),rs.getString(12),rs.getBoolean(13)));}Map<Long,List<SelectedCaseDateOccurrenceDto>> out=new LinkedHashMap<>();mutable.forEach((k,v)->out.put(k,List.copyOf(v)));return Map.copyOf(out);}}}
         catch(SQLException e){throw new IllegalStateException("Case Date presentation could not be resolved.",e);}
     }
 
@@ -74,7 +101,8 @@ public final class CaseDatePresentationConfigurationDao {
           OUTER APPLY (SELECT TOP(1) x.* FROM dbo.CaseDateTypes x WHERE
             (s.SelectionIdentity LIKE 'SYSTEM:%' AND x.SystemKey IS NOT NULL AND LOWER(LTRIM(RTRIM(x.SystemKey)))=SUBSTRING(s.SelectionIdentity,8,160) AND (x.ShaleClientId=s.ShaleClientId OR x.ShaleClientId IS NULL)) OR
             (s.SelectionIdentity LIKE 'TYPE:%' AND x.Id=TRY_CONVERT(int,SUBSTRING(s.SelectionIdentity,6,20)) AND x.ShaleClientId=s.ShaleClientId)
-            ORDER BY CASE WHEN x.ShaleClientId=s.ShaleClientId AND x.IsDeleted=0 THEN 0 WHEN x.ShaleClientId IS NULL THEN 1 ELSE 2 END,x.Id) t
+            ORDER BY CASE WHEN x.ShaleClientId=s.ShaleClientId AND x.IsActive=1 AND x.IsDeleted=0 THEN 0
+                          WHEN x.ShaleClientId IS NULL AND x.IsActive=1 AND x.IsDeleted=0 THEN 1 ELSE 2 END,x.Id) t
           WHERE s.ShaleClientId=? AND s.CaseDatePresentationConfigurationId=? ORDER BY s.SortOrder,s.Id
           """;
         try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setLong(2,config.id);try(ResultSet rs=ps.executeQuery()){List<CaseDatePresentationSelectionDto> out=new ArrayList<>();while(rs.next()){if(rs.getObject(3)==null)throw new IllegalStateException("A historical Case Date presentation selection is no longer readable.");Integer owner=(Integer)rs.getObject(4);var type=new EffectiveCaseDateTypeDto(rs.getInt(3),owner,rs.getString(5),rs.getString(6),rs.getString(7),rs.getString(8),rs.getString(9),rs.getBoolean(10),rs.getInt(11),rs.getBoolean(12),rs.getBoolean(13),owner==null?EffectiveCaseDateTypeDto.Origin.GLOBAL:EffectiveCaseDateTypeDto.Origin.TENANT_CREATED,rs.getBytes(14));out.add(new CaseDatePresentationSelectionDto(rs.getString(1),rs.getInt(2),type,rs.getBoolean(15)));}return new CaseDatePresentationConfigurationDto(config.id,tenant,purpose,out,config.rowVer);}}

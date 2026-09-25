@@ -114,6 +114,12 @@ public interface CaseServicePort {
 		throw new UnsupportedOperationException("Case Date presentation resolution is unavailable.");
 	}
 
+	default java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> resolveCaseDatePresentations(
+			java.util.Collection<? extends Number> caseIds, int shaleClientId, int actorUserId,
+			com.shale.core.model.CaseDatePresentationPurpose purpose) {
+		throw new UnsupportedOperationException("Batch Case Date presentation resolution is unavailable.");
+	}
+
 	default IntakeTakenByMutationResult updateIntakeTakenBy(UpdateIntakeTakenByCommand command) {
 		throw new UnsupportedOperationException("Intake By mutation is unavailable.");
 	}
