@@ -568,6 +568,11 @@ public final class SettingsController {
 		}
 	}
 
+	private void publishCaseDatePresentationChanged(com.shale.core.model.CaseDatePresentationPurpose purpose) {
+		if (runtimeBridge == null) return;
+		runtimeBridge.publishCaseDatePresentationChanged(0L, purpose.name(), requireTenantId(), requireActorUserId());
+	}
+
 	@FXML
 	private void onViewAuditLog(ActionEvent event) {
 		if (!isAdminUser() || onOpenAuditLog == null) {
@@ -597,7 +602,8 @@ public final class SettingsController {
 	@FXML
 	private void onManageCaseDateTypes(ActionEvent event) {
 		if (!requireAdminLookupManagement("Case Date Types") || caseService == null) return;
-		new CaseDateTypeManagementLauncher(caseService, settingsLoadExecutor, this::publishCaseDateTypeChanged)
+		new CaseDateTypeManagementLauncher(caseService, settingsLoadExecutor, this::publishCaseDateTypeChanged,
+				this::publishCaseDatePresentationChanged)
 				.open(settingsWindow(event), requireTenantId(), requireActorUserId(), result -> {
 					if (result.changed()) loadCaseDateRoleMappingsAsync("Case Date settings refreshed.");
 				});

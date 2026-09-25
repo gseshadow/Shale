@@ -8967,6 +8967,13 @@ public class CaseController {
 			Integer tenantId = appState.getShaleClientId();
 			if (tenantId == null || event.shaleClientId() != tenantId) return;
 			String entityType = event.entityType();
+			if (LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION.equals(entityType)) {
+				Object purpose = event.patch() == null ? null : event.patch().get("purpose");
+				if (com.shale.core.model.CaseDatePresentationPurpose.CASE_OVERVIEW.name().equals(String.valueOf(purpose))
+						&& (overviewDateConfiguration == null || !overviewDateConfiguration.customized()))
+					runOnFx(CaseController.this::loadOverviewConfigurationAsync);
+				return;
+			}
 			if (LiveUpdateEvents.ENTITY_CONTACT.equals(entityType)) {
 				runOnFx(CaseController.this::reloadCurrentCaseForViewMode);
 				return;

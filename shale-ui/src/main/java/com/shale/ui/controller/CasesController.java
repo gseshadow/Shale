@@ -718,9 +718,16 @@ public final class CasesController {
 	}
 
 	private void handleCaseDatesUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
-		if (event == null || !LiveUpdateEvents.ENTITY_CASE_DATES.equals(event.entityType()) || appState == null) return;
+		if (event == null || appState == null) return;
 		Integer tenant = appState.getShaleClientId();
-		if (tenant == null || tenant <= 0 || event.shaleClientId() != tenant || event.entityId() <= 0) return;
+		if (tenant == null || tenant <= 0 || event.shaleClientId() != tenant) return;
+		if (LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION.equals(event.entityType())) {
+			Object purpose = event.patch() == null ? null : event.patch().get("purpose");
+			if (com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD.name().equals(String.valueOf(purpose)))
+				Platform.runLater(this::loadFirstPage);
+			return;
+		}
+		if (!LiveUpdateEvents.ENTITY_CASE_DATES.equals(event.entityType()) || event.entityId() <= 0) return;
 		String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
 		if (!mine.isBlank() && mine.equals(event.clientInstanceId())) return;
 		if (!rememberCaseDatesEvent(event.eventId()) || !caseDatesRefreshQueued.compareAndSet(false, true)) return;

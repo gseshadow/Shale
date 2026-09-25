@@ -103,3 +103,18 @@ field. Reconnect duplicates are deduplicated and remain read-only. This adds no 
 new socket, durable replay, legacy `dbo.Cases` date read/write, or dual-write. The next
 cutover gate remains atomic new-case intake; API/web/new-case paths are not partially
 converted here.
+
+## Case Date presentation configuration invalidation
+
+Successful tenant-administrator replacement of either firm presentation list publishes a
+`CaseDatePresentationConfiguration` `EntityUpdated` invalidation after the audited DAO transaction
+commits. Its patch contains only `purpose` (`CASE_CARD` or `CASE_OVERVIEW`) and `change=REORDERED`;
+it never contains selected identities, labels, RowVer bytes, occurrence values, or other sensitive
+data. Open card collections reload authoritatively for `CASE_CARD`. An open Case Overview reloads
+for `CASE_OVERVIEW` only when it has no per-case override; customized and explicit-empty per-case
+configurations retain precedence. Tenant checks remain mandatory for every subscriber.
+
+The configuration replacement remains audited in the same transaction as
+`CASE_DATE_PRESENTATION_CONFIGURATION`, using the existing entity-action audit schema and only the
+allowlisted purpose/kind and ordering count metadata. Presentation reads and live invalidations are
+not additional audit events because they neither reveal a new sensitive value nor mutate state.

@@ -33,6 +33,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.Separator;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -52,6 +53,7 @@ public final class CaseDateTypeManagementPane {
     private final CommittedChangeTracker changed;
     private final AtomicBoolean mutationInFlight = new AtomicBoolean();
     private final VBox root = new VBox(12);
+    private final CaseDatePresentationManagementPane presentation;
     private final FlowPane cards = new FlowPane(10, 10);
     private final Label status = new Label();
     private final Button edit;
@@ -66,6 +68,12 @@ public final class CaseDateTypeManagementPane {
 
     public CaseDateTypeManagementPane(CaseServicePort service, int tenantId, int actorId, Executor executor,
             IntConsumer publisher, CommittedChangeTracker changed) {
+        this(service, tenantId, actorId, executor, publisher, ignored -> {}, changed);
+    }
+
+    public CaseDateTypeManagementPane(CaseServicePort service, int tenantId, int actorId, Executor executor,
+            IntConsumer publisher, java.util.function.Consumer<com.shale.core.model.CaseDatePresentationPurpose> presentationPublisher,
+            CommittedChangeTracker changed) {
         this.service = service; this.tenantId = tenantId; this.actorId = actorId; this.executor = executor;
         this.publisher = publisher == null ? ignored -> {} : publisher; this.changed = changed;
         Button add = button("Add Case Date Type", ControlStyles.Purpose.PRIMARY, () -> editDefinition(null));
@@ -75,14 +83,18 @@ public final class CaseDateTypeManagementPane {
         confirmation = button("Confirmation policy", ControlStyles.Purpose.SECONDARY, this::editConfirmationPolicy);
         status.getStyleClass().add("search-summary-text"); status.setWrapText(true);
         cards.setPrefWrapLength(820);
-        root.getChildren().addAll(new HBox(8, add, edit, toggle, remove, confirmation), status, cards);
+        presentation = new CaseDatePresentationManagementPane(service, tenantId, actorId, executor,
+                presentationPublisher, changed);
+        root.getChildren().addAll(new HBox(8, add, edit, toggle, remove, confirmation), status, cards,
+                new Separator(), presentation.node());
         updateActions();
         reload(null);
     }
 
     public Node node() { return root; }
-    public void dispose() { disposed = true; loadGeneration++; }
-    boolean mutationInFlight() { return mutationInFlight.get(); }
+    public void dispose() { disposed = true; loadGeneration++; presentation.dispose(); }
+    boolean mutationInFlight() { return mutationInFlight.get() || presentation.mutationInFlight(); }
+    boolean canClose() { return !mutationInFlight() && !presentation.hasUnsavedChanges(); }
     int loadGeneration() { return loadGeneration; }
 
     private Button button(String text, ControlStyles.Purpose purpose, Runnable action) {

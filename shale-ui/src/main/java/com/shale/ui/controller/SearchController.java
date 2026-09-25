@@ -196,7 +196,8 @@ public final class SearchController {
 		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
 		liveContactUpdatedHandler = event ->
 		{
-			if (event != null && LiveUpdateEvents.ENTITY_CONTACT.equals(event.entityType()) && appState != null
+			if (event != null && (LiveUpdateEvents.ENTITY_CONTACT.equals(event.entityType())
+					|| LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION.equals(event.entityType())) && appState != null
 					&& java.util.Objects.equals(appState.getShaleClientId(), event.shaleClientId()))
 				Platform.runLater(this::loadResults);
 		};
