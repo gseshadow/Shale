@@ -19,6 +19,7 @@ public class UserCard extends HBox {
 
     private final Label nameLabel = new Label();
     private final StackPane avatarHolder = new StackPane();
+    private final Circle avatarCircle = new Circle();
     private final Label initialsLabel = new Label();
     private final Label secondaryLabel = new Label();
     private static final PseudoClass INACTIVE = PseudoClass.getPseudoClass("inactive");
@@ -34,6 +35,12 @@ public class UserCard extends HBox {
     public UserCard() {
         nameLabel.setId("user-card-name-label");
         nameLabel.getStyleClass().add("user-card-name");
+        avatarCircle.getStyleClass().add("user-card-avatar-circle");
+        initialsLabel.setId("user-card-avatar-initials");
+        initialsLabel.getStyleClass().add("user-card-avatar-initials");
+        initialsLabel.setMouseTransparent(true);
+        initialsLabel.setFocusTraversable(false);
+        initialsLabel.setAccessibleRole(AccessibleRole.NODE);
         setFocusTraversable(true);
         setAccessibleRole(AccessibleRole.BUTTON);
         buildUiMiniDefaults();
@@ -96,6 +103,9 @@ public class UserCard extends HBox {
         String color = ColorUtil.toCssBackgroundColorOrNull(storedColor);
         getStyleClass().addAll("user-card", "shale-entity-card", "shale-entity-card-clickable",
                 "user-card-team-accented");
+        initialsLabel.setText(initialsFromName(nameLabel.getText()));
+        avatarCircle.setStyle("");
+        avatarHolder.getChildren().setAll(avatarCircle, initialsLabel);
         teamAccentStyle = color == null ? null : """
                 -shale-user-accent-strong: %s;
                 -shale-user-accent-sustained: %s;
@@ -103,12 +113,16 @@ public class UserCard extends HBox {
                 -shale-user-accent-light: %s;
                 -shale-user-accent-clear: %s;
                 -shale-user-name-foreground: %s;
+                -shale-user-avatar-background: %s;
+                -shale-user-avatar-foreground: %s;
                 """.formatted(
                 ColorUtil.toCssRgba(color, 0.72),
                 ColorUtil.toCssRgba(color, 0.68),
                 ColorUtil.toCssRgba(color, 0.40),
                 ColorUtil.toCssRgba(color, 0.16),
                 ColorUtil.toCssRgba(color, 0.00),
+                ColorUtil.readableTextColor(color),
+                color,
                 ColorUtil.readableTextColor(color));
         refreshSurfaceStyle();
     }
@@ -125,11 +139,20 @@ public class UserCard extends HBox {
     }
 
     private static String initialsFromName(String value) {
-        if (value == null || value.isBlank() || "—".equals(value.trim())) return "?";
-        String[] parts = value.trim().split("\\s+");
-        String first = parts[0].substring(0, 1);
-        String last = parts.length > 1 ? parts[parts.length - 1].substring(0, 1) : "";
-        return (first + last).toUpperCase(java.util.Locale.ROOT);
+        if (value == null) return "?";
+        String normalizedName = value.replaceAll("^[\\s\\p{Z}]+|[\\s\\p{Z}]+$", "");
+        if (normalizedName.isEmpty() || "—".equals(normalizedName)) return "?";
+        String[] parts = normalizedName.split("[\\s\\p{Z}]+");
+        String first = firstCodePoint(parts[0]);
+        String last = parts.length > 1 ? firstCodePoint(parts[parts.length - 1]) : "";
+        String uppercase = (first + last).toUpperCase(java.util.Locale.ROOT);
+        int end = uppercase.offsetByCodePoints(0, Math.min(2, uppercase.codePointCount(0, uppercase.length())));
+        return uppercase.substring(0, end);
+    }
+
+    private static String firstCodePoint(String value) {
+        int end = value.offsetByCodePoints(0, 1);
+        return value.substring(0, end);
     }
 
     // --- Variants ---
@@ -173,9 +196,9 @@ public class UserCard extends HBox {
 
     private Node buildAvatar(double radius) {
         // Placeholder avatar (circle). Swap later for ImageView clipped to circle.
-        Circle c = new Circle(radius);
-        c.setStyle("-fx-fill: rgba(255,255,255,0.55); -fx-stroke: rgba(0,0,0,0.10);");
-        avatarHolder.getChildren().setAll(c);
+        avatarCircle.setRadius(radius);
+        avatarCircle.setStyle("-fx-fill: rgba(255,255,255,0.55); -fx-stroke: rgba(0,0,0,0.10);");
+        avatarHolder.getChildren().setAll(avatarCircle);
         return avatarHolder;
     }
 

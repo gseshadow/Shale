@@ -116,6 +116,8 @@
     -shale-user-accent-light: transparent;
     -shale-user-accent-clear: transparent;
     -shale-user-name-foreground: -shale-color-text-primary;
+    -shale-user-avatar-background: -shale-color-avatar-neutral-background;
+    -shale-user-avatar-foreground: -shale-color-avatar-neutral-text;
     -fx-background-color:
         -shale-color-elevated-surface,
         linear-gradient(to right,
@@ -139,6 +141,15 @@
 }
 .user-card-team-accented .user-card-name {
     -fx-text-fill: -shale-user-name-foreground;
+}
+.user-card-team-accented .user-card-avatar-circle {
+    -fx-fill: -shale-user-avatar-background;
+    -fx-stroke: -shale-color-border-subtle;
+}
+.user-card-team-accented .user-card-avatar-initials {
+    -fx-font-size: 16px;
+    -fx-font-weight: 800;
+    -fx-text-fill: -shale-user-avatar-foreground;
 }
 
 /* Task Card: priority owns the restrained card wash; status remains the labelled
