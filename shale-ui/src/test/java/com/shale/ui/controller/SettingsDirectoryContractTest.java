@@ -20,12 +20,12 @@ final class SettingsDirectoryContractTest {
         assertEquals(List.of("Case Statuses", "Practice Areas", "Link Types", "Case Team Roles", "Case Dates", "Protected Case Date Mappings"), titles(document, "caseConfigurationGroup"));
         assertEquals(List.of("Request Fields"), titles(document, "requestConfigurationGroup"));
         assertEquals(List.of("Contact Classifications", "Organization Types"), titles(document, "contactOrganizationConfigurationGroup"));
-        assertEquals(List.of("User Management", "Audit Log"), titles(document, "administrationGroup"));
+        assertEquals(List.of("User Management", "Firm-wide Roles", "Audit Log"), titles(document, "administrationGroup"));
     }
 
     @Test void everyDirectoryEntryUsesTheSharedRowAndContainsNoInlineStyle() throws Exception {
         String fxml = Files.readString(FXML);
-        assertEquals(14, count(fxml, "<SettingsManagementRow "));
+        assertEquals(15, count(fxml, "<SettingsManagementRow "));
         assertFalse(fxml.contains(" style=\""), "Settings presentation must remain stylesheet-owned.");
         assertFalse(fxml.contains("CardsContainer"), "Migrated inline definition hosts must not return to Settings FXML.");
         assertTrue(Files.readString(Path.of("src/main/java/com/shale/ui/component/SettingsManagementRow.java"))
