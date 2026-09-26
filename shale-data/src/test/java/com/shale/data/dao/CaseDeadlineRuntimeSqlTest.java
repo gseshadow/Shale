@@ -29,12 +29,25 @@ final class CaseDeadlineRuntimeSqlTest {
         dao.listActiveAssignedForUserDetail(7, 21, 25);
         dao.findActiveGridPage(7, 0, 25, CaseSummaryDao.GridOrder.STATUTE_SOONEST, "",
                 CaseSummaryDao.GridStatusMode.UNRESTRICTED, Set.of(), 1L);
+        dao.listActiveStatusReportCases(7, 31, null, null);
+        dao.findActiveForDocuments(7, 42);
 
         List<String> projections = harness.executed.stream()
-                .filter(sql -> sql.contains("family_date.StartsAt"))
+                .filter(sql -> sql.contains("family_type.SystemKey)))='tort_notice_deadline'"))
                 .toList();
-        assertEquals(7, projections.size(), "Every requested desktop collection must execute its deadline projection");
+        assertEquals(8, projections.size(),
+                "Every requested desktop collection, report, and export source must execute its SOL/TCN projection");
         for (String sql : projections) assertRuntimeProjection(sql);
+
+        String documents = harness.executed.stream().filter(sql -> sql.contains("document_dates.InjuryDate"))
+                .findFirst().orElseThrow(() -> new AssertionError("Documents lookup must execute its bounded projection"));
+        assertAll(
+                () -> assertTrue(documents.contains("family_type.SystemKey)))='statute_of_limitations'")),
+                () -> assertTrue(documents.contains("candidate.IsDeleted=0")),
+                () -> assertTrue(documents.contains("effective_type.IsActive=1")),
+                () -> assertTrue(documents.contains("ORDER BY family_date.StartsAt ASC,family_date.Id ASC")),
+                () -> assertFalse(documents.contains("SemanticRoleKey='STATUTE_OF_LIMITATIONS'")),
+                () -> assertFalse(documents.contains("CaseDatePresentationSelections")));
     }
 
     private static void assertRuntimeProjection(String sql) {
@@ -76,6 +89,7 @@ final class CaseDeadlineRuntimeSqlTest {
                         case "executeQuery" -> {
                             executed.add(sql);
                             if (sql.contains("SESSION_CONTEXT")) yield rows(true, 7);
+                            if (sql.contains("COUNT(DISTINCT s.Id)")) yield rows(true, 1);
                             if (sql.contains("FROM dbo.Users u WHERE u.id=?")) yield rows(true, 1);
                             yield rows(false, null);
                         }
