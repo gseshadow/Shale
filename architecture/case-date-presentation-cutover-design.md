@@ -328,3 +328,56 @@ ordinary-family rule, decide and migrate the generic mutation singleton enforcem
 SOL/TCN semantic-role administration/resolution contracts, and rerun schema/ownership/history audits.
 Only after those dependencies are proven absent should a separate migration deactivate or retire the
 rows; historical mapping records must not be physically deleted.
+
+## Case Date Type lifecycle cutover (2026-09-26)
+
+Intake is now the only operative protected Case Date semantic role. Runtime Intake resolution, New
+Intake, and generic occurrence singleton enforcement continue to use the active tenant-effective
+`INTAKE` mapping. The persisted SOL/TCN semantic-role vocabulary, mapping rows, row versions, and audit
+history remain intact, but Settings lists and accepts protected-role changes only for Intake; SOL/TCN
+mapping activity no longer controls selectors, definition administration, calendar availability,
+fixed editors, or occurrence cardinality.
+
+Global Case Date Type eligibility is explicit and closed: only `intake`, `statute_of_limitations`, and
+`tort_notice_deadline` global families may enter effective selectors or administration. This replaces
+mapping participation as the global visibility gate without exposing unrelated global rows. Within an
+eligible family, a nondeleted tenant row wins; an inactive winner masks the global; a deleted tenant
+row resets to the global; and only an active, nondeleted winner is selectable. Historical occurrence
+reads preserve the stored type ID and fall back to that stored row whenever no active effective family
+presentation exists.
+
+SOL and TCN tenant overrides now use the ordinary audited Case Date Type transaction. Administrators
+can create an override from the immutable global row, edit its presentation and capabilities, toggle
+its lifecycle, soft-remove/reset it, and restore it with tenant/actor validation and `RowVer` checks.
+Each committed mutation uses the existing `CASE_DATE_TYPE` entity-action audit on the same connection;
+audit failure rolls back the definition mutation. No schema migration is required, and no occurrence,
+confirmation snapshot, semantic mapping, or audit-history identity is rewritten.
+
+Generic Case Date create, type-change, and restore enforce protected singleton cardinality only for
+Intake. SOL/TCN are ordinary multi-occurrence families; compatibility presentation continues to choose
+the earliest `StartsAt`, then lowest `CaseDates.Id`, while generic Dates and Calendar retain every
+active occurrence.
+
+### Remaining dependency inventory and mapping-retirement plan
+
+The remaining production reads of `CaseDateTypeSemanticRoleMappings` are Intake-only: New Intake and
+reconciliation authority, Intake list/report projections, Intake compatibility projection/history,
+protected Intake administration, and Intake singleton enforcement. `CaseDateSemanticRole` retains the
+SOL/TCN enum values solely to read historical mapping/audit vocabulary during this phase. The service
+port mapping commands and DTO likewise remain because Intake administration uses the same contract.
+No selector, form reference validation, Overview selection validation, calendar type availability,
+SOL/TCN fixed projection/editor, report/export, server/React compatibility, or generic SOL/TCN
+occurrence mutation depends on an active SOL/TCN mapping.
+
+Retire active SOL/TCN mappings only after this implementation passes focused affected tests, the
+change-aware selector, and the critical reactor in the supported Windows environment, followed by a
+production observation window. Before migration, inventory direct/external SQL consumers; verify every
+tenant has exactly one eligible global SOL/TCN family and no code or saved query resolves those roles;
+compare selector, calendar, card, Overview, report, export, server, fixed-editor, confirmation-policy,
+and historical occurrence results with the SOL/TCN mappings disabled in a production-shaped copy;
+and verify Intake mapping resolution and singleton guards remain unchanged. The later forward-only
+migration should retire (soft-delete/deactivate), not delete, active SOL/TCN mappings; preserve all role,
+mapping, RowVer, and entity-action audit rows; report per-tenant before/after counts and orphan checks;
+run under an explicit transaction with rollback on findings; and include a rollback script that
+reactivates the same mapping IDs. No `CaseDates.CaseDateTypeId`, presentation selection, confirmation
+snapshot, or audit row may be updated by that migration.

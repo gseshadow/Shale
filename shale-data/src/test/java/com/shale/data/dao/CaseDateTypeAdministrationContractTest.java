@@ -25,8 +25,9 @@ final class CaseDateTypeAdministrationContractTest {
         assertFalse(DAO.contains("UPDATE dbo.CalendarEvents"));
         assertFalse(DAO.contains("INSERT dbo.CalendarEvents"));
         assertTrue(DAO.contains("requireCustomType(e)"));
+        assertTrue(DAO.contains("requireOrdinaryOverrideKey"));
         assertTrue(DAO.contains("ensureStableKeyUnchanged"));
-        assertTrue(DAO.contains("System-defined Case Date Types are protected"));
+        assertTrue(DAO.contains("The Intake Case Date Type is protected"));
         assertTrue(DAO.contains("softDeleteType(con,c.shaleClientId(),c.actorUserId(),e.id(),c.expectedRowVer())"));
     }
     @Test void validationCoversSchemaFields(){
@@ -38,7 +39,7 @@ final class CaseDateTypeAdministrationContractTest {
     @Test void customNamesAreNormalizedAndDuplicateChecked(){
         assertTrue(DAO.contains("LOWER(LTRIM(RTRIM(Name)))=LOWER(LTRIM(RTRIM(?)))"));
         assertTrue(DAO.contains("A Case Date Type with that name already exists."));
-        assertTrue(DAO.contains("System keys are reserved for protected system-defined Case Date Types."));
+        assertTrue(DAO.contains("only ordinary SOL/TCN tenant overrides may be created"));
     }
     @Test void everyAuthoritativeMutationAppendsOneSafeTransactionalAudit(){
         assertEquals(4, occurrences(DAO, "auditType(con,c.shaleClientId(),c.actorUserId()"));

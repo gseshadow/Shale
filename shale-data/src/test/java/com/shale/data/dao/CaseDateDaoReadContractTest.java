@@ -77,15 +77,15 @@ class CaseDateDaoReadContractTest {
         assertTrue(source.contains("WHERE rn = 1 AND IsDeleted = 0 AND IsActive = 1"));
         assertTrue(source.contains("UNION ALL"), "tenant-created unkeyed rows remain selectable when active");
         assertTrue(source.contains("ORDER BY SortOrder, Name, Id"));
-        assertTrue(source.contains("pm.CaseDateTypeId=t.Id AND pm.ShaleClientId IS NULL"),
-                "global ownership alone must not make a nonprotected type selectable");
+        assertTrue(source.contains("LOWER(LTRIM(RTRIM(t.SystemKey))) IN ('intake','statute_of_limitations','tort_notice_deadline')"),
+                "global eligibility must be explicit and independent of semantic mapping lifecycle");
     }
 
-    @Test void administrationAndMutationSelectionRestrictGlobalsToProtectedMappings() throws Exception {
+    @Test void administrationAndMutationSelectionUseExplicitEligibleGlobalFamilies() throws Exception {
         String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
-        assertTrue(source.contains("WHERE t.ShaleClientId = ? OR (t.ShaleClientId IS NULL AND EXISTS"));
+        assertTrue(source.contains("WHERE t.ShaleClientId = ? OR (t.ShaleClientId IS NULL AND LOWER"));
         assertTrue(source.contains("private static TypeRow requireSelectableType"));
-        assertTrue(source.substring(source.indexOf("private static TypeRow requireSelectableType"))
+        assertFalse(source.substring(source.indexOf("private static TypeRow requireSelectableType"))
                 .contains("CaseDateTypeSemanticRoleMappings pm"));
         assertTrue(source.contains("requireHistoricalType"), "stored authoritative ids retain a historical read path");
     }
@@ -97,7 +97,8 @@ class CaseDateDaoReadContractTest {
         assertTrue(sql.contains("JOIN dbo.Cases c ON c.Id = cd.CaseId AND c.ShaleClientId = cd.ShaleClientId AND c.IsDeleted = 0"));
         assertTrue(sql.contains("JOIN dbo.CaseDateTypes st ON st.Id = cd.CaseDateTypeId AND (st.ShaleClientId = cd.ShaleClientId OR st.ShaleClientId IS NULL)"));
         assertTrue(sql.contains("OUTER APPLY"));
-        assertTrue(sql.contains("t.IsDeleted = 0 AND t.IsActive = 1"));
+        assertTrue(sql.contains("candidate.IsDeleted=0"));
+        assertTrue(sql.contains("AND t.IsActive=1"), "inactive tenant winners mask global presentation");
         assertTrue(sql.contains("COALESCE(eff.Name, st.Name) AS TypeName"));
         assertTrue(sql.contains("LEFT JOIN dbo.Users cu ON cu.Id = cd.CreatedByUserId AND cu.ShaleClientId = cd.ShaleClientId"));
         assertTrue(sql.contains("cu.name_first"));
