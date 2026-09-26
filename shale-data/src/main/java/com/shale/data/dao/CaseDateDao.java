@@ -68,7 +68,9 @@ public final class CaseDateDao {
         int effectiveTypeId=requireEffectiveMappedType(con,command.shaleClientId(),key);
         if(value.caseDateTypeId()!=null&&value.caseDateTypeId()!=effectiveTypeId)
             throw new IllegalArgumentException("Case Date type is not the effective mapping for "+key.systemKey()+".");
-        TypeRow type=requireSelectableType(con,command.shaleClientId(),effectiveTypeId);
+        TypeRow type=isOptionalDeadlineFamily(key)
+                ? requireHistoricalType(con,command.shaleClientId(),effectiveTypeId)
+                : requireSelectableType(con,command.shaleClientId(),effectiveTypeId);
         validateAllDay(type,value.allDay());
         long id;
         try(PreparedStatement ps=con.prepareStatement("INSERT dbo.CaseDates (ShaleClientId,CaseId,CaseDateTypeId,StartsAt,EndsAt,AllDay,CreatedAt,CreatedByUserId) OUTPUT INSERTED.Id VALUES (?,?,?,?,?,?,SYSUTCDATETIME(),?)")){
@@ -147,6 +149,17 @@ public final class CaseDateDao {
         try (Connection con = db.requireConnection()) {
             verifyTenant(con, tenant); validateActor(con, tenant, actor);
             return CaseDateSemanticRoleResolver.requireEffectiveTypeId(con, tenant, role);
+        } catch (SQLException e) { throw fail(e); }
+    }
+
+    public List<String> listAvailableCompatibilityCaseDateFamilies(int tenant, int actor) {
+        try (Connection con = db.requireConnection()) {
+            verifyTenant(con, tenant); validateActor(con, tenant, actor);
+            List<String> result = new ArrayList<>();
+            for (MigratedCaseDateKey key : List.of(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS,
+                    MigratedCaseDateKey.TORT_NOTICE_DEADLINE))
+                if (findEffectiveFamilyTypeId(con, tenant, key).isPresent()) result.add(key.systemKey());
+            return List.copyOf(result);
         } catch (SQLException e) { throw fail(e); }
     }
 
@@ -343,12 +356,21 @@ public final class CaseDateDao {
     private SingletonRead readMigratedSingletons(long caseId, int tenant, int actor) {
         List<CaseDateDto> occurrences = listCaseDatesForCase(caseId, tenant, actor);
         Map<Integer, MigratedCaseDateKey> protectedTypeKeys = resolveProtectedTypeKeys(tenant, actor);
+        EnumSet<MigratedCaseDateKey> unavailable = unavailableOptionalFamilies(tenant, actor);
         EnumMap<MigratedCaseDateKey, CaseDateDto> result = new EnumMap<>(MigratedCaseDateKey.class);
         EnumSet<MigratedCaseDateKey> conflicts = EnumSet.noneOf(MigratedCaseDateKey.class);
         for (CaseDateDto occurrence : occurrences) {
             MigratedCaseDateKey mapped = migratedOccurrenceKey(
                     occurrence.caseDateTypeId(), occurrence.typeSystemKey(), protectedTypeKeys);
-            if (mapped == null) continue;
+            if (mapped == null || unavailable.contains(mapped)) continue;
+            if (isOptionalDeadlineFamily(mapped)) {
+                // Compatibility chooses one deterministic historical family occurrence,
+                // independently of presentation configuration and stored type lifecycle.
+                result.merge(mapped, occurrence, (left, right) ->
+                        left.startsAt().compareTo(right.startsAt()) < 0
+                                || left.startsAt().equals(right.startsAt()) && left.id() < right.id() ? left : right);
+                continue;
+            }
             if (conflicts.contains(mapped)) continue;
             CaseDateDto conflict = result.putIfAbsent(mapped, occurrence);
             if (conflict != null) {
@@ -356,7 +378,20 @@ public final class CaseDateDao {
                 conflicts.add(mapped);
             }
         }
-        return new SingletonRead(Collections.unmodifiableMap(result), Collections.unmodifiableSet(conflicts));
+        return new SingletonRead(Collections.unmodifiableMap(result), Collections.unmodifiableSet(conflicts),
+                Collections.unmodifiableSet(unavailable));
+    }
+
+    private EnumSet<MigratedCaseDateKey> unavailableOptionalFamilies(int tenant, int actor) {
+        EnumSet<MigratedCaseDateKey> unavailable = EnumSet.noneOf(MigratedCaseDateKey.class);
+        try (Connection con = db.requireConnection()) {
+            verifyTenant(con, tenant); validateActor(con, tenant, actor);
+            for (MigratedCaseDateKey key : List.of(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS,
+                    MigratedCaseDateKey.TORT_NOTICE_DEADLINE)) {
+                if (findEffectiveFamilyTypeId(con, tenant, key).isEmpty()) unavailable.add(key);
+            }
+            return unavailable;
+        } catch (SQLException e) { throw fail(e); }
     }
 
     private Map<Integer, MigratedCaseDateKey> resolveProtectedTypeKeys(int tenant, int actor) {
@@ -369,7 +404,7 @@ public final class CaseDateDao {
                     JOIN dbo.CaseDateTypes t ON t.Id=m.CaseDateTypeId
                     WHERE (m.ShaleClientId=? OR m.ShaleClientId IS NULL)
                       AND (t.ShaleClientId=? OR t.ShaleClientId IS NULL)
-                      AND m.SemanticRoleKey IN ('INTAKE','STATUTE_OF_LIMITATIONS','TORT_NOTICE_DEADLINE')
+                      AND m.SemanticRoleKey='INTAKE'
                     """)) {
                 ps.setInt(1, tenant); ps.setInt(2, tenant);
                 try (ResultSet rs=ps.executeQuery()) { while (rs.next()) {
@@ -397,7 +432,7 @@ public final class CaseDateDao {
 
     public CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(long caseId, int tenant, int actor) {
         SingletonRead read = readMigratedSingletons(caseId, tenant, actor);
-        Map<MigratedCaseDateKey, CompatibilityCaseDateState> dates = compatibilityStates(caseId, tenant, actor, read.dates());
+        Map<MigratedCaseDateKey, CompatibilityCaseDateState> dates = compatibilityStates(caseId, tenant, actor, read.dates(), read.unavailable());
         byte[] token = dates.values().stream().map(CompatibilityCaseDateState::expectedAbsent)
                 .filter(Objects::nonNull).map(CompatibilityCaseDateMutation.ExpectedAbsent::observedCaseRowVer)
                 .findFirst().orElseGet(() -> loadCaseRowVer(caseId, tenant, actor));
@@ -422,12 +457,12 @@ public final class CaseDateDao {
      * holding the case row and singleton key range in its transaction.
      */
     public Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId, int tenant, int actor) {
-        Map<MigratedCaseDateKey, CaseDateDto> present = listMigratedSingletonsForCase(caseId, tenant, actor);
-        return compatibilityStates(caseId, tenant, actor, present);
+        SingletonRead read = readMigratedSingletons(caseId, tenant, actor);
+        return compatibilityStates(caseId, tenant, actor, read.dates(), read.unavailable());
     }
 
     private Map<MigratedCaseDateKey, CompatibilityCaseDateState> compatibilityStates(long caseId, int tenant, int actor,
-            Map<MigratedCaseDateKey, CaseDateDto> present) {
+            Map<MigratedCaseDateKey, CaseDateDto> present, Set<MigratedCaseDateKey> unavailable) {
         byte[] caseRowVer;
         try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(
                 "SELECT RowVer FROM dbo.Cases WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")) {
@@ -441,7 +476,9 @@ public final class CaseDateDao {
         EnumMap<MigratedCaseDateKey, CompatibilityCaseDateState> result = new EnumMap<>(MigratedCaseDateKey.class);
         for (MigratedCaseDateKey key : MigratedCaseDateKey.values()) {
             CaseDateDto date = present.get(key);
-            result.put(key, date == null
+            result.put(key, date == null && unavailable.contains(key)
+                    ? new CompatibilityCaseDateState(key, key.systemKey(), null, null, true, null, null, null, null)
+                    : date == null
                     ? new CompatibilityCaseDateState(key, key.systemKey(), null, null, true, null, null, null,
                             new CompatibilityCaseDateMutation.ExpectedAbsent(caseRowVer))
                     : new CompatibilityCaseDateState(key, key.systemKey(), date.startsAt(), date.endsAt(), date.allDay(),
@@ -450,7 +487,8 @@ public final class CaseDateDao {
         return Collections.unmodifiableMap(result);
     }
 
-    private record SingletonRead(Map<MigratedCaseDateKey, CaseDateDto> dates, Set<MigratedCaseDateKey> conflicts) {}
+    private record SingletonRead(Map<MigratedCaseDateKey, CaseDateDto> dates, Set<MigratedCaseDateKey> conflicts,
+            Set<MigratedCaseDateKey> unavailable) {}
 
     /**
      * Connection-accepting aggregate participant. It deliberately performs no
@@ -528,13 +566,16 @@ public final class CaseDateDao {
                     rows.add(new SingletonMutationRow(rs.getLong(1),rs.getInt(2),ldt(rs,"StartsAt"),ldt(rs,"EndsAt"),rs.getBoolean(5),rs.getString(6),rs.getLong(7),rs.getBytes(8))); return rows; }
             }
         }
+        boolean optionalFamily = isOptionalDeadlineFamily(key);
+        if (optionalFamily && findEffectiveFamilyTypeId(con, tenant, key).isEmpty()) return List.of();
         String sql = """
-                SELECT cd.Id,cd.CaseDateTypeId,cd.StartsAt,cd.EndsAt,cd.AllDay,cd.Notes,cd.ValueRevision,cd.RowVer
+                SELECT %s cd.Id,cd.CaseDateTypeId,cd.StartsAt,cd.EndsAt,cd.AllDay,cd.Notes,cd.ValueRevision,cd.RowVer
                 FROM dbo.CaseDates cd WITH (UPDLOCK,HOLDLOCK)
                 JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId
                 WHERE cd.ShaleClientId=? AND cd.CaseId=? AND cd.IsDeleted=0 AND t.SystemKey=?
                   AND (t.ShaleClientId=? OR t.ShaleClientId IS NULL)
-                """;
+                %s
+                """.formatted(optionalFamily ? "TOP (1)" : "", optionalFamily ? "ORDER BY cd.StartsAt ASC,cd.Id ASC" : "");
         try (PreparedStatement ps=con.prepareStatement(sql)) {
             ps.setInt(1,tenant); ps.setLong(2,caseId); ps.setString(3,systemKey); ps.setInt(4,tenant);
             try(ResultSet rs=ps.executeQuery()) { List<SingletonMutationRow> rows=new ArrayList<>(); while(rs.next())
@@ -545,22 +586,32 @@ public final class CaseDateDao {
     private static int requireEffectiveMappedType(Connection con, int tenant, MigratedCaseDateKey key) throws SQLException {
         CaseDateSemanticRole semanticRole = semanticRole(key);
         if (semanticRole != null) return CaseDateSemanticRoleResolver.requireEffectiveTypeId(con, tenant, semanticRole);
+        return findEffectiveFamilyTypeId(con, tenant, key).orElseThrow(
+                () -> new IllegalStateException("No active Case Date family for " + key.systemKey()));
+    }
+
+    private static OptionalInt findEffectiveFamilyTypeId(Connection con, int tenant, MigratedCaseDateKey key) throws SQLException {
         String sql="""
                 SELECT TOP (1) Id FROM dbo.CaseDateTypes WHERE SystemKey=? AND IsDeleted=0 AND IsActive=1
-                AND (ShaleClientId=? OR ShaleClientId IS NULL) ORDER BY CASE WHEN ShaleClientId=? THEN 0 ELSE 1 END,Id
+                AND Id=(SELECT TOP (1) candidate.Id FROM dbo.CaseDateTypes candidate
+                    WHERE candidate.SystemKey=? AND candidate.IsDeleted=0
+                      AND (candidate.ShaleClientId=? OR candidate.ShaleClientId IS NULL)
+                    ORDER BY CASE WHEN candidate.ShaleClientId=? THEN 0 ELSE 1 END,candidate.Id DESC)
                 """;
-        try(PreparedStatement ps=con.prepareStatement(sql)){ps.setString(1,key.systemKey());ps.setInt(2,tenant);ps.setInt(3,tenant);
-            try(ResultSet rs=ps.executeQuery()){if(rs.next())return rs.getInt(1);}}
-        throw new IllegalStateException("No effective Case Date type for " + key.systemKey());
+        try(PreparedStatement ps=con.prepareStatement(sql)){ps.setString(1,key.systemKey());ps.setString(2,key.systemKey());ps.setInt(3,tenant);ps.setInt(4,tenant);
+            try(ResultSet rs=ps.executeQuery()){return rs.next()?OptionalInt.of(rs.getInt(1)):OptionalInt.empty();}}
     }
 
     private static CaseDateSemanticRole semanticRole(MigratedCaseDateKey key) {
         return switch (key) {
             case CALLER_DATE -> CaseDateSemanticRole.INTAKE;
-            case STATUTE_OF_LIMITATIONS -> CaseDateSemanticRole.STATUTE_OF_LIMITATIONS;
-            case TORT_NOTICE_DEADLINE -> CaseDateSemanticRole.TORT_NOTICE_DEADLINE;
             default -> null;
         };
+    }
+
+    private static boolean isOptionalDeadlineFamily(MigratedCaseDateKey key) {
+        return key == MigratedCaseDateKey.STATUTE_OF_LIMITATIONS
+                || key == MigratedCaseDateKey.TORT_NOTICE_DEADLINE;
     }
 
     private static MigratedCaseDateKey migratedKey(CaseDateSemanticRole role) {

@@ -160,6 +160,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public List<String> listAvailableCompatibilityCaseDateFamilies(int tenant, int actor) {
+		return caseGateway.listAvailableCompatibilityCaseDateFamilies(tenant, actor);
+	}
+
+	@Override
 	public Map<Long, MigratedCaseDateProjectionDto> projectMigratedCaseDates(Collection<Long> caseIds, int tenant, int actor) {
 		return caseGateway.projectMigratedCaseDates(caseIds, tenant, actor);
 	}
@@ -219,7 +224,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 				.findFirst()
 				.orElseThrow(() -> new IllegalStateException("No active non-closed case status is available for this tenant."));
 		long caseId = caseGateway.createCaseAggregate(command, initialStatus.id());
-		return caseGateway.getDetail(caseId);
+		return getAuthoritativeCaseDetail(caseId, command.shaleClientId(), command.actorUserId()).orElseThrow();
 	}
 
 	@Override
@@ -1030,6 +1035,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		default Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId, int tenant, int actor) {
 			throw unsupportedCaseLinkGatewayOperation("listMigratedCompatibilityStateForCase");
 		}
+		default List<String> listAvailableCompatibilityCaseDateFamilies(int tenant, int actor) {
+			throw unsupportedCaseLinkGatewayOperation("listAvailableCompatibilityCaseDateFamilies");
+		}
 
 		default CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(long caseId, int tenant, int actor) {
 			throw unsupportedCaseLinkGatewayOperation("loadMigratedCompatibilityDateSnapshot");
@@ -1351,6 +1359,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override
 		public Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId, int tenant, int actor) {
 			return caseDateDao.listMigratedCompatibilityStateForCase(caseId, tenant, actor);
+		}
+
+		@Override
+		public List<String> listAvailableCompatibilityCaseDateFamilies(int tenant, int actor) {
+			return caseDateDao.listAvailableCompatibilityCaseDateFamilies(tenant, actor);
 		}
 
 		@Override

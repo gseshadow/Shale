@@ -6,6 +6,12 @@ import java.util.EnumMap;
 import org.junit.jupiter.api.Test;
 
 class CompatibilityCaseDateEditorTest {
+ @Test void unavailableOptionalFamilyHasADefinedEmptyState() {
+  var unavailable = new CompatibilityCaseDateState(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS,
+          "statute_of_limitations", null, null, true, null, null, null, null);
+  assertNull(unavailable.occurrenceId());
+  assertNull(unavailable.expectedAbsent());
+ }
  @Test void createsExactlyNineConcurrencyAwareIntents() {
   byte[] caseRv={1}, dateRv={2}; var before=new EnumMap<MigratedCaseDateKey,CompatibilityCaseDateState>(MigratedCaseDateKey.class);
   var after=new EnumMap<MigratedCaseDateKey,CompatibilityCaseDateEditor.EditedValue>(MigratedCaseDateKey.class); var old=LocalDateTime.of(2026,1,1,0,0);

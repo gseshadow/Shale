@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import './styles.css';
 
 interface AuthState {
@@ -911,6 +911,7 @@ function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string
   const [dateOfInjury, setDateOfInjury] = useState('');
   const [statuteOfLimitations, setStatuteOfLimitations] = useState('');
   const [tortNoticeDeadline, setTortNoticeDeadline] = useState('');
+  const [availableDeadlineFamilies, setAvailableDeadlineFamilies] = useState<Set<string>>(new Set());
   const [summary, setSummary] = useState('');
   const [description, setDescription] = useState('');
   const [isLoadingLookups, setIsLoadingLookups] = useState(false);
@@ -920,11 +921,12 @@ function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string
   useEffect(() => {
     if (!accessToken) return;
     setIsLoadingLookups(true);
-    Promise.all([listPracticeAreaLookups(accessToken), listTeamMembers(accessToken)])
-      .then(([areas, members]) => {
+    Promise.all([listPracticeAreaLookups(accessToken), listTeamMembers(accessToken), listEffectiveCaseDateTypes(accessToken)])
+      .then(([areas, members, dateTypes]) => {
         const activeAreas = areas.filter((area) => area.active && !area.deleted);
         setPracticeAreas(activeAreas);
         setAttorneys(members.filter((member) => member.attorney));
+        setAvailableDeadlineFamilies(new Set(dateTypes));
       })
       .catch((caught) => setSubmitError(caught instanceof Error ? caught.message : 'Lookups could not be loaded.'))
       .finally(() => setIsLoadingLookups(false));
@@ -986,8 +988,8 @@ function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string
         <label htmlFor="new-case-attorney">Responsible attorney<select id="new-case-attorney" value={responsibleAttorneyUserId} onChange={(event) => setResponsibleAttorneyUserId(event.target.value)} disabled={isSubmitting || isLoadingLookups} required><option value="">Choose an attorney</option>{attorneys.map((member) => <option key={member.id} value={member.id}>{displayValue(member.displayName, `User ${member.id}`)}</option>)}</select></label>
         <label htmlFor="new-case-caller-date">Intake date<input id="new-case-caller-date" type="date" value={callerDate} onChange={(event) => setCallerDate(event.target.value)} disabled={isSubmitting} /></label>
         <label htmlFor="new-case-injury-date">Date of injury<input id="new-case-injury-date" type="date" value={dateOfInjury} onChange={(event) => setDateOfInjury(event.target.value)} disabled={isSubmitting} /></label>
-        <label htmlFor="new-case-sol">Statute of limitations<input id="new-case-sol" type="date" value={statuteOfLimitations} onChange={(event) => setStatuteOfLimitations(event.target.value)} disabled={isSubmitting} /></label>
-        <label htmlFor="new-case-tort">Tort notice deadline<input id="new-case-tort" type="date" value={tortNoticeDeadline} onChange={(event) => setTortNoticeDeadline(event.target.value)} disabled={isSubmitting} /></label>
+        {availableDeadlineFamilies.has('statute_of_limitations') && <label htmlFor="new-case-sol">Statute of limitations<input id="new-case-sol" type="date" value={statuteOfLimitations} onChange={(event) => setStatuteOfLimitations(event.target.value)} disabled={isSubmitting} /></label>}
+        {availableDeadlineFamilies.has('tort_notice_deadline') && <label htmlFor="new-case-tort">Tort notice deadline<input id="new-case-tort" type="date" value={tortNoticeDeadline} onChange={(event) => setTortNoticeDeadline(event.target.value)} disabled={isSubmitting} /></label>}
         <label htmlFor="new-case-summary">Summary<textarea id="new-case-summary" value={summary} onChange={(event) => setSummary(event.target.value)} disabled={isSubmitting} rows={4} maxLength={10000} /></label>
         <label htmlFor="new-case-description">Description<textarea id="new-case-description" value={description} onChange={(event) => setDescription(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} /></label>
         {submitError && <p className="status error" role="alert">{submitError}</p>}
@@ -1880,6 +1882,8 @@ function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { access
 }
 
 function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const solAvailable = mappedCaseDateAvailable(detail, 'statute_of_limitations');
+  const tortAvailable = mappedCaseDateAvailable(detail, 'tort_notice_deadline');
   const [caseName, setCaseName] = useState(detail.caseName || '');
   const [description, setDescription] = useState(detail.description || '');
   const [dateOfInjury, setDateOfInjury] = useState(mappedDateInput(detail, 'date_of_injury'));
@@ -1936,10 +1940,8 @@ function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { acces
       <textarea id="case-core-description" value={description} onChange={(event) => setDescription(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
       <label htmlFor="case-core-injury-date">Date of injury</label>
       <input id="case-core-injury-date" type="date" value={dateOfInjury} onChange={(event) => setDateOfInjury(event.target.value)} disabled={isSubmitting} />
-      <label htmlFor="case-core-sol-date">Statute of limitations</label>
-      <input id="case-core-sol-date" type="date" value={statuteOfLimitations} onChange={(event) => setStatuteOfLimitations(event.target.value)} disabled={isSubmitting} />
-      <label htmlFor="case-core-tort-notice-date">Tort notice deadline</label>
-      <input id="case-core-tort-notice-date" type="date" value={tortNoticeDeadline} onChange={(event) => setTortNoticeDeadline(event.target.value)} disabled={isSubmitting} />
+      {solAvailable && <><label htmlFor="case-core-sol-date">Statute of limitations</label><input id="case-core-sol-date" type="date" value={statuteOfLimitations} onChange={(event) => setStatuteOfLimitations(event.target.value)} disabled={isSubmitting} /></>}
+      {tortAvailable && <><label htmlFor="case-core-tort-notice-date">Tort notice deadline</label><input id="case-core-tort-notice-date" type="date" value={tortNoticeDeadline} onChange={(event) => setTortNoticeDeadline(event.target.value)} disabled={isSubmitting} /></>}
       <label htmlFor="case-core-summary">Summary</label>
       <textarea id="case-core-summary" value={summary} onChange={(event) => setSummary(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} />
       {submitError && <p className="status error" role="alert">{submitError}</p>}
@@ -1961,6 +1963,11 @@ function toDateInputValue(value: string | null | undefined): string {
 
 function mappedCaseDate(detail: CaseDetail, systemKey: string) {
   return detail.mappedCaseDates?.find((date) => date.systemKey === systemKey);
+}
+
+function mappedCaseDateAvailable(detail: CaseDetail, systemKey: string): boolean {
+  const date = mappedCaseDate(detail, systemKey);
+  return Boolean(date && (!date.absent || date.absenceCaseRowVer));
 }
 
 function mappedDateInput(detail: CaseDetail, systemKey: string): string {
