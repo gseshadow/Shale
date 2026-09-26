@@ -208,9 +208,30 @@ occurrences remain readable while the effective family is available.
 
 Intake continues to resolve through its protected semantic role. SOL/TCN semantic mappings also remain
 active because report/detail export projections, the desktop Documents compatibility lookup, server/React
-fixed compatibility projections and editors, confirmation-policy applicability, mapping administration,
+fixed compatibility projections and editors, mapping administration,
 and migration/verification tooling still read or manage them. Those paths were deliberately not changed
 in this desktop presentation slice. The next safe boundary is a separately verified report/export and
-server compatibility cutover, followed by fixed-editor and confirmation-policy review. Mapping retirement
+server compatibility cutover, followed by fixed-editor review. Mapping retirement
 is not safe until those readers and writers plus external SQL consumers have been inventoried, converted,
 and soaked with row-level verification.
+
+### Desktop boundary inventory
+
+The concrete cut-over inventory is intentionally explicit so a new list surface cannot be mistaken for a completed
+mapping-retirement boundary:
+
+| Desktop behavior | Runtime boundary | SOL/TCN consumer |
+| --- | --- | --- |
+| Cases list sort and stable pagination | `CaseDao.findPageInternal` / `authoritativeBoundaryDateApplySql` | SOL soonest/latest and TCN soonest use the earliest family occurrence; the existing Case-id tie breaker and SQL Server null placement remain unchanged. |
+| Cases grid sort, filter count, and export page | `CaseSummaryDao.findActiveGridPage`, `countActiveGrid`, `listActiveGridForExport`, and `gridSql` | The count predicate remains date-independent; the shared bounded grid projection supplies ordinary-family SOL/TCN dates without per-case reads. |
+| My Shale assigned board warnings and deadline radar | `CaseSummaryDao.listActiveAssignedBoard` | Warning thresholds and labels continue to consume the projected SOL/TCN values; card presentation selections are not consulted. |
+| User Detail assigned-case list | `CaseSummaryDao.listActiveAssignedForUserDetail` | The bounded set projection supplies ordinary-family SOL/TCN values. |
+| Global and deleted-case search | `CaseSummaryDao.searchActiveByName` and `searchDeletedByName` | Search result cards receive ordinary-family SOL/TCN values, including readable historical occurrences while the effective type is available. |
+| Contact and Organization related cases | `CaseSummaryDao.listActiveRelatedToContact`, `listActiveRelatedToOrganization`, and `listActiveRelated` | Both callers share one tenant-scoped ordinary-family projection. |
+
+Every collection above remains one set-based statement under the established tenant session/RLS boundary. For an active
+effective family, occurrences stored on either the visible global definition or the same-tenant overlay remain candidates.
+An inactive, non-deleted tenant overlay masks the global definition and yields null; a deleted overlay permits global
+fallback; an entirely missing optional family also yields null. Multiple values choose the earliest `StartsAt` (and the
+boundary query uses lowest `CaseDates.Id` for an exact timestamp tie). Card or Overview selection changes cannot alter any
+of these results.

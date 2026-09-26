@@ -28,11 +28,9 @@ and `AllDay`. `Title`, `Notes`, deletion/restoration metadata, audit timestamps/
 `RowVer` are not constituents. `CaseDates.ValueRevision` is the business revision and must not be
 inferred from `RowVer`.
 
-SOL and TCN applicability must be resolved through the protected `STATUTE_OF_LIMITATIONS` and
-`TORT_NOTICE_DEADLINE` rows in `CaseDateTypeSemanticRoleMappings`, including tenant-effective
-mapping rules. Labels, numeric type IDs, and the New Intake controller are not semantic authority.
-The Phase 2B writer must perform that resolution inside every Case Date create/edit transaction, no
-matter which application entry point invoked it.
+This Phase 2A/2B semantic-role applicability rule was superseded by the deployed Phase 2D correction
+below. New policy evaluation uses the resulting tenant-effective Case Date Type's stable policy key;
+protected SOL/TCN mappings are not confirmation-policy identity.
 
 Reads join only a requirement targeting the Case Date's current `ValueRevision`: no row is
 `NOT_REQUIRED`, a requirement without a confirmation is `PENDING`, and a requirement with its
@@ -63,7 +61,7 @@ entity-action audit events. It must not backfill existing dates.
 
 Phase 2B adds backend operations only. An active same-tenant administrator replaces the current policy for a registered `(FormKey, FieldKey)` using its identity and `RowVer`. Replacement supersedes the immutable predecessor and inserts the next revision; it never edits requirements or confirmations. Disabled policies store no role. Enabled policies require an active, nondeleted same-tenant firm-wide role. Form replacement continues registering stable field identities and does not couple `IsRequired` to confirmation.
 
-`FieldConfirmationDao.evaluateCaseDate` is the connection-accepting participant used by all authoritative Case Date writers: New Intake/configured-date and duplicate-merge aggregates, web creation, existing-case aggregate/compatibility edits, standalone create/update/restore, and Calendar routes delegating to those operations. SOL/TCN applicability comes only from protected semantic-role mappings. Creates evaluate revision 1; type/start/end/all-day changes and restoration advance `ValueRevision` and evaluate the new revision. Presentation-only changes do not. Deletion preserves history. Unchanged values and policy changes never backfill dates.
+`FieldConfirmationDao.evaluateCaseDate` is the connection-accepting participant used by all authoritative Case Date writers: New Intake/configured-date and duplicate-merge aggregates, web creation, existing-case aggregate/compatibility edits, standalone create/update/restore, and Calendar routes delegating to those operations. The original Phase 2B SOL/TCN semantic-role applicability rule is historical and is superseded by Phase 2D's resulting-type policy key. Creates evaluate revision 1; type/start/end/all-day changes and restoration advance `ValueRevision` and evaluate the new revision. Presentation-only changes do not. Deletion preserves history. Unchanged values and policy changes never backfill dates.
 
 Eligibility is queried in the owning transaction from active Users and roles, legacy built-in ADMIN/ATTORNEY flags, or active tenant-defined assignments. Case Team tables and client claims are not consulted. Manual confirmation locks and validates the active occurrence, current target/revision, Case Date and requirement row versions, tenant/session actor, and snapshotted role.
 
