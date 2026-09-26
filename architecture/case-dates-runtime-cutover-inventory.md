@@ -375,6 +375,23 @@ must preserve this order: the constraint must exist before an application versio
 `CASE_DATE_TYPE`; filename ordering is not a substitute for checking the deployment
 runner's actual order.
 
+### SOL/TCN semantic-mapping retirement verification (2026-09-26)
+
+The final runtime scan covers Java and React production sources, embedded SQL, database scripts,
+views/procedures, reports/documents/exports, and verification tooling. Active SOL/TCN behavior is based
+on ordinary `statute_of_limitations` and `tort_notice_deadline` type families; only Intake still reads or
+writes active semantic mappings. Matches in pre-cutover migrations and historical vocabulary parsers are
+not runtime dependencies and remain immutable evidence.
+
+Operators must preserve the output of the dated preflight, migration, and verification scripts as one
+review packet. Zero database-module findings do not clear external consumers: report-server datasets,
+other databases, scheduled jobs, ad hoc tools, spreadsheets, and deployed binaries are outside
+`sys.sql_modules`. Any consumer not affirmatively inventoried blocks production execution. After clean
+SQL verification, manually compare desktop and web compatibility values, selectors, cards, Overview,
+sorts and warnings, documents/reports/exports, fixed editors, generic Dates and Calendar occurrence lists,
+and Intake create/admin behavior. Multiple SOL/TCN occurrences must remain visible generically while the
+compatibility value remains the deterministic earliest `StartsAt`, then lowest occurrence ID.
+
 ### Deferred legacy-column removal gate
 
 Physical removal remains deferred to a separate approved phase after at least one

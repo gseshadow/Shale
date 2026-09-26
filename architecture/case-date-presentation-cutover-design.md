@@ -369,15 +369,31 @@ No selector, form reference validation, Overview selection validation, calendar 
 SOL/TCN fixed projection/editor, report/export, server/React compatibility, or generic SOL/TCN
 occurrence mutation depends on an active SOL/TCN mapping.
 
-Retire active SOL/TCN mappings only after this implementation passes focused affected tests, the
-change-aware selector, and the critical reactor in the supported Windows environment, followed by a
-production observation window. Before migration, inventory direct/external SQL consumers; verify every
-tenant has exactly one eligible global SOL/TCN family and no code or saved query resolves those roles;
-compare selector, calendar, card, Overview, report, export, server, fixed-editor, confirmation-policy,
-and historical occurrence results with the SOL/TCN mappings disabled in a production-shaped copy;
-and verify Intake mapping resolution and singleton guards remain unchanged. The later forward-only
-migration should retire (soft-delete/deactivate), not delete, active SOL/TCN mappings; preserve all role,
-mapping, RowVer, and entity-action audit rows; report per-tenant before/after counts and orphan checks;
-run under an explicit transaction with rollback on findings; and include a rollback script that
-reactivates the same mapping IDs. No `CaseDates.CaseDateTypeId`, presentation selection, confirmation
-snapshot, or audit row may be updated by that migration.
+The final repository-wide inventory on 2026-09-26 found no active SOL/TCN semantic-mapping read or
+write. Java desktop/server selectors, cards, Overview, compatibility values, sorts, warnings, reports,
+exports, editors, and ordinary multi-occurrence behavior use stable type/SystemKey identity; React uses
+the corresponding compatibility-family API values. Remaining production mapping access is explicitly
+Intake-only. Historical migration scripts, historical parser/enum vocabulary, architecture examples,
+and tests that prove the old dependency is absent remain intentionally searchable.
+
+The final package is
+`docs/sql/2026-09-26_case_date_sol_tcn_mapping_retirement_preflight.sql`, followed by
+`docs/sql/2026-09-26_case_date_sol_tcn_mapping_retirement.sql`, followed by
+`docs/sql/2026-09-26_case_date_sol_tcn_mapping_retirement_verify.sql`. The migration is forward-only:
+it soft-retires mapping rows and makes SOL/TCN roles nonprotected without deleting or re-keying anything.
+It transactionally compares concrete before/after rows for occurrences, definitions, firm presentation,
+per-case Overview overrides, and confirmation policies. Intake remains active and protected.
+
+The database-module inventory reads `sys.sql_modules`; it can find searchable procedures, views,
+functions, and triggers in the connected database and separately flags encrypted definitions. It cannot
+discover ad hoc SQL, application binaries, report-server datasets, ETL/jobs in another database or
+instance, linked-server consumers, cached client queries, spreadsheets, or vendor integrations. An
+unreviewed external SQL/report consumer is therefore still a live-migration blocker even when preflight
+returns no database-resident findings.
+
+Deployment order is strict: deploy the application containing lifecycle cutover `d2a02f24` (the local
+equivalent of the requested `c8ba3021`) or later; run and review preflight; independently clear all
+external consumers; set the one operator acknowledgement on a reviewed migration copy and execute it;
+run verification; then manually exercise desktop and web selectors, cards, Overview, sorts/warnings,
+reports/exports, editors, Calendar/generic multi-occurrence views, Intake creation, and Intake mapping
+administration. Do not run the migration while any preflight finding or external-consumer finding remains.
