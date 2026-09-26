@@ -309,8 +309,8 @@ class ApiReadControllerTest {
                             {"key":"DATE_OF_INJURY","systemKey":"date_of_injury","absent":true,"absenceCaseRowVer":"AQ=="},
                             {"key":"DATE_OF_MEDICAL_NEGLIGENCE","systemKey":"date_of_medical_negligence","absent":true,"absenceCaseRowVer":"AQ=="},
                             {"key":"DATE_MEDICAL_NEGLIGENCE_DISCOVERED","systemKey":"date_medical_negligence_discovered","absent":true,"absenceCaseRowVer":"AQ=="},
-                            {"key":"STATUTE_OF_LIMITATIONS","systemKey":"statute_of_limitations","absent":true,"absenceCaseRowVer":"AQ=="},
-                            {"key":"TORT_NOTICE_DEADLINE","systemKey":"tort_notice_deadline","absent":true,"absenceCaseRowVer":"AQ=="},
+                            {"key":"STATUTE_OF_LIMITATIONS","systemKey":"statute_of_limitations","absent":true,"absenceCaseRowVer":"AQ==","startsAt":"2027-01-02T00:00:00","allDay":true},
+                            {"key":"TORT_NOTICE_DEADLINE","systemKey":"tort_notice_deadline","absent":false,"occurrenceId":82,"caseDateTypeId":12,"occurrenceRowVer":"Ag==","startsAt":null,"allDay":true},
                             {"key":"DISCOVERY_DEADLINE","systemKey":"discovery_deadline","absent":true,"absenceCaseRowVer":"AQ=="},
                             {"key":"DATE_FEE_AGREEMENT_SIGNED","systemKey":"fee_agreement_signed","absent":true,"absenceCaseRowVer":"AQ=="},
                             {"key":"DATE_NON_ENGAGEMENT_LETTER_SENT","systemKey":"non_engagement_letter_sent","absent":true,"absenceCaseRowVer":"AQ=="}
@@ -332,6 +332,27 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals("CASE-501", caseServicePort.updateCaseNumber);
         org.junit.jupiter.api.Assertions.assertEquals("Updated summary", caseServicePort.updateSummary);
         org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[] {1}, caseServicePort.updateExpectedRowVer);
+        var create = org.junit.jupiter.api.Assertions.assertInstanceOf(CompatibilityCaseDateMutation.Create.class,
+                caseServicePort.updateDates.dates().get(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS));
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDateTime.of(2027, 1, 2, 0, 0), create.value().startsAt());
+        var clear = org.junit.jupiter.api.Assertions.assertInstanceOf(CompatibilityCaseDateMutation.Clear.class,
+                caseServicePort.updateDates.dates().get(MigratedCaseDateKey.TORT_NOTICE_DEADLINE));
+        org.junit.jupiter.api.Assertions.assertEquals(82L, clear.occurrenceId());
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[] {2}, clear.expectedRowVer());
+    }
+
+    @Test
+    void compatibilityFamilyLookupUsesAuthenticatedTenantAndPreservesOptionalListContract() throws Exception {
+        RecordingCaseServicePort cases = new RecordingCaseServicePort();
+        MockMvc mvc = developmentMockMvc(cases, unusedPort(TaskServicePort.class), unusedPort(ContactServicePort.class),
+                unusedPort(NotificationServicePort.class));
+        mvc.perform(get("/api/lookups/case-date-types")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[\"statute_of_limitations\"]"));
+        org.junit.jupiter.api.Assertions.assertEquals(41, cases.familyLookupTenant);
+        org.junit.jupiter.api.Assertions.assertEquals(31, cases.familyLookupActor);
     }
 
     @Test
@@ -918,7 +939,17 @@ class ApiReadControllerTest {
         private LocalDate updateTortNoticeDeadline;
         private String updateSummary;
         private byte[] updateExpectedRowVer;
+        private CaseDateAggregateCommand updateDates;
         private CaseDetailDto detail;
+        private int familyLookupTenant;
+        private int familyLookupActor;
+
+        @Override
+        public List<String> listAvailableCompatibilityCaseDateFamilies(int shaleClientId, int actorUserId) {
+            familyLookupTenant = shaleClientId;
+            familyLookupActor = actorUserId;
+            return List.of("statute_of_limitations");
+        }
 
         @Override
         public Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId) {
@@ -1203,6 +1234,7 @@ class ApiReadControllerTest {
             this.updateCaseNumber = command.caseNumber();
             this.updateSummary = command.summary();
             this.updateExpectedRowVer = command.expectedRowVer();
+            this.updateDates = command.caseDates();
             return new CaseDetailDto(command.caseId(), command.caseNumber(), command.caseName(), command.description(), "Open", "Ada Attorney", 10,
                     null, null, null, null, null, null, null, null, null, null, null,
                     null, null, null, null, null, null, null, null, null, null, null,

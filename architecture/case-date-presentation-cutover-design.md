@@ -254,8 +254,29 @@ The Cases XLSX/CSV export was already cut over through
 retains that path rather than adding another export projection. Existing report DTO fields, XLSX
 headings/order/date formats/null behavior, and Documents model/rendering contracts are unchanged.
 
-After this slice, no desktop production report, document-generation, XLSX/CSV export, or report/detail
-projection reads SOL or TCN through protected semantic-role mappings. Remaining SOL/TCN mapping
-consumers are outside this slice: protected mapping administration and protection, migration and
-verification tooling, and the server/React plus fixed desktop compatibility detail/editor paths.
-Mappings therefore remain active.
+## Server and React compatibility cutover (2026-09-26)
+
+The server compatibility detail projection and aggregate create/edit paths resolve SOL and TCN as the
+ordinary tenant-effective `SYSTEM:statute_of_limitations` and
+`SYSTEM:tort_notice_deadline` families. A nondeleted tenant definition wins over the global definition;
+an inactive tenant winner masks the global, while a deleted tenant overlay resets to the global
+definition. Missing or inactive effective families are represented by the existing mapped-date response
+fields as an unavailable absent slot (no occurrence identity and no absence witness), rather than
+failing a read. React uses the dedicated effective-family lookup for new-case fields and the absence
+witness already present in Case Detail for edit availability. Presentation selections never control
+these compatibility fields.
+
+While a family is active, compatibility reads retain occurrences stored against eligible global or
+same-tenant definitions, including historical inactive/deleted definitions, and select earliest
+`StartsAt`, then lowest `CaseDates.Id`. Updates and clears retain that selected occurrence ID and
+`RowVer`; creates resolve the current effective concrete type. The aggregate transaction, entity/PHI
+audits, case/occurrence optimistic concurrency, and confirmation evaluation against the concrete stored
+type remain unchanged and require no audit-schema migration. Intake alone continues to use required
+protected `INTAKE` semantic-role resolution.
+
+After this slice, no desktop production report, document-generation, XLSX/CSV export, server Case-list,
+or server/React compatibility detail projection reads SOL or TCN through protected semantic-role
+mappings. Remaining SOL/TCN mapping consumers are protected mapping administration and lifecycle
+protection, the generic nine-meaning migrated projection, fixed desktop generic occurrence editors,
+migration/verification tooling, and external SQL consumers. Mappings therefore remain active pending
+those separately scoped cutovers.

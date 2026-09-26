@@ -68,8 +68,8 @@ final class CaseDeadlineIdentityCutoverContractTest {
         assertAll(
                 () -> assertTrue(sql.contains("LOWER(LTRIM(RTRIM(family_type.SystemKey)))='statute_of_limitations'")),
                 () -> assertTrue(sql.contains("LOWER(LTRIM(RTRIM(family_type.SystemKey)))='tort_notice_deadline'")),
-                () -> assertTrue(sql.lines().filter(line -> line.contains("effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS'")).count() == 2),
-                () -> assertTrue(sql.lines().filter(line -> line.contains("effective.SemanticRoleKey='TORT_NOTICE_DEADLINE'")).count() == 2),
+                () -> assertFalse(sql.contains("effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS'")),
+                () -> assertFalse(sql.contains("effective.SemanticRoleKey='TORT_NOTICE_DEADLINE'")),
                 () -> assertFalse(sql.contains("CaseDatePresentationSelections")),
                 () -> assertFalse(sql.contains("CASE_CARD")));
     }

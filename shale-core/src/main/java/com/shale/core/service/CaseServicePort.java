@@ -70,6 +70,9 @@ public interface CaseServicePort {
 	List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
 
 	List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId);
+	default List<String> listAvailableCompatibilityCaseDateFamilies(int shaleClientId, int actorUserId) {
+		throw unsupportedCaseLinkOperation("listAvailableCompatibilityCaseDateFamilies");
+	}
 
 	default FieldConfirmationPolicyDto setFieldConfirmationPolicy(SetFieldConfirmationPolicyCommand command) {
 		throw unsupportedCaseLinkOperation("setFieldConfirmationPolicy");

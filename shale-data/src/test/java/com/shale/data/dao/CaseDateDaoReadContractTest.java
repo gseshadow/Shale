@@ -10,19 +10,38 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CaseDateDaoReadContractTest {
-    @Test void protectedOverviewDatesAreClassifiedByEffectiveSemanticIdentity() {
+    @Test void intakeRemainsProtectedWhileDeadlineFamiliesUseTheirOrdinarySystemKeys() {
         Map<Integer, MigratedCaseDateKey> protectedTypes = Map.of(
-                701, MigratedCaseDateKey.STATUTE_OF_LIMITATIONS,
-                702, MigratedCaseDateKey.TORT_NOTICE_DEADLINE);
+                701, MigratedCaseDateKey.CALLER_DATE);
 
-        assertEquals(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS,
+        assertEquals(MigratedCaseDateKey.CALLER_DATE,
                 CaseDateDao.migratedOccurrenceKey(701, null, protectedTypes));
+        assertEquals(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS,
+                CaseDateDao.migratedOccurrenceKey(999, "statute_of_limitations", protectedTypes));
         assertEquals(MigratedCaseDateKey.TORT_NOTICE_DEADLINE,
-                CaseDateDao.migratedOccurrenceKey(702, "tenant_custom_deadline", protectedTypes));
-        assertNull(CaseDateDao.migratedOccurrenceKey(999, "statute_of_limitations", protectedTypes),
-                "a legacy-key row that is not the active protected mapping is not authoritative");
+                CaseDateDao.migratedOccurrenceKey(702, "tort_notice_deadline", protectedTypes));
         assertEquals(MigratedCaseDateKey.DATE_OF_INJURY,
                 CaseDateDao.migratedOccurrenceKey(703, "date_of_injury", protectedTypes));
+    }
+
+    @Test void serverCompatibilityDeadlinesUseOptionalEffectiveFamiliesAndDeterministicHistoricalOccurrences() throws Exception {
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
+        String read = source.substring(source.indexOf("private SingletonRead readMigratedSingletons"),
+                source.indexOf("public CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot"));
+        String mutation = source.substring(source.indexOf("private static List<SingletonMutationRow> lockSingleton"),
+                source.indexOf("private static CaseDateSemanticRole semanticRole"));
+        assertAll(
+                () -> assertTrue(read.contains("unavailableOptionalFamilies")),
+                () -> assertTrue(read.contains("left.startsAt().compareTo(right.startsAt())")),
+                () -> assertTrue(read.contains("left.id() < right.id()")),
+                () -> assertTrue(read.contains("m.SemanticRoleKey='INTAKE'")),
+                () -> assertFalse(read.contains("'STATUTE_OF_LIMITATIONS'")),
+                () -> assertFalse(read.contains("'TORT_NOTICE_DEADLINE'")),
+                () -> assertTrue(mutation.contains("candidate.IsDeleted=0"), "deleted overlays reset to global"),
+                () -> assertTrue(mutation.contains("candidate.ShaleClientId=? THEN 0 ELSE 1 END"), "inactive tenant winners mask global"),
+                () -> assertTrue(mutation.contains("ORDER BY cd.StartsAt ASC,cd.Id ASC")),
+                () -> assertTrue(source.contains("evaluateCaseDate(con,c.shaleClientId(),c.actorUserId(),row.id(),row.typeId()"),
+                        "updates must evaluate confirmation against the exact stored type"));
     }
 
     @Test void duplicateHistoryIsExposedWithoutArbitraryAuthoritativeSelection() throws Exception {
