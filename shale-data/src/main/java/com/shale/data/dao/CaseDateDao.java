@@ -348,10 +348,12 @@ public final class CaseDateDao {
                     AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL)
                     AND m.SemanticRoleKey='INTAKE'
                 ) role_mapping
-                WHERE c.ShaleClientId = ? AND c.Id IN (""" + placeholders + ")
+                WHERE c.ShaleClientId = ? AND c.Id IN (""" + placeholders + """
+                )
                 ORDER BY c.Id,
                   CASE WHEN LOWER(LTRIM(RTRIM(st.SystemKey))) IN ('statute_of_limitations','tort_notice_deadline') THEN 0 ELSE 1 END,
-                  cd.StartsAt,cd.Id";
+                  cd.StartsAt,cd.Id
+                """;
     }
 
     /**

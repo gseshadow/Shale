@@ -38,6 +38,8 @@ class MigratedCaseDateProjectionContractTest {
     @Test void deadlinesUseOrdinaryFamiliesWhileIntakeAloneRetainsProtectedMappingIdentity() {
         String sql = CaseDateDao.migratedProjectionSql("?");
         assertAll(
+                () -> assertTrue(sql.contains("c.Id IN (?)\n") || sql.contains("c.Id IN (?)\r\n"),
+                        "the generated placeholder list must close before the deterministic ORDER BY clause"),
                 () -> assertTrue(sql.contains("m.SemanticRoleKey='INTAKE'")),
                 () -> assertFalse(sql.contains("m.SemanticRoleKey='STATUTE_OF_LIMITATIONS'")),
                 () -> assertFalse(sql.contains("m.SemanticRoleKey='TORT_NOTICE_DEADLINE'")),
