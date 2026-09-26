@@ -208,10 +208,10 @@ occurrences remain readable while the effective family is available.
 
 Intake continues to resolve through its protected semantic role. SOL/TCN semantic mappings also remain
 active because report/detail export projections, the desktop Documents compatibility lookup, server/React
-fixed compatibility projections and editors, confirmation-policy applicability, mapping administration,
+fixed compatibility projections and editors, mapping administration,
 and migration/verification tooling still read or manage them. Those paths were deliberately not changed
 in this desktop presentation slice. The next safe boundary is a separately verified report/export and
-server compatibility cutover, followed by fixed-editor and confirmation-policy review. Mapping retirement
+server compatibility cutover, followed by fixed-editor review. Mapping retirement
 is not safe until those readers and writers plus external SQL consumers have been inventoried, converted,
 and soaked with row-level verification.
 
