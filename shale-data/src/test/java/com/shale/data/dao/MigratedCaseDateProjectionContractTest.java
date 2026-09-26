@@ -25,13 +25,25 @@ class MigratedCaseDateProjectionContractTest {
         assertTrue(sql.contains("cd.ShaleClientId = c.ShaleClientId"));
         assertTrue(sql.contains("c.ShaleClientId = ?"));
         assertTrue(sql.contains("cd.IsDeleted = 0"));
-        assertTrue(sql.contains("COALESCE(eff.SystemKey, st.SystemKey)"), "historical stored type is the fallback");
-        assertTrue(sql.contains("t.IsDeleted = 0 AND t.IsActive = 1"));
+        assertTrue(sql.contains("st.SystemKey AS TypeSystemKey"), "historical stored type identifies family occurrences");
+        assertTrue(sql.contains("family_winner.IsActive=1"), "an inactive effective overlay masks the fixed field");
+        assertTrue(sql.contains("t.IsDeleted = 0"), "a deleted overlay permits global fallback");
         assertTrue(sql.contains("CASE WHEN t.ShaleClientId = ? THEN 0 ELSE 1 END"));
         assertFalse(sql.contains("Name"), "display labels cannot identify fixed meanings");
         assertFalse(sql.contains("CalendarEvents"));
         assertFalse(sql.matches("(?is).*\\b(INSERT|UPDATE|DELETE|MERGE)\\b.*"));
         for (String column : LEGACY_COLUMNS) assertFalse(sql.contains(column), column);
+    }
+
+    @Test void deadlinesUseOrdinaryFamiliesWhileIntakeAloneRetainsProtectedMappingIdentity() {
+        String sql = CaseDateDao.migratedProjectionSql("?");
+        assertAll(
+                () -> assertTrue(sql.contains("m.SemanticRoleKey='INTAKE'")),
+                () -> assertFalse(sql.contains("m.SemanticRoleKey='STATUTE_OF_LIMITATIONS'")),
+                () -> assertFalse(sql.contains("m.SemanticRoleKey='TORT_NOTICE_DEADLINE'")),
+                () -> assertTrue(sql.contains("'statute_of_limitations','tort_notice_deadline'")),
+                () -> assertTrue(sql.contains("cd.StartsAt,cd.Id"),
+                        "the first projected deadline must be earliest StartsAt then lowest occurrence ID"));
     }
 
     @Test void serviceBoundaryIsCollectionOrientedAndFrameworkNeutral() throws Exception {

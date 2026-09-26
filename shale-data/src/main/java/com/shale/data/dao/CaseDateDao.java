@@ -289,6 +289,13 @@ public final class CaseDateDao {
                     MigratedCaseDateKey key;
                     try { key = MigratedCaseDateKey.require(systemKey); }
                     catch (IllegalArgumentException notMigrated) { continue; }
+                    if (isOptionalDeadlineFamily(key)) {
+                        // A fixed deadline is available only while its ordinary tenant-effective
+                        // family is active.  The stored occurrence remains in the generic Dates
+                        // collection even when an inactive overlay masks this compatibility slot.
+                        if (!rs.getBoolean("EffectiveFamilyAvailable")) continue;
+                        if (caseSlots.get(key).present()) continue;
+                    }
                     mergeProjectionSlot(caseSlots, conflicts.computeIfAbsent(caseId,
                             ignored -> EnumSet.noneOf(MigratedCaseDateKey.class)), key,
                             ldt(rs, "StartsAt"), ldt(rs, "EndsAt"), rs.getBoolean("AllDay"));
@@ -320,26 +327,31 @@ public final class CaseDateDao {
     static String migratedProjectionSql(String placeholders) {
         return """
                 SELECT c.Id AS CaseId, cd.Id AS OccurrenceId,
-                       COALESCE(eff.SystemKey, st.SystemKey) AS TypeSystemKey, role_mapping.SemanticRoleKey,
+                       st.SystemKey AS TypeSystemKey, role_mapping.SemanticRoleKey,
+                       CAST(CASE WHEN family_winner.Id IS NOT NULL AND family_winner.IsActive=1 THEN 1 ELSE 0 END AS bit) AS EffectiveFamilyAvailable,
                        cd.StartsAt, cd.EndsAt, cd.AllDay
                 FROM dbo.Cases c
                 LEFT JOIN dbo.CaseDates cd ON cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId AND cd.IsDeleted = 0
                 LEFT JOIN dbo.CaseDateTypes st ON st.Id = cd.CaseDateTypeId
                      AND (st.ShaleClientId = cd.ShaleClientId OR st.ShaleClientId IS NULL)
                 OUTER APPLY (
-                  SELECT TOP (1) t.SystemKey
+                  SELECT TOP (1) t.Id,t.IsActive
                   FROM dbo.CaseDateTypes t
                   WHERE st.SystemKey IS NOT NULL AND t.SystemKey = st.SystemKey
                     AND (t.ShaleClientId = ? OR t.ShaleClientId IS NULL)
-                    AND t.IsDeleted = 0 AND t.IsActive = 1
-                  ORDER BY CASE WHEN t.ShaleClientId = ? THEN 0 ELSE 1 END, t.Id
-                ) eff
+                    AND t.IsDeleted = 0
+                  ORDER BY CASE WHEN t.ShaleClientId = ? THEN 0 ELSE 1 END, t.Id DESC
+                ) family_winner
                 OUTER APPLY (
                   SELECT m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
                   WHERE m.CaseDateTypeId=st.Id AND m.IsActive=1 AND m.IsDeleted=0
                     AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL)
+                    AND m.SemanticRoleKey='INTAKE'
                 ) role_mapping
-                WHERE c.ShaleClientId = ? AND c.Id IN (""" + placeholders + ") ORDER BY c.Id, cd.Id";
+                WHERE c.ShaleClientId = ? AND c.Id IN (""" + placeholders + ")
+                ORDER BY c.Id,
+                  CASE WHEN LOWER(LTRIM(RTRIM(st.SystemKey))) IN ('statute_of_limitations','tort_notice_deadline') THEN 0 ELSE 1 END,
+                  cd.StartsAt,cd.Id";
     }
 
     /**

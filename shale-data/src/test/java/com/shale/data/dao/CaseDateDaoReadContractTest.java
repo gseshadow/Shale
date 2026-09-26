@@ -44,6 +44,24 @@ class CaseDateDaoReadContractTest {
                         "updates must evaluate confirmation against the exact stored type"));
     }
 
+    @Test void desktopDeadlineMutationTargetsDisplayedOccurrenceAndNeverRetypesHistory() throws Exception {
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
+        String aggregate = source.substring(source.indexOf("public void mutateMigratedCompatibilityDates(Connection con"),
+                source.indexOf("public List<CaseDateDto> listDeletedCaseDatesForCase"));
+        assertAll(
+                () -> assertTrue(aggregate.contains("ORDER BY cd.StartsAt ASC,cd.Id ASC"),
+                        "fixed editors must lock the same earliest occurrence they displayed"),
+                () -> assertTrue(aggregate.contains("row.id() != occurrenceId"),
+                        "updates and explicit clears must reject any occurrence other than the displayed ID"),
+                () -> assertTrue(aggregate.contains("findEffectiveFamilyTypeId(con, tenant, key).isEmpty()"),
+                        "an unavailable deadline family must not accept a new value"),
+                () -> assertTrue(aggregate.contains("SET StartsAt=?,EndsAt=?,AllDay=?")),
+                () -> assertFalse(aggregate.contains("SET CaseDateTypeId="),
+                        "editing a historical family occurrence must preserve its stored concrete type"),
+                () -> assertTrue(aggregate.contains("evaluateCaseDate(con,c.shaleClientId(),c.actorUserId(),row.id(),row.typeId()"),
+                        "pending confirmation must be evaluated from the exact stored type"));
+    }
+
     @Test void duplicateHistoryIsExposedWithoutArbitraryAuthoritativeSelection() throws Exception {
         String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
         assertTrue(source.contains("conflicts.add(mapped)"));
