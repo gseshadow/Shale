@@ -138,8 +138,12 @@ public final class CaseDateTypeManagementPane {
 
     static boolean isManageable(EffectiveCaseDateTypeDto row, int tenantId) {
         return row != null && row.shaleClientId() != null && row.shaleClientId() == tenantId
-                && row.origin() == EffectiveCaseDateTypeDto.Origin.TENANT_CREATED && !row.deleted();
+                && row.origin() != EffectiveCaseDateTypeDto.Origin.GLOBAL
+                && !"intake".equals(normalizeKey(row.systemKey()));
     }
+
+    private static String normalizeKey(String key) { return key == null ? null : key.trim().toLowerCase(Locale.ROOT); }
+    static boolean isOrdinaryGlobal(EffectiveCaseDateTypeDto row) { String key=row==null?null:normalizeKey(row.systemKey()); return row!=null&&row.shaleClientId()==null&&("statute_of_limitations".equals(key)||"tort_notice_deadline".equals(key)); }
 
     static String lifecycleActionLabel(EffectiveCaseDateTypeDto row) {
         return row != null && row.active() ? "Deactivate" : "Activate";
@@ -166,8 +170,10 @@ public final class CaseDateTypeManagementPane {
     private void select(EffectiveCaseDateTypeDto row) { selected = row; updateActions(); status.setText(""); }
     private void updateActions() {
         boolean enabled = selected != null && !mutationInFlight.get();
-        boolean definitionEditable=enabled&&isManageable(selected,tenantId);
-        edit.setDisable(!definitionEditable); toggle.setDisable(!definitionEditable); remove.setDisable(!definitionEditable);
+        boolean definitionEditable=enabled&&(isManageable(selected,tenantId)||isOrdinaryGlobal(selected));
+        boolean lifecycleEditable=enabled&&isManageable(selected,tenantId);
+        edit.setDisable(!definitionEditable); toggle.setDisable(!lifecycleEditable); remove.setDisable(!lifecycleEditable);
+        edit.setText(enabled&&isOrdinaryGlobal(selected)?"Customize for this firm":"Edit");
         confirmation.setDisable(!enabled || !selected.active() || selected.deleted());
         toggle.setText(selected == null ? "Activate/Deactivate" : lifecycleActionLabel(selected));
     }
@@ -195,9 +201,12 @@ public final class CaseDateTypeManagementPane {
     private void editDefinition(EffectiveCaseDateTypeDto existing) {
         if (mutationInFlight.get()) return;
         showEditor(existing).ifPresent(input -> mutate(existing == null ? "Case date type added." : "Case date type updated.", () -> {
+            boolean createOverride=existing!=null&&isOrdinaryGlobal(existing);
             EffectiveCaseDateTypeDto saved = existing == null
                     ? service.createCaseDateType(command(null, input, null, null))
-                    : service.updateCaseDateType(command(existing.id(), input, existing.systemKey(), existing.rowVer()));
+                    : createOverride
+                        ? service.createCaseDateType(command(null, input, existing.systemKey(), null))
+                        : service.updateCaseDateType(command(existing.id(), input, existing.systemKey(), existing.rowVer()));
             return saved.id();
         }));
     }

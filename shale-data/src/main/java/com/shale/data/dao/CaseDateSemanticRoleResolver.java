@@ -12,6 +12,9 @@ final class CaseDateSemanticRoleResolver {
     private CaseDateSemanticRoleResolver() {}
 
     static int requireEffectiveTypeId(Connection con, int tenant, CaseDateSemanticRole role) throws SQLException {
+        if (role != CaseDateSemanticRole.INTAKE) {
+            throw new IllegalArgumentException("Only Intake requires protected Case Date role resolution.");
+        }
         String sql = """
                 SELECT m.CaseDateTypeId
                 FROM dbo.CaseDateTypeSemanticRoleMappings m

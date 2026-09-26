@@ -28,6 +28,7 @@ import com.shale.core.model.CaseDateAggregateResult;
 
 public final class CaseDateDao {
     static final int PROJECTION_BATCH_SIZE = 500;
+    private static final Set<String> ELIGIBLE_GLOBAL_TYPE_KEYS = Set.of("intake", "statute_of_limitations", "tort_notice_deadline");
     private static final org.slf4j.Logger PERF_LOG = org.slf4j.LoggerFactory.getLogger(CaseDateDao.class);
     private final DbSessionProvider db;
     private final PhiAuditService phiAuditService;
@@ -124,10 +125,7 @@ public final class CaseDateDao {
                          ROW_NUMBER() OVER (PARTITION BY t.SystemKey ORDER BY CASE WHEN t.ShaleClientId = ? AND t.IsDeleted = 0 THEN 0 ELSE 1 END, t.Id) AS rn
                   FROM dbo.CaseDateTypes t
                   LEFT JOIN dbo.CaseDateTypes g ON g.ShaleClientId IS NULL AND g.SystemKey = t.SystemKey
-                  WHERE (t.ShaleClientId = ? OR (t.ShaleClientId IS NULL AND EXISTS (
-                    SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings pm
-                    WHERE pm.CaseDateTypeId=t.Id AND pm.ShaleClientId IS NULL AND pm.IsActive=1 AND pm.IsDeleted=0
-                  ))) AND t.SystemKey IS NOT NULL
+                  WHERE (t.ShaleClientId = ? OR (t.ShaleClientId IS NULL AND LOWER(LTRIM(RTRIM(t.SystemKey))) IN ('intake','statute_of_limitations','tort_notice_deadline'))) AND t.SystemKey IS NOT NULL
                 )
                 SELECT Id, ShaleClientId, SystemKey, Name, Description, CalendarCategory, Color, SupportsTime, SortOrder, IsActive, IsDeleted, Origin, RowVer
                 FROM visible
@@ -702,10 +700,7 @@ public final class CaseDateDao {
                        t.RowVer
                 FROM dbo.CaseDateTypes t
                 LEFT JOIN dbo.CaseDateTypes g ON g.ShaleClientId IS NULL AND g.SystemKey = t.SystemKey
-                WHERE t.ShaleClientId = ? OR (t.ShaleClientId IS NULL AND EXISTS (
-                  SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings pm
-                  WHERE pm.CaseDateTypeId=t.Id AND pm.ShaleClientId IS NULL AND pm.IsActive=1 AND pm.IsDeleted=0
-                ))
+                WHERE t.ShaleClientId = ? OR (t.ShaleClientId IS NULL AND LOWER(LTRIM(RTRIM(t.SystemKey))) IN ('intake','statute_of_limitations','tort_notice_deadline'))
                 ORDER BY t.SortOrder, t.Name, t.Id
                 """;
         try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
@@ -723,21 +718,23 @@ public final class CaseDateDao {
         JOIN dbo.CaseDateTypes gt ON gt.Id=gm.CaseDateTypeId AND gt.ShaleClientId IS NULL AND gt.IsActive=1 AND gt.IsDeleted=0
         LEFT JOIN dbo.CaseDateTypeSemanticRoleMappings tm ON tm.ShaleClientId=? AND tm.SemanticRoleKey=r.RoleKey AND tm.IsActive=1 AND tm.IsDeleted=0
         LEFT JOIN dbo.CaseDateTypes tt ON tt.Id=tm.CaseDateTypeId AND tt.ShaleClientId=? AND tt.IsActive=1 AND tt.IsDeleted=0
-        ORDER BY CASE r.RoleKey WHEN 'INTAKE' THEN 1 WHEN 'STATUTE_OF_LIMITATIONS' THEN 2 ELSE 3 END""";try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){List<CaseDateSemanticRoleMappingDto> out=new ArrayList<>();while(rs.next()){Long id=(Long)rs.getObject(5);if(id!=null&&rs.getObject(7)==null)throw new IllegalStateException("The tenant Case Date role mapping references an ineligible type.");out.add(new CaseDateSemanticRoleMappingDto(rs.getString(1),rs.getString(2),rs.getInt(3),rs.getString(4),id!=null,id,rs.getBytes(6)));}return List.copyOf(out);}}}
-    public CaseDateSemanticRoleMappingDto saveCaseDateSemanticRoleMapping(SaveCaseDateSemanticRoleMappingCommand c){return mutateType(c.shaleClientId(),c.actorUserId(),con->{CaseDateSemanticRole role=CaseDateSemanticRole.require(c.roleKey());requireEligibleTenantRoleType(con,c.shaleClientId(),c.caseDateTypeId());MappingRow old=findActiveMapping(con,c.shaleClientId(),role.persistedKey());if(old==null&&c.expectedMappingId()!=null)throw new IllegalStateException("Case Date role mapping changed.");if(old!=null){if(!Objects.equals(c.expectedMappingId(),old.id)||!Arrays.equals(c.expectedRowVer(),old.rowVer))throw new IllegalStateException("Case Date role mapping changed.");retireMapping(con,c.shaleClientId(),c.actorUserId(),old.id,c.expectedRowVer());}
+        WHERE r.RoleKey='INTAKE'
+        ORDER BY r.RoleKey""";try(PreparedStatement ps=con.prepareStatement(sql)){ps.setInt(1,tenant);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){List<CaseDateSemanticRoleMappingDto> out=new ArrayList<>();while(rs.next()){Long id=(Long)rs.getObject(5);if(id!=null&&rs.getObject(7)==null)throw new IllegalStateException("The tenant Case Date role mapping references an ineligible type.");out.add(new CaseDateSemanticRoleMappingDto(rs.getString(1),rs.getString(2),rs.getInt(3),rs.getString(4),id!=null,id,rs.getBytes(6)));}return List.copyOf(out);}}}
+    public CaseDateSemanticRoleMappingDto saveCaseDateSemanticRoleMapping(SaveCaseDateSemanticRoleMappingCommand c){return mutateType(c.shaleClientId(),c.actorUserId(),con->{CaseDateSemanticRole role=requireOperativeRole(c.roleKey());requireEligibleTenantRoleType(con,c.shaleClientId(),c.caseDateTypeId());MappingRow old=findActiveMapping(con,c.shaleClientId(),role.persistedKey());if(old==null&&c.expectedMappingId()!=null)throw new IllegalStateException("Case Date role mapping changed.");if(old!=null){if(!Objects.equals(c.expectedMappingId(),old.id)||!Arrays.equals(c.expectedRowVer(),old.rowVer))throw new IllegalStateException("Case Date role mapping changed.");retireMapping(con,c.shaleClientId(),c.actorUserId(),old.id,c.expectedRowVer());}
         long id;try(PreparedStatement ps=con.prepareStatement("INSERT dbo.CaseDateTypeSemanticRoleMappings(ShaleClientId,SemanticRoleKey,CaseDateTypeId,CreatedByUserId) OUTPUT INSERTED.Id VALUES(?,?,?,?)")){ps.setInt(1,c.shaleClientId());ps.setString(2,role.persistedKey());ps.setInt(3,c.caseDateTypeId());ps.setInt(4,c.actorUserId());try(ResultSet rs=ps.executeQuery()){if(!rs.next())throw new IllegalStateException("Case Date role mapping was not saved.");id=rs.getLong(1);}}
         auditRoleMapping(con,c.shaleClientId(),c.actorUserId(),id,old==null?EntityActionAuditEvent.Action.OVERRIDE_CREATED:EntityActionAuditEvent.Action.UPDATED,role.persistedKey(),c.caseDateTypeId());return listRoleMappings(con,c.shaleClientId()).stream().filter(x->x.roleKey().equals(role.persistedKey())).findFirst().orElseThrow();});}
-    public void resetCaseDateSemanticRoleMapping(ResetCaseDateSemanticRoleMappingCommand c){mutateType(c.shaleClientId(),c.actorUserId(),con->{CaseDateSemanticRole role=CaseDateSemanticRole.require(c.roleKey());requireExpected(c.expectedRowVer());MappingRow old=findActiveMapping(con,c.shaleClientId(),role.persistedKey());if(old==null||old.id!=c.mappingId()||!Arrays.equals(old.rowVer,c.expectedRowVer()))throw new IllegalStateException("Case Date role mapping changed.");retireMapping(con,c.shaleClientId(),c.actorUserId(),old.id,c.expectedRowVer());auditRoleMapping(con,c.shaleClientId(),c.actorUserId(),old.id,EntityActionAuditEvent.Action.OVERRIDE_RESET,role.persistedKey(),old.typeId);return null;});}
+    public void resetCaseDateSemanticRoleMapping(ResetCaseDateSemanticRoleMappingCommand c){mutateType(c.shaleClientId(),c.actorUserId(),con->{CaseDateSemanticRole role=requireOperativeRole(c.roleKey());requireExpected(c.expectedRowVer());MappingRow old=findActiveMapping(con,c.shaleClientId(),role.persistedKey());if(old==null||old.id!=c.mappingId()||!Arrays.equals(old.rowVer,c.expectedRowVer()))throw new IllegalStateException("Case Date role mapping changed.");retireMapping(con,c.shaleClientId(),c.actorUserId(),old.id,c.expectedRowVer());auditRoleMapping(con,c.shaleClientId(),c.actorUserId(),old.id,EntityActionAuditEvent.Action.OVERRIDE_RESET,role.persistedKey(),old.typeId);return null;});}
+    private static CaseDateSemanticRole requireOperativeRole(String key){CaseDateSemanticRole role=CaseDateSemanticRole.require(key);if(role!=CaseDateSemanticRole.INTAKE)throw new IllegalArgumentException("Only Intake is an operative protected Case Date role.");return role;}
     private void retireMapping(Connection con,int tenant,int actor,long id,byte[] rv)throws SQLException{try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.CaseDateTypeSemanticRoleMappings SET IsActive=0,IsDeleted=1,DeletedAt=SYSUTCDATETIME(),DeletedByUserId=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND RowVer=?")){ps.setInt(1,actor);ps.setInt(2,actor);ps.setLong(3,id);ps.setInt(4,tenant);ps.setBytes(5,rv);if(ps.executeUpdate()!=1)throw new IllegalStateException("Case Date role mapping changed.");}}
     private MappingRow findActiveMapping(Connection con,int tenant,String role)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT Id,CaseDateTypeId,RowVer FROM dbo.CaseDateTypeSemanticRoleMappings WHERE ShaleClientId=? AND SemanticRoleKey=? AND IsActive=1 AND IsDeleted=0")){ps.setInt(1,tenant);ps.setString(2,role);try(ResultSet rs=ps.executeQuery()){if(!rs.next())return null;MappingRow row=new MappingRow(rs.getLong(1),rs.getInt(2),rs.getBytes(3));if(rs.next())throw new IllegalStateException("Ambiguous tenant Case Date role mappings.");return row;}}}
     private void requireEligibleTenantRoleType(Connection con,int tenant,int type)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT COUNT(*) FROM dbo.CaseDateTypes WHERE Id=? AND ShaleClientId=? AND IsActive=1 AND IsDeleted=0")){ps.setInt(1,type);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){rs.next();if(rs.getInt(1)!=1)throw new IllegalArgumentException("Select an active tenant Case Date Type.");}}}
-    private void requireNotActivelyMapped(Connection con,int tenant,int type)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings WHERE ShaleClientId=? AND CaseDateTypeId=? AND IsActive=1 AND IsDeleted=0")){ps.setInt(1,tenant);ps.setInt(2,type);try(ResultSet rs=ps.executeQuery()){if(rs.next())throw new IllegalStateException("Change or reset the "+CaseDateSemanticRole.require(rs.getString(1)).displayName()+" mapping before deactivating or removing this Case Date Type.");}}}
+    private void requireNotActivelyMapped(Connection con,int tenant,int type)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings WHERE ShaleClientId=? AND CaseDateTypeId=? AND SemanticRoleKey='INTAKE' AND IsActive=1 AND IsDeleted=0")){ps.setInt(1,tenant);ps.setInt(2,type);try(ResultSet rs=ps.executeQuery()){if(rs.next())throw new IllegalStateException("Change or reset the Intake mapping before deactivating or removing this Case Date Type.");}}}
     private void auditRoleMapping(Connection con,int tenant,int actor,long id,EntityActionAuditEvent.Action action,String role,int type)throws SQLException{entityActionAuditDao.append(con,EntityActionAuditEvent.now(tenant,actor,EntityActionAuditEvent.EntityType.CASE_DATE_ROLE_MAPPING,id,action,null,null,Map.of(EntityActionAuditEvent.MetadataKey.SEMANTIC_ROLE,role,EntityActionAuditEvent.MetadataKey.CASE_DATE_TYPE_ID,type)));}
     private record MappingRow(long id,int typeId,byte[] rowVer){}
 
     public EffectiveCaseDateTypeDto createCaseDateType(CaseDateTypeCommand c) { return mutateAuditedType(c.shaleClientId(), c.actorUserId(), con -> {
-        if (normalizeSystemKey(c.systemKey()) != null) throw new IllegalArgumentException("System keys are reserved for protected system-defined Case Date Types.");
-        EffectiveCaseDateTypeDto created=insertType(con,c,null); auditType(con,c.shaleClientId(),c.actorUserId(),created.id(),EntityActionAuditEvent.Action.CREATED,created.active()); return created;
+        String key=normalizeSystemKey(c.systemKey()); if(key!=null)requireOrdinaryOverrideKey(con,key);
+        EffectiveCaseDateTypeDto created=insertType(con,c,key); auditType(con,c.shaleClientId(),c.actorUserId(),created.id(),EntityActionAuditEvent.Action.CREATED,created.active()); return created;
     }); }
     public EffectiveCaseDateTypeDto updateCaseDateType(CaseDateTypeCommand c) { return mutateAuditedType(c.shaleClientId(), c.actorUserId(), con -> {
         requireExpected(c.expectedRowVer()); EffectiveCaseDateTypeDto e=findType(con,c.id()); requireTypeForTenant(e,c.shaleClientId());
@@ -830,7 +827,7 @@ public final class CaseDateDao {
                 JOIN dbo.CaseDateTypes t ON t.Id=m.CaseDateTypeId
                 WHERE m.CaseDateTypeId=? AND (m.ShaleClientId=? OR m.ShaleClientId IS NULL)
                   AND (t.ShaleClientId=? OR t.ShaleClientId IS NULL)
-                  AND m.SemanticRoleKey IN ('INTAKE','STATUTE_OF_LIMITATIONS','TORT_NOTICE_DEADLINE')
+                  AND m.SemanticRoleKey='INTAKE'
                 """)){ps.setInt(1,typeId);ps.setInt(2,tenant);ps.setInt(3,tenant);try(ResultSet rs=ps.executeQuery()){if(rs.next()){role=rs.getString(1);if(rs.next())throw new IllegalStateException("Case Date Type has ambiguous protected semantic history.");}}}
         if(role==null)return;
         try(PreparedStatement ps=con.prepareStatement("""
@@ -860,9 +857,12 @@ public final class CaseDateDao {
             JOIN dbo.Cases c ON c.Id = cd.CaseId AND c.ShaleClientId = cd.ShaleClientId AND c.IsDeleted = 0
             JOIN dbo.CaseDateTypes st ON st.Id = cd.CaseDateTypeId AND (st.ShaleClientId = cd.ShaleClientId OR st.ShaleClientId IS NULL)
             OUTER APPLY (
-              SELECT TOP (1) t.* FROM dbo.CaseDateTypes t
-              WHERE st.SystemKey IS NOT NULL AND t.SystemKey = st.SystemKey AND (t.ShaleClientId = ? OR t.ShaleClientId IS NULL) AND t.IsDeleted = 0 AND t.IsActive = 1
-              ORDER BY CASE WHEN t.ShaleClientId = ? THEN 0 ELSE 1 END, t.Id
+              SELECT t.* FROM dbo.CaseDateTypes t
+              WHERE st.SystemKey IS NOT NULL AND t.Id=(
+                SELECT TOP (1) candidate.Id FROM dbo.CaseDateTypes candidate
+                WHERE candidate.SystemKey=st.SystemKey AND (candidate.ShaleClientId=? OR candidate.ShaleClientId IS NULL) AND candidate.IsDeleted=0
+                ORDER BY CASE WHEN candidate.ShaleClientId=? THEN 0 ELSE 1 END,candidate.Id)
+                AND t.IsActive=1
             ) eff
             LEFT JOIN dbo.Users cu ON cu.Id = cd.CreatedByUserId AND cu.ShaleClientId = cd.ShaleClientId
             LEFT JOIN dbo.Users uu ON uu.Id = cd.UpdatedByUserId AND uu.ShaleClientId = cd.ShaleClientId
@@ -880,7 +880,8 @@ public final class CaseDateDao {
     private void softDeleteType(Connection con,int tenant,int actor,int id,byte[] expected)throws SQLException{try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.CaseDateTypes SET IsDeleted=1,IsActive=0,DeletedAt=SYSUTCDATETIME(),DeletedByUserId=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND RowVer=?")){ps.setInt(1,actor);ps.setInt(2,actor);ps.setInt(3,id);ps.setInt(4,tenant);ps.setBytes(5,expected);if(ps.executeUpdate()!=1)throw new IllegalStateException("Case date type changed.");}}
     private EffectiveCaseDateTypeDto findType(Connection con,Integer id)throws SQLException{if(id==null)return null;try(PreparedStatement ps=con.prepareStatement("SELECT t.Id,t.ShaleClientId,t.SystemKey,t.Name,t.Description,t.CalendarCategory,t.Color,t.SupportsTime,t.SortOrder,t.IsActive,t.IsDeleted,CASE WHEN t.ShaleClientId IS NOT NULL AND g.Id IS NOT NULL THEN 'TENANT_OVERRIDE' WHEN t.ShaleClientId IS NOT NULL THEN 'TENANT_CREATED' ELSE 'GLOBAL' END AS Origin,t.RowVer FROM dbo.CaseDateTypes t LEFT JOIN dbo.CaseDateTypes g ON g.ShaleClientId IS NULL AND g.SystemKey=t.SystemKey WHERE t.Id=?")){ps.setInt(1,id);try(ResultSet rs=ps.executeQuery()){return rs.next()?mapType(rs):null;}}}
     private static void requireTypeForTenant(EffectiveCaseDateTypeDto e,int tenant){if(e==null)throw new IllegalArgumentException("Case date type is not available.");if(e.shaleClientId()!=null&&e.shaleClientId()!=tenant)throw new IllegalArgumentException("Case date type is not available for this tenant.");}
-    private static void requireCustomType(EffectiveCaseDateTypeDto e){if(e.shaleClientId()==null||e.origin()!=EffectiveCaseDateTypeDto.Origin.TENANT_CREATED)throw new IllegalArgumentException("System-defined Case Date Types are protected and cannot be changed.");}
+    private static void requireCustomType(EffectiveCaseDateTypeDto e){if(e.shaleClientId()==null||"intake".equals(normalizeSystemKey(e.systemKey())))throw new IllegalArgumentException("The Intake Case Date Type is protected and cannot be changed.");}
+    private static void requireOrdinaryOverrideKey(Connection con,String key)throws SQLException{if(!ELIGIBLE_GLOBAL_TYPE_KEYS.contains(key)||"intake".equals(key))throw new IllegalArgumentException("System keys are reserved; only ordinary SOL/TCN tenant overrides may be created.");try(PreparedStatement ps=con.prepareStatement("SELECT COUNT(*) FROM dbo.CaseDateTypes WHERE ShaleClientId IS NULL AND LOWER(LTRIM(RTRIM(SystemKey)))=?")){ps.setString(1,key);try(ResultSet rs=ps.executeQuery()){rs.next();if(rs.getInt(1)!=1)throw new IllegalArgumentException("The global Case Date Type is unavailable for override.");}}}
     private static void ensureStableKeyUnchanged(EffectiveCaseDateTypeDto e,String submitted){if(!Objects.equals(normalizeSystemKey(e.systemKey()),normalizeSystemKey(submitted)))throw new IllegalArgumentException("The stable SystemKey cannot be changed.");}
     private static void requireExpected(byte[] rv){if(rv==null||rv.length==0)throw new IllegalArgumentException("expectedRowVer is required");}
     private static void validateTypeValues(String name,String cat,String color,String key,Integer sort){trimReq(name,"Name");category(cat);String c=norm(color);if(c!=null&&!c.matches("#[0-9A-Fa-f]{6}"))throw new IllegalArgumentException("Color must be #RRGGBB.");if(key!=null&&!key.matches("[a-z0-9_\\-]{1,64}"))throw new IllegalArgumentException("SystemKey is invalid.");if(sort!=null&&(sort<-100000||sort>100000))throw new IllegalArgumentException("Sort order is out of range.");}
@@ -899,7 +900,7 @@ public final class CaseDateDao {
     private static String norm(String s){ if(s==null)return null; String t=s.trim(); return t.isEmpty()?null:t; }
     private static void setLdt(PreparedStatement ps,int i,LocalDateTime v)throws SQLException{ if(v==null)ps.setNull(i,Types.TIMESTAMP); else ps.setTimestamp(i,Timestamp.valueOf(v)); }
     private static TypeRow requireSelectableType(Connection con,int tenant,int id)throws SQLException{ try(PreparedStatement ps=con.prepareStatement("""
-            WITH visible AS (SELECT t.Id,t.SupportsTime,t.IsActive,t.IsDeleted,ROW_NUMBER() OVER (PARTITION BY t.SystemKey ORDER BY CASE WHEN t.ShaleClientId=? AND t.IsDeleted=0 THEN 0 ELSE 1 END,t.Id) rn FROM dbo.CaseDateTypes t WHERE (t.ShaleClientId=? OR (t.ShaleClientId IS NULL AND EXISTS (SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings pm WHERE pm.CaseDateTypeId=t.Id AND pm.ShaleClientId IS NULL AND pm.IsActive=1 AND pm.IsDeleted=0))) AND t.SystemKey IS NOT NULL UNION ALL SELECT t.Id,t.SupportsTime,t.IsActive,t.IsDeleted,1 FROM dbo.CaseDateTypes t WHERE t.ShaleClientId=? AND t.SystemKey IS NULL)
+            WITH visible AS (SELECT t.Id,t.SupportsTime,t.IsActive,t.IsDeleted,ROW_NUMBER() OVER (PARTITION BY t.SystemKey ORDER BY CASE WHEN t.ShaleClientId=? AND t.IsDeleted=0 THEN 0 ELSE 1 END,t.Id) rn FROM dbo.CaseDateTypes t WHERE (t.ShaleClientId=? OR (t.ShaleClientId IS NULL AND LOWER(LTRIM(RTRIM(t.SystemKey))) IN ('intake','statute_of_limitations','tort_notice_deadline'))) AND t.SystemKey IS NOT NULL UNION ALL SELECT t.Id,t.SupportsTime,t.IsActive,t.IsDeleted,1 FROM dbo.CaseDateTypes t WHERE t.ShaleClientId=? AND t.SystemKey IS NULL)
             SELECT Id, SupportsTime FROM visible WHERE Id=? AND rn=1 AND IsActive=1 AND IsDeleted=0
             """)){ps.setInt(1,tenant);ps.setInt(2,tenant);ps.setInt(3,tenant);ps.setInt(4,id);try(ResultSet rs=ps.executeQuery()){if(rs.next())return new TypeRow(rs.getInt(1),rs.getBoolean(2));throw new IllegalArgumentException("Case date type is not selectable for this tenant.");}}}
     private static TypeRow requireHistoricalType(Connection con,int tenant,int id)throws SQLException{ try(PreparedStatement ps=con.prepareStatement("SELECT Id, SupportsTime FROM dbo.CaseDateTypes WHERE Id=? AND (ShaleClientId=? OR ShaleClientId IS NULL)")){ps.setInt(1,id);ps.setInt(2,tenant);try(ResultSet rs=ps.executeQuery()){if(rs.next())return new TypeRow(rs.getInt(1),rs.getBoolean(2));throw new IllegalArgumentException("Case date type is not available for this tenant.");}}}
