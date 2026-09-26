@@ -235,3 +235,27 @@ An inactive, non-deleted tenant overlay masks the global definition and yields n
 fallback; an entirely missing optional family also yields null. Multiple values choose the earliest `StartsAt` (and the
 boundary query uses lowest `CaseDates.Id` for an exact timestamp tie). Card or Overview selection changes cannot alter any
 of these results.
+
+## Desktop report, export, and Documents cutover (2026-09-26)
+
+The desktop Case status report detail projection and its XLSX export now resolve the existing SOL and
+TCN fields as the ordinary `SYSTEM:statute_of_limitations` and `SYSTEM:tort_notice_deadline` families.
+The bounded Documents Case-summary lookup uses the same ordinary SOL family. Both readers apply the
+desktop overlay contract: the non-deleted same-tenant definition wins over the global definition, an
+inactive winner masks the global family and returns null, a deleted overlay permits global fallback,
+and a missing family returns null. While the effective winner is active, occurrences stored against
+any visible global or same-tenant definition in the family participate, with earliest `StartsAt` and
+then lowest `CaseDates.Id` selecting the scalar value. Neither reader consults Case Card or Case
+Overview selections, and neither mutates occurrences, mappings, confirmation history, or report
+configuration.
+
+The Cases XLSX/CSV export was already cut over through
+`CaseSummaryDao.listActiveGridForExport` -> `findActiveGridPage` -> `gridSql`; this phase verifies and
+retains that path rather than adding another export projection. Existing report DTO fields, XLSX
+headings/order/date formats/null behavior, and Documents model/rendering contracts are unchanged.
+
+After this slice, no desktop production report, document-generation, XLSX/CSV export, or report/detail
+projection reads SOL or TCN through protected semantic-role mappings. Remaining SOL/TCN mapping
+consumers are outside this slice: protected mapping administration and protection, migration and
+verification tooling, and the server/React plus fixed desktop compatibility detail/editor paths.
+Mappings therefore remain active.
