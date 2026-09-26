@@ -280,3 +280,51 @@ mappings. Remaining SOL/TCN mapping consumers are protected mapping administrati
 protection, the generic nine-meaning migrated projection, fixed desktop generic occurrence editors,
 migration/verification tooling, and external SQL consumers. Mappings therefore remain active pending
 those separately scoped cutovers.
+## Generic compatibility projection and desktop fixed-editor cutover (2026-09-26)
+
+The generic nine-meaning `MigratedCaseDateProjectionDto` reader and the desktop Case View fixed-field
+snapshot now treat Statute of Limitations and Tort Notice Deadline as ordinary
+`SYSTEM:statute_of_limitations` and `SYSTEM:tort_notice_deadline` families. Intake alone continues to
+use its required protected `INTAKE` semantic-role mapping; injury, medical-negligence, discovery,
+fee-agreement, and non-engagement compatibility meanings retain their existing SystemKey behavior.
+The family winner is the nondeleted tenant overlay when present, otherwise the nondeleted global
+definition. An inactive tenant winner masks the global definition, while deletion resets to it.
+Historical active occurrences stored under any same-tenant or global definition in an available
+family remain eligible, and scalar/fixed projections choose `StartsAt`, then `CaseDates.Id` ascending.
+An unavailable family projects an empty, non-creatable fixed field without removing its occurrence
+from the generic Case Dates list or confirmation/history reads.
+
+Desktop update and explicit Save-empty clear intents carry the displayed occurrence ID and RowVer.
+The transaction locks the same deterministic family occurrence and rejects an ID or RowVer mismatch;
+Cancel still emits no intent. Updates retain the stored `CaseDateTypeId`, while creation resolves the
+currently effective concrete family type and fails closed when none is available. Existing Case-row
+concurrency, tenant/actor validation, transaction rollback, PHI/entity-action audit, timeline writes,
+and resulting-type confirmation evaluation remain at the DAO transaction seam. This requires no
+audit schema or vocabulary change.
+
+### Remaining SOL/TCN semantic-mapping dependencies before retirement
+
+SOL/TCN mapping rows intentionally remain active in this phase. A fresh production inventory found
+these remaining dependencies, none of which is a deadline value projection after this cutover:
+
+* `CaseDateSemanticRole` and semantic-role administration/service contracts still expose SOL and TCN,
+  and `CaseDateSemanticRoleResolver` can still resolve either role for administrative compatibility.
+* Case Date Type selector, administration, New Intake form-reference validation, and Case Overview
+  configuration visibility admit global definitions through active global protected mappings. Removing
+  SOL/TCN mappings today could therefore hide their global definitions from definition/configuration
+  lifecycle paths even though runtime deadline values use families.
+* `requireProtectedSingletonAvailable` still classifies historical SOL/TCN mappings as protected and
+  enforces the existing one-active-occurrence rule during generic occurrence create/restore/type-change.
+  Cardinality is deliberately unchanged in this phase.
+* Semantic-role schema, seed/admin migrations, ownership verification, duplicate-detection SQL, and
+  their contract tests retain SOL/TCN history and lifecycle rules. No mapping rows are deleted or
+  rewritten.
+* Frozen `MigratedCaseDateKey` names, DTO/API properties, timeline/audit vocabulary, Calendar category
+  strings, and compatibility field labels remain names only; they do not select SOL/TCN occurrences
+  through mappings.
+
+Mapping retirement must therefore first replace global-definition visibility/ownership with an
+ordinary-family rule, decide and migrate the generic mutation singleton enforcement, remove or narrow
+SOL/TCN semantic-role administration/resolution contracts, and rerun schema/ownership/history audits.
+Only after those dependencies are proven absent should a separate migration deactivate or retire the
+rows; historical mapping records must not be physically deleted.
