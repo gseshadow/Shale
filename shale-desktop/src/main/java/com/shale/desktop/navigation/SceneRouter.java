@@ -15,6 +15,9 @@ import com.shale.desktop.update.DesktopUiUpdateLauncher;
 import com.shale.desktop.notification.DesktopNotificationPresenterFactory;
 
 import java.util.Objects;
+import com.shale.desktop.identity.MachineIdentityResult;
+import com.shale.data.dao.ApplicationInstanceDao;
+import com.shale.data.service.adapter.ApplicationInstanceServiceAdapter;
 
 public final class SceneRouter {
 
@@ -30,6 +33,12 @@ public final class SceneRouter {
 			LiveEventDispatcher dispatcher,
 			RuntimeSessionService runtimeSessionService,
 			String negotiateEndpointUrl) {
+		this(stage,authService,dispatcher,runtimeSessionService,negotiateEndpointUrl,null);
+	}
+
+	public SceneRouter(Stage stage, AuthService authService, LiveEventDispatcher dispatcher,
+			RuntimeSessionService runtimeSessionService, String negotiateEndpointUrl,
+			MachineIdentityResult machineIdentity) {
 
 		this.stage = Objects.requireNonNull(stage, "stage");
 		Objects.requireNonNull(authService, "authService");
@@ -47,7 +56,8 @@ public final class SceneRouter {
 		this.dbProvider = new DesktopRuntimeSessionProvider();
 
 		// Desktop bridge will "arm" dbProvider on successful login
-		var runtimeBridge = new DesktopUiRuntimeBridge(dispatcher, dbProvider, negotiateEndpointUrl);
+		var instanceService = new ApplicationInstanceServiceAdapter(new ApplicationInstanceDao(dbProvider));
+		var runtimeBridge = new DesktopUiRuntimeBridge(dispatcher, dbProvider, negotiateEndpointUrl, machineIdentity, instanceService);
 		runtimeBridge.setRuntimeSessionService(runtimeSessionService);
 
 		var updateLauncher = new DesktopUiUpdateLauncher();

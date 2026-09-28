@@ -11,6 +11,9 @@ public interface UiRuntimeBridge {
 
 	void onLogout();
 
+	/** Best-effort process shutdown hook; implementations must not make shutdown depend on telemetry. */
+	default void onShutdown() { onLogout(); }
+
 	// --- Generic publish (desktop implementation overrides)
 	default void publishEntityUpdated(String entityType, long entityId,
 			int shaleClientId, int updatedByUserId,

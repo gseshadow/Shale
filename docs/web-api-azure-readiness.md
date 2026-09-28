@@ -348,3 +348,13 @@ enforcement, session, heartbeat, or PubSub consumer is wired in this phase.
 
 OpenAPI at `/v3/api-docs` documents authentication, strict query parameters, the `204` empty-policy result,
 response DTOs, error envelopes, and the release-channel, release-item-type, and access-mode vocabularies.
+# Phase 4B application-instance endpoints (implementation; verification pending)
+
+The server exposes bearer-authenticated `POST /api/application-instances` and
+`POST /api/application-instances/{id}/end`. Request identity never supplies tenant/user authority; the
+verified bearer principal and request-scoped RLS connection do. Enrollment accepts a canonical UUID,
+`DESKTOP`, and strict `major.minor.build`. End is owner-qualified, idempotent, and preserves its first
+server-observed UTC end time. These process lifecycle rows are not tokens or durable user sessions. Deployment
+requires `docs/sql/2026-09-28_application_instances_foundation_phase4b.sql` plus its catalog and non-dbo RLS
+verification scripts. Phase 4B remains in progress until Maven Central and a live SQL verification target are
+available.

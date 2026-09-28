@@ -33,14 +33,14 @@ public final class MainApp extends Application {
 		AuthService authService = config.getAuthService();
 		LiveEventDispatcher dispatcher = new LiveEventDispatcher();
 
-		router = new SceneRouter(primaryStage, authService, dispatcher, config.runtimeService, config.negotiateEndpointUrl);
+		router = new SceneRouter(primaryStage, authService, dispatcher, config.runtimeService, config.negotiateEndpointUrl, machineIdentity());
 
 		router.showLogin();
 	}
 
 	/**
 	 * Lazy, authentication-independent desktop composition point for Phase 4A.
-	 * Nothing consumes or transmits the value in this phase.
+	 * The stable value is supplied to authenticated Phase 4B enrollment only after login.
 	 */
 	MachineIdentityResult machineIdentity() {
 		if (machineIdentity == null) {

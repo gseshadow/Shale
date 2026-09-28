@@ -1276,3 +1276,14 @@ The service writes only non-null, published, channel-compatible releases. It adv
 allows skipped releases, rejects backwards movement, and treats the same release idempotently. Updates use
 expected `RowVer`; the DAO locks the scope and handles unique conflicts on concurrent first creation. This is
 announcement state only—not installed version, eligibility, policy, workstation, session, or heartbeat state.
+
+## dbo.ApplicationInstances (Phase 4B implementation; verification pending)
+
+Strict tenant-owned registered client-process launches, not authentication sessions. Columns are `Id bigint
+IDENTITY` (PK), non-null `ShaleClientId`/`UserId`, nullable `MachineId uniqueidentifier`, closed `ClientType`,
+nonnegative integer `MajorVersion`/`MinorVersion`/`BuildVersion`, database-generated UTC `StartedAt`, nullable
+`EndedAt`, UTC `CreatedAt`/`UpdatedAt`, and `RowVer`. DESKTOP requires `MachineId`; WEB/MOBILE require NULL.
+The tenant-qualified Users FK and tenant FK are trusted/non-cascading. Active means `EndedAt IS NULL`; multiple
+active launches are valid. Strict TenantFilter FILTER and AFTER INSERT/UPDATE blocks use
+`sec.fn_FilterByTenant`; there is no global overlay. See
+`docs/sql/2026-09-28_application_instances_foundation_phase4b.sql`.

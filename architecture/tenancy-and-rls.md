@@ -95,3 +95,12 @@ Contact View shared-link reads use the existing Case Link service boundary (`Cas
 ## Entity-action audit tenancy
 
 `dbo.EntityActionAuditLog` is strict tenant-owned audit history. It uses non-null `ShaleClientId` and the existing `TenantFilter` policy with `sec.fn_FilterByTenant(ShaleClientId)`, not the global/overlay predicate. Tenant administrators may read audit rows for their tenant through approved audit tooling; ordinary feature deletion never deletes audit history. Application DAO code may insert audit rows inside the same transaction as the business mutation and must not expose ordinary update/delete audit methods.
+
+## Application instances (Phase 4B implementation; verification pending)
+
+`dbo.ApplicationInstances` is strict tenant-owned history: `ShaleClientId` is non-null, its user FK is
+`(ShaleClientId, UserId)`, and the enabled `TenantFilter` uses `sec.fn_FilterByTenant(ShaleClientId)` for one
+FILTER plus AFTER INSERT and AFTER UPDATE block predicates. It never uses the tenant/global overlay function.
+Runtime enrollment/end also qualifies by authenticated tenant and owning user. Catalog checks may run as dbo,
+but live enforcement must use the disposable non-dbo verifier in
+`docs/sql/verification/2026-09-28_application_instances_phase4b_rls.sql`.

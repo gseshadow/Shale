@@ -33,8 +33,11 @@ import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
 import com.shale.data.dao.ApplicationReleaseReadDao;
+import com.shale.data.dao.ApplicationInstanceDao;
 import com.shale.data.service.adapter.ApplicationReleaseReadServiceAdapter;
+import com.shale.data.service.adapter.ApplicationInstanceServiceAdapter;
 import com.shale.core.service.ApplicationReleaseReadServicePort;
+import com.shale.core.service.ApplicationInstanceServicePort;
 import com.shale.data.service.adapter.OrganizationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
 import com.shale.data.service.adapter.UserServiceAdapter;
@@ -198,5 +201,10 @@ public class ShaleServerServiceConfiguration {
     @Bean
     ApplicationReleaseReadServicePort applicationReleaseReadServicePort(DbSessionProvider serverDbSessionProvider) {
         return new ApplicationReleaseReadServiceAdapter(new ApplicationReleaseReadDao(serverDbSessionProvider));
+    }
+
+    @Bean
+    ApplicationInstanceServicePort applicationInstanceServicePort(DbSessionProvider serverDbSessionProvider) {
+        return new ApplicationInstanceServiceAdapter(new ApplicationInstanceDao(serverDbSessionProvider));
     }
 }
