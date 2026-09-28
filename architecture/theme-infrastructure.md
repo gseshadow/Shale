@@ -39,6 +39,15 @@ context menus, and Task hover-popup visual migration remain deferred. Phase 1B s
 color selectors to looked-up colors and visually verify each screen in both themes without changing the
 central lifecycle contract.
 
+## Desktop What's New dialog
+
+The Phase 3B `WhatsNewDialog` is a programmatic secondary window registered with
+`ThemeManager.application()`. Its stable geometry and content hierarchy live in
+`foundation/whats-new.css`; all paint comes from the existing Light/Dark semantic tokens. It uses a scrollable
+aggregate of semantic-version release sections, the shared Primary action treatment, and a warning-token wash
+only to emphasize `IMPORTANT` release-note items. Importance remains informational and does not block dismissal
+or imply update enforcement.
+
 ## Phase 1B semantic paint vocabulary
 
 Phase 1B adds a matching canonical vocabulary to both theme resources. New shared component work uses these

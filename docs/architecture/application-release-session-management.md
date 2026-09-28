@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 2B complete; Phase 3A in progress — implementation complete, verification blocked
+**Status:** Phase 3A complete; Phase 3B in progress — implementation complete, verification blocked
 
 **Last reviewed:** 2026-09-28
 
@@ -620,10 +620,9 @@ acknowledgement deliberately produces no `EntityActionAuditLog` row: it is routi
 an administrative or sensitive domain mutation. No HTTP endpoint, UI/runtime consumer, updater, policy,
 instance, session, heartbeat, PubSub, or geolocation behavior is included.
 
-**Verification status (2026-09-28):** focused implementation and contract coverage is present, but Maven could
-not resolve `org.springframework.boot:spring-boot-dependencies:3.3.4` because Maven Central returned HTTP 403.
-No live SQL Server is available in this environment, so applying the migration, the read-only verifier, and
-the tenant 7/tenant 8 RLS exercise remain pending. Per the phase gate, Phase 3A remains **IN PROGRESS**.
+**Verification history (2026-09-28):** the implementation run initially encountered Maven Central HTTP 403 and
+had no live SQL Server. Those blockers were subsequently cleared before the Phase 3B initiative baseline; Phase
+3A is complete. This historical note does not weaken its monotonic service contract or reopen its scope.
 
 ### Phase 3B — Desktop What's New experience
 
@@ -636,6 +635,51 @@ the tenant 7/tenant 8 RLS exercise remain pending. Per the phase gate, Phase 3A 
 * **Verification:** multi-version aggregation, first-run rule, failure does not advance, visual inspection.
 * **Dependencies:** 3A.
 * **Risks:** popup loops and confusing clean installs with completed updates.
+
+Phase 3B is implemented in the desktop JavaFX composition through `WhatsNewCoordinator`,
+`WhatsNewPresentation`, and `WhatsNewDialog`. `SceneManager.showMain()` schedules the coordinator only after
+the authenticated main scene and initial My Shale route are installed. The coordinator uses the existing
+direct desktop `ApplicationReleaseReadServicePort` and `UserReleaseStateServicePort` adapters with the current
+tenant/user and the fixed `DESKTOP` / `PRODUCTION` announcement scope. It resolves the running version only
+through `AppVersionProvider.currentVersion()` and parses that value with strict `SemanticVersion`; an unknown
+or malformed value skips the experience for that launch without a fallback version.
+
+For an existing state, selection is every published production release strictly newer than the acknowledged
+semantic version and no newer than the running version. Missing catalog versions are valid. Releases are
+grouped in semantic ascending order, and active items retain `SortOrder ASC, Id ASC`. For no state, only the
+newest published release at or below the running version is evaluated, preventing a historical catalog dump.
+If it has active items, that one release is shown and acknowledged after dismissal. If it has no active items,
+it is silently acknowledged after the interval is successfully evaluated. With existing state, a wholly empty
+interval is likewise silently advanced to its highest applicable release; where visible and empty releases are
+mixed, the dialog and acknowledgement stop at the highest release that actually contributes visible content,
+and a later launch can silently advance any remaining empty tail. No applicable catalog row creates no state.
+
+The UI is one resizable, window-modal, vertically scrollable Shale secondary window. It shows release-version
+groups, nonduplicated stored summaries, and simple title/body treatments for `FEATURE`, `FIX`, `IMPROVEMENT`,
+and emphasized-but-dismissible `IMPORTANT` items. `LINK` and `VIDEO` remain safe text-only title/body/resource
+presentation: no WebView, embedding, autoplay, fetch, or download occurs. `ThemeManager` supplies the same
+token-based stylesheet in Light and Dark, and the single “Got it” action uses the shared semantic Primary
+control. Both that action and the ordinary custom-window close affordance count as dismissal. Fetching,
+constructing, or displaying the window does not acknowledge; the target is the highest published release
+actually represented by visible content.
+
+Catalog/state/version failures are logged with sanitized context and abandon only this non-critical experience.
+Acknowledgement runs off the JavaFX thread; failure closes normally and does not reopen during the process
+login. A failed optimistic write reloads durable state and is accepted when another client already advanced to
+the target or later version; otherwise it is deferred to a future launch. A per-authenticated-context in-memory
+guard prevents route/refresh duplication and resets during authoritative logout/session teardown. This adds no
+SQL migration or audit event: ordinary announcement acknowledgement remains the Phase 3A nonsensitive UI-state
+mutation. It has no updater/manifest, update-policy/enforcement, instance, session, heartbeat, PubSub,
+geolocation, administration, web, or mobile coupling.
+
+**Verification status (2026-09-28):** focused coordinator, presentation, theme, and SceneManager wiring tests
+were added, including interval bounds, skipped releases, first-run/empty catalog, dismissal timing, no-content
+advancement, optimistic-concurrency recovery, duplicate suppression, and startup failure paths. Required Maven
+execution remains blocked before compilation because Maven Central returns HTTP 403 for
+`org.springframework.boot:spring-boot-dependencies:3.3.4` in the reactor and for
+`maven-resources-plugin:3.3.1` in the module-only attempt. Visual launch inspection in Light and Dark is also
+unavailable until the JavaFX test/runtime dependencies resolve. Per the phase gate, Phase 3B remains
+**IN PROGRESS** and Phase 4A must not start.
 
 ### Phase 4A — Stable machine identity
 
@@ -857,9 +901,10 @@ the tenant 7/tenant 8 RLS exercise remain pending. Per the phase gate, Phase 3A 
 | 1B | **COMPLETE** | Empty global revisioned policy schema, verification, contracts, and documentation; no runtime behavior. |
 | 2A | **COMPLETE** | Strict shared semantic version plus immutable release/item/effective-policy models and global read-only DAO/service boundary; `mvn test` passed; no runtime consumer. |
 | 2B | **COMPLETE** | Authenticated read-only release/policy HTTP contracts, safe DTOs/errors/caching, OpenAPI, and focused regressions complete; repository-level `mvn test` passed. |
-| 3A | **IN PROGRESS** | Implementation and contract coverage complete; Maven Central HTTP 403 and unavailable live SQL Server block required verification. |
-| 3B | **NOT STARTED** | Start only after 3A Maven and live SQL/RLS verification pass; it is not yet the next executable step. |
-| 4A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 3A | **COMPLETE** | Strict tenant/user DESKTOP/WEB/MOBILE release-state foundation and monotonic service boundary complete. |
+| 3B | **IN PROGRESS** | Desktop implementation and focused tests added; Maven Central HTTP 403 blocks required test execution and visual QA. |
+| 4A | **NOT STARTED** | Next proposed phase only after Phase 3B verification passes; do not begin while 3B is in progress. |
+| 4B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -895,8 +940,12 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Implement **Phase 3A only**: add the strict tenant-owned
-`UserReleaseState` schema/RLS foundation and narrowly scoped service operations for reading and monotonically
-advancing per-user release acknowledgement. Include transactional concurrency and cross-tenant tests. Do not add
-the Phase 3B What's New UI, client consumption, rich media behavior, updater/manifest changes, policy evaluation
-or enforcement, instances, sessions, heartbeat, PubSub, or geolocation.
+Verify and finish **Phase 3B only**: restore Maven Central access, run its focused UI/coordinator and selected
+Phase 2A/2B/3A regressions plus repository `mvn test`, and visually inspect the dialog in Light and Dark. Make
+only fixes required by that evidence, then mark Phase 3B complete. Do not start Phase 4A until this gate passes.
+
+After Phase 3B is complete, the exact proposed Phase 4A scope is the independently reviewable stable-machine-
+identity slice above: generate and atomically persist a random, non-hardware-derived workstation UUID through a
+platform storage abstraction; validate Windows/macOS machine-wide locations, permissions, multi-user behavior,
+upgrade survival, and uninstall policy. Do not add server reporting, application-instance rows, heartbeat,
+session identity, policy enforcement, updater scheduling, or settings UI in Phase 4A.
