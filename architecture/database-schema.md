@@ -7,7 +7,7 @@
 > callers map to one primary assignment on that same transaction; complete-profile desktop writes use
 > the aggregate cutover and preserve historical assignment identity.
 
-*Last updated: 2026-06-15*
+*Last updated: 2026-09-28*
 
 This document is the working schema reference for Codex and Shale development prompts.
 
@@ -1189,3 +1189,40 @@ lifecycle, deployment, and retirement boundaries.
 `CaseTeamRoleDefinitions` is the tenant/global overlay catalog for Case Team assignment meanings. It is deliberately separate from the legacy `Roles` authorization/assignment lookup and does not change `CaseUsers` in Phase 1. Global protected rows have stable `SystemKey` and `LegacyRoleId` values so a later many-to-many assignment migration can map existing `CaseUsers.RoleId` values without using editable names. Tenant rows with the same `SystemKey` are overrides; deleted overrides fall back to the global row, while inactive overrides remain the effective masked result. Tenant rows without `SystemKey` are custom roles.
 
 The table stores `Id`, nullable `ShaleClientId`, `SystemKey`, `LegacyRoleId`, `Name`, optional `Description`, required `Color`, `SortOrder`, `IsActive`, `IsDeleted`, `IsProtected`, lifecycle actor/time metadata, and `RowVer`. It uses tenant-or-global RLS, filtered global and tenant `SystemKey` uniqueness, normalized effective-name validation in the administration transaction, and entity-action auditing. Phase 1 seeds the legacy Case Team values Responsible Attorney (4), Prelitigation Staff (5), Attorney (7), Legal Assistant (11), Paralegal (12), Law Clerk (13), and Co-counsel (14). Existing `CaseUsers` behavior remains authoritative until the assignment/editor phase.
+
+## Global application release catalog (Phase 1A)
+
+### dbo.ApplicationReleases
+
+Global product-control storage for application release identity and publication state. The table has a
+`bigint` identity `Id`; nonnegative integer `MajorVersion`, `MinorVersion`, and `BuildVersion`; a persisted
+computed canonical `ApplicationVersion` in strict `major.minor.build` form; constrained `ReleaseChannel`
+(`PRODUCTION`, `PILOT`, or `DEVELOPMENT`); constrained `PublicationStatus` (`DRAFT` or `PUBLISHED`);
+publication time/actor; required short `Summary`; creation/update provenance; and `RowVer`. The unique
+`(ReleaseChannel, MajorVersion, MinorVersion, BuildVersion)` index is the authoritative release identity.
+The lifecycle CHECK requires drafts to have no publication metadata and published rows to have a
+publication timestamp. Published identity/content is intended to become service-layer append-only or
+superseded rather than trigger-guarded; Phase 1A adds no mutation path.
+
+This table is global: it deliberately has no `ShaleClientId`, strict tenant predicate, or tenant/global
+overlay predicate. Nullable actor FKs record a known Shale user without granting that user's tenant or
+tenant administrators mutation authority. A later administration/publication phase must define a tightly
+authorized global operator boundary and append changes through the established transactional
+`EntityActionAuditLog` pattern without placing release-note body text in audit metadata. The catalog is
+currently unused by runtime code; `shale-stable.json` remains authoritative for update discovery and
+installation.
+
+### dbo.ApplicationReleaseItems
+
+Global ordered release-note children of `ApplicationReleases`. Each row has a `bigint` identity `Id`, a
+non-cascading `ApplicationReleaseId` FK, nonnegative `SortOrder`, constrained `ItemType` (`FEATURE`, `FIX`,
+`IMPROVEMENT`, `IMPORTANT`, `LINK`, or `VIDEO`), required short `Title` and `Body`, optional generic
+`ResourceUrl`, draft-editing `IsActive`, creation/update provenance, and `RowVer`. Unique
+`(ApplicationReleaseId, SortOrder)` positions make display order deterministic within a release. Resource
+URLs are storage only; Phase 1A performs no download, remote validation, browser, video, or secret-bearing
+URL behavior.
+
+This child table is also global and has neither `ShaleClientId` nor any RLS security predicate. It has no
+soft-delete lifecycle: `IsActive` supports draft composition, while the non-cascading FK preserves release
+history. Phase 1A seeds no releases or items and adds no API, service, DAO, UI, updater, policy, session,
+heartbeat, acknowledgement, or enforcement behavior.
