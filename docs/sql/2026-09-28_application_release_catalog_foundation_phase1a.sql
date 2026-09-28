@@ -1,3 +1,6 @@
+
+    
+  
 /*
  Phase 1A global application-release catalog foundation.
  REVIEW/APPLY MANUALLY IN SSMS OR SQLCMD. Forward-only, additive, transactional,
@@ -111,7 +114,7 @@ BEGIN TRY
  (N'ApplicationReleaseItems',N'PK_ApplicationReleaseItems','PK'),(N'ApplicationReleaseItems',N'FK_ApplicationReleaseItems_Release','F'),(N'ApplicationReleaseItems',N'FK_ApplicationReleaseItems_CreatedByUser','F'),(N'ApplicationReleaseItems',N'FK_ApplicationReleaseItems_UpdatedByUser','F'),
  (N'ApplicationReleaseItems',N'CK_ApplicationReleaseItems_SortOrder','C'),(N'ApplicationReleaseItems',N'CK_ApplicationReleaseItems_ItemType','C'),(N'ApplicationReleaseItems',N'CK_ApplicationReleaseItems_Title','C'),(N'ApplicationReleaseItems',N'CK_ApplicationReleaseItems_Body','C');
  IF EXISTS(SELECT 1 FROM @RequiredObjects e LEFT JOIN sys.tables t ON t.name COLLATE DATABASE_DEFAULT=e.TableName AND SCHEMA_NAME(t.schema_id)=N'dbo'
-  LEFT JOIN sys.objects o ON o.parent_object_id=t.object_id AND o.name COLLATE DATABASE_DEFAULT=e.ObjectName AND o.type=e.ObjectType WHERE o.object_id IS NULL)
+  LEFT JOIN sys.objects o ON o.parent_object_id=t.object_id AND o.name COLLATE DATABASE_DEFAULT=e.ObjectName AND o.type COLLATE DATABASE_DEFAULT=e.ObjectType COLLATE DATABASE_DEFAULT WHERE o.object_id IS NULL)
   THROW 57205,'A required release-catalog key or CHECK constraint is missing.',1;
  IF EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id IN(OBJECT_ID(N'dbo.ApplicationReleases'),OBJECT_ID(N'dbo.ApplicationReleaseItems')) AND (is_disabled=1 OR is_not_trusted=1))
   THROW 57206,'Release-catalog CHECK constraints must be enabled and trusted.',1;
@@ -124,10 +127,16 @@ BEGIN TRY
  IF EXISTS(SELECT 1 FROM @RequiredIndexes e LEFT JOIN sys.tables t ON t.name COLLATE DATABASE_DEFAULT=e.TableName AND SCHEMA_NAME(t.schema_id)=N'dbo'
   LEFT JOIN sys.indexes i ON i.object_id=t.object_id AND i.name COLLATE DATABASE_DEFAULT=e.IndexName
   OUTER APPLY(SELECT STRING_AGG(CONVERT(nvarchar(max),c.name),N',') WITHIN GROUP(ORDER BY ic.key_ordinal) KeyColumns FROM sys.index_columns ic JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id WHERE ic.object_id=i.object_id AND ic.index_id=i.index_id AND ic.key_ordinal>0)x
-  WHERE i.index_id IS NULL OR i.is_unique<>e.IsUnique OR i.is_disabled=1 OR i.is_hypothetical=1 OR ISNULL(x.KeyColumns,N'')<>e.KeyColumns)
+  WHERE i.index_id IS NULL OR i.is_unique<>e.IsUnique OR i.is_disabled=1 OR i.is_hypothetical=1 OR ISNULL(x.KeyColumns,N'') COLLATE DATABASE_DEFAULT<>e.KeyColumns COLLATE DATABASE_DEFAULT)
   THROW 57207,'A required release-catalog index is missing or incompatible.',1;
 
  COMMIT TRANSACTION;
-END TRY BEGIN CATCH IF XACT_STATE()<>0 ROLLBACK TRANSACTION; THROW; END CATCH;
+END TRY
+BEGIN CATCH
+ IF XACT_STATE()<>0
+  ROLLBACK TRANSACTION;
+ THROW;
+END CATCH;
 GO
 /* No rollback script is supplied. Rollback means leaving this unused additive schema in place. */
+
