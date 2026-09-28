@@ -1429,6 +1429,7 @@ public final class SceneManager {
 
 	/** Deterministically releases all SceneManager-owned background work. */
 	public void shutdown() {
+		runtimeBridge.onShutdown();
 		whatsNewCoordinator.close();
 		notificationPollingService.close();
 		durableNotificationService.close();

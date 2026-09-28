@@ -15,6 +15,12 @@ import com.shale.desktop.live.LiveEventDispatcher;
 import com.shale.desktop.net.LiveBus;
 import com.shale.desktop.net.NegotiateClient;
 import com.shale.desktop.runtime.DesktopRuntimeSessionProvider;
+import com.shale.desktop.identity.MachineIdentityResult;
+import com.shale.desktop.instance.CurrentApplicationInstance;
+import com.shale.core.model.ClientType;
+import com.shale.core.model.SemanticVersion;
+import com.shale.core.service.ApplicationInstanceServicePort;
+import com.shale.ui.services.AppVersionProvider;
 import com.shale.ui.services.UiRuntimeBridge;
 
 /**
@@ -28,6 +34,9 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	private final LiveEventDispatcher dispatcher;
 	private final DesktopRuntimeSessionProvider dbProvider;
 	private final String negotiateEndpointUrl;
+	private final MachineIdentityResult machineIdentity;
+	private final ApplicationInstanceServicePort applicationInstances;
+	private final CurrentApplicationInstance currentInstance = new CurrentApplicationInstance();
 
 	private RuntimeSessionService runtimeSessionService;
 	private volatile LiveBus liveBus;
@@ -39,10 +48,18 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			LiveEventDispatcher dispatcher,
 			DesktopRuntimeSessionProvider dbProvider,
 			String negotiateEndpointUrl) {
+		this(dispatcher,dbProvider,negotiateEndpointUrl,null,null);
+	}
+
+	public DesktopUiRuntimeBridge(LiveEventDispatcher dispatcher, DesktopRuntimeSessionProvider dbProvider,
+			String negotiateEndpointUrl, MachineIdentityResult machineIdentity,
+			ApplicationInstanceServicePort applicationInstances) {
 
 		this.dispatcher = dispatcher;
 		this.dbProvider = dbProvider;
 		this.negotiateEndpointUrl = negotiateEndpointUrl;
+		this.machineIdentity = machineIdentity;
+		this.applicationInstances = applicationInstances;
 	}
 
 	@Override
@@ -55,6 +72,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		dbProvider.setRuntime(runtimeSessionService);
 		lastUserId = userId;
 		lastShaleClientId = shaleClientId;
+		enrollBestEffort(shaleClientId,userId);
 
 		tryConnectLiveBus(shaleClientId, userId, generation);
 	}
@@ -98,6 +116,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	@Override
 	public void onLogout() {
+		endBestEffort();
 		sessionGeneration.incrementAndGet();
 		LiveBus bus = liveBus;
 		liveBus = null;
@@ -115,6 +134,30 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 		log.info("Logout requested");
 	}
+
+	@Override public void onShutdown(){onLogout();}
+
+	private void enrollBestEffort(int tenant,int user){
+		currentInstance.clear();
+		if(applicationInstances==null||machineIdentity==null){return;}
+		if(!machineIdentity.isAvailable()){log.warn("Application instance enrollment skipped: machine identity unavailable ({})",machineIdentity.failure().orElse(null));return;}
+		try{
+			SemanticVersion version=SemanticVersion.parse(AppVersionProvider.currentVersion());
+			currentInstance.set(applicationInstances.enroll(tenant,user,machineIdentity.machineId().orElseThrow(),ClientType.DESKTOP,version));
+		}catch(RuntimeException ex){log.warn("Application instance enrollment unavailable: {}",ex.getClass().getSimpleName());}
+	}
+
+	private void endBestEffort(){
+		var active=currentInstance.get(); currentInstance.clear();
+		if(active.isEmpty()||applicationInstances==null||lastShaleClientId==null||lastUserId==null)return;
+		int tenant=lastShaleClientId,user=lastUserId;long instanceId=active.get().id();
+		var executor=java.util.concurrent.Executors.newSingleThreadExecutor(r->{Thread t=new Thread(r,"shale-instance-end");t.setDaemon(true);return t;});
+		try{java.util.concurrent.CompletableFuture.runAsync(()->applicationInstances.end(tenant,user,instanceId),executor).get(2,TimeUnit.SECONDS);}
+		catch(Exception ex){log.warn("Application instance end unavailable: {}",ex.getClass().getSimpleName());}
+		finally{executor.shutdownNow();}
+	}
+
+	public Optional<com.shale.core.dto.ApplicationInstanceView> currentApplicationInstance(){return currentInstance.get();}
 
 	// --- Back-compat wrappers now route through the generic API ---
 

@@ -1,0 +1,5 @@
+package com.shale.data.dao;
+import static org.junit.jupiter.api.Assertions.*;import java.nio.file.*;import org.junit.jupiter.api.Test;
+class ApplicationInstanceDaoContractTest{
+	@Test void writesOnlyAuthenticatedOwnerAndUsesDatabaseUtcIdempotently()throws Exception{String s=Files.readString(Path.of("src","main","java","com","shale","data","dao","ApplicationInstanceDao.java"));for(String token:new String[]{"verifyActor(c,tenant,user)","ShaleClientId,UserId,MachineId,ClientType,MajorVersion,MinorVersion,BuildVersion","OUTPUT INSERTED.Id","WHERE Id=? AND ShaleClientId=? AND UserId=?","EndedAt=COALESCE(EndedAt,SYSUTCDATETIME())","SESSION_CONTEXT(N'ShaleClientId')","SESSION_CONTEXT(N'PrincipalUserId')"})assertTrue(s.contains(token),token);assertFalse(s.contains("BuildVersion,StartedAt) VALUES"),"client must not bind authoritative start time");}
+}

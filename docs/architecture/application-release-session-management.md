@@ -744,21 +744,66 @@ requires no database audit event or schema change.
 Focused tests cover paths, creation/persistence/restart, canonical parsing/newlines, malformed/empty/truncated
 recovery, parent creation, thread/provider convergence, temporary-write and atomic-move failures, simulated
 permission failure, explicit non-ephemeral results, authentication independence, and updater/MSI/macOS external-
-state contracts. **Verification status (2026-09-28):** implementation and tests are present, but the focused
-Maven reactor is currently blocked during project-model resolution by Maven Central HTTP 403 for
-`org.springframework.boot:spring-boot-dependencies:3.3.4`. Phase 4A remains **IN PROGRESS** until the focused,
-change-selected, and repository-level Maven tests execute successfully.
+state contracts. **Phase 4A is COMPLETE**; its stable random UUID contract is the machine identity consumed by
+Phase 4B.
 
-### Phase 4B — Application-instance schema and service foundation
+### Phase 4B — Application-instance persistence and authenticated enrollment/end contracts
 
-* **Goal:** model desktop process instances independently from sessions.
-* **In scope:** strict tenant schema/RLS, lifecycle service, explicit end reasons, retention indexes.
-* **Non-goals:** heartbeat scheduler, activity capture, admin UI.
-* **Likely files:** migrations, core/data/server ports and tests.
-* **Schema/API impact:** additive tenant table and narrow create/end API.
-* **Verification:** RLS, idempotent end, session nullable/reference integrity, abnormal timeout semantics.
-* **Dependencies:** 4A and tenant enrollment/auth approach.
-* **Risks:** treating missing heartbeat as a known clean exit.
+**Status: IN PROGRESS (2026-09-28).** The implementation is present, but required Maven and live SQL/RLS
+verification could not complete in this environment. Maven project-model resolution receives HTTP 403 from
+Maven Central for `org.springframework.boot:spring-boot-dependencies:3.3.4`; no configured live SQL Server is
+available for the catalog and non-dbo enforcement scripts. Phase 5A remains not started.
+
+`dbo.ApplicationInstances` is strict tenant-owned lifecycle history. Its `bigint IDENTITY` primary key makes
+every launch distinct, including concurrent/reopened launches on the same machine or by the same user. It has
+non-null `ShaleClientId` and `UserId`, a trusted non-cascading tenant-qualified user FK, nullable
+`uniqueidentifier MachineId`, closed `DESKTOP`/`WEB`/`MOBILE` `ClientType`, nonnegative numeric
+`MajorVersion`/`MinorVersion`/`BuildVersion`, database-defaulted UTC `StartedAt`, nullable `EndedAt`, UTC
+created/updated metadata, and `RowVer`. DESKTOP requires a machine UUID; WEB/MOBILE prohibit one rather than
+inventing device semantics. Active means only `EndedAt IS NULL`; end means `EndedAt IS NOT NULL` and cannot
+precede start. There is no single-active-instance constraint. Minimal filtered indexes support tenant/user
+active and tenant/machine history reads.
+
+The enabled `TenantFilter` has exactly a strict `sec.fn_FilterByTenant(ShaleClientId)` FILTER predicate and
+AFTER INSERT/AFTER UPDATE block predicates for this table; it never uses overlay/global filtering. The
+migration is forward-only, rerunnable, additive, seeds no rows, and preserves history with `NO ACTION` FKs.
+The read-only catalog verifier emits independent `CheckName | FindingCount` results. A separate live script
+uses a disposable non-dbo principal for same-tenant insert, filtered cross-tenant visibility, and an isolated
+expected SQL Server 33504 cross-tenant insert failure.
+
+`ApplicationInstanceServicePort`, `ApplicationInstanceDao`, and `ApplicationInstanceServiceAdapter` form the
+narrow current-principal boundary. Enrollment accepts only machine UUID, `ClientType`, and strict Phase 2A
+`SemanticVersion`; authenticated tenant/user IDs are resolved by the server principal (or the already-stamped
+desktop runtime context), verified against the active tenant-qualified user, and never trusted from an HTTP
+body. The DAO relies on database `SYSUTCDATETIME()` defaults. End targets the authenticated tenant and owning
+user, uses `COALESCE(EndedAt, SYSUTCDATETIME())`, preserves the first end time, returns the existing ended row
+on repeats, and never deletes it.
+
+Authenticated additive HTTP contracts are `POST /api/application-instances` and
+`POST /api/application-instances/{id}/end`. Enrollment accepts `{machineId, clientType, applicationVersion}`
+and returns only `{id, machineId, clientType, applicationVersion, startedAt, endedAt}`. Current Phase 4B
+runtime accepts DESKTOP only, validates canonical UUID and `major.minor.build`, and documents bearer auth and
+safe 400/401/404/500 envelopes in OpenAPI. End is self/owner-only, idempotent, and intentionally provides no
+list, admin query, or remote termination contract.
+
+Desktop resolves the Phase 4A stable machine result at startup, but enrolls only after authentication has
+initialized tenant/user database session context. It parses the authoritative `AppVersionProvider.currentVersion()`
+through `SemanticVersion`, registers once, and holds the returned view in process-local
+`CurrentApplicationInstance`. Unavailable machine identity or invalid/unknown version skips enrollment;
+enrollment failures are sanitized and fail open without a fake ID or retry loop. Logout best-effort ends then
+clears the current instance before clearing runtime identity; the next login creates a distinct row. Normal
+SceneManager shutdown performs the same best-effort end. End failures never block logout/shutdown. Crash,
+kill, power loss, and outage may leave `EndedAt` NULL; this phase performs no recovery or stale inference.
+
+Audit compatibility review: routine enrollment/end is high-volume operational lifecycle state, not a semantic
+entity mutation or sensitive read. `ApplicationInstances` itself is authoritative, so Phase 4B intentionally
+adds no `EntityActionAuditLog` vocabulary/event and no audit migration. No PHI or hostname, OS account,
+hardware identifier, IP, location, or arbitrary exception text is captured.
+
+Phase 4B explicitly does **not** add heartbeat/last-seen/activity columns or traffic, durable `UserSession`,
+auth credentials/grants, remote logout, policy/version enforcement, PubSub, device/session UI, geolocation,
+updater reporting, scheduling, or unattended-update behavior. `ApplicationInstance` is only a registered
+client-process launch; it is not a bearer/refresh token, authorization grant, or durable user session.
 
 ### Phase 5A — Human-activity signal
 
@@ -960,8 +1005,10 @@ change-selected, and repository-level Maven tests execute successfully.
 | 2B | **COMPLETE** | Authenticated read-only release/policy HTTP contracts, safe DTOs/errors/caching, OpenAPI, and focused regressions complete; repository-level `mvn test` passed. |
 | 3A | **COMPLETE** | Strict tenant/user DESKTOP/WEB/MOBILE release-state foundation and monotonic service boundary complete. |
 | 3B | **COMPLETE** | Desktop What's New implementation and focused tests complete; repository-level `mvn test` passed after the earlier Maven Central outage. |
-| 4A | **IN PROGRESS** | Stable local UUID implementation and focused tests added; current Maven Central HTTP 403 blocks required verification. |
-| 4B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 4A | **COMPLETE** | Stable random machine UUID storage/provider, failure behavior, upgrade persistence, and packaging contracts complete. |
+| 4B | **IN PROGRESS** | Implementation/tests/docs added; Maven Central HTTP 403 and unavailable live SQL Server block required verification. |
+| 5A | **NOT STARTED — NEXT PROPOSED STEP** | Do not start until Phase 4B Maven and live SQL/RLS verification pass. |
+| 5B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -998,13 +1045,11 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Restore Maven Central access and finish **Phase 4A verification only**: run the focused identity/path/failure/
-concurrency/packaging contracts, change-aware selected suite, and repository `mvn test`. If they pass, mark
-Phase 4A complete without changing its runtime scope.
+Finish **Phase 4B verification only**: restore Maven Central access, run the focused instance migration/DAO/
+service/controller/desktop lifecycle tests, change-aware suite, and repository `mvn test`; deploy the rerunnable
+migration to a disposable/live verification database and run both the read-only catalog verifier and separate
+non-dbo RLS script, confirming isolated error 33504. If all pass, mark Phase 4B COMPLETE.
 
-Only after that gate, the exact proposed **Phase 4B** scope is the application-instance schema and service
-foundation described above: strict tenant-scoped `ApplicationInstance` persistence/RLS and a narrow,
-authenticated lifecycle enrollment/end contract tied to the stable machine UUID, with explicit end reasons,
-idempotency, retention indexes, audit compatibility, and focused tenant/security tests. Phase 4B must not add
-heartbeat/activity capture, durable user sessions, remote logout, version enforcement, PubSub, geolocation,
-device/session UI, updater reporting, or scheduling.
+After that gate, **Phase 5A only** should add a process-local, privacy-preserving desktop foreground human-input
+timestamp observer with throttling and lifecycle cleanup tests. It must add no network request, heartbeat,
+schema/API change, key content capture, background activity inference, session behavior, or enforcement.
