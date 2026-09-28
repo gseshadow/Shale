@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 2A implemented; verification blocked by Maven Central HTTP 403
+**Status:** Phase 2A complete; Phase 2B not started — next proposed step
 
 **Last reviewed:** 2026-09-28
 
@@ -542,7 +542,7 @@ hints, not permission for unrelated refactoring.
 * **Verification:** numeric ordering (`1.0.130 > 1.0.99`), malformed inputs, adapter delegation, empty policy.
 * **Dependencies:** 1A-1B.
 * **Risks:** behavior drift from updater comparator; resolve with shared vectors before replacement.
-* **Result:** implemented on 2026-09-28; Maven verification remains blocked by the documented external HTTP 403. `com.shale.core.model.SemanticVersion` is the single strict internal
+* **Result:** complete on 2026-09-28. `com.shale.core.model.SemanticVersion` is the single strict internal
   `major.minor.build` value: it accepts exactly three nonnegative, base-10 Java `int` components in canonical
   form (no trimming, prefixes, leading zeroes, prerelease/build suffixes, or overflow) and compares numeric
   tuples. The deliberately more permissive updater `VersionComparator` remains unchanged and in runtime use;
@@ -558,6 +558,8 @@ hints, not permission for unrelated refactoring.
   references have no additional presence dependency: every available pair is validated. Reads never repair data.
 * **Audit review:** these are global, non-PHI product-control reads and introduce no mutation, so no PHI or
   entity-action audit event is appropriate. A later administration phase must separately design mutation audit.
+* **Verification:** the previously blocked dependency resolution was cleared and the repository-local critical
+  reactor command `mvn test` passed for the completed Phase 2A implementation.
 
 ### Phase 2B — Read-only release/policy HTTP contracts
 
@@ -811,8 +813,8 @@ hints, not permission for unrelated refactoring.
 | 0 | **COMPLETE** | Current state, target architecture, audit compatibility, and roadmap documented; no production/schema change. |
 | 1A | **COMPLETE** | Empty global release catalog and ordered release-item schema, verification, contracts, and documentation; no runtime behavior. |
 | 1B | **COMPLETE** | Empty global revisioned policy schema, verification, contracts, and documentation; no runtime behavior. |
-| 2A | **IN PROGRESS** | Implementation complete, but required Maven verification is blocked by Maven Central HTTP 403; do not advance until relevant tests pass. |
-| 2B | **NOT STARTED — NEXT PROPOSED STEP** | Authenticated read-only release/policy HTTP contracts only; begin only after Phase 2A verification passes. |
+| 2A | **COMPLETE** | Strict shared semantic version plus immutable release/item/effective-policy models and global read-only DAO/service boundary; `mvn test` passed; no runtime consumer. |
+| 2B | **NOT STARTED — NEXT PROPOSED STEP** | Authenticated read-only release/policy HTTP contracts only. |
 | 3A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
