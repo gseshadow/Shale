@@ -512,7 +512,7 @@ hints, not permission for unrelated refactoring.
   accidentally, existing migration contracts.
 * **Dependencies:** operator confirms global control-plane database/authorization boundary.
 * **Risks:** putting global product data behind tenant RLS or allowing tenant admins to mutate it.
-* **Result:** complete on 2026-09-28. Added the two empty global catalog tables, closed rerun validation,
+* **Result:** implemented on 2026-09-28; Maven verification remains blocked by the documented external HTTP 403. Added the two empty global catalog tables, closed rerun validation,
   read-only verification SQL, and focused migration contracts. No runtime, updater, policy, or auth path
   consumes the schema.
 
@@ -527,7 +527,7 @@ hints, not permission for unrelated refactoring.
 * **Verification:** ordering invariants, correction/supersession, concurrency, deployment rollback path.
 * **Dependencies:** 1A and operator authority decision.
 * **Risks:** an uncorrectable singleton or invalid minimum version.
-* **Result:** complete on 2026-09-28. Added empty global `ApplicationPolicy` revision history with one-current-
+* **Result:** implemented on 2026-09-28; Maven verification remains blocked by the documented external HTTP 403. Added empty global `ApplicationPolicy` revision history with one-current-
   per-channel uniqueness, release FKs, lifecycle/vocabulary constraints, optimistic concurrency, closed rerun
   validation, read-only verification, focused contracts, and no runtime or audit mutation path. Cross-release
   channel/publication/version ordering is explicitly reserved for the future transactional mutation service.
