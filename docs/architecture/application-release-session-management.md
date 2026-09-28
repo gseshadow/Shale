@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 2A complete; Phase 2B not started — next proposed step
+**Status:** Phase 2A complete; Phase 2B implementation in progress pending required Maven verification
 
 **Last reviewed:** 2026-09-28
 
@@ -571,6 +571,23 @@ hints, not permission for unrelated refactoring.
 * **Verification:** bearer/RLS boundaries where applicable, safe errors, OpenAPI, old endpoints unchanged.
 * **Dependencies:** 2A.
 * **Risks:** exposing draft releases or coupling policy to tenant input.
+* **Implementation:** `GET /api/application-releases/policy/current?channel=PRODUCTION` returns the current
+  effective policy, or `204 No Content` when none is configured. `GET /api/application-releases?channel=PRODUCTION&after=1.0.127`
+  returns published releases strictly after the canonical lower bound in ascending numeric version order, with
+  their active items embedded in DAO-defined `SortOrder, Id` order. Both routes require the existing bearer
+  principal in production/Azure and retain the existing dev/local header compatibility; caller tenant identity
+  is resolved for authentication but never filters or selects this global control-plane data.
+* **Contract boundaries:** external DTOs omit row versions, publication internals, actor/audit data, and SQL
+  diagnostics. Closed vocabularies serialize as their stable uppercase enum names. Resource URLs are returned
+  only as nullable inert metadata. Invalid channel/version input uses the standard `400` envelope; read-boundary
+  invariant failures and unexpected failures use the sanitized standard `500` envelope.
+* **Caching and consumers:** successful and empty responses use `Cache-Control: private, max-age=60`; no ETag,
+  server-side cache, Redis, runtime consumer, policy evaluation, enforcement, acknowledgement, session,
+  heartbeat, PubSub, client, updater, or manifest behavior was introduced.
+* **Verification status:** focused controller/auth/error/cache and OpenAPI coverage, Phase 2A regression coverage,
+  service wiring coverage, and change-aware/full reactor verification are required before this phase becomes
+  complete. The first Maven attempt was blocked by Maven Central returning HTTP 403, so this phase remains in
+  progress and Phase 3A has not started.
 
 ### Phase 3A — User release-state foundation
 
@@ -814,8 +831,9 @@ hints, not permission for unrelated refactoring.
 | 1A | **COMPLETE** | Empty global release catalog and ordered release-item schema, verification, contracts, and documentation; no runtime behavior. |
 | 1B | **COMPLETE** | Empty global revisioned policy schema, verification, contracts, and documentation; no runtime behavior. |
 | 2A | **COMPLETE** | Strict shared semantic version plus immutable release/item/effective-policy models and global read-only DAO/service boundary; `mvn test` passed; no runtime consumer. |
-| 2B | **NOT STARTED — NEXT PROPOSED STEP** | Authenticated read-only release/policy HTTP contracts only. |
-| 3A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 2B | **IN PROGRESS** | Authenticated read-only release/policy HTTP contracts implemented; required Maven verification is blocked by an external Maven Central HTTP 403. |
+| 3A | **NOT STARTED — NEXT PROPOSED STEP** | Begin only after Phase 2B verification succeeds. |
+| 3B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -851,8 +869,8 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Implement **Phase 2B only**: add authenticated, read-only HTTP contracts for current effective policy and
-published releases since a caller-supplied strict version, reusing the Phase 2A port/models. Define safe external
-DTOs, OpenAPI and focused authentication/filtering/error/caching tests. Do not add administration or writes,
-desktop/startup/UI consumers, updater/manifest changes, acknowledgement, policy evaluation or enforcement,
-instances, sessions, heartbeat, PubSub, or geolocation.
+After the required Phase 2B Maven verification succeeds, implement **Phase 3A only**: add the strict tenant-owned
+`UserReleaseState` schema/RLS foundation and narrowly scoped service operations for reading and monotonically
+advancing per-user release acknowledgement. Include transactional concurrency and cross-tenant tests. Do not add
+the Phase 3B What's New UI, client consumption, rich media behavior, updater/manifest changes, policy evaluation
+or enforcement, instances, sessions, heartbeat, PubSub, or geolocation.
