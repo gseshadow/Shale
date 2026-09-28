@@ -1,3 +1,6 @@
+
+    
+  
 /*
  Read-only Phase 1B application-policy verification. Run after the migration and
  again after rerunning it. Every FindingCount must be zero. This Phase 1B gate
@@ -49,24 +52,36 @@ INSERT @Findings SELECT N'missing, duplicated, or incompatible policy indexes',C
 INSERT @Findings SELECT N'unexpected policy non-primary indexes',COUNT_BIG(*) FROM sys.indexes i WHERE i.object_id=OBJECT_ID(N'dbo.ApplicationPolicy') AND i.index_id>1 AND NOT EXISTS(SELECT 1 FROM @ExpectedIndexes e WHERE e.IndexName COLLATE DATABASE_DEFAULT=i.name COLLATE DATABASE_DEFAULT);
 
 /* Definitions verify constrained vocabularies and lifecycle test vectors without writes. */
-INSERT @Findings SELECT N'missing policy release-channel vocabulary',CASE WHEN EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.ApplicationPolicy') AND name=N'CK_ApplicationPolicy_Channel' AND definition LIKE N'%PRODUCTION%' AND definition LIKE N'%PILOT%' AND definition LIKE N'%DEVELOPMENT%') THEN 0 ELSE 1 END;
-INSERT @Findings SELECT N'missing reserved policy access-mode vocabulary',CASE WHEN EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.ApplicationPolicy') AND name=N'CK_ApplicationPolicy_AccessMode' AND definition LIKE N'%NORMAL%' AND definition LIKE N'%READ_ONLY%' AND definition LIKE N'%MAINTENANCE%' AND definition LIKE N'%BLOCKED%') THEN 0 ELSE 1 END;
-INSERT @Findings SELECT N'missing positive revision rejection rule',CASE WHEN EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.ApplicationPolicy') AND name=N'CK_ApplicationPolicy_RevisionNumber' AND definition LIKE N'%RevisionNumber%>(0)%') THEN 0 ELSE 1 END;
-INSERT @Findings SELECT N'missing current and superseded lifecycle rejection rules',CASE WHEN EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.ApplicationPolicy') AND name=N'CK_ApplicationPolicy_CurrentLifecycle' AND definition LIKE N'%IsCurrent%=(1)%' AND definition LIKE N'%SupersededAt%IS NULL%' AND definition LIKE N'%IsCurrent%=(0)%' AND definition LIKE N'%SupersededAt%IS NOT NULL%') THEN 0 ELSE 1 END;
-INSERT @Findings SELECT N'missing one-current-policy-per-channel filter',CASE WHEN EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.ApplicationPolicy') AND name=N'UX_ApplicationPolicy_Channel_Current' AND is_unique=1 AND filter_definition=N'([IsCurrent]=(1))') THEN 0 ELSE 1 END;
+INSERT @Findings SELECT N'missing policy release-channel vocabulary',CASE WHEN EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.ApplicationPolicy') AND name COLLATE DATABASE_DEFAULT=N'CK_ApplicationPolicy_Channel' COLLATE DATABASE_DEFAULT AND definition LIKE N'%PRODUCTION%' AND definition LIKE N'%PILOT%' AND definition LIKE N'%DEVELOPMENT%') THEN 0 ELSE 1 END;
+INSERT @Findings SELECT N'missing reserved policy access-mode vocabulary',CASE WHEN EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.ApplicationPolicy') AND name COLLATE DATABASE_DEFAULT=N'CK_ApplicationPolicy_AccessMode' COLLATE DATABASE_DEFAULT AND definition LIKE N'%NORMAL%' AND definition LIKE N'%READ_ONLY%' AND definition LIKE N'%MAINTENANCE%' AND definition LIKE N'%BLOCKED%') THEN 0 ELSE 1 END;
+INSERT @Findings SELECT N'missing positive revision rejection rule',CASE WHEN EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.ApplicationPolicy') AND name COLLATE DATABASE_DEFAULT=N'CK_ApplicationPolicy_RevisionNumber' COLLATE DATABASE_DEFAULT AND definition LIKE N'%RevisionNumber%>(0)%') THEN 0 ELSE 1 END;
+INSERT @Findings SELECT N'missing current and superseded lifecycle rejection rules',CASE WHEN EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.ApplicationPolicy') AND name COLLATE DATABASE_DEFAULT=N'CK_ApplicationPolicy_CurrentLifecycle' COLLATE DATABASE_DEFAULT AND definition LIKE N'%IsCurrent%=(1)%' AND definition LIKE N'%SupersededAt%IS NULL%' AND definition LIKE N'%IsCurrent%=(0)%' AND definition LIKE N'%SupersededAt%IS NOT NULL%') THEN 0 ELSE 1 END;
+INSERT @Findings SELECT N'missing one-current-policy-per-channel filter',CASE WHEN EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.ApplicationPolicy') AND name COLLATE DATABASE_DEFAULT=N'UX_ApplicationPolicy_Channel_Current' COLLATE DATABASE_DEFAULT AND is_unique=1 AND filter_definition=N'([IsCurrent]=(1))') THEN 0 ELSE 1 END;
 
 /* Phase 1A regression contract: its exact tables, columns, named constraints and indexes remain present. */
 INSERT @Findings SELECT N'Phase 1A release tables missing',CASE WHEN OBJECT_ID(N'dbo.ApplicationReleases',N'U') IS NULL OR OBJECT_ID(N'dbo.ApplicationReleaseItems',N'U') IS NULL THEN 1 ELSE 0 END;
 INSERT @Findings SELECT N'Phase 1A release columns changed',COUNT_BIG(*) FROM (VALUES
  (N'ApplicationReleases',N'Id'),(N'ApplicationReleases',N'MajorVersion'),(N'ApplicationReleases',N'MinorVersion'),(N'ApplicationReleases',N'BuildVersion'),(N'ApplicationReleases',N'ApplicationVersion'),(N'ApplicationReleases',N'ReleaseChannel'),(N'ApplicationReleases',N'PublicationStatus'),(N'ApplicationReleases',N'RowVer'),
  (N'ApplicationReleaseItems',N'Id'),(N'ApplicationReleaseItems',N'ApplicationReleaseId'),(N'ApplicationReleaseItems',N'SortOrder'),(N'ApplicationReleaseItems',N'ItemType'),(N'ApplicationReleaseItems',N'RowVer'))e(TableName,ColumnName)
-LEFT JOIN sys.tables t ON t.name=e.TableName AND SCHEMA_NAME(t.schema_id)=N'dbo' LEFT JOIN sys.columns c ON c.object_id=t.object_id AND c.name=e.ColumnName WHERE c.column_id IS NULL;
+LEFT JOIN sys.tables t ON t.name COLLATE DATABASE_DEFAULT=e.TableName COLLATE DATABASE_DEFAULT AND SCHEMA_NAME(t.schema_id) COLLATE DATABASE_DEFAULT=N'dbo' COLLATE DATABASE_DEFAULT
+LEFT JOIN sys.columns c ON c.object_id=t.object_id AND c.name COLLATE DATABASE_DEFAULT=e.ColumnName COLLATE DATABASE_DEFAULT
+WHERE c.column_id IS NULL;
 INSERT @Findings SELECT N'Phase 1A named objects changed',COUNT_BIG(*) FROM (VALUES
- (N'ApplicationReleases',N'PK_ApplicationReleases'),(N'ApplicationReleases',N'CK_ApplicationReleases_Channel'),(N'ApplicationReleases',N'CK_ApplicationReleases_VersionComponents'),(N'ApplicationReleases',N'UX_ApplicationReleases_Channel_Version'),
- (N'ApplicationReleaseItems',N'PK_ApplicationReleaseItems'),(N'ApplicationReleaseItems',N'FK_ApplicationReleaseItems_Release'),(N'ApplicationReleaseItems',N'UX_ApplicationReleaseItems_Release_SortOrder'))e(TableName,ObjectName)
-LEFT JOIN sys.tables t ON t.name=e.TableName AND SCHEMA_NAME(t.schema_id)=N'dbo' LEFT JOIN sys.objects o ON o.parent_object_id=t.object_id AND o.name=e.ObjectName WHERE o.object_id IS NULL;
+ (N'ApplicationReleases',N'PK_ApplicationReleases'),(N'ApplicationReleases',N'CK_ApplicationReleases_Channel'),(N'ApplicationReleases',N'CK_ApplicationReleases_VersionComponents'),
+ (N'ApplicationReleaseItems',N'PK_ApplicationReleaseItems'),(N'ApplicationReleaseItems',N'FK_ApplicationReleaseItems_Release'))e(TableName,ObjectName)
+LEFT JOIN sys.tables t ON t.name COLLATE DATABASE_DEFAULT=e.TableName COLLATE DATABASE_DEFAULT AND SCHEMA_NAME(t.schema_id) COLLATE DATABASE_DEFAULT=N'dbo' COLLATE DATABASE_DEFAULT
+LEFT JOIN sys.objects o ON o.parent_object_id=t.object_id AND o.name COLLATE DATABASE_DEFAULT=e.ObjectName COLLATE DATABASE_DEFAULT
+WHERE o.object_id IS NULL;
+
+INSERT @Findings SELECT N'Phase 1A named indexes changed',COUNT_BIG(*) FROM (VALUES
+ (N'ApplicationReleases',N'UX_ApplicationReleases_Channel_Version'),
+ (N'ApplicationReleaseItems',N'UX_ApplicationReleaseItems_Release_SortOrder'))e(TableName,IndexName)
+LEFT JOIN sys.tables t ON t.name COLLATE DATABASE_DEFAULT=e.TableName COLLATE DATABASE_DEFAULT AND SCHEMA_NAME(t.schema_id) COLLATE DATABASE_DEFAULT=N'dbo' COLLATE DATABASE_DEFAULT
+LEFT JOIN sys.indexes i ON i.object_id=t.object_id AND i.name COLLATE DATABASE_DEFAULT=e.IndexName COLLATE DATABASE_DEFAULT
+WHERE i.index_id IS NULL;
 INSERT @Findings SELECT N'Phase 1A unexpected RLS predicates',COUNT_BIG(*) FROM sys.security_predicates WHERE target_object_id IN(OBJECT_ID(N'dbo.ApplicationReleases'),OBJECT_ID(N'dbo.ApplicationReleaseItems'));
 
 SELECT CheckName,FindingCount FROM @Findings ORDER BY CheckName;
 IF EXISTS(SELECT 1 FROM @Findings WHERE FindingCount<>0)
  THROW 57350,'Application policy verification found one or more failures.',1;
+
