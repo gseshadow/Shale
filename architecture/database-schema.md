@@ -1262,3 +1262,17 @@ notes, SQL, or exception text into audit metadata.
 No policy row is seeded. No DAO, service, API, authentication, UI, updater, manifest synchronization, heartbeat,
 session, PubSub, geolocation, or enforcement path reads this table. `shale-stable.json` remains the current
 update-discovery authority.
+
+## dbo.UserReleaseState (Phase 3A)
+
+Strict tenant- and user-owned announcement progress. Columns are `Id`, non-null `ShaleClientId` and `UserId`,
+closed `ClientType` (`DESKTOP`, `WEB`, `MOBILE`), closed `ReleaseChannel` (`PRODUCTION`, `PILOT`,
+`DEVELOPMENT`), nullable non-cascading `ApplicationReleaseId`, `AcknowledgedAt`, `CreatedAt`, `UpdatedAt`, and
+`RowVer`. The unique key `(ShaleClientId, UserId, ClientType, ReleaseChannel)` permits independent release
+streams without duplicate current rows. The tenant-qualified user FK prevents wrong-tenant ownership; the
+release FK targets the global canonical `ApplicationReleases` catalog. No rows are seeded.
+
+The service writes only non-null, published, channel-compatible releases. It advances versions numerically,
+allows skipped releases, rejects backwards movement, and treats the same release idempotently. Updates use
+expected `RowVer`; the DAO locks the scope and handles unique conflicts on concurrent first creation. This is
+announcement state only—not installed version, eligibility, policy, workstation, session, or heartbeat state.
