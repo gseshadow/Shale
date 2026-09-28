@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 2A complete; Phase 2B implementation in progress pending required Maven verification
+**Status:** Phase 2B complete; Phase 3A not started — next proposed step
 
 **Last reviewed:** 2026-09-28
 
@@ -584,10 +584,9 @@ hints, not permission for unrelated refactoring.
 * **Caching and consumers:** successful and empty responses use `Cache-Control: private, max-age=60`; no ETag,
   server-side cache, Redis, runtime consumer, policy evaluation, enforcement, acknowledgement, session,
   heartbeat, PubSub, client, updater, or manifest behavior was introduced.
-* **Verification status:** focused controller/auth/error/cache and OpenAPI coverage, Phase 2A regression coverage,
-  service wiring coverage, and change-aware/full reactor verification are required before this phase becomes
-  complete. The first Maven attempt was blocked by Maven Central returning HTTP 403, so this phase remains in
-  progress and Phase 3A has not started.
+* **Verification:** focused controller/auth/error/cache and OpenAPI coverage, Phase 2A regression coverage,
+  service wiring coverage, and the repository-level `mvn test` passed. Phase 2B is complete; Phase 3A has not
+  started.
 
 ### Phase 3A — User release-state foundation
 
@@ -831,8 +830,8 @@ hints, not permission for unrelated refactoring.
 | 1A | **COMPLETE** | Empty global release catalog and ordered release-item schema, verification, contracts, and documentation; no runtime behavior. |
 | 1B | **COMPLETE** | Empty global revisioned policy schema, verification, contracts, and documentation; no runtime behavior. |
 | 2A | **COMPLETE** | Strict shared semantic version plus immutable release/item/effective-policy models and global read-only DAO/service boundary; `mvn test` passed; no runtime consumer. |
-| 2B | **IN PROGRESS** | Authenticated read-only release/policy HTTP contracts implemented; required Maven verification is blocked by an external Maven Central HTTP 403. |
-| 3A | **NOT STARTED — NEXT PROPOSED STEP** | Begin only after Phase 2B verification succeeds. |
+| 2B | **COMPLETE** | Authenticated read-only release/policy HTTP contracts, safe DTOs/errors/caching, OpenAPI, and focused regressions complete; repository-level `mvn test` passed. |
+| 3A | **NOT STARTED — NEXT PROPOSED STEP** | Strict tenant-owned user release-state foundation only. |
 | 3B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
@@ -869,7 +868,7 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-After the required Phase 2B Maven verification succeeds, implement **Phase 3A only**: add the strict tenant-owned
+Implement **Phase 3A only**: add the strict tenant-owned
 `UserReleaseState` schema/RLS foundation and narrowly scoped service operations for reading and monotonically
 advancing per-user release acknowledgement. Include transactional concurrency and cross-tenant tests. Do not add
 the Phase 3B What's New UI, client consumption, rich media behavior, updater/manifest changes, policy evaluation
