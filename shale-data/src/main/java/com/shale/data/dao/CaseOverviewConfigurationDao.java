@@ -18,6 +18,7 @@ public final class CaseOverviewConfigurationDao {
             "intake", "statute_of_limitations", "tort_notice_deadline");
     private final DbSessionProvider db;
     private final CaseDateDao caseDates;
+    private final CaseDatePresentationConfigurationDao presentationDefaults;
     private final EntityActionAuditDao audits;
 
     public CaseOverviewConfigurationDao(DbSessionProvider db) {
@@ -25,6 +26,7 @@ public final class CaseOverviewConfigurationDao {
     }
     CaseOverviewConfigurationDao(DbSessionProvider db, CaseDateDao caseDates, EntityActionAuditDao audits) {
         this.db=Objects.requireNonNull(db); this.caseDates=Objects.requireNonNull(caseDates); this.audits=Objects.requireNonNull(audits);
+        this.presentationDefaults=new CaseDatePresentationConfigurationDao(db);
     }
 
     public CaseOverviewDateConfigurationDto get(long caseId,int tenant,int actor) {
@@ -32,7 +34,7 @@ public final class CaseOverviewConfigurationDao {
         try(Connection con=db.requireConnection()) {
             verifyTenant(con,tenant); validateActor(con,tenant,actor); validateCase(con,tenant,caseId);
             Config config=findConfig(con,tenant,caseId);
-            if(config==null) return new CaseOverviewDateConfigurationDto(caseId,false,defaults(effective),null);
+            if(config==null) return new CaseOverviewDateConfigurationDto(caseId,false,firmOverviewDefaults(tenant,actor),null);
             return new CaseOverviewDateConfigurationDto(caseId,true,readSelected(con,tenant,config.id,effective),config.rowVer);
         } catch(SQLException e){throw failure(e);}
     }
@@ -43,7 +45,7 @@ public final class CaseOverviewConfigurationDao {
             verifyTenant(con,tenant); validateAdmin(con,tenant,actor);
             CaseIntake intake=readIntake(con,tenant,caseId); Config config=findConfig(con,tenant,caseId);
             CaseOverviewDateConfigurationDto resolved=config==null
-                    ?new CaseOverviewDateConfigurationDto(caseId,false,defaults(effective),null)
+                    ?new CaseOverviewDateConfigurationDto(caseId,false,firmOverviewDefaults(tenant,actor),null)
                     :new CaseOverviewDateConfigurationDto(caseId,true,readSelected(con,tenant,config.id,effective),config.rowVer);
             return administration(resolved,effective,intake);
         } catch(SQLException e){throw failure(e);}
@@ -134,6 +136,14 @@ public final class CaseOverviewConfigurationDao {
 
     static void rejectDuplicates(List<Integer> ids){if(ids==null)throw new IllegalArgumentException("orderedCaseDateTypeIds is required.");if(new HashSet<>(ids).size()!=ids.size()||ids.stream().anyMatch(Objects::isNull))throw new IllegalArgumentException("Duplicate Case Date Types are not allowed.");}
     static List<EffectiveCaseDateTypeDto> defaults(List<EffectiveCaseDateTypeDto> types){Map<String,EffectiveCaseDateTypeDto> byKey=new HashMap<>();for(var t:types)if(t.systemKey()!=null)byKey.put(t.systemKey().toLowerCase(Locale.ROOT),t);return DEFAULT_KEYS.stream().map(byKey::get).filter(Objects::nonNull).toList();}
+    private List<EffectiveCaseDateTypeDto> firmOverviewDefaults(int tenant,int actor){
+        return selectionTypes(presentationDefaults.get(tenant,actor,
+                com.shale.core.model.CaseDatePresentationPurpose.CASE_OVERVIEW).selections());
+    }
+    static List<EffectiveCaseDateTypeDto> selectionTypes(List<com.shale.core.dto.CaseDatePresentationSelectionDto> selections){
+        Objects.requireNonNull(selections,"selections");
+        return selections.stream().map(com.shale.core.dto.CaseDatePresentationSelectionDto::type).toList();
+    }
     private record Config(long id,byte[] rowVer){} private record CaseIntake(Integer userId,String name,boolean active,byte[] rowVer){} private record User(int id,String name){}
     private static CaseOverviewAdministrationDto administration(CaseOverviewDateConfigurationDto config,List<EffectiveCaseDateTypeDto> types,CaseIntake intake){return new CaseOverviewAdministrationDto(config,types,intake.userId,intake.name,intake.userId==null||intake.active,intake.rowVer);}
     private static Config findConfig(Connection c,int t,long caseId)throws SQLException{try(PreparedStatement p=c.prepareStatement("SELECT Id,RowVer FROM dbo.CaseOverviewConfigurations WHERE ShaleClientId=? AND CaseId=?")){p.setInt(1,t);p.setLong(2,caseId);try(ResultSet r=p.executeQuery()){return r.next()?new Config(r.getLong(1),r.getBytes(2)):null;}}}
@@ -142,7 +152,7 @@ public final class CaseOverviewConfigurationDao {
     private static EffectiveCaseDateTypeDto historicalType(Connection c,int t,int id)throws SQLException{try(PreparedStatement p=c.prepareStatement("SELECT Id,ShaleClientId,SystemKey,Name,Description,CalendarCategory,Color,SupportsTime,SortOrder,IsActive,IsDeleted,RowVer FROM dbo.CaseDateTypes WHERE Id=? AND (ShaleClientId=? OR ShaleClientId IS NULL)")){p.setInt(1,id);p.setInt(2,t);try(ResultSet r=p.executeQuery()){if(!r.next())throw new IllegalStateException("Configured Case Date Type is unavailable.");Integer owner=getNullableInt(r,2);return new EffectiveCaseDateTypeDto(r.getInt(1),owner,r.getString(3),r.getString(4),r.getString(5),r.getString(6),r.getString(7),r.getBoolean(8),r.getInt(9),r.getBoolean(10),r.getBoolean(11),owner==null?EffectiveCaseDateTypeDto.Origin.GLOBAL:EffectiveCaseDateTypeDto.Origin.TENANT_CREATED,r.getBytes(12));}}}
     private static void validateSelections(Connection c,int t,List<Integer> ids,Set<Integer> retainedHistorical)throws SQLException{for(int id:ids){if(retainedHistorical.contains(id))continue;try(PreparedStatement p=c.prepareStatement("""
             WITH visible AS (SELECT x.Id,ROW_NUMBER() OVER(PARTITION BY x.SystemKey ORDER BY CASE WHEN x.ShaleClientId=? AND x.IsDeleted=0 THEN 0 ELSE 1 END,x.Id) rn
-            FROM dbo.CaseDateTypes x WHERE (x.ShaleClientId=? OR (x.ShaleClientId IS NULL AND EXISTS(SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings m WHERE m.CaseDateTypeId=x.Id AND m.ShaleClientId IS NULL AND m.IsActive=1 AND m.IsDeleted=0))) AND x.SystemKey IS NOT NULL
+            FROM dbo.CaseDateTypes x WHERE (x.ShaleClientId=? OR (x.ShaleClientId IS NULL AND LOWER(LTRIM(RTRIM(x.SystemKey))) IN ('intake','statute_of_limitations','tort_notice_deadline'))) AND x.SystemKey IS NOT NULL
             UNION ALL SELECT x.Id,1 FROM dbo.CaseDateTypes x WHERE x.ShaleClientId=? AND x.SystemKey IS NULL AND x.IsActive=1 AND x.IsDeleted=0)
             SELECT 1 FROM visible v JOIN dbo.CaseDateTypes x ON x.Id=v.Id WHERE v.Id=? AND v.rn=1 AND x.IsActive=1 AND x.IsDeleted=0
             """)){p.setInt(1,t);p.setInt(2,t);p.setInt(3,t);p.setInt(4,id);try(ResultSet r=p.executeQuery()){if(!r.next())throw new IllegalArgumentException("A selected Case Date Type is not effective for this tenant.");}}}}

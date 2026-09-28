@@ -75,7 +75,8 @@ class CaseDateDaoMutationContractTest {
         assertTrue(source.contains("requireProtectedSingletonAvailable(con,c.shaleClientId(),c.caseId(),c.caseDateTypeId(),null)"));
         assertTrue(source.contains("requireProtectedSingletonAvailable(con,t,caseId,before.typeId,id)"));
         assertTrue(source.contains("WITH (UPDLOCK,HOLDLOCK)"));
-        assertTrue(source.contains("m.SemanticRoleKey IN ('INTAKE','STATUTE_OF_LIMITATIONS','TORT_NOTICE_DEADLINE')"));
+        assertTrue(source.contains("m.SemanticRoleKey='INTAKE'"));
+        assertFalse(source.contains("m.SemanticRoleKey IN ('INTAKE','STATUTE_OF_LIMITATIONS','TORT_NOTICE_DEADLINE')"));
         assertTrue(source.contains("m.CaseDateTypeId=cd.CaseDateTypeId"));
         assertTrue(source.contains("if(restore)requireProtectedSingletonAvailable"));
         assertTrue(source.indexOf("requireProtectedSingletonAvailable(con,c.shaleClientId(),c.caseId(),c.caseDateTypeId(),null)")

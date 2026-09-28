@@ -98,6 +98,7 @@ public final class TaskCard extends VBox {
 	private String relatedCaseResponsibleAttorney = "";
 	private String relatedCaseResponsibleAttorneyColor = "";
 	private Boolean relatedCaseNonEngagementLetterSent;
+	private List<CaseCardFactory.PresentationDate> relatedCasePresentationDates = List.of();
 	private LocalDateTime dueAtValue;
 	private Variant currentVariant = Variant.MINI;
 	private Consumer<Long> onOpen;
@@ -242,7 +243,7 @@ public final class TaskCard extends VBox {
 
 	public void setRelatedCase(Long caseId, String caseName, String casePrimaryStatusName, String casePrimaryStatusColor,
 			String casePracticeAreaColor, String responsibleAttorney, String responsibleAttorneyColor,
-			Boolean nonEngagementLetterSent) {
+			Boolean nonEngagementLetterSent, List<CaseCardFactory.PresentationDate> presentationDates) {
 		relatedCaseId = caseId;
 		relatedCaseName = caseName == null ? "" : caseName.trim();
 		relatedCasePrimaryStatusName = casePrimaryStatusName == null ? "" : casePrimaryStatusName.trim();
@@ -251,6 +252,7 @@ public final class TaskCard extends VBox {
 		relatedCaseResponsibleAttorney = responsibleAttorney == null ? "" : responsibleAttorney.trim();
 		relatedCaseResponsibleAttorneyColor = responsibleAttorneyColor == null ? "" : responsibleAttorneyColor.trim();
 		relatedCaseNonEngagementLetterSent = nonEngagementLetterSent;
+		relatedCasePresentationDates = List.copyOf(presentationDates == null ? List.of() : presentationDates);
 		renderRelatedCaseCard();
 	}
 
@@ -531,7 +533,7 @@ public final class TaskCard extends VBox {
 			}
 		});
 		setAssignees(List.of());
-		setRelatedCase(null, null, null, null, null, null, null, null);
+		setRelatedCase(null, null, null, null, null, null, null, null, List.of());
 	}
 
 	private void setFullExpanded(boolean expanded) {
@@ -707,9 +709,10 @@ public final class TaskCard extends VBox {
 			return;
 		}
 		var caseCard = caseCardFactory.create(
-				new CaseCardModel(relatedCaseId, relatedCaseName, null, null, relatedCaseResponsibleAttorney,
+				new CaseCardModel(relatedCaseId, relatedCaseName, relatedCaseResponsibleAttorney,
 						relatedCaseResponsibleAttorneyColor, relatedCaseNonEngagementLetterSent,
-						relatedCasePrimaryStatusName, relatedCasePrimaryStatusColor, relatedCasePracticeAreaColor),
+					relatedCasePrimaryStatusName, relatedCasePrimaryStatusColor, relatedCasePracticeAreaColor,
+					relatedCasePresentationDates),
 				CaseCardFactory.Variant.EMBEDDED);
 		if (caseCard instanceof Region region && isFluidRelatedCaseVariant()) {
 			region.setMinWidth(0);

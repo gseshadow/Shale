@@ -37,7 +37,8 @@ public final class TaskCardFactory {
             String priorityColorHex,
             LocalDateTime dueAt,
             LocalDateTime completedAt,
-            List<AssignedUserModel> assignedUsers
+            List<AssignedUserModel> assignedUsers,
+            List<CaseCardFactory.PresentationDate> casePresentationDates
     ) {
     }
 
@@ -112,7 +113,7 @@ public final class TaskCardFactory {
                 model.casePracticeAreaColor(),
                 model.caseResponsibleAttorney(),
                 model.caseResponsibleAttorneyColor(),
-                model.caseNonEngagementLetterSent());
+                model.caseNonEngagementLetterSent(), model.casePresentationDates());
         card.setTitle(displayTitle);
         card.setDueAt(model.dueAt());
         card.setCreatedByDisplayName(model.createdByDisplayName());

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.*;
 import java.util.List;
 import com.shale.core.dto.EffectiveCaseDateTypeDto;
+import com.shale.core.dto.CaseDatePresentationSelectionDto;
 import org.junit.jupiter.api.Test;
 
 /** Protects the tenant default foundation before any card/Overview reader cutover. */
@@ -34,12 +35,22 @@ final class CaseDatePresentationConfigurationContractTest {
           ()->assertTrue(s.contains("con.rollback()")));
     }
 
+    @Test void administrationLoadIsAlsoAdminAuthorized()throws Exception{
+        String s=read("shale-data/src/main/java/com/shale/data/dao/CaseDatePresentationConfigurationDao.java");
+        String get=s.substring(s.indexOf("public CaseDatePresentationConfigurationDto get"),s.indexOf("public CaseDatePresentationConfigurationDto replace"));
+        assertTrue(get.contains("verifySession(con,tenant,actor,true)"),
+                "historical configuration reads are administrator-only, not merely UI-hidden");
+    }
+
     @Test void resolverMatchesGlobalOrTenantStoredTypeWithoutRewritingAndKeepsHistoryReadable()throws Exception{
         String s=read("shale-data/src/main/java/com/shale/data/dao/CaseDatePresentationConfigurationDao.java");
         assertAll(
-          ()->assertTrue(s.contains("stored.ShaleClientId=c.ShaleClientId OR stored.ShaleClientId IS NULL")),
+          ()->assertTrue(s.contains("stored.ShaleClientId=? OR stored.ShaleClientId IS NULL")),
           ()->assertTrue(s.contains("LOWER(LTRIM(RTRIM(stored.SystemKey)))=SUBSTRING(s.SelectionIdentity,8,160)")),
           ()->assertTrue(s.contains("ORDER BY cd.StartsAt,cd.Id")),
+          ()->assertTrue(s.contains("NOT EXISTS(SELECT 1 FROM dbo.CaseOverviewConfigurations"), "missing parent inherits the firm Overview default"),
+          ()->assertTrue(s.contains("JOIN dbo.CaseOverviewConfigurations o"), "an existing parent, including one with zero children, overrides the default"),
+          ()->assertTrue(s.contains("resolveForCases(Collection"), "collection reads must be set based"),
           ()->assertFalse(s.contains("UPDATE dbo.CaseDates")),
           ()->assertTrue(s.contains("CASE WHEN t.IsActive=1 AND t.IsDeleted=0 THEN 0 ELSE 1 END Historical")),
           ()->assertTrue(s.contains("not active and tenant-effective")));
@@ -69,6 +80,19 @@ final class CaseDatePresentationConfigurationContractTest {
                 "a built-in-only tenant must preserve its actual three-date uncustomized Overview rather than fail on optional types");
     }
 
+    @Test void firmOverviewDefaultsPreserveSelectionOrderHistoricalPresentationAndExplicitEmpty(){
+        var current=type(11,"intake");
+        var historical=new EffectiveCaseDateTypeDto(12,7,null,"Former deadline",null,"OTHER","#654321",false,2,false,true,
+                EffectiveCaseDateTypeDto.Origin.TENANT_CREATED,new byte[]{2});
+        var selections=List.of(
+                new CaseDatePresentationSelectionDto("TYPE:12",0,historical,true),
+                new CaseDatePresentationSelectionDto("SYSTEM:intake",1,current,false));
+        assertEquals(List.of(historical,current),CaseOverviewConfigurationDao.selectionTypes(selections),
+                "Overview inheritance must use each selection's tenant-effective or historical presentation in saved order");
+        assertEquals(List.of(),CaseOverviewConfigurationDao.selectionTypes(List.of()),
+                "an explicitly empty firm Overview selection must remain empty");
+    }
+
     @Test void servicePortDefaultsFailClosedAndProductionAdapterDelegates()throws Exception{
         String port=read("shale-core/src/main/java/com/shale/core/service/CaseServicePort.java");
         String adapter=read("shale-data/src/main/java/com/shale/data/service/adapter/CaseServiceAdapter.java");
@@ -76,7 +100,8 @@ final class CaseDatePresentationConfigurationContractTest {
           ()->assertTrue(port.contains("Case Date presentation configuration is unavailable.")),
           ()->assertTrue(adapter.contains("requireCaseDatePresentationConfigurationDao().get(t,a,p)")),
           ()->assertTrue(adapter.contains("requireCaseDatePresentationConfigurationDao().replace(c)")),
-          ()->assertTrue(adapter.contains("requireCaseDatePresentationConfigurationDao().resolve(caseId,t,a,p)")));
+          ()->assertTrue(adapter.contains("requireCaseDatePresentationConfigurationDao().resolve(caseId,t,a,p)")),
+          ()->assertTrue(adapter.contains("resolveForCases(ids,t,a,p)")));
     }
 
     @Test void verificationIsRowLevelAndAuditVocabularyIsForwardOnly()throws Exception{

@@ -2,17 +2,21 @@ package com.shale.ui.component.dialog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
 import com.shale.core.dto.CaseTaskListItemDto;
 import com.shale.core.dto.TaskDetailDto;
+import com.shale.ui.component.factory.CaseCardFactory;
 
 final class TaskDetailCaseCardHydrationTest {
 
@@ -34,6 +38,7 @@ final class TaskDetailCaseCardHydrationTest {
                 myShale.id(), myShale.caseId(), myShale.caseName(), myShale.caseResponsibleAttorney(),
                 myShale.caseResponsibleAttorneyColor(), myShale.caseNonEngagementLetterSent(),
                 myShale.casePrimaryStatusName(), myShale.casePrimaryStatusColor(), myShale.casePracticeAreaColor(),
+                List.of(),
                 myShale.title(), myShale.description(), myShale.dueAt(), null, null,
                 myShale.createdByDisplayName(), List.of(), List.of(), List.of(), false);
         TaskDetailDialog.TaskDetailModel calendarModel = new TaskDetailDialog.TaskDetailModel(
@@ -41,6 +46,7 @@ final class TaskDetailCaseCardHydrationTest {
                 calendarLoadedDetail.caseResponsibleAttorney(), calendarLoadedDetail.caseResponsibleAttorneyColor(),
                 calendarLoadedDetail.caseNonEngagementLetterSent(), calendarLoadedDetail.casePrimaryStatusName(),
                 calendarLoadedDetail.casePrimaryStatusColor(), calendarLoadedDetail.casePracticeAreaColor(),
+                List.of(),
                 calendarLoadedDetail.title(), calendarLoadedDetail.description(), calendarLoadedDetail.dueAt(),
                 calendarLoadedDetail.statusId(), calendarLoadedDetail.priorityId(), calendarLoadedDetail.createdByDisplayName(),
                 List.of(), List.of(), List.of(), false);
@@ -67,5 +73,44 @@ final class TaskDetailCaseCardHydrationTest {
         String taskDetailOpener = sceneManager.substring(sceneManager.indexOf("public void openTaskProfile(Long taskId, Runnable onTaskChanged)"));
         taskDetailOpener = taskDetailOpener.substring(0, taskDetailOpener.indexOf("private void showTaskDetailDialog"));
         assertFalse(taskDetailOpener.contains("CalendarFeed"), "Task-detail mini case card must not use Calendar feed colors.");
+    }
+
+    @Test
+    void taskDetailModelPreservesExplicitPresentationDatesAndRejectsMissingContract() {
+        var date = new CaseCardFactory.PresentationDate(
+                "TYPE:42", null, "Mediation", LocalDate.of(2026, 10, 5), false);
+        var mutableDates = new ArrayList<>(List.of(date));
+        TaskDetailDialog.TaskDetailModel model = modelWithPresentationDates(mutableDates);
+
+        mutableDates.clear();
+
+        assertEquals(List.of(date), model.casePresentationDates(),
+                "Task Detail must retain the caller's batched CASE_CARD projection.");
+        assertThrows(UnsupportedOperationException.class, () -> model.casePresentationDates().clear(),
+                "The presentation-date model contract must remain immutable.");
+        assertEquals(List.of(), modelWithPresentationDates(List.of()).casePresentationDates(),
+                "An explicit empty projection must remain empty without fixed-date fallbacks.");
+        assertThrows(NullPointerException.class, () -> modelWithPresentationDates(null),
+                "Callers must explicitly provide the CASE_CARD projection, including an empty list.");
+    }
+
+    @Test
+    void taskDetailOpenersPassTheirExistingBatchedCaseDates() throws Exception {
+        String caseController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
+        String myShaleController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MyShaleController.java"));
+        String userController = Files.readString(Path.of("src/main/java/com/shale/ui/controller/UserController.java"));
+
+        assertTrue(caseController.contains("CaseCardFactory.toPresentationDates(caseTaskCardDates)"));
+        assertTrue(myShaleController.contains("CaseCardFactory.toPresentationDates(taskCaseCardDates.getOrDefault("));
+        assertTrue(userController.contains("CaseCardFactory.toPresentationDates(assignedTaskCaseDates.getOrDefault("));
+    }
+
+    private static TaskDetailDialog.TaskDetailModel modelWithPresentationDates(
+            List<CaseCardFactory.PresentationDate> presentationDates) {
+        return new TaskDetailDialog.TaskDetailModel(
+                10L, 501L, "Smith v. Example", "Ada Attorney", "#AA5500", false,
+                "Open", "#22AA55", "#004488", presentationDates,
+                "Review records", "Read intake packet", LocalDateTime.of(2026, 1, 2, 12, 0),
+                2, 1, "Case Creator", List.of(), List.of(), List.of(), false);
     }
 }

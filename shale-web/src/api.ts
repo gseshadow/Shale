@@ -326,6 +326,14 @@ export interface CreateMappedCaseDateInput {
   allDay: boolean;
 }
 
+export async function listEffectiveCaseDateTypes(accessToken: string): Promise<string[]> {
+  const response = await fetch(`${apiBaseUrl()}/api/lookups/case-date-types`, {
+    method: 'GET', headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new ApiError('Shale could not load Case Date families.', response.status);
+  return response.json() as Promise<string[]>;
+}
+
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
     super(message);

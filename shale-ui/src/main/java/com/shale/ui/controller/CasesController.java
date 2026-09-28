@@ -718,9 +718,16 @@ public final class CasesController {
 	}
 
 	private void handleCaseDatesUpdated(UiRuntimeBridge.EntityUpdatedEvent event) {
-		if (event == null || !LiveUpdateEvents.ENTITY_CASE_DATES.equals(event.entityType()) || appState == null) return;
+		if (event == null || appState == null) return;
 		Integer tenant = appState.getShaleClientId();
-		if (tenant == null || tenant <= 0 || event.shaleClientId() != tenant || event.entityId() <= 0) return;
+		if (tenant == null || tenant <= 0 || event.shaleClientId() != tenant) return;
+		if (LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION.equals(event.entityType())) {
+			Object purpose = event.patch() == null ? null : event.patch().get("purpose");
+			if (com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD.name().equals(String.valueOf(purpose)))
+				Platform.runLater(this::loadFirstPage);
+			return;
+		}
+		if (!LiveUpdateEvents.ENTITY_CASE_DATES.equals(event.entityType()) || event.entityId() <= 0) return;
 		String mine = runtimeBridge == null ? "" : runtimeBridge.getClientInstanceId();
 		if (!mine.isBlank() && mine.equals(event.clientInstanceId())) return;
 		if (!rememberCaseDatesEvent(event.eventId()) || !caseDatesRefreshQueued.compareAndSet(false, true)) return;
@@ -889,6 +896,8 @@ public final class CasesController {
 				List<CaseCardVm> newItems = page.items().stream()
 						.map(this::toViewModel)
 						.toList();
+				var cardDates=caseSummaryDao.resolveCardDates(newItems.stream().map(v->v.id).toList(),tenantId,appState.getUserId());
+				newItems.forEach(v->v.presentationDates=CaseCardFactory.toPresentationDates(cardDates.getOrDefault(v.id,List.of())));
 				PerfLog.logDone("DAO_MAP", "operation=cases-load phase=projection-merge-dto-map pageIndex="
 						+ pageToLoad + " resultCount=" + newItems.size(), mapStartNanos);
 				PerfLog.logDone("CTRL", "operation=cases-load boundary=complete-background loadGeneration="
@@ -1245,15 +1254,13 @@ public final class CasesController {
 		return caseCardFactory.create(new CaseCardModel(
 				vm.id,
 				vm.name,
-				vm.intakeDate,
-				vm.solDate,
-				vm.tortClaimsNoticeDeadline,
 				vm.responsibleAttorney,
 				vm.responsibleAttorneyColor,
 				vm.nonEngagementLetterSent,
 				vm.primaryStatusName,
 				vm.primaryStatusColor,
-				vm.practiceAreaColor
+				vm.practiceAreaColor,
+				vm.presentationDates
 		));
 	}
 
@@ -1299,6 +1306,7 @@ public final class CasesController {
 		final String description;
 		final LocalDate dateOfIncident;
 		final LocalDate tortClaimsNoticeDeadline;
+		List<CaseCardFactory.PresentationDate> presentationDates=List.of();
 
 		CaseCardVm(long id, String name, LocalDate intakeDate, LocalDate solDate, Integer primaryStatusId, String responsibleAttorney,
 				String responsibleAttorneyColor, Boolean nonEngagementLetterSent, String primaryStatusName, String primaryStatusColor, String practiceAreaColor, String clientName,

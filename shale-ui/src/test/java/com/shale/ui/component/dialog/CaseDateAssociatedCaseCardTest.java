@@ -12,6 +12,8 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
+
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -47,8 +49,8 @@ class CaseDateAssociatedCaseCardTest {
     }
 
     private static CaseCardModel model(long id) {
-        return new CaseCardModel(id, "Matter", null, null, null, "Attorney", "#123456",
-                false, "Open", "#654321", "#abcdef");
+        return new CaseCardModel(id, "Matter", "Attorney", "#123456",
+                false, "Open", "#654321", "#abcdef", List.of());
     }
     private static MouseEvent primaryClick() { return new MouseEvent(MouseEvent.MOUSE_CLICKED,1,1,1,1,
             MouseButton.PRIMARY,1,false,false,false,false,true,false,false,true,false,true,null); }

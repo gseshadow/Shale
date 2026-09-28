@@ -44,6 +44,7 @@ import com.shale.ui.notification.NotificationCenterService;
 import com.shale.ui.services.CaseTaskService;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.services.UserPreferencesService;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.AppSectionTabs;
@@ -219,6 +220,7 @@ public final class MyShaleController {
 
 	private CaseDao caseDao;
 	private CaseSummaryDao caseSummaryDao;
+	private java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> myCaseCardDates = java.util.Map.of();
 	private CaseTaskService caseTaskService;
 	private UserBoardLanePreferencesDao userBoardLanePreferencesDao;
 	private AppState appState;
@@ -233,6 +235,7 @@ public final class MyShaleController {
 	private CaseCardFactory caseCardFactory;
 	private TaskCardFactory taskCardFactory;
 	private Consumer<UiRuntimeBridge.CaseUpdatedEvent> liveCaseUpdatedHandler;
+	private Consumer<UiRuntimeBridge.EntityUpdatedEvent> casePresentationUpdatedHandler;
 	private boolean liveSubscribed;
 	private final AtomicBoolean taskDetailDialogInFlight = new AtomicBoolean(false);
 
@@ -241,6 +244,7 @@ public final class MyShaleController {
 	private int recentCaseActivityLoadGeneration = 0;
 
 	private List<CaseTaskListItemDto> myTasks = List.of();
+	private java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> taskCaseCardDates = java.util.Map.of();
 	private List<TaskStatusOptionDto> myTaskStatusOptions = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> myTaskAssignedUsers = java.util.Map.of();
 	private java.util.Map<Integer, String> myTaskPrioritiesById = java.util.Map.of();
@@ -746,6 +750,14 @@ public final class MyShaleController {
 
 		liveCaseUpdatedHandler = this::handleLiveCaseUpdatedEvent;
 		runtimeBridge.subscribeCaseUpdated(liveCaseUpdatedHandler);
+		casePresentationUpdatedHandler = event -> {
+			if (event != null && appState != null && LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION.equals(event.entityType())
+					&& java.util.Objects.equals(appState.getShaleClientId(), event.shaleClientId())) {
+				Object purpose=event.patch()==null?null:event.patch().get("purpose");
+				if (com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD.name().equals(String.valueOf(purpose))) Platform.runLater(this::refreshMyCasesBoard);
+			}
+		};
+		runtimeBridge.subscribeEntityUpdated(casePresentationUpdatedHandler);
 		liveSubscribed = true;
 		log.debug("My Cases live subscribed to case updates");
 	}
@@ -755,6 +767,7 @@ public final class MyShaleController {
 			return;
 		}
 		runtimeBridge.unsubscribeCaseUpdated(liveCaseUpdatedHandler);
+		if (casePresentationUpdatedHandler != null) runtimeBridge.unsubscribeEntityUpdated(casePresentationUpdatedHandler);
 		liveSubscribed = false;
 		log.debug("My Cases live unsubscribed from case updates");
 	}
@@ -816,15 +829,13 @@ public final class MyShaleController {
 		return caseCardFactory.create(new CaseCardModel(
 				vm.id,
 				vm.name,
-				vm.intakeDate,
-				vm.solDate,
-				vm.tortNoticeDate,
 				vm.responsibleAttorney,
 				vm.responsibleAttorneyColor,
 				vm.nonEngagementLetterSent,
 				vm.primaryStatusName,
 				vm.primaryStatusColor,
-				vm.practiceAreaColor));
+				vm.practiceAreaColor,
+				CaseCardFactory.toPresentationDates(myCaseCardDates.getOrDefault(vm.id, List.of()))));
 	}
 
 	private void refreshMyTasks() {
@@ -936,6 +947,9 @@ public final class MyShaleController {
 						? caseTaskService.loadTasksCreatedByUser(tenantAtSubmit, userAtSubmit, sort, includeCompleted)
 						: caseTaskService.loadMyTasks(tenantAtSubmit, userAtSubmit, sort, includeCompleted);
 				List<CaseTaskListItemDto> tasks = result == null ? List.of() : List.copyOf(result);
+				var cardDates = caseSummaryDao.resolveCardDates(tasks.stream().map(CaseTaskListItemDto::caseId)
+						.filter(id -> id > 0).distinct().toList(), tenantAtSubmit, userAtSubmit);
+				taskCaseCardDates = cardDates;
 				runOnFx(() -> applyTasks(generation, tenantAtSubmit, userAtSubmit, tasks, initializationNanos));
 
 				// Assignees depend only on task ids, not on priorities/statuses or FX rendering.
@@ -1106,6 +1120,8 @@ public final class MyShaleController {
 				long daoStartNanos = PerfLog.start();
 				PerfLog.log("DAO", "start", "method=listActiveAssignedBoard page=my_shale userId=" + userIdValue);
 				List<CaseBoardRow> rows = caseSummaryDao.listActiveAssignedBoard(shaleClientId, userIdValue);
+				var loadedCardDates = caseSummaryDao.resolveCardDates((rows == null ? List.<CaseBoardRow>of() : rows).stream()
+						.map(row -> row.summary().caseId()).toList(), shaleClientId, userIdValue);
 				PerfLog.logDone("DAO", "method=listActiveAssignedBoard page=my_shale userId=" + userIdValue + " rows=" + (rows == null ? 0 : rows.size()), daoStartNanos);
 				int rowCount = rows == null ? 0 : rows.size();
 				log.debug("My Cases board DAO returned rowCount={} userId={}", rowCount, userIdValue);
@@ -1123,6 +1139,7 @@ public final class MyShaleController {
 						loadingMyCases = false;
 						myCasesLoadFailed = false;
 						myAssignedCasesBoard = cases;
+						myCaseCardDates = loadedCardDates;
 						cachedCasesUserId = userIdValue;
 						cachedCasesTenantId = shaleClientId;
 						myCasesLoadedOnce = true;
@@ -1561,7 +1578,8 @@ public final class MyShaleController {
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
-					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+					myTaskAssignedUsers.getOrDefault(task.id(), List.of()),
+					CaseCardFactory.toPresentationDates(taskCaseCardDates.getOrDefault(task.caseId(), List.of())));
 			var taskCard = taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true);
 			taskCard.getStyleClass().add("my-tasks-grid-card");
 			taskCard.setMinWidth(TASKS_CASE_COLUMN_PREF_WIDTH);
@@ -3140,7 +3158,8 @@ public final class MyShaleController {
 						task.priorityColorHex(),
 						task.dueAt(),
 						task.completedAt(),
-						myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+						myTaskAssignedUsers.getOrDefault(task.id(), List.of()),
+						CaseCardFactory.toPresentationDates(taskCaseCardDates.getOrDefault(task.caseId(), List.of())));
 				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.COMPACT, true));
 			}
 		}
@@ -3257,11 +3276,11 @@ public final class MyShaleController {
 		Node caseCard = caseCardFactory.create(new CaseCardModel(
 				key == null || key.caseId() == null ? 0L : key.caseId(),
 				key == null ? NO_CASE_COLUMN_TITLE : key.displayName(),
-				null,
-				null,
 				key == null ? "" : key.responsibleAttorney(),
 				key == null ? "" : key.responsibleAttorneyColor(),
-				key != null && key.nonEngagementLetterSent()), CaseCardFactory.Variant.EMBEDDED);
+				key != null && key.nonEngagementLetterSent(), "", "", "",
+				CaseCardFactory.toPresentationDates(taskCaseCardDates.getOrDefault(
+						key == null || key.caseId() == null ? 0L : key.caseId(), List.of()))), CaseCardFactory.Variant.EMBEDDED);
 		VBox header = new VBox(6);
 		HBox headerTopRow = new HBox(8);
 		headerTopRow.setAlignment(Pos.CENTER_LEFT);
@@ -3505,7 +3524,8 @@ public final class MyShaleController {
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
-					myTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+					myTaskAssignedUsers.getOrDefault(task.id(), List.of()),
+					CaseCardFactory.toPresentationDates(taskCaseCardDates.getOrDefault(task.caseId(), List.of())));
 			if (fullVariant) {
 				taskCards.getChildren().add(taskCardFactory.create(model, TaskCardFactory.Variant.MY_TASKS, true));
 			} else {
@@ -3920,6 +3940,8 @@ public final class MyShaleController {
 				summary.map(CaseTaskListItemDto::casePrimaryStatusName).orElse(""),
 				summary.map(CaseTaskListItemDto::casePrimaryStatusColor).orElse(""),
 				summary.map(CaseTaskListItemDto::casePracticeAreaColor).orElse(""),
+				CaseCardFactory.toPresentationDates(taskCaseCardDates.getOrDefault(
+						summary.map(CaseTaskListItemDto::caseId).orElse(0L), List.of())),
 				summary.map(CaseTaskListItemDto::title).orElse(""),
 				summary.map(CaseTaskListItemDto::description).orElse(""),
 				summary.map(CaseTaskListItemDto::dueAt).orElse(null),

@@ -1172,6 +1172,7 @@ public final class SceneManager {
 				initialDetail == null ? "" : initialDetail.casePrimaryStatusName(),
 				initialDetail == null ? "" : initialDetail.casePrimaryStatusColor(),
 				initialDetail == null ? "" : initialDetail.casePracticeAreaColor(),
+				List.of(),
 				initialDetail == null ? "" : initialDetail.title(),
 				initialDetail == null ? "" : initialDetail.description(),
 				initialDetail == null ? null : initialDetail.dueAt(),

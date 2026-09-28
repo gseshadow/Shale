@@ -97,6 +97,7 @@ import com.shale.ui.component.factory.OrganizationCardFactory;
 import com.shale.ui.component.factory.LinkTypeIndicatorFactory;
 import com.shale.ui.component.ColorCodedComboBox;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
+import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
@@ -264,6 +265,7 @@ public class CaseController {
 	private final VBox configuredOverviewDates = new VBox();
 	private CaseOverviewDateConfigurationDto overviewDateConfiguration;
 	private List<CaseDateDto> overviewConfiguredDateValues = List.of();
+	private List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> overviewSelectedOccurrences = List.of();
 	private Map<Long, CaseDateConfirmationDto> caseDateConfirmations = Map.of();
 	private Map<Integer, String> confirmationRoleNames = Map.of();
 	private Set<Integer> actorConfirmationRoles = Set.of();
@@ -831,6 +833,7 @@ public class CaseController {
 	private boolean partiesLoadedOnce = false;
 	private List<CaseTaskListItemDto> caseTasks = List.of();
 	private java.util.Map<Long, List<TaskCardFactory.AssignedUserModel>> caseTaskAssignedUsers = java.util.Map.of();
+	private List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> caseTaskCardDates = List.of();
 	private boolean caseTasksLoadedOnce;
 	private boolean caseTasksStale = true;
 	private boolean showCompletedCaseTasks;
@@ -4287,6 +4290,8 @@ public class CaseController {
 						activeCaseId,
 						shaleClientId,
 						selectedCaseTaskSort());
+				List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> taskCardDates = caseService.resolveCaseDatePresentation(
+						activeCaseId, shaleClientId, appState.getUserId(), com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD);
 				PerfLog.logDone("DAO", "method=loadTasksForCase page=case_view caseId=" + activeCaseId + " rows=" + (tasks == null ? 0 : tasks.size()), taskLoadStartNanos);
 				List<Long> taskIds = (tasks == null ? List.<CaseTaskListItemDto>of() : tasks).stream()
 						.map(CaseTaskListItemDto::id)
@@ -4312,6 +4317,7 @@ public class CaseController {
 					}
 					caseTasks = tasks == null ? List.of() : tasks;
 					caseTaskAssignedUsers = assignedByTask;
+					caseTaskCardDates = taskCardDates;
 					caseTasksLoadedOnce = true;
 					caseTasksStale = false;
 					renderTasksSection();
@@ -4395,7 +4401,7 @@ public class CaseController {
 					task.priorityColorHex(),
 					task.dueAt(),
 					task.completedAt(),
-					caseTaskAssignedUsers.getOrDefault(task.id(), List.of()));
+					caseTaskAssignedUsers.getOrDefault(task.id(), List.of()), CaseCardFactory.toPresentationDates(caseTaskCardDates));
 			tasksTabFlow.getChildren().add(factory.create(model, TaskCardFactory.Variant.COMPACT, true));
 		}
 
@@ -4562,6 +4568,7 @@ public class CaseController {
 				summary.map(CaseTaskListItemDto::casePrimaryStatusName).orElse(""),
 				summary.map(CaseTaskListItemDto::casePrimaryStatusColor).orElse(""),
 				summary.map(CaseTaskListItemDto::casePracticeAreaColor).orElse(""),
+				CaseCardFactory.toPresentationDates(caseTaskCardDates),
 				summary.map(CaseTaskListItemDto::title).orElse(""),
 				summary.map(CaseTaskListItemDto::description).orElse(""),
 				summary.map(CaseTaskListItemDto::dueAt).orElse(null),
@@ -4869,10 +4876,10 @@ public class CaseController {
 		if(caseService==null||appState==null||caseId==null||appState.getShaleClientId()==null||appState.getUserId()==null)return;
 		long activeCase=caseId;int tenant=appState.getShaleClientId(),actor=appState.getUserId(),generation=++overviewConfigurationGeneration;
 		configuredOverviewDates.getChildren().setAll(new Label("Loading overview dates…"));
-		caseDateExecutor.submit(()->{try{CaseOverviewDateConfigurationDto config=caseService.getCaseOverviewDateConfiguration(activeCase,tenant,actor);List<EffectiveCaseDateTypeDto> types=caseService.listEffectiveCaseDateTypes(tenant,actor);List<CaseDateDto> values=caseService.listCaseDatesForCase(activeCase,tenant,actor);List<CaseDateConfirmationDto> confirmations=caseService.listCaseDateConfirmationsForCase(activeCase,tenant,actor);List<CaseServicePort.ConfirmationRole> roles=caseService.listConfirmationRoles(tenant,actor);Set<Integer> eligible=confirmations.stream().filter(c->c.status()==CaseDateConfirmationDto.Status.PENDING).map(CaseDateConfirmationDto::requiredFirmWideRoleDefinitionId).filter(Objects::nonNull).filter(role->caseService.currentActorHasConfirmationRole(tenant,actor,role)).collect(Collectors.toSet());Platform.runLater(()->{if(caseId==null||caseId.longValue()!=activeCase||generation!=overviewConfigurationGeneration)return;overviewDateConfiguration=config;effectiveCaseDateTypes=types==null?List.of():List.copyOf(types);overviewConfiguredDateValues=values==null?List.of():List.copyOf(values);caseDateConfirmations=confirmations.stream().collect(Collectors.toUnmodifiableMap(c->c.caseDate().id(),Function.identity()));confirmationRoleNames=roles.stream().collect(Collectors.toUnmodifiableMap(CaseServicePort.ConfirmationRole::id,CaseServicePort.ConfirmationRole::name));actorConfirmationRoles=Set.copyOf(eligible);renderConfiguredOverviewDates();if(compatibilityDates.isLoaded())renderCompatibilityDates();});}catch(RuntimeException ex){LOG.error("Case Overview configuration load failed tenantId={} actorId={} caseId={}",tenant,actor,activeCase,ex);Platform.runLater(()->{if(generation==overviewConfigurationGeneration)configuredOverviewDates.getChildren().setAll(new Label("Overview dates could not be loaded."));});}});
+		caseDateExecutor.submit(()->{try{CaseOverviewDateConfigurationDto config=caseService.getCaseOverviewDateConfiguration(activeCase,tenant,actor);List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> selected=caseService.resolveCaseDatePresentation(activeCase,tenant,actor,com.shale.core.model.CaseDatePresentationPurpose.CASE_OVERVIEW);List<EffectiveCaseDateTypeDto> types=caseService.listEffectiveCaseDateTypes(tenant,actor);List<CaseDateDto> values=caseService.listCaseDatesForCase(activeCase,tenant,actor);List<CaseDateConfirmationDto> confirmations=caseService.listCaseDateConfirmationsForCase(activeCase,tenant,actor);List<CaseServicePort.ConfirmationRole> roles=caseService.listConfirmationRoles(tenant,actor);Set<Integer> eligible=confirmations.stream().filter(c->c.status()==CaseDateConfirmationDto.Status.PENDING).map(CaseDateConfirmationDto::requiredFirmWideRoleDefinitionId).filter(Objects::nonNull).filter(role->caseService.currentActorHasConfirmationRole(tenant,actor,role)).collect(Collectors.toSet());Platform.runLater(()->{if(caseId==null||caseId.longValue()!=activeCase||generation!=overviewConfigurationGeneration)return;overviewDateConfiguration=config;overviewSelectedOccurrences=selected==null?List.of():List.copyOf(selected);effectiveCaseDateTypes=types==null?List.of():List.copyOf(types);overviewConfiguredDateValues=values==null?List.of():List.copyOf(values);caseDateConfirmations=confirmations.stream().collect(Collectors.toUnmodifiableMap(c->c.caseDate().id(),Function.identity()));confirmationRoleNames=roles.stream().collect(Collectors.toUnmodifiableMap(CaseServicePort.ConfirmationRole::id,CaseServicePort.ConfirmationRole::name));actorConfirmationRoles=Set.copyOf(eligible);renderConfiguredOverviewDates();if(compatibilityDates.isLoaded())renderCompatibilityDates();});}catch(RuntimeException ex){LOG.error("Case Overview configuration load failed tenantId={} actorId={} caseId={}",tenant,actor,activeCase,ex);Platform.runLater(()->{if(generation==overviewConfigurationGeneration)configuredOverviewDates.getChildren().setAll(new Label("Overview dates could not be loaded."));});}});
 	}
 
-	private void renderConfiguredOverviewDates(){configuredOverviewDates.getChildren().clear();if(overviewDateConfiguration==null)return;for(EffectiveCaseDateTypeDto type:overviewDateConfiguration.visibleDateTypes()){CaseDateDto value=overviewConfiguredDateValues.stream().filter(d->d.caseDateTypeId()==type.id()).sorted(Comparator.comparing(CaseDateDto::startsAt).thenComparingLong(CaseDateDto::id)).findFirst().orElse(null);Region color=new Region();color.getStyleClass().add("case-overview-date-color");String accent=ColorUtil.toCssBackgroundColorOrNull(type.color());if(accent!=null)color.setStyle("-fx-background-color: "+accent+";");color.setAccessibleText(type.name()+" color accent");Label name=new Label(type.name());name.getStyleClass().add("shale-property-row-label");name.setMinWidth(150);Label display=new Label(value==null?"—":formatCaseDateOccurrence(value));display.setWrapText(true);display.getStyleClass().add("shale-property-row-value");HBox.setHgrow(display,Priority.ALWAYS);VBox valueBox=new VBox(4,display);CaseDateConfirmationDto confirmation=value==null?null:caseDateConfirmations.get(value.id());if(confirmation!=null&&confirmation.status()!=CaseDateConfirmationDto.Status.NOT_REQUIRED)valueBox.getChildren().add(CaseDateConfirmationView.create(confirmation,confirmationRoleNames.get(confirmation.requiredFirmWideRoleDefinitionId()),actorConfirmationRoles.contains(confirmation.requiredFirmWideRoleDefinitionId()),()->confirmCaseDate(confirmation)));HBox.setHgrow(valueBox,Priority.ALWAYS);Button action=ActionButtonFactory.semantic("✎",e->openOverviewDate(type,value),ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);action.setAccessibleText((value==null?"Add ":"Edit ")+type.name());action.setTooltip(new Tooltip(action.getAccessibleText()));HBox row=new HBox(10,color,name,valueBox,action);row.getStyleClass().addAll("case-overview-configured-date-row","shale-property-row","shale-property-row-compact");configuredOverviewDates.getChildren().add(row);}}
+	private void renderConfiguredOverviewDates(){configuredOverviewDates.getChildren().clear();if(overviewDateConfiguration==null)return;for(int index=0;index<overviewDateConfiguration.visibleDateTypes().size();index++){EffectiveCaseDateTypeDto type=overviewDateConfiguration.visibleDateTypes().get(index);var selected=index<overviewSelectedOccurrences.size()?overviewSelectedOccurrences.get(index):null;CaseDateDto value=selected==null||selected.caseDateId()==null?null:overviewConfiguredDateValues.stream().filter(d->d.id()==selected.caseDateId()).findFirst().orElse(null);String displayName=selected!=null&&selected.displayName()!=null&&!selected.displayName().isBlank()?selected.displayName():type.name();String displayColor=selected!=null&&selected.displayColor()!=null?selected.displayColor():type.color();Region color=new Region();color.getStyleClass().add("case-overview-date-color");String accent=ColorUtil.toCssBackgroundColorOrNull(displayColor);if(accent!=null)color.setStyle("-fx-background-color: "+accent+";");color.setAccessibleText(displayName+" color accent");Label name=new Label(displayName);name.getStyleClass().add("shale-property-row-label");name.setMinWidth(150);Label display=new Label(value==null?"—":formatCaseDateOccurrence(value));display.setWrapText(true);display.getStyleClass().add("shale-property-row-value");HBox.setHgrow(display,Priority.ALWAYS);VBox valueBox=new VBox(4,display);CaseDateConfirmationDto confirmation=value==null?null:caseDateConfirmations.get(value.id());if(confirmation!=null&&confirmation.status()!=CaseDateConfirmationDto.Status.NOT_REQUIRED)valueBox.getChildren().add(CaseDateConfirmationView.create(confirmation,confirmationRoleNames.get(confirmation.requiredFirmWideRoleDefinitionId()),actorConfirmationRoles.contains(confirmation.requiredFirmWideRoleDefinitionId()),()->confirmCaseDate(confirmation)));HBox.setHgrow(valueBox,Priority.ALWAYS);Button action=ActionButtonFactory.semantic("✎",e->openOverviewDate(type,value),ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);action.setAccessibleText((value==null?"Add ":"Edit ")+displayName);action.setTooltip(new Tooltip(action.getAccessibleText()));HBox row=new HBox(10,color,name,valueBox,action);row.getStyleClass().addAll("case-overview-configured-date-row","shale-property-row","shale-property-row-compact");configuredOverviewDates.getChildren().add(row);}}
 
 	private void openOverviewDate(EffectiveCaseDateTypeDto type,CaseDateDto value){if(value!=null){openCaseDateDialog(value);return;}List<EffectiveCaseDateTypeDto> ordered=new ArrayList<>();ordered.add(type);effectiveCaseDateTypes.stream().filter(t->t.id()!=type.id()).forEach(ordered::add);effectiveCaseDateTypes=List.copyOf(ordered);openCaseDateDialog(null);}
 
@@ -8960,6 +8967,13 @@ public class CaseController {
 			Integer tenantId = appState.getShaleClientId();
 			if (tenantId == null || event.shaleClientId() != tenantId) return;
 			String entityType = event.entityType();
+			if (LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION.equals(entityType)) {
+				Object purpose = event.patch() == null ? null : event.patch().get("purpose");
+				if (com.shale.core.model.CaseDatePresentationPurpose.CASE_OVERVIEW.name().equals(String.valueOf(purpose))
+						&& (overviewDateConfiguration == null || !overviewDateConfiguration.customized()))
+					runOnFx(CaseController.this::loadOverviewConfigurationAsync);
+				return;
+			}
 			if (LiveUpdateEvents.ENTITY_CONTACT.equals(entityType)) {
 				runOnFx(CaseController.this::reloadCurrentCaseForViewMode);
 				return;

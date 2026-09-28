@@ -49,6 +49,6 @@ class TaskCardFactoryDescriptionVisibilityTest {
                 "#f97316",
                 LocalDateTime.now().plusDays(2),
                 null,
-                List.of(new TaskCardFactory.AssignedUserModel(7, "Assigned User", "#94a3b8")));
+                List.of(new TaskCardFactory.AssignedUserModel(7, "Assigned User", "#94a3b8")), List.of());
     }
 }

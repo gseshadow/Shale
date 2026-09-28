@@ -71,6 +71,7 @@
       <VBox fx:id="administrationGroup" styleClass="settings-directory-group, shale-section-card">
         <Label text="Administration" styleClass="shale-subsection-title, settings-group-title"/>
         <SettingsManagementRow fx:id="userManagementRow" title="User Management" description="Manage users for the current tenant." actionText="Manage"/>
+        <SettingsManagementRow fx:id="firmWideRolesRow" title="Firm-wide Roles" description="Manage tenant-wide eligibility role definitions." actionText="Manage"/>
         <SettingsManagementRow fx:id="auditLogRow" title="Audit Log" description="Review PHI audit and entity activity for the current tenant." actionText="Open"/>
       </VBox>
     </VBox>

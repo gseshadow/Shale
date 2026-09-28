@@ -32,16 +32,15 @@ final class FieldConfirmationPhase2AContractTest {
                 ()->assertTrue(s.contains("ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId)")));
     }
 
-    @Test void readDoesNotRetroactivelyApplyCurrentPolicyAndPreservesSemanticAuthority()throws Exception{
+    @Test void readDoesNotRetroactivelyApplyCurrentPolicyAndDocumentsPhase2dTypeAuthority()throws Exception{
         String dao=read("shale-data/src/main/java/com/shale/data/dao/CaseDateDao.java");
         String architecture=read("architecture/field-confirmation.md");
-        assertAll("read and semantic compatibility",
+        assertAll("read and resulting-type compatibility",
                 ()->assertTrue(dao.contains("target.BusinessValueRevision=cd.ValueRevision")),
                 ()->assertTrue(dao.contains("Status.NOT_REQUIRED")),
                 ()->assertFalse(dao.substring(dao.indexOf("listCaseDateConfirmationsForCase"),dao.indexOf("private record ConfirmationRead")).contains("FieldConfirmationPolicies")),
-                ()->assertTrue(architecture.contains("CaseDateTypeSemanticRoleMappings")),
-                ()->assertTrue(architecture.contains("STATUTE_OF_LIMITATIONS")),
-                ()->assertTrue(architecture.contains("TORT_NOTICE_DEADLINE")));
+                ()->assertTrue(architecture.contains("superseded by the deployed Phase 2D correction")),
+                ()->assertTrue(architecture.contains("protected SOL/TCN mappings are not confirmation-policy identity")));
     }
 
     @Test void verificationIsReadOnlyAndNeedsNoOperatorPlaceholders()throws Exception{

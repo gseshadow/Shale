@@ -1478,7 +1478,7 @@ public final class CaseDao {
 			boolean boundaryNeedsAuthoritativeDate = requiresAuthoritativeDateSort(effectiveSort);
 			String boundaryStatusApply = boundaryNeedsStatus ? boundaryStatusApplySql() : "";
 			String boundaryResponsibleAttorneyJoins = boundaryNeedsResponsibleAttorney ? boundaryResponsibleAttorneyJoinsSql() : "";
-			String boundaryDateApply = boundaryNeedsAuthoritativeDate ? authoritativeBoundaryDateApplySql() : "";
+			String boundaryDateApply = boundaryNeedsAuthoritativeDate ? authoritativeBoundaryDateApplySql(effectiveSort) : "";
 			String migratedDateSelect = "CAST(NULL AS date) AS CallerDate, CAST(NULL AS date) AS StatuteOfLimitations, "
 					+ "CAST(NULL AS date) AS DateOfIncident, CAST(NULL AS date) AS TortNoticeDeadline,";
 			String sql = """
@@ -1570,8 +1570,8 @@ public final class CaseDao {
 				if (boundaryNeedsResponsibleAttorney) {
 					ps.setInt(idx++, ROLE_RESPONSIBLE_ATTORNEY);
 				}
-				if (boundaryNeedsAuthoritativeDate) {
-					ps.setString(idx++, authoritativeSortSemanticRole(effectiveSort));
+				if (requiresIntakeDateSort(effectiveSort)) {
+					ps.setString(idx++, CaseDateSemanticRole.INTAKE.persistedKey());
 				}
 				ps.setInt(idx++, shaleClientId);
 				StringBuilder traceParams = new StringBuilder()
@@ -1676,30 +1676,46 @@ public final class CaseDao {
 			""";
 	}
 
-	private static String authoritativeBoundaryDateApplySql() {
-		return """
+	private static String authoritativeBoundaryDateApplySql(CaseSort sort) {
+		if (requiresIntakeDateSort(sort)) return """
 			OUTER APPLY (
-			  SELECT MAX(cd.StartsAt) AS SortDate
+			  SELECT TOP(1) cd.StartsAt AS SortDate
 			  FROM dbo.CaseDates cd
-			  INNER JOIN dbo.CaseDateTypes stored_type ON stored_type.Id = cd.CaseDateTypeId
-			    AND (stored_type.ShaleClientId = cd.ShaleClientId OR stored_type.ShaleClientId IS NULL)
-			  WHERE cd.CaseId = c.Id AND cd.ShaleClientId = c.ShaleClientId
-			    AND cd.IsDeleted = 0 AND EXISTS (
-			      SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings role_mapping
-			      WHERE role_mapping.CaseDateTypeId=stored_type.Id AND role_mapping.SemanticRoleKey=?
-			        AND role_mapping.IsActive=1 AND role_mapping.IsDeleted=0
-			        AND (role_mapping.ShaleClientId=c.ShaleClientId OR role_mapping.ShaleClientId IS NULL)
-			        AND NOT (role_mapping.ShaleClientId IS NULL AND EXISTS (
-			          SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings tenant_mapping
-			          JOIN dbo.CaseDateTypes tenant_type ON tenant_type.Id=tenant_mapping.CaseDateTypeId
-			          WHERE tenant_mapping.ShaleClientId=c.ShaleClientId
-			            AND tenant_mapping.SemanticRoleKey=role_mapping.SemanticRoleKey
-			            AND tenant_mapping.IsActive=1 AND tenant_mapping.IsDeleted=0
-			            AND tenant_type.ShaleClientId=c.ShaleClientId
-			            AND tenant_type.IsActive=1 AND tenant_type.IsDeleted=0))
-			    )
+			  INNER JOIN dbo.CaseDateTypes stored_type ON stored_type.Id=cd.CaseDateTypeId
+			   AND (stored_type.ShaleClientId=cd.ShaleClientId OR stored_type.ShaleClientId IS NULL)
+			  WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0
+			   AND EXISTS (SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings role_mapping
+			    WHERE role_mapping.CaseDateTypeId=stored_type.Id AND role_mapping.SemanticRoleKey=?
+			     AND role_mapping.IsActive=1 AND role_mapping.IsDeleted=0
+			     AND (role_mapping.ShaleClientId=c.ShaleClientId OR role_mapping.ShaleClientId IS NULL))
+			  ORDER BY cd.StartsAt ASC,cd.Id ASC
 			) boundary_date
 			""";
+		String systemKey = switch (sort) {
+			case STATUTE_SOONEST, STATUTE_LATEST -> "statute_of_limitations";
+			case TORT_NOTICE_SOONEST -> "tort_notice_deadline";
+			default -> throw new IllegalArgumentException("Sort does not require an ordinary deadline type");
+		};
+		return """
+			OUTER APPLY (
+			 SELECT TOP(1) cd.StartsAt AS SortDate
+			 FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes stored_type ON stored_type.Id=cd.CaseDateTypeId
+			  AND (stored_type.ShaleClientId=c.ShaleClientId OR stored_type.ShaleClientId IS NULL)
+			 WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0
+			  AND LOWER(LTRIM(RTRIM(stored_type.SystemKey)))='%s'
+			  AND EXISTS (SELECT 1 FROM dbo.CaseDateTypes effective_type
+			   WHERE effective_type.Id=(SELECT TOP(1) candidate.Id FROM dbo.CaseDateTypes candidate
+			    WHERE LOWER(LTRIM(RTRIM(candidate.SystemKey)))='%s' AND candidate.IsDeleted=0
+			     AND (candidate.ShaleClientId=c.ShaleClientId OR candidate.ShaleClientId IS NULL)
+			    ORDER BY CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,candidate.Id DESC)
+			   AND effective_type.IsActive=1)
+			 ORDER BY cd.StartsAt ASC,cd.Id ASC
+			) boundary_date
+			""".formatted(systemKey,systemKey);
+	}
+
+	private static boolean requiresIntakeDateSort(CaseSort sort) {
+		return sort == CaseSort.INTAKE_OLDEST || sort == CaseSort.INTAKE_NEWEST;
 	}
 
 	private static boolean requiresAuthoritativeDateSort(CaseSort sort) {
@@ -1714,13 +1730,6 @@ public final class CaseDao {
 
 	private static boolean requiresResponsibleAttorneySort(CaseSort sort) {
 		return sort == CaseSort.RESPONSIBLE_ATTORNEY_ASC || sort == CaseSort.RESPONSIBLE_ATTORNEY_DESC;
-	}
-
-	private static String authoritativeSortSemanticRole(CaseSort sort) {
-		if (sort == CaseSort.INTAKE_OLDEST || sort == CaseSort.INTAKE_NEWEST) return CaseDateSemanticRole.INTAKE.persistedKey();
-		if (sort == CaseSort.STATUTE_SOONEST || sort == CaseSort.STATUTE_LATEST) return CaseDateSemanticRole.STATUTE_OF_LIMITATIONS.persistedKey();
-		if (sort == CaseSort.TORT_NOTICE_SOONEST) return CaseDateSemanticRole.TORT_NOTICE_DEADLINE.persistedKey();
-		throw new IllegalArgumentException("Sort does not require an authoritative Case Date");
 	}
 
 	private static String boundaryOrderByClauseFor(CaseSort sort) {

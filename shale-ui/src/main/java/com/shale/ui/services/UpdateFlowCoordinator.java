@@ -1,19 +1,18 @@
 package com.shale.ui.services;
 
-import java.util.Optional;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.shale.ui.component.dialog.AppDialogs;
+import com.shale.ui.component.dialog.AppDialogs.DialogAction;
+import com.shale.ui.component.dialog.AppDialogs.DialogActionKind;
 
-import javafx.application.Platform;
 import javafx.geometry.Pos;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.ContentDisplay;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 
@@ -28,11 +27,20 @@ public final class UpdateFlowCoordinator {
 	}
 
 	public void presentAvailableUpdate(boolean mandatory, Runnable onDecline) {
-		if (mandatory) {
-			showMandatoryUpdateDialog(onDecline);
-			return;
+		boolean accepted = AppDialogs.showChoice(null,
+				mandatory ? "Update Required" : "Update Available",
+				mandatory ? "Update Shale to continue" : "A newer version of Shale is available",
+				mandatory ? "This update is required before you can continue into Shale."
+						: "Would you like to update now?",
+				List.of(
+						DialogAction.cancel(mandatory ? "Exit application" : "Skip this time", false),
+						DialogAction.of("Update now", true, DialogActionKind.PRIMARY, true, false)))
+				.orElse(false);
+		if (accepted) {
+			startUpdateAndBlock();
+		} else {
+			onDecline.run();
 		}
-		showOptionalUpdateDialog(onDecline);
 	}
 
 	public void startUpdateAndBlock() {
@@ -40,94 +48,47 @@ public final class UpdateFlowCoordinator {
 			return;
 		}
 
-		Alert progress = new Alert(Alert.AlertType.INFORMATION);
-		AppDialogs.applySecondaryWindowChrome(progress);
-		progress.setTitle("Update Started");
-		progress.setHeaderText("Updating…");
-
-		VBox content = new VBox();
-		content.setAlignment(Pos.CENTER);
-		content.setSpacing(15);
-
-		var gifStream = getClass().getResourceAsStream("/images/ShaleLoading.gif");
-		if (gifStream != null) {
-			ImageView loadingImage = new ImageView(new Image(gifStream));
-			loadingImage.setFitWidth(120);
-			loadingImage.setPreserveRatio(true);
-			loadingImage.setSmooth(true);
-			content.getChildren().add(loadingImage);
-		} else {
-			System.out.println("Loading gif resource not found: /images/ShaleLoading.gif");
-		}
-
-		Label messageLabel = new Label("Shale is launching the updater and will close shortly.");
-		messageLabel.setWrapText(true);
-		messageLabel.setContentDisplay(ContentDisplay.TEXT_ONLY);
-		content.getChildren().add(messageLabel);
-
-		progress.getDialogPane().setContent(content);
-		progress.getButtonTypes().setAll();
-		progress.initModality(Modality.APPLICATION_MODAL);
+		Dialog<Void> progress = createLaunchDialog();
 		progress.show();
 
 		try {
-			System.out.println("[Updater] User accepted update; launching updater.");
 			updateLauncher.launchUpdater();
 			onUpdaterLaunchSucceeded.run();
 		} catch (RuntimeException ex) {
 			updaterLaunchInFlight.set(false);
 			progress.close();
-			Alert error = new Alert(Alert.AlertType.ERROR);
-			AppDialogs.applySecondaryWindowChrome(error);
-			error.setTitle("Update Failed");
-			error.setHeaderText("Unable to launch updater.");
-			error.setContentText(ex.getMessage());
-			error.showAndWait();
-			return;
-		}
-
-		Platform.runLater(() -> {
-			if (!progress.isShowing()) {
-				progress.show();
-			}
-		});
-	}
-
-	private void showOptionalUpdateDialog(Runnable onDecline) {
-		ButtonType updateNow = new ButtonType("Update now", ButtonBar.ButtonData.OK_DONE);
-		ButtonType skip = new ButtonType("Skip this time", ButtonBar.ButtonData.CANCEL_CLOSE);
-
-		Alert alert = new Alert(Alert.AlertType.INFORMATION);
-		AppDialogs.applySecondaryWindowChrome(alert);
-		alert.setTitle("Update Available");
-		alert.setHeaderText("A newer version of Shale is available.");
-		alert.setContentText("Would you like to update now?");
-		alert.getButtonTypes().setAll(updateNow, skip);
-
-		Optional<ButtonType> choice = alert.showAndWait();
-		if (choice.isPresent() && choice.get() == updateNow) {
-			startUpdateAndBlock();
-		} else {
-			onDecline.run();
+			AppDialogs.showError(null, "Update Failed", "Shale could not launch the updater. Please try again.");
 		}
 	}
 
-	private void showMandatoryUpdateDialog(Runnable onDecline) {
-		ButtonType updateNow = new ButtonType("Update now", ButtonBar.ButtonData.OK_DONE);
-		ButtonType exit = new ButtonType("Exit application", ButtonBar.ButtonData.CANCEL_CLOSE);
-
-		Alert alert = new Alert(Alert.AlertType.WARNING);
-		AppDialogs.applySecondaryWindowChrome(alert);
-		alert.setTitle("Update Required");
-		alert.setHeaderText("You must update Shale before continuing.");
-		alert.setContentText("An update is required to continue into the app.");
-		alert.getButtonTypes().setAll(updateNow, exit);
-
-		Optional<ButtonType> choice = alert.showAndWait();
-		if (choice.isPresent() && choice.get() == updateNow) {
-			startUpdateAndBlock();
-		} else {
-			onDecline.run();
+	private static Dialog<Void> createLaunchDialog() {
+		Dialog<Void> dialog = new Dialog<>();
+		AppDialogs.applySecondaryDialogShell(dialog, "Updating Shale");
+		if (dialog.getDialogPane().getHeader() instanceof HBox header) {
+			header.getChildren().stream().filter(Button.class::isInstance).forEach(node -> {
+				node.setVisible(false);
+				node.setManaged(false);
+			});
 		}
+		dialog.initModality(Modality.APPLICATION_MODAL);
+		dialog.setResizable(false);
+		dialog.getDialogPane().getStyleClass().add("update-launch-dialog");
+		dialog.getDialogPane().setPrefWidth(480);
+
+		ProgressIndicator indicator = new ProgressIndicator();
+		indicator.setMaxSize(42, 42);
+		Label heading = new Label("Launching the updater");
+		heading.getStyleClass().add("app-dialog-title");
+		Label message = new Label("Shale will close shortly. The updater will continue from there.");
+		message.getStyleClass().add("app-dialog-message");
+		message.setWrapText(true);
+		message.setMaxWidth(Double.MAX_VALUE);
+		VBox content = new VBox(12, indicator, heading, message);
+		content.setAlignment(Pos.CENTER_LEFT);
+		content.getStyleClass().add("update-launch-content");
+		dialog.getDialogPane().setContent(content);
+		dialog.getDialogPane().getButtonTypes().clear();
+		dialog.setOnCloseRequest(event -> event.consume());
+		return dialog;
 	}
 }

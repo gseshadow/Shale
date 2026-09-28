@@ -49,6 +49,7 @@ final class CaseDateSemanticRoleFoundationTest {
         assertTrue(source.contains("m.IsActive=1 AND m.IsDeleted=0 AND t.IsActive=1 AND t.IsDeleted=0"));
         assertTrue(source.contains("t.ShaleClientId=? OR t.ShaleClientId IS NULL"));
         assertTrue(source.contains("tenant_mapping.ShaleClientId=?"));
+        assertTrue(source.contains("role != CaseDateSemanticRole.INTAKE"));
         assertFalse(source.contains("Name="));
     }
 }

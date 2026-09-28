@@ -10,19 +10,56 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CaseDateDaoReadContractTest {
-    @Test void protectedOverviewDatesAreClassifiedByEffectiveSemanticIdentity() {
+    @Test void intakeRemainsProtectedWhileDeadlineFamiliesUseTheirOrdinarySystemKeys() {
         Map<Integer, MigratedCaseDateKey> protectedTypes = Map.of(
-                701, MigratedCaseDateKey.STATUTE_OF_LIMITATIONS,
-                702, MigratedCaseDateKey.TORT_NOTICE_DEADLINE);
+                701, MigratedCaseDateKey.CALLER_DATE);
 
-        assertEquals(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS,
+        assertEquals(MigratedCaseDateKey.CALLER_DATE,
                 CaseDateDao.migratedOccurrenceKey(701, null, protectedTypes));
+        assertEquals(MigratedCaseDateKey.STATUTE_OF_LIMITATIONS,
+                CaseDateDao.migratedOccurrenceKey(999, "statute_of_limitations", protectedTypes));
         assertEquals(MigratedCaseDateKey.TORT_NOTICE_DEADLINE,
-                CaseDateDao.migratedOccurrenceKey(702, "tenant_custom_deadline", protectedTypes));
-        assertNull(CaseDateDao.migratedOccurrenceKey(999, "statute_of_limitations", protectedTypes),
-                "a legacy-key row that is not the active protected mapping is not authoritative");
+                CaseDateDao.migratedOccurrenceKey(702, "tort_notice_deadline", protectedTypes));
         assertEquals(MigratedCaseDateKey.DATE_OF_INJURY,
                 CaseDateDao.migratedOccurrenceKey(703, "date_of_injury", protectedTypes));
+    }
+
+    @Test void serverCompatibilityDeadlinesUseOptionalEffectiveFamiliesAndDeterministicHistoricalOccurrences() throws Exception {
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
+        String read = source.substring(source.indexOf("private SingletonRead readMigratedSingletons"),
+                source.indexOf("public CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot"));
+        String mutation = source.substring(source.indexOf("private static List<SingletonMutationRow> lockSingleton"),
+                source.indexOf("private static CaseDateSemanticRole semanticRole"));
+        assertAll(
+                () -> assertTrue(read.contains("unavailableOptionalFamilies")),
+                () -> assertTrue(read.contains("left.startsAt().compareTo(right.startsAt())")),
+                () -> assertTrue(read.contains("left.id() < right.id()")),
+                () -> assertTrue(read.contains("m.SemanticRoleKey='INTAKE'")),
+                () -> assertFalse(read.contains("'STATUTE_OF_LIMITATIONS'")),
+                () -> assertFalse(read.contains("'TORT_NOTICE_DEADLINE'")),
+                () -> assertTrue(mutation.contains("candidate.IsDeleted=0"), "deleted overlays reset to global"),
+                () -> assertTrue(mutation.contains("candidate.ShaleClientId=? THEN 0 ELSE 1 END"), "inactive tenant winners mask global"),
+                () -> assertTrue(mutation.contains("ORDER BY cd.StartsAt ASC,cd.Id ASC")),
+                () -> assertTrue(source.contains("evaluateCaseDate(con,c.shaleClientId(),c.actorUserId(),row.id(),row.typeId()"),
+                        "updates must evaluate confirmation against the exact stored type"));
+    }
+
+    @Test void desktopDeadlineMutationTargetsDisplayedOccurrenceAndNeverRetypesHistory() throws Exception {
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
+        String aggregate = source.substring(source.indexOf("public void mutateMigratedCompatibilityDates(Connection con"),
+                source.indexOf("public List<CaseDateDto> listDeletedCaseDatesForCase"));
+        assertAll(
+                () -> assertTrue(aggregate.contains("ORDER BY cd.StartsAt ASC,cd.Id ASC"),
+                        "fixed editors must lock the same earliest occurrence they displayed"),
+                () -> assertTrue(aggregate.contains("row.id() != occurrenceId"),
+                        "updates and explicit clears must reject any occurrence other than the displayed ID"),
+                () -> assertTrue(aggregate.contains("findEffectiveFamilyTypeId(con, tenant, key).isEmpty()"),
+                        "an unavailable deadline family must not accept a new value"),
+                () -> assertTrue(aggregate.contains("SET StartsAt=?,EndsAt=?,AllDay=?")),
+                () -> assertFalse(aggregate.contains("SET CaseDateTypeId="),
+                        "editing a historical family occurrence must preserve its stored concrete type"),
+                () -> assertTrue(aggregate.contains("evaluateCaseDate(con,c.shaleClientId(),c.actorUserId(),row.id(),row.typeId()"),
+                        "pending confirmation must be evaluated from the exact stored type"));
     }
 
     @Test void duplicateHistoryIsExposedWithoutArbitraryAuthoritativeSelection() throws Exception {
@@ -40,15 +77,15 @@ class CaseDateDaoReadContractTest {
         assertTrue(source.contains("WHERE rn = 1 AND IsDeleted = 0 AND IsActive = 1"));
         assertTrue(source.contains("UNION ALL"), "tenant-created unkeyed rows remain selectable when active");
         assertTrue(source.contains("ORDER BY SortOrder, Name, Id"));
-        assertTrue(source.contains("pm.CaseDateTypeId=t.Id AND pm.ShaleClientId IS NULL"),
-                "global ownership alone must not make a nonprotected type selectable");
+        assertTrue(source.contains("LOWER(LTRIM(RTRIM(t.SystemKey))) IN ('intake','statute_of_limitations','tort_notice_deadline')"),
+                "global eligibility must be explicit and independent of semantic mapping lifecycle");
     }
 
-    @Test void administrationAndMutationSelectionRestrictGlobalsToProtectedMappings() throws Exception {
+    @Test void administrationAndMutationSelectionUseExplicitEligibleGlobalFamilies() throws Exception {
         String source = java.nio.file.Files.readString(java.nio.file.Path.of("src/main/java/com/shale/data/dao/CaseDateDao.java"));
-        assertTrue(source.contains("WHERE t.ShaleClientId = ? OR (t.ShaleClientId IS NULL AND EXISTS"));
+        assertTrue(source.contains("WHERE t.ShaleClientId = ? OR (t.ShaleClientId IS NULL AND LOWER"));
         assertTrue(source.contains("private static TypeRow requireSelectableType"));
-        assertTrue(source.substring(source.indexOf("private static TypeRow requireSelectableType"))
+        assertFalse(source.substring(source.indexOf("private static TypeRow requireSelectableType"))
                 .contains("CaseDateTypeSemanticRoleMappings pm"));
         assertTrue(source.contains("requireHistoricalType"), "stored authoritative ids retain a historical read path");
     }
@@ -60,7 +97,8 @@ class CaseDateDaoReadContractTest {
         assertTrue(sql.contains("JOIN dbo.Cases c ON c.Id = cd.CaseId AND c.ShaleClientId = cd.ShaleClientId AND c.IsDeleted = 0"));
         assertTrue(sql.contains("JOIN dbo.CaseDateTypes st ON st.Id = cd.CaseDateTypeId AND (st.ShaleClientId = cd.ShaleClientId OR st.ShaleClientId IS NULL)"));
         assertTrue(sql.contains("OUTER APPLY"));
-        assertTrue(sql.contains("t.IsDeleted = 0 AND t.IsActive = 1"));
+        assertTrue(sql.contains("candidate.IsDeleted=0"));
+        assertTrue(sql.contains("AND t.IsActive=1"), "inactive tenant winners mask global presentation");
         assertTrue(sql.contains("COALESCE(eff.Name, st.Name) AS TypeName"));
         assertTrue(sql.contains("LEFT JOIN dbo.Users cu ON cu.Id = cd.CreatedByUserId AND cu.ShaleClientId = cd.ShaleClientId"));
         assertTrue(sql.contains("cu.name_first"));

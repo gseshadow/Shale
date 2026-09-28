@@ -183,14 +183,12 @@ public final class TaskDetailDialog {
                     new CaseCardModel(
                             model.caseId(),
                             relatedCaseName,
-                            null,
-                            null,
                             model.caseResponsibleAttorney(),
                             model.caseResponsibleAttorneyColor(),
                             model.caseNonEngagementLetterSent(),
                             model.casePrimaryStatusName(),
                             model.casePrimaryStatusColor(),
-                            model.casePracticeAreaColor()),
+                            model.casePracticeAreaColor(), model.casePresentationDates()),
                     CaseCardFactory.Variant.EMBEDDED);
             relatedCaseSection.getChildren().setAll(relatedCaseLabel, caseCard);
         } else {
@@ -1391,6 +1389,7 @@ public final class TaskDetailDialog {
             String casePrimaryStatusName,
             String casePrimaryStatusColor,
             String casePracticeAreaColor,
+            List<CaseCardFactory.PresentationDate> casePresentationDates,
             String title,
             String description,
             LocalDateTime dueAt,
@@ -1401,6 +1400,11 @@ public final class TaskDetailDialog {
             List<TaskActivityEntry> activityEntries,
             List<TaskNoteEntry> noteEntries,
             boolean completed) {
+
+        public TaskDetailModel {
+            casePresentationDates = List.copyOf(Objects.requireNonNull(
+                    casePresentationDates, "casePresentationDates"));
+        }
 
         public TaskDetailModel(
                 long taskId,
@@ -1424,6 +1428,7 @@ public final class TaskDetailDialog {
                     "",
                     "",
                     "",
+                    List.of(),
                     title,
                     description,
                     dueAt,
@@ -1463,6 +1468,7 @@ public final class TaskDetailDialog {
                     "",
                     "",
                     "",
+                    List.of(),
                     title,
                     description,
                     dueAt,
@@ -1499,6 +1505,7 @@ public final class TaskDetailDialog {
                     "",
                     "",
                     "",
+                    List.of(),
                     title,
                     description,
                     dueAt,

@@ -29,18 +29,21 @@ final class CaseDateTypeManagementContractTest {
         assertTrue(WINDOW.contains("dispose.run()"));
     }
 
-    @Test void tenantDefinitionsRetainLifecycleAndGlobalsArePolicyVisibleButNotDefinitionManageable() {
-        var global = type(1, null, "required", true);
+    @Test void tenantDefinitionsAndOrdinaryGlobalDeadlineOverridesRetainLifecycle() {
+        var global = type(1, null, "statute_of_limitations", true);
         var active = type(2, 7, null, true);
         var inactive = type(3, 7, null, false);
         var otherTenant = type(4, 8, null, true);
         assertEquals(List.of(global, active, inactive), CaseDateTypeManagementPane.manageableRows(List.of(global, active, inactive, otherTenant), 7));
         assertFalse(CaseDateTypeManagementPane.isManageable(global, 7));
+        assertTrue(CaseDateTypeManagementPane.isOrdinaryGlobal(global));
         assertTrue(CaseDateTypeManagementPane.isManageable(active, 7));
         assertTrue(CaseDateTypeManagementPane.isManageable(inactive, 7));
         assertEquals("Deactivate", CaseDateTypeManagementPane.lifecycleActionLabel(active));
         assertEquals("Activate", CaseDateTypeManagementPane.lifecycleActionLabel(inactive));
         assertTrue(PANE.contains("resetCaseDateTypeOverride"));
+        assertTrue(PANE.contains("Customize for this firm"));
+        assertTrue(PANE.contains("service.createCaseDateType(command(null, input, existing.systemKey(), null))"));
     }
 
     @Test void commandPreservesIdentityContextFieldsAndRowVersion() {

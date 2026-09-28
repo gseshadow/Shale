@@ -397,6 +397,13 @@ public final class ApiReadController {
         return caseServicePort.listCaseStatuses(shaleClientId, false);
     }
 
+    @Operation(summary = "List effective Case Date types", description = "Returns active tenant-effective Case Date families for web forms.")
+    @GetMapping("/api/lookups/case-date-types")
+    public List<String> listCaseDateTypeLookup() {
+        return caseServicePort.listAvailableCompatibilityCaseDateFamilies(
+                runtimeSessionState.requireShaleClientId(), runtimeSessionState.requireUserId());
+    }
+
     @Operation(summary = "Update case status", description = "Changes the current status for one tenant-scoped case and returns the refreshed case detail.")
     @PatchMapping("/api/cases/{caseId:\\d+}/status")
     public CaseDetailDto updateCaseStatus(
@@ -773,7 +780,7 @@ public final class ApiReadController {
             if(absent){
                 if(request.occurrenceId()!=null || request.caseDateTypeId()!=null || request.occurrenceRowVer()!=null)
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Absent mapped Case Date contains occurrence identity.");
-                byte[] witness=parseExpectedRowVer(request.absenceCaseRowVer());
+                byte[] witness=starts==null ? null : parseExpectedRowVer(request.absenceCaseRowVer());
                 mutation=starts==null ? new CompatibilityCaseDateMutation.Unchanged(key)
                         : new CompatibilityCaseDateMutation.Create(key,new CompatibilityCaseDateMutation.ExpectedAbsent(witness),new CompatibilityCaseDateMutation.Value(starts,ends,allDay));
             } else {

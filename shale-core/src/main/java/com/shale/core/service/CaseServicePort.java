@@ -70,6 +70,9 @@ public interface CaseServicePort {
 	List<LinkTypeDto> listLinkTypes(int shaleClientId, boolean includeInactive);
 
 	List<EffectiveCaseDateTypeDto> listEffectiveCaseDateTypes(int shaleClientId, int actorUserId);
+	default List<String> listAvailableCompatibilityCaseDateFamilies(int shaleClientId, int actorUserId) {
+		throw unsupportedCaseLinkOperation("listAvailableCompatibilityCaseDateFamilies");
+	}
 
 	default FieldConfirmationPolicyDto setFieldConfirmationPolicy(SetFieldConfirmationPolicyCommand command) {
 		throw unsupportedCaseLinkOperation("setFieldConfirmationPolicy");
@@ -112,6 +115,12 @@ public interface CaseServicePort {
 	default List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> resolveCaseDatePresentation(
 			long caseId, int shaleClientId, int actorUserId, com.shale.core.model.CaseDatePresentationPurpose purpose) {
 		throw new UnsupportedOperationException("Case Date presentation resolution is unavailable.");
+	}
+
+	default java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> resolveCaseDatePresentations(
+			java.util.Collection<? extends Number> caseIds, int shaleClientId, int actorUserId,
+			com.shale.core.model.CaseDatePresentationPurpose purpose) {
+		throw new UnsupportedOperationException("Batch Case Date presentation resolution is unavailable.");
 	}
 
 	default IntakeTakenByMutationResult updateIntakeTakenBy(UpdateIntakeTakenByCommand command) {

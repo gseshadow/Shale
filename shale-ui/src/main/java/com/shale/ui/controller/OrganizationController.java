@@ -26,6 +26,7 @@ import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.controller.support.CaseListFilterSortSupport;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.ControlStyles;
 import com.shale.ui.util.ControlAvailability;
@@ -86,6 +87,7 @@ public final class OrganizationController {
 	private OrganizationDao organizationDao;
 	private OrganizationServicePort organizationService;
 	private CaseSummaryDao caseSummaryDao;
+	private java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> relatedCaseDates = java.util.Map.of();
 	private Organization currentOrganization;
 	private OrganizationServicePort.OrganizationTypeProfile currentTypeProfile;
 	private List<OrganizationServicePort.OrganizationTypeDefinition> currentTypeDefinitions=List.of();
@@ -255,11 +257,14 @@ public final class OrganizationController {
 				PerfLog.log("organizations.relatedCases.dao", "start", "organizationId=" + organizationId);
 				List<RelatedCaseRow> loadedRelatedCases = caseSummaryDao.listActiveRelatedToOrganization(
 						requestedTenantId == null ? 0 : requestedTenantId, requestedOrganizationId);
+				var loadedDates = caseSummaryDao.resolveCardDates(loadedRelatedCases.stream().map(r -> r.summary().caseId()).toList(),
+						requestedTenantId, appState.getUserId());
 				int rowCount = loadedRelatedCases == null ? 0 : loadedRelatedCases.size();
 				Platform.runLater(() -> {
 					if (generation != relatedCasesLoadGeneration || !Objects.equals(organizationId, requestedOrganizationId)
 							|| !Objects.equals(currentTenantId(), requestedTenantId)) return;
 					relatedCases = loadedRelatedCases == null ? List.of() : loadedRelatedCases;
+					relatedCaseDates = loadedDates;
 					renderRelatedCases();
 					PerfLog.logDone("organizations.relatedCases.load", "organizationId=" + organizationId + " rows=" + rowCount, relatedStarted);
 				});
@@ -404,6 +409,12 @@ public final class OrganizationController {
 	}
 
 	private void handleLiveOrganizationUpdatedEvent(UiRuntimeBridge.EntityUpdatedEvent event) {
+		if (event != null && appState != null && LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION.equals(event.entityType())
+				&& java.util.Objects.equals(appState.getShaleClientId(), event.shaleClientId())) {
+			Object purpose=event.patch()==null?null:event.patch().get("purpose");
+			if (com.shale.core.model.CaseDatePresentationPurpose.CASE_CARD.name().equals(String.valueOf(purpose))) runOnFx(this::loadRelatedCasesSafe);
+			return;
+		}
 		if (shouldIgnoreLiveEvent(event)) {
 			return;
 		}
@@ -601,7 +612,7 @@ public final class OrganizationController {
 	}
 
 	private Node createRelatedCaseCardContainer(RelatedCaseRow row) {
-		Node card = caseCardFactory.create(toRelatedCaseCardModel(row), CaseCardFactory.Variant.FULL);
+		Node card = caseCardFactory.create(toRelatedCaseCardModel(row, relatedCaseDates.getOrDefault(row.summary().caseId(), List.of())), CaseCardFactory.Variant.FULL);
 		if (card instanceof Region region) {
 			region.setMaxWidth(Double.MAX_VALUE);
 			region.setPrefWidth(380);
@@ -614,18 +625,18 @@ public final class OrganizationController {
 	}
 
 	static CaseCardModel toRelatedCaseCardModel(RelatedCaseRow row) {
+		return toRelatedCaseCardModel(row, List.of());
+	}
+	static CaseCardModel toRelatedCaseCardModel(RelatedCaseRow row, List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> dates) {
 		return new CaseCardModel(
 				row.summary().caseId(),
 				row.summary().caseName(),
-				row.intakeDate(),
-				row.statuteOfLimitationsDate(),
-				row.tortClaimsNoticeDeadline(),
 				row.summary().responsibleAttorneyName(),
 				row.summary().responsibleAttorneyColor(),
 				row.nonEngagementLetterSent(),
 				row.summary().primaryStatusName(),
 				row.summary().primaryStatusColor(),
-				row.practiceAreaColor()
+				row.practiceAreaColor(), CaseCardFactory.toPresentationDates(dates)
 		);
 	}
 

@@ -14,7 +14,7 @@ final class UserServiceAdapterDelegationContractTest {
     }
     @Test void productionAdapterDelegatesFirmWideAdministrationToUserDao()throws Exception{
         String source=Files.readString(Path.of("src/main/java/com/shale/data/service/adapter/UserServiceAdapter.java"));
-        for(String method:java.util.List.of("listFirmWideRolesForAdministration","listUserFirmWideRoleAssignments","createFirmWideRole","renameFirmWideRole","setFirmWideRoleActive","deleteFirmWideRole","assignFirmWideRole","removeFirmWideRoleAssignment","restoreFirmWideRoleAssignment"))
+        for(String method:java.util.List.of("listFirmWideRolesForAdministration","listUserFirmWideRoleAssignments","listFirmWideRolesForUserView","listUserFirmWideRoleAssignmentsForView","createFirmWideRole","renameFirmWideRole","setFirmWideRoleActive","deleteFirmWideRole","assignFirmWideRole","removeFirmWideRoleAssignment","restoreFirmWideRoleAssignment"))
             assertTrue(method(source,method).contains("userDao."+method+"("),method+" must delegate to UserDao");
     }
     private static String method(String s,String name){int start=s.indexOf(" "+name+"(");int brace=s.indexOf('{',start),depth=0;for(int i=brace;i<s.length();i++){char c=s.charAt(i);if(c=='{')depth++;else if(c=='}'&&--depth==0)return s.substring(start,i+1);}throw new AssertionError(name);}

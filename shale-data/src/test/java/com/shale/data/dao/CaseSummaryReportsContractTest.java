@@ -32,7 +32,8 @@ final class CaseSummaryReportsContractTest {
 
     @Test void reportQueriesShareAuthoritativeTenantStatusRoleDateAndOrderingContracts() throws Exception {
         String dao = source();
-        String report = dao.substring(dao.indexOf("listActiveStatusReport("), dao.indexOf("static String escapeLike"));
+        String report = dao.substring(dao.indexOf("listActiveStatusReportCases("),
+                dao.indexOf("/** Active Cases related to a tenant Contact"));
         assertTrue(report.contains("verifyTenant(con, requestedTenantId)"));
         assertTrue(report.contains("verifyStatuses(con, requestedTenantId"));
         assertTrue(report.contains("statusApplySql()"));
@@ -40,6 +41,14 @@ final class CaseSummaryReportsContractTest {
         assertTrue(report.contains("RoleSemantics.ROLE_LEGAL_ASSISTANT"));
         assertTrue(report.contains("dbo.CaseDates"));
         assertTrue(report.contains("dbo.CaseDateTypeSemanticRoleMappings"));
+        assertTrue(report.contains("LOWER(LTRIM(RTRIM(family_type.SystemKey)))='statute_of_limitations'"));
+        assertTrue(report.contains("LOWER(LTRIM(RTRIM(family_type.SystemKey)))='tort_notice_deadline'"));
+        assertTrue(report.contains("ORDER BY family_date.StartsAt ASC,family_date.Id ASC"));
+        assertTrue(report.contains("candidate.IsDeleted=0"));
+        assertTrue(report.contains("effective_type.IsActive=1"));
+        assertFalse(report.contains("effective.SemanticRoleKey='STATUTE_OF_LIMITATIONS'"));
+        assertFalse(report.contains("effective.SemanticRoleKey='TORT_NOTICE_DEADLINE'"));
+        assertFalse(report.contains("CaseDatePresentationSelections"));
         assertTrue(report.contains("ORDER BY dates.IntakeDate DESC,c.Id DESC"));
         assertFalse(report.contains("c.CallerDate"));
         assertFalse(report.contains("c.StatuteOfLimitations"));

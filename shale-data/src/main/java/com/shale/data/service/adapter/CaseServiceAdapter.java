@@ -114,6 +114,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override public com.shale.core.dto.CaseDatePresentationConfigurationDto getCaseDatePresentationConfiguration(int t,int a,com.shale.core.model.CaseDatePresentationPurpose p){return requireCaseDatePresentationConfigurationDao().get(t,a,p);}
 	@Override public com.shale.core.dto.CaseDatePresentationConfigurationDto replaceCaseDatePresentationConfiguration(ReplaceCaseDatePresentationConfigurationCommand c){return requireCaseDatePresentationConfigurationDao().replace(c);}
 	@Override public List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> resolveCaseDatePresentation(long caseId,int t,int a,com.shale.core.model.CaseDatePresentationPurpose p){return requireCaseDatePresentationConfigurationDao().resolve(caseId,t,a,p);}
+	@Override public java.util.Map<Long,List<com.shale.core.dto.SelectedCaseDateOccurrenceDto>> resolveCaseDatePresentations(java.util.Collection<? extends Number> ids,int t,int a,com.shale.core.model.CaseDatePresentationPurpose p){return requireCaseDatePresentationConfigurationDao().resolveForCases(ids,t,a,p);}
 	private com.shale.data.dao.CaseDatePresentationConfigurationDao requireCaseDatePresentationConfigurationDao(){if(caseDatePresentationConfigurationDao==null)throw new UnsupportedOperationException("Case Date presentation configuration is unavailable from this test gateway.");return caseDatePresentationConfigurationDao;}
 
 	@Override public List<CaseTeamRoleDefinitionDto> listCaseTeamRolesForAdministration(int tenant,int actor){ return requireCaseTeamRoleDao().listForAdministration(tenant,actor); }
@@ -156,6 +157,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	@Override
 	public Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId, int tenant, int actor) {
 		return caseGateway.listMigratedCompatibilityStateForCase(caseId, tenant, actor);
+	}
+
+	@Override
+	public List<String> listAvailableCompatibilityCaseDateFamilies(int tenant, int actor) {
+		return caseGateway.listAvailableCompatibilityCaseDateFamilies(tenant, actor);
 	}
 
 	@Override
@@ -218,7 +224,7 @@ public final class CaseServiceAdapter implements CaseServicePort {
 				.findFirst()
 				.orElseThrow(() -> new IllegalStateException("No active non-closed case status is available for this tenant."));
 		long caseId = caseGateway.createCaseAggregate(command, initialStatus.id());
-		return caseGateway.getDetail(caseId);
+		return getAuthoritativeCaseDetail(caseId, command.shaleClientId(), command.actorUserId()).orElseThrow();
 	}
 
 	@Override
@@ -1029,6 +1035,9 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		default Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId, int tenant, int actor) {
 			throw unsupportedCaseLinkGatewayOperation("listMigratedCompatibilityStateForCase");
 		}
+		default List<String> listAvailableCompatibilityCaseDateFamilies(int tenant, int actor) {
+			throw unsupportedCaseLinkGatewayOperation("listAvailableCompatibilityCaseDateFamilies");
+		}
 
 		default CaseDateAggregateResult loadMigratedCompatibilityDateSnapshot(long caseId, int tenant, int actor) {
 			throw unsupportedCaseLinkGatewayOperation("loadMigratedCompatibilityDateSnapshot");
@@ -1350,6 +1359,11 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		@Override
 		public Map<MigratedCaseDateKey, CompatibilityCaseDateState> listMigratedCompatibilityStateForCase(long caseId, int tenant, int actor) {
 			return caseDateDao.listMigratedCompatibilityStateForCase(caseId, tenant, actor);
+		}
+
+		@Override
+		public List<String> listAvailableCompatibilityCaseDateFamilies(int tenant, int actor) {
+			return caseDateDao.listAvailableCompatibilityCaseDateFamilies(tenant, actor);
 		}
 
 		@Override

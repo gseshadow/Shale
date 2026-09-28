@@ -87,7 +87,7 @@ public final class FormConfigurationDao {
     private static boolean validKey(String key) { return key != null && KEY.matcher(key).matches(); }
 
     private static void validateReferences(Connection con, int tenant, List<SectionDraft> sections) throws SQLException {
-        String sql = "SELECT t.ShaleClientId,t.IsActive,t.IsDeleted FROM dbo.CaseDateTypes t WHERE t.Id=? AND (t.ShaleClientId=? OR (t.ShaleClientId IS NULL AND EXISTS (SELECT 1 FROM dbo.CaseDateTypeSemanticRoleMappings pm WHERE pm.CaseDateTypeId=t.Id AND pm.ShaleClientId IS NULL AND pm.IsActive=1 AND pm.IsDeleted=0)))";
+        String sql = "SELECT t.ShaleClientId,t.IsActive,t.IsDeleted FROM dbo.CaseDateTypes t WHERE t.Id=? AND (t.ShaleClientId=? OR (t.ShaleClientId IS NULL AND LOWER(LTRIM(RTRIM(t.SystemKey))) IN ('intake','statute_of_limitations','tort_notice_deadline')))";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             for (SectionDraft section : sections) for (FieldDraft field : section.fields()) if ("CASE_DATE".equals(field.fieldKind())) {
                 ps.setInt(1, field.caseDateTypeId()); ps.setInt(2, tenant);

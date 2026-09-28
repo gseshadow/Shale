@@ -558,7 +558,7 @@ public final class NewCalendarEventDialog {
 
 
     private static Node createRelatedCasePreview(CaseCardFactory caseCardFactory, CaseOption selectedCase) {
-        Node casePreview = caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase.caseId(), selectedCase.displayName(), null, null, selectedCase.responsibleAttorney(), selectedCase.responsibleAttorneyColor(), selectedCase.nonEngagementLetterSent()), CaseCardFactory.Variant.MINI);
+        Node casePreview = caseCardFactory.create(new CaseCardFactory.CaseCardModel(selectedCase.caseId(), selectedCase.displayName(), selectedCase.responsibleAttorney(), selectedCase.responsibleAttorneyColor(), selectedCase.nonEngagementLetterSent(), "", "", "", List.of()), CaseCardFactory.Variant.MINI);
         if (casePreview instanceof Region region) {
             region.setMaxWidth(Double.MAX_VALUE);
         }

@@ -27,9 +27,13 @@ final class CaseSummaryDocumentsContractTest {
 		String sql = CaseSummaryDao.documentSelectSql();
 		assertTrue(sql.contains("FROM dbo.CaseDates cd"));
 		assertTrue(sql.contains("stored_type.SystemKey='date_of_injury'"));
-		assertTrue(sql.contains("SemanticRoleKey='STATUTE_OF_LIMITATIONS'"));
-		assertTrue(sql.contains("tenant_mapping.ShaleClientId=c.ShaleClientId"));
-		assertTrue(sql.contains("NOT (role_mapping.ShaleClientId IS NULL AND EXISTS"));
+		assertTrue(sql.contains("LOWER(LTRIM(RTRIM(family_type.SystemKey)))='statute_of_limitations'"));
+		assertTrue(sql.contains("candidate.IsDeleted=0"));
+		assertTrue(sql.contains("CASE WHEN candidate.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END"));
+		assertTrue(sql.contains("effective_type.IsActive=1"));
+		assertTrue(sql.contains("ORDER BY family_date.StartsAt ASC,family_date.Id ASC"));
+		assertFalse(sql.contains("SemanticRoleKey='STATUTE_OF_LIMITATIONS'"));
+		assertFalse(sql.contains("CaseDatePresentationSelections"));
 		assertTrue(sql.contains("cd.IsDeleted=0"));
 		assertTrue(sql.contains("c.Id = ?"));
 		assertFalse(sql.contains("c.DateOfInjury"));

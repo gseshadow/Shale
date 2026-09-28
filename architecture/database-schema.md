@@ -1142,17 +1142,27 @@ for tenant 7 and created no `CalendarEvents` rows.
 
 ### dbo.CaseDateSemanticRoles / dbo.CaseDateTypeSemanticRoleMappings
 
-`CaseDateSemanticRoles` contains the explicit protected application meanings
+`CaseDateSemanticRoles` retains the three historical application meanings
 `INTAKE`, `STATUTE_OF_LIMITATIONS`, and `TORT_NOTICE_DEADLINE`. Its key column is `RoleKey`; the table
 has `IsProtected` and provenance columns and does not have `SemanticRoleKey`, `IsActive`, or
 `IsDeleted`. Those lifecycle columns and `SemanticRoleKey` belong to
 `CaseDateTypeSemanticRoleMappings`.
+After the 2026-09-26 forward retirement, Intake is the only active protected role. SOL and TCN role
+rows and all of their mapping rows remain for identity, foreign-key, provenance, and audit-history
+continuity, but their mappings are inactive/soft-deleted and their roles are nonprotected. Runtime SOL/TCN
+families resolve by normalized `CaseDateTypes.SystemKey` plus tenant-overlay lifecycle precedence.
 `CaseDateTypeSemanticRoleMappings` associates one active global compatibility type,
-or at most one active tenant-specific type, with each role. The association has its
+or at most one active tenant-specific type, with Intake. The association has its
 own tenant/global scope, active and soft-deleted lifecycle, actor/timestamp provenance,
 `RowVer`, foreign keys, filtered singleton indexes, and tenant-or-global RLS. Type
 presentation and occurrence identity remain in `CaseDateTypes` and `CaseDates`;
 neither existing id is rewritten by the semantic-role foundation.
+
+The retirement is an administrative migration rather than an application mutation: it changes only role
+protection and mapping lifecycle state and creates no entity-action audit row. Existing mapping provenance
+is the audit/history record; application mapping administration and its transaction-bound audit remain
+available for Intake only. No sensitive read, occurrence value, case identity, presentation selection, or
+confirmation policy is introduced or mutated by retirement.
 
 ### Administrator-customizable definition colors
 

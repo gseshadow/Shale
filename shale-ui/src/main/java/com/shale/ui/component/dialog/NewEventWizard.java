@@ -181,7 +181,7 @@ public final class NewEventWizard {
             caseList.setAccessibleText("Case search results. Press Enter or Space to select a case."); caseList.setPrefHeight(190); caseField.getStyleClass().add("calendar-case-selection");
             caseList.setCellFactory(v->new ListCell<>() { @Override protected void updateItem(NewCalendarEventDialog.CaseOption x,boolean empty){
                 super.updateItem(x,empty); setText(null); setGraphic(empty||x==null?null:cards.create(new CaseCardFactory.CaseCardModel(
-                        x.caseId(),x.displayName(),null,null,x.responsibleAttorney(),x.responsibleAttorneyColor(),x.nonEngagementLetterSent()),CaseCardFactory.Variant.MINI)); }});
+                        x.caseId(),x.displayName(),x.responsibleAttorney(),x.responsibleAttorneyColor(),x.nonEngagementLetterSent(),"","","",List.of()),CaseCardFactory.Variant.MINI)); }});
             caseList.setOnMouseClicked(e->{
                 if(e.getButton()==MouseButton.PRIMARY&&e.isStillSincePress()&&commitSelectedCase())e.consume();
             });
@@ -198,8 +198,8 @@ public final class NewEventWizard {
                 assign.setAccessibleText("Assign event to a Case"); caseDisplay.getChildren().add(assign);
             } else {
                 CaseCardFactory cards=new CaseCardFactory(id->{});
-                Node card=cards.create(new CaseCardFactory.CaseCardModel(selectedCase.caseId(),selectedCase.displayName(),null,null,
-                        selectedCase.responsibleAttorney(),selectedCase.responsibleAttorneyColor(),selectedCase.nonEngagementLetterSent()),CaseCardFactory.Variant.MINI);
+                Node card=cards.create(new CaseCardFactory.CaseCardModel(selectedCase.caseId(),selectedCase.displayName(),
+                        selectedCase.responsibleAttorney(),selectedCase.responsibleAttorneyColor(),selectedCase.nonEngagementLetterSent(),"","","",List.of()),CaseCardFactory.Variant.MINI);
                 Button change=ActionButtonFactory.semantic("Change",e->openCaseSelector(),ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);
                 Button remove=ActionButtonFactory.semantic("Remove",e->removeCase(),ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);
                 caseDisplay.getChildren().addAll(card,new HBox(8,change,remove));

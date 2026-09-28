@@ -71,6 +71,12 @@ public interface UiRuntimeBridge {
 		publishEntityUpdated(LiveUpdateEvents.ENTITY_CASE_DATE_TYPES, typeId, shaleClientId, updatedByUserId, null);
 	}
 
+	default void publishCaseDatePresentationChanged(long configurationId, String purpose,
+			int shaleClientId, int updatedByUserId) {
+		publishEntityUpdated(LiveUpdateEvents.ENTITY_CASE_DATE_PRESENTATION, configurationId, shaleClientId,
+				updatedByUserId, LiveUpdateEvents.caseDatePresentationPatch(purpose));
+	}
+
 	// --- Generic subscriptions (recommended)
 	default void subscribeEntityUpdated(Consumer<EntityUpdatedEvent> handler) {
 	}
