@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 0 complete; implementation not started
+**Status:** Phase 1A complete; Phase 1B not started
 
 **Last reviewed:** 2026-09-28
 
@@ -73,8 +73,9 @@ Source code is authoritative for behavior described below. Older comments descri
 
 ### 2.3 Existing concepts that must not be duplicated
 
-* There are no `ApplicationReleases`, durable application policy, application instance, durable user
-  session, update attempt, or per-user release-state tables in the inspected schema/migrations.
+* Before Phase 1A there were no `ApplicationReleases`, durable application policy, application instance,
+  durable user session, update attempt, or per-user release-state tables. Phase 1A now supplies only the
+  unused global release/release-item storage described below; every other listed concept remains absent.
 * `dbo.UserPreferences` is a strict tenant/user key-value store. It is suitable for user UI choices,
   but not for global release authority, workstation identity, durable security sessions, or update
   history.
@@ -315,28 +316,30 @@ policy-sensitive API requests independently validate session/version state. PubS
 immediate heartbeat. There must be one lifecycle owner (analogous to `SceneManager`) and no activity
 updates from background callbacks.
 
-## 9. Proposed entities and contracts
+## 9. Entities and proposed contracts
 
-Names are provisional until Phase 1 verifies live schema naming and deployment authority. No SQL is
-specified here.
+Phase 1A verified and implemented the two release-catalog names below. Later entity names remain
+provisional until their own phases verify live schema naming and deployment authority.
 
 ### 9.1 `ApplicationReleases` (global)
 
-Purpose: immutable/versioned publication identity and artifact metadata. Key fields: ID, parsed version
-components/canonical version, channel (default `PRODUCTION`), publish state/time, asset/manifest
-references and hashes, short summary, created/updated/published actor and timestamps, row version.
-Release items and policy reference it. Drafts may change; published release identity/artifact hashes
-should be append-only or superseded. Publication/change is audited. Retain indefinitely enough to
-resolve skipped-release announcements and historical attempts. Read contract is additive and must not
-silently replace today's static manifest.
+Implemented by `docs/sql/2026-09-28_application_release_catalog_foundation_phase1a.sql` as global storage
+with a `bigint` identity, nonnegative numeric version components, persisted computed canonical
+`major.minor.build`, channel (`PRODUCTION`, `PILOT`, `DEVELOPMENT`), `DRAFT`/`PUBLISHED` lifecycle,
+publication time/actor, short summary, creation/update provenance, and `RowVer`. Channel plus numeric
+components is unique. Drafts cannot carry publication metadata; published rows require publication time.
+There are no artifact fields because Phase 1A does not replace or duplicate the static manifest's asset
+authority. Published identity/content should later be append-only or superseded at the service layer.
+Publication/change will use transactional `EntityActionAuditLog` actions without release-note bodies.
+No runtime reads this table; today's static manifest remains authoritative.
 
 ### 9.2 `ApplicationReleaseItems` (global)
 
-Purpose: ordered What's New entries. Key fields: release ID, stable item ID, order, type (`FEATURE`,
-`FIX`, `IMPROVEMENT`, initially), title, short body, optional safe resource URL/type, active state.
-Relationship: children of a release. Publication changes are audited with counts/types, not full text.
-Retain with releases. API should aggregate items over `(lastSeenVersion, currentVersion]` in semantic
-order so skipped releases produce one experience.
+Implemented as global children with a non-cascading release FK, unique per-release nonnegative sort
+position, type (`FEATURE`, `FIX`, `IMPROVEMENT`, `IMPORTANT`, `LINK`, or `VIDEO`), title, short body,
+optional generic resource URL, draft-editing active state, provenance, and `RowVer`. Resource URLs are
+storage only. No RLS predicate or `ShaleClientId` exists on either catalog table. Future publication
+audits use counts/types, not full text; a later read API may aggregate skipped releases.
 
 ### 9.3 `ApplicationPolicy` (global singleton/revisioned policy)
 
@@ -495,6 +498,9 @@ hints, not permission for unrelated refactoring.
   accidentally, existing migration contracts.
 * **Dependencies:** operator confirms global control-plane database/authorization boundary.
 * **Risks:** putting global product data behind tenant RLS or allowing tenant admins to mutate it.
+* **Result:** complete on 2026-09-28. Added the two empty global catalog tables, closed rerun validation,
+  read-only verification SQL, and focused migration contracts. No runtime, updater, policy, or auth path
+  consumes the schema.
 
 ### Phase 1B — Global application-policy schema foundation
 
@@ -769,8 +775,9 @@ hints, not permission for unrelated refactoring.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | 0 | **COMPLETE** | Current state, target architecture, audit compatibility, and roadmap documented; no production/schema change. |
-| 1A | **NOT STARTED — NEXT PROPOSED STEP** | Global release catalog and release-item schema foundation only. |
-| 1B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 1A | **COMPLETE** | Empty global release catalog and ordered release-item schema, verification, contracts, and documentation; no runtime behavior. |
+| 1B | **NOT STARTED — NEXT PROPOSED STEP** | Global application-policy schema foundation only; no reads, writes, API, updater, UI, or enforcement. |
+| 2A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -806,8 +813,9 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Implement **Phase 1A only**: verify the target live schema and global control-plane ownership decision,
-then add forward-only/idempotent schema and verification artifacts for `ApplicationReleases` and
-`ApplicationReleaseItems`, their migration-contract tests, and corresponding schema documentation.
-Do not add `ApplicationPolicy`, service/DAO/API code, seeds, UI, updater changes, application instances,
-sessions, heartbeat, or enforcement in that run.
+Implement **Phase 1B only**: verify the global control-plane database/operator boundary, then add a
+forward-only/idempotent, independently correctable and revisioned global `ApplicationPolicy` foundation
+covering latest, minimum recommended, minimum allowed, optional deadline, reserved channel/access mode,
+concurrency, history/correction semantics, focused verification, migration-contract tests, and schema
+documentation. Do not add policy services/DAOs/APIs, seeds, manifest synchronization, UI, updater changes,
+application instances, sessions, heartbeat, acknowledgements, or enforcement in that run.
