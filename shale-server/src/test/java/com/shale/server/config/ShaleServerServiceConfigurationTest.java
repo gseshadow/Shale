@@ -10,11 +10,13 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.service.AuthServicePort;
+import com.shale.core.service.ApplicationReleaseReadServicePort;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.NotificationServicePort;
 import com.shale.core.service.TaskServicePort;
 import com.shale.data.service.adapter.AuthServiceAdapter;
+import com.shale.data.service.adapter.ApplicationReleaseReadServiceAdapter;
 import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
@@ -38,6 +40,8 @@ class ShaleServerServiceConfigurationTest {
             assertInstanceOf(TaskServiceAdapter.class, context.getBean(TaskServicePort.class));
             assertInstanceOf(ContactServiceAdapter.class, context.getBean(ContactServicePort.class));
             assertInstanceOf(NotificationServiceAdapter.class, context.getBean(NotificationServicePort.class));
+            assertInstanceOf(ApplicationReleaseReadServiceAdapter.class,
+                    context.getBean(ApplicationReleaseReadServicePort.class));
             assertNotNull(context.getBean(ServerRuntimeSessionState.class));
             assertInstanceOf(UnauthenticatedServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
             assertInstanceOf(RequestScopedDbSessionProvider.class, context.getBean(DbSessionProvider.class));
