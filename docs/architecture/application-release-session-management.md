@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 1A complete; Phase 1B not started
+**Status:** Phase 1B complete; Phase 2A not started — next proposed step
 
 **Last reviewed:** 2026-09-28
 
@@ -341,14 +341,28 @@ optional generic resource URL, draft-editing active state, provenance, and `RowV
 storage only. No RLS predicate or `ShaleClientId` exists on either catalog table. Future publication
 audits use counts/types, not full text; a later read API may aggregate skipped releases.
 
-### 9.3 `ApplicationPolicy` (global singleton/revisioned policy)
+### 9.3 `ApplicationPolicy` (global revisioned policy)
 
-Purpose: independently correctable authority. Key fields: policy revision, channel, latest release,
-minimum recommended version, minimum allowed version, optional required deadline, access mode (reserve
-but do not enforce initially), effective time, updated actor/time, row version. Validate
-`minimumAllowed <= minimumRecommended <= latest` where values exist. Changes are audited. Preserve
-revision history or audit reconstruction; do not cache irreversibly in clients. A bad policy can be
-corrected server-side and clients pick up the newer revision.
+Implemented by `docs/sql/2026-09-28_application_policy_foundation_phase1b.sql` as one append-oriented row
+per channel revision. Positive `RevisionNumber` is unique within `ReleaseChannel`; a filtered unique index
+allows at most one `IsCurrent = 1` row per channel. A future correction transaction will supersede the old
+row and insert the next revision, retaining the prior policy. Publication/creation and supersession timestamps
+and nullable actor FKs provide provenance, while `RowVer` enables future optimistic concurrency. Actor identity
+does not grant global authority; the dedicated control-plane authorization boundary remains future work.
+
+Latest, minimum recommended, and minimum allowed are nullable, non-cascading FKs to Phase 1A release rows.
+SQL enforces FK existence, channel/access-mode vocabulary, positive revision, unique revision/current state,
+and internally consistent supersession timing. Cross-table channel equality, published-release eligibility,
+and numeric `minimumAllowed <= minimumRecommended <= latest` ordering cannot be expressed by a SQL Server
+CHECK; the future mutation service must enforce them transactionally from numeric release components before a
+revision becomes current. Phase 1B intentionally adds no trigger or lexical version comparison.
+
+The optional deadline is UTC `datetime2(7)`; future clients use authoritative server time. `NORMAL` is the only
+currently meaningful access mode; `READ_ONLY`, `MAINTENANCE`, and `BLOCKED` are reserved and wholly unenforced.
+The table is global, has no `ShaleClientId`, tenant/workstation targeting, or RLS, and starts empty. No runtime
+reads it, and there is no manifest synchronization: `shale-stable.json` remains authoritative. Policy mutation
+and its transactional, sanitized semantic audit actions are deferred together; Phase 1B changes no audit
+allowlist.
 
 ### 9.4 `UserSessions` (strict tenant-owned)
 
@@ -513,6 +527,10 @@ hints, not permission for unrelated refactoring.
 * **Verification:** ordering invariants, correction/supersession, concurrency, deployment rollback path.
 * **Dependencies:** 1A and operator authority decision.
 * **Risks:** an uncorrectable singleton or invalid minimum version.
+* **Result:** complete on 2026-09-28. Added empty global `ApplicationPolicy` revision history with one-current-
+  per-channel uniqueness, release FKs, lifecycle/vocabulary constraints, optimistic concurrency, closed rerun
+  validation, read-only verification, focused contracts, and no runtime or audit mutation path. Cross-release
+  channel/publication/version ordering is explicitly reserved for the future transactional mutation service.
 
 ### Phase 2A — Shared semantic-version and read service boundary
 
@@ -776,8 +794,9 @@ hints, not permission for unrelated refactoring.
 | --- | --- | --- |
 | 0 | **COMPLETE** | Current state, target architecture, audit compatibility, and roadmap documented; no production/schema change. |
 | 1A | **COMPLETE** | Empty global release catalog and ordered release-item schema, verification, contracts, and documentation; no runtime behavior. |
-| 1B | **NOT STARTED — NEXT PROPOSED STEP** | Global application-policy schema foundation only; no reads, writes, API, updater, UI, or enforcement. |
-| 2A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 1B | **COMPLETE** | Empty global revisioned policy schema, verification, contracts, and documentation; no runtime behavior. |
+| 2A | **NOT STARTED — NEXT PROPOSED STEP** | Shared strict semantic-version value object and read-only release/policy service boundary only. |
+| 2B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -813,9 +832,7 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Implement **Phase 1B only**: verify the global control-plane database/operator boundary, then add a
-forward-only/idempotent, independently correctable and revisioned global `ApplicationPolicy` foundation
-covering latest, minimum recommended, minimum allowed, optional deadline, reserved channel/access mode,
-concurrency, history/correction semantics, focused verification, migration-contract tests, and schema
-documentation. Do not add policy services/DAOs/APIs, seeds, manifest synchronization, UI, updater changes,
-application instances, sessions, heartbeat, acknowledgements, or enforcement in that run.
+Implement **Phase 2A only**: add one strict numeric `major.minor.build` value object and read-only release/policy
+ports, DTOs, DAO/adapters, and delegation/ordering/empty-policy tests in `shale-core` and `shale-data`. Enforce
+numeric ordering and malformed-input rejection at that boundary without adding writes, HTTP/OpenAPI, startup
+reads, UI, updater or manifest changes, enforcement, instances, sessions, heartbeat, PubSub, or geolocation.
