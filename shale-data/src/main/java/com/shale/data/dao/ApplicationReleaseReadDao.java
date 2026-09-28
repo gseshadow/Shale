@@ -18,7 +18,7 @@ public final class ApplicationReleaseReadDao {
 		ORDER BY MajorVersion ASC,MinorVersion ASC,BuildVersion ASC""";
 	private static final String ITEMS_SQL = """
 		SELECT Id,ApplicationReleaseId,SortOrder,ItemType,Title,Body,ResourceUrl,IsActive
-		FROM dbo.ApplicationReleaseItems WHERE ApplicationReleaseId=? ORDER BY SortOrder ASC,Id ASC""";
+		FROM dbo.ApplicationReleaseItems WHERE ApplicationReleaseId=? AND IsActive=1 ORDER BY SortOrder ASC,Id ASC""";
 	private static final String POLICY_SQL = """
 		SELECT p.Id,p.ReleaseChannel,p.RevisionNumber,p.RequiredUpdateDeadline,p.AccessMode,p.PublishedAt,p.RowVer,
 		 l.Id,l.MajorVersion,l.MinorVersion,l.BuildVersion,l.ReleaseChannel,l.PublicationStatus,

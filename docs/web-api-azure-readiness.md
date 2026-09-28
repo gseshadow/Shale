@@ -328,3 +328,23 @@ curl -i 'http://localhost:8080/api/cases/search?query=xxxxxxxxxxxxxxxxxxxxxxxxxx
 ## Step 4E Azure deployment guide
 
 Use `docs/azure-app-service-deployment.md` as the repeatable first-deployment runbook for Azure App Service. It covers App Service creation, Java runtime selection, required app settings, startup command options, health checks, log streaming, restart, rollback, jar packaging, and smoke tests.
+
+## Application release and policy read contracts (Phase 2B)
+
+The server exposes two additive global control-plane reads for future clients:
+
+* `GET /api/application-releases/policy/current?channel=PRODUCTION` returns the current effective policy, or
+  `204 No Content` when that channel has no configured current policy.
+* `GET /api/application-releases?channel=PRODUCTION&after=1.0.127` returns only published releases strictly newer
+  than the supplied strict `major.minor.build` lower bound. Results use ascending numeric version order and embed
+  active release items in stable sort order.
+
+Both endpoints use the existing bearer-token requirement in `prod`/`azure` and the existing bearer-or-development
+header behavior in `dev`/`local`. Authentication resolves the caller but does not tenant-filter global release or
+policy data. Responses expose safe API DTOs rather than row versions or persistence models. Successful and empty
+responses use short client-private caching (`Cache-Control: private, max-age=60`); there is no server-side cache or
+ETag. Resource URLs are inert nullable metadata. No web, desktop, mobile, updater, manifest, acknowledgement,
+enforcement, session, heartbeat, or PubSub consumer is wired in this phase.
+
+OpenAPI at `/v3/api-docs` documents authentication, strict query parameters, the `204` empty-policy result,
+response DTOs, error envelopes, and the release-channel, release-item-type, and access-mode vocabularies.

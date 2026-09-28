@@ -32,6 +32,9 @@ import com.shale.data.service.adapter.AuthServiceAdapter;
 import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
+import com.shale.data.dao.ApplicationReleaseReadDao;
+import com.shale.data.service.adapter.ApplicationReleaseReadServiceAdapter;
+import com.shale.core.service.ApplicationReleaseReadServicePort;
 import com.shale.data.service.adapter.OrganizationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
 import com.shale.data.service.adapter.UserServiceAdapter;
@@ -190,5 +193,10 @@ public class ShaleServerServiceConfiguration {
     @Bean
     NotificationServicePort notificationServicePort(DbSessionProvider serverDbSessionProvider) {
         return new NotificationServiceAdapter(new NotificationDao(serverDbSessionProvider));
+    }
+
+    @Bean
+    ApplicationReleaseReadServicePort applicationReleaseReadServicePort(DbSessionProvider serverDbSessionProvider) {
+        return new ApplicationReleaseReadServiceAdapter(new ApplicationReleaseReadDao(serverDbSessionProvider));
     }
 }
