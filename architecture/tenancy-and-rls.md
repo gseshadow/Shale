@@ -26,6 +26,16 @@ RLS protected tables:
 - Statuses
 - Categories
 - Priorities
+- UserReleaseState
+
+### User release announcement state
+
+`dbo.UserReleaseState` is strict tenant-owned data. It has a non-null `ShaleClientId`, a tenant-qualified user
+foreign key, and participates in the existing enabled `TenantFilter` policy through
+`sec.fn_FilterByTenant(ShaleClientId)`. A filter predicate protects reads and update/delete targeting; matching
+`AFTER INSERT` and `AFTER UPDATE` block predicates reject a row whose owner differs from session tenant
+context. It never uses `sec.fn_FilterByTenantOrGlobal`. The service additionally requires tenant and principal
+session context to equal the requested current user and validates active same-tenant membership.
 
 ## Authoritative Intake reconciliation
 

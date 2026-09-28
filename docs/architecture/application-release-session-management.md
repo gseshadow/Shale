@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 2B complete; Phase 3A not started — next proposed step
+**Status:** Phase 2B complete; Phase 3A in progress — implementation complete, verification blocked
 
 **Last reviewed:** 2026-09-28
 
@@ -599,6 +599,32 @@ hints, not permission for unrelated refactoring.
 * **Dependencies:** 2B.
 * **Risks:** marking unseen releases seen or scoping state to a workstation instead of user experience.
 
+Implementation uses strict tenant-owned `dbo.UserReleaseState`, keyed uniquely by
+`(ShaleClientId, UserId, ClientType, ReleaseChannel)`. Channel is intentionally part of the logical key: a user
+may participate in production, pilot, or development streams without one stream overwriting another. Client
+type is closed to `DESKTOP`, `WEB`, and `MOBILE`. The nullable release FK preserves an honest schema concept
+for “no acknowledgement,” but reads do not create empty rows and the Phase 3A service creates a row only for a
+real acknowledgement of a published release.
+
+`UserReleaseStateServicePort` and its data adapter expose current-actor `findCurrent` and `acknowledge`
+operations. The DAO validates tenant and principal session context plus active same-tenant user membership,
+then owns one transaction that locks the logical scope, resolves the canonical release, validates publication
+and channel, compares `SemanticVersion` numerically, and inserts or updates. Skipped releases are valid;
+backwards movement is rejected; same-release acknowledgement is idempotent and does not update timestamps or
+`RowVer`. Updates require the expected `RowVer`; stale writes fail, and unique-key conflict handling makes a
+concurrent first create fail clearly rather than duplicate state. No installed-version upper bound exists.
+
+The table uses `TenantFilter` with `sec.fn_FilterByTenant(ShaleClientId)` as filter and insert/update block
+predicates, tenant-qualified user ownership, non-cascading release/user FKs, and no seed. Ordinary release-note
+acknowledgement deliberately produces no `EntityActionAuditLog` row: it is routine nonsensitive UI state, not
+an administrative or sensitive domain mutation. No HTTP endpoint, UI/runtime consumer, updater, policy,
+instance, session, heartbeat, PubSub, or geolocation behavior is included.
+
+**Verification status (2026-09-28):** focused implementation and contract coverage is present, but Maven could
+not resolve `org.springframework.boot:spring-boot-dependencies:3.3.4` because Maven Central returned HTTP 403.
+No live SQL Server is available in this environment, so applying the migration, the read-only verifier, and
+the tenant 7/tenant 8 RLS exercise remain pending. Per the phase gate, Phase 3A remains **IN PROGRESS**.
+
 ### Phase 3B — Desktop What's New experience
 
 * **Goal:** one post-update aggregate dialog.
@@ -831,8 +857,9 @@ hints, not permission for unrelated refactoring.
 | 1B | **COMPLETE** | Empty global revisioned policy schema, verification, contracts, and documentation; no runtime behavior. |
 | 2A | **COMPLETE** | Strict shared semantic version plus immutable release/item/effective-policy models and global read-only DAO/service boundary; `mvn test` passed; no runtime consumer. |
 | 2B | **COMPLETE** | Authenticated read-only release/policy HTTP contracts, safe DTOs/errors/caching, OpenAPI, and focused regressions complete; repository-level `mvn test` passed. |
-| 3A | **NOT STARTED — NEXT PROPOSED STEP** | Strict tenant-owned user release-state foundation only. |
-| 3B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 3A | **IN PROGRESS** | Implementation and contract coverage complete; Maven Central HTTP 403 and unavailable live SQL Server block required verification. |
+| 3B | **NOT STARTED** | Start only after 3A Maven and live SQL/RLS verification pass; it is not yet the next executable step. |
+| 4A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.

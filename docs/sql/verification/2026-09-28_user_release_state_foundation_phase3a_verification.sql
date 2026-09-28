@@ -1,0 +1,18 @@
+/* Read-only Phase 3A verification. Every FindingCount must be zero. */
+SET NOCOUNT ON;
+DECLARE @Findings table(Finding nvarchar(200),FindingCount bigint);
+INSERT @Findings VALUES(N'missing UserReleaseState table',CASE WHEN OBJECT_ID(N'dbo.UserReleaseState',N'U') IS NULL THEN 1 ELSE 0 END);
+DECLARE @Expected table(Name sysname,TypeName sysname,MaxLength smallint,Nullable bit);
+INSERT @Expected VALUES(N'Id',N'bigint',8,0),(N'ShaleClientId',N'int',4,0),(N'UserId',N'int',4,0),(N'ClientType',N'varchar',16,0),(N'ReleaseChannel',N'varchar',32,0),(N'ApplicationReleaseId',N'bigint',8,1),(N'AcknowledgedAt',N'datetime2',8,0),(N'CreatedAt',N'datetime2',8,0),(N'UpdatedAt',N'datetime2',8,0),(N'RowVer',N'timestamp',8,0);
+INSERT @Findings SELECT N'missing or incompatible exact columns',COUNT_BIG(*) FROM @Expected e LEFT JOIN sys.columns c ON c.object_id=OBJECT_ID(N'dbo.UserReleaseState') AND c.name COLLATE DATABASE_DEFAULT=e.Name COLLATE DATABASE_DEFAULT LEFT JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.column_id IS NULL OR t.name COLLATE DATABASE_DEFAULT<>e.TypeName COLLATE DATABASE_DEFAULT OR c.max_length<>e.MaxLength OR c.is_nullable<>e.Nullable;
+INSERT @Findings SELECT N'missing primary key',CASE WHEN EXISTS(SELECT 1 FROM sys.key_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.UserReleaseState') AND type=N'PK') THEN 0 ELSE 1 END;
+INSERT @Findings SELECT N'missing, disabled, untrusted, or cascading foreign keys',CASE WHEN (SELECT COUNT(*) FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.UserReleaseState') AND is_disabled=0 AND is_not_trusted=0 AND delete_referential_action=0)=3 THEN 0 ELSE 1 END;
+INSERT @Findings SELECT N'missing logical scope uniqueness',CASE WHEN EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.UserReleaseState') AND name COLLATE DATABASE_DEFAULT=N'UX_UserReleaseState_Scope' COLLATE DATABASE_DEFAULT AND is_unique=1 AND is_disabled=0) THEN 0 ELSE 1 END;
+INSERT @Findings SELECT N'missing release lookup index',CASE WHEN EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.UserReleaseState') AND name COLLATE DATABASE_DEFAULT=N'IX_UserReleaseState_Release' COLLATE DATABASE_DEFAULT AND is_disabled=0) THEN 0 ELSE 1 END;
+INSERT @Findings SELECT N'missing client type vocabulary',CASE WHEN EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.UserReleaseState') AND name COLLATE DATABASE_DEFAULT=N'CK_UserReleaseState_ClientType' COLLATE DATABASE_DEFAULT AND definition LIKE N'%DESKTOP%' AND definition LIKE N'%WEB%' AND definition LIKE N'%MOBILE%') THEN 0 ELSE 1 END;
+INSERT @Findings SELECT N'missing strict TenantFilter predicates',CASE WHEN (SELECT COUNT(*) FROM sys.security_predicates sp JOIN sys.security_policies p ON p.object_id=sp.object_id WHERE sp.target_object_id=OBJECT_ID(N'dbo.UserReleaseState') AND p.name COLLATE DATABASE_DEFAULT=N'TenantFilter' COLLATE DATABASE_DEFAULT AND sp.predicate_definition LIKE N'%fn_FilterByTenant%')=3 THEN 0 ELSE 1 END;
+INSERT @Findings SELECT N'unexpected overlay predicate',COUNT_BIG(*) FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.UserReleaseState') AND predicate_definition LIKE N'%fn_FilterByTenantOrGlobal%';
+INSERT @Findings SELECT N'unexpected seed rows',COUNT_BIG(*) FROM dbo.UserReleaseState;
+INSERT @Findings SELECT N'Phase 1A or 1B regression',CASE WHEN OBJECT_ID(N'dbo.ApplicationReleases',N'U') IS NULL OR OBJECT_ID(N'dbo.ApplicationReleaseItems',N'U') IS NULL OR OBJECT_ID(N'dbo.ApplicationPolicy',N'U') IS NULL THEN 1 ELSE 0 END;
+SELECT Finding,FindingCount FROM @Findings ORDER BY Finding;
+IF EXISTS(SELECT 1 FROM @Findings WHERE FindingCount<>0) THROW 57320,'Phase 3A verification failed.',1;
