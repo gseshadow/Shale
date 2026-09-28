@@ -1226,3 +1226,39 @@ This child table is also global and has neither `ShaleClientId` nor any RLS secu
 soft-delete lifecycle: `IsActive` supports draft composition, while the non-cascading FK preserves release
 history. Phase 1A seeds no releases or items and adds no API, service, DAO, UI, updater, policy, session,
 heartbeat, acknowledgement, or enforcement behavior.
+
+## Global application policy (Phase 1B)
+
+### dbo.ApplicationPolicy
+
+Global, revisioned product-control storage with one row per channel revision. `Id` is a `bigint` identity;
+`RevisionNumber` is positive and unique with `ReleaseChannel`; and the filtered unique
+`UX_ApplicationPolicy_Channel_Current` index permits at most one `IsCurrent = 1` row in each of
+`PRODUCTION`, `PILOT`, and `DEVELOPMENT`. Publishing a correction will transactionally supersede the old
+current row (`IsCurrent = 0`, `SupersededAt`/optional actor populated) and insert the next positive revision.
+Normal correction never deletes history. `RowVer` supports optimistic concurrency for that future mutation.
+
+Nullable `LatestReleaseId`, `MinimumRecommendedReleaseId`, and `MinimumAllowedReleaseId` use trusted,
+non-cascading foreign keys to `ApplicationReleases(Id)`. Supporting filtered indexes protect future release
+history/deletion checks. SQL therefore guarantees referenced release existence, but the future transactional
+mutation service must verify that every referenced release is published in the policy channel and compare its
+numeric Phase 1A components to enforce `minimumAllowed <= minimumRecommended <= latest`. SQL Server CHECK
+constraints cannot safely perform those cross-table comparisons; Phase 1B deliberately adds no trigger and
+does not falsely use lexical version ordering.
+
+`RequiredUpdateDeadline` is nullable `datetime2(7)` UTC; null means no deadline. Future clients must evaluate
+it with authoritative server time rather than blindly trusting a workstation clock. `AccessMode` is constrained
+to `NORMAL`, `READ_ONLY`, `MAINTENANCE`, or `BLOCKED`; only `NORMAL` has any defined meaning today. The other
+values are reserved storage vocabulary and do not imply that current Shale workflows are safely read-only,
+maintained, or blocked. Lifecycle checks require a current row to have no supersession metadata and a historical
+row to have `SupersededAt >= PublishedAt`.
+
+The table deliberately has no `ShaleClientId`, tenant FK, workstation target, or RLS predicate. Nullable actor
+FKs to `Users(id)` provide known-user provenance only and grant neither tenant users nor tenant administrators
+global mutation authority. Phase 1B adds no audit allowlist: the later control-plane mutation service must append
+short, allowlisted semantic policy actions on the same transaction and must not copy policy snapshots, release
+notes, SQL, or exception text into audit metadata.
+
+No policy row is seeded. No DAO, service, API, authentication, UI, updater, manifest synchronization, heartbeat,
+session, PubSub, geolocation, or enforcement path reads this table. `shale-stable.json` remains the current
+update-discovery authority.
