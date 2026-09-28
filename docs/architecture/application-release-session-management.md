@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 1B complete; Phase 2A not started — next proposed step
+**Status:** Phase 2A implemented; verification blocked by Maven Central HTTP 403
 
 **Last reviewed:** 2026-09-28
 
@@ -512,7 +512,7 @@ hints, not permission for unrelated refactoring.
   accidentally, existing migration contracts.
 * **Dependencies:** operator confirms global control-plane database/authorization boundary.
 * **Risks:** putting global product data behind tenant RLS or allowing tenant admins to mutate it.
-* **Result:** complete on 2026-09-28. Added the two empty global catalog tables, closed rerun validation,
+* **Result:** implemented on 2026-09-28; Maven verification remains blocked by the documented external HTTP 403. Added the two empty global catalog tables, closed rerun validation,
   read-only verification SQL, and focused migration contracts. No runtime, updater, policy, or auth path
   consumes the schema.
 
@@ -527,7 +527,7 @@ hints, not permission for unrelated refactoring.
 * **Verification:** ordering invariants, correction/supersession, concurrency, deployment rollback path.
 * **Dependencies:** 1A and operator authority decision.
 * **Risks:** an uncorrectable singleton or invalid minimum version.
-* **Result:** complete on 2026-09-28. Added empty global `ApplicationPolicy` revision history with one-current-
+* **Result:** implemented on 2026-09-28; Maven verification remains blocked by the documented external HTTP 403. Added empty global `ApplicationPolicy` revision history with one-current-
   per-channel uniqueness, release FKs, lifecycle/vocabulary constraints, optimistic concurrency, closed rerun
   validation, read-only verification, focused contracts, and no runtime or audit mutation path. Cross-release
   channel/publication/version ordering is explicitly reserved for the future transactional mutation service.
@@ -542,6 +542,22 @@ hints, not permission for unrelated refactoring.
 * **Verification:** numeric ordering (`1.0.130 > 1.0.99`), malformed inputs, adapter delegation, empty policy.
 * **Dependencies:** 1A-1B.
 * **Risks:** behavior drift from updater comparator; resolve with shared vectors before replacement.
+* **Result:** implemented on 2026-09-28; Maven verification remains blocked by the documented external HTTP 403. `com.shale.core.model.SemanticVersion` is the single strict internal
+  `major.minor.build` value: it accepts exactly three nonnegative, base-10 Java `int` components in canonical
+  form (no trimming, prefixes, leading zeroes, prerelease/build suffixes, or overflow) and compares numeric
+  tuples. The deliberately more permissive updater `VersionComparator` remains unchanged and in runtime use;
+  canonical production vectors prove that both orderings agree.
+* **Read boundary:** `ApplicationReleaseReadServicePort` exposes only current-policy, published-releases-after,
+  and ordered-release-item reads using immutable core views and closed vocabularies. The implementation is
+  `ApplicationReleaseReadServiceAdapter` over `ApplicationReleaseReadDao`; it has no runtime consumer yet.
+  An empty current-policy table returns `Optional.empty()` rather than a synthesized policy.
+* **Read integrity:** DAO SQL is global (no tenant id/session-context predicate), selects only `IsCurrent=1`
+  policy and `PUBLISHED` release history, compares/orders the three numeric version columns, and orders items by
+  `SortOrder, Id`. Effective-policy joins reject unknown vocabulary, wrong-channel or draft references, multiple
+  current rows, and every comparable violation of `minimumAllowed <= minimumRecommended <= latest`. Nullable
+  references have no additional presence dependency: every available pair is validated. Reads never repair data.
+* **Audit review:** these are global, non-PHI product-control reads and introduce no mutation, so no PHI or
+  entity-action audit event is appropriate. A later administration phase must separately design mutation audit.
 
 ### Phase 2B — Read-only release/policy HTTP contracts
 
@@ -795,8 +811,9 @@ hints, not permission for unrelated refactoring.
 | 0 | **COMPLETE** | Current state, target architecture, audit compatibility, and roadmap documented; no production/schema change. |
 | 1A | **COMPLETE** | Empty global release catalog and ordered release-item schema, verification, contracts, and documentation; no runtime behavior. |
 | 1B | **COMPLETE** | Empty global revisioned policy schema, verification, contracts, and documentation; no runtime behavior. |
-| 2A | **NOT STARTED — NEXT PROPOSED STEP** | Shared strict semantic-version value object and read-only release/policy service boundary only. |
-| 2B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 2A | **IN PROGRESS** | Implementation complete, but required Maven verification is blocked by Maven Central HTTP 403; do not advance until relevant tests pass. |
+| 2B | **NOT STARTED — NEXT PROPOSED STEP** | Authenticated read-only release/policy HTTP contracts only; begin only after Phase 2A verification passes. |
+| 3A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -832,7 +849,8 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Implement **Phase 2A only**: add one strict numeric `major.minor.build` value object and read-only release/policy
-ports, DTOs, DAO/adapters, and delegation/ordering/empty-policy tests in `shale-core` and `shale-data`. Enforce
-numeric ordering and malformed-input rejection at that boundary without adding writes, HTTP/OpenAPI, startup
-reads, UI, updater or manifest changes, enforcement, instances, sessions, heartbeat, PubSub, or geolocation.
+Implement **Phase 2B only**: add authenticated, read-only HTTP contracts for current effective policy and
+published releases since a caller-supplied strict version, reusing the Phase 2A port/models. Define safe external
+DTOs, OpenAPI and focused authentication/filtering/error/caching tests. Do not add administration or writes,
+desktop/startup/UI consumers, updater/manifest changes, acknowledgement, policy evaluation or enforcement,
+instances, sessions, heartbeat, PubSub, or geolocation.
