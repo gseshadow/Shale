@@ -104,8 +104,15 @@ import com.shale.ui.notification.NoOpDesktopNotificationPresenter;
 import com.shale.ui.notification.DesktopNotificationPresenter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
 import com.shale.data.service.adapter.UserDictionaryServiceAdapter;
+import com.shale.data.service.adapter.ApplicationReleaseReadServiceAdapter;
+import com.shale.data.service.adapter.UserReleaseStateServiceAdapter;
+import com.shale.data.dao.ApplicationReleaseReadDao;
+import com.shale.data.dao.UserReleaseStateDao;
 import com.shale.data.dao.UserDictionaryWordDao;
 import com.shale.ui.component.spellcheck.UserDictionarySession;
+import com.shale.ui.services.AppVersionProvider;
+import com.shale.ui.whatsnew.WhatsNewCoordinator;
+import com.shale.ui.whatsnew.WhatsNewDialog;
 
 public final class SceneManager {
 	private static final Logger log = LoggerFactory.getLogger(SceneManager.class);
@@ -134,6 +141,7 @@ public final class SceneManager {
 	private final NotificationPollingService notificationPollingService;
 	private final UpdatePollingService updatePollingService;
 	private final PhiReadAuditService phiReadAuditService;
+	private final WhatsNewCoordinator whatsNewCoordinator;
 	private final ExecutorService notificationBadgeCountExecutor;
 	private final ExecutorService notificationStartupExecutor;
 	private final AtomicLong notificationStartupGeneration = new AtomicLong(0);
@@ -200,6 +208,11 @@ public final class SceneManager {
 		this.systemUpdateNotificationProducer = new SystemUpdateNotificationProducer(notificationCenterService, notificationPreferencesService);
 		this.updatePollingService = new UpdatePollingService(updateLauncher, this::onUpdateCheckCompleted);
 		this.phiReadAuditService = new PhiReadAuditService(new AuditLogDao(dbSessionProvider), appState);
+		this.whatsNewCoordinator = new WhatsNewCoordinator(
+				new ApplicationReleaseReadServiceAdapter(new ApplicationReleaseReadDao(dbSessionProvider)),
+				new UserReleaseStateServiceAdapter(new UserReleaseStateDao(dbSessionProvider)),
+				AppVersionProvider::currentVersion, Platform::runLater,
+				(presentation, dismissed) -> WhatsNewDialog.show(stage, presentation, dismissed));
 		UserDictionarySession.configure(new UserDictionarySession(new UserDictionaryServiceAdapter(new UserDictionaryWordDao(dbSessionProvider)),appState));
 	}
 
@@ -234,6 +247,7 @@ public final class SceneManager {
 	}
 
 	private void stopSessionOwnedWork() {
+		whatsNewCoordinator.reset();
 		authenticatedProducersActive = false;
 		activeTenantId = null;
 		activeUserId = null;
@@ -300,6 +314,9 @@ public final class SceneManager {
 		navigationManager.resetTo(AppRoute.myShale());
 		showRouteInternal(AppRoute.myShale());
 		notifyBackAvailabilityChanged();
+		Integer tenantId = appState.getShaleClientId();
+		Integer userId = appState.getUserId();
+		if (tenantId != null && userId != null) Platform.runLater(() -> whatsNewCoordinator.start(tenantId, userId));
 		long showMainEndMs = (System.nanoTime() - showMainStartNanos) / 1_000_000;
 		System.out.println("[StartupTiming] showMain critical path complete in " + showMainEndMs + " ms");
 	}
@@ -1412,6 +1429,7 @@ public final class SceneManager {
 
 	/** Deterministically releases all SceneManager-owned background work. */
 	public void shutdown() {
+		whatsNewCoordinator.close();
 		notificationPollingService.close();
 		durableNotificationService.close();
 		taskDueDateNotificationGenerator.stop();
