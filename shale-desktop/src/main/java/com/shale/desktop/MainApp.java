@@ -1,6 +1,8 @@
 package com.shale.desktop;
 
 import com.shale.data.auth.AuthService;
+import com.shale.desktop.identity.MachineIdentityProvider;
+import com.shale.desktop.identity.MachineIdentityResult;
 import com.shale.desktop.live.LiveEventDispatcher;
 import com.shale.desktop.navigation.SceneRouter;
 import com.shale.desktop.security.SessionContext;
@@ -13,6 +15,7 @@ import java.util.Objects;
 public final class MainApp extends Application {
 
 	private SceneRouter router;
+	private MachineIdentityResult machineIdentity;
 
 	@Override
 	public void start(Stage primaryStage) {
@@ -33,6 +36,17 @@ public final class MainApp extends Application {
 		router = new SceneRouter(primaryStage, authService, dispatcher, config.runtimeService, config.negotiateEndpointUrl);
 
 		router.showLogin();
+	}
+
+	/**
+	 * Lazy, authentication-independent desktop composition point for Phase 4A.
+	 * Nothing consumes or transmits the value in this phase.
+	 */
+	MachineIdentityResult machineIdentity() {
+		if (machineIdentity == null) {
+			machineIdentity = MachineIdentityProvider.resolvePlatformDefault();
+		}
+		return machineIdentity;
 	}
 
 	@Override
