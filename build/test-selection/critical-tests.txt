@@ -13,6 +13,9 @@ com.shale.data.dao.RequestLookupRlsPhase2MigrationTest
 com.shale.data.dao.TaskDaoCompletionStatusSynchronizationTest
 com.shale.data.dao.UserManagementRemovalContractTest
 com.shale.desktop.ShaleLauncherTest
+com.shale.core.platform.AppPathsTest
+com.shale.desktop.identity.MachineIdentityProviderTest
+com.shale.desktop.identity.MachineIdentityUpgradeContractTest
 com.shale.desktop.update.DesktopUiUpdateLauncherTest
 com.shale.desktop.update.DesktopUpdateLauncherTest
 com.shale.server.config.ShaleServerServiceConfigurationTest

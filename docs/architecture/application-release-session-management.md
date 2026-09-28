@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 3A complete; Phase 3B in progress — implementation complete, verification blocked
+**Status:** Phase 3B complete; Phase 4A in progress — implementation complete, verification blocked
 
 **Last reviewed:** 2026-09-28
 
@@ -673,13 +673,9 @@ mutation. It has no updater/manifest, update-policy/enforcement, instance, sessi
 geolocation, administration, web, or mobile coupling.
 
 **Verification status (2026-09-28):** focused coordinator, presentation, theme, and SceneManager wiring tests
-were added, including interval bounds, skipped releases, first-run/empty catalog, dismissal timing, no-content
-advancement, optimistic-concurrency recovery, duplicate suppression, and startup failure paths. Required Maven
-execution remains blocked before compilation because Maven Central returns HTTP 403 for
-`org.springframework.boot:spring-boot-dependencies:3.3.4` in the reactor and for
-`maven-resources-plugin:3.3.1` in the module-only attempt. Visual launch inspection in Light and Dark is also
-unavailable until the JavaFX test/runtime dependencies resolve. Per the phase gate, Phase 3B remains
-**IN PROGRESS** and Phase 4A must not start.
+cover interval bounds, skipped releases, first-run/empty catalog, dismissal timing, no-content advancement,
+optimistic-concurrency recovery, duplicate suppression, and startup failure paths. The repository-level
+`mvn test` subsequently passed after the earlier Maven Central outage; Phase 3B is **COMPLETE**.
 
 ### Phase 4A — Stable machine identity
 
@@ -691,6 +687,67 @@ unavailable until the JavaFX test/runtime dependencies resolve. Per the phase ga
 * **Verification:** persistence across users/restarts/in-place update, atomic creation, permissions, uninstall.
 * **Dependencies:** machine-ID location decision.
 * **Risks:** per-user duplication or unwritable system directory.
+
+Phase 4A is implemented by the platform-neutral `MachineIdentityStore` boundary, filesystem-backed
+`FileMachineIdentityStore`, lazy `MachineIdentityProvider`, and explicit `MachineIdentityResult`. Desktop
+composition exposes the memoized `MainApp.machineIdentity()` accessor independently of authentication;
+it performs no I/O unless requested and is not connected to Phase 3B release acknowledgement. The result is
+either a stable `UUID` or a typed `PLATFORM_STORAGE_UNAVAILABLE` / `STORAGE_ACCESS_FAILED` failure. Callers are
+never given an ephemeral substitute.
+
+The exact identity paths are `%ProgramData%\Shale\machine-id` on Windows and
+`/Library/Application Support/Shale/machine-id` on macOS. `AppPaths.machineDataDir` owns path resolution;
+Windows requires the real `ProgramData` environment value and never falls back to a profile, install directory,
+temp directory, roaming data, or Local AppData. Unsupported platforms fail explicitly; Phase 4A does not
+invent Linux storage behavior. The file contains one canonical lowercase UUID generated locally with
+`UUID.randomUUID()`, optionally followed by a newline, and no version, timestamp, hostname, operating-system,
+tenant, user, session, network, or location data.
+
+Initialization creates the parent directory when permitted, then serializes contenders with an in-JVM lock
+and an OS file lock on `machine-id.lock`. Under that lock it re-reads the winner, or writes and forces a uniquely
+named sibling temporary file before an atomic same-directory move to `machine-id`. Atomic-move support is
+required rather than silently degrading to a partial-write risk. The persisted file is re-read and validated
+before success is returned. Concurrent provider/process callers therefore converge on one file and UUID; failed
+temporary writes/moves clean up the temporary file and return an explicit unavailable result.
+
+Existing content is trimmed only to allow a trailing newline and must round-trip through Java `UUID` to its
+canonical lowercase text. Empty, truncated, non-UUID, or noncanonical content is not accepted. While holding
+the initialization lock, the store atomically preserves it as `machine-id.corrupt-<random UUID>`, creates a new
+random identity, and logs a warning without logging either file content or machine UUID. Read, directory,
+lock, write, sync, move, and permission failures are logged in sanitized form, do not crash desktop startup or
+login, and remain explicit in `MachineIdentityResult`.
+
+The identity is workstation-scoped and takes no Shale tenant/user/login/session input. Switching Shale users
+therefore cannot change it. On Windows, the current supported MSI is deliberately per-user and cannot safely
+provision elevated `%ProgramData%` ACLs. Managed shared workstations should pre-create only the Shale directory
+with administrator/System control and read/write access for users authorized to run Shale. First-launch
+creation is used where inherited platform permissions allow it; cross-Windows-account sharing is available
+where that directory ACL permits, and otherwise the second account receives explicit unavailability rather
+than a second identity. The first-pass unsigned macOS package likewise requires administrator provisioning of
+the machine-wide Shale support directory when ordinary users lack access. No privileged helper or broad ACL is
+introduced in this phase.
+
+Both locations are outside the Windows install payload and macOS `.app` bundle. Existing updater replacement
+remains scoped to its explicit install directory, while the MSI and macOS packaging scripts do not own the
+identity file. Normal overlay/bundle upgrades and versioned payload cleanup therefore leave it untouched.
+Ordinary uninstall/reinstall intentionally retains machine identity; a future explicit full-data removal may
+define a separate deletion contract, but Phase 4A adds no cleanup UI or installer action.
+
+This UUID is an identifier, not a secret, credential, authorization factor, or proof of device trust. Shale
+does not collect or derive MAC addresses, Windows MachineGuid/SIDs, hostnames, serial numbers, BIOS/motherboard,
+TPM, disk, or CPU identifiers. No encryption is added merely to obscure the UUID. Phase 4A has no database
+migration, API/server reporting, application-instance row, version reporting, heartbeat/activity, session,
+remote logout, enforcement, PubSub, geolocation, device name, Settings UI, or updater scheduling. Local identity
+creation/recovery is not an established sensitive read or domain/administrative mutation, so the audit review
+requires no database audit event or schema change.
+
+Focused tests cover paths, creation/persistence/restart, canonical parsing/newlines, malformed/empty/truncated
+recovery, parent creation, thread/provider convergence, temporary-write and atomic-move failures, simulated
+permission failure, explicit non-ephemeral results, authentication independence, and updater/MSI/macOS external-
+state contracts. **Verification status (2026-09-28):** implementation and tests are present, but the focused
+Maven reactor is currently blocked during project-model resolution by Maven Central HTTP 403 for
+`org.springframework.boot:spring-boot-dependencies:3.3.4`. Phase 4A remains **IN PROGRESS** until the focused,
+change-selected, and repository-level Maven tests execute successfully.
 
 ### Phase 4B — Application-instance schema and service foundation
 
@@ -902,8 +959,8 @@ unavailable until the JavaFX test/runtime dependencies resolve. Per the phase ga
 | 2A | **COMPLETE** | Strict shared semantic version plus immutable release/item/effective-policy models and global read-only DAO/service boundary; `mvn test` passed; no runtime consumer. |
 | 2B | **COMPLETE** | Authenticated read-only release/policy HTTP contracts, safe DTOs/errors/caching, OpenAPI, and focused regressions complete; repository-level `mvn test` passed. |
 | 3A | **COMPLETE** | Strict tenant/user DESKTOP/WEB/MOBILE release-state foundation and monotonic service boundary complete. |
-| 3B | **IN PROGRESS** | Desktop implementation and focused tests added; Maven Central HTTP 403 blocks required test execution and visual QA. |
-| 4A | **NOT STARTED** | Next proposed phase only after Phase 3B verification passes; do not begin while 3B is in progress. |
+| 3B | **COMPLETE** | Desktop What's New implementation and focused tests complete; repository-level `mvn test` passed after the earlier Maven Central outage. |
+| 4A | **IN PROGRESS** | Stable local UUID implementation and focused tests added; current Maven Central HTTP 403 blocks required verification. |
 | 4B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
@@ -913,8 +970,9 @@ update this table and the applicable phase section.
 
 1. **Global control-plane ownership:** which database/schema and operator identity may mutate global
    releases/policy? Tenant administrators should not receive this authority by default.
-2. **Machine UUID lifecycle:** approve system-wide locations/installer ACLs and decide whether uninstall
-   preserves identity (useful for continuity) or removes it (privacy/fresh-install semantics).
+2. **Machine directory deployment:** Phase 4A chose system-wide locations and uninstall retention. Decide
+   whether a future machine-wide installer should provision the documented application-specific ACL instead
+   of relying on managed deployment/first-launch permissions; do not add a privileged helper implicitly.
 3. **Durable API session migration:** choose bound JWT `jti` plus durable session, or access-token plus
    hashed rotating refresh credential; decide the short legacy-token overlap window.
 4. **Credential-change policy:** revoke all sessions, or preserve the initiating verified session?
@@ -940,12 +998,13 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Verify and finish **Phase 3B only**: restore Maven Central access, run its focused UI/coordinator and selected
-Phase 2A/2B/3A regressions plus repository `mvn test`, and visually inspect the dialog in Light and Dark. Make
-only fixes required by that evidence, then mark Phase 3B complete. Do not start Phase 4A until this gate passes.
+Restore Maven Central access and finish **Phase 4A verification only**: run the focused identity/path/failure/
+concurrency/packaging contracts, change-aware selected suite, and repository `mvn test`. If they pass, mark
+Phase 4A complete without changing its runtime scope.
 
-After Phase 3B is complete, the exact proposed Phase 4A scope is the independently reviewable stable-machine-
-identity slice above: generate and atomically persist a random, non-hardware-derived workstation UUID through a
-platform storage abstraction; validate Windows/macOS machine-wide locations, permissions, multi-user behavior,
-upgrade survival, and uninstall policy. Do not add server reporting, application-instance rows, heartbeat,
-session identity, policy enforcement, updater scheduling, or settings UI in Phase 4A.
+Only after that gate, the exact proposed **Phase 4B** scope is the application-instance schema and service
+foundation described above: strict tenant-scoped `ApplicationInstance` persistence/RLS and a narrow,
+authenticated lifecycle enrollment/end contract tied to the stable machine UUID, with explicit end reasons,
+idempotency, retention indexes, audit compatibility, and focused tenant/security tests. Phase 4B must not add
+heartbeat/activity capture, durable user sessions, remote logout, version enforcement, PubSub, geolocation,
+device/session UI, updater reporting, or scheduling.

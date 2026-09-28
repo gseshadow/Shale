@@ -65,3 +65,13 @@ dist-macos/Shale.app/Contents/MacOS/Shale
 - In-app updater launch remains temporarily bypassed on macOS while the desktop launcher stays Windows-only.
 - The updater plumbing now expects a macOS **ZIP** payload that contains `Shale.app`, stages that bundle, replaces the installed app bundle, and relaunches it with `open` once the macOS launcher path is enabled.
 - DMG is still for manual install/distribution only; it is not used as the updater payload.
+
+## Machine identity data
+
+Phase 4A reserves `/Library/Application Support/Shale/machine-id` for the workstation-wide random UUID.
+This is deliberately separate from both the replaceable `Shale.app` bundle and the per-user log directory
+above. The current unsigned first-pass DMG does not install a privileged helper or provision that directory;
+an administrator must pre-create the Shale directory with application-specific read/write permissions when
+ordinary users cannot create it. A permission failure is reported by the desktop identity provider as
+unavailable and never causes fallback to a per-user or ephemeral identity. Bundle replacement, ordinary
+uninstall, and reinstall retain this external file.

@@ -31,3 +31,18 @@ End users require only `Shale-<version>.msi`; Visual Studio, the Windows SDK, JD
 11. Uninstall and confirm there is no conflicting Start Menu shortcut or identity.
 
 Toast activation, deep links, buttons, replies, read/dismiss synchronization, tray behavior, startup registration, COM activation, and second-instance routing are intentionally absent. A successful Windows build and installed-machine smoke test are required before production approval.
+
+## Machine identity data and installer ownership
+
+Phase 4A stores only a canonical random UUID plus a newline at `%ProgramData%\Shale\machine-id`. This path
+is outside the per-user `jpackage` installation payload, so the MSI and ZIP updater neither overwrite nor
+remove it during upgrade. Ordinary uninstall/reinstall retains it; there is no full-data-removal action yet.
+
+The current MSI remains a per-user package (`--win-per-user-install`) and therefore does not claim elevated
+ownership of `%ProgramData%` or grant broad machine-wide permissions. On a managed shared workstation, the
+Shale directory should be created by the administrator/deployment system with inherited administrator/System
+control and read/write access limited to the workstation users authorized to run Shale. Where Windows permits
+the first ordinary user to create the application-specific directory, that user creates it on the first
+machine-identity request; other OS users share the UUID only when the resulting ACL permits access. If the
+directory cannot be read or written, Shale continues to run and returns an explicit stable-identity-unavailable
+result. It does not weaken ACLs, invoke a privileged helper, or substitute `%LOCALAPPDATA%`.
