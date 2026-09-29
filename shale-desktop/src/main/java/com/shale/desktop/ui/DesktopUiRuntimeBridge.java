@@ -25,6 +25,7 @@ import com.shale.core.model.SemanticVersion;
 import com.shale.core.service.ApplicationInstanceServicePort;
 import com.shale.ui.services.AppVersionProvider;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.desktop.session.DesktopSessionEnrollmentLifecycle;
 
 /**
  * Desktop-side implementation of UiRuntimeBridge. This is where login success initializes
@@ -41,6 +42,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	private final ApplicationInstanceServicePort applicationInstances;
 	private final CurrentApplicationInstance currentInstance = new CurrentApplicationInstance();
 	private final ApplicationInstanceHeartbeatLifecycle heartbeat;
+	private final DesktopSessionEnrollmentLifecycle serverSessions;
 
 	private RuntimeSessionService runtimeSessionService;
 	private volatile LiveBus liveBus;
@@ -52,12 +54,17 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			LiveEventDispatcher dispatcher,
 			DesktopRuntimeSessionProvider dbProvider,
 			String negotiateEndpointUrl) {
-		this(dispatcher,dbProvider,negotiateEndpointUrl,null,null);
+		this(dispatcher,dbProvider,negotiateEndpointUrl,null,null,null);
 	}
 
 	public DesktopUiRuntimeBridge(LiveEventDispatcher dispatcher, DesktopRuntimeSessionProvider dbProvider,
 			String negotiateEndpointUrl, MachineIdentityResult machineIdentity,
 			ApplicationInstanceServicePort applicationInstances) {
+		this(dispatcher,dbProvider,negotiateEndpointUrl,machineIdentity,applicationInstances,null);
+	}
+	public DesktopUiRuntimeBridge(LiveEventDispatcher dispatcher, DesktopRuntimeSessionProvider dbProvider,
+			String negotiateEndpointUrl, MachineIdentityResult machineIdentity,
+			ApplicationInstanceServicePort applicationInstances,DesktopSessionEnrollmentLifecycle serverSessions) {
 
 		this.dispatcher = dispatcher;
 		this.dbProvider = dbProvider;
@@ -65,6 +72,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		this.machineIdentity = machineIdentity;
 		this.applicationInstances = applicationInstances;
 		this.heartbeat = applicationInstances==null?null:new ApplicationInstanceHeartbeatLifecycle(applicationInstances);
+		this.serverSessions=serverSessions;
 	}
 
 	@Override
@@ -78,6 +86,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		lastUserId = userId;
 		lastShaleClientId = shaleClientId;
 		enrollBestEffort(shaleClientId,userId);
+		if(serverSessions!=null)serverSessions.enroll(currentInstance.get().map(v->v.id()).orElse(null));
 
 		tryConnectLiveBus(shaleClientId, userId, generation);
 	}
@@ -121,7 +130,11 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	@Override
 	public void onLogout() {
+		teardown(true);
+	}
+	private void teardown(boolean logicalLogout) {
 		if(heartbeat!=null)heartbeat.stop();
+		if(serverSessions!=null){if(logicalLogout)serverSessions.logout();else serverSessions.shutdown();}
 		endBestEffort();
 		sessionGeneration.incrementAndGet();
 		LiveBus bus = liveBus;
@@ -141,7 +154,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		log.info("Logout requested");
 	}
 
-	@Override public void onShutdown(){onLogout();if(heartbeat!=null)heartbeat.close();}
+	@Override public void onShutdown(){teardown(false);if(heartbeat!=null)heartbeat.close();}
 
 	@Override public void startApplicationInstanceHeartbeat(Supplier<Optional<Instant>> activity){var enrolled=currentInstance.get();if(heartbeat==null||enrolled.isEmpty()||lastShaleClientId==null||lastUserId==null)return;heartbeat.start(lastShaleClientId,lastUserId,enrolled.get().id(),activity);}
 

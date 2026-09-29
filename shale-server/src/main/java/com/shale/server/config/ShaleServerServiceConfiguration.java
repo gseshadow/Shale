@@ -62,6 +62,7 @@ import com.shale.server.runtime.DurableSessionStore;
 import com.shale.server.runtime.SqlDurableSessionStore;
 import com.shale.server.runtime.DurableSessionTokenValidator;
 import com.shale.server.runtime.LegacyTokenCompatibilityPolicy;
+import com.shale.server.runtime.DesktopApplicationInstanceVerifier;
 import com.shale.server.runtime.ServerAuthSessionService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -131,7 +132,7 @@ public class ShaleServerServiceConfiguration {
 
     @Bean
     @Profile({"dev", "local", "prod", "azure"})
-    RuntimeConnectionProvider runtimeConnectionProvider(DataSources serverDataSources) {
+	RuntimeConnectionProvider runtimeConnectionProvider(DataSources serverDataSources) {
         return new RuntimeSessionServiceConnectionProvider(serverDataSources.runtime());
     }
 
@@ -158,6 +159,10 @@ public class ShaleServerServiceConfiguration {
 			DurableSessionTokenValidator validator,LegacyTokenCompatibilityPolicy legacy,TokenRevocationStore revocations){
 		return new ServerAuthSessionService(tokens,store,validator,legacy,revocations);
 	}
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	DesktopApplicationInstanceVerifier desktopApplicationInstanceVerifier(RuntimeConnectionProvider connections){return new DesktopApplicationInstanceVerifier(connections);}
 
     @Bean
     @Profile({"dev", "local", "prod", "azure"})

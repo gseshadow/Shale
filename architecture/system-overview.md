@@ -116,3 +116,15 @@ does not couple heartbeat or instance abandonment to revocation. Phase 7A itself
 ## Durable server API authentication (Phase 7B)
 
 Server API login continues through `AuthServicePort`, then creates a tenant/user-qualified Phase 7A `UserSessions` row before returning a JWT. New JWTs retain the existing identity/time claims and add public UUID `sid`; SQL `CurrentAccessJti`, expiry, and revocation are authoritative on every authenticated bound-token request. Refresh conditionally rotates the JTI and logout durably revokes only that session. The request resolver performs no lookup for absent bearer tokens or public routes. A temporary, required-cutoff legacy branch accepts otherwise-valid pre-cutover unbound JWTs and upgrades them on refresh; its in-memory revocation store is not authoritative for bound sessions. Desktop direct-JDBC authentication is unchanged until Phase 7C.
+
+## Desktop durable session enrollment (Phase 7C; verification pending)
+
+After the existing direct-JDBC bcrypt login and runtime tenant context succeed, desktop best-effort enrolls its
+Phase 4B instance and performs one additive HTTPS credential exchange. The server re-verifies the credential,
+derives tenant/user rather than accepting asserted ids, validates any active DESKTOP instance against that owner,
+and issues the ordinary Phase 7B bound JWT with a durable DESKTOP `UserSessions` row. The centralized desktop
+bearer is process-memory-only and is not a JDBC authority. Endpoint absence or transport failure leaves an explicit
+JDBC-only compatibility session; security rejection never silently downgrades server-session functionality.
+Logical logout revokes and clears the bound session; process exit clears memory and ends the instance without
+reclassifying exit as user logout. Enrollment is not heartbeat, and this phase adds no remote controls, PubSub,
+geolocation, UI, or update enforcement. Required Maven verification is pending because Maven Central returned 403.

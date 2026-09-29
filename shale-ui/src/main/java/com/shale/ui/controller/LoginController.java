@@ -145,6 +145,7 @@ public final class LoginController {
 					showError("Invalid email or password.");
 					return;
 				}
+				Platform.runLater(passwordField::clear);
 
 				appState.setUserId(result.userId());
 				appState.setShaleClientId(result.shaleClientId());

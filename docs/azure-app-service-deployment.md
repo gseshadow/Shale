@@ -437,3 +437,13 @@ Known deployment lessons:
 Set `SHALE_AUTH_SESSION_BINDING_CUTOVER_AT` to the UTC deployment boundary in strict ISO-8601 form (for example, `2026-09-29T18:00:00Z`) before deploying the Phase 7B server. Startup fails if it is absent or malformed. Existing unbound JWTs issued before that instant remain eligible only until the earlier of their own expiry or the boundary plus `SHALE_AUTH_TOKEN_TTL_SECONDS`; refresh upgrades them to a durable bound session. New logins require the already-deployed Phase 7A `UserSessions` table.
 
 Safe rollout order is Phase 7A verification, cutoff configuration, Phase 7B deployment, legacy drain/refresh upgrade, and confirmation that the maximum token TTL has elapsed. A routine rollback to pre-7B must wait one maximum token TTL with Phase 7B traffic drained because old code does not enforce SQL revocation. If emergency rollback follows any durable revocation, rotate `SHALE_AUTH_TOKEN_SECRET` and require reauthentication; otherwise a still-unexpired bound JWT revoked only in SQL could be accepted by old code.
+
+## Phase 7C desktop enrollment rollout
+
+Deploy the additive `POST /api/auth/desktop-session` server endpoint before Phase 7C desktops and configure each
+desktop's `SHALE_SERVER_API_BASE_URL` to the HTTPS API origin (without `/api`). The endpoint repeats credential
+verification once after successful JDBC login because no trusted post-JDBC assertion facility exists yet; it never
+accepts tenant/user claims as proof. Existing web auth contracts and older desktops are unchanged. A 404/501 is the
+explicit staged-rollout signal for JDBC-only compatibility. Do not interpret 401/403 or an instance mismatch as an
+old-server condition. Rollback may restore the previous desktop; it ignores historical session rows and there is no
+persisted desktop bearer credential to remove.
