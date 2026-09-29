@@ -50,6 +50,7 @@ public final class DesktopConfig {
 		pushToSystemProperty("NEGOTIATE_ENDPOINT_URL", env);
 		pushToSystemProperty("LIVE_NEGOTIATE_ENDPOINT_URL", env);
 		pushToSystemProperty("LIVE_PUBLISH_ENDPOINT_URL", env);
+		pushToSystemProperty("SHALE_SERVER_API_BASE_URL", env);
 
 		pushToSystemProperty("SHALE_APP_JDBC_URL", env);
 		pushToSystemProperty("SHALE_APP_USER", env);

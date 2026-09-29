@@ -18,6 +18,7 @@ import java.util.Objects;
 import com.shale.desktop.identity.MachineIdentityResult;
 import com.shale.data.dao.ApplicationInstanceDao;
 import com.shale.data.service.adapter.ApplicationInstanceServiceAdapter;
+import com.shale.desktop.session.*;
 
 public final class SceneRouter {
 
@@ -50,14 +51,17 @@ public final class SceneRouter {
 		this.stage.setOnCloseRequest(e -> Platform.exit());
 
 		AppState appState = new AppState();
-		var uiAuthService = new DesktopUiAuthService(authService);
+		String apiBase=System.getProperty("SHALE_SERVER_API_BASE_URL",System.getenv("SHALE_SERVER_API_BASE_URL"));
+		var serverSession=new DesktopServerSession();
+		var enrollment=new DesktopSessionEnrollmentLifecycle(apiBase==null||apiBase.isBlank()?null:new DesktopSessionEnrollmentClient(apiBase),serverSession);
+		var uiAuthService = new DesktopUiAuthService(authService,enrollment);
 
 		// Create ONE provider instance and share it with SceneManager + DesktopUiRuntimeBridge
 		this.dbProvider = new DesktopRuntimeSessionProvider();
 
 		// Desktop bridge will "arm" dbProvider on successful login
 		var instanceService = new ApplicationInstanceServiceAdapter(new ApplicationInstanceDao(dbProvider));
-		var runtimeBridge = new DesktopUiRuntimeBridge(dispatcher, dbProvider, negotiateEndpointUrl, machineIdentity, instanceService);
+		var runtimeBridge = new DesktopUiRuntimeBridge(dispatcher, dbProvider, negotiateEndpointUrl, machineIdentity, instanceService,enrollment);
 		runtimeBridge.setRuntimeSessionService(runtimeSessionService);
 
 		var updateLauncher = new DesktopUiUpdateLauncher();

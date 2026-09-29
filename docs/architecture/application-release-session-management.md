@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 7B in progress — implementation complete, verification blocked by Maven Central HTTP 403
+**Status:** Phase 7C IN PROGRESS — implementation complete, verification blocked by Maven Central HTTP 403
 
 **Last reviewed:** 2026-09-29
 
@@ -959,7 +959,7 @@ ordinary-user read audit, or analytics telemetry.
 
 ### Phase 7B — API token/session compatibility migration
 
-**Status: IN PROGRESS — implementation is present; required Maven verification is blocked by Maven Central HTTP 403.**
+**Status: COMPLETE — implementation and required verification completed before Phase 7C.**
 
 * **Goal:** bind newly issued API tokens to durable sessions without breaking existing clients.
 * **In scope:** versioned issuance/validation, overlap for legacy JWTs, durable shared revocation adapter,
@@ -972,6 +972,8 @@ ordinary-user read audit, or analytics telemetry.
 * **Risks:** locking out web users or accepting a revoked legacy token indefinitely.
 
 ### Phase 7C — Desktop session enrollment migration
+
+**Status: IN PROGRESS — implementation is present; required Maven verification is blocked by Maven Central HTTP 403.**
 
 * **Goal:** give desktop a durable session identity while preserving JDBC login during rollout.
 * **In scope:** explicit post-credential server exchange or approved equivalent, secure local credential
@@ -1120,9 +1122,10 @@ ordinary-user read audit, or analytics telemetry.
 | 6A | **COMPLETE** | Read-only tenant-admin service/API and required verification completed before Phase 6B. |
 | 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
 | 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
-| 7B | **IN PROGRESS** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility implemented; Maven Central HTTP 403 blocks required verification. |
-| 7C | **NOT STARTED — NEXT PROPOSED STEP** | Desktop session enrollment only after Phase 7B verification completes. |
-| 8A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
+| 7C | **IN PROGRESS** | Implementation and documentation complete; required Maven verification is blocked by Maven Central HTTP 403. |
+| 8A | **NOT STARTED — NEXT PROPOSED STEP** | Authoritative self/admin revocation behavior only after Phase 7C verification completes. |
+| 8B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1159,7 +1162,7 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-After Phase 7B verification completes, implement **Phase 7C only**: enroll desktop authentication into the durable session model through an additive post-credential server exchange (or an explicitly approved equivalent), securely handle the desktop credential, and attach the existing Phase 4B application instance when ownership is authoritative. Preserve direct-JDBC desktop login during rollout and do not add session/device UI, administrator revocation APIs, PubSub delivery, geolocation, or updater enforcement.
+After Phase 7C verification completes, implement **Phase 8A only**: add the narrowly reviewed authoritative self/admin durable-session revocation service/API behavior, authorization and security-event/audit decision. Do not add session/device UI, PubSub delivery (Phase 8B), geolocation, desktop password cutover, or updater enforcement.
 
 ## Phase 7A implementation record — 2026-09-29
 
@@ -1253,4 +1256,73 @@ No Phase 7B SQL migration is needed: Phase 7A already contains session/JTI, expi
 
 Audit decision: Phase 7B uses the bounded intrinsic `UserSessions` lifecycle record (`IssuedAt`, `LastRefreshedAt`, first `RevokedAt`, and closed reason) as the security record. It does not put authentication events into PHI `AuditLog`, administrative-read audit, or the entity-mutation audit whose allowlists do not model security sessions. No raw JWT or token history is stored. A second audit table would duplicate the authoritative bounded lifecycle and require unnecessary schema in this cutover; no per-request or routine-refresh event is emitted.
 
-This phase adds no public session/device/admin-revoke endpoint, remote logout delivery, PubSub, UI, geolocation, desktop-auth redesign, mobile flow, or updater policy/enforcement. Phase 7C remains not started. Required Maven verification is currently blocked by Maven Central HTTP 403, so Phase 7B remains **IN PROGRESS** rather than complete.
+This phase added no public session/device/admin-revoke endpoint, remote logout delivery, PubSub, UI, geolocation, desktop-auth redesign, mobile flow, or updater policy/enforcement. Its required verification was subsequently completed before Phase 7C, so Phase 7B is **COMPLETE**.
+
+
+## Phase 7C implementation record — 2026-09-29
+
+**Status: IN PROGRESS — implementation complete; required Maven verification is blocked by Maven Central HTTP 403.**
+
+Desktop credential authentication remains the unchanged first authority: `AuthServiceImpl` reads the active user
+through the auth datasource and bcrypt-verifies the password, after which the existing runtime JDBC tenant/user
+context is armed. Phase 7C then makes one bounded HTTPS `POST /api/auth/desktop-session` exchange. Because the
+repository has no trusted post-JDBC assertion issuer, the selected transitional proof is a single second credential
+verification through the server's existing `AuthServicePort`. The password remains only in process memory between
+the successful JDBC check and this immediate exchange, is never persisted or logged, and is discarded when the
+exchange finishes. This is stronger than accepting claimed tenant/user/machine identifiers and avoids introducing
+an evergreen desktop secret or a new proof table. A future migration may replace it with a short-lived assertion.
+
+The additive request contains email, password, and an optional application-instance database id; it contains no
+tenant, user, or client-type authority. The server derives tenant/user from credential authentication, fixes client
+type to `DESKTOP`, owner-qualifies any instance by id + tenant + user + active `DESKTOP` state on a
+principal-initialized connection, and then reuses `ServerAuthSessionService` and Phase 7B signing. The response
+contains the bearer token, public `SessionId`, current JTI, and expiry; internal `UserSessions.Id` is not exposed.
+A legitimate unavailable Phase 4B enrollment results in a null instance link, not a fabricated instance or desktop
+lockout. No SQL change is required because Phase 7A already permits that nullable relationship.
+
+`DesktopSessionEnrollmentLifecycle` stages the credential only after successful JDBC authentication, exchanges it
+after best-effort instance enrollment, and generation-guards installation in `DesktopServerSession`. The latter is
+the single process-level bearer provider. Tokens are deliberately **memory-only**: Phase 7C has no remember-me or
+restart-resume requirement, so OS credential storage would add attack surface without user behavior to support.
+There is therefore no plaintext fallback, token file, registry entry, preferences value, Keychain/Credential Manager
+entry, or token effect on packaging/uninstall. Java `String` values cannot be reliably zeroized; the design limits
+retention instead of claiming erasure.
+
+HTTP 404/501 (older server) and transport/5xx failure enter explicit JDBC-only compatibility mode for that login;
+there is no retry loop. Bound-token HTTP features are unavailable while JDBC database work and prior compatible
+paths remain usable. 401/403, instance mismatch, and malformed successful responses set security-rejected state
+and never masquerade as compatibility. A rejected bearer is cleared rather than retried; Phase 8A owns expanded
+recovery/revocation APIs. Existing desktop HTTP feature inventory found no ordinary API data calls requiring bearer
+conversion; LiveBus negotiate/publish and heartbeat remain separate existing protocols.
+
+Logical logout best-effort calls existing `/api/auth/logout`, clears bearer state, stops heartbeat, ends the instance,
+and clears JDBC/runtime identity. Process exit ends the instance and clears memory but does not revoke the durable
+session merely because the process stopped. A user switch goes through logical logout before staging the next
+identity, so the prior bearer cannot be installed or reused. Old desktops ignore the additive endpoint and rows; a
+new desktop against an old server uses documented JDBC-only compatibility. Rollback simply restores the old
+desktop; historical session rows remain and no local credential artifact affects uninstall or rollback. N-1 schema,
+web login/refresh/logout contracts, and old JDBC operation remain compatible.
+
+Audit compatibility review: issuance and logout use the bounded authoritative `UserSessions` lifecycle selected in
+Phase 7B. This phase adds no PHI/entity mutation and does not duplicate security lifecycle events into PHI,
+administrative-read, or entity-action audit tables. It adds no session UI, remote/admin revoke API, PubSub event,
+geolocation, fingerprinting, heartbeat authentication, update policy, or enforcement.
+
+Deployment order is: retain verified Phase 7A schema; deploy the verified Phase 7B server plus this additive
+endpoint; deploy the Phase 7C desktop; continue JDBC-first login; observe sanitized enrollment outcome logs; and
+only after verification and rollout stability consider Phase 8A. Required focused and full Maven tests could not
+start because Maven Central returned HTTP 403 for the Spring Boot BOM. Phase 7C must remain IN PROGRESS until
+those tests pass.
+
+### Phase 7C focused manual verification checklist
+
+The following installed/runtime checks remain unverified while Phase 7C is IN PROGRESS:
+
+1. Valid desktop JDBC login succeeds before enrollment.
+2. Durable desktop enrollment returns a bound session and matching public session/JTI state.
+3. An available owner-qualified ApplicationInstance is linked; unavailable enrollment produces a null link.
+4. Ordinary JDBC-backed application use remains functional.
+5. Logical logout revokes/clears the durable session and ends the instance.
+6. Restart has no resumed bearer, and user switch cannot reuse the prior user's bearer.
+7. A simulated endpoint outage or old server enters JDBC-only compatibility mode once without retry spam.
+8. Invalid credentials or instance ownership rejection leaves server-session functionality failed closed rather than silently downgrading.

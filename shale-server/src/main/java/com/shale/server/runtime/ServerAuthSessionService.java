@@ -18,6 +18,13 @@ public final class ServerAuthSessionService {
         var prepared=tokens.prepare(principal);var session=sessions.create(principal,ClientType.WEB,null,prepared.tokenId(),Instant.ofEpochSecond(prepared.expiresAtEpochSeconds()));
         return tokens.issueBound(prepared,session.sessionId());
     }
+    /** Issues the shared bound-token shape for a credential-verified desktop principal. */
+    public IssuedSession issueDesktop(ServerPrincipal principal,Long applicationInstanceId){
+        var prepared=tokens.prepare(principal);
+        var session=sessions.create(principal,ClientType.DESKTOP,applicationInstanceId,prepared.tokenId(),Instant.ofEpochSecond(prepared.expiresAtEpochSeconds()));
+        String token=tokens.issueBound(prepared,session.sessionId());
+        return new IssuedSession(token,session.sessionId(),prepared.tokenId(),Instant.ofEpochSecond(prepared.expiresAtEpochSeconds()));
+    }
     public boolean validate(VerifiedAuthToken token){
         return token.isSessionBound()?validator.isValid(token):legacy.permits(token)&&!legacyRevocations.isRevoked(token.tokenId());
     }
@@ -37,4 +44,5 @@ public final class ServerAuthSessionService {
         if(current.isSessionBound())sessions.revoke(current.principal(),UUID.fromString(current.sessionId()),"USER_LOGOUT");
         legacyRevocations.revoke(current.tokenId(),current.expiresAtEpochSeconds());
     }
+    public record IssuedSession(String accessToken,UUID sessionId,UUID currentAccessJti,Instant expiresAt){}
 }
