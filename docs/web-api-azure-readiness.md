@@ -390,6 +390,9 @@ Authenticated bound-token clients may use `GET /api/sessions`, `POST /api/sessio
 have `GET /api/admin/sessions` (page default 50, maximum 100; optional `userId`, `clientType`, `activeOnly`, and
 `since`) and `POST /api/admin/sessions/{sessionId}/revoke`. No request accepts a tenant selector. Revoke responses
 contain no token or internal identifier. Deploy `2026-09-29_session_security_audit_phase8a.sql` before this server.
+The tenant-admin list projection includes the target user's established display name and email so an authorized
+same-tenant administrator can identify a session owner without per-row lookups. It still excludes internal session
+row ids, JTI/token material, tenant ids, row versions, machine identifiers, IP/location, and audit metadata.
 
 ## Phase 8B best-effort invalidation publishing
 

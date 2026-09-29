@@ -155,3 +155,18 @@ HTTP and the process-local Phase 7C bearer. The UI module does not depend on ser
 through JDBC. Phase 8A authorization, current-`sid` binding, revocation, and security auditing remain authoritative.
 Compatibility mode is represented by an absent capability, and async presentation is guarded by active tenant/user
 identity. This boundary is self-service only; tenant-administrator session tooling remains Phase 10.
+
+## Tenant-administrator session management UI (Phase 10)
+
+Settings > Administration > Sessions is a lazy, admin-only desktop management window. JavaFX uses the
+`UiRuntimeBridge.AdminSessionManagement` port; the desktop adapter calls only the bounded Phase 8A admin list and
+revoke endpoints with its memory-only bound bearer. The server remains authoritative for active same-tenant admin
+membership, tenant scope, filtering, revocation, one bounded sensitive-read audit per page query, and transactional
+mutation audit. One Users join adds established same-tenant display name/email without per-row lookup.
+
+The page requests 50 rows and supports server-side user, client-type, active-only, and since filters with compact
+Previous/Next navigation. It reloads after successful revoke, while generation/identity/admin guards discard late
+completions after close, logout, or user/tenant switch. The current administrator session has no row revoke and
+points to ordinary logout. Phase 8A has no authoritative admin bulk-user revoke, so the UI does not simulate one.
+Phase 8B remains the sole optional invalidation accelerator; the admin UI trusts the revoke response and its own
+authoritative reload rather than PubSub delivery.
