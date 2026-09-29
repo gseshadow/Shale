@@ -23,6 +23,7 @@ import com.shale.data.service.adapter.NotificationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
+import com.shale.server.runtime.DesktopApplicationInstanceVerifier;
 import com.shale.server.runtime.RequestScopedDbSessionProvider;
 import com.shale.server.runtime.RuntimeConnectionProvider;
 import com.shale.server.runtime.ServerRuntimeSessionState;
@@ -57,6 +58,7 @@ class ShaleServerServiceConfigurationTest {
                 context.refresh();
 
                 assertInstanceOf(com.shale.server.runtime.CompositeServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
+				assertNotNull(context.getBean(DesktopApplicationInstanceVerifier.class));
             }
         });
     }

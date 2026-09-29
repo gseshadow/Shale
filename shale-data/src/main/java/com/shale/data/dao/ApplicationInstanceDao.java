@@ -43,6 +43,15 @@ public final class ApplicationInstanceDao {
 		}catch(SQLException e){throw new IllegalStateException("Failed to end application instance",e);}
 	}
 
+	/** Reads one instance through the same authenticated owner boundary used by its lifecycle mutations. */
+	public ApplicationInstanceView requireOwned(int tenant,int user,long id){
+		scope(tenant,user);if(id<=0)throw new IllegalArgumentException("applicationInstanceId must be positive");
+		try(Connection c=db.requireConnection()){
+			verifyActor(c,tenant,user);
+			return load(c,id,tenant,user);
+		}catch(SQLException e){throw new IllegalStateException("Failed to read application instance",e);}
+	}
+
 	public ApplicationInstanceView heartbeat(int tenant,int user,long id,SemanticVersion version,Instant activity){
 		scope(tenant,user);if(id<=0)throw new IllegalArgumentException("applicationInstanceId must be positive");Objects.requireNonNull(version,"applicationVersion");
 		try(Connection c=db.requireConnection()){
