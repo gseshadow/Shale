@@ -1328,7 +1328,7 @@ The actor FK is tenant-qualified; strict `TenantFilter` FILTER and AFTER INSERT/
 with no overlay. Runtime code is insert-only. The sensitive read and its single insert share one connection and
 transaction; an audit failure prevents return of the result. The additive migration does not alter existing
 tables or API contracts and is safe before older clients upgrade. No rows are seeded.
-## dbo.UserSessions (Phase 7A foundation; live SQL verification pending)
+## dbo.UserSessions (Phase 7A foundation; verified)
 
 Strict tenant-owned logical authentication-session history, separate from process-oriented
 `ApplicationInstances`. It stores `Id`, random unique `SessionId`, `ShaleClientId`, `UserId`, optional
@@ -1339,3 +1339,8 @@ Active/expired state is derived from `RevokedAt` and `ExpiresAt`; expired rows a
 Strict tenant FILTER and AFTER INSERT/UPDATE blocks apply with no overlay and no seeds. Raw tokens, passwords,
 MFA secrets, IP/location, and arbitrary metadata are absent. The additive table is not read or written by the
 current authentication runtime.
+
+
+## UserSessions Phase 7B runtime cutover (no migration)
+
+Phase 7B uses the existing Phase 7A columns without schema changes. Server API JWTs carry the public UUID `SessionId` as `sid`; `CurrentAccessJti` is the single current credential authority. Bound validation uses a tenant/user/session-qualified indexed lookup, and conditional refresh additionally requires the old JTI, no revocation, and database expiry in the future. Durable expiry equals access-token expiry and is extended together on refresh.
