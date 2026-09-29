@@ -945,6 +945,8 @@ ordinary-user read audit, or analytics telemetry.
 
 ### Phase 7A — Durable user-session schema
 
+**Status: IN PROGRESS — Maven Central HTTP 403 and unavailable live SQL connectivity block required verification.**
+
 * **Goal:** introduce client-neutral durable session/revocation state.
 * **In scope:** strict tenant schema/RLS, hashed opaque/bound-JTI representation, expiry/reason model,
   retention, entity-action audit allowlists.
@@ -1114,9 +1116,10 @@ ordinary-user read audit, or analytics telemetry.
 | 5A | **COMPLETE** | Foreground activity observation completed and verified before this Phase 5B run. |
 | 5B | **COMPLETE** | Heartbeat lifecycle and required verification completed before Phase 6A. |
 | 6A | **COMPLETE** | Read-only tenant-admin service/API and required verification completed before Phase 6B. |
-| 6B | **IN PROGRESS** | Dedicated bounded administrative-read auditing implemented; Maven Central HTTP 403 and unavailable live SQL block required verification. |
-| 7A | **NOT STARTED** | Durable user-session schema only; do not begin until Phase 6B verification completes. |
-| 7B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
+| 7A | **IN PROGRESS** | Additive schema and internal service foundation implemented; Maven Central HTTP 403 plus unavailable live SQL connectivity block required verification. |
+| 7B | **NOT STARTED — NEXT PROPOSED STEP** | Start only after Phase 7A live SQL verification completes. |
+| 7C-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1153,10 +1156,46 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-After Phase 6B verification completes, implement **Phase 7A only**: the additive strict-tenant durable
-`UserSession` schema, hashed opaque credential or bound-JTI representation, expiry/revocation reason model,
-retention definition, entity-action audit allowlists, rerunnable migration/verifier, and non-dbo RLS tests. Do
-not switch existing API tokens or desktop authentication, add revocation endpoints/UI/PubSub, or begin Phase 7B.
+After Phase 7A live SQL verification completes, implement **Phase 7B only**: bind newly issued server API
+tokens to durable sessions behind a backward-compatible overlap for existing JWTs; define durable shared
+revocation and refresh/JTI rotation behavior and its rollback window. Do not migrate desktop authentication,
+add session/device UI, remote logout notification, PubSub, geolocation, or enforcement.
+
+## Phase 7A implementation record — 2026-09-29
+
+`dbo.UserSessions` is strict tenant-owned authentication history, deliberately distinct from
+`ApplicationInstances`. An instance is a process/enrollment with machine, version, heartbeat, and activity;
+a session is a logical authentication lifecycle with credential identity, expiry, and revocation. A session may
+optionally reference a same-tenant, same-user desktop instance, one instance may have sequential sessions, web
+and mobile need no manufactured instance, and instance abandonment does not revoke a session.
+
+The additive table contains an internal `bigint IDENTITY` key; random unique `SessionId uniqueidentifier`;
+tenant-qualified user ownership; optional tenant-qualified, non-cascading `ApplicationInstanceId`; closed
+`DESKTOP`/`WEB`/`MOBILE` client type; unique UUID-shaped `CurrentAccessJti`; database UTC `IssuedAt`,
+`CreatedAt`, and `UpdatedAt`; authoritative `ExpiresAt`; nullable `LastRefreshedAt`, `RevokedAt`, and bounded
+closed `RevocationReason`; and `RowVer`. Active means not revoked and server time is before `ExpiresAt`;
+expired rows are retained. Revocation is idempotent and preserves its first database timestamp/reason. The
+initial retention target is seven years, subject to approved tenant/legal policy; cleanup automation is deferred.
+
+The current API has no separate refresh credential: refresh revokes the old access-token JTI in memory and
+issues a fresh UUID JTI with the same eight-hour access lifetime. Phase 7A therefore stores only the current
+access JTI as UUID metadata. The stable random session ID is independent of every token and database row.
+Future rotation conditionally replaces the current JTI and expiry while preserving the logical session; no
+unbounded token history is introduced. No raw JWT, refresh token, bearer value, password, MFA secret,
+arbitrary metadata, or credential proof is persisted. `UserSessionServicePort`, `UserSessionServiceAdapter`,
+and `UserSessionDao` form an internal-only create/find/idempotent-revoke/conditional-rotation boundary.
+
+Strict `TenantFilter` FILTER and AFTER INSERT/UPDATE block predicates use `sec.fn_FilterByTenant`; there is no
+global overlay or seed data. Existing login, refresh, logout, JWT validation, in-memory JTI revocation,
+desktop/web clients, heartbeat, and administrative reads remain unchanged and require no `UserSessions` row.
+No endpoint, UI, remote logout, PubSub, geolocation, update enforcement, device control, or heartbeat coupling
+is added.
+
+Audit review intentionally adds no `EntityActionAuditLog` vocabulary in this foundation. Session creation and
+routine rotation are security lifecycle state, not PHI/entity administration, and there is no runtime caller.
+Phase 7B must transactionally define bounded security audit events for actual issuance and explicit
+logout/security/admin revocation before activating writes; routine refresh remains unaudited unless an approved
+security-event store is introduced. This avoids misusing PHI logs or claiming atomicity before runtime cutover.
 
 ## Phase 5B implementation record — 2026-09-29
 

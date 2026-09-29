@@ -1328,3 +1328,14 @@ The actor FK is tenant-qualified; strict `TenantFilter` FILTER and AFTER INSERT/
 with no overlay. Runtime code is insert-only. The sensitive read and its single insert share one connection and
 transaction; an audit failure prevents return of the result. The additive migration does not alter existing
 tables or API contracts and is safe before older clients upgrade. No rows are seeded.
+## dbo.UserSessions (Phase 7A foundation; live SQL verification pending)
+
+Strict tenant-owned logical authentication-session history, separate from process-oriented
+`ApplicationInstances`. It stores `Id`, random unique `SessionId`, `ShaleClientId`, `UserId`, optional
+tenant-qualified `ApplicationInstanceId`, closed `ClientType`, unique UUID `CurrentAccessJti`, database UTC
+issuance/creation/update timestamps, authoritative expiry, nullable refresh/revocation timestamps and a closed
+revocation reason, plus `RowVer`. Tenant/user and tenant/instance foreign keys are trusted and non-cascading.
+Active/expired state is derived from `RevokedAt` and `ExpiresAt`; expired rows are not deleted by Phase 7A.
+Strict tenant FILTER and AFTER INSERT/UPDATE blocks apply with no overlay and no seeds. Raw tokens, passwords,
+MFA secrets, IP/location, and arbitrary metadata are absent. The additive table is not read or written by the
+current authentication runtime.

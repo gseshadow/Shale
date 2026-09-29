@@ -106,3 +106,11 @@ authentication, authorization, validation, tenant-context, and read failures cre
 deterministic, allowlisted, and bounded, and result volume never changes the one-event-per-query cardinality.
 No ordinary reads, heartbeat writes, instance mutations, remote control, sessions, geolocation, PubSub,
 enforcement, or UI are included.
+## Durable user-session foundation (Phase 7A; live SQL verification pending)
+
+The core/data boundary defines internal `UserSessionServicePort` -> `UserSessionServiceAdapter` ->
+`UserSessionDao` operations for durable create/find/idempotent revoke/conditional JTI rotation. This model is an
+authentication lifecycle, not an application process: its optional same-owner desktop instance relationship
+does not couple heartbeat or instance abandonment to revocation. Server controllers, bearer filtering, login,
+refresh, logout, in-memory revocation, desktop, and web runtime are intentionally not wired to this boundary.
+There are no new APIs, UI, PubSub, geolocation, enforcement, or device controls.
