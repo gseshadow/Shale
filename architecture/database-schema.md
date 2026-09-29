@@ -1310,3 +1310,21 @@ Phase 6A adds no schema dependency. Reads explicitly filter `ApplicationInstance
 on tenant plus user ID once, bound `StartedAt` to at most 90 days, and page by `StartedAt DESC, Id DESC`.
 Distribution uses SQL `GROUP BY MajorVersion, MinorVersion, BuildVersion` and numeric descending ordering.
 Existing strict tenant RLS is unchanged.
+
+## dbo.AdministrativeReadAuditLog (Phase 6B)
+
+Phase 6B uses a dedicated table rather than `AuditLog` (PHI field changes) or `EntityActionAuditLog`
+(entity mutations). Each successfully completed recent-instance page or version-distribution query appends
+exactly one row with `Id bigint IDENTITY`, authoritative `ShaleClientId` and `ActorUserId`, closed `ReadType`,
+database-generated UTC `OccurredAt`, nonnegative `ResultCount`, and nullable deterministic allowlisted
+`varchar(1000)` metadata. The read types are `APPLICATION_INSTANCE_RECENT_LIST` and
+`APPLICATION_INSTANCE_VERSION_DISTRIBUTION`. Recent-list metadata is limited to page, page size, exact client
+type/version filters, user-filter presence, active-only, and bounded since; distribution metadata contains only
+bounded since. Result count is the returned page row count or returned bucket count. Machine/user/result
+identities and names, emails, heartbeat/activity values, IP/location, tokens, headers, SQL, and exceptions are
+never copied.
+
+The actor FK is tenant-qualified; strict `TenantFilter` FILTER and AFTER INSERT/UPDATE block predicates apply,
+with no overlay. Runtime code is insert-only. The sensitive read and its single insert share one connection and
+transaction; an audit failure prevents return of the result. The additive migration does not alter existing
+tables or API contracts and is safe before older clients upgrade. No rows are seeded.

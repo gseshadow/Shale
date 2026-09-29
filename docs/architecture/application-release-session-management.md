@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 6A in progress — implementation complete, verification blocked
+**Status:** Phase 6B in progress — implementation complete, verification blocked
 
 **Last reviewed:** 2026-09-29
 
@@ -901,16 +901,47 @@ There is no Phase 6A SQL migration. Existing Phase 4B/5B clients and contracts r
 mutation, remote logout/revocation, durable session, geolocation, updater scheduling, version enforcement,
 PubSub authority, liveness classification, or administration UI is added.
 
-**Verification status (2026-09-29): IN PROGRESS.** Focused tests were added, but Maven Central returns HTTP 403
-for the Spring Boot 3.3.4 BOM and no live SQL target is configured. Phase 6A is therefore not complete.
+**Verification status (2026-09-29): COMPLETE.** Required Phase 6A verification was completed before Phase 6B.
 
 ### Phase 6B — Administrative-read audit mechanism
 
-* **Status:** **NOT STARTED — NEXT PROPOSED STEP**.
+* **Status:** **IN PROGRESS** — implementation and static contracts are complete; Maven Central HTTP 403 and
+  unavailable live SQL configuration currently block required executable verification.
 * **Exact recommended scope:** one bounded tenant/actor-attributed audit event per successful sensitive admin
   query (never per row), with sanitized allowlisted query-kind/window/filter-presence/result-count metadata,
   retention/reviewer authorization, additive schema/vocabulary only if required, and cross-tenant tests. Exclude
   instance mutation, remote logout/revocation, sessions, geolocation, updater/enforcement, PubSub, and UI.
+
+Phase 6B selects a dedicated `AdministrativeReadAuditLog`: `AuditLog` is PHI-field history and
+`EntityActionAuditLog` deliberately describes mutations, so reusing either would be semantically misleading.
+The table is strict tenant-owned and append-only in application semantics, with a tenant-qualified actor FK,
+closed read types `APPLICATION_INSTANCE_RECENT_LIST` and
+`APPLICATION_INSTANCE_VERSION_DISTRIBUTION`, database UTC occurrence time, nonnegative result count, and
+bounded `varchar(1000)` metadata. Strict FILTER and AFTER INSERT/UPDATE RLS predicates use
+`sec.fn_FilterByTenant`; there is no overlay or seed data.
+
+`ApplicationInstanceAdminReadDao` is the unavoidable integration seam for the sensitive service: it verifies
+admin/session context, performs the bounded read, appends exactly one event through
+`AdministrativeReadAuditDao`, and commits before returning. Read and audit use one connection/transaction.
+Audit persistence failure therefore fails closed and returns no data; authentication, authorization, malformed
+filters/windows/pages, tenant-context, validation, and DAO read failures emit no success event. Each separate
+page request is one query/event. Result count is page rows for recent list and bucket count for distribution.
+
+Recent-list metadata allows only `page`, `pageSize`, `clientTypeFilter`, `applicationVersionFilter`,
+`userFilterPresent`, `activeOnly`, and bounded `since`; distribution allows only bounded `since`. Serialization
+is deterministic and never includes returned IDs/rows, machine UUID, names/emails, heartbeat/activity values,
+IP/location, tokens, headers, SQL, exceptions, or arbitrary DTOs. No audit review endpoint/UI is added. Future
+review is for a same-tenant administrator or designated audit administrator, never ordinary users.
+
+Retention target is seven years for security/administrative review, subject to approved tenant/legal policy.
+There is no existing automated audit-retention mechanism, so Phase 6B deliberately adds no cleanup job; an
+operator-approved retention implementation remains future work. The migration is purely additive: older clients
+do not populate or reference the new table, no existing constraint/RLS/API changes, and deployment before all
+clients upgrade is safe.
+
+Phase 6B adds no remote logout/control, revocation, durable session, device/audit UI, geolocation, updater
+scheduling, version enforcement, PubSub authority, liveness classification, heartbeat audit, per-result audit,
+ordinary-user read audit, or analytics telemetry.
 
 ### Phase 7A — Durable user-session schema
 
@@ -1082,9 +1113,10 @@ for the Spring Boot 3.3.4 BOM and no live SQL target is configured. Phase 6A is 
 | 4B | **COMPLETE** | Authenticated application-instance enrollment/end lifecycle and required verification completed before Phase 5A. |
 | 5A | **COMPLETE** | Foreground activity observation completed and verified before this Phase 5B run. |
 | 5B | **COMPLETE** | Heartbeat lifecycle and required verification completed before Phase 6A. |
-| 6A | **IN PROGRESS** | Read-only tenant-admin service/API implemented; Maven Central HTTP 403 and unavailable live SQL block verification. |
-| 6B | **NOT STARTED — NEXT PROPOSED STEP** | Dedicated bounded administrative-read audit mechanism only. |
-| 7A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 6A | **COMPLETE** | Read-only tenant-admin service/API and required verification completed before Phase 6B. |
+| 6B | **IN PROGRESS** | Dedicated bounded administrative-read auditing implemented; Maven Central HTTP 403 and unavailable live SQL block required verification. |
+| 7A | **NOT STARTED** | Durable user-session schema only; do not begin until Phase 6B verification completes. |
+| 7B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1121,11 +1153,10 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Implement **Phase 6B only**: one bounded, tenant/actor-attributed sensitive administrative-read audit event
-per successful instance-list or distribution query, never per row. Establish sanitized allowlisted metadata,
-retention and reviewer authorization, additive audit vocabulary/schema only if required, and focused
-cross-tenant/volume tests. Do not add instance mutation, remote logout/session revocation, durable sessions,
-geolocation, updater scheduling, version enforcement, PubSub authority, or device-management UI.
+After Phase 6B verification completes, implement **Phase 7A only**: the additive strict-tenant durable
+`UserSession` schema, hashed opaque credential or bound-JTI representation, expiry/revocation reason model,
+retention definition, entity-action audit allowlists, rerunnable migration/verifier, and non-dbo RLS tests. Do
+not switch existing API tokens or desktop authentication, add revocation endpoints/UI/PubSub, or begin Phase 7B.
 
 ## Phase 5B implementation record — 2026-09-29
 

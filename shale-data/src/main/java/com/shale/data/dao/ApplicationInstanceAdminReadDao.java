@@ -10,11 +10,13 @@ import com.shale.core.service.ApplicationInstanceAdminReadServicePort.Filter;
 
 /** Set-based, explicitly tenant-qualified administrative reads. */
 public final class ApplicationInstanceAdminReadDao {
-	private final DbSessionProvider db;
-	public ApplicationInstanceAdminReadDao(DbSessionProvider db) { this.db=Objects.requireNonNull(db,"db"); }
+	private final DbSessionProvider db; private final AdministrativeReadAuditDao audit;
+	public ApplicationInstanceAdminReadDao(DbSessionProvider db) { this(db,new AdministrativeReadAuditDao()); }
+	ApplicationInstanceAdminReadDao(DbSessionProvider db,AdministrativeReadAuditDao audit) { this.db=Objects.requireNonNull(db,"db");this.audit=Objects.requireNonNull(audit,"audit"); }
 
 	public ApplicationInstanceAdminPage listRecent(int tenant,int actor,Filter filter,int page,int size) {
 		try(Connection c=db.requireConnection()) {
+			c.setAutoCommit(false);
 			verifyAdmin(c,tenant,actor);
 			StringBuilder sql=new StringBuilder("""
 				SELECT ai.Id,ai.UserId,
@@ -36,13 +38,14 @@ public final class ApplicationInstanceAdminReadDao {
 				if(filter.applicationVersion()!=null){p.setInt(i++,filter.applicationVersion().major());p.setInt(i++,filter.applicationVersion().minor());p.setInt(i++,filter.applicationVersion().build());}
 				if(filter.userId()!=null)p.setInt(i++,filter.userId());
 				p.setInt(i++,Math.multiplyExact(page,size));p.setInt(i,size);
-				try(ResultSet r=p.executeQuery()){List<AdminApplicationInstanceView> out=new ArrayList<>();while(r.next())out.add(instance(r));return new ApplicationInstanceAdminPage(out,page,size);}
+				try(ResultSet r=p.executeQuery()){List<AdminApplicationInstanceView> out=new ArrayList<>();while(r.next())out.add(instance(r));var result=new ApplicationInstanceAdminPage(out,page,size);audit.append(c,AdministrativeReadAuditEvent.recentList(tenant,actor,out.size(),page,size,filter.clientType()==null?null:filter.clientType().name(),filter.applicationVersion()==null?null:filter.applicationVersion().toString(),filter.userId()!=null,filter.activeOnly(),filter.startedSince()));c.commit();return result;}
 			}
-		}catch(SQLException e){throw new IllegalStateException("Failed to read application instances",e);}
+		}catch(SQLException e){throw new IllegalStateException("Failed to complete audited application-instance read",e);}
 	}
 
 	public List<ApplicationVersionDistributionView> versionDistribution(int tenant,int actor,Instant since) {
 		try(Connection c=db.requireConnection()) {
+			c.setAutoCommit(false);
 			verifyAdmin(c,tenant,actor);
 			String sql="""
 				SELECT MajorVersion,MinorVersion,BuildVersion,COUNT_BIG(*) InstanceCount,
@@ -51,8 +54,8 @@ public final class ApplicationInstanceAdminReadDao {
 				GROUP BY MajorVersion,MinorVersion,BuildVersion
 				ORDER BY MajorVersion DESC,MinorVersion DESC,BuildVersion DESC
 				""";
-			try(PreparedStatement p=c.prepareStatement(sql)){p.setInt(1,tenant);p.setTimestamp(2,Timestamp.from(since));try(ResultSet r=p.executeQuery()){List<ApplicationVersionDistributionView> out=new ArrayList<>();while(r.next()){Timestamp heartbeat=r.getTimestamp("LatestHeartbeatAt");out.add(new ApplicationVersionDistributionView(new SemanticVersion(r.getInt("MajorVersion"),r.getInt("MinorVersion"),r.getInt("BuildVersion")),r.getLong("InstanceCount"),r.getLong("DistinctUserCount"),heartbeat==null?null:heartbeat.toInstant()));}return List.copyOf(out);}}
-		}catch(SQLException e){throw new IllegalStateException("Failed to read application-instance version distribution",e);}
+			try(PreparedStatement p=c.prepareStatement(sql)){p.setInt(1,tenant);p.setTimestamp(2,Timestamp.from(since));try(ResultSet r=p.executeQuery()){List<ApplicationVersionDistributionView> out=new ArrayList<>();while(r.next()){Timestamp heartbeat=r.getTimestamp("LatestHeartbeatAt");out.add(new ApplicationVersionDistributionView(new SemanticVersion(r.getInt("MajorVersion"),r.getInt("MinorVersion"),r.getInt("BuildVersion")),r.getLong("InstanceCount"),r.getLong("DistinctUserCount"),heartbeat==null?null:heartbeat.toInstant()));}List<ApplicationVersionDistributionView> result=List.copyOf(out);audit.append(c,AdministrativeReadAuditEvent.versionDistribution(tenant,actor,result.size(),since));c.commit();return result;}}
+		}catch(SQLException e){throw new IllegalStateException("Failed to complete audited application-instance version distribution",e);}
 	}
 
 	private static AdminApplicationInstanceView instance(ResultSet r)throws SQLException{
