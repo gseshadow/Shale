@@ -93,6 +93,7 @@ class ShaleServerServiceConfigurationTest {
         System.setProperty("SHALE_RT_DB_USER", "rt_user");
         System.setProperty("SHALE_RT_DB_PASSWORD", "rt_password");
         System.setProperty("SHALE_AUTH_TOKEN_SECRET", "test-auth-token-secret-that-is-long-enough");
+        System.setProperty("SHALE_AUTH_SESSION_BINDING_CUTOVER_AT", "2026-09-29T18:00:00Z");
         try {
             test.run();
         } finally {
@@ -103,6 +104,7 @@ class ShaleServerServiceConfigurationTest {
             System.clearProperty("SHALE_RT_DB_USER");
             System.clearProperty("SHALE_RT_DB_PASSWORD");
             System.clearProperty("SHALE_AUTH_TOKEN_SECRET");
+            System.clearProperty("SHALE_AUTH_SESSION_BINDING_CUTOVER_AT");
         }
     }
 }
