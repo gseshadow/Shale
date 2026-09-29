@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 3B complete; Phase 4A in progress — implementation complete, verification blocked
+**Status:** Phase 5A in progress — implementation complete, Maven verification blocked; Phase 5B not started
 
 **Last reviewed:** 2026-09-28
 
@@ -749,10 +749,8 @@ Phase 4B.
 
 ### Phase 4B — Application-instance persistence and authenticated enrollment/end contracts
 
-**Status: IN PROGRESS (2026-09-28).** The implementation is present, but required Maven and live SQL/RLS
-verification could not complete in this environment. Maven project-model resolution receives HTTP 403 from
-Maven Central for `org.springframework.boot:spring-boot-dependencies:3.3.4`; no configured live SQL Server is
-available for the catalog and non-dbo enforcement scripts. Phase 5A remains not started.
+**Status: COMPLETE (2026-09-28).** Phase 4B implementation and its required Maven and live SQL/RLS
+verification were completed before Phase 5A began.
 
 `dbo.ApplicationInstances` is strict tenant-owned lifecycle history. Its `bigint IDENTITY` primary key makes
 every launch distinct, including concurrent/reopened launches on the same machine or by the same user. It has
@@ -805,16 +803,50 @@ auth credentials/grants, remote logout, policy/version enforcement, PubSub, devi
 updater reporting, scheduling, or unattended-update behavior. `ApplicationInstance` is only a registered
 client-process launch; it is not a bearer/refresh token, authorization grant, or durable user session.
 
-### Phase 5A — Human-activity signal
+### Phase 5A — Local foreground human-activity observation foundation (**IN PROGRESS**)
 
-* **Goal:** define a throttled foreground-input timestamp separate from liveness.
-* **In scope:** desktop activity observer and unit/lifecycle tests; no network traffic.
-* **Non-goals:** key content capture, background activity, heartbeat.
-* **Likely files:** `shale-ui` lifecycle boundary, `shale-desktop` adapter/tests.
-* **Schema/API impact:** none/none.
-* **Verification:** real input advances; timers, refreshes, polling do not; logout removes observers.
-* **Dependencies:** 4B contract.
-* **Risks:** privacy overreach or event-filter leaks.
+`ForegroundHumanActivityObserver` is the one process-local observer for the current authenticated desktop
+runtime. `SceneManager.showMain()` installs it only after the authenticated main scene has been placed on the
+primary `Stage`; login credential entry, launcher/updater windows, and unauthenticated surfaces are outside its
+scope. `stopSessionOwnedWork()` detaches and resets it before logout changes runtime identity, so a subsequent
+user starts with no activity timestamp. `SceneManager.shutdown()` also detaches it. Reinstalling for the same
+shell is idempotent, and the stable primary `Scene` survives route/root replacement, avoiding per-route or
+per-controller registrations.
+
+The explicit qualifying JavaFX event types are `KeyEvent.KEY_PRESSED`, `MouseEvent.MOUSE_PRESSED`,
+`ScrollEvent.SCROLL`, and `TouchEvent.TOUCH_PRESSED`. Window-level filters observe but never consume these
+events. Every observation requires the event's Shale window to be both showing and focused at dispatch time;
+stale scene state is insufficient. Continuous mouse movement, mouse hover, key release/typed payloads, action
+or focus events, animation/layout/rendering, startup, timers, database refresh, polling, PubSub, network
+responses, updater activity, and programmatic/service mutations do not qualify. Updating one in-memory atomic
+reference is intentionally not throttled: no mouse-move stream is observed and there is no I/O to coalesce.
+
+The primary authenticated stage and any currently showing JavaFX `Stage` or `PopupWindow` whose owner chain
+leads to it form the authenticated window context. Thus input in Shale-owned modal dialogs and popups counts,
+while unrelated top-level windows do not. The current desktop architecture has one authenticated primary stage;
+there is no independent second authenticated top-level shell. A JavaFX window-list listener attaches owned
+windows exactly once and retains the exact event-handler references used for removal.
+
+The only observation is `Optional<Instant> lastHumanActivityAt()`. It is empty at startup and after stop/logout,
+and advances from one injected `Clock` (`Clock.systemUTC()` in `SceneManager`, controlled clocks in tests).
+An `AtomicReference<Instant>` makes later background-worker reads safe. The observer retains no key text/code,
+modifiers, target/control, text-field or clipboard content, mouse coordinates/button/click history, scroll or
+touch payload, user/tenant/entity identifiers, document/window/screen content, accessibility/biometric data, or
+input-event object. It never logs individual events or timestamps.
+
+This phase is strictly local and ephemeral. It adds no SQL/migration, persistence, preference or machine-ID
+write, `ApplicationInstance` mutation, API/server dependency, network transmission, heartbeat or scheduler,
+durable session, remote logout, PubSub, geolocation, device UI, updater behavior, policy enforcement, idle
+threshold, or ACTIVE/IDLE/AWAY/OFFLINE interpretation. Activity observation is neither a sensitive read nor a
+meaningful domain/administrative mutation, so the audit compatibility review requires no audit event or schema
+change. Installation failure is sanitized, logged without event data, and fails open without a user dialog.
+
+Focused tests were added for empty initial state; controlled-clock key, mouse, scroll, and touch timestamps;
+deterministic replacement; hidden/unfocused/programmatic/mouse-move exclusions; timing-only retained state;
+cross-thread reads; logout/user-switch reset; exact filter types and handler removal; idempotent registration;
+owned-dialog scope; authenticated installation; and logout/shutdown cleanup. Required verification could not
+execute because Maven Central returned HTTP 403 for the Spring Boot dependency BOM and Maven resources plugin. Phase 5A therefore remains IN PROGRESS and
+unverified; Phase 5B has not been implemented.
 
 ### Phase 5B — Consolidated client-control heartbeat
 
@@ -1006,9 +1038,10 @@ client-process launch; it is not a bearer/refresh token, authorization grant, or
 | 3A | **COMPLETE** | Strict tenant/user DESKTOP/WEB/MOBILE release-state foundation and monotonic service boundary complete. |
 | 3B | **COMPLETE** | Desktop What's New implementation and focused tests complete; repository-level `mvn test` passed after the earlier Maven Central outage. |
 | 4A | **COMPLETE** | Stable random machine UUID storage/provider, failure behavior, upgrade persistence, and packaging contracts complete. |
-| 4B | **IN PROGRESS** | Implementation/tests/docs added; Maven Central HTTP 403 and unavailable live SQL Server block required verification. |
-| 5A | **NOT STARTED — NEXT PROPOSED STEP** | Do not start until Phase 4B Maven and live SQL/RLS verification pass. |
-| 5B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 4B | **COMPLETE** | Authenticated application-instance enrollment/end lifecycle and required verification completed before Phase 5A. |
+| 5A | **IN PROGRESS** | Implementation/tests/docs complete; Maven Central HTTP 403 blocks focused and repository-level test execution. |
+| 5B | **NOT STARTED** | Do not start until Phase 5A focused and repository-level Maven verification passes. |
+| 6-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1045,11 +1078,14 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Finish **Phase 4B verification only**: restore Maven Central access, run the focused instance migration/DAO/
-service/controller/desktop lifecycle tests, change-aware suite, and repository `mvn test`; deploy the rerunnable
-migration to a disposable/live verification database and run both the read-only catalog verifier and separate
-non-dbo RLS script, confirming isolated error 33504. If all pass, mark Phase 4B COMPLETE.
+Finish **Phase 5A verification only**: restore Maven Central access, run the focused observer/classification/
+lifecycle/privacy tests, change-aware affected suite, and repository-level `mvn test`; fix any failures and mark
+Phase 5A COMPLETE only after all pass. Do not begin Phase 5B in that verification run.
 
-After that gate, **Phase 5A only** should add a process-local, privacy-preserving desktop foreground human-input
-timestamp observer with throttling and lifecycle cleanup tests. It must add no network request, heartbeat,
-schema/API change, key content capture, background activity inference, session behavior, or enforcement.
+After that gate, the exact recommended scope for **Phase 5B only** is to define the additive consolidated
+client-control heartbeat service/API contract; add only the instance liveness/version/activity fields required by that contract; have one authenticated desktop
+lifecycle owner send bounded, jittered, non-overlapping heartbeats with backoff; read Phase 5A's optional local
+`Instant` without changing its observer semantics; return explicit server time/session/policy states without
+enforcing them; and verify authorization, tenant/RLS isolation, lifecycle cancellation, stale-generation guards,
+and outage behavior. Do not add remote logout execution, PubSub authority, administrator/device UI, idle-status
+thresholds, version enforcement, update decisions, geolocation, or unattended updater behavior in Phase 5B.
