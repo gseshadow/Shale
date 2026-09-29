@@ -348,7 +348,7 @@ enforcement, session, heartbeat, or PubSub consumer is wired in this phase.
 
 OpenAPI at `/v3/api-docs` documents authentication, strict query parameters, the `204` empty-policy result,
 response DTOs, error envelopes, and the release-channel, release-item-type, and access-mode vocabularies.
-# Phase 4B application-instance endpoints (implementation; verification pending)
+# Phase 4B application-instance endpoints (complete)
 
 The server exposes bearer-authenticated `POST /api/application-instances` and
 `POST /api/application-instances/{id}/end`. Request identity never supplies tenant/user authority; the
@@ -356,5 +356,17 @@ verified bearer principal and request-scoped RLS connection do. Enrollment accep
 `DESKTOP`, and strict `major.minor.build`. End is owner-qualified, idempotent, and preserves its first
 server-observed UTC end time. These process lifecycle rows are not tokens or durable user sessions. Deployment
 requires `docs/sql/2026-09-28_application_instances_foundation_phase4b.sql` plus its catalog and non-dbo RLS
-verification scripts. Phase 4B remains in progress until Maven Central and a live SQL verification target are
-available.
+verification scripts. Phase 4B verification completed before Phase 5A.
+
+## Phase 6A tenant-admin application-instance reads (verification pending)
+
+`GET /api/admin/application-instances` returns a tenant-admin-only recent page. Parameters are `page` (0–100,
+default 0), `size` (1–100, default 50), exact `clientType`, canonical `version`, positive `userId`, `activeOnly`,
+and ISO-8601 `since`. The `StartedAt` window defaults to 30 days and is capped at 90 days; ordering is
+`StartedAt DESC, Id DESC`, and no total count is run.
+
+`GET /api/admin/application-instances/version-distribution` groups that bounded population numerically and
+returns launch `instanceCount`, separately deduplicated `distinctUserCount`, and nullable `latestHeartbeatAt`.
+Both routes derive tenant/user authority from authentication, return 401/403 conventionally, and accept no
+tenant selector. Phase 6A adds no migration, mutation, remote control, session/geolocation/enforcement/PubSub,
+updater action, or UI.

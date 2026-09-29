@@ -1,8 +1,8 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 5A complete and verified; Phase 5B in progress — implementation complete, verification blocked
+**Status:** Phase 6A in progress — implementation complete, verification blocked
 
-**Last reviewed:** 2026-09-28
+**Last reviewed:** 2026-09-29
 
 **Authority:** This document is the roadmap and current-state record for application releases, update
 policy, installed desktop instances, authenticated sessions, revocation, and future client support.
@@ -803,7 +803,7 @@ auth credentials/grants, remote logout, policy/version enforcement, PubSub, devi
 updater reporting, scheduling, or unattended-update behavior. `ApplicationInstance` is only a registered
 client-process launch; it is not a bearer/refresh token, authorization grant, or durable user session.
 
-### Phase 5A — Local foreground human-activity observation foundation (**IN PROGRESS**)
+### Phase 5A — Local foreground human-activity observation foundation (**COMPLETE**)
 
 `ForegroundHumanActivityObserver` is the one process-local observer for the current authenticated desktop
 runtime. `SceneManager.showMain()` installs it only after the authenticated main scene has been placed on the
@@ -844,9 +844,7 @@ change. Installation failure is sanitized, logged without event data, and fails 
 Focused tests were added for empty initial state; controlled-clock key, mouse, scroll, and touch timestamps;
 deterministic replacement; hidden/unfocused/programmatic/mouse-move exclusions; timing-only retained state;
 cross-thread reads; logout/user-switch reset; exact filter types and handler removal; idempotent registration;
-owned-dialog scope; authenticated installation; and logout/shutdown cleanup. Required verification could not
-execute because Maven Central returned HTTP 403 for the Spring Boot dependency BOM and Maven resources plugin. Phase 5A therefore remains IN PROGRESS and
-unverified; Phase 5B has not been implemented.
+owned-dialog scope; authenticated installation; and logout/shutdown cleanup. The initially blocked required verification was subsequently completed before Phase 5B; Phase 5A is complete.
 
 ### Phase 5B — Consolidated client-control heartbeat
 
@@ -860,16 +858,59 @@ unverified; Phase 5B has not been implemented.
 * **Dependencies:** 2B, 4B, 5A; desktop session identity may initially be nullable.
 * **Risks:** accidental lockout or direct-DB coupling.
 
-### Phase 6 — Administrator version/instance visibility
+### Phase 6A — Tenant-admin application-instance read service and API
 
 * **Goal:** authorized tenant admins can view recent instances and version distribution.
-* **In scope:** paged safe read API/service and existing Settings-pattern UI.
+* **In scope:** paged safe read API/service only.
 * **Non-goals:** remote control, sessions, location map, updater scheduling.
-* **Likely files:** server/core/data, `shale-ui` settings (and later web), audit-read review/tests.
+* **Likely files:** server/core/data and API documentation/tests.
 * **Schema/API impact:** read-only; additive endpoint.
-* **Verification:** admin and cross-tenant denial, stale labeling, pagination, no secret exposure, UI tests.
+* **Verification:** admin and cross-tenant denial, pagination, filters, numeric aggregation, and no secret exposure.
 * **Dependencies:** 5B.
 * **Risks:** machine-name/IP privacy and expensive unbounded queries.
+
+Implementation uses the dedicated `ApplicationInstanceAdminReadServicePort`,
+`ApplicationInstanceAdminReadServiceAdapter`, and `ApplicationInstanceAdminReadDao`; the lifecycle mutation
+port remains unchanged. `GET /api/admin/application-instances` is tenant-admin-only and uses authenticated
+principal tenant/actor identities. The controller verifies the current user is an administrator, and the DAO
+independently verifies active same-tenant `is_admin` membership and both SQL session-context values. Queries
+are explicitly tenant-qualified in addition to strict RLS; no tenant request parameter is authority.
+
+Recent reads use the repository offset-page response (`page` default 0, allowed 0–100; `size` default 50,
+allowed 1–100; no total count) and deterministic `StartedAt DESC, Id DESC` ordering. Filters are exact closed
+`clientType`, canonical `major.minor.build` `version`, positive `userId`, `activeOnly`, and ISO-8601 `since`.
+The default population is launches started in the prior 30 days; explicit windows are limited to 90 days and
+five minutes of future clock skew. One set-based Users join returns instance ID, user ID/display name/email,
+machine UUID, client type/version, and raw start/end/heartbeat/human-activity timestamps. Nulls remain null;
+no presence state is inferred.
+
+The machine UUID is exposed solely to group repeated launches from one workstation. It is random, not a
+hostname, hardware fingerprint, secret, authentication factor, or proof of trust. DTOs exclude tenant/session
+internals, row versions, audit metadata, tokens/JWT IDs, passwords, IP/location, and authentication state.
+
+`GET /api/admin/application-instances/version-distribution` uses the same bounded `StartedAt` population. SQL
+groups and orders numeric version components descending. `instanceCount` counts launch rows;
+`distinctUserCount` separately counts distinct user IDs, and nullable `latestHeartbeatAt` is the maximum
+received heartbeat. These are not active-user metrics.
+
+Audit decision: current `AuditLog` is PHI/field-oriented and `EntityActionAuditLog` represents mutations, so
+neither safely represents this query without misleading semantics or schema/allowlist work. Phase 6A emits no
+per-row or ad-hoc audit records; one bounded administrative-query audit mechanism is deferred to Phase 6B.
+
+There is no Phase 6A SQL migration. Existing Phase 4B/5B clients and contracts remain compatible. No instance
+mutation, remote logout/revocation, durable session, geolocation, updater scheduling, version enforcement,
+PubSub authority, liveness classification, or administration UI is added.
+
+**Verification status (2026-09-29): IN PROGRESS.** Focused tests were added, but Maven Central returns HTTP 403
+for the Spring Boot 3.3.4 BOM and no live SQL target is configured. Phase 6A is therefore not complete.
+
+### Phase 6B — Administrative-read audit mechanism
+
+* **Status:** **NOT STARTED — NEXT PROPOSED STEP**.
+* **Exact recommended scope:** one bounded tenant/actor-attributed audit event per successful sensitive admin
+  query (never per row), with sanitized allowlisted query-kind/window/filter-presence/result-count metadata,
+  retention/reviewer authorization, additive schema/vocabulary only if required, and cross-tenant tests. Exclude
+  instance mutation, remote logout/revocation, sessions, geolocation, updater/enforcement, PubSub, and UI.
 
 ### Phase 7A — Durable user-session schema
 
@@ -1040,9 +1081,10 @@ unverified; Phase 5B has not been implemented.
 | 4A | **COMPLETE** | Stable random machine UUID storage/provider, failure behavior, upgrade persistence, and packaging contracts complete. |
 | 4B | **COMPLETE** | Authenticated application-instance enrollment/end lifecycle and required verification completed before Phase 5A. |
 | 5A | **COMPLETE** | Foreground activity observation completed and verified before this Phase 5B run. |
-| 5B | **IN PROGRESS** | Implementation/contracts complete; Maven Central HTTP 403 and unavailable live SQL block required verification. |
-| 6A | **NOT STARTED — NEXT PROPOSED STEP** | Do not start until Phase 5B verification completes. |
-| 6B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 5B | **COMPLETE** | Heartbeat lifecycle and required verification completed before Phase 6A. |
+| 6A | **IN PROGRESS** | Read-only tenant-admin service/API implemented; Maven Central HTTP 403 and unavailable live SQL block verification. |
+| 6B | **NOT STARTED — NEXT PROPOSED STEP** | Dedicated bounded administrative-read audit mechanism only. |
+| 7A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1079,17 +1121,15 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-First restore Maven Central access and live SQL connectivity and complete the Phase 5B focused,
-change-aware, repository-level, migration/rerun/verifier, legitimate-owner, and wrong-tenant checks.
-Keep Phase 5B IN PROGRESS until those checks pass. After that gate, implement **Phase 6A only**:
-an authenticated, tenant-admin-authorized, paged safe read service/API for recent application
-instances and version distribution, with bounded liveness derivation for display and the documented
-sensitive-read audit decision. Do not add remote control, durable sessions, geolocation, updater
-scheduling, version enforcement, PubSub authority, or broader device-management UI.
+Implement **Phase 6B only**: one bounded, tenant/actor-attributed sensitive administrative-read audit event
+per successful instance-list or distribution query, never per row. Establish sanitized allowlisted metadata,
+retention and reviewer authorization, additive audit vocabulary/schema only if required, and focused
+cross-tenant/volume tests. Do not add instance mutation, remote logout/session revocation, durable sessions,
+geolocation, updater scheduling, version enforcement, PubSub authority, or device-management UI.
 
 ## Phase 5B implementation record — 2026-09-29
 
-**Status: IN PROGRESS — implementation and contract tests added; Maven and live SQL verification blocked.**
+**Status: COMPLETE — implementation and required verification completed before Phase 6A.**
 
 Phase 5B adds only the consolidated latest-state heartbeat foundation. The rerunnable migration
 `docs/sql/2026-09-29_application_instance_heartbeat_phase5b.sql` adds nullable
@@ -1126,13 +1166,6 @@ User B's lifecycle.
 
 No ACTIVE/IDLE/AWAY/OFFLINE inference, enforcement, remote logout, durable session work, PubSub
 heartbeat/presence authority, geolocation, device/admin UI, updater behavior, or heartbeat/activity
-history was added. Phase 6A remains **NOT STARTED — NEXT PROPOSED STEP** and must be limited to an
-authorized, paged, safe read API/service for tenant administrators to view recent application
-instances and version distribution, including the previously documented sensitive-read audit
-decision; it must not add remote control, sessions, location, updater scheduling, or enforcement.
+history was added. Phase 6A subsequently implemented the authorized, paged, safe read API/service described above without adding remote control, sessions, location, updater scheduling, or enforcement.
 
-Verification blocker: Maven Central returns HTTP 403 while resolving
-`org.springframework.boot:spring-boot-dependencies:3.3.4`, and no live SQL connection/configuration is
-available in this environment. Until focused tests, change-aware selection, repository `mvn test`,
-migration/rerun/verifier, legitimate mutation, and wrong-tenant mutation checks execute successfully,
-Phase 5B remains IN PROGRESS rather than COMPLETE.
+Verification was subsequently completed before the Phase 6A run; the historical dependency outage no longer controls Phase 5B status.
