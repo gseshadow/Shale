@@ -71,7 +71,7 @@ class ApplicationReleaseControllerTest {
         service.policy = Optional.of(new ApplicationPolicyView(9, ReleaseChannel.PRODUCTION, 4,
                 new ReleaseReference(130, SemanticVersion.parse("1.0.130")), null,
                 new ReleaseReference(99, SemanticVersion.parse("1.0.99")), null,
-                ApplicationAccessMode.READ_ONLY, PUBLISHED_AT, new byte[] {1}));
+                ApplicationAccessMode.READ_ONLY, PUBLISHED_AT, PUBLISHED_AT, new byte[] {1}));
 
         mockMvc.perform(authenticated(get("/api/application-releases/policy/current")
                         .param("channel", "PRODUCTION")))
@@ -87,6 +87,7 @@ class ApplicationReleaseControllerTest {
                 .andExpect(jsonPath("$.minimumAllowedVersion").value("1.0.99"))
                 .andExpect(jsonPath("$.accessMode").value("READ_ONLY"))
                 .andExpect(jsonPath("$.publishedAt").value("2026-09-28T12:00:00Z"))
+                .andExpect(jsonPath("$.serverTime").value("2026-09-28T12:00:00Z"))
                 .andExpect(content().string(not(containsString("rowVersion"))))
                 .andExpect(content().string(not(containsString("actor"))));
     }

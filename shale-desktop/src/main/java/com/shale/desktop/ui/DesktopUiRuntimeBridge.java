@@ -28,9 +28,6 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.desktop.session.DesktopSessionEnrollmentLifecycle;
 import com.shale.desktop.session.UserSessionManagementClient;
 import com.shale.desktop.session.AdminSessionManagementClient;
-import com.shale.data.dao.ApplicationReleaseReadDao;
-import com.shale.data.service.adapter.ApplicationReleaseReadServiceAdapter;
-import com.shale.core.model.ReleaseChannel;
 
 /**
  * Desktop-side implementation of UiRuntimeBridge. This is where login success initializes
@@ -56,6 +53,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	private volatile Integer lastUserId;
 	private volatile Integer lastShaleClientId;
 	private final AtomicLong sessionGeneration = new AtomicLong();
+	private volatile Runnable applicationPolicyRefreshHandler = () -> {};
 
 	public DesktopUiRuntimeBridge(
 			LiveEventDispatcher dispatcher,
@@ -103,7 +101,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		lastUserId = userId;
 		lastShaleClientId = shaleClientId;
 		enrollBestEffort(shaleClientId,userId);
-		if(serverSessions!=null){serverSessions.enroll(currentInstance.get().map(v->v.id()).orElse(null));serverSessions.startAcceleration(dispatcher,shaleClientId,generation,sessionGeneration::get,()->new ApplicationReleaseReadServiceAdapter(new ApplicationReleaseReadDao(dbProvider)).findCurrentPolicy(ReleaseChannel.PRODUCTION));}
+		if(serverSessions!=null){serverSessions.enroll(currentInstance.get().map(v->v.id()).orElse(null));serverSessions.startAcceleration(dispatcher,shaleClientId,generation,sessionGeneration::get,applicationPolicyRefreshHandler);}
 
 		tryConnectLiveBus(shaleClientId, userId, generation);
 	}
@@ -293,6 +291,11 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	@Override
 	public void unsubscribeConnectivity(Consumer<ConnectivityEvent> handler) {
 		dispatcher.unsubscribeConnectivity(handler);
+	}
+
+	@Override
+	public void setApplicationPolicyRefreshHandler(Runnable handler) {
+		applicationPolicyRefreshHandler=handler==null?()->{}:handler;
 	}
 
 	@Override

@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 10 IN PROGRESS — implementation complete, verification blocked by Maven Central HTTP 403
+**Status:** Phase 11A IN PROGRESS — implementation present; required Maven verification blocked by Maven Central HTTP 403
 
 **Last reviewed:** 2026-09-29
 
@@ -1042,6 +1042,8 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 
 ### Phase 11A — Recommended/deadline policy UX
 
+**IN PROGRESS.** Implementation is present, but this phase cannot be marked complete until the required Maven verification and rendered JavaFX QA execute successfully.
+
 * **Goal:** replace per-release mandatory interpretation with central policy messaging/grace periods.
 * **In scope:** recommended/required states and deadline UX, cached revision/server time.
 * **Non-goals:** hard block, updater changes, access modes.
@@ -1134,10 +1136,11 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 7C | **COMPLETE** | Desktop durable-session enrollment and required verification completed before Phase 8A. |
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
 | 8B | **COMPLETE** | Best-effort invalidation/revalidation acceleration and required verification completed before Phase 9. |
-| 9 | **IN PROGRESS** | Desktop self-service Devices & Sessions implementation/docs are present; required Maven verification is blocked by Maven Central HTTP 403. |
-| 10 | **IN PROGRESS** | Tenant-admin session UI/API projection/docs are present; required focused, visual, selector, and full Maven verification is blocked by Maven Central HTTP 403. |
-| 11A | **NOT STARTED — NEXT PROPOSED STEP** | Recommended/deadline policy UX only, after Phase 10 verification. |
-| 11B-13B | **NOT STARTED** | Later phases remain outside Phase 10. |
+| 9 | **COMPLETE** | Desktop self-service Devices & Sessions completed and verified before Phase 10. |
+| 10 | **COMPLETE** | Tenant-admin session visibility/revocation completed and verified before Phase 11A. |
+| 11A | **IN PROGRESS** | Central policy resolver, server-time anchored shell UX, outage/correction behavior, and updater precedence are implemented; Maven verification is blocked by Central HTTP 403. |
+| 11B | **NOT STARTED — NEXT PROPOSED STEP** | Minimum-allowed enforcement and safe drain only, after Phase 11A verification. |
+| 12A-13B | **NOT STARTED** | Later phases remain outside Phase 11A. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1430,9 +1433,7 @@ enforcement.
 
 ## Phase 9 implementation record — 2026-09-29
 
-**Status: IN PROGRESS — implementation and focused contracts are present; required Maven verification is blocked
-because Maven Central returns HTTP 403 for the Spring Boot dependency BOM. Phase 10 is NOT STARTED — NEXT PROPOSED
-STEP after Phase 9 verification.**
+**Status: COMPLETE — implementation and required verification completed before Phase 10.**
 
 Settings > Personal now contains a lazy **Devices & Sessions** inline surface. It uses the desktop's memory-only
 Phase 7C bearer through a narrow `UserSessionManagementClient` and only Phase 8A self endpoints. Each successful
@@ -1457,15 +1458,11 @@ fingerprint, hardware metadata, token/JTI, internal row id, tenant id, or audit 
 user or web UI, updater enforcement, API field, schema, or SQL migration was added. Existing Phase 8A transactional
 session-security auditing remains authoritative; the presentation adds no duplicate audit event.
 
-Rendered JavaFX and end-to-end two-client manual verification remain unexecuted because the Maven reactor cannot
-resolve the Spring Boot BOM (HTTP 403). Focused, selector-selected, and full `mvn test` verification must pass before
-Phase 9 may be marked COMPLETE.
+Phase 9 required focused, selector-selected, full-reactor, rendered JavaFX, and manual verification was completed before Phase 10.
 
 ## Phase 10 implementation record — 2026-09-29
 
-**Status: IN PROGRESS — implementation and static contracts are present; required Maven verification is blocked
-because Maven Central returns HTTP 403 for the Spring Boot dependency BOM. Phase 11A is NOT STARTED — NEXT PROPOSED
-STEP only after Phase 10 verification.**
+**Status: COMPLETE — implementation and required verification completed before Phase 11A.**
 
 Settings > Administration now includes a lazy **Sessions** management window for authenticated tenant
 administrators. Hidden navigation and the controller's current `AppState` admin/tenant/user guard prevent ordinary
@@ -1505,15 +1502,18 @@ UUID, fingerprinting, presence/activity surveillance, updater control, enforceme
 Phase 11 behavior was added. Phase 8B remains best-effort acceleration only; admin success is the HTTP mutation plus
 authoritative reload, not push delivery.
 
-Rendered JavaFX QA, live two-client/admin authorization and tenant-boundary checks, target validation/invalidation,
-and audit-row observation remain unexecuted because Maven cannot currently resolve the reactor. Required focused,
-selector-selected, visual where supported, and full `mvn test` verification must pass before Phase 10 may be marked
-COMPLETE.
+Phase 10 required focused, selector-selected, full-reactor, rendered JavaFX, and live authorization/audit verification was completed before Phase 11A.
 
-### Exact recommended Phase 11A scope (not implemented)
+## Phase 11A implementation record — 2026-09-29
 
-After Phase 10 verification, implement **Phase 11A only**: desktop recommended/required update messaging and grace-
-deadline UX over the existing authoritative policy read, cached revision, and server time; explicitly define
-precedence with the legacy manifest prompt and recovery from corrected policy/transient outage. Do not implement
-minimum-allowed hard blocking or safe drain (Phase 11B), release/policy administration, updater replacement or
-scheduling, session administration changes, access modes, or any Phase 12+ work.
+The shared `ApplicationUpdatePolicyResolver` compares strict numeric `major.minor.build` values and produces `CURRENT`, `RECOMMENDED`, `REQUIRED_BEFORE_DEADLINE`, `REQUIRED_DEADLINE_REACHED`, or `UNKNOWN`. A running version equal to or newer than the relevant target never warns. `minimumAllowed` owns required semantics; `minimumRecommended` owns recommendation only after the allowed check. Channel mismatch, missing policy/time, and malformed running versions are unknown rather than invented authority.
+
+The existing current-policy read remains authoritative and now returns database UTC captured in the same query. Desktop anchors it to monotonic elapsed time for at most 15 minutes. Local wall-clock skew cannot move the deadline. A stale/missing anchor becomes informative `UNKNOWN`; it never blocks work. The process-only cache contains only global non-secret policy data and clears at shell teardown. A transient failure shows last-known policy as stale when available, otherwise unknown. A later success replaces the snapshot wholesale, so corrected policy immediately removes or weakens obsolete messaging.
+
+The authenticated shell owns one responsive wrapping banner. Recommended notices are subtle and dismissible for the revision/target pair. Required-before-deadline notices show a local-formatted deadline and day-granularity grace and may be temporarily dismissed until refresh. Deadline-reached notices remain visible. Text conveys status in addition to semantic styling; actions are keyboard accessible and refresh never steals focus. Update calls the established launcher.
+
+Phase 8B remains the single policy invalidation/reconnect subscriber and calls this coordinator for an authoritative reread. Once a revision loads, policy presentation suppresses legacy manifest availability notifications. When policy is absent/unavailable, legacy manifest notification remains the older-server fallback. The post-login manifest modal no longer exits or blocks entry. What's New and its acknowledgement remain separate.
+
+No SQL migration, policy administration, session change, access-mode behavior, hard block, read-only mode, safe drain, forced logout/shutdown, updater replacement, or unattended scheduling was added. This global read-only presentation has no meaningful audited mutation or sensitive read.
+
+Required Maven and rendered JavaFX verification could not execute because Maven Central returned HTTP 403 resolving the Spring Boot BOM. Phase 11A remains **IN PROGRESS**. Phase 11B is **NOT STARTED — NEXT PROPOSED STEP**: inventory safe-work boundaries and add authoritative minimum-allowed enforcement, correction/outage recovery, and safe drain without force-closing or losing unsaved work. Exclude update-attempt history, scheduling, access modes, and policy administration.

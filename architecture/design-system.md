@@ -667,3 +667,7 @@ Revoked, and Expired are the only lifecycle labels; the current administrator se
 logout rather than offering an ambiguous row revoke. Previous/Next pagination remains bounded at 50 rows. Machine,
 network/location, token/JTI, tenant, database identity, audit metadata, presence, and human-activity details remain
 excluded.
+
+## Application update policy notice
+
+Phase 11A uses one shell-level wrapping notice above working content. Recommended state uses a quiet surface and may be dismissed for its policy revision/target; required state strengthens the border, and deadline-reached state uses the danger border without modal focus or disabled application controls. Text always carries state and deadline meaning. Update is a semantic primary small action and dismissal is a semantic ghost small action. The notice supports both themes, narrow widths, keyboard activation, and background refresh without focus stealing.

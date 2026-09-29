@@ -16,6 +16,12 @@ public final class SystemUpdateNotificationProducer {
 	private Boolean lastUpdateAvailable;
 	private Boolean lastMandatory;
 	private boolean restartRequiredNotified;
+	private boolean policyPresentationOwnsUpdates;
+
+	public void useAuthoritativePolicyPresentation() {
+		policyPresentationOwnsUpdates=true;
+		removeAvailableUpdateNotification();
+	}
 
 	public SystemUpdateNotificationProducer(
 			NotificationCenterService notificationCenterService,
@@ -33,6 +39,7 @@ public final class SystemUpdateNotificationProducer {
 	}
 
 	public void onUpdateCheckResult(UiUpdateLauncher.UpdateCheckResult result) {
+		if (policyPresentationOwnsUpdates) return;
 		if (result == null) {
 			log("Update check result skipped: result=<null>");
 			return;

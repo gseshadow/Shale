@@ -170,3 +170,7 @@ completions after close, logout, or user/tenant switch. The current administrato
 points to ordinary logout. Phase 8A has no authoritative admin bulk-user revoke, so the UI does not simulate one.
 Phase 8B remains the sole optional invalidation accelerator; the admin UI trusts the revoke response and its own
 authoritative reload rather than PubSub delivery.
+
+## Desktop update-policy presentation (Phase 11A)
+
+The authenticated shell resolves global PRODUCTION `ApplicationPolicy` through the existing release-read boundary. Strict semantic versions and database server UTC determine current, recommended, required-before-deadline, and deadline-reached presentation. A 15-minute process cache advances only from a monotonic receipt anchor; stale or unavailable authority is informative and fail-open. Phase 8B invalidation/reconnect invokes the same coordinator. The manifest remains package authority and the established updater remains execution authority. This phase does not enforce, drain, log out, shut down, schedule, or administer policy.
