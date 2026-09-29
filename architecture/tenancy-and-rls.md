@@ -113,3 +113,11 @@ it never uses the global-overlay predicate. The server supplies tenant and actor
 principal and revalidates current admin membership before reading or inserting. Future review is limited to a
 tenant administrator or designated audit administrator through separately approved tooling; ordinary users
 have no visibility and Phase 6B adds no review API or UI.
+## Durable user-session tenancy (Phase 7A; live verification pending)
+
+`dbo.UserSessions` is strict tenant-owned data. Its user and optional application-instance relationships are
+tenant-qualified, trusted, and non-cascading. The enabled `TenantFilter` supplies exactly one FILTER and AFTER
+INSERT/UPDATE blocks through `sec.fn_FilterByTenant(ShaleClientId)`; the global-overlay predicate is forbidden.
+The internal DAO additionally qualifies every operation by authenticated tenant/user and validates an optional
+desktop instance against the same tenant and owner. The explicit non-dbo verifier creates a disposable
+`WITHOUT LOGIN` user, executes as it, expects error 33504 for cross-tenant writes, and cleans its exact fixture.
