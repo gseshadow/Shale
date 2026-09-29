@@ -517,7 +517,7 @@ public final class UserDao {
 
 	public boolean deactivateUser(int userId) {
 		if (userId <= 0) throw new IllegalArgumentException("userId must be > 0");
-		try (Connection con = db.requireConnection()) {
+		try (Connection con = db.requireConnection()) { con.setAutoCommit(false);
 			int shaleClientId = requireCurrentShaleClientId(con);
 			int principalUserId = requireCurrentAdmin(con, shaleClientId);
 			UserManagementRow lifecycleTarget = findManagementUser(con, shaleClientId, userId);
@@ -531,7 +531,7 @@ public final class UserDao {
 			try (PreparedStatement ps = con.prepareStatement("UPDATE dbo.Users SET is_deleted = 1 WHERE Id = ? AND ShaleClientId = ?")) {
 				ps.setInt(1, userId);
 				ps.setInt(2, shaleClientId);
-				return ps.executeUpdate() > 0;
+				boolean changed=ps.executeUpdate()>0;if(changed)revokeAllSessions(con,shaleClientId,userId);con.commit();return changed;
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to deactivate user", e);
@@ -560,7 +560,7 @@ public final class UserDao {
 		if (userId <= 0) throw new IllegalArgumentException("userId must be > 0");
 		validatePassword(newPassword);
 		String passwordHash = hashPassword(newPassword);
-		try (Connection con = db.requireConnection()) {
+		try (Connection con = db.requireConnection()) { con.setAutoCommit(false);
 			int shaleClientId = requireCurrentShaleClientId(con);
 			requireCurrentAdmin(con, shaleClientId);
 			UserManagementRow target = findManagementUser(con, shaleClientId, userId);
@@ -570,7 +570,7 @@ public final class UserDao {
 				ps.setString(1, passwordHash);
 				ps.setInt(2, userId);
 				ps.setInt(3, shaleClientId);
-				return ps.executeUpdate() > 0;
+				boolean changed=ps.executeUpdate()>0;if(changed)revokeAllSessions(con,shaleClientId,userId);con.commit();return changed;
 			}
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to reset user password", e);
@@ -590,11 +590,13 @@ public final class UserDao {
 				if(!Arrays.equals(target.rowVer(),expectedRowVer)) throw new IllegalStateException("This user was changed by someone else. Reload and try again.");
 				if(target.admin()&&!target.deleted()&&countActiveAdmins(con,tenant)<=1) throw new IllegalArgumentException("Cannot remove the last active admin in this tenant.");
 				try(PreparedStatement ps=con.prepareStatement("UPDATE dbo.Users SET is_deleted=1,IsRemoved=1,RemovedAt=SYSUTCDATETIME(),RemovedByUserId=?,UpdatedAt=SYSUTCDATETIME() WHERE Id=? AND ShaleClientId=? AND IsRemoved=0 AND RowVer=?")){ps.setInt(1,actor);ps.setInt(2,userId);ps.setInt(3,tenant);ps.setBytes(4,expectedRowVer);if(ps.executeUpdate()!=1)throw new IllegalStateException("This user was changed by someone else. Reload and try again.");}
+				revokeAllSessions(con,tenant,userId);
 				var md=new EnumMap<EntityActionAuditEvent.MetadataKey,Object>(EntityActionAuditEvent.MetadataKey.class);md.put(EntityActionAuditEvent.MetadataKey.TARGET_USER_ID,userId);md.put(EntityActionAuditEvent.MetadataKey.ACTIVE,false);
 				entityActionAuditDao.append(con,EntityActionAuditEvent.now(tenant,actor,EntityActionAuditEvent.EntityType.USER,userId,EntityActionAuditEvent.Action.REMOVED,null,null,md));con.commit();return true;
 			}catch(Exception ex){try{con.rollback();}catch(SQLException ignored){}if(ex instanceof RuntimeException re)throw re;throw new IllegalStateException("Failed to remove user from tenant.",ex);}
 		}catch(SQLException e){throw new RuntimeException("Failed to remove user from tenant.",e);}
 	}
+	private static int revokeAllSessions(Connection con,int tenant,int user)throws SQLException{try(PreparedStatement p=con.prepareStatement("UPDATE dbo.UserSessions SET RevokedAt=SYSUTCDATETIME(),RevocationReason='SECURITY',UpdatedAt=SYSUTCDATETIME() WHERE ShaleClientId=? AND UserId=? AND RevokedAt IS NULL")){p.setInt(1,tenant);p.setInt(2,user);return p.executeUpdate();}}
 
 
 	public List<UserRoleRow> listAssignedRoles(int userId, int shaleClientId) {

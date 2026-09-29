@@ -128,3 +128,10 @@ JDBC-only compatibility session; security rejection never silently downgrades se
 Logical logout revokes and clears the bound session; process exit clears memory and ends the instance without
 reclassifying exit as user logout. Enrollment is not heartbeat, and this phase adds no remote controls, PubSub,
 geolocation, UI, or update enforcement. Required Maven verification is pending because Maven Central returned 403.
+
+## Authoritative durable-session management (Phase 8A)
+
+The server exposes additive self session list/current revoke/owned revoke/revoke-others APIs and bounded tenant-admin
+list/revoke APIs. Current identity is the JWT `sid`, never recency or machine identity. SQL revocation is checked on
+the next bound request by every replica. There is no session cache, process-presence inference, UI, PubSub delivery,
+geolocation, trust/fingerprinting, or updater behavior in this phase; `ApplicationInstances` remain unchanged.

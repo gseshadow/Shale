@@ -12,7 +12,7 @@ import com.shale.core.service.UserSessionServicePort;
 import com.shale.data.dao.UserSessionDao;
 
 public final class UserSessionServiceAdapter implements UserSessionServicePort {
-	private static final Set<String> REASONS=Set.of("USER_LOGOUT","ADMIN_REVOKED","SECURITY","CREDENTIAL_ROTATED","EXPIRED_REPLACEMENT");
+	private static final Set<String> REASONS=Set.of("USER_LOGOUT","USER_REVOKED","ADMIN_REVOKED","SECURITY","CREDENTIAL_ROTATED","EXPIRED_REPLACEMENT");
 	private final Gateway gateway; private final Clock clock;
 	public UserSessionServiceAdapter(UserSessionDao dao){this(new DaoGateway(dao),Clock.systemUTC());}
 	UserSessionServiceAdapter(Gateway gateway,Clock clock){this.gateway=Objects.requireNonNull(gateway);this.clock=Objects.requireNonNull(clock);}
