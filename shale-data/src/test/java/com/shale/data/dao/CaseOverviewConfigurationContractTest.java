@@ -35,6 +35,28 @@ class CaseOverviewConfigurationContractTest {
   assertTrue(s.contains("Objects.equals(before.userId,c.intakeTakenByUserId())"));
   assertTrue(s.contains("ISNULL(IsRemoved,0)=0"));
  }
+ @Test void overviewReadAllowsAnActiveActorWhileAdministrationAndEveryMutationRequireAdmin() throws Exception {
+  String s=Files.readString(Path.of("src/main/java/com/shale/data/dao/CaseOverviewConfigurationDao.java"));
+  String get=method(s,"public CaseOverviewDateConfigurationDto get","public CaseOverviewAdministrationDto getAdministration");
+  String administration=method(s,"public CaseOverviewAdministrationDto getAdministration","public CaseOverviewMutationResult update");
+  String update=method(s,"public CaseOverviewMutationResult update","public CaseOverviewDateConfigurationDto replace");
+  String replace=method(s,"public CaseOverviewDateConfigurationDto replace","public IntakeTakenByMutationResult updateIntakeTakenBy");
+  String intake=method(s,"public IntakeTakenByMutationResult updateIntakeTakenBy","static void rejectDuplicates");
+  String actor=s.substring(s.indexOf("private static void validateActor"),s.indexOf("private static void validateAdmin"));
+  String admin=s.substring(s.indexOf("private static void validateAdmin"),s.indexOf("private static void validateCase"));
+  assertAll(
+    ()->assertTrue(get.contains("validateActor(con,tenant,actor)"),"ordinary users must load firm defaults or per-case selections"),
+    ()->assertFalse(get.contains("validateAdmin("),"the display read must not require configuration privileges"),
+    ()->assertTrue(administration.contains("validateAdmin(con,tenant,actor)"),"the editor's administration aggregate stays admin-only"),
+    ()->assertTrue(update.contains("validateAdmin(con,c.shaleClientId(),c.actorUserId())")),
+    ()->assertTrue(replace.contains("validateAdmin(con,c.shaleClientId(),c.actorUserId())")),
+    ()->assertTrue(intake.contains("validateAdmin(con,c.shaleClientId(),c.actorUserId())")),
+    ()->assertTrue(actor.contains("ISNULL(is_deleted,0)=0 AND ISNULL(IsRemoved,0)=0"),"inactive or removed actors must be denied"),
+    ()->assertTrue(actor.contains("SESSION_CONTEXT(N'ShaleClientId')"),"the requested tenant must match RLS session context"),
+    ()->assertTrue(actor.contains("SESSION_CONTEXT(N'PrincipalUserId')"),"an actor id cannot be substituted"),
+    ()->assertTrue(admin.contains("ISNULL(is_admin,0)=1")),
+    ()->assertTrue(admin.contains("SESSION_CONTEXT(N'PrincipalUserId')")));
+ }
  @Test void migrationDefinesParentChildUniquenessOrderingRlsAndRerunGuards() throws Exception {
   String s=Files.readString(Path.of("../docs/sql/2026-09-08_case_overview_configuration_phase1.sql"));
   assertTrue(s.contains("SET XACT_ABORT ON")); assertTrue(s.contains("BEGIN TRY")); assertTrue(s.contains("BEGIN TRANSACTION"));
@@ -86,5 +108,6 @@ class CaseOverviewConfigurationContractTest {
  }
  private static EffectiveCaseDateTypeDto type(int id,String key){return new EffectiveCaseDateTypeDto(id,7,key,key,null,"OTHER","#123456",false,id,true,false,EffectiveCaseDateTypeDto.Origin.TENANT_CREATED,new byte[]{1});}
  private static ResultSet resultSet(Number value){return (ResultSet)Proxy.newProxyInstance(CaseOverviewConfigurationContractTest.class.getClassLoader(),new Class<?>[]{ResultSet.class},(proxy,method,args)->{if(method.getName().equals("getObject"))return value;throw new UnsupportedOperationException(method.getName());});}
+ private static String method(String source,String start,String end){return source.substring(source.indexOf(start),source.indexOf(end,source.indexOf(start)));}
  private static int count(String text,String token){int n=0,p=0;while((p=text.indexOf(token,p))>=0){n++;p+=token.length();}return n;}
 }
