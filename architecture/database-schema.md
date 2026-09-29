@@ -1344,3 +1344,13 @@ current authentication runtime.
 ## UserSessions Phase 7B runtime cutover (no migration)
 
 Phase 7B uses the existing Phase 7A columns without schema changes. Server API JWTs carry the public UUID `SessionId` as `sid`; `CurrentAccessJti` is the single current credential authority. Bound validation uses a tenant/user/session-qualified indexed lookup, and conditional refresh additionally requires the old JTI, no revocation, and database expiry in the future. Durable expiry equals access-token expiry and is extended together on refresh.
+
+## Phase 8A session revocation and security audit
+
+`dbo.UserSessions` remains the authentication authority. Phase 8A adds `USER_REVOKED` to its closed reason
+constraint and adds the append-only, tenant-owned `dbo.SessionSecurityAuditLog` for explicit self/admin
+revocations and the bounded admin list read. Audit rows contain actor, optional public session UUID/target user,
+affected count, closed event/reason codes, and database UTC time; they never contain JWTs or JTIs. Account
+deactivation/removal and administrative password reset update the user and revoke every unrevoked session with
+`SECURITY` in the same transaction. Bound-token lookup also joins current active user eligibility as race-safe
+defense in depth.

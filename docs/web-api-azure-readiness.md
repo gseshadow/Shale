@@ -382,3 +382,11 @@ internal-error envelope; audit IDs and internals are not exposed.
 
 Deploy `docs/sql/2026-09-29_administrative_read_audit_phase6b.sql` before enabling the audited server. It is
 additive and safe while older clients run. Catalog and non-dbo RLS checks are separate verification scripts.
+
+## Phase 8A session APIs
+
+Authenticated bound-token clients may use `GET /api/sessions`, `POST /api/sessions/current/revoke`,
+`POST /api/sessions/{sessionId}/revoke`, and `POST /api/sessions/revoke-others`. Tenant administrators additionally
+have `GET /api/admin/sessions` (page default 50, maximum 100; optional `userId`, `clientType`, `activeOnly`, and
+`since`) and `POST /api/admin/sessions/{sessionId}/revoke`. No request accepts a tenant selector. Revoke responses
+contain no token or internal identifier. Deploy `2026-09-29_session_security_audit_phase8a.sql` before this server.

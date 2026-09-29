@@ -121,3 +121,11 @@ INSERT/UPDATE blocks through `sec.fn_FilterByTenant(ShaleClientId)`; the global-
 The internal DAO additionally qualifies every operation by authenticated tenant/user and validates an optional
 desktop instance against the same tenant and owner. The explicit non-dbo verifier creates a disposable
 `WITHOUT LOGIN` user, executes as it, expects error 33504 for cross-tenant writes, and cleans its exact fixture.
+
+## Phase 8A durable-session administration
+
+Self operations derive tenant, user, and current `sid` from the authenticated bound token. Admin operations derive
+tenant/actor the same way and recheck active same-tenant `is_admin` at the service/SQL boundary. Every list/update
+is explicitly tenant-qualified; a cross-tenant UUID is indistinguishable from an unavailable UUID. The new
+`SessionSecurityAuditLog` is strict tenant-owned data protected by the existing `TenantFilter` FILTER and AFTER
+INSERT/UPDATE predicates. RLS is defense in depth, not a replacement for predicates.

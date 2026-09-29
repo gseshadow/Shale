@@ -11,7 +11,7 @@ import com.shale.core.runtime.DbSessionProvider;
 
 /** Tenant- and owner-qualified persistence for durable user sessions. */
 public final class UserSessionDao {
-	private static final String SELECT="SELECT Id,SessionId,ClientType,ApplicationInstanceId,CurrentAccessJti,IssuedAt,ExpiresAt,LastRefreshedAt,RevokedAt,RevocationReason FROM dbo.UserSessions WHERE SessionId=? AND ShaleClientId=? AND UserId=?";
+	private static final String SELECT="SELECT s.Id,s.SessionId,s.ClientType,s.ApplicationInstanceId,s.CurrentAccessJti,s.IssuedAt,s.ExpiresAt,s.LastRefreshedAt,s.RevokedAt,s.RevocationReason FROM dbo.UserSessions s JOIN dbo.Users u ON u.Id=s.UserId AND u.ShaleClientId=s.ShaleClientId AND COALESCE(u.is_deleted,0)=0 AND COALESCE(u.IsRemoved,0)=0 WHERE s.SessionId=? AND s.ShaleClientId=? AND s.UserId=?";
 	private final DbSessionProvider db;
 	public UserSessionDao(DbSessionProvider db){this.db=Objects.requireNonNull(db,"db");}
 	public UserSessionView create(int tenant,int user,ClientType type,Long instance,UUID sessionId,UUID jti,Instant expiresAt){
