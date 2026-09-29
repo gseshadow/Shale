@@ -148,3 +148,10 @@ ignored, and missed events remain correct because every bound API request valida
 
 No schema, delivery audit, durable replay, session/device UI, geolocation, presence classification, updater
 schedule, shutdown enforcement, or Phase 9 behavior is included.
+## Desktop self-session management
+
+The JavaFX Settings surface depends only on `UiRuntimeBridge.UserSessionManagement`; the desktop implementation owns
+HTTP and the process-local Phase 7C bearer. The UI module does not depend on server classes or query `UserSessions`
+through JDBC. Phase 8A authorization, current-`sid` binding, revocation, and security auditing remain authoritative.
+Compatibility mode is represented by an absent capability, and async presentation is guarded by active tenant/user
+identity. This boundary is self-service only; tenant-administrator session tooling remains Phase 10.

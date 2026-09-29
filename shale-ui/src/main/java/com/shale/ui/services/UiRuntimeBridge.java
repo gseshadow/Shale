@@ -6,8 +6,22 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 public interface UiRuntimeBridge {
+
+	record UserSessionView(UUID sessionId, String clientType, Instant issuedAt, Instant expiresAt,
+			Instant lastRefreshedAt, Instant revokedAt, boolean currentSession) {}
+
+	interface UserSessionManagement {
+		List<UserSessionView> list();
+		void revoke(UUID sessionId);
+		void revokeOthers();
+	}
+
+	/** Empty is the expected JDBC-only/older-server compatibility state. */
+	default Optional<UserSessionManagement> userSessionManagement() { return Optional.empty(); }
 
 	void onLoginSuccess(int userId, int shaleClientId, String email);
 

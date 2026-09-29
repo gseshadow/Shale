@@ -16,7 +16,7 @@ final class SettingsDirectoryContractTest {
 
     @Test void directoryGroupsHaveTheExpectedOrderedRows() throws Exception {
         var document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(FXML.toFile());
-        assertEquals(List.of("Appearance", "Notification Preferences", "Custom Dictionary"), titles(document, "personalGroup"));
+        assertEquals(List.of("Appearance", "Notification Preferences", "Devices & Sessions", "Custom Dictionary"), titles(document, "personalGroup"));
         assertEquals(List.of("Case Statuses", "Practice Areas", "Link Types", "Case Team Roles", "Case Dates", "Protected Case Date Mappings"), titles(document, "caseConfigurationGroup"));
         assertEquals(List.of("Request Fields"), titles(document, "requestConfigurationGroup"));
         assertEquals(List.of("Contact Classifications", "Organization Types"), titles(document, "contactOrganizationConfigurationGroup"));
@@ -25,7 +25,7 @@ final class SettingsDirectoryContractTest {
 
     @Test void everyDirectoryEntryUsesTheSharedRowAndContainsNoInlineStyle() throws Exception {
         String fxml = Files.readString(FXML);
-        assertEquals(15, count(fxml, "<SettingsManagementRow "));
+        assertEquals(16, count(fxml, "<SettingsManagementRow "));
         assertFalse(fxml.contains(" style=\""), "Settings presentation must remain stylesheet-owned.");
         assertFalse(fxml.contains("CardsContainer"), "Migrated inline definition hosts must not return to Settings FXML.");
         assertTrue(Files.readString(Path.of("src/main/java/com/shale/ui/component/SettingsManagementRow.java"))

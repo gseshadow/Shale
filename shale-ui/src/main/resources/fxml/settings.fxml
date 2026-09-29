@@ -37,6 +37,9 @@
           </FlowPane>
           <HBox styleClass="settings-inline-actions"><Button fx:id="applyNotificationPreferencesButton" text="Apply" onAction="#onApplyNotificationPreferences"/><Button fx:id="resetNotificationPreferencesButton" text="Reset" onAction="#onResetNotificationPreferences"/><Label fx:id="notificationSettingsStatusLabel" styleClass="settings-state-message" wrapText="true" HBox.hgrow="ALWAYS"/></HBox>
         </VBox>
+        <SettingsManagementRow fx:id="devicesSessionsRow" title="Devices &amp; Sessions"
+            description="Review and sign out your durable Shale sessions." actionText="Open"/>
+        <VBox fx:id="devicesSessionsContent" visible="false" managed="false" styleClass="settings-inline-content"/>
         <SettingsManagementRow fx:id="customDictionaryRow" title="Custom Dictionary"
             description="Manage words accepted by Shale’s spelling tools." actionText="Manage"/>
       </VBox>

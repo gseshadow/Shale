@@ -118,6 +118,9 @@ public final class SettingsController {
 	@FXML private SettingsManagementRow notificationPreferencesRow;
 	@FXML private VBox notificationPreferencesContent;
 	@FXML private SettingsManagementRow appearanceRow;
+	@FXML private SettingsManagementRow devicesSessionsRow;
+	@FXML private VBox devicesSessionsContent;
+	private DevicesSessionsPane devicesSessionsPane;
 	@FXML private VBox appearanceContent;
 	@FXML private ToggleButton lightThemeButton, darkThemeButton;
 	@FXML private Label appearanceStatusLabel;
@@ -189,6 +192,7 @@ public final class SettingsController {
 		viewAuditLogButton = bind(auditLogRow, this::onViewAuditLog);
 		bind(notificationPreferencesRow, event -> toggleInline(notificationPreferencesContent, notificationPreferencesRow, false));
 		bind(appearanceRow, event -> toggleInline(appearanceContent, appearanceRow, false));
+		bind(devicesSessionsRow, event -> toggleDevicesSessions());
 		bind(userManagementRow, this::onManageUsers);
 		manageFirmWideRolesButton = bind(firmWideRolesRow, this::onManageFirmWideRoles);
 		bind(caseDateMappingsRow, event -> {
@@ -196,6 +200,13 @@ public final class SettingsController {
 			toggleInline(caseDateRoleMappingsContent, caseDateMappingsRow, false);
 			if (opening) loadCaseDateRoleMappingsAsync(null);
 		});
+	}
+
+	private void toggleDevicesSessions() {
+		boolean opening=!devicesSessionsContent.isManaged();
+		if(opening&&devicesSessionsPane==null){devicesSessionsPane=new DevicesSessionsPane(runtimeBridge,appState,settingsLoadExecutor);devicesSessionsContent.getChildren().setAll(devicesSessionsPane);}
+		toggleInline(devicesSessionsContent,devicesSessionsRow,false);
+		if(devicesSessionsPane!=null){if(opening)devicesSessionsPane.open();else devicesSessionsPane.close();}
 	}
 
 	@FXML
