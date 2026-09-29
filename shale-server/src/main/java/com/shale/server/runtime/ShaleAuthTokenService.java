@@ -64,6 +64,36 @@ public final class ShaleAuthTokenService {
         return ttlSeconds;
     }
 
+    /** Prepares claims before persistence so the database and signed token use identical values. */
+    public PreparedAuthToken prepare(ServerPrincipal principal) {
+        if (!enabled) throw new IllegalStateException("Authentication tokens are not enabled for this profile.");
+        java.util.Objects.requireNonNull(principal, "principal");
+        long issuedAt = Instant.now(clock).getEpochSecond();
+        return new PreparedAuthToken(principal, UUID.randomUUID(), issuedAt, issuedAt + ttlSeconds);
+    }
+
+    /** Signs a token only after its prepared JTI/expiry have been durably persisted. */
+    public String issueBound(PreparedAuthToken prepared, UUID sessionId) {
+        java.util.Objects.requireNonNull(prepared, "prepared");
+        java.util.Objects.requireNonNull(sessionId, "sessionId");
+        ServerPrincipal principal = prepared.principal();
+        String header = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
+        StringBuilder payload = new StringBuilder()
+                .append("{\"sub\":").append(principal.userId())
+                .append(",\"jti\":\"").append(prepared.tokenId()).append("\"")
+                .append(",\"sid\":\"").append(sessionId).append("\"")
+                .append(",\"userId\":").append(principal.userId())
+                .append(",\"shaleClientId\":").append(principal.shaleClientId())
+                .append(",\"iat\":").append(prepared.issuedAtEpochSeconds())
+                .append(",\"exp\":").append(prepared.expiresAtEpochSeconds());
+        if (principal.email() != null && !principal.email().isBlank()) {
+            payload.append(",\"email\":\"").append(jsonEscape(principal.email())).append("\"");
+        }
+        payload.append('}');
+        String signingInput = encode(header.getBytes(StandardCharsets.UTF_8)) + "." + encode(payload.toString().getBytes(StandardCharsets.UTF_8));
+        return signingInput + "." + encode(sign(signingInput));
+    }
+
     public String issue(ServerPrincipal principal) {
         if (!enabled) {
             throw new IllegalStateException("Authentication tokens are not enabled for this profile.");
@@ -122,13 +152,14 @@ public final class ShaleAuthTokenService {
         String tokenId = stringClaim(payload, "jti");
         Integer userId = intClaim(payload, "userId");
         Integer shaleClientId = intClaim(payload, "shaleClientId");
+        Long iat = longClaim(payload, "iat");
         Long exp = longClaim(payload, "exp");
-        if (tokenId == null || userId == null || shaleClientId == null || exp == null || exp <= Instant.now(clock).getEpochSecond()) {
+        if (tokenId == null || userId == null || shaleClientId == null || iat == null || exp == null || exp <= Instant.now(clock).getEpochSecond()) {
             return Optional.empty();
         }
         try {
             ServerPrincipal principal = new ServerPrincipal(userId, shaleClientId, stringClaim(payload, "email"));
-            return Optional.of(new VerifiedAuthToken(principal, tokenId, exp));
+            return Optional.of(new VerifiedAuthToken(principal, tokenId, iat, exp, stringClaim(payload, "sid")));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }
@@ -184,5 +215,10 @@ public final class ShaleAuthTokenService {
             value = System.getProperty(key);
         }
         return value == null || value.isBlank() ? defaultValue : Long.parseLong(value.trim());
+    }
+
+    public record PreparedAuthToken(ServerPrincipal principal, UUID tokenId, long issuedAtEpochSeconds,
+            long expiresAtEpochSeconds) {
+        public PreparedAuthToken { java.util.Objects.requireNonNull(principal); java.util.Objects.requireNonNull(tokenId); }
     }
 }

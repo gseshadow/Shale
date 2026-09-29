@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 6B in progress — implementation complete, verification blocked
+**Status:** Phase 7B in progress — implementation complete, verification blocked by Maven Central HTTP 403
 
 **Last reviewed:** 2026-09-29
 
@@ -945,7 +945,7 @@ ordinary-user read audit, or analytics telemetry.
 
 ### Phase 7A — Durable user-session schema
 
-**Status: IN PROGRESS — Maven Central HTTP 403 and unavailable live SQL connectivity block required verification.**
+**Status: COMPLETE — foundation deployed and verified before Phase 7B.**
 
 * **Goal:** introduce client-neutral durable session/revocation state.
 * **In scope:** strict tenant schema/RLS, hashed opaque/bound-JTI representation, expiry/reason model,
@@ -958,6 +958,8 @@ ordinary-user read audit, or analytics telemetry.
 * **Risks:** confusing token, session, device, and instance identities.
 
 ### Phase 7B — API token/session compatibility migration
+
+**Status: IN PROGRESS — implementation is present; required Maven verification is blocked by Maven Central HTTP 403.**
 
 * **Goal:** bind newly issued API tokens to durable sessions without breaking existing clients.
 * **In scope:** versioned issuance/validation, overlap for legacy JWTs, durable shared revocation adapter,
@@ -1117,9 +1119,10 @@ ordinary-user read audit, or analytics telemetry.
 | 5B | **COMPLETE** | Heartbeat lifecycle and required verification completed before Phase 6A. |
 | 6A | **COMPLETE** | Read-only tenant-admin service/API and required verification completed before Phase 6B. |
 | 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
-| 7A | **IN PROGRESS** | Additive schema and internal service foundation implemented; Maven Central HTTP 403 plus unavailable live SQL connectivity block required verification. |
-| 7B | **NOT STARTED — NEXT PROPOSED STEP** | Start only after Phase 7A live SQL verification completes. |
-| 7C-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
+| 7B | **IN PROGRESS** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility implemented; Maven Central HTTP 403 blocks required verification. |
+| 7C | **NOT STARTED — NEXT PROPOSED STEP** | Desktop session enrollment only after Phase 7B verification completes. |
+| 8A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1156,10 +1159,7 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-After Phase 7A live SQL verification completes, implement **Phase 7B only**: bind newly issued server API
-tokens to durable sessions behind a backward-compatible overlap for existing JWTs; define durable shared
-revocation and refresh/JTI rotation behavior and its rollback window. Do not migrate desktop authentication,
-add session/device UI, remote logout notification, PubSub, geolocation, or enforcement.
+After Phase 7B verification completes, implement **Phase 7C only**: enroll desktop authentication into the durable session model through an additive post-credential server exchange (or an explicitly approved equivalent), securely handle the desktop credential, and attach the existing Phase 4B application instance when ownership is authoritative. Preserve direct-JDBC desktop login during rollout and do not add session/device UI, administrator revocation APIs, PubSub delivery, geolocation, or updater enforcement.
 
 ## Phase 7A implementation record — 2026-09-29
 
@@ -1239,3 +1239,18 @@ heartbeat/presence authority, geolocation, device/admin UI, updater behavior, or
 history was added. Phase 6A subsequently implemented the authorized, paged, safe read API/service described above without adding remote control, sessions, location, updater scheduling, or enforcement.
 
 Verification was subsequently completed before the Phase 6A run; the historical dependency outage no longer controls Phase 5B status.
+
+
+## Phase 7B implementation record — 2026-09-29
+
+New server API logins now prepare one UUID JTI and access-token expiry, create a `WEB` `UserSessions` row with a random public UUID `SessionId` and null `ApplicationInstanceId`, and only then sign a JWT containing canonical string claims `sid` and `jti`. The persisted `ExpiresAt` equals JWT `exp`; refresh extends both by the configured access-token TTL because Shale has no separate refresh credential. HMAC signing follows persistence and has no expected runtime I/O failure; an exceptional signing failure can leave an unusable orphan row but cannot expose an unpersisted token. Existing login/refresh/logout request and response DTOs are unchanged, and the web treats bearer tokens as opaque values. Desktop authentication remains untouched.
+
+After signature and ordinary expiry verification, bound-token authentication parses UUID `sid`/`jti` and performs one minimal, indexed, tenant-and-user-qualified `UserSessions` lookup through a principal-initialized runtime connection. SQL state is authoritative: missing, revoked, expired, wrong-tenant/wrong-user, or current-JTI-mismatched sessions fail with the existing generic 401. There is no cache, so replicas observe rotation or revocation on their next request. Refresh uses the Phase 7A conditional update, now also requiring database `ExpiresAt > SYSUTCDATETIME()`; one stale/concurrent refresh loses. Logout sets the first `RevokedAt`/`USER_LOGOUT` reason idempotently and also records the JTI in the process-local store only as rollback defense in depth.
+
+`SHALE_AUTH_SESSION_BINDING_CUTOVER_AT` is a required ISO-8601 UTC instant in active server profiles. An otherwise-valid unbound JWT is eligible only when its `iat` is strictly before that boundary and server time is strictly before `cutover + SHALE_AUTH_TOKEN_TTL_SECONDS`; its original JWT expiry and in-memory JTI revocation still apply. An unbound token issued at/after cutover is rejected. Refresh during the window creates a durable WEB session, returns a bound token, and retires the legacy JTI. Missing or malformed cutoff configuration fails startup rather than permitting legacy tokens indefinitely.
+
+No Phase 7B SQL migration is needed: Phase 7A already contains session/JTI, expiry, refresh, and first-revocation fields plus the tenant-qualified index/constraints. This is N-1 compatible at the schema and HTTP-contract layers; older clients send no new fields. Rollback is operationally sensitive: a pre-7B server ignores SQL revocation and could accept a still-unexpired bound JWT as an ordinary signed token. Normal rollback must therefore occur only after the maximum token TTL with Phase 7B traffic drained, or preserve every relevant process-local revocation entry; emergency rollback after durable revocation requires rotating the JWT signing secret, which invalidates all outstanding tokens. Durable rows themselves do not block old code.
+
+Audit decision: Phase 7B uses the bounded intrinsic `UserSessions` lifecycle record (`IssuedAt`, `LastRefreshedAt`, first `RevokedAt`, and closed reason) as the security record. It does not put authentication events into PHI `AuditLog`, administrative-read audit, or the entity-mutation audit whose allowlists do not model security sessions. No raw JWT or token history is stored. A second audit table would duplicate the authoritative bounded lifecycle and require unnecessary schema in this cutover; no per-request or routine-refresh event is emitted.
+
+This phase adds no public session/device/admin-revoke endpoint, remote logout delivery, PubSub, UI, geolocation, desktop-auth redesign, mobile flow, or updater policy/enforcement. Phase 7C remains not started. Required Maven verification is currently blocked by Maven Central HTTP 403, so Phase 7B remains **IN PROGRESS** rather than complete.

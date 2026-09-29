@@ -11,10 +11,18 @@ public final class BearerTokenServerSessionResolver implements ServerSessionReso
 
     private final ShaleAuthTokenService tokenService;
     private final TokenRevocationStore revocationStore;
+    private final ServerAuthSessionService authSessions;
 
     public BearerTokenServerSessionResolver(ShaleAuthTokenService tokenService, TokenRevocationStore revocationStore) {
         this.tokenService = java.util.Objects.requireNonNull(tokenService, "tokenService");
         this.revocationStore = java.util.Objects.requireNonNull(revocationStore, "revocationStore");
+        this.authSessions = null;
+    }
+
+    public BearerTokenServerSessionResolver(ShaleAuthTokenService tokenService, ServerAuthSessionService authSessions) {
+        this.tokenService = java.util.Objects.requireNonNull(tokenService, "tokenService");
+        this.authSessions = java.util.Objects.requireNonNull(authSessions, "authSessions");
+        this.revocationStore = null;
     }
 
     @Override
@@ -28,7 +36,7 @@ public final class BearerTokenServerSessionResolver implements ServerSessionReso
         }
         VerifiedAuthToken verifiedToken = tokenService.verifyToken(token)
                 .orElseThrow(BearerTokenServerSessionResolver::invalidToken);
-        if (revocationStore.isRevoked(verifiedToken.tokenId())) {
+        if (authSessions != null ? !authSessions.validate(verifiedToken) : revocationStore.isRevoked(verifiedToken.tokenId())) {
             throw invalidToken();
         }
         return ServerSessionContext.authenticated(verifiedToken.principal());

@@ -106,11 +106,13 @@ authentication, authorization, validation, tenant-context, and read failures cre
 deterministic, allowlisted, and bounded, and result volume never changes the one-event-per-query cardinality.
 No ordinary reads, heartbeat writes, instance mutations, remote control, sessions, geolocation, PubSub,
 enforcement, or UI are included.
-## Durable user-session foundation (Phase 7A; live SQL verification pending)
+## Durable user-session foundation (Phase 7A; verified)
 
 The core/data boundary defines internal `UserSessionServicePort` -> `UserSessionServiceAdapter` ->
 `UserSessionDao` operations for durable create/find/idempotent revoke/conditional JTI rotation. This model is an
 authentication lifecycle, not an application process: its optional same-owner desktop instance relationship
-does not couple heartbeat or instance abandonment to revocation. Server controllers, bearer filtering, login,
-refresh, logout, in-memory revocation, desktop, and web runtime are intentionally not wired to this boundary.
-There are no new APIs, UI, PubSub, geolocation, enforcement, or device controls.
+does not couple heartbeat or instance abandonment to revocation. Phase 7A itself introduced no runtime wiring. Phase 7B now connects server bearer filtering, login, refresh, and logout to this boundary as described below; desktop remains outside it. There are no new session-management APIs, UI, PubSub, geolocation, enforcement, or device controls.
+
+## Durable server API authentication (Phase 7B)
+
+Server API login continues through `AuthServicePort`, then creates a tenant/user-qualified Phase 7A `UserSessions` row before returning a JWT. New JWTs retain the existing identity/time claims and add public UUID `sid`; SQL `CurrentAccessJti`, expiry, and revocation are authoritative on every authenticated bound-token request. Refresh conditionally rotates the JTI and logout durably revokes only that session. The request resolver performs no lookup for absent bearer tokens or public routes. A temporary, required-cutoff legacy branch accepts otherwise-valid pre-cutover unbound JWTs and upgrades them on refresh; its in-memory revocation store is not authoritative for bound sessions. Desktop direct-JDBC authentication is unchanged until Phase 7C.

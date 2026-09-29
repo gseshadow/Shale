@@ -58,6 +58,11 @@ import com.shale.server.runtime.InMemoryTokenRevocationStore;
 import com.shale.server.runtime.ShaleAuthTokenService;
 import com.shale.server.runtime.TokenRevocationStore;
 import com.shale.server.runtime.UnauthenticatedServerSessionResolver;
+import com.shale.server.runtime.DurableSessionStore;
+import com.shale.server.runtime.SqlDurableSessionStore;
+import com.shale.server.runtime.DurableSessionTokenValidator;
+import com.shale.server.runtime.LegacyTokenCompatibilityPolicy;
+import com.shale.server.runtime.ServerAuthSessionService;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -66,8 +71,8 @@ public class ShaleServerServiceConfiguration {
 
     @Bean
     @Profile({"prod", "azure"})
-    ServerSessionResolver serverSessionResolver(ShaleAuthTokenService tokenService, TokenRevocationStore tokenRevocationStore) {
-        return new BearerTokenServerSessionResolver(tokenService, tokenRevocationStore);
+    ServerSessionResolver serverSessionResolver(ShaleAuthTokenService tokenService, ServerAuthSessionService authSessions) {
+        return new BearerTokenServerSessionResolver(tokenService, authSessions);
     }
 
     @Bean
@@ -82,9 +87,9 @@ public class ShaleServerServiceConfiguration {
      */
     @Bean
     @Profile({"dev", "local"})
-    ServerSessionResolver developmentServerSessionResolver(ShaleAuthTokenService tokenService, TokenRevocationStore tokenRevocationStore) {
+    ServerSessionResolver developmentServerSessionResolver(ShaleAuthTokenService tokenService, ServerAuthSessionService authSessions) {
         return new CompositeServerSessionResolver(java.util.List.of(
-                new BearerTokenServerSessionResolver(tokenService, tokenRevocationStore),
+                new BearerTokenServerSessionResolver(tokenService, authSessions),
                 new DevelopmentHeaderServerSessionResolver()));
     }
 
@@ -134,6 +139,25 @@ public class ShaleServerServiceConfiguration {
     TokenRevocationStore tokenRevocationStore() {
         return new InMemoryTokenRevocationStore();
     }
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	DurableSessionStore durableSessionStore(RuntimeConnectionProvider connections){return new SqlDurableSessionStore(connections);}
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	DurableSessionTokenValidator durableSessionTokenValidator(DurableSessionStore store){return new DurableSessionTokenValidator(store);}
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	LegacyTokenCompatibilityPolicy legacyTokenCompatibilityPolicy(ShaleAuthTokenService tokens){return LegacyTokenCompatibilityPolicy.fromEnvironment(tokens.ttlSeconds());}
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	ServerAuthSessionService serverAuthSessionService(ShaleAuthTokenService tokens,DurableSessionStore store,
+			DurableSessionTokenValidator validator,LegacyTokenCompatibilityPolicy legacy,TokenRevocationStore revocations){
+		return new ServerAuthSessionService(tokens,store,validator,legacy,revocations);
+	}
 
     @Bean
     @Profile({"dev", "local", "prod", "azure"})

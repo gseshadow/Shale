@@ -111,6 +111,7 @@ Optional:
 | Setting | Notes |
 |----------|----------|
 | SHALE_AUTH_TOKEN_TTL_SECONDS | Defaults to 28800 (8 hours) |
+| SHALE_AUTH_SESSION_BINDING_CUTOVER_AT | **Required for Phase 7B.** ISO-8601 UTC deployment boundary; startup fails when missing/malformed. |
 | SHALE_ALLOWED_CORS_ORIGINS | Required for browser clients. For local `shale-web` login, set `SHALE_ALLOWED_CORS_ORIGINS=http://localhost:5173` and restart the App Service. |
 | DB_MAX_POOL_SIZE | Pool tuning |
 | DB_CONNECTION_TIMEOUT_MS | Pool tuning |
@@ -431,3 +432,8 @@ Known deployment lessons:
 3. Use `java -jar ...` without `$JAVA_OPTS`.
 4. Paste only the raw token into Swagger authorization.
 5. Expect first startup to take approximately 45–60 seconds while Spring Boot initializes and Azure instrumentation attaches.
+## Phase 7B durable API sessions
+
+Set `SHALE_AUTH_SESSION_BINDING_CUTOVER_AT` to the UTC deployment boundary in strict ISO-8601 form (for example, `2026-09-29T18:00:00Z`) before deploying the Phase 7B server. Startup fails if it is absent or malformed. Existing unbound JWTs issued before that instant remain eligible only until the earlier of their own expiry or the boundary plus `SHALE_AUTH_TOKEN_TTL_SECONDS`; refresh upgrades them to a durable bound session. New logins require the already-deployed Phase 7A `UserSessions` table.
+
+Safe rollout order is Phase 7A verification, cutoff configuration, Phase 7B deployment, legacy drain/refresh upgrade, and confirmation that the maximum token TTL has elapsed. A routine rollback to pre-7B must wait one maximum token TTL with Phase 7B traffic drained because old code does not enforce SQL revocation. If emergency rollback follows any durable revocation, rotate `SHALE_AUTH_TOKEN_SECRET` and require reauthentication; otherwise a still-unexpired bound JWT revoked only in SQL could be accepted by old code.
