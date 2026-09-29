@@ -9,6 +9,14 @@ import com.shale.core.dto.UserSessionView;import com.shale.core.model.*;import c
 import com.shale.server.runtime.*;
 
 class DesktopSessionControllerTest {
+	@Test void nullInstanceCreatesAnUnlinkedDesktopSession()throws Exception{
+		var auth=new Auth();var store=new Store();var tokens=new ShaleAuthTokenService("test-auth-token-secret-that-is-long-enough",3600,Clock.systemUTC());
+		var service=new ServerAuthSessionService(tokens,store,new DurableSessionTokenValidator(store),new LegacyTokenCompatibilityPolicy(Instant.now(),3600,Clock.systemUTC()),new InMemoryTokenRevocationStore());
+		var mvc=MockMvcBuilders.standaloneSetup(new DesktopSessionController(auth,service,new Verifier(true))).setControllerAdvice(new ApiExceptionHandler()).build();
+		mvc.perform(post("/api/auth/desktop-session").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"owner@test\",\"password\":\"secret\"}"))
+				.andExpect(status().isOk());
+		assertEquals(1,store.creates);assertNull(store.instance);
+	}
  @Test void verifiedCredentialsCreateExactlyOneDesktopSessionBoundToOwnedInstance()throws Exception{
   var auth=new Auth();var store=new Store();var tokens=new ShaleAuthTokenService("test-auth-token-secret-that-is-long-enough",3600,Clock.systemUTC());
   var service=new ServerAuthSessionService(tokens,store,new DurableSessionTokenValidator(store),new LegacyTokenCompatibilityPolicy(Instant.now(),3600,Clock.systemUTC()),new InMemoryTokenRevocationStore());
