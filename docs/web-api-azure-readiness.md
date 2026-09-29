@@ -358,7 +358,7 @@ server-observed UTC end time. These process lifecycle rows are not tokens or dur
 requires `docs/sql/2026-09-28_application_instances_foundation_phase4b.sql` plus its catalog and non-dbo RLS
 verification scripts. Phase 4B verification completed before Phase 5A.
 
-## Phase 6A tenant-admin application-instance reads (verification pending)
+## Phase 6A tenant-admin application-instance reads (complete)
 
 `GET /api/admin/application-instances` returns a tenant-admin-only recent page. Parameters are `page` (0–100,
 default 0), `size` (1–100, default 50), exact `clientType`, canonical `version`, positive `userId`, `activeOnly`,
@@ -370,3 +370,15 @@ returns launch `instanceCount`, separately deduplicated `distinctUserCount`, and
 Both routes derive tenant/user authority from authentication, return 401/403 conventionally, and accept no
 tenant selector. Phase 6A adds no migration, mutation, remote control, session/geolocation/enforcement/PubSub,
 updater action, or UI.
+
+## Phase 6B bounded administrative-read audit
+
+The two Phase 6A routes retain their response and OpenAPI contracts. After a successful bounded DAO read, the
+server writes one tenant/actor-attributed `AdministrativeReadAuditLog` row in the same transaction, then returns
+the response. A page with one or 50 instances still writes one event; a distribution with any number of buckets
+writes one event. Failed authentication, authorization, validation, tenant context, DAO reads, and audit writes
+produce no successful response/audit claim. Audit failure is fail-closed and is handled by the existing safe
+internal-error envelope; audit IDs and internals are not exposed.
+
+Deploy `docs/sql/2026-09-29_administrative_read_audit_phase6b.sql` before enabling the audited server. It is
+additive and safe while older clients run. Catalog and non-dbo RLS checks are separate verification scripts.

@@ -104,3 +104,12 @@ FILTER plus AFTER INSERT and AFTER UPDATE block predicates. It never uses the te
 Runtime enrollment/end also qualifies by authenticated tenant and owning user. Catalog checks may run as dbo,
 but live enforcement must use the disposable non-dbo verifier in
 `docs/sql/verification/2026-09-28_application_instances_phase4b_rls.sql`.
+
+## Administrative read audit tenancy (Phase 6B)
+
+`dbo.AdministrativeReadAuditLog` is strict tenant-owned, append-only application history. Its tenant-qualified
+actor FK and `TenantFilter` FILTER plus AFTER INSERT/UPDATE block predicates prevent cross-tenant attribution;
+it never uses the global-overlay predicate. The server supplies tenant and actor from the authenticated
+principal and revalidates current admin membership before reading or inserting. Future review is limited to a
+tenant administrator or designated audit administrator through separately approved tooling; ordinary users
+have no visibility and Phase 6B adds no review API or UI.

@@ -92,10 +92,17 @@ The database/API heartbeat is authoritative; Web PubSub is not involved. This fo
 idle/online classification, enforcement directive, remote logout, durable user session, version
 policy comparison, geolocation, updater action, device UI, or heartbeat/activity history.
 
-## Tenant-admin application-instance reads (Phase 6A, verification pending)
+## Tenant-admin application-instance reads (Phase 6A, complete; Phase 6B audit)
 
 The server-only `ApplicationInstanceAdminReadServicePort` provides set-based, tenant-qualified bounded recent
 launch pages and numeric version distribution. Authenticated principal identity, controller and DAO admin
 checks, and strict RLS enforce tenant isolation. Responses expose raw nullable timestamps and the random Phase
 4A machine UUID, but no inferred presence, hostname, IP/location, secrets, row version, session state, UI, or
 mutation.
+
+The same DAO transaction now appends one `AdministrativeReadAuditLog` row after each successful recent-page or
+version-distribution query and commits before returning the sensitive response. Audit persistence is fail-closed;
+authentication, authorization, validation, tenant-context, and read failures create no success event. Metadata is
+deterministic, allowlisted, and bounded, and result volume never changes the one-event-per-query cardinality.
+No ordinary reads, heartbeat writes, instance mutations, remote control, sessions, geolocation, PubSub,
+enforcement, or UI are included.
