@@ -76,7 +76,7 @@ tenant, or business identifier is retained. Mouse movement and all programmatic/
 This Phase 5A foundation is process-local: it performs no persistence, SQL, API/network call, heartbeat, idle
 classification, policy action, audit mutation, PubSub operation, updater decision, or OS-wide monitoring.
 
-## Application-instance heartbeat runtime (Phase 5B, verification pending)
+## Application-instance heartbeat runtime (Phase 5B, complete)
 
 The authenticated desktop shell starts one application-instance heartbeat lifecycle only after a
 successful Phase 4B enrollment and Phase 5A observer installation. It sends the strict
@@ -91,3 +91,11 @@ unable to affect a replacement enrollment. Ended or owner-inaccessible instances
 The database/API heartbeat is authoritative; Web PubSub is not involved. This foundation adds no
 idle/online classification, enforcement directive, remote logout, durable user session, version
 policy comparison, geolocation, updater action, device UI, or heartbeat/activity history.
+
+## Tenant-admin application-instance reads (Phase 6A, verification pending)
+
+The server-only `ApplicationInstanceAdminReadServicePort` provides set-based, tenant-qualified bounded recent
+launch pages and numeric version distribution. Authenticated principal identity, controller and DAO admin
+checks, and strict RLS enforce tenant isolation. Responses expose raw nullable timestamps and the random Phase
+4A machine UUID, but no inferred presence, hostname, IP/location, secrets, row version, session state, UI, or
+mutation.

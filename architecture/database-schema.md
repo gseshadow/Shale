@@ -1277,7 +1277,7 @@ allows skipped releases, rejects backwards movement, and treats the same release
 expected `RowVer`; the DAO locks the scope and handles unique conflicts on concurrent first creation. This is
 announcement state only—not installed version, eligibility, policy, workstation, session, or heartbeat state.
 
-## dbo.ApplicationInstances (Phase 4B implementation; verification pending)
+## dbo.ApplicationInstances (Phase 4B complete)
 
 Strict tenant-owned registered client-process launches, not authentication sessions. Columns are `Id bigint
 IDENTITY` (PK), non-null `ShaleClientId`/`UserId`, nullable `MachineId uniqueidentifier`, closed `ClientType`,
@@ -1303,3 +1303,10 @@ older Phase 4B inserts omit both nullable columns and continue to succeed, exist
 unchanged, and all original columns, keys, checks, and strict tenant predicates remain intact. It is
 safe to deploy while older desktops are running. Adding the nullable columns is expected to be a
 short metadata operation; no speculative liveness index is created, avoiding index-build locking.
+
+## ApplicationInstances Phase 6A administrative reads (no migration)
+
+Phase 6A adds no schema dependency. Reads explicitly filter `ApplicationInstances.ShaleClientId`, join `Users`
+on tenant plus user ID once, bound `StartedAt` to at most 90 days, and page by `StartedAt DESC, Id DESC`.
+Distribution uses SQL `GROUP BY MajorVersion, MinorVersion, BuildVersion` and numeric descending ordering.
+Existing strict tenant RLS is unchanged.
