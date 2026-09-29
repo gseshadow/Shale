@@ -150,7 +150,7 @@ public final class ApplicationReleaseController {
                 version(policy.latest()), id(policy.latest()),
                 version(policy.minimumRecommended()), id(policy.minimumRecommended()),
                 version(policy.minimumAllowed()), id(policy.minimumAllowed()),
-                policy.requiredUpdateDeadline(), policy.accessMode(), policy.publishedAt());
+                policy.requiredUpdateDeadline(), policy.accessMode(), policy.publishedAt(), policy.serverTime());
     }
 
     private static String version(ReleaseReference reference) {

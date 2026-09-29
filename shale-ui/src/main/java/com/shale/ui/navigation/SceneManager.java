@@ -111,6 +111,7 @@ import com.shale.data.dao.UserReleaseStateDao;
 import com.shale.data.dao.UserDictionaryWordDao;
 import com.shale.ui.component.spellcheck.UserDictionarySession;
 import com.shale.ui.services.AppVersionProvider;
+import com.shale.ui.services.ApplicationUpdatePolicyCoordinator;
 import com.shale.ui.whatsnew.WhatsNewCoordinator;
 import com.shale.ui.whatsnew.WhatsNewDialog;
 import com.shale.ui.activity.ForegroundHumanActivityObserver;
@@ -143,6 +144,9 @@ public final class SceneManager {
 	private final UpdatePollingService updatePollingService;
 	private final PhiReadAuditService phiReadAuditService;
 	private final WhatsNewCoordinator whatsNewCoordinator;
+	private final ApplicationUpdatePolicyCoordinator updatePolicyCoordinator;
+	private MainController mainController;
+	private UpdateCheckResult lastUpdateCheck;
 	private final ExecutorService notificationBadgeCountExecutor;
 	private final ExecutorService notificationStartupExecutor;
 	private final AtomicLong notificationStartupGeneration = new AtomicLong(0);
@@ -216,6 +220,11 @@ public final class SceneManager {
 				new UserReleaseStateServiceAdapter(new UserReleaseStateDao(dbSessionProvider)),
 				AppVersionProvider::currentVersion, Platform::runLater,
 				(presentation, dismissed) -> WhatsNewDialog.show(stage, presentation, dismissed));
+		this.updatePolicyCoordinator = new ApplicationUpdatePolicyCoordinator(
+				new ApplicationReleaseReadServiceAdapter(new ApplicationReleaseReadDao(dbSessionProvider)),
+				AppVersionProvider::currentVersion, notificationStartupExecutor, Platform::runLater,
+				presentation -> { if (presentation.revision()>0) systemUpdateNotificationProducer.useAuthoritativePolicyPresentation(); if (mainController != null) mainController.showUpdatePolicy(presentation); });
+		runtimeBridge.setApplicationPolicyRefreshHandler(updatePolicyCoordinator::refresh);
 		UserDictionarySession.configure(new UserDictionarySession(new UserDictionaryServiceAdapter(new UserDictionaryWordDao(dbSessionProvider)),appState));
 	}
 
@@ -252,6 +261,8 @@ public final class SceneManager {
 	private void stopSessionOwnedWork() {
 		humanActivityObserver.stop();
 		whatsNewCoordinator.reset();
+		updatePolicyCoordinator.reset();
+		mainController = null;
 		authenticatedProducersActive = false;
 		activeTenantId = null;
 		activeUserId = null;
@@ -307,13 +318,16 @@ public final class SceneManager {
 		var root = load("/fxml/main.fxml", controller ->
 		{
 			MainController c = (MainController) controller;
+			mainController = c;
 			c.init(this, appState, runtimeBridge, notificationCenterService);
 			c.setUpdateLauncher(updateLauncher);
+			if(lastUpdateCheck!=null)c.setUpdaterPackageAvailable(lastUpdateCheck.updateAvailable());
 			return c;
 		});
 		setScene(root, "Shale");
 		Platform.runLater(() -> System.out.println("[StartupTiming] main shell visible"));
 		startSessionOwnedWork();
+		updatePolicyCoordinator.refresh();
 		try {
 			humanActivityObserver.start(stage);
 			log.debug("Foreground human-activity observer installed for authenticated shell.");
@@ -467,11 +481,13 @@ public final class SceneManager {
 	}
 
 	public void onUpdateCheckCompleted(UpdateCheckResult result) {
+		lastUpdateCheck=result;
 		if (Platform.isFxApplicationThread()) {
+			if(mainController!=null)mainController.setUpdaterPackageAvailable(result!=null&&result.updateAvailable());
 			systemUpdateNotificationProducer.onUpdateCheckResult(result);
 			return;
 		}
-		Platform.runLater(() -> systemUpdateNotificationProducer.onUpdateCheckResult(result));
+		Platform.runLater(() -> { if(mainController!=null)mainController.setUpdaterPackageAvailable(result!=null&&result.updateAvailable()); systemUpdateNotificationProducer.onUpdateCheckResult(result); });
 	}
 
 	public void onUpdaterLaunchSucceeded() {
@@ -1443,6 +1459,7 @@ public final class SceneManager {
 		humanActivityObserver.stop();
 		runtimeBridge.onShutdown();
 		whatsNewCoordinator.close();
+		updatePolicyCoordinator.close();
 		notificationPollingService.close();
 		durableNotificationService.close();
 		taskDueDateNotificationGenerator.stop();

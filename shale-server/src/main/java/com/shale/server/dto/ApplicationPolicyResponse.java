@@ -22,5 +22,6 @@ public record ApplicationPolicyResponse(
         @Schema(nullable = true) Instant requiredUpdateDeadline,
         @Schema(allowableValues = {"NORMAL", "READ_ONLY", "MAINTENANCE", "BLOCKED"})
         ApplicationAccessMode accessMode,
-        Instant publishedAt) {
+        Instant publishedAt,
+        Instant serverTime) {
 }

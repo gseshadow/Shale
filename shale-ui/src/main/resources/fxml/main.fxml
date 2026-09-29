@@ -88,6 +88,16 @@
 	<center>
 		<VBox spacing="6" styleClass="content-root" maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">
 			<children>
+				<VBox fx:id="updatePolicyBanner" visible="false" managed="false" spacing="4" styleClass="update-policy-banner">
+					<HBox alignment="CENTER_LEFT" spacing="12">
+						<VBox spacing="2" HBox.hgrow="ALWAYS">
+							<Label fx:id="updatePolicyMessage" wrapText="true" maxWidth="1.7976931348623157E308" styleClass="update-policy-message" />
+							<Label fx:id="updatePolicyDetail" wrapText="true" maxWidth="1.7976931348623157E308" styleClass="update-policy-detail" />
+						</VBox>
+						<Button fx:id="updatePolicyAction" text="Update now" accessibleText="Update Shale now" onAction="#onUpdate" />
+						<Button fx:id="updatePolicyDismiss" text="Dismiss" accessibleText="Dismiss this update notice" onAction="#onDismissUpdatePolicy" />
+					</HBox>
+				</VBox>
 				<!-- Shared readability boundary for every routed primary destination. -->
 				<VBox spacing="6" styleClass="primary-content-surface" VBox.vgrow="ALWAYS"
 					maxWidth="1.7976931348623157E308" maxHeight="1.7976931348623157E308">

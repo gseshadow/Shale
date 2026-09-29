@@ -149,3 +149,7 @@ The configuration replacement remains audited in the same transaction as
 `CASE_DATE_PRESENTATION_CONFIGURATION`, using the existing entity-action audit schema and only the
 allowlisted purpose/kind and ordering count metadata. Presentation reads and live invalidations are
 not additional audit events because they neither reveal a new sensitive value nor mutate state.
+
+## Phase 11A policy presentation refresh
+
+Phase 11A connects the existing coalesced policy callback to the shell's single update-policy coordinator. The event remains an untrusted invalidation and never supplies policy state. The coordinator rereads current policy, atomically replaces cached presentation (including corrections), and uses its server-time anchor. A failed reload retains only clearly stale last-known presentation and never enforces access.

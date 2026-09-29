@@ -124,6 +124,9 @@ public interface UiRuntimeBridge {
 	default void unsubscribeConnectivity(Consumer<ConnectivityEvent> handler) {
 	}
 
+	/** Registers the single shell policy refresh target used by Phase 8B invalidation/reconnect. */
+	default void setApplicationPolicyRefreshHandler(Runnable handler) { }
+
 	/**
 	 * Performs a fresh, best-effort connectivity verification using runtime infrastructure.
 	 * Optional.empty() means the runtime does not support an active recheck.

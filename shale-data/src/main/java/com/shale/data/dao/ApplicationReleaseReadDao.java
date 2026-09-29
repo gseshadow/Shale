@@ -23,7 +23,7 @@ public final class ApplicationReleaseReadDao {
 		SELECT p.Id,p.ReleaseChannel,p.RevisionNumber,p.RequiredUpdateDeadline,p.AccessMode,p.PublishedAt,p.RowVer,
 		 l.Id,l.MajorVersion,l.MinorVersion,l.BuildVersion,l.ReleaseChannel,l.PublicationStatus,
 		 r.Id,r.MajorVersion,r.MinorVersion,r.BuildVersion,r.ReleaseChannel,r.PublicationStatus,
-		 a.Id,a.MajorVersion,a.MinorVersion,a.BuildVersion,a.ReleaseChannel,a.PublicationStatus
+		 a.Id,a.MajorVersion,a.MinorVersion,a.BuildVersion,a.ReleaseChannel,a.PublicationStatus,SYSUTCDATETIME() AS ServerTime
 		FROM dbo.ApplicationPolicy p
 		LEFT JOIN dbo.ApplicationReleases l ON l.Id=p.LatestReleaseId
 		LEFT JOIN dbo.ApplicationReleases r ON r.Id=p.MinimumRecommendedReleaseId
@@ -61,7 +61,7 @@ public final class ApplicationReleaseReadDao {
 	}
 
 	private static ApplicationReleaseView mapRelease(ResultSet r)throws SQLException{return new ApplicationReleaseView(r.getLong(1),new SemanticVersion(r.getInt(2),r.getInt(3),r.getInt(4)),enumValue(ReleaseChannel.class,r.getString(5)),enumValue(PublicationStatus.class,r.getString(6)),instant(r.getTimestamp(7)),r.getString(8),r.getBytes(9));}
-	private static ApplicationPolicyView mapPolicy(ResultSet r)throws SQLException{ReleaseChannel channel=enumValue(ReleaseChannel.class,r.getString(2));return new ApplicationPolicyView(r.getLong(1),channel,r.getLong(3),reference(r,8,channel),reference(r,14,channel),reference(r,20,channel),instant(r.getTimestamp(4)),enumValue(ApplicationAccessMode.class,r.getString(5)),instant(r.getTimestamp(6)),r.getBytes(7));}
+	private static ApplicationPolicyView mapPolicy(ResultSet r)throws SQLException{ReleaseChannel channel=enumValue(ReleaseChannel.class,r.getString(2));return new ApplicationPolicyView(r.getLong(1),channel,r.getLong(3),reference(r,8,channel),reference(r,14,channel),reference(r,20,channel),instant(r.getTimestamp(4)),enumValue(ApplicationAccessMode.class,r.getString(5)),instant(r.getTimestamp(6)),instant(r.getTimestamp(26)),r.getBytes(7));}
 	private static ReleaseReference reference(ResultSet r,int start,ReleaseChannel policyChannel)throws SQLException{
 		Long id=(Long)r.getObject(start); if(id==null)return null;
 		ReleaseChannel releaseChannel=enumValue(ReleaseChannel.class,r.getString(start+4));

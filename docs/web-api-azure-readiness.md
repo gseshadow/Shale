@@ -406,3 +406,7 @@ The additive `APPLICATION_POLICY_CHANGED` publisher contract is global and relea
 existing policy read API; there is no runtime policy mutation/API in this phase. Receivers must reload
 `GET /api/application-releases/policy/current` (or the established desktop policy service) rather than enforce the
 event body. No delivery log, replay store, SQL migration, policy administration, or Phase 9 session UI is added.
+
+## Phase 11A policy server time
+
+The successful current-policy response additively includes `serverTime`: UTC database time captured with the policy read. Clients can anchor deadline presentation without trusting workstation wall clock. Existing clients ignore the additive field. No endpoint, authentication rule, schema, or cache directive changed.
