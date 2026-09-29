@@ -26,6 +26,7 @@ import com.shale.core.service.ApplicationInstanceServicePort;
 import com.shale.ui.services.AppVersionProvider;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.desktop.session.DesktopSessionEnrollmentLifecycle;
+import com.shale.desktop.session.UserSessionManagementClient;
 import com.shale.data.dao.ApplicationReleaseReadDao;
 import com.shale.data.service.adapter.ApplicationReleaseReadServiceAdapter;
 import com.shale.core.model.ReleaseChannel;
@@ -46,6 +47,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	private final CurrentApplicationInstance currentInstance = new CurrentApplicationInstance();
 	private final ApplicationInstanceHeartbeatLifecycle heartbeat;
 	private final DesktopSessionEnrollmentLifecycle serverSessions;
+	private final UiRuntimeBridge.UserSessionManagement sessionManagement;
 
 	private RuntimeSessionService runtimeSessionService;
 	private volatile LiveBus liveBus;
@@ -76,6 +78,12 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		this.applicationInstances = applicationInstances;
 		this.heartbeat = applicationInstances==null?null:new ApplicationInstanceHeartbeatLifecycle(applicationInstances);
 		this.serverSessions=serverSessions;
+		String apiBase=System.getProperty("SHALE_SERVER_API_BASE_URL",System.getenv("SHALE_SERVER_API_BASE_URL"));
+		this.sessionManagement=serverSessions==null||apiBase==null||apiBase.isBlank()?null:new UserSessionManagementClient(apiBase,serverSessions.session());
+	}
+
+	@Override public Optional<UiRuntimeBridge.UserSessionManagement> userSessionManagement(){
+		return serverSessions!=null&&serverSessions.state()==DesktopSessionEnrollmentLifecycle.State.ENROLLED?Optional.of(sessionManagement):Optional.empty();
 	}
 
 	@Override

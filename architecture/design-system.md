@@ -649,3 +649,11 @@ chips. Contact cards use its `COMPACT` size and the Contact header uses `STANDAR
 card factories must pass ordered authoritative presentation records to this component rather than
 duplicating chip CSS or color calculations. It validates stored colors, applies the neutral fallback,
 and preserves category and definition identity on each informational, noninteractive chip.
+
+### Devices & Sessions Settings surface
+
+The self-session manager is an inline Personal Settings section composed from compact card surfaces, semantic status
+pills, Secondary refresh, and confirmed Danger sign-out actions. Current/inactive text labels communicate state
+without color, rows wrap at narrow widths, and buttons name their target. Session facts use cards rather than a raw
+administrative table. Location, network identifiers, machine identifiers, and authentication internals are not
+visual enrichment and must not be introduced.

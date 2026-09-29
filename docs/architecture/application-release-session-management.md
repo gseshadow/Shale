@@ -1000,8 +1000,7 @@ ordinary-user read audit, or analytics telemetry.
 
 ### Phase 8B — PubSub revocation/policy acceleration
 
-**Status: IN PROGRESS — implementation and focused contracts are present; required Maven verification is blocked
-because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
+**Status: COMPLETE — implementation and required verification completed before Phase 9.**
 
 * **Goal:** notify connected clients promptly after authoritative commits.
 * **In scope:** PHI/secret-free invalidations and immediate revalidation.
@@ -1014,6 +1013,9 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 
 ### Phase 9 — User Devices & Sessions UI
 
+**Status: IN PROGRESS — implementation and focused contracts are present; required Maven verification is blocked
+because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
+
 * **Goal:** users view/revoke current and other sessions.
 * **In scope:** current marker, client/device, activity, nullable approximate location, revoke one/others.
 * **Non-goals:** admin firm view, GPS, exact location, instance equivalence.
@@ -1024,6 +1026,8 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 * **Risks:** misleading location/activity and self-lockout UX.
 
 ### Phase 10 — Administrator session visibility and revocation
+
+**Status: NOT STARTED — NEXT PROPOSED STEP after Phase 9 verification.**
 
 * **Goal:** authorized admins manage tenant sessions.
 * **In scope:** paged/filterable view, revoke session/user, reasons, required audit and read-audit decision.
@@ -1128,8 +1132,10 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
 | 7C | **COMPLETE** | Desktop durable-session enrollment and required verification completed before Phase 8A. |
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
-| 8B | **IN PROGRESS** | Implementation/docs and focused contracts are present; required Maven verification is blocked by Maven Central HTTP 403. |
-| 9A-13B | **NOT STARTED** | Phase 9 remains the next proposed product phase only after Phase 8B verification completes; no Phase 9 work is included here. |
+| 8B | **COMPLETE** | Best-effort invalidation/revalidation acceleration and required verification completed before Phase 9. |
+| 9 | **IN PROGRESS** | Desktop self-service Devices & Sessions implementation/docs are present; required Maven verification is blocked by Maven Central HTTP 403. |
+| 10 | **NOT STARTED — NEXT PROPOSED STEP** | Tenant-admin session visibility/revocation only, after Phase 9 verification. |
+| 11A-13B | **NOT STARTED** | Later phases remain outside Phase 9. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1419,3 +1425,36 @@ remains the self-service User Devices & Sessions UI over the existing Phase 8A A
 revoke one/revoke others, nullable approximate location only after its separate privacy decision, and accessibility/
 visual verification—excluding tenant-admin UI, GPS/exact location, instance/session equivalence, and later updater
 enforcement.
+
+## Phase 9 implementation record — 2026-09-29
+
+**Status: IN PROGRESS — implementation and focused contracts are present; required Maven verification is blocked
+because Maven Central returns HTTP 403 for the Spring Boot dependency BOM. Phase 10 is NOT STARTED — NEXT PROPOSED
+STEP after Phase 9 verification.**
+
+Settings > Personal now contains a lazy **Devices & Sessions** inline surface. It uses the desktop's memory-only
+Phase 7C bearer through a narrow `UserSessionManagementClient` and only Phase 8A self endpoints. Each successful
+mutation is followed by a fresh authoritative list; there is no polling, per-row lookup, direct JDBC, or optimistic
+removal. An absent durable server session produces the expected compatibility-mode unavailable state without
+affecting JDBC work.
+
+Rows show only a polished client label, server-provided current marker, signed-in time, last token refresh when
+present, expiry, and reliable signed-out/expired/active state. The current row is pinned first and has no remote
+sign-out action. Other active rows and “Sign out all other sessions” use cancel-default destructive confirmation;
+copy explains that server access changes authoritatively on validation and does not promise immediate process exit.
+Times are rendered in the workstation's local zone. Heartbeat and foreground input are absent from Phase 8A, so
+the UI does not invent “Last active” or “Last server contact” semantics.
+
+Loads and mutations run off the FX thread. A page generation plus tenant/user identity guard discards late results
+after close, logout, or user switch, and close clears rendered rows. The page creates no PubSub subscriber and never
+treats push as authority; Phase 8B remains the single current-session invalidation/revalidation owner. A coalesced
+reconnect hint, successful local mutation, or explicit Refresh triggers authoritative reload while the pane is open.
+
+No approved privacy-safe location source exists, so no location/IP is captured or displayed. No machine name/UUID,
+fingerprint, hardware metadata, token/JTI, internal row id, tenant id, or audit metadata is exposed. No admin/cross-
+user or web UI, updater enforcement, API field, schema, or SQL migration was added. Existing Phase 8A transactional
+session-security auditing remains authoritative; the presentation adds no duplicate audit event.
+
+Rendered JavaFX and end-to-end two-client manual verification remain unexecuted because the Maven reactor cannot
+resolve the Spring Boot BOM (HTTP 403). Focused, selector-selected, and full `mvn test` verification must pass before
+Phase 9 may be marked COMPLETE.
