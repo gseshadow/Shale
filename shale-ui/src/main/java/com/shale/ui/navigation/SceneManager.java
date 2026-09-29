@@ -113,6 +113,7 @@ import com.shale.ui.component.spellcheck.UserDictionarySession;
 import com.shale.ui.services.AppVersionProvider;
 import com.shale.ui.whatsnew.WhatsNewCoordinator;
 import com.shale.ui.whatsnew.WhatsNewDialog;
+import com.shale.ui.activity.ForegroundHumanActivityObserver;
 
 public final class SceneManager {
 	private static final Logger log = LoggerFactory.getLogger(SceneManager.class);
@@ -152,6 +153,8 @@ public final class SceneManager {
 	private Integer activeTenantId;
 	private Integer activeUserId;
 	private boolean logoutInProgress;
+	private final ForegroundHumanActivityObserver humanActivityObserver =
+			new ForegroundHumanActivityObserver(Clock.systemUTC());
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -247,6 +250,7 @@ public final class SceneManager {
 	}
 
 	private void stopSessionOwnedWork() {
+		humanActivityObserver.stop();
 		whatsNewCoordinator.reset();
 		authenticatedProducersActive = false;
 		activeTenantId = null;
@@ -310,6 +314,12 @@ public final class SceneManager {
 		setScene(root, "Shale");
 		Platform.runLater(() -> System.out.println("[StartupTiming] main shell visible"));
 		startSessionOwnedWork();
+		try {
+			humanActivityObserver.start(stage);
+			log.debug("Foreground human-activity observer installed for authenticated shell.");
+		} catch (RuntimeException installationFailure) {
+			log.warn("Foreground human-activity observer could not be installed; continuing without activity observation.");
+		}
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
 		showRouteInternal(AppRoute.myShale());
@@ -1429,6 +1439,7 @@ public final class SceneManager {
 
 	/** Deterministically releases all SceneManager-owned background work. */
 	public void shutdown() {
+		humanActivityObserver.stop();
 		runtimeBridge.onShutdown();
 		whatsNewCoordinator.close();
 		notificationPollingService.close();

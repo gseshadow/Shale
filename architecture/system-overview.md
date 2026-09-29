@@ -61,3 +61,17 @@ Authoritative `CaseDates` use occurrence identity (`CASE_DATE:<CaseDates.Id>`) a
 Calendar projects Case Dates without copying them to `CalendarEvents`. Activating a projected occurrence opens the authoritative `CaseDateOccurrenceDialog` in place over Calendar: a shared UI launcher reloads by stable Case Date ID, validates tenant/actor/Case/open/generation state, and updates through the existing `CaseServicePort` RowVer mutation. Success publishes the PHI-free `CaseDates` LiveBus invalidation and reloads the unchanged Calendar range; cancel and failure do not navigate. Tenant checks, client-instance suppression, event-id coalescing, and load generations prevent cross-tenant corruption, loops, and stale responses. LiveBus carries identifiers and change classification only, never date values, labels, names, notes, or concurrency tokens.
 
 Task due dates and Case Dates must not be duplicated into `dbo.CalendarEvents`; `CalendarEvents` remains the source of truth only for real persisted scheduled events. By default, the feed hides cancelled persisted events and completed tasks while continuing to respect task and case soft-delete filtering. The lifecycle authority for accepted, denied, and closed dates remains intentionally unchanged in this slice pending a separately proven status-history authority.
+
+
+## Desktop foreground activity observation
+
+The authenticated JavaFX shell owns one `ForegroundHumanActivityObserver`. It is installed after the main
+scene is shown and observes only key press, mouse press, scroll, and touch press events from a showing, focused
+primary Shale window or a JavaFX window owned by it. Filters never consume input. Logout, user switching, and
+normal shutdown detach all filters and clear the timestamp; login credential entry is excluded.
+
+The only state is an optional UTC `Instant` supplied by an injected `Clock` and held in an
+`AtomicReference` for safe cross-thread reads. No event payload, key/content, pointer coordinates, target, user,
+tenant, or business identifier is retained. Mouse movement and all programmatic/background work are excluded.
+This Phase 5A foundation is process-local: it performs no persistence, SQL, API/network call, heartbeat, idle
+classification, policy action, audit mutation, PubSub operation, updater decision, or OS-wide monitoring.
