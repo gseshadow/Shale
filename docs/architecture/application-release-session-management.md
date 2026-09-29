@@ -1330,8 +1330,8 @@ The following installed/runtime checks remain unverified while Phase 7C is IN PR
 
 ## Phase 8A implementation record — 2026-09-29
 
-**Status: IN PROGRESS — implementation and static contract coverage are present, but required Maven verification is
-blocked by Maven Central HTTP 403 while resolving `spring-boot-dependencies:3.3.4`. Phase 8B is NOT STARTED.**
+**Status: IN PROGRESS — implementation, schema/catalog verification, and Maven tests pass; the explicit non-`dbo`
+Phase 8A RLS verifier is present but still requires live execution. Phase 8B is NOT STARTED.**
 
 Phase 8A adds `GET /api/sessions`, `POST /api/sessions/current/revoke`,
 `POST /api/sessions/{sessionId}/revoke`, and one set-based transactional
@@ -1377,8 +1377,9 @@ TTL or, for emergency rollback, rotate the signing secret. Phase 8A does not wor
 8. Deactivation/removal/password reset revokes all target sessions and leaves unrelated users untouched.
 
 No session UI, PubSub session event, geolocation, hardware fingerprint, device trust, updater enforcement, desktop
-password-auth removal, or refresh-token redesign was added. Required focused, regression, selector, and full Maven
-commands remain unexecuted because dependency resolution is blocked; therefore Phase 8A is not complete.
+password-auth removal, or refresh-token redesign was added. The catalog verifier and Maven suite pass. The live
+non-`dbo` enforcement script `2026-09-29_session_security_audit_phase8a_rls.sql` and its exact-fixture cleanup script
+are now present; Phase 8A remains in progress until the operator executes that live RLS check.
 
 **Phase 8B: NOT STARTED — NEXT PROPOSED STEP.** Its exact scope is optional best-effort PubSub revocation
 notification and client reaction layered over this SQL authority, including tenant/session routing, missed-message
