@@ -1287,3 +1287,19 @@ The tenant-qualified Users FK and tenant FK are trusted/non-cascading. Active me
 active launches are valid. Strict TenantFilter FILTER and AFTER INSERT/UPDATE blocks use
 `sec.fn_FilterByTenant`; there is no global overlay. See
 `docs/sql/2026-09-28_application_instances_foundation_phase4b.sql`.
+
+## ApplicationInstances Phase 5B heartbeat fields (migration pending verification)
+
+Phase 5B additively extends `dbo.ApplicationInstances` with nullable `datetime2(7)` columns
+`LastHeartbeatAt` and `LastHumanActivityAt`. `LastHeartbeatAt` is assigned only by
+`SYSUTCDATETIME()` during an accepted owner-qualified heartbeat. The supplied activity timestamp is
+validated by the service (at most five minutes ahead of server time) and SQL retains the greater of
+the stored and supplied values; null never clears it. Heartbeat also refreshes the existing numeric
+`MajorVersion`, `MinorVersion`, and `BuildVersion` and `UpdatedAt`. No history table, default,
+backfill, constraint, index, seed, or RLS predicate change is made.
+
+The migration `docs/sql/2026-09-29_application_instance_heartbeat_phase5b.sql` is N-1 compatible:
+older Phase 4B inserts omit both nullable columns and continue to succeed, existing rows remain
+unchanged, and all original columns, keys, checks, and strict tenant predicates remain intact. It is
+safe to deploy while older desktops are running. Adding the nullable columns is expected to be a
+short metadata operation; no speculative liveness index is created, avoiding index-build locking.

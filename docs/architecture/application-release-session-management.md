@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 5A in progress — implementation complete, Maven verification blocked; Phase 5B not started
+**Status:** Phase 5A complete and verified; Phase 5B in progress — implementation complete, verification blocked
 
 **Last reviewed:** 2026-09-28
 
@@ -1039,9 +1039,10 @@ unverified; Phase 5B has not been implemented.
 | 3B | **COMPLETE** | Desktop What's New implementation and focused tests complete; repository-level `mvn test` passed after the earlier Maven Central outage. |
 | 4A | **COMPLETE** | Stable random machine UUID storage/provider, failure behavior, upgrade persistence, and packaging contracts complete. |
 | 4B | **COMPLETE** | Authenticated application-instance enrollment/end lifecycle and required verification completed before Phase 5A. |
-| 5A | **IN PROGRESS** | Implementation/tests/docs complete; Maven Central HTTP 403 blocks focused and repository-level test execution. |
-| 5B | **NOT STARTED** | Do not start until Phase 5A focused and repository-level Maven verification passes. |
-| 6-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 5A | **COMPLETE** | Foreground activity observation completed and verified before this Phase 5B run. |
+| 5B | **IN PROGRESS** | Implementation/contracts complete; Maven Central HTTP 403 and unavailable live SQL block required verification. |
+| 6A | **NOT STARTED — NEXT PROPOSED STEP** | Do not start until Phase 5B verification completes. |
+| 6B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1078,14 +1079,60 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Finish **Phase 5A verification only**: restore Maven Central access, run the focused observer/classification/
-lifecycle/privacy tests, change-aware affected suite, and repository-level `mvn test`; fix any failures and mark
-Phase 5A COMPLETE only after all pass. Do not begin Phase 5B in that verification run.
+First restore Maven Central access and live SQL connectivity and complete the Phase 5B focused,
+change-aware, repository-level, migration/rerun/verifier, legitimate-owner, and wrong-tenant checks.
+Keep Phase 5B IN PROGRESS until those checks pass. After that gate, implement **Phase 6A only**:
+an authenticated, tenant-admin-authorized, paged safe read service/API for recent application
+instances and version distribution, with bounded liveness derivation for display and the documented
+sensitive-read audit decision. Do not add remote control, durable sessions, geolocation, updater
+scheduling, version enforcement, PubSub authority, or broader device-management UI.
 
-After that gate, the exact recommended scope for **Phase 5B only** is to define the additive consolidated
-client-control heartbeat service/API contract; add only the instance liveness/version/activity fields required by that contract; have one authenticated desktop
-lifecycle owner send bounded, jittered, non-overlapping heartbeats with backoff; read Phase 5A's optional local
-`Instant` without changing its observer semantics; return explicit server time/session/policy states without
-enforcing them; and verify authorization, tenant/RLS isolation, lifecycle cancellation, stale-generation guards,
-and outage behavior. Do not add remote logout execution, PubSub authority, administrator/device UI, idle-status
-thresholds, version enforcement, update decisions, geolocation, or unattended updater behavior in Phase 5B.
+## Phase 5B implementation record — 2026-09-29
+
+**Status: IN PROGRESS — implementation and contract tests added; Maven and live SQL verification blocked.**
+
+Phase 5B adds only the consolidated latest-state heartbeat foundation. The rerunnable migration
+`docs/sql/2026-09-29_application_instance_heartbeat_phase5b.sql` adds nullable
+`LastHeartbeatAt datetime2(7)` and `LastHumanActivityAt datetime2(7)` to `ApplicationInstances`.
+It performs no backfill, creates no table/index/default/constraint, and changes no Phase 4B column,
+key, check, or RLS predicate. Therefore current older Shale builds retain their original insert,
+update, and read behavior and may leave both fields null. Deployment before desktop rollout is safe;
+the nullable-column operation should be metadata-only/low-impact and has no index-build locking.
+The companion verifier is
+`docs/sql/verification/2026-09-29_application_instance_heartbeat_phase5b_verification.sql`.
+
+`ApplicationInstanceServicePort.heartbeat` and its production adapter/DAO use authenticated tenant,
+user, and instance identity. One owner-qualified atomic SQL update rejects ended rows, assigns
+`LastHeartbeatAt` and `UpdatedAt` from `SYSUTCDATETIME()`, refreshes the existing three numeric
+version columns, and advances human activity only when the supplied value is newer. Null never
+erases activity. The service rejects activity more than five minutes ahead of its UTC clock. Unknown
+and cross-owner instances are indistinguishable (404); an ended owned instance is a conflict (409).
+The authenticated additive endpoint is `POST /api/application-instances/{id}/heartbeat`, accepting
+only `applicationVersion` and nullable `lastHumanActivityAt`, and returning safe authoritative
+instance lifecycle/version/heartbeat/activity state. Ordinary high-frequency heartbeat writes are
+intentionally not entity-action audited, consistent with the initiative's audit review; they contain
+no PHI and adding one audit row per heartbeat would create unbounded telemetry history.
+
+The desktop owns one scheduler per successfully enrolled instance. Its baseline is 60 seconds with
+uniform bounded jitter from -10 through +10 seconds (always 50–70 seconds). It reschedules only after
+an attempt completes and also uses an atomic in-flight guard, so calls cannot overlap or queue.
+The send reads Phase 5A's `Optional<Instant>` at execution time and parses the single authoritative
+`AppVersionProvider.currentVersion()` through strict `SemanticVersion`. Transient failures keep the
+application usable, log only the first sanitized outage transition, and wait for the next ordinary
+jittered interval; there is no immediate retry loop. Durable ended/not-found outcomes stop that
+enrollment. Logout/shutdown cancel future work before best-effort end without waiting on heartbeat.
+An enrollment generation token discards stale callbacks, so User A's completion cannot stop or alter
+User B's lifecycle.
+
+No ACTIVE/IDLE/AWAY/OFFLINE inference, enforcement, remote logout, durable session work, PubSub
+heartbeat/presence authority, geolocation, device/admin UI, updater behavior, or heartbeat/activity
+history was added. Phase 6A remains **NOT STARTED — NEXT PROPOSED STEP** and must be limited to an
+authorized, paged, safe read API/service for tenant administrators to view recent application
+instances and version distribution, including the previously documented sensitive-read audit
+decision; it must not add remote control, sessions, location, updater scheduling, or enforcement.
+
+Verification blocker: Maven Central returns HTTP 403 while resolving
+`org.springframework.boot:spring-boot-dependencies:3.3.4`, and no live SQL connection/configuration is
+available in this environment. Until focused tests, change-aware selection, repository `mvn test`,
+migration/rerun/verifier, legitimate mutation, and wrong-tenant mutation checks execute successfully,
+Phase 5B remains IN PROGRESS rather than COMPLETE.

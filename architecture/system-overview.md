@@ -75,3 +75,19 @@ The only state is an optional UTC `Instant` supplied by an injected `Clock` and 
 tenant, or business identifier is retained. Mouse movement and all programmatic/background work are excluded.
 This Phase 5A foundation is process-local: it performs no persistence, SQL, API/network call, heartbeat, idle
 classification, policy action, audit mutation, PubSub operation, updater decision, or OS-wide monitoring.
+
+## Application-instance heartbeat runtime (Phase 5B, verification pending)
+
+The authenticated desktop shell starts one application-instance heartbeat lifecycle only after a
+successful Phase 4B enrollment and Phase 5A observer installation. It sends the strict
+`AppVersionProvider.currentVersion()` semantic version and only the observer's `Optional<Instant>`;
+JavaFX input events never cross the networking/service boundary. The cadence is 60 seconds with
+bounded ±10-second jitter. A single completion-rescheduled task plus an in-flight guard prevents
+overlap and queued retries. Transient failures are sanitized and suppressed after the first outage
+log, then retry only on the next normal interval. Logout and shutdown cancel scheduling before the
+best-effort instance end. A generation token makes callbacks from an old authenticated enrollment
+unable to affect a replacement enrollment. Ended or owner-inaccessible instances stop the lifecycle.
+
+The database/API heartbeat is authoritative; Web PubSub is not involved. This foundation adds no
+idle/online classification, enforcement directive, remote logout, durable user session, version
+policy comparison, geolocation, updater action, device UI, or heartbeat/activity history.
