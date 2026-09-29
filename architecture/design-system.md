@@ -657,3 +657,13 @@ pills, Secondary refresh, and confirmed Danger sign-out actions. Current/inactiv
 without color, rows wrap at narrow widths, and buttons name their target. Session facts use cards rather than a raw
 administrative table. Location, network identifiers, machine identifiers, and authentication internals are not
 visual enrichment and must not be introduced.
+
+### Administrator Sessions Settings surface
+
+Settings > Administration > Sessions reuses the compact session-card, factual status-pill, local-time,
+semantic filter-control, and confirmed Danger-action language from the personal surface. Administrative rows add
+only the tenant user's established display name/email treatment and the closed server revocation reason. Active,
+Revoked, and Expired are the only lifecycle labels; the current administrator session directs the user to ordinary
+logout rather than offering an ambiguous row revoke. Previous/Next pagination remains bounded at 50 rows. Machine,
+network/location, token/JTI, tenant, database identity, audit metadata, presence, and human-activity details remain
+excluded.

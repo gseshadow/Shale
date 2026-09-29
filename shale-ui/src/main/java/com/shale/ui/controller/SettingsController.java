@@ -125,6 +125,7 @@ public final class SettingsController {
 	@FXML private ToggleButton lightThemeButton, darkThemeButton;
 	@FXML private Label appearanceStatusLabel;
 	@FXML private SettingsManagementRow userManagementRow;
+	@FXML private SettingsManagementRow adminSessionsRow;
 	@FXML private SettingsManagementRow firmWideRolesRow;
 	private Button manageFirmWideRolesButton;
 	@FXML private VBox personalGroup, caseConfigurationGroup, requestConfigurationGroup,
@@ -194,6 +195,7 @@ public final class SettingsController {
 		bind(appearanceRow, event -> toggleInline(appearanceContent, appearanceRow, false));
 		bind(devicesSessionsRow, event -> toggleDevicesSessions());
 		bind(userManagementRow, this::onManageUsers);
+		bind(adminSessionsRow, this::onManageAdminSessions);
 		manageFirmWideRolesButton = bind(firmWideRolesRow, this::onManageFirmWideRoles);
 		bind(caseDateMappingsRow, event -> {
 			boolean opening = !caseDateRoleMappingsContent.isManaged();
@@ -819,6 +821,12 @@ public final class SettingsController {
 				.open(settingsWindow(event), tenantId, actorUserId, result -> { });
 	}
 
+	private void onManageAdminSessions(ActionEvent event) {
+		if (!hasAdminContext() || runtimeBridge == null || userDao == null) return;
+		new AdminSessionsLauncher(runtimeBridge, appState, new UserServiceAdapter(userDao), settingsLoadExecutor)
+				.open(settingsWindow(event), result -> { });
+	}
+
 	private static String rootMessage(Throwable ex) {
 		Throwable current = ex;
 		while (current.getCause() != null && current.getCause() != current) current = current.getCause();
@@ -886,6 +894,7 @@ public final class SettingsController {
 		setVisibleManaged(auditLogRow, admin);
 		setVisibleManaged(caseDateMappingsRow, admin && caseService != null);
 		setVisibleManaged(userManagementRow, hasAdminContext() && userDao != null);
+		setVisibleManaged(adminSessionsRow, hasAdminContext() && runtimeBridge != null);
 		ControlAvailability.apply(manageFirmWideRolesButton, firmWideRolesRow,
 				hasAdminContext() && userDao != null, this::onManageFirmWideRoles);
 		if (!admin) {

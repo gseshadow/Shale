@@ -13,6 +13,11 @@ public interface UiRuntimeBridge {
 
 	record UserSessionView(UUID sessionId, String clientType, Instant issuedAt, Instant expiresAt,
 			Instant lastRefreshedAt, Instant revokedAt, boolean currentSession) {}
+	record AdminSessionView(UUID sessionId, int userId, String userDisplayName, String userEmail,
+			String clientType, Instant issuedAt, Instant expiresAt, Instant lastRefreshedAt,
+			Instant revokedAt, String revocationReason, boolean currentSession) {}
+	record AdminSessionFilter(Integer userId, String clientType, boolean activeOnly, Instant since, int page, int size) {}
+	record AdminSessionPage(List<AdminSessionView> items, int page, int size) {}
 
 	interface UserSessionManagement {
 		List<UserSessionView> list();
@@ -22,6 +27,13 @@ public interface UiRuntimeBridge {
 
 	/** Empty is the expected JDBC-only/older-server compatibility state. */
 	default Optional<UserSessionManagement> userSessionManagement() { return Optional.empty(); }
+
+	interface AdminSessionManagement {
+		AdminSessionPage list(AdminSessionFilter filter);
+		void revoke(UUID sessionId);
+	}
+	/** Empty unless the authenticated desktop has an enrolled server session. Server authorization remains authoritative. */
+	default Optional<AdminSessionManagement> adminSessionManagement() { return Optional.empty(); }
 
 	void onLoginSuccess(int userId, int shaleClientId, String email);
 

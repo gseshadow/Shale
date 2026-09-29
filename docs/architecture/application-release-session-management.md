@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 7C IN PROGRESS — implementation complete, verification blocked by Maven Central HTTP 403
+**Status:** Phase 10 IN PROGRESS — implementation complete, verification blocked by Maven Central HTTP 403
 
 **Last reviewed:** 2026-09-29
 
@@ -1027,7 +1027,8 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 
 ### Phase 10 — Administrator session visibility and revocation
 
-**Status: NOT STARTED — NEXT PROPOSED STEP after Phase 9 verification.**
+**Status: IN PROGRESS — implementation and focused contracts are present; required Maven verification is blocked
+because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 
 * **Goal:** authorized admins manage tenant sessions.
 * **In scope:** paged/filterable view, revoke session/user, reasons, required audit and read-audit decision.
@@ -1134,8 +1135,9 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
 | 8B | **COMPLETE** | Best-effort invalidation/revalidation acceleration and required verification completed before Phase 9. |
 | 9 | **IN PROGRESS** | Desktop self-service Devices & Sessions implementation/docs are present; required Maven verification is blocked by Maven Central HTTP 403. |
-| 10 | **NOT STARTED — NEXT PROPOSED STEP** | Tenant-admin session visibility/revocation only, after Phase 9 verification. |
-| 11A-13B | **NOT STARTED** | Later phases remain outside Phase 9. |
+| 10 | **IN PROGRESS** | Tenant-admin session UI/API projection/docs are present; required focused, visual, selector, and full Maven verification is blocked by Maven Central HTTP 403. |
+| 11A | **NOT STARTED — NEXT PROPOSED STEP** | Recommended/deadline policy UX only, after Phase 10 verification. |
+| 11B-13B | **NOT STARTED** | Later phases remain outside Phase 10. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1458,3 +1460,60 @@ session-security auditing remains authoritative; the presentation adds no duplic
 Rendered JavaFX and end-to-end two-client manual verification remain unexecuted because the Maven reactor cannot
 resolve the Spring Boot BOM (HTTP 403). Focused, selector-selected, and full `mvn test` verification must pass before
 Phase 9 may be marked COMPLETE.
+
+## Phase 10 implementation record — 2026-09-29
+
+**Status: IN PROGRESS — implementation and static contracts are present; required Maven verification is blocked
+because Maven Central returns HTTP 403 for the Spring Boot dependency BOM. Phase 11A is NOT STARTED — NEXT PROPOSED
+STEP only after Phase 10 verification.**
+
+Settings > Administration now includes a lazy **Sessions** management window for authenticated tenant
+administrators. Hidden navigation and the controller's current `AppState` admin/tenant/user guard prevent ordinary
+entry, while the Phase 8A controller/service/SQL active-membership administrator checks remain authoritative when a
+caller bypasses the UI. The JavaFX module depends on `UiRuntimeBridge.AdminSessionManagement`; the desktop adapter
+uses only `GET /api/admin/sessions` and `POST /api/admin/sessions/{sessionId}/revoke` with the process-memory bound
+bearer. It never queries `UserSessions` through desktop JDBC.
+
+Each request is bounded to 50 rows. User, exact client type, active-only, and since-window selections map directly
+to Phase 8A server filters; Previous/Next changes the server page and no local filter implies unloaded completeness.
+The user selector is hydrated once from the established same-tenant user service. Page results retain Phase 8A's
+deterministic `IssuedAt DESC, Id DESC` ordering and expose no invented total. Opening, filter changes, page changes,
+explicit Refresh, and successful revocation issue an authoritative reload; there is no polling or per-row request.
+
+The safe Phase 8A admin projection was additively extended with the established same-tenant user display name and
+email because numeric user identity alone was a concrete target-selection blocker. The server obtains both in the
+existing set-based page query with one tenant-qualified Users join, not an N+1 lookup. Rows display owner name/email,
+client type, signed-in time, optional last refresh, expiry, revoked time/reason where applicable, and only factual
+Active, Revoked, or Expired state. The current bound administrator session is marked and has no row revoke action;
+ordinary logout is the prescribed path.
+
+Revoke-one requires destructive confirmation identifying owner, client, and sign-in time. Copy states that server
+access is revoked authoritatively, process closure may not be immediate, the next validation rejects the session,
+and the existing Phase 8B hint may accelerate validation. There is no free-text reason: the server continues to use
+fixed `ADMIN_REVOKED`. Success reloads the same page/filter state; failure preserves existing cards and permits retry.
+Generation plus tenant/user/admin identity checks discard stale list and revoke completions after close, logout,
+user switch, tenant switch, or a newer filter/page request; disposal clears rows and selector data.
+
+Phase 8A exposes no same-tenant administrator bulk-user revoke operation. Phase 10 therefore adds no bulk button,
+client-side loop, or new server endpoint; this capability is explicitly deferred until separately justified. The
+existing list transaction still writes exactly one bounded `ADMIN_SESSION_LIST` security/read event per successful
+query, never per row, and the existing admin revoke transaction still writes its one `ADMIN_REVOKE` / `ADMIN_REVOKED`
+security event before commit. The UI creates no duplicate audit rows and displays no audit internals.
+
+No schema or SQL migration was required. No global/all-tenant view, release administration, location/IP, machine
+UUID, fingerprinting, presence/activity surveillance, updater control, enforcement, second PubSub subscriber, or
+Phase 11 behavior was added. Phase 8B remains best-effort acceleration only; admin success is the HTTP mutation plus
+authoritative reload, not push delivery.
+
+Rendered JavaFX QA, live two-client/admin authorization and tenant-boundary checks, target validation/invalidation,
+and audit-row observation remain unexecuted because Maven cannot currently resolve the reactor. Required focused,
+selector-selected, visual where supported, and full `mvn test` verification must pass before Phase 10 may be marked
+COMPLETE.
+
+### Exact recommended Phase 11A scope (not implemented)
+
+After Phase 10 verification, implement **Phase 11A only**: desktop recommended/required update messaging and grace-
+deadline UX over the existing authoritative policy read, cached revision, and server time; explicitly define
+precedence with the legacy manifest prompt and recovery from corrected policy/transient outage. Do not implement
+minimum-allowed hard blocking or safe drain (Phase 11B), release/policy administration, updater replacement or
+scheduling, session administration changes, access modes, or any Phase 12+ work.
