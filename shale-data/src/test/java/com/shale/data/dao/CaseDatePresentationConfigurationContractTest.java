@@ -35,11 +35,21 @@ final class CaseDatePresentationConfigurationContractTest {
           ()->assertTrue(s.contains("con.rollback()")));
     }
 
-    @Test void administrationLoadIsAlsoAdminAuthorized()throws Exception{
+    @Test void readsAllowActiveSameTenantActorsButMutationsRemainAdministratorOnly()throws Exception{
         String s=read("shale-data/src/main/java/com/shale/data/dao/CaseDatePresentationConfigurationDao.java");
         String get=s.substring(s.indexOf("public CaseDatePresentationConfigurationDto get"),s.indexOf("public CaseDatePresentationConfigurationDto replace"));
-        assertTrue(get.contains("verifySession(con,tenant,actor,true)"),
-                "historical configuration reads are administrator-only, not merely UI-hidden");
+        String replace=s.substring(s.indexOf("public CaseDatePresentationConfigurationDto replace"),s.indexOf("public List<SelectedCaseDateOccurrenceDto> resolve"));
+        String resolver=s.substring(s.indexOf("public Map<Long,List<SelectedCaseDateOccurrenceDto>> resolveForCases"),s.indexOf("static String normalizeIdentity"));
+        assertAll(
+                ()->assertTrue(get.contains("verifySession(con,tenant,actor,false)"),
+                        "the same read used by Overview inheritance and Settings must allow an ordinary active tenant actor"),
+                ()->assertTrue(replace.contains("verifySession(con,c.shaleClientId(),c.actorUserId(),true)"),
+                        "reordering or changing firm presentation defaults must remain administrator-only"),
+                ()->assertTrue(resolver.contains("verifySession(con,tenant,actor,false)"),
+                        "presentation resolution must remain available to ordinary case viewers"),
+                ()->assertTrue(s.contains("ISNULL(is_deleted,0)=0 AND ISNULL(IsRemoved,0)=0")),
+                ()->assertTrue(s.contains("CAST(SESSION_CONTEXT(N'ShaleClientId') AS int)=?")),
+                ()->assertTrue(s.contains("CAST(SESSION_CONTEXT(N'PrincipalUserId') AS int)=?")));
     }
 
     @Test void resolverMatchesGlobalOrTenantStoredTypeWithoutRewritingAndKeepsHistoryReadable()throws Exception{
@@ -51,6 +61,8 @@ final class CaseDatePresentationConfigurationContractTest {
           ()->assertTrue(s.contains("NOT EXISTS(SELECT 1 FROM dbo.CaseOverviewConfigurations"), "missing parent inherits the firm Overview default"),
           ()->assertTrue(s.contains("JOIN dbo.CaseOverviewConfigurations o"), "an existing parent, including one with zero children, overrides the default"),
           ()->assertTrue(s.contains("resolveForCases(Collection"), "collection reads must be set based"),
+          ()->assertTrue(s.contains("FROM dbo.CaseDateConfirmationTargets ct"), "resolved Overview dates must retain pending-confirmation presentation"),
+          ()->assertTrue(s.contains("AND cc.Id IS NULL) THEN 1 ELSE 0 END"), "only an unresolved confirmation target is presented as pending"),
           ()->assertFalse(s.contains("UPDATE dbo.CaseDates")),
           ()->assertTrue(s.contains("CASE WHEN t.IsActive=1 AND t.IsDeleted=0 THEN 0 ELSE 1 END Historical")),
           ()->assertTrue(s.contains("not active and tenant-effective")));
