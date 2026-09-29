@@ -390,3 +390,16 @@ Authenticated bound-token clients may use `GET /api/sessions`, `POST /api/sessio
 have `GET /api/admin/sessions` (page default 50, maximum 100; optional `userId`, `clientType`, `activeOnly`, and
 `since`) and `POST /api/admin/sessions/{sessionId}/revoke`. No request accepts a tenant selector. Revoke responses
 contain no token or internal identifier. Deploy `2026-09-29_session_security_audit_phase8a.sql` before this server.
+
+## Phase 8B best-effort invalidation publishing
+
+When `LIVE_PUBLISH_ENDPOINT_URL` is configured, successful Phase 8A revocations publish the minimal versioned
+`SESSION_INVALIDATED` LiveBus hint only after the SQL revocation and audit commit. `FUNCTION_KEY` is optional when
+the key is not already present in the endpoint URL. A non-2xx response, timeout, or transport failure is sanitized
+and cannot roll back the durable operation. With no endpoint configured the publisher is a no-op: authentication,
+login, and durable revocation remain fully functional and authoritative.
+
+The additive `APPLICATION_POLICY_CHANGED` publisher contract is global and release-channel scoped, matching the
+existing policy read API; there is no runtime policy mutation/API in this phase. Receivers must reload
+`GET /api/application-releases/policy/current` (or the established desktop policy service) rather than enforce the
+event body. No delivery log, replay store, SQL migration, policy administration, or Phase 9 session UI is added.

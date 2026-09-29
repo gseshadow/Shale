@@ -228,7 +228,7 @@ reconnects after transport loss. It has no durable replay and missed events are 
 authoritative reloads. The inspected server/web client does not provide equivalent browser PubSub
 session control.
 
-This transport is appropriate as an accelerator for `SESSION_REVOKED`, `POLICY_CHANGED`, or
+This transport is appropriate as an accelerator for `SESSION_INVALIDATED`, `APPLICATION_POLICY_CHANGED`, or
 `INSTANCE_COMMAND` hints after authoritative state commits. It must never be the authority: a missed
 message cannot resurrect a revoked session or permit a blocked version. The next authenticated
 request/heartbeat must read authoritative state. Existing tenant group routing and dispatcher
@@ -1000,6 +1000,9 @@ ordinary-user read audit, or analytics telemetry.
 
 ### Phase 8B — PubSub revocation/policy acceleration
 
+**Status: IN PROGRESS — implementation and focused contracts are present; required Maven verification is blocked
+because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
+
 * **Goal:** notify connected clients promptly after authoritative commits.
 * **In scope:** PHI/secret-free invalidations and immediate revalidation.
 * **Non-goals:** using push as authority or adding durable replay.
@@ -1124,9 +1127,9 @@ ordinary-user read audit, or analytics telemetry.
 | 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
 | 7C | **COMPLETE** | Desktop durable-session enrollment and required verification completed before Phase 8A. |
-| 8A | **IN PROGRESS** | Implementation and documentation present; required Maven verification is blocked by Maven Central HTTP 403. |
-| 8B | **NOT STARTED — NEXT PROPOSED STEP** | Best-effort PubSub acceleration only after Phase 8A verification completes. |
-| 9A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
+| 8B | **IN PROGRESS** | Implementation/docs and focused contracts are present; required Maven verification is blocked by Maven Central HTTP 403. |
+| 9A-13B | **NOT STARTED** | Phase 9 remains the next proposed product phase only after Phase 8B verification completes; no Phase 9 work is included here. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1376,12 +1379,43 @@ TTL or, for emergency rollback, rotate the signing secret. Phase 8A does not wor
 7. A non-admin receives 403 from admin endpoints.
 8. Deactivation/removal/password reset revokes all target sessions and leaves unrelated users untouched.
 
-No session UI, PubSub session event, geolocation, hardware fingerprint, device trust, updater enforcement, desktop
-password-auth removal, or refresh-token redesign was added. The catalog verifier and Maven suite pass. The live
-non-`dbo` enforcement script `2026-09-29_session_security_audit_phase8a_rls.sql` and its exact-fixture cleanup script
-are now present; Phase 8A remains in progress until the operator executes that live RLS check.
+Phase 8A added no session UI, PubSub session event, geolocation, hardware fingerprint, device trust, updater
+enforcement, desktop password-auth removal, or refresh-token redesign. Its catalog, Maven, and live non-`dbo` RLS
+verification (using `2026-09-29_session_security_audit_phase8a_rls.sql` and the exact-fixture cleanup script) were
+completed before Phase 8B began; Phase 8A is complete.
 
-**Phase 8B: NOT STARTED — NEXT PROPOSED STEP.** Its exact scope is optional best-effort PubSub revocation
-notification and client reaction layered over this SQL authority, including tenant/session routing, missed-message
-recovery, and tests proving notifications only accelerate logout. It must not change SQL-as-authority or add UI,
-geolocation, device trust, fingerprinting, or updater enforcement.
+### Phase 8B implementation boundary and manual verification
+
+Phase 8B implements optional best-effort notification layered over SQL authority. `SESSION_INVALIDATED` is routed
+through the existing tenant-authorized `client-{ShaleClientId}` group because the inspected negotiation contract
+does not safely grant a session-specific group; the payload's public `sessionId` narrows reaction without exposing
+a secret. `APPLICATION_POLICY_CHANGED` is global/channel-scoped (`policy:{channel}`), matching the Phase 1B global
+policy rather than inventing tenant RLS. Its mutation publisher is an additive hook because runtime policy
+administration does not yet exist. Both event payloads are minimal invalidations, not state replication.
+
+The Phase 8A service commits revocation and its existing audit, returns the changed public ids directly from the
+set-based update, and only then invokes the best-effort publisher. Rollback emits nothing. A publisher exception is
+logged by exception class only and does not alter the successful operation. Explicit current-session logout skips
+its redundant self-notification because local teardown already clears the bearer. Notification delivery/reception
+is intentionally not audited.
+
+After durable desktop enrollment, LiveBus handlers validate tenant, public session id, and login generation. One
+in-flight bounded `/api/sessions` request coalesces duplicates. Only authoritative 401/403 confirmation clears the
+HTTP bearer; a valid response retains it and a timeout/transport failure makes no revocation assumption. JDBC
+authority remains intact as Phase 7C requires. Policy hints and reconnect reload the existing authoritative global
+PRODUCTION policy read. Reconnect never expects replay. Logout/user switch/shutdown detach handlers, wrong-tenant
+and wrong-session hints are ignored, and unknown types remain safe for old clients. Older servers and PubSub
+outages fall back to ordinary bound-token validation and policy reads.
+
+Manual verification checklist (not executed in this non-connected environment): (1) establish two durable sessions;
+(2) revoke one from the other client/API; (3) observe prompt invalidation; (4) observe authoritative revalidation;
+(5) confirm only the revoked bearer is cleared; (6) disconnect PubSub, revoke, reconnect, and confirm revalidation
+finds the missed revocation; (7) publish a committed policy change and confirm authoritative reload; (8) duplicate
+the hint and confirm no duplicate visible behavior.
+
+No SQL migration, durable replay/outbox/cursor, polling loop, Phase 9 UI, geolocation, new audit row, policy
+enforcement, updater scheduling, or mandatory shutdown was added. Phase 9 is **NOT STARTED**. Its exact next scope
+remains the self-service User Devices & Sessions UI over the existing Phase 8A APIs: current marker, self list,
+revoke one/revoke others, nullable approximate location only after its separate privacy decision, and accessibility/
+visual verification—excluding tenant-admin UI, GPS/exact location, instance/session equivalence, and later updater
+enforcement.

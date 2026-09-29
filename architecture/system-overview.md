@@ -135,3 +135,16 @@ The server exposes additive self session list/current revoke/owned revoke/revoke
 list/revoke APIs. Current identity is the JWT `sid`, never recency or machine identity. SQL revocation is checked on
 the next bound request by every replica. There is no session cache, process-presence inference, UI, PubSub delivery,
 geolocation, trust/fingerprinting, or updater behavior in this phase; `ApplicationInstances` remain unchanged.
+
+## Best-effort session/policy acceleration (Phase 8B)
+
+The existing desktop LiveBus can now dispatch PHI-free `SESSION_INVALIDATED` and
+`APPLICATION_POLICY_CHANGED` hints. Phase 8A revocations publish only after the audited SQL transaction commits;
+publisher failure never rolls back SQL. A durable-session desktop filters tenant and public session identity,
+coalesces concurrent hints, and performs a bounded authenticated session read before clearing only its server
+bearer. Reconnect also revalidates that session and reloads the global PRODUCTION policy using the established
+read service. JDBC login remains separate, compatibility-mode login does not require PubSub, unknown events are
+ignored, and missed events remain correct because every bound API request validates `UserSessions`.
+
+No schema, delivery audit, durable replay, session/device UI, geolocation, presence classification, updater
+schedule, shutdown enforcement, or Phase 9 behavior is included.
