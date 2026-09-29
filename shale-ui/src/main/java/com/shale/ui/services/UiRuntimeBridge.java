@@ -4,6 +4,8 @@ import java.util.Map;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.time.Instant;
 
 public interface UiRuntimeBridge {
 
@@ -13,6 +15,9 @@ public interface UiRuntimeBridge {
 
 	/** Best-effort process shutdown hook; implementations must not make shutdown depend on telemetry. */
 	default void onShutdown() { onLogout(); }
+
+	/** Starts heartbeat only for the bridge's successfully enrolled current instance. */
+	default void startApplicationInstanceHeartbeat(Supplier<Optional<Instant>> lastHumanActivityAt) {}
 
 	// --- Generic publish (desktop implementation overrides)
 	default void publishEntityUpdated(String entityType, long entityId,

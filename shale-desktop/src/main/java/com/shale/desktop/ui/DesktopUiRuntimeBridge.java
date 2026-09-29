@@ -6,6 +6,8 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.time.Instant;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +19,7 @@ import com.shale.desktop.net.NegotiateClient;
 import com.shale.desktop.runtime.DesktopRuntimeSessionProvider;
 import com.shale.desktop.identity.MachineIdentityResult;
 import com.shale.desktop.instance.CurrentApplicationInstance;
+import com.shale.desktop.instance.ApplicationInstanceHeartbeatLifecycle;
 import com.shale.core.model.ClientType;
 import com.shale.core.model.SemanticVersion;
 import com.shale.core.service.ApplicationInstanceServicePort;
@@ -37,6 +40,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	private final MachineIdentityResult machineIdentity;
 	private final ApplicationInstanceServicePort applicationInstances;
 	private final CurrentApplicationInstance currentInstance = new CurrentApplicationInstance();
+	private final ApplicationInstanceHeartbeatLifecycle heartbeat;
 
 	private RuntimeSessionService runtimeSessionService;
 	private volatile LiveBus liveBus;
@@ -60,6 +64,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		this.negotiateEndpointUrl = negotiateEndpointUrl;
 		this.machineIdentity = machineIdentity;
 		this.applicationInstances = applicationInstances;
+		this.heartbeat = applicationInstances==null?null:new ApplicationInstanceHeartbeatLifecycle(applicationInstances);
 	}
 
 	@Override
@@ -116,6 +121,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	@Override
 	public void onLogout() {
+		if(heartbeat!=null)heartbeat.stop();
 		endBestEffort();
 		sessionGeneration.incrementAndGet();
 		LiveBus bus = liveBus;
@@ -135,7 +141,9 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		log.info("Logout requested");
 	}
 
-	@Override public void onShutdown(){onLogout();}
+	@Override public void onShutdown(){onLogout();if(heartbeat!=null)heartbeat.close();}
+
+	@Override public void startApplicationInstanceHeartbeat(Supplier<Optional<Instant>> activity){var enrolled=currentInstance.get();if(heartbeat==null||enrolled.isEmpty()||lastShaleClientId==null||lastUserId==null)return;heartbeat.start(lastShaleClientId,lastUserId,enrolled.get().id(),activity);}
 
 	private void enrollBestEffort(int tenant,int user){
 		currentInstance.clear();

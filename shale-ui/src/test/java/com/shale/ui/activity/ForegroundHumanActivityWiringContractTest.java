@@ -51,6 +51,18 @@ final class ForegroundHumanActivityWiringContractTest {
 		assertFalse(login.contains("humanActivityObserver.start"), "login credential input must never be observed");
 	}
 
+	@Test
+	void heartbeatReceivesOnlyTheTimestampSupplierPrivacyBoundary() throws Exception {
+		String scenes = source("src/main/java/com/shale/ui/navigation/SceneManager.java");
+		assertTrue(scenes.contains("startApplicationInstanceHeartbeat(humanActivityObserver::lastHumanActivityAt)"),
+				"network/runtime wiring must receive only Optional<Instant>, never JavaFX input events");
+		String bridge = source("src/main/java/com/shale/ui/services/UiRuntimeBridge.java");
+		assertTrue(bridge.contains("Supplier<Optional<Instant>> lastHumanActivityAt"),
+				"the heartbeat boundary must expose timing only");
+		assertFalse(bridge.contains("KeyEvent"));
+		assertFalse(bridge.contains("MouseEvent"));
+	}
+
 	private static String source(String path) throws Exception { return Files.readString(Path.of(path)); }
 	private static String method(String source, String signature) {
 		int start = source.indexOf(signature);

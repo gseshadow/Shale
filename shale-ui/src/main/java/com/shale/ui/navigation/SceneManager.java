@@ -320,6 +320,7 @@ public final class SceneManager {
 		} catch (RuntimeException installationFailure) {
 			log.warn("Foreground human-activity observer could not be installed; continuing without activity observation.");
 		}
+		runtimeBridge.startApplicationInstanceHeartbeat(humanActivityObserver::lastHumanActivityAt);
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
 		showRouteInternal(AppRoute.myShale());
