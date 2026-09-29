@@ -1123,9 +1123,10 @@ ordinary-user read audit, or analytics telemetry.
 | 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
 | 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
-| 7C | **IN PROGRESS** | Implementation and documentation complete; required Maven verification is blocked by Maven Central HTTP 403. |
-| 8A | **NOT STARTED — NEXT PROPOSED STEP** | Authoritative self/admin revocation behavior only after Phase 7C verification completes. |
-| 8B-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
+| 7C | **COMPLETE** | Desktop durable-session enrollment and required verification completed before Phase 8A. |
+| 8A | **IN PROGRESS** | Implementation and documentation present; required Maven verification is blocked by Maven Central HTTP 403. |
+| 8B | **NOT STARTED — NEXT PROPOSED STEP** | Best-effort PubSub acceleration only after Phase 8A verification completes. |
+| 9A-13B | **NOT STARTED** | Start only after predecessors and listed decisions are satisfied. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1261,7 +1262,7 @@ This phase added no public session/device/admin-revoke endpoint, remote logout d
 
 ## Phase 7C implementation record — 2026-09-29
 
-**Status: IN PROGRESS — implementation complete; required Maven verification is blocked by Maven Central HTTP 403.**
+**Status: COMPLETE — implementation and required verification completed before Phase 8A.**
 
 Desktop credential authentication remains the unchanged first authority: `AuthServiceImpl` reads the active user
 through the auth datasource and bcrypt-verifies the password, after which the existing runtime JDBC tenant/user
@@ -1326,3 +1327,61 @@ The following installed/runtime checks remain unverified while Phase 7C is IN PR
 6. Restart has no resumed bearer, and user switch cannot reuse the prior user's bearer.
 7. A simulated endpoint outage or old server enters JDBC-only compatibility mode once without retry spam.
 8. Invalid credentials or instance ownership rejection leaves server-session functionality failed closed rather than silently downgrading.
+
+## Phase 8A implementation record — 2026-09-29
+
+**Status: IN PROGRESS — implementation, schema/catalog verification, and Maven tests pass; the explicit non-`dbo`
+Phase 8A RLS verifier is present but still requires live execution. Phase 8B is NOT STARTED.**
+
+Phase 8A adds `GET /api/sessions`, `POST /api/sessions/current/revoke`,
+`POST /api/sessions/{sessionId}/revoke`, and one set-based transactional
+`POST /api/sessions/revoke-others`. Self scope is always the principal tenant/user; the current marker and exclusion
+come only from the authenticated bound JWT `sid`. Responses omit internal row id, JTI, bearer material, tenant id,
+row version, machine UUID, and inferred liveness. Revocation is idempotent and preserves the first timestamp/reason.
+
+Tenant administrators receive bounded `GET /api/admin/sessions` (default 50, maximum 100; strict user/client/active/
+since filters) and `POST /api/admin/sessions/{sessionId}/revoke`. Controller checks are backed by service/SQL checks
+of session context, active membership, and `is_admin`; every lookup/mutation includes the principal tenant. Admin
+list writes one audit per query and explicit self/admin revocations write one event in the same transaction. Audit
+failure rolls back the mutation/read response. The additive, RLS-protected `SessionSecurityAuditLog` contains only
+closed event/reason codes, actor, optional public session/target user, affected count, and server UTC time. The
+UserSessions reason check adds only `USER_REVOKED`; no token/JTI is audited. This additive migration is N-1 schema
+compatible: old builds ignore the table and tolerate stored varchar values, while HTTP contracts are additive.
+
+Deactivation, tenant removal, and administrative password reset revoke all active sessions with `SECURITY` in the
+same user transaction. Bound validation also joins active/non-removed user eligibility, closing the race and making
+disablement authoritative across replicas. There is no distinct end-user password-change flow in the repository;
+when one is introduced it must explicitly choose current-session preservation. The existing administrative reset is
+security-sensitive and revokes all, including the initiating user's target session if applicable. Unrelated users
+are untouched.
+
+SQL updates are set-based. Conditional refresh still requires unrevoked state and its expected JTI, so revoke wins:
+a refresh completed first is followed by revoke, while a refresh attempting after revoke fails and cannot resurrect
+the row. Server A's commit is observed by server B's next indexed SQL validation. No cache, heartbeat,
+ApplicationInstance mutation, PubSub, or client push is required. ApplicationInstance rows and historical heartbeat
+facts remain independent.
+
+Rollback retains revoked rows and audit history. Rolling back to Phase 7B preserves durable enforcement; rolling
+back before 7B can ignore SQL revocation, so the existing mitigation remains mandatory: drain for the maximum token
+TTL or, for emergency rollback, rotate the signing secret. Phase 8A does not worsen that risk.
+
+### Phase 8A API-level manual checklist (not yet executed)
+
+1. Login creates a usable current session.
+2. Self-list shows exactly the token-bound current session marker.
+3. A second login appears as an independent session.
+4. Revoking the other session makes its next authenticated request fail.
+5. Revoke-others preserves the current `sid`.
+6. A tenant admin lists/revokes a same-tenant session.
+7. A non-admin receives 403 from admin endpoints.
+8. Deactivation/removal/password reset revokes all target sessions and leaves unrelated users untouched.
+
+No session UI, PubSub session event, geolocation, hardware fingerprint, device trust, updater enforcement, desktop
+password-auth removal, or refresh-token redesign was added. The catalog verifier and Maven suite pass. The live
+non-`dbo` enforcement script `2026-09-29_session_security_audit_phase8a_rls.sql` and its exact-fixture cleanup script
+are now present; Phase 8A remains in progress until the operator executes that live RLS check.
+
+**Phase 8B: NOT STARTED — NEXT PROPOSED STEP.** Its exact scope is optional best-effort PubSub revocation
+notification and client reaction layered over this SQL authority, including tenant/session routing, missed-message
+recovery, and tests proving notifications only accelerate logout. It must not change SQL-as-authority or add UI,
+geolocation, device trust, fingerprinting, or updater enforcement.

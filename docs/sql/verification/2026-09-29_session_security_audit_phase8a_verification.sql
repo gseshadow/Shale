@@ -1,0 +1,4 @@
+SELECT 'MissingSessionSecurityAuditTable' CheckName,CASE WHEN OBJECT_ID(N'dbo.SessionSecurityAuditLog',N'U') IS NULL THEN 1 ELSE 0 END FindingCount
+UNION ALL SELECT 'MissingSessionSecurityAuditIndex',CASE WHEN NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.SessionSecurityAuditLog') AND name=N'IX_SessionSecurityAuditLog_TenantOccurred') THEN 1 ELSE 0 END
+UNION ALL SELECT 'WrongSessionSecurityAuditPredicateCount',CASE WHEN (SELECT COUNT(*) FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.SessionSecurityAuditLog'))=3 THEN 0 ELSE 1 END
+UNION ALL SELECT 'MissingUserRevokedVocabulary',CASE WHEN NOT EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.UserSessions') AND name=N'CK_UserSessions_Revocation' AND definition LIKE '%USER_REVOKED%') THEN 1 ELSE 0 END;
