@@ -9,6 +9,7 @@ import com.google.gson.Gson;
 
 /** Narrow HTTP client for enrollment/logout; response bodies and bearer values are never logged. */
 public class DesktopSessionEnrollmentClient {
+	public enum Validation { VALID, REVOKED, UNKNOWN }
     public enum Failure { ENDPOINT_UNAVAILABLE, TRANSIENT, SECURITY_REJECTED, MALFORMED_RESPONSE }
     public static final class EnrollmentException extends Exception {private final Failure failure;public EnrollmentException(Failure f){super(f.name());failure=f;}public EnrollmentException(Failure f,Throwable cause){super(f.name(),cause);failure=f;}public Failure failure(){return failure;}}
     private final URI endpoint;private final HttpClient http;private final Gson gson=new Gson();
@@ -27,6 +28,7 @@ public class DesktopSessionEnrollmentClient {
         }catch(EnrollmentException e){throw e;}catch(IOException e){throw new EnrollmentException(Failure.TRANSIENT,e);}catch(InterruptedException e){Thread.currentThread().interrupt();throw new EnrollmentException(Failure.TRANSIENT,e);}
     }
     public void logout(String token){if(token==null||token.isBlank())return;try{http.send(HttpRequest.newBuilder(endpoint.resolve("/api/auth/logout")).timeout(Duration.ofSeconds(4)).header("Authorization","Bearer "+token).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.discarding());}catch(IOException e){/* best effort; never log credential */}catch(InterruptedException e){Thread.currentThread().interrupt();}}
+	public Validation validate(String token){if(token==null||token.isBlank())return Validation.REVOKED;try{var response=http.send(HttpRequest.newBuilder(endpoint.resolve("/api/sessions")).timeout(Duration.ofSeconds(6)).header("Authorization","Bearer "+token).GET().build(),HttpResponse.BodyHandlers.discarding());if(response.statusCode()==401||response.statusCode()==403)return Validation.REVOKED;return response.statusCode()/100==2?Validation.VALID:Validation.UNKNOWN;}catch(IOException e){return Validation.UNKNOWN;}catch(InterruptedException e){Thread.currentThread().interrupt();return Validation.UNKNOWN;}}
     private static String trim(String value){if(value==null||value.isBlank())throw new IllegalArgumentException("apiBaseUrl");return value.trim().replaceAll("/+$","");}
     private record Request(String email,String password,Long applicationInstanceId){}
     private record Response(String accessToken,String sessionId,String currentJti,String expiresAt){}

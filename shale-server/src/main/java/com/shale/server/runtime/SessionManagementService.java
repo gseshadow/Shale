@@ -5,11 +5,16 @@ import java.time.Instant;
 import java.util.*;
 import com.shale.core.model.ClientType;
 import com.shale.server.dto.UserSessionResponse;
+import com.shale.server.live.InvalidationPublisher;
+import org.slf4j.Logger;import org.slf4j.LoggerFactory;
 
 /** Authoritative, tenant-qualified session management. Authorization is repeated at this service boundary. */
 public final class SessionManagementService {
+	private static final Logger LOG=LoggerFactory.getLogger(SessionManagementService.class);
 	private final RuntimeConnectionProvider connections;
-	public SessionManagementService(RuntimeConnectionProvider connections){this.connections=Objects.requireNonNull(connections);}
+	private final InvalidationPublisher invalidations;
+	public SessionManagementService(RuntimeConnectionProvider connections){this(connections,InvalidationPublisher.disabled());}
+	public SessionManagementService(RuntimeConnectionProvider connections,InvalidationPublisher invalidations){this.connections=Objects.requireNonNull(connections);this.invalidations=Objects.requireNonNull(invalidations);}
 
 	public List<UserSessionResponse> listOwnSessions(ServerPrincipal actor,UUID currentSid){return query(actor,currentSid,false,null,null,false,0,100);}
 	public List<UserSessionResponse> listTenantSessionsAsAdmin(ServerPrincipal actor,UUID currentSid,Integer userId,ClientType type,boolean activeOnly,Instant since,int page,int size){
@@ -25,14 +30,16 @@ public final class SessionManagementService {
 				if(admin)appendAudit(c,actor,"ADMIN_SESSION_LIST",null,userId,out.size(),"ADMIN_READ");c.commit();return List.copyOf(out);}
 		}catch(SQLException e){throw new IllegalStateException("Failed to complete session management operation",e);}
 	}
-	public void revokeOwnSession(ServerPrincipal actor,UUID currentSid,UUID target){mutate(actor,currentSid,target,false,false,"USER_REVOKED","SELF_REVOKE");}
+	public void revokeOwnSession(ServerPrincipal actor,UUID currentSid,UUID target){publishAfterCommit(actor,mutate(actor,currentSid,target,false,false,"USER_REVOKED","SELF_REVOKE"));}
+	/** Current-client logout clears local state immediately, so it deliberately avoids a redundant self notification. */
 	public void revokeCurrentSession(ServerPrincipal actor,UUID currentSid){mutate(actor,currentSid,currentSid,false,false,"USER_LOGOUT","SELF_LOGOUT");}
-	public void revokeTenantSessionAsAdmin(ServerPrincipal actor,UUID currentSid,UUID target){mutate(actor,currentSid,target,true,false,"ADMIN_REVOKED","ADMIN_REVOKE");}
-	public int revokeOtherOwnSessions(ServerPrincipal actor,UUID currentSid){return mutate(actor,currentSid,null,false,true,"USER_REVOKED","SELF_REVOKE_OTHERS");}
-	private int mutate(ServerPrincipal actor,UUID currentSid,UUID target,boolean admin,boolean others,String reason,String event){
-		try(Connection c=connections.openConnection(actor)){c.setAutoCommit(false);try{if(admin)requireAdmin(c,actor);else requireEligibleActor(c,actor);String sql=others?"UPDATE dbo.UserSessions SET RevokedAt=SYSUTCDATETIME(),RevocationReason=?,UpdatedAt=SYSUTCDATETIME() WHERE ShaleClientId=? AND UserId=? AND SessionId<>? AND RevokedAt IS NULL":"UPDATE dbo.UserSessions SET RevokedAt=COALESCE(RevokedAt,SYSUTCDATETIME()),RevocationReason=COALESCE(RevocationReason,?),UpdatedAt=CASE WHEN RevokedAt IS NULL THEN SYSUTCDATETIME() ELSE UpdatedAt END WHERE ShaleClientId=? "+(admin?"":"AND UserId=? ")+"AND SessionId=?";int changed;Integer targetUser=null;try(PreparedStatement p=c.prepareStatement(sql)){int i=1;p.setString(i++,reason);p.setInt(i++,actor.shaleClientId());if(!admin)p.setInt(i++,actor.userId());p.setObject(i,target==null?currentSid:target);changed=p.executeUpdate();}if(!others&&changed==0)throw new NoSuchElementException("Session unavailable");if(admin)targetUser=targetUser(c,actor.shaleClientId(),target);appendAudit(c,actor,event,target,targetUser,changed,reason);c.commit();return changed;}catch(Exception e){c.rollback();throw e;}}
+	public void revokeTenantSessionAsAdmin(ServerPrincipal actor,UUID currentSid,UUID target){publishAfterCommit(actor,mutate(actor,currentSid,target,true,false,"ADMIN_REVOKED","ADMIN_REVOKE"));}
+	public int revokeOtherOwnSessions(ServerPrincipal actor,UUID currentSid){List<UUID> changed=mutate(actor,currentSid,null,false,true,"USER_REVOKED","SELF_REVOKE_OTHERS");publishAfterCommit(actor,changed);return changed.size();}
+	private List<UUID> mutate(ServerPrincipal actor,UUID currentSid,UUID target,boolean admin,boolean others,String reason,String event){
+		try(Connection c=connections.openConnection(actor)){c.setAutoCommit(false);try{if(admin)requireAdmin(c,actor);else requireEligibleActor(c,actor);String sql=others?"UPDATE dbo.UserSessions SET RevokedAt=SYSUTCDATETIME(),RevocationReason=?,UpdatedAt=SYSUTCDATETIME() OUTPUT INSERTED.SessionId WHERE ShaleClientId=? AND UserId=? AND SessionId<>? AND RevokedAt IS NULL":"UPDATE dbo.UserSessions SET RevokedAt=COALESCE(RevokedAt,SYSUTCDATETIME()),RevocationReason=COALESCE(RevocationReason,?),UpdatedAt=CASE WHEN RevokedAt IS NULL THEN SYSUTCDATETIME() ELSE UpdatedAt END OUTPUT INSERTED.SessionId WHERE ShaleClientId=? "+(admin?"":"AND UserId=? ")+"AND SessionId=?";List<UUID> changed=new ArrayList<>();Integer targetUser=null;try(PreparedStatement p=c.prepareStatement(sql)){int i=1;p.setString(i++,reason);p.setInt(i++,actor.shaleClientId());if(!admin)p.setInt(i++,actor.userId());p.setObject(i,target==null?currentSid:target);try(ResultSet r=p.executeQuery()){while(r.next())changed.add(UUID.fromString(r.getString(1)));}}if(!others&&changed.isEmpty())throw new NoSuchElementException("Session unavailable");if(admin)targetUser=targetUser(c,actor.shaleClientId(),target);appendAudit(c,actor,event,target,targetUser,changed.size(),reason);c.commit();return List.copyOf(changed);}catch(Exception e){c.rollback();throw e;}}
 		catch(NoSuchElementException|SecurityException e){throw e;}catch(Exception e){throw new IllegalStateException("Failed to revoke durable session",e);}
 	}
+	private void publishAfterCommit(ServerPrincipal actor,List<UUID> sessions){for(UUID session:sessions){try{invalidations.sessionInvalidated(actor.shaleClientId(),session);LOG.debug("Session invalidation published.");}catch(RuntimeException failure){LOG.warn("Session invalidation publish failed after authoritative commit ({}).",failure.getClass().getSimpleName());}}}
 	private static Integer targetUser(Connection c,int tenant,UUID sid)throws SQLException{try(PreparedStatement p=c.prepareStatement("SELECT UserId FROM dbo.UserSessions WHERE ShaleClientId=? AND SessionId=?")){p.setInt(1,tenant);p.setObject(2,sid);try(ResultSet r=p.executeQuery()){return r.next()?r.getInt(1):null;}}}
 	private static void requireEligibleActor(Connection c,ServerPrincipal a)throws SQLException{verify(c,a,false);}
 	private static void requireAdmin(Connection c,ServerPrincipal a)throws SQLException{verify(c,a,true);}

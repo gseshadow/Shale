@@ -65,6 +65,9 @@ import com.shale.server.runtime.LegacyTokenCompatibilityPolicy;
 import com.shale.server.runtime.DesktopApplicationInstanceVerifier;
 import com.shale.server.runtime.ServerAuthSessionService;
 import com.shale.server.runtime.SessionManagementService;
+import com.shale.server.live.InvalidationPublisher;
+import com.shale.server.live.HttpInvalidationPublisher;
+import org.springframework.core.env.Environment;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -166,7 +169,14 @@ public class ShaleServerServiceConfiguration {
 	DesktopApplicationInstanceVerifier desktopApplicationInstanceVerifier(RuntimeConnectionProvider connections){return new DesktopApplicationInstanceVerifier(connections);}
 
 	@Bean @Profile({"dev", "local", "prod", "azure"})
-	SessionManagementService sessionManagementService(RuntimeConnectionProvider connections){return new SessionManagementService(connections);}
+	SessionManagementService sessionManagementService(RuntimeConnectionProvider connections,InvalidationPublisher invalidations){return new SessionManagementService(connections,invalidations);}
+
+	@Bean
+	InvalidationPublisher invalidationPublisher(Environment environment){
+		String endpoint=environment.getProperty("LIVE_PUBLISH_ENDPOINT_URL");
+		if(endpoint==null||endpoint.isBlank())return InvalidationPublisher.disabled();
+		return new HttpInvalidationPublisher(endpoint,environment.getProperty("FUNCTION_KEY"));
+	}
 
     @Bean
     @Profile({"dev", "local", "prod", "azure"})
