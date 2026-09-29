@@ -105,13 +105,13 @@ Required:
 | SHALE_RT_USER | Runtime database user |
 | SHALE_RT_PASS | Runtime database password |
 | SHALE_AUTH_TOKEN_SECRET | 32+ character random secret |
+| SHALE_AUTH_SESSION_BINDING_CUTOVER_AT | **Required for Phase 7B.** ISO-8601 UTC deployment boundary; startup fails when missing/malformed. |
 
 Optional:
 
 | Setting | Notes |
 |----------|----------|
 | SHALE_AUTH_TOKEN_TTL_SECONDS | Defaults to 28800 (8 hours) |
-| SHALE_AUTH_SESSION_BINDING_CUTOVER_AT | **Required for Phase 7B.** ISO-8601 UTC deployment boundary; startup fails when missing/malformed. |
 | SHALE_ALLOWED_CORS_ORIGINS | Required for browser clients. For local `shale-web` login, set `SHALE_ALLOWED_CORS_ORIGINS=http://localhost:5173` and restart the App Service. |
 | DB_MAX_POOL_SIZE | Pool tuning |
 | DB_CONNECTION_TIMEOUT_MS | Pool tuning |
