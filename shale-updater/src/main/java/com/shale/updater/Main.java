@@ -7,6 +7,9 @@ import java.util.UUID;
 import com.shale.core.update.UpdateAttemptState;
 import com.shale.core.update.UpdateAttemptStore;
 import com.shale.core.update.UpdateFailureCode;
+import com.shale.core.update.UpdateExecutionLock;
+import com.shale.core.update.UpdateInvocationMode;
+import com.shale.core.platform.AppPaths;
 
 import com.shale.updater.platform.PlatformSupport;
 
@@ -19,6 +22,9 @@ public class Main {
 		String installDirArg = null;
 		String attemptIdArg = null;
 		String attemptDirArg = null;
+		String executionLockArg = null;
+		UpdateInvocationMode invocationMode = UpdateInvocationMode.MANUAL;
+		boolean lockHandoff = false;
 
 		for (int i = 0; i < args.length; i++) {
 			if ("--currentVersion".equals(args[i]) && i + 1 < args.length) {
@@ -29,6 +35,9 @@ public class Main {
 			}
 			if ("--attemptId".equals(args[i]) && i + 1 < args.length) attemptIdArg = args[i + 1];
 			if ("--attemptDir".equals(args[i]) && i + 1 < args.length) attemptDirArg = args[i + 1];
+			if ("--executionLock".equals(args[i]) && i + 1 < args.length) executionLockArg = args[i + 1];
+			if ("--invocationMode".equals(args[i]) && i + 1 < args.length) invocationMode = UpdateInvocationMode.fromArgument(args[i + 1]);
+			if ("--lockHandoff".equals(args[i]) && i + 1 < args.length) lockHandoff = Boolean.parseBoolean(args[i + 1]);
 		}
 
 		if (installDirArg == null || installDirArg.isBlank()) {
@@ -38,9 +47,10 @@ public class Main {
 
 		String manifestUrl = "https://shalestorage.z13.web.core.windows.net/shale-stable.json";
 		AttemptReporter reporter = AttemptReporter.create(attemptIdArg, attemptDirArg);
-		reporter.state(UpdateAttemptState.UPDATER_LAUNCHED, null, null);
 
-		try {
+		try (UpdateExecutionLock executionLock = acquireExecutionLock(executionLockArg, lockHandoff)) {
+			if (executionLock == null) { System.out.println("UPDATE_ALREADY_RUNNING"); return; }
+			reporter.state(UpdateAttemptState.UPDATER_LAUNCHED, null, null);
 			PlatformSupport platformSupport = PlatformSupport.create();
 			System.out.println("Detected platform: " + platformSupport.platform());
 
@@ -103,7 +113,10 @@ public class Main {
 				System.out.println("Resolved staged install dir: " + stagedInstallDir);
 
 				try {
-					platformSupport.stopRunningApp(installDir);
+					if (!platformSupport.stopRunningApp(installDir, invocationMode)) {
+						System.out.println("Unattended update deferred: cooperative application exit was not established.");
+						return;
+					}
 					armRelaunchHelperOrContinue(platformSupport, installDir, manifest.getVersion());
 					InstallService installService = new InstallService();
 					Path backupDir = installService.backupInstallDir(installDir);
@@ -128,6 +141,20 @@ public class Main {
 			System.out.println("Update check failed: " + ex.getMessage());
 			ex.printStackTrace();
 		}
+	}
+
+	private static UpdateExecutionLock acquireExecutionLock(String value, boolean handoff) throws IOException {
+		Path path = value == null || value.isBlank()
+				? UpdateExecutionLock.path(AppPaths.appSupportDir("Shale")) : Path.of(value);
+		long deadline = System.nanoTime() + (handoff ? 5_000_000_000L : 0L);
+		do {
+			var acquired = UpdateExecutionLock.tryAcquire(path);
+			if (acquired.isPresent()) return acquired.get();
+			if (!handoff) return null;
+			try { Thread.sleep(25); }
+			catch (InterruptedException ex) { Thread.currentThread().interrupt(); return null; }
+		} while (System.nanoTime() < deadline);
+		return null;
 	}
 
 	private record AttemptReporter(UpdateAttemptStore store, UUID id) {

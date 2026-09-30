@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import com.shale.core.update.UpdateAttemptState;
 import com.shale.core.update.UpdateAttemptStore;
+import com.shale.core.update.UpdateExecutionLock;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -29,12 +30,14 @@ final class DesktopUiUpdateLauncherTest {
 	private String originalOsName;
 	private String originalAppVersion;
 	private String originalAttemptDir;
+	private String originalExecutionLock;
 
 	@AfterEach
 	void restoreSystemProperties() {
 		restoreProperty(OS_NAME, originalOsName);
 		restoreProperty(APP_VERSION, originalAppVersion);
 		restoreProperty("SHALE_UPDATE_ATTEMPT_DIR", originalAttemptDir);
+		restoreProperty("SHALE_UPDATE_EXECUTION_LOCK", originalExecutionLock);
 	}
 
 	@Test
@@ -67,6 +70,7 @@ final class DesktopUiUpdateLauncherTest {
 		System.setProperty(OS_NAME, "Mac OS X");
 		System.setProperty(APP_VERSION, "1.0.14");
 		System.setProperty("SHALE_UPDATE_ATTEMPT_DIR", tempDir.toString());
+		System.setProperty("SHALE_UPDATE_EXECUTION_LOCK", tempDir.resolve("update-execution.lock").toString());
 
 		AtomicInteger launchCalls = new AtomicInteger();
 		AtomicInteger shutdownCalls = new AtomicInteger();
@@ -100,6 +104,7 @@ final class DesktopUiUpdateLauncherTest {
 		System.setProperty(OS_NAME, "Windows 11");
 		System.setProperty(APP_VERSION, "1.0.14");
 		System.setProperty("SHALE_UPDATE_ATTEMPT_DIR", tempDir.toString());
+		System.setProperty("SHALE_UPDATE_EXECUTION_LOCK", tempDir.resolve("update-execution.lock").toString());
 
 		AtomicInteger launchCalls = new AtomicInteger();
 		AtomicInteger shutdownCalls = new AtomicInteger();
@@ -115,6 +120,22 @@ final class DesktopUiUpdateLauncherTest {
 		assertEquals(0, shutdownCalls.get(), "Windows launch should leave shutdown control to the updater");
 	}
 
+	@Test void occupiedExecutionLockPreventsProcessAndAttemptCreation(@TempDir Path tempDir) throws Exception {
+		rememberOriginalProperties();
+		System.setProperty("SHALE_UPDATE_ATTEMPT_DIR", tempDir.resolve("attempts").toString());
+		Path lockPath = tempDir.resolve("update-execution.lock");
+		System.setProperty("SHALE_UPDATE_EXECUTION_LOCK", lockPath.toString());
+		AtomicInteger launches = new AtomicInteger();
+		var launcher = new DesktopUiUpdateLauncher(new com.shale.updater.UpdateService(), "ignored",
+				(version, id, directory) -> launches.incrementAndGet(), () -> {});
+		try (var lock = UpdateExecutionLock.tryAcquire(lockPath).orElseThrow()) {
+			var failure = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, launcher::launchUpdater);
+			assertEquals("A Shale update is already in progress.", failure.getMessage());
+		}
+		assertEquals(0, launches.get(), "collision must not create a duplicate updater process");
+		assertTrue(!java.nio.file.Files.exists(tempDir.resolve("attempts")), "collision occurs before Phase 12 begins");
+	}
+
 	private void rememberOriginalProperties() {
 		if (originalOsName == null) {
 			originalOsName = System.getProperty(OS_NAME);
@@ -123,6 +144,7 @@ final class DesktopUiUpdateLauncherTest {
 			originalAppVersion = System.getProperty(APP_VERSION);
 		}
 		if (originalAttemptDir == null) originalAttemptDir = System.getProperty("SHALE_UPDATE_ATTEMPT_DIR");
+		if (originalExecutionLock == null) originalExecutionLock = System.getProperty("SHALE_UPDATE_EXECUTION_LOCK");
 	}
 
 	private static void restoreProperty(String key, String value) {

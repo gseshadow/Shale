@@ -13,6 +13,7 @@ import com.shale.core.update.UpdateAttempt;
 import com.shale.core.update.UpdateAttemptState;
 import com.shale.core.update.UpdateAttemptStore;
 import com.shale.core.update.UpdateFailureCode;
+import com.shale.core.update.UpdateExecutionLock;
 import com.shale.updater.UpdateManifest;
 import com.shale.updater.UpdateService;
 import com.shale.updater.platform.Platform;
@@ -105,6 +106,15 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 	@Override
 	public void launchUpdater() {
 		String currentVersion = AppVersionProvider.currentVersion();
+		java.nio.file.Path executionLockPath = executionLockPath();
+		final UpdateExecutionLock handoffLock;
+		try {
+			handoffLock = UpdateExecutionLock.tryAcquire(executionLockPath)
+					.orElseThrow(() -> new IllegalStateException("A Shale update is already in progress."));
+		} catch (IOException ex) {
+			throw new IllegalStateException("Update coordination is unavailable; try again later.", ex);
+		}
+		try (handoffLock) {
 		UUID attemptId = UUID.randomUUID();
 		UpdateAttemptStore attempts = new UpdateAttemptStore(attemptDirectory());
 		try {
@@ -131,6 +141,15 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 			log.error("Updater launch failure", ex);
 			throw ex;
 		}
+		} catch (IOException ex) {
+			throw new IllegalStateException("Update coordination could not be released safely.", ex);
+		}
+	}
+
+	public static java.nio.file.Path executionLockPath() {
+		String override = System.getProperty("SHALE_UPDATE_EXECUTION_LOCK");
+		return override == null || override.isBlank()
+				? UpdateExecutionLock.path(AppPaths.appSupportDir("Shale")) : java.nio.file.Path.of(override);
 	}
 
 	public static java.nio.file.Path attemptDirectory() {

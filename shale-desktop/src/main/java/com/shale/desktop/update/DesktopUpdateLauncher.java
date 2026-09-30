@@ -17,6 +17,7 @@ import java.util.stream.Stream;
 
 import com.shale.core.platform.AppPaths;
 import com.shale.core.platform.AppPlatform;
+import com.shale.core.update.UpdateExecutionLock;
 
 public final class DesktopUpdateLauncher {
 
@@ -100,7 +101,10 @@ public final class DesktopUpdateLauncher {
 				updaterExe.toString(),
 				"--currentVersion", currentVersion,
 				"--installDir", installDir.toString(), "--attemptId", attemptId.toString(),
-				"--attemptDir", attemptDirectory.toString());
+				"--attemptDir", attemptDirectory.toString(),
+				"--executionLock", UpdateExecutionLock.path(AppPaths.appSupportDir(APP_NAME)).toString(),
+				"--lockHandoff", "true",
+				"--invocationMode", "MANUAL");
 		pb.redirectErrorStream(true);
 		pb.redirectOutput(updaterLog.toFile());
 		return pb;

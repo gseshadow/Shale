@@ -42,8 +42,7 @@ launch an unattended production update. `UnattendedUpdateEvaluationService` rere
 evaluation time. Its reasoned evaluator requires fresh eligible Phase 11A policy, an exact Production policy/
 manifest target match, a strictly newer compatible package, a workstation-local 02:00–04:00 window, at least
 30 minutes since observed Phase 5A foreground input, no foreground window or Phase 11B work, a cooperative
-shutdown capability, and an available shared execution lock. Current source/runtime architecture cannot supply the
-final two guarantees: the updater force-stops Shale and there is no cross-process update lock. A 2026-09-30
+shutdown capability, and an available shared execution lock. The final two foundation guarantees are now supplied: one aggregate inspect-only readiness contract reuses Phase 11B workflow leases and save registrations, and one per-user OS file lock coordinates desktop handoff with updater execution. Only `READY` permits the future normal-lifecycle shutdown seam; uncertainty defers. Manual force-stop compatibility remains isolated from additive unattended mode. A 2026-09-30
 validation pass could not convert those findings into installed-Windows evidence because only a Linux runner was
 available; the Windows checklist therefore remains open. The full repository `mvn test` has since passed outside
 that restricted runner, so automated Maven verification is PASS and is not the remaining blocker. Consequently
@@ -219,3 +218,5 @@ authoritative reload rather than PubSub delivery.
 ## Desktop update-policy presentation (Phase 11A)
 
 The authenticated shell resolves global PRODUCTION `ApplicationPolicy` through the existing release-read boundary. Strict semantic versions and database server UTC determine current, recommended, required-before-deadline, and deadline-reached presentation. A 15-minute process cache advances only from a monotonic receipt anchor; stale or unavailable authority is informative and fail-open. Phase 8B invalidation/reconnect invokes the same coordinator. The manifest remains package authority and the established updater remains execution authority. This phase does not enforce, drain, log out, shut down, schedule, or administer policy.
+
+Phase 13B is complete only as a feasibility/foundation phase. No production scheduler is wired, logged-out execution remains unsupported, and signing remains deferred.

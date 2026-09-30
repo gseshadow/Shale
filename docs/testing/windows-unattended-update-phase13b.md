@@ -301,3 +301,10 @@ installed per-user Windows workstation, including preference persistence/ACL/UAC
 and validate a conservative aggregate cooperative-shutdown readiness contract or keep unattended handoff
 unsupported; and (3) provide and validate one per-install-owner OS-backed cross-process update lock or keep
 eligibility deferred. Production scheduler activation remains disabled.
+
+
+## 2026-09-30 installed acceptance evidence (Shale 1.0.129)
+
+Authoritative installed results supersede earlier Linux-runner `NOT TESTED` statements for these items: running build 1.0.129; per-user LocalAppData installation; updater at `app\updater\ShaleUpdater.exe`; Phase 13A persistence PASS; Shale-user machine scope PASS; non-admin mutation protection PASS; existing preference-file ACL PASS for ordinary-user read/no-write; and both executables `NotSigned`. Runtime SemanticVersion remains authoritative over stale uninstall `DisplayVersion`.
+
+New Intake blocked the parent, confirmed discard, and preserved data on cancel. Case edit blocked the parent and had no child discard confirmation. Organization edit blocked the parent and confirmed discard. Task edit and Calendar/Event edit blocked the parent and had no child discard confirmation. Consequently every open substantive mutation window is `ACTIVE_MUTATION_WORKFLOW` regardless of dirty state. Phase 13B now provides aggregate inspect-only readiness, save-in-flight registration, the normal-lifecycle rechecking shutdown seam, an OS-backed per-user execution lock enforced independently by the updater, and manual/unattended invocation separation. Production scheduling remains disabled; signing and logged-out operation remain deferred/unsupported.

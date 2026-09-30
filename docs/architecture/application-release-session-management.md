@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 13B FOUNDATION IMPLEMENTED — production activation and installed-Windows validation intentionally deferred
+**Status:** Phase 13B FOUNDATION IMPLEMENTED, VERIFICATION PENDING — production unattended scheduling intentionally disabled
 
 **Last reviewed:** 2026-09-30
 
@@ -1650,9 +1650,7 @@ execution, restart, or eligibility logic.
 
 ## Phase 13B implementation record — 2026-09-30
 
-**Status: IN PROGRESS — the feasibility foundation is implemented and safe-default-off. Full `mvn test` now
-passes, so automated Java/Maven verification is no longer the blocker. Installed-Windows feasibility validation
-remains outstanding. This is not production ready.**
+**Status: IMPLEMENTED, VERIFICATION PENDING — aggregate cooperative readiness and an OS-backed per-install-owner update lock are present. Required Maven verification is blocked by repository access (HTTP 403), so Phase 13B is not yet declared complete. Production unattended scheduling remains disabled.**
 
 ### Architecture decision and supported boundary
 
@@ -1795,3 +1793,17 @@ require either validated prompt-free cooperative readiness plus a per-install-ow
 `DEFER/UNSUPPORTED` result for those capabilities. Do not begin another roadmap phase until this validation closes;
 the exact next recommended scope is continuation of Phase 13B on an installed Windows workstation, not scheduler
 activation.
+
+### Phase 13B hardening completion — installed Windows 1.0.129 evidence
+
+Installed acceptance established a per-user installation at `C:\Users\Curtis and Lucero\AppData\Local\Shale\`, with `Shale.exe` at the installation root and `app\updater\ShaleUpdater.exe` as the updater. The running runtime/SemanticVersion authority reported **1.0.129**; Add or Remove Programs `DisplayVersion` can remain older and is not runtime version authority. Phase 13A persistence, cross-Shale-user machine scope, non-admin mutation protection, and ordinary `BUILTIN\Users` read/no-write access on the existing preference file passed. Both executables were `NotSigned`; signing remains explicitly deferred production hardening.
+
+Installed workflow evidence was: New Intake blocks the parent, confirms discard, and preserves data when discard is cancelled; Case field edit blocks the parent but has no child discard confirmation; Organization edit blocks the parent and confirms discard; Task edit blocks the parent but has no child discard confirmation; and Calendar/Event edit blocks the parent but has no child discard confirmation. **An open mutation window is therefore sufficient to make unattended shutdown not ready; dirty-state perfection is not required.** Contact create/edit and obvious equivalent substantive editors use the same registry category. Existing close/prompt behavior is unchanged.
+
+`SafeWorkDrainCoordinator` is now the single session-scoped mutation authority for Phase 11B leases and Phase 13B readiness. Its inspect-only result is `READY`, `ACTIVE_MUTATION_WORKFLOW`, `SAVE_IN_FLIGHT`, `PROMPT_REQUIRED`, or `UNKNOWN`; only `READY` permits a future cooperative request. `READY` means evidence is known, no substantive mutation lease is open, no registered save is executing, and no known prompt-only application condition exists. Unknown evidence always defers. Lease and save handles are idempotent `AutoCloseable` registrations, supporting exception-safe save/cancel/X-close lifetimes and simultaneous workflows without a second drifting counter. A narrow `CooperativeShutdownCoordinator` rechecks readiness on dispatch and invokes only the injected normal JavaFX lifecycle; it never closes children, answers prompts, saves, launches an updater, or terminates a process. It has no production scheduling caller.
+
+The shared execution lock is `%LOCALAPPDATA%\Shale\updates\update-execution.lock` on Windows (the analogous established per-user application-support path elsewhere). `FileChannel.tryLock()` is authority; an empty stale file does not block after OS lock release and stores no identifiers, versions, credentials, or activity. The desktop obtains a short handoff lock **before** creating a Phase 12 attempt or launching a process. Busy returns `A Shale update is already in progress.` with no attempt and no launch. The launched updater waits only for that deliberate handoff, then independently acquires and retains the same lock across package execution; independently launched updaters perform a non-waiting acquisition and only one proceeds. Thus ordering is eligibility → cooperative readiness → execution availability → handoff begins → Phase 12 attempt begins → updater owns execution lock.
+
+Invocation mode is additive: absent/old arguments remain `MANUAL`; desktop currently passes `MANUAL`. Manual Windows force-stop compatibility remains. `UNATTENDED` returns/defer before `stopRunningApp` can call the manual `taskkill /F` implementation, so unattended code cannot force-kill Shale. No unattended caller, timer, task, service, daemon, startup executor, credential, logged-out support, SQL migration, or API change was added. Audit review found only local non-PHI coordination, not a domain/administrative mutation; existing Phase 12 operational evidence remains the audit-compatible handoff record.
+
+Phase 13B is **implemented but remains unverified as a feasibility/foundation phase** until the required Maven suites pass. This does not activate or declare production unattended updates ready. Signing remains deferred, logged-out execution remains unsupported, and production scheduling remains disabled. The exact recommended next phase is **Phase 13C — installed-Windows activation design and acceptance for an opt-in in-session scheduler**, which must be separately authorized and must consume these readiness and lock contracts without widening into logged-out execution.
