@@ -151,3 +151,26 @@ test requests. Validate owner profile and attempt/log paths explicitly; the task
 
 Expected Phase 13D result for every logged-out case today is `UNSUPPORTED`, with no process, attempt, prompt, task
 mutation, retry loop, or replacement. Do not mark any row PASS until executed on an installed Windows machine.
+
+## Phase 13E installed-Windows prerequisite validation (NOT RUN)
+
+This remains an installed-Windows acceptance procedure; no row was executed on the Linux development host.
+
+```powershell
+$installRoot = "$env:LOCALAPPDATA\Shale"
+Get-AuthenticodeSignature "$installRoot\Shale.exe" |
+  Select-Object Status, StatusMessage, @{n='Publisher';e={$_.SignerCertificate.Subject}}, @{n='Timestamp';e={$_.TimeStamperCertificate.Subject}}
+Get-AuthenticodeSignature "$installRoot\app\updater\ShaleUpdater.exe" |
+  Select-Object Status, StatusMessage, @{n='Publisher';e={$_.SignerCertificate.Subject}}, @{n='Timestamp';e={$_.TimeStamperCertificate.Subject}}
+Get-AuthenticodeSignature '.\Shale-<version>.msi'
+
+# Registration persistence is intentionally not installed yet. After an installer architecture phase supplies it,
+# validate exact HKLM/ProgramData location, SID, roots, explicit ACL, two-owner isolation, repair restoration,
+# upgrade identity preservation, stale-root rejection, and exact-record uninstall cleanup.
+Get-Content "$installRoot\app\shale-installed-version.properties"
+# Verify initial install, updater replacement, runtime match, mismatch diagnostics, and stale DisplayVersion ignored.
+```
+
+A signing-required release expects `Valid`, approved publisher, and timestamp certificate. Unsigned developer builds
+remain `NotSigned` and must not be described as production. Do not mark registration/lifecycle rows PASS until the
+installer-owned mechanism exists and the procedure is run.

@@ -247,3 +247,16 @@ service, helper, install registration, credential, SQL/API/schema change, reboot
 Phase 13C remains the supported automatic path while Shale is running in an authenticated session. The immutable
 `LoggedOutAutomaticUpdateSupport` contract prevents callers from claiming capability until a later explicit
 architecture phase closes policy, signing, owner registration/path, attempt-store, and uninstall-lifecycle blockers.
+
+## Windows background-update prerequisite closure (Phase 13E)
+
+Phase 13E approves a narrow unauthenticated `GET /api/public/application-policy?channel=PRODUCTION` read backed by
+the same Phase 11 service/SQL authority. It exposes only channel, revision, recommended/minimum-allowed versions,
+deadline, and database server time. It adds production-optional/developer-disabled Authenticode release enforcement,
+payload-lifecycle installed-version metadata, and pure validated owner/install path contracts. The present per-user,
+non-elevated jpackage/WiX MSI cannot safely create and maintain an HKLM or ACL-hardened ProgramData registration, so
+authoritative registration persistence, repair, upgrade identity preservation, and exact uninstall cleanup remain
+explicit blockers rather than being delegated to the ordinary application process.
+
+`LoggedOutAutomaticUpdateSupport = UNSUPPORTED` is unchanged. No execution principal, scheduled task, service,
+SYSTEM execution, impersonation, logged-out updater, rollout flag, SQL migration, or tenant audit was added.

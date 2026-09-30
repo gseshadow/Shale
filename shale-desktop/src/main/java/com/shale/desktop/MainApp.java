@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.time.Clock;
 import com.shale.core.update.UpdateAttemptReconciler;
 import com.shale.core.update.UpdateAttemptStore;
+import com.shale.core.update.InstalledVersionMetadata;
 import com.shale.ui.services.AppVersionProvider;
 
 public final class MainApp extends Application {
@@ -44,11 +45,29 @@ public final class MainApp extends Application {
 	}
 
 	private void reconcileUpdateAttempt() {
+		reconcileInstalledVersionMetadata();
 		try {
 			var store = new UpdateAttemptStore(com.shale.desktop.update.DesktopUiUpdateLauncher.attemptDirectory());
 			new UpdateAttemptReconciler(store, Clock.systemUTC()).reconcile(AppVersionProvider.currentVersion());
 		} catch (Exception ex) {
 			System.err.println("Update attempt reconciliation deferred: " + ex.getClass().getSimpleName());
+		}
+	}
+
+	private void reconcileInstalledVersionMetadata() {
+		String appPath=System.getProperty("jpackage.app-path","");
+		if(appPath.isBlank()) return;
+		try {
+			var executable=java.nio.file.Path.of(appPath).toAbsolutePath().normalize();
+			var file=executable.getParent().resolve("app").resolve(InstalledVersionMetadata.FILE_NAME);
+			if(!java.nio.file.Files.exists(file)) return;
+			var metadata=InstalledVersionMetadata.read(file);
+			if(!metadata.version().toString().equals(AppVersionProvider.currentVersion()))
+				System.getLogger(getClass().getName()).log(System.Logger.Level.WARNING,
+						"Installed-version metadata does not match the running payload; metadata was not modified");
+		} catch(Exception failure) {
+			System.getLogger(getClass().getName()).log(System.Logger.Level.WARNING,
+					"Installed-version metadata could not be reconciled: {0}",failure.getClass().getSimpleName());
 		}
 	}
 
