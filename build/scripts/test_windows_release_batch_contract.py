@@ -362,10 +362,10 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn("stage=registration-mutation", source)
         self.assertIn("stage=compiled-registration-validation", source)
 
-    def test_main_recompile_recovers_all_jpackage_definitions_without_hard_coded_identity(self):
+    def test_main_recompile_replays_logged_jpackage_definitions_without_hard_coded_identity(self):
         source = batch_source("build-shale-windows-msi.bat")
         self.assertIn('set JPACKAGE_LOG=%STAGE%\\jpackage-verbose.log', source)
-        self.assertIn('windows_jpackage_wix_definitions.py" prepare "%MAIN_SOURCE%" "%JPACKAGE_LOG%"', source)
+        self.assertIn('windows_jpackage_wix_definitions.py" prepare "%JPACKAGE_LOG%" "%JPACKAGE_DEFINITIONS%"', source)
         self.assertIn('candle.exe -nologo @"%JPACKAGE_DEFINITIONS%" "%MAIN_SOURCE%"', source)
         self.assertNotIn("-dJpProductCode=", source)
         self.assertNotIn("-dJpProductUpgradeCode=", source)
