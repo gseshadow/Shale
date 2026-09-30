@@ -1,7 +1,12 @@
 # Phase 13F installed-Windows registration acceptance
 
-**Status on 2026-09-30:** Phase 13F implementation is COMPLETE and the full repository `mvn test` verification is
-PASS. Installed-Windows acceptance is NOT YET RUN, so overall Phase 13F remains IN PROGRESS. The available host is
+**Status on 2026-09-30:** Phase 13F remains IN PROGRESS. Platform-neutral repository verification is PASS, but
+installed-Windows acceptance is NOT YET RUN. A real Windows packaging attempt reached the post-mutation recompilation
+of generated `main.wxs` and failed with `CNDL0150` because the custom Candle invocation omitted jpackage's generated
+`Jp*` preprocessor definitions. The packaging boundary now captures jpackage's verbose command evidence, discovers
+every `$(var.Jp...)` reference in generated `main.wxs`, fails closed if any referenced value is absent, and supplies
+the exact recovered values through a quoted Candle response file. The fixed Windows build has not yet been rerun, so
+neither final MSI production nor installed acceptance is claimed. The available Codex host is
 Ubuntu Linux and has no PowerShell, Windows command environment, Wine, Windows VM manager, MSI artifact, remote
 Windows runner, or release signing credential. Do not report any installed row as PASS until its command is executed
 on an installed Windows machine and evidence is retained. Loose classes, exploded directories, source inspection,
@@ -36,10 +41,12 @@ and platform-neutral tests are not substitutes for MSI lifecycle validation.
 | Authenticode: MSI | NOT RUN | No MSI artifact or production signing credentials are available. |
 | Phase 13A / 13B / 13C installed regressions | NOT RUN | Their installed paths and behavior cannot be exercised on Linux; repository verification is PASS. |
 | Logged-out automatic updating | UNSUPPORTED | Unchanged: registration does not activate Task Scheduler, a service, SYSTEM updating, or any logged-out executor. |
-| Defects and fixes | NONE OBSERVED | Installed acceptance did not execute, so this is not evidence that installed defects are absent; no production change was made. |
+| Packaging defect and fix | FIXED; WINDOWS RERUN NOT YET RUN | The preliminary jpackage MSI succeeded, but mutated `main.wxs` recompilation omitted all build-specific `Jp*` definitions and failed first at `JpProductCode`. The custom recompile now reuses definitions captured from jpackage and validates complete reference coverage. Rerun `build-shale-release.bat` before claiming a final MSI. |
 
-The exact next work is continuation of **Phase 13F installed-Windows acceptance completion only** on a suitable
-Windows machine. No subsequent phase is recommended or authorized until these lifecycle results are known.
+The exact next work is continuation of **Phase 13F only** on a suitable Windows machine. From
+`C:\Eclipse\Workspace\shale-parent\build\scripts`, rerun the single local packaging command
+`build-shale-release.bat`; it must produce and validate the final MSI without uploading a manifest or artifacts.
+Installed lifecycle acceptance follows separately. Logged-out automatic update support remains **UNSUPPORTED**.
 
 After installing the Phase 13F MSI, run the privacy-bounded, read-only helper from an elevated PowerShell prompt
 and paste its complete concise report into the acceptance evidence:
