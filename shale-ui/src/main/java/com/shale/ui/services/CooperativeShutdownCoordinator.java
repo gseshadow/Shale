@@ -3,6 +3,7 @@ package com.shale.ui.services;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 
 import com.shale.core.update.CooperativeShutdownReadiness;
 
@@ -20,10 +21,16 @@ public final class CooperativeShutdownCoordinator {
 	}
 
 	public CooperativeShutdownReadiness requestIfReady() {
+		return requestIfReady(() -> true);
+	}
+
+	/** Rechecks on the UI dispatcher and shuts down only after the handoff action succeeds. */
+	public CooperativeShutdownReadiness requestIfReady(BooleanSupplier handoff) {
+		Objects.requireNonNull(handoff);
 		CooperativeShutdownReadiness inspected = readiness.get();
 		if (!inspected.permitsUnattendedShutdown()) return inspected;
 		dispatcher.accept(() -> {
-			if (readiness.get().permitsUnattendedShutdown()) normalShutdown.run();
+			if (readiness.get().permitsUnattendedShutdown() && handoff.getAsBoolean()) normalShutdown.run();
 		});
 		return inspected;
 	}

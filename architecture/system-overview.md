@@ -51,6 +51,21 @@ Closed/logged-out operation, Task Scheduler provisioning, macOS parity, forced t
 are unsupported. Four eligibility evaluations at 30-minute spacing and one real handoff are the maximum proposed
 per local-date/time-zone window; Phase 12 starts only at handoff.
 
+## Windows in-session automatic-update activation (Phase 13C)
+
+The authenticated JavaFX runtime owns one daemon `InSessionAutomaticUpdateScheduler`. It starts only after the
+policy coordinator and foreground activity observer are available, and it stops on logout, user switch, or process
+shutdown with generation-guarded callbacks. It schedules the next local 02:00 candidate rather than polling every
+minute, delegates every decision and immediate recheck to the Phase 13B evaluator, and launches the ZIP updater only
+as `UNATTENDED`. The machine preference is reread for every evaluation and recheck. Four evaluations approximately
+30 minutes apart and one handoff are allowed per local-date/time-zone window; Phase 12 still begins only after the
+execution lock is acquired and the real updater launch begins.
+
+This is not a background system updater: Shale must already be running in an authenticated Windows desktop session
+and remain idle and safely closable. It creates no Task Scheduler entry, service, wake timer, logged-out helper,
+reboot, macOS scheduler, API, or SQL state. Sleep simply delays the timer; resume inside the window evaluates, while
+resume after 04:00 waits for the next local window. Startup reconciliation, not the scheduler, determines completion.
+
 Current primary client:
 - Curtis & Co.
 - Tenant separation via ShaleClientId

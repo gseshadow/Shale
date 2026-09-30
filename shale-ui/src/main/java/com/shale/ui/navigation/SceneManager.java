@@ -119,6 +119,13 @@ import com.shale.ui.services.SafeWorkDrainCoordinator;
 import com.shale.ui.whatsnew.WhatsNewCoordinator;
 import com.shale.ui.whatsnew.WhatsNewDialog;
 import com.shale.ui.activity.ForegroundHumanActivityObserver;
+import com.shale.core.update.InSessionAutomaticUpdateScheduler;
+import com.shale.core.update.UnattendedUpdateEligibility;
+import com.shale.core.update.UpdateInvocationMode;
+import com.shale.core.update.WorkstationUpdatePreference;
+import com.shale.core.update.WorkstationUpdatePreferenceProvider;
+import com.shale.core.model.ApplicationUpdatePolicyState;
+import com.shale.ui.services.CooperativeShutdownCoordinator;
 
 public final class SceneManager {
 	private static final Logger log = LoggerFactory.getLogger(SceneManager.class);
@@ -166,6 +173,11 @@ public final class SceneManager {
 	private boolean startupPolicyBlocked;
 	private final ForegroundHumanActivityObserver humanActivityObserver =
 			new ForegroundHumanActivityObserver(Clock.systemUTC());
+	private final InSessionAutomaticUpdateScheduler automaticUpdateScheduler;
+	private volatile ApplicationUpdatePolicyCoordinator.Presentation latestPolicy =
+			new ApplicationUpdatePolicyCoordinator.Presentation(ApplicationUpdatePolicyState.UNKNOWN, "", "", 0, "", false, true);
+	private volatile boolean foregroundVisible;
+	private final CooperativeShutdownCoordinator cooperativeShutdownCoordinator;
 
 	public SceneManager(Stage stage,
 			AppState appState,
@@ -174,12 +186,20 @@ public final class SceneManager {
 			DbSessionProvider dbSessionProvider,
 			UiUpdateLauncher updateLauncher) {
 		this(stage, appState, authService, runtimeBridge, dbSessionProvider, updateLauncher,
-				new NoOpDesktopNotificationPresenter());
+				new NoOpDesktopNotificationPresenter(), () -> new WorkstationUpdatePreference(WorkstationUpdatePreference.Status.UNAVAILABLE));
 	}
 
 	public SceneManager(Stage stage, AppState appState, UiAuthService authService,
 			UiRuntimeBridge runtimeBridge, DbSessionProvider dbSessionProvider,
 			UiUpdateLauncher updateLauncher, DesktopNotificationPresenter notificationPresenter) {
+		this(stage, appState, authService, runtimeBridge, dbSessionProvider, updateLauncher, notificationPresenter,
+				() -> new WorkstationUpdatePreference(WorkstationUpdatePreference.Status.UNAVAILABLE));
+	}
+
+	public SceneManager(Stage stage, AppState appState, UiAuthService authService,
+			UiRuntimeBridge runtimeBridge, DbSessionProvider dbSessionProvider,
+			UiUpdateLauncher updateLauncher, DesktopNotificationPresenter notificationPresenter,
+			WorkstationUpdatePreferenceProvider automaticUpdatePreference) {
 		this.stage = stage;
 		this.appState = appState;
 		this.authService = authService;
@@ -230,11 +250,16 @@ public final class SceneManager {
 		this.safeWorkDrainCoordinator = new SafeWorkDrainCoordinator(state -> {
 			if (mainController != null) mainController.showEnforcementState(state);
 		});
+		this.cooperativeShutdownCoordinator = new CooperativeShutdownCoordinator(
+				safeWorkDrainCoordinator::cooperativeShutdownReadiness, Platform::runLater, Platform::exit);
 		this.updatePolicyCoordinator = new ApplicationUpdatePolicyCoordinator(
 				new ApplicationReleaseReadServiceAdapter(new ApplicationReleaseReadDao(dbSessionProvider)),
 				AppVersionProvider::currentVersion, notificationStartupExecutor, Platform::runLater,
 				presentation -> { if (presentation.revision()>0) systemUpdateNotificationProducer.useAuthoritativePolicyPresentation(); safeWorkDrainCoordinator.apply(presentation); onPolicyPresentation(presentation); });
 		runtimeBridge.setApplicationPolicyRefreshHandler(updatePolicyCoordinator::refresh);
+		this.automaticUpdateScheduler = new InSessionAutomaticUpdateScheduler(automaticUpdatePreference,
+				this::automaticUpdateInputs, ignored -> Platform.runLater(this::performAutomaticHandoff));
+		stage.focusedProperty().addListener((observable, oldValue, focused) -> foregroundVisible = focused && stage.isShowing());
 		UserDictionarySession.configure(new UserDictionarySession(new UserDictionaryServiceAdapter(new UserDictionaryWordDao(dbSessionProvider)),appState));
 	}
 
@@ -269,6 +294,7 @@ public final class SceneManager {
 	}
 
 	private void stopSessionOwnedWork() {
+		automaticUpdateScheduler.stop();
 		humanActivityObserver.stop();
 		whatsNewCoordinator.reset();
 		updatePolicyCoordinator.reset();
@@ -353,6 +379,7 @@ public final class SceneManager {
 		} catch (RuntimeException installationFailure) {
 			log.warn("Foreground human-activity observer could not be installed; continuing without activity observation.");
 		}
+		automaticUpdateScheduler.start();
 		runtimeBridge.startApplicationInstanceHeartbeat(humanActivityObserver::lastHumanActivityAt);
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
@@ -366,6 +393,7 @@ public final class SceneManager {
 	}
 
 	private void onPolicyPresentation(ApplicationUpdatePolicyCoordinator.Presentation presentation) {
+		latestPolicy = presentation;
 		if(mainController!=null){mainController.showUpdatePolicy(presentation);return;}
 		if(awaitingStartupPolicy){
 			awaitingStartupPolicy=false;
@@ -374,6 +402,37 @@ public final class SceneManager {
 			return;
 		}
 		if(startupPolicyBlocked&&safeWorkDrainCoordinator.permitsNewWork())showMainShell();
+	}
+
+	private UnattendedUpdateEligibility.Inputs automaticUpdateInputs() {
+		ApplicationUpdatePolicyCoordinator.Presentation policy;
+		try { policy = updatePolicyCoordinator.refreshForAutomaticEvaluation(); latestPolicy = policy; }
+		catch (RuntimeException unavailable) {
+			policy = new ApplicationUpdatePolicyCoordinator.Presentation(ApplicationUpdatePolicyState.UNKNOWN,
+					"", "", 0, "", false, true);
+		}
+		var now = java.time.ZonedDateTime.now();
+		boolean ready = safeWorkDrainCoordinator.cooperativeShutdownReadiness().permitsUnattendedShutdown();
+		return new UnattendedUpdateEligibility.Inputs(
+				new WorkstationUpdatePreference(WorkstationUpdatePreference.Status.UNAVAILABLE),
+				policy.stale() ? ApplicationUpdatePolicyState.UNKNOWN : policy.state(),
+				updateLauncher.automaticAvailability(policy.state(), policy.targetVersion()), now,
+				humanActivityObserver.lastHumanActivityAt(), foregroundVisible,
+				!ready, ready, updateLauncher.automaticExecutionLockAvailable(),
+				updateLauncher.automaticWindowsCapabilityAvailable());
+	}
+
+	private void performAutomaticHandoff() {
+		if (!automaticUpdateScheduler.isRunning()) return;
+		cooperativeShutdownCoordinator.requestIfReady(() -> {
+			var now = java.time.ZonedDateTime.now();
+			if (foregroundVisible || !UnattendedUpdateEligibility.idle(now.toInstant(), humanActivityObserver.lastHumanActivityAt())
+					|| !updateLauncher.automaticExecutionLockAvailable()) return false;
+			try { updateLauncher.launchUpdater(UpdateInvocationMode.UNATTENDED); return true; }
+			catch (RuntimeException failure) {
+				log.warn("Automatic updater handoff deferred: {}", failure.getClass().getSimpleName()); return false;
+			}
+		});
 	}
 
 	private void showPolicyCheckSurface(){
@@ -1516,6 +1575,7 @@ public final class SceneManager {
 
 	/** Deterministically releases all SceneManager-owned background work. */
 	public void shutdown() {
+		automaticUpdateScheduler.close();
 		humanActivityObserver.stop();
 		runtimeBridge.onShutdown();
 		whatsNewCoordinator.close();

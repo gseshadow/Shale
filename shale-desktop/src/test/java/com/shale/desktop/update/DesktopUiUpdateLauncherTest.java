@@ -18,6 +18,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.shale.core.update.UpdateAttemptState;
 import com.shale.core.update.UpdateAttemptStore;
 import com.shale.core.update.UpdateExecutionLock;
+import com.shale.core.update.UpdateInvocationMode;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -134,6 +135,26 @@ final class DesktopUiUpdateLauncherTest {
 		}
 		assertEquals(0, launches.get(), "collision must not create a duplicate updater process");
 		assertTrue(!java.nio.file.Files.exists(tempDir.resolve("attempts")), "collision occurs before Phase 12 begins");
+	}
+
+	@Test void unattendedHandoffCreatesOneAttemptAndCannotUseManualLauncher(@TempDir Path tempDir) {
+		rememberOriginalProperties();
+		System.setProperty(OS_NAME, "Windows 11"); System.setProperty(APP_VERSION, "1.0.129");
+		System.setProperty("SHALE_UPDATE_ATTEMPT_DIR", tempDir.resolve("attempts").toString());
+		System.setProperty("SHALE_UPDATE_EXECUTION_LOCK", tempDir.resolve("update-execution.lock").toString());
+		AtomicInteger manual = new AtomicInteger(); AtomicInteger unattended = new AtomicInteger();
+		var launcher = new DesktopUiUpdateLauncher(new com.shale.updater.UpdateService(), "ignored",
+				(version, id, directory) -> manual.incrementAndGet(),
+				(version, id, directory, mode) -> {
+					assertEquals(UpdateInvocationMode.UNATTENDED, mode); unattended.incrementAndGet();
+				}, () -> {});
+		launcher.launchUpdater(UpdateInvocationMode.UNATTENDED);
+		assertEquals(0, manual.get(), "automatic scheduling must not enter the legacy manual launch path");
+		assertEquals(1, unattended.get(), "one eligible handoff creates exactly one updater process request");
+		try (var files = java.nio.file.Files.list(tempDir.resolve("attempts"))) {
+			assertEquals(1, files.filter(path -> path.getFileName().toString().endsWith(".properties")).count(),
+					"one handoff creates exactly one Phase 12 attempt");
+		} catch (IOException failure) { throw new AssertionError(failure); }
 	}
 
 	private void rememberOriginalProperties() {
