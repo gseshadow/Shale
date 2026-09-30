@@ -22,3 +22,20 @@ registration. Logged-out/closed-app updating is explicitly `UNSUPPORTED`: the pe
 safely with a credentialless owner principal, authoritative policy, trustworthy closed-app version metadata,
 owner-correct attempt/log/lock paths, signed executables, and deterministic MSI cleanup. Phase 13C remains the only
 automatic mechanism. See `docs/testing/windows-logged-out-update-phase13d.md`.
+
+## Phase 13E signing and installed-version metadata
+
+Local builds remain unsigned unless `SHALE_WINDOWS_SIGNING_REQUIRED=true`. Production signing additionally requires
+`SHALE_SIGNTOOL_PATH`, `SHALE_SIGN_TIMESTAMP_URL`, `SHALE_SIGN_EXPECTED_SUBJECT`, and either
+`SHALE_SIGN_CERT_THUMBPRINT` or `SHALE_SIGN_CERT_PATH` (with optional secret `SHALE_SIGN_CERT_PASSWORD`). Secrets and
+certificates are supplied externally and are never committed or printed. `sign-windows-artifact.ps1` signs with
+SHA-256 plus RFC3161 timestamping, verifies signature, timestamp, and expected publisher, and fails closed. It covers
+`Shale.exe`, `ShaleUpdater.exe`, and the final MSI. Executables are signed before ZIP construction; the MSI is signed
+before publication; manifest SHA-256 therefore covers final signed ZIP bytes. Developer mode explicitly says the
+artifact remains unsigned and is not production-ready.
+
+The payload contains `app/shale-installed-version.properties` with schema 1, canonical version, and `PRODUCTION`
+channel. The updater atomically replaces it only after payload application succeeds and before `INSTALL_APPLIED`.
+Add/Remove Programs `DisplayVersion` is not authority. This owner-writable file is lifecycle evidence, not sufficient
+trust for privileged execution; protected registration, canonical/reparse-safe paths, and Authenticode are also
+required.

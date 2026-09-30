@@ -9,6 +9,7 @@ import com.shale.core.update.UpdateAttemptStore;
 import com.shale.core.update.UpdateFailureCode;
 import com.shale.core.update.UpdateExecutionLock;
 import com.shale.core.update.UpdateInvocationMode;
+import com.shale.core.update.InstalledVersionMetadata;
 import com.shale.core.platform.AppPaths;
 
 import com.shale.updater.platform.PlatformSupport;
@@ -131,6 +132,9 @@ public class Main {
 				} catch (Exception ex) { reporter.failed(UpdateFailureCode.INSTALL_APPLY_FAILED); throw ex; }
 
 				System.out.println("Install succeeded at: " + installDir);
+				// Publish version evidence only after every payload copy/replacement completed successfully.
+				InstalledVersionMetadata.production(manifest.getVersion())
+						.writeAtomically(installDir.resolve("app").resolve(InstalledVersionMetadata.FILE_NAME));
 				reporter.state(UpdateAttemptState.INSTALL_APPLIED, manifest.getVersion(), null);
 				restartOrLogManualReopen(platformSupport, installDir, manifest.getVersion());
 

@@ -165,6 +165,9 @@ if errorlevel 1 goto :light_failed
 echo Final light.exe reconstruction completed.
 echo Windows MSI stage completed: light-reconstruction output="%FINAL_MSI%"
 if not exist "%FINAL_MSI%" goto :missing_final_msi
+echo Windows MSI stage started: Authenticode signing before publication
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%FINAL_MSI%"
+if errorlevel 1 goto :msi_signing_failed
 echo Compiled final MSI validation started.
 mkdir "%STAGE%\dark"
 if errorlevel 1 goto :dark_staging_failed
@@ -189,6 +192,11 @@ move /y "%ROOT%\dist\Shale-%VERSION%.msi.new" "%ROOT%\dist\Shale-%VERSION%.msi" 
 if errorlevel 1 goto :final_move_failed
 echo Final MSI publication completed: Shale-%VERSION%.msi
 exit /b 0
+
+:msi_signing_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=Authenticode-signing input="%FINAL_MSI%" exit=%STAGE_EXIT%
+exit /b 31
 
 :staging_failed
 set "STAGE_EXIT=%ERRORLEVEL%"

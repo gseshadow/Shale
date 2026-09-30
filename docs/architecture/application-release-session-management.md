@@ -1997,3 +1997,69 @@ not task/service implementation, production rollout, or macOS parity.
 The new capability is a local immutable unsupported assessment. It reads and mutates no tenant, user, session, PHI,
 domain, preference, or database state and performs no administrative action. Existing audit schemas cannot and
 should not receive timer/feasibility events. No migration or audit allowlist change is required.
+
+## Phase 13E implementation record — 2026-09-30
+
+**Status: IN PROGRESS — implementation and non-Maven contract checks are complete, but required Maven verification
+is blocked by Maven Central HTTP 403; installed-Windows validation is NOT RUN.**
+
+Phase 13E approves the narrowly classified public global-policy read at
+`GET /api/public/application-policy?channel=PRODUCTION`. All canonical channels are accepted and unknown values fail
+before the authority read. It uses the existing `ApplicationReleaseReadServicePort`/Phase 11 database policy, adds no
+policy table/file/manifest rules, and leaves the authenticated endpoint intact. Its public-cacheable response contains
+only channel, revision, recommended and minimum-allowed versions, deadline, and database server time. It excludes
+release ids, access mode, publication/admin metadata, tenants, users, sessions/JTI, devices/machines, audit,
+authorization state, row versions, and all mutations. The bounded three-channel enumeration and indexed single-row
+read are cheap at startup/evaluation volume. Version/deadline publication reveals limited rollout posture, but no
+account/package access; the public manifest already discloses equivalent package-level version/channel/timing/hash
+information. Existing deployment request controls suffice; Phase 13E adds no rate-limit subsystem.
+
+Windows releases now use externally configured Authenticode signing. Developer builds default explicitly to unsigned.
+`SHALE_WINDOWS_SIGNING_REQUIRED=true` fails closed unless signtool, RFC3161 timestamp URL, expected publisher, and
+certificate file or store thumbprint are supplied. Certificate-file passwords are optional secure environment input,
+never printed, and no certificate/key/secret is committed. The script signs and verifies `Shale.exe`,
+`ShaleUpdater.exe`, and the final MSI, including valid status, timestamp certificate, and expected subject. Executable
+signing precedes ZIP creation; MSI signing precedes publication; release manifest SHA-256 is computed afterward over
+final signed ZIP bytes. Thus an unsigned local artifact is supported development output, never production-ready.
+
+The install payload now owns compact `app/shale-installed-version.properties` (`schemaVersion=1`, canonical semantic
+`version`, `channel=PRODUCTION`). Initial packaging writes it, and the updater atomically publishes it only after the
+payload copy/replacement succeeds and before Phase 12 `INSTALL_APPLIED`. Add/Remove Programs `DisplayVersion` is
+ignored. At startup, the running application version remains authority; malformed or mismatched metadata produces
+sanitized diagnostics and is not silently overwritten. Because a per-user install remains owner-writable, metadata
+alone is not trust sufficient for future privileged execution.
+
+The privacy-minimal registration value contract is schema 1, opaque random installation UUID, Windows owner SID,
+absolute canonical install root, and explicit owner support root. It contains no Shale identity, tenant, email,
+session/JTI, machine fingerprint, or case data. Validation rejects malformed SID/schema, relative/traversing paths,
+and unexpected Shale layout. Pure owner path derivation produces the installed updater/version file, the exact Phase
+12 `update-attempts` directory, exact Phase 13B `updates/update-execution.lock`, and update evidence-log location; it
+never reads the executor's `%LOCALAPPDATA%` or loads/impersonates a profile. Multiple UUID/SID registrations remain
+independent.
+
+Authoritative persistence is deliberately not fabricated. The current non-elevated per-user jpackage/WiX lifecycle
+cannot write protected HKLM or explicitly ACL-hardened ProgramData, while HKCU is unsuitable for credentialless
+logged-out discovery and application-authored data permits path nomination by an ordinary process. The required
+future model is installer/admin/SYSTEM write/remove, owner read, unrelated-user no-write; stable UUID preserved on
+upgrade, exact-record removal on uninstall, repair restoration, no duplicates, and stale/missing/reparse/path-owner
+mismatch rejection. Implementing that requires a separately approved elevated installer ownership design. Until
+then forged registration, SID/path modification, arbitrary path injection, junction/redirection, stale records,
+compromised shared storage, and local binary replacement remain blocked from execution rather than partially trusted.
+A future executor must require both protected validated registration and correctly signed expected-publisher binaries.
+
+The audit/privacy review found one non-tenant public global read and local deployment evidence only. There is no
+business/admin mutation or sensitive tenant read, so no tenant audit and no SQL migration is appropriate. Detailed
+security and installed validation procedures are in
+`docs/testing/windows-background-prerequisites-phase13e.md` and the extended Phase 13D runbook. Installed signing,
+ACL, multi-user, repair/upgrade/uninstall, and metadata acceptance remain NOT RUN on this Linux host and are not
+claimed PASS.
+
+`LoggedOutAutomaticUpdateSupport = UNSUPPORTED` and all Phase 13D blockers remain intentionally unchanged pending a
+later complete reevaluation. Phase 13E adds no Task Scheduler call/COM/cmdlet, Windows Service, SYSTEM executor,
+principal choice, impersonation, credential storage, logged-out updater, force-kill, wake/reboot, or production
+background rollout. Phase 13C remains the only automatic mechanism.
+
+The exact recommended next phase is **Phase 13F — elevated installer-owned Windows registration and installed
+lifecycle validation only**. It must implement/prove protected registration ACLs, stable upgrade/repair identity,
+exact uninstall cleanup, reparse-safe validation, signed installed artifacts, and multi-user behavior; it must not
+activate or reevaluate logged-out execution.

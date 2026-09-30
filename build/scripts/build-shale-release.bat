@@ -47,6 +47,10 @@ if not exist "%DESKTOP_JAR%" goto :missing_desktop_jar
 if not exist "%UPDATER_JAR%" goto :missing_updater_jar
 if not exist "%DESKTOP_LIB%\" goto :missing_desktop_lib
 
+>"%DESKTOP_TARGET%\shale-installed-version.properties" echo schemaVersion=1
+>>"%DESKTOP_TARGET%\shale-installed-version.properties" echo version=%VERSION%
+>>"%DESKTOP_TARGET%\shale-installed-version.properties" echo channel=PRODUCTION
+
 call "%ROOT%\build\scripts\build-updater.bat" --package-only || goto :fail
 
 echo Building desktop application image...
@@ -62,6 +66,10 @@ jpackage ^
   --icon "%ASSETS_DIR%\Shale.ico" || goto :fail
 
 python "%ROOT%\build\scripts\windows_msi_payload.py" config "%DIST_APP%\Shale\app\Shale.cfg" || goto :fail
+
+rem Sign final executable bytes before ZIP hashing/manifest publication or MSI construction.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%DIST_APP%\Shale\Shale.exe" || goto :fail
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%DIST_APP%\Shale\app\updater\ShaleUpdater.exe" || goto :fail
 
 powershell -NoProfile -Command "Compress-Archive -Path '%DIST_APP%\Shale\*' -DestinationPath '%DIST%\ShaleApp-%VERSION%.zip' -Force" || goto :fail
 

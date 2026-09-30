@@ -53,6 +53,8 @@ jpackage ^
   --add-modules java.net.http,java.logging,jdk.crypto.ec ^
   --win-console || goto :fail
 
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%DIST_UPDATER%\ShaleUpdater\ShaleUpdater.exe" || goto :fail
+
 rmdir /s /q "%DESKTOP_TARGET%\updater" 2>nul
 mkdir "%DESKTOP_TARGET%\updater"
 
