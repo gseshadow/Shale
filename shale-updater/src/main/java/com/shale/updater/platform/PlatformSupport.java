@@ -1,12 +1,18 @@
 package com.shale.updater.platform;
 
 import java.nio.file.Path;
+import com.shale.core.update.UpdateInvocationMode;
 
 public interface PlatformSupport {
 
 	Platform platform();
 
 	void stopRunningApp(Path installDir) throws Exception;
+	default boolean stopRunningApp(Path installDir, UpdateInvocationMode mode) throws Exception {
+		if (mode == UpdateInvocationMode.UNATTENDED) return false;
+		stopRunningApp(installDir);
+		return true;
+	}
 
 	void restartApp(Path installDir) throws Exception;
 

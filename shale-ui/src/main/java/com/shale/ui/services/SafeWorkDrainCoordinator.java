@@ -6,6 +6,8 @@ import java.util.function.Consumer;
 
 import com.shale.core.model.ApplicationUpdatePolicyState;
 import com.shale.core.model.ApplicationVersionEnforcementState;
+import com.shale.core.update.CooperativeShutdownReadiness;
+import com.shale.core.update.MutationWorkflowType;
 
 /**
  * Session-scoped entry gate and small active-work tracker. Registrations are leases: policy changes
@@ -16,6 +18,9 @@ public final class SafeWorkDrainCoordinator {
 	private final Consumer<ApplicationVersionEnforcementState> listener;
 	private ApplicationVersionEnforcementState state = ApplicationVersionEnforcementState.UNKNOWN_GRACE;
 	private int activeWork;
+	private int savesInFlight;
+	private boolean evidenceKnown = true;
+	private boolean promptRequired;
 
 	public SafeWorkDrainCoordinator(Consumer<ApplicationVersionEnforcementState> listener) {
 		this.listener = Objects.requireNonNull(listener);
@@ -24,6 +29,15 @@ public final class SafeWorkDrainCoordinator {
 	public synchronized ApplicationVersionEnforcementState state() { return state; }
 	public synchronized int activeWorkCount() { return activeWork; }
 	public synchronized boolean permitsNewWork() { return permits(state); }
+	public synchronized CooperativeShutdownReadiness cooperativeShutdownReadiness() {
+		if (!evidenceKnown) return CooperativeShutdownReadiness.UNKNOWN;
+		if (activeWork > 0) return CooperativeShutdownReadiness.ACTIVE_MUTATION_WORKFLOW;
+		if (savesInFlight > 0) return CooperativeShutdownReadiness.SAVE_IN_FLIGHT;
+		if (promptRequired) return CooperativeShutdownReadiness.PROMPT_REQUIRED;
+		return CooperativeShutdownReadiness.READY;
+	}
+	public synchronized void setEvidenceKnown(boolean known) { evidenceKnown = known; }
+	public synchronized void setPromptRequired(boolean required) { promptRequired = required; }
 
 	/** Returns a grandfathering lease, or {@code null} when the workflow must not open. */
 	public synchronized Registration tryStart(String workflow) {
@@ -31,6 +45,14 @@ public final class SafeWorkDrainCoordinator {
 		if (!permits(state)) return null;
 		activeWork++;
 		return new Registration(this, workflow);
+	}
+	public synchronized Registration tryStart(MutationWorkflowType workflow) {
+		return tryStart(Objects.requireNonNull(workflow).name());
+	}
+	/** Tracks a dispatched save at the same authority as workflow leases. */
+	public synchronized SaveRegistration saveStarted() {
+		savesInFlight++;
+		return new SaveRegistration(this);
 	}
 
 	/** Derives enforcement only from the authoritative/bounded Phase 11A result. */
@@ -50,13 +72,14 @@ public final class SafeWorkDrainCoordinator {
 		if (next == ApplicationVersionEnforcementState.RECOVERING) setAllowedAfterRecoverySignal();
 	}
 
-	public synchronized void reset() { activeWork = 0; setState(ApplicationVersionEnforcementState.UNKNOWN_GRACE); }
+	public synchronized void reset() { activeWork = 0; savesInFlight = 0; evidenceKnown = true; promptRequired = false; setState(ApplicationVersionEnforcementState.UNKNOWN_GRACE); }
 
 	private synchronized void finish() {
 		if (activeWork > 0) activeWork--;
 		if (activeWork == 0 && state == ApplicationVersionEnforcementState.DRAINING_REQUIRED_UPDATE)
 			setState(ApplicationVersionEnforcementState.BLOCKED_NEW_WORK);
 	}
+	private synchronized void finishSave() { if (savesInFlight > 0) savesInFlight--; }
 	private synchronized void setAllowedAfterRecoverySignal() { setState(ApplicationVersionEnforcementState.ALLOWED); }
 	private void setState(ApplicationVersionEnforcementState next) {
 		if (state == next) return;
@@ -76,5 +99,11 @@ public final class SafeWorkDrainCoordinator {
 		private Registration(SafeWorkDrainCoordinator owner, String workflow) { this.owner=owner; this.workflow=workflow; }
 		public String workflow() { return workflow; }
 		@Override public void close() { if (closed.compareAndSet(false, true)) owner.finish(); }
+	}
+	public static final class SaveRegistration implements AutoCloseable {
+		private final SafeWorkDrainCoordinator owner;
+		private final AtomicBoolean closed = new AtomicBoolean();
+		private SaveRegistration(SafeWorkDrainCoordinator owner) { this.owner = owner; }
+		@Override public void close() { if (closed.compareAndSet(false, true)) owner.finishSave(); }
 	}
 }

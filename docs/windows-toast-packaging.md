@@ -85,3 +85,8 @@ persistence, ACL inheritance, and prompt-free updater/MSI behavior remain unveri
 package scripts. Phase 13B remains in progress and no production scheduler was activated. The supplied full
 repository `mvn test` result is **PASS** from an unrestricted runner; only installed-Windows acceptance evidence
 remains outstanding, and that Maven result does not establish any Windows runtime fact.
+
+
+### Phase 13B hardening result
+
+The per-user update execution mutex is the OS lock on `%LOCALAPPDATA%\Shale\updates\update-execution.lock`, outside the replaceable payload. Desktop holds it only across preflight/handoff; the updater waits for that deliberate transfer and then independently owns it for package execution. Lock busy creates neither a duplicate handoff nor Phase 12 attempt. A stale empty file is harmless. Old/no invocation mode remains manual; unattended mode cannot invoke Windows `taskkill /F`. No task, service, scheduler, signing configuration, MSI custom action, or logged-out support was added. Installed 1.0.129 evidence confirms the LocalAppData per-user layout and `app\updater\ShaleUpdater.exe`; both installed executables are currently `NotSigned`, which remains future production hardening.

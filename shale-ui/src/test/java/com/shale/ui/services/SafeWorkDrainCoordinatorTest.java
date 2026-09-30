@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
 import com.shale.core.model.*;
+import com.shale.core.update.*;
 
 class SafeWorkDrainCoordinatorTest {
 	@Test void workOpenedBeforeBlockIsGrandfatheredAndDrainEndsWithoutForceClose() {
@@ -25,6 +26,35 @@ class SafeWorkDrainCoordinatorTest {
 		for(var s:new ApplicationUpdatePolicyState[]{ApplicationUpdatePolicyState.RECOMMENDED,ApplicationUpdatePolicyState.REQUIRED_BEFORE_DEADLINE,ApplicationUpdatePolicyState.UNKNOWN}){
 			gate.apply(policy(s));assertTrue(gate.permitsNewWork(),s+" must remain available");
 		}
+	}
+	@Test void readinessIsReadyOnlyWithKnownEmptyAggregateEvidence() {
+		var gate = new SafeWorkDrainCoordinator(s -> {});
+		assertEquals(CooperativeShutdownReadiness.READY, gate.cooperativeShutdownReadiness());
+		for (var type : MutationWorkflowType.values()) {
+			try (var ignored = gate.tryStart(type)) {
+				assertEquals(CooperativeShutdownReadiness.ACTIVE_MUTATION_WORKFLOW, gate.cooperativeShutdownReadiness(), type.name());
+			}
+		}
+		try (var save = gate.saveStarted()) {
+			assertEquals(CooperativeShutdownReadiness.SAVE_IN_FLIGHT, gate.cooperativeShutdownReadiness());
+			save.close();
+			assertEquals(CooperativeShutdownReadiness.READY, gate.cooperativeShutdownReadiness(), "save release must be idempotent");
+		}
+		gate.setPromptRequired(true);
+		assertEquals(CooperativeShutdownReadiness.PROMPT_REQUIRED, gate.cooperativeShutdownReadiness());
+		gate.setEvidenceKnown(false);
+		assertEquals(CooperativeShutdownReadiness.UNKNOWN, gate.cooperativeShutdownReadiness());
+		assertFalse(gate.cooperativeShutdownReadiness().permitsUnattendedShutdown());
+	}
+	@Test void multipleWorkflowLeasesAreExceptionSafeAndNeverDoubleRelease() {
+		var gate = new SafeWorkDrainCoordinator(s -> {});
+		var one = gate.tryStart(MutationWorkflowType.NEW_INTAKE);
+		var two = gate.tryStart(MutationWorkflowType.CASE_EDIT);
+		assertEquals(2, gate.activeWorkCount());
+		one.close(); one.close();
+		assertEquals(1, gate.activeWorkCount());
+		two.close();
+		assertEquals(CooperativeShutdownReadiness.READY, gate.cooperativeShutdownReadiness());
 	}
 	private static ApplicationUpdatePolicyCoordinator.Presentation policy(ApplicationUpdatePolicyState s){return new ApplicationUpdatePolicyCoordinator.Presentation(s,"","",1,"1.0.200",false,false);}
 }
