@@ -35,6 +35,19 @@ unavailable, or corrupt state never permits future unattended execution. Authent
 change it in Settings; every user observes the same state across logout, tenant switch, and restart. This foundation
 performs no scheduling, idle detection, updater launch, policy decision, or central audit/database mutation.
 
+## Windows unattended-update feasibility foundation (Phase 13B)
+
+Phase 13B adds pure, safe-default-off contracts only; it does not register a timer or Windows task and cannot
+launch an unattended production update. `UnattendedUpdateEvaluationService` rereads the Phase 13A provider at
+evaluation time. Its reasoned evaluator requires fresh eligible Phase 11A policy, an exact Production policy/
+manifest target match, a strictly newer compatible package, a workstation-local 02:00–04:00 window, at least
+30 minutes since observed Phase 5A foreground input, no foreground window or Phase 11B work, a cooperative
+shutdown capability, and an available shared execution lock. Current Windows runtime cannot supply the final two
+guarantees: the updater force-stops Shale and there is no cross-process update lock. Consequently activation is
+intentionally absent. Closed/logged-out operation, Task Scheduler provisioning, macOS parity, forced termination,
+and automatic reboot are unsupported. Four eligibility evaluations at 30-minute spacing and one real handoff are
+the maximum proposed per local-date/time-zone window; Phase 12 starts only at handoff.
+
 Current primary client:
 - Curtis & Co.
 - Tenant separation via ShaleClientId

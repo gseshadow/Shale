@@ -63,3 +63,19 @@ installation tree. The desktop passes optional UUID/directory arguments to the a
 compatible with older launch commands and does not alter MSI or ZIP installation semantics. `INSTALL_APPLIED`
 means only that the ZIP overlay completed. A later Shale startup at the target or a newer production semantic
 version is required for `COMPLETED`.
+
+## Phase 13B unattended-update feasibility
+
+No scheduled task, service, helper, MSI custom action, or scheduler state is installed in Phase 13B. This is
+intentional: the MSI is per-user, central policy currently requires an authenticated running desktop, and the
+Windows updater uses forceful process termination rather than a cooperative shutdown. SYSTEM cannot safely own or
+modify a particular user's installation, and a current-user task that works while logged out would require stored
+credentials or a new credential-free policy/helper architecture. Neither is acceptable in this phase.
+
+The selected foundation is therefore an **in-process, authenticated, safe-default-off evaluation contract**. It
+can later be called by one session-owned scheduler while Shale is running, but production wiring is withheld until
+a cooperative shutdown and one per-install-owner cross-process lock exist. There is no task identity or uninstall
+custom action yet, so upgrade/uninstall behavior remains unchanged and cannot leave an orphan Phase 13B task.
+If a later validated task is approved, use one stable current-user identity (`Shale\\Automatic Update`), no saved
+password/token, a stable installed helper path, execution-time preference/policy checks, and explicit uninstall
+removal. Installed Windows validation in `docs/testing/windows-unattended-update-phase13b.md` is mandatory first.

@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 13A IN PROGRESS — implementation present; required Maven verification blocked by Maven Central HTTP 403
+**Status:** Phase 13B FOUNDATION IMPLEMENTED — production activation and installed-Windows validation intentionally deferred
 
 **Last reviewed:** 2026-09-30
 
@@ -1144,8 +1144,8 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 11A | **COMPLETE** | Central policy resolver, server-time anchored shell UX, outage/correction behavior, and updater precedence are verified. |
 | 11B | **COMPLETE** | Minimum-allowed enforcement and safe drain are verified. |
 | 12 | **COMPLETE** | Privacy-safe local attempt/outcome correlation and required verification completed before Phase 13A. |
-| 13A | **IN PROGRESS** | Machine-scoped opt-in storage, provider, authorization, and Settings control are implemented; required Maven verification is blocked by Central HTTP 403. |
-| 13B | **NOT STARTED — NEXT PROPOSED STEP** | Design only the scheduler/idle-aware unattended execution contract after Phase 13A verification completes. |
+| 13A | **COMPLETE** | Machine-scoped opt-in storage, provider, authorization, and Settings control were completed and verified before Phase 13B. |
+| 13B | **IN PROGRESS** | Safe-default-off Windows feasibility/evaluation foundation is implemented; Maven and installed-Windows verification remain incomplete, and no production scheduler is activated. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1182,7 +1182,11 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-After Phase 7C verification completes, implement **Phase 8A only**: add the narrowly reviewed authoritative self/admin durable-session revocation service/API behavior, authorization and security-event/audit decision. Do not add session/device UI, PubSub delivery (Phase 8B), geolocation, desktop password cutover, or updater enforcement.
+Complete **Phase 13B validation only**: restore Maven dependency access, run the required focused/selected/full
+suites, and perform the installed-Windows feasibility checklist. If validation confirms the documented blockers,
+scope a later phase to add a cooperative no-prompt shutdown readiness contract and one per-install-owner shared
+update lock before considering any production scheduler activation. Do not add macOS scheduling, a privileged
+service, public policy API, or production rollout in that validation run.
 
 ## Phase 7A implementation record — 2026-09-29
 
@@ -1610,8 +1614,7 @@ completed before Phase 13A began.
 
 ## Phase 13A implementation record — 2026-09-30
 
-**Status: IN PROGRESS — implementation complete; required focused and full Maven verification cannot execute
-because Maven Central returns HTTP 403. Phase 13B is NOT STARTED.**
+**Status: COMPLETE — implementation and required verification completed before Phase 13B.**
 
 The preference grants permission only for a future unattended executor; it cannot alter central policy, safe drain,
 eligibility, or manual Update now behavior. Missing configuration defaults to not permitted without creating a file.
@@ -1643,3 +1646,92 @@ Phase 13B consumes `WorkstationUpdatePreferenceProvider.current()` and proceeds 
 `unattendedExecutionPermitted()` is true for `ENABLED`; it must separately combine policy, update availability, idle,
 and schedule rules. Phase 13A adds no timer, thread, task/launchd job, idle observer, updater invocation, MSI
 execution, restart, or eligibility logic.
+
+## Phase 13B implementation record — 2026-09-30
+
+**Status: IN PROGRESS — the feasibility foundation is implemented and safe-default-off. Required Maven tests are
+blocked by Maven Central HTTP 403, and installed-Windows validation has not run. This is not production ready.**
+
+### Architecture decision and supported boundary
+
+The selected narrow architecture is an **in-process evaluator in the existing authenticated desktop**, with no
+timer wired in this phase. `UnattendedUpdateEvaluationService` rereads
+`WorkstationUpdatePreferenceProvider.current()` for every evaluation and only calls the supplied handoff seam after
+the pure resolver returns `ELIGIBLE`. It never reads or writes the Phase 13A file. Manual Update now remains on its
+existing independent path. The foundation supports deterministic eligibility, local-window, idle, and bounded-retry
+decisions and proves that every deferral stays before the Phase 12 attempt boundary. It does not claim that an
+unattended update can currently execute.
+
+Windows Task Scheduler (installer- or application-created), a detached helper, a combined task/helper, and a
+Windows Service were rejected for activation now. The per-user MSI belongs to the installing Windows user; SYSTEM
+must not mutate that user's install. A logged-out current-user task would need stored credentials or a new safe
+credential-free logon contract. A detached helper also cannot obtain fresh authenticated Phase 11 authority without
+delegating a bearer. The current updater force-kills `Shale.exe`, and no shared cross-process update/install lock
+protects a second Shale process. An in-process timer alone cannot cover closed/logged-out machines, but it is the
+only context that can presently reuse fresh authenticated policy and Phase 5A/11B state. Therefore no scheduler,
+task, service, helper, MSI/WiX custom action, task name, or operational state file was added. Feature activation is
+safe-default off by absence of runtime wiring, independently of workstation consent.
+
+### Eligibility and scheduling contract
+
+The preference is the first gate. Only `unattendedExecutionPermitted() == true` passes; `DISABLED`, `MISSING`,
+`UNAVAILABLE`, and `CORRUPT` all return `DEFER_PREFERENCE`. Eligible central states are `RECOMMENDED`,
+`REQUIRED_BEFORE_DEADLINE`, and `REQUIRED_DEADLINE_REACHED`; `CURRENT` and `UNKNOWN` defer. A required deadline
+never overrides consent or safety. Package eligibility requires a reachable manifest, a present package, existing
+compatibility approval, exact manifest/policy target equality, equal policy/manifest channel, and a target strictly
+newer than current according to `SemanticVersion`. Production never changes channel to chase a newer file.
+
+The candidate window is **02:00 inclusive to 04:00 exclusive in the workstation's current local zone**. Each
+evaluation uses `ZonedDateTime` local calendar fields rather than adding 24 hours, so missing/repeated hours and
+timezone changes are evaluated from reality at wake-up. The conservative idle threshold is **30 minutes** using
+the Phase 5A observer's optional last foreground activity `Instant`. Exactly 30 minutes passes; less, future-skewed,
+or absent evidence defers. A visible/foreground Shale window also defers even if the timestamp is old. No activity
+history is stored.
+
+Idle is insufficient. Any Phase 11B safe-work lease, open/dirty or otherwise uncertain mutation editor, save in
+flight, unavailable cooperative no-prompt shutdown, another process, or occupied update lock must defer. The
+existing lease count can supply active-work evidence, but there is no trustworthy global dirty-editor readiness
+signal or cooperative unattended shutdown today, so a production caller must supply shutdown unavailable. The
+resolver exposes one immutable reasoned decision rather than scattered booleans.
+
+The retry foundation permits at most four evaluations per local-date/time-zone window, conceptually at initial
+wake then 30-minute intervals, and at most one real handoff. Offline policy/manifest/package uncertainty is an
+eligibility deferral, creates no attempt, and may use those bounded evaluations. A terminal real attempt is not
+relaunched that window. A different local date or changed zone creates a new window; counters are not activity
+history and no persistence is introduced in this phase.
+
+### Execution, lifecycle, security, and packaging findings
+
+Phase 12 begins only when the eligible evaluator crosses the handoff consumer seam; scheduler wake-ups and all
+deferrals create nothing. An eventual handoff must reuse `DesktopUiUpdateLauncher` and existing updater validation.
+The downloader enforces configured SHA-256 and extraction rejects path traversal. Source inspection found no
+runtime Authenticode verification of the updater executable or archive/MSI; do not claim it. The in-app Windows
+path applies the ZIP, not MSI, and the per-user install is expected to run as that user without UAC, but installed
+confirmation is still required. No code bypasses UAC.
+
+Locked is not equivalent to safe: the same activity/work/shutdown/lock gates remain. Closed and logged-out
+execution is unsupported because authenticated policy, install-owner identity, preference access, and safe process
+coordination cannot all be established without credentials or a larger service/API design. No password, JWT/JTI,
+session secret, user, tenant, email, machine UUID, activity history, PHI, or case data enters evaluator/retry state.
+Routine evaluation adds no central audit row; a real handoff retains Phase 12. There is no API, SQL, schema, or
+central persistence change.
+
+Automatic reboot and force termination are forbidden. The current updater's force-stop makes unattended handoff a
+blocker rather than an allowed capability. The ZIP updater has no MSI reboot-required result; if a future installer
+returns one it must be recorded/reconciled without reboot. Existing successful-restart semantics remain unchanged
+and no credential is persisted.
+
+Because no task/helper/state is installed, upgrade and uninstall have nothing new to update, duplicate, or remove;
+Phase 13A preference retention and N-1 behavior are unchanged. A future approved task must be a single stable
+current-user `Shale\\Automatic Update` identity, point to a stable installed path, contain no credentials, reread
+preference/policy on every run, update idempotently, and be explicitly removed on uninstall. macOS launchd parity,
+production rollout, configurable schedule UI, policy administration, a public policy endpoint, privileged daemon,
+force-kill, and workstation reboot are explicitly outside Phase 13B.
+
+Audit compatibility review: evaluation is local non-PHI operational computation and no domain/administrative
+mutation or sensitive read is added. Existing Phase 12 local operational evidence begins only at updater handoff.
+No audit schema, event, allowlist, or SQL migration is appropriate.
+
+The exact installed-Windows acceptance checklist is
+`docs/testing/windows-unattended-update-phase13b.md`. Until Maven and that checklist pass, implementation remains
+unverified and the roadmap intentionally stays `IN PROGRESS`.
