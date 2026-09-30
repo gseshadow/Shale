@@ -9,9 +9,14 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.nio.file.Path;
+import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import com.shale.core.update.UpdateAttemptState;
+import com.shale.core.update.UpdateAttemptStore;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -23,11 +28,13 @@ final class DesktopUiUpdateLauncherTest {
 
 	private String originalOsName;
 	private String originalAppVersion;
+	private String originalAttemptDir;
 
 	@AfterEach
 	void restoreSystemProperties() {
 		restoreProperty(OS_NAME, originalOsName);
 		restoreProperty(APP_VERSION, originalAppVersion);
+		restoreProperty("SHALE_UPDATE_ATTEMPT_DIR", originalAttemptDir);
 	}
 
 	@Test
@@ -55,20 +62,24 @@ final class DesktopUiUpdateLauncherTest {
 	}
 
 	@Test
-	void launchUpdaterOnMacDelegatesToUpdaterExecutionFlow() {
+	void launchUpdaterOnMacDelegatesToUpdaterExecutionFlow(@TempDir Path tempDir) throws Exception {
 		rememberOriginalProperties();
 		System.setProperty(OS_NAME, "Mac OS X");
 		System.setProperty(APP_VERSION, "1.0.14");
+		System.setProperty("SHALE_UPDATE_ATTEMPT_DIR", tempDir.toString());
 
 		AtomicInteger launchCalls = new AtomicInteger();
 		AtomicInteger shutdownCalls = new AtomicInteger();
 		AtomicReference<String> launchedVersion = new AtomicReference<>();
+		AtomicReference<UUID> attemptId = new AtomicReference<>();
 		var launcher = new DesktopUiUpdateLauncher(
 				new com.shale.updater.UpdateService(),
 				"https://example.test/manifest.json",
-				currentVersion -> {
+				(currentVersion, id, attemptDirectory) -> {
 					launchCalls.incrementAndGet();
 					launchedVersion.set(currentVersion);
+					attemptId.set(id);
+					assertEquals(tempDir, attemptDirectory);
 				},
 				shutdownCalls::incrementAndGet);
 
@@ -77,20 +88,25 @@ final class DesktopUiUpdateLauncherTest {
 		assertEquals(1, launchCalls.get(), "macOS launch should hand off into the updater execution flow");
 		assertEquals("1.0.14", launchedVersion.get(), "launcher should pass the current app version to the updater");
 		assertEquals(1, shutdownCalls.get(), "macOS launch should trigger app self-shutdown after updater handoff succeeds");
+		var attempt = new UpdateAttemptStore(tempDir).read(attemptId.get()).orElseThrow();
+		assertEquals("1.0.14", attempt.fromVersion(), "attempt should capture the actual source version");
+		assertEquals("PRODUCTION", attempt.releaseChannel(), "attempt should capture the stable release channel");
+		assertEquals(UpdateAttemptState.UPDATER_LAUNCHED, attempt.state(), "process start is launch evidence, not completion");
 	}
 
 	@Test
-	void launchUpdaterOnWindowsDoesNotTriggerAppShutdown() {
+	void launchUpdaterOnWindowsDoesNotTriggerAppShutdown(@TempDir Path tempDir) {
 		rememberOriginalProperties();
 		System.setProperty(OS_NAME, "Windows 11");
 		System.setProperty(APP_VERSION, "1.0.14");
+		System.setProperty("SHALE_UPDATE_ATTEMPT_DIR", tempDir.toString());
 
 		AtomicInteger launchCalls = new AtomicInteger();
 		AtomicInteger shutdownCalls = new AtomicInteger();
 		var launcher = new DesktopUiUpdateLauncher(
 				new com.shale.updater.UpdateService(),
 				"https://example.test/manifest.json",
-				currentVersion -> launchCalls.incrementAndGet(),
+				(currentVersion, attemptId, attemptDirectory) -> launchCalls.incrementAndGet(),
 				shutdownCalls::incrementAndGet);
 
 		launcher.launchUpdater();
@@ -106,6 +122,7 @@ final class DesktopUiUpdateLauncherTest {
 		if (originalAppVersion == null) {
 			originalAppVersion = System.getProperty(APP_VERSION);
 		}
+		if (originalAttemptDir == null) originalAttemptDir = System.getProperty("SHALE_UPDATE_ATTEMPT_DIR");
 	}
 
 	private static void restoreProperty(String key, String value) {

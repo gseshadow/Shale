@@ -1,12 +1,18 @@
 package com.shale.desktop.update;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.shale.core.platform.AppPaths;
+import com.shale.core.update.UpdateAttempt;
+import com.shale.core.update.UpdateAttemptState;
+import com.shale.core.update.UpdateAttemptStore;
+import com.shale.core.update.UpdateFailureCode;
 import com.shale.updater.UpdateManifest;
 import com.shale.updater.UpdateService;
 import com.shale.updater.platform.Platform;
@@ -19,7 +25,7 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 
 	@FunctionalInterface
 	interface UpdaterLauncher {
-		void launch(String currentVersion);
+		void launch(String currentVersion, UUID attemptId, java.nio.file.Path attemptDirectory);
 	}
 
 	@FunctionalInterface
@@ -99,21 +105,38 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 	@Override
 	public void launchUpdater() {
 		String currentVersion = AppVersionProvider.currentVersion();
+		UUID attemptId = UUID.randomUUID();
+		UpdateAttemptStore attempts = new UpdateAttemptStore(attemptDirectory());
+		try {
+			attempts.create(UpdateAttempt.start(attemptId, currentVersion, null, Instant.now()));
+		} catch (IOException ex) {
+			log.warn("Could not persist local update attempt; updater handoff will continue", ex);
+		}
 		log.debug("Updater launch entry");
 		log.debug("Updater selected platform: {}", AppPaths.platform());
 		log.debug("Updater current version for launch: {}", currentVersion);
 
 		try {
-			updaterLauncher.launch(currentVersion);
+			updaterLauncher.launch(currentVersion, attemptId, attempts.directory());
+			try { attempts.transition(attemptId, UpdateAttemptState.UPDATER_LAUNCHED, null, null, null); }
+			catch (IOException ex) { log.warn("Could not record updater launch outcome", ex); }
 			log.info("Updater launch handoff reported success");
 			if (AppPaths.isMac()) {
 				log.info("macOS updater handoff succeeded; app self-shutdown initiated");
 				appShutdownHandler.shutdown();
 			}
 		} catch (RuntimeException ex) {
+			try { attempts.transition(attemptId, UpdateAttemptState.FAILED, UpdateFailureCode.UPDATER_LAUNCH_FAILED, null, null); }
+			catch (IOException recordingFailure) { log.warn("Could not record updater launch failure", recordingFailure); }
 			log.error("Updater launch failure", ex);
 			throw ex;
 		}
+	}
+
+	public static java.nio.file.Path attemptDirectory() {
+		String override = System.getProperty("SHALE_UPDATE_ATTEMPT_DIR");
+		return override == null || override.isBlank()
+				? AppPaths.appSupportDir("Shale").resolve("update-attempts") : java.nio.file.Path.of(override);
 	}
 
 	private static String printable(String value) {

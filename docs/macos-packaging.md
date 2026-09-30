@@ -65,6 +65,10 @@ dist-macos/Shale.app/Contents/MacOS/Shale
 - In-app updater launch remains temporarily bypassed on macOS while the desktop launcher stays Windows-only.
 - The updater plumbing now expects a macOS **ZIP** payload that contains `Shale.app`, stages that bundle, replaces the installed app bundle, and relaunches it with `open` once the macOS launcher path is enabled.
 - DMG is still for manual install/distribution only; it is not used as the updater payload.
+- Phase 12 passes optional `--attemptId` and `--attemptDir` arguments to the existing updater. Older invocations
+  remain valid. The updater atomically records only bounded, non-secret outcome codes; the next Shale startup is
+  the only confirmation of completion. These per-user files live under
+  `~/Library/Application Support/Shale/update-attempts` and survive bundle replacement/reboot.
 
 ## Machine identity data
 

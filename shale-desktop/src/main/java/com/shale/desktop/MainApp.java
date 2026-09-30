@@ -11,6 +11,10 @@ import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
 import java.util.Objects;
+import java.time.Clock;
+import com.shale.core.update.UpdateAttemptReconciler;
+import com.shale.core.update.UpdateAttemptStore;
+import com.shale.ui.services.AppVersionProvider;
 
 public final class MainApp extends Application {
 
@@ -20,6 +24,7 @@ public final class MainApp extends Application {
 	@Override
 	public void start(Stage primaryStage) {
 		System.out.println("MainApp.start()");// TODO remove
+		reconcileUpdateAttempt();
  
 		var iconStream = MainApp.class.getResourceAsStream("/images/ShaleNoText.png");
 		if (iconStream != null) {
@@ -36,6 +41,15 @@ public final class MainApp extends Application {
 		router = new SceneRouter(primaryStage, authService, dispatcher, config.runtimeService, config.negotiateEndpointUrl, machineIdentity());
 
 		router.showLogin();
+	}
+
+	private void reconcileUpdateAttempt() {
+		try {
+			var store = new UpdateAttemptStore(com.shale.desktop.update.DesktopUiUpdateLauncher.attemptDirectory());
+			new UpdateAttemptReconciler(store, Clock.systemUTC()).reconcile(AppVersionProvider.currentVersion());
+		} catch (Exception ex) {
+			System.err.println("Update attempt reconciliation deferred: " + ex.getClass().getSimpleName());
+		}
 	}
 
 	/**

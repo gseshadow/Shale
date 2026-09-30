@@ -17,6 +17,16 @@ Primary modules:
 - shale-desktop
 - shale-server
 
+## Privacy-safe update-attempt observability (Phase 12)
+
+The desktop and the existing updater correlate one user-initiated handoff with a random UUID and a bounded,
+atomic properties file under the per-user Shale application-support directory. The file contains only semantic
+source/target/actual versions, `PRODUCTION`/`DESKTOP`, closed lifecycle/failure codes, and local diagnostic UTC
+times. It contains no tenant/user identity, machine identifier, credential, network/location data, PHI, exception,
+URL, or log text. Updater launch and install application are evidence, not success: only a later Shale startup at
+the target version or a newer compatible production version records `COMPLETED`. Startup reconciliation is
+best-effort and cannot block application startup. Detailed diagnostics remain in the existing local updater logs.
+
 Current primary client:
 - Curtis & Co.
 - Tenant separation via ShaleClientId

@@ -46,3 +46,11 @@ the first ordinary user to create the application-specific directory, that user 
 machine-identity request; other OS users share the UUID only when the resulting ACL permits access. If the
 directory cannot be read or written, Shale continues to run and returns an explicit stable-identity-unavailable
 result. It does not weaken ACLs, invoke a privileged helper, or substitute `%LOCALAPPDATA%`.
+
+## Update-attempt state
+
+Phase 12 keeps non-secret correlation files in `%LOCALAPPDATA%\Shale\update-attempts`, outside the replaceable
+installation tree. The desktop passes optional UUID/directory arguments to the already packaged updater; this is
+compatible with older launch commands and does not alter MSI or ZIP installation semantics. `INSTALL_APPLIED`
+means only that the ZIP overlay completed. A later Shale startup at the target or a newer production semantic
+version is required for `COMPLETED`.
