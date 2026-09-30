@@ -2,6 +2,10 @@
 
 **Decision:** `UNSUPPORTED` for the current per-user installation architecture.
 
+Phase 13F adds protected installer-owned registration prerequisites only. It does not change this decision, choose a
+principal, or authorize logged-out execution. Registration and owner-correct paths remain insufficient without a
+separately approved execution design and expected-publisher signature validation.
+
 **Verification status:** design and repository contracts are complete; no installed-Windows logged-out execution
 was performed. This runbook records evidence required by a separately authorized successor phase. It is not a setup
 guide and must not be used to register a production task or service.

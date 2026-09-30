@@ -39,3 +39,18 @@ channel. The updater atomically replaces it only after payload application succe
 Add/Remove Programs `DisplayVersion` is not authority. This owner-writable file is lifecycle evidence, not sufficient
 trust for privileged execution; protected registration, canonical/reparse-safe paths, and Authenticode are also
 required.
+
+## Phase 13F elevated registration integration
+
+The existing jpackage/WiX 3.14 stack is retained. `windows_msi_registration.py` modifies generated `main.wxs`, which
+is recompiled into the same MSI. Deferred non-impersonating `WixQuietExec64` actions run the embedded registration
+logic elevated; MSI `UserSID`, `INSTALLDIR`, and `LocalAppDataFolder` are carried as formatted action data. The writer
+cross-checks SID/profile/path, rejects visible reparse ancestors, writes only
+`HKLM\SOFTWARE\Shale\Installations\<UUID>`, and applies protected explicit ACLs. It never uses the elevated account's
+environment as owner authority.
+
+Protected installer state retains the random UUID across upgrade and repair. Major-upgrade removal does not delete
+the record; exact uninstall does. Paired rollback actions restore prior state. If both record and protected state are
+destroyed, repair creates a documented replacement UUID because the original cannot be safely invented. The payload
+remains per-user. Developer MSIs may be unsigned; signing-required builds still fail before publication, and
+registration never makes an unsigned updater trustworthy.

@@ -328,8 +328,9 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         stages = (
             "staging", "native-DLL", "marker-staging", "preliminary-jpackage",
             "generated-payload-validation", "generated-identity-validation",
-            "generated-identity-mutation", "candle-recompile", "light-reconstruction",
-            "dark-extraction", "compiled-identity-validation", "compiled-payload-validation",
+            "generated-identity-mutation", "registration-mutation", "candle-recompile", "main-recompile",
+            "light-reconstruction", "dark-extraction", "compiled-identity-validation",
+            "compiled-registration-validation", "compiled-payload-validation",
             "artifact-finalization",
         )
         toolchain = source.index("Windows MSI stage completed: toolchain-validation")
@@ -340,6 +341,18 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn('echo Windows MSI stage failed:', source)
         self.assertIn('exit=!NATIVE_BUILD_EXIT!', source)
         self.assertGreater(publish, source.index("Windows MSI stage started: compiled-payload-validation"))
+
+    def test_registration_is_injected_recompiled_and_validated_before_publication(self):
+        source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
+        mutate = source.index('windows_msi_registration.py" mutate "%MAIN_SOURCE%"')
+        recompile = source.index('candle.exe -nologo "%MAIN_SOURCE%"', mutate)
+        link = source.index("Final light.exe reconstruction started.", recompile)
+        validate = source.index('windows_msi_registration.py" validate "%STAGE%\\dark\\final.wxs"', link)
+        publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', validate)
+        self.assertEqual([mutate, recompile, link, validate, publish], sorted([mutate, recompile, link, validate, publish]))
+        self.assertIn('--script "%ROOT%\\build\\scripts\\windows-installation-registration.ps1"', source)
+        self.assertIn("stage=registration-mutation", source)
+        self.assertIn("stage=compiled-registration-validation", source)
 
 if __name__ == "__main__":
     unittest.main()

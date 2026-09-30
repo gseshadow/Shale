@@ -66,6 +66,7 @@ set PRELIM=%STAGE%\preliminary
 set JPACKAGE_TEMP=%STAGE%\jpackage-temp
 set GENERATED_CONFIG_DIR=%JPACKAGE_TEMP%\config
 set BUNDLE_SOURCE=%GENERATED_CONFIG_DIR%\bundle.wxf
+set MAIN_SOURCE=%GENERATED_CONFIG_DIR%\main.wxs
 set WIXOBJ_DIR=%JPACKAGE_TEMP%\wixobj
 set BUNDLE_WIXOBJ=%WIXOBJ_DIR%\bundle.wixobj
 set MAIN_WIXOBJ=%WIXOBJ_DIR%\main.wixobj
@@ -125,6 +126,11 @@ echo Windows MSI stage started: generated-identity-mutation script="%ROOT%\build
 python "%ROOT%\build\scripts\windows_msi_identity.py" mutate "%BUNDLE_SOURCE%"
 if errorlevel 1 goto :generated_identity_mutation_failed
 echo bundle.wxf identity and shortcut mutation completed.
+if not exist "%MAIN_SOURCE%" goto :missing_main_source
+echo Windows MSI stage started: registration-mutation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%MAIN_SOURCE%"
+python "%ROOT%\build\scripts\windows_msi_registration.py" mutate "%MAIN_SOURCE%" --script "%ROOT%\build\scripts\windows-installation-registration.ps1"
+if errorlevel 1 goto :registration_mutation_failed
+echo Windows MSI stage completed: registration-mutation
 
 if not exist "%WIXOBJ_DIR%" goto :missing_wixobj_dir
 if not exist "%MAIN_WIXOBJ%" goto :missing_main_wixobj
@@ -142,6 +148,11 @@ if errorlevel 1 goto :candle_failed
 if not exist "%BUNDLE_WIXOBJ%" goto :missing_bundle_wixobj
 echo Recompiled bundle.wixobj verified: "%BUNDLE_WIXOBJ%"
 echo Windows MSI stage completed: candle-recompile
+echo Windows MSI stage started: main-recompile tool=candle.exe input="%MAIN_SOURCE%" expected="%MAIN_WIXOBJ%"
+candle.exe -nologo "%MAIN_SOURCE%" -ext WixUtilExtension -arch x64 -out "%MAIN_WIXOBJ%"
+if errorlevel 1 goto :main_candle_failed
+if not exist "%MAIN_WIXOBJ%" goto :missing_main_wixobj
+echo Windows MSI stage completed: main-recompile
 
 set LINK_OBJECTS=
 set LINK_OBJECT_COUNT=0
@@ -180,6 +191,10 @@ echo Windows MSI stage started: compiled-identity-validation script="%ROOT%\buil
 python "%ROOT%\build\scripts\windows_msi_identity.py" validate "%STAGE%\dark\final.wxs"
 if errorlevel 1 goto :compiled_identity_failed
 echo Windows MSI stage completed: compiled-identity-validation
+echo Windows MSI stage started: compiled-registration-validation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%STAGE%\dark\final.wxs"
+python "%ROOT%\build\scripts\windows_msi_registration.py" validate "%STAGE%\dark\final.wxs"
+if errorlevel 1 goto :compiled_registration_failed
+echo Windows MSI stage completed: compiled-registration-validation
 echo Windows MSI stage started: compiled-payload-validation script="%ROOT%\build\scripts\windows_msi_payload.py" input="%STAGE%\dark\final.wxs"
 python "%ROOT%\build\scripts\windows_msi_payload.py" compiled "%STAGE%\dark\final.wxs"
 if errorlevel 1 goto :compiled_payload_failed
@@ -240,6 +255,16 @@ set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=generated-identity-mutation script="%ROOT%\build\scripts\windows_msi_identity.py" input="%BUNDLE_SOURCE%" exit=%STAGE_EXIT%
 exit /b 20
 
+:registration_mutation_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=registration-mutation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%MAIN_SOURCE%" exit=%STAGE_EXIT%
+exit /b 42
+
+:compiled_registration_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=compiled-registration-validation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%STAGE%\dark\final.wxs" exit=%STAGE_EXIT%
+exit /b 44
+
 :compiled_identity_failed
 set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=compiled-identity-validation script="%ROOT%\build\scripts\windows_msi_identity.py" input="%STAGE%\dark\final.wxs" exit=%STAGE_EXIT%
@@ -268,6 +293,10 @@ exit /b 30
 :missing_bundle
 echo Generated bundle.wxf was not found at expected path: "%BUNDLE_SOURCE%"
 exit /b 19
+
+:missing_main_source
+echo Generated main.wxs was not found at expected path: "%MAIN_SOURCE%"
+exit /b 43
 
 :missing_preliminary_msi
 echo Preliminary jpackage MSI was not found at expected path: "%PRELIMINARY_MSI%"
@@ -329,6 +358,11 @@ exit /b 41
 set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=candle-recompile tool=candle.exe input="%BUNDLE_SOURCE%" expected="%BUNDLE_WIXOBJ%" exit=%STAGE_EXIT%
 exit /b 22
+
+:main_candle_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=main-recompile tool=candle.exe input="%MAIN_SOURCE%" expected="%MAIN_WIXOBJ%" exit=%STAGE_EXIT%
+exit /b 45
 
 :light_failed
 set "STAGE_EXIT=%ERRORLEVEL%"
