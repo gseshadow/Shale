@@ -136,7 +136,7 @@ python "%ROOT%\build\scripts\windows_msi_registration.py" mutate "%MAIN_SOURCE%"
 if errorlevel 1 goto :registration_mutation_failed
 echo Windows MSI stage completed: registration-mutation
 echo Windows MSI stage started: jpackage-definition-recovery source="%MAIN_SOURCE%" log="%JPACKAGE_LOG%" expected="%JPACKAGE_DEFINITIONS%"
-python "%ROOT%\build\scripts\windows_jpackage_wix_definitions.py" prepare "%MAIN_SOURCE%" "%JPACKAGE_LOG%" "%JPACKAGE_DEFINITIONS%"
+python "%ROOT%\build\scripts\windows_jpackage_wix_definitions.py" prepare "%JPACKAGE_LOG%" "%JPACKAGE_DEFINITIONS%"
 if errorlevel 1 goto :jpackage_definition_recovery_failed
 if not exist "%JPACKAGE_DEFINITIONS%" goto :missing_jpackage_definitions
 echo Windows MSI stage completed: jpackage-definition-recovery

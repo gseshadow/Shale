@@ -1,12 +1,18 @@
 # Phase 13F installed-Windows registration acceptance
 
 **Status on 2026-09-30:** Phase 13F remains IN PROGRESS. Platform-neutral repository verification is PASS, but
-installed-Windows acceptance is NOT YET RUN. A real Windows packaging attempt reached the post-mutation recompilation
-of generated `main.wxs` and failed with `CNDL0150` because the custom Candle invocation omitted jpackage's generated
-`Jp*` preprocessor definitions. The packaging boundary now captures jpackage's verbose command evidence, discovers
-every `$(var.Jp...)` reference in generated `main.wxs`, fails closed if any referenced value is absent, and supplies
-the exact recovered values through a quoted Candle response file. The fixed Windows build has not yet been rerun, so
-neither final MSI production nor installed acceptance is claimed. The available Codex host is
+installed-Windows acceptance is NOT YET RUN. The first real Windows packaging attempt reached the post-mutation
+recompilation of generated `main.wxs` and failed with `CNDL0150` because the custom Candle invocation omitted
+jpackage's generated `Jp*` preprocessor definitions. The first attempted fix scanned every textual
+`$(var.Jp...)` reference in `main.wxs` and required a logged definition. A second real Windows build proved that check
+overly strict: jpackage's own successful Candle invocation does not define optional variables referenced inside
+conditional WiX branches, including `JpAboutURL`, `JpHelpURL`, and `JpUpdateURL`.
+
+The corrected packaging boundary treats the original successful generated-`main.wxs` Candle argument list in
+`jpackage-verbose.log` as authoritative. It recovers every and only `-dJp...` argument from that invocation, validates
+the core jpackage identity/configuration definitions, and replays the values unchanged through a quoted Candle
+response file. It does not scan raw WiX references as a mandatory-variable list. The corrected Windows build has not
+yet been rerun, so neither final MSI production nor installed acceptance is claimed. The available Codex host is
 Ubuntu Linux and has no PowerShell, Windows command environment, Wine, Windows VM manager, MSI artifact, remote
 Windows runner, or release signing credential. Do not report any installed row as PASS until its command is executed
 on an installed Windows machine and evidence is retained. Loose classes, exploded directories, source inspection,
@@ -41,7 +47,7 @@ and platform-neutral tests are not substitutes for MSI lifecycle validation.
 | Authenticode: MSI | NOT RUN | No MSI artifact or production signing credentials are available. |
 | Phase 13A / 13B / 13C installed regressions | NOT RUN | Their installed paths and behavior cannot be exercised on Linux; repository verification is PASS. |
 | Logged-out automatic updating | UNSUPPORTED | Unchanged: registration does not activate Task Scheduler, a service, SYSTEM updating, or any logged-out executor. |
-| Packaging defect and fix | FIXED; WINDOWS RERUN NOT YET RUN | The preliminary jpackage MSI succeeded, but mutated `main.wxs` recompilation omitted all build-specific `Jp*` definitions and failed first at `JpProductCode`. The custom recompile now reuses definitions captured from jpackage and validates complete reference coverage. Rerun `build-shale-release.bat` before claiming a final MSI. |
+| Packaging defect and fix | SECOND FIX IMPLEMENTED; WINDOWS RERUN NOT YET RUN | The preliminary jpackage MSI succeeded, but mutated `main.wxs` recompilation first omitted all build-specific `Jp*` definitions. The first recovery fix then falsely required optional conditional references that jpackage itself had not defined. The custom recompile now replays only the exact `-dJp...` arguments from the successful original generated-`main.wxs` Candle command, including its generated ProductCode and UpgradeCode, and requires only the core identity/configuration set. Rerun `build-shale-release.bat` before claiming a final MSI. |
 
 The exact next work is continuation of **Phase 13F only** on a suitable Windows machine. From
 `C:\Eclipse\Workspace\shale-parent\build\scripts`, rerun the single local packaging command
