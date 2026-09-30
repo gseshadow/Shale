@@ -1148,6 +1148,8 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 13B | **COMPLETE** | Eligibility, aggregate readiness, cooperative shutdown, explicit invocation modes, update locking, and bounded retry/window contracts are implemented and verified. |
 | 13C | **COMPLETE** | Authenticated process-local Windows scheduling is implemented and verified; it remains session-only. |
 | 13D | **IN PROGRESS — DESIGN / UNSUPPORTED** | Logged-out alternatives were assessed and no executor was registered. Required Maven verification is blocked by Maven Central HTTP 403, so completion is not claimed. |
+| 13E | **COMPLETE** | Public policy, signing gates, strict registration values, owner paths, and installed-version metadata are implemented and verified; no registration writer or logged-out executor was added. |
+| 13F | **IN PROGRESS — INSTALLED WINDOWS VALIDATION REQUIRED** | Elevated MSI registration, protected HKLM identity lifecycle, rollback, reader, and acceptance tooling are implemented; installed Windows acceptance remains NOT RUN. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -2063,3 +2065,45 @@ The exact recommended next phase is **Phase 13F — elevated installer-owned Win
 lifecycle validation only**. It must implement/prove protected registration ACLs, stable upgrade/repair identity,
 exact uninstall cleanup, reparse-safe validation, signed installed artifacts, and multi-user behavior; it must not
 activate or reevaluate logged-out execution.
+
+## Phase 13F implementation record — 2026-09-30
+
+**Status: IN PROGRESS — platform-neutral packaging checks pass, required Maven verification is blocked by Maven
+Central HTTP 403, and installed-Windows acceptance is NOT RUN on this Linux host.**
+
+The sole authoritative discovery location is 64-bit
+`HKLM\SOFTWARE\Shale\Installations\<installation UUID>`. Each child contains exactly `schemaVersion` (DWORD `1`),
+`installationId` (opaque UUID string matching its key), `ownerSid`, canonical `installRoot`, and canonical
+`supportRoot`. HKLM was selected over ProgramData because it avoids a second file parser and the previously observed
+broad ProgramData inheritance. `HKLM\SOFTWARE\Shale\InstallerState\<SHA-256 owner/path lookup>` is protected MSI
+lifecycle state containing only the UUID; it cannot enumerate or authorize installations and is not a second
+registration authority.
+
+The per-user jpackage payload remains under the installing owner's LocalAppData. WiX 3.14 immediate property
+formatting supplies Windows Installer's `UserSID`, `INSTALLDIR`, and `LocalAppDataFolder` to deferred,
+non-impersonating, fail-closed custom actions. The privileged writer independently resolves the SID through protected
+ProfileList and accepts only the exact `<profile>\AppData\Local\Shale` install/support root. It rejects malformed
+SIDs, root substitution, traversal/canonical mismatch, and any visible reparse ancestor. The elevated token,
+Administrator, and SYSTEM environment never nominate owner or paths.
+
+First install creates a random UUID and protected lookup state. Upgrade and repair reuse it and update the record
+idempotently. If both registration and state are missing, repair cannot reconstruct the old UUID and creates a
+documented replacement. Exact uninstall removes only that record/state; major-upgrade removal skips cleanup. Paired
+rollback actions restore prior state after install, upgrade, or uninstall failure.
+
+Registration/state keys disable inherited permissions and grant SYSTEM/Administrators full control and the owner
+read. Ordinary Shale runtime has no writer. Multiple users have independent lookup state and random UUIDs. The
+read-only production reader returns immutable snapshots classified `VALID`, `STALE`, `INVALID_SCHEMA`,
+`INVALID_OWNER`, `INVALID_PATH`, `DUPLICATE_INSTALLATION_ID`, `REPARSE_UNSAFE`, or `UNAVAILABLE`; it never heals or
+deletes. Duplicate UUID, missing root, owner/path mismatch, and reparse state all fail closed.
+
+`OwnerUpdatePaths` continues deriving the updater, installed-version metadata, Phase 12 attempts, Phase 13B lock,
+and evidence logs from registered roots rather than validator `%LOCALAPPDATA%`. Packaging metadata and updater
+publication ordering remain unchanged. Protected registration is not executable trust: future privileged work must
+also require valid expected-publisher Authenticode.
+
+There is no SQL, API, tenant mutation, sensitive read, or audit change. `LoggedOutAutomaticUpdateSupport` remains
+`UNSUPPORTED`. No task, service, SYSTEM executor, background principal, impersonation, credential, wake/reboot, or
+logged-out scheduler was added. The exact recommended next phase is **Phase 13F installed-Windows acceptance
+completion only**, using `docs/testing/windows-installed-registration-phase13f.md`; do not begin or reevaluate
+logged-out execution.

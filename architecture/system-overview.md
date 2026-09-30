@@ -17,6 +17,16 @@ Primary modules:
 - shale-desktop
 - shale-server
 
+## Installer-owned Windows registration (Phase 13F; installed validation pending)
+
+The WiX 3.14 lifecycle, not Shale runtime, owns one protected 64-bit HKLM registration per per-user installation at
+`SOFTWARE\Shale\Installations\<opaque UUID>`. It stores only schema, UUID, Windows owner SID, install root, and owner
+support root. Elevated actions validate the pre-elevation MSI owner SID against ProfileList path authority, reject
+reparse roots, harden ACLs, preserve identity across upgrade/repair, and perform exact uninstall/rollback. A read-only
+core reader classifies invalid, stale, duplicate, and unsafe records without healing them. Installed Windows
+acceptance remains outstanding, so Phase 13F is in progress. Logged-out automatic updating remains `UNSUPPORTED`;
+there is no task, service, SYSTEM executor, principal selection, or scheduler.
+
 ## Privacy-safe update-attempt observability (Phase 12)
 
 The desktop and the existing updater correlate one user-initiated handoff with a random UUID and a bounded,

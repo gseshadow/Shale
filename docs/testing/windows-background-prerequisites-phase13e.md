@@ -1,5 +1,9 @@
 # Phase 13E Windows background-update prerequisite closure
 
+> Phase 13F now implements the deferred HKLM authority through the existing WiX 3.14 MSI. Installed acceptance is
+> still NOT RUN; use `docs/testing/windows-installed-registration-phase13f.md`. Phase 13E policy, signing,
+> version-metadata, and `UNSUPPORTED` logged-out contracts are unchanged.
+
 ## Public-policy security decision: SUPPORTED
 
 The approved endpoint is `GET /api/public/application-policy?channel=PRODUCTION` (all canonical `ReleaseChannel`
