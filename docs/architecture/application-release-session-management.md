@@ -1145,7 +1145,7 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 11B | **COMPLETE** | Minimum-allowed enforcement and safe drain are verified. |
 | 12 | **COMPLETE** | Privacy-safe local attempt/outcome correlation and required verification completed before Phase 13A. |
 | 13A | **COMPLETE** | Machine-scoped opt-in storage, provider, authorization, and Settings control were completed and verified before Phase 13B. |
-| 13B | **IN PROGRESS** | Safe-default-off Windows feasibility/evaluation foundation is implemented; Maven and installed-Windows verification remain incomplete, and no production scheduler is activated. |
+| 13B | **IN PROGRESS** | Safe-default-off Windows feasibility/evaluation foundation is implemented; automated Maven verification is **PASS**, installed-Windows acceptance evidence remains incomplete, and no production scheduler is activated. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1182,8 +1182,9 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Complete **Phase 13B validation only**: restore Maven dependency access, run the required focused/selected/full
-suites, and perform the installed-Windows feasibility checklist. If validation confirms the documented blockers,
+Complete **Phase 13B installed-Windows validation only** by performing the installed-Windows feasibility checklist;
+the supplied full-repository `mvn test` result is **PASS** and need not be repeated for this documentation-only run.
+If validation confirms the documented blockers,
 scope a later phase to add a cooperative no-prompt shutdown readiness contract and one per-install-owner shared
 update lock before considering any production scheduler activation. Do not add macOS scheduling, a privileged
 service, public policy API, or production rollout in that validation run.
@@ -1734,12 +1735,49 @@ mutation or sensitive read is added. Existing Phase 12 local operational evidenc
 No audit schema, event, allowlist, or SQL migration is appropriate.
 
 The exact installed-Windows acceptance checklist and the 2026-09-30 validation-run evidence are in
-`docs/testing/windows-unattended-update-phase13b.md`. The supplied repository baseline now has a passing full
-`mvn test`, so automated Java/Maven verification is no longer the blocker. The available validation runner was
+`docs/testing/windows-unattended-update-phase13b.md`. **Full repository `mvn test`: PASS** (supplied after execution outside the previously restricted runner), so
+automated Java/Maven verification is no longer a blocker. The available validation runner was
 Linux rather than an installed Windows workstation; it could not inspect `%ProgramData%` ACLs, the MSI/install
-tree, UAC, Windows accounts, Task Scheduler, foreground/session-lock behavior, or updater execution. Its attempted
-focused Maven rerun was also stopped during model resolution by Maven Central HTTP 403, so it did not independently
-reproduce the supplied green baseline.
+tree, UAC, Windows accounts, Task Scheduler, foreground/session-lock behavior, or updater execution. The earlier restricted-runner Maven Central HTTP 403 is retained only as historical context and does not
+downgrade the supplied PASS.
+
+### Installed-Windows evidence table
+
+Only the Maven row is newly established by supplied execution evidence. Runtime-only rows remain `NOT TESTED`;
+static blockers remain `FAIL`. This distinction prevents Linux/source inspection from becoming Windows PASS.
+
+| Scenario | Result | Evidence / limitation |
+|---|---|---|
+| Maven full suite | PASS | Full repository `mvn test` passed outside the previously restricted runner. |
+| Installation scope/path | NOT TESTED | No installed Windows Shale instance is available; executable path, owner, effective write, and genuine per-user scope await the PowerShell transcript. |
+| Updater path | NOT TESTED | Installed primary/legacy candidate and cross-version stability require the real installation and an upgrade observation. |
+| ProgramData ACL | NOT TESTED | `%ProgramData%\Shale` owner, inheritance, ACEs, and effective current-user access require Windows. |
+| Phase 13A persistence | NOT TESTED | Disable/enable plus restart sequence has not run on the installed application. |
+| Second Shale-user behavior | NOT TESTED | Shale-user switch has not been observed on the installed application. |
+| Cross-Windows-user behavior | NOT TESTED | Test only with a readily available second Windows account. |
+| UAC | NOT TESTED | Updater launch and installed-owner privilege behavior require Windows observation. |
+| ZIP/MSI execution | NOT TESTED | ZIP application and any otherwise-required MSI path have not been observed; do not install solely for validation. |
+| Recent activity | NOT TESTED | No installed JavaFX Windows session; deterministic contracts are not runtime evidence. |
+| Foreground app | NOT TESTED | No installed foreground-window observation; supplied `foregroundVisible=true` defers in the pure evaluator. |
+| New Intake active work | NOT TESTED | Static lease presence is not substituted for installed lifecycle/eligibility observation. |
+| Case edit | FAIL | Static inspection finds no reliable aggregate readiness signal; installed behavior remains to be observed and safety is UNKNOWN / DEFER. |
+| Contact edit | NOT TESTED | Static lease presence is not substituted for installed lifecycle/eligibility observation. |
+| Organization edit | FAIL | Static inspection finds no reliable aggregate readiness signal; safety is UNKNOWN / DEFER. |
+| Task edit | FAIL | Static inspection finds no reliable aggregate readiness signal; safety is UNKNOWN / DEFER. |
+| Calendar edit | FAIL | Static inspection finds no reliable aggregate readiness signal; safety is UNKNOWN / DEFER. |
+| Dirty-state coverage | FAIL | Editor-local state is not a reliable global inspect-only readiness answer. |
+| Save-in-flight coverage | FAIL | Save-in-flight cannot currently be proven globally; unattended handoff must defer unless stronger readiness is introduced. |
+| Cooperative shutdown | FAIL | No aggregate inspect-only prompt/loss readiness exists; Windows updater force-stops Shale. |
+| Cross-process update lock | FAIL | No `FileLock`, `FileChannel.tryLock`, named mutex, or equivalent protects desktop handoff/updater application. |
+| Phase 12 ordering | PASS | Deterministic contract places the attempt at actual handoff; every eligibility deferral, including unavailable shutdown/lock, produces no attempt. No installed handoff was run. |
+| Offline behavior | NOT TESTED | Installed authority/package loss and bounded retry observation remain outstanding. |
+| Retry/window contract | PASS | Deterministic contracts retain 02:00 inclusive/04:00 exclusive, four evaluations, 30-minute nominal spacing, one handoff per local-date/zone window, and date/zone reset. |
+| Package integrity | NOT TESTED | Installed package has not run; source has configured SHA-256 and traversal checks but no runtime Authenticode validation. |
+| Windows lock screen | NOT TESTED | No Windows interactive session is available. |
+| Logged-out behavior | DEFER/UNSUPPORTED | Phase 13B in-process architecture does not support logged-out execution. |
+| Reboot | NOT TESTED | No installed update ran; source has no automatic reboot and ZIP has no MSI reboot-required result. |
+| Production scheduler activation | DEFER/UNSUPPORTED | No timer, recurring executor, task, service, daemon, helper, or startup registration is activated. |
+
 
 Static validation confirmed the two previously documented activation blockers rather than supplying contrary
 Windows evidence. The updater still force-stops every `Shale.exe` with `taskkill /F`; ordinary JavaFX exit has no

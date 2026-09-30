@@ -82,4 +82,6 @@ removal. Installed Windows validation in `docs/testing/windows-unattended-update
 The 2026-09-30 validation runner was Linux and had no installed MSI, `%ProgramData%`, Windows ACL/UAC/session, or
 second local account, so installation scope/path, updater-path stability, owning-user write access, preference
 persistence, ACL inheritance, and prompt-free updater/MSI behavior remain unverified rather than inferred from the
-package scripts. Phase 13B remains in progress and no production scheduler was activated.
+package scripts. Phase 13B remains in progress and no production scheduler was activated. The supplied full
+repository `mvn test` result is **PASS** from an unrestricted runner; only installed-Windows acceptance evidence
+remains outstanding, and that Maven result does not establish any Windows runtime fact.
