@@ -61,7 +61,8 @@ final class DesktopUpdateLauncherTest {
 		Files.writeString(updaterJar, "jar");
 
 		DesktopUpdateLauncher.LaunchPlan launchPlan =
-				DesktopUpdateLauncher.buildMacLaunchCommand(installDir, "1.0.13", updaterLog);
+				DesktopUpdateLauncher.buildMacLaunchCommand(installDir, "1.0.13", updaterLog,
+						java.util.UUID.randomUUID(), tempDir.resolve("attempts"));
 
 		assertNotNull(launchPlan);
 		assertNotNull(launchPlan.processBuilder());
@@ -82,6 +83,8 @@ final class DesktopUpdateLauncherTest {
 		assertTrue(helperScript.contains("--currentVersion"));
 		assertTrue(helperScript.contains("1.0.13"));
 		assertTrue(helperScript.contains("--installDir"));
+		assertTrue(helperScript.contains("--attemptId"));
+		assertTrue(helperScript.contains("--attemptDir"));
 		assertTrue(helperScript.contains(installDir.toString()));
 		assertTrue(helperScript.contains(updaterLog.toString()));
 		assertTrue(helperScript.contains("/dev/null"));

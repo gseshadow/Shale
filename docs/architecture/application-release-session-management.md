@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 11B IN PROGRESS — implementation present; required Maven verification blocked by Maven Central HTTP 403
+**Status:** Phase 12 IN PROGRESS — implementation present; required Maven verification blocked by Maven Central HTTP 403
 
 **Last reviewed:** 2026-09-30
 
@@ -1065,14 +1065,17 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 * **Dependencies:** 11A and operator-approved safe-work inventory.
 * **Risks:** firm-wide lockout; staged rollout and kill-switch/correction path are mandatory.
 
-### Phase 12A — Update-attempt schema and API
+### Phase 12A — Update-attempt persistence contract
 
 * **Goal:** durable sanitized history.
-* **In scope:** strict tenant table/RLS, start/complete/idempotency API, retention and result taxonomy.
-* **Non-goals:** updater modification and log upload.
-* **Likely files:** migrations, core/data/server, tests.
-* **Schema/API impact:** additive table/endpoints.
-* **Verification:** RLS, idempotency, abandoned attempt classification, sanitization.
+* **Implemented Phase 12 decision:** bounded per-user local persistence, because the updater has no credential and
+  completion is observable before login. No tenant/user is attributed from a later login, and no bearer is passed
+  to the updater. Central persistence/API/RLS was deliberately not added; local support evidence is the narrow
+  Phase 12 operational surface.
+* **In scope:** start/completion idempotency, retention and result taxonomy.
+* **Non-goals:** log upload or a generic telemetry service.
+* **Schema/API impact:** none.
+* **Verification:** idempotency, unresolved classification, sanitization.
 * **Dependencies:** instance/session identity.
 * **Risks:** secrets/stack traces in failure summaries.
 
@@ -1138,9 +1141,10 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 8B | **COMPLETE** | Best-effort invalidation/revalidation acceleration and required verification completed before Phase 9. |
 | 9 | **COMPLETE** | Desktop self-service Devices & Sessions completed and verified before Phase 10. |
 | 10 | **COMPLETE** | Tenant-admin session visibility/revocation completed and verified before Phase 11A. |
-| 11A | **IN PROGRESS** | Central policy resolver, server-time anchored shell UX, outage/correction behavior, and updater precedence are implemented; Maven verification is blocked by Central HTTP 403. |
-| 11B | **NOT STARTED — NEXT PROPOSED STEP** | Minimum-allowed enforcement and safe drain only, after Phase 11A verification. |
-| 12A-13B | **NOT STARTED** | Later phases remain outside Phase 11A. |
+| 11A | **COMPLETE** | Central policy resolver, server-time anchored shell UX, outage/correction behavior, and updater precedence are verified. |
+| 11B | **COMPLETE** | Minimum-allowed enforcement and safe drain are verified. |
+| 12 | **IN PROGRESS** | Privacy-safe local attempt/outcome correlation is implemented; required Maven verification is blocked by Central HTTP 403. |
+| 13A-13B | **NOT STARTED** | Scheduling, unattended updates, and workstation preference remain outside Phase 12. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1520,7 +1524,7 @@ Phase 11A's focused, selector-selected, full-reactor, and rendered JavaFX verifi
 
 ## Phase 11B implementation record — 2026-09-30
 
-**Status: IN PROGRESS — implementation and static review complete; required Maven and rendered verification could not execute because Maven Central returned HTTP 403 resolving the Spring Boot BOM. Phase 12 is NOT STARTED.**
+**Status: COMPLETE — implementation and required verification completed before Phase 12.**
 
 Phase 11B separates operational enforcement from Phase 11A presentation with `ApplicationVersionEnforcementState`: `ALLOWED`, `DRAINING_REQUIRED_UPDATE`, `BLOCKED_NEW_WORK`, `UNKNOWN_GRACE`, and the observable correction transition `RECOVERING`. Only `REQUIRED_DEADLINE_REACHED`, derived from authoritative `minimumAllowed` and server-anchored time, closes the new-work gate. Recommendation and a future deadline remain allowed. There is no persisted blocked bit: every successful authoritative refresh replaces the decision, and a correction emits recovery then restores normal entry without restart.
 
@@ -1538,6 +1542,73 @@ Rollout rule: never raise `minimumAllowed` above a version lacking Phase 11B saf
 
 Audit compatibility review: the gate and leases create no domain or administrative mutation and no sensitive read. Existing saves continue through their established transactional entity/PHI audit seams. Policy reads are global non-PHI operational reads, so no new audit row or schema is appropriate. No API or SQL schema changed.
 
-Manual and visual verification remain unexecuted while Maven dependency resolution is blocked. The required installed checklist is: allowed startup; open one workflow; activate an overdue minimum; save/cancel it; verify a second workflow is refused while browsing/search/Settings remain available; drain to zero; correct policy and verify recovery without restart; reapply with a missing package; check narrow and wide layouts in light/dark themes; and confirm clear retry/read/exit behavior without data loss. Until focused, selector-selected, `mvn test`, and rendered checks pass, Phase 11B remains **IN PROGRESS** and must not be described as complete.
+Phase 11B's focused, selector-selected, full-reactor, rendered, and installed verification was completed before
+Phase 12. Its installed checklist covered allowed startup, grandfathered workflow completion, refusal of new work,
+continued reads/settings access, policy correction recovery, missing-package behavior, and data-safe exit.
 
-**Phase 12 NOT STARTED — NEXT PROPOSED STEP.** Its exact recommended scope is update-attempt lifecycle and outcome observability using the existing updater handoff: first define a privacy-safe bounded contract and audit/retention model, then add attempt/result reporting and operator-visible diagnostics. It must not introduce unattended scheduling, updater replacement, policy administration, or force-kill behavior without a separately approved phase boundary.
+## Phase 12 implementation record — 2026-09-30
+
+**Status: IN PROGRESS — implementation and static compilation of the new core contract complete; required focused
+and repository Maven verification cannot execute because Maven Central returns HTTP 403 while resolving the Spring
+Boot BOM. Phase 13 is NOT STARTED.**
+
+An attempt begins only inside `launchUpdater()`, after the user has chosen Update now and immediately before the
+process handoff. The desktop generates a random opaque UUID; it encodes no user, tenant, machine, or version and is
+not a credential. Rapid duplicate actions continue to be coalesced by the existing `UpdateFlowCoordinator` in-flight
+guard, while a later retry creates a distinct UUID/history file. Observability is fail-open: inability to create or
+transition the local record is logged and never prevents the updater launch.
+
+Correlation uses one atomic, maximum-4-KiB Java properties file per attempt beneath the established **per-user**
+application-support directory (`%LOCALAPPDATA%\Shale\update-attempts` or
+`~/Library/Application Support/Shale/update-attempts`). Per-user scope matches the per-user Windows install and
+avoids broadening machine-directory ACLs. The location is outside the replaceable install tree, so it survives app
+exit, ZIP overlay, reboot, and bundle replacement. The optional `--attemptId` and `--attemptDir` arguments preserve
+old updater invocation compatibility. Files contain only UUID, strict source/target/actual semantic versions,
+`PRODUCTION`, `DESKTOP`, closed state/failure codes, and diagnostic local UTC timestamps. They contain no password,
+JWT/JTI, email/name, tenant/user ID, machine UUID/fingerprint, IP/location, PHI/business data, URL, raw response,
+exception, stack trace, or arbitrary metadata.
+
+The lifecycle is monotonic: `STARTED -> UPDATER_LAUNCHED -> INSTALL_APPLIED -> COMPLETED`. `FAILED` and
+`OUTCOME_UNKNOWN` are terminal; duplicate reports are idempotent and terminal records cannot regress. The existing
+updater does not invoke the manifest MSI, so Phase 12 does not claim fictional installer-process evidence.
+`INSTALL_APPLIED` means only that stop/backup and ZIP replacement/overlay returned successfully. Relaunch success,
+updater process start, desktop exit, and install application are explicitly not completion.
+
+The closed failure vocabulary reflects facts the current implementation can distinguish:
+`UPDATER_LAUNCH_FAILED`, `MANIFEST_UNAVAILABLE`, `PACKAGE_UNAVAILABLE`, `PACKAGE_DOWNLOAD_FAILED`,
+`PACKAGE_VALIDATION_FAILED`, `PACKAGE_EXTRACTION_FAILED`, and `INSTALL_APPLY_FAILED`. Existing detailed local logs
+remain unchanged. Central state never receives log or exception text because Phase 12 introduces no central state.
+Cancellation cannot currently be distinguished from updater disappearance, so it is not guessed as a failure.
+
+At every application start, before login, best-effort reconciliation scans the bounded local markers. For an
+`INSTALL_APPLIED` attempt, strict `SemanticVersion` comparison confirms `COMPLETED` only when the running production
+version is equal to or greater than the recorded target; the actual running version is retained. Restarting on the
+source version, starting below target, malformed/unknown version, or a marker before install application does not
+prove success and remains unresolved. This avoids attributing an attempt to whichever user later logs in and does
+not require the old and new `ApplicationInstance` to match. A reconciliation error never delays or blocks startup.
+What's New remains driven independently by its existing version/release-state logic, and Phase 11 enforcement
+remains driven independently by actual running version and authoritative policy.
+
+Unresolved attempts remain eligible for reconciliation for 30 days, then become `OUTCOME_UNKNOWN`, never failed.
+Terminal local evidence is retained for 90 days and removed during a later successful startup reconciliation; no
+scheduler or purge service was added. Multiple attempts remain separate and cannot complete each other because
+each target and state is stored under its own UUID.
+
+Central persistence decision: **no SQL table or API in this phase**. The updater is intentionally not made an API
+client, no bearer is delegated, and pre-login reconciliation has no authoritative user/tenant principal. A
+tenant-owned server record would therefore either misattribute the later user or require a new secret/enrollment
+contract outside this phase. Local bounded evidence plus existing logs answers support diagnostics without creating
+cross-tenant data. Consequently there is no migration, FK, RLS policy, live RLS run, server timestamp, audit row, or
+audit allowlist change. Update progress is operational observability rather than PHI/entity mutation audit.
+
+N-1 remains compatible: old desktop/updater pairs ignore the new files, the new updater accepts invocation without
+the optional correlation arguments, and no server/schema requires an attempt write. No UI/dashboard, generic
+telemetry ingestion, scheduling, automatic 2 AM behavior, idle processing, updater/MSI replacement, additional
+termination, policy administration, safe-drain redesign, or session-management behavior was added.
+
+Required installed manual verification remains unexecuted in this Linux environment: Update now; updater launch;
+failure/cancel where distinguishable; retry; successful installed update; new-version startup completion; unchanged
+What's New; and Phase 11 remaining blocked until an actually allowed build runs. Until focused updater/reconciliation/
+privacy/N-1/Phase 11/What's New tests, selector checks, and full `mvn test` pass, Phase 12 must not be marked complete.
+The next run should finish Phase 12 verification only; Phase 13A remains the next roadmap phase and must not begin
+until Phase 12 is complete.

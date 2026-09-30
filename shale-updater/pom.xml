@@ -14,7 +14,7 @@
   
 <dependencies>
   <dependency>
-    <groupId>com.shale</groupId><artifactId>shale-core</artifactId><version>${project.version}</version><scope>test</scope>
+    <groupId>com.shale</groupId><artifactId>shale-core</artifactId><version>${project.version}</version>
   </dependency>
   <dependency>
     <groupId>com.google.code.gson</groupId>

@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import com.shale.core.platform.AppPaths;
@@ -24,7 +25,7 @@ public final class DesktopUpdateLauncher {
 	private DesktopUpdateLauncher() {
 	}
 
-	public static void launchUpdater(String currentVersion) {
+	public static void launchUpdater(String currentVersion, UUID attemptId, Path attemptDirectory) {
 		Path logFile = AppPaths.appLogFile(APP_NAME, "update-launcher.log");
 
 		try {
@@ -40,7 +41,7 @@ public final class DesktopUpdateLauncher {
 
 			Path updaterLog = AppPaths.appLogFile(APP_NAME, "updater-output.log");
 			Files.createDirectories(updaterLog.getParent());
-			LaunchPlan launchPlan = buildLaunchCommand(platform, installDir, currentVersion, updaterLog);
+			LaunchPlan launchPlan = buildLaunchCommand(platform, installDir, currentVersion, updaterLog, attemptId, attemptDirectory);
 			ProcessBuilder pb = launchPlan.processBuilder();
 
 			if (launchPlan.macHelperScript() != null) {
@@ -71,16 +72,18 @@ public final class DesktopUpdateLauncher {
 		}
 	}
 
-	private static LaunchPlan buildLaunchCommand(AppPlatform platform, Path installDir, String currentVersion, Path updaterLog)
+	private static LaunchPlan buildLaunchCommand(AppPlatform platform, Path installDir, String currentVersion, Path updaterLog,
+			UUID attemptId, Path attemptDirectory)
 			throws IOException {
 		return switch (platform) {
-			case WINDOWS -> new LaunchPlan(buildWindowsLaunchCommand(installDir, currentVersion, updaterLog), null, null, null);
-			case MAC -> buildMacLaunchCommand(installDir, currentVersion, updaterLog);
+			case WINDOWS -> new LaunchPlan(buildWindowsLaunchCommand(installDir, currentVersion, updaterLog, attemptId, attemptDirectory), null, null, null);
+			case MAC -> buildMacLaunchCommand(installDir, currentVersion, updaterLog, attemptId, attemptDirectory);
 			default -> throw new IllegalStateException("In-app updates are not available on this platform yet.");
 		};
 	}
 
-	private static ProcessBuilder buildWindowsLaunchCommand(Path installDir, String currentVersion, Path updaterLog) {
+	private static ProcessBuilder buildWindowsLaunchCommand(Path installDir, String currentVersion, Path updaterLog,
+			UUID attemptId, Path attemptDirectory) {
 		Path updaterExe = installDir.resolve("app").resolve("updater").resolve("ShaleUpdater.exe");
 		if (!Files.exists(updaterExe)) {
 			Path alt = installDir.resolve("updater").resolve("ShaleUpdater.exe");
@@ -96,13 +99,15 @@ public final class DesktopUpdateLauncher {
 		ProcessBuilder pb = new ProcessBuilder(
 				updaterExe.toString(),
 				"--currentVersion", currentVersion,
-				"--installDir", installDir.toString());
+				"--installDir", installDir.toString(), "--attemptId", attemptId.toString(),
+				"--attemptDir", attemptDirectory.toString());
 		pb.redirectErrorStream(true);
 		pb.redirectOutput(updaterLog.toFile());
 		return pb;
 	}
 
-	static LaunchPlan buildMacLaunchCommand(Path installDir, String currentVersion, Path updaterLog) throws IOException {
+	static LaunchPlan buildMacLaunchCommand(Path installDir, String currentVersion, Path updaterLog,
+			UUID attemptId, Path attemptDirectory) throws IOException {
 		Path javaBinary = resolveMacJavaBinary(installDir);
 		Path updaterJar = resolveMacUpdaterJar(installDir);
 		Path helperWorkingDirectory = Path.of("/");
@@ -119,7 +124,8 @@ public final class DesktopUpdateLauncher {
 				"-jar",
 				updaterJar.toString(),
 				"--currentVersion", currentVersion,
-				"--installDir", installDir.toString());
+				"--installDir", installDir.toString(), "--attemptId", attemptId.toString(),
+				"--attemptDir", attemptDirectory.toString());
 		String updaterCommand = shellJoin(updaterArgs);
 		Path helperScript = createMacDetachedHelperScript(updaterCommand, updaterLog, helperWorkingDirectory);
 
