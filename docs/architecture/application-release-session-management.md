@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 12 IN PROGRESS — implementation present; required Maven verification blocked by Maven Central HTTP 403
+**Status:** Phase 13A IN PROGRESS — implementation present; required Maven verification blocked by Maven Central HTTP 403
 
 **Last reviewed:** 2026-09-30
 
@@ -1097,8 +1097,8 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 * **Goal:** persist explicit workstation opt-in independently of a user.
 * **In scope:** machine-scoped preference/permissions and admin/user ownership decision.
 * **Non-goals:** scheduler/helper or installation.
-* **Likely files:** platform storage/installer and later Settings UI.
-* **Schema/API impact:** likely local machine setting; optional reported flag only.
+* **Implemented files:** core provider/result contract, desktop platform storage/service, and Settings > Administration UI.
+* **Schema/API impact:** none; this is a local machine setting only.
 * **Verification:** multi-user consistency, least privilege, opt-out, upgrade persistence.
 * **Dependencies:** 4A.
 * **Risks:** ambiguity over who may opt in on shared workstations.
@@ -1143,8 +1143,9 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 10 | **COMPLETE** | Tenant-admin session visibility/revocation completed and verified before Phase 11A. |
 | 11A | **COMPLETE** | Central policy resolver, server-time anchored shell UX, outage/correction behavior, and updater precedence are verified. |
 | 11B | **COMPLETE** | Minimum-allowed enforcement and safe drain are verified. |
-| 12 | **IN PROGRESS** | Privacy-safe local attempt/outcome correlation is implemented; required Maven verification is blocked by Central HTTP 403. |
-| 13A-13B | **NOT STARTED** | Scheduling, unattended updates, and workstation preference remain outside Phase 12. |
+| 12 | **COMPLETE** | Privacy-safe local attempt/outcome correlation and required verification completed before Phase 13A. |
+| 13A | **IN PROGRESS** | Machine-scoped opt-in storage, provider, authorization, and Settings control are implemented; required Maven verification is blocked by Central HTTP 403. |
+| 13B | **NOT STARTED — NEXT PROPOSED STEP** | Design only the scheduler/idle-aware unattended execution contract after Phase 13A verification completes. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1548,9 +1549,7 @@ continued reads/settings access, policy correction recovery, missing-package beh
 
 ## Phase 12 implementation record — 2026-09-30
 
-**Status: IN PROGRESS — implementation and static compilation of the new core contract complete; required focused
-and repository Maven verification cannot execute because Maven Central returns HTTP 403 while resolving the Spring
-Boot BOM. Phase 13 is NOT STARTED.**
+**Status: COMPLETE — implementation and required verification completed before Phase 13A.**
 
 An attempt begins only inside `launchUpdater()`, after the user has chosen Update now and immediately before the
 process handoff. The desktop generates a random opaque UUID; it encodes no user, tenant, machine, or version and is
@@ -1606,9 +1605,41 @@ the optional correlation arguments, and no server/schema requires an attempt wri
 telemetry ingestion, scheduling, automatic 2 AM behavior, idle processing, updater/MSI replacement, additional
 termination, policy administration, safe-drain redesign, or session-management behavior was added.
 
-Required installed manual verification remains unexecuted in this Linux environment: Update now; updater launch;
-failure/cancel where distinguishable; retry; successful installed update; new-version startup completion; unchanged
-What's New; and Phase 11 remaining blocked until an actually allowed build runs. Until focused updater/reconciliation/
-privacy/N-1/Phase 11/What's New tests, selector checks, and full `mvn test` pass, Phase 12 must not be marked complete.
-The next run should finish Phase 12 verification only; Phase 13A remains the next roadmap phase and must not begin
-until Phase 12 is complete.
+Phase 12's focused updater/reconciliation/privacy/N-1/Phase 11/What's New, repository, and installed verification
+completed before Phase 13A began.
+
+## Phase 13A implementation record — 2026-09-30
+
+**Status: IN PROGRESS — implementation complete; required focused and full Maven verification cannot execute
+because Maven Central returns HTTP 403. Phase 13B is NOT STARTED.**
+
+The preference grants permission only for a future unattended executor; it cannot alter central policy, safe drain,
+eligibility, or manual Update now behavior. Missing configuration defaults to not permitted without creating a file.
+Only valid explicit `automaticUpdatesEnabled=true` permits execution; disabled, missing, unavailable, corrupt, and
+unsupported-schema states remain distinguishable and fail safe.
+
+The bounded UTF-8 properties file is `%ProgramData%\Shale\automatic-update-preference.properties` on Windows and
+`/Library/Application Support/Shale/automatic-update-preference.properties` on macOS. Its complete schema is
+`schemaVersion=1` plus `automaticUpdatesEnabled=true|false`. It contains no user, tenant, session, token, machine
+UUID, network/location, PHI, or arbitrary metadata. It shares Phase 4A's durable directory but is independent of
+machine identity. Upgrade and ordinary uninstall/reinstall retain it; old clients ignore it.
+
+Writes use a normalized-path JVM lock plus OS file lock, unique temporary file, forced write, atomic replacement,
+cleanup, and deterministic reread. Corruption never implies consent; authorized recovery preserves the prior file
+under `.corrupt-*`. Permission/I/O failures return explicit unavailable state and never fall back per user.
+
+Any authenticated Shale administrator may change the machine setting; ordinary users may read it but cannot mutate
+through the controller/service path. This is not tenant ownership: a tenant 7 administrator's choice remains when a
+tenant 8 user signs in. Logout, switching, and restart do not clear it. Application authorization is not an OS ACL:
+the per-user Windows MSI provisions no ProgramData ACL, so external file modification remains possible wherever the
+OS ACL permits it. Managed deployment can provision stronger ACLs. Equivalent macOS provisioning requires installed
+verification.
+
+Settings > Administration presents workstation-scoped state and disables non-admin mutation. Failed saves reread
+the authoritative prior state. Changes invoke no updater, create no Phase 12 attempt, and create no central/entity
+audit: this non-PHI local operational setting uses sanitized local transition/error logs.
+
+Phase 13B consumes `WorkstationUpdatePreferenceProvider.current()` and proceeds only when
+`unattendedExecutionPermitted()` is true for `ENABLED`; it must separately combine policy, update availability, idle,
+and schedule rules. Phase 13A adds no timer, thread, task/launchd job, idle observer, updater invocation, MSI
+execution, restart, or eligibility logic.

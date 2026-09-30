@@ -28,6 +28,7 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.desktop.session.DesktopSessionEnrollmentLifecycle;
 import com.shale.desktop.session.UserSessionManagementClient;
 import com.shale.desktop.session.AdminSessionManagementClient;
+import com.shale.desktop.update.AutomaticUpdatePreferenceService;
 
 /**
  * Desktop-side implementation of UiRuntimeBridge. This is where login success initializes
@@ -47,6 +48,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	private final DesktopSessionEnrollmentLifecycle serverSessions;
 	private final UiRuntimeBridge.UserSessionManagement sessionManagement;
 	private final UiRuntimeBridge.AdminSessionManagement adminSessionManagement;
+	private final UiRuntimeBridge.WorkstationAutomaticUpdates workstationAutomaticUpdates;
 
 	private RuntimeSessionService runtimeSessionService;
 	private volatile LiveBus liveBus;
@@ -81,6 +83,16 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		String apiBase=System.getProperty("SHALE_SERVER_API_BASE_URL",System.getenv("SHALE_SERVER_API_BASE_URL"));
 		this.sessionManagement=serverSessions==null||apiBase==null||apiBase.isBlank()?null:new UserSessionManagementClient(apiBase,serverSessions.session());
 		this.adminSessionManagement=serverSessions==null||apiBase==null||apiBase.isBlank()?null:new AdminSessionManagementClient(apiBase,serverSessions.session());
+		AutomaticUpdatePreferenceService preferences = AutomaticUpdatePreferenceService.resolvePlatformDefault();
+		this.workstationAutomaticUpdates = new UiRuntimeBridge.WorkstationAutomaticUpdates() {
+			@Override public com.shale.core.update.WorkstationUpdatePreference read() { return preferences.current(); }
+			@Override public ChangeResult change(boolean enabled, boolean authenticatedAdministrator) {
+				return ChangeResult.valueOf(preferences.change(enabled, authenticatedAdministrator).name());
+			}
+		};
+	}
+	@Override public Optional<UiRuntimeBridge.WorkstationAutomaticUpdates> workstationAutomaticUpdates() {
+		return Optional.of(workstationAutomaticUpdates);
 	}
 	@Override public Optional<UiRuntimeBridge.AdminSessionManagement> adminSessionManagement(){
 		return serverSessions!=null&&serverSessions.state()==DesktopSessionEnrollmentLifecycle.State.ENROLLED?Optional.ofNullable(adminSessionManagement):Optional.empty();

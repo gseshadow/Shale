@@ -126,6 +126,10 @@ public final class SettingsController {
 	@FXML private Label appearanceStatusLabel;
 	@FXML private SettingsManagementRow userManagementRow;
 	@FXML private SettingsManagementRow adminSessionsRow;
+	@FXML private SettingsManagementRow automaticUpdatesRow;
+	@FXML private VBox automaticUpdatesContent;
+	@FXML private CheckBox automaticUpdatesCheck;
+	@FXML private Label automaticUpdatesStatusLabel;
 	@FXML private SettingsManagementRow firmWideRolesRow;
 	private Button manageFirmWideRolesButton;
 	@FXML private VBox personalGroup, caseConfigurationGroup, requestConfigurationGroup,
@@ -196,12 +200,55 @@ public final class SettingsController {
 		bind(devicesSessionsRow, event -> toggleDevicesSessions());
 		bind(userManagementRow, this::onManageUsers);
 		bind(adminSessionsRow, this::onManageAdminSessions);
+		bind(automaticUpdatesRow, event -> toggleAutomaticUpdates());
 		manageFirmWideRolesButton = bind(firmWideRolesRow, this::onManageFirmWideRoles);
 		bind(caseDateMappingsRow, event -> {
 			boolean opening = !caseDateRoleMappingsContent.isManaged();
 			toggleInline(caseDateRoleMappingsContent, caseDateMappingsRow, false);
 			if (opening) loadCaseDateRoleMappingsAsync(null);
 		});
+	}
+
+	private void toggleAutomaticUpdates() {
+		boolean opening = !automaticUpdatesContent.isManaged();
+		toggleInline(automaticUpdatesContent, automaticUpdatesRow, false);
+		if (opening) loadAutomaticUpdates();
+	}
+
+	private void loadAutomaticUpdates() {
+		var capability = runtimeBridge == null ? Optional.<UiRuntimeBridge.WorkstationAutomaticUpdates>empty()
+				: runtimeBridge.workstationAutomaticUpdates();
+		if (capability.isEmpty()) {
+			automaticUpdatesCheck.setDisable(true);
+			automaticUpdatesStatusLabel.setText("Workstation preference storage is unavailable. Automatic updates are not permitted.");
+			return;
+		}
+		var preference = capability.get().read();
+		automaticUpdatesCheck.setSelected(preference.unattendedExecutionPermitted());
+		automaticUpdatesCheck.setDisable(!isAdminUser());
+		automaticUpdatesStatusLabel.setText(switch (preference.status()) {
+			case ENABLED -> "Unattended automatic updates are permitted on this workstation.";
+			case DISABLED -> "Unattended automatic updates are disabled on this workstation.";
+			case MISSING -> "Not configured; unattended automatic updates default to disabled.";
+			case CORRUPT -> "The saved preference is corrupt. Automatic updates are not permitted; an administrator may reset it.";
+			case UNAVAILABLE -> "Preference storage is unavailable. Automatic updates are not permitted.";
+		});
+	}
+
+	@FXML private void onAutomaticUpdatesChanged(ActionEvent event) {
+		boolean requested = automaticUpdatesCheck.isSelected();
+		var capability = runtimeBridge == null ? Optional.<UiRuntimeBridge.WorkstationAutomaticUpdates>empty()
+				: runtimeBridge.workstationAutomaticUpdates();
+		if (capability.isEmpty()) { loadAutomaticUpdates(); return; }
+		var result = capability.get().change(requested, isAdminUser());
+		if (result != UiRuntimeBridge.WorkstationAutomaticUpdates.ChangeResult.SAVED) {
+			loadAutomaticUpdates();
+			if (result == UiRuntimeBridge.WorkstationAutomaticUpdates.ChangeResult.UNAUTHORIZED)
+				automaticUpdatesStatusLabel.setText("Only a Shale administrator may change this workstation setting.");
+			else automaticUpdatesStatusLabel.setText("The preference could not be saved. The prior workstation setting remains authoritative.");
+			return;
+		}
+		loadAutomaticUpdates();
 	}
 
 	private void toggleDevicesSessions() {
@@ -895,6 +942,7 @@ public final class SettingsController {
 		setVisibleManaged(caseDateMappingsRow, admin && caseService != null);
 		setVisibleManaged(userManagementRow, hasAdminContext() && userDao != null);
 		setVisibleManaged(adminSessionsRow, hasAdminContext() && runtimeBridge != null);
+		setVisibleManaged(automaticUpdatesRow, runtimeBridge != null);
 		ControlAvailability.apply(manageFirmWideRolesButton, firmWideRolesRow,
 				hasAdminContext() && userDao != null, this::onManageFirmWideRoles);
 		if (!admin) {

@@ -27,6 +27,14 @@ URL, or log text. Updater launch and install application are evidence, not succe
 the target version or a newer compatible production version records `COMPLETED`. Startup reconciliation is
 best-effort and cannot block application startup. Detailed diagnostics remain in the existing local updater logs.
 
+## Workstation automatic-update preference (Phase 13A)
+
+The desktop exposes a fail-safe machine-scoped permission through `WorkstationUpdatePreferenceProvider`. Its
+bounded versioned file lives beside, but independently of, the Phase 4A machine UUID. Missing, disabled,
+unavailable, or corrupt state never permits future unattended execution. Authenticated Shale administrators may
+change it in Settings; every user observes the same state across logout, tenant switch, and restart. This foundation
+performs no scheduling, idle detection, updater launch, policy decision, or central audit/database mutation.
+
 Current primary client:
 - Curtis & Co.
 - Tenant separation via ShaleClientId
