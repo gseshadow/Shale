@@ -79,3 +79,7 @@ custom action yet, so upgrade/uninstall behavior remains unchanged and cannot le
 If a later validated task is approved, use one stable current-user identity (`Shale\\Automatic Update`), no saved
 password/token, a stable installed helper path, execution-time preference/policy checks, and explicit uninstall
 removal. Installed Windows validation in `docs/testing/windows-unattended-update-phase13b.md` is mandatory first.
+The 2026-09-30 validation runner was Linux and had no installed MSI, `%ProgramData%`, Windows ACL/UAC/session, or
+second local account, so installation scope/path, updater-path stability, owning-user write access, preference
+persistence, ACL inheritance, and prompt-free updater/MSI behavior remain unverified rather than inferred from the
+package scripts. Phase 13B remains in progress and no production scheduler was activated.

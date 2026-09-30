@@ -1649,8 +1649,9 @@ execution, restart, or eligibility logic.
 
 ## Phase 13B implementation record — 2026-09-30
 
-**Status: IN PROGRESS — the feasibility foundation is implemented and safe-default-off. Required Maven tests are
-blocked by Maven Central HTTP 403, and installed-Windows validation has not run. This is not production ready.**
+**Status: IN PROGRESS — the feasibility foundation is implemented and safe-default-off. Full `mvn test` now
+passes, so automated Java/Maven verification is no longer the blocker. Installed-Windows feasibility validation
+remains outstanding. This is not production ready.**
 
 ### Architecture decision and supported boundary
 
@@ -1732,6 +1733,27 @@ Audit compatibility review: evaluation is local non-PHI operational computation 
 mutation or sensitive read is added. Existing Phase 12 local operational evidence begins only at updater handoff.
 No audit schema, event, allowlist, or SQL migration is appropriate.
 
-The exact installed-Windows acceptance checklist is
-`docs/testing/windows-unattended-update-phase13b.md`. Until Maven and that checklist pass, implementation remains
-unverified and the roadmap intentionally stays `IN PROGRESS`.
+The exact installed-Windows acceptance checklist and the 2026-09-30 validation-run evidence are in
+`docs/testing/windows-unattended-update-phase13b.md`. The supplied repository baseline now has a passing full
+`mvn test`, so automated Java/Maven verification is no longer the blocker. The available validation runner was
+Linux rather than an installed Windows workstation; it could not inspect `%ProgramData%` ACLs, the MSI/install
+tree, UAC, Windows accounts, Task Scheduler, foreground/session-lock behavior, or updater execution. Its attempted
+focused Maven rerun was also stopped during model resolution by Maven Central HTTP 403, so it did not independently
+reproduce the supplied green baseline.
+
+Static validation confirmed the two previously documented activation blockers rather than supplying contrary
+Windows evidence. The updater still force-stops every `Shale.exe` with `taskkill /F`; ordinary JavaFX exit has no
+inspect-only aggregate answer for active, dirty, prompt-requiring, or saving editors. Phase 11B leases positively
+observe New Intake, New Organization, and Contact edit lifetimes, but Case, Organization, Task, and Calendar/event
+editors do not expose a reliable aggregate readiness signal to Phase 13B. No shared OS-backed update lock exists at
+desktop handoff, updater startup, or install application. The evaluator can represent both facts as deferrals, but
+no production caller supplies them and no runtime scheduler is wired. Therefore unsafe handoff remains unreachable,
+no speculative readiness/lock/invocation-mode implementation was added without installed-Windows evidence, and
+Phase 12 attempt ordering remains unchanged.
+
+**Phase 13B remains IN PROGRESS.** Its concrete remaining work is installed per-user Windows execution of the
+checklist, followed by only those narrow corrections proven necessary there. Production activation continues to
+require either validated prompt-free cooperative readiness plus a per-install-owner OS lock, or an unconditional
+`DEFER/UNSUPPORTED` result for those capabilities. Do not begin another roadmap phase until this validation closes;
+the exact next recommended scope is continuation of Phase 13B on an installed Windows workstation, not scheduler
+activation.

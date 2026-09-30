@@ -42,11 +42,13 @@ launch an unattended production update. `UnattendedUpdateEvaluationService` rere
 evaluation time. Its reasoned evaluator requires fresh eligible Phase 11A policy, an exact Production policy/
 manifest target match, a strictly newer compatible package, a workstation-local 02:00–04:00 window, at least
 30 minutes since observed Phase 5A foreground input, no foreground window or Phase 11B work, a cooperative
-shutdown capability, and an available shared execution lock. Current Windows runtime cannot supply the final two
-guarantees: the updater force-stops Shale and there is no cross-process update lock. Consequently activation is
-intentionally absent. Closed/logged-out operation, Task Scheduler provisioning, macOS parity, forced termination,
-and automatic reboot are unsupported. Four eligibility evaluations at 30-minute spacing and one real handoff are
-the maximum proposed per local-date/time-zone window; Phase 12 starts only at handoff.
+shutdown capability, and an available shared execution lock. Current source/runtime architecture cannot supply the
+final two guarantees: the updater force-stops Shale and there is no cross-process update lock. A 2026-09-30
+validation pass could not convert those findings into installed-Windows evidence because only a Linux runner was
+available; the Windows checklist therefore remains open. Consequently activation is intentionally absent.
+Closed/logged-out operation, Task Scheduler provisioning, macOS parity, forced termination, and automatic reboot
+are unsupported. Four eligibility evaluations at 30-minute spacing and one real handoff are the maximum proposed
+per local-date/time-zone window; Phase 12 starts only at handoff.
 
 Current primary client:
 - Curtis & Co.
