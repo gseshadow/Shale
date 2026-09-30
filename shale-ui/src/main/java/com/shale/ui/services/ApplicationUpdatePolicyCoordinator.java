@@ -67,6 +67,16 @@ public final class ApplicationUpdatePolicyCoordinator implements AutoCloseable {
 			publish(known==null ? unknown() : evaluate(known,true));
 		} finally { inFlight.set(false); }});
 	}
+	/** Synchronous worker-thread refresh used by the in-session automatic evaluator. */
+	public Presentation refreshForAutomaticEvaluation() {
+		if (closed) return unknown();
+		Optional<ApplicationPolicyView> read = policies.findCurrentPolicy(ReleaseChannel.PRODUCTION);
+		if (read.isEmpty() || read.orElseThrow().serverTime() == null) return unknown();
+		ApplicationPolicyView policy = read.orElseThrow();
+		Snapshot fresh = new Snapshot(policy, policy.serverTime(), monotonicNanos.getAsLong());
+		cache = fresh;
+		return evaluate(fresh, false);
+	}
 	public void reset() { generation.incrementAndGet();cache=null;inFlight.set(false); }
 	private Presentation evaluate(Snapshot snapshot, boolean outage) {
 		long elapsed=Math.max(0,monotonicNanos.getAsLong()-snapshot.receivedNanos);

@@ -18,6 +18,7 @@ import java.util.stream.Stream;
 import com.shale.core.platform.AppPaths;
 import com.shale.core.platform.AppPlatform;
 import com.shale.core.update.UpdateExecutionLock;
+import com.shale.core.update.UpdateInvocationMode;
 
 public final class DesktopUpdateLauncher {
 
@@ -27,6 +28,10 @@ public final class DesktopUpdateLauncher {
 	}
 
 	public static void launchUpdater(String currentVersion, UUID attemptId, Path attemptDirectory) {
+		launchUpdater(currentVersion, attemptId, attemptDirectory, UpdateInvocationMode.MANUAL);
+	}
+
+	public static void launchUpdater(String currentVersion, UUID attemptId, Path attemptDirectory, UpdateInvocationMode mode) {
 		Path logFile = AppPaths.appLogFile(APP_NAME, "update-launcher.log");
 
 		try {
@@ -42,7 +47,7 @@ public final class DesktopUpdateLauncher {
 
 			Path updaterLog = AppPaths.appLogFile(APP_NAME, "updater-output.log");
 			Files.createDirectories(updaterLog.getParent());
-			LaunchPlan launchPlan = buildLaunchCommand(platform, installDir, currentVersion, updaterLog, attemptId, attemptDirectory);
+			LaunchPlan launchPlan = buildLaunchCommand(platform, installDir, currentVersion, updaterLog, attemptId, attemptDirectory, mode);
 			ProcessBuilder pb = launchPlan.processBuilder();
 
 			if (launchPlan.macHelperScript() != null) {
@@ -74,17 +79,17 @@ public final class DesktopUpdateLauncher {
 	}
 
 	private static LaunchPlan buildLaunchCommand(AppPlatform platform, Path installDir, String currentVersion, Path updaterLog,
-			UUID attemptId, Path attemptDirectory)
+			UUID attemptId, Path attemptDirectory, UpdateInvocationMode mode)
 			throws IOException {
 		return switch (platform) {
-			case WINDOWS -> new LaunchPlan(buildWindowsLaunchCommand(installDir, currentVersion, updaterLog, attemptId, attemptDirectory), null, null, null);
+			case WINDOWS -> new LaunchPlan(buildWindowsLaunchCommand(installDir, currentVersion, updaterLog, attemptId, attemptDirectory, mode), null, null, null);
 			case MAC -> buildMacLaunchCommand(installDir, currentVersion, updaterLog, attemptId, attemptDirectory);
 			default -> throw new IllegalStateException("In-app updates are not available on this platform yet.");
 		};
 	}
 
-	private static ProcessBuilder buildWindowsLaunchCommand(Path installDir, String currentVersion, Path updaterLog,
-			UUID attemptId, Path attemptDirectory) {
+	static ProcessBuilder buildWindowsLaunchCommand(Path installDir, String currentVersion, Path updaterLog,
+			UUID attemptId, Path attemptDirectory, UpdateInvocationMode mode) {
 		Path updaterExe = installDir.resolve("app").resolve("updater").resolve("ShaleUpdater.exe");
 		if (!Files.exists(updaterExe)) {
 			Path alt = installDir.resolve("updater").resolve("ShaleUpdater.exe");
@@ -104,7 +109,7 @@ public final class DesktopUpdateLauncher {
 				"--attemptDir", attemptDirectory.toString(),
 				"--executionLock", UpdateExecutionLock.path(AppPaths.appSupportDir(APP_NAME)).toString(),
 				"--lockHandoff", "true",
-				"--invocationMode", "MANUAL");
+				"--invocationMode", mode.name());
 		pb.redirectErrorStream(true);
 		pb.redirectOutput(updaterLog.toFile());
 		return pb;

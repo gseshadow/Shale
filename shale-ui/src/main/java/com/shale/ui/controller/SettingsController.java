@@ -227,7 +227,7 @@ public final class SettingsController {
 		automaticUpdatesCheck.setSelected(preference.unattendedExecutionPermitted());
 		automaticUpdatesCheck.setDisable(!isAdminUser());
 		automaticUpdatesStatusLabel.setText(switch (preference.status()) {
-			case ENABLED -> "Unattended automatic updates are permitted on this workstation.";
+			case ENABLED -> "Enabled — eligible updates are evaluated overnight while Shale is left running and idle.";
 			case DISABLED -> "Unattended automatic updates are disabled on this workstation.";
 			case MISSING -> "Not configured; unattended automatic updates default to disabled.";
 			case CORRUPT -> "The saved preference is corrupt. Automatic updates are not permitted; an administrator may reset it.";

@@ -20,4 +20,12 @@ class CooperativeShutdownCoordinatorTest {
 		queued.get().run();
 		assertEquals(0, shutdowns.get(), "a readiness change before shutdown dispatch must abort safely");
 	}
+
+	@Test void failedHandoffAfterUiThreadRecheckDoesNotShutdown() {
+		var state = new AtomicReference<>(CooperativeShutdownReadiness.READY);
+		var shutdowns = new AtomicInteger();
+		var coordinator = new CooperativeShutdownCoordinator(state::get, Runnable::run, shutdowns::incrementAndGet);
+		assertEquals(CooperativeShutdownReadiness.READY, coordinator.requestIfReady(() -> false));
+		assertEquals(0, shutdowns.get(), "a lock/activity race must abort cooperative shutdown");
+	}
 }

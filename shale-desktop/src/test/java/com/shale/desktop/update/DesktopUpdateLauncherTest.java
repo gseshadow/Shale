@@ -9,11 +9,24 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import com.shale.core.update.UpdateInvocationMode;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 final class DesktopUpdateLauncherTest {
+	@Test void windowsAutomaticLaunchUsesOnlyUnattendedMode(@TempDir Path tempDir) throws IOException {
+		Path updater = tempDir.resolve("app").resolve("updater").resolve("ShaleUpdater.exe");
+		Files.createDirectories(updater.getParent()); Files.writeString(updater, "test");
+		ProcessBuilder command = DesktopUpdateLauncher.buildWindowsLaunchCommand(tempDir, "1.0.129",
+				tempDir.resolve("updater.log"), java.util.UUID.randomUUID(), tempDir.resolve("attempts"),
+				UpdateInvocationMode.UNATTENDED);
+		int mode = command.command().indexOf("--invocationMode");
+		assertTrue(mode >= 0, "automatic command must explicitly declare invocation mode");
+		assertEquals("UNATTENDED", command.command().get(mode + 1));
+		assertTrue(command.command().stream().noneMatch(value -> value.equalsIgnoreCase("MANUAL")),
+				"automatic launch must never fall back to the force-compatible manual mode");
+	}
 
 	@Test
 	void resolveMacUpdaterJarUsesPackagedLibDirectory(@TempDir Path tempDir) throws IOException {

@@ -14,6 +14,11 @@ import com.shale.core.update.UpdateAttemptState;
 import com.shale.core.update.UpdateAttemptStore;
 import com.shale.core.update.UpdateFailureCode;
 import com.shale.core.update.UpdateExecutionLock;
+import com.shale.core.update.UpdateInvocationMode;
+import com.shale.core.update.UnattendedUpdateEligibility;
+import com.shale.core.model.ApplicationUpdatePolicyState;
+import com.shale.core.model.ReleaseChannel;
+import com.shale.core.model.SemanticVersion;
 import com.shale.updater.UpdateManifest;
 import com.shale.updater.UpdateService;
 import com.shale.updater.platform.Platform;
@@ -28,6 +33,9 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 	interface UpdaterLauncher {
 		void launch(String currentVersion, UUID attemptId, java.nio.file.Path attemptDirectory);
 	}
+	@FunctionalInterface interface ModeUpdaterLauncher {
+		void launch(String currentVersion, UUID attemptId, java.nio.file.Path attemptDirectory, UpdateInvocationMode mode);
+	}
 
 	@FunctionalInterface
 	interface AppShutdownHandler {
@@ -39,18 +47,19 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 	private final UpdateService updateService;
 	private final String manifestUrl;
 	private final UpdaterLauncher updaterLauncher;
+	private final ModeUpdaterLauncher modeUpdaterLauncher;
 	private final AppShutdownHandler appShutdownHandler;
 
 	public DesktopUiUpdateLauncher() {
-		this(new UpdateService(), MANIFEST_URL, DesktopUpdateLauncher::launchUpdater, javafx.application.Platform::exit);
+		this(new UpdateService(), MANIFEST_URL, DesktopUpdateLauncher::launchUpdater, DesktopUpdateLauncher::launchUpdater, javafx.application.Platform::exit);
 	}
 
 	DesktopUiUpdateLauncher(UpdateService updateService, String manifestUrl) {
-		this(updateService, manifestUrl, DesktopUpdateLauncher::launchUpdater, javafx.application.Platform::exit);
+		this(updateService, manifestUrl, DesktopUpdateLauncher::launchUpdater, DesktopUpdateLauncher::launchUpdater, javafx.application.Platform::exit);
 	}
 
 	DesktopUiUpdateLauncher(UpdateService updateService, String manifestUrl, UpdaterLauncher updaterLauncher) {
-		this(updateService, manifestUrl, updaterLauncher, javafx.application.Platform::exit);
+		this(updateService, manifestUrl, updaterLauncher, (v,id,d,m) -> updaterLauncher.launch(v,id,d), javafx.application.Platform::exit);
 	}
 
 	DesktopUiUpdateLauncher(
@@ -58,9 +67,15 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 			String manifestUrl,
 			UpdaterLauncher updaterLauncher,
 			AppShutdownHandler appShutdownHandler) {
+		this(updateService, manifestUrl, updaterLauncher, (v,id,d,m) -> updaterLauncher.launch(v,id,d), appShutdownHandler);
+	}
+
+	DesktopUiUpdateLauncher(UpdateService updateService, String manifestUrl, UpdaterLauncher updaterLauncher,
+			ModeUpdaterLauncher modeUpdaterLauncher, AppShutdownHandler appShutdownHandler) {
 		this.updateService = Objects.requireNonNull(updateService);
 		this.manifestUrl = Objects.requireNonNull(manifestUrl);
 		this.updaterLauncher = Objects.requireNonNull(updaterLauncher);
+		this.modeUpdaterLauncher = Objects.requireNonNull(modeUpdaterLauncher);
 		this.appShutdownHandler = Objects.requireNonNull(appShutdownHandler);
 	}
 
@@ -105,6 +120,10 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 
 	@Override
 	public void launchUpdater() {
+		launchUpdater(UpdateInvocationMode.MANUAL);
+	}
+
+	@Override public void launchUpdater(UpdateInvocationMode mode) {
 		String currentVersion = AppVersionProvider.currentVersion();
 		java.nio.file.Path executionLockPath = executionLockPath();
 		final UpdateExecutionLock handoffLock;
@@ -127,7 +146,8 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 		log.debug("Updater current version for launch: {}", currentVersion);
 
 		try {
-			updaterLauncher.launch(currentVersion, attemptId, attempts.directory());
+			if (mode == UpdateInvocationMode.UNATTENDED) modeUpdaterLauncher.launch(currentVersion, attemptId, attempts.directory(), mode);
+			else updaterLauncher.launch(currentVersion, attemptId, attempts.directory());
 			try { attempts.transition(attemptId, UpdateAttemptState.UPDATER_LAUNCHED, null, null, null); }
 			catch (IOException ex) { log.warn("Could not record updater launch outcome", ex); }
 			log.info("Updater launch handoff reported success");
@@ -144,6 +164,34 @@ public final class DesktopUiUpdateLauncher implements UiUpdateLauncher {
 		} catch (IOException ex) {
 			throw new IllegalStateException("Update coordination could not be released safely.", ex);
 		}
+	}
+
+	@Override public UnattendedUpdateEligibility.Availability automaticAvailability(
+			ApplicationUpdatePolicyState policyState, String policyTargetVersion) {
+		try {
+			UpdateManifest manifest = updateService.fetchManifest(manifestUrl);
+			String target = manifest == null ? null : manifest.getVersion();
+			String zip = manifest == null ? null : manifest.getZipUrl(Platform.WINDOWS);
+			SemanticVersion current = SemanticVersion.parse(AppVersionProvider.currentVersion());
+			SemanticVersion targetVersion = target == null ? null : SemanticVersion.parse(target);
+			SemanticVersion policyTarget = policyTargetVersion == null || policyTargetVersion.isBlank()
+					? null : SemanticVersion.parse(policyTargetVersion);
+			return new UnattendedUpdateEligibility.Availability(true, current, targetVersion, policyTarget,
+					ReleaseChannel.PRODUCTION, ReleaseChannel.PRODUCTION, !isBlank(zip), !isBlank(zip));
+		} catch (IOException | InterruptedException | RuntimeException unavailable) {
+			return UnattendedUpdateEligibility.Availability.unavailable();
+		}
+	}
+
+	@Override public boolean automaticWindowsCapabilityAvailable() {
+		if (!AppPaths.isWindows()) return false;
+		try { return java.nio.file.Files.isWritable(DesktopInstallLocator.detectInstallDir()); }
+		catch (RuntimeException unavailable) { return false; }
+	}
+
+	@Override public boolean automaticExecutionLockAvailable() {
+		try (var lock = UpdateExecutionLock.tryAcquire(executionLockPath()).orElse(null)) { return lock != null; }
+		catch (IOException unavailable) { return false; }
 	}
 
 	public static java.nio.file.Path executionLockPath() {

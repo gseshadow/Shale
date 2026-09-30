@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 13B FOUNDATION IMPLEMENTED, VERIFICATION PENDING — production unattended scheduling intentionally disabled
+**Status:** Phase 13C IN PROGRESS — in-session scheduler implemented; installed-Windows activation validation outstanding
 
 **Last reviewed:** 2026-09-30
 
@@ -1145,7 +1145,8 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 11B | **COMPLETE** | Minimum-allowed enforcement and safe drain are verified. |
 | 12 | **COMPLETE** | Privacy-safe local attempt/outcome correlation and required verification completed before Phase 13A. |
 | 13A | **COMPLETE** | Machine-scoped opt-in storage, provider, authorization, and Settings control were completed and verified before Phase 13B. |
-| 13B | **IN PROGRESS** | Safe-default-off Windows feasibility/evaluation foundation is implemented; automated Maven verification is **PASS**, installed-Windows acceptance evidence remains incomplete, and no production scheduler is activated. |
+| 13B | **COMPLETE** | Eligibility, aggregate readiness, cooperative shutdown, explicit invocation modes, update locking, and bounded retry/window contracts are implemented and verified. |
+| 13C | **IN PROGRESS** | One authenticated, process-local Windows scheduler is wired. Automated and installed-Windows activation validation are required before completion. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1807,3 +1808,92 @@ The shared execution lock is `%LOCALAPPDATA%\Shale\updates\update-execution.lock
 Invocation mode is additive: absent/old arguments remain `MANUAL`; desktop currently passes `MANUAL`. Manual Windows force-stop compatibility remains. `UNATTENDED` returns/defer before `stopRunningApp` can call the manual `taskkill /F` implementation, so unattended code cannot force-kill Shale. No unattended caller, timer, task, service, daemon, startup executor, credential, logged-out support, SQL migration, or API change was added. Audit review found only local non-PHI coordination, not a domain/administrative mutation; existing Phase 12 operational evidence remains the audit-compatible handoff record.
 
 Phase 13B is **implemented but remains unverified as a feasibility/foundation phase** until the required Maven suites pass. This does not activate or declare production unattended updates ready. Signing remains deferred, logged-out execution remains unsupported, and production scheduling remains disabled. The exact recommended next phase is **Phase 13C — installed-Windows activation design and acceptance for an opt-in in-session scheduler**, which must be separately authorized and must consume these readiness and lock contracts without widening into logged-out execution.
+
+## Phase 13C implementation record — 2026-09-30
+
+**Status: IN PROGRESS — Windows opt-in in-session scheduler is implemented; installed-Windows activation validation is outstanding.**
+
+### Supported production scenario and lifecycle
+
+Phase 13C supports exactly one scenario: Shale is already running under an authenticated Windows desktop session,
+the workstation preference is enabled, and the process remains running into the local overnight window. One
+process-scoped `InSessionAutomaticUpdateScheduler` starts after the authenticated shell, Phase 11 policy coordinator,
+Phase 5A foreground observer, and Phase 13A provider exist. Logout, user switch, and application shutdown stop it;
+generation tokens make callbacks retained by an old session inert, and repeated initialization is idempotent.
+Eligibility and manifest/network work run on its single daemon executor; the final shell interaction is dispatched
+to JavaFX. Logs are low-volume semantic start/evaluation/defer/handoff/error events and contain no identity, token,
+activity history, case data, PHI, or location.
+
+If Shale is closed, its process is terminated, Windows is logged out, or the computer sleeps through the whole
+window, no automatic update occurs. There is no Task Scheduler registration, Windows Service, SYSTEM execution,
+stored credential, detached helper, anonymous policy access, wake timer, automatic reboot, macOS scheduler,
+configurable schedule, tenant/user preference, new API, SQL migration, or fleet management. A Windows lock screen is
+not treated as evidence of safety. Phase 13C is an authenticated in-process coordinator, not a background system
+updater.
+
+### Timing, consent, and authority
+
+The timer derives candidates from the current local date, time, and zone rather than adding 24 hours. The window is
+02:00 inclusive through 04:00 exclusive. A delayed callback recomputes current local time: resume or JVM delay inside
+the window performs an ordinary evaluation, while a callback after 04:00 schedules the next local window and never
+updates at (for example) 09:00. DST and timezone identity use `UnattendedUpdateRetryPolicy.WindowId`. No wake timer is
+created. Each eligible-window deferral may be reevaluated at the existing nominal 30-minute interval, with at most
+four evaluations and one real handoff per window.
+
+Every scheduled evaluation calls `UnattendedUpdateEvaluationService`; the scheduler contains no duplicate gate
+policy. `WorkstationUpdatePreferenceProvider.current()` is read at evaluation and again for the immediate recheck,
+so disabling while waiting prevents a later launch without restart. Enabling merely participates at the next
+scheduled candidate and never triggers an immediate daytime check. Once a real updater handoff begins, preference
+changes do not cancel it; Phase 12/updater lifecycle owns it. The current Phase 11 policy presentation and a freshly
+fetched Production manifest/package selection are read at evaluation time. Stale/unavailable policy, offline
+manifest, target/channel mismatch, absent compatible Windows ZIP, unsupported/non-writable installed path (including
+a path expected to require elevation), or a busy update lock safely defer.
+
+### Safe handoff and boundaries
+
+The Phase 13B evaluator requires the established 30-minute foreground-human-activity evidence, no active foreground
+Shale window, aggregate `READY` shutdown state, no mutation lease, no save in flight, and the shared OS execution lock.
+`PROMPT_REQUIRED`, `UNKNOWN`, recent activity, foreground visibility, active mutation, save, or unavailable lock always
+defers with no Phase 12 attempt. Eligibility rereads all volatile inputs immediately before the handoff callback; the
+JavaFX callback again checks activity, foreground, aggregate readiness, and lock immediately before launch. It never
+closes child windows, automates prompts, discards or saves work, waits indefinitely, or force-terminates Shale.
+
+The automatic launcher passes explicit `UNATTENDED`; manual Settings/update actions continue through `MANUAL` and are
+independent of preference, scheduler state, and automatic window. The shared lock is probed during eligibility and
+acquired authoritatively before attempt creation/process launch. Only the real launch creates the Phase 12 attempt;
+pure scheduler deferrals do not. Updater launch is evidence, not completion: Phase 12 startup reconciliation remains
+the only completion authority, and Phase 11B enforcement remains until an allowed version actually runs or policy is
+corrected. The unattended updater mode cannot call `taskkill /F`; inability to close cooperatively aborts rather than
+forcing termination. The in-app path remains ZIP overlay, not unattended MSI.
+
+Retry counters are process-memory-only and contain only local window identity and bounded counters; they persist no
+activity, identity, tenant, machine, token, case, or PHI data. A process restart resets those counters. The durable
+Phase 12 pending-attempt evidence and independently enforced update lock remain the minimum duplicate-execution
+protection; Phase 13C does not add scheduler persistence. This limitation must be re-evaluated only if installed
+activation evidence proves those safeguards insufficient.
+
+Settings now says that eligible updates are evaluated only while Shale is left running and idle, and explicitly says
+closed, logged-out, and sleeping computers are not woken. It adds no schedule controls. `Shale.exe` and
+`ShaleUpdater.exe` remain NotSigned; Authenticode signing and verification are production-hardening debt and are not
+claimed by this phase.
+
+### Validation and roadmap boundary
+
+Deterministic tests cover lifecycle idempotence/stale generations, before/at/inside/after-window timing, DST local
+window arithmetic, resume behavior, preference rereads, four-evaluation/one-handoff budgets, immediate activity-race
+recheck, shared-lock ordering, and exact `UNATTENDED` command wiring. The installed-Windows Phase 13C checklist is in
+`docs/testing/windows-unattended-update-phase13c.md`. Until that checklist validates the packaged build and the
+required Maven suite passes, Phase 13C remains **IN PROGRESS** and must not be represented as production-complete.
+
+**NOT STARTED — NEXT PROPOSED STEP:** Phase 13D, a separately authorized Windows logged-out scheduling feasibility and
+security design. It must not be inferred from, or included in, Phase 13C.
+
+### Phase 13C audit-compatibility review
+
+Phase 13C adds no database/domain mutation, sensitive read surface, administrative preference mutation, or server API.
+It consumes the existing machine preference, authenticated policy read, public package manifest, process-local safety
+signals, and local Phase 12 attempt evidence. Therefore no PHI-read or entity-action audit row is appropriate and no
+schema migration is required. The existing Phase 13A administrative preference boundary remains unchanged; scheduler
+timer ticks and eligibility deferrals are operational diagnostics rather than tenant audit events. Logs remain
+sanitized and never serialize policy DTOs, activity timestamps/history, identities, credentials, case values, or
+exception text.

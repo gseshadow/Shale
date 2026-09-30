@@ -25,7 +25,17 @@ public final class UnattendedUpdateEvaluationService {
 				observed.foregroundVisible(), observed.activeWork(), observed.cooperativeShutdownAvailable(),
 				observed.updateLockAvailable(), observed.windowsCapabilityAvailable());
 		var decision = eligibility.resolve(input);
-		if (decision == UnattendedUpdateEligibility.Decision.ELIGIBLE) handoff.accept(input);
+		if (decision == UnattendedUpdateEligibility.Decision.ELIGIBLE) {
+			// Preference and every volatile safety signal are deliberately reread immediately
+			// before crossing the real handoff boundary.
+			var reobserved = Objects.requireNonNull(currentInputs.get(), "currentInputs recheck result");
+			var rechecked = new UnattendedUpdateEligibility.Inputs(preferences.current(), reobserved.policy(),
+					reobserved.availability(), reobserved.workstationTime(), reobserved.lastForegroundActivity(),
+					reobserved.foregroundVisible(), reobserved.activeWork(), reobserved.cooperativeShutdownAvailable(),
+					reobserved.updateLockAvailable(), reobserved.windowsCapabilityAvailable());
+			decision = eligibility.resolve(rechecked);
+			if (decision == UnattendedUpdateEligibility.Decision.ELIGIBLE) handoff.accept(rechecked);
+		}
 		return decision;
 	}
 }

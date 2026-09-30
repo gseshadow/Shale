@@ -32,8 +32,22 @@ final class UnattendedUpdateEvaluationServiceTest {
 				service.evaluateAndHandoff(UnattendedUpdateEvaluationServiceTest::eligibleInputs, ignored -> handoffs.incrementAndGet()));
 		assertEquals(UnattendedUpdateEligibility.Decision.ELIGIBLE,
 				service.evaluateAndHandoff(UnattendedUpdateEvaluationServiceTest::eligibleInputs, ignored -> handoffs.incrementAndGet()));
-		assertEquals(2, reads.get(), "execution-time evaluation must reread Phase 13A through its provider");
+		assertEquals(3, reads.get(), "eligible execution must reread Phase 13A again at the race recheck");
 		assertEquals(1, handoffs.get(), "Phase 12 begins only at the real handoff seam");
+	}
+
+	@Test void safetyChangeAtImmediateRecheckPreventsHandoff() {
+		AtomicInteger observations = new AtomicInteger(); AtomicInteger handoffs = new AtomicInteger();
+		var service = new UnattendedUpdateEvaluationService(() ->
+				new WorkstationUpdatePreference(WorkstationUpdatePreference.Status.ENABLED));
+		assertEquals(UnattendedUpdateEligibility.Decision.DEFER_ACTIVE_USER,
+				service.evaluateAndHandoff(() -> {
+					var input = eligibleInputs();
+					if (observations.incrementAndGet() == 1) return input;
+					return new UnattendedUpdateEligibility.Inputs(input.preference(), input.policy(), input.availability(),
+							input.workstationTime(), Optional.of(input.workstationTime().toInstant()), false, false, true, true, true);
+				}, ignored -> handoffs.incrementAndGet()));
+		assertEquals(0, handoffs.get(), "new human activity must win the handoff race");
 	}
 
 	private static UnattendedUpdateEligibility.Inputs eligibleInputs() {
