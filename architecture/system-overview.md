@@ -1,5 +1,15 @@
 Shale is a multi-tenant law firm case management platform.
 
+## Minimum-version safe drain (Phase 11B)
+
+The global application policy read and database UTC anchor are the only minimum-version authority.
+The desktop owns a session-scoped `SafeWorkDrainCoordinator`: controllers gate mutation-workflow entry
+and retain a lease for already-open work, while reads, navigation, heartbeat, save completion, updater,
+and normal exit remain available. This is intentionally not a generic read-only access mode. Direct
+JDBC remains outside HTTP middleware, so API enforcement alone cannot provide this contract. See
+`docs/architecture/application-release-session-management.md` for the 15-minute bounded-cache rule,
+startup surface, rollout constraint, and workflow inventory.
+
 Primary modules:
 - shale-core
 - shale-data

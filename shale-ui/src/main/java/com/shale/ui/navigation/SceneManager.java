@@ -70,6 +70,9 @@ import javafx.scene.Scene;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.Button;
+import javafx.geometry.Pos;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -112,6 +115,7 @@ import com.shale.data.dao.UserDictionaryWordDao;
 import com.shale.ui.component.spellcheck.UserDictionarySession;
 import com.shale.ui.services.AppVersionProvider;
 import com.shale.ui.services.ApplicationUpdatePolicyCoordinator;
+import com.shale.ui.services.SafeWorkDrainCoordinator;
 import com.shale.ui.whatsnew.WhatsNewCoordinator;
 import com.shale.ui.whatsnew.WhatsNewDialog;
 import com.shale.ui.activity.ForegroundHumanActivityObserver;
@@ -145,6 +149,7 @@ public final class SceneManager {
 	private final PhiReadAuditService phiReadAuditService;
 	private final WhatsNewCoordinator whatsNewCoordinator;
 	private final ApplicationUpdatePolicyCoordinator updatePolicyCoordinator;
+	private final SafeWorkDrainCoordinator safeWorkDrainCoordinator;
 	private MainController mainController;
 	private UpdateCheckResult lastUpdateCheck;
 	private final ExecutorService notificationBadgeCountExecutor;
@@ -157,6 +162,8 @@ public final class SceneManager {
 	private Integer activeTenantId;
 	private Integer activeUserId;
 	private boolean logoutInProgress;
+	private boolean awaitingStartupPolicy;
+	private boolean startupPolicyBlocked;
 	private final ForegroundHumanActivityObserver humanActivityObserver =
 			new ForegroundHumanActivityObserver(Clock.systemUTC());
 
@@ -220,10 +227,13 @@ public final class SceneManager {
 				new UserReleaseStateServiceAdapter(new UserReleaseStateDao(dbSessionProvider)),
 				AppVersionProvider::currentVersion, Platform::runLater,
 				(presentation, dismissed) -> WhatsNewDialog.show(stage, presentation, dismissed));
+		this.safeWorkDrainCoordinator = new SafeWorkDrainCoordinator(state -> {
+			if (mainController != null) mainController.showEnforcementState(state);
+		});
 		this.updatePolicyCoordinator = new ApplicationUpdatePolicyCoordinator(
 				new ApplicationReleaseReadServiceAdapter(new ApplicationReleaseReadDao(dbSessionProvider)),
 				AppVersionProvider::currentVersion, notificationStartupExecutor, Platform::runLater,
-				presentation -> { if (presentation.revision()>0) systemUpdateNotificationProducer.useAuthoritativePolicyPresentation(); if (mainController != null) mainController.showUpdatePolicy(presentation); });
+				presentation -> { if (presentation.revision()>0) systemUpdateNotificationProducer.useAuthoritativePolicyPresentation(); safeWorkDrainCoordinator.apply(presentation); onPolicyPresentation(presentation); });
 		runtimeBridge.setApplicationPolicyRefreshHandler(updatePolicyCoordinator::refresh);
 		UserDictionarySession.configure(new UserDictionarySession(new UserDictionaryServiceAdapter(new UserDictionaryWordDao(dbSessionProvider)),appState));
 	}
@@ -262,6 +272,7 @@ public final class SceneManager {
 		humanActivityObserver.stop();
 		whatsNewCoordinator.reset();
 		updatePolicyCoordinator.reset();
+		safeWorkDrainCoordinator.reset();
 		mainController = null;
 		authenticatedProducersActive = false;
 		activeTenantId = null;
@@ -312,6 +323,13 @@ public final class SceneManager {
 	}
 
 	public void showMain() {
+		awaitingStartupPolicy=true;
+		showPolicyCheckSurface();
+		updatePolicyCoordinator.refresh();
+	}
+
+	private void showMainShell() {
+		awaitingStartupPolicy=false;startupPolicyBlocked=false;
 		UserDictionarySession.current().load();
 		long showMainStartNanos = System.nanoTime();
 		System.out.println("[StartupTiming] showMain entry");
@@ -321,6 +339,7 @@ public final class SceneManager {
 			mainController = c;
 			c.init(this, appState, runtimeBridge, notificationCenterService);
 			c.setUpdateLauncher(updateLauncher);
+			c.showEnforcementState(safeWorkDrainCoordinator.state());
 			if(lastUpdateCheck!=null)c.setUpdaterPackageAvailable(lastUpdateCheck.updateAvailable());
 			return c;
 		});
@@ -346,12 +365,40 @@ public final class SceneManager {
 		System.out.println("[StartupTiming] showMain critical path complete in " + showMainEndMs + " ms");
 	}
 
+	private void onPolicyPresentation(ApplicationUpdatePolicyCoordinator.Presentation presentation) {
+		if(mainController!=null){mainController.showUpdatePolicy(presentation);return;}
+		if(awaitingStartupPolicy){
+			awaitingStartupPolicy=false;
+			if(!safeWorkDrainCoordinator.permitsNewWork()){startupPolicyBlocked=true;showStartupUpdateRequired(presentation);startSessionOwnedWork();runtimeBridge.startApplicationInstanceHeartbeat(humanActivityObserver::lastHumanActivityAt);}
+			else showMainShell();
+			return;
+		}
+		if(startupPolicyBlocked&&safeWorkDrainCoordinator.permitsNewWork())showMainShell();
+	}
+
+	private void showPolicyCheckSurface(){
+		Label status=new Label("Checking Shale update requirements…");status.setWrapText(true);
+		VBox root=new VBox(18,status);root.setAlignment(Pos.CENTER);root.getStyleClass().add("startup-policy-surface");
+		setScene(root,"Shale — Checking update requirements");
+	}
+
+	private void showStartupUpdateRequired(ApplicationUpdatePolicyCoordinator.Presentation presentation){
+		Label title=new Label("Shale must be updated");title.getStyleClass().add("page-title");
+		Label detail=new Label("This version is no longer allowed for new work. Update Shale to begin a working session. Your credentials and session remain intact.");detail.setWrapText(true);detail.setMaxWidth(560);
+		Button update=com.shale.ui.util.ActionButtonFactory.semantic("Update Shale",e->{try{updateLauncher.launchUpdater();onUpdaterLaunchSucceeded();}catch(RuntimeException failure){showError(failure.getMessage());}},com.shale.ui.util.ControlStyles.Purpose.PRIMARY,com.shale.ui.util.ControlStyles.Size.STANDARD);
+		Button retry=com.shale.ui.util.ActionButtonFactory.semantic("Retry policy check",e->{awaitingStartupPolicy=true;updatePolicyCoordinator.refresh();},com.shale.ui.util.ControlStyles.Purpose.SECONDARY,com.shale.ui.util.ControlStyles.Size.STANDARD);
+		Button exit=com.shale.ui.util.ActionButtonFactory.semantic("Exit",e->Platform.exit(),com.shale.ui.util.ControlStyles.Purpose.GHOST,com.shale.ui.util.ControlStyles.Size.STANDARD);
+		javafx.scene.layout.HBox actions=new javafx.scene.layout.HBox(10,update,retry,exit);actions.setAlignment(Pos.CENTER);
+		VBox root=new VBox(18,title,detail,actions);root.setAlignment(Pos.CENTER);root.getStyleClass().add("startup-policy-surface");
+		setScene(root,"Shale — Update required");
+	}
+
 	private void startSessionOwnedWork() {
 		Integer tenantId = appState.getShaleClientId();
 		Integer userId = appState.getUserId();
 		if (tenantId == null || tenantId <= 0 || userId == null || userId <= 0) return;
 		if (authenticatedProducersActive && Objects.equals(activeTenantId, tenantId) && Objects.equals(activeUserId, userId)) return;
-		stopSessionOwnedWork();
+		if(authenticatedProducersActive) stopSessionOwnedWork();
 		authenticatedProducersActive = true;
 		activeTenantId = tenantId;
 		activeUserId = userId;
@@ -763,6 +810,7 @@ public final class SceneManager {
 			ContactsController c = (ContactsController) controller;
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
 			c.init(appState, new ContactServiceAdapter(contactDao), runtimeBridge, onOpenContact);
+			c.setWorkGate(this::beginNewWork);
 			return c;
 		});
 	}
@@ -917,6 +965,7 @@ public final class SceneManager {
 			ContactDao contactDao = new ContactDao(dbSessionProvider);
 			ContactDetailService contactDetailService = new ContactDetailService(contactDao, new CaseSummaryDao(dbSessionProvider));
 			c.setContactService(new ContactServiceAdapter(contactDao));
+			c.setWorkGate(this::beginNewWork);
 			c.init(contactId, contactDetailService, appState, onOpenCase, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), onContactDeleted, phiReadAuditService,
 					this::openContactProfile, runtimeBridge);
 			return c;
@@ -1050,6 +1099,8 @@ public final class SceneManager {
 	}
 
 	public void showNewOrganizationDialog(Consumer<Integer> onOrganizationCreated) {
+		SafeWorkDrainCoordinator.Registration work = beginNewWork("New Organization");
+		if (work == null) return;
 		try {
 			URL url = Objects.requireNonNull(getClass().getResource("/fxml/new-organization.fxml"), "Missing FXML: /fxml/new-organization.fxml");
 			FXMLLoader loader = new FXMLLoader(url);
@@ -1078,10 +1129,12 @@ public final class SceneManager {
 			dialog.showAndWait();
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to open New Organization dialog", e);
-		}
+		} finally { work.close(); }
 	}
 
 	public void showNewIntakeDialog(Consumer<Integer> onCaseCreated) {
+		SafeWorkDrainCoordinator.Registration work = beginNewWork("New Intake");
+		if (work == null) return;
 		try {
 			URL url = Objects.requireNonNull(getClass().getResource("/fxml/new-intake.fxml"), "Missing FXML: /fxml/new-intake.fxml");
 			FXMLLoader loader = new FXMLLoader(url);
@@ -1113,7 +1166,14 @@ public final class SceneManager {
 			dialog.showAndWait();
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to open New Intake dialog", e);
-		}
+		} finally { work.close(); }
+	}
+
+	/** Shared launch-boundary gate used by all substantive editor entry points. */
+	public SafeWorkDrainCoordinator.Registration beginNewWork(String workflow) {
+		SafeWorkDrainCoordinator.Registration registration=safeWorkDrainCoordinator.tryStart(workflow);
+		if(registration==null) AppDialogs.showError(stage,"Update required",SafeWorkDrainCoordinator.BLOCKED_MESSAGE);
+		return registration;
 	}
 
 	private void openStatusProfile(Integer statusId) {
