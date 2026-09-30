@@ -41,7 +41,8 @@ and platform-neutral tests are not substitutes for MSI lifecycle validation.
 The exact next work is continuation of **Phase 13F installed-Windows acceptance completion only** on a suitable
 Windows machine. No subsequent phase is recommended or authorized until these lifecycle results are known.
 
-Run the privacy-bounded helper from an elevated PowerShell prompt after each lifecycle operation:
+After installing the Phase 13F MSI, run the privacy-bounded, read-only helper from an elevated PowerShell prompt
+and paste its complete concise report into the acceptance evidence:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build\scripts\validate-installed-windows.ps1
@@ -52,6 +53,11 @@ For signed acceptance, require `Valid`, approved publisher, and timestamp:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build\scripts\validate-installed-windows.ps1 -MsiPath .\dist\Shale-<version>.msi -ExpectedPublisher '<approved subject fragment>'
 ```
+
+This helper covers only non-destructive fresh-install observations. Upgrade, repair, rollback, uninstall,
+multi-user, stale-registration, duplicate-UUID, and reparse-fixture lifecycle tests remain separate manual steps;
+the helper does not create or mutate those fixtures. Running it and pasting its report does not mark Phase 13F
+complete.
 
 ## Sequence
 
