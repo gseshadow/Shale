@@ -79,3 +79,9 @@ an administrator must pre-create the Shale directory with application-specific r
 ordinary users cannot create it. A permission failure is reported by the desktop identity provider as
 unavailable and never causes fallback to a per-user or ephemeral identity. Bundle replacement, ordinary
 uninstall, and reinstall retain this external file.
+
+Phase 13A stores the independent, non-secret automatic-update permission at
+`/Library/Application Support/Shale/automatic-update-preference.properties`. It has the same external-directory
+persistence and provisioning limitations as machine identity; the package adds no Keychain entry or privileged
+helper. Missing, unreadable, or corrupt state fails safe. Installed macOS permissions and shared-user behavior
+remain a platform verification requirement.

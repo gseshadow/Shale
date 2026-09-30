@@ -47,6 +47,15 @@ machine-identity request; other OS users share the UUID only when the resulting 
 directory cannot be read or written, Shale continues to run and returns an explicit stable-identity-unavailable
 result. It does not weaken ACLs, invoke a privileged helper, or substitute `%LOCALAPPDATA%`.
 
+## Workstation automatic-update preference
+
+Phase 13A adds `%ProgramData%\Shale\automatic-update-preference.properties` beside (not inside) machine identity.
+Normal MSI/ZIP upgrades and ordinary uninstall/reinstall do not remove it. The current per-user MSI does not create
+or secure this directory and Phase 13A does not alter WiX/jpackage: managed deployments may grant appropriate
+workstation users read access and only intended operators write access, but Shale cannot claim that protection for
+first-user-created directories. Inaccessible storage produces an explicit fail-safe unavailable state, never a
+`%LOCALAPPDATA%` fallback. Installed Windows ACL and shared-user verification remains required.
+
 ## Update-attempt state
 
 Phase 12 keeps non-secret correlation files in `%LOCALAPPDATA%\Shale\update-attempts`, outside the replaceable

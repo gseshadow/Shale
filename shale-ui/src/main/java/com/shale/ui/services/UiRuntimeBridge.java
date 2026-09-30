@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import com.shale.core.update.WorkstationUpdatePreference;
 
 public interface UiRuntimeBridge {
 
@@ -34,6 +35,13 @@ public interface UiRuntimeBridge {
 	}
 	/** Empty unless the authenticated desktop has an enrolled server session. Server authorization remains authoritative. */
 	default Optional<AdminSessionManagement> adminSessionManagement() { return Optional.empty(); }
+
+	interface WorkstationAutomaticUpdates {
+		WorkstationUpdatePreference read();
+		ChangeResult change(boolean enabled, boolean authenticatedAdministrator);
+		enum ChangeResult { SAVED, UNAUTHORIZED, UNAVAILABLE }
+	}
+	default Optional<WorkstationAutomaticUpdates> workstationAutomaticUpdates() { return Optional.empty(); }
 
 	void onLoginSuccess(int userId, int shaleClientId, String email);
 
