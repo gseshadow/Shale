@@ -31,3 +31,6 @@ Also capture `Get-AuthenticodeSignature` for both executables. Expected current 
 known hardening debt, not a Phase 13C signing pass. Do not test logged-out execution, Task Scheduler, a service,
 SYSTEM, stored credentials, wake timers, macOS scheduling, MSI automation, or reboot behavior beyond confirming none
 was introduced.
+
+Phase 13D subsequently assessed those logged-out/background choices and selected `UNSUPPORTED`; it did not change
+this checklist or the Phase 13C scheduler. See `windows-logged-out-update-phase13d.md`.

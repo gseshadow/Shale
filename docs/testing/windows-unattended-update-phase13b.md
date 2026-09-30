@@ -308,3 +308,9 @@ eligibility deferred. Production scheduler activation remains disabled.
 Authoritative installed results supersede earlier Linux-runner `NOT TESTED` statements for these items: running build 1.0.129; per-user LocalAppData installation; updater at `app\updater\ShaleUpdater.exe`; Phase 13A persistence PASS; Shale-user machine scope PASS; non-admin mutation protection PASS; existing preference-file ACL PASS for ordinary-user read/no-write; and both executables `NotSigned`. Runtime SemanticVersion remains authoritative over stale uninstall `DisplayVersion`.
 
 New Intake blocked the parent, confirmed discard, and preserved data on cancel. Case edit blocked the parent and had no child discard confirmation. Organization edit blocked the parent and confirmed discard. Task edit and Calendar/Event edit blocked the parent and had no child discard confirmation. Consequently every open substantive mutation window is `ACTIVE_MUTATION_WORKFLOW` regardless of dirty state. Phase 13B now provides aggregate inspect-only readiness, save-in-flight registration, the normal-lifecycle rechecking shutdown seam, an OS-backed per-user execution lock enforced independently by the updater, and manual/unattended invocation separation. Production scheduling remains disabled; signing and logged-out operation remain deferred/unsupported.
+
+## Phase 13D follow-up boundary
+
+Phase 13D subsequently evaluated closed/logged-out execution separately and selected `UNSUPPORTED` for the current
+per-user, unsigned, authenticated-policy architecture. It did not change Phase 13B readiness, invocation-mode, lock,
+or attempt contracts. See `windows-logged-out-update-phase13d.md`.
