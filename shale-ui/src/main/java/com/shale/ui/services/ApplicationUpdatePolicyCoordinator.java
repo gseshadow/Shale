@@ -85,14 +85,16 @@ public final class ApplicationUpdatePolicyCoordinator implements AutoCloseable {
 			case REQUIRED_DEADLINE_REACHED -> "This version of Shale requires an update.";
 			case UNKNOWN -> "Update policy is temporarily unavailable.";
 		};
-		String detail=outage||stale?"Showing last-known policy while Shale reconnects. Work remains available.":detail(state,p,now,target);
+		String detail=outage||stale?(state==ApplicationUpdatePolicyState.REQUIRED_DEADLINE_REACHED
+				? "Showing fresh last-known policy while Shale reconnects. Existing work may be finished, but new work remains blocked."
+				: "Showing last-known policy while Shale reconnects. Work remains available."):detail(state,p,now,target);
 		return new Presentation(state,message,detail,p.revisionNumber(),target,
 				state==ApplicationUpdatePolicyState.RECOMMENDED||state==ApplicationUpdatePolicyState.REQUIRED_BEFORE_DEADLINE,outage||stale);
 	}
 	private static String detail(ApplicationUpdatePolicyState state,ApplicationPolicyView p,Instant now,String target){
 		if(state==ApplicationUpdatePolicyState.RECOMMENDED)return "Recommended version: "+target;
 		if(state==ApplicationUpdatePolicyState.REQUIRED_BEFORE_DEADLINE){long days=Math.max(1,Duration.between(now,p.requiredUpdateDeadline()).toDays()+1);return days+" day"+(days==1?"":"s")+" remaining · Required version: "+target;}
-		if(state==ApplicationUpdatePolicyState.REQUIRED_DEADLINE_REACHED)return "Required version: "+target+". Shale remains usable during Phase 11A.";
+		if(state==ApplicationUpdatePolicyState.REQUIRED_DEADLINE_REACHED)return "Required version: "+target+". Finish existing work; an update is required before starting new work.";
 		return "";
 	}
 	private static String format(Instant instant){return DEADLINE.format(instant.atZone(ZoneId.systemDefault()));}

@@ -1,5 +1,13 @@
 # Shale Design System Architecture
 
+## Minimum-version enforcement surfaces
+
+An overdue minimum-version state uses persistent textual status, not color alone. At login it provides
+keyboard-reachable Update, Retry, and Exit actions without opening the normal shell. In-process, the
+persistent update banner explains that existing work may finish and new work cannot start. Blocked
+launches use the single accessible explanation, “Shale must be updated before starting new work.” Do
+not repeatedly trap focus in warning dialogs or disable read/navigation controls.
+
 ## Purpose
 
 The Shale Design System defines the long-term visual language for Shale. It is the canonical visual reference for the JavaFX desktop application and the future React web application.

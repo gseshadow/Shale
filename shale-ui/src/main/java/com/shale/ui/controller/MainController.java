@@ -9,6 +9,7 @@ import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.services.UpdateFlowCoordinator;
 import com.shale.ui.services.ApplicationUpdatePolicyCoordinator;
+import com.shale.core.model.ApplicationVersionEnforcementState;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
 import com.shale.ui.util.ControlStyles;
@@ -263,6 +264,12 @@ public final class MainController {
 		updatePolicyBanner.getStyleClass().add(switch(presentation.state()){
 			case RECOMMENDED->"update-policy-recommended";case REQUIRED_BEFORE_DEADLINE->"update-policy-required";
 			case REQUIRED_DEADLINE_REACHED->"update-policy-overdue";default->"update-policy-unknown";});
+	}
+	public void showEnforcementState(ApplicationVersionEnforcementState state) {
+		boolean blocked=state==ApplicationVersionEnforcementState.DRAINING_REQUIRED_UPDATE
+				||state==ApplicationVersionEnforcementState.BLOCKED_NEW_WORK;
+		if(newIntakeButton!=null){newIntakeButton.setDisable(blocked);newIntakeButton.setAccessibleHelp(blocked
+				? com.shale.ui.services.SafeWorkDrainCoordinator.BLOCKED_MESSAGE : "Start a new intake");}
 	}
 	public void setUpdaterPackageAvailable(boolean available){updaterPackageAvailable=available;if(shownUpdatePolicy!=null)showUpdatePolicy(shownUpdatePolicy);}
 
