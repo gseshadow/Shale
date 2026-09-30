@@ -2068,8 +2068,13 @@ activate or reevaluate logged-out execution.
 
 ## Phase 13F implementation record — 2026-09-30
 
-**Status: IN PROGRESS — platform-neutral packaging checks pass, required Maven verification is blocked by Maven
-Central HTTP 403, and installed-Windows acceptance is NOT RUN on this Linux host.**
+**Status: IN PROGRESS — implementation is complete and the full repository `mvn test` verification is PASS;
+installed-Windows acceptance is NOT RUN because the available host is Linux.**
+
+The pre-acceptance status is therefore explicit: Phase 13F implementation **COMPLETE**, Maven verification **PASS**,
+installed-Windows acceptance **NOT YET RUN**, and overall Phase 13F **IN PROGRESS**. The Maven result closes automated
+repository verification only. It does not supply an MSI lifecycle, registry, ACL, installed-payload, upgrade, repair,
+uninstall, multi-user, reparse, or Authenticode result.
 
 The sole authoritative discovery location is 64-bit
 `HKLM\SOFTWARE\Shale\Installations\<installation UUID>`. Each child contains exactly `schemaVersion` (DWORD `1`),

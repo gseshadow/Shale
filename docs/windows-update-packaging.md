@@ -54,3 +54,8 @@ the record; exact uninstall does. Paired rollback actions restore prior state. I
 destroyed, repair creates a documented replacement UUID because the original cannot be safely invented. The payload
 remains per-user. Developer MSIs may be unsigned; signing-required builds still fail before publication, and
 registration never makes an unsigned updater trustworthy.
+
+Automated repository verification for Phase 13F is complete: the full `mvn test` suite is PASS. Installed-Windows
+acceptance remains NOT RUN on the available Linux host, which has no Windows/WiX installation environment or MSI
+artifact. Accordingly, no fresh-install, ACL, runtime, upgrade, repair, uninstall, security-fixture, multi-user, or
+Authenticode result is inferred from the packaging contracts.

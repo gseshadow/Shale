@@ -24,8 +24,9 @@ The WiX 3.14 lifecycle, not Shale runtime, owns one protected 64-bit HKLM regist
 support root. Elevated actions validate the pre-elevation MSI owner SID against ProfileList path authority, reject
 reparse roots, harden ACLs, preserve identity across upgrade/repair, and perform exact uninstall/rollback. A read-only
 core reader classifies invalid, stale, duplicate, and unsafe records without healing them. Installed Windows
-acceptance remains outstanding, so Phase 13F is in progress. Logged-out automatic updating remains `UNSUPPORTED`;
-there is no task, service, SYSTEM executor, principal selection, or scheduler.
+acceptance remains outstanding, so Phase 13F is in progress even though implementation is complete and the full
+repository `mvn test` verification is PASS. Logged-out automatic updating remains `UNSUPPORTED`; there is no task,
+service, SYSTEM executor, principal selection, or scheduler.
 
 ## Privacy-safe update-attempt observability (Phase 12)
 
