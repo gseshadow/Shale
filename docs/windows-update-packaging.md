@@ -16,3 +16,9 @@ not process launch or ZIP application, decides completion.
 
 Current installed acceptance evidence records both `Shale.exe` and `ShaleUpdater.exe` as NotSigned. Phase 13C does
 not add or claim Authenticode signing. Signing and runtime signature verification remain release-hardening debt.
+
+Phase 13D does not register a scheduled task, service, SYSTEM helper, install-owner credential, or installation
+registration. Logged-out/closed-app updating is explicitly `UNSUPPORTED`: the per-user install cannot yet be paired
+safely with a credentialless owner principal, authoritative policy, trustworthy closed-app version metadata,
+owner-correct attempt/log/lock paths, signed executables, and deterministic MSI cleanup. Phase 13C remains the only
+automatic mechanism. See `docs/testing/windows-logged-out-update-phase13d.md`.

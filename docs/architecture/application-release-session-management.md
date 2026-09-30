@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 13C IN PROGRESS — in-session scheduler implemented; installed-Windows activation validation outstanding
+**Status:** Phase 13D IN PROGRESS — design selects `UNSUPPORTED`; required Maven verification is blocked by repository access
 
 **Last reviewed:** 2026-09-30
 
@@ -1146,7 +1146,8 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 12 | **COMPLETE** | Privacy-safe local attempt/outcome correlation and required verification completed before Phase 13A. |
 | 13A | **COMPLETE** | Machine-scoped opt-in storage, provider, authorization, and Settings control were completed and verified before Phase 13B. |
 | 13B | **COMPLETE** | Eligibility, aggregate readiness, cooperative shutdown, explicit invocation modes, update locking, and bounded retry/window contracts are implemented and verified. |
-| 13C | **IN PROGRESS** | One authenticated, process-local Windows scheduler is wired. Automated and installed-Windows activation validation are required before completion. |
+| 13C | **COMPLETE** | Authenticated process-local Windows scheduling is implemented and verified; it remains session-only. |
+| 13D | **IN PROGRESS — DESIGN / UNSUPPORTED** | Logged-out alternatives were assessed and no executor was registered. Required Maven verification is blocked by Maven Central HTTP 403, so completion is not claimed. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1183,12 +1184,10 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Complete **Phase 13B installed-Windows validation only** by performing the installed-Windows feasibility checklist;
-the supplied full-repository `mvn test` result is **PASS** and need not be repeated for this documentation-only run.
-If validation confirms the documented blockers,
-scope a later phase to add a cooperative no-prompt shutdown readiness contract and one per-install-owner shared
-update lock before considering any production scheduler activation. Do not add macOS scheduling, a privileged
-service, public policy API, or production rollout in that validation run.
+Phase 13E — **Windows background-update prerequisite closure only**: decide whether to expose a narrowly scoped,
+rate-limited unauthenticated global Production-policy read and design Authenticode signing plus protected explicit
+install-owner registration/uninstall cleanup. Do not implement or roll out a task/service, store credentials, add
+macOS parity, or enable logged-out installation until those prerequisites are independently approved and proven.
 
 ## Phase 7A implementation record — 2026-09-29
 
@@ -1811,7 +1810,8 @@ Phase 13B is **implemented but remains unverified as a feasibility/foundation ph
 
 ## Phase 13C implementation record — 2026-09-30
 
-**Status: IN PROGRESS — Windows opt-in in-session scheduler is implemented; installed-Windows activation validation is outstanding.**
+**Status: COMPLETE — Windows opt-in in-session scheduler is implemented and repository-verified; its installed
+acceptance record remains separate from Phase 13D.**
 
 ### Supported production scenario and lifecycle
 
@@ -1882,11 +1882,11 @@ claimed by this phase.
 Deterministic tests cover lifecycle idempotence/stale generations, before/at/inside/after-window timing, DST local
 window arithmetic, resume behavior, preference rereads, four-evaluation/one-handoff budgets, immediate activity-race
 recheck, shared-lock ordering, and exact `UNATTENDED` command wiring. The installed-Windows Phase 13C checklist is in
-`docs/testing/windows-unattended-update-phase13c.md`. Until that checklist validates the packaged build and the
-required Maven suite passes, Phase 13C remains **IN PROGRESS** and must not be represented as production-complete.
+`docs/testing/windows-unattended-update-phase13c.md`. The checklist remains the installed-machine evidence procedure;
+Phase 13C is complete from the repository/test perspective supplied as the Phase 13D baseline.
 
-**NOT STARTED — NEXT PROPOSED STEP:** Phase 13D, a separately authorized Windows logged-out scheduling feasibility and
-security design. It must not be inferred from, or included in, Phase 13C.
+**COMPLETE:** Phase 13C remains the supported Windows automatic-update mechanism. Phase 13D separately assessed
+logged-out scheduling and did not modify this scheduler.
 
 ### Phase 13C audit-compatibility review
 
@@ -1897,3 +1897,103 @@ schema migration is required. The existing Phase 13A administrative preference b
 timer ticks and eligibility deferrals are operational diagnostics rather than tenant audit events. Logs remain
 sanitized and never serialize policy DTOs, activity timestamps/history, identities, credentials, case values, or
 exception text.
+
+
+## Phase 13D implementation record — 2026-09-30
+
+**Status: IN PROGRESS — feasibility/security design selected `UNSUPPORTED`; no executor was created, and required Maven verification is blocked by Maven Central HTTP 403.**
+
+Phase 13D asked whether a per-user Windows installation can update safely while Shale is closed or its owner is
+logged out. The answer for the current architecture is no. `LoggedOutAutomaticUpdateSupport` makes that safe default
+executable as a closed `UNSUPPORTED` decision with blockers for principal, authoritative policy, install
+registration, trustworthy closed-app version, owner-correct attempt state, executable authenticity, and uninstall
+lifecycle. It is not wired into Phase 13C and has no scheduling or launch behavior.
+
+### Alternatives and selected principal
+
+Install-owner interactive-token scheduling is credentialless and preserves profile ownership, but runs only while a
+user session exists and duplicates the already-supported Phase 13C boundary. Password-logon Task Scheduler could
+run logged out with the owner's non-interactive token, but requires Windows to store credentials and is rejected by
+the no-Windows-password requirement. Passwordless S4U avoids stored credentials but lacks network and encrypted-file
+access and has no installed proof for profile/AppData, TLS, or owner-correct updater behavior. No credentialless
+install-owner principal therefore meets the network-dependent contract.
+
+SYSTEM avoids a password but is not safer: its environment names SYSTEM's profile, not the install owner's; writing
+inside another user's LocalAppData can change ownership/ACL behavior; certificate stores and network identity differ;
+and a machine task cannot infer one target from several per-user installations. A privileged service or
+installer-owned helper could mediate explicit registrations, but would be a signed, privileged, persistent security
+product with install/update/self-protection, impersonation, attack-surface, and deterministic uninstall obligations.
+That is deferred rather than smuggled into feasibility. No principal is selected for execution.
+
+A future Task Scheduler design, if prerequisites are met, would use stable `\\Shale\\Automatic Update` identity,
+idempotent update/delete, a simple daily evaluation trigger, no wake timer, and an independent rollout flag defaulted
+off. Phase 13A consent would remain an execution-time gate and would not select an installation or activate rollout.
+No current task lifecycle can be proven removable by the per-user MSI, so registration remains a blocker.
+
+### Identity, policy, paths, and multi-user result
+
+The Phase 13A `%ProgramData%` preference remains machine-scoped and unchanged. It must never carry owner/install
+identity. Uninstall registry entries and the LocalAppData convention are only discovery hints. Observed stale
+`DisplayVersion` is not eligibility authority. A future design needs a separate protected installer registration
+with owner SID and canonical absolute install/updater/support paths, plus signed packaged/version-resource or stable
+protected release metadata. It must not start JavaFX solely to obtain the version or derive owner paths from the
+executor's `%LOCALAPPDATA%`.
+
+On a shared workstation, User A and User B may own separate installs under one consent value. Updating all profiles
+from one machine principal creates cross-owner privilege, attribution, ACL, and cleanup risks; updating an arbitrary
+first match is incorrect. Thus Phase 13D targets no install. Any future executor must resolve exactly one registered
+owner/install and independently arbitrate each with the existing per-owner OS lock.
+
+Inspection confirms the current policy response is global release metadata only: channel, revision, latest, optional
+minimum recommended/allowed versions, deadline, access mode, publication time, and server time. It contains no tenant,
+user, session, bearer, or PHI data. A public read may be defensible, but was not added because rate/abuse controls,
+cache/replay semantics, deployment ownership, and preservation of Phase 11 authority need a separate server security
+decision. A logged-out process has no memory-only Shale bearer. The public manifest remains package authority only
+and may not silently replace central policy; unavailable authority returns `UNSUPPORTED`. There is no API or schema
+change.
+
+### Execution, observability, and security boundary
+
+A future executor would reread `WorkstationUpdatePreferenceProvider` and continue only for valid `ENABLED`; resolve
+fresh authoritative policy and the existing manifest/package; use a trustworthy local version source; detect the
+target Shale process in every Windows session; defer if it is running; acquire the existing `UpdateExecutionLock`;
+and only then cross real updater handoff and create Phase 12 state. It must reuse the updater downloader, SHA-256,
+archive validation, and ZIP path. It must not automate windows, cross session boundaries, force-close, prompt, bypass
+UAC, or reboot. Offline/policy/package unavailability, disabled/corrupt preference, no update, running app, and busy
+lock exit without an attempt or tight retries.
+
+Attempt and diagnostic paths must be explicit owner paths. Running as SYSTEM must never redirect them to SYSTEM's
+profile. A later normal owner startup must read the identical store and remain the only completion authority. Stable
+semantic outcome codes would cover preference disabled, policy unavailable, no update, app running, lock busy,
+package unavailable/invalid, unsupported install, and insufficient privilege; arbitrary exception text and broad
+telemetry remain forbidden. No new audit is appropriate because this phase adds no sensitive read or domain/admin
+mutation and Phase 12 remains bounded operational evidence.
+
+Both executables remain `NotSigned`. Manifest SHA-256 provides package integrity tied to the manifest but does not
+authenticate an installed, user-replaceable scheduled binary. Executing that binary as SYSTEM or another privileged
+principal creates a material elevation path and blast-radius increase. Authenticode signing/verification, protected
+registration/task ACLs, canonical/reparse-safe paths, and installed-Windows proof are prerequisites, not production
+readiness claims. If ZIP replacement requires elevation or interactive UAC, logged-out execution is unsupported.
+
+Exact supported background/logged-out scenarios are **none**. Locked and disconnected RDP sessions are not logged
+out; if Shale remains authenticated and running, only Phase 13C may act and all its gates still apply. No interactive
+user, owner logged out, Shale closed without authenticated policy, multiple ambiguous installs, another owner's
+install, SYSTEM/service execution, elevation, unsigned task binary, or unavailable authority are unsupported. Any
+running target process causes deferral to Phase 13C; no cooperative cross-session shutdown is attempted.
+
+The threat review covers ordinary-user task/helper/updater replacement, writable per-user install content, unsigned
+execution, malicious package source, stale policy, privilege escalation, profile/ACL confusion, and multiple owners.
+No task, service, helper, credential store, public endpoint, SQL, schema, telemetry, automatic reboot, force-kill, or
+macOS implementation was added. Phase 13C behavior is unchanged. The detailed installed-Windows successor procedure
+is `docs/testing/windows-logged-out-update-phase13d.md`; all runtime rows remain NOT RUN because this environment is
+not an installed Windows workstation.
+
+The exact next recommended phase is **Phase 13E — Windows background-update prerequisite closure only**: decide the
+public global-policy security contract and design signing plus protected install-owner registration/cleanup. It is
+not task/service implementation, production rollout, or macOS parity.
+
+### Phase 13D audit-compatibility review
+
+The new capability is a local immutable unsupported assessment. It reads and mutates no tenant, user, session, PHI,
+domain, preference, or database state and performs no administrative action. Existing audit schemas cannot and
+should not receive timer/feasibility events. No migration or audit allowlist change is required.

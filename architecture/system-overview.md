@@ -235,3 +235,15 @@ authoritative reload rather than PubSub delivery.
 The authenticated shell resolves global PRODUCTION `ApplicationPolicy` through the existing release-read boundary. Strict semantic versions and database server UTC determine current, recommended, required-before-deadline, and deadline-reached presentation. A 15-minute process cache advances only from a monotonic receipt anchor; stale or unavailable authority is informative and fail-open. Phase 8B invalidation/reconnect invokes the same coordinator. The manifest remains package authority and the established updater remains execution authority. This phase does not enforce, drain, log out, shut down, schedule, or administer policy.
 
 Phase 13B is complete only as a feasibility/foundation phase. No production scheduler is wired, logged-out execution remains unsupported, and signing remains deferred.
+
+## Windows logged-out automatic-update feasibility (Phase 13D)
+
+Phase 13D is complete as a security design with the capability explicitly `UNSUPPORTED`. No current credentialless
+principal can both preserve ownership of a per-user LocalAppData installation and obtain authenticated central
+policy while logged out. SYSTEM/service execution would widen privilege and profile/ACL ambiguity, especially with
+multiple per-user installs sharing one machine consent; unsigned installed executables make that materially worse.
+The public manifest remains package authority only and cannot replace Phase 11 policy. No public endpoint, task,
+service, helper, install registration, credential, SQL/API/schema change, reboot, force-kill, or macOS work was added.
+Phase 13C remains the supported automatic path while Shale is running in an authenticated session. The immutable
+`LoggedOutAutomaticUpdateSupport` contract prevents callers from claiming capability until a later explicit
+architecture phase closes policy, signing, owner registration/path, attempt-store, and uninstall-lifecycle blockers.
