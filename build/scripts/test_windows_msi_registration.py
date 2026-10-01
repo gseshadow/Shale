@@ -21,6 +21,11 @@ class RegistrationMutationTest(unittest.TestCase):
         self.assertTrue(all(actions[name].get('Impersonate')=='no' for name in m.IDS))
         source=self.wxs.read_text(encoding='utf-8')
         self.assertIn('[UserSID]',source); self.assertIn('[LocalAppDataFolder]Shale',source); self.assertIn('NOT UPGRADINGPRODUCTCODE',source)
+        self.assertEqual(set(m.IDS), {n.get('Property') for n in actions.values() if n.get('Id','').startswith('SetShaleRegistration')})
+        self.assertTrue(all(len(actions['Set'+name].get('Value')) == 254 for name in m.IDS))
+        self.assertTrue(all(len(actions['Set'+name].get('Value')) <= m.TARGET_MAX for name in m.IDS))
+        payload=next(n for n in root.iter(m.tag('Property')) if n.get('Id') == m.PAYLOAD_PROPERTY)
+        self.assertEqual(m.encoded_script(self.script), payload.get('Value'))
     def test_removes_incompatible_package_privilege_attribute(self):
         self.wxs.write_text(fixture(privileges='elevated'),encoding='utf-8')
         with self.assertRaisesRegex(ValueError,'template contract violation'): m.validate_template(self.wxs)
@@ -71,6 +76,24 @@ class RegistrationMutationTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'final MSI contract violation.*perUser'): m.validate_final(self.wxs)
         package.set('InstallScope','perUser'); package.set('InstallPrivileges','elevated'); root.write(self.wxs,encoding='utf-8',xml_declaration=True)
         with self.assertRaisesRegex(ValueError,'final MSI contract violation.*InstallPrivileges'): m.validate_final(self.wxs)
+    def test_target_limit_is_fail_closed_without_losing_required_action_data(self):
+        m.mutate(self.wxs,self.script)
+        root=ET.parse(self.wxs); actions={n.get('Id'):n for n in root.getroot().iter(m.tag('CustomAction'))}
+        expected=(f'[{m.PAYLOAD_PROPERTY}]','[UserSID]','[INSTALLDIR]','[LocalAppDataFolder]Shale')
+        for name in m.IDS:
+            target=actions['Set'+name].get('Value')
+            self.assertLessEqual(len(target),255)
+            self.assertTrue(all(field in target for field in expected))
+        actions['SetShaleRegistrationCommit'].set('Value',actions['SetShaleRegistrationCommit'].get('Value')+'XX')
+        root.write(self.wxs,encoding='utf-8',xml_declaration=True)
+        with self.assertRaisesRegex(ValueError,r'CustomAction Target overflow: SetShaleRegistrationCommit length=256 limit=255'):
+            m.validate_template(self.wxs)
+    def test_validator_rejects_incomplete_setter_or_missing_private_payload(self):
+        m.mutate(self.wxs,self.script)
+        root=ET.parse(self.wxs); actions={n.get('Id'):n for n in root.getroot().iter(m.tag('CustomAction'))}
+        actions['SetShaleRegistrationRollbackInstall'].set('Value',actions['SetShaleRegistrationRollbackInstall'].get('Value').replace('[UserSID]',''))
+        root.write(self.wxs,encoding='utf-8',xml_declaration=True)
+        with self.assertRaisesRegex(ValueError,r'incomplete action data.*missing \[UserSID\]'): m.validate_template(self.wxs)
     def test_validator_rejects_missing_rollback_or_exact_uninstall_sequence(self):
         m.mutate(self.wxs,self.script)
         root=ET.parse(self.wxs); sequence=next(root.getroot().iter(m.tag('InstallExecuteSequence')))

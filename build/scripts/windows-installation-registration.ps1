@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
-$Mode=$env:SHALE_REG_MODE; $OwnerSid=$env:SHALE_REG_OWNER; $InstallRoot=$env:SHALE_REG_INSTALL; $SupportRoot=$env:SHALE_REG_SUPPORT
+$Mode=@{I='Install';U='Uninstall';R='RollbackInstall';B='RollbackUninstall';C='Commit'}[$env:M]
+$OwnerSid=$env:O; $InstallRoot=$env:I; $SupportRoot=$env:S
 if ($Mode -notin @('Install','Uninstall','RollbackInstall','RollbackUninstall','Commit')) { throw 'Shale installation registration rejected: invalid-mode' }
 $base = 'HKLM:\SOFTWARE\Shale'
 $registrations = "$base\Installations"

@@ -2102,9 +2102,12 @@ At the packaging boundary, the selected JDK 21 module image supplies the authori
 build injects the actions into a staged copy and provides it through jpackage `--resource-dir`, so jpackage's original
 Candle compile supplies all public and implicit `Jp*` defaults. No second `main.wxs` compile or hand-maintained
 default compatibility layer exists. ProductCode, UpgradeCode, and version are compared between the preliminary
-jpackage MSI and final relinked MSI. Pre-jpackage validation requires the raw template to preserve
-`InstallScope="$(var.JpInstallScope)"`; generated and final decompiled validation instead requires its resolved
-`perUser` value. Both stages reject `InstallPrivileges`, while final decompilation must contain the Phase 13F actions.
+jpackage MSI and final relinked MSI. Template validation requires both the injected resource and generated
+`config/main.wxs` source to preserve `InstallScope="$(var.JpInstallScope)"`; Candle consumes but does not rewrite that
+source. Preliminary and final Dark-decompiled MSI validation instead requires the resolved `perUser` value. Every
+stage rejects `InstallPrivileges`, while both decompilations must contain the Phase 13F actions. The encoded writer
+is held once in a private MSI property; 254-character setters stay below the 255-character CustomAction Target
+schema limit while formatting the complete mode, owner SID, install root, and support root into CustomActionData.
 
 First install creates a random UUID and protected lookup state. Upgrade and repair reuse it and update the record
 idempotently. If both registration and state are missing, repair cannot reconstruct the old UUID and creates a
