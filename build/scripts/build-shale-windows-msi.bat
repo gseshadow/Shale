@@ -145,7 +145,7 @@ if errorlevel 1 goto :generated_identity_mutation_failed
 echo bundle.wxf identity and shortcut mutation completed.
 if not exist "%MAIN_SOURCE%" goto :missing_main_source
 echo Windows MSI stage started: original-compile-registration-validation input="%MAIN_SOURCE%"
-python "%ROOT%\build\scripts\windows_msi_registration.py" validate "%MAIN_SOURCE%"
+python "%ROOT%\build\scripts\windows_msi_registration.py" final "%MAIN_SOURCE%"
 if errorlevel 1 goto :original_compile_registration_failed
 echo Windows MSI stage completed: original-compile-registration-validation
 
@@ -211,7 +211,7 @@ python "%ROOT%\build\scripts\windows_msi_identity.py" compare "%STAGE%\prelimina
 if errorlevel 1 goto :compiled_identity_failed
 echo Windows MSI stage completed: compiled-identity-validation
 echo Windows MSI stage started: compiled-registration-validation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%STAGE%\dark\final.wxs"
-python "%ROOT%\build\scripts\windows_msi_registration.py" validate "%STAGE%\dark\final.wxs"
+python "%ROOT%\build\scripts\windows_msi_registration.py" final "%STAGE%\dark\final.wxs"
 if errorlevel 1 goto :compiled_registration_failed
 echo Windows MSI stage completed: compiled-registration-validation
 echo Windows MSI stage started: compiled-payload-validation script="%ROOT%\build\scripts\windows_msi_payload.py" input="%STAGE%\dark\final.wxs"

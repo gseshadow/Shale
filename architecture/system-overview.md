@@ -26,6 +26,9 @@ reparse roots, harden ACLs, preserve identity across upgrade/repair, and perform
 core reader classifies invalid, stale, duplicate, and unsafe records without healing them. Windows packaging feeds
 a minimally augmented copy of JDK 21's own `main.wxs` resource into jpackage's original compile, so
 jpackage retains its implicit WiX defaults and generated package identity without a second main-source compile.
+The MSI declares only `InstallScope="perUser"`; same-owner administrator consent elevates `msiexec`, after which
+deferred non-impersonating actions use the installer service for protected writes. Secondary-credential elevation
+is unsupported because it changes the per-user installation owner.
 Installed Windows acceptance remains outstanding, so Phase 13F is in progress even though implementation is complete and the full
 repository `mvn test` verification is PASS. Logged-out automatic updating remains `UNSUPPORTED`; there is no task,
 service, SYSTEM executor, principal selection, or scheduler.

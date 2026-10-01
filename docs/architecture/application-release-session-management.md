@@ -2084,9 +2084,16 @@ broad ProgramData inheritance. `HKLM\SOFTWARE\Shale\InstallerState\<SHA-256 owne
 lifecycle state containing only the UUID; it cannot enumerate or authorize installations and is not a second
 registration authority.
 
-The per-user jpackage payload remains under the installing owner's LocalAppData. WiX 3.14 immediate property
-formatting supplies Windows Installer's `UserSID`, `INSTALLDIR`, and `LocalAppDataFolder` to deferred,
-non-impersonating, fail-closed custom actions. The privileged writer independently resolves the SID through protected
+The per-user jpackage payload remains under the installing owner's LocalAppData. The package uses only
+`InstallScope="perUser"`, never the invalid WiX 3 combination with `InstallPrivileges="elevated"`. A same-owner
+split-token administrator must start `msiexec` through ordinary UAC consent for install, repair, upgrade, and
+uninstall. Once the transaction is elevated, deferred non-impersonating actions run in the privileged Windows
+Installer service context; without elevation the protected operation fails the transaction rather than degrading
+to an unregistered installation. Windows Installer immediate property formatting supplies `UserSID`, `INSTALLDIR`,
+and `LocalAppDataFolder` to those deferred, non-impersonating, fail-closed custom actions. Same-account consent leaves
+these per-user values bound to the installation owner. Over-the-shoulder administrator credentials instead make the
+credentialed administrator the per-user client and are unsupported; native MSI cannot elevate only an HKLM slice
+while retaining a different standard user's per-user ownership. The privileged writer independently resolves the SID through protected
 ProfileList and accepts only the exact `<profile>\AppData\Local\Shale` install/support root. It rejects malformed
 SIDs, root substitution, traversal/canonical mismatch, and any visible reparse ancestor. The elevated token,
 Administrator, and SYSTEM environment never nominate owner or paths.
@@ -2095,7 +2102,9 @@ At the packaging boundary, the selected JDK 21 module image supplies the authori
 build injects the actions into a staged copy and provides it through jpackage `--resource-dir`, so jpackage's original
 Candle compile supplies all public and implicit `Jp*` defaults. No second `main.wxs` compile or hand-maintained
 default compatibility layer exists. ProductCode, UpgradeCode, and version are compared between the preliminary
-jpackage MSI and final relinked MSI, while final decompilation must contain the Phase 13F actions.
+jpackage MSI and final relinked MSI. Pre-jpackage validation requires the raw template to preserve
+`InstallScope="$(var.JpInstallScope)"`; generated and final decompiled validation instead requires its resolved
+`perUser` value. Both stages reject `InstallPrivileges`, while final decompilation must contain the Phase 13F actions.
 
 First install creates a random UUID and protected lookup state. Upgrade and repair reuse it and update the record
 idempotently. If both registration and state are missing, repair cannot reconstruct the old UUID and creates a
