@@ -311,12 +311,31 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertNotIn("extends Application", launcher)
         self.assertIn("public static void main(String[] args)", launcher)
         self.assertIn("MainApp.main(args);", launcher)
-        self.assertIn('windows_msi_payload.py" config "%DIST_APP%\\Shale\\app\\Shale.cfg"', release)
+        properties = (ROOT / "build/packaging/windows/shale-registration-diagnostic.properties").read_text(encoding="utf-8")
+        for source in (release, msi):
+            self.assertIn('--add-launcher ShaleRegistrationDiagnostic="%DIAGNOSTIC_LAUNCHER_CONFIG%"', source)
+            self.assertIn('windows_msi_payload.py" launcher "%DIAGNOSTIC_LAUNCHER_CONFIG%"', source)
+        self.assertIn("main-class=com.shale.desktop.update.WindowsInstallationRegistrationDiagnostic", properties)
+        self.assertIn("win-console=true", properties)
+        self.assertIn("win-menu=false", properties)
+        self.assertIn("win-shortcut=false", properties)
+        self.assertNotIn("arguments=", properties)
+        self.assertIn('windows_msi_payload.py" image "%DIST_APP%\\Shale"', release)
         source_validation = msi.index('windows_msi_payload.py" source "%BUNDLE_SOURCE%"')
         final_validation = msi.index('windows_msi_payload.py" compiled "%STAGE%\\dark\\final.wxs"')
         publish = msi.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"')
         self.assertLess(source_validation, final_validation)
         self.assertLess(final_validation, publish)
+
+    def test_registration_diagnostic_entrypoint_is_desktop_owned_only(self):
+        legacy = ROOT / "shale-core/src/main/java/com/shale/core/update/WindowsInstallationRegistrationDiagnostic.java"
+        desktop = ROOT / "shale-desktop/src/main/java/com/shale/desktop/update/WindowsInstallationRegistrationDiagnostic.java"
+        self.assertFalse(legacy.exists(), "The legacy core diagnostic would be shaded into updater payloads")
+        self.assertTrue(desktop.is_file(), "The desktop-owned diagnostic entry point is missing")
+        source = desktop.read_text(encoding="utf-8")
+        self.assertIn("import com.shale.core.update.WindowsInstallationRegistrationReader;", source)
+        self.assertIn("WindowsInstallationRegistrationReader.windowsRegistrySource()", source)
+        self.assertIn("WindowsInstallationRegistrationReader::inspectPath", source)
 
     def test_successful_toolchain_reaches_named_native_stage_without_stale_errorlevel(self):
         source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
@@ -332,7 +351,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
     def test_every_post_toolchain_operation_has_fail_closed_stage_diagnostics(self):
         source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
         stages = (
-            "staging", "jpackage-resource-preparation", "native-DLL", "marker-staging", "preliminary-jpackage",
+            "staging", "diagnostic-launcher-validation", "jpackage-resource-preparation", "native-DLL", "marker-staging", "preliminary-jpackage",
             "generated-payload-validation", "generated-identity-validation",
             "generated-identity-mutation", "original-compile-registration-validation", "preliminary-compiled-registration-validation", "candle-recompile",
             "light-reconstruction", "dark-extraction", "compiled-identity-validation",

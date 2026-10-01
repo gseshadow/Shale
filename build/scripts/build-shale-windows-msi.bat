@@ -84,11 +84,17 @@ set FINAL=%STAGE%\final
 set PRELIMINARY_MSI=%PRELIM%\Shale-%VERSION%.msi
 set FINAL_MSI=%FINAL%\Shale-%VERSION%.msi
 set APPINPUT=%ROOT%\shale-desktop\target
+set DIAGNOSTIC_LAUNCHER_CONFIG=%ROOT%\build\packaging\windows\shale-registration-diagnostic.properties
 echo Windows MSI stage started: staging command=mkdir expected="%PRELIM%" and "%FINAL%"
 if exist "%STAGE%" rmdir /s /q "%STAGE%"
 mkdir "%PRELIM%" "%FINAL%"
 if errorlevel 1 goto :staging_failed
 echo Windows MSI stage completed: staging
+echo Windows MSI stage started: diagnostic-launcher-validation input="%DIAGNOSTIC_LAUNCHER_CONFIG%"
+if not exist "%DIAGNOSTIC_LAUNCHER_CONFIG%" goto :missing_diagnostic_launcher_config
+python "%ROOT%\build\scripts\windows_msi_payload.py" launcher "%DIAGNOSTIC_LAUNCHER_CONFIG%"
+if errorlevel 1 goto :invalid_diagnostic_launcher_config
+echo Windows MSI stage completed: diagnostic-launcher-validation
 
 echo Windows MSI stage started: jpackage-resource-preparation source="%JAVA_HOME%\lib\modules" expected="%JPACKAGE_MAIN_TEMPLATE%"
 mkdir "%JPACKAGE_RESOURCE_EXTRACT%" "%JPACKAGE_RESOURCE_DIR%"
@@ -122,6 +128,7 @@ echo Starting jpackage and WiX MSI construction...
 echo Windows MSI stage started: preliminary-jpackage tool=jpackage expected="%PRELIMINARY_MSI%"
 jpackage --type msi --name Shale --input "%APPINPUT%" --dest "%PRELIM%" --temp "%JPACKAGE_TEMP%" --verbose --resource-dir "%JPACKAGE_RESOURCE_DIR%" ^
  --main-jar "shale-desktop-%VERSION%.jar" --main-class com.shale.desktop.ShaleLauncher ^
+ --add-launcher ShaleRegistrationDiagnostic="%DIAGNOSTIC_LAUNCHER_CONFIG%" ^
  --icon "%ROOT%\build\assets\Shale.ico" --app-version "%VERSION%" --vendor "Get Downing" ^
  --description "Shale Desktop" --win-menu --win-shortcut --win-dir-chooser --win-per-user-install --install-dir Shale >"%JPACKAGE_LOG%" 2>&1
 set "JPACKAGE_EXIT=!ERRORLEVEL!"
@@ -317,6 +324,15 @@ exit /b 24
 set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=compiled-payload-validation script="%ROOT%\build\scripts\windows_msi_payload.py" input="%STAGE%\dark\final.wxs" exit=%STAGE_EXIT%
 exit /b 27
+
+:missing_diagnostic_launcher_config
+echo Windows MSI stage failed: stage=diagnostic-launcher-validation input="%DIAGNOSTIC_LAUNCHER_CONFIG%" classification=missing
+exit /b 49
+
+:invalid_diagnostic_launcher_config
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=diagnostic-launcher-validation input="%DIAGNOSTIC_LAUNCHER_CONFIG%" exit=%STAGE_EXIT%
+exit /b 50
 
 :final_copy_failed
 set "STAGE_EXIT=%ERRORLEVEL%"

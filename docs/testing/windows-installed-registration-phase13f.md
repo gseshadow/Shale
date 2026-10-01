@@ -1,7 +1,13 @@
 # Phase 13F installed-Windows registration acceptance
 
-**Status on 2026-10-01:** Phase 13F remains IN PROGRESS. Platform-neutral repository verification is PASS, but
-installed-Windows acceptance is NOT YET RUN. The first real Windows packaging attempt reached the post-mutation
+**Status on 2026-10-01:** Phase 13F remains IN PROGRESS. Platform-neutral repository verification is PASS, and
+installed lifecycle testing has proved fresh install, repair, major upgrade, and exact uninstall identity behavior.
+The authoritative installation UUID observed across repair and the `1.0.128` to `1.0.129` major upgrade was
+`ca2bb9b9-9576-400d-a637-0ad645c52bea`; exact uninstall removed that HKLM registration. The remaining installed
+acceptance is the corrected ACL inspection and production-reader diagnostic described below, followed by the
+separate security-fixture, multi-user, and signing rows that have not been executed. The corrected ACL row now
+passes; the production-reader row remains failed until the dedicated launcher build is installed and rerun. The
+first real Windows packaging attempt reached the post-mutation
 recompilation of generated `main.wxs` and failed with `CNDL0150` because the custom Candle invocation omitted
 jpackage's generated `Jp*` preprocessor definitions. The first attempted fix scanned every textual
 `$(var.Jp...)` reference in `main.wxs` and required a logged definition. A second real Windows build proved that check
@@ -110,32 +116,31 @@ template, original jpackage compile, Option B resource-injection architecture, r
 architecture are unchanged. Phase 13F remains **IN PROGRESS** pending the corrected Windows rerun and installed
 lifecycle acceptance.
 
-The corrected ninth-finding build has not yet been rerun through the final relink on Windows, so neither final MSI
-production nor installed acceptance is claimed. The available Codex host is
-Ubuntu Linux and has no PowerShell, Windows command environment, Wine, Windows VM manager, MSI artifact, remote
-Windows runner, or release signing credential. Do not report any installed row as PASS until its command is executed
-on an installed Windows machine and evidence is retained. Loose classes, exploded directories, source inspection,
-and platform-neutral tests are not substitutes for MSI lifecycle validation.
+The corrected build was subsequently produced and used for the lifecycle evidence recorded below. The current
+Codex host is Ubuntu Linux and cannot rerun the corrected ACL/reader helper against that installation. Do not report
+either remaining row as PASS until its command is executed on an installed Windows machine and evidence is retained.
+Loose classes, exploded directories, source inspection, and platform-neutral tests are not substitutes for that
+installed validation.
 
 ## Current acceptance evidence
 
 | Item | Result | Evidence / remaining action |
 | --- | --- | --- |
-| Windows build/version tested | NOT RUN | Repository version is `1.0.128`, but no Windows build was produced or tested on this host. |
-| MSI tested | NOT RUN | No MSI artifact is present; the supported Windows release pipeline was not executable on Linux. |
-| Signing mode | NOT RUN | No MSI was built, so it is not classified as either a signed release artifact or an unsigned developer artifact. |
-| Fresh-install registration | NOT RUN | Requires a normal installation of the generated MSI on Windows. |
-| Authoritative registration path | NOT RUN | The contract path is `HKLM\SOFTWARE\Shale\Installations\<installation UUID>`; no actual key was inspected. |
-| Installation UUID | NOT RUN | No installed registration exists on this host. |
-| Owner SID and owner-derived roots | NOT RUN | No genuine Windows installation owner or ProfileList authority is available. |
-| Authoritative-record ACL and ordinary-user mutation resistance | NOT RUN | The actual child key and its effective ACL must be inspected on Windows; parent/source ACL assumptions are insufficient. |
-| Production reader classification | NOT RUN | `VALID` has not been observed against an installed registration. |
-| Installed-version metadata | NOT RUN | No installed `app\shale-installed-version.properties` payload exists to compare with the packaged runtime or parse strictly. |
-| Updater, Phase 12 attempt, Phase 13B lock, and evidence-log paths | NOT RUN | No owner registration was available from which to resolve and compare these paths. |
+| Windows build/version tested | PASS | Installed lifecycle evidence covers `1.0.128` and `1.0.129`. |
+| MSI tested | PASS | Fresh install, repair, major upgrade, and exact uninstall were executed with the generated MSIs. |
+| Signing mode | NOT RUN | The supplied lifecycle evidence did not classify the tested MSIs as signed release or unsigned developer artifacts. |
+| Fresh-install registration | PASS | Fresh install created the authoritative HKLM registration. |
+| Authoritative registration path | PASS | The installed record was `HKLM\SOFTWARE\Shale\Installations\ca2bb9b9-9576-400d-a637-0ad645c52bea`. |
+| Installation UUID | PASS | `ca2bb9b9-9576-400d-a637-0ad645c52bea` was retained through repair and major upgrade. |
+| Owner SID and owner-derived roots | PASS | Installed validation matched the registered SID and both canonical owner-derived roots. |
+| Authoritative-record ACL and ordinary-user mutation resistance | PASS | The exact 64-bit child is protected with no inherited ACEs; SYSTEM and Administrators have FullControl; the owner has ReadKey only; no unrelated allow-write/control ACE was observed. |
+| Production reader classification | FAIL | Installed `1.0.129` had no `runtime\bin\java.exe`; that path was an invalid assumption about the minimized jpackage runtime. The first alternate-launcher build then exposed three copies of the core-owned entry point because updater packaging shades core. The corrected build owns the entry point only in `shale-desktop`, retains the production reader in `shale-core`, and validates exactly one effective-classpath copy in `shale-desktop-<version>.jar` before MSI publication. `VALID` still requires an installed rerun. |
+| Installed-version metadata | PASS | Installed schema 1 metadata reported version `1.0.129` and the expected production channel. |
+| Updater, Phase 12 attempt, Phase 13B lock, and evidence-log paths | PASS | Registered owner paths were resolved and the installed updater exists at the expected path. |
 | Runtime startup and Phase 13C availability | NOT RUN | No installed Shale application was launched. |
-| Upgrade UUID preservation | NOT RUN | Requires two actual MSI versions and the normal upgrade path. |
-| Repair and replacement-UUID fallback | NOT RUN | Requires controlled Windows Installer repair fixtures. |
-| Exact uninstall cleanup | NOT RUN | Requires an installed record plus a separate exact fixture/installation to prove noninterference. |
+| Upgrade UUID preservation | PASS | `1.0.128` to `1.0.129` major upgrade preserved UUID `ca2bb9b9-9576-400d-a637-0ad645c52bea`. |
+| Repair and replacement-UUID fallback | PARTIAL | Ordinary repair preserved UUID `ca2bb9b9-9576-400d-a637-0ad645c52bea`; destructive replacement-UUID and corrupt-state fixtures remain NOT RUN. |
+| Exact uninstall cleanup | PASS | Exact uninstall removed the authoritative HKLM registration. Separate noninterference fixtures remain part of multi-user/security acceptance. |
 | Stale registration | NOT RUN | Requires an exact elevated disposable registry fixture and cleanup. |
 | Duplicate UUID | NOT RUN | Requires controlled conflicting claimants and cleanup. |
 | Owner/path mismatch | NOT RUN | Requires a controlled Windows owner/path fixture. |
@@ -176,6 +181,15 @@ and paste its complete concise report into the acceptance evidence:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build\scripts\validate-installed-windows.ps1
 ```
+
+The helper directly opens `HKEY_LOCAL_MACHINE` through the 64-bit .NET registry view for ACL inspection; it does
+not depend on PowerShell provider `PSPath` ACL behavior or localized account names. It also starts only the installed
+`ShaleRegistrationDiagnostic.exe` alternate jpackage launcher with the selected installation UUID. The launcher uses
+the actual generated application classpath and calls the narrow diagnostic entry point backed by the production
+reader in `shale-core`. The entry point itself is uniquely owned by `shale-desktop`; updater JAR layout is unchanged.
+It creates no Start Menu or desktop shortcut. The diagnostic accepts no arbitrary command, performs no
+write/heal operation, and returns only classification, schema, UUID, owner SID, install root, and support root. A
+missing launcher, invocation failure, non-`VALID` classification, or fact mismatch is a specific `FAIL`.
 
 For signed acceptance, require `Valid`, approved publisher, and timestamp:
 

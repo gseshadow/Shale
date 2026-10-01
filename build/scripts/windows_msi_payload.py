@@ -4,6 +4,7 @@ from pathlib import Path
 import argparse
 import sys
 import xml.etree.ElementTree as ET
+import zipfile
 
 NS = "http://schemas.microsoft.com/wix/2006/wi"
 REQUIRED_MARKER = {
@@ -13,6 +14,12 @@ REQUIRED_MARKER = {
     "bridgeVersion": "1",
 }
 APPROVED_MAIN_CLASS = "com.shale.desktop.ShaleLauncher"
+DIAGNOSTIC_MAIN_CLASS = "com.shale.desktop.update.WindowsInstallationRegistrationDiagnostic"
+DIAGNOSTIC_CLASS_ENTRY = "com/shale/desktop/update/WindowsInstallationRegistrationDiagnostic.class"
+LEGACY_DIAGNOSTIC_CLASS_ENTRY = "com/shale/core/update/WindowsInstallationRegistrationDiagnostic.class"
+PRODUCTION_READER_CLASS_ENTRY = "com/shale/core/update/WindowsInstallationRegistrationReader.class"
+DIAGNOSTIC_LAUNCHER = "ShaleRegistrationDiagnostic.exe"
+DIAGNOSTIC_CONFIG = "ShaleRegistrationDiagnostic.cfg"
 
 def tag(name):
     return f"{{{NS}}}{name}"
@@ -123,7 +130,7 @@ def required_source_file(root, filename, expected_directory, label):
         raise ValueError(f"missing generated {label} payload: {source}")
     return source
 
-def validate_launcher_config(path):
+def validate_launcher_config(path, expected_main_class=APPROVED_MAIN_CLASS):
     try:
         lines = path.read_text(encoding="utf-8-sig").splitlines()
     except OSError as error:
@@ -141,8 +148,115 @@ def validate_launcher_config(path):
             values.append(line.partition("=")[2].strip())
     if len(values) != 1:
         raise ValueError(f"launcher configuration must contain exactly one app.mainclass; found {len(values)}")
-    if values[0] != APPROVED_MAIN_CLASS:
+    if values[0] != expected_main_class:
         raise ValueError(f"launcher configuration app.mainclass is not approved: {values[0] or '<empty>'}")
+
+def validate_add_launcher_properties(path):
+    values = {}
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError as error:
+        raise ValueError(f"diagnostic launcher properties are unreadable: {error.__class__.__name__}") from None
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith(("#", "!")):
+            continue
+        key, separator, value = line.partition("=")
+        if not separator or key.strip() in values:
+            raise ValueError("diagnostic launcher properties are malformed or duplicated")
+        values[key.strip()] = value.strip()
+    expected = {"main-class": DIAGNOSTIC_MAIN_CLASS, "win-console": "true",
+                "win-menu": "false", "win-shortcut": "false"}
+    if values != expected:
+        raise ValueError("diagnostic launcher must contain only its approved main-class, console, and no-shortcut settings")
+
+def jar_contains_entry(path, entry):
+    try:
+        with zipfile.ZipFile(path) as jar:
+            return entry in jar.namelist()
+    except (OSError, zipfile.BadZipFile):
+        return False
+
+def launcher_classpath(path):
+    entries = []
+    section = ""
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except OSError as error:
+        raise ValueError(f"launcher configuration is unreadable: {error.__class__.__name__}") from None
+    for raw in lines:
+        line = raw.strip()
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1]
+        elif section == "Application" and line.startswith("app.classpath="):
+            value = line.partition("=")[2].strip().replace("\\", "/")
+            prefix = "$APPDIR/"
+            if not value.upper().startswith(prefix):
+                raise ValueError(f"diagnostic launcher classpath is not APPDIR-relative: {value}")
+            parts = tuple(part for part in value[len(prefix):].split("/") if part)
+            if not parts or any(part in (".", "..") for part in parts):
+                raise ValueError(f"diagnostic launcher classpath is unsafe: {value}")
+            entries.append(parts)
+    if not entries:
+        raise ValueError("diagnostic launcher configuration has no application classpath")
+    return entries
+
+def require_unique_desktop_diagnostic(effective_jars, packaged_jars):
+    packaged_matches = [(installed, source) for installed, source in packaged_jars if jar_contains_entry(source, DIAGNOSTIC_CLASS_ENTRY)]
+    effective_matches = [(installed, source) for installed, source in effective_jars if jar_contains_entry(source, DIAGNOSTIC_CLASS_ENTRY)]
+    if len(packaged_matches) != 1 or len(effective_matches) != 1:
+        raise ValueError(f"packaged desktop diagnostic class must occur exactly once and in exactly one effective classpath JAR; packaged={len(packaged_matches)}, effective={len(effective_matches)}")
+    owner = packaged_matches[0][0][-1]
+    if not owner.casefold().startswith("shale-desktop-") or not owner.casefold().endswith(".jar"):
+        raise ValueError(f"packaged desktop diagnostic class must be owned by shale-desktop; found {owner}")
+    legacy = [installed for installed, source in packaged_jars if jar_contains_entry(source, LEGACY_DIAGNOSTIC_CLASS_ENTRY)]
+    if legacy:
+        raise ValueError(f"legacy core diagnostic class remains in {len(legacy)} packaged JAR(s)")
+    core_readers = [(installed, source) for installed, source in effective_jars
+                    if installed[-1].casefold().startswith("shale-core-")
+                    and jar_contains_entry(source, PRODUCTION_READER_CLASS_ENTRY)]
+    if len(core_readers) != 1:
+        raise ValueError(f"production registration reader must remain in exactly one effective shale-core JAR; found {len(core_readers)}")
+
+def validate_image(root):
+    if not (root / "Shale.exe").is_file():
+        raise ValueError("application image is missing Shale.exe")
+    if not (root / DIAGNOSTIC_LAUNCHER).is_file():
+        raise ValueError(f"application image is missing {DIAGNOSTIC_LAUNCHER}")
+    app = root / "app"
+    validate_launcher_config(app / "Shale.cfg")
+    diagnostic_config = app / DIAGNOSTIC_CONFIG
+    validate_launcher_config(diagnostic_config, DIAGNOSTIC_MAIN_CLASS)
+    effective_jars = []
+    for relative in launcher_classpath(diagnostic_config):
+        source = app.joinpath(*relative)
+        if not source.is_file():
+            raise ValueError(f"diagnostic launcher classpath payload is missing: {'/'.join(relative)}")
+        effective_jars.append((relative, source))
+    packaged_jars = [(source.relative_to(app).parts, source) for source in app.rglob("*.jar")]
+    require_unique_desktop_diagnostic(effective_jars, packaged_jars)
+
+def diagnostic_jars_from_wix(root, config):
+    payload = {}
+    for node in root.iter(tag("File")):
+        source = node.get("Source")
+        if not source or not source.casefold().endswith(".jar"):
+            continue
+        installed = installed_directory(root, node)
+        if not installed or installed[0].casefold() != "app":
+            continue
+        name = node.get("Name") or source.replace("/", "\\").rsplit("\\", 1)[-1]
+        key = tuple(part.casefold() for part in installed + (name,))
+        payload.setdefault(key, []).append((installed + (name,), Path(source)))
+    jars = []
+    for relative in launcher_classpath(config):
+        key = tuple(part.casefold() for part in (("app",) + relative))
+        matches = payload.get(key, [])
+        if len(matches) != 1:
+            raise ValueError(f"diagnostic effective classpath entry must map to exactly one packaged JAR: {'/'.join(relative)}")
+        jars.append(matches[0])
+    packaged = [item for matches in payload.values() for item in matches]
+    return jars, packaged
 
 def marker_properties(path):
     required = {key: [] for key in REQUIRED_MARKER}
@@ -176,22 +290,33 @@ def validate_compiled(wxs):
     marker = required_file(root, "shale-windows-toast.properties", ("app",), "installed marker")
     required_file(root, "shale_windows_toast.dll", ("app", "native"), "native DLL")
     required_file(root, "Shale.exe", (), "launcher")
+    required_file(root, DIAGNOSTIC_LAUNCHER, (), "registration diagnostic launcher")
     launcher_config = required_file(root, "Shale.cfg", ("app",), "launcher configuration")
+    diagnostic_config = required_file(root, DIAGNOSTIC_CONFIG, ("app",), "registration diagnostic configuration")
     marker_properties(marker)
     validate_launcher_config(launcher_config)
+    validate_launcher_config(diagnostic_config, DIAGNOSTIC_MAIN_CLASS)
+    effective_jars, packaged_jars = diagnostic_jars_from_wix(root, diagnostic_config)
+    require_unique_desktop_diagnostic(effective_jars, packaged_jars)
 
 def validate_source(wxs):
     root = ET.parse(wxs).getroot()
     launcher_config = required_source_file(root, "Shale.cfg", ("app",), "launcher configuration")
+    required_source_file(root, DIAGNOSTIC_LAUNCHER, (), "registration diagnostic launcher")
+    diagnostic_config = required_source_file(root, DIAGNOSTIC_CONFIG, ("app",), "registration diagnostic configuration")
     validate_launcher_config(launcher_config)
+    validate_launcher_config(diagnostic_config, DIAGNOSTIC_MAIN_CLASS)
+    effective_jars, packaged_jars = diagnostic_jars_from_wix(root, diagnostic_config)
+    require_unique_desktop_diagnostic(effective_jars, packaged_jars)
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["config", "source", "compiled"])
+    parser.add_argument("mode", choices=["config", "launcher", "image", "source", "compiled"])
     parser.add_argument("path", type=Path)
     args = parser.parse_args()
     try:
-        {"config": validate_launcher_config, "source": validate_source, "compiled": validate_compiled}[args.mode](args.path)
+        {"config": validate_launcher_config, "launcher": validate_add_launcher_properties,
+         "image": validate_image, "source": validate_source, "compiled": validate_compiled}[args.mode](args.path)
     except (OSError, ET.ParseError, ValueError) as error:
         print(f"Windows MSI payload validation failed: {error}", file=sys.stderr)
         return 1

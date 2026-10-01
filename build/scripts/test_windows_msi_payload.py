@@ -3,6 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
+import zipfile
 
 spec = importlib.util.spec_from_file_location("payload", Path(__file__).with_name("windows_msi_payload.py"))
 m = importlib.util.module_from_spec(spec)
@@ -11,7 +12,9 @@ spec.loader.exec_module(m)
 class CompiledPayloadTest(unittest.TestCase):
     def fixture(self, *, marker_count=1, dll_count=1, launcher_count=1, marker_dir="app",
                 dll_dir="native", marker_contents=None, missing_payload=None,
-                main_class=m.APPROVED_MAIN_CLASS):
+                main_class=m.APPROVED_MAIN_CLASS, diagnostic_launcher_count=1,
+                diagnostic_main_class=m.DIAGNOSTIC_MAIN_CLASS, diagnostic_class_count=1,
+                legacy_diagnostic_count=0, diagnostic_owner="shale-desktop-1.0.129.jar"):
         temporary = Path(tempfile.mkdtemp())
         payload = temporary / "opaque"
         payload.mkdir()
@@ -28,7 +31,25 @@ class CompiledPayloadTest(unittest.TestCase):
         marker_files = files("shale-windows-toast.properties", marker_count, marker_dir, expected)
         dll_files = files("shale_windows_toast.dll", dll_count, dll_dir)
         launcher_files = files("Shale.exe", launcher_count, "INSTALLDIR")
+        diagnostic_launcher_files = files(m.DIAGNOSTIC_LAUNCHER, diagnostic_launcher_count, "INSTALLDIR")
         config = files("Shale.cfg", 1, "app", f"[Application]\napp.mainclass={main_class}\n")
+        jar_names = [diagnostic_owner, "shale-core-1.0.129.jar", "shale-updater-1.0.129.jar"]
+        jar_names.extend(f"duplicate-{index}.jar" for index in range(1, diagnostic_class_count))
+        classpath = "\n".join(f"app.classpath=$APPDIR/{'lib/' if name != diagnostic_owner else ''}{name}" for name in jar_names)
+        diagnostic_config = files(m.DIAGNOSTIC_CONFIG, 1, "app", f"[Application]\napp.mainclass={diagnostic_main_class}\n{classpath}\n")
+        root_jars, lib_jars = [], []
+        for index, name in enumerate(jar_names):
+            source = payload / f"jar-{index}.jar"
+            if missing_payload != "diagnostic.jar":
+                with zipfile.ZipFile(source, "w") as jar:
+                    if (index == 0 and diagnostic_class_count > 0) or index >= 3:
+                        jar.writestr(m.DIAGNOSTIC_CLASS_ENTRY, b"class")
+                    if name.startswith("shale-core-"):
+                        jar.writestr(m.PRODUCTION_READER_CLASS_ENTRY, b"reader")
+                    if index > 0 and index <= legacy_diagnostic_count:
+                        jar.writestr(m.LEGACY_DIAGNOSTIC_CLASS_ENTRY, b"legacy")
+            entry = f'<Component Id="c-jar-{index}"><File Id="f-jar-{index}" Name="{name}" Source="{source}"/></Component>'
+            (root_jars if name == diagnostic_owner else lib_jars).append(entry)
         if marker_dir == "app":
             app_marker, wrong_marker = marker_files, ""
         else:
@@ -38,7 +59,7 @@ class CompiledPayloadTest(unittest.TestCase):
         else:
             native_dll, wrong_dll = "", dll_files
         xml = f'''<Wix xmlns="{m.NS}"><Fragment><Directory Id="TARGETDIR"><Directory Id="INSTALLDIR">
-          {launcher_files}<Directory Id="app-dir" Name="app">{app_marker}{config}<Directory Id="native-dir" Name="native">{native_dll}</Directory></Directory>
+          {launcher_files}{diagnostic_launcher_files}<Directory Id="app-dir" Name="app">{app_marker}{config}{diagnostic_config}{"".join(root_jars)}<Directory Id="lib-dir" Name="lib">{"".join(lib_jars)}</Directory><Directory Id="native-dir" Name="native">{native_dll}</Directory></Directory>
           <Directory Id="wrong-dir" Name="wrong">{wrong_marker}{wrong_dll}</Directory>
         </Directory></Directory></Fragment></Wix>'''
         wxs = temporary / "final.wxs"
@@ -89,6 +110,51 @@ class CompiledPayloadTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing extracted launcher payload"):
             m.validate_compiled(self.fixture(missing_payload="Shale.exe"))
 
+    def test_diagnostic_launcher_configuration_and_class_are_mandatory(self):
+        with self.assertRaisesRegex(ValueError, "missing registration diagnostic launcher"):
+            m.validate_compiled(self.fixture(diagnostic_launcher_count=0))
+        with self.assertRaisesRegex(ValueError, "app.mainclass is not approved"):
+            m.validate_compiled(self.fixture(diagnostic_main_class="com.shale.desktop.ShaleLauncher"))
+        for count in (0, 2):
+            with self.subTest(count=count), self.assertRaisesRegex(ValueError, "desktop diagnostic class must occur.*exactly one"):
+                m.validate_compiled(self.fixture(diagnostic_class_count=count))
+        with self.assertRaisesRegex(ValueError, "must be owned by shale-desktop"):
+            m.validate_compiled(self.fixture(diagnostic_owner="diagnostic-host.jar"))
+        with self.assertRaisesRegex(ValueError, "legacy core diagnostic class remains"):
+            m.validate_compiled(self.fixture(legacy_diagnostic_count=1))
+
+    def test_diagnostic_launcher_properties_are_narrow_and_console_enabled(self):
+        temporary = Path(tempfile.mkdtemp())
+        properties = temporary / "diagnostic.properties"
+        valid = (f"main-class={m.DIAGNOSTIC_MAIN_CLASS}\nwin-console=true\n"
+                 "win-menu=false\nwin-shortcut=false\n")
+        properties.write_text(valid, encoding="utf-8")
+        m.validate_add_launcher_properties(properties)
+        for invalid in (
+                valid.replace("win-console=true", "win-console=false"),
+                valid + "arguments=--anything\n"):
+            properties.write_text(invalid, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "must contain only"):
+                m.validate_add_launcher_properties(properties)
+
+    def test_application_image_requires_packaged_diagnostic_launcher_config_and_class(self):
+        temporary = Path(tempfile.mkdtemp())
+        app = temporary / "app"
+        lib = app / "lib"
+        lib.mkdir(parents=True)
+        (temporary / "Shale.exe").write_bytes(b"main")
+        (temporary / m.DIAGNOSTIC_LAUNCHER).write_bytes(b"diagnostic")
+        (app / "Shale.cfg").write_text(f"[Application]\napp.mainclass={m.APPROVED_MAIN_CLASS}\n", encoding="utf-8")
+        (app / m.DIAGNOSTIC_CONFIG).write_text(f"[Application]\napp.mainclass={m.DIAGNOSTIC_MAIN_CLASS}\napp.classpath=$APPDIR\\shale-desktop-1.0.129.jar\napp.classpath=$APPDIR\\lib\\shale-core-1.0.129.jar\n", encoding="utf-8")
+        with zipfile.ZipFile(app / "shale-desktop-1.0.129.jar", "w") as jar:
+            jar.writestr(m.DIAGNOSTIC_CLASS_ENTRY, b"class")
+        with zipfile.ZipFile(lib / "shale-core-1.0.129.jar", "w") as jar:
+            jar.writestr(m.PRODUCTION_READER_CLASS_ENTRY, b"reader")
+        m.validate_image(temporary)
+        (temporary / m.DIAGNOSTIC_LAUNCHER).unlink()
+        with self.assertRaisesRegex(ValueError, "application image is missing ShaleRegistrationDiagnostic.exe"):
+            m.validate_image(temporary)
+
     def test_compiled_launcher_configuration_requires_bootstrap(self):
         m.validate_compiled(self.fixture())
         with self.assertRaisesRegex(ValueError, "app.mainclass is not approved"):
@@ -107,12 +173,26 @@ class CompiledPayloadTest(unittest.TestCase):
         temporary = Path(tempfile.mkdtemp())
         app = temporary / "app"
         app.mkdir()
+        lib = app / "lib"
+        lib.mkdir()
         config = app / "Shale.cfg"
         config.write_text(f"[Application]\napp.mainclass={m.APPROVED_MAIN_CLASS}\n", encoding="utf-8")
+        diagnostic_config = app / m.DIAGNOSTIC_CONFIG
+        diagnostic_config.write_text(f"[Application]\napp.mainclass={m.DIAGNOSTIC_MAIN_CLASS}\napp.classpath=$APPDIR\\shale-desktop-1.0.129.jar\napp.classpath=$APPDIR\\lib\\shale-core-1.0.129.jar\n", encoding="utf-8")
+        diagnostic_launcher = temporary / m.DIAGNOSTIC_LAUNCHER
+        diagnostic_launcher.write_bytes(b"launcher")
+        diagnostic_jar = app / "shale-desktop-1.0.129.jar"
+        with zipfile.ZipFile(diagnostic_jar, "w") as jar:
+            jar.writestr(m.DIAGNOSTIC_CLASS_ENTRY, b"class")
+        core_jar = lib / "shale-core-1.0.129.jar"
+        with zipfile.ZipFile(core_jar, "w") as jar:
+            jar.writestr(m.PRODUCTION_READER_CLASS_ENTRY, b"reader")
         wxs = temporary / "bundle.wxf"
         wxs.write_text(f'''<Wix xmlns="{m.NS}"><Fragment>
-          <Directory Id="TARGETDIR"><Directory Id="INSTALLDIR"><Directory Id="app-dir" Name="app"/></Directory></Directory>
-          <DirectoryRef Id="app-dir"><Component Id="config"><File Id="config-file" Source="{config}"/></Component></DirectoryRef>
+          <Directory Id="TARGETDIR"><Directory Id="INSTALLDIR"><Directory Id="app-dir" Name="app"><Directory Id="lib-dir" Name="lib"/></Directory></Directory></Directory>
+          <DirectoryRef Id="INSTALLDIR"><Component Id="diagnostic-launcher"><File Id="diagnostic-launcher-file" Source="{diagnostic_launcher}"/></Component></DirectoryRef>
+          <DirectoryRef Id="app-dir"><Component Id="config"><File Id="config-file" Source="{config}"/></Component><Component Id="diagnostic-config"><File Id="diagnostic-config-file" Source="{diagnostic_config}"/></Component><Component Id="diagnostic-jar"><File Id="diagnostic-jar-file" Source="{diagnostic_jar}"/></Component></DirectoryRef>
+          <DirectoryRef Id="lib-dir"><Component Id="core-jar"><File Id="core-jar-file" Source="{core_jar}"/></Component></DirectoryRef>
         </Fragment></Wix>''', encoding="utf-8")
         m.validate_source(wxs)
         config.write_text("[Application]\napp.mainclass=com.shale.desktop.MainApp\n", encoding="utf-8")

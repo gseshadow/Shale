@@ -44,6 +44,25 @@ class InstalledWindowsValidationContractTest(unittest.TestCase):
             self.assertIn(required, self.source)
         self.assertNotRegex(self.source, r"(?i)records\s*\[\s*0\s*\]")
 
+    def test_acl_reads_the_64_bit_view_and_compares_only_sids(self):
+        for required in ("RegistryView]::Registry64", "GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])",
+                         "S-1-5-18", "S-1-5-32-544", "AreAccessRulesProtected", "$rule.IsInherited",
+                         "RegistryRights]::FullControl", "RegistryRights]::ReadKey", "$writeMask",
+                         "InheritanceFlags]::ContainerInherit", "PropagationFlags]::None"):
+            self.assertIn(required, self.source)
+        self.assertNotIn("IdentityReference.Translate", self.source)
+        self.assertNotIn("NT AUTHORITY\\SYSTEM", self.source)
+        self.assertNotIn("BUILTIN\\Administrators", self.source)
+        self.assertNotIn("'ACL could not be evaluated'", self.source)
+
+    def test_production_reader_diagnostic_uses_the_installed_jpackage_launcher(self):
+        for required in ("ShaleRegistrationDiagnostic.exe",
+                         "--installation-id", "classification", "-ceq 'VALID'", "factsMatch"):
+            self.assertIn(required, self.source)
+        self.assertNotIn("runtime\\bin\\java.exe", self.source)
+        self.assertNotIn("'-cp'", self.source)
+        self.assertNotIn("the existing Java reader has no installed command-line entry point", self.source)
+
     def test_optional_signing_and_unsigned_developer_behavior_are_explicit(self):
         self.assertIn("if ($MsiPath)", self.source)
         self.assertIn("if (-not $ExpectedPublisher)", self.source)
