@@ -18,6 +18,26 @@ requires `JpProductLanguage`, `JpInstallerVersion`, `JpCompressedMsi`, `JpInstal
 detection variables supplied by jpackage's internal WiX environment, not its visible Candle command, generated
 source, or stub `overrides.wxi`. The final correction therefore does not recreate that private environment.
 
+The fifth Windows finding confirmed Option B but exposed an over-broad extraction check. `jimage` extracted the one
+real JDK resource at `jdk.jpackage/jdk/jpackage/internal/resources/main.wxs`, while the batch `for /r` invocation
+without a wildcard synthesized a `main.wxs` candidate once at every directory level. The six reported paths were:
+
+* `main.wxs`
+* `jdk.jpackage/main.wxs`
+* `jdk.jpackage/jdk/main.wxs`
+* `jdk.jpackage/jdk/jpackage/main.wxs`
+* `jdk.jpackage/jdk/jpackage/internal/main.wxs`
+* `jdk.jpackage/jdk/jpackage/internal/resources/main.wxs`
+
+Only the last path is an actual extracted resource. It is authoritative because it is in the `jdk.jpackage` module's
+Windows resource package beside jpackage's WiX resources (including `overrides.wxi`,
+`InstallDirNotEmptyDlg.wxs`, and `MsiInstallerStrings_*.wxl`), rather than merely sharing the filename. Resource
+selection now enumerates real files and requires exactly one normalized identity equal to
+`jdk.jpackage/jdk/jpackage/internal/resources/main.wxs`. Zero or duplicate exact matches fail closed and print every
+discovered `main.wxs` resource path. The selected file is copied byte-for-byte before the existing registration
+mutation. Only customized `main.wxs` is supplied because jpackage obtains its other resources normally; the build
+does not fork or copy the full JDK resource set.
+
 The build extracts the authoritative `main.wxs` resource from the selected JDK 21 module image, adds only the Phase
 13F actions while preserving WiX preprocessor instructions, and passes it through jpackage's supported
 `--resource-dir` input. jpackage's original Candle invocation compiles it with all native defaults and remains the
@@ -60,7 +80,7 @@ and platform-neutral tests are not substitutes for MSI lifecycle validation.
 | Authenticode: MSI | NOT RUN | No MSI artifact or production signing credentials are available. |
 | Phase 13A / 13B / 13C installed regressions | NOT RUN | Their installed paths and behavior cannot be exercised on Linux; repository verification is PASS. |
 | Logged-out automatic updating | UNSUPPORTED | Unchanged: registration does not activate Task Scheduler, a service, SYSTEM updating, or any logged-out executor. |
-| Packaging defect and fix | RESOURCE-DIR FIX IMPLEMENTED; WINDOWS RERUN REQUIRED | Four findings led to the boundary correction: missing definitions, an overly strict raw-reference check, the real JDK 21 log format, and finally implicit defaults absent even from the exact visible command. The selected JDK's own template and original compile now remain authoritative; no hidden defaults are replayed. |
+| Packaging defect and fix | DETERMINISTIC RESOURCE-DIR FIX IMPLEMENTED; WINDOWS RERUN REQUIRED | Five findings led to the boundary correction: missing definitions, an overly strict raw-reference check, the real JDK 21 log format, implicit defaults absent even from the exact visible command, and the batch recursion that reported six paths for one extracted resource. Selection now requires the exact `jdk.jpackage` Windows MSI resource identity. The selected JDK's own template and original compile remain authoritative; no hidden defaults are replayed. |
 
 The exact next work is continuation of **Phase 13F only** on a suitable Windows machine. From the repository root,
 run:

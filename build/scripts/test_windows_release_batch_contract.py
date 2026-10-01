@@ -351,6 +351,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
     def test_registration_resource_is_consumed_by_original_compile_and_validated_before_publication(self):
         source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
         extract = source.index('jimage.exe" extract')
+        selection = source.index('windows_jpackage_resource.py" "%JPACKAGE_RESOURCE_EXTRACT%" "%JPACKAGE_MAIN_TEMPLATE%"', extract)
         mutate = source.index('windows_msi_registration.py" mutate "%JPACKAGE_MAIN_TEMPLATE%"', extract)
         jpackage = source.index('jpackage --type msi', mutate)
         self.assertIn('--resource-dir "%JPACKAGE_RESOURCE_DIR%"', source[jpackage:])
@@ -358,9 +359,10 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         link = source.index("Final light.exe reconstruction started.", validate_original)
         validate = source.index('windows_msi_registration.py" validate "%STAGE%\\dark\\final.wxs"', link)
         publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', validate)
-        self.assertEqual([extract, mutate, jpackage, validate_original, link, validate, publish],
-                         sorted([extract, mutate, jpackage, validate_original, link, validate, publish]))
+        self.assertEqual([extract, selection, mutate, jpackage, validate_original, link, validate, publish],
+                         sorted([extract, selection, mutate, jpackage, validate_original, link, validate, publish]))
         self.assertIn('--script "%ROOT%\\build\\scripts\\windows-installation-registration.ps1"', source)
+        self.assertNotIn('for /r "%JPACKAGE_RESOURCE_EXTRACT%" %%F in (main.wxs)', source)
         self.assertIn("stage=jpackage-resource-preparation", source)
         self.assertIn("stage=original-compile-registration-validation", source)
         self.assertIn("stage=compiled-registration-validation", source)
