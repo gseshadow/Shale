@@ -116,6 +116,19 @@ template, original jpackage compile, Option B resource-injection architecture, r
 architecture are unchanged. Phase 13F remains **IN PROGRESS** pending the corrected Windows rerun and installed
 lifecycle acceptance.
 
+The next Windows run passed the clean reactor, app-image, generated-WiX, preliminary-MSI, final-link, registration,
+and identity checks, but exposed a payload-validation representation mismatch in the final Dark output. The MSI
+File table preserved long installed JAR names as Dark `LongName` values while `Name` contained their generated 8.3
+aliases; extracted `Source` paths are payload locations, not installed filenames. The validator had indexed only
+`Name` (falling back to the authored source basename), so the diagnostic launcher's exact
+`shale-desktop-1.0.129.jar` classpath entry could not match its one MSI File row. Compiled validation now derives
+the installed name from MSI/Dark `LongName`, `SourceName`, or `Name` semantics (including `short|long` FileName
+serialization), never from a Dark extraction path. It still requires exactly one classpath mapping, opens every
+packaged JAR to prove exactly one desktop-owned diagnostic class, rejects the legacy core class, and proves the
+production reader remains in exactly one effective `shale-core` JAR. Generated source and app-image validation
+remain unchanged and strict. Phase 13F remains **IN PROGRESS** pending the Windows rebuild and installed reader
+acceptance; no Phase 13G work has begun.
+
 The corrected build was subsequently produced and used for the lifecycle evidence recorded below. The current
 Codex host is Ubuntu Linux and cannot rerun the corrected ACL/reader helper against that installation. Do not report
 either remaining row as PASS until its command is executed on an installed Windows machine and evidence is retained.
