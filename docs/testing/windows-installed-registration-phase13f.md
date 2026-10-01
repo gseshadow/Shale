@@ -38,6 +38,29 @@ discovered `main.wxs` resource path. The selected file is copied byte-for-byte b
 mutation. Only customized `main.wxs` is supplied because jpackage obtains its other resources normally; the build
 does not fork or copy the full JDK resource set.
 
+The sixth Windows finding confirmed that resource injection itself works: jpackage reported that it loaded the
+custom `main.wxs`. Its original Candle invocation then failed with `CNDL0387` because Phase 13F had added
+`InstallPrivileges="elevated"` beside jpackage's `InstallScope="perUser"`. WiX 3.14 treats those package declarations
+as incompatible and recommends using `InstallScope` alone. The selected architecture is native MSI Option A with a
+strict owner constraint: retain per-user scope, omit `InstallPrivileges`, and require install, repair, upgrade, and
+uninstall to be launched through UAC by the same split-token administrator who owns the installation. In an elevated
+transaction the deferred `Impersonate="no"` actions run in the privileged installer-service context. In an
+unelevated transaction their protected HKLM work must fail and roll back; there is no best-effort registration.
+
+This does not claim that `Impersonate="no"` independently grants privilege, nor that jpackage's per-user MSI can
+preserve one standard user's identity through an over-the-shoulder credential prompt. Explicitly running `msiexec`
+under secondary administrator credentials changes the per-user client: `UserSID`, `LocalAppDataFolder`, install root,
+Windows Installer ownership, and later maintenance belong to that administrator. That path is unsupported. Same-user
+administrator consent retains the original SID/profile, and the action data is formatted before deferral so SYSTEM
+is never inferred as owner. Windows installed acceptance must prove these statements for every lifecycle operation.
+
+Option B (a separately signed elevated helper/bootstrapper) was not selected because coordinating its independent
+UAC process with MSI rollback, repair, upgrade, and Add/Remove Programs uninstall would add a second transactional
+owner and is not a narrow correction. It becomes necessary only if standard-user ownership plus secondary-credential
+elevation is made a requirement. Option C was rejected because user-writable authority defeats Phase 13F. Option D
+was rejected because it would change deployed per-user LocalAppData ownership, multi-user separation, updater paths,
+upgrade/uninstall registration, and session/version assumptions merely to satisfy Candle.
+
 The build extracts the authoritative `main.wxs` resource from the selected JDK 21 module image, adds only the Phase
 13F actions while preserving WiX preprocessor instructions, and passes it through jpackage's supported
 `--resource-dir` input. jpackage's original Candle invocation compiles it with all native defaults and remains the
@@ -80,7 +103,7 @@ and platform-neutral tests are not substitutes for MSI lifecycle validation.
 | Authenticode: MSI | NOT RUN | No MSI artifact or production signing credentials are available. |
 | Phase 13A / 13B / 13C installed regressions | NOT RUN | Their installed paths and behavior cannot be exercised on Linux; repository verification is PASS. |
 | Logged-out automatic updating | UNSUPPORTED | Unchanged: registration does not activate Task Scheduler, a service, SYSTEM updating, or any logged-out executor. |
-| Packaging defect and fix | DETERMINISTIC RESOURCE-DIR FIX IMPLEMENTED; WINDOWS RERUN REQUIRED | Five findings led to the boundary correction: missing definitions, an overly strict raw-reference check, the real JDK 21 log format, implicit defaults absent even from the exact visible command, and the batch recursion that reported six paths for one extracted resource. Selection now requires the exact `jdk.jpackage` Windows MSI resource identity. The selected JDK's own template and original compile remain authoritative; no hidden defaults are replayed. |
+| Packaging defect and fix | RESOURCE INJECTION CONFIRMED; PRIVILEGE FIX IMPLEMENTED; WINDOWS RERUN REQUIRED | Six findings led to the correction. The sixth proved jpackage consumed custom `main.wxs`, then Candle rejected the invalid `perUser` plus `InstallPrivileges=elevated` pair. The mutation now retains per-user scope without that attribute and relies on a same-owner elevated Windows Installer transaction for its fail-closed non-impersonating actions. The selected JDK template/original compile remain authoritative; no hidden defaults are replayed. |
 
 The exact next work is continuation of **Phase 13F only** on a suitable Windows machine. From the repository root,
 run:
@@ -88,6 +111,16 @@ run:
 ```bat
 build\scripts\build-shale-release.bat
 ```
+
+For installed lifecycle testing, launch the produced MSI from an elevated PowerShell opened with **Run as
+administrator** by the same Windows account (consent prompt, not secondary credentials), for example:
+
+```powershell
+Start-Process "$env:SystemRoot\System32\msiexec.exe" -Verb RunAs -Wait -ArgumentList '/i', (Resolve-Path '.\dist\Shale-<version>.msi')
+```
+
+Use corresponding elevated same-account `msiexec /fa` and `/x` operations for repair and uninstall. Also run one
+ordinary unelevated negative test and require transaction failure with no authoritative partial record.
 
 The run must show jpackage resource preparation, successful preliminary jpackage, original-compile registration
 validation, final link, identity/registration validation, and final MSI creation with no undefined `Jp*` variable.
