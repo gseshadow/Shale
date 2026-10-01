@@ -1,6 +1,6 @@
 # Phase 13F installed-Windows registration acceptance
 
-**Status on 2026-09-30:** Phase 13F remains IN PROGRESS. Platform-neutral repository verification is PASS, but
+**Status on 2026-10-01:** Phase 13F remains IN PROGRESS. Platform-neutral repository verification is PASS, but
 installed-Windows acceptance is NOT YET RUN. The first real Windows packaging attempt reached the post-mutation
 recompilation of generated `main.wxs` and failed with `CNDL0150` because the custom Candle invocation omitted
 jpackage's generated `Jp*` preprocessor definitions. The first attempted fix scanned every textual
@@ -8,15 +8,23 @@ jpackage's generated `Jp*` preprocessor definitions. The first attempted fix sca
 overly strict: jpackage's own successful Candle invocation does not define optional variables referenced inside
 conditional WiX branches, including `JpAboutURL`, `JpHelpURL`, and `JpUpdateURL`.
 
-The exact-definition replay design was correct, but a third Windows finding showed that its parser assumed the
+The third attempted fix replayed the visible definitions, but first its parser assumed the
 wrong jpackage verbose-log serialization. JDK 21 on Windows actually emits `Command [PID: ...]:` followed by an
 indented plain `candle.exe` command line, not the ProcessBuilder-style argument list the parser expected. The parser
-now treats that observed format as first-class while retaining compatibility with the older representation.
+was corrected and recovered all 11 visible definitions, including values containing spaces.
 
-The corrected packaging boundary treats the original successful generated-`main.wxs` Candle command in
-`jpackage-verbose.log` as authoritative. It recovers every and only `-dJp...` argument from that invocation, validates
-the core jpackage identity/configuration definitions, and replays the values unchanged through a quoted Candle
-response file. It does not scan raw WiX references as a mandatory-variable list. The corrected Windows build has not
+The fourth Windows finding proved that exact command-line replay is still insufficient: generated `main.wxs` also
+requires `JpProductLanguage`, `JpInstallerVersion`, `JpCompressedMsi`, `JpInstallScope`, and upgrade/downgrade
+detection variables supplied by jpackage's internal WiX environment, not its visible Candle command, generated
+source, or stub `overrides.wxi`. The final correction therefore does not recreate that private environment.
+
+The build extracts the authoritative `main.wxs` resource from the selected JDK 21 module image, adds only the Phase
+13F actions while preserving WiX preprocessor instructions, and passes it through jpackage's supported
+`--resource-dir` input. jpackage's original Candle invocation compiles it with all native defaults and remains the
+ProductCode, UpgradeCode, version, and package-identity authority. There is no second `main.wxs` compile. The later
+link still replaces only the independently modified shortcut fragment, and a fail-closed comparison of Dark output
+from the preliminary and final MSI requires ProductCode, UpgradeCode, and version to remain identical. Final Dark
+validation still requires all registration actions before artifact finalization. The corrected Windows build has not
 yet been rerun, so neither final MSI production nor installed acceptance is claimed. The available Codex host is
 Ubuntu Linux and has no PowerShell, Windows command environment, Wine, Windows VM manager, MSI artifact, remote
 Windows runner, or release signing credential. Do not report any installed row as PASS until its command is executed
@@ -52,18 +60,18 @@ and platform-neutral tests are not substitutes for MSI lifecycle validation.
 | Authenticode: MSI | NOT RUN | No MSI artifact or production signing credentials are available. |
 | Phase 13A / 13B / 13C installed regressions | NOT RUN | Their installed paths and behavior cannot be exercised on Linux; repository verification is PASS. |
 | Logged-out automatic updating | UNSUPPORTED | Unchanged: registration does not activate Task Scheduler, a service, SYSTEM updating, or any logged-out executor. |
-| Packaging defect and fix | THIRD FIX IMPLEMENTED; DIRECT WINDOWS HELPER RERUN REQUIRED | Exact definition replay was correct, but the parser expected a ProcessBuilder-style list while the actual JDK 21 Windows log uses `Command [PID: ...]:` followed by an indented plain command line. The parser now supports that observed form, selects exactly one generated-`main.wxs` Candle command, and preserves spaced definition values. Run the direct helper check below before another full packaging run. |
+| Packaging defect and fix | RESOURCE-DIR FIX IMPLEMENTED; WINDOWS RERUN REQUIRED | Four findings led to the boundary correction: missing definitions, an overly strict raw-reference check, the real JDK 21 log format, and finally implicit defaults absent even from the exact visible command. The selected JDK's own template and original compile now remain authoritative; no hidden defaults are replayed. |
 
 The exact next work is continuation of **Phase 13F only** on a suitable Windows machine. From the repository root,
-first run only:
+run:
 
 ```bat
-python build\scripts\windows_jpackage_wix_definitions.py prepare build\staging\windows-msi\jpackage-verbose.log build\staging\windows-msi\jpackage-main-definitions-test.rsp
-type build\staging\windows-msi\jpackage-main-definitions-test.rsp
+build\scripts\build-shale-release.bat
 ```
 
-The helper must report recovered definitions and create the response file. Only after that direct check succeeds,
-run `build-shale-release.bat`; it must produce and validate the final MSI without uploading a manifest or artifacts.
+The run must show jpackage resource preparation, successful preliminary jpackage, original-compile registration
+validation, final link, identity/registration validation, and final MSI creation with no undefined `Jp*` variable.
+It must not upload a manifest or artifacts.
 Installed lifecycle acceptance follows separately. Logged-out automatic update support remains **UNSUPPORTED**.
 
 After installing the Phase 13F MSI, run the privacy-bounded, read-only helper from an elevated PowerShell prompt

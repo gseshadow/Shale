@@ -68,10 +68,12 @@ set JPACKAGE_LOG=%STAGE%\jpackage-verbose.log
 set GENERATED_CONFIG_DIR=%JPACKAGE_TEMP%\config
 set BUNDLE_SOURCE=%GENERATED_CONFIG_DIR%\bundle.wxf
 set MAIN_SOURCE=%GENERATED_CONFIG_DIR%\main.wxs
+set JPACKAGE_RESOURCE_EXTRACT=%STAGE%\jdk-resources
+set JPACKAGE_RESOURCE_DIR=%STAGE%\jpackage-resources
+set JPACKAGE_MAIN_TEMPLATE=%JPACKAGE_RESOURCE_DIR%\main.wxs
 set WIXOBJ_DIR=%JPACKAGE_TEMP%\wixobj
 set BUNDLE_WIXOBJ=%WIXOBJ_DIR%\bundle.wixobj
 set MAIN_WIXOBJ=%WIXOBJ_DIR%\main.wixobj
-set JPACKAGE_DEFINITIONS=%STAGE%\jpackage-main-definitions.rsp
 set UI_WIXOBJ=%WIXOBJ_DIR%\ui.wixobj
 set INSTALLDIR_DIALOG_WIXOBJ=%WIXOBJ_DIR%\InstallDirNotEmptyDlg.wixobj
 set LOC_DE=%GENERATED_CONFIG_DIR%\MsiInstallerStrings_de.wxl
@@ -87,6 +89,24 @@ if exist "%STAGE%" rmdir /s /q "%STAGE%"
 mkdir "%PRELIM%" "%FINAL%"
 if errorlevel 1 goto :staging_failed
 echo Windows MSI stage completed: staging
+
+echo Windows MSI stage started: jpackage-resource-preparation source="%JAVA_HOME%\lib\modules" expected="%JPACKAGE_MAIN_TEMPLATE%"
+mkdir "%JPACKAGE_RESOURCE_EXTRACT%" "%JPACKAGE_RESOURCE_DIR%"
+if errorlevel 1 goto :jpackage_resource_failed
+"%JAVA_HOME%\bin\jimage.exe" extract --dir "%JPACKAGE_RESOURCE_EXTRACT%" --include "glob:**/main.wxs" "%JAVA_HOME%\lib\modules"
+if errorlevel 1 goto :jpackage_resource_failed
+set "JPACKAGE_MAIN_SOURCE="
+set "JPACKAGE_MAIN_COUNT=0"
+for /r "%JPACKAGE_RESOURCE_EXTRACT%" %%F in (main.wxs) do (
+ set "JPACKAGE_MAIN_SOURCE=%%~fF"
+ set /a JPACKAGE_MAIN_COUNT+=1 >nul
+)
+if not "!JPACKAGE_MAIN_COUNT!"=="1" goto :jpackage_resource_cardinality_failed
+copy /y "!JPACKAGE_MAIN_SOURCE!" "%JPACKAGE_MAIN_TEMPLATE%" >nul
+if errorlevel 1 goto :jpackage_resource_failed
+python "%ROOT%\build\scripts\windows_msi_registration.py" mutate "%JPACKAGE_MAIN_TEMPLATE%" --script "%ROOT%\build\scripts\windows-installation-registration.ps1"
+if errorlevel 1 goto :jpackage_resource_failed
+echo Windows MSI stage completed: jpackage-resource-preparation
 
 set "NATIVE_BUILD_SCRIPT=%ROOT%\build\native\windows-toast\build-native.bat"
 set "NATIVE_DLL=%APPINPUT%\native\shale_windows_toast.dll"
@@ -107,7 +127,7 @@ echo Windows MSI stage completed: marker-staging
 
 echo Starting jpackage and WiX MSI construction...
 echo Windows MSI stage started: preliminary-jpackage tool=jpackage expected="%PRELIMINARY_MSI%"
-jpackage --type msi --name Shale --input "%APPINPUT%" --dest "%PRELIM%" --temp "%JPACKAGE_TEMP%" --verbose ^
+jpackage --type msi --name Shale --input "%APPINPUT%" --dest "%PRELIM%" --temp "%JPACKAGE_TEMP%" --verbose --resource-dir "%JPACKAGE_RESOURCE_DIR%" ^
  --main-jar "shale-desktop-%VERSION%.jar" --main-class com.shale.desktop.ShaleLauncher ^
  --icon "%ROOT%\build\assets\Shale.ico" --app-version "%VERSION%" --vendor "Get Downing" ^
  --description "Shale Desktop" --win-menu --win-shortcut --win-dir-chooser --win-per-user-install --install-dir Shale >"%JPACKAGE_LOG%" 2>&1
@@ -131,15 +151,15 @@ python "%ROOT%\build\scripts\windows_msi_identity.py" mutate "%BUNDLE_SOURCE%"
 if errorlevel 1 goto :generated_identity_mutation_failed
 echo bundle.wxf identity and shortcut mutation completed.
 if not exist "%MAIN_SOURCE%" goto :missing_main_source
-echo Windows MSI stage started: registration-mutation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%MAIN_SOURCE%"
-python "%ROOT%\build\scripts\windows_msi_registration.py" mutate "%MAIN_SOURCE%" --script "%ROOT%\build\scripts\windows-installation-registration.ps1"
-if errorlevel 1 goto :registration_mutation_failed
-echo Windows MSI stage completed: registration-mutation
-echo Windows MSI stage started: jpackage-definition-recovery source="%MAIN_SOURCE%" log="%JPACKAGE_LOG%" expected="%JPACKAGE_DEFINITIONS%"
-python "%ROOT%\build\scripts\windows_jpackage_wix_definitions.py" prepare "%JPACKAGE_LOG%" "%JPACKAGE_DEFINITIONS%"
-if errorlevel 1 goto :jpackage_definition_recovery_failed
-if not exist "%JPACKAGE_DEFINITIONS%" goto :missing_jpackage_definitions
-echo Windows MSI stage completed: jpackage-definition-recovery
+echo Windows MSI stage started: original-compile-registration-validation input="%MAIN_SOURCE%"
+python "%ROOT%\build\scripts\windows_msi_registration.py" validate "%MAIN_SOURCE%"
+if errorlevel 1 goto :original_compile_registration_failed
+echo Windows MSI stage completed: original-compile-registration-validation
+
+mkdir "%STAGE%\preliminary-dark"
+if errorlevel 1 goto :dark_staging_failed
+dark.exe -o "%STAGE%\preliminary-dark\preliminary.wxs" "%PRELIMINARY_MSI%"
+if errorlevel 1 goto :preliminary_dark_failed
 
 if not exist "%WIXOBJ_DIR%" goto :missing_wixobj_dir
 if not exist "%MAIN_WIXOBJ%" goto :missing_main_wixobj
@@ -157,11 +177,6 @@ if errorlevel 1 goto :candle_failed
 if not exist "%BUNDLE_WIXOBJ%" goto :missing_bundle_wixobj
 echo Recompiled bundle.wixobj verified: "%BUNDLE_WIXOBJ%"
 echo Windows MSI stage completed: candle-recompile
-echo Windows MSI stage started: main-recompile tool=candle.exe input="%MAIN_SOURCE%" expected="%MAIN_WIXOBJ%"
-candle.exe -nologo @"%JPACKAGE_DEFINITIONS%" "%MAIN_SOURCE%" -ext WixUtilExtension -arch x64 -out "%MAIN_WIXOBJ%"
-if errorlevel 1 goto :main_candle_failed
-if not exist "%MAIN_WIXOBJ%" goto :missing_main_wixobj
-echo Windows MSI stage completed: main-recompile
 
 set LINK_OBJECTS=
 set LINK_OBJECT_COUNT=0
@@ -199,6 +214,8 @@ echo Windows MSI stage completed: dark-extraction
 echo Windows MSI stage started: compiled-identity-validation script="%ROOT%\build\scripts\windows_msi_identity.py" input="%STAGE%\dark\final.wxs"
 python "%ROOT%\build\scripts\windows_msi_identity.py" validate "%STAGE%\dark\final.wxs"
 if errorlevel 1 goto :compiled_identity_failed
+python "%ROOT%\build\scripts\windows_msi_identity.py" compare "%STAGE%\preliminary-dark\preliminary.wxs" "%STAGE%\dark\final.wxs"
+if errorlevel 1 goto :compiled_identity_failed
 echo Windows MSI stage completed: compiled-identity-validation
 echo Windows MSI stage started: compiled-registration-validation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%STAGE%\dark\final.wxs"
 python "%ROOT%\build\scripts\windows_msi_registration.py" validate "%STAGE%\dark\final.wxs"
@@ -226,6 +243,15 @@ exit /b 31
 set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=staging command=mkdir expected="%PRELIM%" and "%FINAL%" exit=%STAGE_EXIT%
 exit /b 15
+
+:jpackage_resource_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=jpackage-resource-preparation source="%JAVA_HOME%\lib\modules" expected="%JPACKAGE_MAIN_TEMPLATE%" exit=%STAGE_EXIT%
+exit /b 46
+
+:jpackage_resource_cardinality_failed
+echo Windows MSI stage failed: stage=jpackage-resource-preparation classification=main_template_cardinality expected=1 found=!JPACKAGE_MAIN_COUNT! exit=46
+exit /b 46
 
 :missing_native_build_script
 echo Windows MSI stage failed: stage=native-DLL classification=missing_script script="%NATIVE_BUILD_SCRIPT%" expected="%NATIVE_DLL%" exit=16
@@ -264,19 +290,15 @@ set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=generated-identity-mutation script="%ROOT%\build\scripts\windows_msi_identity.py" input="%BUNDLE_SOURCE%" exit=%STAGE_EXIT%
 exit /b 20
 
-:registration_mutation_failed
+:original_compile_registration_failed
 set "STAGE_EXIT=%ERRORLEVEL%"
-echo Windows MSI stage failed: stage=registration-mutation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%MAIN_SOURCE%" exit=%STAGE_EXIT%
+echo Windows MSI stage failed: stage=original-compile-registration-validation source="%MAIN_SOURCE%" exit=%STAGE_EXIT%
 exit /b 42
 
-:jpackage_definition_recovery_failed
+:preliminary_dark_failed
 set "STAGE_EXIT=%ERRORLEVEL%"
-echo Windows MSI stage failed: stage=jpackage-definition-recovery source="%MAIN_SOURCE%" log="%JPACKAGE_LOG%" exit=%STAGE_EXIT%
-exit /b 45
-
-:missing_jpackage_definitions
-echo Windows MSI stage failed: stage=jpackage-definition-recovery classification=missing_response_file expected="%JPACKAGE_DEFINITIONS%" exit=45
-exit /b 45
+echo Windows MSI stage failed: stage=preliminary-identity-extraction input="%PRELIMINARY_MSI%" exit=%STAGE_EXIT%
+exit /b 47
 
 :compiled_registration_failed
 set "STAGE_EXIT=%ERRORLEVEL%"
@@ -376,11 +398,6 @@ exit /b 41
 set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=candle-recompile tool=candle.exe input="%BUNDLE_SOURCE%" expected="%BUNDLE_WIXOBJ%" exit=%STAGE_EXIT%
 exit /b 22
-
-:main_candle_failed
-set "STAGE_EXIT=%ERRORLEVEL%"
-echo Windows MSI stage failed: stage=main-recompile tool=candle.exe input="%MAIN_SOURCE%" expected="%MAIN_WIXOBJ%" exit=%STAGE_EXIT%
-exit /b 45
 
 :light_failed
 set "STAGE_EXIT=%ERRORLEVEL%"

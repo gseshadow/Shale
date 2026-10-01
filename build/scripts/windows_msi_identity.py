@@ -120,13 +120,39 @@ def validate(path):
     if len(props) != 1:
         raise ValueError("compiled/decompiled: shortcut identity missing or ambiguous")
 
+def product_identity(path):
+    root = ET.parse(path).getroot()
+    products = list(root.iter(tag("Product")))
+    if len(products) != 1:
+        raise ValueError(f"compiled/decompiled: expected one Product; found {len(products)}")
+    product = products[0]
+    values = tuple(product.get(name) for name in ("Id", "UpgradeCode", "Version"))
+    if any(not value for value in values):
+        raise ValueError("compiled/decompiled: Product Id, UpgradeCode, and Version are required")
+    return values
+
+def compare(preliminary, final):
+    expected = product_identity(preliminary)
+    actual = product_identity(final)
+    if actual != expected:
+        raise ValueError(
+            "final Product identity differs from jpackage preliminary MSI: "
+            f"expected Id/UpgradeCode/Version={expected!r}; found {actual!r}"
+        )
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["inspect", "mutate", "validate"])
+    parser.add_argument("mode", choices=["inspect", "mutate", "validate", "compare"])
     parser.add_argument("file", type=Path)
+    parser.add_argument("other", type=Path, nargs="?")
     args = parser.parse_args()
     try:
-        {"inspect": inspect, "mutate": mutate, "validate": validate}[args.mode](args.file)
+        if args.mode == "compare":
+            if args.other is None:
+                raise ValueError("compare requires preliminary and final WiX source paths")
+            compare(args.file, args.other)
+        else:
+            {"inspect": inspect, "mutate": mutate, "validate": validate}[args.mode](args.file)
     except (OSError, ET.ParseError, ValueError) as error:
         print(f"Windows MSI identity validation failed: {error}", file=sys.stderr)
         return 1
