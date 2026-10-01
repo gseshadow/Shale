@@ -2,74 +2,206 @@ $ErrorActionPreference = 'Stop'
 $Mode=@{I='Install';U='Uninstall';R='RollbackInstall';B='RollbackUninstall';C='Commit'}[$env:M]
 $OwnerSid=$env:O; $InstallRoot=$env:I; $SupportRoot=$env:S
 if ($Mode -notin @('Install','Uninstall','RollbackInstall','RollbackUninstall','Commit')) { throw 'Shale installation registration rejected: invalid-mode' }
-$base = 'HKLM:\SOFTWARE\Shale'
-$registrations = "$base\Installations"
-$state = "$base\InstallerState"
+
+$baseSub = 'SOFTWARE\Shale'
+$registrationsSub = "$baseSub\Installations"
+$stateSub = "$baseSub\InstallerState"
 $schema = 1
 
 function Canonical([string]$Value) { return [IO.Path]::GetFullPath($Value).TrimEnd('\') }
 function Fail([string]$Code) { throw "Shale installation registration rejected: $Code" }
-function Assert-Inputs {
-    if ($OwnerSid -notmatch '^S-1-(?:\d+-){1,14}\d+$') { Fail 'invalid-owner' }
-    $profile = (Get-ItemProperty -LiteralPath "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$OwnerSid" -Name ProfileImagePath).ProfileImagePath
-    $expected = Canonical (Join-Path ([Environment]::ExpandEnvironmentVariables($profile)) 'AppData\Local\Shale')
-    if ((Canonical $InstallRoot) -ine $expected -or (Canonical $SupportRoot) -ine $expected) { Fail 'owner-path-mismatch' }
-    foreach ($candidate in @($InstallRoot,$SupportRoot)) { $cursor = Get-Item -LiteralPath (Canonical $candidate) -Force; while ($null -ne $cursor) { if (($cursor.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { Fail 'reparse-unsafe' }; $cursor = $cursor.Parent } }
+function Open-Hklm64([bool]$Writable) {
+    $view = [Microsoft.Win32.RegistryView]::Registry64
+    return [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::LocalMachine,$view)
 }
-function State-Name { $bytes = [Text.Encoding]::UTF8.GetBytes("$OwnerSid`n$(Canonical $InstallRoot)"); $sha=[Security.Cryptography.SHA256]::Create(); try { return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() } finally { $sha.Dispose() } }
-function Protect-Key([string]$Path) {
-    $acl = Get-Acl -LiteralPath $Path
-    $acl.SetAccessRuleProtection($true,$false)
-    foreach ($rule in @($acl.Access)) { [void]$acl.RemoveAccessRuleAll($rule) }
-    $inherit = [Security.AccessControl.InheritanceFlags]::ContainerInherit
-    $propagate = [Security.AccessControl.PropagationFlags]::None
-    $allow = [Security.AccessControl.AccessControlType]::Allow
-    $acl.AddAccessRule([Security.AccessControl.RegistryAccessRule]::new('SYSTEM','FullControl',$inherit,$propagate,$allow))
-    $acl.AddAccessRule([Security.AccessControl.RegistryAccessRule]::new('BUILTIN\Administrators','FullControl',$inherit,$propagate,$allow))
-    $acl.AddAccessRule([Security.AccessControl.RegistryAccessRule]::new($OwnerSid,'ReadKey',$inherit,$propagate,$allow))
-    Set-Acl -LiteralPath $Path -AclObject $acl
+function Ensure-Key([string]$SubKey) {
+    $root = Open-Hklm64 $true
+    try {
+        $key = $root.CreateSubKey($SubKey,[Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree)
+        if ($null -eq $key) { Fail 'registry-create-failed' }
+        $key.Dispose()
+    } finally { $root.Dispose() }
+}
+function Test-Key([string]$SubKey) {
+    $root = Open-Hklm64 $false
+    try {
+        $key = $root.OpenSubKey($SubKey,$false)
+        if ($null -eq $key) { return $false }
+        $key.Dispose(); return $true
+    } finally { $root.Dispose() }
+}
+function Get-Value([string]$SubKey,[string]$Name) {
+    $root = Open-Hklm64 $false
+    try {
+        $key = $root.OpenSubKey($SubKey,$false)
+        if ($null -eq $key) { return $null }
+        try { return $key.GetValue($Name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) }
+        finally { $key.Dispose() }
+    } finally { $root.Dispose() }
+}
+function Set-Value([string]$SubKey,[string]$Name,$Value,[Microsoft.Win32.RegistryValueKind]$Kind) {
+    Ensure-Key $SubKey
+    $root = Open-Hklm64 $true
+    try {
+        $key = $root.OpenSubKey($SubKey,$true)
+        if ($null -eq $key) { Fail 'registry-open-failed' }
+        try { $key.SetValue($Name,$Value,$Kind) }
+        finally { $key.Dispose() }
+    } finally { $root.Dispose() }
+}
+function Delete-Key([string]$SubKey) {
+    $root = Open-Hklm64 $true
+    try { $root.DeleteSubKeyTree($SubKey,$false) }
+    catch [System.ArgumentException] { }
+    finally { $root.Dispose() }
+}
+function Protect-Key([string]$SubKey) {
+    Ensure-Key $SubKey
+    $root = Open-Hklm64 $true
+    try {
+        $key = $root.OpenSubKey($SubKey,[Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree,[System.Security.AccessControl.RegistryRights]::ChangePermissions)
+        if ($null -eq $key) { Fail 'registry-acl-open-failed' }
+        try {
+            $security = [System.Security.AccessControl.RegistrySecurity]::new()
+            $security.SetAccessRuleProtection($true,$false)
+            $inherit = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit
+            $propagate = [System.Security.AccessControl.PropagationFlags]::None
+            $allow = [System.Security.AccessControl.AccessControlType]::Allow
+            $systemSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-18')
+            $administratorsSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
+            $ownerIdentity = [System.Security.Principal.SecurityIdentifier]::new($OwnerSid)
+            $security.AddAccessRule([System.Security.AccessControl.RegistryAccessRule]::new($systemSid,[System.Security.AccessControl.RegistryRights]::FullControl,$inherit,$propagate,$allow))
+            $security.AddAccessRule([System.Security.AccessControl.RegistryAccessRule]::new($administratorsSid,[System.Security.AccessControl.RegistryRights]::FullControl,$inherit,$propagate,$allow))
+            $security.AddAccessRule([System.Security.AccessControl.RegistryAccessRule]::new($ownerIdentity,[System.Security.AccessControl.RegistryRights]::ReadKey,$inherit,$propagate,$allow))
+            $key.SetAccessControl($security)
+        } finally { $key.Dispose() }
+    } finally { $root.Dispose() }
+}
+function Assert-Inputs([bool]$RequireInstallRoot = $true) {
+    if ($OwnerSid -notmatch '^S-1-(?:\d+-){1,14}\d+$') { Fail 'invalid-owner' }
+    $profileSub = "SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$OwnerSid"
+    $profile = Get-Value $profileSub 'ProfileImagePath'
+    if (-not $profile) { Fail 'owner-profile-missing' }
+    $expected = Canonical (Join-Path ([Environment]::ExpandEnvironmentVariables([string]$profile)) 'AppData\Local\Shale')
+    if ((Canonical $InstallRoot) -ine $expected -or (Canonical $SupportRoot) -ine $expected) { Fail 'owner-path-mismatch' }
+    foreach ($candidate in @($InstallRoot,$SupportRoot)) {
+        $canonicalCandidate = Canonical $candidate
+        if ($RequireInstallRoot -and -not (Test-Path -LiteralPath $canonicalCandidate)) { Fail 'install-root-missing' }
+        $cursorPath = $canonicalCandidate
+        while (-not (Test-Path -LiteralPath $cursorPath)) {
+            $parentPath = Split-Path -Parent $cursorPath
+            if (-not $parentPath -or $parentPath -eq $cursorPath) { Fail 'path-ancestor-missing' }
+            $cursorPath = $parentPath
+        }
+        $cursor = Get-Item -LiteralPath $cursorPath -Force
+        while ($null -ne $cursor) {
+            if (($cursor.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { Fail 'reparse-unsafe' }
+            $cursor = $cursor.Parent
+        }
+    }
+}
+function State-Name {
+    $bytes = [Text.Encoding]::UTF8.GetBytes("$OwnerSid`n$(Canonical $InstallRoot)")
+    $sha=[Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() }
+    finally { $sha.Dispose() }
 }
 function Snapshot([string]$Name) {
-    $snapshot = "$state\Rollback\$(State-Name)"
-    $record = if (Test-Path "$registrations\$Name") { Get-ItemProperty -LiteralPath "$registrations\$Name" | Select-Object schemaVersion,installationId,ownerSid,installRoot,supportRoot } else { $null }
-    New-Item -Force $snapshot | Out-Null; Protect-Key "$state\Rollback"; Protect-Key $snapshot
-    New-ItemProperty -Force $snapshot installationId $Name | Out-Null; New-ItemProperty -Force $snapshot existed ([int]($null -ne $record)) | Out-Null
-    if ($record) { foreach ($field in 'schemaVersion','installationId','ownerSid','installRoot','supportRoot') { New-ItemProperty -Force $snapshot $field $record.$field | Out-Null } }
-    return $snapshot
+    $stateName = State-Name
+    $snapshotSub = "$stateSub\Rollback\$stateName"
+    $recordSub = "$registrationsSub\$Name"
+    $exists = Test-Key $recordSub
+    Ensure-Key "$stateSub\Rollback"
+    Ensure-Key $snapshotSub
+    Protect-Key "$stateSub\Rollback"
+    Protect-Key $snapshotSub
+    Set-Value $snapshotSub 'installationId' $Name ([Microsoft.Win32.RegistryValueKind]::String)
+    Set-Value $snapshotSub 'existed' ([int]$exists) ([Microsoft.Win32.RegistryValueKind]::DWord)
+    if ($exists) {
+        foreach ($field in 'schemaVersion','installationId','ownerSid','installRoot','supportRoot') {
+            $value = Get-Value $recordSub $field
+            if ($null -ne $value) {
+                $kind = if ($field -eq 'schemaVersion') { [Microsoft.Win32.RegistryValueKind]::DWord } else { [Microsoft.Win32.RegistryValueKind]::String }
+                Set-Value $snapshotSub $field $value $kind
+            }
+        }
+    }
+    return $snapshotSub
 }
 function Install-Registration {
     Assert-Inputs
-    New-Item -Force $registrations,$state | Out-Null
-    Protect-Key $registrations; Protect-Key $state
+    Ensure-Key $baseSub
+    Ensure-Key $registrationsSub
+    Ensure-Key $stateSub
+    Protect-Key $registrationsSub
+    Protect-Key $stateSub
     $stateName = State-Name
-    $id = (Get-ItemProperty -LiteralPath "$state\$stateName" -Name installationId -ErrorAction SilentlyContinue).installationId
-    if ($id -and $id -notmatch '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$') { Fail 'invalid-protected-state' }
+    $stateRecordSub = "$stateSub\$stateName"
+    $id = Get-Value $stateRecordSub 'installationId'
+    if ($id -and ([string]$id) -notmatch '^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$') { Fail 'invalid-protected-state' }
     if (-not $id) { $id = [guid]::NewGuid().ToString() }
-    [void](Snapshot $id)
-    New-Item -Force "$state\$stateName","$registrations\$id" | Out-Null
-    New-ItemProperty -Force "$state\$stateName" installationId $id | Out-Null
-    $values = @{schemaVersion=$schema;installationId=$id;ownerSid=$OwnerSid;installRoot=(Canonical $InstallRoot);supportRoot=(Canonical $SupportRoot)}
-    foreach ($entry in $values.GetEnumerator()) { New-ItemProperty -Force "$registrations\$id" $entry.Key $entry.Value -PropertyType $(if ($entry.Key -eq 'schemaVersion') {'DWord'} else {'String'}) | Out-Null }
-    Protect-Key "$state\$stateName"; Protect-Key "$registrations\$id"
+    [void](Snapshot ([string]$id))
+    $registrationSub = "$registrationsSub\$id"
+    Ensure-Key $stateRecordSub
+    Ensure-Key $registrationSub
+    Set-Value $stateRecordSub 'installationId' ([string]$id) ([Microsoft.Win32.RegistryValueKind]::String)
+    Set-Value $registrationSub 'schemaVersion' $schema ([Microsoft.Win32.RegistryValueKind]::DWord)
+    Set-Value $registrationSub 'installationId' ([string]$id) ([Microsoft.Win32.RegistryValueKind]::String)
+    Set-Value $registrationSub 'ownerSid' $OwnerSid ([Microsoft.Win32.RegistryValueKind]::String)
+    Set-Value $registrationSub 'installRoot' (Canonical $InstallRoot) ([Microsoft.Win32.RegistryValueKind]::String)
+    Set-Value $registrationSub 'supportRoot' (Canonical $SupportRoot) ([Microsoft.Win32.RegistryValueKind]::String)
+    Protect-Key $stateRecordSub
+    Protect-Key $registrationSub
 }
 function Uninstall-Registration {
-    Assert-Inputs
+    Assert-Inputs $false
     $stateName = State-Name
-    $id = (Get-ItemProperty -LiteralPath "$state\$stateName" -Name installationId -ErrorAction SilentlyContinue).installationId
+    $stateRecordSub = "$stateSub\$stateName"
+    $id = Get-Value $stateRecordSub 'installationId'
     if (-not $id) { return }
-    [void](Snapshot $id)
-    $record = Get-ItemProperty -LiteralPath "$registrations\$id" -ErrorAction SilentlyContinue
-    if ($record -and ($record.ownerSid -ne $OwnerSid -or (Canonical $record.installRoot) -ine (Canonical $InstallRoot))) { Fail 'protected-state-mismatch' }
-    Remove-Item -LiteralPath "$registrations\$id" -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath "$state\$stateName" -Recurse -Force -ErrorAction SilentlyContinue
+    [void](Snapshot ([string]$id))
+    $registrationSub = "$registrationsSub\$id"
+    if (Test-Key $registrationSub) {
+        $recordOwner = Get-Value $registrationSub 'ownerSid'
+        $recordInstall = Get-Value $registrationSub 'installRoot'
+        if ($recordOwner -ne $OwnerSid -or (Canonical ([string]$recordInstall)) -ine (Canonical $InstallRoot)) { Fail 'protected-state-mismatch' }
+    }
+    Delete-Key $registrationSub
+    Delete-Key $stateRecordSub
 }
 function Restore-Snapshot {
-    Assert-Inputs
+    Assert-Inputs $false
     $stateName = State-Name
-    $snapshot="$state\Rollback\$stateName"; if (-not (Test-Path $snapshot)) { return }; $saved=Get-ItemProperty $snapshot
-    if ($saved.existed -eq 0) { Remove-Item "$registrations\$($saved.installationId)" -Recurse -Force -ErrorAction SilentlyContinue; Remove-Item "$state\$stateName" -Recurse -Force -ErrorAction SilentlyContinue }
-    else { if ($saved.ownerSid -ne $OwnerSid -or (Canonical $saved.installRoot) -ine (Canonical $InstallRoot)) { Fail 'rollback-owner-mismatch' }; New-Item -Force "$state\$stateName","$registrations\$($saved.installationId)" | Out-Null; New-ItemProperty -Force "$state\$stateName" installationId $saved.installationId | Out-Null; foreach ($name in 'schemaVersion','installationId','ownerSid','installRoot','supportRoot') { New-ItemProperty -Force "$registrations\$($saved.installationId)" $name $saved.$name -PropertyType $(if ($name -eq 'schemaVersion') {'DWord'} else {'String'}) | Out-Null }; Protect-Key "$state\$stateName"; Protect-Key "$registrations\$($saved.installationId)" }
-    Remove-Item -LiteralPath $snapshot -Recurse -Force
+    $snapshotSub = "$stateSub\Rollback\$stateName"
+    if (-not (Test-Key $snapshotSub)) { return }
+    $id = [string](Get-Value $snapshotSub 'installationId')
+    $existed = [int](Get-Value $snapshotSub 'existed')
+    $stateRecordSub = "$stateSub\$stateName"
+    $registrationSub = "$registrationsSub\$id"
+    if ($existed -eq 0) {
+        Delete-Key $registrationSub
+        Delete-Key $stateRecordSub
+    } else {
+        $savedOwner = [string](Get-Value $snapshotSub 'ownerSid')
+        $savedInstall = [string](Get-Value $snapshotSub 'installRoot')
+        if ($savedOwner -ne $OwnerSid -or (Canonical $savedInstall) -ine (Canonical $InstallRoot)) { Fail 'rollback-owner-mismatch' }
+        Ensure-Key $stateRecordSub
+        Ensure-Key $registrationSub
+        Set-Value $stateRecordSub 'installationId' $id ([Microsoft.Win32.RegistryValueKind]::String)
+        foreach ($name in 'schemaVersion','installationId','ownerSid','installRoot','supportRoot') {
+            $value = Get-Value $snapshotSub $name
+            $kind = if ($name -eq 'schemaVersion') { [Microsoft.Win32.RegistryValueKind]::DWord } else { [Microsoft.Win32.RegistryValueKind]::String }
+            Set-Value $registrationSub $name $value $kind
+        }
+        Protect-Key $stateRecordSub
+        Protect-Key $registrationSub
+    }
+    Delete-Key $snapshotSub
 }
 
-switch ($Mode) { 'Install' { Install-Registration } 'Uninstall' { Uninstall-Registration } 'Commit' { Assert-Inputs; Remove-Item -LiteralPath "$state\Rollback\$(State-Name)" -Recurse -Force -ErrorAction SilentlyContinue } default { Restore-Snapshot } }
+switch ($Mode) {
+    'Install' { Install-Registration }
+    'Uninstall' { Uninstall-Registration }
+    'Commit' { Delete-Key "$stateSub\Rollback\$(State-Name)" }
+    default { Restore-Snapshot }
+}
