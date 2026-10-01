@@ -1,11 +1,9 @@
 package com.shale.ui.services;
 
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.shale.ui.component.dialog.AppDialogs;
-import com.shale.ui.component.dialog.AppDialogs.DialogAction;
-import com.shale.ui.component.dialog.AppDialogs.DialogActionKind;
+import com.shale.ui.component.dialog.UpdateDialog;
 
 import javafx.geometry.Pos;
 import javafx.scene.control.Dialog;
@@ -27,15 +25,7 @@ public final class UpdateFlowCoordinator {
 	}
 
 	public void presentAvailableUpdate(boolean mandatory, Runnable onDecline) {
-		boolean accepted = AppDialogs.showChoice(null,
-				mandatory ? "Update Required" : "Update Available",
-				mandatory ? "Update Shale to continue" : "A newer version of Shale is available",
-				mandatory ? "This update is required before you can continue into Shale."
-						: "Would you like to update now?",
-				List.of(
-						DialogAction.cancel(mandatory ? "Exit application" : "Skip this time", false),
-						DialogAction.of("Update now", true, DialogActionKind.PRIMARY, true, false)))
-				.orElse(false);
+		boolean accepted = UpdateDialog.show(null, mandatory, AppVersionProvider.currentVersion());
 		if (accepted) {
 			startUpdateAndBlock();
 		} else {
@@ -74,6 +64,7 @@ public final class UpdateFlowCoordinator {
 		dialog.setResizable(false);
 		dialog.getDialogPane().getStyleClass().add("update-launch-dialog");
 		dialog.getDialogPane().setPrefWidth(480);
+		dialog.getDialogPane().setMinHeight(230);
 
 		ProgressIndicator indicator = new ProgressIndicator();
 		indicator.setMaxSize(42, 42);
