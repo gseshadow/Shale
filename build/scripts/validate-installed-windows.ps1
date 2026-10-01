@@ -57,41 +57,79 @@ function Test-SemanticVersion([string]$Version) {
     return $true
 }
 
-function Get-IdentityValue($Rule) {
-    try { return $Rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value }
-    catch { return $Rule.IdentityReference.Value }
-}
-
-function Test-RegistrationAcl($Key, [string]$OwnerSid) {
+function Test-RegistrationAcl([string]$KeyName, [string]$OwnerSid) {
     try {
-        $acl = Get-Acl -LiteralPath $Key.PSPath
+        $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+            [Microsoft.Win32.RegistryHive]::LocalMachine,
+            [Microsoft.Win32.RegistryView]::Registry64)
+        try { $key = $baseKey.OpenSubKey("SOFTWARE\Shale\Installations\$KeyName", $false) }
+        finally { $baseKey.Dispose() }
+        if ($null -eq $key) { throw [IO.IOException]::new('the 64-bit registration key is unavailable') }
+        try {
+            $acl = $key.GetAccessControl([Security.AccessControl.AccessControlSections]::Access)
+            $rules = $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])
+        } finally { $key.Dispose() }
         $full = [Security.AccessControl.RegistryRights]::FullControl
         $read = [Security.AccessControl.RegistryRights]::ReadKey
         $writeMask = [Security.AccessControl.RegistryRights]::SetValue -bor [Security.AccessControl.RegistryRights]::CreateSubKey -bor [Security.AccessControl.RegistryRights]::Delete -bor [Security.AccessControl.RegistryRights]::ChangePermissions -bor [Security.AccessControl.RegistryRights]::TakeOwnership
-        $systemFull = $false; $adminFull = $false; $ownerRead = $false; $unsafeWriter = $false
+        $systemFull = $false; $adminFull = $false; $ownerRead = $false; $unsafeWriter = $false; $inheritedRule = $false
         $observed = @()
-        foreach ($rule in $acl.Access) {
-            $identity = Get-IdentityValue $rule
+        foreach ($rule in $rules) {
+            $identity = ([Security.Principal.SecurityIdentifier]$rule.IdentityReference).Value
             $observed += ("{0} {1} {2} inherited={3}" -f $identity,$rule.AccessControlType,$rule.RegistryRights,$rule.IsInherited)
+            if ($rule.IsInherited) { $inheritedRule = $true }
             if ($rule.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) { continue }
             $rights = [Security.AccessControl.RegistryRights]$rule.RegistryRights
-            if ($identity -in @('S-1-5-18','NT AUTHORITY\SYSTEM') -and (($rights -band $full) -eq $full)) { $systemFull = $true; continue }
-            if ($identity -in @('S-1-5-32-544','BUILTIN\Administrators') -and (($rights -band $full) -eq $full)) { $adminFull = $true; continue }
+            $scopeCorrect = $rule.InheritanceFlags -eq [Security.AccessControl.InheritanceFlags]::ContainerInherit -and
+                $rule.PropagationFlags -eq [Security.AccessControl.PropagationFlags]::None
+            if ($identity -eq 'S-1-5-18' -and (($rights -band $full) -eq $full) -and $scopeCorrect) { $systemFull = $true; continue }
+            if ($identity -eq 'S-1-5-32-544' -and (($rights -band $full) -eq $full) -and $scopeCorrect) { $adminFull = $true; continue }
             if ($identity -eq $OwnerSid) {
-                if (($rights -band $read) -eq $read -and ($rights -band $writeMask) -eq 0) { $ownerRead = $true }
+                if (($rights -band $read) -eq $read -and ($rights -band $writeMask) -eq 0 -and $scopeCorrect) { $ownerRead = $true }
                 else { $unsafeWriter = $true }
                 continue
             }
             if (($rights -band $writeMask) -ne 0) { $unsafeWriter = $true }
         }
         Write-Result INFO 'Registration ACL observed ACEs' ($observed -join '; ')
-        if (-not $acl.AreAccessRulesProtected -or -not $systemFull -or -not $adminFull -or -not $ownerRead -or $unsafeWriter) {
-            Write-Result FAIL 'Registration ACL result' 'protected SYSTEM/Administrators Full Control plus owner read-only model was not proven'
+        if (-not $acl.AreAccessRulesProtected -or $inheritedRule -or -not $systemFull -or -not $adminFull -or -not $ownerRead -or $unsafeWriter) {
+            Write-Result FAIL 'Registration ACL result' ("protected={0}; inheritedRule={1}; systemFull={2}; administratorsFull={3}; ownerReadOnly={4}; unrelatedOrOwnerWriter={5}" -f $acl.AreAccessRulesProtected,$inheritedRule,$systemFull,$adminFull,$ownerRead, $unsafeWriter)
         } else {
-            Write-Result PASS 'Registration ACL result' 'protected; SYSTEM and Administrators Full Control; owner read-only; no unrelated allow-write ACE observed'
+            Write-Result PASS 'Registration ACL result' '64-bit key is protected with no inherited ACEs; S-1-5-18 and S-1-5-32-544 have FullControl; owner SID has ReadKey only; no unrelated allow-write ACE observed'
         }
     } catch {
-        Write-RequiredNotRun 'Registration ACL result' 'ACL could not be evaluated'
+        Write-Result FAIL 'Registration ACL result' ("64-bit registry ACL inspection failed ({0})" -f $_.Exception.GetType().Name)
+    }
+}
+
+function Test-ProductionRegistrationReader([string]$InstallRoot, [string]$InstallationId, [string]$OwnerSid) {
+    $java = Join-Path $InstallRoot 'runtime\bin\java.exe'
+    if (-not (Test-Path -LiteralPath $java -PathType Leaf)) {
+        Write-Result FAIL 'Production registration-reader classification' 'installed runtime Java entry point is missing'
+        return
+    }
+    $classPath = (Join-Path $InstallRoot 'app\*') + ';' + (Join-Path $InstallRoot 'app\lib\*')
+    $output = @(& $java '-cp' $classPath 'com.shale.core.update.WindowsInstallationRegistrationDiagnostic' '--installation-id' $InstallationId 2>&1 | ForEach-Object { "$_" })
+    $exitCode = $LASTEXITCODE
+    $facts = @{}
+    foreach ($line in $output) {
+        $parts = $line -split '=', 2
+        if ($parts.Count -eq 2 -and -not $facts.ContainsKey($parts[0])) { $facts[$parts[0]] = $parts[1] }
+    }
+    foreach ($name in 'installationId','ownerSid','installRoot','supportRoot') {
+        if ($facts.ContainsKey($name)) { Write-Result INFO "Production reader $name" $facts[$name] }
+    }
+    $factsMatch = $false
+    try {
+        $factsMatch = $facts.installationId -ieq $InstallationId -and $facts.ownerSid -eq $OwnerSid -and
+            (Canonical-Path $facts.installRoot) -ieq (Canonical-Path $InstallRoot) -and
+            (Canonical-Path $facts.supportRoot) -ieq (Canonical-Path $InstallRoot)
+    } catch { $factsMatch = $false }
+    if ($exitCode -eq 0 -and $facts.classification -ceq 'VALID' -and $factsMatch) {
+        Write-Result PASS 'Production registration-reader classification' 'VALID; production reader facts match the selected authoritative registration'
+    } else {
+        $classification = if ($facts.ContainsKey('classification')) { $facts.classification } else { '(no classification returned)' }
+        Write-Result FAIL 'Production registration-reader classification' "classification=$classification; exitCode=$exitCode; factsMatch=$factsMatch"
     }
 }
 
@@ -202,8 +240,8 @@ if ($null -eq $selected) {
     try { $supportOk = (Canonical-Path $r.supportRoot) -ieq $expectedRoot -and (Canonical-Path $r.supportRoot) -ieq (Canonical-Path $r.installRoot) -and (Test-Path -LiteralPath $r.supportRoot -PathType Container) -and -not (Test-ReparseAncestor $r.supportRoot) } catch {}
     if ($installOk) { Write-Result PASS 'Install-root correctness' 'owner-derived canonical root exists with the expected Shale layout and no reparse ancestor' } else { Write-Result FAIL 'Install-root correctness' 'owner/path/layout/reparse invariant was not satisfied' }
     if ($supportOk) { Write-Result PASS 'Support-root correctness' 'equals the owner-derived canonical Shale root and has no reparse ancestor' } else { Write-Result FAIL 'Support-root correctness' 'owner/path/reparse invariant was not satisfied' }
-    Test-RegistrationAcl $selected.Key $r.ownerSid
-    Write-Result 'NOT RUN' 'Production registration-reader classification' 'the existing Java reader has no installed command-line entry point'
+    Test-RegistrationAcl $keyName $r.ownerSid
+    Test-ProductionRegistrationReader $r.installRoot ([string]$r.installationId) ([string]$r.ownerSid)
 
     $updater = Join-Path $r.installRoot 'app\updater\ShaleUpdater.exe'
     $metadata = Join-Path $r.installRoot 'app\shale-installed-version.properties'

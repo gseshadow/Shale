@@ -2132,3 +2132,27 @@ There is no SQL, API, tenant mutation, sensitive read, or audit change. `LoggedO
 logged-out scheduler was added. The exact recommended next phase is **Phase 13F installed-Windows acceptance
 completion only**, using `docs/testing/windows-installed-registration-phase13f.md`; do not begin or reevaluate
 logged-out execution.
+
+### Phase 13F installed lifecycle continuation — 2026-10-01
+
+Installed Windows evidence now proves fresh registration, ordinary repair identity preservation, `1.0.128` to
+`1.0.129` major-upgrade identity preservation, and exact uninstall cleanup. The authoritative UUID throughout the
+preserved lifecycle was `ca2bb9b9-9576-400d-a637-0ad645c52bea`; exact uninstall removed its HKLM child. This narrows,
+but does not complete, Phase 13F acceptance.
+
+The read-only validator now inspects the authoritative child ACL by opening HKLM through .NET's explicit 64-bit
+registry view and materializing access rules directly as `SecurityIdentifier` values. It requires a protected DACL
+with no inherited ACEs, FullControl for `S-1-5-18` and `S-1-5-32-544`, ReadKey without write/control rights for the
+registered owner SID, and no write/control grant to an unrelated principal. Technical inspection failures are
+reported as specific failures rather than an ambiguous skipped result.
+
+The installed application also carries a narrow command-line diagnostic in core. The validator invokes it through
+the packaged runtime and application classpath with only the selected UUID. That diagnostic delegates directly to
+`WindowsInstallationRegistrationReader.windowsRegistrySource()` and `inspectPath`, emits its classification plus
+the privacy-minimal registration facts, never heals or writes state, and returns failure unless the selected result
+is uniquely `VALID`. This is not a general-purpose debug/admin shell.
+
+Neither the corrected ACL contract nor production-reader `VALID` result is accepted until the revised helper runs
+against a newly installed Windows build. Security fixtures, genuine multi-user behavior, and signing rows remain as
+listed in the Phase 13F runbook. There is no SQL/API/schema or audit mutation: both additions are local read-only
+installation diagnostics, and logged-out automatic updating remains `UNSUPPORTED`. Phase 13G has not started.
