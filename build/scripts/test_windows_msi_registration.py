@@ -6,6 +6,12 @@ spec=importlib.util.spec_from_file_location("registration",Path(__file__).with_n
 def fixture(scope=m.JPACKAGE_SCOPE, privileges=None):
     privilege = '' if privileges is None else f' InstallPrivileges="{privileges}"'
     return f'''<Wix xmlns="{m.NS}"><Product Id="*"><Package InstallScope="{scope}"{privilege}/><InstallExecuteSequence/></Product></Wix>'''
+
+DARK_PRODUCT = {
+    'Id':'{600556C4-4D9C-332A-8728-FE3138D5161A}', 'Language':'1033',
+    'Manufacturer':'Get Downing', 'Name':'Shale',
+    'UpgradeCode':'{E66C3164-CAC0-3DA4-BBF7-AD0299059575}', 'Version':'1.0.128'
+}
 class RegistrationMutationTest(unittest.TestCase):
     def setUp(self):
         self.directory=Path(tempfile.mkdtemp()); self.wxs=self.directory/'main.wxs'; self.wxs.write_text(fixture(),encoding='utf-8')
@@ -55,7 +61,8 @@ class RegistrationMutationTest(unittest.TestCase):
         for attribute,value,message in (
                 ('InstallScope','perMachine','template contract violation'),
                 ('InstallScope','perUser','template contract violation'),
-                ('InstallPrivileges','elevated','template contract violation')):
+                ('InstallPrivileges','elevated','template contract violation'),
+                ('InstallPrivileges','limited','template contract violation')):
             root=ET.parse(self.wxs); package=next(root.getroot().iter(m.tag('Package')))
             package.set(attribute,value); root.write(self.wxs,encoding='utf-8',xml_declaration=True)
             with self.assertRaisesRegex(ValueError,message): m.validate_template(self.wxs)
@@ -67,15 +74,68 @@ class RegistrationMutationTest(unittest.TestCase):
         root=ET.parse(self.wxs); actions={n.get('Id'):n for n in root.getroot().iter(m.tag('CustomAction'))}
         actions['ShaleRegistrationInstall'].set('Impersonate','yes'); root.write(self.wxs,encoding='utf-8',xml_declaration=True)
         with self.assertRaisesRegex(ValueError,'template contract violation.*not fail-closed/elevated'): m.validate_template(self.wxs)
-    def test_final_validator_requires_resolved_per_user_scope(self):
+    def dark_style_final(self):
         m.mutate(self.wxs,self.script)
-        root=ET.parse(self.wxs); package=next(root.getroot().iter(m.tag('Package')))
-        package.set('InstallScope','perUser'); root.write(self.wxs,encoding='utf-8',xml_declaration=True)
+        root=ET.parse(self.wxs); product=next(root.getroot().iter(m.tag('Product')))
+        product.attrib.update(DARK_PRODUCT)
+        package=next(root.getroot().iter(m.tag('Package')))
+        package.attrib.clear(); package.attrib.update({
+            'Compressed':'yes', 'Description':'Shale Desktop',
+            'InstallPrivileges':'limited', 'InstallerVersion':'200',
+            'Languages':'1033', 'Manufacturer':'Get Downing', 'Platform':'x64'})
+        root.write(self.wxs,encoding='utf-8',xml_declaration=True)
+        return root, package
+
+    def test_final_validator_accepts_real_dark_limited_representation_without_scope(self):
+        _,package=self.dark_style_final()
+        self.assertNotIn('InstallScope',package.attrib)
         m.validate_final(self.wxs)
-        package.set('InstallScope','perMachine'); root.write(self.wxs,encoding='utf-8',xml_declaration=True)
-        with self.assertRaisesRegex(ValueError,'final MSI contract violation.*perUser'): m.validate_final(self.wxs)
-        package.set('InstallScope','perUser'); package.set('InstallPrivileges','elevated'); root.write(self.wxs,encoding='utf-8',xml_declaration=True)
-        with self.assertRaisesRegex(ValueError,'final MSI contract violation.*InstallPrivileges'): m.validate_final(self.wxs)
+
+    def test_final_validator_rejects_elevated_unexpected_privilege_and_machine_scope(self):
+        root,package=self.dark_style_final()
+        for attribute,value,pattern in (
+                ('InstallPrivileges','elevated','InstallPrivileges must be limited'),
+                ('InstallPrivileges','custom','InstallPrivileges must be limited'),
+                ('InstallScope','perMachine','InstallScope must be perUser')):
+            package.set(attribute,value); root.write(self.wxs,encoding='utf-8',xml_declaration=True)
+            with self.assertRaisesRegex(ValueError,pattern): m.validate_final(self.wxs)
+            package.attrib.pop('InstallScope',None); package.set('InstallPrivileges','limited')
+        package.attrib.pop('InstallPrivileges')
+        root.write(self.wxs,encoding='utf-8',xml_declaration=True)
+        with self.assertRaisesRegex(ValueError,'InstallPrivileges must be limited.*<absent>'): m.validate_final(self.wxs)
+
+    def test_final_validator_rejects_clear_allusers_and_contradictory_per_user_properties(self):
+        root,_=self.dark_style_final(); product=next(root.getroot().iter(m.tag('Product')))
+        for properties,pattern in (
+                ({'ALLUSERS':'1'},'ALLUSERS indicates'),
+                ({'MSIINSTALLPERUSER':'1'},'MSIINSTALLPERUSER is contradictory'),
+                ({'ALLUSERS':'2'},'ALLUSERS=2 is ambiguous'),
+                ({'ALLUSERS':'2','MSIINSTALLPERUSER':'0'},'MSIINSTALLPERUSER is contradictory')):
+            nodes=[]
+            for key,value in properties.items(): nodes.append(ET.SubElement(product,m.tag('Property'),{'Id':key,'Value':value}))
+            root.write(self.wxs,encoding='utf-8',xml_declaration=True)
+            with self.assertRaisesRegex(ValueError,pattern): m.validate_final(self.wxs)
+            for node in nodes: product.remove(node)
+
+    def test_final_validator_accepts_explicit_non_machine_msi_property_pair(self):
+        root,_=self.dark_style_final(); product=next(root.getroot().iter(m.tag('Product')))
+        ET.SubElement(product,m.tag('Property'),{'Id':'ALLUSERS','Value':'2'})
+        ET.SubElement(product,m.tag('Property'),{'Id':'MSIINSTALLPERUSER','Value':'1'})
+        root.write(self.wxs,encoding='utf-8',xml_declaration=True)
+        m.validate_final(self.wxs)
+
+    def test_final_registration_action_and_sequence_contract_is_unchanged(self):
+        root,_=self.dark_style_final(); sequence=next(root.getroot().iter(m.tag('InstallExecuteSequence')))
+        sequence.remove(next(n for n in sequence.findall(m.tag('Custom')) if n.get('Action')=='ShaleRegistrationRollbackInstall'))
+        root.write(self.wxs,encoding='utf-8',xml_declaration=True)
+        with self.assertRaisesRegex(ValueError,'final MSI contract violation.*sequence missing'): m.validate_final(self.wxs)
+
+    def test_final_target_limit_remains_fail_closed(self):
+        root,_=self.dark_style_final(); actions={n.get('Id'):n for n in root.getroot().iter(m.tag('CustomAction'))}
+        actions['SetShaleRegistrationCommit'].set('Value',actions['SetShaleRegistrationCommit'].get('Value')+'XX')
+        root.write(self.wxs,encoding='utf-8',xml_declaration=True)
+        with self.assertRaisesRegex(ValueError,r'final MSI contract violation.*Target overflow.*length=256'):
+            m.validate_final(self.wxs)
     def test_target_limit_is_fail_closed_without_losing_required_action_data(self):
         m.mutate(self.wxs,self.script)
         root=ET.parse(self.wxs); actions={n.get('Id'):n for n in root.getroot().iter(m.tag('CustomAction'))}

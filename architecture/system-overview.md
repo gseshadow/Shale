@@ -26,7 +26,9 @@ reparse roots, harden ACLs, preserve identity across upgrade/repair, and perform
 core reader classifies invalid, stale, duplicate, and unsafe records without healing them. Windows packaging feeds
 a minimally augmented copy of JDK 21's own `main.wxs` resource into jpackage's original compile, so
 jpackage retains its implicit WiX defaults and generated package identity without a second main-source compile.
-The MSI declares only `InstallScope="perUser"`; same-owner administrator consent elevates `msiexec`, after which
+The source template leaves per-user scope to jpackage through `InstallScope="$(var.JpInstallScope)"` and declares no
+privilege attribute. WiX 3.14 Dark represents the compiled MSI with `InstallPrivileges="limited"` and no required
+`InstallScope`; same-owner administrator consent elevates `msiexec`, after which
 deferred non-impersonating actions use the installer service for protected writes. Secondary-credential elevation
 is unsupported because it changes the per-user installation owner.
 Installed Windows acceptance remains outstanding, so Phase 13F is in progress even though implementation is complete and the full

@@ -2084,8 +2084,8 @@ broad ProgramData inheritance. `HKLM\SOFTWARE\Shale\InstallerState\<SHA-256 owne
 lifecycle state containing only the UUID; it cannot enumerate or authorize installations and is not a second
 registration authority.
 
-The per-user jpackage payload remains under the installing owner's LocalAppData. The package uses only
-`InstallScope="perUser"`, never the invalid WiX 3 combination with `InstallPrivileges="elevated"`. A same-owner
+The per-user jpackage payload remains under the installing owner's LocalAppData. Its source template uses only
+jpackage-controlled `InstallScope`, never the invalid WiX 3 source combination with `InstallPrivileges="elevated"`. A same-owner
 split-token administrator must start `msiexec` through ordinary UAC consent for install, repair, upgrade, and
 uninstall. Once the transaction is elevated, deferred non-impersonating actions run in the privileged Windows
 Installer service context; without elevation the protected operation fails the transaction rather than degrading
@@ -2104,8 +2104,10 @@ Candle compile supplies all public and implicit `Jp*` defaults. No second `main.
 default compatibility layer exists. ProductCode, UpgradeCode, and version are compared between the preliminary
 jpackage MSI and final relinked MSI. Template validation requires both the injected resource and generated
 `config/main.wxs` source to preserve `InstallScope="$(var.JpInstallScope)"`; Candle consumes but does not rewrite that
-source. Preliminary and final Dark-decompiled MSI validation instead requires the resolved `perUser` value. Every
-stage rejects `InstallPrivileges`, while both decompilations must contain the Phase 13F actions. The encoded writer
+source, and source validation rejects every explicit `InstallPrivileges`. WiX 3.14 Dark does not reconstruct
+`InstallScope` for the resulting per-user MSI; preliminary and final decompilation validation instead requires its
+compiled `InstallPrivileges="limited"` representation and rejects machine-scope signals. Both decompilations must
+contain the Phase 13F actions. The encoded writer
 is held once in a private MSI property; 254-character setters stay below the 255-character CustomAction Target
 schema limit while formatting the complete mode, owner SID, install root, and support root into CustomActionData.
 
