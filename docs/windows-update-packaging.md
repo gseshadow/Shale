@@ -50,9 +50,14 @@ uses `windows_msi_registration.py` to add the registration actions without disca
 and supplies it to the original jpackage build with `--resource-dir`. jpackage therefore compiles it once with its
 native implicit/default `Jp*` environment and remains authoritative for ProductCode, UpgradeCode, and version; the
 build does not recompile `main.wxs` or reproduce private defaults. Dark output from the preliminary and final MSI is
-compared fail-closed for those three identity fields. Deferred non-impersonating `WixQuietExec64` actions run the
-embedded registration logic elevated; MSI `UserSID`, `INSTALLDIR`, and `LocalAppDataFolder` are carried as formatted
-action data. The writer
+compared fail-closed for those three identity fields. The package retains `InstallScope="perUser"` and deliberately
+has no `InstallPrivileges` attribute: WiX 3.14 rejects the contradictory `perUser`/`elevated` pair. Installation,
+repair, upgrade, and uninstall must instead start `msiexec` with UAC elevation by the same split-token Windows
+administrator who owns the per-user installation. Deferred non-impersonating `WixQuietExec64` actions then run in
+the elevated Windows Installer service context; an unelevated run fails and rolls back rather than silently omitting
+registration. MSI `UserSID`, `INSTALLDIR`, and `LocalAppDataFolder` are formatted before deferral and carried as
+action data. Consent elevation preserves that user's SID and profile; over-the-shoulder credentials select the
+credentialed account and are unsupported. The writer
 cross-checks SID/profile/path, rejects visible reparse ancestors, writes only
 `HKLM\SOFTWARE\Shale\Installations\<UUID>`, and applies protected explicit ACLs. It never uses the elevated account's
 environment as owner authority.

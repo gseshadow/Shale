@@ -2084,9 +2084,16 @@ broad ProgramData inheritance. `HKLM\SOFTWARE\Shale\InstallerState\<SHA-256 owne
 lifecycle state containing only the UUID; it cannot enumerate or authorize installations and is not a second
 registration authority.
 
-The per-user jpackage payload remains under the installing owner's LocalAppData. WiX 3.14 immediate property
-formatting supplies Windows Installer's `UserSID`, `INSTALLDIR`, and `LocalAppDataFolder` to deferred,
-non-impersonating, fail-closed custom actions. The privileged writer independently resolves the SID through protected
+The per-user jpackage payload remains under the installing owner's LocalAppData. The package uses only
+`InstallScope="perUser"`, never the invalid WiX 3 combination with `InstallPrivileges="elevated"`. A same-owner
+split-token administrator must start `msiexec` through ordinary UAC consent for install, repair, upgrade, and
+uninstall. Once the transaction is elevated, deferred non-impersonating actions run in the privileged Windows
+Installer service context; without elevation the protected operation fails the transaction rather than degrading
+to an unregistered installation. Windows Installer immediate property formatting supplies `UserSID`, `INSTALLDIR`,
+and `LocalAppDataFolder` to those deferred, non-impersonating, fail-closed custom actions. Same-account consent leaves
+these per-user values bound to the installation owner. Over-the-shoulder administrator credentials instead make the
+credentialed administrator the per-user client and are unsupported; native MSI cannot elevate only an HKLM slice
+while retaining a different standard user's per-user ownership. The privileged writer independently resolves the SID through protected
 ProfileList and accepts only the exact `<profile>\AppData\Local\Shale` install/support root. It rejects malformed
 SIDs, root substitution, traversal/canonical mismatch, and any visible reparse ancestor. The elevated token,
 Administrator, and SYSTEM environment never nominate owner or paths.
