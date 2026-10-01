@@ -86,7 +86,17 @@ destroyed, repair creates a documented replacement UUID because the original can
 remains per-user. Developer MSIs may be unsigned; signing-required builds still fail before publication, and
 registration never makes an unsigned updater trustworthy.
 
-Automated repository verification for Phase 13F is complete: the full `mvn test` suite is PASS. Installed-Windows
-acceptance remains NOT RUN on the available Linux host, which has no Windows/WiX installation environment or MSI
-artifact. Accordingly, no fresh-install, ACL, runtime, upgrade, repair, uninstall, security-fixture, multi-user, or
-Authenticode result is inferred from the packaging contracts.
+The Windows package also contains `ShaleRegistrationDiagnostic.exe`, a console-enabled alternate jpackage launcher
+whose only main class is `WindowsInstallationRegistrationDiagnostic`. It inherits the application image's generated
+classpath, creates no Start Menu or desktop shortcut, and accepts only `--installation-id <UUID>`; it is not a Java
+shell and does not expose arbitrary class or argument execution. Build validation fails before MSI publication
+unless the launcher, its generated configuration, and exactly one packaged diagnostic class are present. The
+read-only acceptance script uses this launcher because the minimized jpackage runtime does not expose
+`runtime\bin\java.exe` as an installed command-line contract.
+
+Earlier automated repository verification for Phase 13F completed with a full `mvn test` PASS. Installed Windows
+evidence now covers fresh install, repair, major upgrade, exact uninstall, owner-derived roots, installed metadata,
+updater presence, and the protected SID-based ACL. Production-reader classification remains pending because the
+tested `1.0.129` package lacked the dedicated diagnostic launcher; security fixtures, multi-user behavior, and
+Authenticode remain tracked separately in the Phase 13F runbook. The available Linux host cannot supply the final
+installed-reader observation.
