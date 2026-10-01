@@ -1,13 +1,15 @@
 # Phase 13F installed-Windows registration acceptance
 
-**Status on 2026-10-01:** Phase 13F remains IN PROGRESS. Platform-neutral repository verification is PASS, and
-installed lifecycle testing has proved fresh install, repair, major upgrade, and exact uninstall identity behavior.
-The authoritative installation UUID observed across repair and the `1.0.128` to `1.0.129` major upgrade was
-`ca2bb9b9-9576-400d-a637-0ad645c52bea`; exact uninstall removed that HKLM registration. The remaining installed
-acceptance is the corrected ACL inspection and production-reader diagnostic described below, followed by the
-separate security-fixture, multi-user, and signing rows that have not been executed. The corrected ACL row now
-passes; the production-reader row remains failed until the dedicated launcher build is installed and rerun. The
-first real Windows packaging attempt reached the post-mutation
+**Status on 2026-10-01: COMPLETE.** Platform-neutral repository verification and required installed-Windows
+acceptance are PASS. The final fresh-install run found the authoritative 64-bit HKLM record, no duplicate UUID,
+schema 1, current owner SID, canonical install/support roots, the protected ACL, production-reader `VALID` with exact
+fact matching, schema-1 `1.0.129` / `PRODUCTION` metadata, and the updater executable. Earlier lifecycle runs proved
+repair and `1.0.128` to `1.0.129` major-upgrade UUID preservation plus exact uninstall cleanup. Optional destructive
+fixtures and genuine two-owner testing remain hardening evidence, not required closure gates. Production Authenticode
+is **NOT RUN** because these developer artifacts were intentionally unsigned; it remains a separate deployment
+prerequisite and no unsigned artifact is production-ready.
+
+The first real Windows packaging attempt reached the post-mutation
 recompilation of generated `main.wxs` and failed with `CNDL0150` because the custom Candle invocation omitted
 jpackage's generated `Jp*` preprocessor definitions. The first attempted fix scanned every textual
 `$(var.Jp...)` reference in `main.wxs` and required a logged definition. A second real Windows build proved that check
@@ -101,8 +103,7 @@ uninstall), and 17,641 (commit) characters because each repeated the 17,320-char
 The MSI `CustomAction.Target` schema limit is 255 characters. The program now occupies one private MSI Property and
 each setter uses a 254-character formatted Target containing its reference, compact mode, owner SID, `INSTALLDIR`,
 and exact `LocalAppDataFolder\Shale` support root. Validation fails above 255 or when any field is missing. No ICE03
-suppression was added. Installation acceptance remains unauthorized until a Windows rerun proves the warnings are
-absent; Phase 13F remains IN PROGRESS.
+suppression was added. At that point, installation acceptance remained unauthorized until a Windows rerun proved the warnings absent.
 
 The ninth Windows run proved the customized jpackage template compiles and links successfully, the preliminary MSI
 is produced, and the five ICE03 Target overflows are gone. WiX 3.14 `dark.exe` also successfully decompiled that MSI.
@@ -113,7 +114,7 @@ is optional but may not be explicitly machine-scoped, and clear machine-wide or 
 closed. TEMPLATE validation intentionally remains different: it requires the exact
 `InstallScope="$(var.JpInstallScope)"` expression and forbids every explicit `InstallPrivileges` value. The source
 template, original jpackage compile, Option B resource-injection architecture, registration actions, and privilege
-architecture are unchanged. Phase 13F remains **IN PROGRESS** pending the corrected Windows rerun and installed
+architecture were unchanged. At that point Phase 13F remained **IN PROGRESS** pending the corrected Windows rerun and installed
 lifecycle acceptance.
 
 The next Windows run passed the clean reactor, app-image, generated-WiX, preliminary-MSI, final-link, registration,
@@ -126,7 +127,7 @@ the installed name from MSI/Dark `LongName`, `SourceName`, or `Name` semantics (
 serialization), never from a Dark extraction path. It still requires exactly one classpath mapping, opens every
 packaged JAR to prove exactly one desktop-owned diagnostic class, rejects the legacy core class, and proves the
 production reader remains in exactly one effective `shale-core` JAR. Generated source and app-image validation
-remain unchanged and strict. Phase 13F remains **IN PROGRESS** pending the Windows rebuild and installed reader
+remained unchanged and strict. At that point Phase 13F remained **IN PROGRESS** pending the Windows rebuild and installed reader
 acceptance; no Phase 13G work has begun.
 
 The corrected build was subsequently produced and used for the lifecycle evidence recorded below. The current
@@ -141,13 +142,13 @@ installed validation.
 | --- | --- | --- |
 | Windows build/version tested | PASS | Installed lifecycle evidence covers `1.0.128` and `1.0.129`. |
 | MSI tested | PASS | Fresh install, repair, major upgrade, and exact uninstall were executed with the generated MSIs. |
-| Signing mode | NOT RUN | The supplied lifecycle evidence did not classify the tested MSIs as signed release or unsigned developer artifacts. |
+| Production signing | NOT RUN | Developer artifacts were intentionally unsigned. Expected-publisher/timestamp Authenticode remains a separate deployment prerequisite; this is not production-ready evidence. |
 | Fresh-install registration | PASS | Fresh install created the authoritative HKLM registration. |
 | Authoritative registration path | PASS | The installed record was `HKLM\SOFTWARE\Shale\Installations\ca2bb9b9-9576-400d-a637-0ad645c52bea`. |
 | Installation UUID | PASS | `ca2bb9b9-9576-400d-a637-0ad645c52bea` was retained through repair and major upgrade. |
 | Owner SID and owner-derived roots | PASS | Installed validation matched the registered SID and both canonical owner-derived roots. |
 | Authoritative-record ACL and ordinary-user mutation resistance | PASS | The exact 64-bit child is protected with no inherited ACEs; SYSTEM and Administrators have FullControl; the owner has ReadKey only; no unrelated allow-write/control ACE was observed. |
-| Production reader classification | FAIL | Installed `1.0.129` had no `runtime\bin\java.exe`; that path was an invalid assumption about the minimized jpackage runtime. The first alternate-launcher build then exposed three copies of the core-owned entry point because updater packaging shades core. The corrected build owns the entry point only in `shale-desktop`, retains the production reader in `shale-core`, and validates exactly one effective-classpath copy in `shale-desktop-<version>.jar` before MSI publication. `VALID` still requires an installed rerun. |
+| Production reader classification | PASS | The installed desktop-owned diagnostic invoked the core production reader, returned `VALID`, and exactly matched the authoritative UUID, SID, install root, and support root. |
 | Installed-version metadata | PASS | Installed schema 1 metadata reported version `1.0.129` and the expected production channel. |
 | Updater, Phase 12 attempt, Phase 13B lock, and evidence-log paths | PASS | Registered owner paths were resolved and the installed updater exists at the expected path. |
 | Runtime startup and Phase 13C availability | NOT RUN | No installed Shale application was launched. |
@@ -166,8 +167,7 @@ installed validation.
 | Logged-out automatic updating | UNSUPPORTED | Unchanged: registration does not activate Task Scheduler, a service, SYSTEM updating, or any logged-out executor. |
 | Packaging defect and fix | PRELIMINARY MSI/DARK PROVED; NINTH-FINDING CORRECTION REQUIRES WINDOWS RERUN | Original jpackage Candle and light pass and produce a preliminary MSI without the Phase 13F ICE03 overflows. Dark represents its per-user package as `InstallPrivileges="limited"` without `InstallScope`; FINAL validation now checks that MSI representation for both preliminary and final output. Identity comparison and installed acceptance remain required. |
 
-The exact next work is continuation of **Phase 13F only** on a suitable Windows machine. From the repository root,
-run:
+Phase 13F is closed. The following commands remain the reproducible packaging/acceptance procedure for future signed releases. From the repository root, run:
 
 ```bat
 build\scripts\build-shale-release.bat
@@ -186,7 +186,7 @@ ordinary unelevated negative test and require transaction failure with no author
 The run must show jpackage resource preparation, successful preliminary jpackage, original-compile registration
 validation, final link, identity/registration validation, and final MSI creation with no undefined `Jp*` variable.
 It must not upload a manifest or artifacts.
-Installed lifecycle acceptance follows separately. Logged-out automatic update support remains **UNSUPPORTED**.
+Installed lifecycle acceptance is PASS for Phase 13F. Logged-out automatic update support remains **UNSUPPORTED** and was separately reevaluated in Phase 13G.
 
 After installing the Phase 13F MSI, run the privacy-bounded, read-only helper from an elevated PowerShell prompt
 and paste its complete concise report into the acceptance evidence:

@@ -1147,9 +1147,10 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 13A | **COMPLETE** | Machine-scoped opt-in storage, provider, authorization, and Settings control were completed and verified before Phase 13B. |
 | 13B | **COMPLETE** | Eligibility, aggregate readiness, cooperative shutdown, explicit invocation modes, update locking, and bounded retry/window contracts are implemented and verified. |
 | 13C | **COMPLETE** | Authenticated process-local Windows scheduling is implemented and verified; it remains session-only. |
-| 13D | **IN PROGRESS — DESIGN / UNSUPPORTED** | Logged-out alternatives were assessed and no executor was registered. Required Maven verification is blocked by Maven Central HTTP 403, so completion is not claimed. |
+| 13D | **COMPLETE — UNSUPPORTED** | Logged-out alternatives were assessed, the safe-default capability contract was verified, and no executor was registered. |
 | 13E | **COMPLETE** | Public policy, signing gates, strict registration values, owner paths, and installed-version metadata are implemented and verified; no registration writer or logged-out executor was added. |
-| 13F | **IN PROGRESS — INSTALLED WINDOWS VALIDATION REQUIRED** | Elevated MSI registration, protected HKLM identity lifecycle, rollback, reader, and acceptance tooling are implemented; installed Windows acceptance remains NOT RUN. |
+| 13F | **COMPLETE** | Elevated MSI registration and lifecycle are verified; installed Windows fresh-install acceptance confirmed the protected 64-bit HKLM record, exact owner/roots, ACL, schema/version/channel, updater, and production-reader `VALID`. Production signing remains a separate deployment prerequisite. |
+| 13G | **COMPLETE — UNSUPPORTED** | Every Phase 13D blocker was reevaluated against 13E/13F. Discovery, public policy, version, and owner-path prerequisites are closed, but no credentialless owner principal or sufficiently protected privileged execution boundary is proven; no prototype or rollout was created. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1186,10 +1187,10 @@ update this table and the applicable phase section.
 
 ## Recommended exact scope for the next run
 
-Phase 13E — **Windows background-update prerequisite closure only**: decide whether to expose a narrowly scoped,
-rate-limited unauthenticated global Production-policy read and design Authenticode signing plus protected explicit
-install-owner registration/uninstall cleanup. Do not implement or roll out a task/service, store credentials, add
-macOS parity, or enable logged-out installation until those prerequisites are independently approved and proven.
+Phase 13H — **privileged Windows component go/no-go and threat model only**, and only if the operator accepts
+long-lived ownership of a signed protected broker/service lifecycle. Do not prototype SYSTEM execution from the
+owner-writable installation, change `LoggedOutAutomaticUpdateSupport`, add macOS parity, or redesign the updater.
+If that ownership is not accepted, stop this roadmap branch and retain Phase 13C as the supported architecture.
 
 ## Phase 7A implementation record — 2026-09-29
 
@@ -2068,13 +2069,13 @@ activate or reevaluate logged-out execution.
 
 ## Phase 13F implementation record — 2026-09-30
 
-**Status: IN PROGRESS — implementation is complete and the full repository `mvn test` verification is PASS;
-installed-Windows acceptance is NOT RUN because the available host is Linux.**
+**Status: COMPLETE — implementation, repository verification, lifecycle checks, and required installed-Windows
+acceptance are PASS. Production Authenticode remains a separate deployment prerequisite.**
 
-The pre-acceptance status is therefore explicit: Phase 13F implementation **COMPLETE**, Maven verification **PASS**,
-installed-Windows acceptance **NOT YET RUN**, and overall Phase 13F **IN PROGRESS**. The Maven result closes automated
-repository verification only. It does not supply an MSI lifecycle, registry, ACL, installed-payload, upgrade, repair,
-uninstall, multi-user, reparse, or Authenticode result.
+The original implementation was completed on Linux and therefore could not alone supply MSI lifecycle, registry,
+ACL, installed-payload, upgrade, repair, uninstall, or Authenticode evidence. The later installed lifecycle and
+fresh-install acceptance recorded below close the required Windows rows; intentionally unsigned developer artifacts
+do not close production signing.
 
 The sole authoritative discovery location is 64-bit
 `HKLM\SOFTWARE\Shale\Installations\<installation UUID>`. Each child contains exactly `schemaVersion` (DWORD `1`),
@@ -2129,9 +2130,7 @@ also require valid expected-publisher Authenticode.
 
 There is no SQL, API, tenant mutation, sensitive read, or audit change. `LoggedOutAutomaticUpdateSupport` remains
 `UNSUPPORTED`. No task, service, SYSTEM executor, background principal, impersonation, credential, wake/reboot, or
-logged-out scheduler was added. The exact recommended next phase is **Phase 13F installed-Windows acceptance
-completion only**, using `docs/testing/windows-installed-registration-phase13f.md`; do not begin or reevaluate
-logged-out execution.
+logged-out scheduler was added. The exact recommended next phase is **Phase 13G — logged-out Windows automatic-update architecture reevaluation**, only after Phase 13F installed acceptance is complete. It must not infer support from registration alone.
 
 ### Phase 13F installed lifecycle continuation — 2026-10-01
 
@@ -2161,8 +2160,63 @@ the privacy-minimal registration facts, never heals or writes state, and returns
 is uniquely `VALID`. This is not a general-purpose debug/admin shell.
 
 Installed Windows validation has now accepted the corrected 64-bit ACL contract: SYSTEM and Administrators have
-FullControl, the registered owner has ReadKey only, the DACL is protected, and no inherited ACE was observed. The
-production-reader `VALID` result remains unaccepted until a build containing the dedicated launcher is installed
-and the helper reruns. Security fixtures, genuine multi-user behavior, and signing rows remain as
-listed in the Phase 13F runbook. There is no SQL/API/schema or audit mutation: both additions are local read-only
-installation diagnostics, and logged-out automatic updating remains `UNSUPPORTED`. Phase 13G has not started.
+FullControl, the registered owner has ReadKey only, the DACL is protected, and no inherited ACE was observed. The subsequent installed rerun accepted production-reader `VALID` and exact fact matching, completing the required
+non-destructive fresh-install acceptance. Optional destructive security fixtures and genuine multi-user coverage
+remain follow-up hardening rather than Phase 13F closure gates. Production signing remains separately required for
+deployment. There is no SQL/API/schema or audit mutation, and logged-out automatic updating remains `UNSUPPORTED`.
+
+
+## Phase 13G implementation record — 2026-10-01
+
+**Status: COMPLETE — architecture reevaluation selected `UNSUPPORTED`; no task, service, broker, helper, or rollout was created.**
+
+Phase 13F is now **COMPLETE** based on installed Windows evidence. The corrected fresh-install run found exactly one
+authoritative 64-bit HKLM registration with a unique installation UUID and schema 1; matched the current Windows
+owner SID and canonical install/support roots; proved a protected, non-inherited DACL granting SYSTEM and
+Administrators FullControl and the owner ReadKey only, with no unrelated allow-write ACE; obtained production-reader
+classification `VALID` with exact registration facts; found schema 1 installed metadata for `1.0.129` / `PRODUCTION`;
+and found the updater executable. Previously recorded repair, `1.0.128` to `1.0.129` major-upgrade identity
+preservation, exact uninstall cleanup, rollback/commit corrections, payload/classpath validation, and diagnostic
+launcher ownership complete the required Phase 13F scope. Production Authenticode acceptance remains **NOT RUN**
+for intentionally unsigned developer output and is a deployment prerequisite, not an implied production-readiness
+result.
+
+### Blocker-by-blocker reassessment
+
+| Concern | 13E/13F result | Phase 13G conclusion |
+| --- | --- | --- |
+| Protected discovery; exact SID and roots; ambiguous/multiple installs | Closed as a prerequisite | Enumerate only `VALID` protected registrations and process each UUID independently; zero, duplicate, invalid, stale, or reparse-unsafe records defer. Machine consent never selects an arbitrary first record. |
+| Public policy and offline behavior | Closed as a prerequisite | The public Phase 11-backed channel policy is usable without a Shale session. Unavailable/stale-invalid policy must defer; the manifest cannot replace it. |
+| Installed version and package authority | Closed as data flow, not privileged trust | Protected registration locates schema-1 metadata; policy selects the target and the existing manifest/SHA-256/archive checks remain package authority. Owner-writable metadata cannot authorize privileged execution. |
+| Phase 12 store and execution lock | Closed as explicit path derivation | Use each registration's support root for attempts, logs, and the existing per-owner lock, never executor `%LOCALAPPDATA%`. Create an attempt only at real handoff. |
+| Activity/idle and running Shale | Still open outside the process | Phase 13B activity is process memory and cannot establish logged-out idleness. A future executor must enumerate the exact installed `Shale.exe` across all Windows sessions and defer on any match, including locked/disconnected sessions; it may never kill or request cross-session shutdown. |
+| Owner Scheduled Task | Rejected | Interactive-token mode does not run logged out. Password mode stores OS credentials and violates the credential invariant. S4U avoids a password but does not provide the required network/EFS capability and has no installed proof for updater write semantics. |
+| SYSTEM Scheduled Task | Rejected for the current payload | SYSTEM needs no credentials and can read HKLM/public policy, but the installed updater and destination are owner-writable. Verify-then-execute from that location has substitution/TOCTOU risk, and publisher trust alone does not constrain an old or vulnerable signed binary. SYSTEM also changes the privilege and file-ownership boundary. |
+| Elevated broker/helper/service | Potential future design, not justified as a narrow prototype | A minimal safe design would require a separately installed, protected, version-constrained, expected-publisher-signed broker; protected staging; handle-based/reparse-resistant validation; bounded commands; task/service ACLs; and transactional upgrade/uninstall ownership. That is a new privileged security product, not a reuse of the current updater, and cannot be proven by a small Phase 13G prototype. |
+| Authenticode | Implemented release gate; production acceptance open | Every privileged executable and accepted package must be `Valid`, timestamped, and match the approved publisher. Unsigned developer artifacts remain non-production. Signing does not by itself close owner-writable execution or TOCTOU. |
+| UAC and per-user ownership/write access | Still open | Logged-out work cannot display UAC. The current same-owner elevated MSI lifecycle does not grant the owner a credentialless elevated runtime token, and SYSTEM writes into another user's LocalAppData have not been accepted as preserving required ownership/ACL behavior. |
+| Task ACL, lifecycle, wake/reboot | Still open | No protected task exists. A future installer-owned task must be tamper-resistant, identity-stable, default-off, transactionally preserved/removed on upgrade/uninstall, use no wake timer, never reboot, and use bounded daily retry/backoff. |
+| Multi-user workstation | Discovery is closed; execution is not | Independent registrations prevent guessing, but each owner requires independent lock/process/path evaluation. One owner's failure or uninstall must not mutate another owner's task, state, files, or registration. |
+| No-force-kill / unsaved work | Preserved | Any matching running Shale process, uncertain enumeration, activity uncertainty, lock contention, or disconnected/locked session defers. Phase 13C remains the only cooperative automatic handoff. |
+
+### Decision and gates
+
+`LoggedOutAutomaticUpdateSupport = UNSUPPORTED` remains authoritative. No production code may register or invoke a
+logged-out executor. Phase 13G adds no SQL/API, stores no credential, guesses no profile, changes no Phase 13C
+behavior, and does not weaken Phase 13F validation. The audit-compatibility review finds no tenant/sensitive read or
+domain/administrative mutation: this is local architecture documentation plus an immutable capability assessment, so
+no audit row or migration is appropriate.
+
+A future phase may reconsider only after an operator explicitly approves the cost and ownership of a privileged
+Windows component. Before support can change, it must prove: protected install and task/broker binaries outside
+owner-writable authority; expected-publisher, timestamp, version/rollback, and package verification immediately at
+the execution boundary without a substitution race; exact per-registration multi-owner arbitration; all-session
+process detection that fails closed; owner-correct lock/attempt/log behavior; noninteractive write ACL/ownership
+semantics; public-policy outage deferral; bounded retry with no wake/reboot; transactional upgrade/uninstall cleanup;
+and installed Windows acceptance for locked, disconnected, logged-out, offline, ambiguous, tampered, reparse, and
+concurrent-update cases. Until every gate passes, the explicit result is `UNSUPPORTED`, not a disabled production
+implementation. The detailed decision record is `docs/testing/windows-logged-out-update-phase13g.md`.
+
+The next recommended phase is **Phase 13H — privileged Windows component go/no-go and threat model**, but only if
+the operator chooses to own a signed protected broker/service lifecycle. Otherwise stop logged-out work and retain
+Phase 13C as the supported automatic-update architecture. macOS parity and updater redesign remain out of scope.

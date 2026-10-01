@@ -17,7 +17,7 @@ Primary modules:
 - shale-desktop
 - shale-server
 
-## Installer-owned Windows registration (Phase 13F; installed validation pending)
+## Installer-owned Windows registration (Phase 13F; complete)
 
 The WiX 3.14 lifecycle, not Shale runtime, owns one protected 64-bit HKLM registration per per-user installation at
 `SOFTWARE\Shale\Installations\<opaque UUID>`. It stores only schema, UUID, Windows owner SID, install root, and owner
@@ -31,9 +31,7 @@ privilege attribute. WiX 3.14 Dark represents the compiled MSI with `InstallPriv
 `InstallScope`; same-owner administrator consent elevates `msiexec`, after which
 deferred non-impersonating actions use the installer service for protected writes. Secondary-credential elevation
 is unsupported because it changes the per-user installation owner.
-Installed Windows acceptance remains outstanding, so Phase 13F is in progress even though implementation is complete and the full
-repository `mvn test` verification is PASS. Logged-out automatic updating remains `UNSUPPORTED`; there is no task,
-service, SYSTEM executor, principal selection, or scheduler.
+Installed Windows acceptance is PASS: the protected 64-bit record, owner/roots, strict ACL, production-reader `VALID`, schema-1 `1.0.129` / `PRODUCTION` metadata, and updater were confirmed. Repair and major upgrade preserved the UUID, and exact uninstall removed it. Production Authenticode is still a separate deployment prerequisite because the accepted developer artifacts were intentionally unsigned. Logged-out automatic updating remains `UNSUPPORTED`; there is no task, service, SYSTEM executor, principal selection, or scheduler.
 
 ## Privacy-safe update-attempt observability (Phase 12)
 
@@ -278,3 +276,14 @@ explicit blockers rather than being delegated to the ordinary application proces
 
 `LoggedOutAutomaticUpdateSupport = UNSUPPORTED` is unchanged. No execution principal, scheduled task, service,
 SYSTEM execution, impersonation, logged-out updater, rollout flag, SQL migration, or tenant audit was added.
+
+
+## Windows logged-out architecture reevaluation (Phase 13G)
+
+Phase 13G is complete with `LoggedOutAutomaticUpdateSupport = UNSUPPORTED`. Phase 13E/13F closed public-policy,
+protected discovery, owner-root, installed-version, lock, and attempt-store prerequisites, but did not create a safe
+principal. Owner password tasks violate the no-credential rule; owner S4U lacks required network guarantees; and
+SYSTEM execution of an owner-writable updater has substitution/TOCTOU, privilege, ACL-ownership, and lifecycle risk.
+A safe broker would be a new protected, signed privileged security product rather than a narrow updater extension.
+No task/service/helper, rollout, SQL/API, wake/reboot, force-kill, or macOS work was added. Production signing remains
+mandatory but cannot by itself cure owner-writable privileged execution. Phase 13C is still the supported mechanism.

@@ -97,9 +97,8 @@ present in `shale-desktop-<version>.jar`; any legacy core entry point or duplica
 read-only acceptance script uses this launcher because the minimized jpackage runtime does not expose
 `runtime\bin\java.exe` as an installed command-line contract.
 
-Earlier automated repository verification for Phase 13F completed with a full `mvn test` PASS. Installed Windows
-evidence now covers fresh install, repair, major upgrade, exact uninstall, owner-derived roots, installed metadata,
-updater presence, and the protected SID-based ACL. Production-reader classification remains pending because the
-tested `1.0.129` package lacked the dedicated diagnostic launcher; security fixtures, multi-user behavior, and
-Authenticode remain tracked separately in the Phase 13F runbook. The available Linux host cannot supply the final
-installed-reader observation.
+Phase 13F is complete. Automated repository verification passed, and installed Windows evidence covers fresh
+install, repair, major upgrade, exact uninstall, owner-derived roots, installed metadata, updater presence, the
+protected SID-based ACL, and production-reader `VALID` with exact fact matching through the dedicated launcher.
+Production Authenticode remains separately required and was not run for intentionally unsigned developer artifacts;
+security fixtures and genuine multi-user behavior remain optional hardening rows in the Phase 13F runbook.
