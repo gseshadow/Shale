@@ -2146,12 +2146,15 @@ with no inherited ACEs, FullControl for `S-1-5-18` and `S-1-5-32-544`, ReadKey w
 registered owner SID, and no write/control grant to an unrelated principal. Technical inspection failures are
 reported as specific failures rather than an ambiguous skipped result.
 
-The installed application also carries a narrow command-line diagnostic in core. The first validator revision
+The installed application also carries a narrow command-line entry point in `shale-desktop` that delegates to the
+production registration reader retained in `shale-core`. Keeping the entry point out of core prevents the updater's
+existing core shading from producing duplicate executable entry points. The first validator revision
 incorrectly assumed the minimized jpackage runtime exposed `runtime\bin\java.exe`; installed `1.0.129` proved that
 entry point is absent even though the application payload and registration were otherwise valid. Packaging now
 creates a dedicated `ShaleRegistrationDiagnostic.exe` console launcher with jpackage `--add-launcher`. It inherits
-jpackage's generated application classpath, targets only the diagnostic main class, creates no Start Menu or desktop
-shortcut, and accepts only the selected UUID argument. The validator invokes that launcher rather than reconstructing
+jpackage's generated application classpath, targets only
+`com.shale.desktop.update.WindowsInstallationRegistrationDiagnostic`, creates no Start Menu or desktop shortcut,
+and accepts only the selected UUID argument. The validator invokes that launcher rather than reconstructing
 a Maven-target classpath. The diagnostic delegates directly to
 `WindowsInstallationRegistrationReader.windowsRegistrySource()` and `inspectPath`, emits its classification plus
 the privacy-minimal registration facts, never heals or writes state, and returns failure unless the selected result

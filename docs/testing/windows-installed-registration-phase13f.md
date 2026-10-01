@@ -134,7 +134,7 @@ installed validation.
 | Installation UUID | PASS | `ca2bb9b9-9576-400d-a637-0ad645c52bea` was retained through repair and major upgrade. |
 | Owner SID and owner-derived roots | PASS | Installed validation matched the registered SID and both canonical owner-derived roots. |
 | Authoritative-record ACL and ordinary-user mutation resistance | PASS | The exact 64-bit child is protected with no inherited ACEs; SYSTEM and Administrators have FullControl; the owner has ReadKey only; no unrelated allow-write/control ACE was observed. |
-| Production reader classification | FAIL | Installed `1.0.129` had no `runtime\bin\java.exe`; that path was an invalid assumption about the minimized jpackage runtime. The next build supplies the narrow console-enabled `ShaleRegistrationDiagnostic.exe` alternate launcher and validates its class/configuration before MSI publication. `VALID` still requires an installed rerun. |
+| Production reader classification | FAIL | Installed `1.0.129` had no `runtime\bin\java.exe`; that path was an invalid assumption about the minimized jpackage runtime. The first alternate-launcher build then exposed three copies of the core-owned entry point because updater packaging shades core. The corrected build owns the entry point only in `shale-desktop`, retains the production reader in `shale-core`, and validates exactly one effective-classpath copy in `shale-desktop-<version>.jar` before MSI publication. `VALID` still requires an installed rerun. |
 | Installed-version metadata | PASS | Installed schema 1 metadata reported version `1.0.129` and the expected production channel. |
 | Updater, Phase 12 attempt, Phase 13B lock, and evidence-log paths | PASS | Registered owner paths were resolved and the installed updater exists at the expected path. |
 | Runtime startup and Phase 13C availability | NOT RUN | No installed Shale application was launched. |
@@ -186,7 +186,8 @@ The helper directly opens `HKEY_LOCAL_MACHINE` through the 64-bit .NET registry 
 not depend on PowerShell provider `PSPath` ACL behavior or localized account names. It also starts only the installed
 `ShaleRegistrationDiagnostic.exe` alternate jpackage launcher with the selected installation UUID. The launcher uses
 the actual generated application classpath and calls the narrow diagnostic entry point backed by the production
-reader. It creates no Start Menu or desktop shortcut. The diagnostic accepts no arbitrary command, performs no
+reader in `shale-core`. The entry point itself is uniquely owned by `shale-desktop`; updater JAR layout is unchanged.
+It creates no Start Menu or desktop shortcut. The diagnostic accepts no arbitrary command, performs no
 write/heal operation, and returns only classification, schema, UUID, owner SID, install root, and support root. A
 missing launcher, invocation failure, non-`VALID` classification, or fact mismatch is a specific `FAIL`.
 

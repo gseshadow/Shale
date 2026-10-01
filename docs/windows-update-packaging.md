@@ -87,10 +87,13 @@ remains per-user. Developer MSIs may be unsigned; signing-required builds still 
 registration never makes an unsigned updater trustworthy.
 
 The Windows package also contains `ShaleRegistrationDiagnostic.exe`, a console-enabled alternate jpackage launcher
-whose only main class is `WindowsInstallationRegistrationDiagnostic`. It inherits the application image's generated
+whose only main class is `com.shale.desktop.update.WindowsInstallationRegistrationDiagnostic`. The tiny executable
+entry point is owned only by `shale-desktop` and delegates to the unchanged production reader in `shale-core`; it is
+not shaded into the updater. It inherits the application image's generated
 classpath, creates no Start Menu or desktop shortcut, and accepts only `--installation-id <UUID>`; it is not a Java
 shell and does not expose arbitrary class or argument execution. Build validation fails before MSI publication
-unless the launcher, its generated configuration, and exactly one packaged diagnostic class are present. The
+unless the launcher, its generated configuration, and exactly one effective-classpath copy of the entry point are
+present in `shale-desktop-<version>.jar`; any legacy core entry point or duplicate fails closed. The
 read-only acceptance script uses this launcher because the minimized jpackage runtime does not expose
 `runtime\bin\java.exe` as an installed command-line contract.
 

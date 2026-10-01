@@ -315,7 +315,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         for source in (release, msi):
             self.assertIn('--add-launcher ShaleRegistrationDiagnostic="%DIAGNOSTIC_LAUNCHER_CONFIG%"', source)
             self.assertIn('windows_msi_payload.py" launcher "%DIAGNOSTIC_LAUNCHER_CONFIG%"', source)
-        self.assertIn("main-class=com.shale.core.update.WindowsInstallationRegistrationDiagnostic", properties)
+        self.assertIn("main-class=com.shale.desktop.update.WindowsInstallationRegistrationDiagnostic", properties)
         self.assertIn("win-console=true", properties)
         self.assertIn("win-menu=false", properties)
         self.assertIn("win-shortcut=false", properties)
@@ -326,6 +326,16 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         publish = msi.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"')
         self.assertLess(source_validation, final_validation)
         self.assertLess(final_validation, publish)
+
+    def test_registration_diagnostic_entrypoint_is_desktop_owned_only(self):
+        legacy = ROOT / "shale-core/src/main/java/com/shale/core/update/WindowsInstallationRegistrationDiagnostic.java"
+        desktop = ROOT / "shale-desktop/src/main/java/com/shale/desktop/update/WindowsInstallationRegistrationDiagnostic.java"
+        self.assertFalse(legacy.exists(), "The legacy core diagnostic would be shaded into updater payloads")
+        self.assertTrue(desktop.is_file(), "The desktop-owned diagnostic entry point is missing")
+        source = desktop.read_text(encoding="utf-8")
+        self.assertIn("import com.shale.core.update.WindowsInstallationRegistrationReader;", source)
+        self.assertIn("WindowsInstallationRegistrationReader.windowsRegistrySource()", source)
+        self.assertIn("WindowsInstallationRegistrationReader::inspectPath", source)
 
     def test_successful_toolchain_reaches_named_native_stage_without_stale_errorlevel(self):
         source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
