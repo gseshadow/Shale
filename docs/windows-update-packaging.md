@@ -62,6 +62,11 @@ cross-checks SID/profile/path, rejects visible reparse ancestors, writes only
 `HKLM\SOFTWARE\Shale\Installations\<UUID>`, and applies protected explicit ACLs. It never uses the elevated account's
 environment as owner authority.
 
+These checks are deliberately layered. Before jpackage, the raw JDK template must retain
+`InstallScope="$(var.JpInstallScope)"` and omit `InstallPrivileges`; that stage proves jpackage still owns scope
+resolution. After jpackage, generated/decompiled MSI source must contain resolved `InstallScope="perUser"`, still
+omit `InstallPrivileges`, and retain every registration lifecycle action and sequence row.
+
 Protected installer state retains the random UUID across upgrade and repair. Major-upgrade removal does not delete
 the record; exact uninstall does. Paired rollback actions restore prior state. If both record and protected state are
 destroyed, repair creates a documented replacement UUID because the original cannot be safely invented. The payload

@@ -355,9 +355,9 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         mutate = source.index('windows_msi_registration.py" mutate "%JPACKAGE_MAIN_TEMPLATE%"', extract)
         jpackage = source.index('jpackage --type msi', mutate)
         self.assertIn('--resource-dir "%JPACKAGE_RESOURCE_DIR%"', source[jpackage:])
-        validate_original = source.index('windows_msi_registration.py" validate "%MAIN_SOURCE%"', jpackage)
+        validate_original = source.index('windows_msi_registration.py" final "%MAIN_SOURCE%"', jpackage)
         link = source.index("Final light.exe reconstruction started.", validate_original)
-        validate = source.index('windows_msi_registration.py" validate "%STAGE%\\dark\\final.wxs"', link)
+        validate = source.index('windows_msi_registration.py" final "%STAGE%\\dark\\final.wxs"', link)
         publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', validate)
         self.assertEqual([extract, selection, mutate, jpackage, validate_original, link, validate, publish],
                          sorted([extract, selection, mutate, jpackage, validate_original, link, validate, publish]))
