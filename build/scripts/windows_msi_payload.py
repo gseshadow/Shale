@@ -46,8 +46,28 @@ def directory_graph(root):
 
 def file_description(file_node, component, directory_id):
     return (f"File Id={file_node.get('Id')!r} Name={file_node.get('Name')!r} "
+            f"LongName={file_node.get('LongName')!r} SourceName={file_node.get('SourceName')!r} "
             f"Source={file_node.get('Source')!r} Component={component.get('Id')!r} "
             f"Directory={directory_id!r}")
+
+def msi_file_names(file_node):
+    """Return authoritative installed names retained from the MSI File table."""
+    names = []
+    for attribute in ("LongName", "SourceName", "Name"):
+        value = file_node.get(attribute)
+        if not value:
+            continue
+        # MSI FileName fields may serialize as short|long. The long name is the
+        # installed name; retaining the short alias as a candidate is harmless
+        # and permits exact validation of genuinely short-named payloads.
+        for candidate in reversed(value.split("|", 1)):
+            if candidate and candidate not in names:
+                names.append(candidate)
+    return tuple(names)
+
+def installed_file_name(file_node):
+    names = msi_file_names(file_node)
+    return names[0] if names else None
 
 def canonical_directory_paths(directory_id, parents, names, trail=()):
     if directory_id == "INSTALLDIR":
@@ -95,7 +115,8 @@ def installed_directory(root, file_node):
     return next(iter(paths))
 
 def required_file(root, filename, expected_directory, label):
-    matches = [node for node in root.iter(tag("File")) if node.get("Name", "").casefold() == filename.casefold()]
+    matches = [node for node in root.iter(tag("File"))
+               if filename.casefold() in {name.casefold() for name in msi_file_names(node)}]
     if not matches:
         raise ValueError(f"missing {label} File entry: {filename}")
     if len(matches) != 1:
@@ -236,16 +257,24 @@ def validate_image(root):
     packaged_jars = [(source.relative_to(app).parts, source) for source in app.rglob("*.jar")]
     require_unique_desktop_diagnostic(effective_jars, packaged_jars)
 
-def diagnostic_jars_from_wix(root, config):
+def diagnostic_jars_from_wix(root, config, *, compiled=False):
     payload = {}
     for node in root.iter(tag("File")):
         source = node.get("Source")
-        if not source or not source.casefold().endswith(".jar"):
+        if not source:
+            continue
+        name = installed_file_name(node)
+        if not name and not compiled:
+            name = source.replace("/", "\\").rsplit("\\", 1)[-1]
+        if not name or not name.casefold().endswith(".jar"):
             continue
         installed = installed_directory(root, node)
         if not installed or installed[0].casefold() != "app":
             continue
-        name = node.get("Name") or source.replace("/", "\\").rsplit("\\", 1)[-1]
+        # Dark extraction paths are keyed by MSI File identifiers and need not
+        # preserve the authored source basename. For compiled MSIs the File
+        # table name is authoritative; source fallback is only valid for the
+        # precompile bundle.wxf validation path.
         key = tuple(part.casefold() for part in installed + (name,))
         payload.setdefault(key, []).append((installed + (name,), Path(source)))
     jars = []
@@ -296,7 +325,7 @@ def validate_compiled(wxs):
     marker_properties(marker)
     validate_launcher_config(launcher_config)
     validate_launcher_config(diagnostic_config, DIAGNOSTIC_MAIN_CLASS)
-    effective_jars, packaged_jars = diagnostic_jars_from_wix(root, diagnostic_config)
+    effective_jars, packaged_jars = diagnostic_jars_from_wix(root, diagnostic_config, compiled=True)
     require_unique_desktop_diagnostic(effective_jars, packaged_jars)
 
 def validate_source(wxs):

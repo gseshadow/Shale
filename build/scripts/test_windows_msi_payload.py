@@ -1,4 +1,5 @@
 import importlib.util
+import copy
 from pathlib import Path
 import tempfile
 import unittest
@@ -14,7 +15,8 @@ class CompiledPayloadTest(unittest.TestCase):
                 dll_dir="native", marker_contents=None, missing_payload=None,
                 main_class=m.APPROVED_MAIN_CLASS, diagnostic_launcher_count=1,
                 diagnostic_main_class=m.DIAGNOSTIC_MAIN_CLASS, diagnostic_class_count=1,
-                legacy_diagnostic_count=0, diagnostic_owner="shale-desktop-1.0.129.jar"):
+                legacy_diagnostic_count=0, diagnostic_owner="shale-desktop-1.0.129.jar",
+                dark_short_jar_names=False):
         temporary = Path(tempfile.mkdtemp())
         payload = temporary / "opaque"
         payload.mkdir()
@@ -48,7 +50,14 @@ class CompiledPayloadTest(unittest.TestCase):
                         jar.writestr(m.PRODUCTION_READER_CLASS_ENTRY, b"reader")
                     if index > 0 and index <= legacy_diagnostic_count:
                         jar.writestr(m.LEGACY_DIAGNOSTIC_CLASS_ENTRY, b"legacy")
-            entry = f'<Component Id="c-jar-{index}"><File Id="f-jar-{index}" Name="{name}" Source="{source}"/></Component>'
+            if dark_short_jar_names:
+                opaque_source = payload / f"f-{index}"
+                source.rename(opaque_source)
+                source = opaque_source
+                file_names = f'Name="JAR{index}~1.JAR" LongName="{name}"'
+            else:
+                file_names = f'Name="{name}"'
+            entry = f'<Component Id="c-jar-{index}"><File Id="f-jar-{index}" {file_names} Source="{source}"/></Component>'
             (root_jars if name == diagnostic_owner else lib_jars).append(entry)
         if marker_dir == "app":
             app_marker, wrong_marker = marker_files, ""
@@ -68,6 +77,29 @@ class CompiledPayloadTest(unittest.TestCase):
 
     def test_opaque_dark_sources_and_installed_names_pass(self):
         m.validate_compiled(self.fixture())
+
+    def test_dark_file_table_short_name_and_long_name_map_effective_classpath(self):
+        # Regression shape from the final MSI: Dark extracts payloads under
+        # opaque Source paths while retaining the installed long filename in
+        # LongName and placing its 8.3 alias in Name.
+        m.validate_compiled(self.fixture(dark_short_jar_names=True))
+
+    def test_dark_file_table_duplicate_long_name_mapping_fails_closed(self):
+        wxs = self.fixture(dark_short_jar_names=True)
+        tree = ET.parse(wxs)
+        root = tree.getroot()
+        original = next(node for node in root.iter(m.tag("File"))
+                        if node.get("LongName") == "shale-desktop-1.0.129.jar")
+        duplicate_component = ET.Element(m.tag("Component"), {"Id": "duplicate-desktop-component"})
+        duplicate = copy.deepcopy(original)
+        duplicate.set("Id", "duplicate-desktop-file")
+        duplicate_component.append(duplicate)
+        app_directory = next(node for node in root.iter(m.tag("Directory"))
+                             if node.get("Name") == "app")
+        app_directory.append(duplicate_component)
+        tree.write(wxs, encoding="utf-8", xml_declaration=True)
+        with self.assertRaisesRegex(ValueError, "effective classpath entry must map to exactly one packaged JAR"):
+            m.validate_compiled(wxs)
 
     def test_marker_cardinality(self):
         for count, message in ((0, "missing installed marker"), (2, "duplicate installed marker")):
