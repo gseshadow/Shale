@@ -18,23 +18,14 @@ def encoded_script(script):
     return base64.b64encode(script.read_text(encoding="utf-8-sig").encode("utf-16le")).decode("ascii")
 
 def command(mode):
-    """Return a short MSI-authored CustomAction.Target.
+    """Return a CustomAction.Target that fits the MSI schema's 255-char limit.
 
-    Do not route through cmd.exe: cmd has an ~8K command-line ceiling, while the
-    encoded registration payload expands to about 17K.  WixQuietExec can launch
-    powershell.exe directly, which uses the normal Win32 process-command limit.
-    The compact PowerShell bootstrap sets the four environment inputs expected by
-    the embedded registration program, decodes the MSI-authored payload, and runs
-    it in the same deferred non-impersonating process.
+    The encoded, MSI-authored script lives in a private Property-table value.  The
+    setter's formatted Target contains only its reference and the four complete
+    lifecycle inputs; Windows Installer expands it into CustomActionData.
     """
     code=MODE_CODES[mode]
-    return (
-        f'"[System64Folder]WindowsPowerShell\\v1.0\\powershell.exe" '
-        f'-NoP -EP Bypass -C "'
-        f'$env:M=\'{code}\';$env:O=\'[UserSID]\';$env:I=\'[INSTALLDIR]\';'
-        f'$env:S=\'[LocalAppDataFolder]Shale\';'
-        f'iex([\\[]Text.Encoding[\\]]::Unicode.GetString([\\[]Convert[\\]]::FromBase64String(\'[{PAYLOAD_PROPERTY}]\')))"'
-    )
+    return f'"[SystemFolder]cmd.exe" /D /S /C "set ""M={code}""&set ""O=[UserSID]""&set ""I=[INSTALLDIR]""&set ""S=[LocalAppDataFolder]Shale""&""[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe"" -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand [{PAYLOAD_PROPERTY}]"'
 
 def mutate(path, script):
     # jpackage's resource is a WiX preprocessor template.  Retain its processing
