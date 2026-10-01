@@ -144,8 +144,8 @@ python "%ROOT%\build\scripts\windows_msi_identity.py" mutate "%BUNDLE_SOURCE%"
 if errorlevel 1 goto :generated_identity_mutation_failed
 echo bundle.wxf identity and shortcut mutation completed.
 if not exist "%MAIN_SOURCE%" goto :missing_main_source
-echo Windows MSI stage started: original-compile-registration-validation input="%MAIN_SOURCE%"
-python "%ROOT%\build\scripts\windows_msi_registration.py" final "%MAIN_SOURCE%"
+echo Windows MSI stage started: original-compile-registration-validation input="%MAIN_SOURCE%" contract=TEMPLATE
+python "%ROOT%\build\scripts\windows_msi_registration.py" template "%MAIN_SOURCE%"
 if errorlevel 1 goto :original_compile_registration_failed
 echo Windows MSI stage completed: original-compile-registration-validation
 
@@ -153,6 +153,10 @@ mkdir "%STAGE%\preliminary-dark"
 if errorlevel 1 goto :dark_staging_failed
 dark.exe -o "%STAGE%\preliminary-dark\preliminary.wxs" "%PRELIMINARY_MSI%"
 if errorlevel 1 goto :preliminary_dark_failed
+echo Windows MSI stage started: preliminary-compiled-registration-validation input="%STAGE%\preliminary-dark\preliminary.wxs" contract=FINAL
+python "%ROOT%\build\scripts\windows_msi_registration.py" final "%STAGE%\preliminary-dark\preliminary.wxs"
+if errorlevel 1 goto :preliminary_compiled_registration_failed
+echo Windows MSI stage completed: preliminary-compiled-registration-validation
 
 if not exist "%WIXOBJ_DIR%" goto :missing_wixobj_dir
 if not exist "%MAIN_WIXOBJ%" goto :missing_main_wixobj
@@ -288,6 +292,11 @@ exit /b 42
 set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=preliminary-identity-extraction input="%PRELIMINARY_MSI%" exit=%STAGE_EXIT%
 exit /b 47
+
+:preliminary_compiled_registration_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=preliminary-compiled-registration-validation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%STAGE%\preliminary-dark\preliminary.wxs" exit=%STAGE_EXIT%
+exit /b 48
 
 :compiled_registration_failed
 set "STAGE_EXIT=%ERRORLEVEL%"

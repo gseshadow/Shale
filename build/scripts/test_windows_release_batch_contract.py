@@ -334,7 +334,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         stages = (
             "staging", "jpackage-resource-preparation", "native-DLL", "marker-staging", "preliminary-jpackage",
             "generated-payload-validation", "generated-identity-validation",
-            "generated-identity-mutation", "original-compile-registration-validation", "candle-recompile",
+            "generated-identity-mutation", "original-compile-registration-validation", "preliminary-compiled-registration-validation", "candle-recompile",
             "light-reconstruction", "dark-extraction", "compiled-identity-validation",
             "compiled-registration-validation", "compiled-payload-validation",
             "artifact-finalization",
@@ -355,16 +355,19 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         mutate = source.index('windows_msi_registration.py" mutate "%JPACKAGE_MAIN_TEMPLATE%"', extract)
         jpackage = source.index('jpackage --type msi', mutate)
         self.assertIn('--resource-dir "%JPACKAGE_RESOURCE_DIR%"', source[jpackage:])
-        validate_original = source.index('windows_msi_registration.py" final "%MAIN_SOURCE%"', jpackage)
-        link = source.index("Final light.exe reconstruction started.", validate_original)
+        validate_original = source.index('windows_msi_registration.py" template "%MAIN_SOURCE%"', jpackage)
+        preliminary_dark = source.index('dark.exe -o "%STAGE%\\preliminary-dark\\preliminary.wxs"', validate_original)
+        validate_preliminary = source.index('windows_msi_registration.py" final "%STAGE%\\preliminary-dark\\preliminary.wxs"', preliminary_dark)
+        link = source.index("Final light.exe reconstruction started.", validate_preliminary)
         validate = source.index('windows_msi_registration.py" final "%STAGE%\\dark\\final.wxs"', link)
         publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', validate)
-        self.assertEqual([extract, selection, mutate, jpackage, validate_original, link, validate, publish],
-                         sorted([extract, selection, mutate, jpackage, validate_original, link, validate, publish]))
+        self.assertEqual([extract, selection, mutate, jpackage, validate_original, preliminary_dark, validate_preliminary, link, validate, publish],
+                         sorted([extract, selection, mutate, jpackage, validate_original, preliminary_dark, validate_preliminary, link, validate, publish]))
         self.assertIn('--script "%ROOT%\\build\\scripts\\windows-installation-registration.ps1"', source)
         self.assertNotIn('for /r "%JPACKAGE_RESOURCE_EXTRACT%" %%F in (main.wxs)', source)
         self.assertIn("stage=jpackage-resource-preparation", source)
         self.assertIn("stage=original-compile-registration-validation", source)
+        self.assertIn("stage=preliminary-compiled-registration-validation", source)
         self.assertIn("stage=compiled-registration-validation", source)
 
     def test_original_jpackage_compile_owns_all_preprocessor_definitions_and_identity(self):

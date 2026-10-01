@@ -67,8 +67,9 @@ variable during its original preprocessing/Candle invocation after loading the r
 incorrectly required literal `perUser` while mutating that unresolved template, so resource preparation stopped
 before jpackage ran. Template validation now requires the exact jpackage-owned expression, rejects missing or literal
 scope and every `InstallPrivileges` value, and preserves the expression byte-for-byte as an XML attribute value.
-After jpackage, validation of generated `main.wxs` and final Dark output separately requires the resolved literal
-`InstallScope="perUser"`, absence of `InstallPrivileges`, and the complete registration action sequence. Identity
+After jpackage, generated `main.wxs` remains TEMPLATE-validated because Candle does not rewrite source. Preliminary
+and final Dark output separately require resolved `InstallScope="perUser"`, absence of `InstallPrivileges`, and the
+complete registration action sequence. Identity
 comparison remains independently required before publication. This layering does not define or replay
 `JpInstallScope`, compile `main.wxs` a second time, or weaken the final MSI contract.
 
@@ -78,8 +79,27 @@ The build extracts the authoritative `main.wxs` resource from the selected JDK 2
 ProductCode, UpgradeCode, version, and package-identity authority. There is no second `main.wxs` compile. The later
 link still replaces only the independently modified shortcut fragment, and a fail-closed comparison of Dark output
 from the preliminary and final MSI requires ProductCode, UpgradeCode, and version to remain identical. Final Dark
-validation still requires all registration actions before artifact finalization. The corrected Windows build has not
-yet been rerun, so neither final MSI production nor installed acceptance is claimed. The available Codex host is
+validation still requires all registration actions before artifact finalization.
+
+An eighth Windows run proved the original jpackage compile and all original Candle inputs succeeded, original
+`light.exe` produced the preliminary MSI, and Option B resource injection is operational. It then exposed another
+validation-layer error: Candle consumes but does not rewrite `config/main.wxs`, so that source still contains
+`InstallScope="$(var.JpInstallScope)"` and cannot satisfy the resolved FINAL contract. The pipeline now applies only
+TEMPLATE validation to that source, Dark-decompiles the preliminary MSI and applies FINAL validation there, applies
+FINAL validation again to the Dark-decompiled relinked MSI, and then compares preliminary/final ProductCode,
+UpgradeCode, and Version before artifact finalization.
+
+That first successful preliminary link also reported ICE03 overflows for all five registration action-data setters.
+Their former Targets were 17,642 (install), 17,644 (uninstall), 17,650 (rollback install), 17,652 (rollback
+uninstall), and 17,641 (commit) characters because each repeated the 17,320-character encoded PowerShell program.
+The MSI `CustomAction.Target` schema limit is 255 characters. The program now occupies one private MSI Property and
+each setter uses a 254-character formatted Target containing its reference, compact mode, owner SID, `INSTALLDIR`,
+and exact `LocalAppDataFolder\Shale` support root. Validation fails above 255 or when any field is missing. No ICE03
+suppression was added. Installation acceptance remains unauthorized until a Windows rerun proves the warnings are
+absent; Phase 13F remains IN PROGRESS.
+
+The corrected eighth-finding build has not yet been rerun through the final relink on Windows, so neither final MSI
+production nor installed acceptance is claimed. The available Codex host is
 Ubuntu Linux and has no PowerShell, Windows command environment, Wine, Windows VM manager, MSI artifact, remote
 Windows runner, or release signing credential. Do not report any installed row as PASS until its command is executed
 on an installed Windows machine and evidence is retained. Loose classes, exploded directories, source inspection,
@@ -114,7 +134,7 @@ and platform-neutral tests are not substitutes for MSI lifecycle validation.
 | Authenticode: MSI | NOT RUN | No MSI artifact or production signing credentials are available. |
 | Phase 13A / 13B / 13C installed regressions | NOT RUN | Their installed paths and behavior cannot be exercised on Linux; repository verification is PASS. |
 | Logged-out automatic updating | UNSUPPORTED | Unchanged: registration does not activate Task Scheduler, a service, SYSTEM updating, or any logged-out executor. |
-| Packaging defect and fix | TEMPLATE/RESOLVED VALIDATION LAYERS CORRECTED; WINDOWS RERUN REQUIRED | Seven findings led to the correction. The sixth proved jpackage consumed custom `main.wxs`, then Candle rejected the invalid `perUser` plus `InstallPrivileges=elevated` pair. The seventh proved the raw template retains `$(var.JpInstallScope)` until jpackage resolves it. Pre-jpackage validation now protects that expression; post-jpackage/final validation requires resolved per-user scope. The selected JDK template/original compile remain authoritative; no hidden defaults are replayed. |
+| Packaging defect and fix | PRELIMINARY MSI PROVED; EIGHTH-FINDING CORRECTION REQUIRES WINDOWS RERUN | Original jpackage Candle and light now pass and produce a preliminary MSI. Source `config/main.wxs` remains TEMPLATE-validated; preliminary and final Dark output are FINAL-validated and identity-compared. Five ICE03 Target overflows were eliminated with one private MSI payload property and complete 254-character setters, without suppressing ICE03. Installed acceptance remains unauthorized until Windows evidence confirms warning-free preliminary and final links. |
 
 The exact next work is continuation of **Phase 13F only** on a suitable Windows machine. From the repository root,
 run:

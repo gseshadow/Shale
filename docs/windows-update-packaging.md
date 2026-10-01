@@ -50,7 +50,9 @@ uses `windows_msi_registration.py` to add the registration actions without disca
 and supplies it to the original jpackage build with `--resource-dir`. jpackage therefore compiles it once with its
 native implicit/default `Jp*` environment and remains authoritative for ProductCode, UpgradeCode, and version; the
 build does not recompile `main.wxs` or reproduce private defaults. Dark output from the preliminary and final MSI is
-compared fail-closed for those three identity fields. The package retains `InstallScope="perUser"` and deliberately
+validated as the resolved representation and compared fail-closed for those three identity fields. Generated
+`config/main.wxs` remains preprocessor source after Candle consumes it and is checked with the template contract.
+The package retains `InstallScope="perUser"` and deliberately
 has no `InstallPrivileges` attribute: WiX 3.14 rejects the contradictory `perUser`/`elevated` pair. Installation,
 repair, upgrade, and uninstall must instead start `msiexec` with UAC elevation by the same split-token Windows
 administrator who owns the per-user installation. Deferred non-impersonating `WixQuietExec64` actions then run in
@@ -64,8 +66,16 @@ environment as owner authority.
 
 These checks are deliberately layered. Before jpackage, the raw JDK template must retain
 `InstallScope="$(var.JpInstallScope)"` and omit `InstallPrivileges`; that stage proves jpackage still owns scope
-resolution. After jpackage, generated/decompiled MSI source must contain resolved `InstallScope="perUser"`, still
-omit `InstallPrivileges`, and retain every registration lifecycle action and sequence row.
+resolution. After jpackage, generated `config/main.wxs` must still satisfy the template contract. Dark-decompiled
+preliminary and final MSI source must contain resolved `InstallScope="perUser"`, omit `InstallPrivileges`, and retain
+every registration lifecycle action and sequence row.
+
+Windows Installer limits `CustomAction.Target` to 255 characters. The encoded registration program is stored once
+in the private `Srp` Property-table value; each action-data setter has a 254-character formatted Target that
+references it and carries a compact mode plus the complete MSI-formatted owner SID, install root, and support root.
+Formatting stages the expanded command in CustomActionData without truncation or user-writable storage. Validation
+rejects every Target over 255 characters and every setter missing a required field. ICE03 is not suppressed; only
+the pre-existing ICE27 and ICE91 exceptions remain.
 
 Protected installer state retains the random UUID across upgrade and repair. Major-upgrade removal does not delete
 the record; exact uninstall does. Paired rollback actions restore prior state. If both record and protected state are

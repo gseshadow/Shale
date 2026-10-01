@@ -9,13 +9,23 @@ ET.register_namespace("", NS)
 def tag(name): return f"{{{NS}}}{name}"
 IDS = ("ShaleRegistrationInstall", "ShaleRegistrationUninstall", "ShaleRegistrationRollbackInstall", "ShaleRegistrationRollbackUninstall", "ShaleRegistrationCommit")
 JPACKAGE_SCOPE = "$(var.JpInstallScope)"
+TARGET_MAX = 255
+PAYLOAD_PROPERTY = "Srp"
+MODE_CODES = {"Install":"I", "Uninstall":"U", "RollbackInstall":"R", "RollbackUninstall":"B", "Commit":"C"}
 ROWS = (("SetShaleRegistrationRollbackInstall","InstallFiles","NOT (REMOVE~=\"ALL\")"),(IDS[2],"SetShaleRegistrationRollbackInstall","NOT (REMOVE~=\"ALL\")"),("SetShaleRegistrationInstall",IDS[2],"NOT (REMOVE~=\"ALL\")"),(IDS[0],"SetShaleRegistrationInstall","NOT (REMOVE~=\"ALL\")"),("SetShaleRegistrationRollbackUninstall",IDS[0],"REMOVE~=\"ALL\" AND NOT UPGRADINGPRODUCTCODE"),(IDS[3],"SetShaleRegistrationRollbackUninstall","REMOVE~=\"ALL\" AND NOT UPGRADINGPRODUCTCODE"),("SetShaleRegistrationUninstall",IDS[3],"REMOVE~=\"ALL\" AND NOT UPGRADINGPRODUCTCODE"),(IDS[1],"SetShaleRegistrationUninstall","REMOVE~=\"ALL\" AND NOT UPGRADINGPRODUCTCODE"),("SetShaleRegistrationCommit",IDS[1],"1"),(IDS[4],"SetShaleRegistrationCommit","1"))
 
 def encoded_script(script):
     return base64.b64encode(script.read_text(encoding="utf-8-sig").encode("utf-16le")).decode("ascii")
 
-def command(payload, mode):
-    return f'"[SystemFolder]cmd.exe" /D /S /C "set ""SHALE_REG_MODE={mode}"" & set ""SHALE_REG_OWNER=[UserSID]"" & set ""SHALE_REG_INSTALL=[INSTALLDIR]"" & set ""SHALE_REG_SUPPORT=[LocalAppDataFolder]Shale"" & ""[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe"" -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {payload}"'
+def command(mode):
+    """Return a CustomAction.Target that fits the MSI schema's 255-char limit.
+
+    The encoded, MSI-authored script lives in a private Property-table value.  The
+    setter's formatted Target contains only its reference and the four complete
+    lifecycle inputs; Windows Installer expands it into CustomActionData.
+    """
+    code=MODE_CODES[mode]
+    return f'"[SystemFolder]cmd.exe" /D /S /C "set ""M={code}""&set ""O=[UserSID]""&set ""I=[INSTALLDIR]""&set ""S=[LocalAppDataFolder]Shale""&""[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe"" -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand [{PAYLOAD_PROPERTY}]"'
 
 def mutate(path, script):
     # jpackage's resource is a WiX preprocessor template.  Retain its processing
@@ -35,10 +45,11 @@ def mutate(path, script):
     packages[0].attrib.pop("InstallPrivileges", None)
     if any(n.get("Id") in IDS for n in product.findall(tag("CustomAction"))): raise ValueError("registration actions already exist")
     payload=encoded_script(script)
+    ET.SubElement(product,tag("Property"),{"Id":PAYLOAD_PROPERTY,"Value":payload})
     actions=((IDS[0],"Install",None),(IDS[1],"Uninstall",None),(IDS[2],"RollbackInstall","rollback"),(IDS[3],"RollbackUninstall","rollback"),(IDS[4],"Commit","commit"))
     for action,mode,execute in actions:
         setter=f"Set{action}"
-        ET.SubElement(product,tag("CustomAction"),{"Id":setter,"Property":action,"Value":command(payload,mode)})
+        ET.SubElement(product,tag("CustomAction"),{"Id":setter,"Property":action,"Value":command(mode)})
         attrs={"Id":action,"BinaryKey":"WixCA","DllEntry":"WixQuietExec64","Execute":execute or "deferred","Return":"check","Impersonate":"no"}
         ET.SubElement(product,tag("CustomAction"),attrs)
     sequence=product.find(tag("InstallExecuteSequence"))
@@ -49,12 +60,22 @@ def mutate(path, script):
 
 def validate_registration(root, path, contract):
     actions={n.get("Id"):n for n in root.iter(tag("CustomAction"))}
+    properties={n.get("Id"):n for n in root.iter(tag("Property"))}
     packages=list(root.iter(tag("Package")))
     if len(packages) != 1: raise ValueError(f"{contract} contract violation: expected one Package; found {len(packages)}")
     if packages[0].get("InstallPrivileges") is not None: raise ValueError(f"{contract} contract violation: Package InstallPrivileges must be absent")
     for action in IDS:
         if action not in actions: raise ValueError(f"{contract} contract violation: missing action: {action}")
         if actions[action].get("Impersonate") != "no" or actions[action].get("Return") != "check": raise ValueError(f"{contract} contract violation: action is not fail-closed/elevated: {action}")
+        setter=actions.get(f"Set{action}")
+        if setter is None: raise ValueError(f"{contract} contract violation: missing action-data setter: Set{action}")
+        target=setter.get("Value") or ""
+        if len(target) > TARGET_MAX: raise ValueError(f"{contract} contract violation: CustomAction Target overflow: Set{action} length={len(target)} limit={TARGET_MAX}")
+        for required in (f"[{PAYLOAD_PROPERTY}]", "[UserSID]", "[INSTALLDIR]", "[LocalAppDataFolder]Shale"):
+            if required not in target: raise ValueError(f"{contract} contract violation: incomplete action data for Set{action}: missing {required}")
+    payload=properties.get(PAYLOAD_PROPERTY)
+    if payload is None or not (payload.get("Value") or "").strip():
+        raise ValueError(f"{contract} contract violation: missing private encoded registration payload")
     sequence=root.find(f".//{tag('InstallExecuteSequence')}")
     actual=set() if sequence is None else {(n.get("Action"),n.get("After"),(n.text or "").strip()) for n in sequence.findall(tag("Custom"))}
     missing=set(ROWS)-actual
