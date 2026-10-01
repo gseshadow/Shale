@@ -9,6 +9,11 @@ from pathlib import Path
 
 
 DEFINITION = re.compile(r"^-d(Jp[A-Za-z0-9_]+)=(.*)$", re.DOTALL)
+DEFINITION_START = re.compile(r"(?<!\S)-d(Jp[A-Za-z0-9_]+)=")
+COMMAND_HEADER = re.compile(
+    r"^\s*(?:\[[^\]]+\]\s+)?Command \[PID: \d+\]:\s*$",
+    re.IGNORECASE,
+)
 CORE_DEFINITIONS = (
     "JpAppVersion",
     "JpProductCode",
@@ -25,19 +30,27 @@ def _unquote(argument: str) -> str:
     return argument
 
 
-def _jpackage_command_arguments(log: str) -> list[list[str]]:
-    """Return ProcessBuilder-style argument lists printed by verbose jpackage."""
-    commands: list[list[str]] = []
-    for line in log.splitlines():
-        if "candle.exe" not in line.lower() or "main.wxs" not in line.lower():
+def _jpackage_commands(log: str) -> list[tuple[str, list[str] | None]]:
+    """Return logged Candle commands as raw lines or legacy argument lists."""
+    commands: list[tuple[str, list[str] | None]] = []
+    lines = log.splitlines()
+    for index, line in enumerate(lines):
+        if COMMAND_HEADER.fullmatch(line):
+            if index + 1 < len(lines) and lines[index + 1][:1].isspace():
+                command = lines[index + 1].strip()
+                if "candle.exe" in command.lower():
+                    commands.append((command, None))
+            continue
+
+        if "candle.exe" not in line.lower():
             continue
         end = line.rfind("]")
         start = line.rfind("[", 0, end)
         if start < 0 or end <= start:
             continue
-        # jpackage logs ProcessBuilder's List<String>: each comma-space boundary
-        # is an argument boundary, while spaces inside an argument are retained.
-        commands.append([_unquote(argument) for argument in line[start + 1:end].split(", ")])
+        # Older jpackage output can render ProcessBuilder's List<String>.
+        arguments = [_unquote(argument) for argument in line[start + 1:end].split(", ")]
+        commands.append((line, arguments))
     return commands
 
 
@@ -46,12 +59,37 @@ def _is_named_file(argument: str, filename: str) -> bool:
     return normalized.rsplit("/", 1)[-1].lower() == filename.lower()
 
 
+def _raw_command_has_named_file(command: str, filename: str) -> bool:
+    """Match a filename without tokenizing paths or definition values on spaces."""
+    return re.search(
+        rf"(?:^|[\\/\s\"]){re.escape(filename)}(?=[\s\"]|$)",
+        command,
+        re.IGNORECASE,
+    ) is not None
+
+
+def _raw_definitions(command: str) -> list[str]:
+    """Extract complete -dJp arguments using the next definition as boundary."""
+    starts = list(DEFINITION_START.finditer(command))
+    arguments = []
+    for index, start in enumerate(starts):
+        end = starts[index + 1].start() if index + 1 < len(starts) else len(command)
+        arguments.append(command[start.start():end].rstrip())
+    return arguments
+
+
 def definitions(log: str) -> dict[str, str]:
     """Recover only definitions on jpackage's generated-main Candle command."""
-    candidates = []
-    for arguments in _jpackage_command_arguments(log):
-        if (any(_is_named_file(argument, "candle.exe") for argument in arguments)
-                and any(_is_named_file(argument, "main.wxs") for argument in arguments)):
+    candidates: list[list[str]] = []
+    for command, arguments in _jpackage_commands(log):
+        if arguments is None:
+            first_definition = DEFINITION_START.search(command)
+            command_prefix = command[:first_definition.start()] if first_definition else command
+            if (_raw_command_has_named_file(command_prefix, "candle.exe")
+                    and _raw_command_has_named_file(command_prefix, "main.wxs")):
+                candidates.append(_raw_definitions(command))
+        elif (any(_is_named_file(argument, "candle.exe") for argument in arguments)
+              and any(_is_named_file(argument, "main.wxs") for argument in arguments)):
             candidates.append(arguments)
 
     if not candidates:

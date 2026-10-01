@@ -8,7 +8,12 @@ jpackage's generated `Jp*` preprocessor definitions. The first attempted fix sca
 overly strict: jpackage's own successful Candle invocation does not define optional variables referenced inside
 conditional WiX branches, including `JpAboutURL`, `JpHelpURL`, and `JpUpdateURL`.
 
-The corrected packaging boundary treats the original successful generated-`main.wxs` Candle argument list in
+The exact-definition replay design was correct, but a third Windows finding showed that its parser assumed the
+wrong jpackage verbose-log serialization. JDK 21 on Windows actually emits `Command [PID: ...]:` followed by an
+indented plain `candle.exe` command line, not the ProcessBuilder-style argument list the parser expected. The parser
+now treats that observed format as first-class while retaining compatibility with the older representation.
+
+The corrected packaging boundary treats the original successful generated-`main.wxs` Candle command in
 `jpackage-verbose.log` as authoritative. It recovers every and only `-dJp...` argument from that invocation, validates
 the core jpackage identity/configuration definitions, and replays the values unchanged through a quoted Candle
 response file. It does not scan raw WiX references as a mandatory-variable list. The corrected Windows build has not
@@ -47,11 +52,18 @@ and platform-neutral tests are not substitutes for MSI lifecycle validation.
 | Authenticode: MSI | NOT RUN | No MSI artifact or production signing credentials are available. |
 | Phase 13A / 13B / 13C installed regressions | NOT RUN | Their installed paths and behavior cannot be exercised on Linux; repository verification is PASS. |
 | Logged-out automatic updating | UNSUPPORTED | Unchanged: registration does not activate Task Scheduler, a service, SYSTEM updating, or any logged-out executor. |
-| Packaging defect and fix | SECOND FIX IMPLEMENTED; WINDOWS RERUN NOT YET RUN | The preliminary jpackage MSI succeeded, but mutated `main.wxs` recompilation first omitted all build-specific `Jp*` definitions. The first recovery fix then falsely required optional conditional references that jpackage itself had not defined. The custom recompile now replays only the exact `-dJp...` arguments from the successful original generated-`main.wxs` Candle command, including its generated ProductCode and UpgradeCode, and requires only the core identity/configuration set. Rerun `build-shale-release.bat` before claiming a final MSI. |
+| Packaging defect and fix | THIRD FIX IMPLEMENTED; DIRECT WINDOWS HELPER RERUN REQUIRED | Exact definition replay was correct, but the parser expected a ProcessBuilder-style list while the actual JDK 21 Windows log uses `Command [PID: ...]:` followed by an indented plain command line. The parser now supports that observed form, selects exactly one generated-`main.wxs` Candle command, and preserves spaced definition values. Run the direct helper check below before another full packaging run. |
 
-The exact next work is continuation of **Phase 13F only** on a suitable Windows machine. From
-`C:\Eclipse\Workspace\shale-parent\build\scripts`, rerun the single local packaging command
-`build-shale-release.bat`; it must produce and validate the final MSI without uploading a manifest or artifacts.
+The exact next work is continuation of **Phase 13F only** on a suitable Windows machine. From the repository root,
+first run only:
+
+```bat
+python build\scripts\windows_jpackage_wix_definitions.py prepare build\staging\windows-msi\jpackage-verbose.log build\staging\windows-msi\jpackage-main-definitions-test.rsp
+type build\staging\windows-msi\jpackage-main-definitions-test.rsp
+```
+
+The helper must report recovered definitions and create the response file. Only after that direct check succeeds,
+run `build-shale-release.bat`; it must produce and validate the final MSI without uploading a manifest or artifacts.
 Installed lifecycle acceptance follows separately. Logged-out automatic update support remains **UNSUPPORTED**.
 
 After installing the Phase 13F MSI, run the privacy-bounded, read-only helper from an elevated PowerShell prompt
