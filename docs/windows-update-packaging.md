@@ -42,7 +42,10 @@ required.
 
 ## Phase 13F elevated registration integration
 
-The existing jpackage/WiX 3.14 stack is retained. The build extracts JDK 21's authoritative `main.wxs` resource,
+The existing jpackage/WiX 3.14 stack is retained. The build extracts JDK 21's authoritative
+`jdk.jpackage/jdk/jpackage/internal/resources/main.wxs` resource, lists every discovered `main.wxs`, and fails closed
+unless that exact Windows MSI resource identity occurs once. Unrelated same-named resources do not affect selection.
+The build
 uses `windows_msi_registration.py` to add the registration actions without discarding its preprocessor instructions,
 and supplies it to the original jpackage build with `--resource-dir`. jpackage therefore compiles it once with its
 native implicit/default `Jp*` environment and remains authoritative for ProductCode, UpgradeCode, and version; the

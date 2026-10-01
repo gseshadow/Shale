@@ -95,14 +95,7 @@ mkdir "%JPACKAGE_RESOURCE_EXTRACT%" "%JPACKAGE_RESOURCE_DIR%"
 if errorlevel 1 goto :jpackage_resource_failed
 "%JAVA_HOME%\bin\jimage.exe" extract --dir "%JPACKAGE_RESOURCE_EXTRACT%" --include "glob:**/main.wxs" "%JAVA_HOME%\lib\modules"
 if errorlevel 1 goto :jpackage_resource_failed
-set "JPACKAGE_MAIN_SOURCE="
-set "JPACKAGE_MAIN_COUNT=0"
-for /r "%JPACKAGE_RESOURCE_EXTRACT%" %%F in (main.wxs) do (
- set "JPACKAGE_MAIN_SOURCE=%%~fF"
- set /a JPACKAGE_MAIN_COUNT+=1 >nul
-)
-if not "!JPACKAGE_MAIN_COUNT!"=="1" goto :jpackage_resource_cardinality_failed
-copy /y "!JPACKAGE_MAIN_SOURCE!" "%JPACKAGE_MAIN_TEMPLATE%" >nul
+python "%ROOT%\build\scripts\windows_jpackage_resource.py" "%JPACKAGE_RESOURCE_EXTRACT%" "%JPACKAGE_MAIN_TEMPLATE%"
 if errorlevel 1 goto :jpackage_resource_failed
 python "%ROOT%\build\scripts\windows_msi_registration.py" mutate "%JPACKAGE_MAIN_TEMPLATE%" --script "%ROOT%\build\scripts\windows-installation-registration.ps1"
 if errorlevel 1 goto :jpackage_resource_failed
@@ -247,10 +240,6 @@ exit /b 15
 :jpackage_resource_failed
 set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=jpackage-resource-preparation source="%JAVA_HOME%\lib\modules" expected="%JPACKAGE_MAIN_TEMPLATE%" exit=%STAGE_EXIT%
-exit /b 46
-
-:jpackage_resource_cardinality_failed
-echo Windows MSI stage failed: stage=jpackage-resource-preparation classification=main_template_cardinality expected=1 found=!JPACKAGE_MAIN_COUNT! exit=46
 exit /b 46
 
 :missing_native_build_script
