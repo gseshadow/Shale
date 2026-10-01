@@ -24,6 +24,7 @@ set DIST=%ROOT%\dist
 set DIST_APP=%ROOT%\dist-appimage
 set ASSETS_DIR=%ROOT%\build\assets
 set JMODS_DIR=%ASSETS_DIR%\javafx-jmods-21.0.10
+set DIAGNOSTIC_LAUNCHER_CONFIG=%ROOT%\build\packaging\windows\shale-registration-diagnostic.properties
 
 if not exist "%DIST%" mkdir "%DIST%"
 if not exist "%DIST_APP%" mkdir "%DIST_APP%"
@@ -46,6 +47,8 @@ popd
 if not exist "%DESKTOP_JAR%" goto :missing_desktop_jar
 if not exist "%UPDATER_JAR%" goto :missing_updater_jar
 if not exist "%DESKTOP_LIB%\" goto :missing_desktop_lib
+if not exist "%DIAGNOSTIC_LAUNCHER_CONFIG%" goto :fail
+python "%ROOT%\build\scripts\windows_msi_payload.py" launcher "%DIAGNOSTIC_LAUNCHER_CONFIG%" || goto :fail
 
 >"%DESKTOP_TARGET%\shale-installed-version.properties" echo schemaVersion=1
 >>"%DESKTOP_TARGET%\shale-installed-version.properties" echo version=%VERSION%
@@ -61,11 +64,12 @@ jpackage ^
   --dest "%DIST_APP%" ^
   --main-jar "shale-desktop-%VERSION%.jar" ^
   --main-class "com.shale.desktop.ShaleLauncher" ^
+  --add-launcher ShaleRegistrationDiagnostic="%DIAGNOSTIC_LAUNCHER_CONFIG%" ^
   --module-path "%JMODS_DIR%" ^
   --add-modules javafx.controls,javafx.fxml,java.sql,java.naming,java.net.http,jdk.crypto.ec ^
   --icon "%ASSETS_DIR%\Shale.ico" || goto :fail
 
-python "%ROOT%\build\scripts\windows_msi_payload.py" config "%DIST_APP%\Shale\app\Shale.cfg" || goto :fail
+python "%ROOT%\build\scripts\windows_msi_payload.py" image "%DIST_APP%\Shale" || goto :fail
 
 rem Sign final executable bytes before ZIP hashing/manifest publication or MSI construction.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%DIST_APP%\Shale\Shale.exe" || goto :fail

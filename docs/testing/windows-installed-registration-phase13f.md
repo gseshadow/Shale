@@ -5,9 +5,9 @@ installed lifecycle testing has proved fresh install, repair, major upgrade, and
 The authoritative installation UUID observed across repair and the `1.0.128` to `1.0.129` major upgrade was
 `ca2bb9b9-9576-400d-a637-0ad645c52bea`; exact uninstall removed that HKLM registration. The remaining installed
 acceptance is the corrected ACL inspection and production-reader diagnostic described below, followed by the
-separate security-fixture, multi-user, and signing rows that have not been executed. In particular,
-the ACL and reader rows remain NOT RUN until the revised validator is executed. The first real Windows packaging
-attempt reached the post-mutation
+separate security-fixture, multi-user, and signing rows that have not been executed. The corrected ACL row now
+passes; the production-reader row remains failed until the dedicated launcher build is installed and rerun. The
+first real Windows packaging attempt reached the post-mutation
 recompilation of generated `main.wxs` and failed with `CNDL0150` because the custom Candle invocation omitted
 jpackage's generated `Jp*` preprocessor definitions. The first attempted fix scanned every textual
 `$(var.Jp...)` reference in `main.wxs` and required a logged definition. A second real Windows build proved that check
@@ -132,11 +132,11 @@ installed validation.
 | Fresh-install registration | PASS | Fresh install created the authoritative HKLM registration. |
 | Authoritative registration path | PASS | The installed record was `HKLM\SOFTWARE\Shale\Installations\ca2bb9b9-9576-400d-a637-0ad645c52bea`. |
 | Installation UUID | PASS | `ca2bb9b9-9576-400d-a637-0ad645c52bea` was retained through repair and major upgrade. |
-| Owner SID and owner-derived roots | NOT RUN | No genuine Windows installation owner or ProfileList authority is available. |
-| Authoritative-record ACL and ordinary-user mutation resistance | NOT RUN | The earlier helper could not evaluate the ACL. The revised helper opens the exact child with .NET's `Registry64` view, requests access rules as SIDs, and verifies protected/non-inherited SYSTEM and Administrators FullControl, owner ReadKey-only, and no unrelated allow-write/control ACE. It still requires an installed rerun. |
-| Production reader classification | NOT RUN | The revised helper invokes the installed runtime's narrow `WindowsInstallationRegistrationDiagnostic`, which delegates to the real production `WindowsInstallationRegistrationReader`; `VALID` has not yet been observed with this method. |
-| Installed-version metadata | NOT RUN | No installed `app\shale-installed-version.properties` payload exists to compare with the packaged runtime or parse strictly. |
-| Updater, Phase 12 attempt, Phase 13B lock, and evidence-log paths | NOT RUN | No owner registration was available from which to resolve and compare these paths. |
+| Owner SID and owner-derived roots | PASS | Installed validation matched the registered SID and both canonical owner-derived roots. |
+| Authoritative-record ACL and ordinary-user mutation resistance | PASS | The exact 64-bit child is protected with no inherited ACEs; SYSTEM and Administrators have FullControl; the owner has ReadKey only; no unrelated allow-write/control ACE was observed. |
+| Production reader classification | FAIL | Installed `1.0.129` had no `runtime\bin\java.exe`; that path was an invalid assumption about the minimized jpackage runtime. The next build supplies the narrow console-enabled `ShaleRegistrationDiagnostic.exe` alternate launcher and validates its class/configuration before MSI publication. `VALID` still requires an installed rerun. |
+| Installed-version metadata | PASS | Installed schema 1 metadata reported version `1.0.129` and the expected production channel. |
+| Updater, Phase 12 attempt, Phase 13B lock, and evidence-log paths | PASS | Registered owner paths were resolved and the installed updater exists at the expected path. |
 | Runtime startup and Phase 13C availability | NOT RUN | No installed Shale application was launched. |
 | Upgrade UUID preservation | PASS | `1.0.128` to `1.0.129` major upgrade preserved UUID `ca2bb9b9-9576-400d-a637-0ad645c52bea`. |
 | Repair and replacement-UUID fallback | PARTIAL | Ordinary repair preserved UUID `ca2bb9b9-9576-400d-a637-0ad645c52bea`; destructive replacement-UUID and corrupt-state fixtures remain NOT RUN. |
@@ -184,10 +184,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build\scripts\validate-ins
 
 The helper directly opens `HKEY_LOCAL_MACHINE` through the 64-bit .NET registry view for ACL inspection; it does
 not depend on PowerShell provider `PSPath` ACL behavior or localized account names. It also starts only the installed
-`runtime\bin\java.exe` with the packaged application classpath and the selected installation UUID, calling the narrow
-diagnostic entry point backed by the production reader. The diagnostic accepts no arbitrary command, performs no
+`ShaleRegistrationDiagnostic.exe` alternate jpackage launcher with the selected installation UUID. The launcher uses
+the actual generated application classpath and calls the narrow diagnostic entry point backed by the production
+reader. It creates no Start Menu or desktop shortcut. The diagnostic accepts no arbitrary command, performs no
 write/heal operation, and returns only classification, schema, UUID, owner SID, install root, and support root. A
-missing runtime, invocation failure, non-`VALID` classification, or fact mismatch is a specific `FAIL`.
+missing launcher, invocation failure, non-`VALID` classification, or fact mismatch is a specific `FAIL`.
 
 For signed acceptance, require `Valid`, approved publisher, and timestamp:
 

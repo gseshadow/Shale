@@ -103,13 +103,12 @@ function Test-RegistrationAcl([string]$KeyName, [string]$OwnerSid) {
 }
 
 function Test-ProductionRegistrationReader([string]$InstallRoot, [string]$InstallationId, [string]$OwnerSid) {
-    $java = Join-Path $InstallRoot 'runtime\bin\java.exe'
-    if (-not (Test-Path -LiteralPath $java -PathType Leaf)) {
-        Write-Result FAIL 'Production registration-reader classification' 'installed runtime Java entry point is missing'
+    $diagnostic = Join-Path $InstallRoot 'ShaleRegistrationDiagnostic.exe'
+    if (-not (Test-Path -LiteralPath $diagnostic -PathType Leaf)) {
+        Write-Result FAIL 'Production registration-reader classification' 'installed registration diagnostic launcher is missing'
         return
     }
-    $classPath = (Join-Path $InstallRoot 'app\*') + ';' + (Join-Path $InstallRoot 'app\lib\*')
-    $output = @(& $java '-cp' $classPath 'com.shale.core.update.WindowsInstallationRegistrationDiagnostic' '--installation-id' $InstallationId 2>&1 | ForEach-Object { "$_" })
+    $output = @(& $diagnostic '--installation-id' $InstallationId 2>&1 | ForEach-Object { "$_" })
     $exitCode = $LASTEXITCODE
     $facts = @{}
     foreach ($line in $output) {

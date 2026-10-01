@@ -55,11 +55,12 @@ class InstalledWindowsValidationContractTest(unittest.TestCase):
         self.assertNotIn("BUILTIN\\Administrators", self.source)
         self.assertNotIn("'ACL could not be evaluated'", self.source)
 
-    def test_production_reader_diagnostic_uses_the_installed_java_runtime(self):
-        for required in ("runtime\\bin\\java.exe", "app\\*", "app\\lib\\*",
-                         "com.shale.core.update.WindowsInstallationRegistrationDiagnostic",
+    def test_production_reader_diagnostic_uses_the_installed_jpackage_launcher(self):
+        for required in ("ShaleRegistrationDiagnostic.exe",
                          "--installation-id", "classification", "-ceq 'VALID'", "factsMatch"):
             self.assertIn(required, self.source)
+        self.assertNotIn("runtime\\bin\\java.exe", self.source)
+        self.assertNotIn("'-cp'", self.source)
         self.assertNotIn("the existing Java reader has no installed command-line entry point", self.source)
 
     def test_optional_signing_and_unsigned_developer_behavior_are_explicit(self):
