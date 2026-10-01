@@ -16,7 +16,11 @@ def command(payload, mode):
     return f'"[SystemFolder]cmd.exe" /D /S /C "set ""SHALE_REG_MODE={mode}"" & set ""SHALE_REG_OWNER=[UserSID]"" & set ""SHALE_REG_INSTALL=[INSTALLDIR]"" & set ""SHALE_REG_SUPPORT=[LocalAppDataFolder]Shale"" & ""[SystemFolder]WindowsPowerShell\\v1.0\\powershell.exe"" -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {payload}"'
 
 def mutate(path, script):
-    tree=ET.parse(path); root=tree.getroot(); products=list(root.iter(tag("Product")))
+    # jpackage's resource is a WiX preprocessor template.  Retain its processing
+    # instructions so jpackage, rather than this helper, remains responsible for
+    # evaluating every Jp* default and conditional.
+    parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True, insert_pis=True))
+    tree=ET.parse(path, parser=parser); root=tree.getroot(); products=list(root.iter(tag("Product")))
     if len(products) != 1: raise ValueError(f"expected one Product; found {len(products)}")
     product=products[0]
     packages=product.findall(tag("Package"))

@@ -332,9 +332,9 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
     def test_every_post_toolchain_operation_has_fail_closed_stage_diagnostics(self):
         source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
         stages = (
-            "staging", "native-DLL", "marker-staging", "preliminary-jpackage",
+            "staging", "jpackage-resource-preparation", "native-DLL", "marker-staging", "preliminary-jpackage",
             "generated-payload-validation", "generated-identity-validation",
-            "generated-identity-mutation", "registration-mutation", "candle-recompile", "main-recompile",
+            "generated-identity-mutation", "original-compile-registration-validation", "candle-recompile",
             "light-reconstruction", "dark-extraction", "compiled-identity-validation",
             "compiled-registration-validation", "compiled-payload-validation",
             "artifact-finalization",
@@ -348,28 +348,41 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn('exit=!NATIVE_BUILD_EXIT!', source)
         self.assertGreater(publish, source.index("Windows MSI stage started: compiled-payload-validation"))
 
-    def test_registration_is_injected_recompiled_and_validated_before_publication(self):
+    def test_registration_resource_is_consumed_by_original_compile_and_validated_before_publication(self):
         source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
-        mutate = source.index('windows_msi_registration.py" mutate "%MAIN_SOURCE%"')
-        recovery = source.index('windows_jpackage_wix_definitions.py" prepare', mutate)
-        recompile = source.index('candle.exe -nologo @"%JPACKAGE_DEFINITIONS%" "%MAIN_SOURCE%"', recovery)
-        link = source.index("Final light.exe reconstruction started.", recompile)
+        extract = source.index('jimage.exe" extract')
+        mutate = source.index('windows_msi_registration.py" mutate "%JPACKAGE_MAIN_TEMPLATE%"', extract)
+        jpackage = source.index('jpackage --type msi', mutate)
+        self.assertIn('--resource-dir "%JPACKAGE_RESOURCE_DIR%"', source[jpackage:])
+        validate_original = source.index('windows_msi_registration.py" validate "%MAIN_SOURCE%"', jpackage)
+        link = source.index("Final light.exe reconstruction started.", validate_original)
         validate = source.index('windows_msi_registration.py" validate "%STAGE%\\dark\\final.wxs"', link)
         publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', validate)
-        self.assertEqual([mutate, recovery, recompile, link, validate, publish],
-                         sorted([mutate, recovery, recompile, link, validate, publish]))
+        self.assertEqual([extract, mutate, jpackage, validate_original, link, validate, publish],
+                         sorted([extract, mutate, jpackage, validate_original, link, validate, publish]))
         self.assertIn('--script "%ROOT%\\build\\scripts\\windows-installation-registration.ps1"', source)
-        self.assertIn("stage=registration-mutation", source)
+        self.assertIn("stage=jpackage-resource-preparation", source)
+        self.assertIn("stage=original-compile-registration-validation", source)
         self.assertIn("stage=compiled-registration-validation", source)
 
-    def test_main_recompile_replays_logged_jpackage_definitions_without_hard_coded_identity(self):
+    def test_original_jpackage_compile_owns_all_preprocessor_definitions_and_identity(self):
         source = batch_source("build-shale-windows-msi.bat")
-        self.assertIn('set JPACKAGE_LOG=%STAGE%\\jpackage-verbose.log', source)
-        self.assertIn('windows_jpackage_wix_definitions.py" prepare "%JPACKAGE_LOG%" "%JPACKAGE_DEFINITIONS%"', source)
-        self.assertIn('candle.exe -nologo @"%JPACKAGE_DEFINITIONS%" "%MAIN_SOURCE%"', source)
+        self.assertIn('jpackage --type msi', source)
+        self.assertIn('--resource-dir "%JPACKAGE_RESOURCE_DIR%"', source)
+        self.assertNotIn('windows_jpackage_wix_definitions.py', source)
+        self.assertNotIn('main-recompile', source)
+        self.assertNotIn('candle.exe -nologo @', source)
         self.assertNotIn("-dJpProductCode=", source)
         self.assertNotIn("-dJpProductUpgradeCode=", source)
-        self.assertIn("if errorlevel 1 goto :jpackage_definition_recovery_failed", source)
+
+    def test_final_product_identity_is_compared_with_preliminary_jpackage_msi(self):
+        source = batch_source("build-shale-windows-msi.bat")
+        preliminary_dark = source.index('dark.exe -o "%STAGE%\\preliminary-dark\\preliminary.wxs"')
+        final_link = source.index("Final light.exe reconstruction started.", preliminary_dark)
+        comparison = source.index('windows_msi_identity.py" compare "%STAGE%\\preliminary-dark\\preliminary.wxs" "%STAGE%\\dark\\final.wxs"', final_link)
+        publication = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', comparison)
+        self.assertEqual([preliminary_dark, final_link, comparison, publication],
+                         sorted([preliminary_dark, final_link, comparison, publication]))
 
 if __name__ == "__main__":
     unittest.main()

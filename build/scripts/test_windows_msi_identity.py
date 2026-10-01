@@ -169,5 +169,14 @@ class IdentityMutationTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "generated-source:.*Source is not Shale.exe"):
             m.inspect(self.file(fixture(source=r"C:\dark\payload\opaque-id")))
 
+    def test_compare_preserves_jpackage_product_identity_and_version(self):
+        product = f'<Wix xmlns="{m.NS}"><Product Id="product" UpgradeCode="upgrade" Version="1.2.3"/></Wix>'
+        preliminary = self.file(product)
+        final = self.file(product)
+        m.compare(preliminary, final)
+        final.write_text(product.replace('Version="1.2.3"', 'Version="1.2.4"'), encoding='utf-8')
+        with self.assertRaisesRegex(ValueError, "differs from jpackage preliminary MSI"):
+            m.compare(preliminary, final)
+
 if __name__ == "__main__":
     unittest.main()

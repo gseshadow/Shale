@@ -16,6 +16,16 @@ class RegistrationMutationTest(unittest.TestCase):
         self.assertTrue(all(actions[name].get('Impersonate')=='no' for name in m.IDS))
         source=self.wxs.read_text(encoding='utf-8')
         self.assertIn('[UserSID]',source); self.assertIn('[LocalAppDataFolder]Shale',source); self.assertIn('NOT UPGRADINGPRODUCTCODE',source)
+    def test_template_mutation_preserves_jpackage_preprocessor_instructions(self):
+        self.wxs.write_text(f'''<?xml version="1.0"?>
+<Wix xmlns="{m.NS}"><?include overrides.wxi?><Product Id="*">
+<?if $(var.JpInstallScope) = "perUser"?><Package InstallScope="perUser"/><?endif?>
+<InstallExecuteSequence/></Product></Wix>''', encoding='utf-8')
+        m.mutate(self.wxs, self.script)
+        source = self.wxs.read_text(encoding='utf-8')
+        self.assertIn('<?include overrides.wxi?>', source)
+        self.assertIn('<?if $(var.JpInstallScope) = "perUser"?>', source)
+        self.assertIn('<?endif?>', source)
     def test_duplicate_mutation_and_missing_product_fail_closed(self):
         m.mutate(self.wxs,self.script)
         with self.assertRaisesRegex(ValueError,'already exist'): m.mutate(self.wxs,self.script)

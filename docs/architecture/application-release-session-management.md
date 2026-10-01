@@ -2091,6 +2091,12 @@ ProfileList and accepts only the exact `<profile>\AppData\Local\Shale` install/s
 SIDs, root substitution, traversal/canonical mismatch, and any visible reparse ancestor. The elevated token,
 Administrator, and SYSTEM environment never nominate owner or paths.
 
+At the packaging boundary, the selected JDK 21 module image supplies the authoritative `main.wxs` template. The
+build injects the actions into a staged copy and provides it through jpackage `--resource-dir`, so jpackage's original
+Candle compile supplies all public and implicit `Jp*` defaults. No second `main.wxs` compile or hand-maintained
+default compatibility layer exists. ProductCode, UpgradeCode, and version are compared between the preliminary
+jpackage MSI and final relinked MSI, while final decompilation must contain the Phase 13F actions.
+
 First install creates a random UUID and protected lookup state. Upgrade and repair reuse it and update the record
 idempotently. If both registration and state are missing, repair cannot reconstruct the old UUID and creates a
 documented replacement. Exact uninstall removes only that record/state; major-upgrade removal skips cleanup. Paired
