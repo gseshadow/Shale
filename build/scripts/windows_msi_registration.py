@@ -63,7 +63,6 @@ def validate_registration(root, path, contract):
     properties={n.get("Id"):n for n in root.iter(tag("Property"))}
     packages=list(root.iter(tag("Package")))
     if len(packages) != 1: raise ValueError(f"{contract} contract violation: expected one Package; found {len(packages)}")
-    if packages[0].get("InstallPrivileges") is not None: raise ValueError(f"{contract} contract violation: Package InstallPrivileges must be absent")
     for action in IDS:
         if action not in actions: raise ValueError(f"{contract} contract violation: missing action: {action}")
         if actions[action].get("Impersonate") != "no" or actions[action].get("Return") != "check": raise ValueError(f"{contract} contract violation: action is not fail-closed/elevated: {action}")
@@ -88,12 +87,35 @@ def validate_template(path):
     root=ET.parse(path).getroot(); packages=list(root.iter(tag("Package")))
     if len(packages) != 1 or packages[0].get("InstallScope") != JPACKAGE_SCOPE:
         raise ValueError("template contract violation: Package InstallScope must be $(var.JpInstallScope)")
+    if packages[0].get("InstallPrivileges") is not None:
+        raise ValueError("template contract violation: Package InstallPrivileges must be absent")
     validate_registration(root, path, "template")
 
 def validate_final(path):
     root=ET.parse(path).getroot(); packages=list(root.iter(tag("Package")))
-    if len(packages) != 1 or packages[0].get("InstallScope") != "perUser":
-        raise ValueError("final MSI contract violation: resolved Package InstallScope must be perUser")
+    if len(packages) != 1:
+        raise ValueError(f"final MSI contract violation: expected one Package; found {len(packages)}")
+    package=packages[0]
+    # InstallScope is WiX authoring syntax and is not reconstructed by WiX 3.14
+    # Dark for this jpackage MSI.  Validate the compiled MSI representation that
+    # Dark does emit instead, while rejecting source-like machine scope if a
+    # future toolchain ever supplies it.
+    scope=package.get("InstallScope")
+    if scope is not None and scope != "perUser":
+        raise ValueError(f"final MSI contract violation: explicit Package InstallScope must be perUser; found {scope}")
+    privileges=package.get("InstallPrivileges")
+    if privileges != "limited":
+        raise ValueError(f"final MSI contract violation: resolved Package InstallPrivileges must be limited; found {privileges or '<absent>'}")
+
+    properties={n.get("Id"):(n.get("Value") or "").strip() for n in root.iter(tag("Property"))}
+    all_users=properties.get("ALLUSERS")
+    install_per_user=properties.get("MSIINSTALLPERUSER")
+    if all_users is not None and all_users not in ("", "2"):
+        raise ValueError(f"final MSI contract violation: ALLUSERS indicates or may indicate per-machine installation: {all_users or '<empty>'}")
+    if install_per_user is not None and (install_per_user != "1" or all_users != "2"):
+        raise ValueError("final MSI contract violation: MSIINSTALLPERUSER is contradictory without ALLUSERS=2 and MSIINSTALLPERUSER=1")
+    if all_users == "2" and install_per_user != "1":
+        raise ValueError("final MSI contract violation: ALLUSERS=2 is ambiguous without MSIINSTALLPERUSER=1")
     validate_registration(root, path, "final MSI")
 
 def main():

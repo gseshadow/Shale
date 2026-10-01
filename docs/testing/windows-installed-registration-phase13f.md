@@ -68,8 +68,8 @@ incorrectly required literal `perUser` while mutating that unresolved template, 
 before jpackage ran. Template validation now requires the exact jpackage-owned expression, rejects missing or literal
 scope and every `InstallPrivileges` value, and preserves the expression byte-for-byte as an XML attribute value.
 After jpackage, generated `main.wxs` remains TEMPLATE-validated because Candle does not rewrite source. Preliminary
-and final Dark output separately require resolved `InstallScope="perUser"`, absence of `InstallPrivileges`, and the
-complete registration action sequence. Identity
+and final Dark output separately validate the compiled MSI representation described in the ninth finding below and
+require the complete registration action sequence. Identity
 comparison remains independently required before publication. This layering does not define or replay
 `JpInstallScope`, compile `main.wxs` a second time, or weaken the final MSI contract.
 
@@ -98,7 +98,19 @@ and exact `LocalAppDataFolder\Shale` support root. Validation fails above 255 or
 suppression was added. Installation acceptance remains unauthorized until a Windows rerun proves the warnings are
 absent; Phase 13F remains IN PROGRESS.
 
-The corrected eighth-finding build has not yet been rerun through the final relink on Windows, so neither final MSI
+The ninth Windows run proved the customized jpackage template compiles and links successfully, the preliminary MSI
+is produced, and the five ICE03 Target overflows are gone. WiX 3.14 `dark.exe` also successfully decompiled that MSI.
+The resulting `Package` did not reconstruct the source authoring abstraction `InstallScope="perUser"`; it emitted
+`InstallPrivileges="limited"` and no `InstallScope`, `ALLUSERS`, or `MSIINSTALLPERUSER`. FINAL validation was therefore
+corrected to validate this actual MSI/Dark representation: `InstallPrivileges="limited"` is required, `InstallScope`
+is optional but may not be explicitly machine-scoped, and clear machine-wide or contradictory property signals fail
+closed. TEMPLATE validation intentionally remains different: it requires the exact
+`InstallScope="$(var.JpInstallScope)"` expression and forbids every explicit `InstallPrivileges` value. The source
+template, original jpackage compile, Option B resource-injection architecture, registration actions, and privilege
+architecture are unchanged. Phase 13F remains **IN PROGRESS** pending the corrected Windows rerun and installed
+lifecycle acceptance.
+
+The corrected ninth-finding build has not yet been rerun through the final relink on Windows, so neither final MSI
 production nor installed acceptance is claimed. The available Codex host is
 Ubuntu Linux and has no PowerShell, Windows command environment, Wine, Windows VM manager, MSI artifact, remote
 Windows runner, or release signing credential. Do not report any installed row as PASS until its command is executed
@@ -134,7 +146,7 @@ and platform-neutral tests are not substitutes for MSI lifecycle validation.
 | Authenticode: MSI | NOT RUN | No MSI artifact or production signing credentials are available. |
 | Phase 13A / 13B / 13C installed regressions | NOT RUN | Their installed paths and behavior cannot be exercised on Linux; repository verification is PASS. |
 | Logged-out automatic updating | UNSUPPORTED | Unchanged: registration does not activate Task Scheduler, a service, SYSTEM updating, or any logged-out executor. |
-| Packaging defect and fix | PRELIMINARY MSI PROVED; EIGHTH-FINDING CORRECTION REQUIRES WINDOWS RERUN | Original jpackage Candle and light now pass and produce a preliminary MSI. Source `config/main.wxs` remains TEMPLATE-validated; preliminary and final Dark output are FINAL-validated and identity-compared. Five ICE03 Target overflows were eliminated with one private MSI payload property and complete 254-character setters, without suppressing ICE03. Installed acceptance remains unauthorized until Windows evidence confirms warning-free preliminary and final links. |
+| Packaging defect and fix | PRELIMINARY MSI/DARK PROVED; NINTH-FINDING CORRECTION REQUIRES WINDOWS RERUN | Original jpackage Candle and light pass and produce a preliminary MSI without the Phase 13F ICE03 overflows. Dark represents its per-user package as `InstallPrivileges="limited"` without `InstallScope`; FINAL validation now checks that MSI representation for both preliminary and final output. Identity comparison and installed acceptance remain required. |
 
 The exact next work is continuation of **Phase 13F only** on a suitable Windows machine. From the repository root,
 run:

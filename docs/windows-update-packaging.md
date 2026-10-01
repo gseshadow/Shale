@@ -52,8 +52,8 @@ native implicit/default `Jp*` environment and remains authoritative for ProductC
 build does not recompile `main.wxs` or reproduce private defaults. Dark output from the preliminary and final MSI is
 validated as the resolved representation and compared fail-closed for those three identity fields. Generated
 `config/main.wxs` remains preprocessor source after Candle consumes it and is checked with the template contract.
-The package retains `InstallScope="perUser"` and deliberately
-has no `InstallPrivileges` attribute: WiX 3.14 rejects the contradictory `perUser`/`elevated` pair. Installation,
+The source package retains jpackage-owned per-user scope and deliberately
+has no authored `InstallPrivileges` attribute: WiX 3.14 rejects the contradictory `perUser`/`elevated` pair. Installation,
 repair, upgrade, and uninstall must instead start `msiexec` with UAC elevation by the same split-token Windows
 administrator who owns the per-user installation. Deferred non-impersonating `WixQuietExec64` actions then run in
 the elevated Windows Installer service context; an unelevated run fails and rolls back rather than silently omitting
@@ -67,8 +67,11 @@ environment as owner authority.
 These checks are deliberately layered. Before jpackage, the raw JDK template must retain
 `InstallScope="$(var.JpInstallScope)"` and omit `InstallPrivileges`; that stage proves jpackage still owns scope
 resolution. After jpackage, generated `config/main.wxs` must still satisfy the template contract. Dark-decompiled
-preliminary and final MSI source must contain resolved `InstallScope="perUser"`, omit `InstallPrivileges`, and retain
-every registration lifecycle action and sequence row.
+preliminary and final MSI source uses a deliberately different compiled contract: WiX 3.14 Dark need not reconstruct
+the source-only `InstallScope` abstraction and must emit `InstallPrivileges="limited"` for the supported jpackage
+per-user package. FINAL validation requires that value, rejects `elevated` and every unexpected privilege value,
+rejects an explicit machine scope and machine-wide or contradictory `ALLUSERS`/`MSIINSTALLPERUSER` configurations,
+and retains every registration lifecycle action and sequence row. It does not fabricate absent MSI properties.
 
 Windows Installer limits `CustomAction.Target` to 255 characters. The encoded registration program is stored once
 in the private `Srp` Property-table value; each action-data setter has a 254-character formatted Target that
