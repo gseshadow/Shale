@@ -58,14 +58,16 @@ def mutate(path, script):
         node=ET.SubElement(sequence,tag("Custom"),{"Action":action,"After":after}); node.text=condition
     tree.write(path,encoding="utf-8",xml_declaration=True)
 
-def validate_registration(root, path, contract):
+def validate_registration(root, path, contract, compiled=False):
     actions={n.get("Id"):n for n in root.iter(tag("CustomAction"))}
     properties={n.get("Id"):n for n in root.iter(tag("Property"))}
     packages=list(root.iter(tag("Package")))
     if len(packages) != 1: raise ValueError(f"{contract} contract violation: expected one Package; found {len(packages)}")
     for action in IDS:
         if action not in actions: raise ValueError(f"{contract} contract violation: missing action: {action}")
-        if actions[action].get("Impersonate") != "no" or actions[action].get("Return") != "check": raise ValueError(f"{contract} contract violation: action is not fail-closed/elevated: {action}")
+        return_mode=actions[action].get("Return")
+        return_ok=return_mode == "check" or (compiled and return_mode is None)
+        if actions[action].get("Impersonate") != "no" or not return_ok: raise ValueError(f"{contract} contract violation: action is not fail-closed/elevated: {action}")
         setter=actions.get(f"Set{action}")
         if setter is None: raise ValueError(f"{contract} contract violation: missing action-data setter: Set{action}")
         target=setter.get("Value") or ""
@@ -76,9 +78,29 @@ def validate_registration(root, path, contract):
     if payload is None or not (payload.get("Value") or "").strip():
         raise ValueError(f"{contract} contract violation: missing private encoded registration payload")
     sequence=root.find(f".//{tag('InstallExecuteSequence')}")
-    actual=set() if sequence is None else {(n.get("Action"),n.get("After"),(n.text or "").strip()) for n in sequence.findall(tag("Custom"))}
-    missing=set(ROWS)-actual
-    if missing: raise ValueError(f"{contract} contract violation: registration sequence missing: {sorted(missing)}")
+    if compiled:
+        expected_actions=[row[0] for row in ROWS]
+        expected_conditions={row[0]:row[2] for row in ROWS}
+        nodes=[] if sequence is None else [n for n in sequence.findall(tag("Custom")) if n.get("Action") in expected_actions]
+        if len(nodes) != len(expected_actions):
+            present=[n.get("Action") for n in nodes]
+            missing=[action for action in expected_actions if action not in present]
+            raise ValueError(f"{contract} contract violation: registration sequence missing: {missing}")
+        try:
+            ordered=sorted(nodes,key=lambda n:int(n.get("Sequence") or ""))
+        except ValueError:
+            raise ValueError(f"{contract} contract violation: compiled registration sequence must use numeric Sequence values")
+        actual_actions=[n.get("Action") for n in ordered]
+        if actual_actions != expected_actions:
+            raise ValueError(f"{contract} contract violation: compiled registration sequence order mismatch: {actual_actions}")
+        for node in ordered:
+            action=node.get("Action"); condition=(node.text or "").strip()
+            if condition != expected_conditions[action]:
+                raise ValueError(f"{contract} contract violation: registration sequence condition mismatch: {action}")
+    else:
+        actual=set() if sequence is None else {(n.get("Action"),n.get("After"),(n.text or "").strip()) for n in sequence.findall(tag("Custom"))}
+        missing=set(ROWS)-actual
+        if missing: raise ValueError(f"{contract} contract violation: registration sequence missing: {sorted(missing)}")
     text=Path(path).read_text(encoding="utf-8")
     for forbidden in ("schtasks", "Register-ScheduledTask", "New-ScheduledTask", "New-Service", "CreateService"):
         if forbidden.casefold() in text.casefold(): raise ValueError(f"{contract} contract violation: forbidden scheduler/service primitive: {forbidden}")
@@ -116,7 +138,7 @@ def validate_final(path):
         raise ValueError("final MSI contract violation: MSIINSTALLPERUSER is contradictory without ALLUSERS=2 and MSIINSTALLPERUSER=1")
     if all_users == "2" and install_per_user != "1":
         raise ValueError("final MSI contract violation: ALLUSERS=2 is ambiguous without MSIINSTALLPERUSER=1")
-    validate_registration(root, path, "final MSI")
+    validate_registration(root, path, "final MSI", compiled=True)
 
 def main():
     p=argparse.ArgumentParser(); p.add_argument("mode",choices=("mutate","template","final")); p.add_argument("file",type=Path); p.add_argument("--script",type=Path); a=p.parse_args()
