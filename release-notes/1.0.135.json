@@ -4,14 +4,17 @@
   "releaseDate": "2026-10-02",
   "summary": "Draft generated from commit messages since Shale 1.0.134. Review and edit before publishing.",
   "groups": {
-    "New": [],
+    "New": [
+      "Add release notes for 1.0.135"
+    ],
     "Improvements": [
       "Log unexpected release import failures",
       "Log request binding failures in API handler",
       "Prepare release notes drafts before releases",
       "Prevent release notes bytecode artifacts",
       "Automate release notes Git preparation",
-      "Push release source before Mac build"
+      "Push release source before Mac build",
+      "Safely reuse macOS release workspace"
     ],
     "Fixes": [
       "Fix explicit path variable binding",
