@@ -188,9 +188,15 @@ public final class LoginController {
 	}
 
 	private void handlePostLoginFlow(UiUpdateLauncher.UpdateCheckResult updateCheck) {
-		// Phase 11A never blocks entry. The shell policy banner owns central policy messaging;
-		// the manifest notification remains the compatibility fallback for an older/unavailable policy read.
+		if (requiresMandatoryUpdate(updateCheck)) {
+			updateFlowCoordinator.presentAvailableUpdate(true, Platform::exit);
+			return;
+		}
 		sceneManager.showMain();
+	}
+
+	static boolean requiresMandatoryUpdate(UiUpdateLauncher.UpdateCheckResult updateCheck) {
+		return updateCheck != null && updateCheck.updateAvailable() && updateCheck.mandatory();
 	}
 
 	private void setBusy(boolean busy) {
