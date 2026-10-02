@@ -1,8 +1,8 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 13D IN PROGRESS — design selects `UNSUPPORTED`; required Maven verification is blocked by repository access
+**Status:** Phase 13G COMPLETE — logged-out updates remain `UNSUPPORTED`; Phase 7C configuration re-verification is open
 
-**Last reviewed:** 2026-09-30
+**Last reviewed:** 2026-10-02
 
 **Authority:** This document is the roadmap and current-state record for application releases, update
 policy, installed desktop instances, authenticated sessions, revocation, and future client support.
@@ -1136,7 +1136,7 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
 | 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
-| 7C | **COMPLETE** | Desktop durable-session enrollment and required verification completed before Phase 8A. |
+| 7C | **COMPLETE; CONFIGURATION RE-VERIFICATION OPEN** | Durable-session enrollment was completed before Phase 8A. Central origin packaging/background wiring is implemented; current Maven, deployment, and credentialed Windows verification are not run because external access returned HTTP 403. |
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
 | 8B | **COMPLETE** | Best-effort invalidation/revalidation acceleration and required verification completed before Phase 9. |
 | 9 | **COMPLETE** | Desktop self-service Devices & Sessions completed and verified before Phase 10. |
@@ -2227,3 +2227,25 @@ implementation. The detailed decision record is `docs/testing/windows-logged-out
 The next recommended phase is **Phase 13H — privileged Windows component go/no-go and threat model**, but only if
 the operator chooses to own a signed protected broker/service lifecycle. Otherwise stop logged-out work and retain
 Phase 13C as the supported automatic-update architecture. macOS parity and updater redesign remain out of scope.
+## Phase 7C desktop origin integration completion — 2026-10-02
+
+Desktop server API configuration is now resolved once by `DesktopConfig` and passed through the composition root to
+enrollment, self-session management, and administrator-session management. The clients no longer inspect process
+configuration independently. Explicit system-property and environment overrides take precedence over packaged
+configuration; invalid explicit values fail closed rather than selecting another destination. Production accepts
+HTTPS origins only. Development ignores the packaged production origin and permits HTTP only for an explicitly
+configured loopback origin. Credentials cannot be transmitted to origins containing user-info, a non-root path
+(including `/api`), a query, or a fragment.
+
+The production resource records the existing Azure HTTPS origin so installed packages need no workstation-specific
+environment variable. This is not evidence that the current Azure deployment contains the endpoint. The post-JDBC
+exchange now runs off the JavaFX thread, retains the lifecycle generation guard, uses the same memory-only bearer
+provider as both management clients, and still exposes those clients only in `ENROLLED`. Logout and shutdown retain
+their distinct revoke/clear semantics. This integration introduces no new mutation or sensitive read, and therefore
+requires no new audit schema or event; server-side session issuance, session reads, and revocations retain the
+existing Phase 7A/8A audit decisions.
+
+Automated verification is pending in this environment because Maven Central and the outbound deployment proxy both
+returned HTTP 403. Deployment health, enrollment POST availability, and credentialed Windows acceptance are **NOT
+RUN**. Follow the deployment guide's Phase 7C runtime acceptance checklist before marking runtime verification
+complete.

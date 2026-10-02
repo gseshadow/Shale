@@ -447,3 +447,36 @@ accepts tenant/user claims as proof. Existing web auth contracts and older deskt
 explicit staged-rollout signal for JDBC-only compatibility. Do not interpret 401/403 or an instance mismatch as an
 old-server condition. Rollback may restore the previous desktop; it ignores historical session rows and there is no
 persisted desktop bearer credential to remove.
+
+### Desktop API-origin packaging and overrides
+
+Production desktop packages contain the verified deployment origin
+`https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net` as
+`SHALE_PACKAGED_SERVER_API_BASE_URL`. Installed workstations therefore do not need a per-machine environment
+variable. This repository value is deployment evidence only; release acceptance must still prove that the target
+deployment contains `POST /api/auth/desktop-session` and the Phase 7A/8A database migrations.
+
+`DesktopConfig` resolves one origin for enrollment and both session-management clients. Precedence is a nonblank
+`SHALE_SERVER_API_BASE_URL` Java system property, then the same environment variable, then packaged configuration
+for a production/installed launch. Blank override values are absent. A nonblank invalid override fails startup and
+never falls through to the packaged destination. Development launches ignore the packaged production origin and
+remain unconfigured unless an explicit override is supplied. An explicit local example is
+`-DSHALE_SERVER_API_BASE_URL=http://localhost:8080`; HTTP is accepted only for loopback development. All production
+origins must be HTTPS. Origins must not contain user-info, a path (including `/api`), a query, or a fragment, and
+trailing slashes are normalized.
+
+### Remaining Phase 7C runtime acceptance
+
+From an authorized Windows test workstation, without recording credentials or response bodies:
+
+1. Confirm `GET <origin>/api/health` returns 200.
+2. Confirm an intentionally invalid credential `POST <origin>/api/auth/desktop-session` returns 401 rather than
+   404/405/501. A GET or generic bearer 401 is not endpoint proof.
+3. Sign in with an authorized ordinary user and confirm Settings > Sessions loads authoritative rows; sign out and
+   confirm the prior bearer can no longer be used.
+4. Sign in as a different ordinary user and confirm no prior-user sessions or authority are inherited; confirm the
+   administrator endpoint returns 403.
+5. Sign in as a tenant administrator and confirm the bounded Administration > Sessions page loads and can perform
+   an authorized test revocation.
+6. Inspect sanitized desktop logs for `Desktop durable session enrollment succeeded.` Never capture passwords,
+   bearer tokens, request bodies, or sensitive response bodies.

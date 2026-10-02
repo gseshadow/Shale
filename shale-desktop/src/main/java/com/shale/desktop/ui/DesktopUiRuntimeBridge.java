@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.time.Instant;
+import java.net.URI;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,17 +62,23 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			LiveEventDispatcher dispatcher,
 			DesktopRuntimeSessionProvider dbProvider,
 			String negotiateEndpointUrl) {
-		this(dispatcher,dbProvider,negotiateEndpointUrl,null,null,null);
+		this(dispatcher,dbProvider,negotiateEndpointUrl,null,null,null,Optional.empty());
 	}
 
 	public DesktopUiRuntimeBridge(LiveEventDispatcher dispatcher, DesktopRuntimeSessionProvider dbProvider,
 			String negotiateEndpointUrl, MachineIdentityResult machineIdentity,
 			ApplicationInstanceServicePort applicationInstances) {
-		this(dispatcher,dbProvider,negotiateEndpointUrl,machineIdentity,applicationInstances,null);
+		this(dispatcher,dbProvider,negotiateEndpointUrl,machineIdentity,applicationInstances,null,Optional.empty());
 	}
 	public DesktopUiRuntimeBridge(LiveEventDispatcher dispatcher, DesktopRuntimeSessionProvider dbProvider,
 			String negotiateEndpointUrl, MachineIdentityResult machineIdentity,
 			ApplicationInstanceServicePort applicationInstances,DesktopSessionEnrollmentLifecycle serverSessions) {
+		this(dispatcher,dbProvider,negotiateEndpointUrl,machineIdentity,applicationInstances,serverSessions,Optional.empty());
+	}
+	public DesktopUiRuntimeBridge(LiveEventDispatcher dispatcher, DesktopRuntimeSessionProvider dbProvider,
+			String negotiateEndpointUrl, MachineIdentityResult machineIdentity,
+			ApplicationInstanceServicePort applicationInstances,DesktopSessionEnrollmentLifecycle serverSessions,
+			Optional<URI> serverApiOrigin) {
 
 		this.dispatcher = dispatcher;
 		this.dbProvider = dbProvider;
@@ -80,9 +87,8 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		this.applicationInstances = applicationInstances;
 		this.heartbeat = applicationInstances==null?null:new ApplicationInstanceHeartbeatLifecycle(applicationInstances);
 		this.serverSessions=serverSessions;
-		String apiBase=System.getProperty("SHALE_SERVER_API_BASE_URL",System.getenv("SHALE_SERVER_API_BASE_URL"));
-		this.sessionManagement=serverSessions==null||apiBase==null||apiBase.isBlank()?null:new UserSessionManagementClient(apiBase,serverSessions.session());
-		this.adminSessionManagement=serverSessions==null||apiBase==null||apiBase.isBlank()?null:new AdminSessionManagementClient(apiBase,serverSessions.session());
+		this.sessionManagement=serverSessions==null||serverApiOrigin.isEmpty()?null:new UserSessionManagementClient(serverApiOrigin.get().toString(),serverSessions.session());
+		this.adminSessionManagement=serverSessions==null||serverApiOrigin.isEmpty()?null:new AdminSessionManagementClient(serverApiOrigin.get().toString(),serverSessions.session());
 		AutomaticUpdatePreferenceService preferences = AutomaticUpdatePreferenceService.resolvePlatformDefault();
 		this.workstationAutomaticUpdates = new UiRuntimeBridge.WorkstationAutomaticUpdates() {
 			@Override public com.shale.core.update.WorkstationUpdatePreference read() { return preferences.current(); }
@@ -99,7 +105,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	}
 
 	@Override public Optional<UiRuntimeBridge.UserSessionManagement> userSessionManagement(){
-		return serverSessions!=null&&serverSessions.state()==DesktopSessionEnrollmentLifecycle.State.ENROLLED?Optional.of(sessionManagement):Optional.empty();
+		return serverSessions!=null&&serverSessions.state()==DesktopSessionEnrollmentLifecycle.State.ENROLLED?Optional.ofNullable(sessionManagement):Optional.empty();
 	}
 
 	@Override
@@ -113,7 +119,14 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		lastUserId = userId;
 		lastShaleClientId = shaleClientId;
 		enrollBestEffort(shaleClientId,userId);
-		if(serverSessions!=null){serverSessions.enroll(currentInstance.get().map(v->v.id()).orElse(null));serverSessions.startAcceleration(dispatcher,shaleClientId,generation,sessionGeneration::get,applicationPolicyRefreshHandler);}
+		if(serverSessions!=null){
+			Long instanceId=currentInstance.get().map(v->v.id()).orElse(null);
+			java.util.concurrent.CompletableFuture.runAsync(()->serverSessions.enroll(instanceId))
+					.whenComplete((ignored,failure)->{
+						if(failure!=null){log.warn("Desktop durable session enrollment task failed: {}",failure.getClass().getSimpleName());return;}
+						if(generation==sessionGeneration.get())serverSessions.startAcceleration(dispatcher,shaleClientId,generation,sessionGeneration::get,applicationPolicyRefreshHandler);
+					});
+		}
 
 		tryConnectLiveBus(shaleClientId, userId, generation);
 	}
