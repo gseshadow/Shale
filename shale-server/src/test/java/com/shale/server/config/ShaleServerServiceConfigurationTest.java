@@ -10,17 +10,20 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.service.AuthServicePort;
+import com.shale.core.service.ApplicationReleaseReadServicePort;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.NotificationServicePort;
 import com.shale.core.service.TaskServicePort;
 import com.shale.data.service.adapter.AuthServiceAdapter;
+import com.shale.data.service.adapter.ApplicationReleaseReadServiceAdapter;
 import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
+import com.shale.server.runtime.DesktopApplicationInstanceVerifier;
 import com.shale.server.runtime.RequestScopedDbSessionProvider;
 import com.shale.server.runtime.RuntimeConnectionProvider;
 import com.shale.server.runtime.ServerRuntimeSessionState;
@@ -38,6 +41,8 @@ class ShaleServerServiceConfigurationTest {
             assertInstanceOf(TaskServiceAdapter.class, context.getBean(TaskServicePort.class));
             assertInstanceOf(ContactServiceAdapter.class, context.getBean(ContactServicePort.class));
             assertInstanceOf(NotificationServiceAdapter.class, context.getBean(NotificationServicePort.class));
+            assertInstanceOf(ApplicationReleaseReadServiceAdapter.class,
+                    context.getBean(ApplicationReleaseReadServicePort.class));
             assertNotNull(context.getBean(ServerRuntimeSessionState.class));
             assertInstanceOf(UnauthenticatedServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
             assertInstanceOf(RequestScopedDbSessionProvider.class, context.getBean(DbSessionProvider.class));
@@ -53,6 +58,7 @@ class ShaleServerServiceConfigurationTest {
                 context.refresh();
 
                 assertInstanceOf(com.shale.server.runtime.CompositeServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
+				assertNotNull(context.getBean(DesktopApplicationInstanceVerifier.class));
             }
         });
     }
@@ -89,6 +95,7 @@ class ShaleServerServiceConfigurationTest {
         System.setProperty("SHALE_RT_DB_USER", "rt_user");
         System.setProperty("SHALE_RT_DB_PASSWORD", "rt_password");
         System.setProperty("SHALE_AUTH_TOKEN_SECRET", "test-auth-token-secret-that-is-long-enough");
+        System.setProperty("SHALE_AUTH_SESSION_BINDING_CUTOVER_AT", "2026-09-29T18:00:00Z");
         try {
             test.run();
         } finally {
@@ -99,6 +106,7 @@ class ShaleServerServiceConfigurationTest {
             System.clearProperty("SHALE_RT_DB_USER");
             System.clearProperty("SHALE_RT_DB_PASSWORD");
             System.clearProperty("SHALE_AUTH_TOKEN_SECRET");
+            System.clearProperty("SHALE_AUTH_SESSION_BINDING_CUTOVER_AT");
         }
     }
 }

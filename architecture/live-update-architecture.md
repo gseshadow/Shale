@@ -33,6 +33,37 @@ Rules:
 - Events should be broadcast to tenant groups.
 - Never broadcast data across tenant boundaries.
 - UI should refresh through dispatcher events rather than direct controller coupling.
+
+## Phase 8B session and application-policy invalidations
+
+Phase 8B adds two version-1 invalidation names to the existing JSON envelope: `SESSION_INVALIDATED`
+and `APPLICATION_POLICY_CHANGED`. A session event contains only `schemaVersion`, random `eventId`, server
+`timestamp`, `type`, `shaleClientId`, and the public `sessionId`. A policy event contains only the common
+envelope fields plus the global release `channel`. Neither event contains a token/JTI, password, person name,
+email, machine UUID, IP/location, audit metadata, PHI, policy contents, or revocation reason.
+
+The deployed LiveBus currently authorizes and joins the tenant group `client-{ShaleClientId}`; it has no
+server-verified session-group grant. Session invalidations therefore use that existing tenant-routed group and
+the desktop additionally matches its own public session id. This is the narrowest safe current route: the
+publisher, not merely client filtering, enforces the tenant boundary. A future session group must not accept a
+client-selected session id. Application policy is the Phase 1B global, channel-scoped control plane rather than
+tenant RLS data, so its invalidation route is channel-scoped (`policy:{channel}`) where supported by the Azure
+publisher contract; the additive server publisher hook does not create policy administration.
+
+Session mutation and its Phase 8A audit commit before publication is attempted. Rollback publishes nothing.
+Transport failure is sanitized and swallowed after commit, and cannot undo or misreport the durable change.
+`revoke-others` obtains affected public ids from the update result (`OUTPUT INSERTED.SessionId`) and does no N+1
+read. Current-session logout does not publish because local logout already detaches handlers and clears the bearer.
+Delivery and receipt are transport behavior and create no audit rows.
+
+Desktop handlers exist only for a successfully enrolled durable server session; JDBC-only compatibility mode has
+no fake subscription. A matching event calls the bounded authoritative `/api/sessions` read. Only a confirmed
+401/403 clears the HTTP bearer; timeout or transport failure leaves state unknown and direct JDBC authority is
+unchanged. Tenant/session mismatches and stale login generations are discarded. An in-flight guard coalesces
+duplicates; out-of-order hints merely cause another authoritative read. On reconnect, the desktop revalidates the
+session and reloads the global PRODUCTION policy through the existing policy read service. Logout, user switch,
+and shutdown detach handlers before clearing state. Unknown event types remain ignored, preserving N-1 clients;
+older servers simply emit no hints. There is no replay, cursor, queue, polling timer, new socket, or event store.
 ## Phase 6.3 Case Links, Link Types, and Entity Activity invalidations
 
 Phase 6.3 extends the existing Azure Web PubSub live-update path; it does not add polling, a second bus, durable event storage, event replay, REST audit routes, or web/React live updates. The established path remains: a successful desktop/service mutation returns after the database work has completed, the `UiRuntimeBridge` publishes an `EntityUpdated` invalidation through `LiveBus` to the tenant group `client-{ShaleClientId}`, `LiveEventDispatcher` parses the event into `EntityUpdatedEvent`, and interested controllers reload through their normal tenant-scoped service/DAO paths.
@@ -118,3 +149,7 @@ The configuration replacement remains audited in the same transaction as
 `CASE_DATE_PRESENTATION_CONFIGURATION`, using the existing entity-action audit schema and only the
 allowlisted purpose/kind and ordering count metadata. Presentation reads and live invalidations are
 not additional audit events because they neither reveal a new sensitive value nor mutate state.
+
+## Phase 11A policy presentation refresh
+
+Phase 11A connects the existing coalesced policy callback to the shell's single update-policy coordinator. The event remains an untrusted invalidation and never supplies policy state. The coordinator rereads current policy, atomically replaces cached presentation (including corrections), and uses its server-time anchor. A failed reload retains only clearly stale last-known presentation and never enforces access.

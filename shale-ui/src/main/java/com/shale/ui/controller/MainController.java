@@ -8,6 +8,8 @@ import com.shale.ui.notification.NotificationCategory;
 import com.shale.ui.services.UiRuntimeBridge;
 import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.services.UpdateFlowCoordinator;
+import com.shale.ui.services.ApplicationUpdatePolicyCoordinator;
+import com.shale.core.model.ApplicationVersionEnforcementState;
 import com.shale.ui.state.AppState;
 import com.shale.ui.util.NavButtonStyler;
 import com.shale.ui.util.ControlStyles;
@@ -46,6 +48,11 @@ public final class MainController {
 
 	@FXML
 	private HBox notificationBannerHost;
+	@FXML private VBox updatePolicyBanner;
+	@FXML private Label updatePolicyMessage;
+	@FXML private Label updatePolicyDetail;
+	@FXML private Button updatePolicyAction;
+	@FXML private Button updatePolicyDismiss;
 
 	@FXML
 	private Label notificationBannerLabel;
@@ -106,6 +113,9 @@ public final class MainController {
 	private UiUpdateLauncher updateLauncher;
 	private NotificationCenterService notificationCenterService;
 	private UpdateFlowCoordinator updateFlowCoordinator;
+	private ApplicationUpdatePolicyCoordinator.Presentation shownUpdatePolicy;
+	private String dismissedRecommendedKey;
+	private boolean updaterPackageAvailable;
 
 	public MainController() {
 		System.out.println("MainController()");// TODO remove
@@ -146,6 +156,8 @@ public final class MainController {
 		ControlStyles.apply(newIntakeButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 		ControlStyles.apply(logoutButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		ControlStyles.apply(profileButton, ControlStyles.Purpose.NAVIGATION, ControlStyles.Size.SMALL);
+		ControlStyles.apply(updatePolicyAction, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.SMALL);
+		ControlStyles.apply(updatePolicyDismiss, ControlStyles.Purpose.GHOST, ControlStyles.Size.SMALL);
 	}
 
 	@FXML
@@ -229,6 +241,37 @@ public final class MainController {
 			System.out.println("Update launcher not configured.");
 		}
 	}
+
+	@FXML private void onDismissUpdatePolicy() {
+		if(shownUpdatePolicy!=null&&shownUpdatePolicy.state()==com.shale.core.model.ApplicationUpdatePolicyState.RECOMMENDED)
+			dismissedRecommendedKey=shownUpdatePolicy.revision()+":"+shownUpdatePolicy.targetVersion();
+		updatePolicyBanner.setVisible(false); updatePolicyBanner.setManaged(false);
+	}
+
+	public void showUpdatePolicy(ApplicationUpdatePolicyCoordinator.Presentation presentation) {
+		if (updatePolicyBanner == null) return;
+		shownUpdatePolicy=presentation;
+		String key=presentation==null?"":presentation.revision()+":"+presentation.targetVersion();
+		if(presentation!=null&&presentation.state()==com.shale.core.model.ApplicationUpdatePolicyState.RECOMMENDED&&key.equals(dismissedRecommendedKey))return;
+		boolean visible=presentation!=null&&presentation.visible();
+		updatePolicyBanner.setVisible(visible);updatePolicyBanner.setManaged(visible);
+		if(!visible)return;
+		updatePolicyMessage.setText(presentation.message());updatePolicyDetail.setText(!presentation.targetVersion().isBlank()&&!updaterPackageAvailable
+				? presentation.detail()+" The updater package is temporarily unavailable; retry the update check later." : presentation.detail());
+		updatePolicyDismiss.setVisible(presentation.dismissible());updatePolicyDismiss.setManaged(presentation.dismissible());
+		updatePolicyAction.setVisible(!presentation.targetVersion().isBlank()&&updaterPackageAvailable);updatePolicyAction.setManaged(!presentation.targetVersion().isBlank()&&updaterPackageAvailable);
+		updatePolicyBanner.getStyleClass().removeAll("update-policy-recommended","update-policy-required","update-policy-overdue","update-policy-unknown");
+		updatePolicyBanner.getStyleClass().add(switch(presentation.state()){
+			case RECOMMENDED->"update-policy-recommended";case REQUIRED_BEFORE_DEADLINE->"update-policy-required";
+			case REQUIRED_DEADLINE_REACHED->"update-policy-overdue";default->"update-policy-unknown";});
+	}
+	public void showEnforcementState(ApplicationVersionEnforcementState state) {
+		boolean blocked=state==ApplicationVersionEnforcementState.DRAINING_REQUIRED_UPDATE
+				||state==ApplicationVersionEnforcementState.BLOCKED_NEW_WORK;
+		if(newIntakeButton!=null){newIntakeButton.setDisable(blocked);newIntakeButton.setAccessibleHelp(blocked
+				? com.shale.ui.services.SafeWorkDrainCoordinator.BLOCKED_MESSAGE : "Start a new intake");}
+	}
+	public void setUpdaterPackageAvailable(boolean available){updaterPackageAvailable=available;if(shownUpdatePolicy!=null)showUpdatePolicy(shownUpdatePolicy);}
 
 	@FXML
 	private void onLogout() {

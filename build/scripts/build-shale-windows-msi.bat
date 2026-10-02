@@ -64,8 +64,13 @@ echo Windows MSI stage completed: toolchain-validation
 set STAGE=%ROOT%\build\staging\windows-msi
 set PRELIM=%STAGE%\preliminary
 set JPACKAGE_TEMP=%STAGE%\jpackage-temp
+set JPACKAGE_LOG=%STAGE%\jpackage-verbose.log
 set GENERATED_CONFIG_DIR=%JPACKAGE_TEMP%\config
 set BUNDLE_SOURCE=%GENERATED_CONFIG_DIR%\bundle.wxf
+set MAIN_SOURCE=%GENERATED_CONFIG_DIR%\main.wxs
+set JPACKAGE_RESOURCE_EXTRACT=%STAGE%\jdk-resources
+set JPACKAGE_RESOURCE_DIR=%STAGE%\jpackage-resources
+set JPACKAGE_MAIN_TEMPLATE=%JPACKAGE_RESOURCE_DIR%\main.wxs
 set WIXOBJ_DIR=%JPACKAGE_TEMP%\wixobj
 set BUNDLE_WIXOBJ=%WIXOBJ_DIR%\bundle.wixobj
 set MAIN_WIXOBJ=%WIXOBJ_DIR%\main.wixobj
@@ -79,11 +84,28 @@ set FINAL=%STAGE%\final
 set PRELIMINARY_MSI=%PRELIM%\Shale-%VERSION%.msi
 set FINAL_MSI=%FINAL%\Shale-%VERSION%.msi
 set APPINPUT=%ROOT%\shale-desktop\target
+set DIAGNOSTIC_LAUNCHER_CONFIG=%ROOT%\build\packaging\windows\shale-registration-diagnostic.properties
 echo Windows MSI stage started: staging command=mkdir expected="%PRELIM%" and "%FINAL%"
 if exist "%STAGE%" rmdir /s /q "%STAGE%"
 mkdir "%PRELIM%" "%FINAL%"
 if errorlevel 1 goto :staging_failed
 echo Windows MSI stage completed: staging
+echo Windows MSI stage started: diagnostic-launcher-validation input="%DIAGNOSTIC_LAUNCHER_CONFIG%"
+if not exist "%DIAGNOSTIC_LAUNCHER_CONFIG%" goto :missing_diagnostic_launcher_config
+python "%ROOT%\build\scripts\windows_msi_payload.py" launcher "%DIAGNOSTIC_LAUNCHER_CONFIG%"
+if errorlevel 1 goto :invalid_diagnostic_launcher_config
+echo Windows MSI stage completed: diagnostic-launcher-validation
+
+echo Windows MSI stage started: jpackage-resource-preparation source="%JAVA_HOME%\lib\modules" expected="%JPACKAGE_MAIN_TEMPLATE%"
+mkdir "%JPACKAGE_RESOURCE_EXTRACT%" "%JPACKAGE_RESOURCE_DIR%"
+if errorlevel 1 goto :jpackage_resource_failed
+"%JAVA_HOME%\bin\jimage.exe" extract --dir "%JPACKAGE_RESOURCE_EXTRACT%" --include "glob:**/main.wxs" "%JAVA_HOME%\lib\modules"
+if errorlevel 1 goto :jpackage_resource_failed
+python "%ROOT%\build\scripts\windows_jpackage_resource.py" "%JPACKAGE_RESOURCE_EXTRACT%" "%JPACKAGE_MAIN_TEMPLATE%"
+if errorlevel 1 goto :jpackage_resource_failed
+python "%ROOT%\build\scripts\windows_msi_registration.py" mutate "%JPACKAGE_MAIN_TEMPLATE%" --script "%ROOT%\build\scripts\windows-installation-registration.ps1"
+if errorlevel 1 goto :jpackage_resource_failed
+echo Windows MSI stage completed: jpackage-resource-preparation
 
 set "NATIVE_BUILD_SCRIPT=%ROOT%\build\native\windows-toast\build-native.bat"
 set "NATIVE_DLL=%APPINPUT%\native\shale_windows_toast.dll"
@@ -104,11 +126,14 @@ echo Windows MSI stage completed: marker-staging
 
 echo Starting jpackage and WiX MSI construction...
 echo Windows MSI stage started: preliminary-jpackage tool=jpackage expected="%PRELIMINARY_MSI%"
-jpackage --type msi --name Shale --input "%APPINPUT%" --dest "%PRELIM%" --temp "%JPACKAGE_TEMP%" --verbose ^
+jpackage --type msi --name Shale --input "%APPINPUT%" --dest "%PRELIM%" --temp "%JPACKAGE_TEMP%" --verbose --resource-dir "%JPACKAGE_RESOURCE_DIR%" ^
  --main-jar "shale-desktop-%VERSION%.jar" --main-class com.shale.desktop.ShaleLauncher ^
+ --add-launcher ShaleRegistrationDiagnostic="%DIAGNOSTIC_LAUNCHER_CONFIG%" ^
  --icon "%ROOT%\build\assets\Shale.ico" --app-version "%VERSION%" --vendor "Get Downing" ^
- --description "Shale Desktop" --win-menu --win-shortcut --win-dir-chooser --win-per-user-install --install-dir Shale
-if errorlevel 1 goto :jpackage_failed
+ --description "Shale Desktop" --win-menu --win-shortcut --win-dir-chooser --win-per-user-install --install-dir Shale >"%JPACKAGE_LOG%" 2>&1
+set "JPACKAGE_EXIT=!ERRORLEVEL!"
+type "%JPACKAGE_LOG%"
+if not "!JPACKAGE_EXIT!"=="0" goto :jpackage_failed
 echo Preliminary jpackage MSI completed.
 if not exist "%PRELIMINARY_MSI%" goto :missing_preliminary_msi
 if not exist "%BUNDLE_SOURCE%" goto :missing_bundle
@@ -125,6 +150,20 @@ echo Windows MSI stage started: generated-identity-mutation script="%ROOT%\build
 python "%ROOT%\build\scripts\windows_msi_identity.py" mutate "%BUNDLE_SOURCE%"
 if errorlevel 1 goto :generated_identity_mutation_failed
 echo bundle.wxf identity and shortcut mutation completed.
+if not exist "%MAIN_SOURCE%" goto :missing_main_source
+echo Windows MSI stage started: original-compile-registration-validation input="%MAIN_SOURCE%" contract=TEMPLATE
+python "%ROOT%\build\scripts\windows_msi_registration.py" template "%MAIN_SOURCE%"
+if errorlevel 1 goto :original_compile_registration_failed
+echo Windows MSI stage completed: original-compile-registration-validation
+
+mkdir "%STAGE%\preliminary-dark"
+if errorlevel 1 goto :dark_staging_failed
+dark.exe -o "%STAGE%\preliminary-dark\preliminary.wxs" "%PRELIMINARY_MSI%"
+if errorlevel 1 goto :preliminary_dark_failed
+echo Windows MSI stage started: preliminary-compiled-registration-validation input="%STAGE%\preliminary-dark\preliminary.wxs" contract=FINAL
+python "%ROOT%\build\scripts\windows_msi_registration.py" final "%STAGE%\preliminary-dark\preliminary.wxs"
+if errorlevel 1 goto :preliminary_compiled_registration_failed
+echo Windows MSI stage completed: preliminary-compiled-registration-validation
 
 if not exist "%WIXOBJ_DIR%" goto :missing_wixobj_dir
 if not exist "%MAIN_WIXOBJ%" goto :missing_main_wixobj
@@ -165,6 +204,9 @@ if errorlevel 1 goto :light_failed
 echo Final light.exe reconstruction completed.
 echo Windows MSI stage completed: light-reconstruction output="%FINAL_MSI%"
 if not exist "%FINAL_MSI%" goto :missing_final_msi
+echo Windows MSI stage started: Authenticode signing before publication
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\build\scripts\sign-windows-artifact.ps1" -Path "%FINAL_MSI%"
+if errorlevel 1 goto :msi_signing_failed
 echo Compiled final MSI validation started.
 mkdir "%STAGE%\dark"
 if errorlevel 1 goto :dark_staging_failed
@@ -176,7 +218,13 @@ echo Windows MSI stage completed: dark-extraction
 echo Windows MSI stage started: compiled-identity-validation script="%ROOT%\build\scripts\windows_msi_identity.py" input="%STAGE%\dark\final.wxs"
 python "%ROOT%\build\scripts\windows_msi_identity.py" validate "%STAGE%\dark\final.wxs"
 if errorlevel 1 goto :compiled_identity_failed
+python "%ROOT%\build\scripts\windows_msi_identity.py" compare "%STAGE%\preliminary-dark\preliminary.wxs" "%STAGE%\dark\final.wxs"
+if errorlevel 1 goto :compiled_identity_failed
 echo Windows MSI stage completed: compiled-identity-validation
+echo Windows MSI stage started: compiled-registration-validation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%STAGE%\dark\final.wxs"
+python "%ROOT%\build\scripts\windows_msi_registration.py" final "%STAGE%\dark\final.wxs"
+if errorlevel 1 goto :compiled_registration_failed
+echo Windows MSI stage completed: compiled-registration-validation
 echo Windows MSI stage started: compiled-payload-validation script="%ROOT%\build\scripts\windows_msi_payload.py" input="%STAGE%\dark\final.wxs"
 python "%ROOT%\build\scripts\windows_msi_payload.py" compiled "%STAGE%\dark\final.wxs"
 if errorlevel 1 goto :compiled_payload_failed
@@ -190,10 +238,20 @@ if errorlevel 1 goto :final_move_failed
 echo Final MSI publication completed: Shale-%VERSION%.msi
 exit /b 0
 
+:msi_signing_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=Authenticode-signing input="%FINAL_MSI%" exit=%STAGE_EXIT%
+exit /b 31
+
 :staging_failed
 set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=staging command=mkdir expected="%PRELIM%" and "%FINAL%" exit=%STAGE_EXIT%
 exit /b 15
+
+:jpackage_resource_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=jpackage-resource-preparation source="%JAVA_HOME%\lib\modules" expected="%JPACKAGE_MAIN_TEMPLATE%" exit=%STAGE_EXIT%
+exit /b 46
 
 :missing_native_build_script
 echo Windows MSI stage failed: stage=native-DLL classification=missing_script script="%NATIVE_BUILD_SCRIPT%" expected="%NATIVE_DLL%" exit=16
@@ -232,6 +290,26 @@ set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=generated-identity-mutation script="%ROOT%\build\scripts\windows_msi_identity.py" input="%BUNDLE_SOURCE%" exit=%STAGE_EXIT%
 exit /b 20
 
+:original_compile_registration_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=original-compile-registration-validation source="%MAIN_SOURCE%" exit=%STAGE_EXIT%
+exit /b 42
+
+:preliminary_dark_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=preliminary-identity-extraction input="%PRELIMINARY_MSI%" exit=%STAGE_EXIT%
+exit /b 47
+
+:preliminary_compiled_registration_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=preliminary-compiled-registration-validation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%STAGE%\preliminary-dark\preliminary.wxs" exit=%STAGE_EXIT%
+exit /b 48
+
+:compiled_registration_failed
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=compiled-registration-validation script="%ROOT%\build\scripts\windows_msi_registration.py" input="%STAGE%\dark\final.wxs" exit=%STAGE_EXIT%
+exit /b 44
+
 :compiled_identity_failed
 set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=compiled-identity-validation script="%ROOT%\build\scripts\windows_msi_identity.py" input="%STAGE%\dark\final.wxs" exit=%STAGE_EXIT%
@@ -247,6 +325,15 @@ set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=compiled-payload-validation script="%ROOT%\build\scripts\windows_msi_payload.py" input="%STAGE%\dark\final.wxs" exit=%STAGE_EXIT%
 exit /b 27
 
+:missing_diagnostic_launcher_config
+echo Windows MSI stage failed: stage=diagnostic-launcher-validation input="%DIAGNOSTIC_LAUNCHER_CONFIG%" classification=missing
+exit /b 49
+
+:invalid_diagnostic_launcher_config
+set "STAGE_EXIT=%ERRORLEVEL%"
+echo Windows MSI stage failed: stage=diagnostic-launcher-validation input="%DIAGNOSTIC_LAUNCHER_CONFIG%" exit=%STAGE_EXIT%
+exit /b 50
+
 :final_copy_failed
 set "STAGE_EXIT=%ERRORLEVEL%"
 echo Windows MSI stage failed: stage=artifact-finalization command=copy source="%FINAL_MSI%" expected="%ROOT%\dist\Shale-%VERSION%.msi.new" exit=%STAGE_EXIT%
@@ -260,6 +347,10 @@ exit /b 30
 :missing_bundle
 echo Generated bundle.wxf was not found at expected path: "%BUNDLE_SOURCE%"
 exit /b 19
+
+:missing_main_source
+echo Generated main.wxs was not found at expected path: "%MAIN_SOURCE%"
+exit /b 43
 
 :missing_preliminary_msi
 echo Preliminary jpackage MSI was not found at expected path: "%PRELIMINARY_MSI%"

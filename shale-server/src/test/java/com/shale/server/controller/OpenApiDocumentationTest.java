@@ -38,4 +38,26 @@ class OpenApiDocumentationTest {
                 .andExpect(jsonPath("$.paths['/api/notifications/unread-count']").exists())
                 .andExpect(jsonPath("$.paths['/api/notifications/{notificationId}/activation-target']").exists());
     }
+
+    @Test
+    void openApiDocumentsAuthenticatedApplicationReleaseContractsAndClosedVocabularies() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/application-releases'].get.security[0].bearerAuth").exists())
+                .andExpect(jsonPath("$.paths['/api/application-releases'].get.parameters[?(@.name == 'channel')]").exists())
+                .andExpect(jsonPath("$.paths['/api/application-releases'].get.parameters[?(@.name == 'after')].description")
+                        .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("strict canonical major.minor.build"))))
+                .andExpect(jsonPath("$.paths['/api/application-releases'].get.responses['200'].content['application/json'].schema.items.$ref")
+                        .value(org.hamcrest.Matchers.endsWith("/ApplicationReleaseResponse")))
+                .andExpect(jsonPath("$.paths['/api/application-releases/policy/current'].get.security[0].bearerAuth").exists())
+                .andExpect(jsonPath("$.paths['/api/application-releases/policy/current'].get.responses['204']").exists())
+                .andExpect(jsonPath("$.components.schemas.ApplicationReleaseResponse.properties.items.items.$ref")
+                        .value(org.hamcrest.Matchers.endsWith("/ApplicationReleaseItemResponse")))
+                .andExpect(jsonPath("$.components.schemas.ReleaseChannel.enum")
+                        .value(org.hamcrest.Matchers.contains("PRODUCTION", "PILOT", "DEVELOPMENT")))
+                .andExpect(jsonPath("$.components.schemas.ReleaseItemType.enum")
+                        .value(org.hamcrest.Matchers.contains("FEATURE", "FIX", "IMPROVEMENT", "IMPORTANT", "LINK", "VIDEO")))
+                .andExpect(jsonPath("$.components.schemas.ApplicationAccessMode.enum")
+                        .value(org.hamcrest.Matchers.contains("NORMAL", "READ_ONLY", "MAINTENANCE", "BLOCKED")));
+    }
 }

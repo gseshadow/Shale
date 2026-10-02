@@ -82,6 +82,8 @@ public final class ContactsController {
     private long pageLoadStartedNanos;
     private long totalResults;
     private Consumer<Integer> onOpenContact;
+    private java.util.function.Function<String,com.shale.ui.services.SafeWorkDrainCoordinator.Registration> workGate;
+    public void setWorkGate(java.util.function.Function<String,com.shale.ui.services.SafeWorkDrainCoordinator.Registration> value){workGate=value;}
 
     private final ExecutorService dbExec = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "contacts-directory-loader");
@@ -152,7 +154,7 @@ public final class ContactsController {
     @FXML private void addContact() {
         if (contactService == null || appState == null || appState.getShaleClientId() == null || appState.getUserId() == null) return;
         Window owner=addContactButton==null||addContactButton.getScene()==null?null:addContactButton.getScene().getWindow();
-        new ContactViewController().showCreateEditor(owner,appState,contactService,typeOptions,specialtyOptions,credentialOptions,id->{
+        ContactViewController editor=new ContactViewController();editor.setWorkGate(workGate);editor.showCreateEditor(owner,appState,contactService,typeOptions,specialtyOptions,credentialOptions,id->{
             loadFirstPage();
             if(onOpenContact!=null)onOpenContact.accept(id);
         });

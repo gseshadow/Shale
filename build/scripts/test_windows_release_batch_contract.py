@@ -181,6 +181,12 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn('update-manifest.bat"', release)
         self.assertIn('publish-update.bat"', publish)
 
+    def test_local_release_build_never_crosses_publication_boundary(self):
+        release_build = batch_source("build-shale-release.bat").lower()
+        for forbidden in ("release-and-publish.bat", "publish-update.bat", "update-manifest.bat",
+                          "az storage", "azcopy", "upload-batch"):
+            self.assertNotIn(forbidden, release_build)
+
     def test_native_dependency_report_parent_exists_before_redirection(self):
         source = (ROOT / "build/native/windows-toast/build-native.bat").read_text(encoding="utf-8")
         mkdir = source.index('if not exist "%DEPENDENCY_DIR%" mkdir "%DEPENDENCY_DIR%"')
@@ -305,12 +311,31 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertNotIn("extends Application", launcher)
         self.assertIn("public static void main(String[] args)", launcher)
         self.assertIn("MainApp.main(args);", launcher)
-        self.assertIn('windows_msi_payload.py" config "%DIST_APP%\\Shale\\app\\Shale.cfg"', release)
+        properties = (ROOT / "build/packaging/windows/shale-registration-diagnostic.properties").read_text(encoding="utf-8")
+        for source in (release, msi):
+            self.assertIn('--add-launcher ShaleRegistrationDiagnostic="%DIAGNOSTIC_LAUNCHER_CONFIG%"', source)
+            self.assertIn('windows_msi_payload.py" launcher "%DIAGNOSTIC_LAUNCHER_CONFIG%"', source)
+        self.assertIn("main-class=com.shale.desktop.update.WindowsInstallationRegistrationDiagnostic", properties)
+        self.assertIn("win-console=true", properties)
+        self.assertIn("win-menu=false", properties)
+        self.assertIn("win-shortcut=false", properties)
+        self.assertNotIn("arguments=", properties)
+        self.assertIn('windows_msi_payload.py" image "%DIST_APP%\\Shale"', release)
         source_validation = msi.index('windows_msi_payload.py" source "%BUNDLE_SOURCE%"')
         final_validation = msi.index('windows_msi_payload.py" compiled "%STAGE%\\dark\\final.wxs"')
         publish = msi.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"')
         self.assertLess(source_validation, final_validation)
         self.assertLess(final_validation, publish)
+
+    def test_registration_diagnostic_entrypoint_is_desktop_owned_only(self):
+        legacy = ROOT / "shale-core/src/main/java/com/shale/core/update/WindowsInstallationRegistrationDiagnostic.java"
+        desktop = ROOT / "shale-desktop/src/main/java/com/shale/desktop/update/WindowsInstallationRegistrationDiagnostic.java"
+        self.assertFalse(legacy.exists(), "The legacy core diagnostic would be shaded into updater payloads")
+        self.assertTrue(desktop.is_file(), "The desktop-owned diagnostic entry point is missing")
+        source = desktop.read_text(encoding="utf-8")
+        self.assertIn("import com.shale.core.update.WindowsInstallationRegistrationReader;", source)
+        self.assertIn("WindowsInstallationRegistrationReader.windowsRegistrySource()", source)
+        self.assertIn("WindowsInstallationRegistrationReader::inspectPath", source)
 
     def test_successful_toolchain_reaches_named_native_stage_without_stale_errorlevel(self):
         source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
@@ -326,10 +351,11 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
     def test_every_post_toolchain_operation_has_fail_closed_stage_diagnostics(self):
         source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
         stages = (
-            "staging", "native-DLL", "marker-staging", "preliminary-jpackage",
+            "staging", "diagnostic-launcher-validation", "jpackage-resource-preparation", "native-DLL", "marker-staging", "preliminary-jpackage",
             "generated-payload-validation", "generated-identity-validation",
-            "generated-identity-mutation", "candle-recompile", "light-reconstruction",
-            "dark-extraction", "compiled-identity-validation", "compiled-payload-validation",
+            "generated-identity-mutation", "original-compile-registration-validation", "preliminary-compiled-registration-validation", "candle-recompile",
+            "light-reconstruction", "dark-extraction", "compiled-identity-validation",
+            "compiled-registration-validation", "compiled-payload-validation",
             "artifact-finalization",
         )
         toolchain = source.index("Windows MSI stage completed: toolchain-validation")
@@ -340,6 +366,47 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn('echo Windows MSI stage failed:', source)
         self.assertIn('exit=!NATIVE_BUILD_EXIT!', source)
         self.assertGreater(publish, source.index("Windows MSI stage started: compiled-payload-validation"))
+
+    def test_registration_resource_is_consumed_by_original_compile_and_validated_before_publication(self):
+        source = (ROOT / "build/scripts/build-shale-windows-msi.bat").read_text(encoding="utf-8")
+        extract = source.index('jimage.exe" extract')
+        selection = source.index('windows_jpackage_resource.py" "%JPACKAGE_RESOURCE_EXTRACT%" "%JPACKAGE_MAIN_TEMPLATE%"', extract)
+        mutate = source.index('windows_msi_registration.py" mutate "%JPACKAGE_MAIN_TEMPLATE%"', extract)
+        jpackage = source.index('jpackage --type msi', mutate)
+        self.assertIn('--resource-dir "%JPACKAGE_RESOURCE_DIR%"', source[jpackage:])
+        validate_original = source.index('windows_msi_registration.py" template "%MAIN_SOURCE%"', jpackage)
+        preliminary_dark = source.index('dark.exe -o "%STAGE%\\preliminary-dark\\preliminary.wxs"', validate_original)
+        validate_preliminary = source.index('windows_msi_registration.py" final "%STAGE%\\preliminary-dark\\preliminary.wxs"', preliminary_dark)
+        link = source.index("Final light.exe reconstruction started.", validate_preliminary)
+        validate = source.index('windows_msi_registration.py" final "%STAGE%\\dark\\final.wxs"', link)
+        publish = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', validate)
+        self.assertEqual([extract, selection, mutate, jpackage, validate_original, preliminary_dark, validate_preliminary, link, validate, publish],
+                         sorted([extract, selection, mutate, jpackage, validate_original, preliminary_dark, validate_preliminary, link, validate, publish]))
+        self.assertIn('--script "%ROOT%\\build\\scripts\\windows-installation-registration.ps1"', source)
+        self.assertNotIn('for /r "%JPACKAGE_RESOURCE_EXTRACT%" %%F in (main.wxs)', source)
+        self.assertIn("stage=jpackage-resource-preparation", source)
+        self.assertIn("stage=original-compile-registration-validation", source)
+        self.assertIn("stage=preliminary-compiled-registration-validation", source)
+        self.assertIn("stage=compiled-registration-validation", source)
+
+    def test_original_jpackage_compile_owns_all_preprocessor_definitions_and_identity(self):
+        source = batch_source("build-shale-windows-msi.bat")
+        self.assertIn('jpackage --type msi', source)
+        self.assertIn('--resource-dir "%JPACKAGE_RESOURCE_DIR%"', source)
+        self.assertNotIn('windows_jpackage_wix_definitions.py', source)
+        self.assertNotIn('main-recompile', source)
+        self.assertNotIn('candle.exe -nologo @', source)
+        self.assertNotIn("-dJpProductCode=", source)
+        self.assertNotIn("-dJpProductUpgradeCode=", source)
+
+    def test_final_product_identity_is_compared_with_preliminary_jpackage_msi(self):
+        source = batch_source("build-shale-windows-msi.bat")
+        preliminary_dark = source.index('dark.exe -o "%STAGE%\\preliminary-dark\\preliminary.wxs"')
+        final_link = source.index("Final light.exe reconstruction started.", preliminary_dark)
+        comparison = source.index('windows_msi_identity.py" compare "%STAGE%\\preliminary-dark\\preliminary.wxs" "%STAGE%\\dark\\final.wxs"', final_link)
+        publication = source.index('move /y "%ROOT%\\dist\\Shale-%VERSION%.msi.new"', comparison)
+        self.assertEqual([preliminary_dark, final_link, comparison, publication],
+                         sorted([preliminary_dark, final_link, comparison, publication]))
 
 if __name__ == "__main__":
     unittest.main()

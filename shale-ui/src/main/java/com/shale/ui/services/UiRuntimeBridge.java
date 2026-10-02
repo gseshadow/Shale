@@ -4,12 +4,54 @@ import java.util.Map;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import com.shale.core.update.WorkstationUpdatePreference;
 
 public interface UiRuntimeBridge {
+
+	record UserSessionView(UUID sessionId, String clientType, Instant issuedAt, Instant expiresAt,
+			Instant lastRefreshedAt, Instant revokedAt, boolean currentSession) {}
+	record AdminSessionView(UUID sessionId, int userId, String userDisplayName, String userEmail,
+			String clientType, Instant issuedAt, Instant expiresAt, Instant lastRefreshedAt,
+			Instant revokedAt, String revocationReason, boolean currentSession) {}
+	record AdminSessionFilter(Integer userId, String clientType, boolean activeOnly, Instant since, int page, int size) {}
+	record AdminSessionPage(List<AdminSessionView> items, int page, int size) {}
+
+	interface UserSessionManagement {
+		List<UserSessionView> list();
+		void revoke(UUID sessionId);
+		void revokeOthers();
+	}
+
+	/** Empty is the expected JDBC-only/older-server compatibility state. */
+	default Optional<UserSessionManagement> userSessionManagement() { return Optional.empty(); }
+
+	interface AdminSessionManagement {
+		AdminSessionPage list(AdminSessionFilter filter);
+		void revoke(UUID sessionId);
+	}
+	/** Empty unless the authenticated desktop has an enrolled server session. Server authorization remains authoritative. */
+	default Optional<AdminSessionManagement> adminSessionManagement() { return Optional.empty(); }
+
+	interface WorkstationAutomaticUpdates {
+		WorkstationUpdatePreference read();
+		ChangeResult change(boolean enabled, boolean authenticatedAdministrator);
+		enum ChangeResult { SAVED, UNAUTHORIZED, UNAVAILABLE }
+	}
+	default Optional<WorkstationAutomaticUpdates> workstationAutomaticUpdates() { return Optional.empty(); }
 
 	void onLoginSuccess(int userId, int shaleClientId, String email);
 
 	void onLogout();
+
+	/** Best-effort process shutdown hook; implementations must not make shutdown depend on telemetry. */
+	default void onShutdown() { onLogout(); }
+
+	/** Starts heartbeat only for the bridge's successfully enrolled current instance. */
+	default void startApplicationInstanceHeartbeat(Supplier<Optional<Instant>> lastHumanActivityAt) {}
 
 	// --- Generic publish (desktop implementation overrides)
 	default void publishEntityUpdated(String entityType, long entityId,
@@ -89,6 +131,9 @@ public interface UiRuntimeBridge {
 
 	default void unsubscribeConnectivity(Consumer<ConnectivityEvent> handler) {
 	}
+
+	/** Registers the single shell policy refresh target used by Phase 8B invalidation/reconnect. */
+	default void setApplicationPolicyRefreshHandler(Runnable handler) { }
 
 	/**
 	 * Performs a fresh, best-effort connectivity verification using runtime infrastructure.

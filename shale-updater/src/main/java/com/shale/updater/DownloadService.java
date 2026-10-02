@@ -12,6 +12,9 @@ import java.security.MessageDigest;
 import java.time.Duration;
 
 public final class DownloadService {
+	public static final class PackageValidationException extends IOException {
+		public PackageValidationException(String message, Throwable cause) { super(message, cause); }
+	}
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(15))
@@ -58,7 +61,7 @@ public final class DownloadService {
 
                 System.out.println("SHA256 verification passed.");
             } catch (Exception e) {
-                throw new IOException("Failed to verify update package hash", e);
+                throw new PackageValidationException("Failed to verify update package hash", e);
             }
         }
 

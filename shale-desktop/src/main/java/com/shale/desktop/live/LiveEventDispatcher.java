@@ -27,6 +27,14 @@ public final class LiveEventDispatcher {
 	// Generic subscribers (recommended)
 	private final List<Consumer<EntityUpdatedEvent>> entityUpdatedSubscribers = new CopyOnWriteArrayList<>();
 	private final List<Consumer<ConnectivityEvent>> connectivitySubscribers = new CopyOnWriteArrayList<>();
+	private final List<Consumer<SessionInvalidatedEvent>> sessionSubscribers = new CopyOnWriteArrayList<>();
+	private final List<Consumer<ApplicationPolicyChangedEvent>> policySubscribers = new CopyOnWriteArrayList<>();
+	public record SessionInvalidatedEvent(int schemaVersion,String eventId,int shaleClientId,String sessionId){}
+	public record ApplicationPolicyChangedEvent(int schemaVersion,String eventId,String channel){}
+	public void subscribeSessionInvalidated(Consumer<SessionInvalidatedEvent> h){if(h!=null)sessionSubscribers.add(h);}
+	public void unsubscribeSessionInvalidated(Consumer<SessionInvalidatedEvent> h){sessionSubscribers.remove(h);}
+	public void subscribeApplicationPolicyChanged(Consumer<ApplicationPolicyChangedEvent> h){if(h!=null)policySubscribers.add(h);}
+	public void unsubscribeApplicationPolicyChanged(Consumer<ApplicationPolicyChangedEvent> h){policySubscribers.remove(h);}
 
 	public void subscribe(Consumer<String> handler) {
 		if (handler != null)
@@ -90,6 +98,14 @@ public final class LiveEventDispatcher {
 	public void dispatch(LiveBus.Event event) {
 		if (event == null)
 			return;
+		if("SESSION_INVALIDATED".equals(event.type)){
+			var value=new SessionInvalidatedEvent(event.schemaVersion,event.eventId,event.shaleClientId==null?0:event.shaleClientId,event.sessionId);
+			for(var h:sessionSubscribers)try{h.accept(value);}catch(Exception ignored){} return;
+		}
+		if("APPLICATION_POLICY_CHANGED".equals(event.type)){
+			var value=new ApplicationPolicyChangedEvent(event.schemaVersion,event.eventId,event.channel);
+			for(var h:policySubscribers)try{h.accept(value);}catch(Exception ignored){} return;
+		}
 		if (!"EntityUpdated".equals(event.type))
 			return;
 		if (event.entityType == null || event.entityType.isBlank())

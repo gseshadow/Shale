@@ -1,0 +1,8 @@
+package com.shale.data.service.adapter;
+import static org.junit.jupiter.api.Assertions.*;import java.time.*;import java.util.*;import org.junit.jupiter.api.Test;import com.shale.core.dto.*;import com.shale.core.service.ApplicationInstanceAdminReadServicePort.Filter;
+class ApplicationInstanceAdminReadServiceAdapterTest {
+	private static final Instant NOW=Instant.parse("2026-09-29T12:00:00Z");
+	@Test void defaultsToThirtyDaysAndDelegatesAuthenticatedTenantScope(){var g=new Gateway();var s=new ApplicationInstanceAdminReadServiceAdapter(g,Clock.fixed(NOW,ZoneOffset.UTC));s.listRecent(7,9,null,0,50);assertEquals(7,g.tenant);assertEquals(9,g.actor);assertEquals(NOW.minus(Duration.ofDays(30)),g.since);}
+	@Test void boundsPageSizeUserAndNinetyDayWindow(){var s=new ApplicationInstanceAdminReadServiceAdapter(new Gateway(),Clock.fixed(NOW,ZoneOffset.UTC));assertThrows(IllegalArgumentException.class,()->s.listRecent(7,9,null,-1,50));assertThrows(IllegalArgumentException.class,()->s.listRecent(7,9,null,0,101));assertThrows(IllegalArgumentException.class,()->s.listRecent(7,9,new Filter(null,null,0,false,NOW),0,50));assertThrows(IllegalArgumentException.class,()->s.getVersionDistribution(7,9,NOW.minus(Duration.ofDays(91))));assertThrows(SecurityException.class,()->s.listRecent(8,0,null,0,50));}
+	static final class Gateway implements ApplicationInstanceAdminReadServiceAdapter.Gateway {int tenant,actor;Instant since;public ApplicationInstanceAdminPage listRecent(int t,int a,Filter f,int p,int s){tenant=t;actor=a;since=f.startedSince();return new ApplicationInstanceAdminPage(List.of(),p,s);}public List<ApplicationVersionDistributionView> versionDistribution(int t,int a,Instant since){this.since=since;return List.of();}}
+}

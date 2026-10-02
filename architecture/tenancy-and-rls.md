@@ -26,6 +26,16 @@ RLS protected tables:
 - Statuses
 - Categories
 - Priorities
+- UserReleaseState
+
+### User release announcement state
+
+`dbo.UserReleaseState` is strict tenant-owned data. It has a non-null `ShaleClientId`, a tenant-qualified user
+foreign key, and participates in the existing enabled `TenantFilter` policy through
+`sec.fn_FilterByTenant(ShaleClientId)`. A filter predicate protects reads and update/delete targeting; matching
+`AFTER INSERT` and `AFTER UPDATE` block predicates reject a row whose owner differs from session tenant
+context. It never uses `sec.fn_FilterByTenantOrGlobal`. The service additionally requires tenant and principal
+session context to equal the requested current user and validates active same-tenant membership.
 
 ## Authoritative Intake reconciliation
 
@@ -85,3 +95,37 @@ Contact View shared-link reads use the existing Case Link service boundary (`Cas
 ## Entity-action audit tenancy
 
 `dbo.EntityActionAuditLog` is strict tenant-owned audit history. It uses non-null `ShaleClientId` and the existing `TenantFilter` policy with `sec.fn_FilterByTenant(ShaleClientId)`, not the global/overlay predicate. Tenant administrators may read audit rows for their tenant through approved audit tooling; ordinary feature deletion never deletes audit history. Application DAO code may insert audit rows inside the same transaction as the business mutation and must not expose ordinary update/delete audit methods.
+
+## Application instances (Phase 4B implementation; verification pending)
+
+`dbo.ApplicationInstances` is strict tenant-owned history: `ShaleClientId` is non-null, its user FK is
+`(ShaleClientId, UserId)`, and the enabled `TenantFilter` uses `sec.fn_FilterByTenant(ShaleClientId)` for one
+FILTER plus AFTER INSERT and AFTER UPDATE block predicates. It never uses the tenant/global overlay function.
+Runtime enrollment/end also qualifies by authenticated tenant and owning user. Catalog checks may run as dbo,
+but live enforcement must use the disposable non-dbo verifier in
+`docs/sql/verification/2026-09-28_application_instances_phase4b_rls.sql`.
+
+## Administrative read audit tenancy (Phase 6B)
+
+`dbo.AdministrativeReadAuditLog` is strict tenant-owned, append-only application history. Its tenant-qualified
+actor FK and `TenantFilter` FILTER plus AFTER INSERT/UPDATE block predicates prevent cross-tenant attribution;
+it never uses the global-overlay predicate. The server supplies tenant and actor from the authenticated
+principal and revalidates current admin membership before reading or inserting. Future review is limited to a
+tenant administrator or designated audit administrator through separately approved tooling; ordinary users
+have no visibility and Phase 6B adds no review API or UI.
+## Durable user-session tenancy (Phase 7A; live verification pending)
+
+`dbo.UserSessions` is strict tenant-owned data. Its user and optional application-instance relationships are
+tenant-qualified, trusted, and non-cascading. The enabled `TenantFilter` supplies exactly one FILTER and AFTER
+INSERT/UPDATE blocks through `sec.fn_FilterByTenant(ShaleClientId)`; the global-overlay predicate is forbidden.
+The internal DAO additionally qualifies every operation by authenticated tenant/user and validates an optional
+desktop instance against the same tenant and owner. The explicit non-dbo verifier creates a disposable
+`WITHOUT LOGIN` user, executes as it, expects error 33504 for cross-tenant writes, and cleans its exact fixture.
+
+## Phase 8A durable-session administration
+
+Self operations derive tenant, user, and current `sid` from the authenticated bound token. Admin operations derive
+tenant/actor the same way and recheck active same-tenant `is_admin` at the service/SQL boundary. Every list/update
+is explicitly tenant-qualified; a cross-tenant UUID is indistinguishable from an unavailable UUID. The new
+`SessionSecurityAuditLog` is strict tenant-owned data protected by the existing `TenantFilter` FILTER and AFTER
+INSERT/UPDATE predicates. RLS is defense in depth, not a replacement for predicates.

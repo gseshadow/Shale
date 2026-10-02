@@ -22,6 +22,7 @@ import com.shale.server.dto.RefreshResponse;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.ServerPrincipal;
 import com.shale.server.runtime.ServerRuntimeSessionState;
+import com.shale.server.runtime.ServerAuthSessionService;
 import com.shale.server.runtime.ShaleAuthTokenService;
 import com.shale.server.runtime.TokenRevocationStore;
 import com.shale.server.runtime.VerifiedAuthToken;
@@ -44,6 +45,7 @@ public final class AuthController {
     private final TokenRevocationStore revocationStore;
     private final ServerRuntimeSessionState runtimeSessionState;
     private final CurrentUserProfileService currentUserProfileService;
+    private final ServerAuthSessionService authSessions;
 
     public AuthController(
             AuthServicePort authServicePort,
@@ -51,11 +53,19 @@ public final class AuthController {
             TokenRevocationStore revocationStore,
             ServerRuntimeSessionState runtimeSessionState,
             CurrentUserProfileService currentUserProfileService) {
+		this(authServicePort,tokenService,revocationStore,runtimeSessionState,currentUserProfileService,java.util.Optional.empty());
+	}
+
+	@org.springframework.beans.factory.annotation.Autowired
+	public AuthController(AuthServicePort authServicePort, ShaleAuthTokenService tokenService,
+			TokenRevocationStore revocationStore, ServerRuntimeSessionState runtimeSessionState,
+			CurrentUserProfileService currentUserProfileService, java.util.Optional<ServerAuthSessionService> authSessions) {
         this.authServicePort = Objects.requireNonNull(authServicePort, "authServicePort");
         this.tokenService = Objects.requireNonNull(tokenService, "tokenService");
         this.revocationStore = Objects.requireNonNull(revocationStore, "revocationStore");
         this.runtimeSessionState = Objects.requireNonNull(runtimeSessionState, "runtimeSessionState");
         this.currentUserProfileService = Objects.requireNonNull(currentUserProfileService, "currentUserProfileService");
+		this.authSessions = authSessions.orElse(null);
     }
 
     @Operation(summary = "Login", description = "Authenticates an existing Shale user by email/password and returns a server-issued bearer token plus a safe user profile.")
@@ -70,7 +80,7 @@ public final class AuthController {
 
         User user = result.value().orElseThrow();
         ServerPrincipal principal = new ServerPrincipal(user.getId(), user.getShaleClientId(), user.getEmail());
-        String token = tokenService.issue(principal);
+        String token = authSessions == null ? tokenService.issue(principal) : authSessions.issue(principal);
         return ResponseEntity.ok(new LoginResponse(
                 true,
                 "Bearer",
@@ -85,7 +95,7 @@ public final class AuthController {
     public LogoutResponse logout(HttpServletRequest request) {
         VerifiedAuthToken token = currentToken(request);
         if (token != null) {
-            revocationStore.revoke(token.tokenId(), token.expiresAtEpochSeconds());
+			if(authSessions==null)revocationStore.revoke(token.tokenId(), token.expiresAtEpochSeconds());else authSessions.logout(token);
         }
         return new LogoutResponse(token != null, "Logged out.");
     }
@@ -99,8 +109,12 @@ public final class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(new LogoutResponse(false, "Authentication is required."));
         }
-        revocationStore.revoke(token.tokenId(), token.expiresAtEpochSeconds());
-        String refreshed = tokenService.issue(token.principal());
+		String refreshed;
+		try {
+			if(authSessions==null){revocationStore.revoke(token.tokenId(),token.expiresAtEpochSeconds());refreshed=tokenService.issue(token.principal());}
+			else refreshed=authSessions.refresh(token);
+		}
+		catch(RuntimeException e){return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new LogoutResponse(false,"Authentication is required."));}
         return ResponseEntity.ok(new RefreshResponse(true, "Bearer", refreshed, tokenService.ttlSeconds()));
     }
 
@@ -119,7 +133,7 @@ public final class AuthController {
             return null;
         }
         return tokenService.verifyToken(rawToken)
-                .filter(token -> !revocationStore.isRevoked(token.tokenId()))
+                .filter(token -> authSessions==null ? !revocationStore.isRevoked(token.tokenId()) : authSessions.validate(token))
                 .orElse(null);
     }
 

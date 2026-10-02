@@ -7,7 +7,7 @@
 > callers map to one primary assignment on that same transaction; complete-profile desktop writes use
 > the aggregate cutover and preserve historical assignment identity.
 
-*Last updated: 2026-06-15*
+*Last updated: 2026-09-28*
 
 This document is the working schema reference for Codex and Shale development prompts.
 
@@ -1189,3 +1189,168 @@ lifecycle, deployment, and retirement boundaries.
 `CaseTeamRoleDefinitions` is the tenant/global overlay catalog for Case Team assignment meanings. It is deliberately separate from the legacy `Roles` authorization/assignment lookup and does not change `CaseUsers` in Phase 1. Global protected rows have stable `SystemKey` and `LegacyRoleId` values so a later many-to-many assignment migration can map existing `CaseUsers.RoleId` values without using editable names. Tenant rows with the same `SystemKey` are overrides; deleted overrides fall back to the global row, while inactive overrides remain the effective masked result. Tenant rows without `SystemKey` are custom roles.
 
 The table stores `Id`, nullable `ShaleClientId`, `SystemKey`, `LegacyRoleId`, `Name`, optional `Description`, required `Color`, `SortOrder`, `IsActive`, `IsDeleted`, `IsProtected`, lifecycle actor/time metadata, and `RowVer`. It uses tenant-or-global RLS, filtered global and tenant `SystemKey` uniqueness, normalized effective-name validation in the administration transaction, and entity-action auditing. Phase 1 seeds the legacy Case Team values Responsible Attorney (4), Prelitigation Staff (5), Attorney (7), Legal Assistant (11), Paralegal (12), Law Clerk (13), and Co-counsel (14). Existing `CaseUsers` behavior remains authoritative until the assignment/editor phase.
+
+## Global application release catalog (Phase 1A)
+
+### dbo.ApplicationReleases
+
+Global product-control storage for application release identity and publication state. The table has a
+`bigint` identity `Id`; nonnegative integer `MajorVersion`, `MinorVersion`, and `BuildVersion`; a persisted
+computed canonical `ApplicationVersion` in strict `major.minor.build` form; constrained `ReleaseChannel`
+(`PRODUCTION`, `PILOT`, or `DEVELOPMENT`); constrained `PublicationStatus` (`DRAFT` or `PUBLISHED`);
+publication time/actor; required short `Summary`; creation/update provenance; and `RowVer`. The unique
+`(ReleaseChannel, MajorVersion, MinorVersion, BuildVersion)` index is the authoritative release identity.
+The lifecycle CHECK requires drafts to have no publication metadata and published rows to have a
+publication timestamp. Published identity/content is intended to become service-layer append-only or
+superseded rather than trigger-guarded; Phase 1A adds no mutation path.
+
+This table is global: it deliberately has no `ShaleClientId`, strict tenant predicate, or tenant/global
+overlay predicate. Nullable actor FKs record a known Shale user without granting that user's tenant or
+tenant administrators mutation authority. A later administration/publication phase must define a tightly
+authorized global operator boundary and append changes through the established transactional
+`EntityActionAuditLog` pattern without placing release-note body text in audit metadata. The catalog is
+currently unused by runtime code; `shale-stable.json` remains authoritative for update discovery and
+installation.
+
+### dbo.ApplicationReleaseItems
+
+Global ordered release-note children of `ApplicationReleases`. Each row has a `bigint` identity `Id`, a
+non-cascading `ApplicationReleaseId` FK, nonnegative `SortOrder`, constrained `ItemType` (`FEATURE`, `FIX`,
+`IMPROVEMENT`, `IMPORTANT`, `LINK`, or `VIDEO`), required short `Title` and `Body`, optional generic
+`ResourceUrl`, draft-editing `IsActive`, creation/update provenance, and `RowVer`. Unique
+`(ApplicationReleaseId, SortOrder)` positions make display order deterministic within a release. Resource
+URLs are storage only; Phase 1A performs no download, remote validation, browser, video, or secret-bearing
+URL behavior.
+
+This child table is also global and has neither `ShaleClientId` nor any RLS security predicate. It has no
+soft-delete lifecycle: `IsActive` supports draft composition, while the non-cascading FK preserves release
+history. Phase 1A seeds no releases or items and adds no API, service, DAO, UI, updater, policy, session,
+heartbeat, acknowledgement, or enforcement behavior.
+
+## Global application policy (Phase 1B)
+
+### dbo.ApplicationPolicy
+
+Global, revisioned product-control storage with one row per channel revision. `Id` is a `bigint` identity;
+`RevisionNumber` is positive and unique with `ReleaseChannel`; and the filtered unique
+`UX_ApplicationPolicy_Channel_Current` index permits at most one `IsCurrent = 1` row in each of
+`PRODUCTION`, `PILOT`, and `DEVELOPMENT`. Publishing a correction will transactionally supersede the old
+current row (`IsCurrent = 0`, `SupersededAt`/optional actor populated) and insert the next positive revision.
+Normal correction never deletes history. `RowVer` supports optimistic concurrency for that future mutation.
+
+Nullable `LatestReleaseId`, `MinimumRecommendedReleaseId`, and `MinimumAllowedReleaseId` use trusted,
+non-cascading foreign keys to `ApplicationReleases(Id)`. Supporting filtered indexes protect future release
+history/deletion checks. SQL therefore guarantees referenced release existence, but the future transactional
+mutation service must verify that every referenced release is published in the policy channel and compare its
+numeric Phase 1A components to enforce `minimumAllowed <= minimumRecommended <= latest`. SQL Server CHECK
+constraints cannot safely perform those cross-table comparisons; Phase 1B deliberately adds no trigger and
+does not falsely use lexical version ordering.
+
+`RequiredUpdateDeadline` is nullable `datetime2(7)` UTC; null means no deadline. Future clients must evaluate
+it with authoritative server time rather than blindly trusting a workstation clock. `AccessMode` is constrained
+to `NORMAL`, `READ_ONLY`, `MAINTENANCE`, or `BLOCKED`; only `NORMAL` has any defined meaning today. The other
+values are reserved storage vocabulary and do not imply that current Shale workflows are safely read-only,
+maintained, or blocked. Lifecycle checks require a current row to have no supersession metadata and a historical
+row to have `SupersededAt >= PublishedAt`.
+
+The table deliberately has no `ShaleClientId`, tenant FK, workstation target, or RLS predicate. Nullable actor
+FKs to `Users(id)` provide known-user provenance only and grant neither tenant users nor tenant administrators
+global mutation authority. Phase 1B adds no audit allowlist: the later control-plane mutation service must append
+short, allowlisted semantic policy actions on the same transaction and must not copy policy snapshots, release
+notes, SQL, or exception text into audit metadata.
+
+No policy row is seeded. No DAO, service, API, authentication, UI, updater, manifest synchronization, heartbeat,
+session, PubSub, geolocation, or enforcement path reads this table. `shale-stable.json` remains the current
+update-discovery authority.
+
+## dbo.UserReleaseState (Phase 3A)
+
+Strict tenant- and user-owned announcement progress. Columns are `Id`, non-null `ShaleClientId` and `UserId`,
+closed `ClientType` (`DESKTOP`, `WEB`, `MOBILE`), closed `ReleaseChannel` (`PRODUCTION`, `PILOT`,
+`DEVELOPMENT`), nullable non-cascading `ApplicationReleaseId`, `AcknowledgedAt`, `CreatedAt`, `UpdatedAt`, and
+`RowVer`. The unique key `(ShaleClientId, UserId, ClientType, ReleaseChannel)` permits independent release
+streams without duplicate current rows. The tenant-qualified user FK prevents wrong-tenant ownership; the
+release FK targets the global canonical `ApplicationReleases` catalog. No rows are seeded.
+
+The service writes only non-null, published, channel-compatible releases. It advances versions numerically,
+allows skipped releases, rejects backwards movement, and treats the same release idempotently. Updates use
+expected `RowVer`; the DAO locks the scope and handles unique conflicts on concurrent first creation. This is
+announcement state only—not installed version, eligibility, policy, workstation, session, or heartbeat state.
+
+## dbo.ApplicationInstances (Phase 4B complete)
+
+Strict tenant-owned registered client-process launches, not authentication sessions. Columns are `Id bigint
+IDENTITY` (PK), non-null `ShaleClientId`/`UserId`, nullable `MachineId uniqueidentifier`, closed `ClientType`,
+nonnegative integer `MajorVersion`/`MinorVersion`/`BuildVersion`, database-generated UTC `StartedAt`, nullable
+`EndedAt`, UTC `CreatedAt`/`UpdatedAt`, and `RowVer`. DESKTOP requires `MachineId`; WEB/MOBILE require NULL.
+The tenant-qualified Users FK and tenant FK are trusted/non-cascading. Active means `EndedAt IS NULL`; multiple
+active launches are valid. Strict TenantFilter FILTER and AFTER INSERT/UPDATE blocks use
+`sec.fn_FilterByTenant`; there is no global overlay. See
+`docs/sql/2026-09-28_application_instances_foundation_phase4b.sql`.
+
+## ApplicationInstances Phase 5B heartbeat fields (migration pending verification)
+
+Phase 5B additively extends `dbo.ApplicationInstances` with nullable `datetime2(7)` columns
+`LastHeartbeatAt` and `LastHumanActivityAt`. `LastHeartbeatAt` is assigned only by
+`SYSUTCDATETIME()` during an accepted owner-qualified heartbeat. The supplied activity timestamp is
+validated by the service (at most five minutes ahead of server time) and SQL retains the greater of
+the stored and supplied values; null never clears it. Heartbeat also refreshes the existing numeric
+`MajorVersion`, `MinorVersion`, and `BuildVersion` and `UpdatedAt`. No history table, default,
+backfill, constraint, index, seed, or RLS predicate change is made.
+
+The migration `docs/sql/2026-09-29_application_instance_heartbeat_phase5b.sql` is N-1 compatible:
+older Phase 4B inserts omit both nullable columns and continue to succeed, existing rows remain
+unchanged, and all original columns, keys, checks, and strict tenant predicates remain intact. It is
+safe to deploy while older desktops are running. Adding the nullable columns is expected to be a
+short metadata operation; no speculative liveness index is created, avoiding index-build locking.
+
+## ApplicationInstances Phase 6A administrative reads (no migration)
+
+Phase 6A adds no schema dependency. Reads explicitly filter `ApplicationInstances.ShaleClientId`, join `Users`
+on tenant plus user ID once, bound `StartedAt` to at most 90 days, and page by `StartedAt DESC, Id DESC`.
+Distribution uses SQL `GROUP BY MajorVersion, MinorVersion, BuildVersion` and numeric descending ordering.
+Existing strict tenant RLS is unchanged.
+
+## dbo.AdministrativeReadAuditLog (Phase 6B)
+
+Phase 6B uses a dedicated table rather than `AuditLog` (PHI field changes) or `EntityActionAuditLog`
+(entity mutations). Each successfully completed recent-instance page or version-distribution query appends
+exactly one row with `Id bigint IDENTITY`, authoritative `ShaleClientId` and `ActorUserId`, closed `ReadType`,
+database-generated UTC `OccurredAt`, nonnegative `ResultCount`, and nullable deterministic allowlisted
+`varchar(1000)` metadata. The read types are `APPLICATION_INSTANCE_RECENT_LIST` and
+`APPLICATION_INSTANCE_VERSION_DISTRIBUTION`. Recent-list metadata is limited to page, page size, exact client
+type/version filters, user-filter presence, active-only, and bounded since; distribution metadata contains only
+bounded since. Result count is the returned page row count or returned bucket count. Machine/user/result
+identities and names, emails, heartbeat/activity values, IP/location, tokens, headers, SQL, and exceptions are
+never copied.
+
+The actor FK is tenant-qualified; strict `TenantFilter` FILTER and AFTER INSERT/UPDATE block predicates apply,
+with no overlay. Runtime code is insert-only. The sensitive read and its single insert share one connection and
+transaction; an audit failure prevents return of the result. The additive migration does not alter existing
+tables or API contracts and is safe before older clients upgrade. No rows are seeded.
+## dbo.UserSessions (Phase 7A foundation; verified)
+
+Strict tenant-owned logical authentication-session history, separate from process-oriented
+`ApplicationInstances`. It stores `Id`, random unique `SessionId`, `ShaleClientId`, `UserId`, optional
+tenant-qualified `ApplicationInstanceId`, closed `ClientType`, unique UUID `CurrentAccessJti`, database UTC
+issuance/creation/update timestamps, authoritative expiry, nullable refresh/revocation timestamps and a closed
+revocation reason, plus `RowVer`. Tenant/user and tenant/instance foreign keys are trusted and non-cascading.
+Active/expired state is derived from `RevokedAt` and `ExpiresAt`; expired rows are not deleted by Phase 7A.
+Strict tenant FILTER and AFTER INSERT/UPDATE blocks apply with no overlay and no seeds. Raw tokens, passwords,
+MFA secrets, IP/location, and arbitrary metadata are absent. The additive table is not read or written by the
+current authentication runtime.
+
+
+## UserSessions Phase 7B runtime cutover (no migration)
+
+Phase 7B uses the existing Phase 7A columns without schema changes. Server API JWTs carry the public UUID `SessionId` as `sid`; `CurrentAccessJti` is the single current credential authority. Bound validation uses a tenant/user/session-qualified indexed lookup, and conditional refresh additionally requires the old JTI, no revocation, and database expiry in the future. Durable expiry equals access-token expiry and is extended together on refresh.
+
+## Phase 8A session revocation and security audit
+
+`dbo.UserSessions` remains the authentication authority. Phase 8A adds `USER_REVOKED` to its closed reason
+constraint and adds the append-only, tenant-owned `dbo.SessionSecurityAuditLog` for explicit self/admin
+revocations and the bounded admin list read. Audit rows contain actor, optional public session UUID/target user,
+affected count, closed event/reason codes, and database UTC time; they never contain JWTs or JTIs. Account
+deactivation/removal and administrative password reset update the user and revoke every unrevoked session with
+`SECURITY` in the same transaction. Bound-token lookup also joins current active user eligibility as race-safe
+defense in depth.

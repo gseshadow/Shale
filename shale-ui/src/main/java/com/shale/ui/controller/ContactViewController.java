@@ -33,6 +33,7 @@ import com.shale.ui.services.ContactDetailService;
 import com.shale.ui.services.PhiReadAuditService;
 import com.shale.ui.services.LiveUpdateEvents;
 import com.shale.ui.services.UiRuntimeBridge;
+import com.shale.ui.services.SafeWorkDrainCoordinator;
 import com.shale.ui.util.ExternalBrowserHelper;
 import com.shale.ui.util.ContactExternalActions;
 import com.shale.ui.util.PerfLog;
@@ -138,6 +139,9 @@ public final class ContactViewController {
     private ExternalBrowserHelper externalBrowserHelper = new ExternalBrowserHelper();
     private ContactExternalActions contactExternalActions = new ContactExternalActions();
     private boolean initialized;
+    private java.util.function.Function<String,SafeWorkDrainCoordinator.Registration> workGate;
+
+    public void setWorkGate(java.util.function.Function<String,SafeWorkDrainCoordinator.Registration> workGate){this.workGate=workGate;}
     private ContactServicePort contactService;
     private ContactServicePort.ClassificationProfile classificationProfile;
     private List<ContactServicePort.Definition> effectiveTypes=List.of(),effectiveSpecialties=List.of();
@@ -422,6 +426,8 @@ public final class ContactViewController {
     }
 
     private void showProfileEditor(){
+        SafeWorkDrainCoordinator.Registration work=workGate==null?null:workGate.apply(createMode?"New Contact":"Contact edit");
+        if(workGate!=null&&work==null)return;
         Dialog<Void> dialog=new Dialog<>();AppDialogs.applySecondaryDialogShell(dialog,createMode?"Add Contact":"Edit Contact");Window owner=createMode?editorOwner:dialogOwner(editButton);if(owner!=null)dialog.initOwner(owner);dialog.initModality(Modality.WINDOW_MODAL);dialog.setResizable(true);
         ButtonType save=new ButtonType(createMode?"Create Contact":"Save Changes",ButtonData.OK_DONE),reload=new ButtonType("Reload",ButtonData.OTHER);dialog.getDialogPane().getButtonTypes().add(save);if(!createMode)dialog.getDialogPane().getButtonTypes().add(reload);dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
         var p=classificationProfile;var sn=p.structuredName();
@@ -459,7 +465,8 @@ public final class ContactViewController {
                 }catch(RuntimeException ex){LOG.log(Level.WARNING,"Contact aggregate save failed",ex);Platform.runLater(()->{if(disposed)return;saveInFlight=false;saveButton.setDisable(false);boolean stale=!createMode&&ex.getMessage()!=null&&ex.getMessage().toLowerCase(Locale.ROOT).contains("reload");if(stale)saveButton.setDisable(true);status.setText(stale?"Another update occurred. Your values are retained; choose Reload before saving.":"Save failed and was rolled back. Your values are retained; retrying will not create a duplicate.");status.setVisible(true);status.setManaged(true);});}});
             }catch(IllegalArgumentException ex){status.setText(ex.getMessage());status.setVisible(true);status.setManaged(true);}
         });
-        if(!createMode)dialog.getDialogPane().lookupButton(reload).addEventFilter(javafx.event.ActionEvent.ACTION,e->{e.consume();dialog.close();loadContact();});dialog.showAndWait();
+        if(!createMode)dialog.getDialogPane().lookupButton(reload).addEventFilter(javafx.event.ActionEvent.ACTION,e->{e.consume();dialog.close();loadContact();});
+        try{dialog.showAndWait();}finally{if(work!=null)work.close();}
     }
     static EnhancedTextArea contactNarrativeEditor(String value,String title,int preferredRows){EnhancedTextArea editor=new EnhancedTextArea();editor.setText(safe(value));editor.setEditorTitle(title);editor.setSpellCheckEnabled(true);editor.setExpandable(true);editor.setPrefRowCount(preferredRows);editor.setMaxWidth(Double.MAX_VALUE);return editor;}
     private static Label heading(String text){Label l=new Label(text);l.getStyleClass().add("contact-editor-section-heading");return l;}

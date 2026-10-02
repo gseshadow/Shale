@@ -6,13 +6,16 @@
   <parent>
     <groupId>com.shale</groupId>
     <artifactId>shale-parent</artifactId>
-    <version>1.0.127</version>
+    <version>1.0.131</version>
     <relativePath>../pom.xml</relativePath>
 </parent>
 
   <artifactId>shale-updater</artifactId>
   
 <dependencies>
+  <dependency>
+    <groupId>com.shale</groupId><artifactId>shale-core</artifactId><version>${project.version}</version>
+  </dependency>
   <dependency>
     <groupId>com.google.code.gson</groupId>
     <artifactId>gson</artifactId>

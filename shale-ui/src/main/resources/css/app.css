@@ -42,6 +42,8 @@
 
 @import "foundation/utility-dialogs.css";
 
+@import "foundation/whats-new.css";
+
 @import "foundation/transient-popups.css";
 
 @import "foundation/shell.css";
@@ -3397,4 +3399,3 @@
 .choice-box .menu-item:focused > .label {
     -fx-text-fill: -shale-color-text-primary;
 }
-

@@ -153,6 +153,20 @@ final class SettingsControllerLifecycleTest {
                 "Audit-log navigation failures should be shown as sanitized user-facing errors.");
     }
 
+    @Test
+    void tenantSessionAdministrationIsLazyAndAdminGuarded() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/shale/ui/controller/SettingsController.java"));
+        String fxml = Files.readString(Path.of("src/main/resources/fxml/settings.fxml"));
+        String handler = methodSource(source, "onManageAdminSessions");
+        assertTrue(fxml.contains("fx:id=\"adminSessionsRow\" title=\"Sessions\""));
+        assertTrue(containsCode(source, "bind(adminSessionsRow, this::onManageAdminSessions)"));
+        assertTrue(containsCode(source, "setVisibleManaged(adminSessionsRow, hasAdminContext() && runtimeBridge != null)"));
+        assertTrue(containsCode(handler, "if (!hasAdminContext() || runtimeBridge == null || userDao == null) return;"));
+        assertTrue(containsCode(handler, "new AdminSessionsLauncher("));
+        assertFalse(methodSource(source, "initialize").contains("AdminSessionsPane"),
+                "Opening Settings must not construct or load the sensitive admin session view.");
+    }
+
 
     private static String methodSource(String source, String methodName) {
         Pattern signaturePattern = Pattern.compile("(?m)^\\s*(?:@FXML\\s*)?(?:private|public|protected|static|final|\\s)+[^{;=]*\\b"

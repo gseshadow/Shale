@@ -120,6 +120,11 @@ For exact local Windows CMD commands to run and verify the temporary `dev` read 
 
 ## Intended future flow
 
+Phase 7A supplies an internal durable `UserSessions` schema/service foundation, but it is deliberately not
+connected to this flow. Existing JWT issuance/verification, refresh (old JTI revoked in memory and a new JWT
+issued), and logout remain unchanged; no current request requires a durable session row. Phase 7B is the first
+permitted cutover phase and must preserve legacy-token compatibility while binding newly issued tokens.
+
 1. Browser/mobile authenticates with a server endpoint.
 2. The server validates credentials/session state and resolves both user id and `ShaleClientId` into a `ServerPrincipal`.
 3. Each HTTP request creates or resolves a `ServerSessionContext` for the request principal.

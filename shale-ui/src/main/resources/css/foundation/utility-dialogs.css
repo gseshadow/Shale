@@ -53,3 +53,43 @@
 .update-launch-dialog .progress-indicator { -fx-progress-color: -shale-color-primary-accent; }
 .update-launch-dialog .app-dialog-title { -fx-text-fill: -shale-color-text-primary; }
 .update-launch-dialog .app-dialog-message { -fx-text-fill: -shale-color-text-secondary; }
+
+/* Manual update prompt. Layout is stable while details remain independently scrollable. */
+.update-dialog {
+    -fx-background-color: -shale-color-overlay-dialog;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-width: 1px;
+    -fx-border-radius: 14px;
+    -fx-background-radius: 14px;
+}
+.update-dialog-mandatory { -fx-border-color: -shale-color-warning-border; }
+.update-dialog-content { -fx-padding: 22px; }
+.update-dialog-heading { -fx-padding: 0 2px; }
+.update-dialog-status {
+    -fx-alignment: center;
+    -fx-max-width: -fx-pref-width;
+}
+.update-dialog-versions { -fx-alignment: center-left; }
+.update-dialog-version-card {
+    -fx-padding: 14px;
+    -fx-background-color: -shale-color-section-surface;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+}
+.update-dialog-details-scroll,
+.update-dialog-details-scroll > .viewport,
+.update-dialog-details-scroll > .viewport > .content { -fx-background-color: transparent; }
+.update-dialog-details-scroll {
+    -fx-background-insets: 0;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+}
+.update-dialog-details-content { -fx-padding: 16px; }
+.update-dialog-details-text { -fx-font-size: 13px; -fx-text-fill: -shale-color-text-secondary; }
+.update-dialog-actions {
+    -fx-padding: 4px 0 0 0;
+    -fx-alignment: center-right;
+}

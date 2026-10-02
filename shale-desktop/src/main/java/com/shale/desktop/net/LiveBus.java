@@ -38,12 +38,20 @@ public final class LiveBus {
 		public final String patchRaw;
 		public final String raw;
 		public final String clientInstanceId;
+		public final String sessionId;
+		public final String channel;
 
 		public Event(int schemaVersion, String eventId, String timestamp,
 				String type, String entityType, Long entityId,
 				int updatedByUserId, Integer shaleClientId,
 				String patchRaw, String clientInstanceId, String raw) {
 
+			this(schemaVersion,eventId,timestamp,type,entityType,entityId,updatedByUserId,shaleClientId,patchRaw,clientInstanceId,raw,null,null);
+		}
+
+		public Event(int schemaVersion, String eventId, String timestamp, String type, String entityType, Long entityId,
+				int updatedByUserId, Integer shaleClientId, String patchRaw, String clientInstanceId, String raw,
+				String sessionId, String channel) {
 			this.schemaVersion = schemaVersion;
 			this.eventId = eventId;
 			this.timestamp = timestamp;
@@ -56,6 +64,8 @@ public final class LiveBus {
 			this.patchRaw = patchRaw;
 			this.clientInstanceId = (clientInstanceId == null ? "" : clientInstanceId);
 			this.raw = raw;
+			this.sessionId=sessionId;
+			this.channel=channel;
 		}
 	}
 
@@ -262,12 +272,20 @@ public final class LiveBus {
 		Integer by = extractInt(dataJson, "updatedByUserId");
 		if (by == null)
 			by = extractInt(dataJson, "by");
-		if (type == null || by == null || entityType == null || entityId == null)
+		if (type == null)
 			return;
+		String sessionId=extractString(dataJson,"sessionId");
+		String channel=extractString(dataJson,"channel");
+		boolean entityEvent="EntityUpdated".equals(type);
+		if(entityEvent&&(by==null||entityType==null||entityId==null))return;
+		if("SESSION_INVALIDATED".equals(type)&&sessionId==null)return;
+		if("APPLICATION_POLICY_CHANGED".equals(type)&&channel==null)return;
+		if(!entityEvent&&!"SESSION_INVALIDATED".equals(type)&&!"APPLICATION_POLICY_CHANGED".equals(type))return;
+		if(by==null)by=0;
 
 		log.debug("Live message received: type={} entityType={} entityId={} patchKeys={}", type, entityType, entityId, String.join(",", patchKeys(patchRaw)));
 		Event ev = new Event(schemaVersion, eventId, timestamp,
-				type, entityType, entityId, by, tenantId, patchRaw, inboundClientInstanceId, raw);
+				type, entityType, entityId, by, tenantId, patchRaw, inboundClientInstanceId, raw,sessionId,channel);
 		for (var l : listeners)
 			l.accept(ev);
 	}

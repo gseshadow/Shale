@@ -1,5 +1,13 @@
 # Shale Design System Architecture
 
+## Minimum-version enforcement surfaces
+
+An overdue minimum-version state uses persistent textual status, not color alone. At login it provides
+keyboard-reachable Update, Retry, and Exit actions without opening the normal shell. In-process, the
+persistent update banner explains that existing work may finish and new work cannot start. Blocked
+launches use the single accessible explanation, “Shale must be updated before starting new work.” Do
+not repeatedly trap focus in warning dialogs or disable read/navigation controls.
+
 ## Purpose
 
 The Shale Design System defines the long-term visual language for Shale. It is the canonical visual reference for the JavaFX desktop application and the future React web application.
@@ -649,3 +657,25 @@ chips. Contact cards use its `COMPACT` size and the Contact header uses `STANDAR
 card factories must pass ordered authoritative presentation records to this component rather than
 duplicating chip CSS or color calculations. It validates stored colors, applies the neutral fallback,
 and preserves category and definition identity on each informational, noninteractive chip.
+
+### Devices & Sessions Settings surface
+
+The self-session manager is an inline Personal Settings section composed from compact card surfaces, semantic status
+pills, Secondary refresh, and confirmed Danger sign-out actions. Current/inactive text labels communicate state
+without color, rows wrap at narrow widths, and buttons name their target. Session facts use cards rather than a raw
+administrative table. Location, network identifiers, machine identifiers, and authentication internals are not
+visual enrichment and must not be introduced.
+
+### Administrator Sessions Settings surface
+
+Settings > Administration > Sessions reuses the compact session-card, factual status-pill, local-time,
+semantic filter-control, and confirmed Danger-action language from the personal surface. Administrative rows add
+only the tenant user's established display name/email treatment and the closed server revocation reason. Active,
+Revoked, and Expired are the only lifecycle labels; the current administrator session directs the user to ordinary
+logout rather than offering an ambiguous row revoke. Previous/Next pagination remains bounded at 50 rows. Machine,
+network/location, token/JTI, tenant, database identity, audit metadata, presence, and human-activity details remain
+excluded.
+
+## Application update policy notice
+
+Phase 11A uses one shell-level wrapping notice above working content. Recommended state uses a quiet surface and may be dismissed for its policy revision/target; required state strengthens the border, and deadline-reached state uses the danger border without modal focus or disabled application controls. Text always carries state and deadline meaning. Update is a semantic primary small action and dismissal is a semantic ghost small action. The notice supports both themes, narrow widths, keyboard activation, and background refresh without focus stealing.

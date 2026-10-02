@@ -12,9 +12,14 @@ import javafx.application.Platform;
 import javafx.stage.Stage;
 
 import com.shale.desktop.update.DesktopUiUpdateLauncher;
+import com.shale.desktop.update.AutomaticUpdatePreferenceService;
 import com.shale.desktop.notification.DesktopNotificationPresenterFactory;
 
 import java.util.Objects;
+import com.shale.desktop.identity.MachineIdentityResult;
+import com.shale.data.dao.ApplicationInstanceDao;
+import com.shale.data.service.adapter.ApplicationInstanceServiceAdapter;
+import com.shale.desktop.session.*;
 
 public final class SceneRouter {
 
@@ -30,6 +35,12 @@ public final class SceneRouter {
 			LiveEventDispatcher dispatcher,
 			RuntimeSessionService runtimeSessionService,
 			String negotiateEndpointUrl) {
+		this(stage,authService,dispatcher,runtimeSessionService,negotiateEndpointUrl,null);
+	}
+
+	public SceneRouter(Stage stage, AuthService authService, LiveEventDispatcher dispatcher,
+			RuntimeSessionService runtimeSessionService, String negotiateEndpointUrl,
+			MachineIdentityResult machineIdentity) {
 
 		this.stage = Objects.requireNonNull(stage, "stage");
 		Objects.requireNonNull(authService, "authService");
@@ -41,13 +52,17 @@ public final class SceneRouter {
 		this.stage.setOnCloseRequest(e -> Platform.exit());
 
 		AppState appState = new AppState();
-		var uiAuthService = new DesktopUiAuthService(authService);
+		String apiBase=System.getProperty("SHALE_SERVER_API_BASE_URL",System.getenv("SHALE_SERVER_API_BASE_URL"));
+		var serverSession=new DesktopServerSession();
+		var enrollment=new DesktopSessionEnrollmentLifecycle(apiBase==null||apiBase.isBlank()?null:new DesktopSessionEnrollmentClient(apiBase),serverSession);
+		var uiAuthService = new DesktopUiAuthService(authService,enrollment);
 
 		// Create ONE provider instance and share it with SceneManager + DesktopUiRuntimeBridge
 		this.dbProvider = new DesktopRuntimeSessionProvider();
 
 		// Desktop bridge will "arm" dbProvider on successful login
-		var runtimeBridge = new DesktopUiRuntimeBridge(dispatcher, dbProvider, negotiateEndpointUrl);
+		var instanceService = new ApplicationInstanceServiceAdapter(new ApplicationInstanceDao(dbProvider));
+		var runtimeBridge = new DesktopUiRuntimeBridge(dispatcher, dbProvider, negotiateEndpointUrl, machineIdentity, instanceService,enrollment);
 		runtimeBridge.setRuntimeSessionService(runtimeSessionService);
 
 		var updateLauncher = new DesktopUiUpdateLauncher();
@@ -59,7 +74,8 @@ public final class SceneRouter {
 				runtimeBridge,
 				dbProvider,
 				updateLauncher,
-				DesktopNotificationPresenterFactory.create()
+				DesktopNotificationPresenterFactory.create(),
+				AutomaticUpdatePreferenceService.resolvePlatformDefault()
 		);
 	}
 

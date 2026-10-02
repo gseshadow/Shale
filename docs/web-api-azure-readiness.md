@@ -328,3 +328,85 @@ curl -i 'http://localhost:8080/api/cases/search?query=xxxxxxxxxxxxxxxxxxxxxxxxxx
 ## Step 4E Azure deployment guide
 
 Use `docs/azure-app-service-deployment.md` as the repeatable first-deployment runbook for Azure App Service. It covers App Service creation, Java runtime selection, required app settings, startup command options, health checks, log streaming, restart, rollback, jar packaging, and smoke tests.
+
+## Application release and policy read contracts (Phase 2B)
+
+The server exposes two additive global control-plane reads for future clients:
+
+* `GET /api/application-releases/policy/current?channel=PRODUCTION` returns the current effective policy, or
+  `204 No Content` when that channel has no configured current policy.
+* `GET /api/application-releases?channel=PRODUCTION&after=1.0.127` returns only published releases strictly newer
+  than the supplied strict `major.minor.build` lower bound. Results use ascending numeric version order and embed
+  active release items in stable sort order.
+
+Both endpoints use the existing bearer-token requirement in `prod`/`azure` and the existing bearer-or-development
+header behavior in `dev`/`local`. Authentication resolves the caller but does not tenant-filter global release or
+policy data. Responses expose safe API DTOs rather than row versions or persistence models. Successful and empty
+responses use short client-private caching (`Cache-Control: private, max-age=60`); there is no server-side cache or
+ETag. Resource URLs are inert nullable metadata. No web, desktop, mobile, updater, manifest, acknowledgement,
+enforcement, session, heartbeat, or PubSub consumer is wired in this phase.
+
+OpenAPI at `/v3/api-docs` documents authentication, strict query parameters, the `204` empty-policy result,
+response DTOs, error envelopes, and the release-channel, release-item-type, and access-mode vocabularies.
+# Phase 4B application-instance endpoints (complete)
+
+The server exposes bearer-authenticated `POST /api/application-instances` and
+`POST /api/application-instances/{id}/end`. Request identity never supplies tenant/user authority; the
+verified bearer principal and request-scoped RLS connection do. Enrollment accepts a canonical UUID,
+`DESKTOP`, and strict `major.minor.build`. End is owner-qualified, idempotent, and preserves its first
+server-observed UTC end time. These process lifecycle rows are not tokens or durable user sessions. Deployment
+requires `docs/sql/2026-09-28_application_instances_foundation_phase4b.sql` plus its catalog and non-dbo RLS
+verification scripts. Phase 4B verification completed before Phase 5A.
+
+## Phase 6A tenant-admin application-instance reads (complete)
+
+`GET /api/admin/application-instances` returns a tenant-admin-only recent page. Parameters are `page` (0–100,
+default 0), `size` (1–100, default 50), exact `clientType`, canonical `version`, positive `userId`, `activeOnly`,
+and ISO-8601 `since`. The `StartedAt` window defaults to 30 days and is capped at 90 days; ordering is
+`StartedAt DESC, Id DESC`, and no total count is run.
+
+`GET /api/admin/application-instances/version-distribution` groups that bounded population numerically and
+returns launch `instanceCount`, separately deduplicated `distinctUserCount`, and nullable `latestHeartbeatAt`.
+Both routes derive tenant/user authority from authentication, return 401/403 conventionally, and accept no
+tenant selector. Phase 6A adds no migration, mutation, remote control, session/geolocation/enforcement/PubSub,
+updater action, or UI.
+
+## Phase 6B bounded administrative-read audit
+
+The two Phase 6A routes retain their response and OpenAPI contracts. After a successful bounded DAO read, the
+server writes one tenant/actor-attributed `AdministrativeReadAuditLog` row in the same transaction, then returns
+the response. A page with one or 50 instances still writes one event; a distribution with any number of buckets
+writes one event. Failed authentication, authorization, validation, tenant context, DAO reads, and audit writes
+produce no successful response/audit claim. Audit failure is fail-closed and is handled by the existing safe
+internal-error envelope; audit IDs and internals are not exposed.
+
+Deploy `docs/sql/2026-09-29_administrative_read_audit_phase6b.sql` before enabling the audited server. It is
+additive and safe while older clients run. Catalog and non-dbo RLS checks are separate verification scripts.
+
+## Phase 8A session APIs
+
+Authenticated bound-token clients may use `GET /api/sessions`, `POST /api/sessions/current/revoke`,
+`POST /api/sessions/{sessionId}/revoke`, and `POST /api/sessions/revoke-others`. Tenant administrators additionally
+have `GET /api/admin/sessions` (page default 50, maximum 100; optional `userId`, `clientType`, `activeOnly`, and
+`since`) and `POST /api/admin/sessions/{sessionId}/revoke`. No request accepts a tenant selector. Revoke responses
+contain no token or internal identifier. Deploy `2026-09-29_session_security_audit_phase8a.sql` before this server.
+The tenant-admin list projection includes the target user's established display name and email so an authorized
+same-tenant administrator can identify a session owner without per-row lookups. It still excludes internal session
+row ids, JTI/token material, tenant ids, row versions, machine identifiers, IP/location, and audit metadata.
+
+## Phase 8B best-effort invalidation publishing
+
+When `LIVE_PUBLISH_ENDPOINT_URL` is configured, successful Phase 8A revocations publish the minimal versioned
+`SESSION_INVALIDATED` LiveBus hint only after the SQL revocation and audit commit. `FUNCTION_KEY` is optional when
+the key is not already present in the endpoint URL. A non-2xx response, timeout, or transport failure is sanitized
+and cannot roll back the durable operation. With no endpoint configured the publisher is a no-op: authentication,
+login, and durable revocation remain fully functional and authoritative.
+
+The additive `APPLICATION_POLICY_CHANGED` publisher contract is global and release-channel scoped, matching the
+existing policy read API; there is no runtime policy mutation/API in this phase. Receivers must reload
+`GET /api/application-releases/policy/current` (or the established desktop policy service) rather than enforce the
+event body. No delivery log, replay store, SQL migration, policy administration, or Phase 9 session UI is added.
+
+## Phase 11A policy server time
+
+The successful current-policy response additively includes `serverTime`: UTC database time captured with the policy read. Clients can anchor deadline presentation without trusting workstation wall clock. Existing clients ignore the additive field. No endpoint, authentication rule, schema, or cache directive changed.

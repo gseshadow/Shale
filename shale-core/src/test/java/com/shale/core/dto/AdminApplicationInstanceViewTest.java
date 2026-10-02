@@ -1,0 +1,5 @@
+package com.shale.core.dto;
+import static org.junit.jupiter.api.Assertions.*;import java.lang.reflect.RecordComponent;import java.time.Instant;import java.util.*;import org.junit.jupiter.api.Test;import com.shale.core.model.*;
+class AdminApplicationInstanceViewTest {
+	@Test void safeDtoPreservesRawNullAndTimestampSemantics(){Instant started=Instant.parse("2026-09-01T00:00:00Z"),heartbeat=Instant.parse("2026-09-01T00:01:00Z"),activity=Instant.parse("2026-09-01T00:00:30Z");var v=new AdminApplicationInstanceView(1,2,"User","u@test",UUID.randomUUID(),ClientType.DESKTOP,new SemanticVersion(1,0,10),started,null,heartbeat,activity);assertNull(v.endedAt());assertSame(heartbeat,v.lastHeartbeatAt());assertSame(activity,v.lastHumanActivityAt());Set<String> names=new HashSet<>();for(RecordComponent c:AdminApplicationInstanceView.class.getRecordComponents())names.add(c.getName());for(String forbidden:List.of("shaleClientId","rowVer","token","jwtId","password","ipAddress","location","sessionContext"))assertFalse(names.contains(forbidden),forbidden);}
+}

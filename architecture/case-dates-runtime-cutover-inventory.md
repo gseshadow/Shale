@@ -348,6 +348,18 @@ The customizable Case Dates roadmap is **complete**. User-confirmed release evid
 * the required Case Dates migrations and the `CASE_DATE_TYPE` entity-action-audit
   constraint migration were deployed.
 
+### Case Overview presentation-read authorization correction (2026-09-29)
+
+Implementation and focused contract coverage are complete for the display/configuration authorization split. The
+shared firm-presentation `get` operation now admits an active, non-deleted, nonremoved same-tenant actor with
+matching tenant and principal session context, so an ordinary user can inherit `CASE_OVERVIEW` defaults.
+The per-case Overview read enforces the same actor/session boundary and continues to distinguish a missing
+parent (firm inheritance), ordered selections, and an explicit-empty override. The Settings editor still
+uses the shared read, but its route/administration aggregate and every replace, reorder, combined Overview,
+layout-only, and Intake By mutation remain administrator-only with existing row-version, transaction, RLS,
+and audit behavior. Presentation resolution, including deterministic occurrence selection and the
+pending-confirmation flag, is unchanged. No schema or migration change was required.
+
 Together with the completed implementation inventory and contract/static verification,
 this closes implementation, automated verification, database deployment verification,
 and manual QA. The earlier 2026-08-13 environment-blocked attempt is historical context

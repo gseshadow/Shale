@@ -17,6 +17,23 @@ The foundation schema names are `dbo.CaseDatePresentationConfigurations` (one te
 `CASE_CARD` or `CASE_OVERVIEW`) and `dbo.CaseDatePresentationSelections` (ordered stable identities).
 Administrative replacement is audited as `CASE_DATE_PRESENTATION_CONFIGURATION`.
 
+### Read and mutation authorization boundary (2026-09-29)
+
+The effective firm presentation configuration is runtime display data, not an administrator-only secret.
+An active, non-deleted, nonremoved user may read the `CASE_CARD` and `CASE_OVERVIEW` configuration for the
+same tenant when both `ShaleClientId` and `PrincipalUserId` session context match the requested actor. This
+read is shared by the Settings editor and by Case Overview firm-default inheritance; UI placement does not
+turn the DAO read into a mutation privilege. The Settings route and the separate Overview administration
+aggregate retain their administrator gates.
+
+Every configuration replacement, reorder, per-case Overview layout change, and Intake By change remains
+administrator-only. Those mutation paths retain tenant predicates, RLS session context, row-version checks,
+transaction rollback, and same-transaction entity-action audit writes. Per-case display reads apply the same
+active/nonremoved actor and session-principal checks before reading either an inherited firm default or an
+ordered case override. Cross-tenant, inactive, removed, and substituted actors are denied. No read audit was
+added: these configuration reads only select presentation metadata used in an already-authorized case view;
+the existing Case Date/value read boundaries remain authoritative for sensitive values.
+
 ## Selection identity and occurrence matching
 
 Persist a selection as an immutable **type identity**, not as a semantic role, label, or current numeric

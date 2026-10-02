@@ -140,3 +140,18 @@
     -fx-border-radius: 8px;
     -fx-text-fill: -shale-color-text-secondary;
 }
+
+.devices-sessions-pane, .session-card {
+    -fx-spacing: 8px;
+}
+
+.session-card {
+    -fx-padding: 12px;
+    -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 10px;
+    -fx-border-color: -shale-color-card-border;
+    -fx-border-radius: 10px;
+}
+
+.session-status-inactive { -fx-opacity: 0.68; }
+.session-status-current { -fx-font-weight: 700; }

@@ -31,3 +31,62 @@ End users require only `Shale-<version>.msi`; Visual Studio, the Windows SDK, JD
 11. Uninstall and confirm there is no conflicting Start Menu shortcut or identity.
 
 Toast activation, deep links, buttons, replies, read/dismiss synchronization, tray behavior, startup registration, COM activation, and second-instance routing are intentionally absent. A successful Windows build and installed-machine smoke test are required before production approval.
+
+## Machine identity data and installer ownership
+
+Phase 4A stores only a canonical random UUID plus a newline at `%ProgramData%\Shale\machine-id`. This path
+is outside the per-user `jpackage` installation payload, so the MSI and ZIP updater neither overwrite nor
+remove it during upgrade. Ordinary uninstall/reinstall retains it; there is no full-data-removal action yet.
+
+The current MSI remains a per-user package (`--win-per-user-install`) and therefore does not claim elevated
+ownership of `%ProgramData%` or grant broad machine-wide permissions. On a managed shared workstation, the
+Shale directory should be created by the administrator/deployment system with inherited administrator/System
+control and read/write access limited to the workstation users authorized to run Shale. Where Windows permits
+the first ordinary user to create the application-specific directory, that user creates it on the first
+machine-identity request; other OS users share the UUID only when the resulting ACL permits access. If the
+directory cannot be read or written, Shale continues to run and returns an explicit stable-identity-unavailable
+result. It does not weaken ACLs, invoke a privileged helper, or substitute `%LOCALAPPDATA%`.
+
+## Workstation automatic-update preference
+
+Phase 13A adds `%ProgramData%\Shale\automatic-update-preference.properties` beside (not inside) machine identity.
+Normal MSI/ZIP upgrades and ordinary uninstall/reinstall do not remove it. The current per-user MSI does not create
+or secure this directory and Phase 13A does not alter WiX/jpackage: managed deployments may grant appropriate
+workstation users read access and only intended operators write access, but Shale cannot claim that protection for
+first-user-created directories. Inaccessible storage produces an explicit fail-safe unavailable state, never a
+`%LOCALAPPDATA%` fallback. Installed Windows ACL and shared-user verification remains required.
+
+## Update-attempt state
+
+Phase 12 keeps non-secret correlation files in `%LOCALAPPDATA%\Shale\update-attempts`, outside the replaceable
+installation tree. The desktop passes optional UUID/directory arguments to the already packaged updater; this is
+compatible with older launch commands and does not alter MSI or ZIP installation semantics. `INSTALL_APPLIED`
+means only that the ZIP overlay completed. A later Shale startup at the target or a newer production semantic
+version is required for `COMPLETED`.
+
+## Phase 13B unattended-update feasibility
+
+No scheduled task, service, helper, MSI custom action, or scheduler state is installed in Phase 13B. This is
+intentional: the MSI is per-user, central policy currently requires an authenticated running desktop, and the
+Windows updater uses forceful process termination rather than a cooperative shutdown. SYSTEM cannot safely own or
+modify a particular user's installation, and a current-user task that works while logged out would require stored
+credentials or a new credential-free policy/helper architecture. Neither is acceptable in this phase.
+
+The selected foundation is therefore an **in-process, authenticated, safe-default-off evaluation contract**. It
+can later be called by one session-owned scheduler while Shale is running, but production wiring is withheld until
+a cooperative shutdown and one per-install-owner cross-process lock exist. There is no task identity or uninstall
+custom action yet, so upgrade/uninstall behavior remains unchanged and cannot leave an orphan Phase 13B task.
+If a later validated task is approved, use one stable current-user identity (`Shale\\Automatic Update`), no saved
+password/token, a stable installed helper path, execution-time preference/policy checks, and explicit uninstall
+removal. Installed Windows validation in `docs/testing/windows-unattended-update-phase13b.md` is mandatory first.
+The 2026-09-30 validation runner was Linux and had no installed MSI, `%ProgramData%`, Windows ACL/UAC/session, or
+second local account, so installation scope/path, updater-path stability, owning-user write access, preference
+persistence, ACL inheritance, and prompt-free updater/MSI behavior remain unverified rather than inferred from the
+package scripts. Phase 13B remains in progress and no production scheduler was activated. The supplied full
+repository `mvn test` result is **PASS** from an unrestricted runner; only installed-Windows acceptance evidence
+remains outstanding, and that Maven result does not establish any Windows runtime fact.
+
+
+### Phase 13B hardening result
+
+The per-user update execution mutex is the OS lock on `%LOCALAPPDATA%\Shale\updates\update-execution.lock`, outside the replaceable payload. Desktop holds it only across preflight/handoff; the updater waits for that deliberate transfer and then independently owns it for package execution. Lock busy creates neither a duplicate handoff nor Phase 12 attempt. A stale empty file is harmless. Old/no invocation mode remains manual; unattended mode cannot invoke Windows `taskkill /F`. No task, service, scheduler, signing configuration, MSI custom action, or logged-out support was added. Installed 1.0.129 evidence confirms the LocalAppData per-user layout and `app\updater\ShaleUpdater.exe`; both installed executables are currently `NotSigned`, which remains future production hardening.

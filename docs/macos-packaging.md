@@ -65,3 +65,23 @@ dist-macos/Shale.app/Contents/MacOS/Shale
 - In-app updater launch remains temporarily bypassed on macOS while the desktop launcher stays Windows-only.
 - The updater plumbing now expects a macOS **ZIP** payload that contains `Shale.app`, stages that bundle, replaces the installed app bundle, and relaunches it with `open` once the macOS launcher path is enabled.
 - DMG is still for manual install/distribution only; it is not used as the updater payload.
+- Phase 12 passes optional `--attemptId` and `--attemptDir` arguments to the existing updater. Older invocations
+  remain valid. The updater atomically records only bounded, non-secret outcome codes; the next Shale startup is
+  the only confirmation of completion. These per-user files live under
+  `~/Library/Application Support/Shale/update-attempts` and survive bundle replacement/reboot.
+
+## Machine identity data
+
+Phase 4A reserves `/Library/Application Support/Shale/machine-id` for the workstation-wide random UUID.
+This is deliberately separate from both the replaceable `Shale.app` bundle and the per-user log directory
+above. The current unsigned first-pass DMG does not install a privileged helper or provision that directory;
+an administrator must pre-create the Shale directory with application-specific read/write permissions when
+ordinary users cannot create it. A permission failure is reported by the desktop identity provider as
+unavailable and never causes fallback to a per-user or ephemeral identity. Bundle replacement, ordinary
+uninstall, and reinstall retain this external file.
+
+Phase 13A stores the independent, non-secret automatic-update permission at
+`/Library/Application Support/Shale/automatic-update-preference.properties`. It has the same external-directory
+persistence and provisioning limitations as machine identity; the package adds no Keychain entry or privileged
+helper. Missing, unreadable, or corrupt state fails safe. Installed macOS permissions and shared-user behavior
+remain a platform verification requirement.

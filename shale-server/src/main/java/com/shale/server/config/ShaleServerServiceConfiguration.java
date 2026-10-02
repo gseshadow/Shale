@@ -32,6 +32,15 @@ import com.shale.data.service.adapter.AuthServiceAdapter;
 import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
+import com.shale.data.dao.ApplicationReleaseReadDao;
+import com.shale.data.dao.ApplicationInstanceDao;
+import com.shale.data.dao.ApplicationInstanceAdminReadDao;
+import com.shale.data.service.adapter.ApplicationReleaseReadServiceAdapter;
+import com.shale.data.service.adapter.ApplicationInstanceServiceAdapter;
+import com.shale.data.service.adapter.ApplicationInstanceAdminReadServiceAdapter;
+import com.shale.core.service.ApplicationReleaseReadServicePort;
+import com.shale.core.service.ApplicationInstanceServicePort;
+import com.shale.core.service.ApplicationInstanceAdminReadServicePort;
 import com.shale.data.service.adapter.OrganizationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
 import com.shale.data.service.adapter.UserServiceAdapter;
@@ -49,6 +58,16 @@ import com.shale.server.runtime.InMemoryTokenRevocationStore;
 import com.shale.server.runtime.ShaleAuthTokenService;
 import com.shale.server.runtime.TokenRevocationStore;
 import com.shale.server.runtime.UnauthenticatedServerSessionResolver;
+import com.shale.server.runtime.DurableSessionStore;
+import com.shale.server.runtime.SqlDurableSessionStore;
+import com.shale.server.runtime.DurableSessionTokenValidator;
+import com.shale.server.runtime.LegacyTokenCompatibilityPolicy;
+import com.shale.server.runtime.DesktopApplicationInstanceVerifier;
+import com.shale.server.runtime.ServerAuthSessionService;
+import com.shale.server.runtime.SessionManagementService;
+import com.shale.server.live.InvalidationPublisher;
+import com.shale.server.live.HttpInvalidationPublisher;
+import org.springframework.core.env.Environment;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -57,8 +76,8 @@ public class ShaleServerServiceConfiguration {
 
     @Bean
     @Profile({"prod", "azure"})
-    ServerSessionResolver serverSessionResolver(ShaleAuthTokenService tokenService, TokenRevocationStore tokenRevocationStore) {
-        return new BearerTokenServerSessionResolver(tokenService, tokenRevocationStore);
+    ServerSessionResolver serverSessionResolver(ShaleAuthTokenService tokenService, ServerAuthSessionService authSessions) {
+        return new BearerTokenServerSessionResolver(tokenService, authSessions);
     }
 
     @Bean
@@ -73,9 +92,9 @@ public class ShaleServerServiceConfiguration {
      */
     @Bean
     @Profile({"dev", "local"})
-    ServerSessionResolver developmentServerSessionResolver(ShaleAuthTokenService tokenService, TokenRevocationStore tokenRevocationStore) {
+    ServerSessionResolver developmentServerSessionResolver(ShaleAuthTokenService tokenService, ServerAuthSessionService authSessions) {
         return new CompositeServerSessionResolver(java.util.List.of(
-                new BearerTokenServerSessionResolver(tokenService, tokenRevocationStore),
+                new BearerTokenServerSessionResolver(tokenService, authSessions),
                 new DevelopmentHeaderServerSessionResolver()));
     }
 
@@ -117,7 +136,7 @@ public class ShaleServerServiceConfiguration {
 
     @Bean
     @Profile({"dev", "local", "prod", "azure"})
-    RuntimeConnectionProvider runtimeConnectionProvider(DataSources serverDataSources) {
+	RuntimeConnectionProvider runtimeConnectionProvider(DataSources serverDataSources) {
         return new RuntimeSessionServiceConnectionProvider(serverDataSources.runtime());
     }
 
@@ -125,6 +144,39 @@ public class ShaleServerServiceConfiguration {
     TokenRevocationStore tokenRevocationStore() {
         return new InMemoryTokenRevocationStore();
     }
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	DurableSessionStore durableSessionStore(RuntimeConnectionProvider connections){return new SqlDurableSessionStore(connections);}
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	DurableSessionTokenValidator durableSessionTokenValidator(DurableSessionStore store){return new DurableSessionTokenValidator(store);}
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	LegacyTokenCompatibilityPolicy legacyTokenCompatibilityPolicy(ShaleAuthTokenService tokens){return LegacyTokenCompatibilityPolicy.fromEnvironment(tokens.ttlSeconds());}
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	ServerAuthSessionService serverAuthSessionService(ShaleAuthTokenService tokens,DurableSessionStore store,
+			DurableSessionTokenValidator validator,LegacyTokenCompatibilityPolicy legacy,TokenRevocationStore revocations){
+		return new ServerAuthSessionService(tokens,store,validator,legacy,revocations);
+	}
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	DesktopApplicationInstanceVerifier desktopApplicationInstanceVerifier(RuntimeConnectionProvider connections){return new DesktopApplicationInstanceVerifier(connections);}
+
+	@Bean @Profile({"dev", "local", "prod", "azure"})
+	SessionManagementService sessionManagementService(RuntimeConnectionProvider connections,InvalidationPublisher invalidations){return new SessionManagementService(connections,invalidations);}
+
+	@Bean
+	InvalidationPublisher invalidationPublisher(Environment environment){
+		String endpoint=environment.getProperty("LIVE_PUBLISH_ENDPOINT_URL");
+		if(endpoint==null||endpoint.isBlank())return InvalidationPublisher.disabled();
+		return new HttpInvalidationPublisher(endpoint,environment.getProperty("FUNCTION_KEY"));
+	}
 
     @Bean
     @Profile({"dev", "local", "prod", "azure"})
@@ -190,5 +242,20 @@ public class ShaleServerServiceConfiguration {
     @Bean
     NotificationServicePort notificationServicePort(DbSessionProvider serverDbSessionProvider) {
         return new NotificationServiceAdapter(new NotificationDao(serverDbSessionProvider));
+    }
+
+    @Bean
+    ApplicationReleaseReadServicePort applicationReleaseReadServicePort(DbSessionProvider serverDbSessionProvider) {
+        return new ApplicationReleaseReadServiceAdapter(new ApplicationReleaseReadDao(serverDbSessionProvider));
+    }
+
+    @Bean
+    ApplicationInstanceServicePort applicationInstanceServicePort(DbSessionProvider serverDbSessionProvider) {
+        return new ApplicationInstanceServiceAdapter(new ApplicationInstanceDao(serverDbSessionProvider));
+    }
+
+    @Bean
+    ApplicationInstanceAdminReadServicePort applicationInstanceAdminReadServicePort(DbSessionProvider serverDbSessionProvider) {
+        return new ApplicationInstanceAdminReadServiceAdapter(new ApplicationInstanceAdminReadDao(serverDbSessionProvider));
     }
 }

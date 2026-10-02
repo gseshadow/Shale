@@ -145,6 +145,7 @@ public final class LoginController {
 					showError("Invalid email or password.");
 					return;
 				}
+				Platform.runLater(passwordField::clear);
 
 				appState.setUserId(result.userId());
 				appState.setShaleClientId(result.shaleClientId());
@@ -187,13 +188,9 @@ public final class LoginController {
 	}
 
 	private void handlePostLoginFlow(UiUpdateLauncher.UpdateCheckResult updateCheck) {
-		if (!updateCheck.updateAvailable()) {
-			sceneManager.showMain();
-			return;
-		}
-
-		Runnable onDecline = updateCheck.mandatory() ? Platform::exit : sceneManager::showMain;
-		updateFlowCoordinator.presentAvailableUpdate(updateCheck.mandatory(), onDecline);
+		// Phase 11A never blocks entry. The shell policy banner owns central policy messaging;
+		// the manifest notification remains the compatibility fallback for an older/unavailable policy read.
+		sceneManager.showMain();
 	}
 
 	private void setBusy(boolean busy) {
