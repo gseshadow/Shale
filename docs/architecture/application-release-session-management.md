@@ -697,12 +697,16 @@ content.
 The existing Phase 3B UI remains the user contract: one post-update What's New dialog reads published release rows
 and items and advances the existing per-user acknowledgement only after dismissal. The pre-update policy/update
 dialog does not render these notes. This preserves the separation of package/policy decisions from release content.
-The manifest transfer is the authoring/publication foundation only: a future tightly authorized catalog importer
-must copy this content into `ApplicationReleases`/`ApplicationReleaseItems` transactionally and append the required
-sanitized global publication audit. Until that control-plane seam exists, the release manager's existing catalog
-publication remains necessary; generated or manual ad-hoc SQL is intentionally not introduced. No tenant/PHI read
-or domain mutation is added by repository validation/manifest generation, so this increment requires no audit row
-or schema migration.
+The 2026-10-02 control-plane importer transfers this content into
+`ApplicationReleases`/`ApplicationReleaseItems` and supplies the required sanitized global publication audit. A dedicated
+release-pipeline credential (not a tenant-admin bearer) authorizes a single-version request; the DAO locks the
+canonical production identity, writes the published parent and every ordered child, appends bounded global audit,
+and commits once. Identical content is a no-op. Differing content is a conflict unless an explicit correction carries
+the current RowVer; stale corrections fail and roll back. `release-all.bat` reaches this through its existing
+`release-and-publish.bat`/`publish-update.bat` chain after binary upload and before manifest upload. Missing notes
+skip the call. A required import failure prevents manifest publication. Generated or manual ad-hoc SQL is not the
+release workflow. Repository validation/manifest generation needs no audit row; the authoritative catalog mutation
+is audited inside its database transaction. The import extension uses its documented additive schema migration.
 
 ### Phase 4A — Stable machine identity
 

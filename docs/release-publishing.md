@@ -59,12 +59,24 @@ version must exactly match the version passed to `release-all.bat`.
 The build validates canonical versioning, the optional ISO release date, supported fields/groups, length limits,
 nonempty content, and rejection of HTML. A present but invalid or mismatched file fails before the manifest is
 copied to `dist`; an absent file is explicitly non-fatal and leaves the established `Release <version>` fallback.
-The ordinary manifest upload consequently carries both the backward-compatible `notes` text and a structured
-`releaseNotes` object without creating another publication endpoint or coupling content to `mandatory`.
+The ordinary manifest carries both the backward-compatible `notes` text and a structured `releaseNotes` object
+without coupling content to `mandatory`. During `publish-update.bat`, after immutable installers/ZIPs upload but
+before the discoverable manifest uploads, `import_release_catalog.py` posts that object to the dedicated
+`/api/control-plane/application-releases/<version>/import` endpoint. Set
+`SHALE_RELEASE_CONTROL_PLANE_URL` and a minimum-32-character `SHALE_RELEASE_CONTROL_PLANE_TOKEN` in the operator
+environment; configure the server with the same token and optional `SHALE_RELEASE_CONTROL_PLANE_OPERATOR` audit
+identity. These values are never committed or printed.
 
 The authenticated desktop What's New experience remains post-update and release-catalog driven. It displays
 published catalog summaries/items through the existing per-user acknowledgement flow; release notes are not added
-to the pre-update policy dialog because update policy and release content remain separate. The manifest embedding
-in this increment makes authored content available to the existing publication artifact, but an authorized,
-transactionally audited catalog importer is still required before this repository source can replace the current
-catalog-publication operation. Do not bypass that pending control-plane boundary with ad-hoc release SQL.
+to the pre-update policy dialog because update policy and release content remain separate. Missing `releaseNotes`
+skips import and remains non-fatal. Present notes make import mandatory: authorization, validation, conflict, audit,
+or database failure stops publication before manifest upload. Identical imports return `UNCHANGED` without duplicate
+rows or audit noise. Different historical content returns HTTP 409; an exceptional correction must explicitly send
+`allowUpdate=true` with the current base64 `expectedRowVersion`. That RowVer-guarded replacement and its sanitized
+audit append commit together. The normal release script never enables correction mode, and operators must not use
+ad-hoc SQL instead.
+
+Developer procedure: author and commit `release-notes/<major>.<minor>.<build>.json`; run its Python contract tests;
+then run `build\scripts\release-all.bat <major>.<minor>.<build> <true|false>` from the clean attached release branch.
+The version argument remains the only release-version source of truth and must match both filename and JSON value.

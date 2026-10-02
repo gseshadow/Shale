@@ -1227,6 +1227,19 @@ soft-delete lifecycle: `IsActive` supports draft composition, while the non-casc
 history. Phase 1A seeds no releases or items and adds no API, service, DAO, UI, updater, policy, session,
 heartbeat, acknowledgement, or enforcement behavior.
 
+### Release catalog import extension (2026-10-02)
+
+The importer migration adds nullable `Title nvarchar(200)` and `ReleaseDate date` metadata to
+`ApplicationReleases`; nullable preserves compatibility with earlier catalog rows. Repository groups map in one
+global order to item types `New`/`FEATURE`, `Improvements`/`IMPROVEMENT`, and `Fixes`/`FIX`; the authored group is
+stored in item `Title` and the authored item text in `Body`.
+
+`dbo.GlobalControlPlaneAuditLog` is append-only global control-plane audit storage with `OperatorId`, stable entity
+type/id, semantic action, database UTC occurrence time, and bounded sanitized metadata. It deliberately has no
+tenant key or tenant RLS: tenant-owned `EntityActionAuditLog` cannot safely represent a global mutation. Import and
+audit append share the DAO-owned transaction. Metadata contains only canonical version and item count—never note
+text, credentials, RowVer, SQL, exception text, user/tenant data, or PHI.
+
 ## Global application policy (Phase 1B)
 
 ### dbo.ApplicationPolicy

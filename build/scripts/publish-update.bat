@@ -65,6 +65,11 @@ if exist "%MAC_ZIP_FILE%" (
     echo.
 )
 
+echo Importing structured release notes into the authoritative release catalog...
+python "%SCRIPT_DIR%import_release_catalog.py" "%JSON_FILE%" || exit /b 1
+echo Release catalog import complete or not required.
+echo.
+
 echo Uploading manifest...
 call az storage blob upload --account-name "%STORAGE_ACCOUNT%" --container-name "%CONTAINER%" --name "shale-stable.json" --file "%JSON_FILE%" --overwrite true --auth-mode login --no-progress --only-show-errors --output none || exit /b 1
 echo Manifest uploaded.
