@@ -218,6 +218,16 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn("build\\scripts\\release-all.bat %VERSION% %MANDATORY_UPDATE%", prepared)
         self.assertIn("exit /b 0", prepared)
 
+    def test_notes_preparation_disables_python_bytecode_cache_writes(self):
+        full = batch_source("release-all.bat")
+        preparation_commands = [line for line in command_lines(full, "python")
+                                if 'prepare_release_notes.py"' in line]
+        self.assertEqual(
+            ['python -B "%SCRIPT_DIR%\\prepare_release_notes.py" "%ROOT%" "%VERSION%"'],
+            preparation_commands,
+            "Draft preparation must disable bytecode writes so its first run leaves only the notes draft",
+        )
+
     def test_local_release_build_never_crosses_publication_boundary(self):
         release_build = batch_source("build-shale-release.bat").lower()
         for forbidden in ("release-and-publish.bat", "publish-update.bat", "update-manifest.bat",
