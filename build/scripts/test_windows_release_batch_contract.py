@@ -181,6 +181,15 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn('update-manifest.bat"', release)
         self.assertIn('publish-update.bat"', publish)
 
+    def test_release_validates_notes_after_manifest_generation_and_before_distribution(self):
+        release = batch_source("release.bat")
+        manifest = release.index('update-manifest.bat"')
+        notes = release.index('release_notes.py"')
+        distribution = release.index('copy /Y "%MANIFEST_SRC%" "%MANIFEST_DIST%"')
+        self.assertLess(manifest, notes)
+        self.assertLess(notes, distribution)
+        self.assertIn('--notes-dir "%ROOT%\\release-notes"', release)
+
     def test_git_preflight_and_sync_bound_the_publication_pipeline(self):
         full = batch_source("release-all.bat")
         publish = batch_source("release-and-publish.bat")

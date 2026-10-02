@@ -104,6 +104,17 @@ class ReleaseGitSyncTest(unittest.TestCase):
         self.assertNotIn("git add .", source.lower())
         self.assertIn("publish-update.bat", source[source.index(":fail"):])
 
+    def test_sync_includes_matching_authored_notes_when_present(self):
+        note = self.repo / "release-notes" / "3.0.0.json"
+        note.parent.mkdir()
+        note.write_text('{"version":"3.0.0"}\n', encoding="utf-8")
+        run(self.repo, "git", "add", str(note.relative_to(self.repo)))
+        run(self.repo, "git", "commit", "-m", "author release notes")
+        (self.repo / "pom.xml").write_text("release\n", encoding="utf-8")
+        SYNC.synchronize(self.repo, "3.0.0")
+        self.assertEqual("Release Shale 3.0.0", run(self.repo, "git", "log", "-1", "--pretty=%s").stdout.strip())
+        self.assertEqual('{"version":"3.0.0"}', run(self.repo, "git", "show", "HEAD:release-notes/3.0.0.json").stdout.strip())
+
 
 if __name__ == "__main__":
     unittest.main()
