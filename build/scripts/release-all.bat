@@ -20,7 +20,7 @@ set "MAC_METADATA=%HANDOFF%\shale-mac-release.json"
 
 cd /d "%ROOT%" || goto :root_unavailable
 
-python "%SCRIPT_DIR%\prepare_release_notes.py" "%ROOT%" "%VERSION%"
+python -B "%SCRIPT_DIR%\prepare_release_notes.py" "%ROOT%" "%VERSION%"
 set "PREPARE_EXIT=%ERRORLEVEL%"
 if "%PREPARE_EXIT%"=="10" goto :notes_prepared
 if not "%PREPARE_EXIT%"=="0" goto :notes_preparation_failed
