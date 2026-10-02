@@ -24,12 +24,16 @@ The enforced order is:
    no duplicate commit, while any unrelated tracked, untracked, or staged change fails closed;
 3. require an attached branch and configured upstream, require a clean index/worktree, fetch the upstream, and reject
    upstream-ahead or diverged history;
-4. run `release.bat`, which bumps Maven versions, builds artifacts, updates the source manifest, and validates
+4. before contacting the Mac host, normally push the preflighted `HEAD` to its configured upstream when it is ahead,
+   fetch that remote again, and verify that the upstream ref contains the exact source SHA; an already synchronized
+   SHA is verified without an unnecessary push, and any push or verification failure stops both platform builds;
+5. invoke the Mac build with that verified SHA, then run `release.bat`, which bumps Maven versions, builds artifacts,
+   updates the source manifest, and validates
    `release-notes/<version>.json` when present before embedding its plain-text and structured content in that manifest;
-5. stage only `pom.xml`, the six module POMs, `build/assets/shale-stable.json`, and matching release notes;
-6. create `Release Shale <version>` when those files have staged changes, then perform a normal `git push` to the
+6. stage only `pom.xml`, the six module POMs, `build/assets/shale-stable.json`, and matching release notes;
+7. create `Release Shale <version>` when those files have staged changes, then perform a normal `git push` to the
    configured upstream (already-committed local-ahead work is included);
-7. begin `publish-update.bat` only after the push succeeds.
+8. begin `publish-update.bat` only after the push succeeds.
 
 `release.bat` remains build-only. It neither commits nor pushes. The synchronizer never uses `git add .`/`-A`, never
 force-pushes, resets, stashes, rebases, or discards work, and never stages `dist`, credentials, Mac handoff output, or
@@ -39,6 +43,8 @@ arbitrary source changes. A clean retry creates no empty duplicate commit.
 
 * A preflight failure happens before release mutation/build. Commit or otherwise resolve every path listed by the
   diagnostic, or manually reconcile upstream-ahead/diverged history, then rerun the normal release command.
+* A source push or origin-containment verification failure happens before either platform build. Correct credentials
+  or connectivity, or manually reconcile an advanced upstream without force-pushing, then rerun the full release.
 * A commit failure preserves generated files and the index. Correct the reported Git problem and inspect
   `git status`; do not rerun publication until the release commit is valid.
 * A push failure preserves generated files and any `Release Shale <version>` commit. Fix credentials/connectivity or

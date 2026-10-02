@@ -27,10 +27,10 @@ export JAVAFX_JMODS_DIR=/absolute/path/to/javafx-jmods
 ./build/scripts/build-shale-macos.sh dmg
 ```
 
-The cross-platform `release-all.bat` flow passes its exact preflighted Git `HEAD` to
-`prepare-shale-mac-release.sh`. The Mac workspace checks out that commit before applying the requested release
-version, so Mac and Windows artifacts use the same source revision even when the Windows branch has committed local
-changes ahead of its upstream. Direct legacy two-argument Mac preparation remains supported but emits a source
+The cross-platform `release-all.bat` flow pushes its exact preflighted Git `HEAD` when needed, fetches the configured
+remote again, verifies that its upstream ref contains that exact commit, and only then passes the SHA to
+`prepare-shale-mac-release.sh`. The Mac workspace fetches origin and checks out that commit before applying the
+requested release version, so Mac and Windows artifacts use the same origin-available source revision. Direct legacy two-argument Mac preparation remains supported but emits a source
 revision mismatch warning because it falls back to `origin/<branch>`.
 
 ## Output

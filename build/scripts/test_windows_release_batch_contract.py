@@ -193,13 +193,35 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
     def test_git_preflight_and_sync_bound_the_publication_pipeline(self):
         full = batch_source("release-all.bat")
         publish = batch_source("release-and-publish.bat")
-        self.assertLess(full.index("release_git_sync.py\" preflight"), full.index("ssh %MAC_HOST%"))
+        preflight = full.index("release_git_sync.py\" preflight")
+        source_sync = full.index("release_git_sync.py\" publish-source")
+        revision = full.index("git rev-parse HEAD")
+        mac_build = full.index("ssh %MAC_HOST%")
+        self.assertEqual(
+            [preflight, revision, source_sync, mac_build],
+            sorted([preflight, revision, source_sync, mac_build]),
+            "The reviewed notes commit must reach origin before its exact SHA is sent to the Mac",
+        )
+        self.assertIn('publish-source "%ROOT%" "%SOURCE_REVISION%"', full)
         self.assertIn('set "SHALE_GIT_PREFLIGHT_DONE=true"', full)
         self.assertIn("%SOURCE_REVISION%", full)
         self.assertLess(publish.index("release_git_sync.py\" preflight"), publish.index('release.bat"'))
         self.assertLess(publish.index('release.bat"'), publish.index("release_git_sync.py\" sync"))
         self.assertLess(publish.index("release_git_sync.py\" sync"), publish.index('publish-update.bat"'))
         self.assertIn("retry publication only", publish)
+
+    def test_source_push_failure_stops_before_release_side_effects(self):
+        full = batch_source("release-all.bat")
+        source_sync = full.index('release_git_sync.py" publish-source')
+        source_failure = full.index('goto :source_sync_failed', source_sync)
+        mac_build = full.index("ssh %MAC_HOST%")
+        windows_release = full.index('call "%DOWNSTREAM_SCRIPT%"')
+        self.assertLess(source_sync, source_failure)
+        self.assertLess(source_failure, mac_build)
+        self.assertLess(source_failure, windows_release)
+        handler = full[full.index("\n:source_sync_failed"):full.index("\n:missing_mac_zip")]
+        self.assertIn("before the Mac or Windows build, upload, or publication", handler)
+        self.assertIn("goto :fail", handler)
 
     def test_missing_notes_preparation_stops_before_every_release_side_effect(self):
         full = batch_source("release-all.bat")
