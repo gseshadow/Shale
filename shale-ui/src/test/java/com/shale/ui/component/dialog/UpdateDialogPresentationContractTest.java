@@ -41,9 +41,24 @@ class UpdateDialogPresentationContractTest {
 		String source = read("shale-ui/src/main/java/com/shale/ui/component/dialog/UpdateDialog.java");
 		assertTrue(source.contains("detailsScroll.setFitToWidth(true)"));
 		assertTrue(source.contains("detailsScroll.setMaxHeight(180)"));
+		assertTrue(source.contains("VBox.setVgrow(detailsScroll, Priority.ALWAYS)"),
+				"bounded windows must shrink the scrolling details rather than the action footer");
 		assertTrue(source.indexOf("detailsScroll, actions") > 0,
 				"actions must remain outside the independently scrolling detail region");
 		assertTrue(source.contains("DialogSizingUtil.applyConfirmationDialogSizing"));
+		String sizing = read("shale-ui/src/main/java/com/shale/ui/util/DialogSizingUtil.java");
+		assertTrue(sizing.indexOf("stage.sizeToScene()") < sizing.lastIndexOf("WindowSizingUtil.sizeModalStage"),
+				"content measurement must happen before the final screen-bounded stage size");
+	}
+
+	@Test
+	void closeRequestsUseTheConfiguredDeclineActionAndARealOwner() throws Exception {
+		String source = read("shale-ui/src/main/java/com/shale/ui/component/dialog/UpdateDialog.java");
+		assertTrue(source.contains("owner = resolveOwner(owner)"),
+				"a null caller must still produce a window-modal prompt over the active application window");
+		assertTrue(source.contains("stage.setOnCloseRequest"));
+		assertTrue(source.contains("event.consume();\n\t\t\tdecline.run();"),
+				"window dismissal must have the same mandatory Exit / optional Not-now semantics");
 	}
 
 	@Test

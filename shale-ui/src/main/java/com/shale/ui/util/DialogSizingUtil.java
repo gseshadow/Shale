@@ -23,26 +23,19 @@ public final class DialogSizingUtil {
             return;
         }
 
-        root.setMinWidth(minimumWidth);
         root.setPrefWidth(preferredWidth);
-        root.setMinHeight(minimumHeight);
 
         double initialWidth = Math.max(preferredWidth, minimumWidth);
         double initialHeight = preferredHeight(root, initialWidth, minimumHeight);
         WindowSizingUtil.sizeModalStage(stage, owner, initialWidth, initialHeight, minimumWidth, minimumHeight);
 
         stage.setOnShown(event -> {
-            double width = Math.max(minimumWidth, stage.getWidth());
-            double height = preferredHeight(root, width, minimumHeight);
-            WindowSizingUtil.sizeModalStage(stage, owner, width, height, minimumWidth, minimumHeight);
             stage.sizeToScene();
-            if (stage.getWidth() < minimumWidth) {
-                stage.setWidth(minimumWidth);
-            }
-            if (stage.getHeight() < minimumHeight) {
-                stage.setHeight(minimumHeight);
-            }
-            WindowSizingUtil.constrainToVisualBounds(stage, owner);
+            double width = Math.max(preferredWidth, stage.getWidth());
+            double height = Math.max(stage.getHeight(), preferredHeight(root, width, minimumHeight));
+            // Apply the bounded size last. Calling sizeToScene after this point can grow the
+            // window beyond the visual bounds and leave its non-scrolling footer clipped.
+            WindowSizingUtil.sizeModalStage(stage, owner, width, height, minimumWidth, minimumHeight);
         });
     }
 

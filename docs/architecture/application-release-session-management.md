@@ -1543,6 +1543,13 @@ The concrete inventory found: New Intake and new Organization are modal multi-st
 
 At authenticated startup the shell first presents a textual policy-check surface. A fresh prohibited result presents an update-required surface with keyboard-reachable Update, Retry policy check, and Exit actions rather than entering the normal shell. Authentication credentials/session are retained, background policy invalidation and heartbeat remain active, and a corrected policy opens the shell without restart. Missing policy, no cache, or an expired time anchor enters `UNKNOWN_GRACE` and permits startup. In-process policy changes retain read/navigation access, strengthen the persistent Phase 11A notice, disable/gate substantive workflow entry, and grandfather registered work.
 
+The package release manifest remains a separate compatibility gate. When the authenticated startup manifest check
+reports both a newer package and `mandatory=true`, the dedicated Update prompt is shown before policy checking or
+normal-shell construction. Its only outcomes are updater handoff or application exit; the title-bar close and Escape
+follow the Exit outcome and cannot enter Shale. Optional manifest updates retain **Not now** and continue through the
+normal policy-check startup path. This does not change manifest syntax, version comparison, policy authority,
+in-session safe-drain behavior, automatic scheduling, or updater handoff semantics.
+
 The bounded authority window is exactly **15 minutes of monotonic elapsed time** from the last policy response's database UTC. A transient failure inside that window retains a last-known prohibited decision (hysteresis). Once older than 15 minutes it becomes `UNKNOWN_GRACE`; an ancient cache cannot lock out the firm. A later authoritative success replaces it wholesale. If the package is unavailable, the notice says so, enforcement remains, Retry/read/finish/exit remain available, and no write is automatically retried. The existing updater launcher is unchanged.
 
 No server mutation middleware was added. Current desktop domain mutations remain predominantly direct JDBC and authenticated API requests do not carry a sufficiently authoritative, ubiquitous desktop version plus workflow-start token to distinguish grandfathered completion from new work. Blocking all POST/PUT would destroy drain safety. The explicit desktop contract is therefore the launch-gate message `Shale must be updated before starting new work.` Server-side classified rejection remains a future additive hardening only after routes carry safe workflow semantics; reads and grandfathered completion must remain allowed. This is operational compatibility enforcement, not anti-tampering.
