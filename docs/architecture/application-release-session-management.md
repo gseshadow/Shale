@@ -99,11 +99,16 @@ but no UI belongs in the foundation phases.
 
 ### 3.1 Release production and packaging
 
-1. `release.bat <version> <mandatory>` bumps Maven versions and builds the desktop and updater.
+1. `release-and-publish.bat` performs a clean-tree/upstream Git preflight before invoking build work;
+   `release.bat <version> <mandatory>` itself remains build-only and bumps Maven versions before building the
+   desktop and updater.
 2. `build-shale-release.bat` creates a Windows `jpackage` app image, embeds the separately packaged
    `ShaleUpdater` image under the desktop payload, ZIPs the app image, and creates the MSI.
 3. `update-manifest.bat` hashes the Windows ZIP, optionally carries macOS ZIP/hash metadata, and writes
-   the global `shale-stable.json`. `release-and-publish.bat` publishes those static artifacts.
+   the global `shale-stable.json`. Before `release-and-publish.bat` publishes those static artifacts, it stages only
+   the root/module POMs and source manifest, commits `Release Shale <version>` when needed, normally pushes the
+   current branch to its configured upstream, and requires confirmed push success. Committed local-ahead source work
+   is pushed with that commit; unrelated working-tree/index changes fail preflight and are never auto-committed.
 4. The MSI is installation/distribution output. The current in-app update consumes the ZIP, not the
    manifest's installer URL.
 
@@ -1153,13 +1158,13 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 13E | **COMPLETE** | Public policy, signing gates, strict registration values, owner paths, and installed-version metadata are implemented and verified; no registration writer or logged-out executor was added. |
 | 13F | **COMPLETE** | Elevated MSI registration and lifecycle are verified; installed Windows fresh-install acceptance confirmed the protected 64-bit HKLM record, exact owner/roots, ACL, schema/version/channel, updater, and production-reader `VALID`. Production signing remains a separate deployment prerequisite. |
 | 13G | **COMPLETE — UNSUPPORTED** | Every Phase 13D blocker was reevaluated against 13E/13F. Discovery, public policy, version, and owner-path prerequisites are closed, but no credentialless owner principal or sufficiently protected privileged execution boundary is proven; no prototype or rollout was created. |
+| 14A | **COMPLETE** | Release-pipeline Git synchronization is fail-closed before publication: attached/upstream/clean/divergence preflight, exact release-file staging, commit/push recovery, retry behavior, and source-revision-consistent Mac handoff are documented and covered by temporary-repository tests. No domain or administrative runtime mutation exists, so the established audit schemas are not applicable. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
 
-The next implementation task for this initiative is **release-pipeline Git synchronization**. This documentation
-closeout does not implement it and does not mark the entire release/session initiative complete. The conditional
-Phase 13H privileged-component decision remains separate; logged-out automatic updates remain `UNSUPPORTED`.
+Release-pipeline Git synchronization is complete. The wider initiative remains open: the conditional Phase 13H
+privileged-component decision remains separate, and logged-out automatic updates remain `UNSUPPORTED`.
 
 ## 16. Open decisions requiring operator input
 

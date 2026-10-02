@@ -10,12 +10,13 @@ usage() {
   exit 1
 }
 
-if [[ $# -lt 2 ]]; then
+if [[ $# -lt 2 || $# -gt 3 ]]; then
   usage
 fi
 
 BRANCH="$1"
 VERSION="$2"
+SOURCE_REVISION="${3:-}"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "This script must be run on macOS." >&2
@@ -45,12 +46,20 @@ echo "Root:    $ROOT"
 echo "===================================="
 echo
 
-echo "Step 0: Force sync repo to origin/$BRANCH"
+echo "Step 0: Force sync Mac build workspace to the requested source"
 git fetch origin
-git reset --hard "origin/$BRANCH"
+if [[ -n "$SOURCE_REVISION" ]]; then
+  git cat-file -e "$SOURCE_REVISION^{commit}" || {
+    echo "Requested Windows source revision is unavailable on the Mac host: $SOURCE_REVISION" >&2
+    exit 1
+  }
+  git checkout --detach "$SOURCE_REVISION"
+else
+  echo "WARNING: no source revision supplied; Mac may not include committed local changes ahead of origin/$BRANCH" >&2
+  git checkout -B "$BRANCH" "origin/$BRANCH"
+fi
 git clean -fd
-git checkout -B "$BRANCH" "origin/$BRANCH"
-git reset --hard "origin/$BRANCH"
+git reset --hard "${SOURCE_REVISION:-origin/$BRANCH}"
 git clean -fd
 PREVIOUS_VERSION=$(python3 "$ROOT/build/scripts/preflight-version.py" "$ROOT" --print-root-version)
 

@@ -20,6 +20,12 @@ set "MAC_METADATA=%HANDOFF%\shale-mac-release.json"
 
 cd /d "%ROOT%" || goto :root_unavailable
 
+echo Step 0: Git preflight before remote Mac build
+python "%SCRIPT_DIR%\release_git_sync.py" preflight "%ROOT%" || goto :git_preflight_failed
+set "SHALE_GIT_PREFLIGHT_DONE=true"
+for /f "delims=" %%C in ('git rev-parse HEAD') do set "SOURCE_REVISION=%%C"
+if not defined SOURCE_REVISION goto :git_preflight_failed
+
 echo ====================================
 echo Full cross-platform release %VERSION%
 echo Mandatory update: %MANDATORY_UPDATE%
@@ -27,7 +33,8 @@ echo ====================================
 echo.
 
 echo Step 1: Run Mac build via SSH
-ssh %MAC_HOST% "cd %MAC_REPO% && ./build/scripts/prepare-shale-mac-release.sh codex/latest %VERSION%" || goto :fail
+echo Mac artifacts will be built from source revision: %SOURCE_REVISION%
+ssh %MAC_HOST% "cd %MAC_REPO% && ./build/scripts/prepare-shale-mac-release.sh codex/latest %VERSION% %SOURCE_REVISION%" || goto :fail
 
 echo.
 echo Step 2: Fetch Mac artifacts
@@ -80,6 +87,10 @@ exit /b 2
 :root_unavailable
 echo Repository root is unavailable: "%ROOT%"
 exit /b 3
+
+:git_preflight_failed
+echo Git preflight failed before the Mac or Windows build. Nothing was published.
+goto :fail
 
 :missing_mac_zip
 echo Required fetched Mac ZIP was not found: "%MAC_ZIP%"
