@@ -1,6 +1,6 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 13G COMPLETE — logged-out updates remain `UNSUPPORTED`; Phase 7C configuration re-verification is open
+**Status:** Phase 13G COMPLETE — logged-out updates remain `UNSUPPORTED`; Phase 7C and Phase 10 runtime re-verification are open
 
 **Last reviewed:** 2026-10-02
 
@@ -1140,7 +1140,7 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
 | 8B | **COMPLETE** | Best-effort invalidation/revalidation acceleration and required verification completed before Phase 9. |
 | 9 | **COMPLETE** | Desktop self-service Devices & Sessions completed and verified before Phase 10. |
-| 10 | **COMPLETE** | Tenant-admin session visibility/revocation completed and verified before Phase 11A. |
+| 10 | **COMPLETE; RUNTIME RE-VERIFICATION OPEN** | Tenant-admin session visibility/revocation completed before Phase 11A. A 2026-10-02 installed-desktop list failure is awaiting sanitized HTTP/parse evidence and Azure schema verification. |
 | 11A | **COMPLETE** | Central policy resolver, server-time anchored shell UX, outage/correction behavior, and updater precedence are verified. |
 | 11B | **COMPLETE** | Minimum-allowed enforcement and safe drain are verified. |
 | 12 | **COMPLETE** | Privacy-safe local attempt/outcome correlation and required verification completed before Phase 13A. |
@@ -1516,6 +1516,31 @@ Phase 11 behavior was added. Phase 8B remains best-effort acceleration only; adm
 authoritative reload, not push delivery.
 
 Phase 10 required focused, selector-selected, full-reactor, rendered JavaFX, and live authorization/audit verification was completed before Phase 11A.
+
+### Phase 10 administrative-list diagnosis — 2026-10-02
+
+Runtime evidence now confirms successful desktop enrollment (`200` in 2547 ms), an installed process-memory bound
+bearer, and the `ENROLLED` capability gate. Administration > Sessions opens but its initial bounded list reports the
+generic failure message, with no corresponding Azure exception in the available logs. Source review found no
+endpoint, parameter, DTO, authorization, tenant, SQL projection, or transactional read-audit contract mismatch:
+the desktop calls `GET /api/admin/sessions` with the documented bounded filters; the controller derives both
+principal and current public session id from the same bearer; the service repeats active tenant-admin authorization,
+performs one tenant-qualified Users/UserSessions page query, inserts exactly one `ADMIN_SESSION_LIST` audit row, and
+commits before returning the matching page DTO. The UI continues to expose this adapter only while enrollment state
+is `ENROLLED`, and the bearer remains memory-only and shared with self-session management.
+
+The desktop admin-list adapter now logs only HTTP status and elapsed milliseconds, a closed transport category plus
+exception class and elapsed milliseconds, or response-parsing exception class. It never logs the URL/query,
+authorization header, bearer, response body, filter values, or user/session details. This distinguishes a routed
+401/403/4xx/5xx response, request timeout, connection/TLS failure, and a successful but incompatible response shape
+without changing the eight-second request timeout or authorization behavior.
+
+Enrollment success proves the Phase 7A `UserSessions` write path, but it does not prove the Phase 8A
+`SessionSecurityAuditLog` table, RLS predicates, runtime INSERT permission, or same-transaction admin read audit.
+Because audit failure must roll back the response, those deployed objects remain the leading configuration check if
+the new diagnostic reports HTTP 500. A 401/403 instead directs investigation to bound-token/admin eligibility; a
+200 followed by a parsing-class diagnostic directs investigation to the deployed response DTO. No new schema or
+audit contract is introduced. Runtime re-verification remains open.
 
 ## Phase 11A implementation record — 2026-09-29
 
