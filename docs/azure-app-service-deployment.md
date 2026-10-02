@@ -465,7 +465,20 @@ remain unconfigured unless an explicit override is supplied. An explicit local e
 origins must be HTTPS. Origins must not contain user-info, a path (including `/api`), a query, or a fragment, and
 trailing slashes are normalized.
 
-### Remaining Phase 7C runtime acceptance
+### Phase 7C runtime acceptance and remaining checks
+
+The 2026-10-02 user-reported Windows/Eclipse production run confirms the Azure API starts, desktop enrollment
+returns HTTP 200, Administration > Sessions loads tenant-wide data, explicit logout returns HTTP 200 and revokes the
+session, remote administrative revocation is detected by polling in approximately one minute, and confirmed
+revocation locks the application before the popup is dismissed (OK returns to sign-in). My Sessions works for both
+ordinary users and administrators, is self-only, marks the current session, and current-session self-revocation
+locks and returns to sign-in. Earlier local Maven runs passed as reported by the user; these runtime observations do
+not create a new Maven result.
+
+The following checklist remains the reproducible deployment procedure. A clean installed production launch without
+`SHALE_SERVER_API_BASE_URL` or another API override is **NOT RUN** unless separately evidenced. Intermittent
+enrollment `REQUEST_TIMEOUT` also remains open. Items concerning a second user, an ordinary user's administrator
+403, and crafted cross-tenant requests are not claimed as manually accepted by the evidence above.
 
 From an authorized Windows test workstation, without recording credentials or response bodies:
 
@@ -509,3 +522,12 @@ new JDBC work. Repeat with LiveBus disconnected. Push should accelerate detectio
 validation begins within 60 seconds and has a six-second request timeout, for a maximum documented detection window
 of 66 seconds when the server is reachable. A timeout or transport outage is uncertainty and must not be reported as
 revocation; validation retries at the next interval.
+
+
+### 2026-10-02 revocation acceptance closeout
+
+The user-reported production acceptance satisfies the observed enforcement behavior: administrative revocation was
+detected in approximately one minute, the application was already locked while the session-ended popup remained
+open, and OK moved to sign-in. This does not replace automated tenant/authorization coverage or claim manual
+cross-tenant/crafted-request acceptance. Normal X-button closure continues to clear local state without server
+revocation; only explicit Logout revokes the durable session. Logged-out automatic updates remain `UNSUPPORTED`.

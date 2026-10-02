@@ -1,6 +1,7 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 13G COMPLETE — logged-out updates remain `UNSUPPORTED`; Phase 7C and Phase 10 runtime re-verification are open
+**Status:** Desktop session enrollment, revocation enforcement, and My Sessions acceptance are closed; the wider
+release/session initiative remains in progress and logged-out updates remain `UNSUPPORTED`
 
 **Last reviewed:** 2026-10-02
 
@@ -973,7 +974,8 @@ ordinary-user read audit, or analytics telemetry.
 
 ### Phase 7C — Desktop session enrollment migration
 
-**Status: IN PROGRESS — implementation is present; required Maven verification is blocked by Maven Central HTTP 403.**
+**Status: COMPLETE — implementation and user-reported production Windows/Eclipse acceptance are recorded; an
+intermittent enrollment timeout and one clean packaged-origin launch check remain explicit follow-up items.**
 
 * **Goal:** give desktop a durable session identity while preserving JDBC login during rollout.
 * **In scope:** explicit post-credential server exchange or approved equivalent, secure local credential
@@ -1013,8 +1015,8 @@ ordinary-user read audit, or analytics telemetry.
 
 ### Phase 9 — User Devices & Sessions UI
 
-**Status: IN PROGRESS — the ordinary Settings entry is explicitly named My Sessions and is available to every
-authenticated role; focused tests are present but local Maven execution is blocked by Maven Central HTTP 403.**
+**Status: COMPLETE — My Sessions is available to every authenticated role and its installed runtime acceptance is
+user-confirmed.**
 
 * **Goal:** users view/revoke current and other sessions.
 * **In scope:** current marker, client/device, activity, nullable approximate location, revoke one/others.
@@ -1027,8 +1029,8 @@ authenticated role; focused tests are present but local Maven execution is block
 
 ### Phase 10 — Administrator session visibility and revocation
 
-**Status: IN PROGRESS — implementation and focused contracts are present; required Maven verification is blocked
-because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
+**Status: COMPLETE — implementation and prior focused contracts are present; user-reported production acceptance
+confirms the tenant-wide surface loads and remote revocation is enforced.**
 
 * **Goal:** authorized admins manage tenant sessions.
 * **In scope:** paged/filterable view, revoke session/user, reasons, required audit and read-audit decision.
@@ -1136,11 +1138,11 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
 | 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
-| 7C | **COMPLETE; CONFIGURATION RE-VERIFICATION OPEN** | Durable-session enrollment was completed before Phase 8A. Central origin packaging/background wiring is implemented; current Maven, deployment, and credentialed Windows verification are not run because external access returned HTTP 403. |
+| 7C | **COMPLETE; FOLLOW-UP ITEMS OPEN** | User-reported production acceptance confirms the Azure API starts, desktop enrollment returns HTTP 200, and the session surfaces work. A clean installed production launch with no API override is **NOT RUN**, and intermittent enrollment `REQUEST_TIMEOUT` remains open. |
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
-| 8B | **COMPLETE; DESKTOP ENFORCEMENT HARDENED 2026-10-02** | Push/reconnect acceleration now shares a generation-safe terminal desktop invalidation path with 60-second periodic authoritative validation; confirmed revocation blocks new JDBC/service work and ends the authenticated UI session. |
-| 9 | **IN PROGRESS; MY SESSIONS VERIFICATION BLOCKED 2026-10-02** | Settings > Personal > My Sessions is implemented for every authenticated role, including administrators. It uses only principal-derived self endpoints, while Administration > Sessions remains the separately authorized tenant-wide surface. Focused and critical Maven execution remains blocked by Maven Central HTTP 403. |
-| 10 | **COMPLETE; DEPLOYMENT RE-VERIFICATION OPEN** | Tenant-admin session visibility/revocation completed before Phase 11A. The 2026-10-02 HTTP 400 was traced to unnamed Spring MVC parameters and fixed with explicit binding names plus MockMvc coverage; the corrected server build still requires deployment verification. |
+| 8B | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms remote administrative revocation is detected in approximately one minute by polling and locks the application before the session-ended popup is dismissed; OK transitions to sign-in. Push remains acceleration, not authority. |
+| 9 | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms Settings > Personal > My Sessions works for ordinary users and administrators, shows only the authenticated user's sessions, marks the current session, and current-session self-revocation locks the app and returns to sign-in. |
+| 10 | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms Administration > Sessions loads tenant-wide data and authorized remote revocation is enforced. This is not manual cross-tenant or crafted-request security acceptance. |
 | 11A | **COMPLETE** | Central policy resolver, server-time anchored shell UX, outage/correction behavior, and updater precedence are verified. |
 | 11B | **COMPLETE** | Minimum-allowed enforcement and safe drain are verified. |
 | 12 | **COMPLETE** | Privacy-safe local attempt/outcome correlation and required verification completed before Phase 13A. |
@@ -1154,6 +1156,10 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
+
+The next implementation task for this initiative is **release-pipeline Git synchronization**. This documentation
+closeout does not implement it and does not mark the entire release/session initiative complete. The conditional
+Phase 13H privileged-component decision remains separate; logged-out automatic updates remain `UNSUPPORTED`.
 
 ## 16. Open decisions requiring operator input
 
@@ -1338,13 +1344,15 @@ geolocation, fingerprinting, heartbeat authentication, update policy, or enforce
 
 Deployment order is: retain verified Phase 7A schema; deploy the verified Phase 7B server plus this additive
 endpoint; deploy the Phase 7C desktop; continue JDBC-first login; observe sanitized enrollment outcome logs; and
-only after verification and rollout stability consider Phase 8A. Required focused and full Maven tests could not
-start because Maven Central returned HTTP 403 for the Spring Boot BOM. Phase 7C must remain IN PROGRESS until
-those tests pass.
+only after verification and rollout stability consider Phase 8A. At the time of that implementation record,
+focused and full Maven tests could not start because Maven Central returned HTTP 403 for the Spring Boot BOM. The user subsequently reported that earlier local Maven runs passed and
+provided the production acceptance recorded in the 2026-10-02 closeout below. Those are historical/user-reported
+results, not tests executed by this documentation-only run.
 
 ### Phase 7C focused manual verification checklist
 
-The following installed/runtime checks remain unverified while Phase 7C is IN PROGRESS:
+The following checklist is retained for reproducibility. The closeout below records which runtime outcomes are now
+accepted and which narrower items remain open:
 
 1. Valid desktop JDBC login succeeds before enrollment.
 2. Durable desktop enrollment returns a bound session and matching public session/JTI state.
@@ -2300,10 +2308,9 @@ their distinct revoke/clear semantics. This integration introduces no new mutati
 requires no new audit schema or event; server-side session issuance, session reads, and revocations retain the
 existing Phase 7A/8A audit decisions.
 
-Automated verification is pending in this environment because Maven Central and the outbound deployment proxy both
-returned HTTP 403. Deployment health, enrollment POST availability, and credentialed Windows acceptance are **NOT
-RUN**. Follow the deployment guide's Phase 7C runtime acceptance checklist before marking runtime verification
-complete.
+This was the state when the integration was implemented: Maven Central and the outbound deployment proxy returned
+HTTP 403. Later user-reported production acceptance supersedes the stale deployment/enrollment status as recorded
+in the closeout below; it does not retroactively turn this documentation run into a Maven or deployment test run.
 
 ## Phase 7C enrollment diagnostics — 2026-10-02
 
@@ -2320,8 +2327,8 @@ The valid-credential server path was reviewed through repeated credential authen
 ownership/active-DESKTOP verification, and durable DESKTOP session/JTI issuance. Unexpected exceptions from instance
 verification or durable issuance continue to use the safe 500 response and are now recorded by the central exception
 handler using exception class only; no unrestricted message or request content is logged. This observability change
-adds no domain mutation, sensitive read, or audit event, and needs no schema change. Credentialed installed-Windows
-acceptance remains open pending the retest in the deployment runbook.
+adds no domain mutation, sensitive read, or audit event, and needs no schema change. The later acceptance rerun
+succeeded, but intermittent enrollment `REQUEST_TIMEOUT` remains an open reliability item rather than being erased by a successful attempt.
 
 ## Desktop explicit-logout revocation verification — 2026-10-02
 
@@ -2345,8 +2352,8 @@ Audit compatibility is unchanged: explicit logout uses the existing bounded dura
 Phase 7B, while Phase 8A session management mutations retain their transaction-coupled security audit. No schema
 migration is required. A new server JAR is not required for this desktop lifecycle/diagnostics correction because
 the deployed server revocation and filtering paths are already authoritative; a rebuilt desktop artifact is required.
-Focused and critical Maven verification remain pending in this environment because Maven Central returned HTTP 403
-for required build metadata; the source/test change must remain unverified until those commands complete successfully.
+Earlier local Maven runs passed as reported by the user. No Maven command was executed in this documentation-only
+closeout, and the runtime statements below are user-reported acceptance rather than inferred test results.
 
 ## Phase 9 My Sessions access completion — 2026-10-02
 
@@ -2365,19 +2372,51 @@ and 60-second polling, so database/runtime access is disarmed and the establishe
 the transition to sign-in. Loading, empty, refresh, compatibility/unavailable, and retryable error states remain
 off the JavaFX thread and discard stale results after logout or account/tenant change.
 
-The supplied deployed-Azure acceptance evidence is recorded as follows: desktop enrollment succeeds;
-Administration > Sessions loads; explicit logout returns HTTP 200; remote revocation is detected by the 60-second
-fallback; and the session-ended popup locks the application before dismissal and moves to sign-in after OK. These
-behaviors are preserved. Ordinary-user and administrator My Sessions installed-desktop acceptance is still required
-for this naming/access completion; Windows acceptance is not inferred from automated Linux tests.
-
-Focused and critical Maven verification was attempted but Maven Central returned HTTP 403 for the Spring Boot BOM
-and Maven resources plugin. The implementation therefore remains unverified and Phase 9 is not declared complete in
-the progress tracker.
+The final user-reported Windows/Eclipse acceptance confirms My Sessions works as expected for ordinary users and
+administrators, shows only the authenticated user's sessions, marks the current session, and makes current-session
+self-revocation lock the application and return to sign-in. Administration > Sessions remains a separate
+administrator-only tenant-wide surface. Phase 9 is therefore closed for its verified scope. These observations do
+not establish manual cross-tenant or crafted-request security acceptance; those protections remain supported only
+by the available automated/runtime evidence.
 
 Audit compatibility is unchanged. Self list is not an administrative/PHI read; self and administrator revocations
 retain the existing transaction-coupled `SessionSecurityAuditLog` events, and administrator list retains its one
 bounded read-audit event. Bearers remain memory-only, RLS remains enabled, and durable validation remains
-authoritative. No schema migration is required. A new server JAR is required to deploy the explicit self-revoke path
-variable binding regression fix; a rebuilt desktop artifact is also required for My Sessions and immediate current-
-session handling.
+authoritative. No schema migration is required. The explicit self-revoke binding fix and rebuilt desktop were
+required for this acceptance; the user-reported successful production behavior establishes that deployed runtime
+scope without turning it into a check executed by this documentation run.
+
+
+## Desktop session closeout — 2026-10-02
+
+This documentation-only closeout records the following **user-reported** Windows/Eclipse production acceptance; it
+does not present these observations as commands executed in this run:
+
+* the production Azure API starts successfully and desktop enrollment returns HTTP 200;
+* Administration > Sessions loads tenant-wide data;
+* explicit Logout returns HTTP 200 and revokes the durable session;
+* remote administrative revocation is detected through authoritative polling within approximately one minute;
+* after confirmed revocation, the application is locked before the session-ended popup is dismissed, and **OK**
+  transitions to sign-in;
+* Settings > Personal > My Sessions works for ordinary users and administrators, displays only the authenticated
+  user's sessions, and marks the current session;
+* current-session self-revocation locks the application and returns to sign-in; and
+* administrators retain the separate tenant-wide Administration > Sessions surface. The user reports the latest
+  My Sessions acceptance steps work as expected.
+
+Earlier local Maven test runs passed **as reported by the user**. This run changed documentation only and does not
+infer a new Maven result from “everything working as expected.” Manual cross-tenant and crafted-request security
+acceptance were not reported and are not claimed beyond existing automated/runtime evidence.
+
+The lifecycle decisions remain unchanged: normal X-button closure clears local state without server revocation;
+explicit Logout revokes the durable session; Active means unexpired and unrevoked, not a running application; and
+expired/revoked history remains stored. Bearers remain memory-only. “Stay logged in” is a future feature, not an
+implemented capability. Logged-out automatic updates remain `UNSUPPORTED`.
+
+The closed verified scope does not close the whole initiative. Remaining items are:
+
+1. an installed production launch with no API override is **NOT RUN** unless separately evidenced;
+2. intermittent enrollment `REQUEST_TIMEOUT` remains open;
+3. release-pipeline Git synchronization is the next implementation task; and
+4. no manual cross-tenant or crafted-request security acceptance is claimed beyond available automated/runtime
+   evidence.
