@@ -259,6 +259,7 @@ public final class SceneManager {
 		runtimeBridge.setApplicationPolicyRefreshHandler(updatePolicyCoordinator::refresh);
 		this.automaticUpdateScheduler = new InSessionAutomaticUpdateScheduler(automaticUpdatePreference,
 				this::automaticUpdateInputs, ignored -> Platform.runLater(this::performAutomaticHandoff));
+		runtimeBridge.setSessionEndedHandler(() -> Platform.runLater(this::onAuthoritativeSessionEnded));
 		stage.focusedProperty().addListener((observable, oldValue, focused) -> foregroundVisible = focused && stage.isShowing());
 		UserDictionarySession.configure(new UserDictionarySession(new UserDictionaryServiceAdapter(new UserDictionaryWordDao(dbSessionProvider)),appState));
 	}
@@ -284,6 +285,22 @@ public final class SceneManager {
 		logoutInProgress = true;
 		stopSessionOwnedWork();
 		runtimeBridge.onLogout();
+		appState.setUserId(0);
+		appState.setShaleClientId(0);
+		appState.setUserEmail(null);
+		appState.setAdmin(false);
+		appState.setAttorney(false);
+		showLoginSurface();
+		logoutInProgress = false;
+	}
+
+	private void onAuthoritativeSessionEnded() {
+		if (!Platform.isFxApplicationThread()) throw new IllegalStateException("Session-ended presentation must run on the JavaFX application thread.");
+		if (logoutInProgress || appState.getUserId() == null || appState.getUserId() <= 0) return;
+		logoutInProgress = true;
+		stopSessionOwnedWork();
+		AppDialogs.showWarning(stage, "Session ended",
+				"Your session was ended by an administrator or account security change. Database access has stopped. Any unsaved changes remain visible behind this message for review but cannot be saved. Select OK to return to sign in.");
 		appState.setUserId(0);
 		appState.setShaleClientId(0);
 		appState.setUserEmail(null);

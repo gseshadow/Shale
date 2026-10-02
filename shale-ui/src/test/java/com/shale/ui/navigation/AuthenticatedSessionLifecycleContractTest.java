@@ -46,6 +46,16 @@ final class AuthenticatedSessionLifecycleContractTest {
                 "the unauthenticated surface must still reset Appearance to Light");
     }
 
+	@Test
+	void authoritativeSessionEndStopsWorkWarnsAboutUnsavedChangesAndThenShowsLogin() throws Exception {
+		String scenes = source("src/main/java/com/shale/ui/navigation/SceneManager.java");
+		String ended = method(scenes, "private void onAuthoritativeSessionEnded()");
+		assertOrdered(ended, "stopSessionOwnedWork()", "AppDialogs.showWarning", "appState.setUserId(0)", "showLoginSurface()");
+		assertTrue(ended.contains("unsaved changes remain visible"), "the terminal warning must explain how unsaved work is protected");
+		assertTrue(scenes.contains("setSessionEndedHandler(() -> Platform.runLater(this::onAuthoritativeSessionEnded))"),
+				"desktop callbacks must cross onto the JavaFX thread before changing authenticated UI");
+	}
+
     @Test
     void notificationBootstrapChecksGenerationBeforeEachDatabasePhaseAndBeforeApply() throws Exception {
         String scenes = source("src/main/java/com/shale/ui/navigation/SceneManager.java");

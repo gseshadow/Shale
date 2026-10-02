@@ -53,6 +53,9 @@ public interface UiRuntimeBridge {
 	/** Starts heartbeat only for the bridge's successfully enrolled current instance. */
 	default void startApplicationInstanceHeartbeat(Supplier<Optional<Instant>> lastHumanActivityAt) {}
 
+	/** Installs the UI-owned terminal-session handler. Implementations must generation-guard its invocation. */
+	default void setSessionEndedHandler(Runnable handler) {}
+
 	// --- Generic publish (desktop implementation overrides)
 	default void publishEntityUpdated(String entityType, long entityId,
 			int shaleClientId, int updatedByUserId,
