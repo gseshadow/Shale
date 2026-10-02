@@ -181,6 +181,17 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn('update-manifest.bat"', release)
         self.assertIn('publish-update.bat"', publish)
 
+    def test_git_preflight_and_sync_bound_the_publication_pipeline(self):
+        full = batch_source("release-all.bat")
+        publish = batch_source("release-and-publish.bat")
+        self.assertLess(full.index("release_git_sync.py\" preflight"), full.index("ssh %MAC_HOST%"))
+        self.assertIn('set "SHALE_GIT_PREFLIGHT_DONE=true"', full)
+        self.assertIn("%SOURCE_REVISION%", full)
+        self.assertLess(publish.index("release_git_sync.py\" preflight"), publish.index('release.bat"'))
+        self.assertLess(publish.index('release.bat"'), publish.index("release_git_sync.py\" sync"))
+        self.assertLess(publish.index("release_git_sync.py\" sync"), publish.index('publish-update.bat"'))
+        self.assertIn("retry publication only", publish)
+
     def test_local_release_build_never_crosses_publication_boundary(self):
         release_build = batch_source("build-shale-release.bat").lower()
         for forbidden in ("release-and-publish.bat", "publish-update.bat", "update-manifest.bat",
