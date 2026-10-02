@@ -14,9 +14,10 @@ import com.shale.server.auth.ReleaseControlPlaneAuthorizer;
 class ApplicationReleaseImportControllerTest {
 	private Recording service; private MockMvc mvc; private static final String TOKEN="01234567890123456789012345678901";
 	@BeforeEach void setup(){service=new Recording();mvc=MockMvcBuilders.standaloneSetup(new ApplicationReleaseImportController(service,new ReleaseControlPlaneAuthorizer(TOKEN,"release-pipeline"))).setControllerAdvice(new ApiExceptionHandler()).build();}
-	@Test void authorizedInitialImportPreservesGroupAndGlobalOrder()throws Exception{
-		mvc.perform(post("/api/control-plane/application-releases/1.2.3/import").header("X-Shale-Control-Plane-Token",TOKEN).contentType(MediaType.APPLICATION_JSON).content(json("1.2.3")))
+	@Test void productionImportRouteBindsVersionAndPreservesGroupAndGlobalOrder()throws Exception{
+		mvc.perform(post("/api/control-plane/application-releases/1.0.134/import").header("X-Shale-Control-Plane-Token",TOKEN).contentType(MediaType.APPLICATION_JSON).content(json("1.0.134")))
 			.andExpect(status().isOk()).andExpect(jsonPath("$.outcome").value("CREATED"));
+		Assertions.assertEquals("1.0.134",service.command.version().toString(),"The route version must bind without Java parameter metadata.");
 		Assertions.assertEquals(List.of("New:FEATURE:0","Improvements:IMPROVEMENT:1","Fixes:FIX:2"),service.command.items().stream().map(i->i.group()+":"+i.type()+":"+i.sortOrder()).toList());
 		Assertions.assertEquals("release-pipeline",service.operator);
 	}

@@ -24,7 +24,7 @@ public final class ApplicationReleaseImportController {
 	private final ApplicationReleaseImportServicePort service; private final ReleaseControlPlaneAuthorizer auth;
 	public ApplicationReleaseImportController(ApplicationReleaseImportServicePort service,ReleaseControlPlaneAuthorizer auth){this.service=service;this.auth=auth;}
 	@PostMapping("/{version}/import")
-	public ResponseEntity<ApplicationReleaseImportResult> importRelease(@PathVariable String version,
+	public ResponseEntity<ApplicationReleaseImportResult> importRelease(@PathVariable("version") String version,
 			@RequestHeader(value="X-Shale-Control-Plane-Token",required=false) String token,
 			@RequestBody ApplicationReleaseImportRequest request){
 		String operator=auth.require(token);
