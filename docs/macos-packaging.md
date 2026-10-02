@@ -33,6 +33,13 @@ remote again, verifies that its upstream ref contains that exact commit, and onl
 requested release version, so Mac and Windows artifacts use the same origin-available source revision. Direct legacy two-argument Mac preparation remains supported but emits a source
 revision mismatch warning because it falls back to `origin/<branch>`.
 
+The dedicated Mac checkout is reusable. Before fetching or switching revisions, preparation inspects all tracked,
+staged, and untracked changes. It restores only the root POM and the six module POMs whose versions are temporarily
+rewritten by the release build; any other change fails closed and is reported without being discarded. After the
+fetch, the requested commit must exist, is checked out detached, and is compared with `HEAD` before version injection.
+An exit trap restores the same seven POMs after packaging on both success and ordinary build failure. The flow does
+not use `git clean`, blanket stashing, or an unvalidated hard reset. Build artifacts remain in `dist-macos/` as before.
+
 ## Output
 
 Artifacts are written to `dist-macos/`:

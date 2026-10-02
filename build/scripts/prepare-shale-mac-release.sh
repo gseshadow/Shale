@@ -17,6 +17,7 @@ fi
 BRANCH="$1"
 VERSION="$2"
 SOURCE_REVISION="${3:-}"
+REMOTE="${SHALE_RELEASE_REMOTE:-origin}"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "This script must be run on macOS." >&2
@@ -46,22 +47,29 @@ echo "Root:    $ROOT"
 echo "===================================="
 echo
 
-echo "Step 0: Force sync Mac build workspace to the requested source"
-git fetch origin
+echo "Step 0: Safely sync Mac build workspace to the requested source"
 if [[ -n "$SOURCE_REVISION" ]]; then
-  git cat-file -e "$SOURCE_REVISION^{commit}" || {
-    echo "Requested Windows source revision is unavailable on the Mac host: $SOURCE_REVISION" >&2
-    exit 1
-  }
-  git checkout --detach "$SOURCE_REVISION"
+  REQUESTED_REVISION="$SOURCE_REVISION"
 else
   echo "WARNING: no source revision supplied; Mac may not include committed local changes ahead of origin/$BRANCH" >&2
-  git checkout -B "$BRANCH" "origin/$BRANCH"
+  REQUESTED_REVISION="$REMOTE/$BRANCH"
 fi
-git clean -fd
-git reset --hard "${SOURCE_REVISION:-origin/$BRANCH}"
-git clean -fd
+python3 "$ROOT/build/scripts/mac_release_workspace.py" \
+  --root "$ROOT" prepare --remote "$REMOTE" --revision "$REQUESTED_REVISION"
 PREVIOUS_VERSION=$(python3 "$ROOT/build/scripts/preflight-version.py" "$ROOT" --print-root-version)
+
+cleanup_release_poms() {
+  local release_status=$?
+  trap - EXIT
+  if ! python3 "$ROOT/build/scripts/mac_release_workspace.py" --root "$ROOT" cleanup; then
+    echo "Failed to restore release-generated POM changes; inspect the Mac workspace." >&2
+    if [[ $release_status -eq 0 ]]; then
+      release_status=1
+    fi
+  fi
+  exit "$release_status"
+}
+trap cleanup_release_poms EXIT
 
 echo
 echo "Step 2: Update root pom version"
