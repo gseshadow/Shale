@@ -2,6 +2,8 @@ package com.shale.server.controller;
 
 import java.time.LocalDate;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,6 +19,7 @@ import com.shale.data.dao.ApplicationReleaseImportDao.ReleaseImportConflictExcep
 @RestController
 @RequestMapping("/api/control-plane/application-releases")
 public final class ApplicationReleaseImportController {
+	private static final Logger log=LoggerFactory.getLogger(ApplicationReleaseImportController.class);
 	private static final List<String> GROUPS=List.of("New","Improvements","Fixes");
 	private final ApplicationReleaseImportServicePort service; private final ReleaseControlPlaneAuthorizer auth;
 	public ApplicationReleaseImportController(ApplicationReleaseImportServicePort service,ReleaseControlPlaneAuthorizer auth){this.service=service;this.auth=auth;}
@@ -36,7 +39,7 @@ public final class ApplicationReleaseImportController {
 			var command=new ApplicationReleaseImport(body,request.title(),date,request.summary(),items,rowVer);
 			return ResponseEntity.ok(service.importProductionRelease(command,Boolean.TRUE.equals(request.allowUpdate()),operator));
 		}catch(ReleaseImportConflictException ex){throw new ResponseStatusException(CONFLICT,ex.getMessage());}
-		catch(RuntimeException ex){if(ex instanceof ResponseStatusException r)throw r;throw new ResponseStatusException(BAD_REQUEST,"Invalid structured release notes.");}
+		catch(RuntimeException ex){if(ex instanceof ResponseStatusException r)throw r;log.error("Unexpected application release import failure for version={}.",version,ex);throw new ResponseStatusException(BAD_REQUEST,"Invalid structured release notes.");}
 	}
 	private static ReleaseItemType type(String group){return switch(group){case"New"->ReleaseItemType.FEATURE;case"Improvements"->ReleaseItemType.IMPROVEMENT;case"Fixes"->ReleaseItemType.FIX;default->throw new IllegalArgumentException();};}
 }

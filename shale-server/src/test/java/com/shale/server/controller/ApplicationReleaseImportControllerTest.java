@@ -26,6 +26,12 @@ class ApplicationReleaseImportControllerTest {
 		Assertions.assertEquals(0,service.calls);
 	}
 	@Test void versionMismatchIsRejected()throws Exception{mvc.perform(post("/api/control-plane/application-releases/1.2.4/import").header("X-Shale-Control-Plane-Token",TOKEN).contentType(MediaType.APPLICATION_JSON).content(json("1.2.3"))).andExpect(status().isBadRequest());Assertions.assertEquals(0,service.calls);}
+	@Test void unexpectedInternalFailureReturnsSanitizedBadRequest()throws Exception{
+		service.failure=new IllegalStateException("database diagnostics must remain internal");
+		mvc.perform(post("/api/control-plane/application-releases/1.2.3/import").header("X-Shale-Control-Plane-Token",TOKEN).contentType(MediaType.APPLICATION_JSON).content(json("1.2.3")))
+			.andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Invalid structured release notes."))
+			.andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("database diagnostics must remain internal"))));
+	}
 	private static String json(String v){return "{\"version\":\""+v+"\",\"title\":\"What is new\",\"releaseDate\":\"2026-10-02\",\"summary\":\"Summary\",\"groups\":{\"New\":[\"A\"],\"Improvements\":[\"B\"],\"Fixes\":[\"C\"]}}";}
-	private static final class Recording implements ApplicationReleaseImportServicePort{int calls;ApplicationReleaseImport command;String operator;public ApplicationReleaseImportResult importProductionRelease(ApplicationReleaseImport c,boolean update,String op){calls++;command=c;operator=op;return new ApplicationReleaseImportResult(1,c.version().toString(),ApplicationReleaseImportResult.Outcome.CREATED,new byte[]{1});}}
+	private static final class Recording implements ApplicationReleaseImportServicePort{int calls;ApplicationReleaseImport command;String operator;RuntimeException failure;public ApplicationReleaseImportResult importProductionRelease(ApplicationReleaseImport c,boolean update,String op){calls++;command=c;operator=op;if(failure!=null)throw failure;return new ApplicationReleaseImportResult(1,c.version().toString(),ApplicationReleaseImportResult.Outcome.CREATED,new byte[]{1});}}
 }
