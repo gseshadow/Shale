@@ -207,6 +207,13 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
                           "az storage", "azcopy", "upload-batch"):
             self.assertNotIn(forbidden, release_build)
 
+    def test_publication_imports_catalog_before_making_manifest_discoverable(self):
+        source = batch_source("publish-update.bat")
+        catalog = source.index('import_release_catalog.py" "%JSON_FILE%"')
+        manifest = source.index("echo Uploading manifest...")
+        self.assertLess(catalog, manifest)
+        self.assertIn('python "%SCRIPT_DIR%import_release_catalog.py" "%JSON_FILE%" || exit /b 1', source)
+
     def test_native_dependency_report_parent_exists_before_redirection(self):
         source = (ROOT / "build/native/windows-toast/build-native.bat").read_text(encoding="utf-8")
         mkdir = source.index('if not exist "%DEPENDENCY_DIR%" mkdir "%DEPENDENCY_DIR%"')
