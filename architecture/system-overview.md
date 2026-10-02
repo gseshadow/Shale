@@ -198,7 +198,7 @@ bearer remains process-memory-only and generation-bound.
 
 Server API login continues through `AuthServicePort`, then creates a tenant/user-qualified Phase 7A `UserSessions` row before returning a JWT. New JWTs retain the existing identity/time claims and add public UUID `sid`; SQL `CurrentAccessJti`, expiry, and revocation are authoritative on every authenticated bound-token request. Refresh conditionally rotates the JTI and logout durably revokes only that session. The request resolver performs no lookup for absent bearer tokens or public routes. A temporary, required-cutoff legacy branch accepts otherwise-valid pre-cutover unbound JWTs and upgrades them on refresh; its in-memory revocation store is not authoritative for bound sessions. Desktop direct-JDBC authentication is unchanged until Phase 7C.
 
-## Desktop durable session enrollment (Phase 7C; verification pending)
+## Desktop durable session enrollment (Phase 7C; accepted with follow-up items)
 
 After the existing direct-JDBC bcrypt login and runtime tenant context succeed, desktop best-effort enrolls its
 Phase 4B instance and performs one additive HTTPS credential exchange. The server re-verifies the credential,
@@ -206,9 +206,12 @@ derives tenant/user rather than accepting asserted ids, validates any active DES
 and issues the ordinary Phase 7B bound JWT with a durable DESKTOP `UserSessions` row. The centralized desktop
 bearer is process-memory-only and is not a JDBC authority. Endpoint absence or transport failure leaves an explicit
 JDBC-only compatibility session; security rejection never silently downgrades server-session functionality.
-Logical logout revokes and clears the bound session; process exit clears memory and ends the instance without
-reclassifying exit as user logout. Enrollment is not heartbeat, and this phase adds no remote controls, PubSub,
-geolocation, UI, or update enforcement. Required Maven verification is pending because Maven Central returned 403.
+Logical logout revokes and clears the bound session; normal X-button/process exit clears local memory and ends the
+instance without revoking or reclassifying the durable session as user logout. User-reported production
+Windows/Eclipse acceptance confirms the Azure API starts, enrollment returns HTTP 200, and explicit logout returns
+HTTP 200 and revokes the session. Earlier local Maven runs passed as reported by the user; no new Maven result is
+inferred from runtime acceptance. A clean installed production launch without an API override is **NOT RUN**, and
+intermittent enrollment `REQUEST_TIMEOUT` remains open.
 
 ## Authoritative durable-session management (Phase 8A)
 
@@ -237,6 +240,12 @@ through JDBC. Phase 8A authorization, current-`sid` binding, revocation, and sec
 Compatibility mode is represented by an absent capability, and async presentation is guarded by active tenant/user
 identity. This boundary is self-service only; tenant-administrator session tooling remains Phase 10.
 
+The user-reported installed acceptance confirms Settings > Personal > My Sessions works for ordinary users and
+administrators, lists only the authenticated user's sessions, marks the current session, and locks/returns to
+sign-in after current-session self-revocation. Active means unexpired and unrevoked, not that an application process
+is running; expired and revoked history remains stored. Bearers remain memory-only, and “Stay logged in” remains a
+future feature.
+
 ## Tenant-administrator session management UI (Phase 10)
 
 Settings > Administration > Sessions is a lazy, admin-only desktop management window. JavaFX uses the
@@ -251,6 +260,11 @@ completions after close, logout, or user/tenant switch. The current administrato
 points to ordinary logout. Phase 8A has no authoritative admin bulk-user revoke, so the UI does not simulate one.
 Phase 8B remains the sole optional invalidation accelerator; the admin UI trusts the revoke response and its own
 authoritative reload rather than PubSub delivery.
+
+User-reported acceptance confirms the tenant-wide page loads and that remote administrative revocation is detected
+through polling in approximately one minute. Confirmed revocation locks the application before the session-ended
+popup is dismissed; OK transitions to sign-in. This is not a claim of manual cross-tenant or crafted-request
+security acceptance beyond existing automated/runtime evidence.
 
 ## Desktop update-policy presentation (Phase 11A)
 

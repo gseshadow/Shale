@@ -34,8 +34,21 @@ Feature panes retain their own authoritative state, editors, commands, confirmat
 | User Management | `onManageUsers` → `UserManagementLauncher` → `UserManagementPane` | independently scrolling `TableView`; search and inactive filter; add/edit/reset dialogs; footer status | Add User, Edit/Save Changes, Deactivate/Reactivate, Remove from Tenant, Reset Password, Cancel, Refresh; administrator/context gate | Fixed viewport mode, tenant isolation, password contract, RowVer updates, and confirmations unchanged. |
 | Firm-wide Roles | `onManageFirmWideRoles` → `FirmWideRoleManagementLauncher` → `FirmWideRoleAdminPane` | definition cards; active/inactive/deleted status; modal name editor; inline state feedback | Add, Rename, Activate, Deactivate, Delete, Refresh; administrator/context gate | Protected Administrator/Attorney membership remains flag-owned; tenant-defined lifecycle uses UserServicePort, RowVer, tenant/actor authorization, and existing transactional entity-action audits. Assignment history remains intact. |
 | Audit Log | `onViewAuditLog` → `SceneManager.showAuditLogViewer` → `audit-log-viewer.fxml` / `AuditLogViewerController` | routed read-only `TableView`; mode and six existing filters; status near toolbar | Apply, Clear Filters; administrator gate | Intentionally remains an embedded routed pane rather than a modal. Query, tenant scope, newest-first ordering, 500-row limit, and read-only behavior remain unchanged; duplicate content title removed because the route shell owns it. |
+| My Sessions | `SettingsController` personal section → `UserSessionManagementClient` | authenticated user's compact session cards; factual Active/Expired/Revoked state; server current marker; loading/empty/error states | Refresh and confirmed self-revocation; every authenticated role | User-reported Windows/Eclipse acceptance confirms ordinary-user and administrator access, self-only results, the current marker, and current-session revocation locking then returning to sign-in. Active means unexpired and unrevoked, not process presence. |
 | Sessions | `onManageAdminSessions` → `AdminSessionsLauncher` → `AdminSessionsPane` | compact session cards; user/client/active/since server filters; Previous/Next bounded paging; loading/empty/error/authorization states | Refresh, Clear filters, Revoke session; administrator/context gate plus authoritative server gate | Phase 9 card/status/time language is reused; current session points to ordinary logout; reads/revokes use only Phase 8A server APIs and their existing read/mutation audits. |
 
 Appearance, Notification Preferences, and Protected Case Date Mappings remain inline Settings content and are
 not constructed or moved by this phase. No DAO, service, schema, audit-write, transaction, authorization, overlay
 winner, mutation payload, or assignment workflow is changed.
+
+
+## 2026-10-02 session acceptance record
+
+The latest Windows/Eclipse results are user-reported acceptance, not checks executed by this documentation run.
+They confirm My Sessions works as expected for ordinary users and administrators, shows only the authenticated
+user's sessions, marks the current session, and makes current-session self-revocation lock the app and return to
+sign-in. Administrators retain the separate tenant-wide Sessions surface. Earlier local Maven runs passed as
+reported by the user; “everything working as expected” is not recorded as a new test result.
+
+No manual cross-tenant or crafted-request security exercise is claimed. A clean installed production launch without
+an API override is **NOT RUN**, and intermittent enrollment `REQUEST_TIMEOUT` remains open.
