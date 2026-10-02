@@ -2,6 +2,7 @@ package com.shale.server.config;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.core.service.AuthServicePort;
 import com.shale.core.service.ApplicationReleaseReadServicePort;
+import com.shale.core.service.ApplicationReleaseImportServicePort;
 import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.NotificationServicePort;
@@ -25,8 +27,10 @@ import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
 import com.shale.server.runtime.DesktopApplicationInstanceVerifier;
 import com.shale.server.runtime.RequestScopedDbSessionProvider;
+import com.shale.server.runtime.GlobalControlPlaneDbSessionProvider;
 import com.shale.server.runtime.RuntimeConnectionProvider;
 import com.shale.server.runtime.ServerRuntimeSessionState;
+import org.springframework.test.util.ReflectionTestUtils;
 import com.shale.server.runtime.ServerSessionResolver;
 import com.shale.server.runtime.UnauthenticatedServerSessionResolver;
 
@@ -46,6 +50,20 @@ class ShaleServerServiceConfigurationTest {
             assertNotNull(context.getBean(ServerRuntimeSessionState.class));
             assertInstanceOf(UnauthenticatedServerSessionResolver.class, context.getBean(ServerSessionResolver.class));
             assertInstanceOf(RequestScopedDbSessionProvider.class, context.getBean(DbSessionProvider.class));
+            assertInstanceOf(GlobalControlPlaneDbSessionProvider.class,
+                    context.getBean("globalControlPlaneDbSessionProvider", DbSessionProvider.class));
+
+            Object importAdapter = context.getBean(ApplicationReleaseImportServicePort.class);
+            Object importDao = ReflectionTestUtils.getField(importAdapter, "dao");
+            assertSame(context.getBean("globalControlPlaneDbSessionProvider", DbSessionProvider.class),
+                    ReflectionTestUtils.getField(importDao, "db"),
+                    "Only the global release importer must bypass tenant request session resolution.");
+
+            Object readAdapter = context.getBean(ApplicationReleaseReadServicePort.class);
+            Object readGateway = ReflectionTestUtils.getField(readAdapter, "gateway");
+            Object readDao = ReflectionTestUtils.getField(readGateway, "dao");
+            assertSame(context.getBean(DbSessionProvider.class), ReflectionTestUtils.getField(readDao, "db"),
+                    "Ordinary authenticated services must retain the request-scoped provider.");
         }
     }
 

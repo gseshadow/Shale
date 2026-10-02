@@ -25,6 +25,7 @@ The server now models the future request identity flow with JavaFX-free runtime 
 - `DevelopmentHeaderServerSessionResolver` is a temporary development-profile-only resolver that reads `X-Shale-UserId` and `X-Shale-TenantId` request headers. It is not authentication and must not be used for production, JWTs, cookies, Azure auth, or browser sessions.
 - `ServerRuntimeSessionState` is the controller-facing guard used by DB-backed routes. It fails closed with `501 Not Implemented` when no principal is available.
 - `RequestScopedDbSessionProvider` resolves a principal, obtains a runtime connection, and initializes SQL Server `SESSION_CONTEXT` with `ShaleClientId` and `PrincipalUserId` using the same `RuntimeSessionService` path as desktop before DAO/service-port calls. Without a resolved principal, it still fails closed before opening a connection.
+- Global control-plane mutations are the narrow exception to request-scoped database access. The release catalog importer uses `GlobalControlPlaneDbSessionProvider` to borrow a normal connection directly from the existing runtime datasource without resolving `ServerPrincipal` or setting tenant/user `SESSION_CONTEXT`. It is wired only to `ApplicationReleaseImportDao`, whose release, item, and global audit tables have no `ShaleClientId` or tenant RLS. The dedicated `SHALE_RELEASE_CONTROL_PLANE_TOKEN` remains the endpoint authorization boundary; an ordinary tenant bearer session cannot replace it. Tenant-scoped services continue to use `RequestScopedDbSessionProvider`.
 
 
 ## Login route skeleton

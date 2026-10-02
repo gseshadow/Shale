@@ -4,6 +4,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.context.annotation.Primary;
 
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.server.auth.CurrentUserProfileService;
@@ -52,6 +53,7 @@ import com.shale.server.health.DataSourcesAppDatabaseHealthCheck;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.CompositeServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
+import com.shale.server.runtime.GlobalControlPlaneDbSessionProvider;
 import com.shale.server.runtime.RequestScopedDbSessionProvider;
 import com.shale.server.runtime.RuntimeConnectionProvider;
 import com.shale.server.runtime.RuntimeSessionServiceConnectionProvider;
@@ -71,6 +73,7 @@ import com.shale.server.runtime.SessionManagementService;
 import com.shale.server.live.InvalidationPublisher;
 import com.shale.server.live.HttpInvalidationPublisher;
 import org.springframework.core.env.Environment;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -109,11 +112,18 @@ public class ShaleServerServiceConfiguration {
     }
 
     @Bean
+    @Primary
     DbSessionProvider serverDbSessionProvider(
             ServerSessionResolver serverSessionResolver,
             ObjectProvider<HttpServletRequest> currentRequest,
             RuntimeConnectionProvider runtimeConnectionProvider) {
         return new RequestScopedDbSessionProvider(serverSessionResolver, currentRequest, runtimeConnectionProvider);
+    }
+
+    @Bean
+    DbSessionProvider globalControlPlaneDbSessionProvider(ObjectProvider<DataSources> serverDataSources) {
+        return new GlobalControlPlaneDbSessionProvider(
+                () -> serverDataSources.getObject().runtime().getConnection());
     }
 
     @Bean
@@ -253,8 +263,10 @@ public class ShaleServerServiceConfiguration {
     }
 
     @Bean
-    ApplicationReleaseImportServicePort applicationReleaseImportServicePort(DbSessionProvider serverDbSessionProvider) {
-        return new ApplicationReleaseImportServiceAdapter(new ApplicationReleaseImportDao(serverDbSessionProvider));
+    ApplicationReleaseImportServicePort applicationReleaseImportServicePort(
+            @Qualifier("globalControlPlaneDbSessionProvider") DbSessionProvider globalControlPlaneDbSessionProvider) {
+        return new ApplicationReleaseImportServiceAdapter(
+                new ApplicationReleaseImportDao(globalControlPlaneDbSessionProvider));
     }
 
     @Bean

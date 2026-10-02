@@ -24,6 +24,7 @@ class ApplicationReleaseImportControllerTest {
 	@Test void missingOrWrongControlPlaneCredentialIsRejectedBeforeMutation()throws Exception{
 		mvc.perform(post("/api/control-plane/application-releases/1.2.3/import").contentType(MediaType.APPLICATION_JSON).content(json("1.2.3"))).andExpect(status().isUnauthorized());
 		mvc.perform(post("/api/control-plane/application-releases/1.2.3/import").header("X-Shale-Control-Plane-Token","wrong").contentType(MediaType.APPLICATION_JSON).content(json("1.2.3"))).andExpect(status().isUnauthorized());
+		mvc.perform(post("/api/control-plane/application-releases/1.2.3/import").header("Authorization","Bearer ordinary-tenant-admin-token").contentType(MediaType.APPLICATION_JSON).content(json("1.2.3"))).andExpect(status().isUnauthorized());
 		Assertions.assertEquals(0,service.calls);
 	}
 	@Test void versionMismatchIsRejected()throws Exception{mvc.perform(post("/api/control-plane/application-releases/1.2.4/import").header("X-Shale-Control-Plane-Token",TOKEN).contentType(MediaType.APPLICATION_JSON).content(json("1.2.3"))).andExpect(status().isBadRequest());Assertions.assertEquals(0,service.calls);}
