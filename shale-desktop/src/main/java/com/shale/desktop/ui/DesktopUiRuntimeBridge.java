@@ -88,7 +88,16 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		this.applicationInstances = applicationInstances;
 		this.heartbeat = applicationInstances==null?null:new ApplicationInstanceHeartbeatLifecycle(applicationInstances);
 		this.serverSessions=serverSessions;
-		this.sessionManagement=serverSessions==null||serverApiOrigin.isEmpty()?null:new UserSessionManagementClient(serverApiOrigin.get().toString(),serverSessions.session());
+		if(serverSessions==null||serverApiOrigin.isEmpty())this.sessionManagement=null;
+		else {
+			var client=new UserSessionManagementClient(serverApiOrigin.get().toString(),serverSessions.session());
+			this.sessionManagement=new UiRuntimeBridge.UserSessionManagement(){
+				@Override public java.util.List<UiRuntimeBridge.UserSessionView> list(){return client.list();}
+				@Override public void revoke(java.util.UUID id){client.revoke(id);}
+				@Override public void revokeOthers(){client.revokeOthers();}
+				@Override public void revokeCurrent(){long generation=sessionGeneration.get();client.revokeCurrent();invalidateConfirmedSession(generation);}
+			};
+		}
 		this.adminSessionManagement=serverSessions==null||serverApiOrigin.isEmpty()?null:new AdminSessionManagementClient(serverApiOrigin.get().toString(),serverSessions.session());
 		AutomaticUpdatePreferenceService preferences = AutomaticUpdatePreferenceService.resolvePlatformDefault();
 		this.workstationAutomaticUpdates = new UiRuntimeBridge.WorkstationAutomaticUpdates() {

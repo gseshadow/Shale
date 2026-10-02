@@ -23,6 +23,7 @@ public interface UiRuntimeBridge {
 	interface UserSessionManagement {
 		List<UserSessionView> list();
 		void revoke(UUID sessionId);
+		void revokeCurrent();
 		void revokeOthers();
 	}
 
