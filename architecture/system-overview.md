@@ -190,6 +190,12 @@ does not couple heartbeat or instance abandonment to revocation. Phase 7A itself
 
 ## Durable server API authentication (Phase 7B)
 
+Desktop server-session clients receive one centrally validated API origin from `DesktopConfig`. Installed production
+packages carry the production HTTPS origin, while development ignores that packaged value unless a destination is
+explicitly selected. Enrollment, self-session management, and administrator-session management do not independently
+read environment or system properties. The post-JDBC enrollment exchange is background work and the resulting
+bearer remains process-memory-only and generation-bound.
+
 Server API login continues through `AuthServicePort`, then creates a tenant/user-qualified Phase 7A `UserSessions` row before returning a JWT. New JWTs retain the existing identity/time claims and add public UUID `sid`; SQL `CurrentAccessJti`, expiry, and revocation are authoritative on every authenticated bound-token request. Refresh conditionally rotates the JTI and logout durably revokes only that session. The request resolver performs no lookup for absent bearer tokens or public routes. A temporary, required-cutoff legacy branch accepts otherwise-valid pre-cutover unbound JWTs and upgrades them on refresh; its in-memory revocation store is not authoritative for bound sessions. Desktop direct-JDBC authentication is unchanged until Phase 7C.
 
 ## Desktop durable session enrollment (Phase 7C; verification pending)
