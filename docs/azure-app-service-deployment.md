@@ -480,3 +480,17 @@ From an authorized Windows test workstation, without recording credentials or re
    an authorized test revocation.
 6. Inspect sanitized desktop logs for `Desktop durable session enrollment succeeded.` Never capture passwords,
    bearer tokens, request bodies, or sensitive response bodies.
+7. For an enrollment failure, record the single sanitized enrollment diagnostic: HTTP status and `elapsedMs` when a
+   response arrived, or transport `kind`, `exceptionClass`, and `elapsedMs`. Do not collect surrounding credential,
+   bearer, request/response-body, email, or unrestricted exception-message output. `REQUEST_TIMEOUT` at approximately
+   8000 ms identifies the desktop request boundary; `CONNECTION_FAILURE` and `TLS_FAILURE` distinguish connection and
+   handshake paths without increasing either timeout.
+8. After successful enrollment, open Administration > Sessions and record only the sanitized administrative-list
+   diagnostic: response `status` and `elapsedMs`; transport `kind`, `exceptionClass`, and `elapsedMs`; or response
+   parsing `exceptionClass`. Do not capture the URL/query, authorization header, bearer, body, filters, or any
+   user/session fields.
+9. If the list reports status 500, verify that `dbo.SessionSecurityAuditLog` exists, has the Phase 8A tenant FILTER
+   and AFTER INSERT/UPDATE block predicates, and permits the configured runtime database principal to insert. A
+   successful desktop enrollment proves `dbo.UserSessions` issuance but does not prove this fail-closed read-audit
+   write. Apply the existing `2026-09-29_session_security_audit_phase8a.sql` migration if it is absent; do not bypass
+   or disable the audit to make the page load.
