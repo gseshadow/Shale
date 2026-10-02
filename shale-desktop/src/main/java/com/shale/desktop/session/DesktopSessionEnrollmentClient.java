@@ -34,11 +34,20 @@ public class DesktopSessionEnrollmentClient {
             catch(RuntimeException bad){throw new EnrollmentException(Failure.MALFORMED_RESPONSE,bad);}
         }catch(EnrollmentException e){throw e;}catch(IOException e){logTransportFailure(e,started);throw new EnrollmentException(Failure.TRANSIENT,e);}catch(InterruptedException e){Thread.currentThread().interrupt();logTransportFailure(e,started);throw new EnrollmentException(Failure.TRANSIENT,e);}
     }
-    public void logout(String token){if(token==null||token.isBlank())return;try{http.send(HttpRequest.newBuilder(endpoint.resolve("/api/auth/logout")).timeout(Duration.ofSeconds(4)).header("Authorization","Bearer "+token).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.discarding());}catch(IOException e){/* best effort; never log credential */}catch(InterruptedException e){Thread.currentThread().interrupt();}}
+    public void logout(String token){
+        if(token==null||token.isBlank())return;
+        long started=System.nanoTime();
+        try{
+            var response=http.send(HttpRequest.newBuilder(endpoint.resolve("/api/auth/logout")).timeout(Duration.ofSeconds(4)).header("Authorization","Bearer "+token).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.discarding());
+            log.info("Desktop durable session logout response status={} elapsedMs={}.",response.statusCode(),elapsedMillis(started));
+        }catch(IOException e){logLogoutTransportFailure(e,started);}
+        catch(InterruptedException e){Thread.currentThread().interrupt();logLogoutTransportFailure(e,started);}
+    }
 	public Validation validate(String token){if(token==null||token.isBlank())return Validation.REVOKED;try{var response=http.send(HttpRequest.newBuilder(endpoint.resolve("/api/sessions")).timeout(Duration.ofSeconds(6)).header("Authorization","Bearer "+token).GET().build(),HttpResponse.BodyHandlers.discarding());if(response.statusCode()==401||response.statusCode()==403)return Validation.REVOKED;return response.statusCode()/100==2?Validation.VALID:Validation.UNKNOWN;}catch(IOException e){return Validation.UNKNOWN;}catch(InterruptedException e){Thread.currentThread().interrupt();return Validation.UNKNOWN;}}
     private static String trim(String value){if(value==null||value.isBlank())throw new IllegalArgumentException("apiBaseUrl");return value.trim().replaceAll("/+$","");}
     static String transportFailureKind(Throwable failure){if(hasCause(failure,HttpTimeoutException.class))return "REQUEST_TIMEOUT";if(hasCause(failure,SSLException.class))return "TLS_FAILURE";if(hasCause(failure,ConnectException.class))return "CONNECTION_FAILURE";return "TRANSPORT_FAILURE";}
     private static void logTransportFailure(Throwable failure,long started){log.warn("Desktop durable session enrollment transport failure kind={} exceptionClass={} elapsedMs={}.",transportFailureKind(failure),failure.getClass().getSimpleName(),elapsedMillis(started));}
+    private static void logLogoutTransportFailure(Throwable failure,long started){log.warn("Desktop durable session logout transport failure kind={} exceptionClass={} elapsedMs={}.",transportFailureKind(failure),failure.getClass().getSimpleName(),elapsedMillis(started));}
     private static boolean hasCause(Throwable failure,Class<? extends Throwable> type){for(Throwable current=failure;current!=null;current=current.getCause())if(type.isInstance(current))return true;return false;}
     private static long elapsedMillis(long started){return Math.max(0L,java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));}
     private record Request(String email,String password,Long applicationInstanceId){}
