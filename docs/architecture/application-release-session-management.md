@@ -1138,7 +1138,7 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
 | 7C | **COMPLETE; CONFIGURATION RE-VERIFICATION OPEN** | Durable-session enrollment was completed before Phase 8A. Central origin packaging/background wiring is implemented; current Maven, deployment, and credentialed Windows verification are not run because external access returned HTTP 403. |
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
-| 8B | **COMPLETE** | Best-effort invalidation/revalidation acceleration and required verification completed before Phase 9. |
+| 8B | **COMPLETE; DESKTOP ENFORCEMENT HARDENED 2026-10-02** | Push/reconnect acceleration now shares a generation-safe terminal desktop invalidation path with 60-second periodic authoritative validation; confirmed revocation blocks new JDBC/service work and ends the authenticated UI session. |
 | 9 | **COMPLETE** | Desktop self-service Devices & Sessions completed and verified before Phase 10. |
 | 10 | **COMPLETE; DEPLOYMENT RE-VERIFICATION OPEN** | Tenant-admin session visibility/revocation completed before Phase 11A. The 2026-10-02 HTTP 400 was traced to unnamed Spring MVC parameters and fixed with explicit binding names plus MockMvc coverage; the corrected server build still requires deployment verification. |
 | 11A | **COMPLETE** | Central policy resolver, server-time anchored shell UX, outage/correction behavior, and updater precedence are verified. |
@@ -1425,15 +1425,14 @@ is intentionally not audited.
 
 After durable desktop enrollment, LiveBus handlers validate tenant, public session id, and login generation. One
 in-flight bounded `/api/sessions` request coalesces duplicates. Only authoritative 401/403 confirmation clears the
-HTTP bearer; a valid response retains it and a timeout/transport failure makes no revocation assumption. JDBC
-authority remains intact as Phase 7C requires. Policy hints and reconnect reload the existing authoritative global
+HTTP bearer; a valid response retains it and a timeout/transport failure makes no revocation assumption. Policy hints and reconnect reload the existing authoritative global
 PRODUCTION policy read. Reconnect never expects replay. Logout/user switch/shutdown detach handlers, wrong-tenant
 and wrong-session hints are ignored, and unknown types remain safe for old clients. Older servers and PubSub
 outages fall back to ordinary bound-token validation and policy reads.
 
-Manual verification checklist (not executed in this non-connected environment): (1) establish two durable sessions;
+Original Phase 8B manual verification checklist (superseded for desktop enforcement by the 2026-10-02 checklist below): (1) establish two durable sessions;
 (2) revoke one from the other client/API; (3) observe prompt invalidation; (4) observe authoritative revalidation;
-(5) confirm only the revoked bearer is cleared; (6) disconnect PubSub, revoke, reconnect, and confirm revalidation
+(5) confirm the revoked bearer is cleared; (6) disconnect PubSub, revoke, reconnect, and confirm revalidation
 finds the missed revocation; (7) publish a committed policy change and confirm authoritative reload; (8) duplicate
 the hint and confirm no duplicate visible behavior.
 
@@ -1443,6 +1442,32 @@ remains the self-service User Devices & Sessions UI over the existing Phase 8A A
 revoke one/revoke others, nullable approximate location only after its separate privacy decision, and accessibility/
 visual verification—excluding tenant-admin UI, GPS/exact location, instance/session equivalence, and later updater
 enforcement.
+
+### Phase 8B desktop revocation enforcement correction — 2026-10-02
+
+The original accelerator cleared only the process-memory bearer, leaving direct-JDBC authority and the authenticated
+JavaFX shell active. Confirmed `REVOKED` validation now enters one terminal, generation-scoped desktop path: it stops
+the application-instance heartbeat, invalidates pending transport callbacks, closes LiveBus, clears the bearer and
+runtime session context, disarms `DesktopRuntimeSessionProvider` before UI work, stops every SceneManager-owned
+authenticated producer, and transitions through the login surface after a clear session-ended warning. The warning
+uses the established modal pattern and leaves the current UI visible while acknowledged so the user can inspect or
+record unsaved text for recovery, but saving and every new JDBC acquisition are already denied. This is distinct from explicit
+logout (which requests `USER_LOGOUT`) and ordinary X/process shutdown (which neither reclassifies nor revokes the
+durable session); it does not introduce a future Stay logged in decision.
+
+Push and reconnect remain accelerators. Because the existing application-instance heartbeat is direct JDBC and
+cannot authoritatively validate the bound durable session, the enrolled-session coordinator now performs a
+non-overlapping authenticated validation every 60 seconds. The HTTP request timeout is six seconds, so the documented
+worst-case confirmation window is 66 seconds after durable commit (60 seconds to start plus six seconds to receive
+an authoritative response). Transport errors and other uncertain responses retain the session and retry on the next
+interval. Tenant, public session ID, current credential identity, and login generation are checked before the terminal
+callback; a stale completion cannot invalidate a replacement user.
+
+The server mutation remains unchanged: the administrator update is exact on `ShaleClientId` and public `SessionId`,
+the existing active-admin/RLS checks apply, and the existing `ADMIN_REVOKE` security audit is written in the same
+transaction before commit. Only the committed changed ID is published afterward, and publication failure cannot undo
+revocation. No schema migration or new audit event is required; validation and local enforcement are reads/lifecycle
+actions rather than new administrative mutations.
 
 ## Phase 9 implementation record — 2026-09-29
 

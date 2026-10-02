@@ -57,6 +57,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	private volatile Integer lastShaleClientId;
 	private final AtomicLong sessionGeneration = new AtomicLong();
 	private volatile Runnable applicationPolicyRefreshHandler = () -> {};
+	private volatile Runnable sessionEndedHandler = () -> {};
 
 	public DesktopUiRuntimeBridge(
 			LiveEventDispatcher dispatcher,
@@ -124,7 +125,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			java.util.concurrent.CompletableFuture.runAsync(()->serverSessions.enroll(instanceId))
 					.whenComplete((ignored,failure)->{
 						if(failure!=null){log.warn("Desktop durable session enrollment task failed: {}",failure.getClass().getSimpleName());return;}
-						if(generation==sessionGeneration.get())serverSessions.startAcceleration(dispatcher,shaleClientId,generation,sessionGeneration::get,applicationPolicyRefreshHandler);
+						if(generation==sessionGeneration.get())serverSessions.startAcceleration(dispatcher,shaleClientId,generation,sessionGeneration::get,applicationPolicyRefreshHandler,()->invalidateConfirmedSession(generation));
 					});
 		}
 
@@ -192,6 +193,16 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		}
 
 		log.info("Logout requested");
+	}
+	private synchronized void invalidateConfirmedSession(long expectedGeneration){
+		if(expectedGeneration!=sessionGeneration.get())return;
+		if(heartbeat!=null)heartbeat.stop();
+		sessionGeneration.incrementAndGet();
+		LiveBus bus=liveBus;liveBus=null;if(bus!=null)bus.shutdown();
+		dispatcher.dispatchConnectivity(false,"Session ended");
+		dbProvider.clear();if(runtimeSessionService!=null)runtimeSessionService.clear();
+		lastUserId=null;lastShaleClientId=null;
+		sessionEndedHandler.run();
 	}
 
 	@Override public void onShutdown(){teardown(false);if(heartbeat!=null)heartbeat.close();}
@@ -322,6 +333,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	public void setApplicationPolicyRefreshHandler(Runnable handler) {
 		applicationPolicyRefreshHandler=handler==null?()->{}:handler;
 	}
+	@Override public void setSessionEndedHandler(Runnable handler){sessionEndedHandler=handler==null?()->{}:handler;}
 
 	@Override
 	public Optional<Boolean> recheckConnectivity() {

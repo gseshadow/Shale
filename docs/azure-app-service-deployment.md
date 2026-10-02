@@ -494,3 +494,18 @@ From an authorized Windows test workstation, without recording credentials or re
    successful desktop enrollment proves `dbo.UserSessions` issuance but does not prove this fail-closed read-audit
    write. Apply the existing `2026-09-29_session_security_audit_phase8a.sql` migration if it is absent; do not bypass
    or disable the audit to make the page load.
+
+### Desktop durable-session revocation enforcement rollout
+
+The 2026-10-02 enforcement correction requires a rebuilt/redeployed desktop, not a new SQL migration. The server must
+already include the Phase 8A session APIs/audit migration and Phase 8B post-commit publisher configuration described
+above; no server rebuild is required when that version is already deployed. Roll out the server/migrations first,
+then the corrected desktop. Older desktops can durably enroll but do not reliably remove direct-JDBC authority after
+remote revocation.
+
+Acceptance requires two corrected desktop processes: enroll Joreen's exact current session, revoke that public
+session ID as a same-tenant administrator, and verify that Joreen receives the session-ended warning and cannot start
+new JDBC work. Repeat with LiveBus disconnected. Push should accelerate detection; without push, authoritative
+validation begins within 60 seconds and has a six-second request timeout, for a maximum documented detection window
+of 66 seconds when the server is reachable. A timeout or transport outage is uncertainty and must not be reported as
+revocation; validation retries at the next interval.
