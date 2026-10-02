@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +20,7 @@ RELEASE_FILES = (
     "shale-server/pom.xml",
     "build/assets/shale-stable.json",
 )
+VERSION = re.compile(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\Z")
 
 
 class GitFailure(RuntimeError):
@@ -68,6 +70,54 @@ def dirty_paths(root: Path) -> list[str]:
             index += 1
         paths.append(path)
     return paths
+
+
+def prepare_release_notes(root: Path, version: str) -> None:
+    """Commit only the reviewed notes file, while failing closed on every other change."""
+    if not VERSION.fullmatch(version):
+        raise GitFailure("release version must be canonical major.minor.build")
+    notes_file = f"release-notes/{version}.json"
+    notes_path = root / notes_file
+    if not notes_path.is_file():
+        raise GitFailure(f"Reviewed release notes were not found: {notes_path}")
+
+    changed = dirty_paths(root)
+    unrelated = [path for path in changed if path != notes_file]
+    if unrelated:
+        listing = "\n".join(f"  {path}" for path in unrelated)
+        raise GitFailure(
+            "Release-notes preparation permits only the matching notes file to be dirty. "
+            "Commit or otherwise resolve these files before retrying (Shale will not stash or discard them):\n"
+            + listing
+        )
+
+    if not changed:
+        print("Reviewed release notes are already committed; no duplicate commit was created.")
+        return
+
+    branch_and_upstream(root)
+    git(root, "add", "--", notes_file)
+    staged = git(root, "diff", "--cached", "--name-only").stdout.splitlines()
+    if staged != [notes_file]:
+        raise GitFailure(
+            "Refusing to commit because the index does not contain exactly the matching release-notes file: "
+            + (", ".join(staged) if staged else "(empty index)")
+        )
+
+    message = f"Add release notes for {version}"
+    result = git(root, "commit", "--only", "-m", message, "--", notes_file, check=False)
+    if result.returncode:
+        raise GitFailure(
+            "Release-notes commit failed; the release was aborted and the index is preserved for recovery. "
+            + (result.stderr.strip() or result.stdout.strip())
+        )
+    remaining = dirty_paths(root)
+    if remaining:
+        raise GitFailure(
+            "Release-notes commit completed, but the index/worktree is not clean; release is aborted:\n"
+            + "\n".join(f"  {path}" for path in remaining)
+        )
+    print(f"Created release-notes commit: {message}")
 
 
 def fetch_and_counts(root: Path, remote: str) -> tuple[int, int]:
@@ -146,12 +196,16 @@ def synchronize(root: Path, version: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("preflight", "sync"))
+    parser.add_argument("command", choices=("prepare-notes", "preflight", "sync"))
     parser.add_argument("root", type=Path)
     parser.add_argument("version", nargs="?")
     args = parser.parse_args()
     try:
-        if args.command == "preflight":
+        if args.command == "prepare-notes":
+            if not args.version:
+                parser.error("prepare-notes requires a version")
+            prepare_release_notes(args.root.resolve(), args.version)
+        elif args.command == "preflight":
             preflight(args.root.resolve())
         else:
             if not args.version:

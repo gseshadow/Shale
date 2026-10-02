@@ -213,10 +213,27 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertLess(preflight, mac_build)
         self.assertLess(mac_build, windows_release)
         prepared = full[full.index("\n:notes_prepared"):full.index("\n:notes_preparation_failed")]
+        self.assertIn('start "" "%NOTES_PATH%"', prepared)
+        self.assertLess(prepared.index('start "" "%NOTES_PATH%"'), prepared.index("exit /b 0"))
         self.assertIn("No build, upload, catalog import, or publication was started", prepared)
         self.assertIn("release-notes\\%VERSION%.json", prepared)
         self.assertIn("build\\scripts\\release-all.bat %VERSION% %MANDATORY_UPDATE%", prepared)
         self.assertIn("exit /b 0", prepared)
+
+    def test_reviewed_notes_are_committed_before_preflight_and_release_side_effects(self):
+        full = batch_source("release-all.bat")
+        preparation = full.index('prepare_release_notes.py"')
+        notes_commit = full.index('release_git_sync.py" prepare-notes')
+        preflight = full.index('release_git_sync.py" preflight')
+        mac_build = full.index("ssh %MAC_HOST%")
+        windows_release = full.index('call "%DOWNSTREAM_SCRIPT%"')
+        self.assertEqual(
+            [preparation, notes_commit, preflight, mac_build, windows_release],
+            sorted([preparation, notes_commit, preflight, mac_build, windows_release]),
+        )
+        failure = full[full.index("\n:notes_git_failed"):full.index("\n:git_preflight_failed")]
+        self.assertIn("before the normal Git preflight, build, upload, catalog import, or publication", failure)
+        self.assertIn("goto :fail", failure)
 
     def test_notes_preparation_disables_python_bytecode_cache_writes(self):
         full = batch_source("release-all.bat")

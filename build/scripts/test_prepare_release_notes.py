@@ -1,6 +1,7 @@
 import datetime as dt
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -84,6 +85,26 @@ class PrepareReleaseNotesTest(unittest.TestCase):
         value = PREPARE.draft(self.root, "1.2.5", dt.date(2026, 10, 2))
         self.assertEqual([], value["groups"]["New"])
         self.assertEqual(["Fix after current release"], value["groups"]["Fixes"])
+
+    def test_cli_bytecode_disabled_draft_generation_creates_no_cache_artifacts(self):
+        scripts = self.root / "scripts"
+        scripts.mkdir()
+        for name in ("prepare_release_notes.py", "release_notes.py"):
+            shutil.copy2(SCRIPT.with_name(name), scripts / name)
+
+        result = subprocess.run(
+            [sys.executable, "-B", str(scripts / "prepare_release_notes.py"), str(self.root), "1.2.4"],
+            cwd=self.root,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        self.assertEqual(PREPARE.PREPARED, result.returncode, result.stderr)
+        self.assertTrue((self.root / "release-notes/1.2.4.json").is_file())
+        self.assertEqual([], list(scripts.rglob("__pycache__")))
+        self.assertEqual([], list(scripts.rglob("*.pyc")))
 
 
 if __name__ == "__main__":

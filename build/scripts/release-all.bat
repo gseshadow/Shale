@@ -17,6 +17,7 @@ set "MAC_DIST=%MAC_REPO%/dist-macos"
 set "HANDOFF=%ROOT%\build\mac-handoff"
 set "MAC_ZIP=%HANDOFF%\ShaleApp-%VERSION%-mac.zip"
 set "MAC_METADATA=%HANDOFF%\shale-mac-release.json"
+set "NOTES_PATH=%ROOT%\release-notes\%VERSION%.json"
 
 cd /d "%ROOT%" || goto :root_unavailable
 
@@ -24,6 +25,9 @@ python -B "%SCRIPT_DIR%\prepare_release_notes.py" "%ROOT%" "%VERSION%"
 set "PREPARE_EXIT=%ERRORLEVEL%"
 if "%PREPARE_EXIT%"=="10" goto :notes_prepared
 if not "%PREPARE_EXIT%"=="0" goto :notes_preparation_failed
+
+echo Step 0: Commit reviewed release notes
+python "%SCRIPT_DIR%\release_git_sync.py" prepare-notes "%ROOT%" "%VERSION%" || goto :notes_git_failed
 
 echo Step 0: Git preflight before remote Mac build
 python "%SCRIPT_DIR%\release_git_sync.py" preflight "%ROOT%" || goto :git_preflight_failed
@@ -95,14 +99,20 @@ exit /b 3
 
 :notes_prepared
 echo.
+echo Generated release-notes draft: "%NOTES_PATH%"
+start "" "%NOTES_PATH%"
 echo Release-notes draft preparation is complete. No build, upload, catalog import, or publication was started.
-echo Review and edit: "%ROOT%\release-notes\%VERSION%.json"
+echo Review and edit the opened file: "%ROOT%\release-notes\%VERSION%.json"
 echo Then rerun the exact same command:
 echo build\scripts\release-all.bat %VERSION% %MANDATORY_UPDATE%
 exit /b 0
 
 :notes_preparation_failed
 echo Release-notes draft preparation failed before the Git preflight, build, upload, catalog import, or publication.
+goto :fail
+
+:notes_git_failed
+echo Release-notes Git preparation failed before the normal Git preflight, build, upload, catalog import, or publication.
 goto :fail
 
 :git_preflight_failed
