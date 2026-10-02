@@ -3,6 +3,9 @@ package com.shale.server.controller;
 import java.time.Instant;
 import java.util.NoSuchElementException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
@@ -19,6 +22,7 @@ import jakarta.validation.ConstraintViolationException;
 
 @RestControllerAdvice
 public final class ApiExceptionHandler {
+	private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<ApiErrorResponse> handleResponseStatus(ResponseStatusException ex, HttpServletRequest request) {
@@ -48,6 +52,7 @@ public final class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> handleUnexpected(Exception ex, HttpServletRequest request) {
+        log.error("Unexpected server exception class={}.", ex.getClass().getSimpleName());
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error.", request);
     }
 
