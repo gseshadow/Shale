@@ -201,6 +201,23 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertLess(publish.index("release_git_sync.py\" sync"), publish.index('publish-update.bat"'))
         self.assertIn("retry publication only", publish)
 
+    def test_missing_notes_preparation_stops_before_every_release_side_effect(self):
+        full = batch_source("release-all.bat")
+        preparation = full.index('prepare_release_notes.py"')
+        prepared_branch = full.index('if "%PREPARE_EXIT%"=="10" goto :notes_prepared')
+        preflight = full.index('release_git_sync.py" preflight')
+        mac_build = full.index("ssh %MAC_HOST%")
+        windows_release = full.index('call "%DOWNSTREAM_SCRIPT%"')
+        self.assertLess(preparation, prepared_branch)
+        self.assertLess(prepared_branch, preflight)
+        self.assertLess(preflight, mac_build)
+        self.assertLess(mac_build, windows_release)
+        prepared = full[full.index("\n:notes_prepared"):full.index("\n:notes_preparation_failed")]
+        self.assertIn("No build, upload, catalog import, or publication was started", prepared)
+        self.assertIn("release-notes\\%VERSION%.json", prepared)
+        self.assertIn("build\\scripts\\release-all.bat %VERSION% %MANDATORY_UPDATE%", prepared)
+        self.assertIn("exit /b 0", prepared)
+
     def test_local_release_build_never_crosses_publication_boundary(self):
         release_build = batch_source("build-shale-release.bat").lower()
         for forbidden in ("release-and-publish.bat", "publish-update.bat", "update-manifest.bat",

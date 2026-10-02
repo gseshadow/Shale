@@ -1,8 +1,9 @@
 # Shale release notes
 
-Add one UTF-8 JSON file named `<major>.<minor>.<build>.json` for each release. Files are retained permanently so
-past notes remain reviewable. `release.bat` validates a matching file when present and merges it into the existing
-`shale-stable.json` publication manifest. Missing notes are allowed and retain the generic manifest fallback.
+The first `release-all.bat` invocation creates a UTF-8 JSON draft named `<major>.<minor>.<build>.json` when it is
+missing, then stops before release work so a developer can review and edit it. Existing files are never overwritten.
+Files are retained permanently so past notes remain reviewable. `release.bat` strictly validates the reviewed file
+and merges it into the existing `shale-stable.json` publication manifest.
 
 ```json
 {
