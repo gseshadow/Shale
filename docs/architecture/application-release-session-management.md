@@ -1140,7 +1140,7 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
 | 8B | **COMPLETE** | Best-effort invalidation/revalidation acceleration and required verification completed before Phase 9. |
 | 9 | **COMPLETE** | Desktop self-service Devices & Sessions completed and verified before Phase 10. |
-| 10 | **COMPLETE; RUNTIME RE-VERIFICATION OPEN** | Tenant-admin session visibility/revocation completed before Phase 11A. A 2026-10-02 installed-desktop list failure is awaiting sanitized HTTP/parse evidence and Azure schema verification. |
+| 10 | **COMPLETE; DEPLOYMENT RE-VERIFICATION OPEN** | Tenant-admin session visibility/revocation completed before Phase 11A. The 2026-10-02 HTTP 400 was traced to unnamed Spring MVC parameters and fixed with explicit binding names plus MockMvc coverage; the corrected server build still requires deployment verification. |
 | 11A | **COMPLETE** | Central policy resolver, server-time anchored shell UX, outage/correction behavior, and updater precedence are verified. |
 | 11B | **COMPLETE** | Minimum-allowed enforcement and safe drain are verified. |
 | 12 | **COMPLETE** | Privacy-safe local attempt/outcome correlation and required verification completed before Phase 13A. |
@@ -1537,10 +1537,15 @@ without changing the eight-second request timeout or authorization behavior.
 
 Enrollment success proves the Phase 7A `UserSessions` write path, but it does not prove the Phase 8A
 `SessionSecurityAuditLog` table, RLS predicates, runtime INSERT permission, or same-transaction admin read audit.
-Because audit failure must roll back the response, those deployed objects remain the leading configuration check if
-the new diagnostic reports HTTP 500. A 401/403 instead directs investigation to bound-token/admin eligibility; a
-200 followed by a parsing-class diagnostic directs investigation to the deployed response DTO. No new schema or
-audit contract is introduced. Runtime re-verification remains open.
+The sanitized diagnostic subsequently reported HTTP 400. This confirmed the Spring MVC argument-binding hypothesis:
+`AdminSessionController` relied on inferred Java parameter names while Maven compilation does not explicitly enable
+`-parameters`. All six query parameters (`page`, `size`, `userId`, `clientType`, `activeOnly`, and `since`) and the
+`sessionId` path variable now declare their wire names explicitly. A real standalone MockMvc request using the
+desktop's exact initial query, `?page=0&size=50&activeOnly=false`, verifies that binding reaches the existing service
+with null optional filters; malformed client-type and since filters remain HTTP 400 and do not reach the service.
+The desktop source still supplies page `0` and the UI's established `PAGE_SIZE=50` default. Defaults, validation,
+authorization, bound-session derivation, transactional list auditing, and HTTP timeouts are unchanged. No schema or
+audit contract is introduced. Deployment re-verification of the corrected server build remains open.
 
 ## Phase 11A implementation record — 2026-09-29
 
