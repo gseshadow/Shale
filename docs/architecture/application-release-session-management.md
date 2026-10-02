@@ -2297,3 +2297,28 @@ verification or durable issuance continue to use the safe 500 response and are n
 handler using exception class only; no unrestricted message or request content is logged. This observability change
 adds no domain mutation, sensitive read, or audit event, and needs no schema change. Credentialed installed-Windows
 acceptance remains open pending the retest in the deployment runbook.
+
+## Desktop explicit-logout revocation verification — 2026-10-02
+
+The explicit UI action remains distinct from window close and process shutdown: only `SceneManager.logout()` calls
+`DesktopUiRuntimeBridge.onLogout()`, which invokes the durable-session logout while the memory-only bearer and JDBC
+runtime identity are still available. Shutdown clears the bearer and ends the application instance without revoking
+the durable session. The bridge clears database/runtime context only after the bounded server logout attempt, so
+runtime-context teardown cannot invalidate the HTTP request. Local bearer clearing is protected by `finally` and
+therefore remains immediate even if an unexpected client failure escapes the best-effort request; generation
+invalidation and stale-enrollment isolation are unchanged.
+
+The logout client now records the HTTP status and elapsed milliseconds for every response. Transport failures record
+only a bounded category, exception class, and elapsed milliseconds. These diagnostics never include an origin,
+credential, bearer/token, body, tenant, user, session identifier, or exception message. Server review confirms that
+the signed bound token supplies the exact `sid`, tenant, and user authority; logout owner-qualifies that session and
+sets the first `RevokedAt` and `USER_LOGOUT`. The administrative `activeOnly` query continues to require both null
+`RevokedAt` and future `ExpiresAt`, so revoked history remains visible only when the filter permits it and is never
+deleted or cosmetically hidden.
+
+Audit compatibility is unchanged: explicit logout uses the existing bounded durable lifecycle record selected in
+Phase 7B, while Phase 8A session management mutations retain their transaction-coupled security audit. No schema
+migration is required. A new server JAR is not required for this desktop lifecycle/diagnostics correction because
+the deployed server revocation and filtering paths are already authoritative; a rebuilt desktop artifact is required.
+Focused and critical Maven verification remain pending in this environment because Maven Central returned HTTP 403
+for required build metadata; the source/test change must remain unverified until those commands complete successfully.
