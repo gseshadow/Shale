@@ -66,6 +66,69 @@ class ReleaseGitSyncTest(unittest.TestCase):
         with self.assertRaisesRegex(SYNC.GitFailure, "diverged"):
             SYNC.preflight(self.repo)
 
+    def test_prepare_notes_stages_and_commits_only_matching_dirty_file(self):
+        note = self.repo / "release-notes/1.2.3.json"
+        note.parent.mkdir()
+        note.write_text('{"version":"1.2.3"}\n', encoding="utf-8")
+
+        SYNC.prepare_release_notes(self.repo, "1.2.3")
+
+        self.assertEqual(
+            "Add release notes for 1.2.3",
+            run(self.repo, "git", "log", "-1", "--pretty=%s").stdout.strip(),
+        )
+        self.assertEqual("", run(self.repo, "git", "status", "--short").stdout)
+        self.assertEqual(
+            ["release-notes/1.2.3.json"],
+            run(self.repo, "git", "show", "--pretty=", "--name-only", "HEAD").stdout.splitlines(),
+        )
+
+    def test_prepare_notes_rejects_unrelated_tracked_untracked_and_staged_changes(self):
+        note = self.repo / "release-notes/1.2.3.json"
+        note.parent.mkdir()
+        note.write_text('{"version":"1.2.3"}\n', encoding="utf-8")
+        (self.repo / "unrelated.txt").write_text("modified\n", encoding="utf-8")
+        (self.repo / "untracked.txt").write_text("untracked\n", encoding="utf-8")
+        (self.repo / "pom.xml").write_text("staged\n", encoding="utf-8")
+        run(self.repo, "git", "add", "pom.xml")
+
+        with self.assertRaisesRegex(SYNC.GitFailure, "unrelated.txt") as failure:
+            SYNC.prepare_release_notes(self.repo, "1.2.3")
+        self.assertIn("untracked.txt", str(failure.exception))
+        self.assertIn("pom.xml", str(failure.exception))
+        self.assertNotEqual(
+            "Add release notes for 1.2.3",
+            run(self.repo, "git", "log", "-1", "--pretty=%s").stdout.strip(),
+        )
+
+    def test_prepare_notes_does_not_duplicate_an_already_committed_note(self):
+        note = self.repo / "release-notes/1.2.3.json"
+        note.parent.mkdir()
+        note.write_text('{"version":"1.2.3"}\n', encoding="utf-8")
+        run(self.repo, "git", "add", "--", "release-notes/1.2.3.json")
+        run(self.repo, "git", "commit", "-m", "authored notes")
+        before = run(self.repo, "git", "rev-list", "--count", "HEAD").stdout
+
+        SYNC.prepare_release_notes(self.repo, "1.2.3")
+
+        self.assertEqual(before, run(self.repo, "git", "rev-list", "--count", "HEAD").stdout)
+
+    def test_prepare_notes_commit_failure_aborts_with_only_note_staged(self):
+        note = self.repo / "release-notes/1.2.3.json"
+        note.parent.mkdir()
+        note.write_text('{"version":"1.2.3"}\n', encoding="utf-8")
+        hook = self.repo / ".git/hooks/pre-commit"
+        hook.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        hook.chmod(0o755)
+
+        with self.assertRaisesRegex(SYNC.GitFailure, "commit failed"):
+            SYNC.prepare_release_notes(self.repo, "1.2.3")
+
+        self.assertEqual(
+            "release-notes/1.2.3.json",
+            run(self.repo, "git", "diff", "--cached", "--name-only").stdout.strip(),
+        )
+
     def test_sync_stages_only_release_files_and_pushes_ahead_source_commits(self):
         (self.repo / "unrelated.txt").write_text("committed source work\n", encoding="utf-8")
         run(self.repo, "git", "commit", "-am", "source work")
@@ -103,6 +166,14 @@ class ReleaseGitSyncTest(unittest.TestCase):
         self.assertLess(sync, publish)
         self.assertNotIn("git add .", source.lower())
         self.assertIn("publish-update.bat", source[source.index(":fail"):])
+
+    def test_git_helper_never_uses_broad_or_destructive_worktree_commands(self):
+        source = SCRIPT.read_text(encoding="utf-8").lower()
+        for forbidden in (
+            '"add", "."', '"add", "-a"', '"stash"', '"reset"', '"checkout"',
+            '"restore"', '"clean"',
+        ):
+            self.assertNotIn(forbidden, source)
 
     def test_sync_includes_matching_authored_notes_when_present(self):
         note = self.repo / "release-notes" / "3.0.0.json"
