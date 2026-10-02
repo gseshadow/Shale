@@ -1,0 +1,19 @@
+{
+  "version": "1.0.134",
+  "title": "What's New in Shale 1.0.134",
+  "releaseDate": "2026-10-02",
+  "summary": "This release improves update handling and adds the foundation for release-specific What's New content.",
+  "groups": {
+    "New": [
+      "Added release-specific What's New content support."
+    ],
+    "Improvements": [
+      "Improved the mandatory update experience so required updates block entry into Shale until the update is installed.",
+      "Improved the update window layout so action controls remain visible on constrained or scaled displays."
+    ],
+    "Fixes": [
+      "Fixed mandatory updates loading the main Shale interface before the update was completed.",
+      "Fixed update dialog footer controls being clipped on Windows."
+    ]
+  }
+}

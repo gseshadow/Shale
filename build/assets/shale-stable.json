@@ -1,12 +1,31 @@
-﻿{
-    "version":  "1.0.131",
-    "channel":  "stable",
-    "zipUrl":  "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.131.zip",
-    "installerUrl":  "https://shalestorage.z13.web.core.windows.net/Shale-1.0.131.msi",
-    "notes":  "Release 1.0.131",
-    "mandatory":  true,
-    "sha256":  "cfd7f109c0407a29f4892a2da28c9f167eb14bd39498d61b4fd75a5faa454caf",
-    "publishedAt":  "2026-10-02T00:59:55Z",
-    "macZipUrl":  "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.131-mac.zip",
-    "macSha256":  "fd09305dc94efc0964ce9521787a4431e6f33d5eaa1d92da5e495ba245b33bc3"
+{
+  "version": "1.0.134",
+  "channel": "stable",
+  "zipUrl": "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.134.zip",
+  "installerUrl": "https://shalestorage.z13.web.core.windows.net/Shale-1.0.134.msi",
+  "notes": "What's New in Shale 1.0.134\nThis release improves update handling and adds the foundation for release-specific What's New content.\n\nNew\n• Added release-specific What's New content support.\n\nImprovements\n• Improved the mandatory update experience so required updates block entry into Shale until the update is installed.\n• Improved the update window layout so action controls remain visible on constrained or scaled displays.\n\nFixes\n• Fixed mandatory updates loading the main Shale interface before the update was completed.\n• Fixed update dialog footer controls being clipped on Windows.",
+  "mandatory": true,
+  "sha256": "8428877d52c8fc380ac29aa183a3771841e0536bd9801f2fd8e1b38de93e2872",
+  "publishedAt": "2026-10-02T20:58:28Z",
+  "macZipUrl": "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.134-mac.zip",
+  "macSha256": "2a41f3a33e53abf081d9189447b9c350c8c772ee74915e6fa9d8d6003ab9e11d",
+  "releaseNotes": {
+    "version": "1.0.134",
+    "title": "What's New in Shale 1.0.134",
+    "summary": "This release improves update handling and adds the foundation for release-specific What's New content.",
+    "groups": {
+      "New": [
+        "Added release-specific What's New content support."
+      ],
+      "Improvements": [
+        "Improved the mandatory update experience so required updates block entry into Shale until the update is installed.",
+        "Improved the update window layout so action controls remain visible on constrained or scaled displays."
+      ],
+      "Fixes": [
+        "Fixed mandatory updates loading the main Shale interface before the update was completed.",
+        "Fixed update dialog footer controls being clipped on Windows."
+      ]
+    },
+    "releaseDate": "2026-10-02"
+  }
 }
