@@ -20,6 +20,11 @@ set "MAC_METADATA=%HANDOFF%\shale-mac-release.json"
 
 cd /d "%ROOT%" || goto :root_unavailable
 
+python "%SCRIPT_DIR%\prepare_release_notes.py" "%ROOT%" "%VERSION%"
+set "PREPARE_EXIT=%ERRORLEVEL%"
+if "%PREPARE_EXIT%"=="10" goto :notes_prepared
+if not "%PREPARE_EXIT%"=="0" goto :notes_preparation_failed
+
 echo Step 0: Git preflight before remote Mac build
 python "%SCRIPT_DIR%\release_git_sync.py" preflight "%ROOT%" || goto :git_preflight_failed
 set "SHALE_GIT_PREFLIGHT_DONE=true"
@@ -87,6 +92,18 @@ exit /b 2
 :root_unavailable
 echo Repository root is unavailable: "%ROOT%"
 exit /b 3
+
+:notes_prepared
+echo.
+echo Release-notes draft preparation is complete. No build, upload, catalog import, or publication was started.
+echo Review and edit: "%ROOT%\release-notes\%VERSION%.json"
+echo Then rerun the exact same command:
+echo build\scripts\release-all.bat %VERSION% %MANDATORY_UPDATE%
+exit /b 0
+
+:notes_preparation_failed
+echo Release-notes draft preparation failed before the Git preflight, build, upload, catalog import, or publication.
+goto :fail
 
 :git_preflight_failed
 echo Git preflight failed before the Mac or Windows build. Nothing was published.
