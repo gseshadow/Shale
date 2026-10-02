@@ -18,7 +18,8 @@ The enforced order is:
 
 1. require an attached branch and configured upstream, require a clean index/worktree, fetch the upstream, and reject
    upstream-ahead or diverged history;
-2. run `release.bat`, which bumps Maven versions, builds artifacts, and updates the source manifest;
+2. run `release.bat`, which bumps Maven versions, builds artifacts, updates the source manifest, and validates
+   `release-notes/<version>.json` when present before embedding its plain-text and structured content in that manifest;
 3. stage only `pom.xml`, the six module POMs, and `build/assets/shale-stable.json`;
 4. create `Release Shale <version>` when those files have staged changes, then perform a normal `git push` to the
    configured upstream (already-committed local-ahead work is included);
@@ -47,3 +48,23 @@ arbitrary source changes. A clean retry creates no empty duplicate commit.
 
 The release scripts do not upload or push during automated tests. The Git synchronization tests use temporary local
 repositories and bare remotes.
+
+## Authoring What's New content
+
+Before the release preflight, copy the example in `release-notes/README.md` to
+`release-notes/<major>.<minor>.<build>.json`, write the short title and summary, and add plain-text entries under
+`New`, `Improvements`, and `Fixes`. Commit that historical source with the release work. The filename and embedded
+version must exactly match the version passed to `release-all.bat`.
+
+The build validates canonical versioning, the optional ISO release date, supported fields/groups, length limits,
+nonempty content, and rejection of HTML. A present but invalid or mismatched file fails before the manifest is
+copied to `dist`; an absent file is explicitly non-fatal and leaves the established `Release <version>` fallback.
+The ordinary manifest upload consequently carries both the backward-compatible `notes` text and a structured
+`releaseNotes` object without creating another publication endpoint or coupling content to `mandatory`.
+
+The authenticated desktop What's New experience remains post-update and release-catalog driven. It displays
+published catalog summaries/items through the existing per-user acknowledgement flow; release notes are not added
+to the pre-update policy dialog because update policy and release content remain separate. The manifest embedding
+in this increment makes authored content available to the existing publication artifact, but an authorized,
+transactionally audited catalog importer is still required before this repository source can replace the current
+catalog-publication operation. Do not bypass that pending control-plane boundary with ad-hoc release SQL.

@@ -683,6 +683,27 @@ cover interval bounds, skipped releases, first-run/empty catalog, dismissal timi
 optimistic-concurrency recovery, duplicate suppression, and startup failure paths. The repository-level
 `mvn test` subsequently passed after the earlier Maven Central outage; Phase 3B is **COMPLETE**.
 
+### Release-notes authoring foundation — 2026-10-02
+
+Versioned developer-authored notes now live at `release-notes/<major>.<minor>.<build>.json`. The deliberately small
+JSON contract carries version, title, optional ISO release date, summary, and plain-text `New`, `Improvements`, and
+`Fixes` arrays. It rejects HTML and unknown fields and uses the same canonical three-component version vocabulary.
+Historical files remain in Git. During `release.bat`, validation occurs after manifest generation and before the
+manifest is copied to `dist`; matching notes become both backward-compatible manifest `notes` text and a structured
+`releaseNotes` object. Missing notes preserve the generic fallback and never block an update, while present invalid
+or version-mismatched notes fail the release before publication. Mandatory/optional policy is not derived from this
+content.
+
+The existing Phase 3B UI remains the user contract: one post-update What's New dialog reads published release rows
+and items and advances the existing per-user acknowledgement only after dismissal. The pre-update policy/update
+dialog does not render these notes. This preserves the separation of package/policy decisions from release content.
+The manifest transfer is the authoring/publication foundation only: a future tightly authorized catalog importer
+must copy this content into `ApplicationReleases`/`ApplicationReleaseItems` transactionally and append the required
+sanitized global publication audit. Until that control-plane seam exists, the release manager's existing catalog
+publication remains necessary; generated or manual ad-hoc SQL is intentionally not introduced. No tenant/PHI read
+or domain mutation is added by repository validation/manifest generation, so this increment requires no audit row
+or schema migration.
+
 ### Phase 4A — Stable machine identity
 
 * **Goal:** create/persist a non-invasive workstation UUID.

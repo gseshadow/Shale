@@ -114,10 +114,12 @@ def synchronize(root: Path, version: str) -> None:
         tracked = git(root, "ls-files", "--error-unmatch", "--", relative, check=False)
         if tracked.returncode:
             raise GitFailure(f"Required release metadata is not tracked: {relative}")
-    git(root, "add", "--", *RELEASE_FILES)
+    notes_file = f"release-notes/{version}.json"
+    release_files = (*RELEASE_FILES, notes_file) if (root / notes_file).is_file() else RELEASE_FILES
+    git(root, "add", "--", *release_files)
 
     staged = git(root, "diff", "--cached", "--name-only").stdout.splitlines()
-    unexpected = sorted(set(staged) - set(RELEASE_FILES))
+    unexpected = sorted(set(staged) - set(release_files))
     if unexpected:
         raise GitFailure("Refusing to commit unexpected staged paths: " + ", ".join(unexpected))
 

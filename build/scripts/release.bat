@@ -115,7 +115,10 @@ if not "!MAC_ZIP_NAME!"=="" if not "!MAC_SHA256!"=="" (
 )
 
 echo.
-echo Step 5: Copying manifest into dist
+echo Step 5: Validating and embedding authored release notes
+python "%SCRIPT_DIR%\release_notes.py" "%VERSION%" "%MANIFEST_SRC%" --notes-dir "%ROOT%\release-notes" || goto :fail
+echo.
+echo Step 6: Copying manifest into dist
 if not exist "%DIST%" mkdir "%DIST%"
 copy /Y "%MANIFEST_SRC%" "%MANIFEST_DIST%" >nul || goto :fail
 
