@@ -2249,3 +2249,21 @@ Automated verification is pending in this environment because Maven Central and 
 returned HTTP 403. Deployment health, enrollment POST availability, and credentialed Windows acceptance are **NOT
 RUN**. Follow the deployment guide's Phase 7C runtime acceptance checklist before marking runtime verification
 complete.
+
+## Phase 7C enrollment diagnostics — 2026-10-02
+
+Azure evidence now proves server liveness and endpoint routing: `/api/health` returned 200 and an invalid-credential
+desktop-session POST returned the expected 401 in 0.37 seconds. A valid JDBC desktop login still reached the bounded
+eight-second enrollment limit and entered the existing `TRANSIENT` compatibility classification. To locate that
+boundary without changing behavior or timeouts, the desktop now records only response status plus elapsed
+milliseconds, or transport category (`REQUEST_TIMEOUT`, `CONNECTION_FAILURE`, `TLS_FAILURE`, or generic transport),
+exception class, and elapsed milliseconds. It never records origin, email, password, bearer, request/response body,
+or exception message. Existing 404/501, 401/403, 5xx, malformed-response, and compatibility/security classifications
+remain unchanged.
+
+The valid-credential server path was reviewed through repeated credential authentication, principal-derived instance
+ownership/active-DESKTOP verification, and durable DESKTOP session/JTI issuance. Unexpected exceptions from instance
+verification or durable issuance continue to use the safe 500 response and are now recorded by the central exception
+handler using exception class only; no unrestricted message or request content is logged. This observability change
+adds no domain mutation, sensitive read, or audit event, and needs no schema change. Credentialed installed-Windows
+acceptance remains open pending the retest in the deployment runbook.

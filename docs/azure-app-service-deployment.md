@@ -480,3 +480,8 @@ From an authorized Windows test workstation, without recording credentials or re
    an authorized test revocation.
 6. Inspect sanitized desktop logs for `Desktop durable session enrollment succeeded.` Never capture passwords,
    bearer tokens, request bodies, or sensitive response bodies.
+7. For an enrollment failure, record the single sanitized enrollment diagnostic: HTTP status and `elapsedMs` when a
+   response arrived, or transport `kind`, `exceptionClass`, and `elapsedMs`. Do not collect surrounding credential,
+   bearer, request/response-body, email, or unrestricted exception-message output. `REQUEST_TIMEOUT` at approximately
+   8000 ms identifies the desktop request boundary; `CONNECTION_FAILURE` and `TLS_FAILURE` distinguish connection and
+   handshake paths without increasing either timeout.
