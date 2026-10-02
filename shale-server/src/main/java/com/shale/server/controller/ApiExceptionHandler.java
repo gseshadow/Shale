@@ -37,11 +37,15 @@ public final class ApiExceptionHandler {
             MethodArgumentTypeMismatchException.class
     })
     ResponseEntity<ApiErrorResponse> handleInvalidRequest(Exception ex, HttpServletRequest request) {
+        log.error("Invalid request exceptionClass={} requestUri={}.",
+                ex.getClass().getName(), request.getRequestURI(), ex);
         return error(HttpStatus.BAD_REQUEST, "Invalid request.", request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
+        log.error("Invalid request exceptionClass={} requestUri={}.",
+                ex.getClass().getName(), request.getRequestURI(), ex);
         return error(HttpStatus.BAD_REQUEST, "Invalid request.", request);
     }
 
