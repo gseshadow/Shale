@@ -151,6 +151,61 @@ def preflight(root: Path) -> None:
     print(f"Git preflight passed: {branch} tracks {upstream} (local commits ahead: {ahead}).")
 
 
+def verify_upstream_contains(root: Path, upstream: str, revision: str) -> None:
+    contained = git(root, "merge-base", "--is-ancestor", revision, upstream, check=False)
+    if contained.returncode:
+        raise GitFailure(
+            f"Upstream {upstream} does not contain release source revision {revision}. "
+            "The release was aborted before any build or publication side effect."
+        )
+
+
+def publish_source(root: Path, expected_revision: str | None = None) -> str:
+    """Safely publish the clean, preflighted HEAD needed by the remote Mac builder."""
+    branch, upstream, remote = branch_and_upstream(root)
+    changed = dirty_paths(root)
+    if changed:
+        listing = "\n".join(f"  {path}" for path in changed)
+        raise GitFailure(
+            "Release source synchronization requires a clean index and working tree. "
+            "Shale will not stash or discard these files:\n" + listing
+        )
+
+    revision = git(root, "rev-parse", "HEAD").stdout.strip()
+    if expected_revision is not None and revision != expected_revision:
+        raise GitFailure(
+            f"Release source changed after preflight: expected {expected_revision}, found {revision}. "
+            "Rerun the release so the exact revision can be checked and published safely."
+        )
+    ahead, behind = fetch_and_counts(root, remote)
+    if behind:
+        state = "diverged" if ahead else "behind"
+        raise GitFailure(
+            f"Branch {branch} became {state} relative to {upstream} before the Mac build "
+            f"(ahead {ahead}, behind {behind}). Reconcile it manually and rerun the release; "
+            "Shale will not reset, rebase, stash, or force-push."
+        )
+
+    if ahead:
+        result = git(root, "push", check=False)
+        if result.returncode:
+            raise GitFailure(
+                f"Could not push release source revision {revision} to {upstream}. "
+                "Fix authentication/connectivity or reconcile a newly advanced remote, then rerun "
+                "the release. No Mac or Windows build/upload/publication was started. "
+                + (result.stderr.strip() or result.stdout.strip())
+            )
+        # Refresh the remote-tracking ref instead of trusting the push command's local output.
+        fetch_and_counts(root, remote)
+        print(f"Published release source revision {revision} to {upstream}.")
+    else:
+        print(f"Release source revision {revision} is already synchronized with {upstream}; no push was needed.")
+
+    verify_upstream_contains(root, upstream, revision)
+    print(f"Verified {upstream} contains release source revision {revision}.")
+    return revision
+
+
 def synchronize(root: Path, version: str) -> None:
     branch, upstream, remote = branch_and_upstream(root)
     ahead, behind = fetch_and_counts(root, remote)
@@ -196,7 +251,7 @@ def synchronize(root: Path, version: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("prepare-notes", "preflight", "sync"))
+    parser.add_argument("command", choices=("prepare-notes", "preflight", "publish-source", "sync"))
     parser.add_argument("root", type=Path)
     parser.add_argument("version", nargs="?")
     args = parser.parse_args()
@@ -207,6 +262,8 @@ def main() -> int:
             prepare_release_notes(args.root.resolve(), args.version)
         elif args.command == "preflight":
             preflight(args.root.resolve())
+        elif args.command == "publish-source":
+            publish_source(args.root.resolve(), args.version)
         else:
             if not args.version:
                 parser.error("sync requires a version")

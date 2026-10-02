@@ -129,6 +129,57 @@ class ReleaseGitSyncTest(unittest.TestCase):
             run(self.repo, "git", "diff", "--cached", "--name-only").stdout.strip(),
         )
 
+    def test_publish_source_pushes_new_notes_commit_and_verifies_origin_contains_exact_sha(self):
+        note = self.repo / "release-notes/1.2.3.json"
+        note.parent.mkdir()
+        note.write_text('{"version":"1.2.3"}\n', encoding="utf-8")
+        SYNC.prepare_release_notes(self.repo, "1.2.3")
+        revision = run(self.repo, "git", "rev-parse", "HEAD").stdout.strip()
+
+        published = SYNC.publish_source(self.repo)
+
+        self.assertEqual(revision, published)
+        remote_tip = run(self.repo, "git", "rev-parse", "@{upstream}").stdout.strip()
+        self.assertEqual(revision, remote_tip, "The Mac source SHA must be reachable from origin before SSH starts")
+
+    def test_publish_source_does_not_push_when_revision_is_already_synchronized(self):
+        hook = self.repo / ".git/hooks/pre-push"
+        hook.write_text("#!/bin/sh\necho unexpected-push >&2\nexit 1\n", encoding="utf-8")
+        hook.chmod(0o755)
+
+        revision = SYNC.publish_source(self.repo)
+
+        self.assertEqual(run(self.repo, "git", "rev-parse", "HEAD").stdout.strip(), revision)
+
+    def test_publish_source_rejects_a_revision_other_than_the_preflighted_head(self):
+        with self.assertRaisesRegex(SYNC.GitFailure, "changed after preflight"):
+            SYNC.publish_source(self.repo, "0" * 40)
+
+    def test_publish_source_push_failure_aborts_without_making_revision_available(self):
+        note = self.repo / "release-notes/1.2.3.json"
+        note.parent.mkdir()
+        note.write_text('{"version":"1.2.3"}\n', encoding="utf-8")
+        SYNC.prepare_release_notes(self.repo, "1.2.3")
+        revision = run(self.repo, "git", "rev-parse", "HEAD").stdout.strip()
+        run(self.repo, "git", "remote", "set-url", "--push", "origin", str(self.remote) + "-missing")
+
+        with self.assertRaisesRegex(SYNC.GitFailure, "No Mac or Windows build"):
+            SYNC.publish_source(self.repo)
+
+        remote_tip = run(self.remote, "git", "rev-parse", "HEAD").stdout.strip()
+        self.assertNotEqual(revision, remote_tip)
+
+    def test_publish_source_rejects_unrelated_dirty_work_without_pushing(self):
+        (self.repo / "unrelated.txt").write_text("dirty\n", encoding="utf-8")
+        hook = self.repo / ".git/hooks/pre-push"
+        hook.write_text("#!/bin/sh\necho push-was-attempted > ../push-marker\nexit 1\n", encoding="utf-8")
+        hook.chmod(0o755)
+
+        with self.assertRaisesRegex(SYNC.GitFailure, "unrelated.txt"):
+            SYNC.publish_source(self.repo)
+
+        self.assertFalse((self.repo.parent / "push-marker").exists())
+
     def test_sync_stages_only_release_files_and_pushes_ahead_source_commits(self):
         (self.repo / "unrelated.txt").write_text("committed source work\n", encoding="utf-8")
         run(self.repo, "git", "commit", "-am", "source work")
@@ -171,7 +222,7 @@ class ReleaseGitSyncTest(unittest.TestCase):
         source = SCRIPT.read_text(encoding="utf-8").lower()
         for forbidden in (
             '"add", "."', '"add", "-a"', '"stash"', '"reset"', '"checkout"',
-            '"restore"', '"clean"',
+            '"restore"', '"clean"', '"push", "--force"', '"push", "-f"',
         ):
             self.assertNotIn(forbidden, source)
 

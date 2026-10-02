@@ -31,9 +31,12 @@ python "%SCRIPT_DIR%\release_git_sync.py" prepare-notes "%ROOT%" "%VERSION%" || 
 
 echo Step 0: Git preflight before remote Mac build
 python "%SCRIPT_DIR%\release_git_sync.py" preflight "%ROOT%" || goto :git_preflight_failed
-set "SHALE_GIT_PREFLIGHT_DONE=true"
 for /f "delims=" %%C in ('git rev-parse HEAD') do set "SOURCE_REVISION=%%C"
 if not defined SOURCE_REVISION goto :git_preflight_failed
+
+echo Step 0: Publish and verify the exact source revision before remote Mac build
+python "%SCRIPT_DIR%\release_git_sync.py" publish-source "%ROOT%" "%SOURCE_REVISION%" || goto :source_sync_failed
+set "SHALE_GIT_PREFLIGHT_DONE=true"
 
 echo ====================================
 echo Full cross-platform release %VERSION%
@@ -117,6 +120,11 @@ goto :fail
 
 :git_preflight_failed
 echo Git preflight failed before the Mac or Windows build. Nothing was published.
+goto :fail
+
+:source_sync_failed
+echo Release source synchronization failed before the Mac or Windows build, upload, or publication.
+echo Resolve the Git error above and rerun the release. No release side effects were started.
 goto :fail
 
 :missing_mac_zip
