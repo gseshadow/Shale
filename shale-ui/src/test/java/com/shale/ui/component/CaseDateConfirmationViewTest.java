@@ -10,6 +10,8 @@ final class CaseDateConfirmationViewTest {
     @Test void pendingNamesRequiredBuiltInOrCustomRole() {
         assertEquals("Confirmation needed — Attorney", CaseDateConfirmationView.message(pending(), "Attorney"));
         assertEquals("Confirmation needed — Senior Reviewer", CaseDateConfirmationView.message(pending(), "Senior Reviewer"));
+        assertEquals("Confirmation needed — National Complex Litigation Supervising Attorney",
+                CaseDateConfirmationView.message(pending(), "National Complex Litigation Supervising Attorney"));
     }
 
     @Test void confirmedNamesActorAndTimeWhileHistoricalUnenrolledHasNoMarker() {
