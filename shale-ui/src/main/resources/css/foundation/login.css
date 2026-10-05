@@ -1,0 +1,83 @@
+.login-root {
+    -fx-background-color: linear-gradient(to bottom right, #071a35 0%, #0b3150 48%, #105968 100%);
+}
+
+.login-content { -fx-padding: 18 0 28 0; }
+.login-brand-pane { -fx-padding: 8 4 8 4; }
+.login-headline { -fx-font-size: 38px; -fx-font-weight: 800; -fx-text-fill: #f8fbff; }
+.login-tagline { -fx-font-size: 17px; -fx-text-fill: rgba(232, 244, 255, 0.82); }
+
+.login-background-glow {
+    -fx-fill: radial-gradient(center 50% 50%, radius 50%, rgba(48, 205, 202, 0.18), rgba(80, 101, 220, 0.02));
+    -fx-translate-x: -90;
+    -fx-translate-y: -70;
+}
+
+.login-illustration { -fx-padding: 22 10 10 8; }
+.login-demo-card {
+    -fx-background-color: rgba(249, 252, 255, 0.96);
+    -fx-background-radius: 14;
+    -fx-border-color: rgba(144, 185, 214, 0.5);
+    -fx-border-radius: 14;
+    -fx-padding: 16;
+    -fx-effect: dropshadow(gaussian, rgba(2, 16, 38, 0.24), 18, 0.16, 0, 7);
+}
+.login-demo-case { -fx-rotate: -3; -fx-translate-x: 26; -fx-translate-y: 10; }
+.login-demo-task { -fx-rotate: 4; -fx-translate-x: -22; -fx-translate-y: 38; }
+.login-demo-calendar { -fx-rotate: -1.5; -fx-translate-x: 100; -fx-translate-y: -4; }
+.login-demo-kicker, .login-whats-new-kicker { -fx-font-size: 10px; -fx-font-weight: 800; -fx-text-fill: #32647e; }
+.login-demo-line-strong { -fx-fill: #466783; }
+.login-demo-line { -fx-fill: #c8d8e6; }
+.login-dot-teal { -fx-fill: #17a9a5; }
+.login-check { -fx-fill: #3c83e6; }
+.login-check-muted { -fx-fill: #d4e0ec; }
+.login-calendar-date { -fx-background-color: #ede8ff; -fx-background-radius: 9; -fx-padding: 7 10; -fx-text-fill: #6642bb; -fx-font-weight: 800; }
+
+.login-whats-new {
+    -fx-background-color: rgba(9, 38, 68, 0.58);
+    -fx-background-radius: 12;
+    -fx-border-color: rgba(153, 220, 232, 0.20);
+    -fx-border-radius: 12;
+    -fx-padding: 12 14;
+}
+.login-whats-new-kicker { -fx-text-fill: #71ddd5; }
+.login-whats-new-text { -fx-text-fill: rgba(239, 247, 255, 0.88); -fx-font-size: 12px; }
+
+.login-form-scroll, .login-form-scroll > .viewport { -fx-background-color: transparent; }
+.login-form-scroll { -fx-padding: 0; -fx-background-insets: 0; }
+.login-card {
+    -fx-background-color: -shale-color-card-surface;
+    -fx-background-radius: 16;
+    -fx-border-color: -shale-color-card-border;
+    -fx-border-radius: 16;
+    -fx-padding: 32;
+    -fx-effect: dropshadow(gaussian, rgba(2, 17, 42, 0.28), 25, 0.14, 0, 10);
+}
+.login-card-title { -fx-font-size: 27px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
+.login-card-subtitle { -fx-font-size: 14px; -fx-text-fill: -shale-color-text-secondary; -fx-padding: 0 0 8 0; }
+.login-field-label { -fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; }
+.login-card .text-field, .login-card .password-field { -fx-min-height: 44px; -fx-pref-height: 44px; }
+.login-password-toggle {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+    -fx-text-fill: -shale-color-text-link;
+    -fx-font-weight: 700;
+    -fx-cursor: hand;
+}
+.login-password-toggle:hover { -fx-text-fill: -shale-color-text-link-hover; -fx-underline: true; }
+.login-stay-row { -fx-padding: 2 0 0 0; }
+.login-coming-soon {
+    -fx-background-color: -shale-color-info-wash;
+    -fx-background-radius: 999;
+    -fx-border-color: -shale-color-info-border;
+    -fx-border-radius: 999;
+    -fx-padding: 3 8;
+    -fx-text-fill: -shale-color-info-text;
+    -fx-font-size: 10px;
+    -fx-font-weight: 700;
+}
+.login-supporting-text { -fx-font-size: 11px; -fx-text-fill: -shale-color-text-muted; -fx-padding: -10 0 2 26; }
+.login-progress { -fx-text-fill: -shale-color-info-text; -fx-font-weight: 700; }
+.login-error { -fx-text-fill: -shale-color-text-danger; -fx-font-size: 12px; }
+.login-version-label { -fx-font-size: 11px; -fx-text-fill: rgba(233, 241, 255, 0.68); }

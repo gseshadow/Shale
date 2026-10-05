@@ -160,6 +160,7 @@ public final class SceneManager {
 	private final ApplicationUpdatePolicyCoordinator updatePolicyCoordinator;
 	private final SafeWorkDrainCoordinator safeWorkDrainCoordinator;
 	private MainController mainController;
+	private LoginController loginController;
 	private UpdateCheckResult lastUpdateCheck;
 	private final ExecutorService notificationBadgeCountExecutor;
 	private final ExecutorService notificationStartupExecutor;
@@ -1575,6 +1576,14 @@ public final class SceneManager {
 	}
 
 	private void setScene(Parent root, String title) {
+		Object nextController = root.getProperties().get(ROOT_CONTROLLER_KEY);
+		if (loginController != null && loginController != nextController) {
+			loginController.dispose();
+			loginController = null;
+		}
+		if (nextController instanceof LoginController nextLoginController) {
+			loginController = nextLoginController;
+		}
 		Scene scene = stage.getScene();
 		if (scene == null) {
 			scene = new Scene(root);
@@ -1596,6 +1605,10 @@ public final class SceneManager {
 
 	/** Deterministically releases all SceneManager-owned background work. */
 	public void shutdown() {
+		if (loginController != null) {
+			loginController.dispose();
+			loginController = null;
+		}
 		automaticUpdateScheduler.close();
 		humanActivityObserver.stop();
 		runtimeBridge.onShutdown();
