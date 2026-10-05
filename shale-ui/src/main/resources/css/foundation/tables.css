@@ -1,7 +1,7 @@
 /* Shale Design Foundation - Shared Tables */
 
 .table-view.shale-table {
-    -fx-background-color: rgba(248, 250, 252, 0.96);
+    -fx-background-color: -shale-color-card-surface;
     -fx-background-radius: 12;
     -fx-border-radius: 12;
     -fx-border-color: -shale-color-card-border;
@@ -10,14 +10,14 @@
 }
 
 .table-view.shale-table .column-header-background {
-    -fx-background-color: rgba(232, 241, 251, 0.94);
+    -fx-background-color: -shale-color-section-surface;
     -fx-background-radius: 12 12 0 0;
 }
 
 .table-view.shale-table .column-header,
 .table-view.shale-table .filler {
     -fx-background-color: transparent;
-    -fx-border-color: transparent transparent rgba(15, 35, 66, 0.14) transparent;
+    -fx-border-color: transparent transparent -shale-color-divider transparent;
     -fx-border-width: 0 0 1 0;
     -fx-size: 38;
 }
@@ -30,23 +30,23 @@
 }
 
 .table-view.shale-table .table-row-cell {
-    -fx-background-color: rgba(255, 255, 255, 0.72);
-    -fx-border-color: transparent transparent rgba(15, 35, 66, 0.08) transparent;
+    -fx-background-color: -shale-color-card-surface;
+    -fx-border-color: transparent transparent -shale-color-divider transparent;
     -fx-border-width: 0 0 1 0;
     -fx-cell-size: 36;
 }
 
 .table-view.shale-table .table-row-cell:odd {
-    -fx-background-color: rgba(242, 248, 255, 0.62);
+    -fx-background-color: -shale-color-card-embedded-surface;
 }
 
 .table-view.shale-table .table-row-cell:hover {
-    -fx-background-color: rgba(232, 241, 251, 0.90);
+    -fx-background-color: -shale-color-card-hover;
 }
 
 .table-view.shale-table .table-row-cell:selected {
-    -fx-background-color: rgba(84, 130, 195, 0.28);
-    -fx-border-color: transparent transparent rgba(75, 127, 206, 0.34) transparent;
+    -fx-background-color: -shale-color-selection;
+    -fx-border-color: transparent transparent -shale-color-border-selected transparent;
 }
 
 .table-view.shale-table .table-cell {

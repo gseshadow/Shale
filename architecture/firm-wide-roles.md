@@ -100,3 +100,21 @@ Exact deployment order:
 The verified 2026-09-23 production execution reported zero for every Phase 1B `FindingCount`.
 
 Phase 1B does not implement field-confirmation policy, Case Date confirmation, case-attention badges, notifications, or any Case Team role/assignment mutation.
+
+## User Management bulk hydration (2026-10-05)
+
+The User Management grid loads the tenant user projection, role definitions, and all current tenant-user
+assignment history through three bounded reads on its existing background executor. Previously it called the
+single-user assignment operation once for every displayed user; each call opened a connection, repeated
+administrator/session checks, checked tenant membership, and then queried assignments. The replacement
+`listTenantUserFirmWideRoleAssignments` boundary performs one administrator-authorized, explicitly
+tenant-qualified assignment query joined to nonremoved `Users` and mirrors the grid's active/inactive filter, so
+query count no longer grows with grid size.
+It returns deleted assignment rows as well as active rows because edit/restore behavior depends on assignment
+history. Built-in Administrator and Attorney display still comes from `Users.is_admin` and `Users.is_attorney`;
+tenant-defined display still requires an active, nondeleted definition and assignment.
+
+The grid read is administrative identity/role metadata rather than PHI and remains intentionally outside the PHI
+read-audit path. This optimization adds no mutation and changes no entity-action audit transaction, RowVer rule,
+RLS policy, or authorization boundary. Existing user and role mutations retain their established transactional
+audits; no schema migration is required.
