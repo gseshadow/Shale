@@ -17,6 +17,7 @@ import javafx.scene.layout.Region;
 
 /** Shared compact presentation and action for an authoritative Case Date confirmation. */
 public final class CaseDateConfirmationView {
+    private static final double MAX_COMPACT_WIDTH = 320;
     private static final DateTimeFormatter CONFIRMED_AT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
     private CaseDateConfirmationView() { }
 

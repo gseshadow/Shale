@@ -23,6 +23,9 @@ import org.xml.sax.InputSource;
 final class CaseCalendarTabSourceTest {
     private static final Path CONTROLLER_PATH = Path.of("src/main/java/com/shale/ui/controller/CaseController.java");
     private static final Path FXML_PATH = Path.of("src/main/resources/fxml/case.fxml");
+    private static final Path CALENDAR_CSS_PATH = Path.of("src/main/resources/css/foundation/calendar.css");
+    private static final Path LIGHT_THEME_PATH = Path.of("src/main/resources/css/theme/light.css");
+    private static final Path DARK_THEME_PATH = Path.of("src/main/resources/css/theme/dark.css");
     private static final String FX_ID_ATTRIBUTE = "fx:id";
 
     @Test
@@ -104,6 +107,45 @@ final class CaseCalendarTabSourceTest {
                 "Case Calendar event editing must persist through the shared calendar service.");
     }
 
+    @Test
+    void caseCalendarEntriesUseThemeAwareSharedCardAndTextHierarchy() throws Exception {
+        String controller = Files.readString(CONTROLLER_PATH);
+        String createRow = methodBody(controller, "private Node createCaseCalendarRow");
+        String css = Files.readString(CALENDAR_CSS_PATH);
+
+        assertTrue(createRow.contains("case-calendar-entry-card"),
+                "Every Case Calendar source must use the shared themed entry-card class.");
+        assertTrue(createRow.contains("case-calendar-entry-title")
+                        && createRow.contains("case-calendar-entry-time")
+                        && createRow.contains("case-calendar-entry-meta"),
+                "Case Calendar entries must expose title, time, and metadata hierarchy classes.");
+        assertTrue(createRow.contains("CalendarFeedCategory.classify(item)"),
+                "The shared entry treatment must retain metadata for events, tasks, deadlines, and case dates.");
+        for (String source : List.of("CALENDAR_EVENTS", "TASKS", "CASE_DEADLINES", "OTHER_CASE_DATES")) {
+            assertTrue(controller.contains("enabled.add(CalendarFeedCategory." + source + ")"),
+                    () -> "The shared Case Calendar card contract must continue to cover " + source + ".");
+        }
+        assertTrue(!createRow.contains("rgba(255,255,255") && !createRow.contains("setStyle("),
+                "Case Calendar cards must not restore fixed light paint or inline text styling.");
+
+        assertCssRuleContains(css, ".case-calendar-entry-card", "-shale-color-card-surface");
+        assertCssRuleContains(css, ".case-calendar-entry-card:hover", "-shale-color-card-hover");
+        assertCssRuleContains(css, ".case-calendar-entry-card:focused", "-shale-color-border-focus");
+        assertCssRuleContains(css, ".case-calendar-entry-card:disabled", "-shale-opacity-disabled");
+        assertCssRuleContains(css, ".label.case-calendar-entry-title", "-shale-color-text-primary");
+        assertCssRuleContains(css, ".label.case-calendar-entry-time", "-shale-color-text-secondary");
+        assertCssRuleContains(css, ".label.case-calendar-entry-meta", "-shale-color-text-muted");
+
+        for (Path themePath : List.of(LIGHT_THEME_PATH, DARK_THEME_PATH)) {
+            String theme = Files.readString(themePath);
+            for (String token : List.of("-shale-color-card-surface", "-shale-color-card-hover",
+                    "-shale-color-text-primary", "-shale-color-text-secondary", "-shale-color-text-muted")) {
+                assertTrue(theme.contains(token + ":"),
+                        () -> themePath + " must define the Case Calendar token " + token + ".");
+            }
+        }
+    }
+
     private static List<String> caseNavigationSections(String controller) {
         Matcher matcher = Pattern.compile("private\\s+static\\s+final\\s+List<String>\\s+SECTIONS\\s*=\\s*List\\.of\\((.*?)\\);", Pattern.DOTALL)
                 .matcher(controller);
@@ -175,5 +217,13 @@ final class CaseCalendarTabSourceTest {
 
     private static boolean matches(String source, String regex) {
         return Pattern.compile(regex, Pattern.DOTALL).matcher(source).find();
+    }
+
+    private static void assertCssRuleContains(String css, String selector, String expectedToken) {
+        Pattern rule = Pattern.compile(Pattern.quote(selector) + "\\s*\\{([^}]*)}", Pattern.DOTALL);
+        Matcher matcher = rule.matcher(css);
+        assertTrue(matcher.find(), () -> "Expected CSS rule for " + selector + ".");
+        assertTrue(matcher.group(1).contains(expectedToken),
+                () -> selector + " must use the theme token " + expectedToken + ".");
     }
 }
