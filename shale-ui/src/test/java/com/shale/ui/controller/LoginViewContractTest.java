@@ -1,5 +1,6 @@
 package com.shale.ui.controller;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -9,6 +10,7 @@ import java.nio.file.Path;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.junit.jupiter.api.Test;
+import org.w3c.dom.Element;
 
 final class LoginViewContractTest {
     private static final Path FXML = Path.of("src/main/resources/fxml/login.fxml");
@@ -34,13 +36,33 @@ final class LoginViewContractTest {
         assertFalse(fxml.contains("forgot") || fxml.contains("support"),
                 "login must not offer an unimplemented help destination");
 
-		assertTrue(fxml.contains("maxWidth=\"1220\"") && fxml.contains("maxHeight=\"USE_PREF_SIZE\""),
+		assertTrue(fxml.contains("maxWidth=\"1220\"") && count(fxml, "maxHeight=\"-Infinity\"") == 3,
 				"the centered composition and content-sized card must remain bounded");
+		assertFalse(fxml.contains("USE_PREF_SIZE"),
+				"Region sizing attributes must use numeric values that FXMLLoader can coerce to double");
+		for (String attribute : new String[] {
+				"minWidth", "prefWidth", "maxWidth", "minHeight", "prefHeight", "maxHeight" }) {
+			var elements = document.getElementsByTagName("*");
+			for (int index = 0; index < elements.getLength(); index++) {
+				Element element = (Element) elements.item(index);
+				if (element.hasAttribute(attribute)) {
+					assertDoesNotThrow(() -> Double.parseDouble(element.getAttribute(attribute)),
+							() -> attribute + " must be a numeric JavaFX Region size on " + element.getTagName());
+				}
+			}
+		}
 		assertTrue(fxml.contains("prefWidth=\"540\"") && fxml.contains("prefHeight=\"310\""),
 				"the illustration must retain an explicit bounded desktop size");
 		assertTrue(fxml.contains("minHeight=\"252\"") && fxml.contains("maxHeight=\"252\""),
 				"decorative cards must not inherit unbounded parent height");
+		assertTrue(fxml.contains("fx:id=\"loginViewport\" alignment=\"CENTER\"")
+				&& fxml.contains("fx:id=\"loginContent\"") && fxml.contains("minHeight=\"0\""),
+				"a full-height outer viewport must center the shrinkable, content-height composition");
     }
+
+	private static int count(String value, String target) {
+		return (value.length() - value.replace(target, "").length()) / target.length();
+	}
 
     @Test
     void controllerPreservesLoginInteractionAndAnimationLifecycle() throws Exception {

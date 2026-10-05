@@ -9,3 +9,4 @@
 **/SemanticControlCssRuntimeTest.java
 **/ApplicationShellCssRuntimeTest.java
 **/UserAssignedTaskCardLayoutTest.java
+**/LoginRuntimeLayoutTest.java
