@@ -120,9 +120,43 @@ class MacReleaseBootstrapTest(unittest.TestCase):
         with mock.patch.object(BOOTSTRAP.subprocess, "run") as invoked:
             BOOTSTRAP.run_remote_bootstrap("mac", "/repo", "origin", "main", "1.2.3", "a" * 40)
         command = invoked.call_args.args[0]
-        self.assertEqual(["ssh", "mac", "bash", "-s", "--"], command[:5])
+        self.assertEqual(
+            ["ssh", "mac", "bash", "-s", "--", "/repo", "origin", "main",
+             "1.2.3", "a" * 40, BOOTSTRAP.RELEASE_SCRIPT],
+            command,
+        )
         self.assertNotIn("./build/scripts/prepare-shale-mac-release.sh", command)
-        self.assertEqual(BOOTSTRAP.REMOTE_BOOTSTRAP, invoked.call_args.kwargs["input"])
+        transmitted = invoked.call_args.kwargs["input"]
+        self.assertIsInstance(transmitted, bytes)
+        self.assertNotIn(b"\r", transmitted)
+        self.assertEqual(BOOTSTRAP.REMOTE_BOOTSTRAP.encode("utf-8"), transmitted)
+        self.assertNotIn("text", invoked.call_args.kwargs)
+        self.assertNotIn("stdout", invoked.call_args.kwargs)
+        self.assertNotIn("stderr", invoked.call_args.kwargs)
+        self.assertNotIn("capture_output", invoked.call_args.kwargs)
+        self.assertTrue(invoked.call_args.kwargs["check"])
+
+    def test_ssh_invocation_normalizes_windows_and_legacy_mac_line_endings_to_lf(self):
+        windows_source = "set -eu\r\necho first\recho second\r\n"
+        with (mock.patch.object(BOOTSTRAP, "REMOTE_BOOTSTRAP", windows_source),
+              mock.patch.object(BOOTSTRAP.subprocess, "run") as invoked):
+            BOOTSTRAP.run_remote_bootstrap("mac", "/repo", "origin", "main", "1.2.3", "a" * 40)
+
+        transmitted = invoked.call_args.kwargs["input"]
+        self.assertEqual(b"set -eu\necho first\necho second\n", transmitted)
+        self.assertNotIn(b"\r", transmitted)
+        self.assertEqual(transmitted.count(b"\n"), len(transmitted.splitlines()))
+
+    def test_invalid_or_non_full_revision_is_rejected_before_ssh(self):
+        for revision in ("a" * 39, "a" * 41, "g" * 40, ""):
+            with self.subTest(revision=revision), mock.patch.object(BOOTSTRAP.subprocess, "run") as invoked:
+                with self.assertRaisesRegex(
+                    ValueError, "source revision must be a full 40-character Git SHA"
+                ):
+                    BOOTSTRAP.run_remote_bootstrap(
+                        "mac", "/repo", "origin", "main", "1.2.3", revision
+                    )
+                invoked.assert_not_called()
 
     def test_bootstrap_contains_no_broad_destructive_git_commands(self):
         sources = SCRIPT_PATH.read_text(encoding="utf-8") + (ROOT / "build/scripts/release-all.bat").read_text(encoding="utf-8")

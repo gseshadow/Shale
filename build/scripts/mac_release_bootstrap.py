@@ -48,13 +48,13 @@ def run_remote_bootstrap(
 ) -> None:
     if REVISION_PATTERN.fullmatch(revision) is None:
         raise ValueError("source revision must be a full 40-character Git SHA")
+    bootstrap_bytes = REMOTE_BOOTSTRAP.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
     subprocess.run(
         [
             "ssh", ssh_target, "bash", "-s", "--",
             repo, remote, branch, version, revision, RELEASE_SCRIPT,
         ],
-        input=REMOTE_BOOTSTRAP,
-        text=True,
+        input=bootstrap_bytes,
         check=True,
     )
 
