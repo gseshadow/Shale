@@ -1464,7 +1464,8 @@ public final class SceneManager {
 					}
 				},
 				this::openUserProfile,
-				caseId -> openCaseProfile(caseId, "OVERVIEW"));
+				caseId -> openCaseProfile(caseId, "OVERVIEW"),
+				caseTaskService.resolveTaskDueDatePolicy(shaleClientId));
 		if (result.isEmpty()) {
 			taskDetailDialogInFlight.set(false);
 			if (dialogMutatedAssignments.get())

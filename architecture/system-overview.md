@@ -307,3 +307,7 @@ SYSTEM execution of an owner-writable updater has substitution/TOCTOU, privilege
 A safe broker would be a new protected, signed privileged security product rather than a narrow updater extension.
 No task/service/helper, rollout, SQL/API, wake/reboot, force-kill, or macOS work was added. Production signing remains
 mandatory but cannot by itself cure owner-writable privileged execution. Phase 13C is still the supported mechanism.
+
+## Tenant task due-date policy (2026-10-05)
+
+Task due-date policy is tenant scoped and defaults to `WARN`. The desktop task dialogs own the `WARN` confirmation, whereas the data/service mutation boundary owns the `REQUIRED` rejection, including direct service and future API calls. `OPTIONAL` preserves nullable `Tasks.DueAt`. Existing undated tasks are never migrated and remain readable, but an attempted edit under `REQUIRED` must supply a date. The current task editors are the shared `NewTaskDialog` (case task creation) and `TaskDetailDialog` (My Shale, Tasks/calendar navigation, case view, and User View); using shared dialogs prevents per-controller validation drift.

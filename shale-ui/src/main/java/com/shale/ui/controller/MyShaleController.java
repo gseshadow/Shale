@@ -4053,7 +4053,8 @@ public final class MyShaleController {
 						}
 					},
 					onOpenUser,
-					onOpenCase);
+					onOpenCase,
+					caseTaskService.resolveTaskDueDatePolicy(shaleClientId));
 			if (result.isEmpty()) {
 				if (dialogMutatedAssignments.get()) {
 					myTasksDirty = true;
