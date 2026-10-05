@@ -161,10 +161,12 @@ public final class CaseDateTypeManagementPane {
         Label name = new Label(row.name()); name.getStyleClass().add("app-dialog-field-label");
         HBox heading = new HBox(8, dot, name); heading.setAlignment(Pos.CENTER_LEFT);
         Label details = new Label((row.active() ? "Active" : "Inactive") + " · " + row.calendarCategory() + " · " + (row.supportsTime() ? "Timed or all-day" : "All-day only"));
-        details.getStyleClass().add("search-summary-text"); details.setWrapText(true);
+        details.getStyleClass().addAll("case-date-custom-card__secondary",
+                row.active() ? "case-date-custom-card__secondary--active" : "case-date-custom-card__secondary--inactive");
+        details.setWrapText(true);
         FieldConfirmationPolicyDto policy=policies.get(policyKey(row));
         Label policyLabel=new Label(policy!=null&&policy.requiresConfirmation()?"Requires confirmation":"Confirmation not required");
-        policyLabel.getStyleClass().add("search-summary-text");
+        policyLabel.getStyleClass().add("case-date-custom-card__secondary");
         card.getChildren().addAll(heading, details, policyLabel);
         card.setOnMouseClicked(e -> select(row));
         card.setOnKeyPressed(e -> { if (e.getCode() == javafx.scene.input.KeyCode.SPACE || e.getCode() == javafx.scene.input.KeyCode.ENTER) select(row); });
