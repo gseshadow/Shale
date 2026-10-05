@@ -36,7 +36,7 @@ final class LoginViewContractTest {
         assertFalse(fxml.contains("forgot") || fxml.contains("support"),
                 "login must not offer an unimplemented help destination");
 
-		assertTrue(fxml.contains("maxWidth=\"1220\"") && count(fxml, "maxHeight=\"-1.0\"") == 2,
+		assertTrue(fxml.contains("maxWidth=\"1220\"") && count(fxml, "maxHeight=\"-Infinity\"") == 3,
 				"the centered composition and content-sized card must remain bounded");
 		assertFalse(fxml.contains("USE_PREF_SIZE"),
 				"Region sizing attributes must use numeric values that FXMLLoader can coerce to double");
@@ -55,6 +55,9 @@ final class LoginViewContractTest {
 				"the illustration must retain an explicit bounded desktop size");
 		assertTrue(fxml.contains("minHeight=\"252\"") && fxml.contains("maxHeight=\"252\""),
 				"decorative cards must not inherit unbounded parent height");
+		assertTrue(fxml.contains("fx:id=\"loginViewport\" alignment=\"CENTER\"")
+				&& fxml.contains("fx:id=\"loginContent\"") && fxml.contains("minHeight=\"0\""),
+				"a full-height outer viewport must center the shrinkable, content-height composition");
     }
 
 	private static int count(String value, String target) {

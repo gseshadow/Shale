@@ -3,7 +3,7 @@
 **Status:** Desktop session enrollment, revocation enforcement, and My Sessions acceptance are closed; the wider
 release/session initiative remains in progress and logged-out updates remain `UNSUPPORTED`
 
-**Last reviewed:** 2026-10-02
+**Last reviewed:** 2026-10-05
 
 **Authority:** This document is the roadmap and current-state record for application releases, update
 policy, installed desktop instances, authenticated sessions, revocation, and future client support.
@@ -1184,7 +1184,7 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 13F | **COMPLETE** | Elevated MSI registration and lifecycle are verified; installed Windows fresh-install acceptance confirmed the protected 64-bit HKLM record, exact owner/roots, ACL, schema/version/channel, updater, and production-reader `VALID`. Production signing remains a separate deployment prerequisite. |
 | 13G | **COMPLETE — UNSUPPORTED** | Every Phase 13D blocker was reevaluated against 13E/13F. Discovery, public policy, version, and owner-path prerequisites are closed, but no credentialless owner principal or sufficiently protected privileged execution boundary is proven; no prototype or rollout was created. |
 | 14A | **COMPLETE** | Release-pipeline Git synchronization is fail-closed before publication: attached/upstream/clean/divergence preflight, exact release-file staging, commit/push recovery, retry behavior, and source-revision-consistent Mac handoff are documented and covered by temporary-repository tests. No domain or administrative runtime mutation exists, so the established audit schemas are not applicable. |
-| Login visual refresh | **REFINED; VERIFICATION BLOCKED** | The desktop sign-in surface now has a centered, width-bounded composition; content-sized illustration cards; a wider, vertically centered form; and width/height-responsive decoration removal. Static XML/CSS/diff checks pass, but this run's Maven verification remains blocked by Maven Central HTTP 403 and no JavaFX display is available for rendered visual acceptance. A prior local `mvn test` pass was user-reported separately and does not verify this refinement. Persistent sessions remain **NOT STARTED** and bearer/password lifecycle is unchanged. |
+| Login visual refresh | **IN PROGRESS; RUNTIME FLOW ACCEPTED** | The remaining tall-window stretch was traced to `-1.0`, which is JavaFX `USE_COMPUTED_SIZE`, not `USE_PREF_SIZE`; the content-sized groups now use the preferred-size sentinel inside a full-height centering viewport. The user reports local Maven tests pass and the application successfully launches, signs in, enrolls the durable session with HTTP 200, and logs out with HTTP 200. Rendered tall/short-window acceptance for this sizing correction remains **PENDING**. Persistent sessions remain **NOT STARTED** and bearer/password lifecycle is unchanged. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1246,6 +1246,27 @@ Audit compatibility remains unchanged: this is unauthenticated presentation and 
 sensitive read or domain, administrative, or session mutation. Existing audit schemas require no event or migration.
 Persistent Stay logged in support remains **NOT STARTED**; the disabled **Coming soon** placeholder remains the only
 surface and no credential or bearer persistence was introduced.
+
+### Login content-height centering correction — 2026-10-05
+
+The follow-up screenshot showed that the earlier numeric substitution did not preserve preferred-height behavior:
+JavaFX defines `-1.0` as `Region.USE_COMPUTED_SIZE`, so it allowed the brand group and sign-in card to retain their
+computed, vertically growable maximum. The corrected hierarchy uses a full-height centering viewport around a
+shrinkable, preferred-height two-column composition. The branding group and sign-in card use the preferred-size
+maximum sentinel, while the form `ScrollPane` continues to fit its centering wrapper to the viewport. Extra height
+therefore belongs outside the card on tall windows, while a constrained composition can still shrink and expose the
+complete form through vertical scrolling. Card width, illustration bounds, headline, What's New, reserved
+progress/error space, responsive decoration removal, and all login interactions remain unchanged.
+
+The user reports that local Maven tests pass and that the rebuilt desktop application launches and signs in
+successfully, durable session enrollment returns HTTP 200, and explicit logout returns HTTP 200. These are
+user-reported local/runtime results, not commands executed by this documentation update. Rendered visual acceptance
+of the corrected approximately 1920×1300 tall state and a short scrollable state remains **PENDING** until the
+stretching and centering result is observed. Persistent **Stay logged in** support remains **NOT STARTED**; the
+disabled placeholder does not persist a password or bearer and does not change enrollment, logout, or revocation.
+
+Audit compatibility remains unchanged. This is unauthenticated presentation and local layout behavior, not a
+sensitive read or a domain, administrative, or session mutation. No audit event or schema migration is appropriate.
 
 ## 16. Open decisions requiring operator input
 
