@@ -52,3 +52,30 @@ reported by the user; “everything working as expected” is not recorded as a 
 
 No manual cross-tenant or crafted-request security exercise is claimed. A clean installed production launch without
 an API override is **NOT RUN**, and intermittent enrollment `REQUEST_TIMEOUT` remains open.
+
+## 2026-10-05 User Management performance and dark-theme correction
+
+Investigation traced the initial popup flow from `SettingsController` through `UserManagementLauncher` and
+`UserManagementPane` to `UserServiceAdapter`/`UserDao`. Construction itself did not refresh: the launcher shows
+the window and invokes `pane.open()` exactly once, and observable table changes were already marshalled with
+`Platform.runLater`. The delay was backend N+1 enrichment: after the user and definition reads, the pane invoked
+the single-user role-assignment service once per row. Each invocation acquired another connection and repeated
+session/admin and tenant-user checks before its assignment query. For 20 users, this produced the two list reads
+plus 20 assignment service/connection sequences. The grid did not load session data or user-detail DTOs.
+
+The grid now uses one bulk tenant-assignment service/DAO boundary. Initial hydration is three bounded reads—role
+definitions, all assignment history, and the existing management user projection—regardless of displayed user
+count, and remains entirely on the Settings background executor until the final JavaFX mutation. Focused contract
+coverage prevents the pane from reverting to the per-user method and verifies the bulk SQL remains administrator
+authorized, tenant-qualified, nonremoved-membership constrained, and a single assignment query. Existing Add,
+Edit, lifecycle, password, remove, refresh, inactive toggle, local search, selection-button, RowVer, role-history,
+and audit paths are unchanged; the existing presentation/action tests continue to cover selection behavior.
+
+The dark-theme contrast defect was shared rather than User Management-specific: `shale-table` painted hard-coded
+light header/body/alternate/hover surfaces while its text correctly inherited dark-theme foreground tokens. The
+shared table foundation now pairs semantic card, section, embedded, hover, selection, divider, and selected-border
+tokens with semantic text tokens, preserving coherent light and dark palettes for every shared table. User name
+chips also now derive a readable foreground from their authoritative database color through the shared `UserCard`
+component. No global text token was changed because those tokens were correct on intentionally dark surfaces.
+Static theme-contract coverage protects the shared token pairing; rendered visual inspection remains part of the
+desktop acceptance pass.

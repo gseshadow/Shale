@@ -1,6 +1,7 @@
 package com.shale.core.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface UserServicePort {
@@ -18,6 +19,13 @@ public interface UserServicePort {
     List<FirmWideRoleDefinition> listFirmWideRolesForAdministration(int shaleClientId, int actorUserId);
 
     List<FirmWideRoleAssignment> listUserFirmWideRoleAssignments(int shaleClientId, int actorUserId, int userId);
+
+    /**
+     * Loads assignment history for all current tenant users in one bounded operation.
+     * Users without assignments are intentionally absent from the returned map.
+     */
+    Map<Integer, List<FirmWideRoleAssignment>> listTenantUserFirmWideRoleAssignments(
+            int shaleClientId, int actorUserId, boolean includeInactive);
 
     List<FirmWideRoleDefinition> listFirmWideRolesForUserView(int shaleClientId, int actorUserId);
 

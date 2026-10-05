@@ -343,8 +343,9 @@ public final class UserManagementPane {
 			try {
 				List<UserServicePort.FirmWideRoleDefinition> loadedRoles=userService.listFirmWideRolesForAdministration(tenantId,actorUserId);
 				List<UserManagementViewRow> rows = new ArrayList<>();
-				Map<Integer,List<UserServicePort.FirmWideRoleAssignment>> loadedAssignments=new HashMap<>();
-				for (UserDao.UserManagementRow row : userDao.listUsersForManagement(includeInactive)){List<UserServicePort.FirmWideRoleAssignment> assignments=userService.listUserFirmWideRoleAssignments(tenantId,actorUserId,row.id());loadedAssignments.put(row.id(),assignments);Set<Integer> effectiveIds=loadedRoles.stream().filter(r->r.active()&&!r.deleted()).map(UserServicePort.FirmWideRoleDefinition::id).collect(java.util.stream.Collectors.toSet());rows.add(new UserManagementViewRow(row,assignments.stream().filter(a->effectiveIds.contains(a.definitionId())).toList()));}
+				Map<Integer,List<UserServicePort.FirmWideRoleAssignment>> loadedAssignments=userService.listTenantUserFirmWideRoleAssignments(tenantId,actorUserId,includeInactive);
+				Set<Integer> effectiveIds=loadedRoles.stream().filter(r->r.active()&&!r.deleted()).map(UserServicePort.FirmWideRoleDefinition::id).collect(java.util.stream.Collectors.toSet());
+				for (UserDao.UserManagementRow row : userDao.listUsersForManagement(includeInactive)){List<UserServicePort.FirmWideRoleAssignment> assignments=loadedAssignments.getOrDefault(row.id(),List.of());rows.add(new UserManagementViewRow(row,assignments.stream().filter(a->effectiveIds.contains(a.definitionId())).toList()));}
 				Platform.runLater(() ->
 				{
 					if (disposed.get() || generation != userManagementLoadGeneration)

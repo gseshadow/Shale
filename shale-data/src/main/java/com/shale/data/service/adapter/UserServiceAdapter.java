@@ -1,6 +1,7 @@
 package com.shale.data.service.adapter;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -61,6 +62,7 @@ public final class UserServiceAdapter implements UserServicePort {
 
     @Override public List<FirmWideRoleDefinition> listFirmWideRolesForAdministration(int tenant,int actor){return userDao.listFirmWideRolesForAdministration(tenant,actor);}
     @Override public List<FirmWideRoleAssignment> listUserFirmWideRoleAssignments(int tenant,int actor,int user){return userDao.listUserFirmWideRoleAssignments(tenant,actor,user);}
+    @Override public Map<Integer,List<FirmWideRoleAssignment>> listTenantUserFirmWideRoleAssignments(int tenant,int actor,boolean includeInactive){return userDao.listTenantUserFirmWideRoleAssignments(tenant,actor,includeInactive);}
     @Override public List<FirmWideRoleDefinition> listFirmWideRolesForUserView(int tenant,int actor){return userDao.listFirmWideRolesForUserView(tenant,actor);}
     @Override public List<FirmWideRoleAssignment> listUserFirmWideRoleAssignmentsForView(int tenant,int actor,int user){return userDao.listUserFirmWideRoleAssignmentsForView(tenant,actor,user);}
     @Override public FirmWideRoleDefinition createFirmWideRole(CreateFirmWideRoleCommand command){return userDao.createFirmWideRole(command);}
