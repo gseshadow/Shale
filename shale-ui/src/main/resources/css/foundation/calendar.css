@@ -130,3 +130,21 @@
 .calendar-event-owner-marker, .calendar-event-shared-marker { -fx-font-size: 9px; -fx-font-weight: 900; -fx-padding: 0 2px; -fx-alignment: top-center; }
 .calendar-event-shared-marker { -fx-text-fill: -shale-color-text-muted; }
 .calendar-event-card-user-owned { -fx-border-color: -shale-color-border-strong; }
+
+/* Case > Calendar uses the shared theme palette for every feed source. */
+.case-calendar-entry-card {
+    -fx-background-color: -shale-color-card-surface; -fx-background-radius: 10px;
+    -fx-border-color: -shale-color-border-subtle; -fx-border-radius: 10px; -fx-border-width: 1px;
+}
+.case-calendar-entry-card:hover {
+    -fx-background-color: -shale-color-card-hover; -fx-border-color: -shale-color-border-strong;
+}
+.case-calendar-entry-card:focused {
+    -fx-border-color: -shale-color-border-focus;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 8, 0.14, 0, 0);
+}
+.case-calendar-entry-card:disabled { -fx-opacity: -shale-opacity-disabled; }
+.case-calendar-entry-card-past { -fx-background-color: -shale-color-surface-muted; }
+.label.case-calendar-entry-title { -fx-text-fill: -shale-color-text-primary; -fx-font-weight: 700; }
+.label.case-calendar-entry-time { -fx-text-fill: -shale-color-text-secondary; -fx-font-weight: 600; }
+.label.case-calendar-entry-meta { -fx-text-fill: -shale-color-text-muted; -fx-font-size: 11px; }
