@@ -16,3 +16,11 @@ FROM sys.security_policies sp JOIN sys.security_predicates pr ON pr.object_id=sp
 WHERE pr.target_object_id=OBJECT_ID(N'dbo.TaskPolicyConfigurations') GROUP BY sp.is_enabled;
 -- Under two separately stamped non-bypass sessions, update one visible tenant to OPTIONAL,
 -- verify the other tenant remains invisible/unchanged, then restore WARN. RLS functions are not invoked as scalars.
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.EntityActionAuditLog') AND definition LIKE '%TASK_POLICY_CONFIGURATION%')
+BEGIN
+    THROW 57056, 'Task policy entity-action audit mapping is missing.', 1;
+END;
+SELECT TOP (20) ShaleClientId,ActorUserId,EntityId,Action,OccurredAt,Metadata
+FROM dbo.EntityActionAuditLog WHERE EntityType='TASK_POLICY_CONFIGURATION' ORDER BY Id DESC;
+-- After an administrator mutation, verify exactly one UPDATED row contains only PREVIOUS_POLICY and RESULTING_POLICY,
+-- and verify its tenant, actor, entity id, and database timestamp match the committed configuration change.

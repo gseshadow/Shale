@@ -22,10 +22,16 @@ INSERT dbo.TaskPolicyConfigurations (ShaleClientId, DueDatePolicy)
 SELECT c.Id, 'WARN' FROM dbo.ShaleClients c
 WHERE NOT EXISTS (SELECT 1 FROM dbo.TaskPolicyConfigurations p WHERE p.ShaleClientId=c.Id);
 
-IF NOT EXISTS (SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.TaskPolicyConfigurations'))
+IF NOT EXISTS (SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.TaskPolicyConfigurations') AND predicate_type_desc=N'FILTER')
 BEGIN
     ALTER SECURITY POLICY sec.TenantFilter ADD FILTER PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.TaskPolicyConfigurations;
+END;
+IF NOT EXISTS (SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.TaskPolicyConfigurations') AND predicate_type_desc=N'BLOCK' AND operation_desc=N'AFTER INSERT')
+BEGIN
     ALTER SECURITY POLICY sec.TenantFilter ADD BLOCK PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.TaskPolicyConfigurations AFTER INSERT;
+END;
+IF NOT EXISTS (SELECT 1 FROM sys.security_predicates WHERE target_object_id=OBJECT_ID(N'dbo.TaskPolicyConfigurations') AND predicate_type_desc=N'BLOCK' AND operation_desc=N'AFTER UPDATE')
+BEGIN
     ALTER SECURITY POLICY sec.TenantFilter ADD BLOCK PREDICATE sec.fn_FilterByTenant(ShaleClientId) ON dbo.TaskPolicyConfigurations AFTER UPDATE;
 END;
 COMMIT;

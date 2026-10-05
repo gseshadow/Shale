@@ -17,12 +17,14 @@ import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.NotificationServicePort;
 import com.shale.core.service.TaskServicePort;
+import com.shale.core.service.TaskPolicyConfigurationServicePort;
 import com.shale.data.service.adapter.AuthServiceAdapter;
 import com.shale.data.service.adapter.ApplicationReleaseReadServiceAdapter;
 import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
+import com.shale.data.service.adapter.TaskPolicyConfigurationServiceAdapter;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
 import com.shale.server.runtime.DesktopApplicationInstanceVerifier;
@@ -43,6 +45,8 @@ class ShaleServerServiceConfigurationTest {
             assertInstanceOf(AuthServiceAdapter.class, context.getBean(AuthServicePort.class));
             assertInstanceOf(CaseServiceAdapter.class, context.getBean(CaseServicePort.class));
             assertInstanceOf(TaskServiceAdapter.class, context.getBean(TaskServicePort.class));
+            assertInstanceOf(TaskPolicyConfigurationServiceAdapter.class,
+                    context.getBean(TaskPolicyConfigurationServicePort.class));
             assertInstanceOf(ContactServiceAdapter.class, context.getBean(ContactServicePort.class));
             assertInstanceOf(NotificationServiceAdapter.class, context.getBean(NotificationServicePort.class));
             assertInstanceOf(ApplicationReleaseReadServiceAdapter.class,
