@@ -279,8 +279,6 @@ public class CaseController {
 	@FXML
 	private VBox detailsPane;
 	@FXML
-	private StackPane detailsUpdatesHost;
-	@FXML
 	private VBox tasksTabPane;
 	@FXML
 	private StackPane tasksUpdatesHost;
@@ -334,8 +332,6 @@ public class CaseController {
 	private Button caseCalendarNewEventButton;
 	@FXML
 	private Button caseCalendarNewTaskButton;
-	@FXML
-	private StackPane caseCalendarUpdatesHost;
 	@FXML
 	private VBox genericPane;
 	@FXML

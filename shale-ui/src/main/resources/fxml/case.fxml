@@ -420,7 +420,7 @@
 
 				<!-- DETAILS PANE -->
 				<VBox fx:id="detailsSectionPane" spacing="8" visible="false"
-					managed="false">
+					managed="false" maxWidth="1.7976931348623157E308">
 					<HBox alignment="CENTER_LEFT" spacing="8">
 						<Label text="Details"
 							style="-fx-font-size: 16px; -fx-font-weight: bold;" />
@@ -452,8 +452,9 @@
 					<HBox spacing="12" fillHeight="true" VBox.vgrow="ALWAYS">
 						<ScrollPane fx:id="detailsScrollPane" fitToWidth="true"
 							hbarPolicy="NEVER" styleClass="surface-scroll"
-							HBox.hgrow="ALWAYS">
-							<VBox fx:id="detailsPane" spacing="10" maxWidth="980"
+							HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308">
+							<VBox fx:id="detailsPane" spacing="10"
+								maxWidth="1.7976931348623157E308"
 								styleClass="case-main-surface">
 								<padding>
 									<Insets top="12" right="12" bottom="12" left="12" />
@@ -838,8 +839,6 @@
 
 							</VBox>
 						</ScrollPane>
-						<StackPane fx:id="detailsUpdatesHost" prefWidth="320.0"
-							minWidth="300.0" maxWidth="360.0" />
 					</HBox>
 				</VBox>
 				<!-- TASKS TAB PANE (center) -->
@@ -938,7 +937,9 @@
 					</padding>
 					<HBox spacing="10" alignment="TOP_LEFT" fillHeight="true"
 						VBox.vgrow="ALWAYS">
-						<VBox spacing="8" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS"
+						<VBox fx:id="caseCalendarContentPane" spacing="8"
+							HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS"
+							maxWidth="1.7976931348623157E308"
 							maxHeight="1.7976931348623157E308" styleClass="case-main-surface">
 							<padding>
 								<Insets top="10" right="10" bottom="10" left="10" />
@@ -974,8 +975,6 @@
 								</content>
 							</ScrollPane>
 						</VBox>
-						<StackPane fx:id="caseCalendarUpdatesHost"
-							prefWidth="320.0" minWidth="300.0" maxWidth="360.0" />
 					</HBox>
 				</VBox>
 

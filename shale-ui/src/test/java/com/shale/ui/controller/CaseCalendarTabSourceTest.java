@@ -1,5 +1,7 @@
 package com.shale.ui.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -40,7 +42,6 @@ final class CaseCalendarTabSourceTest {
 
         Map<String, Element> elementsById = elementsByFxId(caseFxml);
         assertNotNull(elementsById.get("caseCalendarTabPane"), "Case FXML must declare the Calendar tab pane.");
-        assertNotNull(elementsById.get("caseCalendarUpdatesHost"), "Case Calendar tab must keep the shared updates host.");
         assertNotNull(elementsById.get("caseCalendarAgendaBox"), "Case Calendar tab must keep the agenda content host.");
         assertNotNull(elementsById.get("caseCalendarNewEventButton"), "Case Calendar tab must keep the shared new-event entry point.");
         assertNotNull(elementsById.get("caseCalendarNewTaskButton"), "Case Calendar tab must keep the shared new-task entry point.");
@@ -105,6 +106,26 @@ final class CaseCalendarTabSourceTest {
                 "Case Calendar event editing must use the shared calendar event dialog.");
         assertTrue(openEditor.contains("calendarService.updateEvent"),
                 "Case Calendar event editing must persist through the shared calendar service.");
+    }
+
+    @Test
+    void caseCalendarContentConsumesSpaceBeforeTheSingleUpdatesRail() throws Exception {
+        Document caseFxml = parseFxml(Files.readString(FXML_PATH));
+        Map<String, Element> elementsById = elementsByFxId(caseFxml);
+
+        Element calendarContent = elementsById.get("caseCalendarContentPane");
+        assertNotNull(calendarContent, "Case Calendar must expose its responsive main-content pane.");
+        assertEquals("ALWAYS", calendarContent.getAttribute("HBox.hgrow"),
+                "Case Calendar main content must receive all spare horizontal width.");
+        assertEquals("1.7976931348623157E308", calendarContent.getAttribute("maxWidth"),
+                "Case Calendar main content must not retain a fixed maximum width.");
+        assertFalse(elementsById.containsKey("caseCalendarUpdatesHost"),
+                "Case Calendar must not reserve a second empty Updates-width column beside the global Updates rail.");
+
+        Element updates = elementsById.get("caseUpdatesPane");
+        assertNotNull(updates, "The Case shell must retain its single global Updates rail.");
+        assertEquals("336.0", updates.getAttribute("prefWidth"),
+                "The Updates rail must retain its stable preferred width while Calendar grows.");
     }
 
     @Test
