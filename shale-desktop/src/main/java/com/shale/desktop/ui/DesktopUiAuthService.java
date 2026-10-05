@@ -21,9 +21,12 @@ public final class DesktopUiAuthService implements UiAuthService {
 
 	@Override
 	public Result login(String email, String password) throws Exception {
+		return login(email,password,false);
+	}
+	@Override public Result login(String email,String password,boolean stayLoggedIn)throws Exception{
 		// Call real authentication in shale-data
 		User user = authService.login(email, password);
-		if(enrollment!=null)enrollment.stage(user.getShaleClientId(),user.getId(),user.getEmail(),password);
+		if(enrollment!=null)enrollment.stage(user.getShaleClientId(),user.getId(),user.getEmail(),password,stayLoggedIn);
 
 		// Convert core User -> UI layer Result record
 		return new Result(
@@ -34,4 +37,8 @@ public final class DesktopUiAuthService implements UiAuthService {
 				user.isAttorney() // attorney
 		);
 	}
+	@Override public boolean hasRememberedCredential(){return enrollment!=null&&enrollment.hasRememberedCredential();}
+	@Override public Result restore()throws Exception{if(enrollment==null)return null;var r=enrollment.restore();return r==null?null:new Result(r.userId(),r.shaleClientId(),r.email(),r.admin(),r.attorney());}
+	@Override public void commitRememberedCredential()throws Exception{if(enrollment!=null)enrollment.commitRemembered();}
+	@Override public void clearRememberedCredential(){if(enrollment!=null)enrollment.clearRemembered();}
 }

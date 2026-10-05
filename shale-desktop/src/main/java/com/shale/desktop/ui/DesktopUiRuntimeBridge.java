@@ -131,11 +131,8 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		enrollBestEffort(shaleClientId,userId);
 		if(serverSessions!=null){
 			Long instanceId=currentInstance.get().map(v->v.id()).orElse(null);
-			java.util.concurrent.CompletableFuture.runAsync(()->serverSessions.enroll(instanceId))
-					.whenComplete((ignored,failure)->{
-						if(failure!=null){log.warn("Desktop durable session enrollment task failed: {}",failure.getClass().getSimpleName());return;}
-						if(generation==sessionGeneration.get())serverSessions.startAcceleration(dispatcher,shaleClientId,generation,sessionGeneration::get,applicationPolicyRefreshHandler,()->invalidateConfirmedSession(generation));
-					});
+			serverSessions.enroll(instanceId);
+			if(generation==sessionGeneration.get())serverSessions.startAcceleration(dispatcher,shaleClientId,generation,sessionGeneration::get,applicationPolicyRefreshHandler,()->invalidateConfirmedSession(generation));
 		}
 
 		tryConnectLiveBus(shaleClientId, userId, generation);

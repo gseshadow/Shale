@@ -73,6 +73,8 @@ import com.shale.server.runtime.LegacyTokenCompatibilityPolicy;
 import com.shale.server.runtime.DesktopApplicationInstanceVerifier;
 import com.shale.server.runtime.ServerAuthSessionService;
 import com.shale.server.runtime.SessionManagementService;
+import com.shale.server.runtime.RememberCredentialStore;
+import com.shale.server.runtime.SqlRememberCredentialStore;
 import com.shale.server.live.InvalidationPublisher;
 import com.shale.server.live.HttpInvalidationPublisher;
 import org.springframework.core.env.Environment;
@@ -164,6 +166,10 @@ public class ShaleServerServiceConfiguration {
 	@Bean
 	@Profile({"dev", "local", "prod", "azure"})
 	DurableSessionStore durableSessionStore(RuntimeConnectionProvider connections){return new SqlDurableSessionStore(connections);}
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	RememberCredentialStore rememberCredentialStore(DataSources sources){return new SqlRememberCredentialStore(sources.auth());}
 
 	@Bean
 	@Profile({"dev", "local", "prod", "azure"})

@@ -68,6 +68,7 @@ public final class LoginController {
 	private CheckBox stayLoggedInCheckBox;
 	@FXML
 	private Label progressLabel;
+	@FXML private Button retryRestoreButton;
 	@FXML
 	private Circle backgroundGlow;
 
@@ -80,6 +81,7 @@ public final class LoginController {
 	private UiUpdateLauncher updateLauncher;
 	private UpdateFlowCoordinator updateFlowCoordinator;
 	private final AtomicBoolean authenticationInProgress = new AtomicBoolean();
+	private final java.util.concurrent.atomic.AtomicLong authenticationGeneration=new java.util.concurrent.atomic.AtomicLong();
 	private Animation backgroundAnimation;
 	private Animation entranceAnimation;
 
@@ -97,6 +99,7 @@ public final class LoginController {
 		this.runtimeBridge = runtimeBridge;
 		this.updateLauncher = updateLauncher;
 		this.updateFlowCoordinator = new UpdateFlowCoordinator(updateLauncher, sceneManager::onUpdaterLaunchSucceeded);
+		if(authService.hasRememberedCredential())Platform.runLater(this::attemptRestore);
 	}
 
 	@FXML
@@ -120,12 +123,13 @@ public final class LoginController {
 
 		signInButton.setDefaultButton(true);
 		ControlStyles.apply(signInButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(retryRestoreButton,ControlStyles.Purpose.SECONDARY,ControlStyles.Size.SMALL);
 		ControlStyles.formControl(emailField);
 		ControlStyles.formControl(passwordField);
 		ControlStyles.formControl(visiblePasswordField);
 		passwordField.textProperty().bindBidirectional(visiblePasswordField.textProperty());
 		stayLoggedInCheckBox.setSelected(false);
-		stayLoggedInCheckBox.setDisable(true);
+		stayLoggedInCheckBox.setDisable(false);
 
 		emailField.setOnAction(e -> onSignIn());
 		passwordField.setOnAction(e -> onSignIn());
@@ -233,22 +237,41 @@ public final class LoginController {
 	@FXML
 	private void onSignIn() {
 		if (!authenticationInProgress.compareAndSet(false, true)) return;
+		final long generation=authenticationGeneration.incrementAndGet();
 		System.out.println("LoginController.onSignIn()");// TODO
 		setBusy(true);
 		errorLabel.setText("");
 		final String email = emailField.getText() == null ? "" : emailField.getText().trim();
 		final String pass = passwordField.getText() == null ? "" : passwordField.getText();
+		final boolean stayLoggedIn=stayLoggedInCheckBox.isSelected();
 
 		new Thread(() ->
 		{
 			try {
-				UiAuthService.Result result = authService.login(email, pass);
+				UiAuthService.Result result = authService.login(email, pass,stayLoggedIn);
 				if (result == null) {
 					showError("Invalid email or password.");
 					return;
 				}
-				Platform.runLater(passwordField::clear);
+				if(generation!=authenticationGeneration.get())return;
+				completeAuthentication(result,generation);
+			} catch (Exception ex) {
+				showError("Sign-in failed. " + ex.getMessage());
+			} finally {
+				setBusy(false);
+				authenticationInProgress.set(false);
+			}
+		}, "login-thread").start();
+	}
 
+	private void attemptRestore(){
+		if(!authenticationInProgress.compareAndSet(false,true))return;long generation=authenticationGeneration.incrementAndGet();setBusy(true);progressLabel.setText("Signing you in…");errorLabel.setText("");
+		new Thread(()->{try{UiAuthService.Result result=authService.restore();if(result==null){showError("Saved sign-in is unavailable. Please sign in again.");return;}if(generation!=authenticationGeneration.get())return;completeAuthentication(result,generation);}catch(Exception ex){String name=ex.getClass().getSimpleName();if(name.contains("Enrollment")){showError("Shale could not reach the server. Retry or sign in manually.");Platform.runLater(()->{retryRestoreButton.setVisible(true);retryRestoreButton.setManaged(true);});}else showError(ex.getMessage());}finally{setBusy(false);authenticationInProgress.set(false);}},"remembered-sign-in").start();
+	}
+	@FXML private void onRetryRestore(){retryRestoreButton.setVisible(false);retryRestoreButton.setManaged(false);attemptRestore();}
+
+	private void completeAuthentication(UiAuthService.Result result,long generation)throws Exception{
+				Platform.runLater(passwordField::clear);
 				appState.setUserId(result.userId());
 				appState.setShaleClientId(result.shaleClientId());
 				appState.setUserEmail(result.email());
@@ -256,6 +279,7 @@ public final class LoginController {
 				appState.setAttorney(result.attorney());
 
 				runtimeBridge.onLoginSuccess(result.userId(), result.shaleClientId(), result.email());
+				authService.commitRememberedCredential();
 				Theme appearance;
 				try {
 					appearance = sceneManager.loadAppearanceForAuthenticatedUser();
@@ -281,13 +305,6 @@ public final class LoginController {
 					sceneManager.onUpdateCheckCompleted(updateCheck);
 					handlePostLoginFlow(updateCheck);
 				});
-			} catch (Exception ex) {
-				showError("Sign-in failed. " + ex.getMessage());
-			} finally {
-				setBusy(false);
-				authenticationInProgress.set(false);
-			}
-		}, "login-thread").start();
 	}
 
 	private void handlePostLoginFlow(UiUpdateLauncher.UpdateCheckResult updateCheck) {
@@ -310,6 +327,7 @@ public final class LoginController {
 			passwordField.setDisable(busy);
 			visiblePasswordField.setDisable(busy);
 			passwordVisibilityButton.setDisable(busy);
+			stayLoggedInCheckBox.setDisable(busy);
 			progressLabel.setVisible(busy);
 			progressLabel.setManaged(busy);
 		});
