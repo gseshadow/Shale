@@ -2,7 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd)
+if [[ -n "${SHALE_RELEASE_ROOT:-}" ]]; then
+  ROOT=$(cd -- "$SHALE_RELEASE_ROOT" && pwd)
+else
+  ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd)
+fi
 
 usage() {
   echo "Usage: $0 <branch> <version>" >&2

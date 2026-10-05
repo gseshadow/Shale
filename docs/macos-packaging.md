@@ -28,10 +28,14 @@ export JAVAFX_JMODS_DIR=/absolute/path/to/javafx-jmods
 ```
 
 The cross-platform `release-all.bat` flow pushes its exact preflighted Git `HEAD` when needed, fetches the configured
-remote again, verifies that its upstream ref contains that exact commit, and only then passes the SHA to
-`prepare-shale-mac-release.sh`. The Mac workspace fetches origin and checks out that commit before applying the
-requested release version, so Mac and Windows artifacts use the same origin-available source revision. Direct legacy two-argument Mac preparation remains supported but emits a source
-revision mismatch warning because it falls back to `origin/<branch>`.
+remote again, verifies that its upstream ref contains that exact commit, and only then passes the SHA to a narrow
+SSH bootstrap. The bootstrap fetches the configured Mac remote, verifies the full requested commit, extracts
+`prepare-shale-mac-release.sh` from that commit into a temporary file, verifies the extracted Git blob, and executes
+it with the repository root supplied explicitly. It never invokes the checkout's potentially stale release script.
+The requested script then uses `mac_release_workspace.py` from the checked-out commit to clean only allowlisted POMs
+and check out that exact commit before applying the requested release version, so Mac and Windows artifacts use the
+same origin-available source revision. Direct legacy two-argument Mac preparation remains supported but emits a
+source revision mismatch warning because it falls back to `origin/<branch>`.
 
 The dedicated Mac checkout is reusable. Before fetching or switching revisions, preparation inspects all tracked,
 staged, and untracked changes. It restores only the root POM and the six module POMs whose versions are temporarily
