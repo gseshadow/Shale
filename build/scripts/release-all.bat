@@ -13,6 +13,7 @@ set "SCRIPT_DIR=%ROOT%\build\scripts"
 set "DOWNSTREAM_SCRIPT=%SCRIPT_DIR%\release-and-publish.bat"
 set "MAC_HOST=admin@192.168.1.56"
 set "MAC_REPO=/Users/admin/Documents/Shale"
+set "MAC_REMOTE=origin"
 set "MAC_DIST=%MAC_REPO%/dist-macos"
 set "HANDOFF=%ROOT%\build\mac-handoff"
 set "MAC_ZIP=%HANDOFF%\ShaleApp-%VERSION%-mac.zip"
@@ -46,7 +47,7 @@ echo.
 
 echo Step 1: Run Mac build via SSH
 echo Mac artifacts will be built from source revision: %SOURCE_REVISION%
-ssh %MAC_HOST% "cd %MAC_REPO% && ./build/scripts/prepare-shale-mac-release.sh codex/latest %VERSION% %SOURCE_REVISION%" || goto :fail
+python "%SCRIPT_DIR%\mac_release_bootstrap.py" "%MAC_HOST%" "%MAC_REPO%" "%MAC_REMOTE%" "codex/latest" "%VERSION%" "%SOURCE_REVISION%" || goto :fail
 
 echo.
 echo Step 2: Fetch Mac artifacts

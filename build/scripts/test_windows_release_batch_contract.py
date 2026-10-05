@@ -196,7 +196,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         preflight = full.index("release_git_sync.py\" preflight")
         source_sync = full.index("release_git_sync.py\" publish-source")
         revision = full.index("git rev-parse HEAD")
-        mac_build = full.index("ssh %MAC_HOST%")
+        mac_build = full.index("mac_release_bootstrap.py")
         self.assertEqual(
             [preflight, revision, source_sync, mac_build],
             sorted([preflight, revision, source_sync, mac_build]),
@@ -205,6 +205,8 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn('publish-source "%ROOT%" "%SOURCE_REVISION%"', full)
         self.assertIn('set "SHALE_GIT_PREFLIGHT_DONE=true"', full)
         self.assertIn("%SOURCE_REVISION%", full)
+        self.assertIn('"%MAC_REMOTE%" "codex/latest" "%VERSION%" "%SOURCE_REVISION%"', full)
+        self.assertNotIn('./build/scripts/prepare-shale-mac-release.sh', full)
         self.assertLess(publish.index("release_git_sync.py\" preflight"), publish.index('release.bat"'))
         self.assertLess(publish.index('release.bat"'), publish.index("release_git_sync.py\" sync"))
         self.assertLess(publish.index("release_git_sync.py\" sync"), publish.index('publish-update.bat"'))
@@ -214,7 +216,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         full = batch_source("release-all.bat")
         source_sync = full.index('release_git_sync.py" publish-source')
         source_failure = full.index('goto :source_sync_failed', source_sync)
-        mac_build = full.index("ssh %MAC_HOST%")
+        mac_build = full.index("mac_release_bootstrap.py")
         windows_release = full.index('call "%DOWNSTREAM_SCRIPT%"')
         self.assertLess(source_sync, source_failure)
         self.assertLess(source_failure, mac_build)
@@ -228,7 +230,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         preparation = full.index('prepare_release_notes.py"')
         prepared_branch = full.index('if "%PREPARE_EXIT%"=="10" goto :notes_prepared')
         preflight = full.index('release_git_sync.py" preflight')
-        mac_build = full.index("ssh %MAC_HOST%")
+        mac_build = full.index("mac_release_bootstrap.py")
         windows_release = full.index('call "%DOWNSTREAM_SCRIPT%"')
         self.assertLess(preparation, prepared_branch)
         self.assertLess(prepared_branch, preflight)
@@ -247,7 +249,7 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         preparation = full.index('prepare_release_notes.py"')
         notes_commit = full.index('release_git_sync.py" prepare-notes')
         preflight = full.index('release_git_sync.py" preflight')
-        mac_build = full.index("ssh %MAC_HOST%")
+        mac_build = full.index("mac_release_bootstrap.py")
         windows_release = full.index('call "%DOWNSTREAM_SCRIPT%"')
         self.assertEqual(
             [preparation, notes_commit, preflight, mac_build, windows_release],
