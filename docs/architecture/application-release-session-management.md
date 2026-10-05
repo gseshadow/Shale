@@ -5,6 +5,46 @@ release/session initiative remains in progress and logged-out updates remain `UN
 
 **Last reviewed:** 2026-10-05
 
+## Remembered desktop sign-in implementation — 2026-10-05
+
+Stay logged in is now an opt-in desktop extension of the durable `UserSessions` lifecycle. Password sign-in still
+initializes the existing runtime and enrolls exactly one desktop session. When selected, the server additionally
+issues a 256-bit opaque credential, stores only its SHA-256 hash in `DesktopRememberCredentials`, and binds it to
+the server-derived tenant/user, durable session, and stable installation UUID. The credential is not an access
+bearer: access bearers remain process-memory-only. Windows stores the opaque value with current-user DPAPI in the
+per-user Shale support directory; unsupported protected storage leaves ordinary password login available.
+
+Restore runs off the JavaFX thread before ordinary login presentation completes, shows “Signing you in…”, and uses
+the same runtime initialization, application-instance enrollment, live connection, update policy, and session
+monitoring path as password login. The server checks the active user, tenant membership, durable session, revocation,
+installation, and absolute expiry before access issuance. Every successful use replaces the credential hash under a
+serializable lock and rotates the access JTI. The absolute deadline is fixed at 30 days and is never extended by use.
+Invalid/revoked/expired credentials are deleted locally; transport uncertainty retains protected state and grants no
+offline access. Before rotation the client DPAPI-protects both the current and proposed replacement so an interrupted
+response can retry the proposed value first and safely fall back to the prior value without creating another session.
+Explicit logout clears DPAPI state before its bounded best-effort server revocation; ordinary window
+close performs shutdown only and preserves the remembered relationship. Existing self/admin session revocation
+invalidates restore through the same `UserSessions` row. No credential value is included in logging or audit metadata.
+
+### Required deployment order and acceptance status
+
+1. Back up the database and run `docs/sql/2026-10-05_desktop_remember_credentials.sql`.
+2. Run `docs/sql/verification/2026-10-05_desktop_remember_credentials_verification.sql`; investigate every finding.
+3. Deploy the matching server before distributing the matching MSI. Older desktop clients continue ordinary login.
+4. Build/sign/package the MSI through the existing Windows release process; JNA's maintained DPAPI integration is
+   included as a normal packaged runtime dependency.
+
+Automated source/test verification is recorded with the implementation commit. Production acceptance remains
+**PENDING** until a signed installed MSI and deployed SQL/server complete the manual checklist: checked login plus
+application restart; Windows restart; unchecked login leaving no restore; X-close preserving restore; explicit
+logout clearing restore; self-revocation; administrator revocation; disabled-account rejection; transient network
+failure with retry/manual sign-in; and DPAPI-unavailable behavior under the installation owner account.
+
+Audit compatibility review: credential creation/rotation is security plumbing within the existing durable session
+relationship, not a new domain mutation or sensitive-data view. Existing session enrollment/logout/self/admin
+revocation audit events remain authoritative. No new audit payload is added because even a hash, credential prefix,
+installation identifier, or rotation detail would add unnecessary authentication metadata exposure.
+
 **Authority:** This document is the roadmap and current-state record for application releases, update
 policy, installed desktop instances, authenticated sessions, revocation, and future client support.
 Later work in this initiative must update the progress tracker and any decisions changed by verified

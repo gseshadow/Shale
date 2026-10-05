@@ -72,6 +72,13 @@ public final class ShaleAuthTokenService {
         return new PreparedAuthToken(principal, UUID.randomUUID(), issuedAt, issuedAt + ttlSeconds);
     }
 
+    /** Prepares a token for an access JTI already reserved by the same atomic persistence transaction. */
+    PreparedAuthToken prepare(ServerPrincipal principal,UUID tokenId){
+        if(!enabled)throw new IllegalStateException("Authentication tokens are not enabled for this profile.");
+        java.util.Objects.requireNonNull(principal,"principal");java.util.Objects.requireNonNull(tokenId,"tokenId");
+        long issuedAt=Instant.now(clock).getEpochSecond();return new PreparedAuthToken(principal,tokenId,issuedAt,issuedAt+ttlSeconds);
+    }
+
     /** Signs a token only after its prepared JTI/expiry have been durably persisted. */
     public String issueBound(PreparedAuthToken prepared, UUID sessionId) {
         java.util.Objects.requireNonNull(prepared, "prepared");

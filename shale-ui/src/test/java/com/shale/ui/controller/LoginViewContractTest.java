@@ -17,7 +17,7 @@ final class LoginViewContractTest {
     private static final Path CONTROLLER = Path.of("src/main/java/com/shale/ui/controller/LoginController.java");
 
     @Test
-    void loginResourceKeepsApprovedCopyAndSessionPlaceholder() throws Exception {
+    void loginResourceKeepsApprovedCopyAndFunctionalStayLoggedInControl() throws Exception {
         var document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(FXML.toFile());
         assertTrue(document.getDocumentElement().getTagName().endsWith("StackPane"),
                 "login resource must retain one parseable root");
@@ -29,10 +29,10 @@ final class LoginViewContractTest {
                 "approved login subtitle must remain exact");
         assertTrue(fxml.contains("Welcome back") && fxml.contains("Sign in to your workspace."),
                 "the sign-in card must retain its approved hierarchy");
-        assertTrue(fxml.contains("Only on your personal device.") && fxml.contains("Coming soon"),
-                "persistent-session copy must describe its unavailable state");
-        assertTrue(fxml.contains("fx:id=\"stayLoggedInCheckBox\"") && fxml.contains("disable=\"true\""),
-                "Stay logged in must remain an explicitly disabled placeholder");
+        assertTrue(fxml.contains("Only on your personal device.") && !fxml.contains("Coming soon"),
+                "persistent-session copy must retain the device warning without placeholder text");
+        assertTrue(fxml.contains("fx:id=\"stayLoggedInCheckBox\"") && !fxml.contains("disable=\"true\""),
+                "Stay logged in must be available and unchecked by default");
         assertFalse(fxml.contains("forgot") || fxml.contains("support"),
                 "login must not offer an unimplemented help destination");
 

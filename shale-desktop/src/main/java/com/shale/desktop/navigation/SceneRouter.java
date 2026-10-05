@@ -61,7 +61,7 @@ public final class SceneRouter {
 
 		AppState appState = new AppState();
 		var serverSession=new DesktopServerSession();
-		var enrollment=new DesktopSessionEnrollmentLifecycle(serverApiOrigin.map(URI::toString).map(DesktopSessionEnrollmentClient::new).orElse(null),serverSession);
+		var enrollment=new DesktopSessionEnrollmentLifecycle(serverApiOrigin.map(URI::toString).map(DesktopSessionEnrollmentClient::new).orElse(null),serverSession,new ProtectedRememberCredentialStore(),machineIdentity==null?null:machineIdentity.machineId().orElse(null));
 		var uiAuthService = new DesktopUiAuthService(authService,enrollment);
 
 		// Create ONE provider instance and share it with SceneManager + DesktopUiRuntimeBridge

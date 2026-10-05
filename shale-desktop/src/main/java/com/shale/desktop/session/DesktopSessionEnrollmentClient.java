@@ -21,8 +21,16 @@ public class DesktopSessionEnrollmentClient {
     public DesktopSessionEnrollmentClient(String apiBaseUrl){this(URI.create(trim(apiBaseUrl)+"/api/auth/desktop-session"),HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build());}
     DesktopSessionEnrollmentClient(URI endpoint,HttpClient http){this.endpoint=endpoint;this.http=http;}
     public DesktopServerSession.Credential enroll(String email,String password,Long instanceId)throws EnrollmentException{
-        String body=gson.toJson(new Request(email,password,instanceId));
-        HttpRequest request=HttpRequest.newBuilder(endpoint).timeout(Duration.ofSeconds(8)).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body,StandardCharsets.UTF_8)).build();
+        return exchange(gson.toJson(new Request(email,password,instanceId,false,null)),endpoint).credential();
+    }
+    public EnrollmentResult enrollRemembered(String email,String password,Long instanceId,java.util.UUID installationId)throws EnrollmentException{
+        return exchange(gson.toJson(new Request(email,password,instanceId,true,installationId)),endpoint);
+    }
+    public EnrollmentResult restore(String credential,String replacement,java.util.UUID installationId)throws EnrollmentException{
+        return exchange(gson.toJson(new RestoreRequest(credential,replacement,installationId)),endpoint.resolve("/api/auth/desktop-session/restore"));
+    }
+    private EnrollmentResult exchange(String body,URI target)throws EnrollmentException{
+        HttpRequest request=HttpRequest.newBuilder(target).timeout(Duration.ofSeconds(8)).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body,StandardCharsets.UTF_8)).build();
         long started=System.nanoTime();
         try{
             HttpResponse<String> response=http.send(request,HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));int status=response.statusCode();
@@ -30,7 +38,7 @@ public class DesktopSessionEnrollmentClient {
             if(status==404||status==501)throw new EnrollmentException(Failure.ENDPOINT_UNAVAILABLE);
             if(status==401||status==403)throw new EnrollmentException(Failure.SECURITY_REJECTED);
             if(status<200||status>=300)throw new EnrollmentException(status>=500?Failure.TRANSIENT:Failure.SECURITY_REJECTED);
-            try{Response value=gson.fromJson(response.body(),Response.class);return new DesktopServerSession.Credential(value.accessToken,java.util.UUID.fromString(value.sessionId),java.util.UUID.fromString(value.currentJti),java.time.Instant.parse(value.expiresAt));}
+            try{Response value=gson.fromJson(response.body(),Response.class);var c=new DesktopServerSession.Credential(value.accessToken,java.util.UUID.fromString(value.sessionId),java.util.UUID.fromString(value.currentJti),java.time.Instant.parse(value.expiresAt));return new EnrollmentResult(c,value.rememberCredential,value.userId,value.shaleClientId,value.email,Boolean.TRUE.equals(value.admin),Boolean.TRUE.equals(value.attorney));}
             catch(RuntimeException bad){throw new EnrollmentException(Failure.MALFORMED_RESPONSE,bad);}
         }catch(EnrollmentException e){throw e;}catch(IOException e){logTransportFailure(e,started);throw new EnrollmentException(Failure.TRANSIENT,e);}catch(InterruptedException e){Thread.currentThread().interrupt();logTransportFailure(e,started);throw new EnrollmentException(Failure.TRANSIENT,e);}
     }
@@ -50,6 +58,8 @@ public class DesktopSessionEnrollmentClient {
     private static void logLogoutTransportFailure(Throwable failure,long started){log.warn("Desktop durable session logout transport failure kind={} exceptionClass={} elapsedMs={}.",transportFailureKind(failure),failure.getClass().getSimpleName(),elapsedMillis(started));}
     private static boolean hasCause(Throwable failure,Class<? extends Throwable> type){for(Throwable current=failure;current!=null;current=current.getCause())if(type.isInstance(current))return true;return false;}
     private static long elapsedMillis(long started){return Math.max(0L,java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));}
-    private record Request(String email,String password,Long applicationInstanceId){}
-    private record Response(String accessToken,String sessionId,String currentJti,String expiresAt){}
+    public record EnrollmentResult(DesktopServerSession.Credential credential,String rememberCredential,Integer userId,Integer shaleClientId,String email,boolean admin,boolean attorney){}
+    private record Request(String email,String password,Long applicationInstanceId,Boolean remember,java.util.UUID installationId){}
+    private record RestoreRequest(String credential,String replacementCredential,java.util.UUID installationId){}
+    private record Response(String accessToken,String sessionId,String currentJti,String expiresAt,String rememberCredential,Integer userId,Integer shaleClientId,String email,Boolean admin,Boolean attorney){}
 }

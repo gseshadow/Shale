@@ -85,10 +85,11 @@
 								<StackPane><PasswordField fx:id="passwordField" promptText="Enter your password" maxWidth="Infinity"/><TextField fx:id="visiblePasswordField" promptText="Enter your password" maxWidth="Infinity" visible="false" managed="false"/></StackPane>
 								<ToggleButton fx:id="passwordVisibilityButton" text="Show password" onAction="#onPasswordVisibilityChanged" styleClass="login-password-toggle" />
 							</VBox>
-							<HBox alignment="CENTER_LEFT" spacing="10" styleClass="login-stay-row"><CheckBox fx:id="stayLoggedInCheckBox" text="Stay logged in" disable="true"><tooltip><Tooltip text="Persistent sessions are not available yet. Shale will continue to sign you out normally." wrapText="true"/></tooltip></CheckBox><Label text="Coming soon" styleClass="login-coming-soon"/></HBox>
+							<HBox alignment="CENTER_LEFT" spacing="10" styleClass="login-stay-row"><CheckBox fx:id="stayLoggedInCheckBox" text="Stay logged in" /></HBox>
 							<Label text="Only on your personal device." styleClass="login-supporting-text" />
 							<Button fx:id="signInButton" text="Sign in" onAction="#onSignIn" defaultButton="true" maxWidth="Infinity" />
 							<Label fx:id="progressLabel" text="Signing in…" visible="false" managed="false" minHeight="20" styleClass="login-progress" />
+							<Button fx:id="retryRestoreButton" text="Retry saved sign-in" onAction="#onRetryRestore" visible="false" managed="false" />
 							<Label fx:id="errorLabel" wrapText="true" minHeight="40" styleClass="login-error" />
 						</VBox>
 					</StackPane>
