@@ -21,7 +21,8 @@ final class LoginViewContractTest {
                 "login resource must retain one parseable root");
         String fxml = Files.readString(FXML);
 
-        assertTrue(fxml.contains("Your practice. In order."), "approved login headline must remain exact");
+        assertTrue(fxml.contains("text=\"Your practice.\"") && fxml.contains("text=\"In order.\""),
+                "approved two-line login headline must remain exact");
         assertTrue(fxml.contains("Cases, tasks, and your team. Together in Shale."),
                 "approved login subtitle must remain exact");
         assertTrue(fxml.contains("Welcome back") && fxml.contains("Sign in to your workspace."),
@@ -32,6 +33,13 @@ final class LoginViewContractTest {
                 "Stay logged in must remain an explicitly disabled placeholder");
         assertFalse(fxml.contains("forgot") || fxml.contains("support"),
                 "login must not offer an unimplemented help destination");
+
+		assertTrue(fxml.contains("maxWidth=\"1220\"") && fxml.contains("maxHeight=\"USE_PREF_SIZE\""),
+				"the centered composition and content-sized card must remain bounded");
+		assertTrue(fxml.contains("prefWidth=\"540\"") && fxml.contains("prefHeight=\"310\""),
+				"the illustration must retain an explicit bounded desktop size");
+		assertTrue(fxml.contains("minHeight=\"252\"") && fxml.contains("maxHeight=\"252\""),
+				"decorative cards must not inherit unbounded parent height");
     }
 
     @Test
@@ -48,5 +56,8 @@ final class LoginViewContractTest {
                 "login motion must support the application reduced-motion override");
         assertTrue(source.contains("public void dispose()") && source.contains("backgroundAnimation.stop()"),
                 "view-owned background motion must stop when the login view is disposed");
+		assertTrue(source.contains("loginRoot.heightProperty().addListener")
+				&& source.contains("loginIllustration.setManaged(showBranding && showIllustration)"),
+				"responsive layout must consider height and remove decoration before form usability");
     }
 }
