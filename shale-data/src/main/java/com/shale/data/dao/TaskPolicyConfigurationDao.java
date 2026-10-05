@@ -1,0 +1,22 @@
+package com.shale.data.dao;
+
+import static com.shale.core.service.TaskPolicyConfigurationServicePort.*;
+import java.sql.*;
+import java.util.EnumMap;
+import java.util.Objects;
+import com.shale.core.model.TaskDueDatePolicy;
+import com.shale.core.runtime.DbSessionProvider;
+
+/** Transaction owner for tenant task-policy administration. */
+public final class TaskPolicyConfigurationDao {
+    private final DbSessionProvider db; private final EntityActionAuditDao audits;
+    public TaskPolicyConfigurationDao(DbSessionProvider db){this(db,new EntityActionAuditDao());}
+    TaskPolicyConfigurationDao(DbSessionProvider db,EntityActionAuditDao audits){this.db=Objects.requireNonNull(db,"db");this.audits=Objects.requireNonNull(audits,"audits");}
+    public TaskPolicyConfiguration load(int tenant,int actor){validateIds(tenant,actor);try(Connection con=db.requireConnection()){verifyContext(con,tenant);validateAdmin(con,tenant,actor);return read(con,tenant);}catch(SQLException e){throw failure(e);}}
+    public TaskPolicyConfiguration update(UpdateTaskPolicyCommand c){Objects.requireNonNull(c,"command");validateIds(c.shaleClientId(),c.actorUserId());Objects.requireNonNull(c.dueDatePolicy(),"dueDatePolicy");if(c.configurationId()<=0)throw new IllegalArgumentException("configurationId must be > 0");try(Connection con=db.requireConnection()){verifyContext(con,c.shaleClientId());con.setAutoCommit(false);try{validateAdmin(con,c.shaleClientId(),c.actorUserId());TaskPolicyConfiguration old=read(con,c.shaleClientId());if(old.id()!=c.configurationId())throw new SecurityException("Task policy configuration is not available for this tenant.");try(PreparedStatement p=con.prepareStatement("UPDATE dbo.TaskPolicyConfigurations SET DueDatePolicy=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND RowVer=?")){p.setString(1,c.dueDatePolicy().name());p.setInt(2,c.actorUserId());p.setLong(3,c.configurationId());p.setInt(4,c.shaleClientId());p.setBytes(5,c.expectedRowVer());if(p.executeUpdate()!=1)throw new IllegalStateException("Task due-date policy changed. Reload before saving.");}var md=new EnumMap<EntityActionAuditEvent.MetadataKey,Object>(EntityActionAuditEvent.MetadataKey.class);md.put(EntityActionAuditEvent.MetadataKey.PREVIOUS_POLICY,old.dueDatePolicy().name());md.put(EntityActionAuditEvent.MetadataKey.RESULTING_POLICY,c.dueDatePolicy().name());audits.append(con,EntityActionAuditEvent.now(c.shaleClientId(),c.actorUserId(),EntityActionAuditEvent.EntityType.TASK_POLICY_CONFIGURATION,c.configurationId(),EntityActionAuditEvent.Action.UPDATED,null,null,md));con.commit();return read(con,c.shaleClientId());}catch(Exception e){try{con.rollback();}catch(SQLException rollback){e.addSuppressed(rollback);}if(e instanceof RuntimeException runtime)throw runtime;throw e;}finally{con.setAutoCommit(true);}}catch(SQLException e){throw failure(e);}}
+    private static TaskPolicyConfiguration read(Connection c,int tenant)throws SQLException{try(var p=c.prepareStatement("SELECT Id,ShaleClientId,DueDatePolicy,RowVer FROM dbo.TaskPolicyConfigurations WHERE ShaleClientId=?")){p.setInt(1,tenant);try(var r=p.executeQuery()){if(!r.next())throw new IllegalStateException("Task policy configuration is not provisioned for this tenant.");return new TaskPolicyConfiguration(r.getLong(1),r.getInt(2),TaskDueDatePolicy.fromDatabase(r.getString(3)),r.getBytes(4));}}}
+    private static void validateIds(int tenant,int actor){if(tenant<=0||actor<=0)throw new IllegalArgumentException("Tenant and actor are required.");}
+    private static void verifyContext(Connection c,int tenant)throws SQLException{try(var p=c.prepareStatement("SELECT TRY_CONVERT(int,SESSION_CONTEXT(N'ShaleClientId'))");var r=p.executeQuery()){if(!r.next()||r.getObject(1)==null||r.getInt(1)!=tenant)throw new SecurityException("Tenant session context does not match the requested tenant.");}}
+    private static void validateAdmin(Connection c,int tenant,int actor)throws SQLException{try(var p=c.prepareStatement("SELECT 1 FROM dbo.Users WHERE id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0 AND ISNULL(IsRemoved,0)=0 AND ISNULL(is_admin,0)=1 AND TRY_CONVERT(int,SESSION_CONTEXT(N'PrincipalUserId'))=?")){p.setInt(1,actor);p.setInt(2,tenant);p.setInt(3,actor);try(var r=p.executeQuery()){if(!r.next())throw new SecurityException("Only an active administrator may manage task policy.");}}}
+    private static RuntimeException failure(SQLException e){return new IllegalStateException("Task policy persistence failed.",e);}
+}

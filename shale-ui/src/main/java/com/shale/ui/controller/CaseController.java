@@ -4482,7 +4482,8 @@ public class CaseController {
 				Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(
 						taskDialogOwner(),
 						priorities,
-						assignableUsers);
+						assignableUsers,
+						caseTaskService.resolveTaskDueDatePolicy(shaleClientId));
 				if (input.isEmpty()) {
 					return;
 				}
@@ -4677,7 +4678,8 @@ public class CaseController {
 						}
 					},
 					onOpenUser,
-					onOpenCase);
+					onOpenCase,
+					caseTaskService.resolveTaskDueDatePolicy(shaleClientId));
 			if (result.isEmpty()) {
 				return;
 			}

@@ -1367,3 +1367,7 @@ affected count, closed event/reason codes, and database UTC time; they never con
 deactivation/removal and administrative password reset update the user and revoke every unrevoked session with
 `SECURITY` in the same transaction. Bound-token lookup also joins current active user eligibility as race-safe
 defense in depth.
+
+## dbo.TaskPolicyConfigurations (Task Due Date Policy)
+
+One strict tenant-owned row stores `DueDatePolicy` as `OPTIONAL`, `WARN`, or `REQUIRED`; the unique tenant key prevents duplicate authority and a missing row resolves to `WARN`. `WARN` is desktop confirmation behavior only. `REQUIRED` is enforced by `TaskDao` immediately before every task create/update, while existing undated tasks remain readable. The table has timestamps, actor columns, `RowVer`, a closed-value check, and strict tenant filter/insert/update RLS predicates. Administrative changes use the established transactional entity-action audit seam with TASK_POLICY_CONFIGURATION/UPDATED and allowlisted PREVIOUS_POLICY/RESULTING_POLICY metadata. The tenant-qualified RowVer update and audit append share one connection and transaction; administrator, tenant context, and actor identity are checked before mutation.

@@ -20,6 +20,8 @@ import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.TaskDao;
+import com.shale.data.dao.TaskPolicyConfigurationDao;
+import com.shale.data.service.adapter.TaskPolicyConfigurationServiceAdapter;
 import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.UserBoardLanePreferencesDao;
 import com.shale.data.dao.UserPreferencesDao;
@@ -948,6 +950,7 @@ public final class SceneManager {
 			c.init(notificationPreferencesService, appearancePreferenceService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new MaterialRequestServiceAdapter(
 					new MaterialRequestDao(dbSessionProvider)), new ContactServiceAdapter(new ContactDao(dbSessionProvider)),
 					new OrganizationServiceAdapter(new OrganizationDao(dbSessionProvider),new CaseSummaryDao(dbSessionProvider)),new UserDao(dbSessionProvider), runtimeBridge);
+			c.setTaskPolicyService(new TaskPolicyConfigurationServiceAdapter(new TaskPolicyConfigurationDao(dbSessionProvider)));
 			return c;
 		});
 	}
@@ -1464,7 +1467,8 @@ public final class SceneManager {
 					}
 				},
 				this::openUserProfile,
-				caseId -> openCaseProfile(caseId, "OVERVIEW"));
+				caseId -> openCaseProfile(caseId, "OVERVIEW"),
+				caseTaskService.resolveTaskDueDatePolicy(shaleClientId));
 		if (result.isEmpty()) {
 			taskDetailDialogInFlight.set(false);
 			if (dialogMutatedAssignments.get())

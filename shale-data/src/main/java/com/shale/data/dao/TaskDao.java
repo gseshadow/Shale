@@ -20,6 +20,8 @@ import com.shale.core.dto.TaskDetailDto;
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.core.runtime.DbSessionProvider;
+import com.shale.core.model.TaskDueDatePolicy;
+import com.shale.core.service.TaskDueDateRequiredException;
 import com.shale.core.semantics.RoleSemantics;
 
 /**
@@ -1546,6 +1548,7 @@ public final class TaskDao {
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
+            enforceDueDatePolicy(con, shaleClientId, dueAt);
             int defaultStatusId = resolveDefaultTaskStatusId(con, shaleClientId);
             int resolvedPriorityId = resolvePriorityIdForCreate(con, shaleClientId, priorityId);
             int i = 1;
@@ -1670,6 +1673,7 @@ public final class TaskDao {
 
         try (Connection con = db.requireConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
+            enforceDueDatePolicy(con, shaleClientId, dueAt);
             TaskDetailDto before = findTaskDetail(taskId, shaleClientId);
             int resolvedStatusId = resolveStatusIdForUpdate(con, shaleClientId, statusId);
             if (completed) {
@@ -1697,6 +1701,32 @@ public final class TaskDao {
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update taskId=" + taskId, e);
+        }
+    }
+
+    /** Authoritative tenant policy read. Missing rows intentionally resolve to WARN. */
+    public TaskDueDatePolicy resolveDueDatePolicy(int shaleClientId) {
+        if (shaleClientId <= 0) throw new IllegalArgumentException("shaleClientId must be > 0");
+        try (Connection con = db.requireConnection()) {
+            return resolveDueDatePolicy(con, shaleClientId);
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to resolve task due-date policy", e);
+        }
+    }
+
+    private static void enforceDueDatePolicy(Connection con, int tenantId, LocalDateTime dueAt) throws SQLException {
+        if (dueAt == null && resolveDueDatePolicy(con, tenantId) == TaskDueDatePolicy.REQUIRED) {
+            throw new TaskDueDateRequiredException();
+        }
+    }
+
+    private static TaskDueDatePolicy resolveDueDatePolicy(Connection con, int tenantId) throws SQLException {
+        try (PreparedStatement ps = con.prepareStatement(
+                "SELECT DueDatePolicy FROM dbo.TaskPolicyConfigurations WHERE ShaleClientId=?")) {
+            ps.setInt(1, tenantId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? TaskDueDatePolicy.fromDatabase(rs.getString(1)) : TaskDueDatePolicy.WARN;
+            }
         }
     }
 

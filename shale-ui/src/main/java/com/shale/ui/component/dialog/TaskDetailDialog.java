@@ -20,6 +20,7 @@ import java.util.function.Function;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
 import com.shale.core.dto.TaskStatusOptionDto;
+import com.shale.core.model.TaskDueDatePolicy;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory.CaseCardModel;
 import com.shale.ui.component.factory.UserCardFactory;
@@ -73,6 +74,21 @@ public final class TaskDetailDialog {
             NotesEditor notesEditor,
             Consumer<Integer> onOpenUser,
             Consumer<Integer> onOpenCase) {
+        return showAndWait(timingContext, clickReceivedAtNanos, owner, model, statuses, priorities,
+                loadCoreTaskData, loadAssignableUsersForTask, loadAssignedTeamMembers, loadActivityEntries,
+                loadNoteEntries, assignmentEditor, notesEditor, onOpenUser, onOpenCase, TaskDueDatePolicy.WARN);
+    }
+
+    public static Optional<TaskDetailResult> showAndWait(
+            String timingContext, long clickReceivedAtNanos, Window owner, TaskDetailModel model,
+            List<TaskStatusOptionDto> statuses, List<TaskPriorityOptionDto> priorities,
+            Function<Long, CoreTaskHydration> loadCoreTaskData,
+            Function<Long, List<CaseTaskService.AssignableUserOption>> loadAssignableUsersForTask,
+            Function<Long, List<AssignedTeamMember>> loadAssignedTeamMembers,
+            Function<Long, List<TaskActivityEntry>> loadActivityEntries,
+            Function<Long, List<TaskNoteEntry>> loadNoteEntries, AssignmentEditor assignmentEditor,
+            NotesEditor notesEditor, Consumer<Integer> onOpenUser, Consumer<Integer> onOpenCase,
+            TaskDueDatePolicy dueDatePolicy) {
         long dialogCreateStartedAt = PerfLog.start();
         Stage stage = AppDialogs.createModalStage(owner, "Task Details");
         Consumer<Integer> closeAndOpenUser = userId -> {
@@ -539,6 +555,20 @@ public final class TaskDetailDialog {
                 dueAt = parseDueAt(dueDatePicker.getValue(), dueTimeField.getText());
             } catch (DateTimeParseException ex) {
                 showError(errorLabel, "Invalid time. Use HH:mm (example: 14:30).");
+                return;
+            }
+            TaskDueDatePolicy effectivePolicy = dueDatePolicy == null ? TaskDueDatePolicy.WARN : dueDatePolicy;
+            if (dueAt == null && effectivePolicy == TaskDueDatePolicy.REQUIRED) {
+                ControlStyles.setInvalid(dueDatePicker, true);
+                showError(errorLabel, "Due date required — Your firm requires all tasks to have a due date.");
+                dueDatePicker.requestFocus();
+                return;
+            }
+            if (dueAt == null && effectivePolicy == TaskDueDatePolicy.WARN && !AppDialogs.showConfirmation(
+                    stage, "Save task without a due date?", "This task does not have a due date.",
+                    "Tasks without due dates may not appear in the assignee's normal due-date and to-do views, making them easier to overlook.",
+                    "Save Anyway", AppDialogs.DialogActionKind.DANGER)) {
+                dueDatePicker.requestFocus();
                 return;
             }
             Integer priorityId = Optional.ofNullable(priorityCombo.getValue()).map(TaskPriorityOptionDto::id).orElse(null);
