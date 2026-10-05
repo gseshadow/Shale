@@ -47,8 +47,7 @@ public final class CaseDateConfirmationView {
             row.getChildren().add(confirm);
         }
         row.setMinWidth(0);
-        row.setPrefWidth(Region.USE_COMPUTED_SIZE);
-        row.setMaxWidth(MAX_COMPACT_WIDTH);
+        row.setMaxWidth(Region.USE_PREF_SIZE);
         return row;
     }
 
