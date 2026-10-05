@@ -11,6 +11,7 @@ final class CaseDateTypeManagementContractTest {
     private static final String PANE = read("src/main/java/com/shale/ui/controller/CaseDateTypeManagementPane.java");
     private static final String WINDOW = read("src/main/java/com/shale/ui/component/DefinitionManagementWindow.java");
     private static final String CASE = read("src/main/java/com/shale/ui/controller/CaseController.java");
+    private static final String MANAGEMENT_CSS = read("src/main/resources/css/foundation/management.css");
 
     @Test void settingsAndCaseDatesShareOneLauncherAndPane() {
         String settings = read("src/main/java/com/shale/ui/controller/SettingsController.java");
@@ -56,6 +57,24 @@ final class CaseDateTypeManagementContractTest {
                 () -> assertEquals("DEADLINE", command.calendarCategory()), () -> assertEquals("#112233", command.color()),
                 () -> assertTrue(command.supportsTime()), () -> assertEquals(12, command.sortOrder()),
                 () -> assertFalse(command.active()), () -> assertArrayEquals(rowVer, command.expectedRowVer()));
+    }
+
+    @Test void selectedCardUsesTheExistingSelectionAndSharedThemeTokens() {
+        assertTrue(PANE.contains("PseudoClass.getPseudoClass(\"selected\")"),
+                "Case Date cards must expose their selected state through the shared selected pseudo-class");
+        assertTrue(PANE.contains("shale-entity-card-selectable"),
+                "Case Date cards must opt into the shared selectable-card visual contract");
+        assertTrue(PANE.contains("cards.getChildren().forEach"),
+                "changing the existing selected row must refresh every rendered card so only one remains selected");
+        assertTrue(MANAGEMENT_CSS.contains(".management-window .shale-entity-card-selectable:selected:hover"),
+                "the selected state must remain visible while the selected card is hovered");
+        assertTrue(MANAGEMENT_CSS.contains("-fx-background-color: -shale-color-selection;"),
+                "management-card selection must use the theme's light/dark selection token");
+        assertTrue(MANAGEMENT_CSS.contains("-fx-border-color: -shale-color-primary-accent;"),
+                "management-card selection must use the established accent token");
+        assertTrue(MANAGEMENT_CSS.contains(".management-window .shale-entity-card-selectable {")
+                        && MANAGEMENT_CSS.contains("-fx-border-width: 2px;"),
+                "selectable management cards must reserve their selected border width to avoid layout movement");
     }
 
     @Test void caseActionIsAdminOnlyAndRefreshesAllDependentReadModelsWithoutOccurrenceMutation() {
