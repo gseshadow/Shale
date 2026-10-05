@@ -9,7 +9,7 @@ else
 fi
 
 usage() {
-  echo "Usage: $0 <branch> <version>" >&2
+  echo "Usage: $0 <branch> <version> [source-revision]" >&2
   echo "Example: $0 codex/latest 1.0.11" >&2
   exit 1
 }
@@ -58,22 +58,37 @@ else
   echo "WARNING: no source revision supplied; Mac may not include committed local changes ahead of origin/$BRANCH" >&2
   REQUESTED_REVISION="$REMOTE/$BRANCH"
 fi
-python3 "$ROOT/build/scripts/mac_release_workspace.py" \
+# The checkout may predate the workspace helper. Resolve and verify its bytes
+# from the requested commit before running any checkout code or cleaning POMs.
+git fetch "$REMOTE"
+REQUESTED_REVISION=$(git rev-parse --verify "$REQUESTED_REVISION^{commit}")
+WORKSPACE_HELPER_PATH="build/scripts/mac_release_workspace.py"
+EXPECTED_HELPER_BLOB=$(git rev-parse "$REQUESTED_REVISION:$WORKSPACE_HELPER_PATH")
+WORKSPACE_HELPER=$(mktemp "${TMPDIR:-/tmp}/shale-mac-workspace.XXXXXX")
+trap 'rm -f "$WORKSPACE_HELPER"' EXIT
+git show "$REQUESTED_REVISION:$WORKSPACE_HELPER_PATH" > "$WORKSPACE_HELPER"
+if [[ "$(git hash-object "$WORKSPACE_HELPER")" != "$EXPECTED_HELPER_BLOB" ]]; then
+  echo "Fetched workspace helper content did not match requested revision $REQUESTED_REVISION" >&2
+  exit 1
+fi
+echo "Verified Mac workspace helper from requested revision: $REQUESTED_REVISION ($EXPECTED_HELPER_BLOB)"
+python3 "$WORKSPACE_HELPER" \
   --root "$ROOT" prepare --remote "$REMOTE" --revision "$REQUESTED_REVISION"
-PREVIOUS_VERSION=$(python3 "$ROOT/build/scripts/preflight-version.py" "$ROOT" --print-root-version)
 
 cleanup_release_poms() {
   local release_status=$?
   trap - EXIT
-  if ! python3 "$ROOT/build/scripts/mac_release_workspace.py" --root "$ROOT" cleanup; then
+  if ! python3 "$WORKSPACE_HELPER" --root "$ROOT" cleanup; then
     echo "Failed to restore release-generated POM changes; inspect the Mac workspace." >&2
     if [[ $release_status -eq 0 ]]; then
       release_status=1
     fi
   fi
+  rm -f "$WORKSPACE_HELPER"
   exit "$release_status"
 }
 trap cleanup_release_poms EXIT
+PREVIOUS_VERSION=$(python3 "$ROOT/build/scripts/preflight-version.py" "$ROOT" --print-root-version)
 
 echo
 echo "Step 2: Update root pom version"
