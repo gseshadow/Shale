@@ -1,82 +1,105 @@
 .login-root {
-    -fx-background-color: linear-gradient(to bottom right, #071a35 0%, #0b3150 48%, #105968 100%);
+    -fx-background-color: linear-gradient(to bottom right, #06172f 0%, #0a304c 50%, #0d4f5b 100%);
 }
 
-.login-content { -fx-padding: 18 0 28 0; }
-.login-brand-pane { -fx-padding: 8 4 8 4; }
-.login-headline { -fx-font-size: 38px; -fx-font-weight: 800; -fx-text-fill: #f8fbff; }
-.login-tagline { -fx-font-size: 17px; -fx-text-fill: rgba(232, 244, 255, 0.82); }
+.login-content { -fx-padding: 12 0 24 0; }
+.login-brand-pane { -fx-padding: 0; }
+.login-brand-group { -fx-alignment: top-left; }
+.login-headline-block { -fx-padding: 18 0 0 0; }
+.login-headline { -fx-font-size: 48px; -fx-font-weight: 800; -fx-text-fill: #f8fbff; }
+.login-headline-accent {
+    -fx-text-fill: linear-gradient(to right, #55e5d5, #4bc9f0);
+}
+.login-tagline {
+    -fx-font-size: 16px;
+    -fx-text-fill: rgba(232, 244, 255, 0.78);
+    -fx-padding: 12 0 0 1;
+}
 
 .login-background-glow {
-    -fx-fill: radial-gradient(center 50% 50%, radius 50%, rgba(48, 205, 202, 0.18), rgba(80, 101, 220, 0.02));
+    -fx-fill: radial-gradient(center 50% 50%, radius 50%, rgba(48, 205, 202, 0.16), rgba(80, 101, 220, 0.01));
     -fx-translate-x: -90;
     -fx-translate-y: -70;
 }
 
-.login-illustration { -fx-padding: 22 10 10 8; }
+.login-illustration { -fx-padding: 24 8 12 8; }
 .login-demo-card {
-    -fx-background-color: rgba(249, 252, 255, 0.96);
-    -fx-background-radius: 14;
-    -fx-border-color: rgba(144, 185, 214, 0.5);
-    -fx-border-radius: 14;
-    -fx-padding: 16;
-    -fx-effect: dropshadow(gaussian, rgba(2, 16, 38, 0.24), 18, 0.16, 0, 7);
+    -fx-background-color: rgba(249, 252, 255, 0.98);
+    -fx-background-radius: 15;
+    -fx-border-width: 1;
+    -fx-border-radius: 15;
+    -fx-padding: 17 18;
+    -fx-effect: dropshadow(gaussian, rgba(2, 16, 38, 0.25), 18, 0.14, 0, 7);
 }
-.login-demo-case { -fx-rotate: -3; -fx-translate-x: 26; -fx-translate-y: 10; }
-.login-demo-task { -fx-rotate: 4; -fx-translate-x: -22; -fx-translate-y: 38; }
-.login-demo-calendar { -fx-rotate: -1.5; -fx-translate-x: 100; -fx-translate-y: -4; }
+.login-demo-case {
+    -fx-border-color: rgba(55, 192, 181, 0.72);
+    -fx-rotate: -3;
+    -fx-translate-x: 18;
+    -fx-translate-y: 10;
+}
+.login-demo-task {
+    -fx-border-color: rgba(127, 105, 220, 0.68);
+    -fx-rotate: 3.5;
+    -fx-translate-x: -15;
+    -fx-translate-y: 26;
+}
+.login-demo-calendar {
+    -fx-border-color: rgba(70, 139, 224, 0.68);
+    -fx-rotate: -1.5;
+    -fx-translate-x: 18;
+    -fx-translate-y: -1;
+}
 .login-demo-kicker, .login-whats-new-kicker { -fx-font-size: 10px; -fx-font-weight: 800; -fx-text-fill: #32647e; }
-.login-demo-line-strong { -fx-fill: #466783; }
-.login-demo-line { -fx-fill: #c8d8e6; }
-.login-dot-teal { -fx-fill: #17a9a5; }
-.login-check { -fx-fill: #3c83e6; }
-.login-check-muted { -fx-fill: #d4e0ec; }
-.login-calendar-date { -fx-background-color: #ede8ff; -fx-background-radius: 9; -fx-padding: 7 10; -fx-text-fill: #6642bb; -fx-font-weight: 800; }
+.login-demo-title { -fx-font-size: 14px; -fx-font-weight: 800; -fx-text-fill: #163b59; }
+.login-demo-line-strong { -fx-fill: #56758e; }
+.login-demo-line { -fx-fill: #cedce8; }
+.login-dot-teal { -fx-fill: #18aaa4; }
+.login-dot-violet { -fx-fill: #8066d8; }
+.login-dot-blue { -fx-fill: #438bdc; }
+.login-check, .login-check-muted {
+    -fx-min-width: 20;
+    -fx-pref-width: 20;
+    -fx-alignment: center;
+    -fx-font-size: 14px;
+    -fx-font-weight: 800;
+}
+.login-check { -fx-background-color: #e9e5ff; -fx-background-radius: 6; -fx-text-fill: #7054cf; }
+.login-check-muted { -fx-background-color: #edf2f7; -fx-background-radius: 6; -fx-text-fill: #7890a5; }
+.login-calendar-month { -fx-background-color: #e5efff; -fx-background-radius: 8; -fx-padding: 5 8; -fx-text-fill: #3372c1; -fx-font-size: 10px; -fx-font-weight: 800; }
+.login-calendar-grid { -fx-padding: 2 0 0 0; }
+.login-calendar-day { -fx-min-width: 29; -fx-alignment: center; -fx-font-size: 9px; -fx-font-weight: 800; -fx-text-fill: #7890a5; }
+.login-calendar-cell { -fx-min-width: 29; -fx-min-height: 25; -fx-alignment: center; -fx-background-color: #f1f5f9; -fx-background-radius: 6; -fx-font-size: 9px; -fx-text-fill: #45627a; }
+.login-calendar-selected { -fx-background-color: #478dde; -fx-text-fill: white; -fx-font-weight: 800; }
 
 .login-whats-new {
-    -fx-background-color: rgba(9, 38, 68, 0.58);
+    -fx-background-color: rgba(5, 27, 52, 0.72);
     -fx-background-radius: 12;
-    -fx-border-color: rgba(153, 220, 232, 0.20);
+    -fx-border-color: rgba(153, 220, 232, 0.22);
     -fx-border-radius: 12;
     -fx-padding: 12 14;
 }
-.login-whats-new-kicker { -fx-text-fill: #71ddd5; }
+.login-whats-new-kicker { -fx-text-fill: #67ddd4; }
 .login-whats-new-text { -fx-text-fill: rgba(239, 247, 255, 0.88); -fx-font-size: 12px; }
 
 .login-form-scroll, .login-form-scroll > .viewport { -fx-background-color: transparent; }
 .login-form-scroll { -fx-padding: 0; -fx-background-insets: 0; }
+.login-card-centering-pane { -fx-padding: 12 0; }
 .login-card {
     -fx-background-color: -shale-color-card-surface;
     -fx-background-radius: 16;
     -fx-border-color: -shale-color-card-border;
     -fx-border-radius: 16;
-    -fx-padding: 32;
+    -fx-padding: 34;
     -fx-effect: dropshadow(gaussian, rgba(2, 17, 42, 0.28), 25, 0.14, 0, 10);
 }
-.login-card-title { -fx-font-size: 27px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
+.login-card-title { -fx-font-size: 29px; -fx-font-weight: 800; -fx-text-fill: -shale-color-text-primary; }
 .login-card-subtitle { -fx-font-size: 14px; -fx-text-fill: -shale-color-text-secondary; -fx-padding: 0 0 8 0; }
 .login-field-label { -fx-font-size: 12px; -fx-font-weight: 700; -fx-text-fill: -shale-color-text-primary; }
 .login-card .text-field, .login-card .password-field { -fx-min-height: 44px; -fx-pref-height: 44px; }
-.login-password-toggle {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent;
-    -fx-padding: 0;
-    -fx-text-fill: -shale-color-text-link;
-    -fx-font-weight: 700;
-    -fx-cursor: hand;
-}
+.login-password-toggle { -fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 0; -fx-text-fill: -shale-color-text-link; -fx-font-weight: 700; -fx-cursor: hand; }
 .login-password-toggle:hover { -fx-text-fill: -shale-color-text-link-hover; -fx-underline: true; }
 .login-stay-row { -fx-padding: 2 0 0 0; }
-.login-coming-soon {
-    -fx-background-color: -shale-color-info-wash;
-    -fx-background-radius: 999;
-    -fx-border-color: -shale-color-info-border;
-    -fx-border-radius: 999;
-    -fx-padding: 3 8;
-    -fx-text-fill: -shale-color-info-text;
-    -fx-font-size: 10px;
-    -fx-font-weight: 700;
-}
+.login-coming-soon { -fx-background-color: -shale-color-info-wash; -fx-background-radius: 999; -fx-border-color: -shale-color-info-border; -fx-border-radius: 999; -fx-padding: 3 8; -fx-text-fill: -shale-color-info-text; -fx-font-size: 10px; -fx-font-weight: 700; }
 .login-supporting-text { -fx-font-size: 11px; -fx-text-fill: -shale-color-text-muted; -fx-padding: -10 0 2 26; }
 .login-progress { -fx-text-fill: -shale-color-info-text; -fx-font-weight: 700; }
 .login-error { -fx-text-fill: -shale-color-text-danger; -fx-font-size: 12px; }

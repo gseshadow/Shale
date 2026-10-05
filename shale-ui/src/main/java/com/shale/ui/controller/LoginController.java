@@ -59,6 +59,8 @@ public final class LoginController {
 	@FXML
 	private Pane brandPane;
 	@FXML
+	private Pane loginIllustration;
+	@FXML
 	private TextField visiblePasswordField;
 	@FXML
 	private ToggleButton passwordVisibilityButton;
@@ -128,8 +130,9 @@ public final class LoginController {
 		emailField.setOnAction(e -> onSignIn());
 		passwordField.setOnAction(e -> onSignIn());
 		visiblePasswordField.setOnAction(e -> onSignIn());
-		loginRoot.widthProperty().addListener((ignored, oldWidth, newWidth) -> updateResponsiveLayout(newWidth.doubleValue()));
-		updateResponsiveLayout(loginRoot.getWidth());
+		loginRoot.widthProperty().addListener((ignored, oldWidth, newWidth) -> updateResponsiveLayout());
+		loginRoot.heightProperty().addListener((ignored, oldHeight, newHeight) -> updateResponsiveLayout());
+		updateResponsiveLayout();
 		startAnimations();
 
 		try {
@@ -189,11 +192,17 @@ public final class LoginController {
 		to.selectRange(anchor, caret);
 	}
 
-	private void updateResponsiveLayout(double width) {
-		boolean showBranding = width <= 0 || width >= 920;
+	private void updateResponsiveLayout() {
+		double width = loginRoot.getWidth();
+		double height = loginRoot.getHeight();
+		boolean initialLayout = width <= 0 || height <= 0;
+		boolean showBranding = initialLayout || (width >= 980 && height >= 620);
+		boolean showIllustration = initialLayout || (width >= 1140 && height >= 760);
 		brandPane.setVisible(showBranding);
 		brandPane.setManaged(showBranding);
-		loginContent.setSpacing(showBranding ? 48 : 0);
+		loginIllustration.setVisible(showBranding && showIllustration);
+		loginIllustration.setManaged(showBranding && showIllustration);
+		loginContent.setSpacing(showBranding ? 56 : 0);
 	}
 
 	private void startAnimations() {

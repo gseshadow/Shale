@@ -1184,7 +1184,7 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 13F | **COMPLETE** | Elevated MSI registration and lifecycle are verified; installed Windows fresh-install acceptance confirmed the protected 64-bit HKLM record, exact owner/roots, ACL, schema/version/channel, updater, and production-reader `VALID`. Production signing remains a separate deployment prerequisite. |
 | 13G | **COMPLETE — UNSUPPORTED** | Every Phase 13D blocker was reevaluated against 13E/13F. Discovery, public policy, version, and owner-path prerequisites are closed, but no credentialless owner principal or sufficiently protected privileged execution boundary is proven; no prototype or rollout was created. |
 | 14A | **COMPLETE** | Release-pipeline Git synchronization is fail-closed before publication: attached/upstream/clean/divergence preflight, exact release-file staging, commit/push recovery, retry behavior, and source-revision-consistent Mac handoff are documented and covered by temporary-repository tests. No domain or administrative runtime mutation exists, so the established audit schemas are not applicable. |
-| Login visual refresh | **IMPLEMENTED; VERIFICATION BLOCKED** | The desktop sign-in surface now uses the approved two-column Shale composition, responsive decorative cards, accessible labelled fields, password reveal, restrained/reduced motion, progress/error space, and a disabled Stay logged in placeholder. Static XML/diff checks pass, but Maven and rendered visual acceptance are blocked by the build environment's Maven Central HTTP 403; visual completion is not claimed. Persistent sessions remain **NOT STARTED** and bearer/password lifecycle is unchanged. |
+| Login visual refresh | **REFINED; VERIFICATION BLOCKED** | The desktop sign-in surface now has a centered, width-bounded composition; content-sized illustration cards; a wider, vertically centered form; and width/height-responsive decoration removal. Static XML/CSS/diff checks pass, but this run's Maven verification remains blocked by Maven Central HTTP 403 and no JavaFX display is available for rendered visual acceptance. A prior local `mvn test` pass was user-reported separately and does not verify this refinement. Persistent sessions remain **NOT STARTED** and bearer/password lifecycle is unchanged. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -1217,6 +1217,35 @@ Central returning HTTP 403 while resolving the existing Spring Boot dependency B
 recorded as implemented but not complete or visually accepted; the focused login tests, affected suite, critical
 `mvn test`, and manual keyboard/theme/resizing/password/error/loading/cleanup checks must pass before changing the
 tracker status to **COMPLETE**.
+
+### Login composition refinement — 2026-10-05
+
+The follow-up refinement fixes the reported tall-window stretching at its layout source. The illustration no longer
+has a vertical-grow constraint, its container and all three rotated cards have bounded preferred/minimum/maximum
+sizes, and the left content group is content-sized inside a centered, maximum-width two-column composition. The
+sign-in surface is now 420 logical pixels wide by preference (bounded from 380 to 440), retains content-derived
+height and its reserved error area, and is centered by a viewport-filling wrapper. If height or width becomes
+constrained, the bounded illustration is removed before the complete branding group; the form stays in its scroll
+pane so controls remain reachable on short windows.
+
+The approved slogan is represented as two explicit lines, with a 48-pixel bold neutral first line and a teal/cyan
+accent treatment on the second. Cases, Tasks, and Calendar are generic miniature panels with distinct teal, violet,
+and blue borders, distributed list/check/calendar content, and compact overlapping rotation. What's New remains
+immediately beneath the illustration and keeps the previously verified release copy. The refinement does not alter
+authentication, update gating, keyboard submission, duplicate-submit protection, password reveal, status/error
+handling, reduced-motion behavior, or animation disposal.
+
+Verification in this run is deliberately recorded separately from earlier evidence. XML parsing, CSS brace balance,
+and `git diff --check` passed. The focused Maven command was attempted but could not build the reactor because Maven
+Central returned HTTP 403 for the existing Spring Boot dependency BOM. The user separately reported a local
+`mvn test` pass before this refinement; that report is retained as user-provided context only and is not presented as
+a test of the changed files. No JavaFX display or prebuilt dependency set was available, so normal, maximized,
+narrow, and short rendered states remain **NOT RUN** and visual completion is not claimed.
+
+Audit compatibility remains unchanged: this is unauthenticated presentation and local responsive behavior, with no
+sensitive read or domain, administrative, or session mutation. Existing audit schemas require no event or migration.
+Persistent Stay logged in support remains **NOT STARTED**; the disabled **Coming soon** placeholder remains the only
+surface and no credential or bearer persistence was introduced.
 
 ## 16. Open decisions requiring operator input
 
