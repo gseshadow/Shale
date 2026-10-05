@@ -18,7 +18,7 @@
 				styleClass="login-brand-pane">
 				<children>
 					<VBox alignment="TOP_LEFT" spacing="0" minWidth="500" prefWidth="540" maxWidth="560"
-						maxHeight="USE_PREF_SIZE" styleClass="login-brand-group">
+						maxHeight="-1.0" styleClass="login-brand-group">
 						<ImageView fx:id="logoImage" fitWidth="190" preserveRatio="true" smooth="true" />
 						<VBox spacing="0" styleClass="login-headline-block">
 							<Label text="Your practice." styleClass="login-headline" />
@@ -72,7 +72,7 @@
 				vbarPolicy="AS_NEEDED" minWidth="380" prefWidth="420" maxWidth="440" styleClass="login-form-scroll">
 				<content>
 					<StackPane minWidth="380" prefWidth="420" maxWidth="440" styleClass="login-card-centering-pane">
-						<VBox spacing="16" minWidth="380" prefWidth="420" maxWidth="440" maxHeight="USE_PREF_SIZE"
+						<VBox spacing="16" minWidth="380" prefWidth="420" maxWidth="440" maxHeight="-1.0"
 							styleClass="login-card">
 							<Label text="Welcome back" styleClass="login-card-title" />
 							<Label text="Sign in to your workspace." styleClass="login-card-subtitle" />

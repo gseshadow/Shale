@@ -8,6 +8,9 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 RESOURCES = ROOT / "shale-ui/src/main/resources"
+REGION_SIZE_ATTRIBUTES = {
+    "minWidth", "prefWidth", "maxWidth", "minHeight", "prefHeight", "maxHeight"
+}
 
 
 def main() -> int:
@@ -30,6 +33,14 @@ def main() -> int:
                 errors.append(
                     f"{fxml.relative_to(ROOT)}: styleClass {style_class!r} uses whitespace instead of JavaFX collection commas"
                 )
+            for attribute in REGION_SIZE_ATTRIBUTES.intersection(element.attrib):
+                value = element.attrib[attribute]
+                try:
+                    float(value)
+                except ValueError:
+                    errors.append(
+                        f"{fxml.relative_to(ROOT)}: {attribute}={value!r} is not a numeric JavaFX Region size"
+                    )
 
     for css in sorted((RESOURCES / "css").rglob("*.css")):
         text = css.read_text(encoding="utf-8")
