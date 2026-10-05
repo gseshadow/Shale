@@ -1184,12 +1184,39 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 13F | **COMPLETE** | Elevated MSI registration and lifecycle are verified; installed Windows fresh-install acceptance confirmed the protected 64-bit HKLM record, exact owner/roots, ACL, schema/version/channel, updater, and production-reader `VALID`. Production signing remains a separate deployment prerequisite. |
 | 13G | **COMPLETE — UNSUPPORTED** | Every Phase 13D blocker was reevaluated against 13E/13F. Discovery, public policy, version, and owner-path prerequisites are closed, but no credentialless owner principal or sufficiently protected privileged execution boundary is proven; no prototype or rollout was created. |
 | 14A | **COMPLETE** | Release-pipeline Git synchronization is fail-closed before publication: attached/upstream/clean/divergence preflight, exact release-file staging, commit/push recovery, retry behavior, and source-revision-consistent Mac handoff are documented and covered by temporary-repository tests. No domain or administrative runtime mutation exists, so the established audit schemas are not applicable. |
+| Login visual refresh | **IMPLEMENTED; VERIFICATION BLOCKED** | The desktop sign-in surface now uses the approved two-column Shale composition, responsive decorative cards, accessible labelled fields, password reveal, restrained/reduced motion, progress/error space, and a disabled Stay logged in placeholder. Static XML/diff checks pass, but Maven and rendered visual acceptance are blocked by the build environment's Maven Central HTTP 403; visual completion is not claimed. Persistent sessions remain **NOT STARTED** and bearer/password lifecycle is unchanged. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
 
 Release-pipeline Git synchronization is complete. The wider initiative remains open: the conditional Phase 13H
 privileged-component decision remains separate, and logged-out automatic updates remain `UNSUPPORTED`.
+
+## Desktop login visual refresh — 2026-10-05
+
+The unauthenticated JavaFX surface has been recomposed as a responsive brand/illustration region and a focused
+sign-in card. It uses the existing Shale logo, the approved headline and subtitle, generic Cases/Tasks/Calendar
+shapes with no pre-authentication business or user data, and verified repository release-note themes describing
+release-specific highlights and the clearer required-update experience. The form retains the existing authentication
+and post-login update gates, Enter submission, version provider, validation/error route, and keyboard-native
+controls. Password visibility is a presentation-only paired field with one bidirectionally bound value; switching
+restores focus and selection/caret. An atomic in-flight boundary disables the fields and action and prevents duplicate
+authentication attempts while the progress message is shown.
+
+The unchecked **Stay logged in** control is intentionally disabled, marked **Coming soon**, and explains that
+persistent sessions are unavailable. It does not store a password, persist a bearer, enroll another session, or
+alter logout, shutdown, revocation, refresh, or session-expiry behavior. Persistent-session design and implementation
+remain **NOT STARTED**. The visual layer adds only a short content fade and a slow background accent translation;
+`-Dshale.ui.reduceMotion=true` suppresses both, and scene replacement/shutdown disposes them. At constrained widths
+the decorative brand region is removed before the scrollable sign-in card.
+
+Audit compatibility is unchanged. This work adds no authenticated sensitive read and no domain, administrative, or
+session mutation, so no PHI, entity-action, or session-security audit event and no schema migration are appropriate.
+Automated Maven verification and rendered light/dark/resizing acceptance remain blocked in this run by Maven
+Central returning HTTP 403 while resolving the existing Spring Boot dependency BOM. Therefore the visual work is
+recorded as implemented but not complete or visually accepted; the focused login tests, affected suite, critical
+`mvn test`, and manual keyboard/theme/resizing/password/error/loading/cleanup checks must pass before changing the
+tracker status to **COMPLETE**.
 
 ## 16. Open decisions requiring operator input
 

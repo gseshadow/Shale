@@ -1,40 +1,92 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
-<?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Circle?>
+<?import javafx.scene.shape.Rectangle?>
 
-<BorderPane xmlns="http://javafx.com/javafx/21"
-	xmlns:fx="http://javafx.com/fxml/1"
+<StackPane fx:id="loginRoot" minWidth="640" minHeight="560" styleClass="login-root"
+	xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
 	fx:controller="com.shale.ui.controller.LoginController">
-	<bottom>
-		<HBox alignment="BOTTOM_LEFT">
-			<children>
-				<Label fx:id="versionLabel" styleClass="login-version-label" />
-			</children>
-			<padding>
-				<Insets top="0" right="16" bottom="12" left="16" />
-			</padding>
+	<children>
+		<Circle fx:id="backgroundGlow" radius="260" mouseTransparent="true" styleClass="login-background-glow"
+			StackPane.alignment="TOP_LEFT" />
+		<HBox fx:id="loginContent" alignment="CENTER" spacing="48" maxWidth="1180" styleClass="login-content">
+			<StackPane fx:id="brandPane" HBox.hgrow="ALWAYS" minWidth="420" prefWidth="590" maxWidth="650"
+				styleClass="login-brand-pane">
+				<children>
+					<VBox alignment="TOP_LEFT" spacing="18" maxWidth="560">
+						<ImageView fx:id="logoImage" fitWidth="220" preserveRatio="true" smooth="true" />
+						<Label text="Your practice. In order." wrapText="true" styleClass="login-headline" />
+						<Label text="Cases, tasks, and your team. Together in Shale." wrapText="true"
+							styleClass="login-tagline" />
+						<StackPane prefHeight="258" minHeight="258" styleClass="login-illustration" VBox.vgrow="ALWAYS">
+							<children>
+								<VBox spacing="10" maxWidth="250" styleClass="login-demo-card,login-demo-case"
+									StackPane.alignment="TOP_LEFT">
+									<Label text="CASES" styleClass="login-demo-kicker" />
+									<Rectangle width="152" height="12" arcWidth="12" arcHeight="12" styleClass="login-demo-line-strong" />
+									<Rectangle width="204" height="8" arcWidth="8" arcHeight="8" styleClass="login-demo-line" />
+									<HBox spacing="8"><Circle radius="6" styleClass="login-dot-teal"/><Rectangle width="110" height="8" arcWidth="8" arcHeight="8" styleClass="login-demo-line"/></HBox>
+								</VBox>
+								<VBox spacing="10" maxWidth="230" styleClass="login-demo-card,login-demo-task"
+									StackPane.alignment="CENTER_RIGHT">
+									<Label text="TASKS" styleClass="login-demo-kicker" />
+									<HBox spacing="10"><Rectangle width="14" height="14" arcWidth="5" arcHeight="5" styleClass="login-check"/><Rectangle width="140" height="9" arcWidth="9" arcHeight="9" styleClass="login-demo-line-strong"/></HBox>
+									<HBox spacing="10"><Rectangle width="14" height="14" arcWidth="5" arcHeight="5" styleClass="login-check-muted"/><Rectangle width="116" height="9" arcWidth="9" arcHeight="9" styleClass="login-demo-line"/></HBox>
+								</VBox>
+								<VBox spacing="10" maxWidth="245" styleClass="login-demo-card,login-demo-calendar"
+									StackPane.alignment="BOTTOM_LEFT">
+									<Label text="CALENDAR" styleClass="login-demo-kicker" />
+									<HBox spacing="8"><Label text="12" styleClass="login-calendar-date"/><VBox spacing="5"><Rectangle width="116" height="9" arcWidth="9" arcHeight="9" styleClass="login-demo-line-strong"/><Rectangle width="92" height="7" arcWidth="7" arcHeight="7" styleClass="login-demo-line"/></VBox></HBox>
+								</VBox>
+							</children>
+						</StackPane>
+						<VBox spacing="7" styleClass="login-whats-new">
+							<Label text="WHAT'S NEW" styleClass="login-whats-new-kicker" />
+							<Label text="Release-specific highlights and a clearer required-update experience."
+								wrapText="true" styleClass="login-whats-new-text" />
+						</VBox>
+					</VBox>
+				</children>
+			</StackPane>
+			<ScrollPane fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" maxWidth="450"
+				styleClass="login-form-scroll">
+				<content>
+					<VBox spacing="16" maxWidth="450" styleClass="login-card">
+						<Label text="Welcome back" styleClass="login-card-title" />
+						<Label text="Sign in to your workspace." styleClass="login-card-subtitle" />
+						<VBox spacing="7">
+							<Label text="Email" labelFor="$emailField" styleClass="login-field-label" />
+							<TextField fx:id="emailField" promptText="you@example.com" maxWidth="Infinity" />
+						</VBox>
+						<VBox spacing="7">
+							<Label text="Password" labelFor="$passwordField" styleClass="login-field-label" />
+							<StackPane>
+								<PasswordField fx:id="passwordField" promptText="Enter your password" maxWidth="Infinity" />
+								<TextField fx:id="visiblePasswordField" promptText="Enter your password" maxWidth="Infinity"
+									visible="false" managed="false" />
+							</StackPane>
+							<ToggleButton fx:id="passwordVisibilityButton" text="Show password"
+								onAction="#onPasswordVisibilityChanged" styleClass="login-password-toggle" />
+						</VBox>
+						<HBox alignment="CENTER_LEFT" spacing="10" styleClass="login-stay-row">
+							<CheckBox fx:id="stayLoggedInCheckBox" text="Stay logged in" disable="true">
+								<tooltip><Tooltip text="Persistent sessions are not available yet. Shale will continue to sign you out normally." wrapText="true" /></tooltip>
+							</CheckBox>
+							<Label text="Coming soon" styleClass="login-coming-soon" />
+						</HBox>
+						<Label text="Only on your personal device." styleClass="login-supporting-text" />
+						<Button fx:id="signInButton" text="Sign in" onAction="#onSignIn" defaultButton="true" maxWidth="Infinity" />
+						<Label fx:id="progressLabel" text="Signing in…" visible="false" managed="false"
+							minHeight="20" styleClass="login-progress" />
+						<Label fx:id="errorLabel" wrapText="true" minHeight="40" styleClass="login-error" />
+					</VBox>
+				</content>
+			</ScrollPane>
 		</HBox>
-	</bottom>
-	<center>
-		<VBox spacing="18" alignment="CENTER" maxWidth="360">
-			<children>
-				<ImageView fx:id="logoImage" fitWidth="440"
-					preserveRatio="true" smooth="true" pickOnBounds="true">
-				</ImageView>
-				<Label text="Sign in to Shale" styleClass="title" />
-				<TextField fx:id="emailField" promptText="Email" />
-				<PasswordField fx:id="passwordField"
-					promptText="Password" />
-				<Button fx:id="signInButton" text="Sign in"
-					onAction="#onSignIn" defaultButton="true" maxWidth="Infinity" />
-				<Label fx:id="errorLabel" styleClass="error" />
-			</children>
-			<padding>
-				<Insets top="24" right="24" bottom="24" left="24" />
-			</padding>
-		</VBox>
-	</center>
-</BorderPane>
+		<Label fx:id="versionLabel" styleClass="login-version-label" StackPane.alignment="BOTTOM_LEFT" />
+	</children>
+	<padding><Insets top="34" right="42" bottom="28" left="42" /></padding>
+</StackPane>

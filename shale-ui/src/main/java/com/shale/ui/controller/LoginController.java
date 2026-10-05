@@ -3,6 +3,7 @@ package com.shale.ui.controller;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.concurrent.atomic.AtomicBoolean;
 import com.shale.core.platform.AppPaths;
 import com.shale.ui.navigation.SceneManager;
 import com.shale.ui.services.AppVersionProvider;
@@ -12,15 +13,28 @@ import com.shale.ui.services.UiUpdateLauncher;
 import com.shale.ui.services.UpdateFlowCoordinator;
 import com.shale.ui.state.AppState;
 import com.shale.ui.theme.Theme;
+import com.shale.ui.util.ControlStyles;
 
+import javafx.animation.Animation;
+import javafx.animation.FadeTransition;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+import javafx.scene.shape.Circle;
+import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +52,22 @@ public final class LoginController {
 	private ImageView logoImage;
 	@FXML
 	private Label versionLabel;
+	@FXML
+	private StackPane loginRoot;
+	@FXML
+	private HBox loginContent;
+	@FXML
+	private Pane brandPane;
+	@FXML
+	private TextField visiblePasswordField;
+	@FXML
+	private ToggleButton passwordVisibilityButton;
+	@FXML
+	private CheckBox stayLoggedInCheckBox;
+	@FXML
+	private Label progressLabel;
+	@FXML
+	private Circle backgroundGlow;
 
 	private SceneManager sceneManager;
 	private AppState appState;
@@ -47,6 +77,9 @@ public final class LoginController {
 
 	private UiUpdateLauncher updateLauncher;
 	private UpdateFlowCoordinator updateFlowCoordinator;
+	private final AtomicBoolean authenticationInProgress = new AtomicBoolean();
+	private Animation backgroundAnimation;
+	private Animation entranceAnimation;
 
 	public LoginController() {
 		System.out.println("LoginController()");// TODO
@@ -84,9 +117,20 @@ public final class LoginController {
 		versionLabel.setText("Version - " + AppVersionProvider.currentVersion());
 
 		signInButton.setDefaultButton(true);
+		ControlStyles.apply(signInButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
+		ControlStyles.formControl(emailField);
+		ControlStyles.formControl(passwordField);
+		ControlStyles.formControl(visiblePasswordField);
+		passwordField.textProperty().bindBidirectional(visiblePasswordField.textProperty());
+		stayLoggedInCheckBox.setSelected(false);
+		stayLoggedInCheckBox.setDisable(true);
 
 		emailField.setOnAction(e -> onSignIn());
 		passwordField.setOnAction(e -> onSignIn());
+		visiblePasswordField.setOnAction(e -> onSignIn());
+		loginRoot.widthProperty().addListener((ignored, oldWidth, newWidth) -> updateResponsiveLayout(newWidth.doubleValue()));
+		updateResponsiveLayout(loginRoot.getWidth());
+		startAnimations();
 
 		try {
 			var logoUrl = getClass().getResource("/images/Shale.png");
@@ -130,7 +174,56 @@ public final class LoginController {
 	}
 
 	@FXML
+	private void onPasswordVisibilityChanged() {
+		boolean reveal = passwordVisibilityButton.isSelected();
+		TextField from = reveal ? passwordField : visiblePasswordField;
+		TextField to = reveal ? visiblePasswordField : passwordField;
+		int caret = from.getCaretPosition();
+		int anchor = from.getAnchor();
+		passwordField.setVisible(!reveal);
+		passwordField.setManaged(!reveal);
+		visiblePasswordField.setVisible(reveal);
+		visiblePasswordField.setManaged(reveal);
+		passwordVisibilityButton.setText(reveal ? "Hide password" : "Show password");
+		to.requestFocus();
+		to.selectRange(anchor, caret);
+	}
+
+	private void updateResponsiveLayout(double width) {
+		boolean showBranding = width <= 0 || width >= 920;
+		brandPane.setVisible(showBranding);
+		brandPane.setManaged(showBranding);
+		loginContent.setSpacing(showBranding ? 48 : 0);
+	}
+
+	private void startAnimations() {
+		if (Boolean.getBoolean("shale.ui.reduceMotion")) return;
+		loginContent.setOpacity(0);
+		FadeTransition fade = new FadeTransition(Duration.millis(420), loginContent);
+		fade.setFromValue(0);
+		fade.setToValue(1);
+		fade.play();
+		entranceAnimation = fade;
+
+		Timeline glow = new Timeline(
+				new KeyFrame(Duration.ZERO, new KeyValue(backgroundGlow.translateXProperty(), -90)),
+				new KeyFrame(Duration.seconds(12), new KeyValue(backgroundGlow.translateXProperty(), 35)));
+		glow.setAutoReverse(true);
+		glow.setCycleCount(Animation.INDEFINITE);
+		glow.play();
+		backgroundAnimation = glow;
+	}
+
+	/** Stops view-owned animation before the scene root is replaced. */
+	public void dispose() {
+		if (entranceAnimation != null) entranceAnimation.stop();
+		if (backgroundAnimation != null) backgroundAnimation.stop();
+		passwordField.textProperty().unbindBidirectional(visiblePasswordField.textProperty());
+	}
+
+	@FXML
 	private void onSignIn() {
+		if (!authenticationInProgress.compareAndSet(false, true)) return;
 		System.out.println("LoginController.onSignIn()");// TODO
 		setBusy(true);
 		errorLabel.setText("");
@@ -183,6 +276,7 @@ public final class LoginController {
 				showError("Sign-in failed. " + ex.getMessage());
 			} finally {
 				setBusy(false);
+				authenticationInProgress.set(false);
 			}
 		}, "login-thread").start();
 	}
@@ -205,6 +299,10 @@ public final class LoginController {
 			signInButton.setDisable(busy);
 			emailField.setDisable(busy);
 			passwordField.setDisable(busy);
+			visiblePasswordField.setDisable(busy);
+			passwordVisibilityButton.setDisable(busy);
+			progressLabel.setVisible(busy);
+			progressLabel.setManaged(busy);
 		});
 	}
 
