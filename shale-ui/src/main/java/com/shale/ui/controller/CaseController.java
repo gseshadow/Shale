@@ -5094,8 +5094,36 @@ public class CaseController {
 	private void setCompatibilityDate(Label label, DatePicker picker, CompatibilityCaseDateState state) {
 		LocalDate date = state == null || state.startsAt() == null ? null : state.startsAt().toLocalDate();
 		if (label != null) label.setText(formatDate(date));
-		if(label!=null&&label.getParent() instanceof GridPane parent){parent.getChildren().removeIf(n->n.getUserData()==label);CaseDateConfirmationDto c=state==null||state.occurrenceId()==null?null:caseDateConfirmations.get(state.occurrenceId());if(c!=null&&c.status()!=CaseDateConfirmationDto.Status.NOT_REQUIRED){Node marker=CaseDateConfirmationView.create(c,confirmationRoleNames.get(c.requiredFirmWideRoleDefinitionId()),actorConfirmationRoles.contains(c.requiredFirmWideRoleDefinitionId()),()->confirmCaseDate(c));marker.setUserData(label);parent.add(marker,2,GridPane.getRowIndex(label)==null?0:GridPane.getRowIndex(label));}}
+		VBox valueStack = compatibilityDateValueStack(label);
+		if (valueStack != null) {
+			valueStack.getChildren().removeIf(node -> node.getUserData() == label);
+			CaseDateConfirmationDto confirmation = state == null || state.occurrenceId() == null
+					? null : caseDateConfirmations.get(state.occurrenceId());
+			if (confirmation != null && confirmation.status() != CaseDateConfirmationDto.Status.NOT_REQUIRED) {
+				Node marker = CaseDateConfirmationView.create(confirmation,
+						confirmationRoleNames.get(confirmation.requiredFirmWideRoleDefinitionId()),
+						actorConfirmationRoles.contains(confirmation.requiredFirmWideRoleDefinitionId()),
+						() -> confirmCaseDate(confirmation));
+				marker.setUserData(label);
+				valueStack.getChildren().add(marker);
+			}
+		}
 		if (picker != null) picker.setValue(date);
+	}
+
+	private VBox compatibilityDateValueStack(Label label) {
+		if (label == null) return null;
+		if (label.getParent() instanceof VBox stack
+				&& stack.getStyleClass().contains("case-details-date-value-stack")) return stack;
+		if (!(label.getParent() instanceof GridPane grid)) return null;
+		int row = GridPane.getRowIndex(label) == null ? 0 : GridPane.getRowIndex(label);
+		grid.getChildren().remove(label);
+		VBox stack = new VBox(4, label);
+		stack.getStyleClass().add("case-details-date-value-stack");
+		stack.setMinWidth(0);
+		stack.setMaxWidth(Double.MAX_VALUE);
+		grid.add(stack, 1, row);
+		return stack;
 	}
 
 	private void saveAuthoritativeDate(MigratedCaseDateKey key, LocalDate date) {

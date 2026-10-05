@@ -1,5 +1,20 @@
 # Case Date presentation cutover design (Phase 1 decision record)
 
+## Desktop Case Details confirmation-row presentation (2026-10-05)
+
+The Case Details **Incident & Deadlines** grid keeps three distinct regions: the date-type label, a
+growing value/status region, and a fixed trailing edit-action column. The value/status region is a
+compact vertical stack whose first line is the displayed date (or its missing-value placeholder) and
+whose optional second line is the authoritative confirmation status. Confirmation content is never
+placed in the action column. Status text remains single-line, ellipsizes only under genuine width
+pressure, and exposes its complete message through a tooltip.
+
+This presentation correction applies consistently to the compatibility Case Date rows in Incident &
+Deadlines. It does not change effective type selection, occurrence identity, confirmation eligibility,
+policy or value revisions, role checks, confirmation mutation, or audit behavior. No schema or audit
+vocabulary change is required because the UI continues to invoke the existing confirmation and
+occurrence-edit service seams.
+
 ## Scope and fixed product decisions
 
 The Phase 1 configuration foundation described here is implemented; card and Overview runtime cutover
