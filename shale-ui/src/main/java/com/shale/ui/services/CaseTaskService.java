@@ -16,6 +16,7 @@ import com.shale.core.dto.TaskStatusOptionDto;
 import com.shale.data.dao.TaskDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.NotificationDao;
+import com.shale.core.model.TaskDueDatePolicy;
 import com.shale.ui.util.PerfLog;
 
 /**
@@ -276,6 +277,10 @@ public final class CaseTaskService {
 
     public List<TaskStatusOptionDto> loadActiveTaskStatuses(int shaleClientId) {
         return taskDao.listActiveTaskStatuses(shaleClientId);
+    }
+
+    public TaskDueDatePolicy resolveTaskDueDatePolicy(int shaleClientId) {
+        return taskDao.resolveDueDatePolicy(shaleClientId);
     }
 
     public void completeTask(long taskId, int shaleClientId) {

@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 import com.shale.core.dto.TaskPriorityOptionDto;
+import com.shale.core.model.TaskDueDatePolicy;
 import com.shale.ui.component.factory.UserCardFactory;
 import com.shale.ui.component.factory.UserCardFactory.UserCardModel;
 import com.shale.ui.services.CaseTaskService;
@@ -45,6 +46,14 @@ public final class NewTaskDialog {
             Window owner,
             List<TaskPriorityOptionDto> availablePriorities,
             List<CaseTaskService.AssignableUserOption> availableAssignees) {
+        return showAndWait(owner, availablePriorities, availableAssignees, TaskDueDatePolicy.OPTIONAL);
+    }
+
+    public static Optional<CreateTaskInput> showAndWait(
+            Window owner,
+            List<TaskPriorityOptionDto> availablePriorities,
+            List<CaseTaskService.AssignableUserOption> availableAssignees,
+            TaskDueDatePolicy dueDatePolicy) {
         Stage stage = AppDialogs.createModalStage(owner, "New Task");
 
         ResultHolder result = new ResultHolder();
@@ -190,6 +199,20 @@ public final class NewTaskDialog {
             } catch (DateTimeParseException ex) {
                 ControlStyles.setInvalid(dueTimeField, true);
                 showError(errorLabel, "Invalid time. Use HH:mm (example: 14:30).");
+                return;
+            }
+            TaskDueDatePolicy effectivePolicy = dueDatePolicy == null ? TaskDueDatePolicy.WARN : dueDatePolicy;
+            if (dueAt == null && effectivePolicy == TaskDueDatePolicy.REQUIRED) {
+                ControlStyles.setInvalid(dueDatePicker, true);
+                showError(errorLabel, "Due date required — Your firm requires all tasks to have a due date.");
+                dueDatePicker.requestFocus();
+                return;
+            }
+            if (dueAt == null && effectivePolicy == TaskDueDatePolicy.WARN && !AppDialogs.showConfirmation(
+                    stage, "Save task without a due date?", "This task does not have a due date.",
+                    "Tasks without due dates may not appear in the assignee's normal due-date and to-do views, making them easier to overlook.",
+                    "Save Anyway", AppDialogs.DialogActionKind.DANGER)) {
+                dueDatePicker.requestFocus();
                 return;
             }
 

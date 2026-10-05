@@ -1953,7 +1953,8 @@ public final class UserController {
 									}
 								},
 								this::onOpenUserFromTask,
-								onOpenCase);
+								onOpenCase,
+								caseTaskService.resolveTaskDueDatePolicy(shaleClientId));
 						if (result.isEmpty()) {
 							return;
 						}
