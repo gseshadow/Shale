@@ -1973,16 +1973,18 @@ public class CaseController {
 	private Node createCaseCalendarRow(CalendarFeedItem item, boolean past) {
 		Label time = new Label(item.allDay() ? "All day" : item.startsAt().format(DateTimeFormatter.ofPattern("h:mm a")));
 		time.setMinWidth(72);
+		time.getStyleClass().add("case-calendar-entry-time");
 		Label title = new Label(safeText(item.title()).replaceFirst("\\s+—\\s+.*$", ""));
 		title.setWrapText(true);
-		title.setStyle("-fx-font-weight: 700;");
+		title.getStyleClass().add("case-calendar-entry-title");
 		Label meta = new Label(CalendarFeedCategory.classify(item).name().replace('_', ' ') + " • " + safeText(item.displayTypeName()));
-		meta.setStyle("-fx-opacity: 0.68; -fx-font-size: 11px;");
+		meta.getStyleClass().add("case-calendar-entry-meta");
 		VBox text = new VBox(2, title, meta);
 		HBox row = new HBox(10, time, text);
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.setPadding(new Insets(8, 10, 8, 10));
-		row.setStyle("-fx-background-color: rgba(255,255,255,0.86); -fx-background-radius: 10; -fx-border-color: rgba(31,41,55,0.12); -fx-border-radius: 10;" + (past ? " -fx-opacity: 0.78;" : ""));
+		row.getStyleClass().add("case-calendar-entry-card");
+		if (past) row.getStyleClass().add("case-calendar-entry-card-past");
 		CalendarEventCardFactory.applyCalendarItemTooltip(row, item);
 		configureCaseCalendarClick(row, item);
 		return row;
