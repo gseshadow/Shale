@@ -25,12 +25,12 @@ final class AutomaticUpdatePreferenceServiceTest {
 		assertFalse(Files.exists(file), "Reading the safe default must not imply consent or create state");
 	}
 
-	@Test void enabledAndDisabledValuesSurviveRestartAndContainOnlyTheBoundedContract() throws Exception {
+	@Test void anyAuthenticatedUiCallerCanPersistEnabledAndDisabledValuesThroughTheExistingStore() throws Exception {
 		Path file = file();
-		assertEquals(AutomaticUpdatePreferenceService.ChangeResult.SAVED, service(file).change(true, true));
+		assertEquals(AutomaticUpdatePreferenceService.ChangeResult.SAVED, service(file).change(true));
 		assertEquals(WorkstationUpdatePreference.Status.ENABLED, service(file).current().status());
 		assertEquals("schemaVersion=1\nautomaticUpdatesEnabled=true\n", Files.readString(file));
-		assertEquals(AutomaticUpdatePreferenceService.ChangeResult.SAVED, service(file).change(false, true));
+		assertEquals(AutomaticUpdatePreferenceService.ChangeResult.SAVED, service(file).change(false));
 		assertEquals(WorkstationUpdatePreference.Status.DISABLED, service(file).current().status());
 		String serialized = Files.readString(file);
 		for (String forbidden : List.of("user", "tenant", "jwt", "jti", "machine", "email", "ip", "location", "metadata"))
@@ -45,7 +45,7 @@ final class AutomaticUpdatePreferenceServiceTest {
 			AutomaticUpdatePreferenceService service = service(file);
 			assertEquals(WorkstationUpdatePreference.Status.CORRUPT, service.current().status());
 			assertFalse(service.current().unattendedExecutionPermitted());
-			assertEquals(AutomaticUpdatePreferenceService.ChangeResult.SAVED, service.change(true, true));
+			assertEquals(AutomaticUpdatePreferenceService.ChangeResult.SAVED, service.change(true));
 			assertEquals(WorkstationUpdatePreference.Status.ENABLED, service.current().status());
 			try (var files = Files.list(file.getParent())) {
 				assertTrue(files.anyMatch(p -> p.getFileName().toString().startsWith("automatic-update-preference.corrupt-")));
@@ -53,21 +53,20 @@ final class AutomaticUpdatePreferenceServiceTest {
 		}
 	}
 
-	@Test void ordinaryUserCannotMutateAndIoFailureIsNotReportedAsSuccess() {
+	@Test void storageFailureIsNotReportedAsSuccess() {
 		WorkstationUpdatePreferenceStore store = new WorkstationUpdatePreferenceStore() {
 			@Override public WorkstationUpdatePreference load() throws IOException { throw new IOException("denied"); }
 			@Override public void save(boolean enabled) throws IOException { throw new IOException("denied"); }
 		};
 		AutomaticUpdatePreferenceService service = new AutomaticUpdatePreferenceService(store);
-		assertEquals(AutomaticUpdatePreferenceService.ChangeResult.UNAUTHORIZED, service.change(true, false));
-		assertEquals(AutomaticUpdatePreferenceService.ChangeResult.UNAVAILABLE, service.change(true, true));
+		assertEquals(AutomaticUpdatePreferenceService.ChangeResult.UNAVAILABLE, service.change(true));
 		assertEquals(WorkstationUpdatePreference.Status.UNAVAILABLE, service.current().status());
 	}
 
 	@Test void concurrentProcessesLeaveOneCompleteValidPreferenceAndNoTemporaryFile() throws Exception {
 		Path file = file(); CountDownLatch ready = new CountDownLatch(2); CountDownLatch start = new CountDownLatch(1);
-		Callable<Void> enable = () -> { ready.countDown(); assertTrue(start.await(5, TimeUnit.SECONDS)); service(file).change(true, true); return null; };
-		Callable<Void> disable = () -> { ready.countDown(); assertTrue(start.await(5, TimeUnit.SECONDS)); service(file).change(false, true); return null; };
+		Callable<Void> enable = () -> { ready.countDown(); assertTrue(start.await(5, TimeUnit.SECONDS)); service(file).change(true); return null; };
+		Callable<Void> disable = () -> { ready.countDown(); assertTrue(start.await(5, TimeUnit.SECONDS)); service(file).change(false); return null; };
 		try (var executor = Executors.newFixedThreadPool(2)) {
 			var a = executor.submit(enable); var b = executor.submit(disable); assertTrue(ready.await(5, TimeUnit.SECONDS)); start.countDown(); a.get(); b.get();
 		}

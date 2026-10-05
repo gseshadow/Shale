@@ -225,12 +225,12 @@ public final class SettingsController {
 		}
 		var preference = capability.get().read();
 		automaticUpdatesCheck.setSelected(preference.unattendedExecutionPermitted());
-		automaticUpdatesCheck.setDisable(!isAdminUser());
+		automaticUpdatesCheck.setDisable(false);
 		automaticUpdatesStatusLabel.setText(switch (preference.status()) {
 			case ENABLED -> "Enabled — eligible updates are evaluated overnight while Shale is left running and idle.";
 			case DISABLED -> "Unattended automatic updates are disabled on this workstation.";
 			case MISSING -> "Not configured; unattended automatic updates default to disabled.";
-			case CORRUPT -> "The saved preference is corrupt. Automatic updates are not permitted; an administrator may reset it.";
+			case CORRUPT -> "The saved preference is corrupt. Automatic updates are not permitted; choose a preference to reset it.";
 			case UNAVAILABLE -> "Preference storage is unavailable. Automatic updates are not permitted.";
 		});
 	}
@@ -240,12 +240,10 @@ public final class SettingsController {
 		var capability = runtimeBridge == null ? Optional.<UiRuntimeBridge.WorkstationAutomaticUpdates>empty()
 				: runtimeBridge.workstationAutomaticUpdates();
 		if (capability.isEmpty()) { loadAutomaticUpdates(); return; }
-		var result = capability.get().change(requested, isAdminUser());
+		var result = capability.get().change(requested);
 		if (result != UiRuntimeBridge.WorkstationAutomaticUpdates.ChangeResult.SAVED) {
 			loadAutomaticUpdates();
-			if (result == UiRuntimeBridge.WorkstationAutomaticUpdates.ChangeResult.UNAUTHORIZED)
-				automaticUpdatesStatusLabel.setText("Only a Shale administrator may change this workstation setting.");
-			else automaticUpdatesStatusLabel.setText("The preference could not be saved. The prior workstation setting remains authoritative.");
+			automaticUpdatesStatusLabel.setText("The preference could not be saved. The prior workstation setting remains authoritative.");
 			return;
 		}
 		loadAutomaticUpdates();

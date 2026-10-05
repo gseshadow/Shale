@@ -42,6 +42,12 @@
         <VBox fx:id="devicesSessionsContent" visible="false" managed="false" styleClass="settings-inline-content"/>
         <SettingsManagementRow fx:id="customDictionaryRow" title="Custom Dictionary"
             description="Manage words accepted by Shale’s spelling tools." actionText="Manage"/>
+        <SettingsManagementRow fx:id="automaticUpdatesRow" title="Automatic Updates" description="Allow overnight evaluation while Shale is left running and idle." actionText="Open"/>
+        <VBox fx:id="automaticUpdatesContent" visible="false" managed="false" styleClass="settings-inline-content">
+          <CheckBox fx:id="automaticUpdatesCheck" text="Allow eligible updates while Shale is running and idle" onAction="#onAutomaticUpdatesChanged" wrapText="true"/>
+          <Label text="This setting applies to this workstation. When Shale is left running and idle, eligible updates can be installed during the 2:00–4:00 AM local window. Closed, logged-out, and sleeping computers are not woken." styleClass="search-summary-text" wrapText="true"/>
+          <Label fx:id="automaticUpdatesStatusLabel" styleClass="settings-state-message" wrapText="true"/>
+        </VBox>
       </VBox>
 
       <VBox fx:id="caseConfigurationGroup" styleClass="settings-directory-group, shale-section-card">
@@ -75,12 +81,6 @@
         <Label text="Administration" styleClass="shale-subsection-title, settings-group-title"/>
         <SettingsManagementRow fx:id="userManagementRow" title="User Management" description="Manage users for the current tenant." actionText="Manage"/>
         <SettingsManagementRow fx:id="adminSessionsRow" title="Sessions" description="Review and revoke durable sessions for this tenant." actionText="Open"/>
-        <SettingsManagementRow fx:id="automaticUpdatesRow" title="Automatic Updates" description="Allow overnight evaluation while Shale is left running and idle." actionText="Open"/>
-        <VBox fx:id="automaticUpdatesContent" visible="false" managed="false" styleClass="settings-inline-content">
-          <CheckBox fx:id="automaticUpdatesCheck" text="Allow eligible updates while Shale is running and idle" onAction="#onAutomaticUpdatesChanged" wrapText="true"/>
-          <Label text="This setting applies to this workstation. When Shale is left running and idle, eligible updates can be installed during the 2:00–4:00 AM local window. Closed, logged-out, and sleeping computers are not woken." styleClass="search-summary-text" wrapText="true"/>
-          <Label fx:id="automaticUpdatesStatusLabel" styleClass="settings-state-message" wrapText="true"/>
-        </VBox>
         <SettingsManagementRow fx:id="firmWideRolesRow" title="Firm-wide Roles" description="Manage tenant-wide eligibility role definitions." actionText="Manage"/>
         <SettingsManagementRow fx:id="auditLogRow" title="Audit Log" description="Review PHI audit and entity activity for the current tenant." actionText="Open"/>
       </VBox>

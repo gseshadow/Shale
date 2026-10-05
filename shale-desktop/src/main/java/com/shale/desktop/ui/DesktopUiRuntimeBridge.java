@@ -102,8 +102,8 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		AutomaticUpdatePreferenceService preferences = AutomaticUpdatePreferenceService.resolvePlatformDefault();
 		this.workstationAutomaticUpdates = new UiRuntimeBridge.WorkstationAutomaticUpdates() {
 			@Override public com.shale.core.update.WorkstationUpdatePreference read() { return preferences.current(); }
-			@Override public ChangeResult change(boolean enabled, boolean authenticatedAdministrator) {
-				return ChangeResult.valueOf(preferences.change(enabled, authenticatedAdministrator).name());
+			@Override public ChangeResult change(boolean enabled) {
+				return ChangeResult.valueOf(preferences.change(enabled).name());
 			}
 		};
 	}

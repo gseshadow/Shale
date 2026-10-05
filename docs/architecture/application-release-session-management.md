@@ -1127,13 +1127,13 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 ### Phase 13A — Workstation automatic-update preference
 
 * **Goal:** persist explicit workstation opt-in independently of a user.
-* **In scope:** machine-scoped preference/permissions and admin/user ownership decision.
+* **In scope:** workstation-scoped application preference and authenticated-user ownership decision.
 * **Non-goals:** scheduler/helper or installation.
-* **Implemented files:** core provider/result contract, desktop platform storage/service, and Settings > Administration UI.
+* **Implemented files:** core provider/result contract, desktop platform storage/service, and Settings > Personal UI.
 * **Schema/API impact:** none; this is a local machine setting only.
 * **Verification:** multi-user consistency, least privilege, opt-out, upgrade persistence.
 * **Dependencies:** 4A.
-* **Risks:** ambiguity over who may opt in on shared workstations.
+* **Risks:** a preference changed by one authenticated user applies to later users of the same workstation.
 
 ### Phase 13B — Idle-aware unattended updater feasibility/prototype
 
@@ -1176,7 +1176,7 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 11A | **COMPLETE** | Central policy resolver, server-time anchored shell UX, outage/correction behavior, and updater precedence are verified. |
 | 11B | **COMPLETE** | Minimum-allowed enforcement and safe drain are verified. |
 | 12 | **COMPLETE** | Privacy-safe local attempt/outcome correlation and required verification completed before Phase 13A. |
-| 13A | **COMPLETE** | Machine-scoped opt-in storage, provider, authorization, and Settings control were completed and verified before Phase 13B. |
+| 13A | **COMPLETE; AUTHORIZATION FIXED 2026-10-05** | Workstation-scoped opt-in storage and provider remain unchanged. Automatic Updates is a personal application preference editable by any active authenticated user; runtime/storage unavailability still disables it, while genuinely administrative Settings controls retain their authorization. |
 | 13B | **COMPLETE** | Eligibility, aggregate readiness, cooperative shutdown, explicit invocation modes, update locking, and bounded retry/window contracts are implemented and verified. |
 | 13C | **COMPLETE** | Authenticated process-local Windows scheduling is implemented and verified; it remains session-only. |
 | 13D | **COMPLETE — UNSUPPORTED** | Logged-out alternatives were assessed, the safe-default capability contract was verified, and no executor was registered. |
@@ -1732,19 +1732,22 @@ UUID, network/location, PHI, or arbitrary metadata. It shares Phase 4A's durable
 machine identity. Upgrade and ordinary uninstall/reinstall retain it; old clients ignore it.
 
 Writes use a normalized-path JVM lock plus OS file lock, unique temporary file, forced write, atomic replacement,
-cleanup, and deterministic reread. Corruption never implies consent; authorized recovery preserves the prior file
+cleanup, and deterministic reread. Corruption never implies consent; explicit recovery preserves the prior file
 under `.corrupt-*`. Permission/I/O failures return explicit unavailable state and never fall back per user.
 
-Any authenticated Shale administrator may change the machine setting; ordinary users may read it but cannot mutate
-through the controller/service path. This is not tenant ownership: a tenant 7 administrator's choice remains when a
-tenant 8 user signs in. Logout, switching, and restart do not clear it. Application authorization is not an OS ACL:
+Any active authenticated Shale user may change this application preference; it is not an administrator capability.
+This is not tenant ownership: a tenant 7 user's choice remains when a tenant 8 user signs in. Logout, switching, and
+restart do not clear it. Application authorization is not an OS ACL:
 the per-user Windows MSI provisions no ProgramData ACL, so external file modification remains possible wherever the
 OS ACL permits it. Managed deployment can provision stronger ACLs. Equivalent macOS provisioning requires installed
 verification.
 
-Settings > Administration presents workstation-scoped state and disables non-admin mutation. Failed saves reread
-the authoritative prior state. Changes invoke no updater, create no Phase 12 attempt, and create no central/entity
-audit: this non-PHI local operational setting uses sanitized local transition/error logs.
+Settings > Personal presents workstation-scoped state to every authenticated user. The control is disabled only when
+the runtime does not provide preference storage; failed saves reread the authoritative prior state. User Management,
+tenant-wide Sessions, Audit Log, and configuration-management controls retain their separate administrator guards.
+Changes invoke no updater, create no Phase 12 attempt, and create no central/entity audit: this non-PHI local
+application preference is not a meaningful domain or administrative mutation and uses sanitized local
+transition/error logs. No schema migration is required.
 
 Phase 13B consumes `WorkstationUpdatePreferenceProvider.current()` and proceeds only when
 `unattendedExecutionPermitted()` is true for `ENABLED`; it must separately combine policy, update availability, idle,

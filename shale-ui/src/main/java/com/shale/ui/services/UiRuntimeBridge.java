@@ -39,8 +39,8 @@ public interface UiRuntimeBridge {
 
 	interface WorkstationAutomaticUpdates {
 		WorkstationUpdatePreference read();
-		ChangeResult change(boolean enabled, boolean authenticatedAdministrator);
-		enum ChangeResult { SAVED, UNAUTHORIZED, UNAVAILABLE }
+		ChangeResult change(boolean enabled);
+		enum ChangeResult { SAVED, UNAVAILABLE }
 	}
 	default Optional<WorkstationAutomaticUpdates> workstationAutomaticUpdates() { return Optional.empty(); }
 
