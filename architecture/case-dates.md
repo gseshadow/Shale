@@ -204,6 +204,8 @@ singleton/read-resilience behavior passed the completed manual QA sign-off.
 
 Phase 2B adds **Settings > Case Date Types** in the established Settings manager surface. It uses the Phase 2A `CaseServicePort` administration APIs and does not call DAOs directly or calculate persistence semantics outside the service.
 
+Case Date Type cards keep their title as the primary text level, render status/category/time and confirmation-policy copy with the theme-aware secondary text role, and use the theme-aware muted role for an inactive type's status line. Hover and selected surfaces do not replace those foreground roles, preserving the same hierarchy and readable contrast in both light and dark themes.
+
 The Settings manager supports loading/error/empty states, Add, Edit, Activate/Deactivate, soft Remove, and refresh-after-mutation for tenant-created custom types. Cards distinguish protected Global/default and Tenant override rows from editable Tenant custom rows, along with Active/Inactive, category, color, and `SupportsTime`, in the same unobtrusive metadata style as other Settings managers.
 
 The UI uses shared Settings cards, shared semantic buttons (`ActionButtonFactory.semantic`/`ControlStyles`), Shale dialog shell/form styling, inline validation through the existing dialog flow, shared color conversion/rendering, and existing confirmation dialogs. Category values are persisted through the backend contract and color values use the same `ColorPicker`/DB color conversion used by comparable Settings lookup managers. Mutations preserve the submitted authoritative id and expected row version; concurrency failures are surfaced to the user and require reload rather than silent retry.
