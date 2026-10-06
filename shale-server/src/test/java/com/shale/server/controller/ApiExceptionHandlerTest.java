@@ -65,13 +65,19 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
-    void unexpectedFailureLogsSanitizedStackAndCauseChainWhileKeepingClientResponseGeneric() {
+    void sqlServerFailureLogsSafeMetadataAndCompletesWithoutReplacingOriginalFailure() throws Exception {
         var request = new MockHttpServletRequest("POST", "/api/auth/desktop-session");
-        var cause = new java.sql.SQLException("password=hunter2 token=secret rememberedCredential=opaque body={secret}");
-        var exception = new IllegalStateException("request body and response body are sensitive", cause);
+        var cause = org.mockito.Mockito.mock(com.microsoft.sqlserver.jdbc.SQLServerException.class);
+        org.mockito.Mockito.when(cause.getSQLState()).thenReturn("S0001");
+        org.mockito.Mockito.when(cause.getErrorCode()).thenReturn(229);
+        var chained = new java.sql.SQLException("credentialHash=secret", "23000", 547);
+        org.mockito.Mockito.when(cause.getNextException()).thenReturn(chained);
+        var exception = new IllegalStateException(
+                "password=hunter2 token=secret rememberedCredential=opaque body={secret}", cause);
         var originalStack = new StackTraceElement("com.shale.server.runtime.SqlRememberCredentialStore", "create",
-                "SqlRememberCredentialStore.java", 14);
+                "SqlRememberCredentialStore.java", 16);
         exception.setStackTrace(new StackTraceElement[] { originalStack });
+        exception.addSuppressed(new IllegalArgumentException("response body secret"));
 
         var response = handler.handleUnexpected(exception, request);
 
@@ -83,20 +89,42 @@ class ApiExceptionHandlerTest {
         var event = appender.list.getFirst();
         assertEquals(ch.qos.logback.classic.Level.ERROR, event.getLevel(), "Unexpected failures must be logged at ERROR");
         assertEquals("Unexpected server exception exceptionClass=java.lang.IllegalStateException "
-                        + "causeClasses=java.lang.IllegalStateException -> java.sql.SQLException.",
+                        + "causeClasses=java.lang.IllegalStateException -> com.microsoft.sqlserver.jdbc.SQLServerException "
+                        + "sqlExceptions=[{exceptionClass=com.microsoft.sqlserver.jdbc.SQLServerException,sqlState=S0001,vendorCode=229}, "
+                        + "{exceptionClass=java.sql.SQLException,sqlState=23000,vendorCode=547}].",
                 event.getFormattedMessage(), "The safe diagnostic must identify the failure and full cause types");
         assertNotNull(event.getThrowableProxy(), "The safe diagnostic must contain a stack trace");
         assertEquals(originalStack, event.getThrowableProxy().getStackTraceElementProxyArray()[0].getStackTraceElement(),
                 "The diagnostic must preserve the original failure location");
         assertNotNull(event.getThrowableProxy().getCause(), "The diagnostic must retain the cause chain");
-        assertTrue(event.getThrowableProxy().getCause().getMessage().contains("java.sql.SQLException"),
+        assertTrue(event.getThrowableProxy().getCause().getMessage().contains("SQLServerException"),
                 "The sanitized cause must retain its exception type");
+        assertEquals(1, event.getThrowableProxy().getSuppressed().length,
+                "The diagnostic must preserve sanitized suppressed exceptions");
         String diagnostic = event.getFormattedMessage() + event.getThrowableProxy().getMessage()
                 + event.getThrowableProxy().getCause().getMessage();
         assertFalse(diagnostic.contains("hunter2"), "Passwords must not be logged");
         assertFalse(diagnostic.contains("token=secret"), "Tokens must not be logged");
         assertFalse(diagnostic.contains("rememberedCredential=opaque"), "Remembered credentials must not be logged");
         assertFalse(diagnostic.contains("body={secret}"), "Request or response bodies must not be logged");
+    }
+
+    @Test
+    void cyclicCauseGraphIsTruncatedWithoutBreakingGenericErrorHandling() {
+        var request = new MockHttpServletRequest("POST", "/api/auth/desktop-session");
+        var first = new Exception("password=secret");
+        var second = new Exception("token=secret");
+        first.initCause(second);
+        second.initCause(first);
+
+        var response = handler.handleUnexpected(first, request);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode(),
+                "A cyclic throwable graph must still complete generic HTTP 500 handling");
+        assertEquals("Internal server error.", response.getBody().message());
+        assertEquals(1, appender.list.size());
+        assertNotNull(appender.list.getFirst().getThrowableProxy(),
+                "Cycle handling must retain a bounded sanitized diagnostic");
     }
 
     private static void assertSanitizedBadRequest(

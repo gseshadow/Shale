@@ -5,41 +5,68 @@ release/session initiative remains in progress and logged-out updates remain `UN
 
 **Last reviewed:** 2026-10-06
 
-## Server-side HTTP 500 diagnostics for desktop enrollment — 2026-10-06
+## Remembered-enrollment SQL and diagnostic correction — 2026-10-06
 
-`ApiExceptionHandler` now records unexpected failures at ERROR with the full exception class, cause-class chain,
-and the original stack frames for the exception, causes, and suppressed failures. It deliberately
-reconstructs a diagnostic throwable without copying any exception message. This preserves actionable server-side
-failure locations and cause types while preventing a framework, JDBC driver, or future adapter message from echoing
-a password, bearer/token, remembered credential, or request/response body into Azure logs. It does not log query
-strings, headers, parameters, DTOs, bodies, principals, tenant/user/session identifiers, or credential values. The
-HTTP response remains the generic 500 `Internal server error.` contract.
+Production evidence now locates the remembered-enrollment HTTP 500 at `SqlRememberCredentialStore.create`, wrapped
+by `ServerAuthSessionService.issueRememberedDesktop`, with `SQLServerException` as the underlying cause. This proves
+the database operation failed; it does not identify permission, constraint, or other SQL category because the first
+diagnostic revision discarded SQL state/error code and then failed while reconstructing the cause.
 
-Code inspection identifies several plausible failure boundaries, but the observed `IllegalStateException` class alone
-does not select among them:
+The diagnostic failure was deterministic: `SanitizedDiagnosticException` called the four-argument `Throwable`
+constructor with a null cause, which marks cause initialization complete, and later called `initCause`. Sanitization
+now constructs each wrapper only after recursively constructing its safe cause and passes that cause to the
+constructor. Cause/suppressed cycles are identity-bounded, and a final fallback ensures diagnostic construction can
+never prevent the generic HTTP 500 response. Logs retain sanitized original stack frames, cause/suppressed exception
+types, and, for every cause or chained `SQLException`, only allowlisted SQL state plus numeric vendor error code.
+They never copy exception messages, SQL text, parameter values, hashes, passwords, bearers, remembered credentials,
+headers, DTOs, query strings, or request/response bodies.
 
-* application-instance attachment opens a principal-scoped runtime connection and explicitly wraps an
-  `SQLException` as `IllegalStateException`; connectivity, pool, login, or session-context initialization failure at
-  that boundary is therefore possible;
-* durable desktop issuance calls `UserSessionDao.create`, whose explicit wrapper represents SQL failure while
-  owner/instance validation can separately fail with `SecurityException`; likely SQL-side categories include an
-  absent/out-of-date `UserSessions` deployment, database permissions/RLS/session context, connectivity, or an insert
-  constraint, but the new sanitized cause type and stack location—not the wrapper class—must distinguish the path;
-* remembered issuance next calls `SqlRememberCredentialStore.create`, whose explicit wrapper represents an
-  `SQLException`; the especially relevant deployment possibilities are an unapplied
-  `DesktopRememberCredentials` migration, insufficient table permission, referential/unique constraint failure, or
-  database connectivity; and
-* if remembered-row creation fails, issuance attempts to revoke the just-created durable session before rethrowing.
-  A revoke failure can replace the original store failure, so its stack/cause location must also be considered. The
-  only other explicit issuance-path `IllegalStateException` is the impossible-on-supported-Java SHA-256 algorithm
-  lookup guard; no evidence currently points to it.
+### Database operation findings
 
-These are evidence-based candidate boundaries, not a diagnosis of the production incident. After deploying this
-server build, reproduce one checked desktop enrollment and use the logged top frame plus cause classes to identify
-the failing boundary. Exception messages remain intentionally unavailable; if a cause class and code location are
-insufficient, add a bounded semantic category at that owning boundary rather than logging raw exception text or
-request state. This observability-only change introduces no domain/administrative mutation or sensitive read, uses
-no audit schema, and adds no audit event or database migration.
+The deployed migration and Java bindings agree on table/column names and order: tenant `int`, user `int`, session and
+installation `uniqueidentifier`, SHA-256 `binary(32)`, and absolute expiry `datetime2(7)` bound with `Timestamp`.
+The migration requires unique credential hashes and session/installation pairs, a cascading session UUID foreign key,
+and a tenant-qualified Users foreign key; all columns inserted by `create` are non-null. No statement/binding,
+nullability, type, foreign-key, or uniqueness mismatch is established by the repository evidence.
+
+A connection-boundary mismatch **is** established. The store previously used `DataSources.auth()` for creation and
+for the rotation transaction even though `dbo.UserSessions` is protected by strict tenant RLS and the auth pool does
+not initialize tenant/user session context. The corrected store uses the auth connection only for a read-only opaque
+hash plus installation lookup sufficient to derive the candidate principal. Creation, the locked revalidation and
+rotation transaction, and deletion now open a principal-scoped runtime connection, retain explicit tenant/user/session
+predicates, and therefore execute with the same tenant context as durable `UserSessions`. The preliminary lookup is
+not authority: rotation rechecks the hash, installation, derived ownership, active user, unrevoked session, and both
+expiries under serializable locks before changing either row.
+
+`DesktopRememberCredentials` intentionally has no tenant security predicate because pre-authentication restore must
+locate the candidate tenant from an opaque 256-bit credential hash plus installation UUID. It stores no raw
+credential. This exception does not weaken `UserSessions` RLS: every authoritative session read/update occurs only
+after principal derivation on the tenant-scoped runtime connection and remains explicitly owner-qualified. A future
+schema redesign could replace this narrow lookup with a signed module/stored procedure, but adding the ordinary
+tenant predicate now would make pre-authentication lookup impossible rather than improve this flow.
+
+The expanded verification SQL is read-only and reports exact columns/types/nullability/defaults, unique and foreign
+key constraints, security predicates on both tables, data findings, and effective object permissions. Run its
+catalog sections as dbo, then run the entire script using the API `SHALE_APP_DB_USER` for identity-lookup permissions
+and `SHALE_RT_DB_USER` for tenant-scoped creation/rotation/deletion permissions. A dbo result cannot prove either API
+principal. Any zero effective permission must be corrected through the deployment's existing database-role/grant
+management; the repository cannot safely invent production principal names or grant membership. The next deployed
+trace will additionally provide SQL state and numeric vendor code if a database failure remains.
+
+### Desktop classification and deployment
+
+HTTP 500 and timeout enrollment results retain `TRANSIENT`; 404/501 retain `ENDPOINT_UNAVAILABLE`; neither can fall
+through to the “running server does not support Stay logged in” message. That message is reserved for an HTTP success
+whose otherwise valid response omits `rememberCredential`. Failed remembered enrollment still tears down the partly
+initialized local runtime through the existing commit failure path and never persists a credential.
+
+No new schema migration is required by the code correction. Before acceptance, rerun the existing
+`2026-10-05_desktop_remember_credentials.sql` only if the schema verifier reports missing/incompatible objects,
+correct any verified API-principal permission finding, deploy the rebuilt server, and rebuild/redeploy the desktop.
+Then reproduce checked login and confirm either successful protected save or a diagnostic containing the original
+store frame plus SQL state/vendor code. Audit compatibility is unchanged: this is authentication plumbing inside the
+existing durable-session relationship, not a new domain mutation or sensitive view; no new audit row or audit schema
+is appropriate.
 
 ## Remembered sign-in ordinary-close diagnosis — 2026-10-06
 
@@ -1289,7 +1316,7 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
 | 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
-| 7C | **COMPLETE; DIAGNOSTIC FOLLOW-UP OPEN** | User-reported production acceptance previously confirmed enrollment, but a later remembered-enrollment HTTP 500 is not diagnosed. Privacy-safe server stack/cause diagnostics are implemented; deploy and reproduce to distinguish instance verification, durable-session SQL, remembered-credential SQL, or cleanup failure. A clean installed production launch with no API override is **NOT RUN**, and intermittent `REQUEST_TIMEOUT` remains open. |
+| 7C | **COMPLETE; SQL FIX DEPLOYMENT/ACCEPTANCE OPEN** | Production evidence localized remembered enrollment to `SqlRememberCredentialStore.create` with `SQLServerException`. The auth/runtime connection mismatch and broken sanitized cause construction are corrected; SQL state/vendor-code diagnostics, read-only schema/permission verification, and desktop failure classification are added. Run verification as dbo plus both API principals, deploy server and desktop, and rerun checked-login/restart acceptance. A clean installed production launch with no API override is **NOT RUN**, and intermittent `REQUEST_TIMEOUT` remains open. |
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
 | 8B | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms remote administrative revocation is detected in approximately one minute by polling and locks the application before the session-ended popup is dismissed; OK transitions to sign-in. Push remains acceleration, not authority. |
 | 9 | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms Settings > Personal > My Sessions works for ordinary users and administrators, shows only the authenticated user's sessions, marks the current session, and current-session self-revocation locks the app and returns to sign-in. |

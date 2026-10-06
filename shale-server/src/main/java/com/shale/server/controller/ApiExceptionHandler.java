@@ -1,6 +1,7 @@
 package com.shale.server.controller;
 
 import java.time.Instant;
+import java.sql.SQLException;
 import java.util.IdentityHashMap;
 import java.util.NoSuchElementException;
 import java.util.StringJoiner;
@@ -58,8 +59,20 @@ public final class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> handleUnexpected(Exception ex, HttpServletRequest request) {
-        log.error("Unexpected server exception exceptionClass={} causeClasses={}.",
-                ex.getClass().getName(), causeClasses(ex), sanitizedThrowable(ex));
+        Throwable diagnostic;
+        String causes;
+        String sql;
+        try {
+            diagnostic = sanitizedThrowable(ex);
+            causes = causeClasses(ex);
+            sql = sqlMetadata(ex);
+        } catch (Throwable diagnosticFailure) {
+            diagnostic = fallbackDiagnostic(ex);
+            causes = ex.getClass().getName();
+            sql = "[]";
+        }
+        log.error("Unexpected server exception exceptionClass={} causeClasses={} sqlExceptions={}.",
+                ex.getClass().getName(), causes, sql, diagnostic);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error.", request);
     }
 
@@ -74,10 +87,9 @@ public final class ApiExceptionHandler {
 
     private static Throwable sanitizedThrowable(Throwable failure, IdentityHashMap<Throwable, Boolean> seen) {
         if (failure == null || seen.put(failure, Boolean.TRUE) != null) return null;
-        var sanitized = new SanitizedDiagnosticException(failure.getClass().getName());
-        sanitized.setStackTrace(failure.getStackTrace());
         Throwable cause = sanitizedThrowable(failure.getCause(), seen);
-        if (cause != null) sanitized.initCause(cause);
+        var sanitized = new SanitizedDiagnosticException(failure.getClass().getName(), cause);
+        sanitized.setStackTrace(failure.getStackTrace());
         for (Throwable suppressed : failure.getSuppressed()) {
             Throwable safeSuppressed = sanitizedThrowable(suppressed, seen);
             if (safeSuppressed != null) sanitized.addSuppressed(safeSuppressed);
@@ -95,11 +107,40 @@ public final class ApiExceptionHandler {
         return classes.toString();
     }
 
+    private static String sqlMetadata(Throwable failure) {
+        var values = new StringJoiner(", ", "[", "]");
+        var causes = new IdentityHashMap<Throwable, Boolean>();
+        var sqlExceptions = new IdentityHashMap<SQLException, Boolean>();
+        for (Throwable current = failure; current != null && causes.put(current, Boolean.TRUE) == null;
+                current = current.getCause()) {
+            if (current instanceof SQLException sql) {
+                for (SQLException chained = sql; chained != null && sqlExceptions.put(chained, Boolean.TRUE) == null;
+                        chained = chained.getNextException()) {
+                    values.add("{exceptionClass=" + chained.getClass().getName()
+                            + ",sqlState=" + safeSqlState(chained.getSQLState())
+                            + ",vendorCode=" + chained.getErrorCode() + "}");
+                }
+            }
+        }
+        return values.toString();
+    }
+
+    private static String safeSqlState(String value) {
+        return value != null && value.matches("[A-Za-z0-9]{1,16}") ? value : "UNKNOWN";
+    }
+
+    private static Throwable fallbackDiagnostic(Throwable failure) {
+        var fallback = new SanitizedDiagnosticException(failure.getClass().getName(), null);
+        try { fallback.setStackTrace(failure.getStackTrace()); }
+        catch (Throwable ignored) { fallback.setStackTrace(new StackTraceElement[0]); }
+        return fallback;
+    }
+
     private static final class SanitizedDiagnosticException extends RuntimeException {
         private static final long serialVersionUID = 1L;
 
-        private SanitizedDiagnosticException(String exceptionClass) {
-            super("Sanitized diagnostic for " + exceptionClass, null, true, true);
+        private SanitizedDiagnosticException(String exceptionClass, Throwable cause) {
+            super("Sanitized diagnostic for " + exceptionClass, cause, true, true);
         }
     }
 
