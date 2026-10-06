@@ -83,6 +83,7 @@ import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.ContactCard;
 import com.shale.ui.component.CaseDateConfirmationView;
+import com.shale.ui.component.CaseOverviewDateRow;
 import com.shale.ui.component.OrganizationCard;
 import com.shale.ui.component.StatusTimeline;
 import com.shale.ui.component.UserSelectionField;
@@ -278,8 +279,6 @@ public class CaseController {
 	@FXML
 	private VBox detailsPane;
 	@FXML
-	private StackPane detailsUpdatesHost;
-	@FXML
 	private VBox tasksTabPane;
 	@FXML
 	private StackPane tasksUpdatesHost;
@@ -333,8 +332,6 @@ public class CaseController {
 	private Button caseCalendarNewEventButton;
 	@FXML
 	private Button caseCalendarNewTaskButton;
-	@FXML
-	private StackPane caseCalendarUpdatesHost;
 	@FXML
 	private VBox genericPane;
 	@FXML
@@ -1972,16 +1969,18 @@ public class CaseController {
 	private Node createCaseCalendarRow(CalendarFeedItem item, boolean past) {
 		Label time = new Label(item.allDay() ? "All day" : item.startsAt().format(DateTimeFormatter.ofPattern("h:mm a")));
 		time.setMinWidth(72);
+		time.getStyleClass().add("case-calendar-entry-time");
 		Label title = new Label(safeText(item.title()).replaceFirst("\\s+—\\s+.*$", ""));
 		title.setWrapText(true);
-		title.setStyle("-fx-font-weight: 700;");
+		title.getStyleClass().add("case-calendar-entry-title");
 		Label meta = new Label(CalendarFeedCategory.classify(item).name().replace('_', ' ') + " • " + safeText(item.displayTypeName()));
-		meta.setStyle("-fx-opacity: 0.68; -fx-font-size: 11px;");
+		meta.getStyleClass().add("case-calendar-entry-meta");
 		VBox text = new VBox(2, title, meta);
 		HBox row = new HBox(10, time, text);
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.setPadding(new Insets(8, 10, 8, 10));
-		row.setStyle("-fx-background-color: rgba(255,255,255,0.86); -fx-background-radius: 10; -fx-border-color: rgba(31,41,55,0.12); -fx-border-radius: 10;" + (past ? " -fx-opacity: 0.78;" : ""));
+		row.getStyleClass().add("case-calendar-entry-card");
+		if (past) row.getStyleClass().add("case-calendar-entry-card-past");
 		CalendarEventCardFactory.applyCalendarItemTooltip(row, item);
 		configureCaseCalendarClick(row, item);
 		return row;
@@ -4483,7 +4482,8 @@ public class CaseController {
 				Optional<NewTaskDialog.CreateTaskInput> input = NewTaskDialog.showAndWait(
 						taskDialogOwner(),
 						priorities,
-						assignableUsers);
+						assignableUsers,
+						caseTaskService.resolveTaskDueDatePolicy(shaleClientId));
 				if (input.isEmpty()) {
 					return;
 				}
@@ -4678,7 +4678,8 @@ public class CaseController {
 						}
 					},
 					onOpenUser,
-					onOpenCase);
+					onOpenCase,
+					caseTaskService.resolveTaskDueDatePolicy(shaleClientId));
 			if (result.isEmpty()) {
 				return;
 			}
@@ -4879,7 +4880,7 @@ public class CaseController {
 		caseDateExecutor.submit(()->{try{CaseOverviewDateConfigurationDto config=caseService.getCaseOverviewDateConfiguration(activeCase,tenant,actor);List<com.shale.core.dto.SelectedCaseDateOccurrenceDto> selected=caseService.resolveCaseDatePresentation(activeCase,tenant,actor,com.shale.core.model.CaseDatePresentationPurpose.CASE_OVERVIEW);List<EffectiveCaseDateTypeDto> types=caseService.listEffectiveCaseDateTypes(tenant,actor);List<CaseDateDto> values=caseService.listCaseDatesForCase(activeCase,tenant,actor);List<CaseDateConfirmationDto> confirmations=caseService.listCaseDateConfirmationsForCase(activeCase,tenant,actor);List<CaseServicePort.ConfirmationRole> roles=caseService.listConfirmationRoles(tenant,actor);Set<Integer> eligible=confirmations.stream().filter(c->c.status()==CaseDateConfirmationDto.Status.PENDING).map(CaseDateConfirmationDto::requiredFirmWideRoleDefinitionId).filter(Objects::nonNull).filter(role->caseService.currentActorHasConfirmationRole(tenant,actor,role)).collect(Collectors.toSet());Platform.runLater(()->{if(caseId==null||caseId.longValue()!=activeCase||generation!=overviewConfigurationGeneration)return;overviewDateConfiguration=config;overviewSelectedOccurrences=selected==null?List.of():List.copyOf(selected);effectiveCaseDateTypes=types==null?List.of():List.copyOf(types);overviewConfiguredDateValues=values==null?List.of():List.copyOf(values);caseDateConfirmations=confirmations.stream().collect(Collectors.toUnmodifiableMap(c->c.caseDate().id(),Function.identity()));confirmationRoleNames=roles.stream().collect(Collectors.toUnmodifiableMap(CaseServicePort.ConfirmationRole::id,CaseServicePort.ConfirmationRole::name));actorConfirmationRoles=Set.copyOf(eligible);renderConfiguredOverviewDates();if(compatibilityDates.isLoaded())renderCompatibilityDates();});}catch(RuntimeException ex){LOG.error("Case Overview configuration load failed tenantId={} actorId={} caseId={}",tenant,actor,activeCase,ex);Platform.runLater(()->{if(generation==overviewConfigurationGeneration)configuredOverviewDates.getChildren().setAll(new Label("Overview dates could not be loaded."));});}});
 	}
 
-	private void renderConfiguredOverviewDates(){configuredOverviewDates.getChildren().clear();if(overviewDateConfiguration==null)return;for(int index=0;index<overviewDateConfiguration.visibleDateTypes().size();index++){EffectiveCaseDateTypeDto type=overviewDateConfiguration.visibleDateTypes().get(index);var selected=index<overviewSelectedOccurrences.size()?overviewSelectedOccurrences.get(index):null;CaseDateDto value=selected==null||selected.caseDateId()==null?null:overviewConfiguredDateValues.stream().filter(d->d.id()==selected.caseDateId()).findFirst().orElse(null);String displayName=selected!=null&&selected.displayName()!=null&&!selected.displayName().isBlank()?selected.displayName():type.name();String displayColor=selected!=null&&selected.displayColor()!=null?selected.displayColor():type.color();Region color=new Region();color.getStyleClass().add("case-overview-date-color");String accent=ColorUtil.toCssBackgroundColorOrNull(displayColor);if(accent!=null)color.setStyle("-fx-background-color: "+accent+";");color.setAccessibleText(displayName+" color accent");Label name=new Label(displayName);name.getStyleClass().add("shale-property-row-label");name.setMinWidth(150);Label display=new Label(value==null?"—":formatCaseDateOccurrence(value));display.setWrapText(true);display.getStyleClass().add("shale-property-row-value");HBox.setHgrow(display,Priority.ALWAYS);VBox valueBox=new VBox(4,display);CaseDateConfirmationDto confirmation=value==null?null:caseDateConfirmations.get(value.id());if(confirmation!=null&&confirmation.status()!=CaseDateConfirmationDto.Status.NOT_REQUIRED)valueBox.getChildren().add(CaseDateConfirmationView.create(confirmation,confirmationRoleNames.get(confirmation.requiredFirmWideRoleDefinitionId()),actorConfirmationRoles.contains(confirmation.requiredFirmWideRoleDefinitionId()),()->confirmCaseDate(confirmation)));HBox.setHgrow(valueBox,Priority.ALWAYS);Button action=ActionButtonFactory.semantic("✎",e->openOverviewDate(type,value),ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);action.setAccessibleText((value==null?"Add ":"Edit ")+displayName);action.setTooltip(new Tooltip(action.getAccessibleText()));HBox row=new HBox(10,color,name,valueBox,action);row.getStyleClass().addAll("case-overview-configured-date-row","shale-property-row","shale-property-row-compact");configuredOverviewDates.getChildren().add(row);}}
+	private void renderConfiguredOverviewDates(){configuredOverviewDates.getChildren().clear();if(overviewDateConfiguration==null)return;for(int index=0;index<overviewDateConfiguration.visibleDateTypes().size();index++){EffectiveCaseDateTypeDto type=overviewDateConfiguration.visibleDateTypes().get(index);var selected=index<overviewSelectedOccurrences.size()?overviewSelectedOccurrences.get(index):null;CaseDateDto value=selected==null||selected.caseDateId()==null?null:overviewConfiguredDateValues.stream().filter(d->d.id()==selected.caseDateId()).findFirst().orElse(null);String displayName=selected!=null&&selected.displayName()!=null&&!selected.displayName().isBlank()?selected.displayName():type.name();String displayColor=selected!=null&&selected.displayColor()!=null?selected.displayColor():type.color();Region color=new Region();color.getStyleClass().add("case-overview-date-color");String accent=ColorUtil.toCssBackgroundColorOrNull(displayColor);if(accent!=null)color.setStyle("-fx-background-color: "+accent+";");color.setAccessibleText(displayName+" color accent");CaseDateConfirmationDto confirmation=value==null?null:caseDateConfirmations.get(value.id());Node confirmationView=confirmation==null||confirmation.status()==CaseDateConfirmationDto.Status.NOT_REQUIRED?null:CaseDateConfirmationView.create(confirmation,confirmationRoleNames.get(confirmation.requiredFirmWideRoleDefinitionId()),actorConfirmationRoles.contains(confirmation.requiredFirmWideRoleDefinitionId()),()->confirmCaseDate(confirmation));Button action=ActionButtonFactory.semantic("✎",e->openOverviewDate(type,value),ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);action.setAccessibleText((value==null?"Add ":"Edit ")+displayName);action.setTooltip(new Tooltip(action.getAccessibleText()));configuredOverviewDates.getChildren().add(CaseOverviewDateRow.create(color,displayName,value==null?"—":formatCaseDateOccurrence(value),confirmationView,action));}}
 
 	private void openOverviewDate(EffectiveCaseDateTypeDto type,CaseDateDto value){if(value!=null){openCaseDateDialog(value);return;}List<EffectiveCaseDateTypeDto> ordered=new ArrayList<>();ordered.add(type);effectiveCaseDateTypes.stream().filter(t->t.id()!=type.id()).forEach(ordered::add);effectiveCaseDateTypes=List.copyOf(ordered);openCaseDateDialog(null);}
 
@@ -5094,8 +5095,36 @@ public class CaseController {
 	private void setCompatibilityDate(Label label, DatePicker picker, CompatibilityCaseDateState state) {
 		LocalDate date = state == null || state.startsAt() == null ? null : state.startsAt().toLocalDate();
 		if (label != null) label.setText(formatDate(date));
-		if(label!=null&&label.getParent() instanceof GridPane parent){parent.getChildren().removeIf(n->n.getUserData()==label);CaseDateConfirmationDto c=state==null||state.occurrenceId()==null?null:caseDateConfirmations.get(state.occurrenceId());if(c!=null&&c.status()!=CaseDateConfirmationDto.Status.NOT_REQUIRED){Node marker=CaseDateConfirmationView.create(c,confirmationRoleNames.get(c.requiredFirmWideRoleDefinitionId()),actorConfirmationRoles.contains(c.requiredFirmWideRoleDefinitionId()),()->confirmCaseDate(c));marker.setUserData(label);parent.add(marker,2,GridPane.getRowIndex(label)==null?0:GridPane.getRowIndex(label));}}
+		VBox valueStack = compatibilityDateValueStack(label);
+		if (valueStack != null) {
+			valueStack.getChildren().removeIf(node -> node.getUserData() == label);
+			CaseDateConfirmationDto confirmation = state == null || state.occurrenceId() == null
+					? null : caseDateConfirmations.get(state.occurrenceId());
+			if (confirmation != null && confirmation.status() != CaseDateConfirmationDto.Status.NOT_REQUIRED) {
+				Node marker = CaseDateConfirmationView.create(confirmation,
+						confirmationRoleNames.get(confirmation.requiredFirmWideRoleDefinitionId()),
+						actorConfirmationRoles.contains(confirmation.requiredFirmWideRoleDefinitionId()),
+						() -> confirmCaseDate(confirmation));
+				marker.setUserData(label);
+				valueStack.getChildren().add(marker);
+			}
+		}
 		if (picker != null) picker.setValue(date);
+	}
+
+	private VBox compatibilityDateValueStack(Label label) {
+		if (label == null) return null;
+		if (label.getParent() instanceof VBox stack
+				&& stack.getStyleClass().contains("case-details-date-value-stack")) return stack;
+		if (!(label.getParent() instanceof GridPane grid)) return null;
+		int row = GridPane.getRowIndex(label) == null ? 0 : GridPane.getRowIndex(label);
+		grid.getChildren().remove(label);
+		VBox stack = new VBox(4, label);
+		stack.getStyleClass().add("case-details-date-value-stack");
+		stack.setMinWidth(0);
+		stack.setMaxWidth(Double.MAX_VALUE);
+		grid.add(stack, 1, row);
+		return stack;
 	}
 
 	private void saveAuthoritativeDate(MigratedCaseDateKey key, LocalDate date) {

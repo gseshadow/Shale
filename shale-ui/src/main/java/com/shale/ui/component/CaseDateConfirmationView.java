@@ -9,11 +9,15 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 
 /** Shared compact presentation and action for an authoritative Case Date confirmation. */
 public final class CaseDateConfirmationView {
+    private static final double MAX_COMPACT_WIDTH = 320;
     private static final DateTimeFormatter CONFIRMED_AT = DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a");
     private CaseDateConfirmationView() { }
 
@@ -24,8 +28,13 @@ public final class CaseDateConfirmationView {
         row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("case-date-confirmation");
         if (value.status() == CaseDateConfirmationDto.Status.NOT_REQUIRED) return row;
-        Label state = new Label(message(value, requiredRoleName));
-        state.setWrapText(true);
+        String message = message(value, requiredRoleName);
+        Label state = new Label(message);
+        state.setWrapText(false);
+        state.setTextOverrun(OverrunStyle.ELLIPSIS);
+        state.setMinWidth(0);
+        state.setMaxWidth(Double.MAX_VALUE);
+        state.setTooltip(new Tooltip(message));
         state.getStyleClass().addAll("shale-semantic-chip", "metadata-chip-compact",
                 value.status() == CaseDateConfirmationDto.Status.PENDING
                         ? "shale-semantic-chip-warning" : "shale-semantic-chip-success");
@@ -37,6 +46,8 @@ public final class CaseDateConfirmationView {
             confirm.setAccessibleText("Confirm this case date");
             row.getChildren().add(confirm);
         }
+        row.setMinWidth(0);
+        row.setMaxWidth(Region.USE_PREF_SIZE);
         return row;
     }
 

@@ -4,6 +4,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.context.annotation.Primary;
 
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.server.auth.CurrentUserProfileService;
@@ -14,6 +15,7 @@ import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.NotificationServicePort;
 import com.shale.core.service.OrganizationServicePort;
 import com.shale.core.service.TaskServicePort;
+import com.shale.core.service.TaskPolicyConfigurationServicePort;
 import com.shale.core.service.UserServicePort;
 import com.shale.data.auth.AuthService;
 import com.shale.data.auth.AuthServiceImpl;
@@ -26,6 +28,7 @@ import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.TaskDao;
+import com.shale.data.dao.TaskPolicyConfigurationDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.errors.AuthException;
 import com.shale.data.service.adapter.AuthServiceAdapter;
@@ -33,22 +36,27 @@ import com.shale.data.service.adapter.CaseServiceAdapter;
 import com.shale.data.service.adapter.ContactServiceAdapter;
 import com.shale.data.service.adapter.NotificationServiceAdapter;
 import com.shale.data.dao.ApplicationReleaseReadDao;
+import com.shale.data.dao.ApplicationReleaseImportDao;
 import com.shale.data.dao.ApplicationInstanceDao;
 import com.shale.data.dao.ApplicationInstanceAdminReadDao;
 import com.shale.data.service.adapter.ApplicationReleaseReadServiceAdapter;
+import com.shale.data.service.adapter.ApplicationReleaseImportServiceAdapter;
 import com.shale.data.service.adapter.ApplicationInstanceServiceAdapter;
 import com.shale.data.service.adapter.ApplicationInstanceAdminReadServiceAdapter;
 import com.shale.core.service.ApplicationReleaseReadServicePort;
+import com.shale.core.service.ApplicationReleaseImportServicePort;
 import com.shale.core.service.ApplicationInstanceServicePort;
 import com.shale.core.service.ApplicationInstanceAdminReadServicePort;
 import com.shale.data.service.adapter.OrganizationServiceAdapter;
 import com.shale.data.service.adapter.TaskServiceAdapter;
+import com.shale.data.service.adapter.TaskPolicyConfigurationServiceAdapter;
 import com.shale.data.service.adapter.UserServiceAdapter;
 import com.shale.server.health.AppDatabaseHealthCheck;
 import com.shale.server.health.DataSourcesAppDatabaseHealthCheck;
 import com.shale.server.runtime.BearerTokenServerSessionResolver;
 import com.shale.server.runtime.CompositeServerSessionResolver;
 import com.shale.server.runtime.DevelopmentHeaderServerSessionResolver;
+import com.shale.server.runtime.GlobalControlPlaneDbSessionProvider;
 import com.shale.server.runtime.RequestScopedDbSessionProvider;
 import com.shale.server.runtime.RuntimeConnectionProvider;
 import com.shale.server.runtime.RuntimeSessionServiceConnectionProvider;
@@ -65,9 +73,12 @@ import com.shale.server.runtime.LegacyTokenCompatibilityPolicy;
 import com.shale.server.runtime.DesktopApplicationInstanceVerifier;
 import com.shale.server.runtime.ServerAuthSessionService;
 import com.shale.server.runtime.SessionManagementService;
+import com.shale.server.runtime.RememberCredentialStore;
+import com.shale.server.runtime.SqlRememberCredentialStore;
 import com.shale.server.live.InvalidationPublisher;
 import com.shale.server.live.HttpInvalidationPublisher;
 import org.springframework.core.env.Environment;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -106,11 +117,18 @@ public class ShaleServerServiceConfiguration {
     }
 
     @Bean
+    @Primary
     DbSessionProvider serverDbSessionProvider(
             ServerSessionResolver serverSessionResolver,
             ObjectProvider<HttpServletRequest> currentRequest,
             RuntimeConnectionProvider runtimeConnectionProvider) {
         return new RequestScopedDbSessionProvider(serverSessionResolver, currentRequest, runtimeConnectionProvider);
+    }
+
+    @Bean
+    DbSessionProvider globalControlPlaneDbSessionProvider(ObjectProvider<DataSources> serverDataSources) {
+        return new GlobalControlPlaneDbSessionProvider(
+                () -> serverDataSources.getObject().runtime().getConnection());
     }
 
     @Bean
@@ -148,6 +166,10 @@ public class ShaleServerServiceConfiguration {
 	@Bean
 	@Profile({"dev", "local", "prod", "azure"})
 	DurableSessionStore durableSessionStore(RuntimeConnectionProvider connections){return new SqlDurableSessionStore(connections);}
+
+	@Bean
+	@Profile({"dev", "local", "prod", "azure"})
+	RememberCredentialStore rememberCredentialStore(DataSources sources,RuntimeConnectionProvider connections){return new SqlRememberCredentialStore(sources.auth(),connections);}
 
 	@Bean
 	@Profile({"dev", "local", "prod", "azure"})
@@ -230,6 +252,11 @@ public class ShaleServerServiceConfiguration {
     }
 
     @Bean
+    TaskPolicyConfigurationServicePort taskPolicyConfigurationServicePort(DbSessionProvider serverDbSessionProvider) {
+        return new TaskPolicyConfigurationServiceAdapter(new TaskPolicyConfigurationDao(serverDbSessionProvider));
+    }
+
+    @Bean
     ContactServicePort contactServicePort(DbSessionProvider serverDbSessionProvider) {
         return new ContactServiceAdapter(new ContactDao(serverDbSessionProvider));
     }
@@ -247,6 +274,13 @@ public class ShaleServerServiceConfiguration {
     @Bean
     ApplicationReleaseReadServicePort applicationReleaseReadServicePort(DbSessionProvider serverDbSessionProvider) {
         return new ApplicationReleaseReadServiceAdapter(new ApplicationReleaseReadDao(serverDbSessionProvider));
+    }
+
+    @Bean
+    ApplicationReleaseImportServicePort applicationReleaseImportServicePort(
+            @Qualifier("globalControlPlaneDbSessionProvider") DbSessionProvider globalControlPlaneDbSessionProvider) {
+        return new ApplicationReleaseImportServiceAdapter(
+                new ApplicationReleaseImportDao(globalControlPlaneDbSessionProvider));
     }
 
     @Bean

@@ -115,6 +115,8 @@ final class UserManagementTablePresentationTest {
                     () -> assertEquals(0, name.getMinWidth()),
                     () -> assertEquals(Double.MAX_VALUE, name.getMaxWidth()),
                     () -> assertEquals("Alexandria Very-Long-Surname", name.getText()),
+                    () -> assertTrue(name.getStyle().contains("-fx-text-fill:"),
+                            "A database-colored name chip must choose a readable foreground."),
                     () -> assertEquals("Alexandria Very-Long-Surname", cell.getTooltip().getText()),
                     () -> assertEquals("Alexandria Very-Long-Surname", name.getTooltip().getText()));
 

@@ -1,12 +1,36 @@
-﻿{
-    "version":  "1.0.131",
-    "channel":  "stable",
-    "zipUrl":  "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.131.zip",
-    "installerUrl":  "https://shalestorage.z13.web.core.windows.net/Shale-1.0.131.msi",
-    "notes":  "Release 1.0.131",
-    "mandatory":  true,
-    "sha256":  "cfd7f109c0407a29f4892a2da28c9f167eb14bd39498d61b4fd75a5faa454caf",
-    "publishedAt":  "2026-10-02T00:59:55Z",
-    "macZipUrl":  "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.131-mac.zip",
-    "macSha256":  "fd09305dc94efc0964ce9521787a4431e6f33d5eaa1d92da5e495ba245b33bc3"
+{
+  "version": "1.0.135",
+  "channel": "stable",
+  "zipUrl": "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.135.zip",
+  "installerUrl": "https://shalestorage.z13.web.core.windows.net/Shale-1.0.135.msi",
+  "notes": "What's New in Shale 1.0.135\nDraft generated from commit messages since Shale 1.0.134. Review and edit before publishing.\n\nNew\n• Add release notes for 1.0.135\n\nImprovements\n• Log unexpected release import failures\n• Log request binding failures in API handler\n• Prepare release notes drafts before releases\n• Prevent release notes bytecode artifacts\n• Automate release notes Git preparation\n• Push release source before Mac build\n• Safely reuse macOS release workspace\n\nFixes\n• Fix explicit path variable binding\n• Fix global release import database session wiring",
+  "mandatory": true,
+  "sha256": "99770aeae8befdd1c30c7092ab14994436f47f5707c9dae5d86bc6c859209733",
+  "publishedAt": "2026-10-05T15:43:16Z",
+  "macZipUrl": "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.135-mac.zip",
+  "macSha256": "3536b8ef9f8b2e9ac767fe600e204e4cc0c95829a1a41f294b742e2c41fb4b00",
+  "releaseNotes": {
+    "version": "1.0.135",
+    "title": "What's New in Shale 1.0.135",
+    "summary": "Draft generated from commit messages since Shale 1.0.134. Review and edit before publishing.",
+    "groups": {
+      "New": [
+        "Add release notes for 1.0.135"
+      ],
+      "Improvements": [
+        "Log unexpected release import failures",
+        "Log request binding failures in API handler",
+        "Prepare release notes drafts before releases",
+        "Prevent release notes bytecode artifacts",
+        "Automate release notes Git preparation",
+        "Push release source before Mac build",
+        "Safely reuse macOS release workspace"
+      ],
+      "Fixes": [
+        "Fix explicit path variable binding",
+        "Fix global release import database session wiring"
+      ]
+    },
+    "releaseDate": "2026-10-02"
+  }
 }

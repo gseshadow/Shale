@@ -12,6 +12,8 @@ import java.sql.Statement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Arrays;
 import java.util.Set;
@@ -690,6 +692,29 @@ public final class UserDao {
 
 	public List<FirmWideRoleDefinition> listFirmWideRolesForUserView(int tenant,int actor){
 		try(Connection c=db.requireConnection()){requireRoleViewer(c,tenant,actor);try(PreparedStatement p=c.prepareStatement("SELECT Id,ShaleClientId,SystemKey,Name,IsActive,IsDeleted,RowVer FROM dbo.FirmWideRoleDefinitions WHERE ShaleClientId=? AND IsActive=1 AND IsDeleted=0 ORDER BY SortOrder,Name,Id")){p.setInt(1,tenant);try(ResultSet r=p.executeQuery()){List<FirmWideRoleDefinition> out=new ArrayList<>();while(r.next())out.add(roleDefinition(r));return List.copyOf(out);}}}catch(SQLException e){throw new RuntimeException("Failed to list firm-wide roles for user view",e);}
+	}
+
+	/** Loads all current tenant-user assignment history with one set-based assignment query. */
+	public Map<Integer,List<FirmWideRoleAssignment>> listTenantUserFirmWideRoleAssignments(int tenant,int actor,boolean includeInactive){
+		try(Connection c=db.requireConnection()){
+			requireRoleAdmin(c,tenant,actor);
+			String sql="SELECT a.Id,a.UserId,a.FirmWideRoleDefinitionId,d.Name,a.IsDeleted,a.RowVer " +
+					"FROM dbo.UserFirmWideRoleAssignments a " +
+					"JOIN dbo.FirmWideRoleDefinitions d ON d.Id=a.FirmWideRoleDefinitionId AND d.ShaleClientId=a.ShaleClientId " +
+					"JOIN dbo.Users u ON u.Id=a.UserId AND u.ShaleClientId=a.ShaleClientId AND COALESCE(u.IsRemoved,0)=0 " +
+					(includeInactive ? "" : "AND COALESCE(u.is_deleted,0)=0 ") +
+					"WHERE a.ShaleClientId=? ORDER BY a.UserId,a.IsDeleted,d.SortOrder,d.Name,a.Id";
+			try(PreparedStatement p=c.prepareStatement(sql)){
+				p.setInt(1,tenant);
+				try(ResultSet r=p.executeQuery()){
+					Map<Integer,List<FirmWideRoleAssignment>> mutable=new LinkedHashMap<>();
+					while(r.next()) mutable.computeIfAbsent(r.getInt("UserId"),ignored->new ArrayList<>()).add(roleAssignment(r));
+					Map<Integer,List<FirmWideRoleAssignment>> out=new LinkedHashMap<>();
+					mutable.forEach((user,assignments)->out.put(user,List.copyOf(assignments)));
+					return Map.copyOf(out);
+				}
+			}
+		}catch(SQLException e){throw new RuntimeException("Failed to list tenant user firm-wide role assignments",e);}
 	}
 
 	public List<FirmWideRoleAssignment> listUserFirmWideRoleAssignmentsForView(int tenant,int actor,int user){

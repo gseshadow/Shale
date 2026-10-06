@@ -13,12 +13,31 @@ set "SCRIPT_DIR=%ROOT%\build\scripts"
 set "DOWNSTREAM_SCRIPT=%SCRIPT_DIR%\release-and-publish.bat"
 set "MAC_HOST=admin@192.168.1.56"
 set "MAC_REPO=/Users/admin/Documents/Shale"
+set "MAC_REMOTE=origin"
 set "MAC_DIST=%MAC_REPO%/dist-macos"
 set "HANDOFF=%ROOT%\build\mac-handoff"
 set "MAC_ZIP=%HANDOFF%\ShaleApp-%VERSION%-mac.zip"
 set "MAC_METADATA=%HANDOFF%\shale-mac-release.json"
+set "NOTES_PATH=%ROOT%\release-notes\%VERSION%.json"
 
 cd /d "%ROOT%" || goto :root_unavailable
+
+python -B "%SCRIPT_DIR%\prepare_release_notes.py" "%ROOT%" "%VERSION%"
+set "PREPARE_EXIT=%ERRORLEVEL%"
+if "%PREPARE_EXIT%"=="10" goto :notes_prepared
+if not "%PREPARE_EXIT%"=="0" goto :notes_preparation_failed
+
+echo Step 0: Commit reviewed release notes
+python "%SCRIPT_DIR%\release_git_sync.py" prepare-notes "%ROOT%" "%VERSION%" || goto :notes_git_failed
+
+echo Step 0: Git preflight before remote Mac build
+python "%SCRIPT_DIR%\release_git_sync.py" preflight "%ROOT%" || goto :git_preflight_failed
+for /f "delims=" %%C in ('git rev-parse HEAD') do set "SOURCE_REVISION=%%C"
+if not defined SOURCE_REVISION goto :git_preflight_failed
+
+echo Step 0: Publish and verify the exact source revision before remote Mac build
+python "%SCRIPT_DIR%\release_git_sync.py" publish-source "%ROOT%" "%SOURCE_REVISION%" || goto :source_sync_failed
+set "SHALE_GIT_PREFLIGHT_DONE=true"
 
 echo ====================================
 echo Full cross-platform release %VERSION%
@@ -27,7 +46,8 @@ echo ====================================
 echo.
 
 echo Step 1: Run Mac build via SSH
-ssh %MAC_HOST% "cd %MAC_REPO% && ./build/scripts/prepare-shale-mac-release.sh codex/latest %VERSION%" || goto :fail
+echo Mac artifacts will be built from source revision: %SOURCE_REVISION%
+python "%SCRIPT_DIR%\mac_release_bootstrap.py" "%MAC_HOST%" "%MAC_REPO%" "%MAC_REMOTE%" "codex/latest" "%VERSION%" "%SOURCE_REVISION%" || goto :fail
 
 echo.
 echo Step 2: Fetch Mac artifacts
@@ -80,6 +100,33 @@ exit /b 2
 :root_unavailable
 echo Repository root is unavailable: "%ROOT%"
 exit /b 3
+
+:notes_prepared
+echo.
+echo Generated release-notes draft: "%NOTES_PATH%"
+start "" "%NOTES_PATH%"
+echo Release-notes draft preparation is complete. No build, upload, catalog import, or publication was started.
+echo Review and edit the opened file: "%ROOT%\release-notes\%VERSION%.json"
+echo Then rerun the exact same command:
+echo build\scripts\release-all.bat %VERSION% %MANDATORY_UPDATE%
+exit /b 0
+
+:notes_preparation_failed
+echo Release-notes draft preparation failed before the Git preflight, build, upload, catalog import, or publication.
+goto :fail
+
+:notes_git_failed
+echo Release-notes Git preparation failed before the normal Git preflight, build, upload, catalog import, or publication.
+goto :fail
+
+:git_preflight_failed
+echo Git preflight failed before the Mac or Windows build. Nothing was published.
+goto :fail
+
+:source_sync_failed
+echo Release source synchronization failed before the Mac or Windows build, upload, or publication.
+echo Resolve the Git error above and rerun the release. No release side effects were started.
+goto :fail
 
 :missing_mac_zip
 echo Required fetched Mac ZIP was not found: "%MAC_ZIP%"

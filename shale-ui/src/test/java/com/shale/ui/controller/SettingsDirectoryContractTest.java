@@ -16,7 +16,7 @@ final class SettingsDirectoryContractTest {
 
     @Test void directoryGroupsHaveTheExpectedOrderedRows() throws Exception {
         var document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(FXML.toFile());
-        assertEquals(List.of("Appearance", "Notification Preferences", "Devices & Sessions", "Custom Dictionary"), titles(document, "personalGroup"));
+        assertEquals(List.of("Appearance", "Notification Preferences", "My Sessions", "Custom Dictionary"), titles(document, "personalGroup"));
         assertEquals(List.of("Case Statuses", "Practice Areas", "Link Types", "Case Team Roles", "Case Dates", "Protected Case Date Mappings"), titles(document, "caseConfigurationGroup"));
         assertEquals(List.of("Request Fields"), titles(document, "requestConfigurationGroup"));
         assertEquals(List.of("Contact Classifications", "Organization Types"), titles(document, "contactOrganizationConfigurationGroup"));

@@ -181,11 +181,106 @@ class WindowsReleaseBatchContractTest(unittest.TestCase):
         self.assertIn('update-manifest.bat"', release)
         self.assertIn('publish-update.bat"', publish)
 
+    def test_release_validates_notes_after_manifest_generation_and_before_distribution(self):
+        release = batch_source("release.bat")
+        manifest = release.index('update-manifest.bat"')
+        notes = release.index('release_notes.py"')
+        distribution = release.index('copy /Y "%MANIFEST_SRC%" "%MANIFEST_DIST%"')
+        self.assertLess(manifest, notes)
+        self.assertLess(notes, distribution)
+        self.assertIn('--notes-dir "%ROOT%\\release-notes"', release)
+
+    def test_git_preflight_and_sync_bound_the_publication_pipeline(self):
+        full = batch_source("release-all.bat")
+        publish = batch_source("release-and-publish.bat")
+        preflight = full.index("release_git_sync.py\" preflight")
+        source_sync = full.index("release_git_sync.py\" publish-source")
+        revision = full.index("git rev-parse HEAD")
+        mac_build = full.index("mac_release_bootstrap.py")
+        self.assertEqual(
+            [preflight, revision, source_sync, mac_build],
+            sorted([preflight, revision, source_sync, mac_build]),
+            "The reviewed notes commit must reach origin before its exact SHA is sent to the Mac",
+        )
+        self.assertIn('publish-source "%ROOT%" "%SOURCE_REVISION%"', full)
+        self.assertIn('set "SHALE_GIT_PREFLIGHT_DONE=true"', full)
+        self.assertIn("%SOURCE_REVISION%", full)
+        self.assertIn('"%MAC_REMOTE%" "codex/latest" "%VERSION%" "%SOURCE_REVISION%"', full)
+        self.assertNotIn('./build/scripts/prepare-shale-mac-release.sh', full)
+        self.assertLess(publish.index("release_git_sync.py\" preflight"), publish.index('release.bat"'))
+        self.assertLess(publish.index('release.bat"'), publish.index("release_git_sync.py\" sync"))
+        self.assertLess(publish.index("release_git_sync.py\" sync"), publish.index('publish-update.bat"'))
+        self.assertIn("retry publication only", publish)
+
+    def test_source_push_failure_stops_before_release_side_effects(self):
+        full = batch_source("release-all.bat")
+        source_sync = full.index('release_git_sync.py" publish-source')
+        source_failure = full.index('goto :source_sync_failed', source_sync)
+        mac_build = full.index("mac_release_bootstrap.py")
+        windows_release = full.index('call "%DOWNSTREAM_SCRIPT%"')
+        self.assertLess(source_sync, source_failure)
+        self.assertLess(source_failure, mac_build)
+        self.assertLess(source_failure, windows_release)
+        handler = full[full.index("\n:source_sync_failed"):full.index("\n:missing_mac_zip")]
+        self.assertIn("before the Mac or Windows build, upload, or publication", handler)
+        self.assertIn("goto :fail", handler)
+
+    def test_missing_notes_preparation_stops_before_every_release_side_effect(self):
+        full = batch_source("release-all.bat")
+        preparation = full.index('prepare_release_notes.py"')
+        prepared_branch = full.index('if "%PREPARE_EXIT%"=="10" goto :notes_prepared')
+        preflight = full.index('release_git_sync.py" preflight')
+        mac_build = full.index("mac_release_bootstrap.py")
+        windows_release = full.index('call "%DOWNSTREAM_SCRIPT%"')
+        self.assertLess(preparation, prepared_branch)
+        self.assertLess(prepared_branch, preflight)
+        self.assertLess(preflight, mac_build)
+        self.assertLess(mac_build, windows_release)
+        prepared = full[full.index("\n:notes_prepared"):full.index("\n:notes_preparation_failed")]
+        self.assertIn('start "" "%NOTES_PATH%"', prepared)
+        self.assertLess(prepared.index('start "" "%NOTES_PATH%"'), prepared.index("exit /b 0"))
+        self.assertIn("No build, upload, catalog import, or publication was started", prepared)
+        self.assertIn("release-notes\\%VERSION%.json", prepared)
+        self.assertIn("build\\scripts\\release-all.bat %VERSION% %MANDATORY_UPDATE%", prepared)
+        self.assertIn("exit /b 0", prepared)
+
+    def test_reviewed_notes_are_committed_before_preflight_and_release_side_effects(self):
+        full = batch_source("release-all.bat")
+        preparation = full.index('prepare_release_notes.py"')
+        notes_commit = full.index('release_git_sync.py" prepare-notes')
+        preflight = full.index('release_git_sync.py" preflight')
+        mac_build = full.index("mac_release_bootstrap.py")
+        windows_release = full.index('call "%DOWNSTREAM_SCRIPT%"')
+        self.assertEqual(
+            [preparation, notes_commit, preflight, mac_build, windows_release],
+            sorted([preparation, notes_commit, preflight, mac_build, windows_release]),
+        )
+        failure = full[full.index("\n:notes_git_failed"):full.index("\n:git_preflight_failed")]
+        self.assertIn("before the normal Git preflight, build, upload, catalog import, or publication", failure)
+        self.assertIn("goto :fail", failure)
+
+    def test_notes_preparation_disables_python_bytecode_cache_writes(self):
+        full = batch_source("release-all.bat")
+        preparation_commands = [line for line in command_lines(full, "python")
+                                if 'prepare_release_notes.py"' in line]
+        self.assertEqual(
+            ['python -B "%SCRIPT_DIR%\\prepare_release_notes.py" "%ROOT%" "%VERSION%"'],
+            preparation_commands,
+            "Draft preparation must disable bytecode writes so its first run leaves only the notes draft",
+        )
+
     def test_local_release_build_never_crosses_publication_boundary(self):
         release_build = batch_source("build-shale-release.bat").lower()
         for forbidden in ("release-and-publish.bat", "publish-update.bat", "update-manifest.bat",
                           "az storage", "azcopy", "upload-batch"):
             self.assertNotIn(forbidden, release_build)
+
+    def test_publication_imports_catalog_before_making_manifest_discoverable(self):
+        source = batch_source("publish-update.bat")
+        catalog = source.index('import_release_catalog.py" "%JSON_FILE%"')
+        manifest = source.index("echo Uploading manifest...")
+        self.assertLess(catalog, manifest)
+        self.assertIn('python "%SCRIPT_DIR%import_release_catalog.py" "%JSON_FILE%" || exit /b 1', source)
 
     def test_native_dependency_report_parent_exists_before_redirection(self):
         source = (ROOT / "build/native/windows-toast/build-native.bat").read_text(encoding="utf-8")

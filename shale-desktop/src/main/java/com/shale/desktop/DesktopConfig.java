@@ -3,6 +3,7 @@ package com.shale.desktop;
 import java.io.InputStream;
 import java.util.Map;
 import java.util.Properties;
+import java.net.URI;
 
 import com.shale.data.auth.AuthService;
 import com.shale.data.auth.AuthServiceImpl;
@@ -14,6 +15,7 @@ import com.shale.data.runtime.RuntimeSessionService;
 public final class DesktopConfig {
 	public final String appEnv;
 	public final String negotiateEndpointUrl;
+	public final java.util.Optional<URI> serverApiOrigin;
 
 	public final DataSources dataSources;
 	public final AuthService authService;
@@ -24,12 +26,14 @@ public final class DesktopConfig {
 	private DesktopConfig(
 			String appEnv,
 			String negotiateEndpointUrl,
+			java.util.Optional<URI> serverApiOrigin,
 			DataSources dataSources,
 			AuthService authService,
 			RuntimeSessionService runtimeService) {
 		System.out.println("DesktopConfig()"); // TODO remove
 		this.appEnv = appEnv;
 		this.negotiateEndpointUrl = negotiateEndpointUrl;
+		this.serverApiOrigin = serverApiOrigin;
 		this.dataSources = dataSources;
 		this.authService = authService;
 		this.runtimeService = runtimeService;
@@ -50,7 +54,6 @@ public final class DesktopConfig {
 		pushToSystemProperty("NEGOTIATE_ENDPOINT_URL", env);
 		pushToSystemProperty("LIVE_NEGOTIATE_ENDPOINT_URL", env);
 		pushToSystemProperty("LIVE_PUBLISH_ENDPOINT_URL", env);
-		pushToSystemProperty("SHALE_SERVER_API_BASE_URL", env);
 
 		pushToSystemProperty("SHALE_APP_JDBC_URL", env);
 		pushToSystemProperty("SHALE_APP_USER", env);
@@ -71,24 +74,28 @@ public final class DesktopConfig {
 		AuthService auth = new AuthServiceImpl(dsrc, new BCryptPasswordVerifier());
 		RuntimeSessionService runtime = new RuntimeSessionService(dsrc.runtime());
 
-		return new DesktopConfig(appEnv, negotiateUrl, dsrc, auth, runtime);
+		boolean packagedInstallation = !System.getProperty("jpackage.app-path", "").isBlank();
+		var serverApiOrigin = DesktopApiOrigin.resolve(System.getProperties(), env, PROPS, appEnv, packagedInstallation);
+
+		return new DesktopConfig(appEnv, negotiateUrl, serverApiOrigin, dsrc, auth, runtime);
 	}
 
 	private static Properties loadProperties() {
 		Properties props = new Properties();
 
-		try (InputStream in = DesktopConfig.class.getClassLoader().getResourceAsStream("application.properties")) {
+		loadResource(props, "desktop-production.properties");
+		loadResource(props, "application.properties");
+		return props;
+	}
+
+	private static void loadResource(Properties props, String resource) {
+		try (InputStream in = DesktopConfig.class.getClassLoader().getResourceAsStream(resource)) {
 			if (in != null) {
 				props.load(in);
-				System.out.println("Loaded application.properties"); // TODO remove
-			} else {
-				System.out.println("application.properties not found on classpath"); // TODO remove
 			}
 		} catch (Exception ex) {
-			System.out.println("Failed to load application.properties: " + ex.getMessage()); // TODO remove
+			throw new IllegalStateException("Failed to load desktop configuration resource: " + resource, ex);
 		}
-
-		return props;
 	}
 
 	private static void pushToSystemProperty(String key, Map<String, String> env) {

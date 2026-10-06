@@ -14,5 +14,6 @@ public final class DesktopServerSession {
     public Optional<Credential> current(){return Optional.ofNullable(current.get());}
     public void install(Credential credential){current.set(java.util.Objects.requireNonNull(credential));}
     public void clear(){current.set(null);}
+	public boolean clearIf(UUID sessionId){for(;;){Credential value=current.get();if(value==null||!value.sessionId().equals(sessionId))return false;if(current.compareAndSet(value,null))return true;}}
     public Optional<String> bearerToken(){return current().map(Credential::accessToken);}
 }

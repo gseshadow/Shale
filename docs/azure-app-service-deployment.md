@@ -447,3 +447,87 @@ accepts tenant/user claims as proof. Existing web auth contracts and older deskt
 explicit staged-rollout signal for JDBC-only compatibility. Do not interpret 401/403 or an instance mismatch as an
 old-server condition. Rollback may restore the previous desktop; it ignores historical session rows and there is no
 persisted desktop bearer credential to remove.
+
+### Desktop API-origin packaging and overrides
+
+Production desktop packages contain the verified deployment origin
+`https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net` as
+`SHALE_PACKAGED_SERVER_API_BASE_URL`. Installed workstations therefore do not need a per-machine environment
+variable. This repository value is deployment evidence only; release acceptance must still prove that the target
+deployment contains `POST /api/auth/desktop-session` and the Phase 7A/8A database migrations.
+
+`DesktopConfig` resolves one origin for enrollment and both session-management clients. Precedence is a nonblank
+`SHALE_SERVER_API_BASE_URL` Java system property, then the same environment variable, then packaged configuration
+for a production/installed launch. Blank override values are absent. A nonblank invalid override fails startup and
+never falls through to the packaged destination. Development launches ignore the packaged production origin and
+remain unconfigured unless an explicit override is supplied. An explicit local example is
+`-DSHALE_SERVER_API_BASE_URL=http://localhost:8080`; HTTP is accepted only for loopback development. All production
+origins must be HTTPS. Origins must not contain user-info, a path (including `/api`), a query, or a fragment, and
+trailing slashes are normalized.
+
+### Phase 7C runtime acceptance and remaining checks
+
+The 2026-10-02 user-reported Windows/Eclipse production run confirms the Azure API starts, desktop enrollment
+returns HTTP 200, Administration > Sessions loads tenant-wide data, explicit logout returns HTTP 200 and revokes the
+session, remote administrative revocation is detected by polling in approximately one minute, and confirmed
+revocation locks the application before the popup is dismissed (OK returns to sign-in). My Sessions works for both
+ordinary users and administrators, is self-only, marks the current session, and current-session self-revocation
+locks and returns to sign-in. Earlier local Maven runs passed as reported by the user; these runtime observations do
+not create a new Maven result.
+
+The following checklist remains the reproducible deployment procedure. A clean installed production launch without
+`SHALE_SERVER_API_BASE_URL` or another API override is **NOT RUN** unless separately evidenced. Intermittent
+enrollment `REQUEST_TIMEOUT` also remains open. Items concerning a second user, an ordinary user's administrator
+403, and crafted cross-tenant requests are not claimed as manually accepted by the evidence above.
+
+From an authorized Windows test workstation, without recording credentials or response bodies:
+
+1. Confirm `GET <origin>/api/health` returns 200.
+2. Confirm an intentionally invalid credential `POST <origin>/api/auth/desktop-session` returns 401 rather than
+   404/405/501. A GET or generic bearer 401 is not endpoint proof.
+3. Sign in with an authorized ordinary user and confirm Settings > Sessions loads authoritative rows; sign out and
+   confirm the prior bearer can no longer be used.
+4. Sign in as a different ordinary user and confirm no prior-user sessions or authority are inherited; confirm the
+   administrator endpoint returns 403.
+5. Sign in as a tenant administrator and confirm the bounded Administration > Sessions page loads and can perform
+   an authorized test revocation.
+6. Inspect sanitized desktop logs for `Desktop durable session enrollment succeeded.` Never capture passwords,
+   bearer tokens, request bodies, or sensitive response bodies.
+7. For an enrollment failure, record the single sanitized enrollment diagnostic: HTTP status and `elapsedMs` when a
+   response arrived, or transport `kind`, `exceptionClass`, and `elapsedMs`. Do not collect surrounding credential,
+   bearer, request/response-body, email, or unrestricted exception-message output. `REQUEST_TIMEOUT` at approximately
+   8000 ms identifies the desktop request boundary; `CONNECTION_FAILURE` and `TLS_FAILURE` distinguish connection and
+   handshake paths without increasing either timeout.
+8. After successful enrollment, open Administration > Sessions and record only the sanitized administrative-list
+   diagnostic: response `status` and `elapsedMs`; transport `kind`, `exceptionClass`, and `elapsedMs`; or response
+   parsing `exceptionClass`. Do not capture the URL/query, authorization header, bearer, body, filters, or any
+   user/session fields.
+9. If the list reports status 500, verify that `dbo.SessionSecurityAuditLog` exists, has the Phase 8A tenant FILTER
+   and AFTER INSERT/UPDATE block predicates, and permits the configured runtime database principal to insert. A
+   successful desktop enrollment proves `dbo.UserSessions` issuance but does not prove this fail-closed read-audit
+   write. Apply the existing `2026-09-29_session_security_audit_phase8a.sql` migration if it is absent; do not bypass
+   or disable the audit to make the page load.
+
+### Desktop durable-session revocation enforcement rollout
+
+The 2026-10-02 enforcement correction requires a rebuilt/redeployed desktop, not a new SQL migration. The server must
+already include the Phase 8A session APIs/audit migration and Phase 8B post-commit publisher configuration described
+above; no server rebuild is required when that version is already deployed. Roll out the server/migrations first,
+then the corrected desktop. Older desktops can durably enroll but do not reliably remove direct-JDBC authority after
+remote revocation.
+
+Acceptance requires two corrected desktop processes: enroll Joreen's exact current session, revoke that public
+session ID as a same-tenant administrator, and verify that Joreen receives the session-ended warning and cannot start
+new JDBC work. Repeat with LiveBus disconnected. Push should accelerate detection; without push, authoritative
+validation begins within 60 seconds and has a six-second request timeout, for a maximum documented detection window
+of 66 seconds when the server is reachable. A timeout or transport outage is uncertainty and must not be reported as
+revocation; validation retries at the next interval.
+
+
+### 2026-10-02 revocation acceptance closeout
+
+The user-reported production acceptance satisfies the observed enforcement behavior: administrative revocation was
+detected in approximately one minute, the application was already locked while the session-ended popup remained
+open, and OK moved to sign-in. This does not replace automated tenant/authorization coverage or claim manual
+cross-tenant/crafted-request acceptance. Normal X-button closure continues to clear local state without server
+revocation; only explicit Logout revokes the durable session. Logged-out automatic updates remain `UNSUPPORTED`.

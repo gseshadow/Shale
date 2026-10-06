@@ -53,6 +53,18 @@
     -fx-background-color: -shale-color-card-surface;
 }
 
+/* Supporting copy must follow the active theme rather than the legacy
+ * search-summary color declared in app.css. Card hover/selection changes only
+ * the surface, so these foreground roles remain stable in every card state. */
+.case-date-custom-card__secondary {
+    -fx-text-fill: -shale-color-text-secondary;
+    -fx-font-weight: 600;
+}
+
+.case-date-custom-card__secondary--inactive {
+    -fx-text-fill: -shale-color-text-muted;
+}
+
 /* Case View Dates cards start from the themed card plane and end in a restrained
  * wash supplied by the authoritative Case Date Type color. The semantic info
  * wash is the safe fallback when production data has no usable color. */

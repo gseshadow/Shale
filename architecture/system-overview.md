@@ -190,9 +190,15 @@ does not couple heartbeat or instance abandonment to revocation. Phase 7A itself
 
 ## Durable server API authentication (Phase 7B)
 
+Desktop server-session clients receive one centrally validated API origin from `DesktopConfig`. Installed production
+packages carry the production HTTPS origin, while development ignores that packaged value unless a destination is
+explicitly selected. Enrollment, self-session management, and administrator-session management do not independently
+read environment or system properties. The post-JDBC enrollment exchange is background work and the resulting
+bearer remains process-memory-only and generation-bound.
+
 Server API login continues through `AuthServicePort`, then creates a tenant/user-qualified Phase 7A `UserSessions` row before returning a JWT. New JWTs retain the existing identity/time claims and add public UUID `sid`; SQL `CurrentAccessJti`, expiry, and revocation are authoritative on every authenticated bound-token request. Refresh conditionally rotates the JTI and logout durably revokes only that session. The request resolver performs no lookup for absent bearer tokens or public routes. A temporary, required-cutoff legacy branch accepts otherwise-valid pre-cutover unbound JWTs and upgrades them on refresh; its in-memory revocation store is not authoritative for bound sessions. Desktop direct-JDBC authentication is unchanged until Phase 7C.
 
-## Desktop durable session enrollment (Phase 7C; verification pending)
+## Desktop durable session enrollment (Phase 7C; accepted with follow-up items)
 
 After the existing direct-JDBC bcrypt login and runtime tenant context succeed, desktop best-effort enrolls its
 Phase 4B instance and performs one additive HTTPS credential exchange. The server re-verifies the credential,
@@ -200,9 +206,12 @@ derives tenant/user rather than accepting asserted ids, validates any active DES
 and issues the ordinary Phase 7B bound JWT with a durable DESKTOP `UserSessions` row. The centralized desktop
 bearer is process-memory-only and is not a JDBC authority. Endpoint absence or transport failure leaves an explicit
 JDBC-only compatibility session; security rejection never silently downgrades server-session functionality.
-Logical logout revokes and clears the bound session; process exit clears memory and ends the instance without
-reclassifying exit as user logout. Enrollment is not heartbeat, and this phase adds no remote controls, PubSub,
-geolocation, UI, or update enforcement. Required Maven verification is pending because Maven Central returned 403.
+Logical logout revokes and clears the bound session; normal X-button/process exit clears local memory and ends the
+instance without revoking or reclassifying the durable session as user logout. User-reported production
+Windows/Eclipse acceptance confirms the Azure API starts, enrollment returns HTTP 200, and explicit logout returns
+HTTP 200 and revokes the session. Earlier local Maven runs passed as reported by the user; no new Maven result is
+inferred from runtime acceptance. A clean installed production launch without an API override is **NOT RUN**, and
+intermittent enrollment `REQUEST_TIMEOUT` remains open.
 
 ## Authoritative durable-session management (Phase 8A)
 
@@ -231,6 +240,12 @@ through JDBC. Phase 8A authorization, current-`sid` binding, revocation, and sec
 Compatibility mode is represented by an absent capability, and async presentation is guarded by active tenant/user
 identity. This boundary is self-service only; tenant-administrator session tooling remains Phase 10.
 
+The user-reported installed acceptance confirms Settings > Personal > My Sessions works for ordinary users and
+administrators, lists only the authenticated user's sessions, marks the current session, and locks/returns to
+sign-in after current-session self-revocation. Active means unexpired and unrevoked, not that an application process
+is running; expired and revoked history remains stored. Bearers remain memory-only, and “Stay logged in” remains a
+future feature.
+
 ## Tenant-administrator session management UI (Phase 10)
 
 Settings > Administration > Sessions is a lazy, admin-only desktop management window. JavaFX uses the
@@ -245,6 +260,11 @@ completions after close, logout, or user/tenant switch. The current administrato
 points to ordinary logout. Phase 8A has no authoritative admin bulk-user revoke, so the UI does not simulate one.
 Phase 8B remains the sole optional invalidation accelerator; the admin UI trusts the revoke response and its own
 authoritative reload rather than PubSub delivery.
+
+User-reported acceptance confirms the tenant-wide page loads and that remote administrative revocation is detected
+through polling in approximately one minute. Confirmed revocation locks the application before the session-ended
+popup is dismissed; OK transitions to sign-in. This is not a claim of manual cross-tenant or crafted-request
+security acceptance beyond existing automated/runtime evidence.
 
 ## Desktop update-policy presentation (Phase 11A)
 
@@ -287,3 +307,7 @@ SYSTEM execution of an owner-writable updater has substitution/TOCTOU, privilege
 A safe broker would be a new protected, signed privileged security product rather than a narrow updater extension.
 No task/service/helper, rollout, SQL/API, wake/reboot, force-kill, or macOS work was added. Production signing remains
 mandatory but cannot by itself cure owner-writable privileged execution. Phase 13C is still the supported mechanism.
+
+## Tenant task due-date policy (2026-10-05)
+
+Task due-date policy is tenant scoped and defaults to `WARN`. The desktop task dialogs own the `WARN` confirmation, whereas the data/service mutation boundary owns the `REQUIRED` rejection, including direct service and future API calls. `OPTIONAL` preserves nullable `Tasks.DueAt`. Existing undated tasks are never migrated and remain readable, but an attempted edit under `REQUIRED` must supply a date. The current task editors are the shared `NewTaskDialog` (case task creation) and `TaskDetailDialog` (My Shale, Tasks/calendar navigation, case view, and User View); using shared dialogs prevents per-controller validation drift. Settings > Administration > Tasks loads the authoritative row for administrators and saves changed values with RowVer optimistic concurrency. The policy update and its TASK_POLICY_CONFIGURATION/UPDATED entity-action audit (PREVIOUS_POLICY and RESULTING_POLICY only) commit or roll back together. Policy reads are intentionally uncached, so newly opened task editors observe changes without restart or explicit invalidation.

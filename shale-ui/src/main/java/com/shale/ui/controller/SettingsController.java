@@ -11,6 +11,8 @@ import com.shale.core.service.CaseServicePort;
 import com.shale.core.service.MaterialRequestServicePort;
 import com.shale.core.service.ContactServicePort;
 import com.shale.core.service.OrganizationServicePort;
+import com.shale.core.service.TaskPolicyConfigurationServicePort;
+import com.shale.core.model.TaskDueDatePolicy;
 import com.shale.data.dao.UserDao;
 import com.shale.data.service.adapter.UserServiceAdapter;
 import com.shale.ui.component.dialog.AppDialogs;
@@ -37,6 +39,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Button;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.RadioButton;
 import javafx.scene.Node;
 import javafx.stage.Window;
 import javafx.scene.layout.HBox;
@@ -131,6 +134,11 @@ public final class SettingsController {
 	@FXML private CheckBox automaticUpdatesCheck;
 	@FXML private Label automaticUpdatesStatusLabel;
 	@FXML private SettingsManagementRow firmWideRolesRow;
+	@FXML private SettingsManagementRow taskPolicyRow;
+	@FXML private VBox taskPolicyContent;
+	@FXML private RadioButton taskPolicyOptional, taskPolicyWarn, taskPolicyRequired;
+	@FXML private Button saveTaskPolicyButton;
+	@FXML private Label taskPolicyStatusLabel;
 	private Button manageFirmWideRolesButton;
 	@FXML private VBox personalGroup, caseConfigurationGroup, requestConfigurationGroup,
 			contactOrganizationConfigurationGroup, administrationGroup;
@@ -149,6 +157,9 @@ public final class SettingsController {
 	private MaterialRequestServicePort materialRequestService;
 	private ContactServicePort contactService;
 	private OrganizationServicePort organizationService;
+	private TaskPolicyConfigurationServicePort taskPolicyService;
+	private TaskPolicyConfigurationServicePort.TaskPolicyConfiguration loadedTaskPolicy;
+	private boolean taskPolicyLoading;
 	private UserDao userDao;
 	private Runnable onOpenAuditLog;
 	private boolean fxmlReady;
@@ -200,6 +211,7 @@ public final class SettingsController {
 		bind(devicesSessionsRow, event -> toggleDevicesSessions());
 		bind(userManagementRow, this::onManageUsers);
 		bind(adminSessionsRow, this::onManageAdminSessions);
+		bind(taskPolicyRow, event -> toggleTaskPolicy());
 		bind(automaticUpdatesRow, event -> toggleAutomaticUpdates());
 		manageFirmWideRolesButton = bind(firmWideRolesRow, this::onManageFirmWideRoles);
 		bind(caseDateMappingsRow, event -> {
@@ -208,6 +220,29 @@ public final class SettingsController {
 			if (opening) loadCaseDateRoleMappingsAsync(null);
 		});
 	}
+
+	public void setTaskPolicyService(TaskPolicyConfigurationServicePort service) {
+		this.taskPolicyService=Objects.requireNonNull(service,"taskPolicyService");
+		if(fxmlReady) updateTaskPolicySaveState();
+	}
+
+	private void toggleTaskPolicy(){boolean opening=!taskPolicyContent.isManaged();toggleInline(taskPolicyContent,taskPolicyRow,false);if(opening)loadTaskPolicy();}
+	private void loadTaskPolicy(){
+		if(!isAdminUser()||taskPolicyService==null){taskPolicyStatusLabel.setText("Task policy is available to administrators.");return;}
+		taskPolicyLoading=true;taskPolicyStatusLabel.setText("Loading task policy…");updateTaskPolicySaveState();
+		int tenant=requireTenantId(),actor=requireActorUserId();
+		settingsLoadExecutor.submit(()->{try{var value=taskPolicyService.load(tenant,actor);Platform.runLater(()->{loadedTaskPolicy=value;selectTaskPolicy(value.dueDatePolicy());taskPolicyLoading=false;taskPolicyStatusLabel.setText("");updateTaskPolicySaveState();});}catch(Exception failure){LOG.warn("Task policy could not be loaded",failure);Platform.runLater(()->{taskPolicyLoading=false;taskPolicyStatusLabel.setText("Task due-date policy could not be loaded. Try again.");updateTaskPolicySaveState();});}});
+	}
+	@FXML private void onTaskPolicySelectionChanged(ActionEvent event){updateTaskPolicySaveState();}
+	@FXML private void onSaveTaskPolicy(ActionEvent event){
+		TaskDueDatePolicy selected=selectedTaskPolicy();if(taskPolicyLoading||loadedTaskPolicy==null||selected==null||selected==loadedTaskPolicy.dueDatePolicy()||!isAdminUser())return;
+		taskPolicyLoading=true;taskPolicyStatusLabel.setText("Saving task policy…");updateTaskPolicySaveState();
+		var command=new TaskPolicyConfigurationServicePort.UpdateTaskPolicyCommand(requireTenantId(),requireActorUserId(),loadedTaskPolicy.id(),selected,loadedTaskPolicy.rowVer());
+		settingsLoadExecutor.submit(()->{try{var value=taskPolicyService.update(command);Platform.runLater(()->{loadedTaskPolicy=value;selectTaskPolicy(value.dueDatePolicy());taskPolicyLoading=false;taskPolicyStatusLabel.setText("Task due-date policy saved for the firm.");updateTaskPolicySaveState();});}catch(Exception failure){LOG.warn("Task policy could not be saved",failure);Platform.runLater(()->{taskPolicyLoading=false;taskPolicyStatusLabel.setText(failure instanceof IllegalStateException?"The task policy changed. Reload this section and try again.":"Task due-date policy could not be saved.");updateTaskPolicySaveState();});}});
+	}
+	private void updateTaskPolicySaveState(){if(saveTaskPolicyButton!=null)saveTaskPolicyButton.setDisable(taskPolicyLoading||!isAdminUser()||taskPolicyService==null||loadedTaskPolicy==null||selectedTaskPolicy()==null||selectedTaskPolicy()==loadedTaskPolicy.dueDatePolicy());}
+	private TaskDueDatePolicy selectedTaskPolicy(){if(taskPolicyOptional!=null&&taskPolicyOptional.isSelected())return TaskDueDatePolicy.OPTIONAL;if(taskPolicyRequired!=null&&taskPolicyRequired.isSelected())return TaskDueDatePolicy.REQUIRED;if(taskPolicyWarn!=null&&taskPolicyWarn.isSelected())return TaskDueDatePolicy.WARN;return null;}
+	private void selectTaskPolicy(TaskDueDatePolicy policy){TaskDueDatePolicy p=policy==null?TaskDueDatePolicy.WARN:policy;taskPolicyOptional.setSelected(p==TaskDueDatePolicy.OPTIONAL);taskPolicyWarn.setSelected(p==TaskDueDatePolicy.WARN);taskPolicyRequired.setSelected(p==TaskDueDatePolicy.REQUIRED);}
 
 	private void toggleAutomaticUpdates() {
 		boolean opening = !automaticUpdatesContent.isManaged();
@@ -225,12 +260,12 @@ public final class SettingsController {
 		}
 		var preference = capability.get().read();
 		automaticUpdatesCheck.setSelected(preference.unattendedExecutionPermitted());
-		automaticUpdatesCheck.setDisable(!isAdminUser());
+		automaticUpdatesCheck.setDisable(false);
 		automaticUpdatesStatusLabel.setText(switch (preference.status()) {
 			case ENABLED -> "Enabled — eligible updates are evaluated overnight while Shale is left running and idle.";
 			case DISABLED -> "Unattended automatic updates are disabled on this workstation.";
 			case MISSING -> "Not configured; unattended automatic updates default to disabled.";
-			case CORRUPT -> "The saved preference is corrupt. Automatic updates are not permitted; an administrator may reset it.";
+			case CORRUPT -> "The saved preference is corrupt. Automatic updates are not permitted; choose a preference to reset it.";
 			case UNAVAILABLE -> "Preference storage is unavailable. Automatic updates are not permitted.";
 		});
 	}
@@ -240,12 +275,10 @@ public final class SettingsController {
 		var capability = runtimeBridge == null ? Optional.<UiRuntimeBridge.WorkstationAutomaticUpdates>empty()
 				: runtimeBridge.workstationAutomaticUpdates();
 		if (capability.isEmpty()) { loadAutomaticUpdates(); return; }
-		var result = capability.get().change(requested, isAdminUser());
+		var result = capability.get().change(requested);
 		if (result != UiRuntimeBridge.WorkstationAutomaticUpdates.ChangeResult.SAVED) {
 			loadAutomaticUpdates();
-			if (result == UiRuntimeBridge.WorkstationAutomaticUpdates.ChangeResult.UNAUTHORIZED)
-				automaticUpdatesStatusLabel.setText("Only a Shale administrator may change this workstation setting.");
-			else automaticUpdatesStatusLabel.setText("The preference could not be saved. The prior workstation setting remains authoritative.");
+			automaticUpdatesStatusLabel.setText("The preference could not be saved. The prior workstation setting remains authoritative.");
 			return;
 		}
 		loadAutomaticUpdates();
@@ -340,6 +373,7 @@ public final class SettingsController {
 		ControlStyles.apply(applyNotificationPreferencesButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 		ControlStyles.apply(resetNotificationPreferencesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		ControlStyles.apply(viewAuditLogButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
+		ControlStyles.apply(saveTaskPolicyButton, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 		if (manageCaseDateTypesButton != null) ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		if (manageCaseStatusesButton != null) ControlStyles.apply(manageCaseStatusesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
 		if (manageLinkTypesButton != null) ControlStyles.apply(manageLinkTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
@@ -939,6 +973,8 @@ public final class SettingsController {
 	private void updateAdminControlsVisibility() {
 		boolean admin = isAdminUser();
 		setVisibleManaged(auditLogRow, admin);
+		setVisibleManaged(taskPolicyRow, admin && taskPolicyService != null);
+		if (!admin) setVisibleManaged(taskPolicyContent, false);
 		setVisibleManaged(caseDateMappingsRow, admin && caseService != null);
 		setVisibleManaged(userManagementRow, hasAdminContext() && userDao != null);
 		setVisibleManaged(adminSessionsRow, hasAdminContext() && runtimeBridge != null);

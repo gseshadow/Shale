@@ -23,6 +23,7 @@ public interface UiRuntimeBridge {
 	interface UserSessionManagement {
 		List<UserSessionView> list();
 		void revoke(UUID sessionId);
+		void revokeCurrent();
 		void revokeOthers();
 	}
 
@@ -38,8 +39,8 @@ public interface UiRuntimeBridge {
 
 	interface WorkstationAutomaticUpdates {
 		WorkstationUpdatePreference read();
-		ChangeResult change(boolean enabled, boolean authenticatedAdministrator);
-		enum ChangeResult { SAVED, UNAUTHORIZED, UNAVAILABLE }
+		ChangeResult change(boolean enabled);
+		enum ChangeResult { SAVED, UNAVAILABLE }
 	}
 	default Optional<WorkstationAutomaticUpdates> workstationAutomaticUpdates() { return Optional.empty(); }
 
@@ -52,6 +53,9 @@ public interface UiRuntimeBridge {
 
 	/** Starts heartbeat only for the bridge's successfully enrolled current instance. */
 	default void startApplicationInstanceHeartbeat(Supplier<Optional<Instant>> lastHumanActivityAt) {}
+
+	/** Installs the UI-owned terminal-session handler. Implementations must generation-guard its invocation. */
+	default void setSessionEndedHandler(Runnable handler) {}
 
 	// --- Generic publish (desktop implementation overrides)
 	default void publishEntityUpdated(String entityType, long entityId,

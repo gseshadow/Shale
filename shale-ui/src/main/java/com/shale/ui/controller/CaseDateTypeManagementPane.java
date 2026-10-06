@@ -23,6 +23,7 @@ import com.shale.ui.util.ColorUtil;
 import com.shale.ui.util.ControlStyles;
 
 import javafx.application.Platform;
+import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -45,6 +46,7 @@ import javafx.scene.shape.Circle;
 /** Case-Date-specific definition UI. Persistence remains exclusively behind CaseServicePort. */
 public final class CaseDateTypeManagementPane {
     private static final Logger LOG = LoggerFactory.getLogger(CaseDateTypeManagementPane.class);
+    private static final PseudoClass SELECTED_PSEUDO_CLASS = PseudoClass.getPseudoClass("selected");
     private final CaseServicePort service;
     private final int tenantId;
     private final int actorId;
@@ -150,24 +152,38 @@ public final class CaseDateTypeManagementPane {
     }
 
     private Node card(EffectiveCaseDateTypeDto row) {
-        VBox card = new VBox(7); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact", "case-date-custom-card");
+        VBox card = new VBox(7); card.getStyleClass().addAll("shale-entity-card", "shale-entity-card-compact",
+                "shale-entity-card-selectable", "shale-entity-card-clickable", "case-date-custom-card");
         card.setMinWidth(240); card.setPrefWidth(340); card.setMaxWidth(390); card.setFocusTraversable(true); card.setUserData(row);
+        card.pseudoClassStateChanged(SELECTED_PSEUDO_CLASS, sameSelection(row));
         Circle dot = new Circle(6); String css = ColorUtil.toCssBackgroundColorOrNull(row.color());
         if (css != null) dot.setStyle("-fx-fill: " + css + ";");
         Label name = new Label(row.name()); name.getStyleClass().add("app-dialog-field-label");
         HBox heading = new HBox(8, dot, name); heading.setAlignment(Pos.CENTER_LEFT);
         Label details = new Label((row.active() ? "Active" : "Inactive") + " · " + row.calendarCategory() + " · " + (row.supportsTime() ? "Timed or all-day" : "All-day only"));
-        details.getStyleClass().add("search-summary-text"); details.setWrapText(true);
+        details.getStyleClass().addAll("case-date-custom-card__secondary",
+                row.active() ? "case-date-custom-card__secondary--active" : "case-date-custom-card__secondary--inactive");
+        details.setWrapText(true);
         FieldConfirmationPolicyDto policy=policies.get(policyKey(row));
         Label policyLabel=new Label(policy!=null&&policy.requiresConfirmation()?"Requires confirmation":"Confirmation not required");
-        policyLabel.getStyleClass().add("search-summary-text");
+        policyLabel.getStyleClass().add("case-date-custom-card__secondary");
         card.getChildren().addAll(heading, details, policyLabel);
         card.setOnMouseClicked(e -> select(row));
         card.setOnKeyPressed(e -> { if (e.getCode() == javafx.scene.input.KeyCode.SPACE || e.getCode() == javafx.scene.input.KeyCode.ENTER) select(row); });
         return card;
     }
 
-    private void select(EffectiveCaseDateTypeDto row) { selected = row; updateActions(); status.setText(""); }
+    private void select(EffectiveCaseDateTypeDto row) {
+        selected = row;
+        cards.getChildren().forEach(card -> card.pseudoClassStateChanged(SELECTED_PSEUDO_CLASS,
+                card.getUserData() instanceof EffectiveCaseDateTypeDto candidate && sameSelection(candidate)));
+        updateActions();
+        status.setText("");
+    }
+
+    private boolean sameSelection(EffectiveCaseDateTypeDto row) {
+        return selected != null && row != null && selected.id() == row.id();
+    }
     private void updateActions() {
         boolean enabled = selected != null && !mutationInFlight.get();
         boolean definitionEditable=enabled&&(isManageable(selected,tenantId)||isOrdinaryGlobal(selected));

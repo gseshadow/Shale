@@ -46,8 +46,7 @@ public final class AutomaticUpdatePreferenceService implements WorkstationUpdate
 		}
 	}
 
-	public ChangeResult change(boolean enabled, boolean authenticatedAdministrator) {
-		if (!authenticatedAdministrator) return ChangeResult.UNAUTHORIZED;
+	public ChangeResult change(boolean enabled) {
 		try {
 			store.save(enabled);
 			log.info("Workstation automatic-update preference changed to {}", enabled ? "enabled" : "disabled");
@@ -58,5 +57,5 @@ public final class AutomaticUpdatePreferenceService implements WorkstationUpdate
 		}
 	}
 
-	public enum ChangeResult { SAVED, UNAUTHORIZED, UNAVAILABLE }
+	public enum ChangeResult { SAVED, UNAVAILABLE }
 }

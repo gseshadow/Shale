@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.time.Instant;
+import java.net.URI;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,22 +57,29 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	private volatile Integer lastShaleClientId;
 	private final AtomicLong sessionGeneration = new AtomicLong();
 	private volatile Runnable applicationPolicyRefreshHandler = () -> {};
+	private volatile Runnable sessionEndedHandler = () -> {};
 
 	public DesktopUiRuntimeBridge(
 			LiveEventDispatcher dispatcher,
 			DesktopRuntimeSessionProvider dbProvider,
 			String negotiateEndpointUrl) {
-		this(dispatcher,dbProvider,negotiateEndpointUrl,null,null,null);
+		this(dispatcher,dbProvider,negotiateEndpointUrl,null,null,null,Optional.empty());
 	}
 
 	public DesktopUiRuntimeBridge(LiveEventDispatcher dispatcher, DesktopRuntimeSessionProvider dbProvider,
 			String negotiateEndpointUrl, MachineIdentityResult machineIdentity,
 			ApplicationInstanceServicePort applicationInstances) {
-		this(dispatcher,dbProvider,negotiateEndpointUrl,machineIdentity,applicationInstances,null);
+		this(dispatcher,dbProvider,negotiateEndpointUrl,machineIdentity,applicationInstances,null,Optional.empty());
 	}
 	public DesktopUiRuntimeBridge(LiveEventDispatcher dispatcher, DesktopRuntimeSessionProvider dbProvider,
 			String negotiateEndpointUrl, MachineIdentityResult machineIdentity,
 			ApplicationInstanceServicePort applicationInstances,DesktopSessionEnrollmentLifecycle serverSessions) {
+		this(dispatcher,dbProvider,negotiateEndpointUrl,machineIdentity,applicationInstances,serverSessions,Optional.empty());
+	}
+	public DesktopUiRuntimeBridge(LiveEventDispatcher dispatcher, DesktopRuntimeSessionProvider dbProvider,
+			String negotiateEndpointUrl, MachineIdentityResult machineIdentity,
+			ApplicationInstanceServicePort applicationInstances,DesktopSessionEnrollmentLifecycle serverSessions,
+			Optional<URI> serverApiOrigin) {
 
 		this.dispatcher = dispatcher;
 		this.dbProvider = dbProvider;
@@ -80,14 +88,22 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		this.applicationInstances = applicationInstances;
 		this.heartbeat = applicationInstances==null?null:new ApplicationInstanceHeartbeatLifecycle(applicationInstances);
 		this.serverSessions=serverSessions;
-		String apiBase=System.getProperty("SHALE_SERVER_API_BASE_URL",System.getenv("SHALE_SERVER_API_BASE_URL"));
-		this.sessionManagement=serverSessions==null||apiBase==null||apiBase.isBlank()?null:new UserSessionManagementClient(apiBase,serverSessions.session());
-		this.adminSessionManagement=serverSessions==null||apiBase==null||apiBase.isBlank()?null:new AdminSessionManagementClient(apiBase,serverSessions.session());
+		if(serverSessions==null||serverApiOrigin.isEmpty())this.sessionManagement=null;
+		else {
+			var client=new UserSessionManagementClient(serverApiOrigin.get().toString(),serverSessions.session());
+			this.sessionManagement=new UiRuntimeBridge.UserSessionManagement(){
+				@Override public java.util.List<UiRuntimeBridge.UserSessionView> list(){return client.list();}
+				@Override public void revoke(java.util.UUID id){client.revoke(id);}
+				@Override public void revokeOthers(){client.revokeOthers();}
+				@Override public void revokeCurrent(){long generation=sessionGeneration.get();client.revokeCurrent();invalidateConfirmedSession(generation);}
+			};
+		}
+		this.adminSessionManagement=serverSessions==null||serverApiOrigin.isEmpty()?null:new AdminSessionManagementClient(serverApiOrigin.get().toString(),serverSessions.session());
 		AutomaticUpdatePreferenceService preferences = AutomaticUpdatePreferenceService.resolvePlatformDefault();
 		this.workstationAutomaticUpdates = new UiRuntimeBridge.WorkstationAutomaticUpdates() {
 			@Override public com.shale.core.update.WorkstationUpdatePreference read() { return preferences.current(); }
-			@Override public ChangeResult change(boolean enabled, boolean authenticatedAdministrator) {
-				return ChangeResult.valueOf(preferences.change(enabled, authenticatedAdministrator).name());
+			@Override public ChangeResult change(boolean enabled) {
+				return ChangeResult.valueOf(preferences.change(enabled).name());
 			}
 		};
 	}
@@ -99,7 +115,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	}
 
 	@Override public Optional<UiRuntimeBridge.UserSessionManagement> userSessionManagement(){
-		return serverSessions!=null&&serverSessions.state()==DesktopSessionEnrollmentLifecycle.State.ENROLLED?Optional.of(sessionManagement):Optional.empty();
+		return serverSessions!=null&&serverSessions.state()==DesktopSessionEnrollmentLifecycle.State.ENROLLED?Optional.ofNullable(sessionManagement):Optional.empty();
 	}
 
 	@Override
@@ -113,7 +129,11 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 		lastUserId = userId;
 		lastShaleClientId = shaleClientId;
 		enrollBestEffort(shaleClientId,userId);
-		if(serverSessions!=null){serverSessions.enroll(currentInstance.get().map(v->v.id()).orElse(null));serverSessions.startAcceleration(dispatcher,shaleClientId,generation,sessionGeneration::get,applicationPolicyRefreshHandler);}
+		if(serverSessions!=null){
+			Long instanceId=currentInstance.get().map(v->v.id()).orElse(null);
+			serverSessions.enroll(instanceId);
+			if(generation==sessionGeneration.get())serverSessions.startAcceleration(dispatcher,shaleClientId,generation,sessionGeneration::get,applicationPolicyRefreshHandler,()->invalidateConfirmedSession(generation));
+		}
 
 		tryConnectLiveBus(shaleClientId, userId, generation);
 	}
@@ -157,6 +177,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	@Override
 	public void onLogout() {
+		log.info("Desktop lifecycle explicit logout requested.");
 		teardown(true);
 	}
 	private void teardown(boolean logicalLogout) {
@@ -178,7 +199,17 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			runtimeSessionService.clear();
 		}
 
-		log.info("Logout requested");
+		log.info(logicalLogout ? "Desktop explicit logout cleanup completed." : "Desktop ordinary shutdown cleanup completed; remembered sign-in and server session were preserved.");
+	}
+	private synchronized void invalidateConfirmedSession(long expectedGeneration){
+		if(expectedGeneration!=sessionGeneration.get())return;
+		if(heartbeat!=null)heartbeat.stop();
+		sessionGeneration.incrementAndGet();
+		LiveBus bus=liveBus;liveBus=null;if(bus!=null)bus.shutdown();
+		dispatcher.dispatchConnectivity(false,"Session ended");
+		dbProvider.clear();if(runtimeSessionService!=null)runtimeSessionService.clear();
+		lastUserId=null;lastShaleClientId=null;
+		sessionEndedHandler.run();
 	}
 
 	@Override public void onShutdown(){teardown(false);if(heartbeat!=null)heartbeat.close();}
@@ -309,6 +340,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 	public void setApplicationPolicyRefreshHandler(Runnable handler) {
 		applicationPolicyRefreshHandler=handler==null?()->{}:handler;
 	}
+	@Override public void setSessionEndedHandler(Runnable handler){sessionEndedHandler=handler==null?()->{}:handler;}
 
 	@Override
 	public Optional<Boolean> recheckConnectivity() {

@@ -466,7 +466,7 @@ public final class CasesController {
 			try {
 				List<TaskPriorityOptionDto> priorities = caseTaskService.loadActivePriorities(shaleClientId);
 				List<CaseTaskService.AssignableUserOption> users = caseTaskService.loadAssignableUsers(shaleClientId);
-				Platform.runLater(() -> NewTaskDialog.showAndWait(dialogOwner(), priorities, users).ifPresent(input ->
+				Platform.runLater(() -> NewTaskDialog.showAndWait(dialogOwner(), priorities, users, caseTaskService.resolveTaskDueDatePolicy(shaleClientId)).ifPresent(input ->
 					dbExec.submit(() -> caseTaskService.createTask(new CaseTaskService.CreateTaskRequest(
 						shaleClientId, vm.id, input.title(), input.description(), input.dueAt(),
 						input.priorityId(), input.assignedUserIds(), currentUserId)))));

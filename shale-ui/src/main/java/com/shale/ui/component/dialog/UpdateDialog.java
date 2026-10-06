@@ -28,6 +28,7 @@ public final class UpdateDialog {
 	}
 
 	public static boolean show(Window owner, boolean mandatory, String currentVersion) {
+		owner = resolveOwner(owner);
 		Stage stage = AppDialogs.createModalStage(owner, mandatory ? "Update Required" : "Update Available");
 		AtomicBoolean accepted = new AtomicBoolean(false);
 		Runnable decline = stage::close;
@@ -42,6 +43,10 @@ public final class UpdateDialog {
 
 		Scene scene = new Scene(shell, PREF_WIDTH, MIN_HEIGHT);
 		stage.setScene(scene);
+		stage.setOnCloseRequest(event -> {
+			event.consume();
+			decline.run();
+		});
 		DialogSizingUtil.applyConfirmationDialogSizing(stage, owner, shell,
 				PREF_WIDTH, MIN_WIDTH, MIN_HEIGHT);
 		stage.showAndWait();
@@ -85,6 +90,7 @@ public final class UpdateDialog {
 		detailsScroll.setPrefHeight(132);
 		detailsScroll.setMaxHeight(180);
 		detailsScroll.getStyleClass().add("update-dialog-details-scroll");
+		VBox.setVgrow(detailsScroll, Priority.ALWAYS);
 
 		Button secondary = ActionButtonFactory.semantic(mandatory ? "Exit application" : "Not now",
 				event -> decline.run(), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.STANDARD);
@@ -101,6 +107,17 @@ public final class UpdateDialog {
 		VBox root = new VBox(18, heading, versions, detailsScroll, actions);
 		root.getStyleClass().add("update-dialog-content");
 		return root;
+	}
+
+	private static Window resolveOwner(Window requestedOwner) {
+		if (requestedOwner != null) {
+			return requestedOwner;
+		}
+		return Window.getWindows().stream()
+				.filter(Window::isShowing)
+				.filter(window -> !(window instanceof Stage candidate) || candidate.getModality() == javafx.stage.Modality.NONE)
+				.findFirst()
+				.orElse(null);
 	}
 
 	private static VBox versionBlock(String caption, String value) {

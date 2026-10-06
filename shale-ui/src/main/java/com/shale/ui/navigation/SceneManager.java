@@ -20,6 +20,8 @@ import com.shale.data.dao.ContactDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.data.dao.UserDao;
 import com.shale.data.dao.TaskDao;
+import com.shale.data.dao.TaskPolicyConfigurationDao;
+import com.shale.data.service.adapter.TaskPolicyConfigurationServiceAdapter;
 import com.shale.data.dao.NotificationDao;
 import com.shale.data.dao.UserBoardLanePreferencesDao;
 import com.shale.data.dao.UserPreferencesDao;
@@ -158,6 +160,7 @@ public final class SceneManager {
 	private final ApplicationUpdatePolicyCoordinator updatePolicyCoordinator;
 	private final SafeWorkDrainCoordinator safeWorkDrainCoordinator;
 	private MainController mainController;
+	private LoginController loginController;
 	private UpdateCheckResult lastUpdateCheck;
 	private final ExecutorService notificationBadgeCountExecutor;
 	private final ExecutorService notificationStartupExecutor;
@@ -259,6 +262,7 @@ public final class SceneManager {
 		runtimeBridge.setApplicationPolicyRefreshHandler(updatePolicyCoordinator::refresh);
 		this.automaticUpdateScheduler = new InSessionAutomaticUpdateScheduler(automaticUpdatePreference,
 				this::automaticUpdateInputs, ignored -> Platform.runLater(this::performAutomaticHandoff));
+		runtimeBridge.setSessionEndedHandler(() -> Platform.runLater(this::onAuthoritativeSessionEnded));
 		stage.focusedProperty().addListener((observable, oldValue, focused) -> foregroundVisible = focused && stage.isShowing());
 		UserDictionarySession.configure(new UserDictionarySession(new UserDictionaryServiceAdapter(new UserDictionaryWordDao(dbSessionProvider)),appState));
 	}
@@ -284,6 +288,22 @@ public final class SceneManager {
 		logoutInProgress = true;
 		stopSessionOwnedWork();
 		runtimeBridge.onLogout();
+		appState.setUserId(0);
+		appState.setShaleClientId(0);
+		appState.setUserEmail(null);
+		appState.setAdmin(false);
+		appState.setAttorney(false);
+		showLoginSurface();
+		logoutInProgress = false;
+	}
+
+	private void onAuthoritativeSessionEnded() {
+		if (!Platform.isFxApplicationThread()) throw new IllegalStateException("Session-ended presentation must run on the JavaFX application thread.");
+		if (logoutInProgress || appState.getUserId() == null || appState.getUserId() <= 0) return;
+		logoutInProgress = true;
+		stopSessionOwnedWork();
+		AppDialogs.showWarning(stage, "Session ended",
+				"Your session was ended by an administrator or account security change. Database access has stopped. Any unsaved changes remain visible behind this message for review but cannot be saved. Select OK to return to sign in.");
 		appState.setUserId(0);
 		appState.setShaleClientId(0);
 		appState.setUserEmail(null);
@@ -931,6 +951,7 @@ public final class SceneManager {
 			c.init(notificationPreferencesService, appearancePreferenceService, appState, this::showAuditLogViewer, new CaseServiceAdapter(new CaseDao(dbSessionProvider)), new MaterialRequestServiceAdapter(
 					new MaterialRequestDao(dbSessionProvider)), new ContactServiceAdapter(new ContactDao(dbSessionProvider)),
 					new OrganizationServiceAdapter(new OrganizationDao(dbSessionProvider),new CaseSummaryDao(dbSessionProvider)),new UserDao(dbSessionProvider), runtimeBridge);
+			c.setTaskPolicyService(new TaskPolicyConfigurationServiceAdapter(new TaskPolicyConfigurationDao(dbSessionProvider)));
 			return c;
 		});
 	}
@@ -1447,7 +1468,8 @@ public final class SceneManager {
 					}
 				},
 				this::openUserProfile,
-				caseId -> openCaseProfile(caseId, "OVERVIEW"));
+				caseId -> openCaseProfile(caseId, "OVERVIEW"),
+				caseTaskService.resolveTaskDueDatePolicy(shaleClientId));
 		if (result.isEmpty()) {
 			taskDetailDialogInFlight.set(false);
 			if (dialogMutatedAssignments.get())
@@ -1554,6 +1576,14 @@ public final class SceneManager {
 	}
 
 	private void setScene(Parent root, String title) {
+		Object nextController = root.getProperties().get(ROOT_CONTROLLER_KEY);
+		if (loginController != null && loginController != nextController) {
+			loginController.dispose();
+			loginController = null;
+		}
+		if (nextController instanceof LoginController nextLoginController) {
+			loginController = nextLoginController;
+		}
 		Scene scene = stage.getScene();
 		if (scene == null) {
 			scene = new Scene(root);
@@ -1575,6 +1605,10 @@ public final class SceneManager {
 
 	/** Deterministically releases all SceneManager-owned background work. */
 	public void shutdown() {
+		if (loginController != null) {
+			loginController.dispose();
+			loginController = null;
+		}
 		automaticUpdateScheduler.close();
 		humanActivityObserver.stop();
 		runtimeBridge.onShutdown();

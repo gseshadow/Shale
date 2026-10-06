@@ -8,7 +8,7 @@
             hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" styleClass="surface-scroll, settings-scroll">
   <content>
     <VBox styleClass="settings-workspace">
-      <fx:define><ToggleGroup fx:id="appearanceThemeGroup"/></fx:define>
+      <fx:define><ToggleGroup fx:id="appearanceThemeGroup"/><ToggleGroup fx:id="taskDueDatePolicyGroup"/></fx:define>
       <VBox fx:id="personalGroup" styleClass="settings-directory-group, shale-section-card">
         <Label text="Personal" styleClass="shale-subsection-title, settings-group-title"/>
         <SettingsManagementRow fx:id="appearanceRow" title="Appearance"
@@ -37,11 +37,17 @@
           </FlowPane>
           <HBox styleClass="settings-inline-actions"><Button fx:id="applyNotificationPreferencesButton" text="Apply" onAction="#onApplyNotificationPreferences"/><Button fx:id="resetNotificationPreferencesButton" text="Reset" onAction="#onResetNotificationPreferences"/><Label fx:id="notificationSettingsStatusLabel" styleClass="settings-state-message" wrapText="true" HBox.hgrow="ALWAYS"/></HBox>
         </VBox>
-        <SettingsManagementRow fx:id="devicesSessionsRow" title="Devices &amp; Sessions"
+        <SettingsManagementRow fx:id="devicesSessionsRow" title="My Sessions"
             description="Review and sign out your durable Shale sessions." actionText="Open"/>
         <VBox fx:id="devicesSessionsContent" visible="false" managed="false" styleClass="settings-inline-content"/>
         <SettingsManagementRow fx:id="customDictionaryRow" title="Custom Dictionary"
             description="Manage words accepted by Shale’s spelling tools." actionText="Manage"/>
+        <SettingsManagementRow fx:id="automaticUpdatesRow" title="Automatic Updates" description="Allow overnight evaluation while Shale is left running and idle." actionText="Open"/>
+        <VBox fx:id="automaticUpdatesContent" visible="false" managed="false" styleClass="settings-inline-content">
+          <CheckBox fx:id="automaticUpdatesCheck" text="Allow eligible updates while Shale is running and idle" onAction="#onAutomaticUpdatesChanged" wrapText="true"/>
+          <Label text="This setting applies to this workstation. When Shale is left running and idle, eligible updates can be installed during the 2:00–4:00 AM local window. Closed, logged-out, and sleeping computers are not woken." styleClass="search-summary-text" wrapText="true"/>
+          <Label fx:id="automaticUpdatesStatusLabel" styleClass="settings-state-message" wrapText="true"/>
+        </VBox>
       </VBox>
 
       <VBox fx:id="caseConfigurationGroup" styleClass="settings-directory-group, shale-section-card">
@@ -73,14 +79,19 @@
 
       <VBox fx:id="administrationGroup" styleClass="settings-directory-group, shale-section-card">
         <Label text="Administration" styleClass="shale-subsection-title, settings-group-title"/>
+        <SettingsManagementRow fx:id="taskPolicyRow" title="Tasks" description="Configure firm-wide task behavior." actionText="Open"/>
+        <VBox fx:id="taskPolicyContent" visible="false" managed="false" styleClass="settings-inline-content">
+          <Label text="Task due dates" styleClass="app-dialog-field-label"/>
+          <Label text="Choose how Shale handles tasks without a due date. This setting applies to all users in the firm." styleClass="search-summary-text" wrapText="true"/>
+          <VBox spacing="8">
+            <RadioButton fx:id="taskPolicyOptional" text="Optional — Tasks may be saved without a due date." toggleGroup="$taskDueDatePolicyGroup" onAction="#onTaskPolicySelectionChanged" wrapText="true"/>
+            <RadioButton fx:id="taskPolicyWarn" text="Warn — Users may save a task without a due date, but Shale will display a warning before saving." toggleGroup="$taskDueDatePolicyGroup" onAction="#onTaskPolicySelectionChanged" wrapText="true"/>
+            <RadioButton fx:id="taskPolicyRequired" text="Required — Tasks must have a due date before they can be saved." toggleGroup="$taskDueDatePolicyGroup" onAction="#onTaskPolicySelectionChanged" wrapText="true"/>
+          </VBox>
+          <HBox styleClass="settings-inline-actions"><Button fx:id="saveTaskPolicyButton" text="Save" onAction="#onSaveTaskPolicy"/><Label fx:id="taskPolicyStatusLabel" styleClass="settings-state-message" wrapText="true" HBox.hgrow="ALWAYS"/></HBox>
+        </VBox>
         <SettingsManagementRow fx:id="userManagementRow" title="User Management" description="Manage users for the current tenant." actionText="Manage"/>
         <SettingsManagementRow fx:id="adminSessionsRow" title="Sessions" description="Review and revoke durable sessions for this tenant." actionText="Open"/>
-        <SettingsManagementRow fx:id="automaticUpdatesRow" title="Automatic Updates" description="Allow overnight evaluation while Shale is left running and idle." actionText="Open"/>
-        <VBox fx:id="automaticUpdatesContent" visible="false" managed="false" styleClass="settings-inline-content">
-          <CheckBox fx:id="automaticUpdatesCheck" text="Allow eligible updates while Shale is running and idle" onAction="#onAutomaticUpdatesChanged" wrapText="true"/>
-          <Label text="This setting applies to this workstation. When Shale is left running and idle, eligible updates can be installed during the 2:00–4:00 AM local window. Closed, logged-out, and sleeping computers are not woken." styleClass="search-summary-text" wrapText="true"/>
-          <Label fx:id="automaticUpdatesStatusLabel" styleClass="settings-state-message" wrapText="true"/>
-        </VBox>
         <SettingsManagementRow fx:id="firmWideRolesRow" title="Firm-wide Roles" description="Manage tenant-wide eligibility role definitions." actionText="Manage"/>
         <SettingsManagementRow fx:id="auditLogRow" title="Audit Log" description="Review PHI audit and entity activity for the current tenant." actionText="Open"/>
       </VBox>

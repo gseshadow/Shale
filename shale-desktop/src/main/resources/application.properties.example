@@ -1,4 +1,4 @@
-# Optional defaults; environment variables will override at runtime
+# Optional development defaults. System properties override environment variables; both override packaged configuration.
 APP_ENV=
 
 LIVE_NEGOTIATE_ENDPOINT_URL=
@@ -17,3 +17,6 @@ WEBPUBSUB_HUB=
 
 DB_MAX_POOL_SIZE=
 DB_CONNECTION_TIMEOUT_MS=
+
+# Development must opt in explicitly. HTTP is accepted only for a loopback origin.
+SHALE_SERVER_API_BASE_URL=

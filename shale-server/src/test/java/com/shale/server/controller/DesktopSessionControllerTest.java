@@ -31,7 +31,15 @@ class DesktopSessionControllerTest {
   mvc.perform(post("/api/auth/desktop-session").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"owner@test\",\"password\":\"secret\",\"applicationInstanceId\":99,\"shaleClientId\":8,\"userId\":999}")) .andExpect(status().isForbidden());assertEquals(0,store.creates);
   auth.ok=false;mvc.perform(post("/api/auth/desktop-session").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"owner@test\",\"password\":\"wrong\"}")) .andExpect(status().isUnauthorized());assertEquals(0,store.creates);
  }
+ @Test void unexpectedValidCredentialPathFailureUsesCentralSafeErrorHandling()throws Exception{
+  var auth=new Auth();var store=new Store();var tokens=new ShaleAuthTokenService("test-auth-token-secret-that-is-long-enough",3600,Clock.systemUTC());var service=new ServerAuthSessionService(tokens,store,new DurableSessionTokenValidator(store),new LegacyTokenCompatibilityPolicy(Instant.now(),3600,Clock.systemUTC()),new InMemoryTokenRevocationStore());
+  var verifier=new Verifier(true){@Override public boolean isAttachable(ServerPrincipal p,long id){throw new IllegalStateException("sensitive database detail");}};
+  var mvc=MockMvcBuilders.standaloneSetup(new DesktopSessionController(auth,service,verifier)).setControllerAdvice(new ApiExceptionHandler()).build();
+  mvc.perform(post("/api/auth/desktop-session").contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"owner@test\",\"password\":\"secret\",\"applicationInstanceId\":44}"))
+   .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.message").value("Internal server error."));
+  assertEquals(0,store.creates,"instance verification failures must not issue a durable session");
+ }
  static final class Auth implements AuthServicePort{boolean ok=true;public Result<User> authenticate(String e,String p){return ok?Result.ok(User.builder().id(9).shaleClientId(7).email("owner@test").build()):Result.fail("no");}}
- static final class Verifier extends DesktopApplicationInstanceVerifier{final boolean result;Verifier(boolean r){super(p->{throw new AssertionError();});result=r;}@Override public boolean isAttachable(ServerPrincipal p,long id){assertEquals(7,p.shaleClientId());assertEquals(9,p.userId());return result;}}
+ static class Verifier extends DesktopApplicationInstanceVerifier{final boolean result;Verifier(boolean r){super(p->{throw new AssertionError();});result=r;}@Override public boolean isAttachable(ServerPrincipal p,long id){assertEquals(7,p.shaleClientId());assertEquals(9,p.userId());return result;}}
  static final class Store implements DurableSessionStore{int creates;ClientType type;Long instance;UserSessionView value;public UserSessionView create(ServerPrincipal p,ClientType c,Long i,UUID j,Instant e){creates++;type=c;instance=i;return value=new UserSessionView(1,UUID.randomUUID(),c,i,j,Instant.now(),e,null,null,null);}public Optional<UserSessionView> find(ServerPrincipal p,UUID s){return Optional.ofNullable(value);}public UserSessionView rotate(ServerPrincipal p,UUID s,UUID x,UUID n,Instant e){throw new UnsupportedOperationException();}public UserSessionView revoke(ServerPrincipal p,UUID s,String r){throw new UnsupportedOperationException();}}
 }

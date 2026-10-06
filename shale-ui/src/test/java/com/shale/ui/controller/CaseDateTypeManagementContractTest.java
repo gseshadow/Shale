@@ -11,6 +11,8 @@ final class CaseDateTypeManagementContractTest {
     private static final String PANE = read("src/main/java/com/shale/ui/controller/CaseDateTypeManagementPane.java");
     private static final String WINDOW = read("src/main/java/com/shale/ui/component/DefinitionManagementWindow.java");
     private static final String CASE = read("src/main/java/com/shale/ui/controller/CaseController.java");
+    private static final String MANAGEMENT_CSS = read("src/main/resources/css/foundation/management.css");
+    private static final String CARD_CSS = read("src/main/resources/css/foundation/cards.css");
 
     @Test void settingsAndCaseDatesShareOneLauncherAndPane() {
         String settings = read("src/main/java/com/shale/ui/controller/SettingsController.java");
@@ -56,6 +58,48 @@ final class CaseDateTypeManagementContractTest {
                 () -> assertEquals("DEADLINE", command.calendarCategory()), () -> assertEquals("#112233", command.color()),
                 () -> assertTrue(command.supportsTime()), () -> assertEquals(12, command.sortOrder()),
                 () -> assertFalse(command.active()), () -> assertArrayEquals(rowVer, command.expectedRowVer()));
+    }
+
+    @Test void selectedCardUsesTheExistingSelectionAndSharedThemeTokens() {
+        assertTrue(PANE.contains("PseudoClass.getPseudoClass(\"selected\")"),
+                "Case Date cards must expose their selected state through the shared selected pseudo-class");
+        assertTrue(PANE.contains("shale-entity-card-selectable"),
+                "Case Date cards must opt into the shared selectable-card visual contract");
+        assertTrue(PANE.contains("cards.getChildren().forEach"),
+                "changing the existing selected row must refresh every rendered card so only one remains selected");
+        assertTrue(MANAGEMENT_CSS.contains(".management-window .shale-entity-card-selectable:selected:hover"),
+                "the selected state must remain visible while the selected card is hovered");
+        assertTrue(MANAGEMENT_CSS.contains("-fx-background-color: -shale-color-selection;"),
+                "management-card selection must use the theme's light/dark selection token");
+        assertTrue(MANAGEMENT_CSS.contains("-fx-border-color: -shale-color-primary-accent;"),
+                "management-card selection must use the established accent token");
+        assertTrue(MANAGEMENT_CSS.contains(".management-window .shale-entity-card-selectable {")
+                        && MANAGEMENT_CSS.contains("-fx-border-width: 2px;"),
+                "selectable management cards must reserve their selected border width to avoid layout movement");
+    }
+
+    @Test void cardSupportingTextUsesReadableThemeRolesInEveryInteractionState() {
+        assertTrue(PANE.contains("case-date-custom-card__secondary"),
+                "status and confirmation copy must opt into the Case Date card's theme-aware secondary role");
+        assertTrue(PANE.contains("details.getStyleClass().addAll(\"case-date-custom-card__secondary\""),
+                "the status/category/time label must use the readable secondary role");
+        assertTrue(PANE.contains("policyLabel.getStyleClass().add(\"case-date-custom-card__secondary\")"),
+                "the confirmation-status label must use the readable secondary role");
+        assertTrue(PANE.contains("case-date-custom-card__secondary--inactive"),
+                "inactive date types must retain a distinct theme-aware muted role");
+        assertFalse(PANE.substring(PANE.indexOf("private Node card("), PANE.indexOf("private void select("))
+                        .contains("search-summary-text"),
+                "Case Date cards must not inherit the legacy fixed dark search-summary foreground");
+        assertTrue(CARD_CSS.contains(".case-date-custom-card__secondary {")
+                        && CARD_CSS.contains("-fx-text-fill: -shale-color-text-secondary;"),
+                "normal, hovered, and selected supporting text must resolve through the secondary theme token");
+        assertTrue(CARD_CSS.contains(".case-date-custom-card__secondary--inactive {")
+                        && CARD_CSS.contains("-fx-text-fill: -shale-color-text-muted;"),
+                "inactive supporting text must resolve through the readable muted theme token");
+        assertFalse(MANAGEMENT_CSS.contains(".management-window .shale-entity-card-selectable:selected .label"),
+                "management selection must not override card foreground roles");
+        assertFalse(MANAGEMENT_CSS.contains(".management-window .shale-entity-card-selectable:hover .label"),
+                "management hover must not override card foreground roles");
     }
 
     @Test void caseActionIsAdminOnlyAndRefreshesAllDependentReadModelsWithoutOccurrenceMutation() {

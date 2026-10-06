@@ -36,6 +36,20 @@
     -fx-background-color: -shale-color-card-surface;
     -fx-border-color: -shale-color-card-border;
 }
+.management-window .shale-entity-card-selectable {
+    -fx-border-width: 2px;
+}
+.management-window .shale-entity-card-selectable:hover {
+    -fx-background-color: -shale-color-card-hover-surface;
+    -fx-border-color: -shale-color-card-hover-border;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 24, 0.2, 0, 8);
+}
+.management-window .shale-entity-card-selectable:selected,
+.management-window .shale-entity-card-selectable:selected:hover {
+    -fx-background-color: -shale-color-selection;
+    -fx-border-color: -shale-color-primary-accent;
+    -fx-effect: dropshadow(gaussian, -shale-color-focus-ring, 12, 0.2, 0, 2);
+}
 .management-window .contact-classification-card-subdued { -fx-opacity: 1; }
 .management-window .contact-classification-card-subdued .label {
     -fx-text-fill: -shale-color-text-secondary;

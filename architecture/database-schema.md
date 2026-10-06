@@ -1227,6 +1227,19 @@ soft-delete lifecycle: `IsActive` supports draft composition, while the non-casc
 history. Phase 1A seeds no releases or items and adds no API, service, DAO, UI, updater, policy, session,
 heartbeat, acknowledgement, or enforcement behavior.
 
+### Release catalog import extension (2026-10-02)
+
+The importer migration adds nullable `Title nvarchar(200)` and `ReleaseDate date` metadata to
+`ApplicationReleases`; nullable preserves compatibility with earlier catalog rows. Repository groups map in one
+global order to item types `New`/`FEATURE`, `Improvements`/`IMPROVEMENT`, and `Fixes`/`FIX`; the authored group is
+stored in item `Title` and the authored item text in `Body`.
+
+`dbo.GlobalControlPlaneAuditLog` is append-only global control-plane audit storage with `OperatorId`, stable entity
+type/id, semantic action, database UTC occurrence time, and bounded sanitized metadata. It deliberately has no
+tenant key or tenant RLS: tenant-owned `EntityActionAuditLog` cannot safely represent a global mutation. Import and
+audit append share the DAO-owned transaction. Metadata contains only canonical version and item count—never note
+text, credentials, RowVer, SQL, exception text, user/tenant data, or PHI.
+
 ## Global application policy (Phase 1B)
 
 ### dbo.ApplicationPolicy
@@ -1354,3 +1367,7 @@ affected count, closed event/reason codes, and database UTC time; they never con
 deactivation/removal and administrative password reset update the user and revoke every unrevoked session with
 `SECURITY` in the same transaction. Bound-token lookup also joins current active user eligibility as race-safe
 defense in depth.
+
+## dbo.TaskPolicyConfigurations (Task Due Date Policy)
+
+One strict tenant-owned row stores `DueDatePolicy` as `OPTIONAL`, `WARN`, or `REQUIRED`; the unique tenant key prevents duplicate authority and a missing row resolves to `WARN`. `WARN` is desktop confirmation behavior only. `REQUIRED` is enforced by `TaskDao` immediately before every task create/update, while existing undated tasks remain readable. The table has timestamps, actor columns, `RowVer`, a closed-value check, and strict tenant filter/insert/update RLS predicates. Administrative changes use the established transactional entity-action audit seam with TASK_POLICY_CONFIGURATION/UPDATED and allowlisted PREVIOUS_POLICY/RESULTING_POLICY metadata. The tenant-qualified RowVer update and audit append share one connection and transaction; administrator, tenant context, and actor identity are checked before mutation.

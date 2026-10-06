@@ -79,6 +79,9 @@ public class UserCard extends HBox {
 
     public void setBackgroundCssColor(String css) {
         backgroundCss = css;
+        nameLabel.setStyle(css == null || css.isBlank()
+                ? ""
+                : "-fx-text-fill: " + ColorUtil.readableTextColor(css) + ";");
         refreshSurfaceStyle();
     }
 
@@ -163,7 +166,7 @@ public class UserCard extends HBox {
         setPadding(new Insets(4, 10, 4, 10));
         setSpacing(6);
 
-        nameLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: 600;");
+        nameLabel.setStyle(nameTextStyle("12px", "600"));
 
         getChildren().add(nameLabel);
     }
@@ -175,7 +178,7 @@ public class UserCard extends HBox {
         setSpacing(8);
 
         Node avatar = buildAvatar(18);
-        nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 600;");
+        nameLabel.setStyle(nameTextStyle("13px", "600"));
 
         getChildren().addAll(avatar, nameLabel);
     }
@@ -187,7 +190,7 @@ public class UserCard extends HBox {
         setSpacing(10);
 
         Node avatar = buildAvatar(26);
-        nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700;");
+        nameLabel.setStyle(nameTextStyle("14px", "700"));
 
         // Extend later: role, email, phone, etc
         VBox text = new VBox(2, nameLabel);
@@ -206,6 +209,14 @@ public class UserCard extends HBox {
         setCursor(Cursor.HAND);
         setBackgroundCssColor(null);
         applyMini();
+    }
+
+    private String nameTextStyle(String size, String weight) {
+        String foreground = backgroundCss == null || backgroundCss.isBlank()
+                ? "-shale-color-text-primary"
+                : ColorUtil.readableTextColor(backgroundCss);
+        return "-fx-font-size: " + size + "; -fx-font-weight: " + weight
+                + "; -fx-text-fill: " + foreground + ";";
     }
 
     private void wireEvents() {

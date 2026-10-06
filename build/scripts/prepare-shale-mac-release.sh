@@ -2,20 +2,26 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd)
+if [[ -n "${SHALE_RELEASE_ROOT:-}" ]]; then
+  ROOT=$(cd -- "$SHALE_RELEASE_ROOT" && pwd)
+else
+  ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd)
+fi
 
 usage() {
-  echo "Usage: $0 <branch> <version>" >&2
+  echo "Usage: $0 <branch> <version> [source-revision]" >&2
   echo "Example: $0 codex/latest 1.0.11" >&2
   exit 1
 }
 
-if [[ $# -lt 2 ]]; then
+if [[ $# -lt 2 || $# -gt 3 ]]; then
   usage
 fi
 
 BRANCH="$1"
 VERSION="$2"
+SOURCE_REVISION="${3:-}"
+REMOTE="${SHALE_RELEASE_REMOTE:-origin}"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "This script must be run on macOS." >&2
@@ -45,13 +51,43 @@ echo "Root:    $ROOT"
 echo "===================================="
 echo
 
-echo "Step 0: Force sync repo to origin/$BRANCH"
-git fetch origin
-git reset --hard "origin/$BRANCH"
-git clean -fd
-git checkout -B "$BRANCH" "origin/$BRANCH"
-git reset --hard "origin/$BRANCH"
-git clean -fd
+echo "Step 0: Safely sync Mac build workspace to the requested source"
+if [[ -n "$SOURCE_REVISION" ]]; then
+  REQUESTED_REVISION="$SOURCE_REVISION"
+else
+  echo "WARNING: no source revision supplied; Mac may not include committed local changes ahead of origin/$BRANCH" >&2
+  REQUESTED_REVISION="$REMOTE/$BRANCH"
+fi
+# The checkout may predate the workspace helper. Resolve and verify its bytes
+# from the requested commit before running any checkout code or cleaning POMs.
+git fetch "$REMOTE"
+REQUESTED_REVISION=$(git rev-parse --verify "$REQUESTED_REVISION^{commit}")
+WORKSPACE_HELPER_PATH="build/scripts/mac_release_workspace.py"
+EXPECTED_HELPER_BLOB=$(git rev-parse "$REQUESTED_REVISION:$WORKSPACE_HELPER_PATH")
+WORKSPACE_HELPER=$(mktemp "${TMPDIR:-/tmp}/shale-mac-workspace.XXXXXX")
+trap 'rm -f "$WORKSPACE_HELPER"' EXIT
+git show "$REQUESTED_REVISION:$WORKSPACE_HELPER_PATH" > "$WORKSPACE_HELPER"
+if [[ "$(git hash-object "$WORKSPACE_HELPER")" != "$EXPECTED_HELPER_BLOB" ]]; then
+  echo "Fetched workspace helper content did not match requested revision $REQUESTED_REVISION" >&2
+  exit 1
+fi
+echo "Verified Mac workspace helper from requested revision: $REQUESTED_REVISION ($EXPECTED_HELPER_BLOB)"
+python3 "$WORKSPACE_HELPER" \
+  --root "$ROOT" prepare --remote "$REMOTE" --revision "$REQUESTED_REVISION"
+
+cleanup_release_poms() {
+  local release_status=$?
+  trap - EXIT
+  if ! python3 "$WORKSPACE_HELPER" --root "$ROOT" cleanup; then
+    echo "Failed to restore release-generated POM changes; inspect the Mac workspace." >&2
+    if [[ $release_status -eq 0 ]]; then
+      release_status=1
+    fi
+  fi
+  rm -f "$WORKSPACE_HELPER"
+  exit "$release_status"
+}
+trap cleanup_release_poms EXIT
 PREVIOUS_VERSION=$(python3 "$ROOT/build/scripts/preflight-version.py" "$ROOT" --print-root-version)
 
 echo

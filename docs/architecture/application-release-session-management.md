@@ -1,8 +1,239 @@
 # Application Release and Session Management Architecture
 
-**Status:** Phase 13D IN PROGRESS — design selects `UNSUPPORTED`; required Maven verification is blocked by repository access
+**Status:** Desktop session enrollment, revocation enforcement, My Sessions, and Stay logged in acceptance are
+closed; the wider release/session initiative remains in progress and logged-out updates remain `UNSUPPORTED`
 
-**Last reviewed:** 2026-09-30
+**Last reviewed:** 2026-10-06
+
+## Stay logged in acceptance closeout — 2026-10-06
+
+**Status: COMPLETE — user-reported Windows acceptance.** This documentation-only closeout records the user's
+reported passes below. These are user-reported results, not checks executed in this documentation run; no Maven,
+Windows, DPAPI, MSI, SQL, server deployment, or runtime acceptance check was executed here.
+
+| Acceptance scenario | Result | Evidence source |
+| --- | --- | --- |
+| Checked login across application restart and Windows restart | **PASS** | User-reported Windows acceptance. |
+| Repeated restore after credential rotation | **PASS** | User-reported Windows acceptance. |
+| X-close preserving remembered sign-in | **PASS** | User-reported Windows acceptance. |
+| Explicit Logout clearing remembered sign-in | **PASS** | User-reported Windows acceptance. |
+| Unchecked login leaving no remembered sign-in | **PASS** | User-reported Windows acceptance. |
+| Self-revocation and administrator revocation invalidating restore | **PASS** | User-reported Windows acceptance for both revocation paths. |
+| Installed-MSI remembered sign-in and logout | **PASS** | User-reported installed-Windows acceptance. |
+| Temporary outage recovery through Retry without losing the credential | **PASS** | User-reported Windows acceptance. |
+
+The previously recorded local `mvn test` **PASS** is preserved as user-reported evidence. It is not a new Maven
+result from this documentation run. The reported Windows acceptance supersedes the earlier failed restart and
+error-229 restore-blocked statuses below; those diagnosis sections remain historical records.
+
+This closes only the Stay logged in feature. Installed-MSI acceptance does not establish a clean production launch
+with no API override or production signing. The separate intermittent enrollment `REQUEST_TIMEOUT` investigation,
+login tall/short-window visual acceptance, manual cross-tenant/crafted-request security acceptance, and conditional
+Phase 13H decision remain open or separately gated. Disabled-account rejection and DPAPI-unavailable behavior were
+not among the reported passes and are not claimed here. Logged-out automatic updates remain `UNSUPPORTED`.
+
+The lifecycle and audit decisions are unchanged: access bearers remain process-memory-only, Windows DPAPI protects
+the remembered credential, ordinary close preserves it, explicit Logout clears it, and durable session revocation
+invalidates restore. Existing session-security audit events remain authoritative; this documentation update adds
+no implementation, schema, or audit behavior.
+
+## Remembered-restore permission correction — 2026-10-06
+
+**Historical diagnosis:** the restore-blocked status in this section is superseded by the acceptance closeout above.
+
+Production acceptance now confirms four important lifecycle steps: remembered issuance succeeds, Windows DPAPI save
+succeeds, a later launch finds and decrypts the protected credential, and ordinary close preserves it. Automatic
+restore remains blocked: the restore endpoint returns HTTP 500 and the sanitized server trace identifies
+`SqlRememberCredentialStore.lookup` with SQL state `S0005` and vendor error 229. Error 229 establishes permission
+denial under the pre-authentication database principal; it does not justify changing RLS or broadening a database
+role.
+
+`lookup` is the only pre-authentication database operation. It uses `DataSources.auth()`, therefore
+`SHALE_APP_DB_USER` (`shale_app` in the documented deployment), and its former inline query referenced
+`dbo.DesktopRememberCredentials` and `dbo.Users`. Successful password authentication already proves this principal
+can read the required active `Users` fields. The new table was added without a matching authentication-principal
+permission, so the evidence-supported missing boundary is credential lookup—not the later tenant-scoped rotation.
+
+The correction does not grant `shale_app` base-table `SELECT`. A new dbo-owned
+`ResolveDesktopRememberCredential` procedure accepts only the 32-byte hash, installation UUID, and current time and
+returns only the candidate tenant, user, session, and email after active/expiry checks. Same-owner module chaining
+allows this deliberately narrow lookup without exposing all stored credential hashes to the authentication principal;
+`shale_app` receives only `EXECUTE` on that procedure. The Java store calls the procedure, treats its result only as
+a candidate, and still opens a principal-scoped runtime connection for authoritative serializable revalidation.
+
+The full transaction boundary is also explicit. `shale_runtime` receives only object-level SELECT/INSERT/UPDATE/DELETE
+on `DesktopRememberCredentials`; its existing `Users` SELECT and `UserSessions` SELECT/UPDATE remain required and are
+verified. Rotation still requires initialized `ShaleClientId` and `PrincipalUserId` session context, strict
+`UserSessions` RLS, explicit tenant/user/session predicates, active user, unrevoked/unexpired session, unconsumed
+credential, matching installation, and matching hash. No `db_owner`, `db_datareader`, `db_datawriter`, database-wide
+permission, RLS disablement, raw credential access, or credential/hash output is introduced.
+
+Apply `docs/sql/2026-10-06_desktop_remember_credentials_permissions.sql` with the approved migration principal, then
+run `docs/sql/verification/2026-10-06_desktop_remember_credentials_permissions_verification.sql` once as the actual
+`shale_app` principal and once as the actual `shale_runtime` principal. A dbo-only run is not acceptance. This fix
+requires both SQL and a server deployment because the server changes from inline base-table lookup to procedure
+execution; no desktop rebuild is required for this permission correction. Deploy SQL first, then the rebuilt server,
+then rerun automatic restore. Until that succeeds, automatic restore remains **BLOCKED BY ERROR 229 / PENDING
+RETEST**, while issuance, protected save/read, and ordinary-close preservation remain user-observed successes.
+
+Audit compatibility is unchanged. Credential lookup/rotation is authentication security plumbing inside the existing
+durable-session relationship, not a domain mutation or sensitive business-data view. No audit payload may contain a
+credential or hash, and no new audit event/schema is appropriate.
+
+## Remembered-enrollment SQL and diagnostic correction — 2026-10-06
+
+**Historical diagnosis:** subsequent user-reported acceptance is recorded in the closeout above.
+
+Production evidence now locates the remembered-enrollment HTTP 500 at `SqlRememberCredentialStore.create`, wrapped
+by `ServerAuthSessionService.issueRememberedDesktop`, with `SQLServerException` as the underlying cause. This proves
+the database operation failed; it does not identify permission, constraint, or other SQL category because the first
+diagnostic revision discarded SQL state/error code and then failed while reconstructing the cause.
+
+The diagnostic failure was deterministic: `SanitizedDiagnosticException` called the four-argument `Throwable`
+constructor with a null cause, which marks cause initialization complete, and later called `initCause`. Sanitization
+now constructs each wrapper only after recursively constructing its safe cause and passes that cause to the
+constructor. Cause/suppressed cycles are identity-bounded, and a final fallback ensures diagnostic construction can
+never prevent the generic HTTP 500 response. Logs retain sanitized original stack frames, cause/suppressed exception
+types, and, for every cause or chained `SQLException`, only allowlisted SQL state plus numeric vendor error code.
+They never copy exception messages, SQL text, parameter values, hashes, passwords, bearers, remembered credentials,
+headers, DTOs, query strings, or request/response bodies.
+
+### Database operation findings
+
+The deployed migration and Java bindings agree on table/column names and order: tenant `int`, user `int`, session and
+installation `uniqueidentifier`, SHA-256 `binary(32)`, and absolute expiry `datetime2(7)` bound with `Timestamp`.
+The migration requires unique credential hashes and session/installation pairs, a cascading session UUID foreign key,
+and a tenant-qualified Users foreign key; all columns inserted by `create` are non-null. No statement/binding,
+nullability, type, foreign-key, or uniqueness mismatch is established by the repository evidence.
+
+A connection-boundary mismatch **is** established. The store previously used `DataSources.auth()` for creation and
+for the rotation transaction even though `dbo.UserSessions` is protected by strict tenant RLS and the auth pool does
+not initialize tenant/user session context. The corrected store uses the auth connection only for a read-only opaque
+hash plus installation lookup sufficient to derive the candidate principal. Creation, the locked revalidation and
+rotation transaction, and deletion now open a principal-scoped runtime connection, retain explicit tenant/user/session
+predicates, and therefore execute with the same tenant context as durable `UserSessions`. The preliminary lookup is
+not authority: rotation rechecks the hash, installation, derived ownership, active user, unrevoked session, and both
+expiries under serializable locks before changing either row.
+
+`DesktopRememberCredentials` intentionally has no tenant security predicate because pre-authentication restore must
+locate the candidate tenant from an opaque 256-bit credential hash plus installation UUID. It stores no raw
+credential. This exception does not weaken `UserSessions` RLS: every authoritative session read/update occurs only
+after principal derivation on the tenant-scoped runtime connection and remains explicitly owner-qualified. A future
+schema redesign could replace this narrow lookup with a signed module/stored procedure, but adding the ordinary
+tenant predicate now would make pre-authentication lookup impossible rather than improve this flow.
+
+The expanded verification SQL is read-only and reports exact columns/types/nullability/defaults, unique and foreign
+key constraints, security predicates on both tables, data findings, and effective object permissions. Run its
+catalog sections as dbo, then run the entire script using the API `SHALE_APP_DB_USER` for identity-lookup permissions
+and `SHALE_RT_DB_USER` for tenant-scoped creation/rotation/deletion permissions. A dbo result cannot prove either API
+principal. Any zero effective permission must be corrected through the deployment's existing database-role/grant
+management; the repository cannot safely invent production principal names or grant membership. The next deployed
+trace will additionally provide SQL state and numeric vendor code if a database failure remains.
+
+### Desktop classification and deployment
+
+HTTP 500 and timeout enrollment results retain `TRANSIENT`; 404/501 retain `ENDPOINT_UNAVAILABLE`; neither can fall
+through to the “running server does not support Stay logged in” message. That message is reserved for an HTTP success
+whose otherwise valid response omits `rememberCredential`. Failed remembered enrollment still tears down the partly
+initialized local runtime through the existing commit failure path and never persists a credential.
+
+No new schema migration is required by the code correction. Before acceptance, rerun the existing
+`2026-10-05_desktop_remember_credentials.sql` only if the schema verifier reports missing/incompatible objects,
+correct any verified API-principal permission finding, deploy the rebuilt server, and rebuild/redeploy the desktop.
+Then reproduce checked login and confirm either successful protected save or a diagnostic containing the original
+store frame plus SQL state/vendor code. Audit compatibility is unchanged: this is authentication plumbing inside the
+existing durable-session relationship, not a new domain mutation or sensitive view; no new audit row or audit schema
+is appropriate.
+
+## Remembered sign-in ordinary-close diagnosis — 2026-10-06
+
+**Historical diagnosis:** the failed restart status in this section is superseded by the acceptance closeout above.
+
+The reported unsuccessful restart did **not** prove that ordinary application closure logged out. The text
+`DesktopUiRuntimeBridge - Logout requested` was emitted by a shared teardown method for both logical logout and
+shutdown, even though the shutdown branch correctly called `DesktopSessionEnrollmentLifecycle.shutdown()`, which
+cleared only process memory and did not revoke the server session or delete protected state. That ambiguous message
+has been replaced by distinct ordinary-shutdown and explicit-logout diagnostics.
+
+The verified loss occurred earlier. A checked password login sent the remember flag through JDBC authentication and
+desktop enrollment, but a pre-remember server could still return HTTP 200 with an otherwise valid durable-session
+response and no `rememberCredential`. The desktop accepted that response, staged `null`, and its post-runtime commit
+silently did nothing. Consequently no DPAPI file existed on the next launch, `hasRememberedCredential()` returned
+false, and `LoginController.init()` correctly skipped asynchronous restore. The desktop now treats a checked login
+whose successful response lacks the credential as unsupported, tears down the partially initialized runtime, and
+shows an actionable instruction to deploy the matching server rather than entering the application under a false
+persistence promise. Safe diagnostics now distinguish the request, server credential presence, DPAPI save/read,
+restore attempt/result, deletion reason, explicit logout, and ordinary shutdown without logging secrets.
+
+The protected file remains `%LOCALAPPDATA%\Shale\credentials\remember.dpapi` and is independent of the Eclipse
+workspace. Its server binding uses the Phase 4A installation UUID under `%ProgramData%\Shale\machine-id`; both must
+remain accessible under the same Windows account across launches. Eclipse module-only launches can resolve old
+`com.shale` sibling artifacts from the local Maven repository. Rebuild and launch from the repository root:
+
+```powershell
+mvn clean install -DskipTests
+mvn -pl shale-desktop -am javafx:run
+```
+
+In Eclipse, run **Maven > Update Project…** for the parent and all Shale modules (enable **Force Update of
+Snapshots/Releases**), then launch the `shale-desktop` Maven configuration with goal `javafx:run`; do not launch from
+an independently imported desktop module with stale sibling JARs. Deploy the matching `shale-server` build after the
+SQL migration and before retesting the desktop. HTTP 200 alone is insufficient acceptance: the new safe diagnostic
+must report `serverRememberCredentialPresent=true` followed by `protected save outcome=SUCCESS`.
+
+Evidence is recorded accurately: the user reported that the SQL migration was applied and local `mvn test` passed;
+the Windows Eclipse/Maven login enrollment returned HTTP 200; ordinary closure produced the formerly ambiguous
+logout text; and the next launch showed the ordinary login form with no visible restore outcome. Restart acceptance
+therefore remains **FAILED / PENDING RERUN**. This run does not claim Windows/DPAPI acceptance from static or Linux
+checks.
+
+The correction's focused, selector-chosen, and critical Maven commands were attempted in the Codex environment but
+could not execute because Maven Central returned HTTP 403 while resolving Spring Boot's dependency BOM; the change
+is therefore not presented as newly Maven-verified. The earlier successful `mvn test` remains user-reported evidence,
+not evidence for this correction.
+
+## Remembered desktop sign-in implementation — 2026-10-05
+
+Stay logged in is now an opt-in desktop extension of the durable `UserSessions` lifecycle. Password sign-in still
+initializes the existing runtime and enrolls exactly one desktop session. When selected, the server additionally
+issues a 256-bit opaque credential, stores only its SHA-256 hash in `DesktopRememberCredentials`, and binds it to
+the server-derived tenant/user, durable session, and stable installation UUID. The credential is not an access
+bearer: access bearers remain process-memory-only. Windows stores the opaque value with current-user DPAPI in the
+per-user Shale support directory; unsupported protected storage leaves ordinary password login available.
+
+Restore runs off the JavaFX thread before ordinary login presentation completes, shows “Signing you in…”, and uses
+the same runtime initialization, application-instance enrollment, live connection, update policy, and session
+monitoring path as password login. The server checks the active user, tenant membership, durable session, revocation,
+installation, and absolute expiry before access issuance. Every successful use replaces the credential hash under a
+serializable lock and rotates the access JTI. The absolute deadline is fixed at 30 days and is never extended by use.
+Invalid/revoked/expired credentials are deleted locally; transport uncertainty retains protected state and grants no
+offline access. Before rotation the client DPAPI-protects both the current and proposed replacement so an interrupted
+response can retry the proposed value first and safely fall back to the prior value without creating another session.
+Explicit logout clears DPAPI state before its bounded best-effort server revocation; ordinary window
+close performs shutdown only and preserves the remembered relationship. Existing self/admin session revocation
+invalidates restore through the same `UserSessions` row. No credential value is included in logging or audit metadata.
+
+### Required deployment order and acceptance status
+
+**Current status: COMPLETE.** See the user-reported Windows acceptance closeout above. The deployment order remains
+applicable to new deployments; the original acceptance checklist below is retained with its evidence limits.
+
+1. Back up the database and run `docs/sql/2026-10-05_desktop_remember_credentials.sql`.
+2. Run `docs/sql/verification/2026-10-05_desktop_remember_credentials_verification.sql`; investigate every finding.
+3. Deploy the matching server before distributing the matching MSI. Older desktop clients continue ordinary login.
+4. Build/sign/package the MSI through the existing Windows release process; JNA's maintained DPAPI integration is
+   included as a normal packaged runtime dependency.
+
+Automated source/test verification is recorded with the implementation commit. The original production acceptance
+checklist called for a signed installed MSI and deployed SQL/server: checked login plus
+application restart; Windows restart; unchecked login leaving no restore; X-close preserving restore; explicit
+logout clearing restore; self-revocation; administrator revocation; disabled-account rejection; transient network
+failure with retry/manual sign-in; and DPAPI-unavailable behavior under the installation owner account.
+
+Audit compatibility review: credential creation/rotation is security plumbing within the existing durable session
+relationship, not a new domain mutation or sensitive-data view. Existing session enrollment/logout/self/admin
+revocation audit events remain authoritative. No new audit payload is added because even a hash, credential prefix,
+installation identifier, or rotation detail would add unnecessary authentication metadata exposure.
 
 **Authority:** This document is the roadmap and current-state record for application releases, update
 policy, installed desktop instances, authenticated sessions, revocation, and future client support.
@@ -98,11 +329,16 @@ but no UI belongs in the foundation phases.
 
 ### 3.1 Release production and packaging
 
-1. `release.bat <version> <mandatory>` bumps Maven versions and builds the desktop and updater.
+1. `release-and-publish.bat` performs a clean-tree/upstream Git preflight before invoking build work;
+   `release.bat <version> <mandatory>` itself remains build-only and bumps Maven versions before building the
+   desktop and updater.
 2. `build-shale-release.bat` creates a Windows `jpackage` app image, embeds the separately packaged
    `ShaleUpdater` image under the desktop payload, ZIPs the app image, and creates the MSI.
 3. `update-manifest.bat` hashes the Windows ZIP, optionally carries macOS ZIP/hash metadata, and writes
-   the global `shale-stable.json`. `release-and-publish.bat` publishes those static artifacts.
+   the global `shale-stable.json`. Before `release-and-publish.bat` publishes those static artifacts, it stages only
+   the root/module POMs and source manifest, commits `Release Shale <version>` when needed, normally pushes the
+   current branch to its configured upstream, and requires confirmed push success. Committed local-ahead source work
+   is pushed with that commit; unrelated working-tree/index changes fail preflight and are never auto-committed.
 4. The MSI is installation/distribution output. The current in-app update consumes the ZIP, not the
    manifest's installer URL.
 
@@ -677,6 +913,31 @@ cover interval bounds, skipped releases, first-run/empty catalog, dismissal timi
 optimistic-concurrency recovery, duplicate suppression, and startup failure paths. The repository-level
 `mvn test` subsequently passed after the earlier Maven Central outage; Phase 3B is **COMPLETE**.
 
+### Release-notes authoring foundation — 2026-10-02
+
+Versioned developer-authored notes now live at `release-notes/<major>.<minor>.<build>.json`. The deliberately small
+JSON contract carries version, title, optional ISO release date, summary, and plain-text `New`, `Improvements`, and
+`Fixes` arrays. It rejects HTML and unknown fields and uses the same canonical three-component version vocabulary.
+Historical files remain in Git. During `release.bat`, validation occurs after manifest generation and before the
+manifest is copied to `dist`; matching notes become both backward-compatible manifest `notes` text and a structured
+`releaseNotes` object. Missing notes preserve the generic fallback and never block an update, while present invalid
+or version-mismatched notes fail the release before publication. Mandatory/optional policy is not derived from this
+content.
+
+The existing Phase 3B UI remains the user contract: one post-update What's New dialog reads published release rows
+and items and advances the existing per-user acknowledgement only after dismissal. The pre-update policy/update
+dialog does not render these notes. This preserves the separation of package/policy decisions from release content.
+The 2026-10-02 control-plane importer transfers this content into
+`ApplicationReleases`/`ApplicationReleaseItems` and supplies the required sanitized global publication audit. A dedicated
+release-pipeline credential (not a tenant-admin bearer) authorizes a single-version request; the DAO locks the
+canonical production identity, writes the published parent and every ordered child, appends bounded global audit,
+and commits once. Identical content is a no-op. Differing content is a conflict unless an explicit correction carries
+the current RowVer; stale corrections fail and roll back. `release-all.bat` reaches this through its existing
+`release-and-publish.bat`/`publish-update.bat` chain after binary upload and before manifest upload. Missing notes
+skip the call. A required import failure prevents manifest publication. Generated or manual ad-hoc SQL is not the
+release workflow. Repository validation/manifest generation needs no audit row; the authoritative catalog mutation
+is audited inside its database transaction. The import extension uses its documented additive schema migration.
+
 ### Phase 4A — Stable machine identity
 
 * **Goal:** create/persist a non-invasive workstation UUID.
@@ -973,7 +1234,8 @@ ordinary-user read audit, or analytics telemetry.
 
 ### Phase 7C — Desktop session enrollment migration
 
-**Status: IN PROGRESS — implementation is present; required Maven verification is blocked by Maven Central HTTP 403.**
+**Status: COMPLETE — implementation and user-reported production Windows/Eclipse acceptance are recorded; an
+intermittent enrollment timeout and one clean packaged-origin launch check remain explicit follow-up items.**
 
 * **Goal:** give desktop a durable session identity while preserving JDBC login during rollout.
 * **In scope:** explicit post-credential server exchange or approved equivalent, secure local credential
@@ -1013,8 +1275,8 @@ ordinary-user read audit, or analytics telemetry.
 
 ### Phase 9 — User Devices & Sessions UI
 
-**Status: IN PROGRESS — implementation and focused contracts are present; required Maven verification is blocked
-because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
+**Status: COMPLETE — My Sessions is available to every authenticated role and its installed runtime acceptance is
+user-confirmed.**
 
 * **Goal:** users view/revoke current and other sessions.
 * **In scope:** current marker, client/device, activity, nullable approximate location, revoke one/others.
@@ -1027,8 +1289,8 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 
 ### Phase 10 — Administrator session visibility and revocation
 
-**Status: IN PROGRESS — implementation and focused contracts are present; required Maven verification is blocked
-because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
+**Status: COMPLETE — implementation and prior focused contracts are present; user-reported production acceptance
+confirms the tenant-wide surface loads and remote revocation is enforced.**
 
 * **Goal:** authorized admins manage tenant sessions.
 * **In scope:** paged/filterable view, revoke session/user, reasons, required audit and read-audit decision.
@@ -1095,13 +1357,13 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 ### Phase 13A — Workstation automatic-update preference
 
 * **Goal:** persist explicit workstation opt-in independently of a user.
-* **In scope:** machine-scoped preference/permissions and admin/user ownership decision.
+* **In scope:** workstation-scoped application preference and authenticated-user ownership decision.
 * **Non-goals:** scheduler/helper or installation.
-* **Implemented files:** core provider/result contract, desktop platform storage/service, and Settings > Administration UI.
+* **Implemented files:** core provider/result contract, desktop platform storage/service, and Settings > Personal UI.
 * **Schema/API impact:** none; this is a local machine setting only.
 * **Verification:** multi-user consistency, least privilege, opt-out, upgrade persistence.
 * **Dependencies:** 4A.
-* **Risks:** ambiguity over who may opt in on shared workstations.
+* **Risks:** a preference changed by one authenticated user applies to later users of the same workstation.
 
 ### Phase 13B — Idle-aware unattended updater feasibility/prototype
 
@@ -1136,24 +1398,111 @@ because Maven Central returns HTTP 403 for the Spring Boot dependency BOM.**
 | 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
 | 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
-| 7C | **COMPLETE** | Desktop durable-session enrollment and required verification completed before Phase 8A. |
+| 7C | **COMPLETE** | Desktop session enrollment remains closed. User-reported Windows Stay logged in acceptance supersedes the earlier error-229 restore blocker; see the remembered sign-in closeout. A clean installed production launch with no API override is **NOT RUN**, and intermittent enrollment `REQUEST_TIMEOUT` remains open. |
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
-| 8B | **COMPLETE** | Best-effort invalidation/revalidation acceleration and required verification completed before Phase 9. |
-| 9 | **COMPLETE** | Desktop self-service Devices & Sessions completed and verified before Phase 10. |
-| 10 | **COMPLETE** | Tenant-admin session visibility/revocation completed and verified before Phase 11A. |
+| 8B | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms remote administrative revocation is detected in approximately one minute by polling and locks the application before the session-ended popup is dismissed; OK transitions to sign-in. Push remains acceleration, not authority. |
+| 9 | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms Settings > Personal > My Sessions works for ordinary users and administrators, shows only the authenticated user's sessions, marks the current session, and current-session self-revocation locks the app and returns to sign-in. |
+| 10 | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms Administration > Sessions loads tenant-wide data and authorized remote revocation is enforced. This is not manual cross-tenant or crafted-request security acceptance. |
 | 11A | **COMPLETE** | Central policy resolver, server-time anchored shell UX, outage/correction behavior, and updater precedence are verified. |
 | 11B | **COMPLETE** | Minimum-allowed enforcement and safe drain are verified. |
 | 12 | **COMPLETE** | Privacy-safe local attempt/outcome correlation and required verification completed before Phase 13A. |
-| 13A | **COMPLETE** | Machine-scoped opt-in storage, provider, authorization, and Settings control were completed and verified before Phase 13B. |
+| 13A | **COMPLETE; AUTHORIZATION FIXED 2026-10-05** | Workstation-scoped opt-in storage and provider remain unchanged. Automatic Updates is a personal application preference editable by any active authenticated user; runtime/storage unavailability still disables it, while genuinely administrative Settings controls retain their authorization. |
 | 13B | **COMPLETE** | Eligibility, aggregate readiness, cooperative shutdown, explicit invocation modes, update locking, and bounded retry/window contracts are implemented and verified. |
 | 13C | **COMPLETE** | Authenticated process-local Windows scheduling is implemented and verified; it remains session-only. |
 | 13D | **COMPLETE — UNSUPPORTED** | Logged-out alternatives were assessed, the safe-default capability contract was verified, and no executor was registered. |
 | 13E | **COMPLETE** | Public policy, signing gates, strict registration values, owner paths, and installed-version metadata are implemented and verified; no registration writer or logged-out executor was added. |
 | 13F | **COMPLETE** | Elevated MSI registration and lifecycle are verified; installed Windows fresh-install acceptance confirmed the protected 64-bit HKLM record, exact owner/roots, ACL, schema/version/channel, updater, and production-reader `VALID`. Production signing remains a separate deployment prerequisite. |
 | 13G | **COMPLETE — UNSUPPORTED** | Every Phase 13D blocker was reevaluated against 13E/13F. Discovery, public policy, version, and owner-path prerequisites are closed, but no credentialless owner principal or sufficiently protected privileged execution boundary is proven; no prototype or rollout was created. |
+| 14A | **COMPLETE** | Release-pipeline Git synchronization is fail-closed before publication: attached/upstream/clean/divergence preflight, exact release-file staging, commit/push recovery, retry behavior, and source-revision-consistent Mac handoff are documented and covered by temporary-repository tests. No domain or administrative runtime mutation exists, so the established audit schemas are not applicable. |
+| Login visual refresh | **IN PROGRESS; RUNTIME FLOW ACCEPTED** | The remaining tall-window stretch was traced to `-1.0`, which is JavaFX `USE_COMPUTED_SIZE`, not `USE_PREF_SIZE`; the content-sized groups now use the preferred-size sentinel inside a full-height centering viewport. The user reports local Maven tests pass and the application successfully launches, signs in, enrolls the durable session with HTTP 200, and logs out with HTTP 200. Rendered tall/short-window acceptance for this sizing correction remains **PENDING**. Stay logged in acceptance is closed separately below; this does not close the pending visual sizing acceptance. |
+| Remembered desktop sign-in (Stay logged in) | **COMPLETE — USER-REPORTED WINDOWS ACCEPTANCE 2026-10-06** | User reports PASS for checked login across application/Windows restart, repeated restore after rotation, X-close preservation, explicit Logout clearing, unchecked login with no remembered sign-in, self/admin revocation invalidating restore, installed-MSI sign-in/logout, and outage recovery through Retry without credential loss. The previously recorded user-reported local `mvn test` PASS is preserved. No checks were executed in this documentation run; unrelated release/session work remains open. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
+
+Release-pipeline Git synchronization and Stay logged in are complete. The wider initiative remains open: the
+conditional Phase 13H privileged-component decision remains separate, and logged-out automatic updates remain
+`UNSUPPORTED`.
+
+## Desktop login visual refresh — 2026-10-05
+
+**Historical implementation record:** the disabled Stay logged in placeholder and NOT STARTED statements below
+precede its implementation and acceptance closeout above. Tall/short-window visual acceptance remains pending.
+
+The unauthenticated JavaFX surface has been recomposed as a responsive brand/illustration region and a focused
+sign-in card. It uses the existing Shale logo, the approved headline and subtitle, generic Cases/Tasks/Calendar
+shapes with no pre-authentication business or user data, and verified repository release-note themes describing
+release-specific highlights and the clearer required-update experience. The form retains the existing authentication
+and post-login update gates, Enter submission, version provider, validation/error route, and keyboard-native
+controls. Password visibility is a presentation-only paired field with one bidirectionally bound value; switching
+restores focus and selection/caret. An atomic in-flight boundary disables the fields and action and prevents duplicate
+authentication attempts while the progress message is shown.
+
+The unchecked **Stay logged in** control is intentionally disabled, marked **Coming soon**, and explains that
+persistent sessions are unavailable. It does not store a password, persist a bearer, enroll another session, or
+alter logout, shutdown, revocation, refresh, or session-expiry behavior. Persistent-session design and implementation
+remain **NOT STARTED**. The visual layer adds only a short content fade and a slow background accent translation;
+`-Dshale.ui.reduceMotion=true` suppresses both, and scene replacement/shutdown disposes them. At constrained widths
+the decorative brand region is removed before the scrollable sign-in card.
+
+Audit compatibility is unchanged. This work adds no authenticated sensitive read and no domain, administrative, or
+session mutation, so no PHI, entity-action, or session-security audit event and no schema migration are appropriate.
+Automated Maven verification and rendered light/dark/resizing acceptance remain blocked in this run by Maven
+Central returning HTTP 403 while resolving the existing Spring Boot dependency BOM. Therefore the visual work is
+recorded as implemented but not complete or visually accepted; the focused login tests, affected suite, critical
+`mvn test`, and manual keyboard/theme/resizing/password/error/loading/cleanup checks must pass before changing the
+tracker status to **COMPLETE**.
+
+### Login composition refinement — 2026-10-05
+
+The follow-up refinement fixes the reported tall-window stretching at its layout source. The illustration no longer
+has a vertical-grow constraint, its container and all three rotated cards have bounded preferred/minimum/maximum
+sizes, and the left content group is content-sized inside a centered, maximum-width two-column composition. The
+sign-in surface is now 420 logical pixels wide by preference (bounded from 380 to 440), retains content-derived
+height and its reserved error area, and is centered by a viewport-filling wrapper. If height or width becomes
+constrained, the bounded illustration is removed before the complete branding group; the form stays in its scroll
+pane so controls remain reachable on short windows.
+
+The approved slogan is represented as two explicit lines, with a 48-pixel bold neutral first line and a teal/cyan
+accent treatment on the second. Cases, Tasks, and Calendar are generic miniature panels with distinct teal, violet,
+and blue borders, distributed list/check/calendar content, and compact overlapping rotation. What's New remains
+immediately beneath the illustration and keeps the previously verified release copy. The refinement does not alter
+authentication, update gating, keyboard submission, duplicate-submit protection, password reveal, status/error
+handling, reduced-motion behavior, or animation disposal.
+
+Verification in this run is deliberately recorded separately from earlier evidence. XML parsing, CSS brace balance,
+and `git diff --check` passed. The focused Maven command was attempted but could not build the reactor because Maven
+Central returned HTTP 403 for the existing Spring Boot dependency BOM. The user separately reported a local
+`mvn test` pass before this refinement; that report is retained as user-provided context only and is not presented as
+a test of the changed files. No JavaFX display or prebuilt dependency set was available, so normal, maximized,
+narrow, and short rendered states remain **NOT RUN** and visual completion is not claimed.
+
+Audit compatibility remains unchanged: this is unauthenticated presentation and local responsive behavior, with no
+sensitive read or domain, administrative, or session mutation. Existing audit schemas require no event or migration.
+Persistent Stay logged in support remains **NOT STARTED**; the disabled **Coming soon** placeholder remains the only
+surface and no credential or bearer persistence was introduced.
+
+### Login content-height centering correction — 2026-10-05
+
+The follow-up screenshot showed that the earlier numeric substitution did not preserve preferred-height behavior:
+JavaFX defines `-1.0` as `Region.USE_COMPUTED_SIZE`, so it allowed the brand group and sign-in card to retain their
+computed, vertically growable maximum. The corrected hierarchy uses a full-height centering viewport around a
+shrinkable, preferred-height two-column composition. The branding group and sign-in card use the preferred-size
+maximum sentinel, while the form `ScrollPane` continues to fit its centering wrapper to the viewport. Extra height
+therefore belongs outside the card on tall windows, while a constrained composition can still shrink and expose the
+complete form through vertical scrolling. Card width, illustration bounds, headline, What's New, reserved
+progress/error space, responsive decoration removal, and all login interactions remain unchanged.
+
+The user reports that local Maven tests pass and that the rebuilt desktop application launches and signs in
+successfully, durable session enrollment returns HTTP 200, and explicit logout returns HTTP 200. These are
+user-reported local/runtime results, not commands executed by this documentation update. Rendered visual acceptance
+of the corrected approximately 1920×1300 tall state and a short scrollable state remains **PENDING** until the
+stretching and centering result is observed. At the time of this visual correction, persistent **Stay logged in**
+support was **NOT STARTED**. That historical feature status is superseded by the implementation and user-reported
+acceptance closeout above; visual sizing acceptance remains separate.
+
+Audit compatibility remains unchanged. This is unauthenticated presentation and local layout behavior, not a
+sensitive read or a domain, administrative, or session mutation. No audit event or schema migration is appropriate.
 
 ## 16. Open decisions requiring operator input
 
@@ -1338,13 +1687,15 @@ geolocation, fingerprinting, heartbeat authentication, update policy, or enforce
 
 Deployment order is: retain verified Phase 7A schema; deploy the verified Phase 7B server plus this additive
 endpoint; deploy the Phase 7C desktop; continue JDBC-first login; observe sanitized enrollment outcome logs; and
-only after verification and rollout stability consider Phase 8A. Required focused and full Maven tests could not
-start because Maven Central returned HTTP 403 for the Spring Boot BOM. Phase 7C must remain IN PROGRESS until
-those tests pass.
+only after verification and rollout stability consider Phase 8A. At the time of that implementation record,
+focused and full Maven tests could not start because Maven Central returned HTTP 403 for the Spring Boot BOM. The user subsequently reported that earlier local Maven runs passed and
+provided the production acceptance recorded in the 2026-10-02 closeout below. Those are historical/user-reported
+results, not tests executed by this documentation-only run.
 
 ### Phase 7C focused manual verification checklist
 
-The following installed/runtime checks remain unverified while Phase 7C is IN PROGRESS:
+The following checklist is retained for reproducibility. The closeout below records which runtime outcomes are now
+accepted and which narrower items remain open:
 
 1. Valid desktop JDBC login succeeds before enrollment.
 2. Durable desktop enrollment returns a bound session and matching public session/JTI state.
@@ -1425,15 +1776,14 @@ is intentionally not audited.
 
 After durable desktop enrollment, LiveBus handlers validate tenant, public session id, and login generation. One
 in-flight bounded `/api/sessions` request coalesces duplicates. Only authoritative 401/403 confirmation clears the
-HTTP bearer; a valid response retains it and a timeout/transport failure makes no revocation assumption. JDBC
-authority remains intact as Phase 7C requires. Policy hints and reconnect reload the existing authoritative global
+HTTP bearer; a valid response retains it and a timeout/transport failure makes no revocation assumption. Policy hints and reconnect reload the existing authoritative global
 PRODUCTION policy read. Reconnect never expects replay. Logout/user switch/shutdown detach handlers, wrong-tenant
 and wrong-session hints are ignored, and unknown types remain safe for old clients. Older servers and PubSub
 outages fall back to ordinary bound-token validation and policy reads.
 
-Manual verification checklist (not executed in this non-connected environment): (1) establish two durable sessions;
+Original Phase 8B manual verification checklist (superseded for desktop enforcement by the 2026-10-02 checklist below): (1) establish two durable sessions;
 (2) revoke one from the other client/API; (3) observe prompt invalidation; (4) observe authoritative revalidation;
-(5) confirm only the revoked bearer is cleared; (6) disconnect PubSub, revoke, reconnect, and confirm revalidation
+(5) confirm the revoked bearer is cleared; (6) disconnect PubSub, revoke, reconnect, and confirm revalidation
 finds the missed revocation; (7) publish a committed policy change and confirm authoritative reload; (8) duplicate
 the hint and confirm no duplicate visible behavior.
 
@@ -1443,6 +1793,32 @@ remains the self-service User Devices & Sessions UI over the existing Phase 8A A
 revoke one/revoke others, nullable approximate location only after its separate privacy decision, and accessibility/
 visual verification—excluding tenant-admin UI, GPS/exact location, instance/session equivalence, and later updater
 enforcement.
+
+### Phase 8B desktop revocation enforcement correction — 2026-10-02
+
+The original accelerator cleared only the process-memory bearer, leaving direct-JDBC authority and the authenticated
+JavaFX shell active. Confirmed `REVOKED` validation now enters one terminal, generation-scoped desktop path: it stops
+the application-instance heartbeat, invalidates pending transport callbacks, closes LiveBus, clears the bearer and
+runtime session context, disarms `DesktopRuntimeSessionProvider` before UI work, stops every SceneManager-owned
+authenticated producer, and transitions through the login surface after a clear session-ended warning. The warning
+uses the established modal pattern and leaves the current UI visible while acknowledged so the user can inspect or
+record unsaved text for recovery, but saving and every new JDBC acquisition are already denied. This is distinct from explicit
+logout (which requests `USER_LOGOUT`) and ordinary X/process shutdown (which neither reclassifies nor revokes the
+durable session); it does not introduce a future Stay logged in decision.
+
+Push and reconnect remain accelerators. Because the existing application-instance heartbeat is direct JDBC and
+cannot authoritatively validate the bound durable session, the enrolled-session coordinator now performs a
+non-overlapping authenticated validation every 60 seconds. The HTTP request timeout is six seconds, so the documented
+worst-case confirmation window is 66 seconds after durable commit (60 seconds to start plus six seconds to receive
+an authoritative response). Transport errors and other uncertain responses retain the session and retry on the next
+interval. Tenant, public session ID, current credential identity, and login generation are checked before the terminal
+callback; a stale completion cannot invalidate a replacement user.
+
+The server mutation remains unchanged: the administrator update is exact on `ShaleClientId` and public `SessionId`,
+the existing active-admin/RLS checks apply, and the existing `ADMIN_REVOKE` security audit is written in the same
+transaction before commit. Only the committed changed ID is published afterward, and publication failure cannot undo
+revocation. No schema migration or new audit event is required; validation and local enforcement are reads/lifecycle
+actions rather than new administrative mutations.
 
 ## Phase 9 implementation record — 2026-09-29
 
@@ -1517,6 +1893,36 @@ authoritative reload, not push delivery.
 
 Phase 10 required focused, selector-selected, full-reactor, rendered JavaFX, and live authorization/audit verification was completed before Phase 11A.
 
+### Phase 10 administrative-list diagnosis — 2026-10-02
+
+Runtime evidence now confirms successful desktop enrollment (`200` in 2547 ms), an installed process-memory bound
+bearer, and the `ENROLLED` capability gate. Administration > Sessions opens but its initial bounded list reports the
+generic failure message, with no corresponding Azure exception in the available logs. Source review found no
+endpoint, parameter, DTO, authorization, tenant, SQL projection, or transactional read-audit contract mismatch:
+the desktop calls `GET /api/admin/sessions` with the documented bounded filters; the controller derives both
+principal and current public session id from the same bearer; the service repeats active tenant-admin authorization,
+performs one tenant-qualified Users/UserSessions page query, inserts exactly one `ADMIN_SESSION_LIST` audit row, and
+commits before returning the matching page DTO. The UI continues to expose this adapter only while enrollment state
+is `ENROLLED`, and the bearer remains memory-only and shared with self-session management.
+
+The desktop admin-list adapter now logs only HTTP status and elapsed milliseconds, a closed transport category plus
+exception class and elapsed milliseconds, or response-parsing exception class. It never logs the URL/query,
+authorization header, bearer, response body, filter values, or user/session details. This distinguishes a routed
+401/403/4xx/5xx response, request timeout, connection/TLS failure, and a successful but incompatible response shape
+without changing the eight-second request timeout or authorization behavior.
+
+Enrollment success proves the Phase 7A `UserSessions` write path, but it does not prove the Phase 8A
+`SessionSecurityAuditLog` table, RLS predicates, runtime INSERT permission, or same-transaction admin read audit.
+The sanitized diagnostic subsequently reported HTTP 400. This confirmed the Spring MVC argument-binding hypothesis:
+`AdminSessionController` relied on inferred Java parameter names while Maven compilation does not explicitly enable
+`-parameters`. All six query parameters (`page`, `size`, `userId`, `clientType`, `activeOnly`, and `since`) and the
+`sessionId` path variable now declare their wire names explicitly. A real standalone MockMvc request using the
+desktop's exact initial query, `?page=0&size=50&activeOnly=false`, verifies that binding reaches the existing service
+with null optional filters; malformed client-type and since filters remain HTTP 400 and do not reach the service.
+The desktop source still supplies page `0` and the UI's established `PAGE_SIZE=50` default. Defaults, validation,
+authorization, bound-session derivation, transactional list auditing, and HTTP timeouts are unchanged. No schema or
+audit contract is introduced. Deployment re-verification of the corrected server build remains open.
+
 ## Phase 11A implementation record — 2026-09-29
 
 The shared `ApplicationUpdatePolicyResolver` compares strict numeric `major.minor.build` values and produces `CURRENT`, `RECOMMENDED`, `REQUIRED_BEFORE_DEADLINE`, `REQUIRED_DEADLINE_REACHED`, or `UNKNOWN`. A running version equal to or newer than the relevant target never warns. `minimumAllowed` owns required semantics; `minimumRecommended` owns recommendation only after the allowed check. Channel mismatch, missing policy/time, and malformed running versions are unknown rather than invented authority.
@@ -1542,6 +1948,13 @@ Phase 11B separates operational enforcement from Phase 11A presentation with `Ap
 The concrete inventory found: New Intake and new Organization are modal multi-step create workflows with existing dirty-close protection; Contact aggregate create/edit is a modal transaction retaining values after failed saves; case overview/details have inline edit modes plus focused field, team, party, task, link, date, and enhanced-text dialogs; task detail is an editable hydrated dialog; calendar has a new-event wizard and asynchronous event/case-date editors; Settings contains administrative editors; material requests and file/document-adjacent case-material actions have modal create/edit flows. These are safe to finish or cancel after entry and unsafe to close from under the user. Plain list/profile/search navigation is read-only. Existing editor dirty prompts remain authoritative; the drain coordinator does not serialize form state or add duplicate prompts.
 
 At authenticated startup the shell first presents a textual policy-check surface. A fresh prohibited result presents an update-required surface with keyboard-reachable Update, Retry policy check, and Exit actions rather than entering the normal shell. Authentication credentials/session are retained, background policy invalidation and heartbeat remain active, and a corrected policy opens the shell without restart. Missing policy, no cache, or an expired time anchor enters `UNKNOWN_GRACE` and permits startup. In-process policy changes retain read/navigation access, strengthen the persistent Phase 11A notice, disable/gate substantive workflow entry, and grandfather registered work.
+
+The package release manifest remains a separate compatibility gate. When the authenticated startup manifest check
+reports both a newer package and `mandatory=true`, the dedicated Update prompt is shown before policy checking or
+normal-shell construction. Its only outcomes are updater handoff or application exit; the title-bar close and Escape
+follow the Exit outcome and cannot enter Shale. Optional manifest updates retain **Not now** and continue through the
+normal policy-check startup path. This does not change manifest syntax, version comparison, policy authority,
+in-session safe-drain behavior, automatic scheduling, or updater handoff semantics.
 
 The bounded authority window is exactly **15 minutes of monotonic elapsed time** from the last policy response's database UTC. A transient failure inside that window retains a last-known prohibited decision (hysteresis). Once older than 15 minutes it becomes `UNKNOWN_GRACE`; an ancient cache cannot lock out the firm. A later authoritative success replaces it wholesale. If the package is unavailable, the notice says so, enforcement remains, Retry/read/finish/exit remain available, and no write is automatically retried. The existing updater launcher is unchanged.
 
@@ -1632,19 +2045,22 @@ UUID, network/location, PHI, or arbitrary metadata. It shares Phase 4A's durable
 machine identity. Upgrade and ordinary uninstall/reinstall retain it; old clients ignore it.
 
 Writes use a normalized-path JVM lock plus OS file lock, unique temporary file, forced write, atomic replacement,
-cleanup, and deterministic reread. Corruption never implies consent; authorized recovery preserves the prior file
+cleanup, and deterministic reread. Corruption never implies consent; explicit recovery preserves the prior file
 under `.corrupt-*`. Permission/I/O failures return explicit unavailable state and never fall back per user.
 
-Any authenticated Shale administrator may change the machine setting; ordinary users may read it but cannot mutate
-through the controller/service path. This is not tenant ownership: a tenant 7 administrator's choice remains when a
-tenant 8 user signs in. Logout, switching, and restart do not clear it. Application authorization is not an OS ACL:
+Any active authenticated Shale user may change this application preference; it is not an administrator capability.
+This is not tenant ownership: a tenant 7 user's choice remains when a tenant 8 user signs in. Logout, switching, and
+restart do not clear it. Application authorization is not an OS ACL:
 the per-user Windows MSI provisions no ProgramData ACL, so external file modification remains possible wherever the
 OS ACL permits it. Managed deployment can provision stronger ACLs. Equivalent macOS provisioning requires installed
 verification.
 
-Settings > Administration presents workstation-scoped state and disables non-admin mutation. Failed saves reread
-the authoritative prior state. Changes invoke no updater, create no Phase 12 attempt, and create no central/entity
-audit: this non-PHI local operational setting uses sanitized local transition/error logs.
+Settings > Personal presents workstation-scoped state to every authenticated user. The control is disabled only when
+the runtime does not provide preference storage; failed saves reread the authoritative prior state. User Management,
+tenant-wide Sessions, Audit Log, and configuration-management controls retain their separate administrator guards.
+Changes invoke no updater, create no Phase 12 attempt, and create no central/entity audit: this non-PHI local
+application preference is not a meaningful domain or administrative mutation and uses sanitized local
+transition/error logs. No schema migration is required.
 
 Phase 13B consumes `WorkstationUpdatePreferenceProvider.current()` and proceeds only when
 `unattendedExecutionPermitted()` is true for `ENABLED`; it must separately combine policy, update availability, idle,
@@ -2220,3 +2636,134 @@ implementation. The detailed decision record is `docs/testing/windows-logged-out
 The next recommended phase is **Phase 13H — privileged Windows component go/no-go and threat model**, but only if
 the operator chooses to own a signed protected broker/service lifecycle. Otherwise stop logged-out work and retain
 Phase 13C as the supported automatic-update architecture. macOS parity and updater redesign remain out of scope.
+## Phase 7C desktop origin integration completion — 2026-10-02
+
+Desktop server API configuration is now resolved once by `DesktopConfig` and passed through the composition root to
+enrollment, self-session management, and administrator-session management. The clients no longer inspect process
+configuration independently. Explicit system-property and environment overrides take precedence over packaged
+configuration; invalid explicit values fail closed rather than selecting another destination. Production accepts
+HTTPS origins only. Development ignores the packaged production origin and permits HTTP only for an explicitly
+configured loopback origin. Credentials cannot be transmitted to origins containing user-info, a non-root path
+(including `/api`), a query, or a fragment.
+
+The production resource records the existing Azure HTTPS origin so installed packages need no workstation-specific
+environment variable. This is not evidence that the current Azure deployment contains the endpoint. The post-JDBC
+exchange now runs off the JavaFX thread, retains the lifecycle generation guard, uses the same memory-only bearer
+provider as both management clients, and still exposes those clients only in `ENROLLED`. Logout and shutdown retain
+their distinct revoke/clear semantics. This integration introduces no new mutation or sensitive read, and therefore
+requires no new audit schema or event; server-side session issuance, session reads, and revocations retain the
+existing Phase 7A/8A audit decisions.
+
+This was the state when the integration was implemented: Maven Central and the outbound deployment proxy returned
+HTTP 403. Later user-reported production acceptance supersedes the stale deployment/enrollment status as recorded
+in the closeout below; it does not retroactively turn this documentation run into a Maven or deployment test run.
+
+## Phase 7C enrollment diagnostics — 2026-10-02
+
+Azure evidence now proves server liveness and endpoint routing: `/api/health` returned 200 and an invalid-credential
+desktop-session POST returned the expected 401 in 0.37 seconds. A valid JDBC desktop login still reached the bounded
+eight-second enrollment limit and entered the existing `TRANSIENT` compatibility classification. To locate that
+boundary without changing behavior or timeouts, the desktop now records only response status plus elapsed
+milliseconds, or transport category (`REQUEST_TIMEOUT`, `CONNECTION_FAILURE`, `TLS_FAILURE`, or generic transport),
+exception class, and elapsed milliseconds. It never records origin, email, password, bearer, request/response body,
+or exception message. Existing 404/501, 401/403, 5xx, malformed-response, and compatibility/security classifications
+remain unchanged.
+
+The valid-credential server path was reviewed through repeated credential authentication, principal-derived instance
+ownership/active-DESKTOP verification, and durable DESKTOP session/JTI issuance. Unexpected exceptions from instance
+verification or durable issuance continue to use the safe 500 response and are now recorded by the central exception
+handler using exception class only; no unrestricted message or request content is logged. This observability change
+adds no domain mutation, sensitive read, or audit event, and needs no schema change. The later acceptance rerun
+succeeded, but intermittent enrollment `REQUEST_TIMEOUT` remains an open reliability item rather than being erased by a successful attempt.
+
+## Desktop explicit-logout revocation verification — 2026-10-02
+
+The explicit UI action remains distinct from window close and process shutdown: only `SceneManager.logout()` calls
+`DesktopUiRuntimeBridge.onLogout()`, which invokes the durable-session logout while the memory-only bearer and JDBC
+runtime identity are still available. Shutdown clears the bearer and ends the application instance without revoking
+the durable session. The bridge clears database/runtime context only after the bounded server logout attempt, so
+runtime-context teardown cannot invalidate the HTTP request. Local bearer clearing is protected by `finally` and
+therefore remains immediate even if an unexpected client failure escapes the best-effort request; generation
+invalidation and stale-enrollment isolation are unchanged.
+
+The logout client now records the HTTP status and elapsed milliseconds for every response. Transport failures record
+only a bounded category, exception class, and elapsed milliseconds. These diagnostics never include an origin,
+credential, bearer/token, body, tenant, user, session identifier, or exception message. Server review confirms that
+the signed bound token supplies the exact `sid`, tenant, and user authority; logout owner-qualifies that session and
+sets the first `RevokedAt` and `USER_LOGOUT`. The administrative `activeOnly` query continues to require both null
+`RevokedAt` and future `ExpiresAt`, so revoked history remains visible only when the filter permits it and is never
+deleted or cosmetically hidden.
+
+Audit compatibility is unchanged: explicit logout uses the existing bounded durable lifecycle record selected in
+Phase 7B, while Phase 8A session management mutations retain their transaction-coupled security audit. No schema
+migration is required. A new server JAR is not required for this desktop lifecycle/diagnostics correction because
+the deployed server revocation and filtering paths are already authoritative; a rebuilt desktop artifact is required.
+Earlier local Maven runs passed as reported by the user. No Maven command was executed in this documentation-only
+closeout, and the runtime statements below are user-reported acceptance rather than inferred test results.
+
+## Phase 9 My Sessions access completion — 2026-10-02
+
+Settings > Personal now names the existing Phase 9 surface **My Sessions** for every authenticated user, including
+administrators. Administration > Sessions remains a distinct administrator-only tenant-wide surface. My Sessions
+continues to use `UserSessionManagementClient` and only `GET /api/sessions` plus the established self-revocation
+routes; it never obtains the admin page and applies a client-side user filter. The server derives tenant, user, and
+current session from the authenticated bound token. Its SQL list and revoke paths independently qualify tenant and
+user, while the admin paths retain the active-administrator check and tenant qualification.
+
+The surface keeps the server current-session marker and displays client type, issue, refresh, expiry, and revocation
+times with factual Active, Expired, and Revoked states. Copy explicitly says Active means unexpired and unrevoked,
+not that Shale is running. Current and other active-session revocations use cancel-default destructive confirmation.
+A successful current-session revocation enters the same generation-guarded terminal invalidation path used by push
+and 60-second polling, so database/runtime access is disarmed and the established locked session-ended dialog owns
+the transition to sign-in. Loading, empty, refresh, compatibility/unavailable, and retryable error states remain
+off the JavaFX thread and discard stale results after logout or account/tenant change.
+
+The final user-reported Windows/Eclipse acceptance confirms My Sessions works as expected for ordinary users and
+administrators, shows only the authenticated user's sessions, marks the current session, and makes current-session
+self-revocation lock the application and return to sign-in. Administration > Sessions remains a separate
+administrator-only tenant-wide surface. Phase 9 is therefore closed for its verified scope. These observations do
+not establish manual cross-tenant or crafted-request security acceptance; those protections remain supported only
+by the available automated/runtime evidence.
+
+Audit compatibility is unchanged. Self list is not an administrative/PHI read; self and administrator revocations
+retain the existing transaction-coupled `SessionSecurityAuditLog` events, and administrator list retains its one
+bounded read-audit event. Bearers remain memory-only, RLS remains enabled, and durable validation remains
+authoritative. No schema migration is required. The explicit self-revoke binding fix and rebuilt desktop were
+required for this acceptance; the user-reported successful production behavior establishes that deployed runtime
+scope without turning it into a check executed by this documentation run.
+
+
+## Desktop session closeout — 2026-10-02
+
+This documentation-only closeout records the following **user-reported** Windows/Eclipse production acceptance; it
+does not present these observations as commands executed in this run:
+
+* the production Azure API starts successfully and desktop enrollment returns HTTP 200;
+* Administration > Sessions loads tenant-wide data;
+* explicit Logout returns HTTP 200 and revokes the durable session;
+* remote administrative revocation is detected through authoritative polling within approximately one minute;
+* after confirmed revocation, the application is locked before the session-ended popup is dismissed, and **OK**
+  transitions to sign-in;
+* Settings > Personal > My Sessions works for ordinary users and administrators, displays only the authenticated
+  user's sessions, and marks the current session;
+* current-session self-revocation locks the application and returns to sign-in; and
+* administrators retain the separate tenant-wide Administration > Sessions surface. The user reports the latest
+  My Sessions acceptance steps work as expected.
+
+Earlier local Maven test runs passed **as reported by the user**. This run changed documentation only and does not
+infer a new Maven result from “everything working as expected.” Manual cross-tenant and crafted-request security
+acceptance were not reported and are not claimed beyond existing automated/runtime evidence.
+
+The lifecycle decisions remain unchanged: normal X-button closure clears local state without server revocation;
+explicit Logout revokes the durable session; Active means unexpired and unrevoked, not a running application; and
+expired/revoked history remains stored. Bearers remain memory-only. The first reported “Stay logged in” Windows
+restart failure is superseded by the 2026-10-06 user-reported acceptance closeout above; the feature is **COMPLETE**.
+Logged-out automatic updates remain `UNSUPPORTED`.
+
+The closed verified scope does not close the whole initiative. Remaining items are:
+
+1. an installed production launch with no API override is **NOT RUN** unless separately evidenced;
+2. intermittent enrollment `REQUEST_TIMEOUT` remains open;
+3. release-pipeline Git synchronization is the next implementation task; and
+4. no manual cross-tenant or crafted-request security acceptance is claimed beyond available automated/runtime
+   evidence.
