@@ -1,7 +1,9 @@
 package com.shale.server.controller;
 
 import java.time.Instant;
+import java.util.IdentityHashMap;
 import java.util.NoSuchElementException;
+import java.util.StringJoiner;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,8 +58,49 @@ public final class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> handleUnexpected(Exception ex, HttpServletRequest request) {
-        log.error("Unexpected server exception class={}.", ex.getClass().getSimpleName());
+        log.error("Unexpected server exception exceptionClass={} causeClasses={}.",
+                ex.getClass().getName(), causeClasses(ex), sanitizedThrowable(ex));
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error.", request);
+    }
+
+    /**
+     * Produces a throwable suitable for server diagnostics without copying exception messages. Exception messages
+     * are not a safe logging boundary because framework, JDBC, or future adapter failures can echo credentials or
+     * request bodies. The exception/cause types and original stack frames retain the failure location and chain.
+     */
+    private static Throwable sanitizedThrowable(Throwable failure) {
+        return sanitizedThrowable(failure, new IdentityHashMap<>());
+    }
+
+    private static Throwable sanitizedThrowable(Throwable failure, IdentityHashMap<Throwable, Boolean> seen) {
+        if (failure == null || seen.put(failure, Boolean.TRUE) != null) return null;
+        var sanitized = new SanitizedDiagnosticException(failure.getClass().getName());
+        sanitized.setStackTrace(failure.getStackTrace());
+        Throwable cause = sanitizedThrowable(failure.getCause(), seen);
+        if (cause != null) sanitized.initCause(cause);
+        for (Throwable suppressed : failure.getSuppressed()) {
+            Throwable safeSuppressed = sanitizedThrowable(suppressed, seen);
+            if (safeSuppressed != null) sanitized.addSuppressed(safeSuppressed);
+        }
+        return sanitized;
+    }
+
+    private static String causeClasses(Throwable failure) {
+        var classes = new StringJoiner(" -> ");
+        var seen = new IdentityHashMap<Throwable, Boolean>();
+        for (Throwable current = failure; current != null && seen.put(current, Boolean.TRUE) == null;
+                current = current.getCause()) {
+            classes.add(current.getClass().getName());
+        }
+        return classes.toString();
+    }
+
+    private static final class SanitizedDiagnosticException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        private SanitizedDiagnosticException(String exceptionClass) {
+            super("Sanitized diagnostic for " + exceptionClass, null, true, true);
+        }
     }
 
     private static ResponseEntity<ApiErrorResponse> error(HttpStatus status, String message, HttpServletRequest request) {
