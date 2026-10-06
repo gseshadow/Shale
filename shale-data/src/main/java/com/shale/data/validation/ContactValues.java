@@ -36,6 +36,17 @@ public final class ContactValues implements ContactValueValidator {
         String ext = separate == null ? inline : separate;
         // Do not let the parser's vanity-number or first-number extraction accept prose/lists.
         if (!MAIN.matcher(main).matches() || main.chars().filter(c -> c == '+').count() > 1) throw invalidPhone(field);
+        // A local NANP subscriber has an NXX exchange (N=2–9), excluding N11 service exchanges.
+        // No area code is inferred, and this branch never supplies an E.164 value.
+        if (main.matches("[0-9 -]+")) {
+            String digits = main.replace(" ", "").replace("-", "");
+            if (digits.length() == 7) {
+                if (!digits.matches("[2-9][0-9]{6}") || digits.substring(1, 3).equals("11")) throw invalidPhone(field);
+                String preview = digits.substring(0, 3) + "-" + digits.substring(3)
+                        + (ext == null ? "" : " ext. " + ext) + " · US local; area code required to call";
+                return new Phone(main, null, ext, preview, PhoneKind.US_LOCAL, digits);
+            }
+        }
         try {
             var parsed = PHONES.parse(main, DEFAULT_PHONE_REGION);
             if (!PHONES.isValidNumber(parsed)) throw invalidPhone(field);
@@ -75,10 +86,14 @@ public final class ContactValues implements ContactValueValidator {
         return new Email(value, value.toLowerCase(Locale.ROOT), local + "@" + ascii);
     }
     public boolean usablePhone(String input, String ext) { try { return phone(input, ext, true, "phone") != null; } catch (FieldValidationException e) { return false; } }
+    public boolean dialablePhone(String input, String ext) {
+        try { return phone(input, ext, true, "phone").dialableWithoutContext(); }
+        catch (FieldValidationException e) { return false; }
+    }
     public boolean usableEmail(String input) { try { return email(input, true, "email") != null; } catch (FieldValidationException e) { return false; } }
     public static String trim(String input) { return input == null || input.strip().isEmpty() ? null : input.strip(); }
     private static boolean controls(String v) { return v.chars().anyMatch(c -> Character.isISOControl(c) || c == 0x2028 || c == 0x2029); }
-    private static FieldValidationException invalidPhone(String field) { return error(field, "invalid_phone", "Enter a complete valid phone number. Use +country code for international numbers; US is the default."); }
+    private static FieldValidationException invalidPhone(String field) { return error(field, "invalid_phone", "Enter a valid US full or 7-digit local number. Use +country code for international numbers."); }
     private static FieldValidationException invalidExtension(String field) { return error(field + ".extension", "invalid_extension", "Enter an extension of 1–12 digits (0–9)."); }
     private static FieldValidationException invalidEmail(String field) { return error(field, "invalid_email", "Enter one email address, such as name@example.com."); }
     private static FieldValidationException error(String field, String code, String message) { return new FieldValidationException(field, code, message); }

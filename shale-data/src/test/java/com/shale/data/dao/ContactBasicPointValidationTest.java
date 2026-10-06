@@ -38,4 +38,14 @@ class ContactBasicPointValidationTest {
     @Test void explicitClearSoftRemovesOnlyOwnedPointAndPreservesHistory()throws Exception{
         List<Write>writes=new ArrayList<>(),reads=new ArrayList<>();save(connection("0",null,writes,reads),null,null,true);var removal=writes.getFirst();assertTrue(removal.sql.contains("IsDeleted=1,IsPrimary=0,DeletedAt="));assertTrue(removal.sql.contains("WHERE Id=? AND ShaleClientId=? AND ContactId=? AND RowVer=?"));assertFalse(writes.stream().anyMatch(w->w.sql.startsWith("DELETE")||w.sql.startsWith("INSERT dbo.ContactPhoneNumbers")));
     }
+    @Test void localSaveUsesSubscriberNormalizationAndSeparateExtensionWithoutNullBindings()throws Exception {
+        List<Write> writes=new ArrayList<>(),reads=new ArrayList<>();
+        save(connection("3035550123",null,writes,reads),"555-0123 x001",null,true);
+        var update=writes.getFirst();
+        assertEquals("555-0123",update.bindings.get(1));
+        assertEquals("5550123",update.bindings.get(2));
+        assertEquals("001",update.bindings.get(3));
+        assertEquals(2,writes.size(),"point and existing transaction-bound audit both persist");
+    }
+
 }

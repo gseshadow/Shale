@@ -46,4 +46,30 @@ class ContactValuesTest {
         for (String e : new String[]{"\"a b\"@example.com", "me@[127.0.0.1]", "é@example.com", "\"a@b,c\"@example.com"})
             assertEquals("unsupported_format", assertThrows(FieldValidationException.class, () -> v.email(e, true, "email")).errors().getFirst().code());
     }
+    @Test void localSubscribersHaveExplicitNonE164StateAndWholeNumberComparison() {
+        for (String input : new String[]{"5550123", "555-0123", " 555 0123 "}) {
+            var result = v.phone(input, "001", true, "phone");
+            assertEquals(com.shale.core.validation.ContactValueValidator.PhoneKind.US_LOCAL, result.kind());
+            assertNull(result.canonicalNumber(), "No area code may be fabricated");
+            assertEquals("5550123", result.localNumber());
+            assertEquals("5550123", result.normalizedNumber());
+            assertFalse(result.dialableWithoutContext());
+            assertTrue(result.preview().contains("area code required to call"));
+            assertEquals("001", result.extension());
+        }
+        assertEquals("001", v.phone("555-0123 ext. 001", null, true, "phone").extension());
+        assertNotEquals(v.phone("5550123", null, true, "phone").normalizedNumber(),
+                v.phone("3035550123", null, true, "phone").normalizedNumber());
+        assertThrows(FieldValidationException.class, () -> v.phone("5550123 x001", "002", true, "phone"));
+        assertThrows(FieldValidationException.class, () -> v.phone("5550123", "1234567890123", true, "phone"));
+    }
+    @Test void localExchangeStructureAndInputShapeAreRequired() {
+        for (String input : new String[]{"0000000", "0550123", "1550123", "2110123", "311-0123", "9110123",
+                "555012", "55501234", "call 5550123", "5550123,5550124", "5550123 / 5550124", "+5550123"})
+            assertThrows(FieldValidationException.class, () -> v.phone(input, null, true, "phone"), input);
+        assertEquals(com.shale.core.validation.ContactValueValidator.PhoneKind.GLOBAL,
+                v.phone("+44 20 7946 0018", null, true, "phone").kind());
+        assertTrue(v.phone("(303) 555-0123", null, true, "phone").dialableWithoutContext());
+    }
+
 }

@@ -220,7 +220,7 @@ final class OrganizationEditEntryPointTest {
                 "the legacy compatibility-only single Organization Type field must not be rendered beside chips");
         assertTrue(controller.contains("Comparator.comparing(OrganizationServicePort.AssignedOrganizationType::primary).reversed()")
                         && controller.contains("new ClassificationChipGroup.Chip")
-                        && controller.contains("p.fax()||!ContactValues.INSTANCE.usablePhone(p.displayNumber(),p.extension())?null:\"Call\"")
+                        && controller.contains("p.fax()||!ContactValues.INSTANCE.dialablePhone(p.displayNumber(),p.extension())?null:\"Call\"")
                         && controller.contains("validEmail(e.emailAddress())?\"Email\":null")
                         && controller.contains("value.isBlank()?null:\"Open in Maps\"")
                         && controller.contains("safeWebsite(w.website())?\"Open Website\":null"),

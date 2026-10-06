@@ -21,6 +21,7 @@ public final class ContactExternalActions {
     public static URI telephone(String displayNumber) { return telephone(displayNumber,null); }
     public static URI telephone(String number,String extension) {
         var value=ContactValues.INSTANCE.phone(number,extension,true,"phone");
+        if (!value.dialableWithoutContext()) throw new IllegalArgumentException("Add an area code before calling a US local number.");
         return opaque("tel",value.canonicalNumber()+(value.extension()==null?"":";ext="+value.extension()));
     }
     public static URI email(String address) { return opaque("mailto",ContactValues.INSTANCE.email(address,true,"email").transportAddress()); }

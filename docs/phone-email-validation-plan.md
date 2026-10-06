@@ -569,3 +569,15 @@ restoration evidence/missing-history behavior, unsupported email formats, accoun
 read-only audit approach, deployment prerequisites and manual Windows/browser/database checks.
 Original historical line numbers above are not current implementation line numbers; named methods and
 the current source files in this checklist are the navigation anchors.
+
+
+### Scoped follow-up after PR #1825
+
+Approved seven-digit US local subscribers now use explicit `US_LOCAL` parser results with
+subscriber digits and no E.164 value; whole-number normalized comparisons preserve the local/full
+distinction and existing kind/extension invariants. Full-number parsing remains unchanged.
+Intake blur/Save synchronize field feedback/styling and summary errors without clearing on typing,
+and both roles keep all phone controls beneath Phone Number before Email. Safe Call actions require
+a full number, and local previews explain the missing area code. No new migration, backfill,
+audit/API redesign or legacy rewrite is part of this follow-up. See the rollout document for the
+new examples, storage/deployment implications and manual acceptance checks.

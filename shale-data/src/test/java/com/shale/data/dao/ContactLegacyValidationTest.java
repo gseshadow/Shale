@@ -62,4 +62,17 @@ class ContactLegacyValidationTest {
         assertNull(UserDao.validatedUserPhone(null,"0"));
         assertEquals("display_too_long",assertThrows(com.shale.core.validation.FieldValidationException.class,()->UserDao.validatedUserPhone("303"+" ".repeat(91)+"5550123",null)).errors().getFirst().code());
     }
+    @Test void localDuplicatesUseWholeSubscriberAndExtensionAndNeverFullNumberSuffix()throws Exception {
+        var local=new IntendedPhoneNumber(null,null,"WORK","555-0123","001",true,false,0);
+        var same=new IntendedPhoneNumber(null,null,"WORK","555 0123","001",false,false,1);
+        assertThrows(IllegalArgumentException.class,()->validate("validatePhones",List.of(local,same),Map.of()));
+        var otherExtension=new IntendedPhoneNumber(null,null,"WORK","5550123","002",false,false,1);
+        assertDoesNotThrow(()->validate("validatePhones",List.of(local,otherExtension),Map.of()));
+        var full=new IntendedPhoneNumber(null,null,"WORK","3035550123","001",false,false,1);
+        assertDoesNotThrow(()->validate("validatePhones",List.of(local,full),Map.of()));
+        assertThrows(IllegalArgumentException.class,()->validate("validatePhones",List.of(phone("555 0123","001",false,false),same),
+                Map.of(1L,baseline(false,"555 0123","001",false))));
+        assertEquals("555-0123 ext. 001",UserDao.validatedUserPhone("555-0123 x001",null));
+    }
+
 }

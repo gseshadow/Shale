@@ -78,7 +78,7 @@ final class OrganizationStructuredContactMutationDao {
  private static String duplicateKey(Spec s,Row r){
   if(s==EMAIL)return r.kind+"|"+r.values.getFirst().toLowerCase(Locale.ROOT);
   String main=r.values.getFirst(),extension=r.values.get(2);
-  if(ContactValues.INSTANCE.usablePhone(main,extension)){var parsed=ContactValues.INSTANCE.phone(main,extension,true,"phone");main=parsed.canonicalNumber();extension=nz(parsed.extension());}
+  if(ContactValues.INSTANCE.usablePhone(main,extension)){var parsed=ContactValues.INSTANCE.phone(main,extension,true,"phone");main=parsed.normalizedNumber();extension=nz(parsed.extension());}
   return r.kind+"|"+main+"|"+extension;
  }
  private static void rejectIntroducedDuplicate(Spec s,Row r,Row old,List<Row> current){if((s!=PHONE&&s!=EMAIL)||!valueChanged(s,r,old))return;String key=duplicateKey(s,validated(s,r,old));if(current.stream().anyMatch(other->!other.deleted&&other.id!=r.id&&duplicateKey(s,other).equals(key)))throw new IllegalArgumentException("Duplicate active contact value and extension for this kind.");}
@@ -99,7 +99,7 @@ final class OrganizationStructuredContactMutationDao {
   boolean newPrimary=r.primary&&(old==null||!old.primary)&&!(old!=null&&old.deleted&&old.restorablePrimary);
   List<String> values=old==null?r.values:old.values;
   if(changed||newPrimary){
-   if(s==PHONE){var v=ContactValues.INSTANCE.phone(r.values.getFirst(),r.values.get(2),true,"FAX".equals(r.kind)?"fax":"phone");if(changed)values=List.of(v.displayInput(),v.canonicalNumber(),nz(v.extension()));}
+   if(s==PHONE){var v=ContactValues.INSTANCE.phone(r.values.getFirst(),r.values.get(2),true,"FAX".equals(r.kind)?"fax":"phone");if(changed)values=List.of(v.displayInput(),v.normalizedNumber(),nz(v.extension()));}
    else {var v=ContactValues.INSTANCE.email(r.values.getFirst(),true,"email");if(changed)values=List.of(v.displayInput(),v.comparisonKey());}
   }
   return new Row(r.id,r.kind,values,r.primary,r.order,r.deleted,r.rowVer);
