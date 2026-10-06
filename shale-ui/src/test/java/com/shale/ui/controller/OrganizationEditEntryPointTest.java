@@ -150,7 +150,7 @@ final class OrganizationEditEntryPointTest {
         appender.start();
         logger.addAppender(appender);
         try {
-            RuntimeException failure = new IllegalStateException("persistence unavailable");
+            RuntimeException failure = new IllegalStateException("phone 3035550123 email private@example.test",new java.sql.SQLException("private@example.test"));
 
             EditOrganizationDialog.logPersistenceFailure(7,42,19,failure);
 
@@ -162,9 +162,10 @@ final class OrganizationEditEntryPointTest {
             assertTrue(message.contains("tenantId=7")&&message.contains("actorId=42")&&message.contains("organizationId=19"));
             assertTrue(message.contains("exceptionClass=java.lang.IllegalStateException"));
             assertNotNull(event.getThrowableProxy(),"the logging API must retain the failure stack trace");
-            assertEquals(failure.getClass().getName(),event.getThrowableProxy().getClassName());
-            assertEquals(failure.getMessage(),event.getThrowableProxy().getMessage(),
-                    "the attached stack trace must belong to the injected persistence failure");
+            assertEquals(failure.getClass().getName(),event.getThrowableProxy().getMessage());
+            assertEquals(failure.getStackTrace()[0],event.getThrowableProxy().getStackTraceElementProxyArray()[0].getStackTraceElement(),"original diagnostic frames must remain available");
+            assertEquals(java.sql.SQLException.class.getName(),event.getThrowableProxy().getCause().getMessage());
+            assertFalse(event.getThrowableProxy().getMessage().contains("private@example.test"));
             for(String sensitive:new String[]{"phone","email","notes","rowver","sql","password","credential"})
                 assertFalse(message.toLowerCase(java.util.Locale.ROOT).contains(sensitive),"structured values and persistence secrets must not enter log metadata: "+sensitive);
         } finally {
@@ -219,7 +220,7 @@ final class OrganizationEditEntryPointTest {
                 "the legacy compatibility-only single Organization Type field must not be rendered beside chips");
         assertTrue(controller.contains("Comparator.comparing(OrganizationServicePort.AssignedOrganizationType::primary).reversed()")
                         && controller.contains("new ClassificationChipGroup.Chip")
-                        && controller.contains("p.fax()?null:\"Call\"")
+                        && controller.contains("p.fax()||!ContactValues.INSTANCE.usablePhone(p.displayNumber(),p.extension())?null:\"Call\"")
                         && controller.contains("validEmail(e.emailAddress())?\"Email\":null")
                         && controller.contains("value.isBlank()?null:\"Open in Maps\"")
                         && controller.contains("safeWebsite(w.website())?\"Open Website\":null"),

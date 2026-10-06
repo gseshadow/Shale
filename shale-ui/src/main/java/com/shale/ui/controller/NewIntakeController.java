@@ -1119,7 +1119,7 @@ public final class NewIntakeController {
 			System.out.println("[NewIntakeController] fresh connectivity check result=" + result);
 			return result;
 		} catch (RuntimeException ex) {
-			System.err.println("[NewIntakeController] fresh connectivity check failed: " + ex.getMessage());
+			System.err.println("[NewIntakeController] fresh connectivity check failed: " + ex.getClass().getName());
 			return Optional.empty();
 		}
 	}
@@ -1191,7 +1191,7 @@ public final class NewIntakeController {
 				deleteDraftFile(draftPath);
 			}
 		} catch (RuntimeException ex) {
-			System.err.println("[NewIntakeController] draft restore prompt failed: " + ex.getMessage());
+			System.err.println("[NewIntakeController] draft restore prompt failed: " + ex.getClass().getName());
 		}
 	}
 
@@ -1204,7 +1204,7 @@ public final class NewIntakeController {
 			showSuccess("Local backup saved. You can restore it next time New Intake is opened.");
 			System.out.println("[NewIntakeController] local draft saved path=" + draftPath);
 		} catch (Exception ex) {
-			System.err.println("[NewIntakeController] local draft save failed: " + ex.getMessage());
+			System.err.println("[NewIntakeController] local draft save failed: " + ex.getClass().getName());
 			System.err.println("Intake operation failed; exceptionClass="+ex.getClass().getName());
 			showValidation("Unable to save a local backup right now. Your form is still open. Use Copy Intake Text to keep an emergency copy.");
 			copyIntakeTextToClipboard();
@@ -1223,7 +1223,7 @@ public final class NewIntakeController {
 			showSuccess("Local draft restored.");
 			System.out.println("[NewIntakeController] local draft restored path=" + draftPath);
 		} catch (Exception ex) {
-			System.err.println("[NewIntakeController] local draft restore failed: " + ex.getMessage());
+			System.err.println("[NewIntakeController] local draft restore failed: " + ex.getClass().getName());
 			showValidation("Unable to restore the local draft.");
 		}
 	}
@@ -1319,7 +1319,7 @@ public final class NewIntakeController {
 			Clipboard.getSystemClipboard().setContent(content);
 			showSuccess("Intake text copied to the clipboard.");
 		} catch (Exception ex) {
-			System.err.println("[NewIntakeController] copy intake text failed: " + ex.getMessage());
+			System.err.println("[NewIntakeController] copy intake text failed: " + ex.getClass().getName());
 			System.err.println("Intake operation failed; exceptionClass="+ex.getClass().getName());
 			showValidation("Unable to copy intake text automatically. Your form is still open; please keep editing or copy fields manually.");
 		}
@@ -1342,7 +1342,7 @@ public final class NewIntakeController {
 	}
 
 	private void logCreateFailure(int tenantId, RuntimeException ex) {
-		System.err.println("[NewIntakeController] DAO create failed " + saveContext(tenantId) + " connectivity=" + isConnectivityFailure(ex) + " error=" + ex.getMessage());
+		System.err.println("[NewIntakeController] DAO create failed " + saveContext(tenantId) + " connectivity=" + isConnectivityFailure(ex) + " error=" + ex.getClass().getName());
 		System.err.println("Intake operation failed; exceptionClass="+ex.getClass().getName());
 	}
 
@@ -1365,7 +1365,7 @@ public final class NewIntakeController {
 		try {
 			deleteDraftFile(resolveDraftPath());
 		} catch (RuntimeException ex) {
-			System.err.println("[NewIntakeController] local draft delete failed: " + ex.getMessage());
+			System.err.println("[NewIntakeController] local draft delete failed: " + ex.getClass().getName());
 		}
 	}
 
@@ -1374,7 +1374,7 @@ public final class NewIntakeController {
 		try {
 			Files.deleteIfExists(draftPath);
 		} catch (Exception ex) {
-			System.err.println("[NewIntakeController] local draft delete failed path=" + draftPath + " error=" + ex.getMessage());
+			System.err.println("[NewIntakeController] local draft delete failed path=" + draftPath + " error=" + ex.getClass().getName());
 		}
 	}
 

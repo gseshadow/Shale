@@ -476,7 +476,7 @@ public final class ContactViewController {
     private static void logAggregateSaveFailure(ContactServicePort.UpdateContactProfileCommand command,RuntimeException failure){
         LOG.log(Level.WARNING,String.format(Locale.ROOT,
                 "operation=contact.aggregate-save tenantId=%d contactId=%d actorId=%d exceptionClass=%s",
-                command.shaleClientId(),command.contactId(),command.actorUserId(),failure.getClass().getName()));
+                command.shaleClientId(),command.contactId(),command.actorUserId(),failure.getClass().getName()),com.shale.ui.util.SafeDiagnostics.forLogging(failure));
     }
     private static VBox formField(String label,Node field){Label caption=new Label(label);caption.setLabelFor(field);caption.getStyleClass().add("contact-editor-field-label");VBox box=new VBox(4,caption,field);box.setFillWidth(true);GridPane.setHgrow(box,Priority.ALWAYS);return box;}
     private static ScrollPane sectionScroll(Node node){ScrollPane scroll=new ScrollPane(node);scroll.setFitToWidth(true);scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);scroll.getStyleClass().addAll("contact-editor-section-scroll","entity-editor-scroll");return scroll;}

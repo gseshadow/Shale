@@ -164,7 +164,8 @@ visibility separately for an all-tenant audit. Never bypass RLS by guessing a te
 Run the pinned shared parser offline against display input and extension. Report aggregate counts by
 field, reason code, active/deleted/primary, missing availability provenance, mirror mismatch and
 canonical mismatch; supply restricted row IDs/tokens for review, not raw values in logs, live events,
-PRs or audit metadata. Valid structure is not contactability. Preserve the export securely and delete
+PRs or audit metadata. Save diagnostics retain exception classes/frames through a sanitized
+throwable rather than logging JDBC/serializer messages. Valid structure is not contactability. Preserve the export securely and delete
 it under the organization's approved retention process. No audit query/export was executed here.
 
 A reviewer can confirm a correction, remove an optional point, record unavailable intake information
@@ -201,7 +202,13 @@ trusted primary history, adapter, URI and API/auth tests passed. The repository 
 suite, default critical reactor, browser TypeScript and static FXML/CSS checks were run. See the PR
 validation record for final counts/results after the last edits. `git diff --check` is required before
 commit. These checks use local JVMs and recording/proxy JDBC tests; they establish no live SQL Server,
-Windows visual or production-data verification.
+Windows visual or production-data verification. Organization entry point and logging tests also ran
+under a temporary Linux Xvfb display; that establishes no Windows or manual visual acceptance.
+The final affected-suite run with that display reaches an existing `SettingsFxmlLoadTest` error
+(`settingsScroll` is null), reproduced with the same display in the clean merged-base worktree.
+That run stops before server tests; focused server/API tests run separately. The earlier headless
+affected run passed before the logging follow-up added Organization entry point tests to selection.
+Do not describe the final affected suite as fully passing.
 
 The informational `-Pall-tests` run exposed historical failures. A clean worktree at merged base
 `772b77c3ddb35546305669a379c0a35e48d3ba48` reproduces 12 of them: AdministrativeReadAuditMigrationContractTest,
