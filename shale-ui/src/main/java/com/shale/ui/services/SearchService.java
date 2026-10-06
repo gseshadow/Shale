@@ -85,6 +85,108 @@ public final class SearchService {
 		return new SearchResults(searchQuery.rawQuery(), cases, deletedCases, caseCardDates, contacts, organizations, users, tasks, calendarEvents, failures);
 	}
 
+    public enum SuggestionType {
+        CASE("Cases"), CONTACT("Contacts"), ORGANIZATION("Organizations"), USER("Users"),
+        TASK("Tasks"), CALENDAR_EVENT("Calendar Events"), DELETED_CASE("Deleted Cases");
+        private final String label;
+        SuggestionType(String label) { this.label = label; }
+        public String label() { return label; }
+    }
+
+    public record Suggestion(SuggestionType type, long id, String name, String detail, int matchRank) { }
+    public record Suggestions(List<Suggestion> rows, boolean failed) {
+        public Suggestions { rows = List.copyOf(rows); }
+    }
+    public static final int SUGGESTIONS_PER_CATEGORY = 3;
+    public static final int SUGGESTIONS_TOTAL = 18;
+
+    /** Each provider ranks before bounding in SQL. No full-results/card-date hydration. */
+    public Suggestions suggest(int tenant, String query, boolean includeDeleted,
+            java.util.function.BooleanSupplier current) {
+        if (query == null || query.isBlank()) return new Suggestions(List.of(), false);
+        var bounds = new com.shale.data.dao.SuggestionBounds(SUGGESTIONS_PER_CATEGORY);
+        var rows = new java.util.ArrayList<Suggestion>();
+        boolean failed = false;
+        for (SuggestionType type : SuggestionType.values()) {
+            if (!current.getAsBoolean()) break;
+            if (type == SuggestionType.DELETED_CASE && !includeDeleted) continue;
+            try { rows.addAll(loadSuggestions(type, tenant, query, bounds)); }
+            catch (RuntimeException ex) {
+                // Never log query text, identifying values, or provider exception payloads.
+                LOG.warn("Search suggestions unavailable provider={} failureClass={}", type, ex.getClass().getSimpleName());
+                failed = true;
+            }
+        }
+        return new Suggestions(orderSuggestions(rows, SUGGESTIONS_PER_CATEGORY, SUGGESTIONS_TOTAL), failed);
+    }
+
+    /** Reload the selected ID through the same tenant/lifecycle predicates before routing. */
+    public boolean suggestionAvailable(int tenant, String query, Suggestion row, boolean includeDeleted) {
+        if (row.type() == SuggestionType.DELETED_CASE && !includeDeleted) return false;
+        return !loadSuggestions(row.type(), tenant, query,
+                new com.shale.data.dao.SuggestionBounds(1, row.id())).isEmpty();
+    }
+
+    private List<Suggestion> loadSuggestions(SuggestionType type, int tenant, String query,
+            com.shale.data.dao.SuggestionBounds bounds) {
+        return switch (type) {
+            case CASE -> caseSummaryDao.searchActiveByName(tenant, query, bounds).stream().map(row ->
+                suggestion(type, row.summary().caseId(), row.summary().caseName(),
+                    details(row.summary().caseNumber(), row.summary().responsibleAttorneyName()), query,
+                    List.of(safeText(row.summary().caseName())), List.of())).toList();
+            case DELETED_CASE -> caseSummaryDao.searchDeletedByName(tenant, query, bounds).stream().map(row ->
+                suggestion(type, row.summary().caseId(), row.summary().caseName(),
+                    details("Deleted", row.summary().caseNumber()), query,
+                    List.of(safeText(row.summary().caseName())), List.of())).toList();
+            case CONTACT -> contactDao.searchContacts(tenant, query, bounds).stream().map(this::credentialAware).map(row ->
+                suggestion(type, row.id(), row.displayName(), details(row.email(), row.phone()), query,
+                    List.of(safeText(preferCombinedName(row.firstName(), row.lastName(), row.displayName())),
+                        safeText(row.displayName()), safeText(row.firstName()), safeText(row.lastName()), safeText(row.email())),
+                    List.of(safeText(row.phone())))).toList();
+            case ORGANIZATION -> organizationDao.searchOrganizations(query, bounds).stream().map(row ->
+                suggestion(type, row.getId(), row.getName(), details(row.getCity(), row.getEmail()), query,
+                    List.of(safeText(row.getName()), safeText(row.getEmail())),
+                    List.of(safeText(row.getPhone()), safeText(row.getFax())))).toList();
+            case USER -> userDao.searchUsers(tenant, query, bounds).stream().map(row ->
+                suggestion(type, row.id(), row.displayName(), safeText(row.email()), query,
+                    List.of(safeText(row.displayName()), safeText(row.firstName()), safeText(row.lastName()), safeText(row.email())),
+                    List.of(safeText(row.phone())))).toList();
+            case TASK -> taskDao.searchTasks(tenant, query, bounds).stream().map(row ->
+                suggestion(type, row.taskId(), row.title(), details(row.caseName(), row.statusName()), query,
+                    List.of(safeText(row.title()), safeText(row.description())), List.of())).toList();
+            case CALENDAR_EVENT -> calendarEventDao.searchCalendarEvents(tenant, query, bounds).stream().map(row ->
+                suggestion(type, row.calendarEventId(), row.title(), details(row.caseName(), String.valueOf(row.startsAt())), query,
+                    List.of(safeText(row.title()), safeText(row.description()), safeText(row.caseName())), List.of())).toList();
+        };
+    }
+
+    static Suggestion suggestion(SuggestionType type, long id, String name, String detail, String query,
+            List<String> texts, List<String> phones) {
+        return new Suggestion(type, id, safeText(name), details(detail, "#" + id), matchRank(query, texts, phones));
+    }
+
+    static int matchRank(String query, List<String> texts, List<String> phones) {
+        String normalized = normalizeText(query), digits = normalizePhoneDigits(query);
+        if (texts.stream().anyMatch(value -> normalizeText(value).equals(normalized))
+                || (!digits.isBlank() && phones.stream().anyMatch(value -> normalizePhoneDigits(value).equals(digits)))) return 0;
+        if (texts.stream().anyMatch(value -> normalizeText(value).startsWith(normalized))
+                || (!digits.isBlank() && phones.stream().anyMatch(value -> normalizePhoneDigits(value).startsWith(digits)))) return 1;
+        return 2;
+    }
+
+    static List<Suggestion> orderSuggestions(List<Suggestion> rows, int perCategory, int total) {
+        var counts = new java.util.EnumMap<SuggestionType, Integer>(SuggestionType.class);
+        return rows.stream().sorted(Comparator.comparing(Suggestion::type).thenComparingInt(Suggestion::matchRank)
+            .thenComparing(Suggestion::name, String.CASE_INSENSITIVE_ORDER).thenComparingLong(Suggestion::id))
+            .filter(row -> counts.merge(row.type(), 1, Integer::sum) <= perCategory).limit(total).toList();
+    }
+
+    private static String safeText(String text) { return text == null ? "" : text.trim(); }
+    private static String details(String... values) {
+        return java.util.Arrays.stream(values).map(SearchService::safeText).filter(v -> !v.isBlank())
+            .collect(java.util.stream.Collectors.joining(" · "));
+    }
+
 	private static <K,V> Map<K,V> providerMap(String provider, List<ProviderFailure> failures, java.util.function.Supplier<Map<K,V>> loader) {
 		try { return Map.copyOf(loader.get()); }
 		catch (RuntimeException ex) { failures.add(new ProviderFailure(provider, ex.getClass().getName(), ex.getMessage())); return Map.of(); }

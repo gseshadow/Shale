@@ -167,6 +167,10 @@ public final class OrganizationDao {
 	}
 
 	public List<Organization> searchOrganizations(String query) {
+		return searchOrganizations(query, null);
+	}
+
+	public List<Organization> searchOrganizations(String query, SuggestionBounds bounds) {
 		String normalizedSearch = normalizeSearch(query);
 		if (normalizedSearch.isBlank()) {
 			return List.of();
@@ -209,7 +213,7 @@ public final class OrganizationDao {
 				""".formatted(ORGANIZATIONS_TABLE, ORGANIZATION_TYPES_TABLE, phoneDigitsExpression("o.Phone"), phoneDigitsExpression("o.Fax"));
 
 		try (Connection con = db.requireConnection();
-				PreparedStatement ps = con.prepareStatement(sql)) {
+				PreparedStatement ps = con.prepareStatement(bounds == null ? sql : bounds.sql(sql, "Name", "Id", List.of("Name", "Email"), List.of("Phone", "Fax")))) {
 			String likeValue = containsPattern(normalizedSearch.toLowerCase(java.util.Locale.ROOT));
 			String phoneLikeValue = containsPattern(phoneDigits);
 			ps.setInt(1, requireCurrentShaleClientId(con));
@@ -219,6 +223,7 @@ public final class OrganizationDao {
 			ps.setString(5, phoneLikeValue);
 			ps.setString(6, phoneDigits);
 			ps.setString(7, phoneLikeValue);
+			if (bounds != null) bounds.bind(ps, 8, query, List.of("Name", "Email"), List.of("Phone", "Fax"));
 			try (ResultSet rs = ps.executeQuery()) {
 				List<Organization> out = new ArrayList<>();
 				while (rs.next()) {

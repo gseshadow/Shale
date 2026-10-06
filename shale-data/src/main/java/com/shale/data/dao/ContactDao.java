@@ -249,6 +249,10 @@ public final class ContactDao {
     }
 
     public List<DirectoryContactRow> searchContacts(int shaleClientId, String query) {
+        return searchContacts(shaleClientId, query, null);
+    }
+
+    public List<DirectoryContactRow> searchContacts(int shaleClientId, String query, SuggestionBounds bounds) {
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
         }
@@ -286,8 +290,9 @@ public final class ContactDao {
                     activeFilter(schema.deletedColumn(), "c"),
                     globalSearchClause(schema, "c"));
 
-            try (PreparedStatement ps = con.prepareStatement(sql)) {
-                bindGlobalSearchQuery(ps, 1, shaleClientId, schema, query);
+            try (PreparedStatement ps = con.prepareStatement(bounds == null ? sql : bounds.sql(sql, "DisplayName", "Id", List.of("DisplayName", "FirstName", "LastName", "Email"), List.of("Phone")))) {
+                int nextParameter = bindGlobalSearchQuery(ps, 1, shaleClientId, schema, query);
+                if (bounds != null) bounds.bind(ps, nextParameter, query, List.of("DisplayName", "FirstName", "LastName", "Email"), List.of("Phone"));
                 List<DirectoryContactRow> selected = new ArrayList<>();
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {

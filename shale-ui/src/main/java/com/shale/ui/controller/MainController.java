@@ -116,6 +116,17 @@ public final class MainController {
 	private ApplicationUpdatePolicyCoordinator.Presentation shownUpdatePolicy;
 	private String dismissedRecommendedKey;
 	private boolean updaterPackageAvailable;
+    private com.shale.ui.component.UniversalSearchPopup searchPopup;
+
+    private void configureSearchPopup() {
+        if (searchPopup == null && globalSearchField != null && sceneManager != null)
+            searchPopup = sceneManager.createUniversalSearchPopup(globalSearchField);
+    }
+
+    public void dismissSearchPopup() { if (searchPopup != null) searchPopup.dismiss(); }
+    public void disposeSearchPopup() {
+        if (searchPopup != null) { searchPopup.close(); searchPopup = null; }
+    }
 
 	public MainController() {
 		System.out.println("MainController()");// TODO remove
@@ -131,6 +142,7 @@ public final class MainController {
 		this.appState = appState;
 		this.runtimeBridge = runtimeBridge;
 		this.notificationCenterService = notificationCenterService;
+        configureSearchPopup();
 		refreshSessionLabel();
 		bindNotificationShell();
 	}
@@ -140,6 +152,7 @@ public final class MainController {
 		System.out.println("MainController.initialize()");// TODO remove
 		styleNavigationButtons();
 		styleShellControls();
+        configureSearchPopup();
 		highlightNav(navMyShaleButton);
 
 		if (globalSearchField != null) {
@@ -162,6 +175,7 @@ public final class MainController {
 
 	@FXML
 	private void onGlobalSearch() {
+        if (searchPopup != null) { searchPopup.submitFullSearch(); return; }
 		String query = globalSearchField == null || globalSearchField.getText() == null
 				? ""
 				: globalSearchField.getText().trim();
