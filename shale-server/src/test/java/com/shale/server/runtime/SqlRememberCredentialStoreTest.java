@@ -45,6 +45,40 @@ class SqlRememberCredentialStoreTest {
         assertEquals(Timestamp.from(expiry),bindings.get(6));
     }
 
+    @Test void restoreIdentityLookupUsesOnlyTheNarrowAuthModuleBeforeOpeningRuntimeContext() {
+        UUID session=UUID.randomUUID(),installation=UUID.randomUUID();
+        var next=new java.util.concurrent.atomic.AtomicBoolean(true);
+        ResultSet rows=(ResultSet)Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{ResultSet.class},
+                (proxy,method,args)->switch(method.getName()){
+                    case "next" -> next.getAndSet(false);
+                    case "getInt" -> ((Integer)args[0])==1?7:9;
+                    case "getString" -> ((Integer)args[0])==3?session.toString():"owner@test";
+                    case "close" -> null;
+                    default -> defaultValue(method.getReturnType());
+                });
+        CallableStatement call=(CallableStatement)Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{CallableStatement.class},
+                (proxy,method,args)->method.getName().equals("executeQuery")?rows:defaultValue(method.getReturnType()));
+        var calledSql=new AtomicReference<String>();
+        Connection authConnection=(Connection)Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{Connection.class},
+                (proxy,method,args)->{
+                    if(method.getName().equals("prepareCall")){calledSql.set((String)args[0]);return call;}
+                    if(method.getName().equals("prepareStatement"))throw new AssertionError("auth lookup must not read credential tables directly");
+                    return defaultValue(method.getReturnType());
+                });
+        DataSource auth=(DataSource)Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{DataSource.class},
+                (proxy,method,args)->method.getName().equals("getConnection")?authConnection:defaultValue(method.getReturnType()));
+        var runtimePrincipal=new AtomicReference<ServerPrincipal>();
+        RuntimeConnectionProvider runtime=principal->{runtimePrincipal.set(principal);throw new SQLException("stop after principal derivation");};
+        var store=new SqlRememberCredentialStore(auth,runtime);
+
+        var failure=assertThrows(IllegalStateException.class,()->store.rotate(new byte[32],installation,new byte[32],UUID.randomUUID(),Instant.now()));
+
+        assertEquals("Failed to rotate remembered sign-in",failure.getMessage());
+        assertEquals("{call dbo.ResolveDesktopRememberCredential(?,?,?)}",calledSql.get(),"shale_app must execute only the narrow resolver module");
+        assertEquals(7,runtimePrincipal.get().shaleClientId());assertEquals(9,runtimePrincipal.get().userId());
+        assertEquals("owner@test",runtimePrincipal.get().email());
+    }
+
     private static Object defaultValue(Class<?> type){
         if(!type.isPrimitive())return null;
         if(type==boolean.class)return false;if(type==byte.class)return (byte)0;if(type==short.class)return (short)0;

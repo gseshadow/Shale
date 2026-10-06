@@ -5,6 +5,47 @@ release/session initiative remains in progress and logged-out updates remain `UN
 
 **Last reviewed:** 2026-10-06
 
+## Remembered-restore permission correction — 2026-10-06
+
+Production acceptance now confirms four important lifecycle steps: remembered issuance succeeds, Windows DPAPI save
+succeeds, a later launch finds and decrypts the protected credential, and ordinary close preserves it. Automatic
+restore remains blocked: the restore endpoint returns HTTP 500 and the sanitized server trace identifies
+`SqlRememberCredentialStore.lookup` with SQL state `S0005` and vendor error 229. Error 229 establishes permission
+denial under the pre-authentication database principal; it does not justify changing RLS or broadening a database
+role.
+
+`lookup` is the only pre-authentication database operation. It uses `DataSources.auth()`, therefore
+`SHALE_APP_DB_USER` (`shale_app` in the documented deployment), and its former inline query referenced
+`dbo.DesktopRememberCredentials` and `dbo.Users`. Successful password authentication already proves this principal
+can read the required active `Users` fields. The new table was added without a matching authentication-principal
+permission, so the evidence-supported missing boundary is credential lookup—not the later tenant-scoped rotation.
+
+The correction does not grant `shale_app` base-table `SELECT`. A new dbo-owned
+`ResolveDesktopRememberCredential` procedure accepts only the 32-byte hash, installation UUID, and current time and
+returns only the candidate tenant, user, session, and email after active/expiry checks. Same-owner module chaining
+allows this deliberately narrow lookup without exposing all stored credential hashes to the authentication principal;
+`shale_app` receives only `EXECUTE` on that procedure. The Java store calls the procedure, treats its result only as
+a candidate, and still opens a principal-scoped runtime connection for authoritative serializable revalidation.
+
+The full transaction boundary is also explicit. `shale_runtime` receives only object-level SELECT/INSERT/UPDATE/DELETE
+on `DesktopRememberCredentials`; its existing `Users` SELECT and `UserSessions` SELECT/UPDATE remain required and are
+verified. Rotation still requires initialized `ShaleClientId` and `PrincipalUserId` session context, strict
+`UserSessions` RLS, explicit tenant/user/session predicates, active user, unrevoked/unexpired session, unconsumed
+credential, matching installation, and matching hash. No `db_owner`, `db_datareader`, `db_datawriter`, database-wide
+permission, RLS disablement, raw credential access, or credential/hash output is introduced.
+
+Apply `docs/sql/2026-10-06_desktop_remember_credentials_permissions.sql` with the approved migration principal, then
+run `docs/sql/verification/2026-10-06_desktop_remember_credentials_permissions_verification.sql` once as the actual
+`shale_app` principal and once as the actual `shale_runtime` principal. A dbo-only run is not acceptance. This fix
+requires both SQL and a server deployment because the server changes from inline base-table lookup to procedure
+execution; no desktop rebuild is required for this permission correction. Deploy SQL first, then the rebuilt server,
+then rerun automatic restore. Until that succeeds, automatic restore remains **BLOCKED BY ERROR 229 / PENDING
+RETEST**, while issuance, protected save/read, and ordinary-close preservation remain user-observed successes.
+
+Audit compatibility is unchanged. Credential lookup/rotation is authentication security plumbing inside the existing
+durable-session relationship, not a domain mutation or sensitive business-data view. No audit payload may contain a
+credential or hash, and no new audit event/schema is appropriate.
+
 ## Remembered-enrollment SQL and diagnostic correction — 2026-10-06
 
 Production evidence now locates the remembered-enrollment HTTP 500 at `SqlRememberCredentialStore.create`, wrapped
@@ -1316,7 +1357,7 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
 | 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
-| 7C | **COMPLETE; SQL FIX DEPLOYMENT/ACCEPTANCE OPEN** | Production evidence localized remembered enrollment to `SqlRememberCredentialStore.create` with `SQLServerException`. The auth/runtime connection mismatch and broken sanitized cause construction are corrected; SQL state/vendor-code diagnostics, read-only schema/permission verification, and desktop failure classification are added. Run verification as dbo plus both API principals, deploy server and desktop, and rerun checked-login/restart acceptance. A clean installed production launch with no API override is **NOT RUN**, and intermittent `REQUEST_TIMEOUT` remains open. |
+| 7C | **COMPLETE; RESTORE BLOCKED BY ERROR 229 / PENDING RETEST** | User-observed acceptance confirms remembered issuance, DPAPI save/read, and ordinary-close preservation. Automatic restore reaches the server but `shale_app` is denied in pre-auth lookup. The narrow resolver-module permission migration and matching server call are implemented; apply SQL, verify as actual `shale_app` and `shale_runtime`, redeploy the server, and rerun restore. No desktop rebuild is required for this correction. A clean installed production launch with no API override is **NOT RUN**, and intermittent `REQUEST_TIMEOUT` remains open. |
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
 | 8B | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms remote administrative revocation is detected in approximately one minute by polling and locks the application before the session-ended popup is dismissed; OK transitions to sign-in. Push remains acceleration, not authority. |
 | 9 | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms Settings > Personal > My Sessions works for ordinary users and administrators, shows only the authenticated user's sessions, marks the current session, and current-session self-revocation locks the app and returns to sign-in. |

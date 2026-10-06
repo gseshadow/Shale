@@ -67,8 +67,8 @@ public final class SqlRememberCredentialStore implements RememberCredentialStore
     }
 
     private Optional<Lookup> lookup(byte[] hash,UUID installation,Instant now){
-        try(Connection c=identityLookup.getConnection();PreparedStatement q=c.prepareStatement(
-                "SELECT r.ShaleClientId,r.UserId,r.SessionId,u.Email FROM dbo.DesktopRememberCredentials r JOIN dbo.Users u ON u.Id=r.UserId AND u.ShaleClientId=r.ShaleClientId WHERE r.CredentialHash=? AND r.InstallationId=? AND r.ConsumedAt IS NULL AND r.AbsoluteExpiresAt>? AND COALESCE(u.is_deleted,0)=0 AND COALESCE(u.IsRemoved,0)=0")){
+        try(Connection c=identityLookup.getConnection();CallableStatement q=c.prepareCall(
+                "{call dbo.ResolveDesktopRememberCredential(?,?,?)}")){
             q.setBytes(1,hash);q.setObject(2,installation);q.setTimestamp(3,Timestamp.from(now));
             try(ResultSet rs=q.executeQuery()){
                 if(!rs.next())return Optional.empty();

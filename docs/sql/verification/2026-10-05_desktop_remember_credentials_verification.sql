@@ -1,7 +1,7 @@
 /*
  Read-only remembered-sign-in verification. Run three times:
    1. as dbo (or a metadata-review principal) to inspect the complete schema and constraints;
-   2. using the API SHALE_APP_DB_USER credentials for the identity-lookup rows;
+   2. using the API SHALE_APP_DB_USER credentials for the narrow identity-lookup module;
    3. using the API SHALE_RT_DB_USER credentials for tenant-scoped create/rotate/delete rows.
  The matching non-dbo run is authoritative for each EffectivePermission; dbo is not permission evidence.
 */
@@ -68,7 +68,7 @@ SELECT required.RequiredPool,
        required.PermissionName,
        HAS_PERMS_BY_NAME(required.ObjectName,N'OBJECT',required.PermissionName) AS EffectivePermission
 FROM (VALUES
- (N'SHALE_APP_DB_USER',N'dbo.DesktopRememberCredentials',N'SELECT'),
+ (N'SHALE_APP_DB_USER',N'dbo.ResolveDesktopRememberCredential',N'EXECUTE'),
  (N'SHALE_APP_DB_USER',N'dbo.Users',N'SELECT'),
  (N'SHALE_RT_DB_USER',N'dbo.DesktopRememberCredentials',N'SELECT'),
  (N'SHALE_RT_DB_USER',N'dbo.DesktopRememberCredentials',N'INSERT'),
