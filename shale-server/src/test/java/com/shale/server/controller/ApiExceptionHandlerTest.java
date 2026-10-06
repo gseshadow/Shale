@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Set;
 
@@ -61,6 +62,41 @@ class ApiExceptionHandlerTest {
         assertSanitizedBadRequest(response.getStatusCode(), response.getBody().status(), response.getBody().message(),
                 response.getBody().path(), request.getRequestURI(), "sensitive argument diagnostic");
         assertDiagnosticLog(exception, request.getRequestURI());
+    }
+
+    @Test
+    void unexpectedFailureLogsSanitizedStackAndCauseChainWhileKeepingClientResponseGeneric() {
+        var request = new MockHttpServletRequest("POST", "/api/auth/desktop-session");
+        var cause = new java.sql.SQLException("password=hunter2 token=secret rememberedCredential=opaque body={secret}");
+        var exception = new IllegalStateException("request body and response body are sensitive", cause);
+        var originalStack = new StackTraceElement("com.shale.server.runtime.SqlRememberCredentialStore", "create",
+                "SqlRememberCredentialStore.java", 14);
+        exception.setStackTrace(new StackTraceElement[] { originalStack });
+
+        var response = handler.handleUnexpected(exception, request);
+
+        assertNotNull(response.getBody(), "The error response must include its generic body");
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode(), "Unexpected failures must be HTTP 500");
+        assertEquals("Internal server error.", response.getBody().message(), "Internal diagnostics must not reach clients");
+        assertFalse(response.getBody().message().contains("sensitive"), "The client response must omit exception details");
+        assertEquals(1, appender.list.size(), "The failure should produce exactly one server diagnostic");
+        var event = appender.list.getFirst();
+        assertEquals(ch.qos.logback.classic.Level.ERROR, event.getLevel(), "Unexpected failures must be logged at ERROR");
+        assertEquals("Unexpected server exception exceptionClass=java.lang.IllegalStateException "
+                        + "causeClasses=java.lang.IllegalStateException -> java.sql.SQLException.",
+                event.getFormattedMessage(), "The safe diagnostic must identify the failure and full cause types");
+        assertNotNull(event.getThrowableProxy(), "The safe diagnostic must contain a stack trace");
+        assertEquals(originalStack, event.getThrowableProxy().getStackTraceElementProxyArray()[0].getStackTraceElement(),
+                "The diagnostic must preserve the original failure location");
+        assertNotNull(event.getThrowableProxy().getCause(), "The diagnostic must retain the cause chain");
+        assertTrue(event.getThrowableProxy().getCause().getMessage().contains("java.sql.SQLException"),
+                "The sanitized cause must retain its exception type");
+        String diagnostic = event.getFormattedMessage() + event.getThrowableProxy().getMessage()
+                + event.getThrowableProxy().getCause().getMessage();
+        assertFalse(diagnostic.contains("hunter2"), "Passwords must not be logged");
+        assertFalse(diagnostic.contains("token=secret"), "Tokens must not be logged");
+        assertFalse(diagnostic.contains("rememberedCredential=opaque"), "Remembered credentials must not be logged");
+        assertFalse(diagnostic.contains("body={secret}"), "Request or response bodies must not be logged");
     }
 
     private static void assertSanitizedBadRequest(

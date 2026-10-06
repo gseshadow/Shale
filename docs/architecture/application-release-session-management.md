@@ -5,6 +5,42 @@ release/session initiative remains in progress and logged-out updates remain `UN
 
 **Last reviewed:** 2026-10-06
 
+## Server-side HTTP 500 diagnostics for desktop enrollment — 2026-10-06
+
+`ApiExceptionHandler` now records unexpected failures at ERROR with the full exception class, cause-class chain,
+and the original stack frames for the exception, causes, and suppressed failures. It deliberately
+reconstructs a diagnostic throwable without copying any exception message. This preserves actionable server-side
+failure locations and cause types while preventing a framework, JDBC driver, or future adapter message from echoing
+a password, bearer/token, remembered credential, or request/response body into Azure logs. It does not log query
+strings, headers, parameters, DTOs, bodies, principals, tenant/user/session identifiers, or credential values. The
+HTTP response remains the generic 500 `Internal server error.` contract.
+
+Code inspection identifies several plausible failure boundaries, but the observed `IllegalStateException` class alone
+does not select among them:
+
+* application-instance attachment opens a principal-scoped runtime connection and explicitly wraps an
+  `SQLException` as `IllegalStateException`; connectivity, pool, login, or session-context initialization failure at
+  that boundary is therefore possible;
+* durable desktop issuance calls `UserSessionDao.create`, whose explicit wrapper represents SQL failure while
+  owner/instance validation can separately fail with `SecurityException`; likely SQL-side categories include an
+  absent/out-of-date `UserSessions` deployment, database permissions/RLS/session context, connectivity, or an insert
+  constraint, but the new sanitized cause type and stack location—not the wrapper class—must distinguish the path;
+* remembered issuance next calls `SqlRememberCredentialStore.create`, whose explicit wrapper represents an
+  `SQLException`; the especially relevant deployment possibilities are an unapplied
+  `DesktopRememberCredentials` migration, insufficient table permission, referential/unique constraint failure, or
+  database connectivity; and
+* if remembered-row creation fails, issuance attempts to revoke the just-created durable session before rethrowing.
+  A revoke failure can replace the original store failure, so its stack/cause location must also be considered. The
+  only other explicit issuance-path `IllegalStateException` is the impossible-on-supported-Java SHA-256 algorithm
+  lookup guard; no evidence currently points to it.
+
+These are evidence-based candidate boundaries, not a diagnosis of the production incident. After deploying this
+server build, reproduce one checked desktop enrollment and use the logged top frame plus cause classes to identify
+the failing boundary. Exception messages remain intentionally unavailable; if a cause class and code location are
+insufficient, add a bounded semantic category at that owning boundary rather than logging raw exception text or
+request state. This observability-only change introduces no domain/administrative mutation or sensitive read, uses
+no audit schema, and adds no audit event or database migration.
+
 ## Remembered sign-in ordinary-close diagnosis — 2026-10-06
 
 The reported unsuccessful restart did **not** prove that ordinary application closure logged out. The text
@@ -1253,7 +1289,7 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
 | 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
-| 7C | **COMPLETE; FOLLOW-UP ITEMS OPEN** | User-reported production acceptance confirms the Azure API starts, desktop enrollment returns HTTP 200, and the session surfaces work. A clean installed production launch with no API override is **NOT RUN**, and intermittent enrollment `REQUEST_TIMEOUT` remains open. |
+| 7C | **COMPLETE; DIAGNOSTIC FOLLOW-UP OPEN** | User-reported production acceptance previously confirmed enrollment, but a later remembered-enrollment HTTP 500 is not diagnosed. Privacy-safe server stack/cause diagnostics are implemented; deploy and reproduce to distinguish instance verification, durable-session SQL, remembered-credential SQL, or cleanup failure. A clean installed production launch with no API override is **NOT RUN**, and intermittent `REQUEST_TIMEOUT` remains open. |
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
 | 8B | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms remote administrative revocation is detected in approximately one minute by polling and locks the application before the session-ended popup is dismissed; OK transitions to sign-in. Push remains acceleration, not authority. |
 | 9 | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms Settings > Personal > My Sessions works for ordinary users and administrators, shows only the authenticated user's sessions, marks the current session, and current-session self-revocation locks the app and returns to sign-in. |
