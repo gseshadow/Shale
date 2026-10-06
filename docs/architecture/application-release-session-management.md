@@ -3,7 +3,52 @@
 **Status:** Desktop session enrollment, revocation enforcement, and My Sessions acceptance are closed; the wider
 release/session initiative remains in progress and logged-out updates remain `UNSUPPORTED`
 
-**Last reviewed:** 2026-10-05
+**Last reviewed:** 2026-10-06
+
+## Remembered sign-in ordinary-close diagnosis — 2026-10-06
+
+The reported unsuccessful restart did **not** prove that ordinary application closure logged out. The text
+`DesktopUiRuntimeBridge - Logout requested` was emitted by a shared teardown method for both logical logout and
+shutdown, even though the shutdown branch correctly called `DesktopSessionEnrollmentLifecycle.shutdown()`, which
+cleared only process memory and did not revoke the server session or delete protected state. That ambiguous message
+has been replaced by distinct ordinary-shutdown and explicit-logout diagnostics.
+
+The verified loss occurred earlier. A checked password login sent the remember flag through JDBC authentication and
+desktop enrollment, but a pre-remember server could still return HTTP 200 with an otherwise valid durable-session
+response and no `rememberCredential`. The desktop accepted that response, staged `null`, and its post-runtime commit
+silently did nothing. Consequently no DPAPI file existed on the next launch, `hasRememberedCredential()` returned
+false, and `LoginController.init()` correctly skipped asynchronous restore. The desktop now treats a checked login
+whose successful response lacks the credential as unsupported, tears down the partially initialized runtime, and
+shows an actionable instruction to deploy the matching server rather than entering the application under a false
+persistence promise. Safe diagnostics now distinguish the request, server credential presence, DPAPI save/read,
+restore attempt/result, deletion reason, explicit logout, and ordinary shutdown without logging secrets.
+
+The protected file remains `%LOCALAPPDATA%\Shale\credentials\remember.dpapi` and is independent of the Eclipse
+workspace. Its server binding uses the Phase 4A installation UUID under `%ProgramData%\Shale\machine-id`; both must
+remain accessible under the same Windows account across launches. Eclipse module-only launches can resolve old
+`com.shale` sibling artifacts from the local Maven repository. Rebuild and launch from the repository root:
+
+```powershell
+mvn clean install -DskipTests
+mvn -pl shale-desktop -am javafx:run
+```
+
+In Eclipse, run **Maven > Update Project…** for the parent and all Shale modules (enable **Force Update of
+Snapshots/Releases**), then launch the `shale-desktop` Maven configuration with goal `javafx:run`; do not launch from
+an independently imported desktop module with stale sibling JARs. Deploy the matching `shale-server` build after the
+SQL migration and before retesting the desktop. HTTP 200 alone is insufficient acceptance: the new safe diagnostic
+must report `serverRememberCredentialPresent=true` followed by `protected save outcome=SUCCESS`.
+
+Evidence is recorded accurately: the user reported that the SQL migration was applied and local `mvn test` passed;
+the Windows Eclipse/Maven login enrollment returned HTTP 200; ordinary closure produced the formerly ambiguous
+logout text; and the next launch showed the ordinary login form with no visible restore outcome. Restart acceptance
+therefore remains **FAILED / PENDING RERUN**. This run does not claim Windows/DPAPI acceptance from static or Linux
+checks.
+
+The correction's focused, selector-chosen, and critical Maven commands were attempted in the Codex environment but
+could not execute because Maven Central returned HTTP 403 while resolving Spring Boot's dependency BOM; the change
+is therefore not presented as newly Maven-verified. The earlier successful `mvn test` remains user-reported evidence,
+not evidence for this correction.
 
 ## Remembered desktop sign-in implementation — 2026-10-05
 
@@ -1225,6 +1270,7 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 13G | **COMPLETE — UNSUPPORTED** | Every Phase 13D blocker was reevaluated against 13E/13F. Discovery, public policy, version, and owner-path prerequisites are closed, but no credentialless owner principal or sufficiently protected privileged execution boundary is proven; no prototype or rollout was created. |
 | 14A | **COMPLETE** | Release-pipeline Git synchronization is fail-closed before publication: attached/upstream/clean/divergence preflight, exact release-file staging, commit/push recovery, retry behavior, and source-revision-consistent Mac handoff are documented and covered by temporary-repository tests. No domain or administrative runtime mutation exists, so the established audit schemas are not applicable. |
 | Login visual refresh | **IN PROGRESS; RUNTIME FLOW ACCEPTED** | The remaining tall-window stretch was traced to `-1.0`, which is JavaFX `USE_COMPUTED_SIZE`, not `USE_PREF_SIZE`; the content-sized groups now use the preferred-size sentinel inside a full-height centering viewport. The user reports local Maven tests pass and the application successfully launches, signs in, enrolls the durable session with HTTP 200, and logs out with HTTP 200. Rendered tall/short-window acceptance for this sizing correction remains **PENDING**. Persistent sessions remain **NOT STARTED** and bearer/password lifecycle is unchanged. |
+| Remembered desktop sign-in | **IN PROGRESS; RESTART ACCEPTANCE FAILED / PENDING RERUN** | The SQL migration and earlier local `mvn test` pass are user-reported. The failed Eclipse restart was traced to an old-server-compatible HTTP 200 response without a remember credential, not to ordinary-close revocation. Desktop handling, lifecycle diagnostics, and close/logout regressions are corrected; the matching server must be deployed and Windows DPAPI restart acceptance rerun. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
@@ -2560,8 +2606,9 @@ acceptance were not reported and are not claimed beyond existing automated/runti
 
 The lifecycle decisions remain unchanged: normal X-button closure clears local state without server revocation;
 explicit Logout revokes the durable session; Active means unexpired and unrevoked, not a running application; and
-expired/revoked history remains stored. Bearers remain memory-only. “Stay logged in” is a future feature, not an
-implemented capability. Logged-out automatic updates remain `UNSUPPORTED`.
+expired/revoked history remains stored. Bearers remain memory-only. “Stay logged in” is implemented but its first
+reported Windows restart acceptance failed and remains pending a matching server deployment and rerun. Logged-out
+automatic updates remain `UNSUPPORTED`.
 
 The closed verified scope does not close the whole initiative. Remaining items are:
 

@@ -177,6 +177,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 
 	@Override
 	public void onLogout() {
+		log.info("Desktop lifecycle explicit logout requested.");
 		teardown(true);
 	}
 	private void teardown(boolean logicalLogout) {
@@ -198,7 +199,7 @@ public final class DesktopUiRuntimeBridge implements UiRuntimeBridge {
 			runtimeSessionService.clear();
 		}
 
-		log.info("Logout requested");
+		log.info(logicalLogout ? "Desktop explicit logout cleanup completed." : "Desktop ordinary shutdown cleanup completed; remembered sign-in and server session were preserved.");
 	}
 	private synchronized void invalidateConfirmedSession(long expectedGeneration){
 		if(expectedGeneration!=sessionGeneration.get())return;
