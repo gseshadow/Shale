@@ -101,6 +101,10 @@ public final class UserDao {
 	}
 
 	public List<DirectoryUserRow> searchUsers(int shaleClientId, String query) {
+		return searchUsers(shaleClientId, query, null);
+	}
+
+	public List<DirectoryUserRow> searchUsers(int shaleClientId, String query, SuggestionBounds bounds) {
 		if (shaleClientId <= 0) {
 			throw new IllegalArgumentException("shaleClientId must be > 0");
 		}
@@ -160,7 +164,7 @@ public final class UserDao {
 					ORDER BY DisplayName ASC, u.Id ASC;
 					""");
 
-			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
+			try (PreparedStatement ps = con.prepareStatement(bounds == null ? sql.toString() : bounds.sql(sql.toString(), "DisplayName", "Id", List.of("DisplayName", "FirstName", "LastName", "Email"), List.of("Phone")))) {
 				String likeValue = containsPattern(normalizedQuery);
 				String phoneLikeValue = containsPattern(phoneDigits);
 				ps.setInt(1, shaleClientId);
@@ -170,6 +174,7 @@ public final class UserDao {
 				ps.setString(5, likeValue);
 				ps.setString(6, phoneDigits);
 				ps.setString(7, phoneLikeValue);
+				if (bounds != null) bounds.bind(ps, 8, query, List.of("DisplayName", "FirstName", "LastName", "Email"), List.of("Phone"));
 				try (ResultSet rs = ps.executeQuery()) {
 					List<DirectoryUserRow> out = new ArrayList<>();
 					while (rs.next()) {

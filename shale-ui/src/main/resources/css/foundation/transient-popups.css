@@ -41,3 +41,32 @@
 .task-hover-popup .task-hover-description-scroll,
 .task-hover-popup .task-hover-description-scroll > .viewport { -fx-background-color: transparent; }
 .task-hover-popup .task-hover-description-scroll { -fx-padding: 0; -fx-border-color: transparent; }
+
+/* Universal search: independent themed popup; shell on-dark labels do not apply here. */
+.root.universal-search-popup {
+    -fx-background-color: -shale-color-overlay-dialog;
+    -fx-background-radius: 10;
+    -fx-border-color: -shale-color-border-subtle;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-padding: 8;
+    -fx-effect: dropshadow(gaussian, -shale-color-card-shadow, 14, 0.14, 0, 4);
+}
+.universal-search-popup .label { -fx-text-fill: -shale-color-text-primary; }
+.universal-search-popup .universal-search-detail { -fx-text-fill: -shale-color-text-secondary; -fx-font-size: 11; }
+.universal-search-popup .universal-search-group { -fx-font-weight: 800; -fx-padding: 8 8 4 8; }
+.universal-search-popup .universal-search-scroll,
+.universal-search-popup .universal-search-scroll > .viewport { -fx-background-color: transparent; -fx-border-color: transparent; }
+.universal-search-popup .button.shale-control-button.universal-search-choice {
+    -fx-alignment: center-left;
+    -fx-padding: 6 8;
+    -fx-min-height: 40;
+    -fx-pref-height: -1;
+    -fx-max-height: -1;
+    -fx-background-color: transparent;
+}
+.universal-search-popup .button.shale-control-button.universal-search-choice:hover { -fx-background-color: -shale-color-card-hover; }
+.universal-search-popup .button.shale-control-button:selected {
+    -fx-background-color: -shale-color-selected-control-background;
+    -fx-border-color: -shale-color-border-selected;
+}

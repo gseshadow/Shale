@@ -314,6 +314,7 @@ public final class SceneManager {
 	}
 
 	private void stopSessionOwnedWork() {
+        if (mainController != null) mainController.disposeSearchPopup();
 		automaticUpdateScheduler.stop();
 		humanActivityObserver.stop();
 		whatsNewCoordinator.reset();
@@ -670,10 +671,12 @@ public final class SceneManager {
 	}
 
 	public void openCalendarEventFromNotification(long calendarEventId) {
+        if (mainController != null) mainController.dismissSearchPopup();
 		if (calendarEventId <= 0 || calendarEventId > Integer.MAX_VALUE) {
 			return;
 		}
-		if (calendarController != null) {
+		if (calendarController != null && navigationManager.currentRoute()
+                .map(route -> route.type() == AppRoute.RouteType.CALENDAR).orElse(false)) {
 			calendarController.openCalendarEventFromNotification(calendarEventId);
 			return;
 		}
@@ -704,6 +707,7 @@ public final class SceneManager {
 	}
 
 	private void recordCaseSectionNavigation(Integer caseId, String sectionKey) {
+        if (mainController != null) mainController.dismissSearchPopup();
 		if (caseId == null || caseId <= 0 || sectionKey == null || sectionKey.isBlank()) {
 			return;
 		}
@@ -742,6 +746,7 @@ public final class SceneManager {
 	}
 
 	private void navigateTo(AppRoute route, boolean addToHistory) {
+        if (mainController != null) mainController.dismissSearchPopup();
 		Objects.requireNonNull(route, "route");
 		String navContext = routePerfContext(route);
 		PerfLog.log("NAV", "start", "page=" + route.type().name().toLowerCase() + navContext);
@@ -765,6 +770,7 @@ public final class SceneManager {
 
 	private void showRouteInternal(AppRoute route) {
 		MainController mainController = resolveMainController();
+        if (mainController != null) mainController.dismissSearchPopup();
 		PerfLog.log("CTRL", "start", "route=" + route.type().name().toLowerCase() + routePerfContext(route));
 		if (mainController == null) {
 			System.err.println("Unable to navigate; main controller is unavailable for route " + route);
@@ -1001,6 +1007,25 @@ public final class SceneManager {
 			return c;
 		});
 	}
+
+    public com.shale.ui.component.UniversalSearchPopup createUniversalSearchPopup(javafx.scene.control.TextField field) {
+        SearchService service = new SearchService(new CaseDao(dbSessionProvider), new CaseSummaryDao(dbSessionProvider),
+                new ContactDao(dbSessionProvider), new OrganizationDao(dbSessionProvider), new UserDao(dbSessionProvider),
+                new TaskDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider));
+        var permissions = new CaseDetailService(new CaseDao(dbSessionProvider), appState);
+        return new com.shale.ui.component.UniversalSearchPopup(field, appState, service,
+                new com.shale.ui.services.RecentSearchHistory(), permissions::canViewDeletedCasesInSearch,
+                this::openSearchView, row -> {
+                    switch (row.type()) {
+                        case CASE, DELETED_CASE -> openCaseProfile(Math.toIntExact(row.id()), "OVERVIEW");
+                        case CONTACT -> openContactProfile(Math.toIntExact(row.id()));
+                        case ORGANIZATION -> openOrganizationProfile(Math.toIntExact(row.id()));
+                        case USER -> openUserProfile(Math.toIntExact(row.id()));
+                        case TASK -> openTaskProfile(row.id());
+                        case CALENDAR_EVENT -> openCalendarEventFromNotification(row.id());
+                    }
+                });
+    }
 
 	private String routePerfContext(AppRoute route) {
 		if (route == null) {
@@ -1303,6 +1328,7 @@ public final class SceneManager {
 	}
 
 	public void openTaskProfile(Long taskId, Runnable onTaskChanged) {
+        if (mainController != null) mainController.dismissSearchPopup();
 		if (taskId == null || taskId <= 0) {
 			System.err.println("Ignoring task navigation for invalid taskId: " + taskId);
 			return;
@@ -1312,6 +1338,10 @@ public final class SceneManager {
 		}
 		Integer shaleClientId = appState.getShaleClientId();
 		Integer currentUserId = appState.getUserId();
+        long taskOpenSession = appState.sessionRevision();
+        java.util.function.BooleanSupplier taskSessionCurrent = () -> taskOpenSession == appState.sessionRevision()
+                && Objects.equals(shaleClientId, appState.getShaleClientId())
+                && Objects.equals(currentUserId, appState.getUserId());
 		if (shaleClientId == null || shaleClientId <= 0 || currentUserId == null || currentUserId <= 0) {
 			taskDetailDialogInFlight.set(false);
 			AppDialogs.showError(stage, "Tasks", "You must be signed in to view task details.");
@@ -1328,13 +1358,22 @@ public final class SceneManager {
 				TaskDetailDto initialDetail = caseTaskService.loadTaskDetail(taskId, shaleClientId);
 				if (initialDetail == null) {
 					taskDetailDialogInFlight.set(false);
-					Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted."));
+					Platform.runLater(() -> {
+                        if (taskSessionCurrent.getAsBoolean())
+                            AppDialogs.showError(stage, "Tasks", "Task was not found or may have been deleted.");
+                    });
 					return;
 				}
-				Platform.runLater(() -> showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, onTaskChanged, initialDetail));
+				Platform.runLater(() -> {
+                    if (!taskSessionCurrent.getAsBoolean()) { taskDetailDialogInFlight.set(false); return; }
+                    showTaskDetailDialog(taskId, shaleClientId, currentUserId, caseTaskService, onTaskChanged, initialDetail);
+                });
 			} catch (Exception ex) {
 				taskDetailDialogInFlight.set(false);
-				Platform.runLater(() -> AppDialogs.showError(stage, "Tasks", "Failed to load task details. " + rootCauseMessage(ex)));
+				Platform.runLater(() -> {
+                    if (taskSessionCurrent.getAsBoolean())
+                        AppDialogs.showError(stage, "Tasks", "Failed to load task details.");
+                });
 			}
 		}, "scene-manager-open-task-detail-" + taskId).start();
 	}
@@ -1605,6 +1644,7 @@ public final class SceneManager {
 
 	/** Deterministically releases all SceneManager-owned background work. */
 	public void shutdown() {
+        if (mainController != null) mainController.disposeSearchPopup();
 		if (loginController != null) {
 			loginController.dispose();
 			loginController = null;
