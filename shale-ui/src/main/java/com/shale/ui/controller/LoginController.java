@@ -99,7 +99,9 @@ public final class LoginController {
 		this.runtimeBridge = runtimeBridge;
 		this.updateLauncher = updateLauncher;
 		this.updateFlowCoordinator = new UpdateFlowCoordinator(updateLauncher, sceneManager::onUpdaterLaunchSucceeded);
-		if(authService.hasRememberedCredential())Platform.runLater(this::attemptRestore);
+		boolean rememberedCredentialPresent=authService.hasRememberedCredential();
+		LOG.info("Remembered sign-in startup credential present={}.",rememberedCredentialPresent);
+		if(rememberedCredentialPresent)Platform.runLater(this::attemptRestore);
 	}
 
 	@FXML
@@ -244,6 +246,7 @@ public final class LoginController {
 		final String email = emailField.getText() == null ? "" : emailField.getText().trim();
 		final String pass = passwordField.getText() == null ? "" : passwordField.getText();
 		final boolean stayLoggedIn=stayLoggedInCheckBox.isSelected();
+		LOG.info("Password sign-in submitted; remember requested={}.",stayLoggedIn);
 
 		new Thread(() ->
 		{
@@ -265,6 +268,7 @@ public final class LoginController {
 	}
 
 	private void attemptRestore(){
+		LOG.info("Remembered sign-in asynchronous restore initiated.");
 		if(!authenticationInProgress.compareAndSet(false,true))return;long generation=authenticationGeneration.incrementAndGet();setBusy(true);progressLabel.setText("Signing you in…");errorLabel.setText("");
 		new Thread(()->{try{UiAuthService.Result result=authService.restore();if(result==null){showError("Saved sign-in is unavailable. Please sign in again.");return;}if(generation!=authenticationGeneration.get())return;completeAuthentication(result,generation);}catch(Exception ex){String name=ex.getClass().getSimpleName();if(name.contains("Enrollment")){showError("Shale could not reach the server. Retry or sign in manually.");Platform.runLater(()->{retryRestoreButton.setVisible(true);retryRestoreButton.setManaged(true);});}else showError(ex.getMessage());}finally{setBusy(false);authenticationInProgress.set(false);}},"remembered-sign-in").start();
 	}
@@ -279,7 +283,20 @@ public final class LoginController {
 				appState.setAttorney(result.attorney());
 
 				runtimeBridge.onLoginSuccess(result.userId(), result.shaleClientId(), result.email());
-				authService.commitRememberedCredential();
+				try {
+					authService.commitRememberedCredential();
+				} catch (Exception rememberFailure) {
+					// A password login may have initialized JDBC and enrolled a server session before an
+					// old server's HTTP 200 response is discovered to lack remember support. Return to
+					// a clean login state instead of entering the application with a misleading choice.
+					runtimeBridge.onLogout();
+					appState.setUserId(0);
+					appState.setShaleClientId(0);
+					appState.setUserEmail(null);
+					appState.setAdmin(false);
+					appState.setAttorney(false);
+					throw rememberFailure;
+				}
 				Theme appearance;
 				try {
 					appearance = sceneManager.loadAppearanceForAuthenticatedUser();
