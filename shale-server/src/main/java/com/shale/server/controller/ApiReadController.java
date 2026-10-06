@@ -1,5 +1,6 @@
 package com.shale.server.controller;
 
+import com.shale.core.validation.ValueUpdate;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -113,7 +114,18 @@ public final class ApiReadController {
             String address,
             String dateOfBirth,
             String condition,
-            Boolean deceased) {
+            Boolean deceased,String phoneExtension) {
+        public CreateContactRequest(
+            String name,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            String address,
+            String dateOfBirth,
+            String condition,
+            Boolean deceased){this(name,firstName,lastName,email,phone,address,dateOfBirth,condition,deceased,null);}
+
     }
 
     public record UpdateContactRequest(
@@ -128,6 +140,9 @@ public final class ApiReadController {
             Boolean deceased) {
     }
 
+    public record UpdateContactV2Request(UpdateContactRequest details,String expectedUpdatedAt,ValueUpdate phone,ValueUpdate email) {}
+    public record UpdateOrganizationV2Request(UpdateOrganizationRequest details,String rowVer,ValueUpdate phone,ValueUpdate fax,ValueUpdate email) {}
+
     public record CreateOrganizationRequest(
             String name,
             String phone,
@@ -141,7 +156,22 @@ public final class ApiReadController {
             String postalCode,
             String country,
 			String notes,
-			Integer organizationTypeId) {
+			Integer organizationTypeId,String phoneExtension,String faxExtension) {
+        public CreateOrganizationRequest(
+            String name,
+            String phone,
+            String fax,
+            String email,
+            String website,
+            String address1,
+            String address2,
+            String city,
+            String state,
+            String postalCode,
+            String country,
+			String notes,
+			Integer organizationTypeId){this(name,phone,fax,email,website,address1,address2,city,state,postalCode,country,notes,organizationTypeId,null,null);}
+
     }
 
     public record UpdateOrganizationRequest(
@@ -501,7 +531,7 @@ public final class ApiReadController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least a display name, first name, or last name is required.");
         }
         String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
-        String phone = ApiValidation.optionalContactText(request == null ? null : request.phone(), "Phone", 100);
+        String phone = ApiValidation.optionalPhone(request == null ? null : request.phone(),request==null?null:request.phoneExtension(), "phone");
         String address = ApiValidation.optionalContactText(request == null ? null : request.address(), "Address", 2000);
         String dateOfBirth = ApiValidation.optionalDateText(request == null ? null : request.dateOfBirth(), "Date of birth");
         String condition = ApiValidation.optionalContactText(request == null ? null : request.condition(), "Notes", 10000);
@@ -533,8 +563,8 @@ public final class ApiReadController {
         if ((firstName == null || firstName.isBlank()) && (lastName == null || lastName.isBlank()) && (displayName == null || displayName.isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least a display name, first name, or last name is required.");
         }
-        String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
-        String phone = ApiValidation.optionalContactText(request == null ? null : request.phone(), "Phone", 100);
+        String email = request == null ? null : request.email();
+        String phone = request == null ? null : request.phone();
         String address = ApiValidation.optionalContactText(request == null ? null : request.address(), "Address", 2000);
         String dateOfBirth = ApiValidation.optionalDateText(request == null ? null : request.dateOfBirth(), "Date of birth");
         String condition = ApiValidation.optionalContactText(request == null ? null : request.condition(), "Notes", 10000);
@@ -545,6 +575,22 @@ public final class ApiReadController {
         }
         return contactServicePort.getContactDetail(safeContactId, shaleClientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found."));
+    }
+
+    @PatchMapping("/api/v2/contacts/{contactId:\\d+}")
+    public ContactDetail updateContactV2(@PathVariable("contactId") int contactId,@RequestBody UpdateContactV2Request request){
+        int tenant=runtimeSessionState.requireShaleClientId(),actor=runtimeSessionState.requireUserId();ApiValidation.positiveId(contactId,"contactId");
+        if(request==null)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"An update is required.");
+        var old=contactServicePort.getContactDetail(contactId,tenant).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Contact not found."));var d=request.details();
+        java.time.Instant expected;
+        try{if(request.expectedUpdatedAt()==null&&old.updatedAt()!=null)throw new IllegalArgumentException();expected=request.expectedUpdatedAt()==null?null:java.time.Instant.parse(request.expectedUpdatedAt());}catch(java.time.DateTimeException|IllegalArgumentException invalid){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"The opening Contact timestamp is required in ISO format.");}
+        if(!java.util.Objects.equals(old.updatedAt(),expected==null?null:expected.toString()))throw new ResponseStatusException(HttpStatus.CONFLICT,"Contact changed. Reload before saving.");
+        boolean changed;try{changed=contactServicePort.updateContact(new ContactServicePort.UpdateContactCommand(contactId,tenant,actor,
+            d==null||d.name()==null?old.name():d.name(),d==null||d.firstName()==null?old.firstName():d.firstName(),d==null||d.lastName()==null?old.lastName():d.lastName(),null,null,
+            d==null||d.address()==null?old.address():d.address(),d==null||d.dateOfBirth()==null?old.dateOfBirth():d.dateOfBirth(),d==null||d.condition()==null?old.condition():d.condition(),d==null?null:d.deceased(),expected,
+            request.phone()==null?ValueUpdate.retain():request.phone(),request.email()==null?ValueUpdate.retain():request.email()));}catch(IllegalStateException conflict){throw new ResponseStatusException(HttpStatus.CONFLICT,"This record changed. Reload before saving.");}
+        if(!changed)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Contact not found.");
+        return contactServicePort.getContactDetail(contactId,tenant).orElseThrow();
     }
 
     @Operation(summary = "Search contacts", description = "Returns the first matching contacts for the authenticated tenant. Preserved list response for existing clients.")
@@ -580,8 +626,8 @@ public final class ApiReadController {
         int shaleClientId = runtimeSessionState.requireShaleClientId();
         int userId = runtimeSessionState.requireUserId();
         String name = ApiValidation.organizationName(request == null ? null : request.name());
-        String phone = ApiValidation.optionalOrganizationText(request == null ? null : request.phone(), "Phone", 100);
-        String fax = ApiValidation.optionalOrganizationText(request == null ? null : request.fax(), "Fax", 100);
+        String phone = ApiValidation.optionalPhone(request == null ? null : request.phone(),request==null?null:request.phoneExtension(), "phone");
+        String fax = ApiValidation.optionalPhone(request == null ? null : request.fax(),request==null?null:request.faxExtension(), "fax");
         String email = ApiValidation.optionalEmail(request == null ? null : request.email(), "Email");
         String website = ApiValidation.optionalOrganizationText(request == null ? null : request.website(), "Website", 500);
         String address1 = ApiValidation.optionalOrganizationText(request == null ? null : request.address1(), "Address line 1", 500);
@@ -622,9 +668,9 @@ public final class ApiReadController {
         int userId = runtimeSessionState.requireUserId();
 		OrganizationDetail opening=organizationServicePort.getOrganizationDetail(safeOrganizationId,shaleClientId).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Organization not found."));
 		String name = request==null||request.name()==null?opening.name():ApiValidation.organizationName(request.name());
-		String phone = request==null||request.phone()==null?opening.phone():ApiValidation.optionalOrganizationText(request.phone(), "Phone", 100);
-		String fax = request==null||request.fax()==null?opening.fax():ApiValidation.optionalOrganizationText(request.fax(), "Fax", 100);
-		String email = request==null||request.email()==null?opening.email():ApiValidation.optionalEmail(request.email(), "Email");
+		String phone = request==null||request.phone()==null?opening.phone():request.phone();
+		String fax = request==null||request.fax()==null?opening.fax():request.fax();
+		String email = request==null||request.email()==null?opening.email():request.email();
 		String website = request==null||request.website()==null?opening.website():ApiValidation.optionalOrganizationText(request.website(), "Website", 500);
 		String address1 = request==null||request.address1()==null?opening.address1():ApiValidation.optionalOrganizationText(request.address1(), "Address line 1", 500);
 		String address2 = request==null||request.address2()==null?opening.address2():ApiValidation.optionalOrganizationText(request.address2(), "Address line 2", 500);
@@ -642,6 +688,17 @@ public final class ApiReadController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Organization not found."));
     }
 
+
+    @PatchMapping("/api/v2/organizations/{organizationId:\\d+}")
+    public OrganizationDetail updateOrganizationV2(@PathVariable("organizationId") int organizationId,@RequestBody UpdateOrganizationV2Request request){
+        int tenant=runtimeSessionState.requireShaleClientId(),actor=runtimeSessionState.requireUserId();ApiValidation.positiveId(organizationId,"organizationId");
+        if(request==null||request.rowVer()==null||request.rowVer().isBlank())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"The opening Organization version is required.");
+        var old=organizationServicePort.getOrganizationDetail(organizationId,tenant).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Organization not found."));var d=request.details();
+        boolean saved;try{saved=organizationServicePort.updateOrganization(new UpdateOrganizationCommand(organizationId,tenant,actor,
+            d==null||d.name()==null?old.name():d.name(),old.phone(),old.fax(),old.email(),d==null||d.website()==null?old.website():d.website(),
+            d==null||d.address1()==null?old.address1():d.address1(),d==null||d.address2()==null?old.address2():d.address2(),d==null||d.city()==null?old.city():d.city(),d==null||d.state()==null?old.state():d.state(),d==null||d.postalCode()==null?old.postalCode():d.postalCode(),d==null||d.country()==null?old.country():d.country(),d==null||d.notes()==null?old.notes():d.notes(),d==null?null:d.organizationTypeId(),decodeOptionalRowVer(request.rowVer()),request.phone()==null?ValueUpdate.retain():request.phone(),request.fax()==null?ValueUpdate.retain():request.fax(),request.email()==null?ValueUpdate.retain():request.email()));}catch(IllegalStateException conflict){throw new ResponseStatusException(HttpStatus.CONFLICT,"This record changed. Reload before saving.");}
+        if(!saved)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Organization not found.");return organizationServicePort.getOrganizationDetail(organizationId,tenant).orElseThrow();
+    }
 
     @Operation(summary = "List case statuses", description = "Returns read-only case status settings for administrators in the authenticated tenant.")
     @GetMapping("/api/settings/case-statuses")

@@ -1,6 +1,7 @@
 package com.shale.ui.util;
 
 import java.awt.Desktop;
+import com.shale.data.validation.ContactValues;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -17,18 +18,12 @@ public final class ContactExternalActions {
     }); }
     public ContactExternalActions(Launcher launcher) { this.launcher=java.util.Objects.requireNonNull(launcher); }
     public void open(URI uri) { try { launcher.open(uri); } catch(Exception ex) { throw new IllegalStateException("No application is available for this action.",ex); } }
-    public static URI telephone(String displayNumber) { return opaque("tel",displayNumber); }
-    public static URI telephone(String normalizedNumber, String extension) {
-        if (normalizedNumber == null || !normalizedNumber.trim().matches("\\+?[0-9*#]{3,}"))
-            throw new IllegalArgumentException("A valid dialable phone number is required.");
-        String target = normalizedNumber.trim();
-        if (extension != null && !extension.isBlank()) {
-            if (!extension.trim().matches("[0-9]{1,12}")) throw new IllegalArgumentException("A valid phone extension is required.");
-            target += ";ext=" + extension.trim();
-        }
-        return opaque("tel", target);
+    public static URI telephone(String displayNumber) { return telephone(displayNumber,null); }
+    public static URI telephone(String number,String extension) {
+        var value=ContactValues.INSTANCE.phone(number,extension,true,"phone");
+        return opaque("tel",value.canonicalNumber()+(value.extension()==null?"":";ext="+value.extension()));
     }
-    public static URI email(String address) { return opaque("mailto",address); }
+    public static URI email(String address) { return opaque("mailto",ContactValues.INSTANCE.email(address,true,"email").transportAddress()); }
     public static URI maps(String address) {
         if(address==null||address.isBlank())throw new IllegalArgumentException("Address is required.");
         return URI.create("https://www.google.com/maps/search/?api=1&query="+URLEncoder.encode(address.trim(),StandardCharsets.UTF_8));

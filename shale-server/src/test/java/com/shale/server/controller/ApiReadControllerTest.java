@@ -83,6 +83,29 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(17,port.createdCommand.caseDates().get(1).caseDateTypeId());
     }
 
+    @Test void versionedContactPatchDistinguishesRetainSetClearAndRejectsStaleOpeningToken()throws Exception{
+        final ContactServicePort.UpdateContactCommand[] captured={null};
+        String token="2026-10-06T00:00:00Z";
+        ContactServicePort port=(ContactServicePort)Proxy.newProxyInstance(ContactServicePort.class.getClassLoader(),new Class<?>[]{ContactServicePort.class},(proxy,method,args)->switch(method.getName()){
+            case "getContactDetail" -> Optional.of(new ContactServicePort.ContactDetail(7,41,"Person","First","Last",null,"legacy","0",null,null,null,null,false,false,token,"001"));
+            case "updateContact" -> {captured[0]=(ContactServicePort.UpdateContactCommand)args[0];yield true;}
+            default -> throw new AssertionError(method.getName());
+        });
+        MockMvc mvc=developmentMockMvc(unusedPort(CaseServicePort.class),unusedPort(TaskServicePort.class),port,unusedPort(NotificationServicePort.class));
+        for(String operation:List.of(""," ,\"phone\":{\"action\":\"SET\",\"value\":\"3035550123\",\"extension\":\"002\"}"," ,\"phone\":{\"action\":\"CLEAR\"}")){
+            mvc.perform(patch("/api/v2/contacts/7").header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31").header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41").contentType(MediaType.APPLICATION_JSON).content("{\"expectedUpdatedAt\":\""+token+"\""+operation+"}")).andExpect(status().isOk());
+            assertEquals(41,captured[0].shaleClientId());assertEquals(31,captured[0].actorUserId());assertEquals(com.shale.core.validation.ValueUpdate.Action.valueOf(operation.isEmpty()?"RETAIN":operation.contains("SET")?"SET":"CLEAR"),captured[0].phoneUpdate().action());
+            assertEquals(com.shale.core.validation.ValueUpdate.Action.RETAIN,captured[0].emailUpdate().action());
+        }
+        mvc.perform(patch("/api/v2/contacts/7").header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31").header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41").contentType(MediaType.APPLICATION_JSON).content("{\"expectedUpdatedAt\":\"2026-10-05T00:00:00Z\"}")).andExpect(status().isConflict());
+        mvc.perform(patch("/api/v2/contacts/7").header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER,"31").header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER,"41").contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isBadRequest());
+    }
+
+    @Test void malformedPatchOperationsReturnSafeBadRequestWithoutEnteringPersistence()throws Exception{
+        MockMvc mvc=developmentMockMvc(unusedPort(CaseServicePort.class),unusedPort(TaskServicePort.class),unusedPort(ContactServicePort.class),unusedPort(NotificationServicePort.class));
+        for(String operation:List.of("{\"action\":\"BOGUS\"}","{\"action\":\"RETAIN\",\"value\":\"0\"}","{\"action\":\"CLEAR\",\"value\":\"0\"}"))mvc.perform(patch("/api/v2/contacts/7").contentType(MediaType.APPLICATION_JSON).content("{\"phone\":"+operation+"}")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("Invalid request."));
+    }
+
     @BeforeEach
     void setUp() {
         ApiReadController apiReadController = new ApiReadController(
@@ -691,7 +714,7 @@ class ApiReadControllerTest {
                           "firstName":" Ada ",
                           "lastName":" Lovelace ",
                           "email":" ada@example.test ",
-                          "phone":" 555-0100 ",
+                          "phone":" 303-555-0123 ",
                           "address":" 123 Main ",
                           "dateOfBirth":"1980-01-02",
                           "condition":" Notes ",
@@ -709,7 +732,7 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals("Ada", contactServicePort.createdCommand.firstName());
         org.junit.jupiter.api.Assertions.assertEquals("Lovelace", contactServicePort.createdCommand.lastName());
         org.junit.jupiter.api.Assertions.assertEquals("ada@example.test", contactServicePort.createdCommand.email());
-        org.junit.jupiter.api.Assertions.assertEquals("555-0100", contactServicePort.createdCommand.phone());
+        org.junit.jupiter.api.Assertions.assertEquals("303-555-0123", contactServicePort.createdCommand.phone());
         org.junit.jupiter.api.Assertions.assertEquals("123 Main", contactServicePort.createdCommand.address());
         org.junit.jupiter.api.Assertions.assertEquals("1980-01-02", contactServicePort.createdCommand.dateOfBirth());
         org.junit.jupiter.api.Assertions.assertEquals("Notes", contactServicePort.createdCommand.condition());
@@ -732,7 +755,7 @@ class ApiReadControllerTest {
                 .andExpect(jsonPath("$.shaleClientId").value(41))
                 .andExpect(jsonPath("$.displayName").value("Ada Lovelace"))
                 .andExpect(jsonPath("$.email").value("ada@example.test"))
-                .andExpect(jsonPath("$.phone").value("555-0100"));
+                .andExpect(jsonPath("$.phone").value("303-555-0123"));
 
         org.junit.jupiter.api.Assertions.assertEquals(801, contactServicePort.contactId);
         org.junit.jupiter.api.Assertions.assertEquals(41, contactServicePort.detailShaleClientId);
@@ -1371,7 +1394,7 @@ class ApiReadControllerTest {
             this.shaleClientId = shaleClientId;
             this.query = query;
             this.limit = limit;
-            return List.of(new ContactSummary(801, "Ada Lovelace", "ada@example.test", "555-0100"));
+            return List.of(new ContactSummary(801, "Ada Lovelace", "ada@example.test", "303-555-0123"));
         }
 
         @Override
@@ -1387,7 +1410,7 @@ class ApiReadControllerTest {
                 return Optional.empty();
             }
             return Optional.of(new ContactDetail(contactId, shaleClientId, "Ada Lovelace", "Ada", "Lovelace",
-                    "Ada Lovelace", "ada@example.test", "555-0100", "123 Main", "1980-01-02", "Notes", null, false, true));
+                    "Ada Lovelace", "ada@example.test", "303-555-0123", "123 Main", "1980-01-02", "Notes", null, false, true));
         }
 
 		@Override public List<Definition> getEffectiveContactTypes(int shaleClientId) { return List.of(); }

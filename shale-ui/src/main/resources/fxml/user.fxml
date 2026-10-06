@@ -106,12 +106,17 @@
                                             <Label text="Email:" style="-fx-opacity: 0.8;" GridPane.rowIndex="3" />
                                             <Label fx:id="emailValue" text="—" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="1" />
                                             <Button fx:id="editEmailButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="3" GridPane.columnIndex="2" />
-                                            <TextField fx:id="emailEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="3" GridPane.columnIndex="1" />
+                                            <VBox fx:id="emailEditorContainer" spacing="4" visible="false" managed="false" GridPane.rowIndex="3" GridPane.columnIndex="1"><TextField fx:id="emailEditor" maxWidth="1.7976931348623157E308" /></VBox>
 
                                             <Label text="Phone:" style="-fx-opacity: 0.8;" GridPane.rowIndex="4" />
                                             <Label fx:id="phoneValue" text="—" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1" />
                                             <Button fx:id="editPhoneButton" text="✎" styleClass="case-overview-edit-button" GridPane.rowIndex="4" GridPane.columnIndex="2" />
-                                            <TextField fx:id="phoneEditor" visible="false" managed="false" maxWidth="1.7976931348623157E308" GridPane.rowIndex="4" GridPane.columnIndex="1" />
+                                            <VBox fx:id="phoneEditorContainer" spacing="4" visible="false" managed="false" GridPane.rowIndex="4" GridPane.columnIndex="1">
+                                                <Label text="US default; international +country code" wrapText="true" />
+                                                <TextField fx:id="phoneEditor" maxWidth="1.7976931348623157E308" />
+                                                <Label text="Extension (optional, 1–12 digits)" />
+                                                <TextField fx:id="phoneExtensionEditor" maxWidth="1.7976931348623157E308" />
+                                            </VBox>
 
                                             <Label text="Initials:" style="-fx-opacity: 0.8;" GridPane.rowIndex="5" />
                                             <Label fx:id="initialsValue" text="—" wrapText="true" GridPane.rowIndex="5" GridPane.columnIndex="1" />
