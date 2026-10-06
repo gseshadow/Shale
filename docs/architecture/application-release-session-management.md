@@ -5,6 +5,110 @@ release/session initiative remains in progress and logged-out updates remain `UN
 
 **Last reviewed:** 2026-10-06
 
+## Remembered-restore permission correction — 2026-10-06
+
+Production acceptance now confirms four important lifecycle steps: remembered issuance succeeds, Windows DPAPI save
+succeeds, a later launch finds and decrypts the protected credential, and ordinary close preserves it. Automatic
+restore remains blocked: the restore endpoint returns HTTP 500 and the sanitized server trace identifies
+`SqlRememberCredentialStore.lookup` with SQL state `S0005` and vendor error 229. Error 229 establishes permission
+denial under the pre-authentication database principal; it does not justify changing RLS or broadening a database
+role.
+
+`lookup` is the only pre-authentication database operation. It uses `DataSources.auth()`, therefore
+`SHALE_APP_DB_USER` (`shale_app` in the documented deployment), and its former inline query referenced
+`dbo.DesktopRememberCredentials` and `dbo.Users`. Successful password authentication already proves this principal
+can read the required active `Users` fields. The new table was added without a matching authentication-principal
+permission, so the evidence-supported missing boundary is credential lookup—not the later tenant-scoped rotation.
+
+The correction does not grant `shale_app` base-table `SELECT`. A new dbo-owned
+`ResolveDesktopRememberCredential` procedure accepts only the 32-byte hash, installation UUID, and current time and
+returns only the candidate tenant, user, session, and email after active/expiry checks. Same-owner module chaining
+allows this deliberately narrow lookup without exposing all stored credential hashes to the authentication principal;
+`shale_app` receives only `EXECUTE` on that procedure. The Java store calls the procedure, treats its result only as
+a candidate, and still opens a principal-scoped runtime connection for authoritative serializable revalidation.
+
+The full transaction boundary is also explicit. `shale_runtime` receives only object-level SELECT/INSERT/UPDATE/DELETE
+on `DesktopRememberCredentials`; its existing `Users` SELECT and `UserSessions` SELECT/UPDATE remain required and are
+verified. Rotation still requires initialized `ShaleClientId` and `PrincipalUserId` session context, strict
+`UserSessions` RLS, explicit tenant/user/session predicates, active user, unrevoked/unexpired session, unconsumed
+credential, matching installation, and matching hash. No `db_owner`, `db_datareader`, `db_datawriter`, database-wide
+permission, RLS disablement, raw credential access, or credential/hash output is introduced.
+
+Apply `docs/sql/2026-10-06_desktop_remember_credentials_permissions.sql` with the approved migration principal, then
+run `docs/sql/verification/2026-10-06_desktop_remember_credentials_permissions_verification.sql` once as the actual
+`shale_app` principal and once as the actual `shale_runtime` principal. A dbo-only run is not acceptance. This fix
+requires both SQL and a server deployment because the server changes from inline base-table lookup to procedure
+execution; no desktop rebuild is required for this permission correction. Deploy SQL first, then the rebuilt server,
+then rerun automatic restore. Until that succeeds, automatic restore remains **BLOCKED BY ERROR 229 / PENDING
+RETEST**, while issuance, protected save/read, and ordinary-close preservation remain user-observed successes.
+
+Audit compatibility is unchanged. Credential lookup/rotation is authentication security plumbing inside the existing
+durable-session relationship, not a domain mutation or sensitive business-data view. No audit payload may contain a
+credential or hash, and no new audit event/schema is appropriate.
+
+## Remembered-enrollment SQL and diagnostic correction — 2026-10-06
+
+Production evidence now locates the remembered-enrollment HTTP 500 at `SqlRememberCredentialStore.create`, wrapped
+by `ServerAuthSessionService.issueRememberedDesktop`, with `SQLServerException` as the underlying cause. This proves
+the database operation failed; it does not identify permission, constraint, or other SQL category because the first
+diagnostic revision discarded SQL state/error code and then failed while reconstructing the cause.
+
+The diagnostic failure was deterministic: `SanitizedDiagnosticException` called the four-argument `Throwable`
+constructor with a null cause, which marks cause initialization complete, and later called `initCause`. Sanitization
+now constructs each wrapper only after recursively constructing its safe cause and passes that cause to the
+constructor. Cause/suppressed cycles are identity-bounded, and a final fallback ensures diagnostic construction can
+never prevent the generic HTTP 500 response. Logs retain sanitized original stack frames, cause/suppressed exception
+types, and, for every cause or chained `SQLException`, only allowlisted SQL state plus numeric vendor error code.
+They never copy exception messages, SQL text, parameter values, hashes, passwords, bearers, remembered credentials,
+headers, DTOs, query strings, or request/response bodies.
+
+### Database operation findings
+
+The deployed migration and Java bindings agree on table/column names and order: tenant `int`, user `int`, session and
+installation `uniqueidentifier`, SHA-256 `binary(32)`, and absolute expiry `datetime2(7)` bound with `Timestamp`.
+The migration requires unique credential hashes and session/installation pairs, a cascading session UUID foreign key,
+and a tenant-qualified Users foreign key; all columns inserted by `create` are non-null. No statement/binding,
+nullability, type, foreign-key, or uniqueness mismatch is established by the repository evidence.
+
+A connection-boundary mismatch **is** established. The store previously used `DataSources.auth()` for creation and
+for the rotation transaction even though `dbo.UserSessions` is protected by strict tenant RLS and the auth pool does
+not initialize tenant/user session context. The corrected store uses the auth connection only for a read-only opaque
+hash plus installation lookup sufficient to derive the candidate principal. Creation, the locked revalidation and
+rotation transaction, and deletion now open a principal-scoped runtime connection, retain explicit tenant/user/session
+predicates, and therefore execute with the same tenant context as durable `UserSessions`. The preliminary lookup is
+not authority: rotation rechecks the hash, installation, derived ownership, active user, unrevoked session, and both
+expiries under serializable locks before changing either row.
+
+`DesktopRememberCredentials` intentionally has no tenant security predicate because pre-authentication restore must
+locate the candidate tenant from an opaque 256-bit credential hash plus installation UUID. It stores no raw
+credential. This exception does not weaken `UserSessions` RLS: every authoritative session read/update occurs only
+after principal derivation on the tenant-scoped runtime connection and remains explicitly owner-qualified. A future
+schema redesign could replace this narrow lookup with a signed module/stored procedure, but adding the ordinary
+tenant predicate now would make pre-authentication lookup impossible rather than improve this flow.
+
+The expanded verification SQL is read-only and reports exact columns/types/nullability/defaults, unique and foreign
+key constraints, security predicates on both tables, data findings, and effective object permissions. Run its
+catalog sections as dbo, then run the entire script using the API `SHALE_APP_DB_USER` for identity-lookup permissions
+and `SHALE_RT_DB_USER` for tenant-scoped creation/rotation/deletion permissions. A dbo result cannot prove either API
+principal. Any zero effective permission must be corrected through the deployment's existing database-role/grant
+management; the repository cannot safely invent production principal names or grant membership. The next deployed
+trace will additionally provide SQL state and numeric vendor code if a database failure remains.
+
+### Desktop classification and deployment
+
+HTTP 500 and timeout enrollment results retain `TRANSIENT`; 404/501 retain `ENDPOINT_UNAVAILABLE`; neither can fall
+through to the “running server does not support Stay logged in” message. That message is reserved for an HTTP success
+whose otherwise valid response omits `rememberCredential`. Failed remembered enrollment still tears down the partly
+initialized local runtime through the existing commit failure path and never persists a credential.
+
+No new schema migration is required by the code correction. Before acceptance, rerun the existing
+`2026-10-05_desktop_remember_credentials.sql` only if the schema verifier reports missing/incompatible objects,
+correct any verified API-principal permission finding, deploy the rebuilt server, and rebuild/redeploy the desktop.
+Then reproduce checked login and confirm either successful protected save or a diagnostic containing the original
+store frame plus SQL state/vendor code. Audit compatibility is unchanged: this is authentication plumbing inside the
+existing durable-session relationship, not a new domain mutation or sensitive view; no new audit row or audit schema
+is appropriate.
+
 ## Remembered sign-in ordinary-close diagnosis — 2026-10-06
 
 The reported unsuccessful restart did **not** prove that ordinary application closure logged out. The text
@@ -1253,7 +1357,7 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
 | 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
-| 7C | **COMPLETE; FOLLOW-UP ITEMS OPEN** | User-reported production acceptance confirms the Azure API starts, desktop enrollment returns HTTP 200, and the session surfaces work. A clean installed production launch with no API override is **NOT RUN**, and intermittent enrollment `REQUEST_TIMEOUT` remains open. |
+| 7C | **COMPLETE; RESTORE BLOCKED BY ERROR 229 / PENDING RETEST** | User-observed acceptance confirms remembered issuance, DPAPI save/read, and ordinary-close preservation. Automatic restore reaches the server but `shale_app` is denied in pre-auth lookup. The narrow resolver-module permission migration and matching server call are implemented; apply SQL, verify as actual `shale_app` and `shale_runtime`, redeploy the server, and rerun restore. No desktop rebuild is required for this correction. A clean installed production launch with no API override is **NOT RUN**, and intermittent `REQUEST_TIMEOUT` remains open. |
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
 | 8B | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms remote administrative revocation is detected in approximately one minute by polling and locks the application before the session-ended popup is dismissed; OK transitions to sign-in. Push remains acceleration, not authority. |
 | 9 | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms Settings > Personal > My Sessions works for ordinary users and administrators, shows only the authenticated user's sessions, marks the current session, and current-session self-revocation locks the app and returns to sign-in. |

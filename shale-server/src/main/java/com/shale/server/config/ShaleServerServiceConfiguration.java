@@ -169,7 +169,7 @@ public class ShaleServerServiceConfiguration {
 
 	@Bean
 	@Profile({"dev", "local", "prod", "azure"})
-	RememberCredentialStore rememberCredentialStore(DataSources sources){return new SqlRememberCredentialStore(sources.auth());}
+	RememberCredentialStore rememberCredentialStore(DataSources sources,RuntimeConnectionProvider connections){return new SqlRememberCredentialStore(sources.auth(),connections);}
 
 	@Bean
 	@Profile({"dev", "local", "prod", "azure"})
