@@ -1,11 +1,45 @@
 # Application Release and Session Management Architecture
 
-**Status:** Desktop session enrollment, revocation enforcement, and My Sessions acceptance are closed; the wider
-release/session initiative remains in progress and logged-out updates remain `UNSUPPORTED`
+**Status:** Desktop session enrollment, revocation enforcement, My Sessions, and Stay logged in acceptance are
+closed; the wider release/session initiative remains in progress and logged-out updates remain `UNSUPPORTED`
 
 **Last reviewed:** 2026-10-06
 
+## Stay logged in acceptance closeout — 2026-10-06
+
+**Status: COMPLETE — user-reported Windows acceptance.** This documentation-only closeout records the user's
+reported passes below. These are user-reported results, not checks executed in this documentation run; no Maven,
+Windows, DPAPI, MSI, SQL, server deployment, or runtime acceptance check was executed here.
+
+| Acceptance scenario | Result | Evidence source |
+| --- | --- | --- |
+| Checked login across application restart and Windows restart | **PASS** | User-reported Windows acceptance. |
+| Repeated restore after credential rotation | **PASS** | User-reported Windows acceptance. |
+| X-close preserving remembered sign-in | **PASS** | User-reported Windows acceptance. |
+| Explicit Logout clearing remembered sign-in | **PASS** | User-reported Windows acceptance. |
+| Unchecked login leaving no remembered sign-in | **PASS** | User-reported Windows acceptance. |
+| Self-revocation and administrator revocation invalidating restore | **PASS** | User-reported Windows acceptance for both revocation paths. |
+| Installed-MSI remembered sign-in and logout | **PASS** | User-reported installed-Windows acceptance. |
+| Temporary outage recovery through Retry without losing the credential | **PASS** | User-reported Windows acceptance. |
+
+The previously recorded local `mvn test` **PASS** is preserved as user-reported evidence. It is not a new Maven
+result from this documentation run. The reported Windows acceptance supersedes the earlier failed restart and
+error-229 restore-blocked statuses below; those diagnosis sections remain historical records.
+
+This closes only the Stay logged in feature. Installed-MSI acceptance does not establish a clean production launch
+with no API override or production signing. The separate intermittent enrollment `REQUEST_TIMEOUT` investigation,
+login tall/short-window visual acceptance, manual cross-tenant/crafted-request security acceptance, and conditional
+Phase 13H decision remain open or separately gated. Disabled-account rejection and DPAPI-unavailable behavior were
+not among the reported passes and are not claimed here. Logged-out automatic updates remain `UNSUPPORTED`.
+
+The lifecycle and audit decisions are unchanged: access bearers remain process-memory-only, Windows DPAPI protects
+the remembered credential, ordinary close preserves it, explicit Logout clears it, and durable session revocation
+invalidates restore. Existing session-security audit events remain authoritative; this documentation update adds
+no implementation, schema, or audit behavior.
+
 ## Remembered-restore permission correction — 2026-10-06
+
+**Historical diagnosis:** the restore-blocked status in this section is superseded by the acceptance closeout above.
 
 Production acceptance now confirms four important lifecycle steps: remembered issuance succeeds, Windows DPAPI save
 succeeds, a later launch finds and decrypts the protected credential, and ordinary close preserves it. Automatic
@@ -47,6 +81,8 @@ durable-session relationship, not a domain mutation or sensitive business-data v
 credential or hash, and no new audit event/schema is appropriate.
 
 ## Remembered-enrollment SQL and diagnostic correction — 2026-10-06
+
+**Historical diagnosis:** subsequent user-reported acceptance is recorded in the closeout above.
 
 Production evidence now locates the remembered-enrollment HTTP 500 at `SqlRememberCredentialStore.create`, wrapped
 by `ServerAuthSessionService.issueRememberedDesktop`, with `SQLServerException` as the underlying cause. This proves
@@ -110,6 +146,8 @@ existing durable-session relationship, not a new domain mutation or sensitive vi
 is appropriate.
 
 ## Remembered sign-in ordinary-close diagnosis — 2026-10-06
+
+**Historical diagnosis:** the failed restart status in this section is superseded by the acceptance closeout above.
 
 The reported unsuccessful restart did **not** prove that ordinary application closure logged out. The text
 `DesktopUiRuntimeBridge - Logout requested` was emitted by a shared teardown method for both logical logout and
@@ -177,14 +215,17 @@ invalidates restore through the same `UserSessions` row. No credential value is 
 
 ### Required deployment order and acceptance status
 
+**Current status: COMPLETE.** See the user-reported Windows acceptance closeout above. The deployment order remains
+applicable to new deployments; the original acceptance checklist below is retained with its evidence limits.
+
 1. Back up the database and run `docs/sql/2026-10-05_desktop_remember_credentials.sql`.
 2. Run `docs/sql/verification/2026-10-05_desktop_remember_credentials_verification.sql`; investigate every finding.
 3. Deploy the matching server before distributing the matching MSI. Older desktop clients continue ordinary login.
 4. Build/sign/package the MSI through the existing Windows release process; JNA's maintained DPAPI integration is
    included as a normal packaged runtime dependency.
 
-Automated source/test verification is recorded with the implementation commit. Production acceptance remains
-**PENDING** until a signed installed MSI and deployed SQL/server complete the manual checklist: checked login plus
+Automated source/test verification is recorded with the implementation commit. The original production acceptance
+checklist called for a signed installed MSI and deployed SQL/server: checked login plus
 application restart; Windows restart; unchecked login leaving no restore; X-close preserving restore; explicit
 logout clearing restore; self-revocation; administrator revocation; disabled-account rejection; transient network
 failure with retry/manual sign-in; and DPAPI-unavailable behavior under the installation owner account.
@@ -1357,7 +1398,7 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 6B | **COMPLETE** | Dedicated bounded administrative-read auditing and required verification completed before Phase 7A. |
 | 7A | **COMPLETE** | Additive strict-tenant UserSessions schema and internal service foundation were verified before Phase 7B. |
 | 7B | **COMPLETE** | Durable API issuance/validation/rotation/revocation and bounded legacy compatibility were completed and verified before Phase 7C. |
-| 7C | **COMPLETE; RESTORE BLOCKED BY ERROR 229 / PENDING RETEST** | User-observed acceptance confirms remembered issuance, DPAPI save/read, and ordinary-close preservation. Automatic restore reaches the server but `shale_app` is denied in pre-auth lookup. The narrow resolver-module permission migration and matching server call are implemented; apply SQL, verify as actual `shale_app` and `shale_runtime`, redeploy the server, and rerun restore. No desktop rebuild is required for this correction. A clean installed production launch with no API override is **NOT RUN**, and intermittent `REQUEST_TIMEOUT` remains open. |
+| 7C | **COMPLETE** | Desktop session enrollment remains closed. User-reported Windows Stay logged in acceptance supersedes the earlier error-229 restore blocker; see the remembered sign-in closeout. A clean installed production launch with no API override is **NOT RUN**, and intermittent enrollment `REQUEST_TIMEOUT` remains open. |
 | 8A | **COMPLETE** | Authoritative self/admin revocation, audit, and account-security invalidation were completed and verified before Phase 8B. |
 | 8B | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms remote administrative revocation is detected in approximately one minute by polling and locks the application before the session-ended popup is dismissed; OK transitions to sign-in. Push remains acceleration, not authority. |
 | 9 | **COMPLETE; RUNTIME ACCEPTED 2026-10-02** | User-reported acceptance confirms Settings > Personal > My Sessions works for ordinary users and administrators, shows only the authenticated user's sessions, marks the current session, and current-session self-revocation locks the app and returns to sign-in. |
@@ -1373,16 +1414,20 @@ confirms the tenant-wide surface loads and remote revocation is enforced.**
 | 13F | **COMPLETE** | Elevated MSI registration and lifecycle are verified; installed Windows fresh-install acceptance confirmed the protected 64-bit HKLM record, exact owner/roots, ACL, schema/version/channel, updater, and production-reader `VALID`. Production signing remains a separate deployment prerequisite. |
 | 13G | **COMPLETE — UNSUPPORTED** | Every Phase 13D blocker was reevaluated against 13E/13F. Discovery, public policy, version, and owner-path prerequisites are closed, but no credentialless owner principal or sufficiently protected privileged execution boundary is proven; no prototype or rollout was created. |
 | 14A | **COMPLETE** | Release-pipeline Git synchronization is fail-closed before publication: attached/upstream/clean/divergence preflight, exact release-file staging, commit/push recovery, retry behavior, and source-revision-consistent Mac handoff are documented and covered by temporary-repository tests. No domain or administrative runtime mutation exists, so the established audit schemas are not applicable. |
-| Login visual refresh | **IN PROGRESS; RUNTIME FLOW ACCEPTED** | The remaining tall-window stretch was traced to `-1.0`, which is JavaFX `USE_COMPUTED_SIZE`, not `USE_PREF_SIZE`; the content-sized groups now use the preferred-size sentinel inside a full-height centering viewport. The user reports local Maven tests pass and the application successfully launches, signs in, enrolls the durable session with HTTP 200, and logs out with HTTP 200. Rendered tall/short-window acceptance for this sizing correction remains **PENDING**. Persistent sessions remain **NOT STARTED** and bearer/password lifecycle is unchanged. |
-| Remembered desktop sign-in | **IN PROGRESS; RESTART ACCEPTANCE FAILED / PENDING RERUN** | The SQL migration and earlier local `mvn test` pass are user-reported. The failed Eclipse restart was traced to an old-server-compatible HTTP 200 response without a remember credential, not to ordinary-close revocation. Desktop handling, lifecycle diagnostics, and close/logout regressions are corrected; the matching server must be deployed and Windows DPAPI restart acceptance rerun. |
+| Login visual refresh | **IN PROGRESS; RUNTIME FLOW ACCEPTED** | The remaining tall-window stretch was traced to `-1.0`, which is JavaFX `USE_COMPUTED_SIZE`, not `USE_PREF_SIZE`; the content-sized groups now use the preferred-size sentinel inside a full-height centering viewport. The user reports local Maven tests pass and the application successfully launches, signs in, enrolls the durable session with HTTP 200, and logs out with HTTP 200. Rendered tall/short-window acceptance for this sizing correction remains **PENDING**. Stay logged in acceptance is closed separately below; this does not close the pending visual sizing acceptance. |
+| Remembered desktop sign-in (Stay logged in) | **COMPLETE — USER-REPORTED WINDOWS ACCEPTANCE 2026-10-06** | User reports PASS for checked login across application/Windows restart, repeated restore after rotation, X-close preservation, explicit Logout clearing, unchecked login with no remembered sign-in, self/admin revocation invalidating restore, installed-MSI sign-in/logout, and outage recovery through Retry without credential loss. The previously recorded user-reported local `mvn test` PASS is preserved. No checks were executed in this documentation run; unrelated release/session work remains open. |
 
 Status vocabulary: **NOT STARTED**, **IN PROGRESS**, **COMPLETE**, **BLOCKED**. Later Codex runs must
 update this table and the applicable phase section.
 
-Release-pipeline Git synchronization is complete. The wider initiative remains open: the conditional Phase 13H
-privileged-component decision remains separate, and logged-out automatic updates remain `UNSUPPORTED`.
+Release-pipeline Git synchronization and Stay logged in are complete. The wider initiative remains open: the
+conditional Phase 13H privileged-component decision remains separate, and logged-out automatic updates remain
+`UNSUPPORTED`.
 
 ## Desktop login visual refresh — 2026-10-05
+
+**Historical implementation record:** the disabled Stay logged in placeholder and NOT STARTED statements below
+precede its implementation and acceptance closeout above. Tall/short-window visual acceptance remains pending.
 
 The unauthenticated JavaFX surface has been recomposed as a responsive brand/illustration region and a focused
 sign-in card. It uses the existing Shale logo, the approved headline and subtitle, generic Cases/Tasks/Calendar
@@ -1452,8 +1497,9 @@ The user reports that local Maven tests pass and that the rebuilt desktop applic
 successfully, durable session enrollment returns HTTP 200, and explicit logout returns HTTP 200. These are
 user-reported local/runtime results, not commands executed by this documentation update. Rendered visual acceptance
 of the corrected approximately 1920×1300 tall state and a short scrollable state remains **PENDING** until the
-stretching and centering result is observed. Persistent **Stay logged in** support remains **NOT STARTED**; the
-disabled placeholder does not persist a password or bearer and does not change enrollment, logout, or revocation.
+stretching and centering result is observed. At the time of this visual correction, persistent **Stay logged in**
+support was **NOT STARTED**. That historical feature status is superseded by the implementation and user-reported
+acceptance closeout above; visual sizing acceptance remains separate.
 
 Audit compatibility remains unchanged. This is unauthenticated presentation and local layout behavior, not a
 sensitive read or a domain, administrative, or session mutation. No audit event or schema migration is appropriate.
@@ -2710,9 +2756,9 @@ acceptance were not reported and are not claimed beyond existing automated/runti
 
 The lifecycle decisions remain unchanged: normal X-button closure clears local state without server revocation;
 explicit Logout revokes the durable session; Active means unexpired and unrevoked, not a running application; and
-expired/revoked history remains stored. Bearers remain memory-only. “Stay logged in” is implemented but its first
-reported Windows restart acceptance failed and remains pending a matching server deployment and rerun. Logged-out
-automatic updates remain `UNSUPPORTED`.
+expired/revoked history remains stored. Bearers remain memory-only. The first reported “Stay logged in” Windows
+restart failure is superseded by the 2026-10-06 user-reported acceptance closeout above; the feature is **COMPLETE**.
+Logged-out automatic updates remain `UNSUPPORTED`.
 
 The closed verified scope does not close the whole initiative. Remaining items are:
 
