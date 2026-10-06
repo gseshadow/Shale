@@ -37,12 +37,12 @@ final class NewIntakeContactPersistenceRegressionTest {
         invokeContactPoints(dao, connection, request, 202,
                 request.callerPhone(), request.callerEmail(), request.callerAddress());
 
-        List<Execution> writes = executions.stream().filter(e -> !isEntityAudit(e)).toList();
+        List<Execution> writes = executions.stream().filter(e -> e.sql().startsWith("INSERT dbo.") && !isEntityAudit(e)).toList();
         assertEquals(6, writes.size());
-        assertPoint(writes.get(0), "ContactPhoneNumbers", 101, "MOBILE", "(555) 101-0001", "5551010001");
+        assertPoint(writes.get(0), "ContactPhoneNumbers", 101, "MOBILE", "(303) 555-0123", "+13035550123");
         assertPoint(writes.get(1), "ContactEmailAddresses", 101, "PERSONAL", "client@example.test", "client@example.test");
         assertPoint(writes.get(2), "ContactAddresses", 101, "HOME", "101 Client Street", null);
-        assertPoint(writes.get(3), "ContactPhoneNumbers", 202, "MOBILE", "(555) 202-0002", "5552020002");
+        assertPoint(writes.get(3), "ContactPhoneNumbers", 202, "MOBILE", "(720) 555-0123", "+17205550123");
         assertPoint(writes.get(4), "ContactEmailAddresses", 202, "PERSONAL", "caller@example.test", "caller@example.test");
         assertPoint(writes.get(5), "ContactAddresses", 202, "HOME", "202 Caller Avenue", null);
         assertTrue(writes.get(2).sql().contains("LegacyAddressText"));
@@ -99,7 +99,7 @@ final class NewIntakeContactPersistenceRegressionTest {
                 () -> new CaseAggregateTransaction(() -> failing).execute(connection -> {
                     try {
                         invokeContactPoints(dao, connection, request(), 101,
-                                "555-101-0001", "client@example.test", "101 Client Street");
+                                "303-555-0123", "client@example.test", "101 Client Street");
                         return null;
                     } catch (Exception ex) {
                         throw new RuntimeException(ex);
@@ -119,7 +119,7 @@ final class NewIntakeContactPersistenceRegressionTest {
         assertThrows(RuntimeException.class, () -> new CaseAggregateTransaction(() -> failing).execute(connection -> {
             try {
                 invokeContactPoints(dao, connection, request(), 101,
-                        "555-101-0001", "client@example.test", "101 Client Street");
+                        "303-555-0123", "client@example.test", "101 Client Street");
                 return null;
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
@@ -169,6 +169,8 @@ final class NewIntakeContactPersistenceRegressionTest {
         assertEquals(kind, execution.bindings().get(3));
         assertEquals(displayValue, execution.bindings().get(4));
         if (normalizedValue != null) assertEquals(normalizedValue, execution.bindings().get(5));
+        assertEquals(execution.sql().chars().filter(c->c=='?').count(),execution.bindings().size(),"nullable values must retain one binding per SQL column");
+        if(table.equals("ContactPhoneNumbers"))assertNull(execution.bindings().get(6),"main number excludes the optional extension");
     }
 
     private static boolean isEntityAudit(Execution execution) {
@@ -214,7 +216,8 @@ final class NewIntakeContactPersistenceRegressionTest {
                 });
     }
 
-    private static PreparedStatement statement(String sql, List<Execution> executions, String failTable) {
+    private static PreparedStatement statement(String sql, List<Execution> executions, String failTable) {return statement(sql,executions,failTable,0,0);}
+    private static PreparedStatement statement(String sql, List<Execution> executions, String failTable,int activeCount,int nextOrder) {
         Map<Integer, Object> bindings = new LinkedHashMap<>();
         return (PreparedStatement) Proxy.newProxyInstance(PreparedStatement.class.getClassLoader(),
                 new Class<?>[]{PreparedStatement.class}, (proxy, method, args) -> switch (method.getName()) {
@@ -225,7 +228,7 @@ final class NewIntakeContactPersistenceRegressionTest {
                         executions.add(new Execution(sql,
                                 Collections.unmodifiableMap(new LinkedHashMap<>(bindings))));
                         if (failTable != null && sql.contains(failTable)) throw new SQLException("structured write failed");
-                        yield resultSet();
+                        yield resultSet(sql,activeCount,nextOrder);
                     }
                     case "executeUpdate" -> {
                         executions.add(new Execution(sql,
@@ -238,12 +241,12 @@ final class NewIntakeContactPersistenceRegressionTest {
                 });
     }
 
-    private static ResultSet resultSet() {
+    private static ResultSet resultSet(String sql,int activeCount,int nextOrder) {
         int[] calls = {0};
         return (ResultSet) Proxy.newProxyInstance(ResultSet.class.getClassLoader(), new Class<?>[]{ResultSet.class},
                 (proxy, method, args) -> switch (method.getName()) {
                     case "next" -> calls[0]++ == 0;
-                    case "getInt" -> 1001;
+                    case "getInt" -> sql.startsWith("SELECT COUNT(*)")?((Integer)args[0]==1?activeCount:nextOrder):1001;
                     case "getLong" -> 1001L;
                     case "close" -> null;
                     default -> defaultValue(method.getReturnType());
@@ -277,12 +280,59 @@ final class NewIntakeContactPersistenceRegressionTest {
         return "";
     }
 
+    @Test void mergePointInsertionUsesExistingOrderAndDoesNotCreateSecondPrimary()throws Exception{
+        List<Execution> executions=new ArrayList<>();
+        Connection connection=(Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(p,m,a)->m.getName().equals("prepareStatement")?statement((String)a[0],executions,null,2,2):defaultValue(m.getReturnType()));
+        invokeContactPoints(dao(),connection,request(),101,"3035550123 x001",null,null);
+        Execution point=executions.stream().filter(e->e.sql.startsWith("INSERT dbo.ContactPhoneNumbers")).findFirst().orElseThrow();
+        assertEquals(false,point.bindings.get(7));assertEquals(2,point.bindings.get(8));assertEquals("001",point.bindings.get(6));assertEquals("+13035550123",point.bindings.get(5));
+    }
+    @Test void intakeProvenanceRequiresMatchingSessionTenantActorAndActiveAccount()throws Exception{
+        Method guard=CaseDao.class.getDeclaredMethod("requireIntakeSession",Connection.class,CaseDao.NewIntakeCreateRequest.class);guard.setAccessible(true);
+        for(int[] context:List.of(new int[]{7,9,1},new int[]{42,9,1},new int[]{7,10,1},new int[]{7,9,0})){
+            Connection connection=(Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(p,m,a)->{
+                if(!m.getName().equals("prepareStatement"))return defaultValue(m.getReturnType());String sql=(String)a[0];
+                return Proxy.newProxyInstance(PreparedStatement.class.getClassLoader(),new Class<?>[]{PreparedStatement.class},(ps,method,args)->{
+                    if(!method.getName().equals("executeQuery"))return defaultValue(method.getReturnType());boolean[] next={true};int value=sql.contains("PrincipalUserId")?context[1]:context[0];
+                    return Proxy.newProxyInstance(ResultSet.class.getClassLoader(),new Class<?>[]{ResultSet.class},(rs,get,arguments)->switch(get.getName()){
+                        case "next"->{boolean found=next[0]&&(!sql.contains("FROM dbo.Users")||context[2]==1);next[0]=false;yield found;}case "getObject","getInt"->value;default->defaultValue(get.getReturnType());});
+                });
+            });
+            if(context[0]==7&&context[1]==9&&context[2]==1)assertDoesNotThrow(()->guard.invoke(null,connection,request()));
+            else {InvocationTargetException failure=assertThrows(InvocationTargetException.class,()->guard.invoke(null,connection,request()));assertInstanceOf(SecurityException.class,failure.getCause());}
+        }
+    }
+
+    private static CaseDao.NewIntakeCreateRequest withValues(Map<String,Object> replacements)throws Exception {
+        var components=CaseDao.NewIntakeCreateRequest.class.getRecordComponents();
+        Object[] values=new Object[components.length];Class<?>[] types=new Class<?>[components.length];
+        var original=request();
+        for(int i=0;i<components.length;i++){types[i]=components[i].getType();values[i]=replacements.containsKey(components[i].getName())?replacements.get(components[i].getName()):components[i].getAccessor().invoke(original);}
+        return CaseDao.NewIntakeCreateRequest.class.getDeclaredConstructor(types).newInstance(values);
+    }
+    @Test void requiredPhonesAndIndependentUnavailableReasonsAreAuthoritative()throws Exception{
+        assertThrows(IllegalArgumentException.class,()->CaseDao.validateIntakeContactValues(withValues(Map.of("clientPhone",""))));
+        assertDoesNotThrow(()->CaseDao.validateIntakeContactValues(withValues(Map.of("clientPhone","","clientPhoneUnavailableReason",com.shale.core.validation.PhoneUnavailableReason.UNKNOWN))));
+        assertThrows(IllegalArgumentException.class,()->CaseDao.validateIntakeContactValues(withValues(Map.of("clientPhone","","clientPhoneUnavailableReason",com.shale.core.validation.PhoneUnavailableReason.UNKNOWN,"callerPhone",""))));
+        assertDoesNotThrow(()->CaseDao.validateIntakeContactValues(withValues(Map.of("clientPhone","","clientPhoneUnavailableReason",com.shale.core.validation.PhoneUnavailableReason.UNKNOWN,"callerPhone","","callerPhoneUnavailableReason",com.shale.core.validation.PhoneUnavailableReason.NO_PHONE))));
+        assertThrows(IllegalArgumentException.class,()->CaseDao.validateIntakeContactValues(withValues(Map.of("clientPhone","0","clientPhoneUnavailableReason",com.shale.core.validation.PhoneUnavailableReason.NOT_PROVIDED))));
+        assertDoesNotThrow(()->CaseDao.validateIntakeContactValues(withValues(Map.of("callerIsClient",true,"callerPhone","0"))));
+        assertThrows(IllegalArgumentException.class,()->CaseDao.validateIntakeContactValues(withValues(Map.of("clientPhoneExtension","ABC"))));
+    }
+    @Test void availabilityObservationsCopyClientReasonOnlyWhenCallerIsClient()throws Exception{
+        var method=CaseDao.class.getDeclaredMethod("recordPhoneAvailability",Connection.class,CaseDao.NewIntakeCreateRequest.class,long.class,int.class,int.class);method.setAccessible(true);
+        List<Execution> writes=new ArrayList<>();var request=withValues(Map.of("callerIsClient",true,"clientPhone","","clientPhoneUnavailableReason",com.shale.core.validation.PhoneUnavailableReason.UNKNOWN));
+        method.invoke(null,recordingConnection(writes,null),request,10L,101,101);
+        assertEquals(2,writes.size());assertEquals("CLIENT",writes.get(0).bindings.get(4));assertEquals("CALLER",writes.get(1).bindings.get(4));
+        for(var write:writes){assertEquals("UNKNOWN",write.bindings.get(5));assertEquals(7,write.bindings.get(1));assertEquals(101,write.bindings.get(3));assertEquals(9,write.bindings.get(6));}
+    }
+
     private static CaseDao.NewIntakeCreateRequest request() {
         return new CaseDao.NewIntakeCreateRequest(7, "Intake", LocalDate.of(2026, 9, 1), LocalTime.NOON,
                 false, 1, 2, "description", "summary", null, null, null, null, null,
-                "Client", "Person", "101 Client Street", "(555) 101-0001", "client@example.test",
+                "Client", "Person", "101 Client Street", "(303) 555-0123", "client@example.test",
                 LocalDate.of(1984, 2, 3), true, "Client condition", false,
-                "Caller", "Person", "(555) 202-0002", "202 Caller Avenue", "caller@example.test",
+                "Caller", "Person", "(720) 555-0123", "202 Caller Avenue", "caller@example.test",
                 List.of(), 9, 1L, new byte[]{1}, List.of());
     }
 }

@@ -62,7 +62,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 						row.condition(),
 						row.notes(),
 						row.deceased(),
-						row.client()));
+						row.client(),row.updatedAt()==null?null:row.updatedAt().toString(),row.phoneExtension()));
 	}
 
 	private String presentationName(ContactDao.DirectoryContactRow row, int shaleClientId) {
@@ -197,7 +197,7 @@ public final class ContactServiceAdapter implements ContactServicePort {
 				command.dateOfBirth() == null ? null : java.time.LocalDate.parse(command.dateOfBirth()),
 				command.condition(),
 				command.deceased() == null ? current.deceased() : command.deceased(),
-				current.client()));
+				current.client(),command.phoneUpdate()==null&&command.emailUpdate()==null?current.updatedAt():command.expectedUpdatedAt(),command.phoneUpdate(),command.emailUpdate()));
 	}
 
 	@Override

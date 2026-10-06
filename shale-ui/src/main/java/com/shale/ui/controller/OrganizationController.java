@@ -1,5 +1,6 @@
 package com.shale.ui.controller;
 
+import com.shale.data.validation.ContactValues;
 import com.shale.ui.component.richtext.NarrativeMarkdownCodec;
 
 import java.time.ZoneId;
@@ -540,8 +541,8 @@ public final class OrganizationController {
 		if(phoneCards==null||emailCards==null||addressCards==null||websiteCards==null)return;
 		phoneCards.getChildren().clear();emailCards.getChildren().clear();addressCards.getChildren().clear();websiteCards.getChildren().clear();
 		if(currentContactProfile!=null){
-			currentContactProfile.activePhones().stream().sorted(contactOrder(OrganizationServicePort.OrganizationPhoneNumber::primary,OrganizationServicePort.OrganizationPhoneNumber::sortOrder,OrganizationServicePort.OrganizationPhoneNumber::id)).forEach(p->phoneCards.getChildren().add(methodCard(phoneDisplay(p),kindLabel(p.kind(),p.rawKind()),p.primary(),p.fax()?null:"Call",()->externalActions.open(ContactExternalActions.telephone(p.normalizedNumber(),p.extension())))));
-			currentContactProfile.activeEmails().stream().sorted(contactOrder(OrganizationServicePort.OrganizationEmailAddress::primary,OrganizationServicePort.OrganizationEmailAddress::sortOrder,OrganizationServicePort.OrganizationEmailAddress::id)).forEach(e->emailCards.getChildren().add(methodCard(e.emailAddress(),kindLabel(e.kind(),e.rawKind()),e.primary(),validEmail(e.emailAddress())?"Email":null,()->externalActions.open(ContactExternalActions.email(e.emailAddress())))));
+			currentContactProfile.activePhones().stream().sorted(contactOrder(OrganizationServicePort.OrganizationPhoneNumber::primary,OrganizationServicePort.OrganizationPhoneNumber::sortOrder,OrganizationServicePort.OrganizationPhoneNumber::id)).forEach(p->phoneCards.getChildren().add(methodCard(phoneDisplay(p),kindLabel(p.kind(),p.rawKind()),p.primary(),p.fax()||!ContactValues.INSTANCE.usablePhone(p.displayNumber(),p.extension())?null:"Call",()->externalActions.open(ContactExternalActions.telephone(p.displayNumber(),p.extension())))));
+			currentContactProfile.activeEmails().stream().sorted(contactOrder(OrganizationServicePort.OrganizationEmailAddress::primary,OrganizationServicePort.OrganizationEmailAddress::sortOrder,OrganizationServicePort.OrganizationEmailAddress::id)).forEach(e->emailCards.getChildren().add(methodCard(e.emailAddress()+(validEmail(e.emailAddress())?"":" · Needs review; emailing unavailable"),kindLabel(e.kind(),e.rawKind()),e.primary(),validEmail(e.emailAddress())?"Email":null,()->externalActions.open(ContactExternalActions.email(e.emailAddress())))));
 			currentContactProfile.activeAddresses().stream().sorted(contactOrder(OrganizationServicePort.OrganizationAddress::primary,OrganizationServicePort.OrganizationAddress::sortOrder,OrganizationServicePort.OrganizationAddress::id)).forEach(a->{String value=formatAddress(a);addressCards.getChildren().add(methodCard(value,kindLabel(a.kind(),a.rawKind()),a.primary(),value.isBlank()?null:"Open in Maps",()->externalActions.open(ContactExternalActions.maps(value))));});
 			currentContactProfile.activeWebsites().stream().sorted(contactOrder(OrganizationServicePort.OrganizationWebsite::primary,OrganizationServicePort.OrganizationWebsite::sortOrder,OrganizationServicePort.OrganizationWebsite::id)).forEach(w->websiteCards.getChildren().add(methodCard(w.website(),kindLabel(w.kind(),w.rawKind()),w.primary(),safeWebsite(w.website())?"Open Website":null,()->externalActions.open(ContactExternalActions.website(w.website())))));
 		}
@@ -551,11 +552,13 @@ public final class OrganizationController {
 		return new ContactMethodDisplayCard(value,kind,primary,action,()->{try{launch.run();}catch(RuntimeException ex){AppDialogs.showError(dialogOwner(editButton),"Open External Action","Unable to open this item.");}});
 	}
 	private static void showGroup(Node node,boolean show){if(node!=null){node.setVisible(show);node.setManaged(show);}}
-	private static String phoneDisplay(OrganizationServicePort.OrganizationPhoneNumber p){return p.displayNumber()+(p.extension()==null||p.extension().isBlank()?"":" ext. "+p.extension());}
+    private static String phoneDisplay(OrganizationServicePort.OrganizationPhoneNumber p){return ContactValues.INSTANCE.usablePhone(p.displayNumber(),p.extension())?ContactValues.INSTANCE.phone(p.displayNumber(),p.extension(),true,"phone").preview():p.displayNumber()+" · Needs review; calling unavailable";}
+
 	private static String kindLabel(Enum<?> kind,String raw){if(kind==null||"UNKNOWN".equals(kind.name()))return readable(raw);return readable(kind.name());}
 	private static String readable(String value){if(value==null||value.isBlank())return "Other";String s=value.trim().replace('_',' ').toLowerCase();return Character.toUpperCase(s.charAt(0))+s.substring(1);}
 	private static String formatAddress(OrganizationServicePort.OrganizationAddress a){return java.util.stream.Stream.of(a.addressLine1(),a.addressLine2(),a.city(),a.stateOrProvince(),a.postalCode(),a.country()).filter(v->v!=null&&!v.isBlank()).map(String::trim).collect(java.util.stream.Collectors.joining(", "));}
-	private static boolean validEmail(String value){return value!=null&&value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");}
+    private static boolean validEmail(String value){return ContactValues.INSTANCE.usableEmail(value);}
+
 	private static boolean safeWebsite(String value){try{ContactExternalActions.website(value);return true;}catch(IllegalArgumentException ex){return false;}}
 	private static <T> Comparator<T> contactOrder(java.util.function.Predicate<T> primary,java.util.function.ToIntFunction<T> order,java.util.function.ToLongFunction<T> id){return Comparator.<T,Boolean>comparing(primary::test).reversed().thenComparingInt(order).thenComparingLong(id);}
 	private static void configureMethodTiles(TilePane pane){double width=pane.getWidth();boolean two=width>=600;pane.setPrefColumns(two?2:1);pane.setPrefTileWidth(two?Math.max(250,(width-pane.getHgap())/2):Math.max(250,width));}

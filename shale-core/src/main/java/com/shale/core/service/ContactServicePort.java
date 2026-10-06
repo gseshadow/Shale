@@ -111,7 +111,39 @@ public interface ContactServicePort {
 			String condition,
 			String notes,
 			boolean deceased,
-			boolean client) {
+			boolean client,String updatedAt,String phoneExtension) {
+        public ContactDetail(
+			int id,
+			int shaleClientId,
+			String name,
+			String firstName,
+			String lastName,
+			String displayName,
+			String email,
+			String phone,
+			String address,
+			String dateOfBirth,
+			String condition,
+			String notes,
+			boolean deceased,
+			boolean client,String updatedAt){this(id,shaleClientId,name,firstName,lastName,displayName,email,phone,address,dateOfBirth,condition,notes,deceased,client,updatedAt,null);}
+
+        public ContactDetail(
+			int id,
+			int shaleClientId,
+			String name,
+			String firstName,
+			String lastName,
+			String displayName,
+			String email,
+			String phone,
+			String address,
+			String dateOfBirth,
+			String condition,
+			String notes,
+			boolean deceased,
+			boolean client){this(id,shaleClientId,name,firstName,lastName,displayName,email,phone,address,dateOfBirth,condition,notes,deceased,client,null);}
+
 	}
 
 	/** A selectable effective Contact Type or Specialty; the id is always the stored definition id. */
@@ -216,7 +248,21 @@ public interface ContactServicePort {
 			String address,
 			String dateOfBirth,
 			String condition,
-			Boolean deceased) {
+			Boolean deceased,java.time.Instant expectedUpdatedAt, com.shale.core.validation.ValueUpdate phoneUpdate, com.shale.core.validation.ValueUpdate emailUpdate) {
+        public UpdateContactCommand(
+			int contactId,
+			int shaleClientId,
+			int actorUserId,
+			String name,
+			String firstName,
+			String lastName,
+			String email,
+			String phone,
+			String address,
+			String dateOfBirth,
+			String condition,
+			Boolean deceased){this(contactId,shaleClientId,actorUserId,name,firstName,lastName,email,phone,address,dateOfBirth,condition,deceased,null,null,null);}
+
 	}
 
 	enum DefinitionCategory { CONTACT_TYPE, SPECIALTY, CREDENTIAL }

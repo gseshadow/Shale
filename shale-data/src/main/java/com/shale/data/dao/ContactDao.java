@@ -1,5 +1,6 @@
 package com.shale.data.dao;
 
+import com.shale.data.validation.ContactValues;
 import com.shale.core.semantics.RoleSemantics;
 import com.shale.core.service.ContactServicePort.DefinitionCategory;
 import com.shale.core.service.ContactServicePort.DirectoryFilters;
@@ -80,7 +81,26 @@ public final class ContactDao {
             boolean client,
             boolean deleted,
             Instant updatedAt
-    ) {
+    ,String phoneExtension) {
+        public ContactDetailRow(
+            int id,
+            int shaleClientId,
+            String name,
+            String firstName,
+            String lastName,
+            String displayName,
+            String email,
+            String phone,
+            String address,
+            LocalDate dateOfBirth,
+            String condition,
+            String notes,
+            boolean deceased,
+            boolean client,
+            boolean deleted,
+            Instant updatedAt
+    ){this(id,shaleClientId,name,firstName,lastName,displayName,email,phone,address,dateOfBirth,condition,notes,deceased,client,deleted,updatedAt,null);}
+
     }
 
     public record ContactProfileUpdateRequest(
@@ -97,7 +117,23 @@ public final class ContactDao {
             String condition,
             boolean deceased,
             boolean client
-    ) {
+    ,Instant expectedUpdatedAt,com.shale.core.validation.ValueUpdate phoneUpdate,com.shale.core.validation.ValueUpdate emailUpdate) {
+        public ContactProfileUpdateRequest(
+            int contactId,
+            int shaleClientId,
+            Integer actorUserId,
+            String name,
+            String firstName,
+            String lastName,
+            String email,
+            String phone,
+            String address,
+            LocalDate dateOfBirth,
+            String condition,
+            boolean deceased,
+            boolean client
+    ){this(contactId,shaleClientId,actorUserId,name,firstName,lastName,email,phone,address,dateOfBirth,condition,deceased,client,null,null,null);}
+
     }
 
     public record DefinitionRow(int id, String systemKey, String name, String description, String color,
@@ -772,8 +808,12 @@ public final class ContactDao {
         }
 
         try (Connection con = db.requireConnection()) {
+            con.setAutoCommit(false);
+            try {
+            int actor=requireBasicActor(con,request.shaleClientId(),request.actorUserId());
             verifyTenantMatchesSession(con, request.shaleClientId());
-            ContactDetailRow before = findById(request.contactId(), request.shaleClientId());
+            String previousCondition;
+            try(var lock=con.prepareStatement("SELECT UpdatedAt,Condition FROM dbo.Contacts WITH(UPDLOCK,HOLDLOCK) WHERE Id=? AND ShaleClientId=? AND ISNULL(IsDeleted,0)=0")){lock.setInt(1,request.contactId());lock.setInt(2,request.shaleClientId());try(var r=lock.executeQuery()){if(!r.next())return false;previousCondition=r.getString(2);Timestamp t=r.getTimestamp(1);if(!Objects.equals(t==null?null:t.toInstant(),request.expectedUpdatedAt()))throw new IllegalStateException("This Contact changed. Reload and retry.");}}
             ContactSchema schema = ContactSchema.load(con);
             logDetectedCoreColumns(schema);
 
@@ -828,21 +868,14 @@ public final class ContactDao {
                 boolean updated = ps.executeUpdate() > 0;
                 if (updated) {
                     replaceBasicStructuredPoints(con, request.contactId(), request.shaleClientId(), request.actorUserId(),
-                            request.email(), request.phone(), request.address());
-                    ContactDetailRow after = findById(request.contactId(), request.shaleClientId());
-                    if (before != null && after != null) {
-                        phiAuditService.auditUpdate(
-                                request.actorUserId(),
-                                "Contacts",
-                                "Condition",
-                                (long) request.contactId(),
-                                before.condition(),
-                                after.condition());
-                    }
+                            request.email(), request.phone(), request.address(),request.emailUpdate(),request.phoneUpdate());
+                    phiAuditService.auditUpdate(con,actor,"Contacts","Condition",(long)request.contactId(),previousCondition,request.condition());
                 }
                 logPerf("contacts.save.query", "contactId=" + request.contactId() + " tenantId=" + request.shaleClientId() + " updated=" + updated, started);
-                return updated;
+                if(updated)new EntityActionAuditDao().append(con,EntityActionAuditEvent.now(request.shaleClientId(),actor,EntityActionAuditEvent.EntityType.CONTACT,request.contactId(),EntityActionAuditEvent.Action.UPDATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,request.contactId())));
+                con.commit();return updated;
             }
+            }catch(SQLException|RuntimeException ex){con.rollback();throw ex;}
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update contact basic profile (id=" + request.contactId() + ")", e);
         }
@@ -861,6 +894,9 @@ public final class ContactDao {
         }
 
         try (Connection con = db.requireConnection()) {
+            con.setAutoCommit(false);
+            try {
+            int actor=requireBasicActor(con,request.shaleClientId(),request.actorUserId());
             verifyTenantMatchesSession(con, request.shaleClientId());
             ContactSchema schema = ContactSchema.load(con);
             logDetectedCoreColumns(schema);
@@ -936,16 +972,18 @@ public final class ContactDao {
                             request.email(), request.phone(), request.address());
                     if (normalizeOptional(request.condition()) != null) {
                         phiAuditService.auditUpdate(
-                                request.actorUserId(),
+                                con, actor,
                                 "Contacts",
                                 "Condition",
                                 (long) contactId,
                                 null,
                                 normalizeOptional(request.condition()));
                     }
-                    return contactId;
+                    new EntityActionAuditDao().append(con,EntityActionAuditEvent.now(request.shaleClientId(),actor,EntityActionAuditEvent.EntityType.CONTACT,contactId,EntityActionAuditEvent.Action.CREATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,contactId)));
+                    con.commit();return contactId;
                 }
             }
+            }catch(SQLException|RuntimeException ex){con.rollback();throw ex;}
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create contact", e);
         }
@@ -956,39 +994,67 @@ public final class ContactDao {
      * values are authoritative structured rows. This method deliberately has no dbo.Contacts
      * projection or column discovery.
      */
-    private static void replaceBasicStructuredPoints(Connection con, int contactId, int tenantId,
-            Integer actorUserId, String email, String phone, String address) throws SQLException {
-        replaceBasicStructuredPoint(con, "ContactEmailAddresses", "EmailAddress,NormalizedEmail", contactId,
-                tenantId, actorUserId, "PERSONAL", normalizeOptional(email),
-                normalizeOptional(email) == null ? null : normalizeOptional(email).toLowerCase(Locale.ROOT));
-        String normalizedPhone = normalizeOptional(phone) == null ? null
-                : normalizeOptional(phone).replaceAll("[^0-9+]", "");
-        replaceBasicStructuredPoint(con, "ContactPhoneNumbers", "DisplayNumber,NormalizedNumber", contactId,
-                tenantId, actorUserId, "MOBILE", normalizeOptional(phone), normalizedPhone);
-        replaceBasicStructuredPoint(con, "ContactAddresses", "LegacyAddressText", contactId,
-                tenantId, actorUserId, "HOME", normalizeOptional(address));
+    private static void replaceBasicStructuredPoints(Connection con,int contactId,int tenantId,Integer actor,String email,String phone,String address,com.shale.core.validation.ValueUpdate emailUpdate,com.shale.core.validation.ValueUpdate phoneUpdate)throws SQLException{
+        if(emailUpdate!=null&&emailUpdate.extension()!=null)throw new com.shale.core.validation.FieldValidationException("email","unsupported_extension","Email addresses do not have extensions.");
+        if(emailUpdate==null||!emailUpdate.retained())replaceBasicStructuredPoint(con,"ContactEmailAddresses","EmailAddress,NormalizedEmail",contactId,tenantId,actor,"PERSONAL",emailUpdate==null?email:emailUpdate.input());
+        if(phoneUpdate==null||!phoneUpdate.retained())replaceBasicStructuredPoint(con,"ContactPhoneNumbers","DisplayNumber,NormalizedNumber,Extension",contactId,tenantId,actor,"MOBILE",phoneUpdate==null?phone:phoneUpdate.input(),phoneUpdate==null?null:phoneUpdate.extension(),phoneUpdate!=null);
+
+        replaceBasicStructuredPoint(con,"ContactAddresses","LegacyAddressText",contactId,tenantId,actor,"HOME",address);
+    }
+    private static void replaceBasicStructuredPoints(Connection con,int contactId,int tenantId,Integer actorUserId,String email,String phone,String address)throws SQLException{
+        replaceBasicStructuredPoint(con,"ContactEmailAddresses","EmailAddress,NormalizedEmail",contactId,tenantId,actorUserId,"PERSONAL",email);
+        replaceBasicStructuredPoint(con,"ContactPhoneNumbers","DisplayNumber,NormalizedNumber,Extension",contactId,tenantId,actorUserId,"MOBILE",phone);
+        replaceBasicStructuredPoint(con,"ContactAddresses","LegacyAddressText",contactId,tenantId,actorUserId,"HOME",address);
+    }
+    /** A basic field owns one selected kind row. Additional rows and other kinds are retained. */
+    private static void replaceBasicStructuredPoint(Connection con,String table,String valueColumns,int contactId,int tenantId,Integer actorUserId,String kind,String desired)throws SQLException{
+        replaceBasicStructuredPoint(con,table,valueColumns,contactId,tenantId,actorUserId,kind,desired,null,false);
+    }
+    private static void replaceBasicStructuredPoint(Connection con,String table,String valueColumns,int contactId,int tenantId,Integer actorUserId,String kind,String desired,String suppliedExtension,boolean extensionOwned)throws SQLException{
+        Long id=null;String original=null,originalExtension=null;byte[] rv=null;boolean primary=false;int order=0;
+        try(var p=con.prepareStatement("SELECT TOP(1) Id,"+valueColumns.split(",")[0]+",RowVer,IsPrimary,SortOrder,"+(table.equals("ContactPhoneNumbers")?"Extension":"CAST(NULL AS nvarchar(20))")+",Kind FROM dbo."+table+" WITH(UPDLOCK,HOLDLOCK) WHERE ShaleClientId=? AND ContactId=? AND IsDeleted=0 ORDER BY IsPrimary DESC,SortOrder,Id")){
+            p.setInt(1,tenantId);p.setInt(2,contactId);try(var r=p.executeQuery()){if(r.next()){id=r.getLong(1);original=r.getString(2);rv=r.getBytes(3);primary=r.getBoolean(4);order=r.getInt(5);originalExtension=r.getString(6);kind=r.getString(7);}}
+        }
+        if((Objects.equals(original,desired)&&(!extensionOwned||Objects.equals(Objects.toString(originalExtension,""),Objects.toString(suppliedExtension,""))))||original==null&&normalizeOptional(desired)==null&&ContactValues.trim(suppliedExtension)==null)return;
+        String value=normalizeOptional(desired);List<String> values=new ArrayList<>();
+        if(table.equals("ContactPhoneNumbers")&&value==null&&ContactValues.trim(suppliedExtension)!=null)ContactValues.INSTANCE.phone(desired,suppliedExtension,false,"phone");
+        if(value!=null){
+            if(table.equals("ContactPhoneNumbers")){var v=ContactValues.INSTANCE.phone(desired,suppliedExtension,true,"phone");if(!extensionOwned&&v.extension()==null&&originalExtension!=null)v=ContactValues.INSTANCE.phone(desired,originalExtension,true,"phone");values=java.util.Arrays.asList(v.displayInput(),v.canonicalNumber(),v.extension());}
+            else if(table.equals("ContactEmailAddresses")){var v=ContactValues.INSTANCE.email(desired,true,"email");values=List.of(v.displayInput(),v.comparisonKey());}
+            else values=List.of(value);
+        }
+        int actor=requireBasicActor(con,tenantId,actorUserId);
+        var type=table.equals("ContactPhoneNumbers")?EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER:table.equals("ContactEmailAddresses")?EntityActionAuditEvent.EntityType.CONTACT_EMAIL_ADDRESS:EntityActionAuditEvent.EntityType.CONTACT_ADDRESS;
+        EntityActionAuditEvent.Action action;
+        if(id!=null){
+            String sets=value==null?"IsDeleted=1,IsPrimary=0,DeletedAt=SYSUTCDATETIME(),DeletedByUserId=?,":java.util.Arrays.stream(valueColumns.split(",")).map(c->c+"=?,").collect(java.util.stream.Collectors.joining());
+            try(var p=con.prepareStatement("UPDATE dbo."+table+" SET "+sets+"UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND ContactId=? AND RowVer=?")){
+                int i=1;if(value==null)p.setInt(i++,actor);else for(String v:values)p.setString(i++,v);p.setInt(i++,actor);p.setLong(i++,id);p.setInt(i++,tenantId);p.setInt(i++,contactId);p.setBytes(i,rv);if(p.executeUpdate()!=1)throw new IllegalStateException("A Contact point changed. Reload and retry.");
+            }action=value==null?EntityActionAuditEvent.Action.REMOVED:EntityActionAuditEvent.Action.UPDATED;
+        }else{
+            try(var p=con.prepareStatement("SELECT COUNT(*),COALESCE(MAX(SortOrder),-1)+1 FROM dbo."+table+" WHERE ShaleClientId=? AND ContactId=? AND IsDeleted=0")){p.setInt(1,tenantId);p.setInt(2,contactId);try(var r=p.executeQuery()){r.next();primary=r.getInt(1)==0;order=r.getInt(2);}}
+            String q=String.join(",",Collections.nCopies(values.size(),"?"));
+            try(var p=con.prepareStatement("INSERT dbo."+table+"(ShaleClientId,ContactId,Kind,"+valueColumns+",IsPrimary,SortOrder,CreatedByUserId) OUTPUT INSERTED.Id VALUES(?,?,?,"+q+",?,?,?)")){
+                int i=1;p.setInt(i++,tenantId);p.setInt(i++,contactId);p.setString(i++,kind);for(String v:values)p.setString(i++,v);p.setBoolean(i++,primary);p.setInt(i++,order);p.setInt(i,actor);try(var r=p.executeQuery()){if(!r.next())throw new SQLException("Contact point was not created.");id=r.getLong(1);}
+            }action=EntityActionAuditEvent.Action.CREATED;
+        }
+        new EntityActionAuditDao().append(con,EntityActionAuditEvent.now(tenantId,actor,type,id,action,EntityActionAuditEvent.EntityType.CONTACT,(long)contactId,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,contactId,EntityActionAuditEvent.MetadataKey.KIND,kind,EntityActionAuditEvent.MetadataKey.PRIMARY,value!=null&&primary)));
+        if(value==null)compactBasicPointOrder(con,table,contactId,tenantId,actor,type);
+    }
+    private static void compactBasicPointOrder(Connection con,String table,int contact,int tenant,int actor,EntityActionAuditEvent.EntityType type)throws SQLException{
+        record Position(long id,String kind,boolean primary,int order,byte[] rv){}
+        List<Position> rows=new ArrayList<>();
+        try(var p=con.prepareStatement("SELECT Id,Kind,IsPrimary,SortOrder,RowVer FROM dbo."+table+" WITH(UPDLOCK,HOLDLOCK) WHERE ShaleClientId=? AND ContactId=? AND IsDeleted=0 ORDER BY SortOrder,Id")){p.setInt(1,tenant);p.setInt(2,contact);try(var r=p.executeQuery()){while(r.next())rows.add(new Position(r.getLong(1),r.getString(2),r.getBoolean(3),r.getInt(4),r.getBytes(5)));}}
+        for(int i=0;i<rows.size();i++){var row=rows.get(i);if(row.order()==i)continue;
+            try(var p=con.prepareStatement("UPDATE dbo."+table+" SET SortOrder=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? WHERE Id=? AND ShaleClientId=? AND ContactId=? AND RowVer=?")){p.setInt(1,i);p.setInt(2,actor);p.setLong(3,row.id());p.setInt(4,tenant);p.setInt(5,contact);p.setBytes(6,row.rv());if(p.executeUpdate()!=1)throw new IllegalStateException("A Contact point changed. Reload and retry.");}
+            new EntityActionAuditDao().append(con,EntityActionAuditEvent.now(tenant,actor,type,row.id(),EntityActionAuditEvent.Action.REORDERED,EntityActionAuditEvent.EntityType.CONTACT,(long)contact,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,contact,EntityActionAuditEvent.MetadataKey.KIND,row.kind(),EntityActionAuditEvent.MetadataKey.PRIMARY,row.primary())));
+        }
     }
 
-    private static void replaceBasicStructuredPoint(Connection con, String table, String valueColumns,
-            int contactId, int tenantId, Integer actorUserId, String kind, String... values) throws SQLException {
-        String remove = "UPDATE dbo." + table + " SET IsDeleted=1,IsPrimary=0,DeletedAt=SYSUTCDATETIME(),"
-                + "DeletedByUserId=?,UpdatedAt=SYSUTCDATETIME(),UpdatedByUserId=? "
-                + "WHERE ContactId=? AND ShaleClientId=? AND Kind=? AND IsDeleted=0";
-        try (PreparedStatement ps = con.prepareStatement(remove)) {
-            if (actorUserId == null) { ps.setNull(1, Types.INTEGER); ps.setNull(2, Types.INTEGER); }
-            else { ps.setInt(1, actorUserId); ps.setInt(2, actorUserId); }
-            ps.setInt(3, contactId); ps.setInt(4, tenantId); ps.setString(5, kind); ps.executeUpdate();
-        }
-        if (values.length == 0 || values[0] == null) return;
-        String placeholders = String.join(",", Collections.nCopies(values.length, "?"));
-        String insert = "INSERT dbo." + table + " (ShaleClientId,ContactId,Kind," + valueColumns
-                + ",IsPrimary,SortOrder,CreatedByUserId) VALUES (?,?,?," + placeholders + ",1,0,?)";
-        try (PreparedStatement ps = con.prepareStatement(insert)) {
-            int i=1; ps.setInt(i++,tenantId); ps.setInt(i++,contactId); ps.setString(i++,kind);
-            for (String value : values) ps.setString(i++, value);
-            if (actorUserId == null) ps.setNull(i, Types.INTEGER); else ps.setInt(i, actorUserId);
-            ps.executeUpdate();
-        }
+    private static int requireBasicActor(Connection c,int tenant,Integer requested)throws SQLException{
+        int actor;try(var p=c.prepareStatement("SELECT CAST(SESSION_CONTEXT(N'PrincipalUserId') AS INT)");var r=p.executeQuery()){if(!r.next()||r.getObject(1)==null)throw new SecurityException("An authenticated actor is required.");actor=r.getInt(1);}
+        if(requested!=null&&requested!=actor)throw new SecurityException("Actor does not match the current session.");
+        try(var p=c.prepareStatement("SELECT 1 FROM dbo.Users WHERE Id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0 AND ISNULL(IsRemoved,0)=0")){p.setInt(1,actor);p.setInt(2,tenant);try(var r=p.executeQuery()){if(!r.next())throw new SecurityException("An active tenant actor is required.");}}return actor;
     }
 
     public boolean softDeleteContact(int contactId, int shaleClientId) {
@@ -1091,7 +1157,7 @@ public final class ContactDao {
                 optionalColumnExpression(schema.lastNameColumn(), "c", "LastName"),
                 displayNameExpression(schema, "c"),
                 currentEmailExpression("c", schema.tenantColumn()),
-                currentPhoneExpression("c", schema.tenantColumn()),
+                currentPhoneWithExtensionExpression("c", schema.tenantColumn()),
                 currentAddressExpression("c", schema.tenantColumn()),
                 optionalDateColumnExpression(schema.dateOfBirthColumn(), "c", "DateOfBirth"),
                 optionalColumnExpression(schema.conditionColumn(), "c", "Condition"),
@@ -1129,7 +1195,7 @@ public final class ContactDao {
                         rs.getBoolean("IsDeceased"),
                         rs.getBoolean("IsClient"),
                         false,
-                        updatedAt == null ? null : updatedAt.toInstant());
+                        updatedAt == null ? null : updatedAt.toInstant(),rs.getString("PhoneExtension"));
             }
         }
     }
@@ -1357,6 +1423,7 @@ public final class ContactDao {
      * current value.  Id is the final tie-breaker so corrupt/pre-constraint data is
      * still presented deterministically.
      */
+    private static String currentPhoneWithExtensionExpression(String alias,String tenantColumn){return currentPhoneExpression(alias,tenantColumn)+", (SELECT TOP(1) p.Extension FROM dbo.ContactPhoneNumbers p WHERE p.ContactId="+alias+".Id AND p.ShaleClientId="+alias+"."+tenantColumn+" AND p.IsDeleted=0 ORDER BY p.IsPrimary DESC,p.SortOrder,p.Id) AS PhoneExtension";}
     private static String currentPhoneExpression(String alias, String tenantColumn) {
         return "(SELECT TOP(1) p.DisplayNumber FROM dbo.ContactPhoneNumbers p "
                 + "WHERE p.ContactId=" + alias + ".Id AND p.ShaleClientId=" + alias + "." + tenantColumn

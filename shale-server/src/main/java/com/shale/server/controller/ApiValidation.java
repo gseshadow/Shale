@@ -28,7 +28,7 @@ final class ApiValidation {
             throw badRequest("Email and password are required.");
         }
         String email = request.email().trim();
-        if (email.length() > MAX_EMAIL_LENGTH || !email.contains("@")) {
+        if (email.length() > 510) {
             throw badRequest("A valid email is required.");
         }
         if (request.password().length() > MAX_PASSWORD_LENGTH) {
@@ -117,13 +117,8 @@ final class ApiValidation {
         return optionalContactText(value, "Display name", MAX_CONTACT_NAME_LENGTH);
     }
 
-    static String optionalEmail(String value, String fieldName) {
-        String safeValue = optionalContactText(value, fieldName, MAX_EMAIL_LENGTH);
-        if (safeValue != null && !safeValue.contains("@")) {
-            throw badRequest(fieldName + " must be a valid email address.");
-        }
-        return safeValue;
-    }
+    static String optionalPhone(String value,String extension,String field){var parsed=com.shale.data.validation.ContactValues.INSTANCE.phone(value,extension,false,field);return parsed==null?null:parsed.displayInput()+(parsed.extension()==null?"":" ext. "+parsed.extension());}
+    static String optionalEmail(String value,String fieldName){var v=com.shale.data.validation.ContactValues.INSTANCE.email(value,false,"email");return v==null?null:v.displayInput();}
 
     static String optionalContactText(String value, String fieldName, int maxLength) {
         String safeValue = value == null ? "" : value.trim();

@@ -1,5 +1,6 @@
 package com.shale.data.dao;
 
+import com.shale.data.validation.ContactValues;
 import com.shale.core.semantics.RoleSemantics;
 import com.shale.core.runtime.DbSessionProvider;
 import com.shale.data.runtime.RuntimeSessionService;
@@ -59,7 +60,18 @@ public final class UserDao {
 			String email,
 			String phone,
 			String initials,
-			String color) {
+			String color, byte[] expectedRowVer) {
+        public UserProfileUpdateRequest(
+			int userId,
+			int shaleClientId,
+			String firstName,
+			String lastName,
+			String email,
+			String phone,
+			String initials,
+			String color){this(userId,shaleClientId,firstName,lastName,email,phone,initials,color,null);}
+        public UserProfileUpdateRequest {expectedRowVer=expectedRowVer==null?null:expectedRowVer.clone();}
+        @Override public byte[] expectedRowVer(){return expectedRowVer==null?null:expectedRowVer.clone();}
 	}
 
 	public record UserRoleRow(int roleId, String roleName) {
@@ -335,52 +347,30 @@ public final class UserDao {
 		}
 	}
 
-	public boolean updateBasicProfile(UserProfileUpdateRequest request) {
-		Objects.requireNonNull(request, "request");
-		if (request.userId() <= 0) {
-			throw new IllegalArgumentException("userId must be > 0");
-		}
-		if (request.shaleClientId() <= 0) {
-			throw new IllegalArgumentException("shaleClientId must be > 0");
-		}
-
-		try (Connection con = db.requireConnection()) {
-			verifyTenantMatchesSession(con, request.shaleClientId());
-
-			String phoneColumn = existingPhoneColumn(con);
-			StringBuilder sql = new StringBuilder("""
-					UPDATE dbo.Users
-					SET name_first = ?,
-					    name_last = ?,
-					    email = ?,
-					    Initials = ?,
-					    Color = ?
-					""");
-			if (phoneColumn != null) {
-				sql.append(",\n    ").append(phoneColumn).append(" = ?");
-			}
-			sql.append("\nWHERE Id = ?\n  AND ShaleClientId = ?");
-			appendUserVisibilityFilters(sql, con, null);
-			sql.append(";");
-
-			try (PreparedStatement ps = con.prepareStatement(sql.toString())) {
-				int idx = 1;
-				setNullableString(ps, idx++, request.firstName());
-				setNullableString(ps, idx++, request.lastName());
-				setNullableString(ps, idx++, request.email());
-				setNullableString(ps, idx++, request.initials());
-				setNullableString(ps, idx++, request.color());
-				if (phoneColumn != null) {
-					setNullableString(ps, idx++, request.phone());
-				}
-				ps.setInt(idx++, request.userId());
-				ps.setInt(idx++, request.shaleClientId());
-				return ps.executeUpdate() > 0;
-			}
-		} catch (SQLException e) {
-			throw new RuntimeException("Failed to update user basic profile (id=" + request.userId() + ")", e);
-		}
-	}
+    public boolean updateBasicProfile(UserProfileUpdateRequest request){
+        Objects.requireNonNull(request,"request");
+        if(request.expectedRowVer()==null||request.expectedRowVer().length==0)throw new IllegalArgumentException("User version is required. Reload the profile before saving.");
+        try(Connection con=db.requireConnection()){
+            verifyTenantMatchesSession(con,request.shaleClientId());con.setAutoCommit(false);
+            try{
+                int actor=requireCurrentPrincipalUserId(con);
+                // Self-edit or active tenant administrator; tenant ownership is checked independently.
+                try(var p=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE Id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0 AND ISNULL(IsRemoved,0)=0 AND (Id=? OR ISNULL(is_admin,0)=1)")){p.setInt(1,actor);p.setInt(2,request.shaleClientId());p.setInt(3,request.userId());try(var r=p.executeQuery()){if(!r.next())throw new SecurityException("You cannot edit this user profile.");}}
+                var old=findManagementUser(con,request.shaleClientId(),request.userId());
+                if(old==null||old.deleted()||old.removed())throw new IllegalArgumentException("Active user is unavailable.");
+                if(!Arrays.equals(old.rowVer(),request.expectedRowVer()))throw new IllegalStateException("This user was changed by someone else. Reload and try again.");
+                String email=validatedUserEmail(request.email(),old.email());String phone=validatedUserPhone(request.phone(),old.phone());
+                var duplicate=findExistingEmail(con,request.shaleClientId(),normalizeEmail(email));if(duplicate!=null&&duplicate.id()!=request.userId())throw new IllegalArgumentException(duplicateEmailMessage(duplicate.deleted()));
+                String phoneColumn=existingPhoneColumn(con);
+                String sql="UPDATE dbo.Users SET name_first=?,name_last=?,email=?,Initials=?,Color=?,UpdatedAt=SYSUTCDATETIME()"+(phoneColumn==null?"":","+phoneColumn+"=?")+" WHERE Id=? AND ShaleClientId=? AND RowVer=? AND ISNULL(is_deleted,0)=0 AND ISNULL(IsRemoved,0)=0";
+                try(var p=con.prepareStatement(sql)){int i=1;setNullableString(p,i++,request.firstName());setNullableString(p,i++,request.lastName());p.setString(i++,email);setNullableString(p,i++,request.initials());setNullableString(p,i++,request.color());if(phoneColumn!=null)p.setString(i++,phone);p.setInt(i++,request.userId());p.setInt(i++,request.shaleClientId());p.setBytes(i,request.expectedRowVer());if(p.executeUpdate()!=1)throw new IllegalStateException("This user was changed by someone else. Reload and try again.");}
+                entityActionAuditDao.append(con,EntityActionAuditEvent.now(request.shaleClientId(),actor,EntityActionAuditEvent.EntityType.USER,request.userId(),EntityActionAuditEvent.Action.UPDATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.TARGET_USER_ID,request.userId())));
+                con.commit();return true;
+            }catch(SQLException|RuntimeException ex){con.rollback();throw ex;}
+        }catch(SQLException ex){throw new IllegalStateException("Failed to update user profile.",ex);}
+    }
+    static String validatedUserEmail(String proposed,String baseline){if(Objects.equals(proposed,baseline))return baseline;return ContactValues.INSTANCE.email(proposed,true,"email").displayInput();}
+    static String validatedUserPhone(String proposed,String baseline){if(Objects.equals(proposed,baseline))return baseline;var v=ContactValues.INSTANCE.phone(proposed,null,false,"phone");String stored=v==null?null:v.displayInput()+(v.extension()==null?"":" ext. "+v.extension());if(stored!=null&&stored.length()>100)throw new com.shale.core.validation.FieldValidationException("phone","display_too_long","Use a shorter phone display (at most 100 characters including the extension).");return stored;}
 
 	public UserDetailRow createUser(UserCreateRequest request) {
 		Objects.requireNonNull(request, "request");
@@ -388,9 +378,11 @@ public final class UserDao {
 
 		try (Connection con = db.requireConnection()) {
 			int shaleClientId = requireCurrentShaleClientId(con);
-			requireCurrentAdmin(con, shaleClientId);
-			String email = normalizeEmail(request.email());
-			ExistingEmailRow existingEmail = findExistingEmail(con, shaleClientId, email);
+			int actor = requireCurrentAdmin(con, shaleClientId);
+			con.setAutoCommit(false);
+			try {
+			String email = ContactValues.INSTANCE.email(request.email(),true,"email").displayInput();
+			ExistingEmailRow existingEmail = findExistingEmail(con, shaleClientId, normalizeEmail(email));
 			if (existingEmail != null) {
 				throw new IllegalArgumentException(duplicateEmailMessage(existingEmail.deleted()));
 			}
@@ -428,11 +420,15 @@ public final class UserDao {
 				ps.executeUpdate();
 				try (ResultSet keys = ps.getGeneratedKeys()) {
 					if (keys.next()) {
-						return findById(keys.getInt(1), shaleClientId);
+						int userId = keys.getInt(1);
+						entityActionAuditDao.append(con, EntityActionAuditEvent.now(shaleClientId, actor, EntityActionAuditEvent.EntityType.USER, userId, EntityActionAuditEvent.Action.CREATED, null, null, Map.of(EntityActionAuditEvent.MetadataKey.TARGET_USER_ID, userId)));
+						con.commit();
+						return findById(userId, shaleClientId);
 					}
 				}
 			}
 			throw new IllegalStateException("User was created but no generated id was returned.");
+			} catch (SQLException | RuntimeException failure) { con.rollback(); throw failure; }
 		} catch (SQLException e) {
 			throw new RuntimeException("Failed to create tenant user", e);
 		}
@@ -442,7 +438,7 @@ public final class UserDao {
 		if (isBlank(request.firstName())) throw new IllegalArgumentException("First name is required.");
 		if (isBlank(request.lastName())) throw new IllegalArgumentException("Last name is required.");
 		if (isBlank(request.email())) throw new IllegalArgumentException("Email is required.");
-		if (!normalizeEmail(request.email()).contains("@")) throw new IllegalArgumentException("A valid email is required.");
+		ContactValues.INSTANCE.email(request.email(),true,"email");
 		validatePassword(request.temporaryPassword());
 	}
 
@@ -484,7 +480,7 @@ public final class UserDao {
 	public UserUpdateResult updateManagedUser(UserUpdateRequest request) {
 		Objects.requireNonNull(request,"request");
 		String first=trimRequired(request.firstName(),"First name"), last=trimRequired(request.lastName(),"Last name");
-		String email=normalizeEmail(request.email()); if(!email.contains("@")) throw new IllegalArgumentException("A valid email is required.");
+		String email=request.email();
 		if(request.expectedRowVer()==null||request.expectedRowVer().length==0) throw new IllegalArgumentException("User version is required.");
 		if(!Set.of(RoleSemantics.ROLE_ADMIN,RoleSemantics.ROLE_ATTORNEY).containsAll(request.roleIds())) throw new IllegalArgumentException("An unsupported user role was supplied.");
 		try(Connection con=db.requireConnection()) { int tenant=requireCurrentShaleClientId(con), actor=requireCurrentAdmin(con,tenant); con.setAutoCommit(false);
@@ -492,14 +488,15 @@ public final class UserDao {
 				UserManagementRow old=findManagementUser(con,tenant,request.userId()); if(old==null) throw new IllegalArgumentException("User was not found for this tenant.");
 				if(old.removed()) throw new IllegalArgumentException("Removed users cannot be edited.");
 				if(!Arrays.equals(old.rowVer(),request.expectedRowVer())) throw new IllegalStateException("This user was changed by someone else. Reload and try again.");
-				ExistingEmailRow duplicate=findExistingEmail(con,tenant,email); if(duplicate!=null&&duplicate.id()!=request.userId()) throw new IllegalArgumentException(duplicateEmailMessage(duplicate.deleted()));
+                email=validatedUserEmail(request.email(),old.email());
+				ExistingEmailRow duplicate=findExistingEmail(con,tenant,normalizeEmail(email)); if(duplicate!=null&&duplicate.id()!=request.userId()) throw new IllegalArgumentException(duplicateEmailMessage(duplicate.deleted()));
 				boolean admin=request.roleIds().contains(RoleSemantics.ROLE_ADMIN), attorney=request.roleIds().contains(RoleSemantics.ROLE_ATTORNEY);
 				if(old.admin()&&!admin&&(!old.deleted()&&countActiveAdmins(con,tenant)<=1)) throw new IllegalArgumentException("Cannot remove the last active admin in this tenant.");
-				String phoneColumn=existingPhoneColumn(con); String phoneValue=blankToNull(request.phone()), initials=blankToNull(request.initials()), color=blankToNull(request.color());
-				boolean changed=!old.firstName().equals(first)||!old.lastName().equals(last)||!normalizeEmail(old.email()).equals(email)||!Objects.equals(blankToNull(old.phone()),phoneValue)||!Objects.equals(blankToNull(old.initials()),initials)||!Objects.equals(blankToNull(old.color()),color)||old.admin()!=admin||old.attorney()!=attorney;
+				String phoneColumn=existingPhoneColumn(con); String phoneValue=validatedUserPhone(request.phone(),old.phone()), initials=blankToNull(request.initials()), color=blankToNull(request.color());
+				boolean changed=!old.firstName().equals(first)||!old.lastName().equals(last)||!Objects.equals(old.email(),email)||!Objects.equals(old.phone(),phoneValue)||!Objects.equals(blankToNull(old.initials()),initials)||!Objects.equals(blankToNull(old.color()),color)||old.admin()!=admin||old.attorney()!=attorney;
 				if(!changed){ con.rollback(); return new UserUpdateResult(old,false); }
 				String sql="UPDATE dbo.Users SET name_first=?,name_last=?,email=?,Initials=?,Color=?,is_admin=?,is_attorney=?,UpdatedAt=SYSUTCDATETIME()"+(phoneColumn==null?"":","+phoneColumn+"=?")+" WHERE Id=? AND ShaleClientId=? AND RowVer=?";
-				try(PreparedStatement ps=con.prepareStatement(sql)){int i=1;ps.setString(i++,first);ps.setString(i++,last);ps.setString(i++,email);setNullableString(ps,i++,initials);setNullableString(ps,i++,color);ps.setBoolean(i++,admin);ps.setBoolean(i++,attorney);if(phoneColumn!=null)setNullableString(ps,i++,phoneValue);ps.setInt(i++,request.userId());ps.setInt(i++,tenant);ps.setBytes(i++,request.expectedRowVer());if(ps.executeUpdate()!=1)throw new IllegalStateException("This user was changed by someone else. Reload and try again.");}
+				try(PreparedStatement ps=con.prepareStatement(sql)){int i=1;ps.setString(i++,first);ps.setString(i++,last);ps.setString(i++,email);setNullableString(ps,i++,initials);setNullableString(ps,i++,color);ps.setBoolean(i++,admin);ps.setBoolean(i++,attorney);if(phoneColumn!=null)ps.setString(i++,phoneValue);ps.setInt(i++,request.userId());ps.setInt(i++,tenant);ps.setBytes(i++,request.expectedRowVer());if(ps.executeUpdate()!=1)throw new IllegalStateException("This user was changed by someone else. Reload and try again.");}
 				var md=new EnumMap<EntityActionAuditEvent.MetadataKey,Object>(EntityActionAuditEvent.MetadataKey.class);md.put(EntityActionAuditEvent.MetadataKey.TARGET_USER_ID,request.userId());md.put(EntityActionAuditEvent.MetadataKey.ADMIN_ROLE,admin);md.put(EntityActionAuditEvent.MetadataKey.ATTORNEY_ROLE,attorney);
 				entityActionAuditDao.append(con,EntityActionAuditEvent.now(tenant,actor,EntityActionAuditEvent.EntityType.USER,request.userId(),EntityActionAuditEvent.Action.UPDATED,null,null,md)); con.commit();
 				return new UserUpdateResult(findManagementUser(con,tenant,request.userId()),true);

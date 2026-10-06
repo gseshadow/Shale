@@ -1,5 +1,6 @@
 package com.shale.ui.component.dialog;
 
+import com.shale.data.validation.ContactValues;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -28,6 +29,7 @@ public final class CreateContactDialog {
     private final TextField lastNameField = new TextField();
     private final TextField emailField = new TextField();
     private final TextField phoneField = new TextField();
+    private final TextField extensionField = new TextField();
     private final CheckBox clientCheckBox = new CheckBox("Mark as client");
     private final Label errorLabel = new Label();
     private ContactDao.CreateContactRequest result;
@@ -46,7 +48,7 @@ public final class CreateContactDialog {
         firstNameField.setPromptText("First name");
         lastNameField.setPromptText("Last name");
         emailField.setPromptText("Email");
-        phoneField.setPromptText("Phone");
+        phoneField.setPromptText("US default; international +country code");
         ControlStyles.formControl(firstNameField);
         ControlStyles.formControl(lastNameField);
         ControlStyles.formControl(emailField);
@@ -63,7 +65,8 @@ public final class CreateContactDialog {
         form.add(new Label("Email"), 0, 2);
         form.add(emailField, 1, 2);
         form.add(new Label("Phone"), 0, 3);
-        form.add(phoneField, 1, 3);
+        form.add(new VBox(4,phoneField,new Label("US default; international +country code"),new Label("Extension (optional, 1–12 digits)"),ControlStyles.formControl(extensionField),com.shale.ui.util.ContactFieldFeedback.phone(phoneField,extensionField,false,null)), 1, 3);
+        form.add(com.shale.ui.util.ContactFieldFeedback.email(emailField,false,null),2,2);
         form.add(clientCheckBox, 1, 4);
         GridPane.setHgrow(firstNameField, Priority.ALWAYS);
         GridPane.setHgrow(lastNameField, Priority.ALWAYS);
@@ -134,6 +137,8 @@ public final class CreateContactDialog {
     }
 
     private void onCreate() {
+        try{ContactValues.INSTANCE.email(emailField.getText(),false,"email");ContactValues.INSTANCE.phone(phoneField.getText(),extensionField.getText(),false,"phone");}catch(IllegalArgumentException invalid){showError(invalid.getMessage());if(!emailField.getText().isBlank()&&!ContactValues.INSTANCE.usableEmail(emailField.getText()))emailField.requestFocus();else phoneField.requestFocus();return;}
+
         String firstName = normalize(firstNameField.getText());
         String lastName = normalize(lastNameField.getText());
         if (firstName == null && lastName == null) {
@@ -147,7 +152,7 @@ public final class CreateContactDialog {
                 firstName,
                 lastName,
                 normalize(emailField.getText()),
-                normalize(phoneField.getText()),
+                phoneInput(),
                 null,
                 null,
                 null,
@@ -155,6 +160,8 @@ public final class CreateContactDialog {
                 clientCheckBox.isSelected());
         stage.close();
     }
+
+    private String phoneInput(){var v=ContactValues.INSTANCE.phone(phoneField.getText(),extensionField.getText(),false,"phone");return v==null?null:v.displayInput()+(v.extension()==null?"":" ext. "+v.extension());}
 
     private void showError(String message) {
         errorLabel.setText(message == null ? "" : message);

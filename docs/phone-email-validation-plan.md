@@ -1,7 +1,11 @@
 # Phone and email validation: inventory and implementation plan
 
-Status: inspection and proposal only. No validators, application behavior, database objects, or data
-were changed. Inspected the fetched `origin/codex/latest` at
+Status: implementation now follows the approved decisions after PR #1824. See the
+[implementation checklist](#implementation-checklist-after-pr-1824) and
+[behavior, migration, rollout and acceptance record](phone-email-validation-rollout.md).
+The inventory and proposal below describe the historical inspection; recommendations and pending
+product questions below are superseded by the approved implementation record. That inspection used
+the fetched `origin/codex/latest` at
 `e5c6229fd94cc8a7275c9ba10e881442997013d5` on 2026-10-06. Source line references below are for that
 revision; method names are the durable navigation anchors. Database statements below describe
 repository schema/migration contracts, **not a live catalog or data verification**.
@@ -538,3 +542,30 @@ Only documentation consistency, source-reference checks, selector inspection and
 are appropriate to this inspection-only change. No production/test code changed; no Maven/runtime,
 browser/JavaFX or database verification is claimed. The executed check results are recorded in the PR
 body. Suggested audit and implementation commands above are future work, not executed validation.
+
+
+## Implementation checklist after PR #1824
+
+Implementation branch starts from merged base `772b77c3ddb35546305669a379c0a35e48d3ba48`.
+Approved unavailable/US/extensions/email/legacy/PATCH decisions replace the earlier pending questions.
+No tenant policy or automatic cleanup is inferred. The remaining operational decisions are upgrade
+coordination for direct-JDBC clients, approved migration window/principal, and separately authorized
+legacy review; these do not reopen the approved validation behavior.
+
+| Inventory entry | Implemented entry/save/action behavior and current source anchors |
+| --- | --- |
+| I-UI / I-DB: Client/Caller phone and email; create and duplicate merge | `NewIntakeController.validateContactFields`, request capture, local draft/backup and `new-intake.fxml`: independent unavailable controls/reasons/extensions, shared blur/Save checks and conditional caller requirements. `CaseDao.validateIntakeContactValues`, `createIntake`, `mergeIntake`, `insertMissingContactPoints`, `insertIntakeContactPointValues`, `recordPhoneAvailability`: authoritative parser, no blank points, role provenance in transaction, extension extraction, merge primary/order and nullable binding fixes. |
+| C-UI / C-PORT / C-DB: basic and complete Contacts | `ContactViewController.PhoneEditor`/`EmailEditor` and dormant `CreateContactDialog`: staged shared checks and previews, preserved drafts, nonblocking retained warnings. `ContactDao.createContact`/`updateBasicProfile`/`replaceBasicStructuredPoint`: transaction audits, authoritative preferred point ownership, no wholesale replacement. `ContactMutationDao.inventory`/`validatePhones`/`validateEmails`/`applyPhones`/`applyEmails`: authoritative unchanged detection and tokens, normalize only new/changed; complete aggregate exact-set/kind/order/history invariants retained. |
+| O-UI / O-DB: Organization phone/fax/email, structured and compatibility paths | `OrganizationAggregateEditor` point editors; `OrganizationTypeMutationDao` transaction owner; `OrganizationStructuredContactMutationDao.reconcile`/`exact`/`legacy`/`validated`/`compactAfterRemoval`: shared persistence validation, owned compatibility edits, extension-aware duplicate behavior, mirror capacity and preserved history. Scalar deprecated DAO/service adapters still reach the authoritative owner. Parent restoration keeps existing unchanged values and invariants. |
+| U-UI / U-DB: admin Add/Edit User; User View pencil and whole-profile | `UserManagementPane` and `UserController`: shared blur/Save feedback, separate phone extensions, required new account email, warnings and retained failed drafts. `UserDao.createUser`, `updateManagedUser`, `updateBasicProfile`, `validatedUserEmail`/`validatedUserPhone`: same parser at DAO boundary, stored baseline/RowVer, preserved identity comparison and transaction audits. Account lifecycle/authentication remains compatible with existing identifiers. |
+| Web and server writes | `App.tsx.ContactValueInput`, create/edit Contact/Organization forms; `api.ts` v2 operations: unrestricted text, blur previews, extension controls, retained warnings, safe errors/focus and draft retention. `ApiReadController.updateContactV2`/`updateOrganizationV2` plus create/v1 routes delegate to the same persistence owners. `ApiExceptionHandler` structured safe errors, `ContactValueValidationController` authenticated advisory parity. V1 retains its historical contract; in-repository browser uses v2. |
+| Child removal/restoration/primary and parent restoration | Existing aggregate commands/tokens remain authoritative. `ContactPointHistory.wasPrimary` permits unchanged invalid former-primary restoration only from tenant/parent-bound persisted history. Missing evidence grants no primary exception; structural rules can require a valid preferred point. New/copy/change or deliberate invalid primary selection is rejected. No history backfill or rewrite. |
+| Communication/display projections | `ContactExternalActions`, `ContactViewController`, `OrganizationController`, `OrganizationCard`, User View previews: parse display main and separate extension for safe readable display/actions; invalid legacy communication actions disabled with warnings. Canonical value alone is not trusted as proof of usability. |
+| Settings, technical fields, import/bulk/duplicate inventory | Settings' user management paths above are covered. No separate human-contact settings/SMTP form or reachable general contact/org importer, bulk editor or duplicate/merge producer was found. Classification keys and remembered/auth identifiers remain distinct from new contact input. Historical migrations and external/older writers require rollout control, not retroactive syntax constraints. |
+| Schema and verification | Additive `docs/sql/2026-10-06_phone_email_validation.sql` and read-only `docs/sql/verification/2026-10-06_phone_email_validation_verification.sql`: intake provenance, mirror expansion without truncation, extension-aware Organization index and tenant ownership. Not executed. |
+
+See [rollout documentation](phone-email-validation-rollout.md) for examples, safe messages, legacy
+restoration evidence/missing-history behavior, unsupported email formats, account comparison limits,
+read-only audit approach, deployment prerequisites and manual Windows/browser/database checks.
+Original historical line numbers above are not current implementation line numbers; named methods and
+the current source files in this checklist are the navigation anchors.
