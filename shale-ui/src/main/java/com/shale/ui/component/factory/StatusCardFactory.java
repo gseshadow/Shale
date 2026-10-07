@@ -36,10 +36,10 @@ public class StatusCardFactory {
         card.setName(model.name());
 
         // If your ColorUtil already accepts "0xRRGGBBAA", keep using it.
-        String css = ColorUtil.toCssBackgroundColor(model.colorCss());
+        String css = ColorUtil.toCssBackgroundColorOrNull(model.colorCss());
 
-        card.setBackgroundCssColor(css);
-        card.setTextCssColor(ColorUtil.readableTextColor(model.colorCss()));
+        card.setBackgroundCssColor(css == null ? "-shale-color-card-surface" : css);
+        card.setTextCssColor(css == null ? "-shale-color-text-primary" : ColorUtil.readableTextColor(model.colorCss(), "white", "#172033"));
 
         switch (variant) {
         case FULL -> card.applyFull();
