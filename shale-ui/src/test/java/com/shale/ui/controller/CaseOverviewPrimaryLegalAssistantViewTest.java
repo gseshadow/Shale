@@ -99,7 +99,10 @@ final class CaseOverviewPrimaryLegalAssistantViewTest {
         assertTrue(deduper.contains("thenComparingInt(CaseDao.CaseUserTeamRow::roleId)"));
         assertTrue(deduper.contains("thenComparingInt(CaseDao.CaseUserTeamRow::userId)"));
         assertTrue(source.contains("renderTeamCardsFromTeamRows(rows)"), "Draft/team editor path should still pass all underlying assignments before display-only consolidation");
-        assertTrue(source.contains("assignedRoles = caseDao.listCaseUserRoles(activeCaseId)"), "Team editor should still receive all role rows from DAO");
+        String teamEditor = method(source, "private void onEditTeamInternal", "private void renderTeamFromDraft");
+        assertTrue(teamEditor.contains("baseline = caseService.listCaseTeamMemberships(tId, actorId, activeCaseId)"),
+                "Team editor must receive all authoritative memberships through the service");
+        assertTrue(teamEditor.contains("allUsers, baseline, roles"), "Display deduplication must not filter the editor baseline");
         assertFalse(deduper.contains("displayName()).distinct"));
         assertFalse(deduper.contains("SELECT DISTINCT"));
     }

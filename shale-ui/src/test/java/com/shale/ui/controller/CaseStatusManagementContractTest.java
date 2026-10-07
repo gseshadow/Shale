@@ -25,7 +25,7 @@ class CaseStatusManagementContractTest {
     void caseContextUsesSameLauncherAndGuardsDirtyNavigation() throws Exception {
         String fxml = Files.readString(Path.of("src/main/resources/fxml/case.fxml"));
         String controller = Files.readString(Path.of("src/main/java/com/shale/ui/controller/CaseController.java"));
-        assertTrue(fxml.contains("fx:id=\"caseStatusesRow\""));
+        assertFalse(fxml.contains("fx:id=\"manageCaseStatusesButton\""), "Status management belongs in its editor");
         assertTrue(controller.contains("new CaseStatusManagementLauncher(caseService, caseDateExecutor)"));
         assertTrue(controller.contains("if (editMode || detailsEditMode)"));
         assertTrue(controller.contains("Save or cancel the current Case edits before managing Case Statuses."));

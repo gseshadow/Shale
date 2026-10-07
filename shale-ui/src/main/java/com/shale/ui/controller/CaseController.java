@@ -499,8 +499,6 @@ public class CaseController {
 	private StackPane ovPracticeAreaHost;
 	@FXML
 	private Button changePracticeAreaButton;
-	@FXML private Button managePracticeAreasButton;
-	@FXML private Button manageCaseStatusesButton;
 	@FXML
 	private Button changeOpposingCounselButton;
 	@FXML
@@ -2060,10 +2058,6 @@ public class CaseController {
 	}
 
 	private void configureContextualDefinitionManagementButtons() {
-		if (managePracticeAreasButton != null) {
-			ControlStyles.apply(managePracticeAreasButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
-		}
-		if (manageCaseStatusesButton != null) ControlStyles.apply(manageCaseStatusesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		if (manageCaseDateTypesButton != null) {
 			ControlStyles.apply(manageCaseDateTypesButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
 		}
@@ -2075,52 +2069,77 @@ public class CaseController {
 	private void refreshContextualDefinitionManagementActions() {
 		boolean base = appState != null && appState.isAdmin() && caseId != null && caseService != null
 				&& appState.getShaleClientId() != null && appState.getShaleClientId() > 0;
-		ControlAvailability.apply(managePracticeAreasButton, base && practiceAreaManagementLauncher != null,
-				e -> openPracticeAreaManagement());
 		boolean actorAvailable = base && appState.getUserId() != null && appState.getUserId() > 0;
-		ControlAvailability.apply(manageCaseStatusesButton, actorAvailable && caseStatusManagementLauncher != null,
-				e -> openCaseStatusManagement());
 		ControlAvailability.apply(manageCaseDateTypesButton, actorAvailable && caseDateTypeManagementLauncher != null,
 				e -> openCaseDateTypeManagement());
 		ControlAvailability.apply(manageLinkTypesButton, actorAvailable && linkTypeManagementLauncher != null,
 				e -> openLinkTypeManagement());
 	}
 
-	private void openPracticeAreaManagement() {
-		if (appState == null || !appState.isAdmin() || practiceAreaManagementLauncher == null || caseId == null
-				|| appState.getShaleClientId() == null) return;
+    private boolean hasDefinitionManagementContext() {
+        return appState != null && appState.isAdmin() && caseId != null && caseService != null
+                && appState.getShaleClientId() != null && appState.getShaleClientId() > 0;
+    }
+
+    private boolean canManagePracticeAreas() {
+        return hasDefinitionManagementContext() && practiceAreaManagementLauncher != null;
+    }
+
+    private boolean canManageCaseStatuses() {
+        return hasDefinitionManagementContext() && caseStatusManagementLauncher != null
+                && appState.getUserId() != null && appState.getUserId() > 0;
+    }
+
+    private Button createFieldManagementAction(String fieldLabel, java.util.function.Supplier<Window> owner,
+            Runnable refreshChoices) {
+        boolean practiceArea = "Practice Area".equals(fieldLabel);
+        if (!practiceArea && !"Case Status".equals(fieldLabel)) return null;
+        Button manage = ActionButtonFactory.semantic(practiceArea ? "Manage Practice Areas" : "Manage Case Statuses",
+                null, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
+        manage.setId(practiceArea ? "managePracticeAreasButton" : "manageCaseStatusesButton");
+        manage.setAccessibleText(manage.getText());
+        ControlAvailability.apply(manage, practiceArea ? canManagePracticeAreas() : canManageCaseStatuses(), event -> {
+            if (practiceArea) openPracticeAreaManagement(owner.get(), refreshChoices);
+            else openCaseStatusManagement(owner.get(), refreshChoices);
+        });
+        return manage;
+    }
+
+	private void openPracticeAreaManagement(Window owner, Runnable refreshChoices) {
+		if (!canManagePracticeAreas()) return;
 		if (editMode || detailsEditMode) {
-			AppDialogs.showError(managePracticeAreasButton.getScene().getWindow(), "Practice Areas", "Save or cancel the current Case edits before managing Practice Areas.");
+			AppDialogs.showError(owner, "Practice Areas", "Save or cancel the current Case edits before managing Practice Areas.");
 			return;
 		}
 		final int openingCaseId = caseId;
 		final int openingTenantId = appState.getShaleClientId();
 		final long openingNavigationGeneration = documentGeneration;
-		practiceAreaManagementLauncher.open(managePracticeAreasButton.getScene().getWindow(), openingTenantId, result -> {
+		practiceAreaManagementLauncher.open(owner, openingTenantId, result -> {
 			if (!result.changed() || documentGeneration != openingNavigationGeneration || caseId == null || caseId != openingCaseId || appState == null
 					|| appState.getShaleClientId() == null || appState.getShaleClientId() != openingTenantId) return;
 			practiceAreasByTenantCache.remove(openingTenantId);
+			refreshChoices.run();
 			reloadCurrentCaseForViewMode();
 		});
 	}
 
-	private void openCaseStatusManagement() {
-		if (appState == null || !appState.isAdmin() || caseStatusManagementLauncher == null || caseId == null
-				|| appState.getShaleClientId() == null || appState.getUserId() == null) return;
+	private void openCaseStatusManagement(Window owner, Runnable refreshChoices) {
+		if (!canManageCaseStatuses()) return;
 		if (editMode || detailsEditMode) {
-			AppDialogs.showError(manageCaseStatusesButton.getScene().getWindow(), "Case Statuses",
+			AppDialogs.showError(owner, "Case Statuses",
 					"Save or cancel the current Case edits before managing Case Statuses.");
 			return;
 		}
 		final int openingCaseId = caseId;
 		final int openingTenantId = appState.getShaleClientId();
 		final long openingNavigationGeneration = documentGeneration;
-		caseStatusManagementLauncher.open(manageCaseStatusesButton.getScene().getWindow(), openingTenantId,
+		caseStatusManagementLauncher.open(owner, openingTenantId,
 				appState.getUserId(), result -> {
 			if (!result.changed() || documentGeneration != openingNavigationGeneration || caseId == null
 					|| caseId != openingCaseId || appState == null || appState.getShaleClientId() == null
 					|| appState.getShaleClientId() != openingTenantId) return;
 			statusesByTenantCache.remove(openingTenantId);
+			refreshChoices.run();
 			reloadCurrentCaseForViewMode();
 		});
 	}
@@ -4843,8 +4862,6 @@ public class CaseController {
 		java.util.stream.Stream.of(editCaseNameButton,editCaseNumberButton,changePracticeAreaButton,changeStatusButton,
 				changeResponsibleAttorneyButton,changePrimaryLegalAssistantButton,editDescriptionButton)
 				.filter(Objects::nonNull).forEach(this::configureOverviewEditAction);
-		configureOverviewManagementAction(managePracticeAreasButton);
-		configureOverviewManagementAction(manageCaseStatusesButton);
 		configuredOverviewDates.getStyleClass().add("case-overview-configured-dates");
 		if(overviewDetailsGrid!=null){List<Node> remove=overviewDetailsGrid.getChildren().stream().filter(n->{Integer r=GridPane.getRowIndex(n);return r!=null&&r>=4&&r<=8;}).toList();overviewDetailsGrid.getChildren().removeAll(remove);for(Node n:overviewDetailsGrid.getChildren()){Integer r=GridPane.getRowIndex(n);if(r!=null&&r>=9)GridPane.setRowIndex(n,r-4);}overviewDetailsGrid.add(configuredOverviewDates,0,4,3,1);}
 	}
@@ -4859,12 +4876,6 @@ public class CaseController {
 			case "changePrimaryLegalAssistantButton"->"primary legal assistant";
 			case "editDescriptionButton"->"description";default->"case detail";});
 		action.setTooltip(new Tooltip(action.getAccessibleText()));
-	}
-
-	private void configureOverviewManagementAction(Button action) {
-		if(action==null)return;
-		ControlStyles.apply(action,ControlStyles.Purpose.GHOST,ControlStyles.Size.SMALL);
-		action.getStyleClass().add("shale-inline-action");
 	}
 
 	void refreshOverviewAdminAction() {
@@ -6064,6 +6075,7 @@ public class CaseController {
 
 	private void onEditStatusField() {
 		if (!ensureTenantAndCaseForFieldDialog("status")) return;
+        final int tenantId = appState.getShaleClientId();
 		List<CaseDao.StatusRow> options = statusesForTenantCached(appState.getShaleClientId());
 		CaseDao.StatusRow currentValue = currentOverview == null ? null : options.stream()
 				.filter(v -> Objects.equals(v.id(), currentOverview.getPrimaryStatusId())).findFirst()
@@ -6073,13 +6085,15 @@ public class CaseController {
 		showCardChoiceFieldDialog("Edit Case Status", "Case Status", currentValue, options,
 				CaseDao.StatusRow::id, v -> cards.create(new StatusCardModel(v.id(), v.name(), v.sortOrder(), v.color()), StatusCardFactory.Variant.MINI),
 				false, null, changeStatusButton,
-                (owner, field) -> CaseStatusSelector.showPicker(owner, options, field.getSelectedUser(),
-                        CaseDao.StatusRow::id, CaseDao.StatusRow::name, CaseDao.StatusRow::color))
+                (owner, field) -> CaseStatusSelector.showPicker(owner, field.getCandidates(), field.getSelectedUser(),
+                        CaseDao.StatusRow::id, CaseDao.StatusRow::name, CaseDao.StatusRow::color),
+                () -> statusesForTenantCached(tenantId))
                 .ifPresent(v -> saveStatusField(v.id()));
 	}
 
 	private void onEditPracticeAreaField() {
 		if (!ensureTenantAndCaseForFieldDialog("practice area")) return;
+        final int tenantId = appState.getShaleClientId();
 		List<CaseDao.PracticeAreaRow> options = practiceAreasForTenantCached(appState.getShaleClientId());
 		CaseDao.PracticeAreaRow currentValue = currentOverview == null ? null : options.stream()
 				.filter(v -> Objects.equals(v.id(), currentOverview.getPracticeAreaId())).findFirst()
@@ -6089,8 +6103,9 @@ public class CaseController {
 		showCardChoiceFieldDialog("Edit Practice Area", "Practice Area", currentValue, options,
 				CaseDao.PracticeAreaRow::id, v -> cards.create(new PracticeAreaCardModel(v.id(), v.name(), v.color()), PracticeAreaCardFactory.Variant.MINI),
 				false, null, changePracticeAreaButton,
-                (owner, field) -> PracticeAreaSelector.showPicker(owner, options, field.getSelectedUser(),
-                        CaseDao.PracticeAreaRow::id, CaseDao.PracticeAreaRow::name, CaseDao.PracticeAreaRow::color))
+                (owner, field) -> PracticeAreaSelector.showPicker(owner, field.getCandidates(), field.getSelectedUser(),
+                        CaseDao.PracticeAreaRow::id, CaseDao.PracticeAreaRow::name, CaseDao.PracticeAreaRow::color),
+                () -> practiceAreasForTenantCached(tenantId))
                 .ifPresent(v -> savePracticeAreaField(v.id()));
 	}
 
@@ -6145,6 +6160,15 @@ public class CaseController {
             Function<T, Integer> identity, Function<T, Node> miniCardRenderer, boolean clearable,
             Runnable removeAction, Button ownerButton,
             java.util.function.BiFunction<Window, UserSelectionField<T>, Optional<T>> picker) {
+        return showCardChoiceFieldDialog(title, fieldLabel, currentValue, options, identity, miniCardRenderer,
+                clearable, removeAction, ownerButton, picker, null);
+    }
+
+    private <T> Optional<T> showCardChoiceFieldDialog(String title, String fieldLabel, T currentValue, List<T> options,
+            Function<T, Integer> identity, Function<T, Node> miniCardRenderer, boolean clearable,
+            Runnable removeAction, Button ownerButton,
+            java.util.function.BiFunction<Window, UserSelectionField<T>, Optional<T>> picker,
+            java.util.function.Supplier<List<T>> candidateLoader) {
 		Dialog<T> dialog = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(dialog, title);
 		dialog.initOwner(dialogOwner(ownerButton));
@@ -6166,6 +6190,32 @@ public class CaseController {
 				new Label("New " + fieldLabel), selector);
 		content.getStyleClass().add("field-edit-dialog-body");
 		content.setMinWidth(420);
+        Button manage = createFieldManagementAction(fieldLabel,
+                () -> dialog.getDialogPane().getScene().getWindow(), () -> {
+                    if (candidateLoader == null) return;
+                    final Integer openingTenantId = appState.getShaleClientId();
+                    final long openingGeneration = documentGeneration;
+                    java.util.concurrent.CompletableFuture.supplyAsync(candidateLoader, caseDateExecutor).whenComplete((choices, error) -> runOnFx(() -> {
+                        if (!dialog.isShowing() || documentGeneration != openingGeneration || appState == null
+                                || !Objects.equals(openingTenantId, appState.getShaleClientId())) return;
+                        if (error != null) {
+                            AppDialogs.showError(dialog.getDialogPane().getScene().getWindow(), title,
+                                    "Definitions changed, but choices could not be refreshed. Reopen this editor to try again.");
+                            return;
+                        }
+                        selector.setCandidates(choices);
+                        T staged = selector.getSelectedUser();
+                        if (staged != null) choices.stream().filter(value -> Objects.equals(identity.apply(value), identity.apply(staged)))
+                                .findFirst().ifPresent(selector::setSelectedUser);
+                    }));
+                });
+        if (manage != null) {
+            HBox administration = new HBox(manage);
+            administration.setAlignment(Pos.CENTER_LEFT);
+            administration.managedProperty().bind(manage.managedProperty());
+            administration.visibleProperty().bind(manage.visibleProperty());
+            content.getChildren().add(administration);
+        }
 		dialog.getDialogPane().setContent(content);
         if (picker != null) dialog.getDialogPane().getStyleClass().add("mini-card-field-edit-dialog");
         if ("Practice Area".equals(fieldLabel)) dialog.getDialogPane().getStyleClass().add("practice-area-edit-dialog");
