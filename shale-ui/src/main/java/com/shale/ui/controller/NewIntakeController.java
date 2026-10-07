@@ -1522,13 +1522,15 @@ public final class NewIntakeController {
                 clientPhoneExtensionField, callerPhoneExtensionField, clientPhoneUnavailableCheckBox,
                 callerPhoneUnavailableCheckBox, clientPhoneUnavailableReasonBox, callerPhoneUnavailableReasonBox)) {
             field.focusedProperty().addListener((o, wasFocused, focused) -> {
-                if (!focused) revalidateContactFields(false);
+                if (!focused) revalidateContactFields(false, field);
             });
         }
     }
 
-    private List<String> revalidateContactFields(boolean focus) {
-        List<String> errors = validateContactFields(focus);
+    private List<String> revalidateContactFields(boolean focus) { return revalidateContactFields(focus, null); }
+
+    private List<String> revalidateContactFields(boolean focus, Node blurred) {
+        List<String> errors = validateContactFields(focus, blurred);
         List<String> summary = new ArrayList<>();
         if (validationLabel.getStyleClass().contains("shale-error-message")) {
             validationLabel.getText().lines().filter(line -> !contactValidationErrors.contains(line))
@@ -1541,7 +1543,7 @@ public final class NewIntakeController {
         return errors;
     }
 
-    private List<String> validateContactFields(boolean focus) {
+    private List<String> validateContactFields(boolean focus, Node blurred) {
         List<String> errors = new ArrayList<>();
         Node first = null;
         for (boolean client : List.of(true, false)) {
@@ -1564,7 +1566,13 @@ public final class NewIntakeController {
                 try {
                     var value = ContactValues.INSTANCE.phone(phone.getText(), extension.getText(),
                             !unavailable.isSelected(), client ? "clientPhone" : "callerPhone");
-                    if (value != null) preview = value.preview();
+                    if (value != null) {
+                        preview = value.preview();
+                        if (focus || blurred == phone || blurred == extension) {
+                            phone.setText(value.displayInput());
+                            extension.setText(Objects.toString(value.extension(), ""));
+                        }
+                    }
                 } catch (FieldValidationException invalid) {
                     phoneErrors.add(invalid.getMessage());
                     javafx.scene.control.Control field = invalid.errors().getFirst().field().endsWith(".extension") ? extension : phone;

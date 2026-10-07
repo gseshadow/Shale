@@ -22,13 +22,13 @@ class ContactValuesTest {
         for (String suffix : new String[]{" x0012", " ext. 0012", ";ext=0012", " extension 0012"}) {
             var result = v.phone("3035550123"+suffix, "0012", true, "phone");
             assertEquals("0012", result.extension());
-            assertEquals("3035550123", result.displayInput());
+            assertEquals("(303) 555-0123", result.displayInput());
         }
         assertThrows(FieldValidationException.class, () -> v.phone("3035550123 x1", "2", true, "phone"));
         assertThrows(FieldValidationException.class, () -> v.phone("3035550123", "１２", true, "phone"));
     }
     @Test void unusableValuesCannotBeParsedAsPhones() {
-        for (String n : new String[]{"0", "0000000000", "911", "123", "call 3035550123", "3035550123,7205550123", "3035550123 / 7205550123", "3035550123 x1234567890123", "2021234567"})
+        for (String n : new String[]{"0", "0000000000", "911", "123", "3035550123,7205550123", "3035550123 / 7205550123", "3035550123 x1234567890123", "2021234567"})
             assertThrows(FieldValidationException.class, () -> v.phone(n, null, true, "phone"), n);
     }
     @Test void supportedEmailsPreserveDisplayAndExistingComparisonSemantics() {
@@ -65,11 +65,45 @@ class ContactValuesTest {
     }
     @Test void localExchangeStructureAndInputShapeAreRequired() {
         for (String input : new String[]{"0000000", "0550123", "1550123", "2110123", "311-0123", "9110123",
-                "555012", "55501234", "call 5550123", "5550123,5550124", "5550123 / 5550124", "+5550123"})
+                "555012", "55501234", "5550123,5550124", "5550123 / 5550124", "+5550123"})
             assertThrows(FieldValidationException.class, () -> v.phone(input, null, true, "phone"), input);
-        assertEquals(com.shale.core.validation.ContactValueValidator.PhoneKind.GLOBAL,
+        assertEquals(com.shale.core.validation.ContactValueValidator.PhoneKind.INTERNATIONAL,
                 v.phone("+44 20 7946 0018", null, true, "phone").kind());
         assertTrue(v.phone("(303) 555-0123", null, true, "phone").dialableWithoutContext());
+    }
+
+    @Test void usDigitExtractionAndFormattingUseOnlyApprovedLengths() {
+        for (String input : new String[]{"9033568", "903 3568", "(903)-3568", "Call: 903-3568", "903\t3568"}) {
+            var phone = v.phone(input, null, true, "phone");
+            assertEquals("903-3568", phone.displayInput(), input);
+            assertEquals("9033568", phone.normalizedNumber());
+            assertNull(phone.canonicalNumber());
+        }
+        for (String input : new String[]{"5059033568", "(505) 903-3568", "phone: 505.903.3568", "505/903/3568", "５０５5059033568"}) {
+            var phone = v.phone(input, null, true, "phone");
+            assertEquals("(505) 903-3568", phone.displayInput(), input);
+            assertEquals(com.shale.core.validation.ContactValueValidator.PhoneKind.US_FULL, phone.kind());
+            assertEquals("+15059033568", phone.normalizedNumber());
+        }
+        assertEquals("+1 (505) 903-3568", v.phone("1 (505) 903-3568", null, true, "phone").displayInput());
+        assertEquals("+1 (505) 903-3568", v.phone("+1 (505) 903-3568", null, true, "phone").displayInput());
+        for (String input : new String[]{"", "123456", "90335680", "505903356", "25059033568", "150590335680", "0000000", "5050000000", "5119033568", "5059113568"})
+            assertThrows(FieldValidationException.class, () -> v.phone(input, null, true, "phone"), input);
+    }
+    @Test void extensionsAreRemovedBeforeDigitsAndMalformedExtensionsNeverBecomeMainDigits() {
+        for (String suffix : new String[]{"x001", " ext. 001", " extension: 001", ";ext=001"}) {
+            var phone = v.phone("Call: 505-903-3568" + suffix, "001", true, "phone");
+            assertEquals("(505) 903-3568", phone.displayInput());
+            assertEquals("+15059033568", phone.canonicalNumber());
+            assertEquals("001", phone.extension());
+        }
+        for (String suffix : new String[]{" x", " xabc001", " ext. 12 34", " x1234567890123"})
+            assertThrows(FieldValidationException.class, () -> v.phone("9033568" + suffix, null, true, "phone"));
+        assertThrows(FieldValidationException.class, () -> v.phone("5059033568 x001", "002", true, "phone"));
+        assertEquals("+44 20 7946 0018", v.phone("+44 20 7946 0018 ext. 001", null, true, "phone").displayInput());
+        assertEquals("+49 30 901820", v.phone("+49 30 901820", null, true, "phone").displayInput());
+        assertThrows(FieldValidationException.class, () -> v.phone("+999 9033568", null, true, "phone"));
+        assertThrows(FieldValidationException.class, () -> v.phone("+44 call 20 7946 0018", null, true, "phone"));
     }
 
 }

@@ -101,6 +101,7 @@ public final class CreateContactDialog {
         header.getStyleClass().add("app-dialog-header");
 
         VBox body = new VBox(16, header, form, errorLabel, actions);
+        com.shale.ui.util.ContactFieldFeedback.trackSummary(form,errorLabel);
         body.setPadding(new Insets(18));
         VBox root = AppDialogs.createSecondaryWindowShell(stage, "New Contact", () -> {
             result = null;
@@ -137,7 +138,15 @@ public final class CreateContactDialog {
     }
 
     private void onCreate() {
-        try{ContactValues.INSTANCE.email(emailField.getText(),false,"email");ContactValues.INSTANCE.phone(phoneField.getText(),extensionField.getText(),false,"phone");}catch(IllegalArgumentException invalid){showError(invalid.getMessage());if(!emailField.getText().isBlank()&&!ContactValues.INSTANCE.usableEmail(emailField.getText()))emailField.requestFocus();else phoneField.requestFocus();return;}
+        try {
+            ContactValues.INSTANCE.email(emailField.getText(),false,"email");
+            ContactValues.INSTANCE.phone(phoneField.getText(),extensionField.getText(),false,"phone");
+        } catch(IllegalArgumentException invalid) {
+            showError(invalid.getMessage());
+            if(invalid instanceof com.shale.core.validation.FieldValidationException fieldError)
+                com.shale.ui.util.ContactFieldFeedback.focus(stage.getScene().getRoot(),fieldError);
+            return;
+        }
 
         String firstName = normalize(firstNameField.getText());
         String lastName = normalize(lastNameField.getText());

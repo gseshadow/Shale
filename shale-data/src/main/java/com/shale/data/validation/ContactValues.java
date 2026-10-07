@@ -13,8 +13,8 @@ public final class ContactValues implements ContactValueValidator {
     public static final ContactValues INSTANCE = new ContactValues();
     private static final PhoneNumberUtil PHONES = PhoneNumberUtil.getInstance();
     private static final IDNA DOMAINS=IDNA.getUTS46Instance(IDNA.USE_STD3_RULES|IDNA.CHECK_BIDI|IDNA.CHECK_CONTEXTJ|IDNA.NONTRANSITIONAL_TO_ASCII);
-    private static final Pattern EXT = Pattern.compile("(?i)(?:\\s*(?:ext\\.?|extension|x|;ext=)\\s*:?\\s*([0-9]+))$");
-    private static final Pattern MAIN = Pattern.compile("\\+?[0-9() .\\-/]+");
+    private static final Pattern EXT = Pattern.compile("(?i)(?:\\bextension\\b|\\bext\\.?|(?<![A-Za-z])x|;ext=)\\s*:?\\s*(.*)$");
+    private static final Pattern INTERNATIONAL_MAIN = Pattern.compile("\\+[0-9() .\\-/]+");
     private static final Pattern LOCAL = Pattern.compile("[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+");
     private ContactValues() {}
 
@@ -25,36 +25,58 @@ public final class ContactValues implements ContactValueValidator {
             if (required) throw error(field, "required", "Enter a usable phone number.");
             return null;
         }
-        if (value.length() > 255 || controls(value)) throw invalidPhone(field);
         String main = value, inline = null;
         var match = EXT.matcher(main);
-        if (match.find()) { inline = match.group(1); main = main.substring(0, match.start()).trim();if(main.isBlank())throw error(field+".extension","phone_required","Enter a phone number before adding an extension."); }
+        if (match.find()) {
+            inline = match.group(1).strip();
+            main = main.substring(0, match.start()).strip();
+            if (main.isBlank()) throw error(field + ".extension", "phone_required", "Enter a phone number before adding an extension.");
+        }
         if (separate != null && !separate.matches("[0-9]{1,12}")) throw invalidExtension(field);
         if (inline != null && !inline.matches("[0-9]{1,12}")) throw invalidExtension(field);
         if (inline != null && separate != null && !inline.equals(separate))
             throw error(field + ".extension", "conflicting_extension", "The inline and separate extensions must match.");
         String ext = separate == null ? inline : separate;
-        // Do not let the parser's vanity-number or first-number extraction accept prose/lists.
-        if (!MAIN.matcher(main).matches() || main.chars().filter(c -> c == '+').count() > 1) throw invalidPhone(field);
-        // A local NANP subscriber has an NXX exchange (N=2–9), excluding N11 service exchanges.
-        // No area code is inferred, and this branch never supplies an E.164 value.
-        if (main.matches("[0-9 -]+")) {
-            String digits = main.replace(" ", "").replace("-", "");
-            if (digits.length() == 7) {
-                if (!digits.matches("[2-9][0-9]{6}") || digits.substring(1, 3).equals("11")) throw invalidPhone(field);
-                String preview = digits.substring(0, 3) + "-" + digits.substring(3)
-                        + (ext == null ? "" : " ext. " + ext) + " · US local; area code required to call";
-                return new Phone(main, null, ext, preview, PhoneKind.US_LOCAL, digits);
-            }
+        // Explicit international input keeps numbering-plan validation and does not use US lengths.
+        if (main.startsWith("+")) {
+            if (!INTERNATIONAL_MAIN.matcher(main).matches()) throw invalidPhone(field);
+            return fullPhone(main, ext, field, true, false);
         }
+        // Extract only ASCII digits, after removing the extension. Never map letters to keypad digits.
+        String digits = main.replaceAll("[^0-9]", "");
+        if (digits.length() == 7) {
+            if (!validExchange(digits)) throw invalidPhone(field);
+            String display = digits.substring(0, 3) + "-" + digits.substring(3);
+            return new Phone(display, null, ext, withExtension(display, ext)
+                    + " · US local; area code required to call", PhoneKind.US_LOCAL, digits);
+        }
+        boolean countryPrefix = digits.length() == 11;
+        if (digits.length() != 10 && !countryPrefix || countryPrefix && digits.charAt(0) != '1') throw invalidPhone(field);
+        String national = countryPrefix ? digits.substring(1) : digits;
+        if (!validExchange(national) || !validExchange(national.substring(3))) throw invalidPhone(field);
+        return fullPhone(digits, ext, field, false, countryPrefix);
+    }
+
+    private static boolean validExchange(String digits) {
+        return digits.charAt(0) >= '2' && digits.charAt(0) <= '9' && !digits.substring(1, 3).equals("11");
+    }
+
+    private static Phone fullPhone(String main, String ext, String field, boolean international, boolean countryPrefix) {
         try {
             var parsed = PHONES.parse(main, DEFAULT_PHONE_REGION);
             if (!PHONES.isValidNumber(parsed)) throw invalidPhone(field);
             String canonical = PHONES.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164);
-            String preview = PHONES.format(parsed, parsed.getCountryCode() == 1
-                    ? PhoneNumberUtil.PhoneNumberFormat.NATIONAL : PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL);
-            return new Phone(main, canonical, ext, preview + (ext == null ? "" : " ext. " + ext));
+            String display = PHONES.format(parsed, international
+                    ? PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL : PhoneNumberUtil.PhoneNumberFormat.NATIONAL);
+            if (parsed.getCountryCode() == 1 && (international || countryPrefix))
+                display = "+1 " + PHONES.format(parsed, PhoneNumberUtil.PhoneNumberFormat.NATIONAL);
+            return new Phone(display, canonical, ext, withExtension(display, ext),
+                    parsed.getCountryCode() == 1 ? PhoneKind.US_FULL : PhoneKind.INTERNATIONAL, null);
         } catch (NumberParseException e) { throw invalidPhone(field); }
+    }
+
+    private static String withExtension(String display, String extension) {
+        return display + (extension == null ? "" : " ext. " + extension);
     }
 
     @Override public Email email(String input, boolean required, String field) {

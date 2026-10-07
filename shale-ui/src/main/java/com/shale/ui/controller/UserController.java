@@ -335,6 +335,8 @@ public final class UserController {
 		initializeInlineEditButtons();
         if(phoneEditorContainer!=null)phoneEditorContainer.getChildren().add(ContactFieldFeedback.phone(phoneEditor,phoneExtensionEditor,false,this::profilePhoneRetained));
         if(emailEditorContainer!=null)emailEditorContainer.getChildren().add(ContactFieldFeedback.email(emailEditor,true,()->currentUser!=null&&Objects.equals(emailEditor.getText(),safeText(currentUser.email()))));
+        if(phoneEditorContainer!=null)ContactFieldFeedback.trackSummary(phoneEditorContainer,errorLabel);
+        if(emailEditorContainer!=null)ContactFieldFeedback.trackSummary(emailEditorContainer,errorLabel);
         if(phoneExtensionEditor!=null)ControlStyles.formControl(phoneExtensionEditor);
 		if (saveButton != null) {
 			saveButton.setOnAction(e -> onSave());
@@ -1018,7 +1020,7 @@ public final class UserController {
 				selectedStoredColor(),currentUser.rowVer());
 
 		saveUserProfile(request);
-        } catch(FieldValidationException invalid){setError(invalid.getMessage());if(invalid.errors().getFirst().field().equals("email")&&emailEditor!=null){ControlStyles.setInvalid(emailEditor,true);emailEditor.requestFocus();}else if(phoneEditorContainer!=null)ContactFieldFeedback.focus(phoneEditorContainer,invalid);}
+        } catch(FieldValidationException invalid){setError(invalid.getMessage());if(invalid.errors().getFirst().field().equals("email")&&emailEditorContainer!=null){ContactFieldFeedback.focus(emailEditorContainer,invalid);}else if(phoneEditorContainer!=null)ContactFieldFeedback.focus(phoneEditorContainer,invalid);}
 	}
 
     private boolean profilePhoneRetained(){return currentUser!=null&&phoneEditor!=null&&Objects.equals(phoneBaselineInput,phoneEditor.getText())&&Objects.equals(phoneBaselineExtension,phoneExtensionEditor==null?null:phoneExtensionEditor.getText());}
@@ -1050,7 +1052,7 @@ public final class UserController {
 		if(phone)body.getChildren().addAll(new Label("US default; international +country code"),new Label("Extension (optional, 1–12 digits)"),extension,ContactFieldFeedback.phone(field,extension,false,()->Objects.equals(originalNumber,field.getText())&&Objects.equals(originalExtension,extension.getText())));
         else if("Email".equals(label))body.getChildren().add(ContactFieldFeedback.email(field,true,()->Objects.equals(safeText(currentValue),safeText(field.getText()))));
         body.getStyleClass().add("field-edit-dialog-body");
-		dialog.getDialogPane().setContent(body);
+		dialog.getDialogPane().setContent(body);ContactFieldFeedback.trackSummary(body,error);
 
 		Node save = dialog.getDialogPane().lookupButton(saveType);
 		save.addEventFilter(javafx.event.ActionEvent.ACTION, e ->

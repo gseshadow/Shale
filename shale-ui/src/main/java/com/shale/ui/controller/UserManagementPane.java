@@ -186,7 +186,7 @@ public final class UserManagementPane {
 		g.add(new Label("User ID " + row.id() + " · Status " + row.getStatus() + " (managed separately)"), 0, 11, 2, 1);
 		Label guidance=new Label("Update this user's identity, contact information, appearance, and application roles. Lifecycle and password actions remain separate."); guidance.getStyleClass().add("user-window-guidance"); guidance.setWrapText(true);
 		VBox content=new VBox(12,guidance,g); content.getStyleClass().add("user-window-root");
-		d.getDialogPane().setContent(content);
+		d.getDialogPane().setContent(content);com.shale.ui.util.ContactFieldFeedback.trackSummary(g,guidance);
         UserEdit draft=failedEditDrafts.get(row.id());if(draft!=null){var p=draft.profile();first.setText(p.firstName());last.setText(p.lastName());email.setText(p.email());phone.setText(p.phone());extension.setText("");initials.setText(p.initials());color.setValue(dbColorToFx(p.color()));attorney.setSelected(p.roleIds().contains(com.shale.core.semantics.RoleSemantics.ROLE_ATTORNEY));admin.setSelected(p.roleIds().contains(com.shale.core.semantics.RoleSemantics.ROLE_ADMIN));guidance.setText("Your previous draft is retained. Reloaded changes still require review before saving.");}
 		styleDialogLabels(g);
 		g.getChildren().stream().filter(n->n instanceof Label label&&label.getText()!=null&&label.getText().startsWith("User ID ")).forEach(n->n.getStyleClass().add("user-window-metadata"));

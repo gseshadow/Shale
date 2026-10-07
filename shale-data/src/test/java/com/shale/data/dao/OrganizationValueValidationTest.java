@@ -45,4 +45,10 @@ class OrganizationValueValidationTest {
         assertNotEquals(local,key.invoke(null,spec.get(null),row(List.of("5550123","","002"),false,false,false)));
     }
 
+    @Test void pastedPhoneAndFaxRowsShareFormattedWholeNumberNormalization() throws Exception {
+        assertEquals(List.of("(505) 903-3568","+15059033568","001"),validate("PHONE",row(List.of("phone: 505 903 3568 x001","",""),true,false,false),null));
+        assertEquals(List.of("+1 (505) 903-3568","+15059033568",""),validate("PHONE",row(List.of("1 505 903 3568","",""),true,false,false),null));
+        assertThrows(IllegalArgumentException.class,()->validate("PHONE",row(List.of("2 505 903 3568","",""),true,false,false),null));
+    }
+
 }
