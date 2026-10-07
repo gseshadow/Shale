@@ -10,6 +10,7 @@ import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.EnhancedTextArea;
 import com.shale.ui.component.PracticeAreaSelector;
+import com.shale.ui.component.CaseStatusSelector;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.StatusCardFactory;
@@ -35,7 +36,6 @@ import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
@@ -745,88 +745,55 @@ public final class NewIntakeController {
         hideValidation();
     }
 
-	private void onSelectStatus() {
-		try {
-			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(requireClientId());
-			if (statuses.isEmpty()) {
-				showValidation("No statuses are available for this tenant.");
-				return;
-			}
+    private void onSelectStatus() {
+        try {
+            selectStatusFromCandidates(caseDao.listStatusesForTenant(requireClientId()));
+        } catch (RuntimeException ex) {
+            showValidation("Unable to load statuses.");
+        }
+    }
 
-			Map<String, CaseDao.StatusRow> labelToRow = new LinkedHashMap<>();
-			for (CaseDao.StatusRow status : statuses) {
-				String label = status.name() == null || status.name().isBlank() ? "Status #" + status.id() : status.name();
-				labelToRow.put(label, status);
-			}
+    void selectStatusFromCandidates(List<CaseDao.StatusRow> statuses) {
+        if (statuses.isEmpty()) {
+            showValidation("No statuses are available for this tenant.");
+            return;
+        }
+        CaseStatusSelector.showPicker(selectStatusButton.getScene().getWindow(), statuses, selectedStatus,
+                CaseDao.StatusRow::id, CaseDao.StatusRow::name, CaseDao.StatusRow::color)
+                .ifPresent(this::applyStatusSelection);
+    }
 
-			String preselect = selectedStatus == null ? labelToRow.keySet().iterator().next() : safeTrim(selectedStatus.name());
-			Optional<String> picked = showSecondaryChoiceDialog(
-					"Change Status",
-					"Status:",
-					preselect,
-					labelToRow.keySet());
-			if (picked.isPresent()) {
-				selectedStatus = labelToRow.get(picked.get());
-				renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
-				hideValidation();
-			}
-		} catch (RuntimeException ex) {
-			showValidation("Unable to load statuses.");
-		}
-	}
+    void applyStatusSelection(CaseDao.StatusRow selected) {
+        selectedStatus = selected;
+        renderStatusMini(selected.id(), selected.name(), selected.color());
+        hideValidation();
+    }
 
-	private Optional<String> showSecondaryChoiceDialog(
-			String title,
-			String content,
-			String preselect,
-			java.util.Collection<String> options) {
-		ChoiceDialog<String> dialog = new ChoiceDialog<>(preselect, options);
-		dialog.setTitle(title);
-		dialog.setHeaderText(null);
-		dialog.setContentText(content);
-		AppDialogs.applySecondaryDialogShell(dialog, title);
-		Window owner = stage == null ? null : stage;
-		if (owner != null) {
-			dialog.initOwner(owner);
-		}
-		applyToolbarClassesToDialogButton(dialog.getDialogPane().lookupButton(javafx.scene.control.ButtonType.OK), "app-toolbar-button-primary");
-		applyToolbarClassesToDialogButton(dialog.getDialogPane().lookupButton(javafx.scene.control.ButtonType.CANCEL), "app-toolbar-button-neutral");
-		return dialog.showAndWait();
-	}
+    private void preselectDefaultStatusIfAvailable() {
+        if (selectedStatus != null || caseDao == null || appState == null) {
+            return;
+        }
+        try {
+            applyDefaultStatusIfAvailable(caseDao.listStatusesForTenant(requireClientId()));
+        } catch (RuntimeException ignored) {
+            // If statuses cannot be loaded at initialization time, keep existing fallback (unselected).
+        }
+    }
 
-	private void applyToolbarClassesToDialogButton(Node node, String variantClass) {
-		if (!(node instanceof Button button)) {
-			return;
-		}
-		if (!button.getStyleClass().contains("app-toolbar-button")) {
-			button.getStyleClass().add("app-toolbar-button");
-		}
-		if (!button.getStyleClass().contains(variantClass)) {
-			button.getStyleClass().add(variantClass);
-		}
-	}
-
-	private void preselectDefaultStatusIfAvailable() {
-		if (selectedStatus != null || caseDao == null || appState == null) {
-			return;
-		}
-		try {
-			List<CaseDao.StatusRow> statuses = caseDao.listStatusesForTenant(requireClientId());
-			Optional<CaseDao.StatusRow> defaultOpenStatus = statuses.stream()
-					.filter(Objects::nonNull)
-					.filter(status -> !CaseDao.isTerminalStatus(status))
-					.findFirst();
-			if (defaultOpenStatus.isPresent()) {
-				selectedStatus = defaultOpenStatus.get();
-				renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
-				if (!hasUnsavedChanges()) {
-					captureInitialSnapshot();
-				}
-			}
-		} catch (RuntimeException ignored) {
-			// If statuses cannot be loaded at initialization time, keep existing fallback (unselected).
-		}
-	}
+    void applyDefaultStatusIfAvailable(List<CaseDao.StatusRow> statuses) {
+        if (selectedStatus != null) return;
+        Optional<CaseDao.StatusRow> defaultOpenStatus = statuses.stream()
+                .filter(Objects::nonNull)
+                .filter(status -> !CaseDao.isTerminalStatus(status))
+                .findFirst();
+        if (defaultOpenStatus.isPresent()) {
+            selectedStatus = defaultOpenStatus.get();
+            renderStatusMini(selectedStatus.id(), selectedStatus.name(), selectedStatus.color());
+            if (!hasUnsavedChanges()) {
+                captureInitialSnapshot();
+            }
+        }
+    }
 
 	private void renderPracticeAreaMini(Integer practiceAreaId, String name, String colorCss) {
 		if (practiceAreaHost == null)
@@ -858,7 +825,9 @@ public final class NewIntakeController {
 				null,
 				statusColorCss
 		);
-		statusHost.getChildren().setAll(statusCardFactory.create(model, StatusCardFactory.Variant.MINI));
+		var card = statusCardFactory.create(model, StatusCardFactory.Variant.MINI);
+        if (statusId != null) card.getStyleClass().add("shale-card-selected");
+        statusHost.getChildren().setAll(card);
 	}
 
 	private int requireClientId() {

@@ -680,17 +680,22 @@ excluded.
 
 Phase 11A uses one shell-level wrapping notice above working content. Recommended state uses a quiet surface and may be dismissed for its policy revision/target; required state strengthens the border, and deadline-reached state uses the danger border without modal focus or disabled application controls. Text always carries state and deadline meaning. Update is a semantic primary small action and dismissal is a semantic ghost small action. The notice supports both themes, narrow widths, keyboard activation, and background refresh without focus stealing.
 
-### Practice Area mini-card selection
+### Practice Area and Case Status mini-card selection
 
-`PracticeAreaSelector<T>` is the shared, presentation-only card picker for New Intake and Case
-Overview Practice Area changes. It composes `PracticeAreaCardFactory` MINI cards, preserves the
-configured dot color, and uses the existing `shale-card-selected` border without changing text paint.
-Native button activation surfaces provide keyboard/focus behavior; Cancel leaves caller state intact.
-This is an intentional rich-selector exception to the ordinary dropdown API. Controllers retain
-loading, required-field validation, tenant scope, and persistence. The Case Overview editor keeps its
-Current/New fields, Change action, and staged Save/Cancel behavior. Theme tokens own Practice Area
-card surfaces, text, borders, and the scoped editor body in both themes.
+`MiniCardSelector<T>` is the shared presentation-only owner of ID-based card selection, selected
+borders, native keyboard-focusable activation buttons, scrolling and typed picker cancellation.
+`PracticeAreaSelector<T>` and `CaseStatusSelector<T>` supply their existing MINI card factories;
+Practice Areas preserve the configured color dot, and Case Status preserves the colored status pill
+and readable foreground. Both use `shale-card-selected` without changing text paint. Missing or
+invalid status colors use the themed neutral card surface and primary text.
+
+These are intentional rich-selector exceptions to the ordinary dropdown API. Controllers retain
+loading, required-field validation, default status initialization, tenant scope, and persistence.
+Both Case Overview editors retain Current/New fields, Change, and staged Save/Cancel behavior.
+The shared `mini-card-field-edit-dialog` style owns their body surface and typography in both themes;
+status-pill foreground remains supplied by its existing factory rather than a dialog text color.
 
 Audit compatibility: selecting a card only stages local form state and adds no domain mutation or
-sensitive read. Existing intake creation and Case Practice Area save/audit seams remain authoritative;
-this presentation change adds no audit event, SQL migration, or server deployment.
+sensitive read. Existing intake creation, status history/timeline, and Case Practice Area save/audit
+seams remain authoritative. This presentation change adds no audit event, SQL migration, API change,
+or server deployment.

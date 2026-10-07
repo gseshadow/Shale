@@ -3394,13 +3394,13 @@
     -fx-text-fill: -shale-color-text-primary;
 }
 
-/* Scope the Practice Area editor to theme tokens without migrating other editors. */
-.dialog-pane.practice-area-edit-dialog .field-edit-dialog-body {
+/* Shared typed MINI editors follow theme tokens without migrating unrelated editors. */
+.dialog-pane.mini-card-field-edit-dialog .field-edit-dialog-body {
     -fx-background-color: -shale-color-dialog-surface;
 }
-.dialog-pane.practice-area-edit-dialog .field-edit-dialog-body .label {
+.dialog-pane.mini-card-field-edit-dialog .field-edit-dialog-body .label {
     -fx-text-fill: -shale-color-text-primary;
 }
-.dialog-pane.practice-area-edit-dialog .field-edit-current-value {
+.dialog-pane.mini-card-field-edit-dialog .field-edit-current-value {
     -fx-background-color: -shale-color-card-embedded-surface;
 }

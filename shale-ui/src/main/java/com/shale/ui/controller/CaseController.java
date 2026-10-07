@@ -101,6 +101,7 @@ import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseLinkCardFactory;
 import com.shale.ui.component.PracticeAreaSelector;
+import com.shale.ui.component.CaseStatusSelector;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.PracticeAreaIndicatorFactory;
@@ -6071,7 +6072,10 @@ public class CaseController {
 		StatusCardFactory cards = new StatusCardFactory(id -> { });
 		showCardChoiceFieldDialog("Edit Case Status", "Case Status", currentValue, options,
 				CaseDao.StatusRow::id, v -> cards.create(new StatusCardModel(v.id(), v.name(), v.sortOrder(), v.color()), StatusCardFactory.Variant.MINI),
-				false, null, changeStatusButton).ifPresent(v -> saveStatusField(v.id()));
+				false, null, changeStatusButton,
+                (owner, field) -> CaseStatusSelector.showPicker(owner, options, field.getSelectedUser(),
+                        CaseDao.StatusRow::id, CaseDao.StatusRow::name, CaseDao.StatusRow::color))
+                .ifPresent(v -> saveStatusField(v.id()));
 	}
 
 	private void onEditPracticeAreaField() {
@@ -6163,7 +6167,9 @@ public class CaseController {
 		content.getStyleClass().add("field-edit-dialog-body");
 		content.setMinWidth(420);
 		dialog.getDialogPane().setContent(content);
+        if (picker != null) dialog.getDialogPane().getStyleClass().add("mini-card-field-edit-dialog");
         if ("Practice Area".equals(fieldLabel)) dialog.getDialogPane().getStyleClass().add("practice-area-edit-dialog");
+        if ("Case Status".equals(fieldLabel)) dialog.getDialogPane().getStyleClass().add("case-status-edit-dialog");
 		Node save = dialog.getDialogPane().lookupButton(saveType);
 		if (save instanceof Button button) ControlStyles.apply(button, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 		if (save != null) save.disableProperty().bind(selector.selectedUserProperty().isNull());
