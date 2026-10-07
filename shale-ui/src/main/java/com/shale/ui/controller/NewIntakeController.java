@@ -9,6 +9,7 @@ import com.shale.data.dao.CaseDao;
 import com.shale.data.dao.OrganizationDao;
 import com.shale.ui.component.dialog.AppDialogs;
 import com.shale.ui.component.EnhancedTextArea;
+import com.shale.ui.component.PracticeAreaSelector;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.StatusCardFactory;
@@ -729,27 +730,20 @@ public final class NewIntakeController {
 				return;
 			}
 
-			Map<String, CaseDao.PracticeAreaRow> labelToRow = new LinkedHashMap<>();
-			for (CaseDao.PracticeAreaRow area : areas) {
-				String label = area.name() == null || area.name().isBlank() ? "Practice Area #" + area.id() : area.name();
-				labelToRow.put(label, area);
-			}
-
-			String preselect = selectedPracticeArea == null ? labelToRow.keySet().iterator().next() : safeTrim(selectedPracticeArea.name());
-			Optional<String> picked = showSecondaryChoiceDialog(
-					"Change Practice Area",
-					"Practice Area:",
-					preselect,
-					labelToRow.keySet());
-			if (picked.isPresent()) {
-				selectedPracticeArea = labelToRow.get(picked.get());
-				renderPracticeAreaMini(selectedPracticeArea.id(), selectedPracticeArea.name(), selectedPracticeArea.color());
-				hideValidation();
-			}
+			Optional<CaseDao.PracticeAreaRow> picked = PracticeAreaSelector.showPicker(
+                    selectPracticeAreaButton.getScene().getWindow(), areas, selectedPracticeArea,
+                    CaseDao.PracticeAreaRow::id, CaseDao.PracticeAreaRow::name, CaseDao.PracticeAreaRow::color);
+            picked.ifPresent(this::applyPracticeAreaSelection);
 		} catch (RuntimeException ex) {
 			showValidation("Unable to load practice areas.");
 		}
 	}
+
+    void applyPracticeAreaSelection(CaseDao.PracticeAreaRow selected) {
+        selectedPracticeArea = selected;
+        renderPracticeAreaMini(selected.id(), selected.name(), selected.color());
+        hideValidation();
+    }
 
 	private void onSelectStatus() {
 		try {
@@ -846,7 +840,9 @@ public final class NewIntakeController {
 				(name == null || name.isBlank()) ? "—" : name,
 				colorCss
 		);
-		practiceAreaHost.getChildren().setAll(practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI));
+		var card = practiceAreaCardFactory.create(model, PracticeAreaCardFactory.Variant.MINI);
+        if (practiceAreaId != null) card.getStyleClass().add("shale-card-selected");
+        practiceAreaHost.getChildren().setAll(card);
 	}
 
 	private void renderStatusMini(Integer statusId, String statusName, String statusColorCss) {

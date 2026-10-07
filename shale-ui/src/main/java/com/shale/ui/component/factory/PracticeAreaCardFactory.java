@@ -40,8 +40,7 @@ public class PracticeAreaCardFactory {
         // Dot uses the practice-area color
         card.setDotCssColor(css);
 
-        // Background: subtle for readability (same approach as StatusCardFactory)
-        card.setBackgroundCssColor("rgba(0,0,0,0.06)");
+        // The shared card surface follows the active theme; stored color belongs only in the dot.
 
         switch (variant) {
         case FULL -> card.applyFull();

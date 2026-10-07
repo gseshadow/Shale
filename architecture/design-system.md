@@ -679,3 +679,18 @@ excluded.
 ## Application update policy notice
 
 Phase 11A uses one shell-level wrapping notice above working content. Recommended state uses a quiet surface and may be dismissed for its policy revision/target; required state strengthens the border, and deadline-reached state uses the danger border without modal focus or disabled application controls. Text always carries state and deadline meaning. Update is a semantic primary small action and dismissal is a semantic ghost small action. The notice supports both themes, narrow widths, keyboard activation, and background refresh without focus stealing.
+
+### Practice Area mini-card selection
+
+`PracticeAreaSelector<T>` is the shared, presentation-only card picker for New Intake and Case
+Overview Practice Area changes. It composes `PracticeAreaCardFactory` MINI cards, preserves the
+configured dot color, and uses the existing `shale-card-selected` border without changing text paint.
+Native button activation surfaces provide keyboard/focus behavior; Cancel leaves caller state intact.
+This is an intentional rich-selector exception to the ordinary dropdown API. Controllers retain
+loading, required-field validation, tenant scope, and persistence. The Case Overview editor keeps its
+Current/New fields, Change action, and staged Save/Cancel behavior. Theme tokens own Practice Area
+card surfaces, text, borders, and the scoped editor body in both themes.
+
+Audit compatibility: selecting a card only stages local form state and adds no domain mutation or
+sensitive read. Existing intake creation and Case Practice Area save/audit seams remain authoritative;
+this presentation change adds no audit event, SQL migration, or server deployment.
