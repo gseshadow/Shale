@@ -34,18 +34,24 @@ SSH bootstrap. The bootstrap fetches the configured Mac remote, verifies the ful
 it with the repository root supplied explicitly. It never invokes the checkout's potentially stale release script.
 Before workspace synchronization, the requested script fetches the remote, resolves the requested commit, extracts
 `mac_release_workspace.py` into a separate temporary file, and verifies its Git blob against that commit. It runs
-this verified helper to clean only allowlisted POMs and check out that exact commit before applying the requested
-release version. A stale checkout may lack the helper entirely; no pre-sync helper is loaded from that checkout.
+this verified helper to remove disposable outputs, restore only allowlisted POMs, and check out that exact commit
+before applying the requested release version. A stale checkout may lack the helper entirely; no pre-sync helper is loaded from that checkout.
 The same verified temporary helper handles exit cleanup and is removed on exit. Mac and Windows artifacts use the
 same origin-available source revision. Direct legacy two-argument Mac preparation remains supported but emits a
 source revision mismatch warning because it falls back to `origin/<branch>`.
 
-The dedicated Mac checkout is reusable. Before restoring POMs or switching revisions, preparation inspects all tracked,
+The dedicated Mac checkout is reusable. Before its Git cleanliness check, the verified helper removes only
+`build/tmp/` and `dist-macos/`, including runtime images, smoke-test output, DMGs, ZIPs, and release metadata from
+the previous release. Missing directories are harmless, so cleanup is safe to rerun and does not depend on
+`.gitignore`. Cleanup refuses tracked paths in either HEAD or the index and symlinked parent directories;
+output symlinks are unlinked without following their targets. Unknown files outside these two disposable output
+paths are preserved. Before restoring POMs or switching revisions, preparation then inspects all tracked,
 staged, and untracked changes. It restores only the root POM and the six module POMs whose versions are temporarily
 rewritten by the release build; any other change fails closed and is reported without being discarded. After the
 fetch, the requested commit must exist, is checked out detached, and is compared with `HEAD` before version injection.
 An exit trap restores the same seven POMs after packaging on both success and ordinary build failure. The flow does
-not use `git clean`, blanket stashing, or an unvalidated hard reset. Build artifacts remain in `dist-macos/` as before.
+not use `git clean`, blanket stashing, or an unvalidated hard reset. New build artifacts remain in `dist-macos/`
+for handoff until the next release preparation.
 
 ## Output
 
