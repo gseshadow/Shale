@@ -39,6 +39,7 @@ import java.util.function.Consumer;
 
 /** Session-owned shell companion. Entity navigation remains in SceneManager. */
 public final class UniversalSearchPopup implements AutoCloseable {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(UniversalSearchPopup.class);
     private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
     private final TextField field;
     private final AppState state;
@@ -54,9 +55,12 @@ public final class UniversalSearchPopup implements AutoCloseable {
     private final VBox root = new VBox(4, scroll, footer);
     private final PauseTransition debounce = new PauseTransition(Duration.millis(250));
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> daemon(r, "search-suggestions"));
+    private final ExecutorService cancellationWorker = new java.util.concurrent.ThreadPoolExecutor(1, 1, 0,
+            java.util.concurrent.TimeUnit.MILLISECONDS, new java.util.concurrent.ArrayBlockingQueue<>(1),
+            r -> daemon(r, "search-suggestion-cancel"), new java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy());
     // Completion writes finish on disposal; history never depends on a mutable AppState inside a worker.
     private final ExecutorService historyWorker = Executors.newSingleThreadExecutor(r -> new Thread(r, "search-history"));
-    private final LatestSearchRunner runner = new LatestSearchRunner(worker, Platform::runLater);
+    private final LatestSearchRunner runner = new LatestSearchRunner(worker, Platform::runLater, cancellationWorker);
     private final List<Button> choices = new ArrayList<>();
     private int selection = -1;
     private boolean active;
@@ -89,6 +93,10 @@ public final class UniversalSearchPopup implements AutoCloseable {
             public SearchService.Suggestions suggest(int tenant, String query, boolean deleted, BooleanSupplier current) {
                 return search.suggest(tenant, query, deleted, current);
             }
+            public SearchService.Suggestions suggest(int tenant, String query, boolean deleted, BooleanSupplier current,
+                    Consumer<Runnable> cancellation) {
+                return search.suggest(tenant, query, deleted, current, cancellation);
+            }
             public boolean available(int tenant, String query, Suggestion row, boolean deleted) {
                 return search.suggestionAvailable(tenant, query, row, deleted);
             }
@@ -97,6 +105,10 @@ public final class UniversalSearchPopup implements AutoCloseable {
 
     interface Source {
         SearchService.Suggestions suggest(int tenant, String query, boolean deleted, BooleanSupplier current);
+        default SearchService.Suggestions suggest(int tenant, String query, boolean deleted, BooleanSupplier current,
+                Consumer<Runnable> cancellation) {
+            return suggest(tenant, query, deleted, current);
+        }
         boolean available(int tenant, String query, Suggestion row, boolean deleted);
     }
 
@@ -174,6 +186,7 @@ public final class UniversalSearchPopup implements AutoCloseable {
     }
 
     private void refresh() {
+        long typed = com.shale.core.util.PerformanceLogging.start();
         long token = runner.invalidate();
         debounce.stop();
         if (closed || !field.isFocused() || scope() == null) { dismiss(); return; }
@@ -190,18 +203,32 @@ public final class UniversalSearchPopup implements AutoCloseable {
                     values -> { if (current(scope, session, query)) renderHistory(values, scope, session); },
                     error -> { if (current(scope, session, query)) message("Recent searches are unavailable."); });
         } else {
-            debounce.setOnFinished(event -> runner.submit(token,
-                    () -> search.suggest(scope.tenantId(), query, includeDeleted.getAsBoolean(),
-                            () -> runner.isCurrent(token) && identityCurrent(scope, session)),
+            boolean deleted = includeDeleted.getAsBoolean();
+            debounce.setOnFinished(event -> {
+                com.shale.data.dao.SearchPerformance.log(LOG, "typing_debounce", token, "all", 0,
+                        com.shale.core.util.PerformanceLogging.elapsedMs(typed));
+                long afterDebounce = com.shale.core.util.PerformanceLogging.start();
+                runner.submit(token,
+                    () -> search.suggest(scope.tenantId(), query, deleted,
+                            () -> runner.isCurrent(token) && identityCurrent(scope, session),
+                            action -> runner.onCancel(token, action)),
                     values -> {
-                        if (current(scope, session, query)) renderSuggestions(values, query, scope, session);
+                        if (current(scope, session, query)) {
+                            long render = com.shale.core.util.PerformanceLogging.start();
+                            renderSuggestions(values, query, scope, session);
+                            com.shale.data.dao.SearchPerformance.log(LOG, "fx_render", token, "all", values.rows().size(),
+                                    com.shale.core.util.PerformanceLogging.elapsedMs(render));
+                            com.shale.data.dao.SearchPerformance.log(LOG, "after_debounce", token, "all", values.rows().size(),
+                                    com.shale.core.util.PerformanceLogging.elapsedMs(afterDebounce));
+                        }
                     },
                     error -> {
                         if (current(scope, session, query)) {
                             message("Suggestions are unavailable. You can still search.");
                             addViewAll(query, scope, session);
                         }
-                    }));
+                    });
+            });
             debounce.playFromStart();
         }
     }
@@ -446,6 +473,7 @@ public final class UniversalSearchPopup implements AutoCloseable {
         if (closed) return;
         dismiss();
         closed = true;
+        cancellationWorker.shutdown();
         state.removeIdentityListener(identityListener);
         field.textProperty().removeListener(textListener);
         field.focusedProperty().removeListener(focusListener);

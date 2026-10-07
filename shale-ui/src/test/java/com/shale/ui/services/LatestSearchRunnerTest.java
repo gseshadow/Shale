@@ -8,6 +8,63 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class LatestSearchRunnerTest {
+    @Test void invalidationCancelsOnlyTheCapturedStatementOffTheCallingThread() {
+        var worker = new ArrayDeque<Runnable>();
+        var ui = new ArrayDeque<Runnable>();
+        var cancellations = new ArrayDeque<Runnable>();
+        var runner = new LatestSearchRunner(worker::add, ui::add, cancellations::add);
+        var cancelled = new ArrayList<String>();
+        long first = runner.invalidate();
+        runner.submit(first, () -> {
+            runner.onCancel(first, () -> cancelled.add("old statement"));
+            long latest = runner.invalidate();
+            runner.invalidate(); // Repeated keystrokes must not enqueue another cancel for the same statement.
+            assertTrue(cancelled.isEmpty(), "JDBC cancel must not execute on the typing/invalidation thread");
+            assertEquals(1, cancellations.size());
+            runner.onCancel(first, null);
+            assertFalse(runner.isCurrent(latest));
+            return "old";
+        }, v -> fail("Stale result"), ex -> fail(ex));
+        worker.remove().run();
+        cancellations.remove().run();
+        ui.forEach(Runnable::run);
+        assertEquals(List.of("old statement"), cancelled);
+    }
+
+    @Test void invalidationBeforeStatementRegistrationStillCancelsAndQueuedReplacementRunsOnce() {
+        var worker = new ArrayDeque<Runnable>();
+        var ui = new ArrayDeque<Runnable>();
+        var cancellations = new ArrayDeque<Runnable>();
+        var runner = new LatestSearchRunner(worker::add, ui::add, cancellations::add);
+        var calls = new ArrayList<String>();
+        long old = runner.invalidate();
+        runner.submit(old, () -> {
+            long next = runner.invalidate();
+            runner.onCancel(old, () -> calls.add("cancel"));
+            runner.submit(next, () -> "latest", calls::add, ex -> fail(ex));
+            return "old";
+        }, v -> fail(), ex -> fail(ex));
+        worker.remove().run();
+        cancellations.remove().run();
+        ui.forEach(Runnable::run);
+        assertEquals(List.of("cancel", "latest"), calls);
+    }
+
+    @Test void requestsReplacedBeforeWorkerStartsNeverAcquireConnections() {
+        var worker = new ArrayDeque<Runnable>();
+        var ui = new ArrayDeque<Runnable>();
+        var runner = new LatestSearchRunner(worker::add, ui::add);
+        var shown = new ArrayList<Integer>();
+        for (int i=0; i<100; i++) {
+            long token = runner.invalidate();
+            int value = i;
+            runner.submit(token, () -> { assertEquals(99, value, "Obsolete queued work must not start"); return value; },
+                    shown::add, ex -> fail(ex));
+        }
+        assertEquals(1, worker.size());
+        worker.remove().run(); ui.forEach(Runnable::run);
+        assertEquals(List.of(99), shown);
+    }
     @Test void onlyLatestPendingQueryRunsAndQueuedCallbacksCannotRenderAfterInvalidation() {
         var worker = new ArrayDeque<Runnable>();
         var ui = new ArrayDeque<Runnable>();

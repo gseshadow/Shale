@@ -52,8 +52,9 @@ public final class SearchService {
 	private final UserDao userDao;
 	private final TaskDao taskDao;
 	private final CalendarEventDao calendarEventDao;
+	private final com.shale.data.dao.SuggestionDao suggestionDao;
 
-	public SearchService(CaseDao caseDao, CaseSummaryDao caseSummaryDao, ContactDao contactDao, OrganizationDao organizationDao, UserDao userDao, TaskDao taskDao, CalendarEventDao calendarEventDao) {
+	public SearchService(CaseDao caseDao, CaseSummaryDao caseSummaryDao, ContactDao contactDao, OrganizationDao organizationDao, UserDao userDao, TaskDao taskDao, CalendarEventDao calendarEventDao, com.shale.data.dao.SuggestionDao suggestionDao) {
 		this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
 		this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
 		this.contactDao = Objects.requireNonNull(contactDao, "contactDao");
@@ -61,6 +62,7 @@ public final class SearchService {
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
 		this.taskDao = Objects.requireNonNull(taskDao, "taskDao");
 		this.calendarEventDao = Objects.requireNonNull(calendarEventDao, "calendarEventDao");
+		this.suggestionDao = Objects.requireNonNull(suggestionDao, "suggestionDao");
 	}
 
 	public SearchResults searchAll(int shaleClientId, Integer currentUserId, String query, boolean includeDeletedCases) {
@@ -100,78 +102,35 @@ public final class SearchService {
     public static final int SUGGESTIONS_PER_CATEGORY = 3;
     public static final int SUGGESTIONS_TOTAL = 18;
 
-    /** Each provider ranks before bounding in SQL. No full-results/card-date hydration. */
+    /** Suggestions have their own narrow query path; full search keeps its broader DAO reads. */
     public Suggestions suggest(int tenant, String query, boolean includeDeleted,
             java.util.function.BooleanSupplier current) {
-        if (query == null || query.isBlank()) return new Suggestions(List.of(), false);
-        var bounds = new com.shale.data.dao.SuggestionBounds(SUGGESTIONS_PER_CATEGORY);
-        var rows = new java.util.ArrayList<Suggestion>();
-        boolean failed = false;
-        for (SuggestionType type : SuggestionType.values()) {
-            if (!current.getAsBoolean()) break;
-            if (type == SuggestionType.DELETED_CASE && !includeDeleted) continue;
-            try { rows.addAll(loadSuggestions(type, tenant, query, bounds)); }
-            catch (RuntimeException ex) {
-                // Never log query text, identifying values, or provider exception payloads.
-                LOG.warn("Search suggestions unavailable provider={} failureClass={}", type, ex.getClass().getSimpleName());
-                failed = true;
-            }
-        }
-        return new Suggestions(orderSuggestions(rows, SUGGESTIONS_PER_CATEGORY, SUGGESTIONS_TOTAL), failed);
+        return suggest(tenant, query, includeDeleted, current, ignored -> { });
     }
 
-    /** Reload the selected ID through the same tenant/lifecycle predicates before routing. */
+    public Suggestions suggest(int tenant, String query, boolean includeDeleted,
+            java.util.function.BooleanSupplier current, java.util.function.Consumer<Runnable> cancellation) {
+        long started = com.shale.core.util.PerformanceLogging.start();
+        var result = suggestionDao.search(tenant, query, includeDeleted, SUGGESTIONS_PER_CATEGORY, SUGGESTIONS_TOTAL,
+                null, null, current, cancellation);
+        var rows = orderSuggestions(result.rows().stream().map(SearchService::suggestionRow).toList(),
+                SUGGESTIONS_PER_CATEGORY, SUGGESTIONS_TOTAL);
+        com.shale.data.dao.SearchPerformance.log(LOG, "suggestions_total", 0, "all", rows.size(),
+                com.shale.core.util.PerformanceLogging.elapsedMs(started));
+        return new Suggestions(rows, result.failed());
+    }
+
+    /** Recheck the selected ID with exactly the same identifying fields and visibility rules. */
     public boolean suggestionAvailable(int tenant, String query, Suggestion row, boolean includeDeleted) {
         if (row.type() == SuggestionType.DELETED_CASE && !includeDeleted) return false;
-        return !loadSuggestions(row.type(), tenant, query,
-                new com.shale.data.dao.SuggestionBounds(1, row.id())).isEmpty();
+        return !suggestionDao.search(tenant, query, includeDeleted, 1, 1,
+                com.shale.data.dao.SuggestionDao.Category.valueOf(row.type().name()), row.id(),
+                () -> true, ignored -> { }).rows().isEmpty();
     }
 
-    private List<Suggestion> loadSuggestions(SuggestionType type, int tenant, String query,
-            com.shale.data.dao.SuggestionBounds bounds) {
-        return switch (type) {
-            case CASE -> caseSummaryDao.searchActiveByName(tenant, query, bounds).stream().map(row ->
-                suggestion(type, row.summary().caseId(), row.summary().caseName(),
-                    details(row.summary().caseNumber(), row.summary().responsibleAttorneyName()), query,
-                    List.of(safeText(row.summary().caseName())), List.of())).toList();
-            case DELETED_CASE -> caseSummaryDao.searchDeletedByName(tenant, query, bounds).stream().map(row ->
-                suggestion(type, row.summary().caseId(), row.summary().caseName(),
-                    details("Deleted", row.summary().caseNumber()), query,
-                    List.of(safeText(row.summary().caseName())), List.of())).toList();
-            case CONTACT -> contactDao.searchContacts(tenant, query, bounds).stream().map(this::credentialAware).map(row ->
-                suggestion(type, row.id(), row.displayName(), details(row.email(), row.phone()), query,
-                    List.of(safeText(preferCombinedName(row.firstName(), row.lastName(), row.displayName())),
-                        safeText(row.displayName()), safeText(row.firstName()), safeText(row.lastName()), safeText(row.email())),
-                    List.of(safeText(row.phone())))).toList();
-            case ORGANIZATION -> organizationDao.searchOrganizations(query, bounds).stream().map(row ->
-                suggestion(type, row.getId(), row.getName(), details(row.getCity(), row.getEmail()), query,
-                    List.of(safeText(row.getName()), safeText(row.getEmail())),
-                    List.of(safeText(row.getPhone()), safeText(row.getFax())))).toList();
-            case USER -> userDao.searchUsers(tenant, query, bounds).stream().map(row ->
-                suggestion(type, row.id(), row.displayName(), safeText(row.email()), query,
-                    List.of(safeText(row.displayName()), safeText(row.firstName()), safeText(row.lastName()), safeText(row.email())),
-                    List.of(safeText(row.phone())))).toList();
-            case TASK -> taskDao.searchTasks(tenant, query, bounds).stream().map(row ->
-                suggestion(type, row.taskId(), row.title(), details(row.caseName(), row.statusName()), query,
-                    List.of(safeText(row.title()), safeText(row.description())), List.of())).toList();
-            case CALENDAR_EVENT -> calendarEventDao.searchCalendarEvents(tenant, query, bounds).stream().map(row ->
-                suggestion(type, row.calendarEventId(), row.title(), details(row.caseName(), String.valueOf(row.startsAt())), query,
-                    List.of(safeText(row.title()), safeText(row.description()), safeText(row.caseName())), List.of())).toList();
-        };
-    }
-
-    static Suggestion suggestion(SuggestionType type, long id, String name, String detail, String query,
-            List<String> texts, List<String> phones) {
-        return new Suggestion(type, id, safeText(name), details(detail, "#" + id), matchRank(query, texts, phones));
-    }
-
-    static int matchRank(String query, List<String> texts, List<String> phones) {
-        String normalized = normalizeText(query), digits = normalizePhoneDigits(query);
-        if (texts.stream().anyMatch(value -> normalizeText(value).equals(normalized))
-                || (!digits.isBlank() && phones.stream().anyMatch(value -> normalizePhoneDigits(value).equals(digits)))) return 0;
-        if (texts.stream().anyMatch(value -> normalizeText(value).startsWith(normalized))
-                || (!digits.isBlank() && phones.stream().anyMatch(value -> normalizePhoneDigits(value).startsWith(digits)))) return 1;
-        return 2;
+    private static Suggestion suggestionRow(com.shale.data.dao.SuggestionDao.Row row) {
+        return new Suggestion(SuggestionType.valueOf(row.category().name()), row.id(), safeText(row.name()),
+                details(row.detail(), "#" + row.id()), row.rank());
     }
 
     static List<Suggestion> orderSuggestions(List<Suggestion> rows, int perCategory, int total) {
