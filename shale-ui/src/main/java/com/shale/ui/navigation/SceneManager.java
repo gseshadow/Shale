@@ -1001,7 +1001,7 @@ public final class SceneManager {
 					new OrganizationDao(dbSessionProvider),
 					new UserDao(dbSessionProvider),
 					new TaskDao(dbSessionProvider),
-					new CalendarEventDao(dbSessionProvider));
+					new CalendarEventDao(dbSessionProvider), new com.shale.data.dao.SuggestionDao(dbSessionProvider));
 			CaseDetailService caseDetailService = new CaseDetailService(caseDao, appState);
 			c.init(appState, searchService, caseDetailService, runtimeBridge, query, onOpenCase, onOpenContact, onOpenOrganization, onOpenUser, this::openTaskProfile,
 					this::openCalendarEventFromNotification);
@@ -1012,7 +1012,7 @@ public final class SceneManager {
     public com.shale.ui.component.UniversalSearchPopup createUniversalSearchPopup(javafx.scene.control.TextField field) {
         SearchService service = new SearchService(new CaseDao(dbSessionProvider), new CaseSummaryDao(dbSessionProvider),
                 new ContactDao(dbSessionProvider), new OrganizationDao(dbSessionProvider), new UserDao(dbSessionProvider),
-                new TaskDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider));
+                new TaskDao(dbSessionProvider), new CalendarEventDao(dbSessionProvider), new com.shale.data.dao.SuggestionDao(dbSessionProvider));
         var permissions = new CaseDetailService(new CaseDao(dbSessionProvider), appState);
         return new com.shale.ui.component.UniversalSearchPopup(field, appState, service,
                 new com.shale.ui.services.RecentSearchHistory(), permissions::canViewDeletedCasesInSearch,

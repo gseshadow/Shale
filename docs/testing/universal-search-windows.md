@@ -38,3 +38,32 @@ Startup focus checklist (not run here):
 
 Automated Maven and resource checks are reported separately in the PR; they do not constitute Windows
 acceptance or live SQL Server validation.
+
+## Windows/Azure timing checklist
+
+Status: **NOT RUN** here. Use the updated desktop against production Azure SQL with the ordinary authenticated
+runtime principal and existing permissions. Enable `-DSHALE_PERF_LOGGING=true -DSHALE_LOG_LEVEL=DEBUG`; keep
+Hikari DEBUG off unless connection_acquisition indicates a pool problem. Do not record query text or identifying
+row values in a shared measurement report.
+
+1. First search after cold startup/sign-in: choose an existing name and note the executor_queue generation. Record
+   typing_debounce, after_debounce, connection_acquisition, session_context_setup, tenant_verification, per-category
+   sql_category times/counts, mapping, FX dispatch and row construction. Check visible dropdown appearance too.
+   Record cold-start separately from warm results; do not infer suggestion latency from unrelated DAO startup logs.
+2. Subsequent searches: repeat at least 20 representative exact names, prefixes, CaseNumber/OfficePrinterCode/Id
+   queries, broad common names and no-match queries. Include Contacts, Organizations and other categories, and
+   ordinary/admin sessions. Report warm median/p95/max after_debounce and row counts; compare with roughly 500 ms
+   after the unchanged 250 ms debounce. Preserve exact-before-prefix ordering and three/eighteen bounds. Check
+   narrative/email/phone-only matches still work in the broader full results where previously supported.
+3. Rapid typing: type/edit every 50–100 ms, then pause; also replace text while a database request is already active.
+   The worker must run only the newest pending query, cancel the old statement, and show only the latest response.
+   No old success/error may reopen the popup after Escape/navigation/logout or an away-and-back identity switch.
+   Check typing stays responsive and compare newest after_debounce/queue wait to ordinary warm searches.
+4. Diagnose remaining delay: high connection_acquisition suggests pool/login/network cost; high session_context_setup
+   suggests context round trips; high tenant_verification suggests metadata/network cost; high sql_category identifies
+   the category needing actual-plan/IO inspection. High client SQL transfer with low server times suggests transport
+   or driver buffering; high executor_queue suggests slow cancellation/acquisition; high fx_dispatch suggests a busy
+   JavaFX thread. fx_render is row construction, so compare it with actual visible appearance to catch pulse delays.
+5. Disable diagnostic logging after collection. Report Windows, desktop/JDK/JDBC versions and coarse network conditions,
+   first/warm/rapid measurements, sanitized phase logs and any cancellation failures. Never include search text,
+   credentials, SQL parameter values or record details. Confirm Enter and View all results still open full search.
