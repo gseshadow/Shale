@@ -62,13 +62,15 @@ public final class UniversalSearchPopup implements AutoCloseable {
     private boolean active;
     private boolean closed;
     private boolean popupMouseDown;
-    private boolean suppressFocusRefresh;
     private Scene ownerScene;
     private Window ownerWindow;
     private final ChangeListener<String> textListener = (obs, oldValue, newValue) -> queryChanged();
     private final ChangeListener<Boolean> focusListener = (obs, oldValue, focused) -> {
-        if (focused && !suppressFocusRefresh) refresh();
-        else Platform.runLater(this::dismissIfFocusLeft);
+        if (!focused) Platform.runLater(this::dismissIfFocusLeft);
+    };
+    // JavaFX distinguishes keyboard traversal from automatic/requestFocus() focus.
+    private final ChangeListener<Boolean> keyboardFocusListener = (obs, oldValue, visible) -> {
+        if (visible) refresh();
     };
     private final ChangeListener<Boolean> windowFocusListener = (obs, oldValue, focused) -> {
         if (!focused) Platform.runLater(this::dismissIfFocusLeft);
@@ -133,6 +135,7 @@ public final class UniversalSearchPopup implements AutoCloseable {
         });
         field.textProperty().addListener(textListener);
         field.focusedProperty().addListener(focusListener);
+        field.focusVisibleProperty().addListener(keyboardFocusListener);
         field.sceneProperty().addListener(sceneListener);
         field.addEventFilter(KeyEvent.KEY_PRESSED, keys);
         state.addIdentityListener(identityListener);
@@ -147,17 +150,16 @@ public final class UniversalSearchPopup implements AutoCloseable {
         if (closed || scope == null || query.isBlank()) return;
         record(scope, query);
         field.setText(query);
-        suppressFocusRefresh = true;
         dismiss();
         fullSearch.accept(query);
     }
 
-    private void queryChanged() { suppressFocusRefresh = false; refresh(); }
+    private void queryChanged() { refresh(); }
     private void outsideClick(MouseEvent event) {
         if (!descendant(event.getTarget(), field)) dismiss();
         else {
-            suppressFocusRefresh = false;
-            if (field.isFocused() && !popup.isShowing()) refresh();
+            field.requestFocus();
+            if (!popup.isShowing()) refresh();
         }
     }
     private void identityChanged() {
@@ -165,7 +167,6 @@ public final class UniversalSearchPopup implements AutoCloseable {
         Runnable clear = () -> {
             if (closed) return;
             dismiss();
-            suppressFocusRefresh = true;
             field.clear();
             dismiss();
         };
@@ -259,7 +260,6 @@ public final class UniversalSearchPopup implements AutoCloseable {
 
     private void activate(Suggestion row, String query, Scope scope, long session) {
         if (!current(scope, session, query)) return;
-        suppressFocusRefresh = true;
         dismiss();
         // Dismiss without stealing focus or cancelling the explicit activation request.
         long token = runner.invalidate();
@@ -449,6 +449,7 @@ public final class UniversalSearchPopup implements AutoCloseable {
         state.removeIdentityListener(identityListener);
         field.textProperty().removeListener(textListener);
         field.focusedProperty().removeListener(focusListener);
+        field.focusVisibleProperty().removeListener(keyboardFocusListener);
         field.sceneProperty().removeListener(sceneListener);
         field.removeEventFilter(KeyEvent.KEY_PRESSED, keys);
         attachScene(null);

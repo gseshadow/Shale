@@ -31,6 +31,43 @@ import org.junit.jupiter.api.io.TempDir;
 class UniversalSearchPopupTest {
     @TempDir Path directory;
 
+    @Test void automaticAndProgrammaticFocusStayClosedButClickingFocusedSearchOpensHistory() throws Exception {
+        var history = new RecentSearchHistory(directory);
+        history.record(new RecentSearchHistory.Scope(7, 11), "Recent Case");
+        Fixture fixture = JavaFxTestSupport.runAndWait(() -> new Fixture(history, false));
+        try {
+            JavaFxTestSupport.runAndWait(() -> {
+                assertFalse(fixture.popupShowing(), "Initialization must not open recent searches");
+                fixture.other.requestFocus();
+                fixture.field.requestFocus();
+                assertFalse(fixture.popupShowing(), "Programmatic focus must not open recent searches");
+                fixture.field.fireEvent(mouse(MouseEvent.MOUSE_PRESSED));
+            });
+            fixture.awaitChoices(1);
+            JavaFxTestSupport.runAndWait(() -> {
+                key(fixture.field, KeyCode.ESCAPE);
+                assertTrue(fixture.field.isFocused(), "Escape should leave search ready for input");
+                fixture.field.fireEvent(mouse(MouseEvent.MOUSE_PRESSED));
+            });
+            fixture.awaitChoices(1);
+        } finally { fixture.close(); }
+    }
+
+    @Test void tabTraversalIntoSearchOpensRecentHistory() throws Exception {
+        var history = new RecentSearchHistory(directory);
+        history.record(new RecentSearchHistory.Scope(7, 11), "Recent Case");
+        Fixture fixture = JavaFxTestSupport.runAndWait(() -> new Fixture(history, false));
+        try {
+            JavaFxTestSupport.runAndWait(() -> {
+                fixture.other.requestFocus();
+                fixture.other.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.TAB,
+                        false, false, false, false));
+                assertTrue(fixture.field.isFocused(), "Tab must retain normal traversal into search");
+            });
+            fixture.awaitChoices(1);
+        } finally { fixture.close(); }
+    }
+
     @Test void unselectedEnterPreservesFullSearchAndRecentKeyboardSelectionRunsThatQuery() throws Exception {
         var history = new RecentSearchHistory(directory);
         history.record(new RecentSearchHistory.Scope(7, 11), "Recent Case");
@@ -162,7 +199,9 @@ class UniversalSearchPopupTest {
         volatile int fullCount;
         private Window popupWindow;
 
-        Fixture(RecentSearchHistory history) {
+        Fixture(RecentSearchHistory history) { this(history, true); }
+
+        Fixture(RecentSearchHistory history, boolean interact) {
             state.setUserId(11); state.setShaleClientId(7);
             stage.setScene(new Scene(new VBox(field, other), 600, 400));
             ThemeManager.application().register(stage.getScene());
@@ -182,6 +221,12 @@ class UniversalSearchPopupTest {
             field.setOnAction(event -> popup.submitFullSearch());
             stage.show();
             field.requestFocus();
+            if (interact) field.fireEvent(mouse(MouseEvent.MOUSE_PRESSED));
+        }
+
+        boolean popupShowing() {
+            return Window.getWindows().stream().anyMatch(w -> w != stage && w.isShowing()
+                    && w.getScene() != null && w.getScene().getRoot().lookup(".universal-search-popup") != null);
         }
 
         Window window() {

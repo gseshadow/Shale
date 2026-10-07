@@ -3,6 +3,19 @@
 Status: **NOT RUN** in this Linux environment. Run against an authenticated Windows desktop with seeded
 duplicate names, multiple supported entity types, and two users/tenants where available.
 
+Startup focus checklist (not run here):
+
+- Cold launch: reach the initial My Shale page; search is unfocused, dropdown closed, and My Shale navigation
+  has initial focus. Background initialization must not reopen suggestions or steal later user focus.
+- Manual login: sign out and sign in with credentials; verify the same initial focus and closed dropdown.
+- Remembered login: enable Stay logged in, exit, and relaunch; after restoration verify the same state.
+- Clicking search: an empty field shows recent searches. Press Escape, then click the still-focused field;
+  recent searches reopen. Clicking from another control also works.
+- Tabbing into search: Tab/Shift+Tab remain usable; traversal into empty search opens history. Verify any
+  configured search shortcut, if present, retains its intentional search behavior.
+- Typing: type a known query and verify live suggestions. Check Up/Down + Enter direct navigation, unselected
+  Enter full search, history recording, Escape, and ordinary/back navigation.
+
 - Mouse: type a known name; confirm grouped Cases, Contacts, Organizations, then other supported types.
   Check exact-before-prefix ordering, distinguishing metadata/IDs, scrolling, row clicks, View all results,
   and dismissal on outside click and ordinary/back navigation. Click a row as field focus transfers.

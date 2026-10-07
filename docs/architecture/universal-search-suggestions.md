@@ -25,6 +25,12 @@ dismiss/invalidate the popup. Popup mouse presses protect row activation during 
 Enter with no explicit arrow selection retains the full-search route; a fixed-footer View all results action is always
 available for a nonempty query, including loading/no-match/failure states.
 
+Shell initialization gives focus once to the existing My Shale navigation button after installing the initial
+route. Manual password sign-in and remembered sign-in share this path. Automatic/programmatic search focus
+does not open suggestions; JavaFX keyboard focus visibility opens them on intentional traversal. Clicking
+the field opens history even when already focused (including after Escape), and typing continues to refresh
+live suggestions. Search remains focus-traversable; no delay or recurring focus correction is used.
+
 ## Local history and privacy
 
 `RecentSearchHistory` uses the existing `AppPaths.appSupportDir("Shale")` location and the established
