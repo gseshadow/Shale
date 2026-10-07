@@ -66,9 +66,10 @@ public final class SuggestionDao {
             if (!current.getAsBoolean()) return new Result(List.of(), false);
             try (PreparedStatement ps = con.prepareStatement(batchSql(userFilters))) {
                 ps.setInt(1, tenant);
-                ps.setString(2, text);
-                ps.setString(3, literal + "%");
-                ps.setString(4, "%" + literal + "%");
+                // Keep Unicode even when sendStringParametersAsUnicode is disabled on the connection.
+                ps.setNString(2, text);
+                ps.setNString(3, literal + "%");
+                ps.setNString(4, "%" + literal + "%");
                 ps.setInt(5, perCategory);
                 ps.setInt(6, total);
                 ps.setBoolean(7, deleted);
@@ -143,7 +144,7 @@ public final class SuggestionDao {
     static String batchSql(String userFilters) {
         String sql = """
                 SET NOCOUNT ON;
-                DECLARE @tenant int=?, @text nvarchar(2048)=?, @prefix nvarchar(4096)=?, @contains nvarchar(4096)=?,
+                DECLARE @tenant int=?, @text nvarchar(2048)=?, @prefix nvarchar(4000)=?, @contains nvarchar(4000)=?,
                     @limit int=?, @total int=?, @deleted bit=?, @only int=?, @id bigint=?;
                 IF ISNULL(TRY_CONVERT(int,SESSION_CONTEXT(N'ShaleClientId')),-1)<>@tenant
                     THROW 51000, 'Runtime tenant context mismatch', 1;
