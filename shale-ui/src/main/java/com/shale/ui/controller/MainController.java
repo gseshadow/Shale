@@ -124,6 +124,11 @@ public final class MainController {
     }
 
     public void dismissSearchPopup() { if (searchPopup != null) searchPopup.dismiss(); }
+    /** Called once after the initial route is installed, for every sign-in path. */
+    public void focusInitialPage() {
+        dismissSearchPopup();
+        navMyShaleButton.requestFocus();
+    }
     public void disposeSearchPopup() {
         if (searchPopup != null) { searchPopup.close(); searchPopup = null; }
     }

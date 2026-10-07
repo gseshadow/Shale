@@ -405,6 +405,7 @@ public final class SceneManager {
 		System.out.println("[Navigation] Initial route reset -> MY_SHALE");
 		navigationManager.resetTo(AppRoute.myShale());
 		showRouteInternal(AppRoute.myShale());
+		mainController.focusInitialPage();
 		notifyBackAvailabilityChanged();
 		Integer tenantId = appState.getShaleClientId();
 		Integer userId = appState.getUserId();
