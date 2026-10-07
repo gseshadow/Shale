@@ -602,3 +602,22 @@
 .contact-card-secondary-mini { -fx-padding: 3px 8px; -fx-spacing: 5px; }
 .contact-card-identity { -fx-spacing: 5px; }
 .contact-card-role { -fx-font-weight: 700; }
+
+/* Practice Area MINI cards share surfaces and selected borders in both themes. */
+.practice-area-card .practice-area-card-name {
+    -fx-text-fill: -shale-color-text-primary;
+}
+.practice-area-card-dot { -fx-stroke: -shale-color-card-border; }
+.dialog-pane.secondary-window-shell .practice-area-selector-card {
+    -fx-background-color: transparent;
+    -fx-padding: 2;
+    -fx-content-display: graphic-only;
+    -fx-cursor: hand;
+}
+.dialog-pane.secondary-window-shell .practice-area-selector-card:focused {
+    -fx-background-color: -shale-color-border-selected;
+    -fx-background-radius: 16;
+}
+.dialog-pane.secondary-window-shell .practice-area-selector-card:hover .practice-area-card {
+    -fx-background-color: -shale-color-card-hover-surface;
+}

@@ -100,6 +100,7 @@ import com.shale.ui.component.ColorCodedComboBox;
 import com.shale.ui.component.factory.CalendarEventCardFactory;
 import com.shale.ui.component.factory.CaseCardFactory;
 import com.shale.ui.component.factory.CaseLinkCardFactory;
+import com.shale.ui.component.PracticeAreaSelector;
 import com.shale.ui.component.factory.PracticeAreaCardFactory;
 import com.shale.ui.component.factory.PracticeAreaCardFactory.PracticeAreaCardModel;
 import com.shale.ui.component.factory.PracticeAreaIndicatorFactory;
@@ -6083,7 +6084,10 @@ public class CaseController {
 		PracticeAreaCardFactory cards = new PracticeAreaCardFactory(id -> { });
 		showCardChoiceFieldDialog("Edit Practice Area", "Practice Area", currentValue, options,
 				CaseDao.PracticeAreaRow::id, v -> cards.create(new PracticeAreaCardModel(v.id(), v.name(), v.color()), PracticeAreaCardFactory.Variant.MINI),
-				false, null, changePracticeAreaButton).ifPresent(v -> savePracticeAreaField(v.id()));
+				false, null, changePracticeAreaButton,
+                (owner, field) -> PracticeAreaSelector.showPicker(owner, options, field.getSelectedUser(),
+                        CaseDao.PracticeAreaRow::id, CaseDao.PracticeAreaRow::name, CaseDao.PracticeAreaRow::color))
+                .ifPresent(v -> savePracticeAreaField(v.id()));
 	}
 
 	private void onEditResponsibleAttorneyField() {
@@ -6129,6 +6133,14 @@ public class CaseController {
 	/** Shared Case Overview editor shell; persistence deliberately remains in each caller. */
 	private <T> Optional<T> showCardChoiceFieldDialog(String title, String fieldLabel, T currentValue, List<T> options,
 			Function<T, Integer> identity, Function<T, Node> miniCardRenderer, boolean clearable, Runnable removeAction, Button ownerButton) {
+        return showCardChoiceFieldDialog(title, fieldLabel, currentValue, options, identity, miniCardRenderer,
+                clearable, removeAction, ownerButton, null);
+    }
+
+    private <T> Optional<T> showCardChoiceFieldDialog(String title, String fieldLabel, T currentValue, List<T> options,
+            Function<T, Integer> identity, Function<T, Node> miniCardRenderer, boolean clearable,
+            Runnable removeAction, Button ownerButton,
+            java.util.function.BiFunction<Window, UserSelectionField<T>, Optional<T>> picker) {
 		Dialog<T> dialog = new Dialog<>();
 		AppDialogs.applySecondaryDialogShell(dialog, title);
 		dialog.initOwner(dialogOwner(ownerButton));
@@ -6137,8 +6149,10 @@ public class CaseController {
 		if (clearable && currentValue != null) dialog.getDialogPane().getButtonTypes().add(removeType);
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, saveType);
 		UserSelectionField<T> selector = new UserSelectionField<>(identity, Object::toString, ignored -> null,
-				(field, candidates) -> showMiniCardPicker(dialog.getDialogPane().getScene().getWindow(), fieldLabel, candidates,
-						identity, miniCardRenderer), clearable, miniCardRenderer).useUnifiedControlStyles();
+				(field, candidates) -> picker == null
+                        ? showMiniCardPicker(dialog.getDialogPane().getScene().getWindow(), fieldLabel, candidates,
+                                identity, miniCardRenderer)
+                        : picker.apply(dialog.getDialogPane().getScene().getWindow(), field), clearable, miniCardRenderer).useUnifiedControlStyles();
 		selector.setCandidates(options);
 		selector.setSelectedUser(currentValue);
 		selector.setMaxWidth(Double.MAX_VALUE);
@@ -6149,6 +6163,7 @@ public class CaseController {
 		content.getStyleClass().add("field-edit-dialog-body");
 		content.setMinWidth(420);
 		dialog.getDialogPane().setContent(content);
+        if ("Practice Area".equals(fieldLabel)) dialog.getDialogPane().getStyleClass().add("practice-area-edit-dialog");
 		Node save = dialog.getDialogPane().lookupButton(saveType);
 		if (save instanceof Button button) ControlStyles.apply(button, ControlStyles.Purpose.PRIMARY, ControlStyles.Size.STANDARD);
 		if (save != null) save.disableProperty().bind(selector.selectedUserProperty().isNull());
