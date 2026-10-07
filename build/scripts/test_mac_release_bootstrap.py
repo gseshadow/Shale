@@ -133,9 +133,18 @@ class MacReleaseBootstrapTest(unittest.TestCase):
                     "shale-updater/pom.xml", "shale-server/pom.xml"):
             (self.repo / pom).write_text("release-generated\n", encoding="utf-8")
 
+        for relative in ("build/tmp/macos-runtime-image/bin/java",
+                         "build/tmp/macos-runtime-smoke/smoke.txt",
+                         "dist-macos/Shale-1.0.135.dmg", "dist-macos/shale-mac-release.json"):
+            path = self.repo / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("previous release\n", encoding="utf-8")
+
         result = self.bootstrap()
 
         self.assertEqual(0, result.returncode, result.stderr)
+        self.assertFalse((self.repo / "build/tmp").exists())
+        self.assertFalse((self.repo / "dist-macos").exists())
         self.assertEqual("requested\n", (self.repo.parent / "marker").read_text(encoding="utf-8"))
         self.assertIn(f"requested revision: {self.requested}", result.stdout)
         self.assertIn(f"workspace helper from requested revision: {self.requested}", result.stdout)

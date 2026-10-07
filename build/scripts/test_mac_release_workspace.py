@@ -49,17 +49,108 @@ class MacReleaseWorkspaceTest(unittest.TestCase):
         self.assertEqual(self.requested, run(self.repo, "git", "rev-parse", "HEAD").stdout.strip())
         self.assertEqual("", run(self.repo, "git", "status", "--porcelain").stdout)
 
+    def previous_outputs(self):
+        for relative in (
+            "build/tmp/macos-runtime-image/bin/java",
+            "build/tmp/macos-runtime-smoke/smoke.txt",
+            "dist-macos/Shale-1.0.135.dmg",
+            "dist-macos/shale-mac-release.json",
+        ):
+            path = self.repo / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("previous release\n", encoding="utf-8")
+
+    def assert_outputs_removed(self):
+        for relative in WORKSPACE.GENERATED_OUTPUTS:
+            self.assertFalse((self.repo / relative).exists(), relative)
+
+    def test_previous_release_outputs_are_removed_before_check_and_cleanup_is_repeatable(self):
+        # Exercise an old checkout without ignore rules and one with ignored output.
+        for ignored in (False, True):
+            with self.subTest(ignored=ignored):
+                if ignored:
+                    (self.repo / ".git/info/exclude").write_text(
+                        "/build/tmp/\n/dist-macos/\n", encoding="utf-8"
+                    )
+                self.previous_outputs()
+                (self.repo / "pom.xml").write_text("release version\n", encoding="utf-8")
+                WORKSPACE.prepare(self.repo, "origin", self.requested)
+                self.assert_outputs_removed()
+                WORKSPACE.prepare(self.repo, "origin", self.requested)
+                self.assertEqual(self.requested, run(self.repo, "git", "rev-parse", "HEAD").stdout.strip())
+                self.assertEqual("", run(self.repo, "git", "status", "--porcelain").stdout)
+
+    def test_tracked_generated_path_is_refused_even_after_staged_deletion(self):
+        path = self.repo / "dist-macos/versioned.txt"
+        path.parent.mkdir()
+        path.write_text("preserve\n", encoding="utf-8")
+        run(self.repo, "git", "add", "dist-macos")
+        run(self.repo, "git", "commit", "-m", "tracked output")
+        for staged_deletion in (False, True):
+            with self.subTest(staged_deletion=staged_deletion):
+                if staged_deletion:
+                    run(self.repo, "git", "rm", "--cached", "dist-macos/versioned.txt")
+                with self.assertRaisesRegex(WORKSPACE.WorkspaceError, "tracked paths"):
+                    WORKSPACE.prepare(self.repo, "origin", self.requested)
+                self.assertEqual("preserve\n", path.read_text(encoding="utf-8"))
+
+    def test_staged_generated_path_is_refused(self):
+        self.previous_outputs()
+        run(self.repo, "git", "add", "dist-macos")
+        with self.assertRaisesRegex(WORKSPACE.WorkspaceError, "tracked paths"):
+            WORKSPACE.prepare(self.repo, "origin", self.requested)
+        self.assertTrue((self.repo / "build/tmp/macos-runtime-image/bin/java").exists())
+
+    def test_symlink_targets_are_preserved(self):
+        outside = self.repo.parent / "developer-files"
+        outside.mkdir()
+        marker = outside / "notes.txt"
+        marker.write_text("preserve\n", encoding="utf-8")
+        (self.repo / "dist-macos").symlink_to(outside, target_is_directory=True)
+        nested = self.repo / "build/tmp/runtime-link"
+        nested.parent.mkdir(parents=True)
+        nested.symlink_to(outside, target_is_directory=True)
+        WORKSPACE.prepare(self.repo, "origin", self.requested)
+        self.assert_outputs_removed()
+        self.assertFalse((self.repo / "dist-macos").is_symlink())
+        self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))
+
+    def test_symlinked_output_parent_is_refused_without_deleting_external_files(self):
+        outside = self.repo.parent / "developer-build"
+        (outside / "tmp").mkdir(parents=True)
+        marker = outside / "tmp/notes.txt"
+        marker.write_text("preserve\n", encoding="utf-8")
+        (self.repo / "build").symlink_to(outside, target_is_directory=True)
+        with self.assertRaisesRegex(WORKSPACE.WorkspaceError, "symlinked parent"):
+            WORKSPACE.prepare(self.repo, "origin", self.requested)
+        self.assertEqual("preserve\n", marker.read_text(encoding="utf-8"))
+
+    def test_subdirectory_root_is_refused(self):
+        self.previous_outputs()
+        with self.assertRaisesRegex(WORKSPACE.WorkspaceError, "Git workspace root"):
+            WORKSPACE.prepare(self.repo / "build", "origin", self.requested)
+        self.assertTrue((self.repo / "dist-macos/Shale-1.0.135.dmg").exists())
+
     def test_unrelated_tracked_change_fails_closed(self):
+        self.previous_outputs()
         (self.repo / "tracked.txt").write_text("do not discard\n", encoding="utf-8")
         with self.assertRaisesRegex(WORKSPACE.WorkspaceError, "tracked.txt"):
             WORKSPACE.prepare(self.repo, "origin", self.requested)
         self.assertEqual("do not discard\n", (self.repo / "tracked.txt").read_text(encoding="utf-8"))
 
     def test_unrelated_untracked_change_fails_closed(self):
+        self.previous_outputs()
         (self.repo / "notes.txt").write_text("do not discard\n", encoding="utf-8")
         with self.assertRaisesRegex(WORKSPACE.WorkspaceError, "notes.txt"):
             WORKSPACE.prepare(self.repo, "origin", self.requested)
         self.assertTrue((self.repo / "notes.txt").exists())
+
+    def test_unrelated_tracked_deletion_fails_closed(self):
+        self.previous_outputs()
+        (self.repo / "tracked.txt").unlink()
+        with self.assertRaisesRegex(WORKSPACE.WorkspaceError, "tracked.txt"):
+            WORKSPACE.prepare(self.repo, "origin", self.requested)
+        self.assertIn(" D tracked.txt", run(self.repo, "git", "status", "--porcelain").stdout)
 
     def test_unknown_revision_is_rejected_without_moving_head(self):
         original = run(self.repo, "git", "rev-parse", "HEAD").stdout.strip()
