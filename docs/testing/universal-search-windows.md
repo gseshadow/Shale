@@ -67,3 +67,36 @@ row values in a shared measurement report.
 5. Disable diagnostic logging after collection. Report Windows, desktop/JDK/JDBC versions and coarse network conditions,
    first/warm/rapid measurements, sanitized phase logs and any cancellation failures. Never include search text,
    credentials, SQL parameter values or record details. Confirm Enter and View all results still open full search.
+
+## SQL declaration regression (#1829)
+
+SQL Server error 2717 was caused by `@prefix nvarchar(4096)` and `@contains nvarchar(4096)` in the client batch.
+Bounded `nvarchar(n)` permits at most 4,000 UTF-16 code units; the declarations fail for short input too.
+Both are now `nvarchar(4000)`. The existing guard allows at most 3,998 escaped code units, leaving room for
+both contains wildcards and respecting LIKE's 8,000-byte limit. Exact text remains `nvarchar(2048)`;
+display table columns use legal `nvarchar(max)` and identifier conversion uses `nvarchar(20)`.
+All three string parameters use `setNString`, including when `sendStringParametersAsUnicode=false`.
+No search text or exception message is added to diagnostic logs.
+
+For read-only runtime verification, explicitly configure an authorized SQL Server test database with the Shale
+search tables and runtime principal. Set `SHALE_SUGGESTION_TEST_JDBC_URL`, optional
+`SHALE_SUGGESTION_TEST_USERNAME` / `SHALE_SUGGESTION_TEST_PASSWORD`, and positive
+`SHALE_SUGGESTION_TEST_TENANT_ID` / `SHALE_SUGGESTION_TEST_USER_ID` through your secure local environment.
+Keep credentials out of command lines, URLs and reports. Use the ordinary runtime account to test RLS as well.
+
+```bash
+mvn -pl shale-data -am -Dtest=SuggestionDaoTest,SuggestionDaoSqlServerTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+`SuggestionDaoSqlServerTest` uses the actual Microsoft driver, reproduces 2717 with short input for each old
+declaration, and executes the full production DAO batch with Unicode/metacharacters and the maximum escaped
+pattern. Without a configured connection it skips; that is not runtime SQL validation. It creates no schema
+or records. Synthetic local SQL Server execution verifies syntax and driver compatibility, not production
+Azure plans, RLS configuration or Windows latency. Repeat the timing checklist above on the updated desktop.
+
+Local verification on disposable SQL Server 2022 with Microsoft JDBC `12.6.1.jre11` reproduced 2717 for both
+old declarations and successfully executed the corrected full batch for both input cases. Production Azure SQL
+and Windows performance measurements remain outstanding.
+
+Deployment requires updated desktop binaries only. No SQL migration/index script or API/server deployment is required.

@@ -15,6 +15,35 @@ import org.junit.jupiter.api.Test;
 
 /** Guards narrow autocomplete SQL and JDBC work volume; not a SQL Server execution-plan test. */
 class SuggestionDaoTest {
+    @Test void boundedUnicodeDeclarationsStayWithinSqlServerLimits() {
+        String sql = SuggestionDao.batchSql("");
+        var lengths = java.util.regex.Pattern.compile("(?i)nvarchar\\((\\d+)\\)").matcher(sql);
+        assertTrue(lengths.find(), "Batch must declare Unicode parameters");
+        do {
+            assertTrue(Integer.parseInt(lengths.group(1)) <= 4000,
+                    "Bounded nvarchar over 4000 fails SQL Server compilation with error 2717");
+        } while (lengths.find());
+        assertTrue(sql.contains("@prefix nvarchar(4000)=?, @contains nvarchar(4000)=?"));
+    }
+
+    @Test void unicodeBindingsAndLongestEscapedPatternAreNotTruncated() {
+        var fixture = new JdbcFixture();
+        // 1 Unicode character + 1,332 escaped percent signs + 1 plain character = 3,998 code units.
+        String input = "漢" + "%".repeat(1332) + "x";
+        new SuggestionDao(fixture::connection).search(7, input, false, 3, 18, null, null,
+                () -> true, ignored -> { });
+        assertEquals(input, fixture.bindings.get(2));
+        assertEquals("漢" + "[%]".repeat(1332) + "x%", fixture.bindings.get(3));
+        assertEquals("%漢" + "[%]".repeat(1332) + "x%", fixture.bindings.get(4));
+        assertEquals(4000, ((String) fixture.bindings.get(4)).length());
+        assertEquals(List.of(2, 3, 4), fixture.unicodeBindings,
+                "All search strings must use explicit Unicode JDBC bindings");
+        var rejected = new JdbcFixture();
+        new SuggestionDao(rejected::connection).search(7, input + "x", false, 3, 18, null, null,
+                () -> true, ignored -> { });
+        assertEquals(0, rejected.acquisitions, "Overlong LIKE patterns must be rejected before database work");
+    }
+
     @Test void identifyingFieldsOnlyAndRankBeforeBounds() {
         String sql = SuggestionDao.batchSql(" AND ISNULL(u.is_deleted,0)=0");
         for (String field : List.of("c.Name", "c.CaseNumber", "c.OfficePrinterCode", "c.Id", "c.FirstName", "c.LastName",
@@ -123,6 +152,7 @@ class SuggestionDaoTest {
         boolean closed;
         final List<String> sql = new ArrayList<>();
         final List<Integer> timeouts = new ArrayList<>();
+        final List<Integer> unicodeBindings = new ArrayList<>();
         final Map<Integer,Object> bindings = new HashMap<>();
         Connection connection() {
             acquisitions++;
@@ -132,6 +162,7 @@ class SuggestionDaoTest {
                     String statement=(String)a[0]; sql.add(statement); int[] result={0};
                     yield proxy(PreparedStatement.class, (sp,sm,sa) -> switch (sm.getName()) {
                         case "setInt", "setLong", "setString", "setBoolean" -> { bindings.put((Integer)sa[0],sa[1]); yield null; }
+                        case "setNString" -> { bindings.put((Integer)sa[0],sa[1]); unicodeBindings.add((Integer)sa[0]); yield null; }
                         case "setNull" -> { bindings.put((Integer)sa[0],null); yield null; }
                         case "setQueryTimeout" -> { timeouts.add((Integer)sa[0]); yield null; }
                         case "cancel" -> { cancels++; yield null; }
