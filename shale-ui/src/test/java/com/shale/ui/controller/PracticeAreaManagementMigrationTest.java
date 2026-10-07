@@ -38,7 +38,7 @@ final class PracticeAreaManagementMigrationTest {
         assertTrue(cases.indexOf("configureContextualDefinitionManagementButtons();")
                         < cases.indexOf("private void configureContextualDefinitionManagementButtons()"),
                 "FXML-injected contextual actions must be semantically classified during initialize().");
-        assertTrue(cases.contains("ControlStyles.apply(managePracticeAreasButton, ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL)"));
+        assertTrue(cases.contains("createFieldManagementAction(fieldLabel"));
     }
 
     @Test

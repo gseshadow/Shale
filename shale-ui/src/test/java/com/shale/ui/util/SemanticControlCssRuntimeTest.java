@@ -7,7 +7,6 @@ import javafx.scene.control.Button;
 import javafx.scene.layout.VBox;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
@@ -41,13 +40,16 @@ final class SemanticControlCssRuntimeTest {
                 try {
                     Button standard = ControlStyles.apply(new Button("A deliberately long action label"), ControlStyles.Purpose.PRIMARY);
                     Button small = ControlStyles.apply(new Button("Set Primary"), ControlStyles.Purpose.SECONDARY, ControlStyles.Size.SMALL);
-                    VBox root = new VBox(standard, small);
+                    VBox secondaryShell = new VBox(small);
+                    secondaryShell.getStyleClass().addAll("dialog-pane", "secondary-window-shell");
+                    VBox root = new VBox(standard, secondaryShell);
                     Scene scene = new Scene(root, 500, 160);
-                    scene.getStylesheets().add(requireStylesheet());
+                    new com.shale.ui.theme.ThemeManager().register(scene);
                     root.applyCss();
                     root.layout();
                     require(close(standard.getMinHeight(), 40) && close(standard.getPrefHeight(), 40), "standard height");
                     require(close(small.getMinHeight(), 32) && close(small.getPrefHeight(), 32), "small height");
+                    require(small.getPadding().equals(standard.getPadding()), "secondary-shell small action uses semantic padding");
                     Insets padding = standard.getPadding();
                     require(close(padding.getLeft(), 16) && close(padding.getRight(), 16), "horizontal padding");
                     double radius = standard.getBackground().getFills().getFirst().getRadii().getTopLeftHorizontalRadius();
@@ -66,11 +68,6 @@ final class SemanticControlCssRuntimeTest {
             if (failure.get() != null) throw new AssertionError("JavaFX probe failed", failure.get());
         }
 
-        private static String requireStylesheet() throws IOException {
-            var resource = Probe.class.getResource("/css/app.css");
-            if (resource == null) throw new IOException("Missing /css/app.css");
-            return resource.toExternalForm();
-        }
         private static boolean close(double actual, double expected) { return Math.abs(actual - expected) < 0.01; }
         private static void require(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
     }

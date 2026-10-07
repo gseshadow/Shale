@@ -39,12 +39,43 @@ class CaseOverviewCaseStatusEditorTest {
         });
     }
 
+    @Test void administratorCanOpenExistingManagerWithoutCommittingSelection() {
+        JavaFxTestSupport.runAndWait(() -> {
+            Platform.runLater(() -> {
+                DialogPane outer = pane(".case-status-edit-dialog");
+                @SuppressWarnings("unchecked")
+                var field = (UserSelectionField<CaseDao.StatusRow>) outer.lookup(".user-selection-field");
+                field.setSelectedUser(NEXT);
+                Button manage = (Button) outer.lookup("#manageCaseStatusesButton");
+                assertNotNull(manage, "Management belongs inside the field editor");
+                assertTrue(manage.isVisible());
+                assertTrue(manage.getStyleClass().contains("shale-control-secondary"));
+                assertTrue(manage.getStyleClass().contains("shale-control-small"));
+                manage.fire();
+                DialogPane manager = pane(".management-window");
+                assertSame(outer.getScene().getWindow(), ((javafx.stage.Stage) manager.getScene().getWindow()).getOwner(),
+                        "Existing management window must be owned by the editor");
+                ((Button) manager.lookupButton(ButtonType.CLOSE)).fire();
+                assertTrue(outer.getScene().getWindow().isShowing(), "Closing management must leave selection staged");
+                assertSame(NEXT, field.getSelectedUser(), "Definition management must not discard or save the staged choice");
+                ((Button) outer.lookupButton(ButtonType.CANCEL)).fire();
+            });
+            assertTrue(openEditor(true).isEmpty());
+        });
+    }
+
     private static void scheduleChange(boolean save) {
         Platform.runLater(() -> {
             DialogPane outer = pane(".case-status-edit-dialog");
             @SuppressWarnings("unchecked")
             var field = (UserSelectionField<CaseDao.StatusRow>) outer.lookup(".user-selection-field");
             assertSame(CURRENT, field.getSelectedUser());
+            Button manage = (Button) outer.lookup("#manageCaseStatusesButton");
+            assertNotNull(manage);
+            assertFalse(manage.isVisible(), "Ordinary users must not gain definition management");
+            assertFalse(manage.isManaged());
+            assertFalse(manage.isFocusTraversable());
+            assertNull(manage.getOnAction());
             assertFalse(field.isDisabled(), "the active Change field must not inherit read-only/disabled styling");
             Platform.runLater(() -> {
                 var picker = (CaseStatusSelector<?>) pane(".case-status-selector").lookup(".case-status-selector");
@@ -61,9 +92,21 @@ class CaseOverviewCaseStatusEditorTest {
         });
     }
 
-    @SuppressWarnings("unchecked")
     private static Optional<CaseDao.StatusRow> openEditor() throws Exception {
+        return openEditor(false);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Optional<CaseDao.StatusRow> openEditor(boolean administrator) throws Exception {
         var controller = new CaseController();
+        var state = new com.shale.ui.state.AppState();
+        state.setAdmin(administrator); state.setShaleClientId(7); state.setUserId(11);
+        com.shale.core.service.CaseServicePort service = (com.shale.core.service.CaseServicePort) java.lang.reflect.Proxy.newProxyInstance(
+                CaseOverviewCaseStatusEditorTest.class.getClassLoader(), new Class<?>[] { com.shale.core.service.CaseServicePort.class },
+                (proxy, method, args) -> method.getReturnType() == List.class ? List.of() : null);
+        set(controller, "appState", state); set(controller, "caseId", 42); set(controller, "caseService", service);
+        set(controller, "caseStatusManagementLauncher",
+                new CaseStatusManagementLauncher(service, task -> { Thread worker = new Thread(task); worker.setDaemon(true); worker.start(); }));
         var cards = new StatusCardFactory(ignored -> { });
         Function<CaseDao.StatusRow, Node> renderer = value -> cards.create(
                 new StatusCardModel(value.id(), value.name(), value.sortOrder(), value.color()), StatusCardFactory.Variant.MINI);
@@ -78,6 +121,10 @@ class CaseOverviewCaseStatusEditorTest {
         return (Optional<CaseDao.StatusRow>) method.invoke(controller, "Edit Case Status", "Case Status",
                 CURRENT, options, (Function<CaseDao.StatusRow, Integer>) CaseDao.StatusRow::id,
                 renderer, false, null, null, picker);
+    }
+
+    private static void set(Object target, String name, Object value) throws Exception {
+        var field = target.getClass().getDeclaredField(name); field.setAccessible(true); field.set(target, value);
     }
 
     private static DialogPane pane(String selector) {
