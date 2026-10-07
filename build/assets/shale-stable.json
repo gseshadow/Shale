@@ -1,36 +1,47 @@
 {
-  "version": "1.0.135",
+  "version": "1.0.136",
   "channel": "stable",
-  "zipUrl": "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.135.zip",
-  "installerUrl": "https://shalestorage.z13.web.core.windows.net/Shale-1.0.135.msi",
-  "notes": "What's New in Shale 1.0.135\nDraft generated from commit messages since Shale 1.0.134. Review and edit before publishing.\n\nNew\n• Add release notes for 1.0.135\n\nImprovements\n• Log unexpected release import failures\n• Log request binding failures in API handler\n• Prepare release notes drafts before releases\n• Prevent release notes bytecode artifacts\n• Automate release notes Git preparation\n• Push release source before Mac build\n• Safely reuse macOS release workspace\n\nFixes\n• Fix explicit path variable binding\n• Fix global release import database session wiring",
+  "zipUrl": "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.136.zip",
+  "installerUrl": "https://shalestorage.z13.web.core.windows.net/Shale-1.0.136.msi",
+  "notes": "What's New in Shale 1.0.136\nDraft generated from commit messages since Shale 1.0.135. Review and edit before publishing.\n\nNew\n• Added task due date policy (none, warn, require)\n• Added Stay Logged In feature to login screen\n• Added phone and email format requirements\n• Added universal search suggestions and scoped recent history\n\nImprovements\n• Allow all users to configure automatic updates\n• Place case date confirmation below value\n• Show selected Case Date type card\n• Optimize user management loading and dark theme contrast\n• Complete audited task policy administration\n• Redesign desktop login experience\n• Validate phone and email values across intake, profiles and APIs\n\nFixes\n• Fix case date confirmation row layout\n• Fix Case Calendar dark theme cards\n• Fix case content pane horizontal growth\n• Fix Case Date card text contrast\n• Corrected sql calls\n• Fix login FXML preferred sizing constants\n• Fix remembered sign-in lifecycle diagnostics\n• Fix remembered session SQL context and diagnostics\n• Fix intake phone feedback and layout; accept explicit US local numbers\n• Fix SQL Server suggestion pattern declarations and Unicode bindings",
   "mandatory": true,
-  "sha256": "99770aeae8befdd1c30c7092ab14994436f47f5707c9dae5d86bc6c859209733",
-  "publishedAt": "2026-10-05T15:43:16Z",
-  "macZipUrl": "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.135-mac.zip",
-  "macSha256": "3536b8ef9f8b2e9ac767fe600e204e4cc0c95829a1a41f294b742e2c41fb4b00",
+  "sha256": "1dcda3f017084e393b0465e5131b337119f1eed91c79286c70aebcb9d18bf5b5",
+  "publishedAt": "2026-10-07T17:29:51Z",
+  "macZipUrl": "https://shalestorage.z13.web.core.windows.net/ShaleApp-1.0.136-mac.zip",
+  "macSha256": "f256e69f157fcb436f446bea86f8031db243a347b3df932cc7e97a6b4ff63d4d",
   "releaseNotes": {
-    "version": "1.0.135",
-    "title": "What's New in Shale 1.0.135",
-    "summary": "Draft generated from commit messages since Shale 1.0.134. Review and edit before publishing.",
+    "version": "1.0.136",
+    "title": "What's New in Shale 1.0.136",
+    "summary": "Draft generated from commit messages since Shale 1.0.135. Review and edit before publishing.",
     "groups": {
       "New": [
-        "Add release notes for 1.0.135"
+        "Added task due date policy (none, warn, require)",
+        "Added Stay Logged In feature to login screen",
+        "Added phone and email format requirements",
+        "Added universal search suggestions and scoped recent history"
       ],
       "Improvements": [
-        "Log unexpected release import failures",
-        "Log request binding failures in API handler",
-        "Prepare release notes drafts before releases",
-        "Prevent release notes bytecode artifacts",
-        "Automate release notes Git preparation",
-        "Push release source before Mac build",
-        "Safely reuse macOS release workspace"
+        "Allow all users to configure automatic updates",
+        "Place case date confirmation below value",
+        "Show selected Case Date type card",
+        "Optimize user management loading and dark theme contrast",
+        "Complete audited task policy administration",
+        "Redesign desktop login experience",
+        "Validate phone and email values across intake, profiles and APIs"
       ],
       "Fixes": [
-        "Fix explicit path variable binding",
-        "Fix global release import database session wiring"
+        "Fix case date confirmation row layout",
+        "Fix Case Calendar dark theme cards",
+        "Fix case content pane horizontal growth",
+        "Fix Case Date card text contrast",
+        "Corrected sql calls",
+        "Fix login FXML preferred sizing constants",
+        "Fix remembered sign-in lifecycle diagnostics",
+        "Fix remembered session SQL context and diagnostics",
+        "Fix intake phone feedback and layout; accept explicit US local numbers",
+        "Fix SQL Server suggestion pattern declarations and Unicode bindings"
       ]
     },
-    "releaseDate": "2026-10-02"
+    "releaseDate": "2026-10-07"
   }
 }
