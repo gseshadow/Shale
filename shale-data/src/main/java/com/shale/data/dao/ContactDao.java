@@ -1019,7 +1019,7 @@ public final class ContactDao {
         String value=normalizeOptional(desired);List<String> values=new ArrayList<>();
         if(table.equals("ContactPhoneNumbers")&&value==null&&ContactValues.trim(suppliedExtension)!=null)ContactValues.INSTANCE.phone(desired,suppliedExtension,false,"phone");
         if(value!=null){
-            if(table.equals("ContactPhoneNumbers")){var v=ContactValues.INSTANCE.phone(desired,suppliedExtension,true,"phone");if(!extensionOwned&&v.extension()==null&&originalExtension!=null)v=ContactValues.INSTANCE.phone(desired,originalExtension,true,"phone");values=java.util.Arrays.asList(v.displayInput(),v.canonicalNumber(),v.extension());}
+            if(table.equals("ContactPhoneNumbers")){var v=ContactValues.INSTANCE.phone(desired,suppliedExtension,true,"phone");if(!extensionOwned&&v.extension()==null&&originalExtension!=null)v=ContactValues.INSTANCE.phone(desired,originalExtension,true,"phone");values=java.util.Arrays.asList(v.displayInput(),v.normalizedNumber(),v.extension());}
             else if(table.equals("ContactEmailAddresses")){var v=ContactValues.INSTANCE.email(desired,true,"email");values=List.of(v.displayInput(),v.comparisonKey());}
             else values=List.of(value);
         }

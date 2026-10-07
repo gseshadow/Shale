@@ -32,4 +32,12 @@ class ContactValueApiTest {
     @Test void authenticationDoesNotApplyNewAccountEmailGrammar(){
         assertEquals("legacy-account",ApiValidation.requireValidLogin(new com.shale.server.dto.LoginRequest("legacy-account","secret")).email());
     }
+    @Test void advisoryLocalNumberExposesLocalStateWithoutAnInventedE164()throws Exception {
+        var mvc=MockMvcBuilders.standaloneSetup(new ContactValueValidationController(session())).setControllerAdvice(new ApiExceptionHandler()).build();
+        mvc.perform(post("/api/validation/contact-value").contentType(MediaType.APPLICATION_JSON).content("{\"kind\":\"phone\",\"value\":\"555-0123 x001\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.kind").value("US_LOCAL"))
+            .andExpect(jsonPath("$.canonicalNumber").doesNotExist()).andExpect(jsonPath("$.localNumber").value("5550123"))
+            .andExpect(jsonPath("$.extension").value("001"));
+    }
+
 }

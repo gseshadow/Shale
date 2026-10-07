@@ -14,16 +14,28 @@ and run parser regressions before changing pins. Validation establishes numberin
 not that a number is assigned, reachable or owned by the person.
 
 The phone default is explicitly **US**, displayed in forms. International input uses a country
-calling code. Familiar punctuation is accepted; input/paste is unrestricted. The parser checks
-`isValidNumber`, rather than accepting every parseable number. Separate extensions contain 1–12
+calling code. Familiar punctuation is accepted; input/paste is unrestricted. Full numbers check
+`isValidNumber`, rather than accepting every parseable number. Approved seven-digit US local
+subscribers are also accepted, including familiar spaces/hyphens. Their exchange must start with
+2–9 and must not be an N11 service exchange (211, 311, …, 911). This checks local structure,
+not area-code availability, assignment or reachability. Other incomplete lengths remain invalid. Separate extensions contain 1–12
 ASCII digits; leading zeros are retained. `x`, `ext`, `ext.`, `extension` and `;ext=` suffixes are
 extracted for new/changed input. Matching inline/separate extensions are accepted, conflicts rejected.
 An extension alone is rejected even when the phone is optional/unavailable. New/changed structured
-phones store trimmed main display input, E.164 main number, and extension separately. Users' scalar
+phones store trimmed main display input, normalized main number, and extension separately. Full
+numbers normalize to E.164; local subscribers normalize to exactly seven ASCII digits. Parser
+results explicitly expose `kind=US_LOCAL`, `localNumber` and a null `canonicalNumber`; global
+results have `kind=GLOBAL` and E.164 `canonicalNumber`. `normalizedNumber()` supplies the whole
+storage/comparison key for either kind. No area code is invented, and comparisons never match
+only the final seven digits of a full number. Local punctuation variants collide for the same
+extension (and Organization kind) under existing domain rules; distinct extensions and local/full counterparts may
+coexist. These keys fit existing `nvarchar(32)` normalized columns; no new migration or backfill. Users' scalar
 phone column stores trimmed display main plus ` ext. digits`; it has no canonical column.
 New/changed User phone display is limited to the documented 100-character scalar capacity; long input
-receives a safe field error, never truncation. Verify optional phone-column capacity at deployment. Display
-previews and `tel:` links are computed independently; unchanged historical storage is not reformatted.
+receives a safe field error, never truncation. Verify optional phone-column capacity at deployment. Local previews say “US local; area code required to call.” Local values satisfy phone validation
+and may be primary, but Call actions remain unavailable until a full number/context is supplied.
+No ambiguous `tel:` URI is constructed; an attempted local action says “Add an area code before
+calling a US local number.” Display previews and `tel:` links are computed independently; unchanged historical storage is not reformatted.
 
 Emails accept a single ASCII dot-atom local part, plus tags, apostrophes, subdomains and international
 domain names. ICU performs nontransitional UTS #46 domain conversion, including `ß`, for transport;
@@ -40,18 +52,35 @@ header characters are rejected. Existing account authentication does not apply t
 | Required phone blank | “Enter a usable phone number.” Intake also offers Phone unavailable with a reason. |
 | Optional phone/email blank | Accepted; no blank structured point inserted. |
 | `(303) 555-0123`, `303.555.0123`, `+44 20 7946 0958` | Accepted; canonical main `+13035550123` or `+442079460958`. |
+| `5550123`, `555-0123`, `234 5678 x001` | Accepted as US local; normalized subscriber digits, separate extension, no E.164, area code required to call. |
+| `0000000`, `1550123`, `211-0123`, `555012`, `55501234` | Rejected: invalid exchange or incomplete length. |
 | `1-800-234-5678` | Accepted if valid numbering-plan structure; business/toll-free/fax are not restricted to mobiles. |
 | `3035550123 x001`, separate `001` | Accepted, extension `001`. Same main with extension `002` may coexist. |
 | Inline `001`, separate `002` | “The inline and separate extensions must match.” |
 | Extension `abc`, `１２`, or 13 digits | “Enter an extension of 1–12 digits (0–9).” |
 | Blank phone plus extension | “Enter a phone number before adding an extension.” |
-| `0`, `0000000000`, `911`, `12345`, `call me`, two full numbers | “Enter a complete valid phone number. Use +country code for international numbers; US is the default.” |
+| `0`, `0000000000`, `911`, `12345`, `call me`, two full numbers | “Enter a valid US full or 7-digit local number. Use +country code for international numbers.” |
 | `  O'Neil+tag@Sub.Example.technology  ` | Accepted; surrounding whitespace removed, spelling/casing retained. |
 | `person@bücher.example`, `person@straße.example` | Accepted; international domain converted only for transport. |
 | `a..b@example.com`, `a@`, `a@example.com,b@example.com`, `Name <a@example.com>` | “Enter one email address, such as name@example.com.” |
 | `a@example.com` with embedded CR/LF/header text | Rejected with the same safe structure error. |
 | `"quoted"@example.com` | “Quoted email local parts are not supported. Use an unquoted address.” |
 | `用户@example.com`, `a@[127.0.0.1]` | “This email format is not supported. Use an unquoted address with an ASCII local part and a domain name.” |
+
+## Intake follow-up after PR #1825
+
+Client and separate Caller each group Phone Number, Extension, Phone unavailable, reason, region
+guidance and field feedback together before Email. IDs, caller-is-client copying and draft fields
+remain intact. Blur and Save revalidate field styling, feedback and the summary; correcting one
+field removes its errors while retaining other outstanding contact and unrelated summary errors.
+Typing alone does not clear an error. Successful Save validation clears the previous summary.
+
+The local-number change applies to the shared parser, authoritative Contact/Organization/intake
+writes, User scalar validation and desktop/browser feedback. It uses existing transaction-bound
+audit seams without new event vocabulary, schema or sensitive metadata. Blur, previews and layout
+are non-persisting UI operations and create no new audit events. Deploy updated data/core/UI/server
+and browser clients together; older validators still reject local subscribers. Existing PR #1825
+schema prerequisites remain, but this follow-up introduces no SQL migration or data rewrite.
 
 ## Unknown information and history
 
@@ -179,6 +208,11 @@ unrelated edits and supported restoration do not force cleanup.
 - In light and dark mode, type/paste without filters. Blur/Save `0`, blank, valid US/international,
   fax/toll-free, leading-zero extensions, conflict and extension-only inputs; inspect readable messages,
   previews and first-field focus. Failed Save must preserve every draft field.
+- In both intake roles, enter `0`, blur, then correct it; errors must remain while typing and
+  clear on blur or Save. Another role’s invalid phone and unrelated required-field errors must
+  remain visible. Inspect grouped phone controls before Email, including narrow/light/dark views.
+  Accept `555-0123 x001`, reject N11/0/1 exchange prefixes, and ensure local/full duplicate keys
+  remain distinct; local Call stays unavailable with an accurate area-code message.
 - Complete intake with both roles independently unavailable; require a reason, reject retained `0`,
   test caller-is-client copying, local draft restore and readable backup. Repeat duplicate merge into
   existing contacts with multiple points; inspect preferred flag/order, nullable binds and observations.
@@ -196,6 +230,18 @@ unrelated edits and supported restoration do not force cleanup.
   refresh/live delivery only after commit. Review the deployment verification SQL output.
 
 ## Automated validation record
+
+The scoped follow-up after PR #1825 passed **56 distinct focused tests**, covering parser results,
+direct local persistence, whole-number/extension duplicate handling, advisory API parity, safe Call
+actions, intake blur/Save error synchronization and FXML grouping/loading. Production Client/Caller
+sections were rendered and inspected in both themes under Linux Xvfb; this is not Windows acceptance.
+Browser typecheck/build, static FXML/CSS and local documentation links passed. The required final
+affected selector ran **79 tests, with one known `SettingsFxmlLoadTest` error** (`settingsScroll` is
+null); it stops before server, whose focused API tests pass separately. No historical all-tests suite
+or repeat baseline investigation was run for this follow-up. The default `mvn test` critical
+reactor passed **116 tests**; exact commands are recorded in its PR. No live database or production-data check was performed.
+
+### PR #1825 validation record (historical)
 
 The focused parser, intent, intake, authoritative legacy/concurrency, direct basic point ownership,
 trusted primary history, adapter, URI and API/auth tests passed. The repository selector's affected
@@ -227,7 +273,7 @@ These links identify the final implementation entry points; names remain durable
 | --- | --- |
 | Shared contract: `interface ContactValueValidator` | [ContactValueValidator.java:4](../shale-core/src/main/java/com/shale/core/validation/ContactValueValidator.java#L4) |
 | Phone and email parser: `Phone phone(` | [ContactValues.java:21](../shale-data/src/main/java/com/shale/data/validation/ContactValues.java#L21) |
-| Unavailable intake controls: `validateContactFields(boolean` | [NewIntakeController.java:1517](../shale-ui/src/main/java/com/shale/ui/controller/NewIntakeController.java#L1517) |
+| Unavailable intake controls: `validateContactFields(boolean` | [NewIntakeController.java:1544](../shale-ui/src/main/java/com/shale/ui/controller/NewIntakeController.java#L1544) |
 | Intake create: `NewIntakeCreateResult createIntake(` | [CaseDao.java:617](../shale-data/src/main/java/com/shale/data/dao/CaseDao.java#L617) |
 | Intake merge: `NewIntakeCreateResult mergeIntake(` | [CaseDao.java:542](../shale-data/src/main/java/com/shale/data/dao/CaseDao.java#L542) |
 | Intake availability persistence: `void recordPhoneAvailability(` | [CaseDao.java:1084](../shale-data/src/main/java/com/shale/data/dao/CaseDao.java#L1084) |

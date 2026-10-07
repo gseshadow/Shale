@@ -335,4 +335,20 @@ final class NewIntakeContactPersistenceRegressionTest {
                 "Caller", "Person", "(720) 555-0123", "202 Caller Avenue", "caller@example.test",
                 List.of(), 9, 1L, new byte[]{1}, List.of());
     }
+    @Test void localIntakeCreateAndMergePersistWholeNormalizedNumberAndExtensions()throws Exception {
+        var request=withValues(Map.of("clientPhone","555-0123 x001","callerPhone","234 5678"));
+        assertDoesNotThrow(()->CaseDao.validateIntakeContactValues(request));
+        List<Execution> writes=new ArrayList<>();
+        invokeContactPoints(dao(),recordingConnection(writes,null),request,101,request.clientPhone(),null,null);
+        Execution point=writes.stream().filter(e->e.sql.startsWith("INSERT dbo.ContactPhoneNumbers")).findFirst().orElseThrow();
+        assertEquals("555-0123",point.bindings.get(4));assertEquals("5550123",point.bindings.get(5));assertEquals("001",point.bindings.get(6));
+        assertEquals(point.sql.chars().filter(c->c=='?').count(),point.bindings.size(),"all SQL parameters must be bound");
+        writes.clear();
+        Method merge=CaseDao.class.getDeclaredMethod("insertMissingContactPoints",Connection.class,CaseDao.NewIntakeCreateRequest.class,int.class,String.class,String.class,String.class);merge.setAccessible(true);
+        merge.invoke(dao(),recordingConnection(writes,null),request,101,request.clientPhone(),null,null);
+        Execution lookup=writes.stream().filter(e->e.sql.contains("LOWER(LTRIM(RTRIM(NormalizedNumber)))")).findFirst().orElseThrow();
+        assertEquals("5550123",lookup.bindings.get(3));assertEquals("001",lookup.bindings.get(4));
+        assertFalse(lookup.sql.contains("RIGHT("),"local and full numbers must never be equated by suffix");
+    }
+
 }

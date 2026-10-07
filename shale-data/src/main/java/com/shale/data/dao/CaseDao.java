@@ -601,7 +601,7 @@ public final class CaseDao {
 
     private void insertMissingContactPoints(Connection con,NewIntakeCreateRequest r,int id,String phone,String email,String address)throws SQLException{
         var p=ContactValues.INSTANCE.phone(phone,null,false,"phone");var e=ContactValues.INSTANCE.email(email,false,"email");
-        if(p!=null&&!hasContactPoint(con,r.shaleClientId(),"ContactPhoneNumbers",id,"NormalizedNumber",p.canonicalNumber(),p.extension()))insertIntakeContactPointValues(con,r,id,"ContactPhoneNumbers","DisplayNumber,NormalizedNumber,Extension","MOBILE",EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER,p.displayInput(),p.canonicalNumber(),p.extension());
+        if(p!=null&&!hasContactPoint(con,r.shaleClientId(),"ContactPhoneNumbers",id,"NormalizedNumber",p.normalizedNumber(),p.extension()))insertIntakeContactPointValues(con,r,id,"ContactPhoneNumbers","DisplayNumber,NormalizedNumber,Extension","MOBILE",EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER,p.displayInput(),p.normalizedNumber(),p.extension());
         if(e!=null&&!hasContactPoint(con,r.shaleClientId(),"ContactEmailAddresses",id,"NormalizedEmail",e.comparisonKey(),null))insertIntakeContactPointValues(con,r,id,"ContactEmailAddresses","EmailAddress,NormalizedEmail","PERSONAL",EntityActionAuditEvent.EntityType.CONTACT_EMAIL_ADDRESS,e.displayInput(),e.comparisonKey());
         if(!hasContactPoint(con,r.shaleClientId(),"ContactAddresses",id,"LegacyAddressText",normalizeOptional(address),null))insertIntakeContactPoint(con,r,id,"ContactAddresses","LegacyAddressText","HOME",normalizeOptional(address),EntityActionAuditEvent.EntityType.CONTACT_ADDRESS);
     }
@@ -1062,7 +1062,7 @@ public final class CaseDao {
             String phone, String email, String address) throws SQLException {
         var p=ContactValues.INSTANCE.phone(phone,null,false,"phone");
         var e=ContactValues.INSTANCE.email(email,false,"email");
-        if(p!=null)insertIntakeContactPointValues(con,request,contactId,"ContactPhoneNumbers","DisplayNumber,NormalizedNumber,Extension","MOBILE",EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER,p.displayInput(),p.canonicalNumber(),p.extension());
+        if(p!=null)insertIntakeContactPointValues(con,request,contactId,"ContactPhoneNumbers","DisplayNumber,NormalizedNumber,Extension","MOBILE",EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER,p.displayInput(),p.normalizedNumber(),p.extension());
         if(e!=null)insertIntakeContactPointValues(con,request,contactId,"ContactEmailAddresses","EmailAddress,NormalizedEmail","PERSONAL",EntityActionAuditEvent.EntityType.CONTACT_EMAIL_ADDRESS,e.displayInput(),e.comparisonKey());
         insertIntakeContactPoint(con,request,contactId,"ContactAddresses","LegacyAddressText","HOME",normalizeOptional(address),EntityActionAuditEvent.EntityType.CONTACT_ADDRESS);
     }
@@ -1142,7 +1142,7 @@ public final class CaseDao {
 
 	private static String normalizePhone(String value) {
 		String normalized = normalizeOptional(value);
-		return normalized == null ? null : ContactValues.INSTANCE.phone(value,null,false,"phone").canonicalNumber();
+		return normalized == null ? null : ContactValues.INSTANCE.phone(value,null,false,"phone").normalizedNumber();
 	}
 
 	private static String normalizeEmail(String value) {

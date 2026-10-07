@@ -35,4 +35,14 @@ class OrganizationValueValidationTest {
         assertEquals(List.of("(303) 555-0123","+13035550123","001"),validate("PHONE",row(List.of(" (303) 555-0123 x001 ","",""),true,false,false),null));
         assertEquals(List.of("O'Neil+tag@Example.technology","o'neil+tag@example.technology"),validate("EMAIL",row(List.of(" O'Neil+tag@Example.technology ",""),true,false,false),null));
     }
+    @Test void localStructuredValuesNormalizeWithoutNullAndDuplicatesRemainKindAndExtensionSpecific()throws Exception {
+        assertEquals(List.of("555-0123","5550123","001"),validate("PHONE",row(List.of("555-0123 x001","",""),true,false,false),null));
+        Field spec=OWNER.getDeclaredField("PHONE");spec.setAccessible(true);
+        Method key=OWNER.getDeclaredMethod("duplicateKey",spec.getType(),ROW);key.setAccessible(true);
+        Object local=key.invoke(null,spec.get(null),row(List.of("555-0123","","001"),false,false,false));
+        assertEquals(local,key.invoke(null,spec.get(null),row(List.of("555 0123","","001"),false,false,false)));
+        assertNotEquals(local,key.invoke(null,spec.get(null),row(List.of("3035550123","","001"),false,false,false)));
+        assertNotEquals(local,key.invoke(null,spec.get(null),row(List.of("5550123","","002"),false,false,false)));
+    }
+
 }

@@ -37,12 +37,18 @@
                                 <TextField fx:id="callerFirstNameField" accessibleText="Caller first name, required" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
                                 <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1"><Label text="Last Name" styleClass="shale-field-label"/><Label fx:id="callerLastNameRequiredIndicator" text="*" accessibleText="required" styleClass="new-intake-required"/></HBox>
                                 <TextField fx:id="callerLastNameField" accessibleText="Caller last name, required" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="2"><Label text="Phone Number" styleClass="shale-field-label"/><Label fx:id="callerPhoneRequiredIndicator" text="*" accessibleText="required" styleClass="new-intake-required"/></HBox>
-                                <TextField fx:id="callerPhoneField" accessibleText="Caller phone number, required" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" promptText="US default; international +country code"/>
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="2" GridPane.valignment="TOP" GridPane.fillHeight="false" minHeight="36"><Label text="Phone Number" styleClass="shale-field-label"/><Label fx:id="callerPhoneRequiredIndicator" text="*" accessibleText="required" styleClass="new-intake-required"/></HBox>
+                                <VBox spacing="6" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308">
+                                    <TextField fx:id="callerPhoneField" accessibleText="Caller phone number, required" maxWidth="1.7976931348623157E308" promptText="US default; international +country code"/>
+                                    <Label text="Extension (optional)" styleClass="shale-field-label"/>
+                                    <TextField fx:id="callerPhoneExtensionField" accessibleText="Caller phone extension" promptText="1–12 digits; leading zeros preserved" maxWidth="1.7976931348623157E308"/>
+                                    <CheckBox fx:id="callerPhoneUnavailableCheckBox" text="Phone unavailable"/>
+                                    <ComboBox fx:id="callerPhoneUnavailableReasonBox" promptText="Choose a reason" maxWidth="1.7976931348623157E308"/>
+                                    <Label text="US full or 7-digit local numbers; use +country code for international numbers." wrapText="true" styleClass="shale-metadata-muted"/>
+                                    <Label fx:id="callerPhoneFeedbackLabel" wrapText="true" visible="false" managed="false" styleClass="shale-metadata-muted"/>
+                                </VBox>
                                 <Label text="Address" styleClass="shale-field-label" GridPane.rowIndex="3"/><TextField fx:id="callerAddressField" accessibleText="Caller address" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
                                 <Label text="Email" styleClass="shale-field-label" GridPane.rowIndex="4"/><TextField fx:id="callerEmailField" accessibleText="Caller email" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
-                            <VBox spacing="6" GridPane.columnIndex="1" GridPane.rowIndex="5"><CheckBox fx:id="callerPhoneUnavailableCheckBox" text="Phone unavailable"/><ComboBox fx:id="callerPhoneUnavailableReasonBox" promptText="Choose a reason" maxWidth="1.7976931348623157E308"/><Label text="US numbers by default; use +country code for international numbers." wrapText="true" styleClass="shale-field-label"/></VBox>
-                            <Label text="Extension (optional)" styleClass="shale-field-label" GridPane.rowIndex="6"/><TextField fx:id="callerPhoneExtensionField" promptText="1–12 digits; leading zeros preserved" GridPane.columnIndex="1" GridPane.rowIndex="6"/>
                             </GridPane>
                         </VBox>
 
@@ -56,13 +62,19 @@
                                 <HBox spacing="4" alignment="CENTER_LEFT"><Label text="First Name" styleClass="shale-field-label"/><Label text="*" accessibleText="required" styleClass="new-intake-required"/></HBox><TextField fx:id="clientFirstNameField" accessibleText="Client first name, required" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
                                 <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="1"><Label text="Last Name" styleClass="shale-field-label"/><Label text="*" accessibleText="required" styleClass="new-intake-required"/></HBox><TextField fx:id="clientLastNameField" accessibleText="Client last name, required" GridPane.rowIndex="1" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
                                 <Label text="Address" styleClass="shale-field-label" GridPane.rowIndex="2"/><TextField fx:id="clientAddressField" accessibleText="Client address" GridPane.rowIndex="2" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
-                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="3"><Label text="Phone Number" styleClass="shale-field-label"/><Label text="*" accessibleText="required" styleClass="new-intake-required"/></HBox><TextField fx:id="clientPhoneField" accessibleText="Client phone number, required" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308" promptText="US default; international +country code"/>
+                                <HBox spacing="4" alignment="CENTER_LEFT" GridPane.rowIndex="3" GridPane.valignment="TOP" GridPane.fillHeight="false" minHeight="36"><Label text="Phone Number" styleClass="shale-field-label"/><Label text="*" accessibleText="required" styleClass="new-intake-required"/></HBox><VBox spacing="6" GridPane.rowIndex="3" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308">
+                                    <TextField fx:id="clientPhoneField" accessibleText="Client phone number, required" maxWidth="1.7976931348623157E308" promptText="US default; international +country code"/>
+                                    <Label text="Extension (optional)" styleClass="shale-field-label"/>
+                                    <TextField fx:id="clientPhoneExtensionField" accessibleText="Client phone extension" promptText="1–12 digits; leading zeros preserved" maxWidth="1.7976931348623157E308"/>
+                                    <CheckBox fx:id="clientPhoneUnavailableCheckBox" text="Phone unavailable"/>
+                                    <ComboBox fx:id="clientPhoneUnavailableReasonBox" promptText="Choose a reason" maxWidth="1.7976931348623157E308"/>
+                                    <Label text="US full or 7-digit local numbers; use +country code for international numbers." wrapText="true" styleClass="shale-metadata-muted"/>
+                                    <Label fx:id="clientPhoneFeedbackLabel" wrapText="true" visible="false" managed="false" styleClass="shale-metadata-muted"/>
+                                </VBox>
                                 <Label text="Email" styleClass="shale-field-label" GridPane.rowIndex="4"/><TextField fx:id="clientEmailField" accessibleText="Client email" GridPane.rowIndex="4" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
                                 <Label text="Date of Birth" styleClass="shale-field-label" GridPane.rowIndex="5"/><DatePicker fx:id="clientDateOfBirthPicker" accessibleText="Client date of birth" GridPane.rowIndex="5" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
                                 <Label text="Deceased" styleClass="shale-field-label" GridPane.rowIndex="6"/><CheckBox fx:id="clientDeceasedCheckBox" accessibleText="Client deceased" GridPane.rowIndex="6" GridPane.columnIndex="1"/>
                                 <Label text="Client Condition" styleClass="shale-field-label" GridPane.rowIndex="7"/><EnhancedTextArea fx:id="clientConditionArea" accessibleText="Client condition" editorTitle="Client Condition" prefRowCount="3" promptText="Relevant medical condition or client circumstances" GridPane.rowIndex="7" GridPane.columnIndex="1" maxWidth="1.7976931348623157E308"/>
-                            <VBox spacing="6" GridPane.columnIndex="1" GridPane.rowIndex="8"><CheckBox fx:id="clientPhoneUnavailableCheckBox" text="Phone unavailable"/><ComboBox fx:id="clientPhoneUnavailableReasonBox" promptText="Choose a reason" maxWidth="1.7976931348623157E308"/><Label text="US numbers by default; use +country code for international numbers." wrapText="true" styleClass="shale-field-label"/></VBox>
-                            <Label text="Extension (optional)" styleClass="shale-field-label" GridPane.rowIndex="9"/><TextField fx:id="clientPhoneExtensionField" promptText="1–12 digits; leading zeros preserved" GridPane.columnIndex="1" GridPane.rowIndex="9"/>
                             </GridPane>
                         </VBox>
 

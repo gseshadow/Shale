@@ -92,6 +92,8 @@ public final class NewIntakeController {
     @FXML private javafx.scene.control.ComboBox<PhoneUnavailableReason> clientPhoneUnavailableReasonBox,callerPhoneUnavailableReasonBox;
 
 	@FXML private Label validationLabel;
+    @FXML private Label clientPhoneFeedbackLabel, callerPhoneFeedbackLabel;
+    private List<String> contactValidationErrors = List.of();
 	@FXML private GridPane intakeWorkspace;
 	@FXML private ColumnConstraints leftWorkspaceColumn;
 	@FXML private ColumnConstraints rightWorkspaceColumn;
@@ -255,7 +257,7 @@ public final class NewIntakeController {
         ControlStyles.formControl(clientPhoneExtensionField);ControlStyles.formControl(callerPhoneExtensionField);
         clientPhoneUnavailableReasonBox.disableProperty().bind(clientPhoneUnavailableCheckBox.selectedProperty().not());
         callerPhoneUnavailableReasonBox.disableProperty().bind(callerPhoneUnavailableCheckBox.selectedProperty().not());
-        for(TextField field:List.of(clientPhoneField,callerPhoneField,clientEmailField,callerEmailField,clientPhoneExtensionField,callerPhoneExtensionField))field.focusedProperty().addListener((o,a,focused)->{if(!focused){var errors=validateContactFields(false);if(!errors.isEmpty())showValidation(String.join("\n",errors));}});
+        configureContactValidation();
 
 		intakeWorkspace.widthProperty().addListener((observable, oldWidth, newWidth) ->
 				configureResponsiveWorkspace(newWidth.doubleValue()));
@@ -285,7 +287,7 @@ public final class NewIntakeController {
 				copyCallerFieldsToClientIfEmpty();
 			}
 			applyCallerMode(Boolean.TRUE.equals(newVal));
-			hideValidation();
+            revalidateContactFields(false);
 		});
 		applyCallerMode(false);
 
@@ -891,6 +893,7 @@ public final class NewIntakeController {
 			return;
 		}
 
+        hideValidation();
 		boolean shouldBlockForOffline = shouldBlockCreateForOfflinePreflight();
 		if (shouldBlockForOffline) {
 			System.out.println("[NewIntakeController] create blocked by offline preflight.");
@@ -1501,7 +1504,7 @@ public final class NewIntakeController {
 				callerRequiredWhenNotClient(callerLastNameField.getText(), "Caller Last Name is required when Caller is Client is unchecked."),
 				null
 		).filter(s -> s != null && !s.isBlank()).toList());
-        errors.addAll(validateContactFields(true));
+        errors.addAll(revalidateContactFields(true));
 		configuredDateInputs.values().stream().filter(input -> input.required() && input.value() == null)
 				.forEach(input -> {
 					ControlStyles.setInvalid(input.input(), true);
@@ -1514,20 +1517,77 @@ public final class NewIntakeController {
 		return List.copyOf(errors);
 	}
 
-    private List<String> validateContactFields(boolean focus){
-        List<String> errors=new ArrayList<>();Node first=null;
-        for(boolean client:List.of(true,false)){
-            if(!client&&callerIsClientCheckBox.isSelected())continue;
-            TextField phone=client?clientPhoneField:callerPhoneField,email=client?clientEmailField:callerEmailField;
-            CheckBox unavailable=client?clientPhoneUnavailableCheckBox:callerPhoneUnavailableCheckBox;
-            var reason=client?clientPhoneUnavailableReasonBox:callerPhoneUnavailableReasonBox;
-            String prefix=client?"Client":"Caller";
-            ControlStyles.setInvalid(phone,false);ControlStyles.setInvalid(email,false);ControlStyles.setInvalid(reason,false);
-            if(unavailable.isSelected()&&reason.getValue()==null){errors.add(prefix+" Phone: choose an unavailable reason.");ControlStyles.setInvalid(reason,true);if(first==null)first=reason;}
-            try{ContactValues.INSTANCE.phone(phone.getText(),(client?clientPhoneExtensionField:callerPhoneExtensionField).getText(),!unavailable.isSelected(),client?"clientPhone":"callerPhone");}catch(FieldValidationException invalid){errors.add(prefix+" Phone: "+invalid.getMessage());ControlStyles.setInvalid(phone,true);if(first==null)first=phone;}
-            try{ContactValues.INSTANCE.email(email.getText(),false,client?"clientEmail":"callerEmail");}catch(FieldValidationException invalid){errors.add(prefix+" Email: "+invalid.getMessage());ControlStyles.setInvalid(email,true);if(first==null)first=email;}
+    private void configureContactValidation() {
+        for (var field : List.of(clientPhoneField, callerPhoneField, clientEmailField, callerEmailField,
+                clientPhoneExtensionField, callerPhoneExtensionField, clientPhoneUnavailableCheckBox,
+                callerPhoneUnavailableCheckBox, clientPhoneUnavailableReasonBox, callerPhoneUnavailableReasonBox)) {
+            field.focusedProperty().addListener((o, wasFocused, focused) -> {
+                if (!focused) revalidateContactFields(false);
+            });
         }
-        if(focus&&first!=null)first.requestFocus();return errors;
+    }
+
+    private List<String> revalidateContactFields(boolean focus) {
+        List<String> errors = validateContactFields(focus);
+        List<String> summary = new ArrayList<>();
+        if (validationLabel.getStyleClass().contains("shale-error-message")) {
+            validationLabel.getText().lines().filter(line -> !contactValidationErrors.contains(line))
+                    .filter(line -> !line.isBlank()).forEach(summary::add);
+        }
+        contactValidationErrors = List.copyOf(errors);
+        summary.addAll(errors);
+        if (!summary.isEmpty()) showValidation(String.join("\n", summary));
+        else if (validationLabel.getStyleClass().contains("shale-error-message")) hideValidation();
+        return errors;
+    }
+
+    private List<String> validateContactFields(boolean focus) {
+        List<String> errors = new ArrayList<>();
+        Node first = null;
+        for (boolean client : List.of(true, false)) {
+            TextField phone = client ? clientPhoneField : callerPhoneField;
+            TextField extension = client ? clientPhoneExtensionField : callerPhoneExtensionField;
+            TextField email = client ? clientEmailField : callerEmailField;
+            CheckBox unavailable = client ? clientPhoneUnavailableCheckBox : callerPhoneUnavailableCheckBox;
+            var reason = client ? clientPhoneUnavailableReasonBox : callerPhoneUnavailableReasonBox;
+            Label feedback = client ? clientPhoneFeedbackLabel : callerPhoneFeedbackLabel;
+            String prefix = client ? "Client" : "Caller";
+            for (var field : List.of(phone, extension, email, reason)) ControlStyles.setInvalid(field, false);
+            List<String> phoneErrors = new ArrayList<>();
+            String preview = "";
+            if (client || !callerIsClientCheckBox.isSelected()) {
+                if (unavailable.isSelected() && reason.getValue() == null) {
+                    phoneErrors.add("Choose an unavailable reason.");
+                    ControlStyles.setInvalid(reason, true);
+                    if (first == null) first = reason;
+                }
+                try {
+                    var value = ContactValues.INSTANCE.phone(phone.getText(), extension.getText(),
+                            !unavailable.isSelected(), client ? "clientPhone" : "callerPhone");
+                    if (value != null) preview = value.preview();
+                } catch (FieldValidationException invalid) {
+                    phoneErrors.add(invalid.getMessage());
+                    javafx.scene.control.Control field = invalid.errors().getFirst().field().endsWith(".extension") ? extension : phone;
+                    ControlStyles.setInvalid(field, true);
+                    if (first == null) first = field;
+                }
+                try {
+                    ContactValues.INSTANCE.email(email.getText(), false, client ? "clientEmail" : "callerEmail");
+                } catch (FieldValidationException invalid) {
+                    errors.add(prefix + " Email: " + invalid.getMessage());
+                    ControlStyles.setInvalid(email, true);
+                    if (first == null) first = email;
+                }
+            }
+            errors.addAll(phoneErrors.stream().map(message -> prefix + " Phone: " + message).toList());
+            feedback.setText(phoneErrors.isEmpty() ? preview : String.join("\n", phoneErrors));
+            feedback.getStyleClass().remove("shale-error-message");
+            if (!phoneErrors.isEmpty()) feedback.getStyleClass().add("shale-error-message");
+            feedback.setVisible(!feedback.getText().isBlank());
+            feedback.setManaged(feedback.isVisible());
+        }
+        if (focus && first != null) first.requestFocus();
+        return errors;
     }
 
 	private List<DatePicker> allIntakeDatePickers() {
@@ -1655,6 +1715,7 @@ public final class NewIntakeController {
 	}
 
 	private void hideValidation() {
+        validationLabel.setText("");
 		validationLabel.setVisible(false);
 		validationLabel.setManaged(false);
 	}

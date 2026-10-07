@@ -22,7 +22,7 @@ function ContactValueInput({ accessToken, kind, baseline, baselineExtension, ext
   useEffect(() => { if (baseline !== undefined) void validate(); }, []);
   const fieldName = props.id?.includes('fax') ? 'fax' : kind;
   return <><input {...props} data-validation-field={fieldName} type="text" onBlur={() => void validate()} onChange={event => { generation.current++; setFeedback(''); props.onChange?.(event); }} aria-describedby={`${props.id}-feedback`} />
-    {kind === 'phone' && <><small>US numbers by default; use +country code for international numbers.</small><label htmlFor={`${props.id}-extension`}>Extension (optional, 1–12 digits)</label><input id={`${props.id}-extension`} type="text" inputMode="numeric" value={extension ?? ''} onChange={event => { generation.current++; setFeedback(''); onExtensionChange?.(event.target.value); }} onBlur={() => void validate()} disabled={props.disabled} data-validation-field={`${fieldName}.extension`} aria-describedby={`${props.id}-feedback`} /></>}
+    {kind === 'phone' && <><small>US full or 7-digit local numbers; use +country code for international numbers.</small><label htmlFor={`${props.id}-extension`}>Extension (optional, 1–12 digits)</label><input id={`${props.id}-extension`} type="text" inputMode="numeric" value={extension ?? ''} onChange={event => { generation.current++; setFeedback(''); onExtensionChange?.(event.target.value); }} onBlur={() => void validate()} disabled={props.disabled} data-validation-field={`${fieldName}.extension`} aria-describedby={`${props.id}-feedback`} /></>}
     <small id={`${props.id}-feedback`} role="status">{feedback}</small></>;
 }
 function focusContactError(error: unknown, form: HTMLFormElement) {

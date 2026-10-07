@@ -16,4 +16,11 @@ class ContactExternalActionsTest {
   assertThrows(IllegalArgumentException.class,()->ContactExternalActions.website("javascript:alert(1)"));
   assertThrows(IllegalArgumentException.class,()->ContactExternalActions.telephone("not a number",null));
  }
+ @Test void validLocalSubscriberCannotConstructAmbiguousInternationalUri(){
+  assertTrue(com.shale.data.validation.ContactValues.INSTANCE.usablePhone("555-0123","001"));
+  assertFalse(com.shale.data.validation.ContactValues.INSTANCE.dialablePhone("555-0123","001"));
+  var failure=assertThrows(IllegalArgumentException.class,()->ContactExternalActions.telephone("555-0123","001"));
+  assertEquals("Add an area code before calling a US local number.",failure.getMessage());
+ }
+
 }
