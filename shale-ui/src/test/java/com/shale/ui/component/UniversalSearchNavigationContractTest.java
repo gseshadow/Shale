@@ -6,12 +6,32 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
 class UniversalSearchNavigationContractTest {
+    @Test void initialFocusUsesExistingNavigationForNewAndReplacedSceneRoots() {
+        com.shale.ui.testutil.JavaFxTestSupport.runAndWait(() -> {
+            javafx.stage.Stage stage = new javafx.stage.Stage();
+            try {
+                for (int i = 0; i < 2; i++) {
+                    var loader = new javafx.fxml.FXMLLoader(getClass().getResource("/fxml/main.fxml"));
+                    javafx.scene.Parent root = loader.load();
+                    if (stage.getScene() == null) stage.setScene(new javafx.scene.Scene(root));
+                    else stage.getScene().setRoot(root);
+                    stage.show();
+                    ((com.shale.ui.controller.MainController) loader.getController()).focusInitialPage();
+                    assertSame(root.lookup("#navMyShaleButton"), stage.getScene().getFocusOwner(),
+                            "New and login-replaced shells must give initial focus to My Shale navigation");
+                    assertTrue(root.lookup("#globalSearchField").isFocusTraversable(),
+                            "Search must remain reachable with the keyboard");
+                }
+            } finally { stage.close(); }
+        });
+    }
+
     @Test void everyAuthenticatedShellFocusesInitialNavigationAfterInstallingItsRoute() throws Exception {
         String scene = Files.readString(Path.of("src/main/java/com/shale/ui/navigation/SceneManager.java"));
         String shell = body(scene, "private void showMainShell");
         assertTrue(shell.indexOf("mainController.focusInitialPage()") > shell.indexOf("showRouteInternal(AppRoute.myShale())"),
                 "The shared manual/remembered sign-in shell must focus navigation after installing My Shale");
-        assertEquals(1, java.util.regex.Pattern.compile("focusInitialPage\\(") .matcher(scene).results().count(),
+        assertEquals(1, java.util.regex.Pattern.compile("focusInitialPage\\(").matcher(scene).results().count(),
                 "Initial focus must happen once at shell creation, never on ordinary route changes");
         String main = Files.readString(Path.of("src/main/java/com/shale/ui/controller/MainController.java"));
         String focus = body(main, "public void focusInitialPage");

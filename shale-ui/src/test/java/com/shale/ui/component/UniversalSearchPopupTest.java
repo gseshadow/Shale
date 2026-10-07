@@ -34,8 +34,9 @@ class UniversalSearchPopupTest {
     @Test void automaticAndProgrammaticFocusStayClosedButClickingFocusedSearchOpensHistory() throws Exception {
         var history = new RecentSearchHistory(directory);
         history.record(new RecentSearchHistory.Scope(7, 11), "Recent Case");
-        Fixture fixture = JavaFxTestSupport.runAndWait(() -> new Fixture(history, false));
+        Fixture fixture = JavaFxTestSupport.runAndWait(() -> new Fixture(history));
         try {
+            await(() -> JavaFxTestSupport.runAndWait(() -> fixture.field.isFocused()));
             JavaFxTestSupport.runAndWait(() -> {
                 assertFalse(fixture.popupShowing(), "Initialization must not open recent searches");
                 fixture.other.requestFocus();
@@ -50,19 +51,36 @@ class UniversalSearchPopupTest {
                 fixture.field.fireEvent(mouse(MouseEvent.MOUSE_PRESSED));
             });
             fixture.awaitChoices(1);
+            JavaFxTestSupport.runAndWait(() -> {
+                fixture.popup.dismiss();
+                fixture.other.requestFocus();
+                fixture.field.requestFocus();
+                fixture.field.setText("Example");
+            });
+            fixture.awaitChoices(1);
         } finally { fixture.close(); }
     }
 
     @Test void tabTraversalIntoSearchOpensRecentHistory() throws Exception {
         var history = new RecentSearchHistory(directory);
         history.record(new RecentSearchHistory.Scope(7, 11), "Recent Case");
-        Fixture fixture = JavaFxTestSupport.runAndWait(() -> new Fixture(history, false));
+        Fixture fixture = JavaFxTestSupport.runAndWait(() -> new Fixture(history));
         try {
+            await(() -> JavaFxTestSupport.runAndWait(() -> fixture.field.isFocused()));
             JavaFxTestSupport.runAndWait(() -> {
                 fixture.other.requestFocus();
                 fixture.other.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.TAB,
                         false, false, false, false));
                 assertTrue(fixture.field.isFocused(), "Tab must retain normal traversal into search");
+            });
+            fixture.awaitChoices(1);
+            JavaFxTestSupport.runAndWait(() -> {
+                fixture.field.setText("Full query");
+                fixture.popup.submitFullSearch();
+                fixture.other.requestFocus();
+                fixture.field.clear();
+                fixture.other.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.TAB,
+                        false, false, false, false));
             });
             fixture.awaitChoices(1);
         } finally { fixture.close(); }
@@ -183,8 +201,16 @@ class UniversalSearchPopupTest {
         } finally { fixture.close(); }
     }
 
-    private Fixture create(RecentSearchHistory history) {
-        return JavaFxTestSupport.runAndWait(() -> new Fixture(history));
+    private Fixture create(RecentSearchHistory history) throws Exception {
+        Fixture fixture = JavaFxTestSupport.runAndWait(() -> new Fixture(history));
+        try {
+            await(() -> JavaFxTestSupport.runAndWait(() -> fixture.field.isFocused()));
+            JavaFxTestSupport.runAndWait(() -> fixture.field.fireEvent(mouse(MouseEvent.MOUSE_PRESSED)));
+            return fixture;
+        } catch (Exception | AssertionError failure) {
+            fixture.close();
+            throw failure;
+        }
     }
 
     private static class Fixture {
@@ -199,9 +225,7 @@ class UniversalSearchPopupTest {
         volatile int fullCount;
         private Window popupWindow;
 
-        Fixture(RecentSearchHistory history) { this(history, true); }
-
-        Fixture(RecentSearchHistory history, boolean interact) {
+        Fixture(RecentSearchHistory history) {
             state.setUserId(11); state.setShaleClientId(7);
             stage.setScene(new Scene(new VBox(field, other), 600, 400));
             ThemeManager.application().register(stage.getScene());
@@ -221,7 +245,6 @@ class UniversalSearchPopupTest {
             field.setOnAction(event -> popup.submitFullSearch());
             stage.show();
             field.requestFocus();
-            if (interact) field.fireEvent(mouse(MouseEvent.MOUSE_PRESSED));
         }
 
         boolean popupShowing() {
