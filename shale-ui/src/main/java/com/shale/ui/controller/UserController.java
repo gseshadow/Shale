@@ -1,5 +1,8 @@
 package com.shale.ui.controller;
 
+import com.shale.ui.util.ContactFieldFeedback;
+import com.shale.core.validation.FieldValidationException;
+import com.shale.data.validation.ContactValues;
 import com.shale.data.dao.CaseDao.CaseRow;
 import com.shale.data.dao.TaskDao.AssignedUserTaskRow;
 import com.shale.data.dao.UserDao.UserDetailRow;
@@ -189,6 +192,10 @@ public final class UserController {
 	private Button editPhoneButton;
 	@FXML
 	private TextField phoneEditor;
+	@FXML private TextField phoneExtensionEditor;
+	@FXML private VBox phoneEditorContainer;
+    @FXML private VBox emailEditorContainer;
+	private String phoneBaselineInput, phoneBaselineExtension;
 	@FXML
 	private Label initialsValue;
 	@FXML
@@ -326,6 +333,11 @@ public final class UserController {
 			setVisibleManaged(editButton, false);
 		}
 		initializeInlineEditButtons();
+        if(phoneEditorContainer!=null)phoneEditorContainer.getChildren().add(ContactFieldFeedback.phone(phoneEditor,phoneExtensionEditor,false,this::profilePhoneRetained));
+        if(emailEditorContainer!=null)emailEditorContainer.getChildren().add(ContactFieldFeedback.email(emailEditor,true,()->currentUser!=null&&Objects.equals(emailEditor.getText(),safeText(currentUser.email()))));
+        if(phoneEditorContainer!=null)ContactFieldFeedback.trackSummary(phoneEditorContainer,errorLabel);
+        if(emailEditorContainer!=null)ContactFieldFeedback.trackSummary(emailEditorContainer,errorLabel);
+        if(phoneExtensionEditor!=null)ControlStyles.formControl(phoneExtensionEditor);
 		if (saveButton != null) {
 			saveButton.setOnAction(e -> onSave());
 		}
@@ -995,18 +1007,24 @@ public final class UserController {
 			return;
 		}
 
+        try {
+        if(emailEditor!=null&&!Objects.equals(safeText(currentUser.email()),emailEditor.getText()))ContactValues.INSTANCE.email(emailEditor.getText(),true,"email");
 		UserProfileUpdateRequest request = new UserProfileUpdateRequest(
 				currentUser.id(),
 				currentUser.shaleClientId(),
 				safeText(firstNameEditor == null ? null : firstNameEditor.getText()),
 				safeText(lastNameEditor == null ? null : lastNameEditor.getText()),
-				safeText(emailEditor == null ? null : emailEditor.getText()),
-				safeText(phoneEditor == null ? null : phoneEditor.getText()),
+				retainUserValue(currentUser.email(),emailEditor == null ? currentUser.email() : emailEditor.getText()),
+				profilePhoneCandidate(),
 				safeText(initialsEditor == null ? null : initialsEditor.getText()),
-				selectedStoredColor());
+				selectedStoredColor(),currentUser.rowVer());
 
 		saveUserProfile(request);
+        } catch(FieldValidationException invalid){setError(invalid.getMessage());if(invalid.errors().getFirst().field().equals("email")&&emailEditorContainer!=null){ContactFieldFeedback.focus(emailEditorContainer,invalid);}else if(phoneEditorContainer!=null)ContactFieldFeedback.focus(phoneEditorContainer,invalid);}
 	}
+
+    private boolean profilePhoneRetained(){return currentUser!=null&&phoneEditor!=null&&Objects.equals(phoneBaselineInput,phoneEditor.getText())&&Objects.equals(phoneBaselineExtension,phoneExtensionEditor==null?null:phoneExtensionEditor.getText());}
+    private String profilePhoneCandidate(){if(phoneEditor==null||profilePhoneRetained())return currentUser.phone();var v=ContactValues.INSTANCE.phone(phoneEditor.getText(),phoneExtensionEditor==null?null:phoneExtensionEditor.getText(),false,"phone");return v==null?null:v.displayInput()+(v.extension()==null?"":" ext. "+v.extension());}
 
 	private void showUserTextFieldDialog(String title, String label, String currentValue, Button ownerButton, Consumer<String> onSave) {
 		Dialog<String> dialog = new Dialog<>();
@@ -1016,8 +1034,14 @@ public final class UserController {
 		dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
 
 		TextField field = new TextField(safeText(currentValue));
+        TextField extension=new TextField();
+        boolean phone="Phone".equals(label);
+        if(phone&&ContactValues.INSTANCE.usablePhone(currentValue,null)){var initial=ContactValues.INSTANCE.phone(currentValue,null,false,"phone");if(initial!=null){field.setText(initial.displayInput());extension.setText(initial.extension());}}
+        String originalNumber=field.getText(),originalExtension=extension.getText();
+        java.util.function.Supplier<String> candidate=()->{if(Objects.equals(originalNumber,field.getText())&&Objects.equals(originalExtension,extension.getText()))return currentValue;if(phone){var v=ContactValues.INSTANCE.phone(field.getText(),extension.getText(),false,"phone");return v==null?null:v.displayInput()+(v.extension()==null?"":" ext. "+v.extension());}return field.getText();};
+        ControlStyles.formControl(field);ControlStyles.formControl(extension);
 		Label error = new Label();
-		error.setTextFill(Color.web("#b42318"));
+		error.getStyleClass().add("dialog-error-text");
 		error.setVisible(false);
 		error.setManaged(false);
 		VBox body = new VBox(8,
@@ -1025,13 +1049,16 @@ public final class UserController {
 				currentValueLabel(currentValue),
 				field,
 				error);
-		body.getStyleClass().add("field-edit-dialog-body");
-		dialog.getDialogPane().setContent(body);
+		if(phone)body.getChildren().addAll(new Label("US default; international +country code"),new Label("Extension (optional, 1–12 digits)"),extension,ContactFieldFeedback.phone(field,extension,false,()->Objects.equals(originalNumber,field.getText())&&Objects.equals(originalExtension,extension.getText())));
+        else if("Email".equals(label))body.getChildren().add(ContactFieldFeedback.email(field,true,()->Objects.equals(safeText(currentValue),safeText(field.getText()))));
+        body.getStyleClass().add("field-edit-dialog-body");
+		dialog.getDialogPane().setContent(body);ContactFieldFeedback.trackSummary(body,error);
 
 		Node save = dialog.getDialogPane().lookupButton(saveType);
 		save.addEventFilter(javafx.event.ActionEvent.ACTION, e ->
 		{
-			String validationMessage = validateUserField(label, field.getText());
+			String validationMessage;
+            try{String input=candidate.get();validationMessage=Objects.equals(currentValue,input)?"":validateUserField(label,input);}catch(FieldValidationException invalid){validationMessage=invalid.getMessage();ContactFieldFeedback.focus(body,invalid);}
 			if (!validationMessage.isBlank()) {
 				error.setText(validationMessage);
 				error.setVisible(true);
@@ -1040,7 +1067,7 @@ public final class UserController {
 			}
 		});
 		installUnsavedUserDialogConfirmation(dialog, () -> !Objects.equals(safeText(currentValue), safeText(field.getText())));
-		dialog.setResultConverter(button -> button == saveType ? field.getText() : null);
+		dialog.setResultConverter(button -> button == saveType ? Objects.toString(candidate.get(),"") : null);
 		dialog.showAndWait().ifPresent(onSave);
 	}
 
@@ -1117,7 +1144,7 @@ public final class UserController {
 					Platform.runLater(() ->
 					{
 						setBusy(false);
-						setError("User profile could not be saved.");
+						setError("User profile could not be saved. Your draft is retained.");
 					});
 					return;
 				}
@@ -1143,11 +1170,14 @@ public final class UserController {
 				Platform.runLater(() ->
 				{
 					setBusy(false);
-					setError("Failed to save user profile.");
+					retainFailedProfileDraft(request);
+                    setError(ex instanceof FieldValidationException invalid?invalid.getMessage():"Failed to save user profile. Your draft is retained.");
 				});
 			}
 		});
 	}
+
+    private void retainFailedProfileDraft(UserProfileUpdateRequest request){setEditMode(true);if(firstNameEditor!=null)firstNameEditor.setText(request.firstName());if(lastNameEditor!=null)lastNameEditor.setText(request.lastName());if(emailEditor!=null)emailEditor.setText(request.email());if(phoneEditor!=null)phoneEditor.setText(request.phone());if(phoneExtensionEditor!=null)phoneExtensionEditor.setText("");if(initialsEditor!=null)initialsEditor.setText(request.initials());setEditorColor(request.color());}
 
 	private void onAddRole() {
 		if (!canManageRoles()) {
@@ -1286,6 +1316,8 @@ public final class UserController {
 		setLabel(lastNameValue, currentUser.lastName());
 		setLabel(emailValue, currentUser.email());
 		setLabel(phoneValue, currentUser.phone());
+        if(phoneValue!=null&&currentUser.phone()!=null&&!currentUser.phone().isBlank()){if(ContactValues.INSTANCE.usablePhone(currentUser.phone(),null))phoneValue.setText(ContactValues.INSTANCE.phone(currentUser.phone(),null,false,"phone").preview());else phoneValue.setText(currentUser.phone()+" · Phone needs review");}
+        if(emailValue!=null&&!ContactValues.INSTANCE.usableEmail(currentUser.email()))emailValue.setText(safeText(currentUser.email())+" · Email needs review; existing login is retained");
 		setLabel(initialsValue, currentUser.initials());
 		renderColorValue(currentUser.color());
 		writeEditorsFromCurrent();
@@ -1612,6 +1644,8 @@ public final class UserController {
 		}
 		if (phoneEditor != null) {
 			phoneEditor.setText(safeText(currentUser.phone()));
+            if(phoneExtensionEditor!=null){phoneExtensionEditor.setText("");if(ContactValues.INSTANCE.usablePhone(currentUser.phone(),null)){var v=ContactValues.INSTANCE.phone(currentUser.phone(),null,false,"phone");if(v!=null){phoneEditor.setText(v.displayInput());phoneExtensionEditor.setText(safeText(v.extension()));}}}
+            phoneBaselineInput=phoneEditor.getText();phoneBaselineExtension=phoneExtensionEditor==null?null:phoneExtensionEditor.getText();
 		}
 		if (initialsEditor != null) {
 			initialsEditor.setText(safeText(currentUser.initials()));
@@ -1625,8 +1659,8 @@ public final class UserController {
 
 		toggleEditableField(firstNameValue, firstNameEditor, this.editMode);
 		toggleEditableField(lastNameValue, lastNameEditor, this.editMode);
-		toggleEditableField(emailValue, emailEditor, this.editMode);
-		toggleEditableField(phoneValue, phoneEditor, this.editMode);
+		if(emailEditorContainer!=null){setVisibleManaged(emailValue,!this.editMode);setVisibleManaged(emailEditorContainer,this.editMode);}else toggleEditableField(emailValue, emailEditor, this.editMode);
+		if(phoneEditorContainer!=null){setVisibleManaged(phoneValue,!this.editMode);setVisibleManaged(phoneEditorContainer,this.editMode);}else toggleEditableField(phoneValue, phoneEditor, this.editMode);
 		toggleEditableField(initialsValue, initialsEditor, this.editMode);
 		toggleEditableField(colorValueContainer, colorEditorContainer, this.editMode);
 	}
@@ -1673,7 +1707,7 @@ public final class UserController {
 			emailEditor.setDisable(busy);
 		}
 		if (phoneEditor != null) {
-			phoneEditor.setDisable(busy);
+			phoneEditor.setDisable(busy);if(phoneExtensionEditor!=null)phoneExtensionEditor.setDisable(busy);
 		}
 		if (initialsEditor != null) {
 			initialsEditor.setDisable(busy);
@@ -2126,15 +2160,7 @@ public final class UserController {
 		return label;
 	}
 
-	private static String validateUserField(String label, String value) {
-		if ("Email".equals(label)) {
-			String email = safeText(value);
-			if (!email.isBlank() && (!email.contains("@") || email.indexOf('@') == 0 || email.endsWith("@"))) {
-				return "Enter a valid email address.";
-			}
-		}
-		return "";
-	}
+    private static String validateUserField(String label,String value){try{if("Email".equals(label))ContactValues.INSTANCE.email(value,true,"email");if("Phone".equals(label))ContactValues.INSTANCE.phone(value,null,false,"phone");return "";}catch(IllegalArgumentException invalid){return invalid.getMessage();}}
 
 	private static String displayName(UserDetailRow user) {
 		if (user == null) {
@@ -2260,12 +2286,14 @@ public final class UserController {
 					user.shaleClientId(),
 					safeText(firstName),
 					safeText(lastName),
-					safeText(email),
-					safeText(phone),
+					retainUserValue(user.email(),email),
+					retainUserValue(user.phone(),phone),
 					safeText(initials),
-					color);
+					color,user.rowVer());
 		}
 	}
+
+    private static String retainUserValue(String baseline,String proposed){return Objects.equals(safeText(baseline),safeText(proposed))?baseline:proposed;}
 
 	private static String safeText(String value) {
 		return value == null ? "" : value.trim();

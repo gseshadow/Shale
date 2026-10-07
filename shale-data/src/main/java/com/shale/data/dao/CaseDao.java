@@ -1,5 +1,7 @@
 package com.shale.data.dao;
 
+import com.shale.data.validation.ContactValues;
+import com.shale.core.validation.PhoneUnavailableReason;
 import java.sql.Connection;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -385,8 +387,83 @@ public final class CaseDao {
 			Integer createdByUserId,
 			long formConfigurationId,
 			byte[] formConfigurationRowVer,
-			List<ConfiguredDateValue> configuredDates
-	) {
+			List<ConfiguredDateValue> configuredDates,
+            PhoneUnavailableReason clientPhoneUnavailableReason,
+            PhoneUnavailableReason callerPhoneUnavailableReason
+	,String clientPhoneExtension,String callerPhoneExtension) {
+        public NewIntakeCreateRequest(
+			int shaleClientId,
+			String caseName,
+			LocalDate intakeDate,
+			LocalTime intakeTime,
+			boolean estateCase,
+			int practiceAreaId,
+			int statusId,
+			String description,
+			String summary,
+			LocalDate dateOfMedicalNegligence,
+			LocalDate dateMedicalNegligenceWasDiscovered,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortClaimsNotice,
+			String clientFirstName,
+			String clientLastName,
+			String clientAddress,
+			String clientPhone,
+			String clientEmail,
+			LocalDate clientDateOfBirth,
+			boolean clientDeceased,
+			String clientCondition,
+			boolean callerIsClient,
+			String callerFirstName,
+			String callerLastName,
+			String callerPhone,
+			String callerAddress,
+			String callerEmail,
+			List<NewIntakePendingParty> pendingParties,
+			Integer createdByUserId,
+			long formConfigurationId,
+			byte[] formConfigurationRowVer,
+			List<ConfiguredDateValue> configuredDates,
+            PhoneUnavailableReason clientPhoneUnavailableReason,
+            PhoneUnavailableReason callerPhoneUnavailableReason
+	){this(shaleClientId,caseName,intakeDate,intakeTime,estateCase,practiceAreaId,statusId,description,summary,dateOfMedicalNegligence,dateMedicalNegligenceWasDiscovered,dateOfInjury,statuteOfLimitations,tortClaimsNotice,clientFirstName,clientLastName,clientAddress,clientPhone,clientEmail,clientDateOfBirth,clientDeceased,clientCondition,callerIsClient,callerFirstName,callerLastName,callerPhone,callerAddress,callerEmail,pendingParties,createdByUserId,formConfigurationId,formConfigurationRowVer,configuredDates,clientPhoneUnavailableReason,callerPhoneUnavailableReason,null,null);}
+
+        public NewIntakeCreateRequest(
+			int shaleClientId,
+			String caseName,
+			LocalDate intakeDate,
+			LocalTime intakeTime,
+			boolean estateCase,
+			int practiceAreaId,
+			int statusId,
+			String description,
+			String summary,
+			LocalDate dateOfMedicalNegligence,
+			LocalDate dateMedicalNegligenceWasDiscovered,
+			LocalDate dateOfInjury,
+			LocalDate statuteOfLimitations,
+			LocalDate tortClaimsNotice,
+			String clientFirstName,
+			String clientLastName,
+			String clientAddress,
+			String clientPhone,
+			String clientEmail,
+			LocalDate clientDateOfBirth,
+			boolean clientDeceased,
+			String clientCondition,
+			boolean callerIsClient,
+			String callerFirstName,
+			String callerLastName,
+			String callerPhone,
+			String callerAddress,
+			String callerEmail,
+			List<NewIntakePendingParty> pendingParties,
+			Integer createdByUserId,
+			long formConfigurationId,
+			byte[] formConfigurationRowVer,
+			List<ConfiguredDateValue> configuredDates) { this(shaleClientId,caseName,intakeDate,intakeTime,estateCase,practiceAreaId,statusId,description,summary,dateOfMedicalNegligence,dateMedicalNegligenceWasDiscovered,dateOfInjury,statuteOfLimitations,tortClaimsNotice,clientFirstName,clientLastName,clientAddress,clientPhone,clientEmail,clientDateOfBirth,clientDeceased,clientCondition,callerIsClient,callerFirstName,callerLastName,callerPhone,callerAddress,callerEmail,pendingParties,createdByUserId,formConfigurationId,formConfigurationRowVer,configuredDates,null,null); }
+
 		public NewIntakeCreateRequest {
 			formConfigurationRowVer = formConfigurationRowVer == null ? null : formConfigurationRowVer.clone();
 			configuredDates = configuredDates == null ? List.of() : List.copyOf(configuredDates);
@@ -463,10 +540,12 @@ public final class CaseDao {
 	}
 
 	public NewIntakeCreateResult mergeIntake(long existingCaseId, NewIntakeCreateRequest request) {
+        validateIntakeContactValues(request);
 		Objects.requireNonNull(request,"request");
 		Connection con=null;
 		try {
 			con=db.requireConnection(); con.setAutoCommit(false);
+            requireIntakeSession(con,request);
 			List<ConfiguredDateValue> dates=validateConfiguredIntakeDates(con,request);
 			int intakeTypeId=requireConfiguredIntakeValue(con,request,dates);
 			if (!lockMatchingCase(con,existingCaseId,request)) throw new IllegalArgumentException("The selected case is no longer an eligible duplicate.");
@@ -474,9 +553,9 @@ public final class CaseDao {
 			ensureRequiredPartyRolesForTenant(con,request.shaleClientId());
 			fillBlankCaseScalars(con,existingCaseId,request);
 			int clientId=mergeRoleContact(con,existingCaseId,request,PARTY_ROLE_NAME_PARTY,request.clientFirstName(),request.clientLastName(),
-				request.clientDateOfBirth(),request.clientCondition(),request.clientDeceased(),true,request.clientPhone(),request.clientEmail(),request.clientAddress(),now);
+				request.clientDateOfBirth(),request.clientCondition(),request.clientDeceased(),true,intakePhone(request.clientPhone(),request.clientPhoneExtension(),"clientPhone"),request.clientEmail(),request.clientAddress(),now);
 			int callerId=request.callerIsClient()?clientId:mergeRoleContact(con,existingCaseId,request,PARTY_ROLE_NAME_CALLER,
-				request.callerFirstName(),request.callerLastName(),null,null,false,false,request.callerPhone(),request.callerEmail(),request.callerAddress(),now);
+				request.callerFirstName(),request.callerLastName(),null,null,false,false,intakePhone(request.callerPhone(),request.callerPhoneExtension(),"callerPhone"),request.callerEmail(),request.callerAddress(),now);
 			ensureCaseParty(con,existingCaseId,clientId,PARTY_ROLE_NAME_PARTY,now,request.shaleClientId());
 			ensureCaseParty(con,existingCaseId,callerId,PARTY_ROLE_NAME_CALLER,now,request.shaleClientId());
 			for(NewIntakePendingParty pending:request.pendingParties()==null?List.<NewIntakePendingParty>of():request.pendingParties()) addPendingPartyForMerge(con,existingCaseId,request,pending,now);
@@ -484,7 +563,8 @@ public final class CaseDao {
 			int createdDates=0; for(ConfiguredDateValue date:dates) if(!hasActiveCaseDate(con,existingCaseId,date.caseDateTypeId(),request.shaleClientId())) {
 				long id=insertConfiguredCaseDate(con,request,existingCaseId,date,intakeTypeId); auditCreatedCaseDate(con,request,existingCaseId,id,date,intakeTypeId);
 				fieldConfirmationDao.evaluateCaseDate(con,request.shaleClientId(),request.createdByUserId(),id,date.caseDateTypeId(),1); createdDates++; }
-			con.commit(); return new NewIntakeCreateResult(existingCaseId,clientId,callerId,createdDates);
+			recordPhoneAvailability(con,request,existingCaseId,clientId,callerId);
+            con.commit(); return new NewIntakeCreateResult(existingCaseId,clientId,callerId,createdDates);
 		} catch(Exception e) { if(con!=null)try{con.rollback();}catch(SQLException ignored){} throw e instanceof RuntimeException r?r:new RuntimeException("Failed to merge intake.",e); }
 		finally { if(con!=null){try{con.setAutoCommit(true);}catch(SQLException ignored){} try{con.close();}catch(SQLException ignored){}} }
 	}
@@ -519,16 +599,23 @@ public final class CaseDao {
 		if(r.createdByUserId()!=null){entityActionAuditDao.append(con,EntityActionAuditEvent.now(r.shaleClientId(),r.createdByUserId(),EntityActionAuditEvent.EntityType.CONTACT,id,EntityActionAuditEvent.Action.UPDATED,null,null,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,id)));if(normalizeOptional(condition)!=null)phiAuditService.auditUpdate(con,r.createdByUserId(),"Contacts","Condition",(long)id,null,condition);}
 	}
 
-	private void insertMissingContactPoints(Connection con,NewIntakeCreateRequest r,int id,String phone,String email,String address)throws SQLException{
-		if(!hasContactPoint(con,"ContactPhoneNumbers",id,"NormalizedNumber",normalizePhone(phone)))insertIntakeContactPoint(con,r,id,"ContactPhoneNumbers","DisplayNumber,NormalizedNumber","MOBILE",normalizeOptional(phone),normalizePhone(phone),EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER);
-		if(!hasContactPoint(con,"ContactEmailAddresses",id,"NormalizedEmail",normalizeEmail(email)))insertIntakeContactPoint(con,r,id,"ContactEmailAddresses","EmailAddress,NormalizedEmail","PERSONAL",normalizeOptional(email),normalizeEmail(email),EntityActionAuditEvent.EntityType.CONTACT_EMAIL_ADDRESS);
-		if(!hasContactPoint(con,"ContactAddresses",id,"LegacyAddressText",normalizeOptional(address)))insertIntakeContactPoint(con,r,id,"ContactAddresses","LegacyAddressText","HOME",normalizeOptional(address),EntityActionAuditEvent.EntityType.CONTACT_ADDRESS);
-	}
-	private static boolean hasContactPoint(Connection con,String table,int id,String column,String value)throws SQLException{if(value==null)return true;String expression=column.equals("LegacyAddressText")?"LOWER(LTRIM(RTRIM("+column+")))":"LOWER("+column+")";try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo."+table+" WHERE ContactId=? AND ISNULL(IsDeleted,0)=0 AND "+expression+"=?")){ps.setInt(1,id);ps.setString(2,value.toLowerCase(Locale.ROOT));try(ResultSet rs=ps.executeQuery()){return rs.next();}}}
+    private void insertMissingContactPoints(Connection con,NewIntakeCreateRequest r,int id,String phone,String email,String address)throws SQLException{
+        var p=ContactValues.INSTANCE.phone(phone,null,false,"phone");var e=ContactValues.INSTANCE.email(email,false,"email");
+        if(p!=null&&!hasContactPoint(con,r.shaleClientId(),"ContactPhoneNumbers",id,"NormalizedNumber",p.normalizedNumber(),p.extension()))insertIntakeContactPointValues(con,r,id,"ContactPhoneNumbers","DisplayNumber,NormalizedNumber,Extension","MOBILE",EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER,p.displayInput(),p.normalizedNumber(),p.extension());
+        if(e!=null&&!hasContactPoint(con,r.shaleClientId(),"ContactEmailAddresses",id,"NormalizedEmail",e.comparisonKey(),null))insertIntakeContactPointValues(con,r,id,"ContactEmailAddresses","EmailAddress,NormalizedEmail","PERSONAL",EntityActionAuditEvent.EntityType.CONTACT_EMAIL_ADDRESS,e.displayInput(),e.comparisonKey());
+        if(!hasContactPoint(con,r.shaleClientId(),"ContactAddresses",id,"LegacyAddressText",normalizeOptional(address),null))insertIntakeContactPoint(con,r,id,"ContactAddresses","LegacyAddressText","HOME",normalizeOptional(address),EntityActionAuditEvent.EntityType.CONTACT_ADDRESS);
+    }
+    private static boolean hasContactPoint(Connection con,int tenant,String table,int id,String column,String value,String extension)throws SQLException{
+        if(value==null)return true;
+        String sql="SELECT 1 FROM dbo."+table+" WHERE ShaleClientId=? AND ContactId=? AND IsDeleted=0 AND LOWER(LTRIM(RTRIM("+column+")))=?"+(table.equals("ContactPhoneNumbers")?" AND COALESCE(Extension,'')=?":"");
+        try(var p=con.prepareStatement(sql)){p.setInt(1,tenant);p.setInt(2,id);p.setString(3,value.toLowerCase(Locale.ROOT));if(table.equals("ContactPhoneNumbers"))p.setString(4,extension==null?"":extension);try(var rs=p.executeQuery()){return rs.next();}}
+    }
+
 	private static boolean hasActiveCaseDate(Connection con,long caseId,int type,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.CaseDates WHERE CaseId=? AND CaseDateTypeId=? AND ShaleClientId=? AND IsDeleted=0")){ps.setLong(1,caseId);ps.setInt(2,type);ps.setInt(3,tenant);try(ResultSet rs=ps.executeQuery()){return rs.next();}}}
 	private void ensureCaseParty(Connection con,long caseId,int contact,String role,Timestamp now,int tenant)throws SQLException{try(PreparedStatement ps=con.prepareStatement("SELECT 1 FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId WHERE cp.CaseId=? AND cp.ContactId=? AND LOWER(LTRIM(RTRIM(COALESCE(pr.SystemKey,pr.Name))))=?")){ps.setLong(1,caseId);ps.setInt(2,contact);ps.setString(3,role);try(ResultSet rs=ps.executeQuery()){if(rs.next())return;}}insertCaseParty(con,caseId,contact,role,PARTY_SIDE_KEY_REPRESENTED,true,now,tenant);}
 
 	public NewIntakeCreateResult createIntake(NewIntakeCreateRequest request) {
+        validateIntakeContactValues(request);
 		Objects.requireNonNull(request, "request");
 		if (request.shaleClientId() <= 0)
 			throw new IllegalArgumentException("shaleClientId is required.");
@@ -538,6 +625,7 @@ public final class CaseDao {
 		try {
 			con = db.requireConnection();
 			con.setAutoCommit(false);
+            requireIntakeSession(con,request);
 			List<ConfiguredDateValue> configuredDates = validateConfiguredIntakeDates(con, request);
 			int intakeTypeId = requireConfiguredIntakeValue(con, request, configuredDates);
 			System.out.println("[IntakeCreate] start shaleClientId=" + request.shaleClientId()
@@ -555,7 +643,7 @@ public final class CaseDao {
 					true,
 					request.shaleClientId(),
 					now);
-			insertIntakeContactPoints(con, request, clientContactId, request.clientPhone(),
+			insertIntakeContactPoints(con, request, clientContactId, intakePhone(request.clientPhone(),request.clientPhoneExtension(),"clientPhone"),
 					request.clientEmail(), request.clientAddress());
 			if (request.createdByUserId() != null && normalizeOptional(request.clientCondition()) != null) {
 				phiAuditService.auditUpdate(con, request.createdByUserId(), "Contacts", "Condition",
@@ -629,12 +717,12 @@ public final class CaseDao {
 			}
 			System.out.println("[IntakeCreate] primary status linked caseId=" + caseId + " statusId=" + request.statusId());
 
-			con.commit();
+			recordPhoneAvailability(con,request,caseId,clientContactId,callerContactId);
+            con.commit();
 			System.out.println("[IntakeCreate] committed caseId=" + caseId + " shaleClientId=" + request.shaleClientId());
 			return new NewIntakeCreateResult(caseId, clientContactId, callerContactId, configuredDates.size());
 		} catch (Exception e) {
-			System.err.println("[IntakeCreate] failed shaleClientId=" + request.shaleClientId() + " error=" + e.getMessage());
-			e.printStackTrace(System.err);
+			System.err.println("[IntakeCreate] failed shaleClientId=" + request.shaleClientId() + " exceptionClass=" + e.getClass().getName());
 			if (con != null) {
 				try {
 					con.rollback();
@@ -911,7 +999,7 @@ public final class CaseDao {
 			int shaleClientId, Timestamp now, NewIntakeCreateRequest request) throws SQLException {
 		int contactId = insertContact(con, name, firstName, lastName, dateOfBirth, condition,
 				isDeceased, isClient, shaleClientId, now);
-		insertIntakeContactPoints(con, request, contactId, request.callerPhone(), request.callerEmail(),
+		insertIntakeContactPoints(con, request, contactId, intakePhone(request.callerPhone(),request.callerPhoneExtension(),"callerPhone"), request.callerEmail(),
 				request.callerAddress());
 		return contactId;
 	}
@@ -970,18 +1058,39 @@ public final class CaseDao {
 		}
 	}
 
-	private void insertIntakeContactPoints(Connection con, NewIntakeCreateRequest request, int contactId,
-			String phone, String email, String address) throws SQLException {
-		insertIntakeContactPoint(con, request, contactId, "ContactPhoneNumbers",
-				"DisplayNumber,NormalizedNumber", "MOBILE", normalizeOptional(phone), normalizePhone(phone),
-				EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER);
-		insertIntakeContactPoint(con, request, contactId, "ContactEmailAddresses",
-				"EmailAddress,NormalizedEmail", "PERSONAL", normalizeOptional(email), normalizeEmail(email),
-				EntityActionAuditEvent.EntityType.CONTACT_EMAIL_ADDRESS);
-		insertIntakeContactPoint(con, request, contactId, "ContactAddresses",
-				"LegacyAddressText", "HOME", normalizeOptional(address),
-				EntityActionAuditEvent.EntityType.CONTACT_ADDRESS);
-	}
+    private void insertIntakeContactPoints(Connection con, NewIntakeCreateRequest request, int contactId,
+            String phone, String email, String address) throws SQLException {
+        var p=ContactValues.INSTANCE.phone(phone,null,false,"phone");
+        var e=ContactValues.INSTANCE.email(email,false,"email");
+        if(p!=null)insertIntakeContactPointValues(con,request,contactId,"ContactPhoneNumbers","DisplayNumber,NormalizedNumber,Extension","MOBILE",EntityActionAuditEvent.EntityType.CONTACT_PHONE_NUMBER,p.displayInput(),p.normalizedNumber(),p.extension());
+        if(e!=null)insertIntakeContactPointValues(con,request,contactId,"ContactEmailAddresses","EmailAddress,NormalizedEmail","PERSONAL",EntityActionAuditEvent.EntityType.CONTACT_EMAIL_ADDRESS,e.displayInput(),e.comparisonKey());
+        insertIntakeContactPoint(con,request,contactId,"ContactAddresses","LegacyAddressText","HOME",normalizeOptional(address),EntityActionAuditEvent.EntityType.CONTACT_ADDRESS);
+    }
+    private static void requireIntakeSession(Connection con,NewIntakeCreateRequest request)throws SQLException{
+        if(requireCurrentShaleClientId(con)!=request.shaleClientId())throw new SecurityException("Intake tenant does not match the current session.");
+        int actor=requirePrincipalUserId(con);if(request.createdByUserId()==null||request.createdByUserId()!=actor)throw new SecurityException("Intake actor does not match the current session.");
+        try(var p=con.prepareStatement("SELECT 1 FROM dbo.Users WHERE Id=? AND ShaleClientId=? AND ISNULL(is_deleted,0)=0 AND ISNULL(IsRemoved,0)=0")){p.setInt(1,actor);p.setInt(2,request.shaleClientId());try(var rows=p.executeQuery()){if(!rows.next())throw new SecurityException("An active intake actor is required.");}}
+    }
+    private static String intakePhone(String input,String extension,String field){var v=ContactValues.INSTANCE.phone(input,extension,false,field);return v==null?null:v.displayInput()+(v.extension()==null?"":" ext. "+v.extension());}
+    static void validateIntakeContactValues(NewIntakeCreateRequest r){
+        Objects.requireNonNull(r,"request");
+        ContactValues.INSTANCE.phone(r.clientPhone(),r.clientPhoneExtension(),r.clientPhoneUnavailableReason()==null,"clientPhone");
+        ContactValues.INSTANCE.email(r.clientEmail(),false,"clientEmail");
+        if(!r.callerIsClient()){
+            ContactValues.INSTANCE.phone(r.callerPhone(),r.callerPhoneExtension(),r.callerPhoneUnavailableReason()==null,"callerPhone");
+            ContactValues.INSTANCE.email(r.callerEmail(),false,"callerEmail");
+        }
+    }
+    private static void recordPhoneAvailability(Connection con,NewIntakeCreateRequest r,long caseId,int client,int caller)throws SQLException{
+        if(r.createdByUserId()==null)throw new IllegalArgumentException("An intake actor is required.");
+        String sql="INSERT dbo.IntakePhoneAvailability(ShaleClientId,CaseId,ContactId,IntakeRole,UnavailableReason,CreatedByUserId) VALUES(?,?,?,?,?,?)";
+        try(var p=con.prepareStatement(sql)){
+            for(String role:List.of("CLIENT","CALLER")){
+                var reason=role.equals("CLIENT")||r.callerIsClient()?r.clientPhoneUnavailableReason():r.callerPhoneUnavailableReason();
+                p.setInt(1,r.shaleClientId());p.setLong(2,caseId);p.setInt(3,role.equals("CLIENT")?client:caller);p.setString(4,role);p.setString(5,reason==null?null:reason.name());p.setInt(6,r.createdByUserId());p.executeUpdate();
+            }
+        }
+    }
 
 	private void insertIntakeContactPoint(Connection con, NewIntakeCreateRequest request, int contactId,
 			String table, String valueColumns, String kind, String value,
@@ -992,18 +1101,23 @@ public final class CaseDao {
 	private void insertIntakeContactPoint(Connection con, NewIntakeCreateRequest request, int contactId,
 			String table, String valueColumns, String kind, String firstValue, String secondValue,
 			EntityActionAuditEvent.EntityType entityType) throws SQLException {
-		if (firstValue == null) return;
-		String placeholders = secondValue == null ? "?" : "?,?";
+		insertIntakeContactPointValues(con,request,contactId,table,valueColumns,kind,entityType,valueColumns.split(",").length==1?new String[]{firstValue}:new String[]{firstValue,secondValue});
+    }
+    private void insertIntakeContactPointValues(Connection con,NewIntakeCreateRequest request,int contactId,String table,String valueColumns,String kind,EntityActionAuditEvent.EntityType entityType,String... values)throws SQLException {
+        if(values[0]==null)return;
+        boolean primary;int order;
+        try(var p=con.prepareStatement("SELECT COUNT(*),COALESCE(MAX(SortOrder),-1)+1 FROM dbo."+table+" WITH(UPDLOCK,HOLDLOCK) WHERE ShaleClientId=? AND ContactId=? AND IsDeleted=0")){p.setInt(1,request.shaleClientId());p.setInt(2,contactId);try(var r=p.executeQuery()){r.next();primary=r.getInt(1)==0;order=r.getInt(2);}}
+		String placeholders = String.join(",", java.util.Collections.nCopies(values.length,"?"));
 		String sql = "INSERT dbo." + table + " (ShaleClientId,ContactId,Kind," + valueColumns
-				+ ",IsPrimary,SortOrder,CreatedByUserId) OUTPUT INSERTED.Id VALUES (?,?,?," + placeholders + ",1,0,?)";
+				+ ",IsPrimary,SortOrder,CreatedByUserId) OUTPUT INSERTED.Id VALUES (?,?,?," + placeholders + ",?,?,?)";
 		long pointId;
 		try (PreparedStatement ps = con.prepareStatement(sql)) {
 			int i = 1;
 			ps.setInt(i++, request.shaleClientId());
 			ps.setInt(i++, contactId);
 			ps.setString(i++, kind);
-			ps.setString(i++, firstValue);
-			if (secondValue != null) ps.setString(i++, secondValue);
+			for(String value:values)ps.setString(i++,value);
+            ps.setBoolean(i++,primary);ps.setInt(i++,order);
 			if (request.createdByUserId() == null) ps.setNull(i, java.sql.Types.INTEGER);
 			else ps.setInt(i, request.createdByUserId());
 			try (ResultSet rs = ps.executeQuery()) {
@@ -1017,7 +1131,7 @@ public final class CaseDao {
 					EntityActionAuditEvent.EntityType.CONTACT, (long) contactId,
 					Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID, contactId,
 							EntityActionAuditEvent.MetadataKey.KIND, kind,
-							EntityActionAuditEvent.MetadataKey.PRIMARY, true)));
+							EntityActionAuditEvent.MetadataKey.PRIMARY, primary)));
 		}
 	}
 
@@ -1028,12 +1142,12 @@ public final class CaseDao {
 
 	private static String normalizePhone(String value) {
 		String normalized = normalizeOptional(value);
-		return normalized == null ? null : normalized.replaceAll("[^0-9+]", "");
+		return normalized == null ? null : ContactValues.INSTANCE.phone(value,null,false,"phone").normalizedNumber();
 	}
 
 	private static String normalizeEmail(String value) {
 		String normalized = normalizeOptional(value);
-		return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
+		return normalized == null ? null : ContactValues.INSTANCE.email(value,false,"email").comparisonKey();
 	}
 
 	private long insertCase(Connection con, NewIntakeCreateRequest request, Timestamp now) throws SQLException {

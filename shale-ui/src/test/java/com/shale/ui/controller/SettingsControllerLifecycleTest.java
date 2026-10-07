@@ -46,8 +46,13 @@ final class SettingsControllerLifecycleTest {
                 "Settings service/DAO calls should be submitted to the background executor.");
         assertTrue(containsCode(source, "Platform.runLater(() -> {"),
                 "User-management UI application must happen on the JavaFX application thread.");
-        assertTrue(containsCode(source, "if (generation != userManagementLoadGeneration) return;"),
-                "User Management async results need stale-result protection.");
+        String users = Files.readString(Path.of("src/main/java/com/shale/ui/controller/UserManagementPane.java"));
+        String load = methodSource(users, "loadManagedUsersAsync");
+        assertTrue(containsCode(load, "settingsLoadExecutor.execute"),
+                "User Management hydration belongs to its background pane executor.");
+        assertEquals(2, Pattern.compile("if \\(\\s*disposed\\.get\\(\\)\\s*\\|\\|\\s*generation != userManagementLoadGeneration\\s*\\)\\s*return;")
+                .matcher(load).results().count(),
+                "Both successful and failed User Management callbacks must reject closed or stale pane loads.");
     }
 
 

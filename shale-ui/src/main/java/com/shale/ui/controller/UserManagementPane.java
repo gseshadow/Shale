@@ -1,5 +1,6 @@
 package com.shale.ui.controller;
 
+import com.shale.data.validation.ContactValues;
 import java.util.*; import java.util.concurrent.Executor; import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger; import org.slf4j.LoggerFactory;
 import com.shale.data.dao.UserDao; import com.shale.data.service.adapter.UserServiceAdapter; import com.shale.core.service.UserServicePort; import com.shale.ui.component.*; import com.shale.ui.component.dialog.AppDialogs; import com.shale.ui.component.factory.UserCardFactory; import com.shale.ui.component.factory.UserCardFactory.UserCardModel; import com.shale.ui.util.ControlStyles;
@@ -28,11 +29,11 @@ public final class UserManagementPane {
  private int userManagementLoadGeneration; private final List<UserManagementViewRow> managedUserRows=new ArrayList<>(); private final UserCardFactory userManagementCardFactory=new UserCardFactory(null); private boolean userMutationRunning;
  private final AutoCloseable roleRefreshSubscription; private volatile List<UserServicePort.FirmWideRoleDefinition> firmWideRoles=List.of(); private final Map<Integer,List<UserServicePort.FirmWideRoleAssignment>> assignmentsByUser=new HashMap<>();
  UserManagementPane(UserDao dao,Executor executor,CommittedChangeTracker changes,int tenantId,int actorUserId){this.userDao=Objects.requireNonNull(dao);this.userService=new UserServiceAdapter(dao);this.settingsLoadExecutor=Objects.requireNonNull(executor);this.changes=Objects.requireNonNull(changes);if(tenantId<=0||actorUserId<=0)throw new IllegalArgumentException("Tenant and actor context are required.");this.tenantId=tenantId;this.actorUserId=actorUserId;this.roleRefreshSubscription=FirmWideRoleDefinitionRefresh.subscribe(changedTenant->{if(changedTenant==tenantId&&!disposed.get())loadManagedUsersAsync("Firm-wide role choices refreshed.");});userSearchField.setPromptText("Search name, email, initials, or role");HBox.setHgrow(userSearchField,Priority.ALWAYS);HBox filters=new HBox(10,userSearchField,showInactiveUsersCheck);filters.setAlignment(Pos.CENTER_LEFT);HBox createActions=new HBox(8,addUserButton);VBox header=new VBox(10,filters,createActions);header.getStyleClass().add("user-window-section");userManagementTable.getColumns().setAll(userNameColumn,userEmailColumn,userInitialsColumn,userRolesColumn,userStatusColumn);userManagementTable.setFixedCellSize(36);userManagementTable.setMinHeight(120);userManagementTable.setPrefHeight(430);userManagementTable.setMaxHeight(Double.MAX_VALUE);userManagementTable.getStyleClass().add("shale-table");actionToolbar.getChildren().setAll(editUserButton,deactivateUserButton,reactivateUserButton,resetPasswordButton,refreshUsersButton,removeUserButton);actionToolbar.setAlignment(Pos.CENTER_LEFT);VBox footer=new VBox(8,actionToolbar,userManagementStatusLabel);footer.getStyleClass().add("user-window-footer");userManagementStatusLabel.getStyleClass().add("user-window-metadata");root.setTop(header);root.setCenter(userManagementTable);root.setBottom(footer);BorderPane.setMargin(userManagementTable,new javafx.geometry.Insets(10,0,10,0));root.getStyleClass().addAll("strong-panel","user-window-root","user-management-window");addUserButton.setOnAction(e->onAddUser());editUserButton.setOnAction(e->onEditUser());refreshUsersButton.setOnAction(e->onRefreshUsers());removeUserButton.setOnAction(e->onRemoveUserFromTenant());deactivateUserButton.setOnAction(e->onDeactivateUser());reactivateUserButton.setOnAction(e->onReactivateUser());resetPasswordButton.setOnAction(e->onResetUserPassword());showInactiveUsersCheck.setOnAction(e->onToggleInactiveUsers());configureSemanticButtons();configureUserManagementTable();updateUserActionButtons(null);}
- Node node(){return root;} boolean mutationInFlight(){return userMutationRunning;} void open(){loadManagedUsersAsync(null);} void dispose(){disposed.set(true);userManagementLoadGeneration++;try{roleRefreshSubscription.close();}catch(Exception ignored){/* no-op subscription close */}} int tenantId(){return tenantId;} int actorUserId(){return actorUserId;}
+ Node node(){return root;} boolean mutationInFlight(){return userMutationRunning;} void open(){loadManagedUsersAsync(null);} void dispose(){pendingCreate=null;failedEditDrafts.clear();disposed.set(true);userManagementLoadGeneration++;try{roleRefreshSubscription.close();}catch(Exception ignored){/* no-op subscription close */}} int tenantId(){return tenantId;} int actorUserId(){return actorUserId;}
  private void configureSemanticButtons(){ControlStyles.apply(addUserButton,ControlStyles.Purpose.PRIMARY);ControlStyles.apply(editUserButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(deactivateUserButton,ControlStyles.Purpose.DANGER);ControlStyles.apply(reactivateUserButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(resetPasswordButton,ControlStyles.Purpose.SECONDARY);ControlStyles.apply(refreshUsersButton,ControlStyles.Purpose.GHOST);ControlStyles.apply(removeUserButton,ControlStyles.Purpose.DANGER);}
- private static String fxColorToDb(Color c){Color x=c==null?DEFAULT_STATUS_COLOR:c;return String.format("#%02X%02X%02X",byteOf(x.getRed()),byteOf(x.getGreen()),byteOf(x.getBlue()));} private static int byteOf(double v){return Math.max(0,Math.min(255,(int)Math.round(v*255)));} private static Color dbColorToFx(String v){try{return v!=null&&v.matches("(?i)^#[0-9a-f]{6}$")?Color.web(v):DEFAULT_STATUS_COLOR;}catch(RuntimeException e){return DEFAULT_STATUS_COLOR;}} private static String rootMessage(Throwable ex){return "User management operation could not be completed.";}
+ private static String fxColorToDb(Color c){Color x=c==null?DEFAULT_STATUS_COLOR:c;return String.format("#%02X%02X%02X",byteOf(x.getRed()),byteOf(x.getGreen()),byteOf(x.getBlue()));} private static int byteOf(double v){return Math.max(0,Math.min(255,(int)Math.round(v*255)));} private static Color dbColorToFx(String v){try{return v!=null&&v.matches("(?i)^#[0-9a-f]{6}$")?Color.web(v):DEFAULT_STATUS_COLOR;}catch(RuntimeException e){return DEFAULT_STATUS_COLOR;}} private static String rootMessage(Throwable ex){return ex instanceof com.shale.core.validation.FieldValidationException invalid?invalid.getMessage():"User management operation could not be completed. Reopen the form to review your retained draft.";}
 
-    private void onAddUser() { showAddUserDialog().ifPresent(request -> mutate("Adding user…", "User added.", () -> userDao.createUser(request))); }
+    private void onAddUser() { showAddUserDialog().ifPresent(request -> {pendingCreate=request;mutate("Adding user…", "User added.", () -> {userDao.createUser(request);Platform.runLater(()->pendingCreate=null);});}); }
 
 
 
@@ -83,8 +84,10 @@ public final class UserManagementPane {
 		Label guidance=new Label("Create an active user in the current tenant. Temporary password and application roles are administrator-only."); guidance.getStyleClass().add("user-window-guidance"); guidance.setWrapText(true);
 		VBox content=new VBox(12,guidance,grid); content.getStyleClass().add("user-window-root");
 		dialog.getDialogPane().setContent(content);
+        if(pendingCreate!=null){firstName.setText(pendingCreate.firstName());lastName.setText(pendingCreate.lastName());email.setText(pendingCreate.email());password.setText(pendingCreate.temporaryPassword());initials.setText(pendingCreate.initials());colorPicker.setValue(dbColorToFx(pendingCreate.color()));attorney.setSelected(pendingCreate.attorney());admin.setSelected(pendingCreate.admin());}
 		styleDialogLabels(grid);
 		configureDialogButtons(dialog, ButtonType.OK, ButtonType.CANCEL);
+        dialog.getDialogPane().lookupButton(ButtonType.OK).addEventFilter(ActionEvent.ACTION,event->{if(!validateAddUserEmail(email,emailValidation).isBlank()){email.requestFocus();event.consume();}});
 		dialog.setResultConverter(button ->
 		{
 			if (button != ButtonType.OK)
@@ -110,7 +113,8 @@ public final class UserManagementPane {
 		}
 	}
 
-    private String validateAddUserEmail(TextField field, Label label) { String email=UserDao.normalizeEmail(trim(field==null?null:field.getText()));String message=email.contains("@")?"":"Enter a valid email address.";if(label!=null)label.setText(message);return message;}
+    private String validateAddUserEmail(TextField field,Label label){String message="";try{ContactValues.INSTANCE.email(field.getText(),true,"email");}catch(IllegalArgumentException invalid){message=invalid.getMessage();}ControlStyles.setInvalid(field,!message.isEmpty());if(label!=null)label.setText(message);return message;}
+
 
     private void applyUserFilter() {
 		if (userManagementTable == null)
@@ -128,8 +132,10 @@ public final class UserManagementPane {
 
     private void onRemoveUserFromTenant() { UserManagementViewRow selected=selectedManagedUser();if(selected==null||userMutationRunning)return;if(AppDialogs.showConfirmation(null,"Remove from Tenant","Remove "+selected.name()+" from this tenant?","They will no longer be able to sign in. Historical records will be preserved.","Remove from Tenant",AppDialogs.DialogActionKind.DANGER))mutate("Removing user from tenant…","User removed from tenant.",()->userDao.removeUserFromTenant(selected.id(),selected.rowVer()));}
 
+    private final Map<Integer,UserEdit> failedEditDrafts=new java.util.HashMap<>();
+    private UserDao.UserCreateRequest pendingCreate;
     private record UserEdit(UserDao.UserUpdateRequest profile,Set<Integer> customRoleIds){}
-    private void onEditUser() { UserManagementViewRow selected=selectedManagedUser();if(selected==null||userMutationRunning)return;showEditUserDialog(selected).ifPresent(request->mutate("Saving changes…","User updated.",()->{userDao.updateManagedUser(request.profile());reconcileCustomRoles(selected.id(),request.customRoleIds());}));}
+    private void onEditUser() { UserManagementViewRow selected=selectedManagedUser();if(selected==null||userMutationRunning)return;showEditUserDialog(selected).ifPresent(request->{failedEditDrafts.put(selected.id(),request);mutate("Saving changes…","User updated.",()->{userDao.updateManagedUser(request.profile());reconcileCustomRoles(selected.id(),request.customRoleIds());Platform.runLater(()->failedEditDrafts.remove(selected.id()));});});}
 
     private Optional<UserEdit> showEditUserDialog(UserManagementViewRow row) {
 		Dialog<UserEdit> d = new Dialog<>();
@@ -142,6 +148,11 @@ public final class UserManagementPane {
 		TextField first = ControlStyles.formControl(new TextField(row.firstName())), last = ControlStyles.formControl(new TextField(row.lastName())), email = ControlStyles
 				.formControl(new TextField(row.email())), phone = ControlStyles.formControl(new TextField(row.phone())), initials = ControlStyles.formControl(new TextField(row
 						.initials()));
+        TextField extension=ControlStyles.formControl(new TextField());
+        if(ContactValues.INSTANCE.usablePhone(row.phone(),null)){var v=ContactValues.INSTANCE.phone(row.phone(),null,false,"phone");if(v!=null){phone.setText(v.displayInput());extension.setText(v.extension());}}
+        String originalPhone=phone.getText(), originalExtension=extension.getText();
+        java.util.function.BooleanSupplier phoneRetained=()->java.util.Objects.equals(originalPhone,phone.getText())&&java.util.Objects.equals(originalExtension,extension.getText());
+        java.util.function.Supplier<String> phoneCandidate=()->{if(phoneRetained.getAsBoolean())return row.phone();var v=ContactValues.INSTANCE.phone(phone.getText(),extension.getText(),false,"phone");return v==null?null:v.displayInput()+(v.extension()==null?"":" ext. "+v.extension());};
 		ColorPicker color = ControlStyles.formControl(new ColorPicker(dbColorToFx(row.color())));
 		color.setAccessibleText("User color preview and selector");
 		color.getStyleClass().add("user-window-color-preview");
@@ -161,8 +172,9 @@ public final class UserManagementPane {
 		g.add(last, 1, 2);
 		g.add(new Label("Email / login"), 0, 3);
 		g.add(email, 1, 3);
-		g.add(new Label("Phone"), 0, 4);
-		g.add(phone, 1, 4);
+		g.add(new Label("Phone (US default; international +country code)"), 0, 4);
+		g.add(new VBox(4,phone,new Label("Extension (optional, 1–12 digits)"),extension,com.shale.ui.util.ContactFieldFeedback.phone(phone,extension,false,phoneRetained)), 1, 4);
+        g.add(com.shale.ui.util.ContactFieldFeedback.email(email,true,()->java.util.Objects.equals(email.getText(),row.email())),2,3);
 		g.add(new Label("Initials"), 0, 5);
 		g.add(initials, 1, 5);
 		g.add(new Label("User color"), 0, 6);
@@ -174,7 +186,8 @@ public final class UserManagementPane {
 		g.add(new Label("User ID " + row.id() + " · Status " + row.getStatus() + " (managed separately)"), 0, 11, 2, 1);
 		Label guidance=new Label("Update this user's identity, contact information, appearance, and application roles. Lifecycle and password actions remain separate."); guidance.getStyleClass().add("user-window-guidance"); guidance.setWrapText(true);
 		VBox content=new VBox(12,guidance,g); content.getStyleClass().add("user-window-root");
-		d.getDialogPane().setContent(content);
+		d.getDialogPane().setContent(content);com.shale.ui.util.ContactFieldFeedback.trackSummary(g,guidance);
+        UserEdit draft=failedEditDrafts.get(row.id());if(draft!=null){var p=draft.profile();first.setText(p.firstName());last.setText(p.lastName());email.setText(p.email());phone.setText(p.phone());extension.setText("");initials.setText(p.initials());color.setValue(dbColorToFx(p.color()));attorney.setSelected(p.roleIds().contains(com.shale.core.semantics.RoleSemantics.ROLE_ATTORNEY));admin.setSelected(p.roleIds().contains(com.shale.core.semantics.RoleSemantics.ROLE_ADMIN));guidance.setText("Your previous draft is retained. Reloaded changes still require review before saving.");}
 		styleDialogLabels(g);
 		g.getChildren().stream().filter(n->n instanceof Label label&&label.getText()!=null&&label.getText().startsWith("User ID ")).forEach(n->n.getStyleClass().add("user-window-metadata"));
 		ControlStyles.apply((ButtonBase) d.getDialogPane().lookupButton(save), ControlStyles.Purpose.PRIMARY);
@@ -182,12 +195,12 @@ public final class UserManagementPane {
 		Node saveButton = d.getDialogPane().lookupButton(save);
 		saveButton.addEventFilter(ActionEvent.ACTION, e ->
 		{
-			boolean invalid = trim(first.getText()).isBlank() || trim(last.getText()).isBlank() || !UserDao.normalizeEmail(email.getText()).contains("@");
-			ControlStyles.setInvalid(first, trim(first.getText()).isBlank());
-			ControlStyles.setInvalid(last, trim(last.getText()).isBlank());
-			ControlStyles.setInvalid(email, !UserDao.normalizeEmail(email.getText()).contains("@"));
-			if (invalid)
-				e.consume();
+            try {
+                if(trim(first.getText()).isBlank()){ControlStyles.setInvalid(first,true);first.requestFocus();e.consume();return;}
+                if(trim(last.getText()).isBlank()){ControlStyles.setInvalid(last,true);last.requestFocus();e.consume();return;}
+                if(!java.util.Objects.equals(email.getText(),row.email()))ContactValues.INSTANCE.email(email.getText(),true,"email");
+                phoneCandidate.get();
+            } catch(com.shale.core.validation.FieldValidationException invalid){com.shale.ui.util.ContactFieldFeedback.focus(g,invalid);guidance.setText(invalid.getMessage());e.consume();}
 		});
 		d.setResultConverter(b ->
 		{
@@ -198,7 +211,7 @@ public final class UserManagementPane {
 				roles.add(com.shale.core.semantics.RoleSemantics.ROLE_ADMIN);
 			if (attorney.isSelected())
 				roles.add(com.shale.core.semantics.RoleSemantics.ROLE_ATTORNEY);
-			return new UserEdit(new UserDao.UserUpdateRequest(row.id(), row.rowVer(), first.getText(), last.getText(), email.getText(), phone.getText(), initials.getText(), fxColorToDb(color
+			return new UserEdit(new UserDao.UserUpdateRequest(row.id(), row.rowVer(), first.getText(), last.getText(), email.getText(), phoneCandidate.get(), initials.getText(), fxColorToDb(color
 					.getValue()), roles),Set.copyOf(selectedCustom));
 		});
 		return d.showAndWait();

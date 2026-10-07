@@ -148,6 +148,8 @@ export interface OrganizationRelatedCase {
 }
 
 export interface CreateOrganizationRequest {
+  phoneExtension?: string | null;
+  faxExtension?: string | null;
   name: string;
   phone?: string | null;
   fax?: string | null;
@@ -163,10 +165,11 @@ export interface CreateOrganizationRequest {
 }
 
 export interface UpdateOrganizationDetailsRequest {
+  rowVer: string | null;
   name: string;
-  phone?: string | null;
-  fax?: string | null;
-  email?: string | null;
+  phone?: ValueUpdate;
+  fax?: ValueUpdate;
+  email?: ValueUpdate;
   website?: string | null;
   address1?: string | null;
   address2?: string | null;
@@ -178,6 +181,9 @@ export interface UpdateOrganizationDetailsRequest {
 }
 
 export interface OrganizationDetail {
+  phoneExtension?: string | null;
+  faxExtension?: string | null;
+  rowVer: string | null;
   id: number;
   shaleClientId: number;
   organizationTypeId: number | null;
@@ -198,6 +204,8 @@ export interface OrganizationDetail {
 }
 
 export interface ContactDetail {
+  phoneExtension?: string | null;
+  updatedAt: string | null;
   id: number;
   shaleClientId: number;
   name: string | null;
@@ -214,6 +222,7 @@ export interface ContactDetail {
 }
 
 export interface CreateContactRequest {
+  phoneExtension?: string | null;
   name: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -226,11 +235,12 @@ export interface CreateContactRequest {
 }
 
 export interface UpdateContactDetailsRequest {
+  expectedUpdatedAt: string | null;
   name: string | null;
   firstName: string | null;
   lastName: string | null;
-  email: string | null;
-  phone: string | null;
+  email: ValueUpdate;
+  phone: ValueUpdate;
   address: string | null;
   dateOfBirth: string | null;
   condition: string | null;
@@ -334,8 +344,26 @@ export async function listEffectiveCaseDateTypes(accessToken: string): Promise<s
   return response.json() as Promise<string[]>;
 }
 
+export interface ValueUpdate { action: 'RETAIN' | 'SET' | 'CLEAR'; value?: string; extension?: string }
+export function contactValueUpdate(value: string, baseline: string | null, extension?: string, baselineExtension?: string | null): ValueUpdate {
+  if (value === (baseline ?? '') && (extension === undefined || extension === (baselineExtension ?? ''))) return { action: 'RETAIN' };
+  return value.trim() || extension?.trim() ? { action: 'SET', value, extension } : { action: 'CLEAR' };
+}
+async function validationFailure(response: Response): Promise<ApiError> {
+  const body = await response.json().catch(() => ({})) as { message?: string; fieldErrors?: FieldError[] };
+  const errors = Array.isArray(body.fieldErrors) ? body.fieldErrors.filter(e => typeof e.field === 'string' && typeof e.message === 'string') : [];
+  return new ApiError(errors.length ? errors.map(e => e.message).join(' ') : 'Check the details and try again.', response.status, errors);
+}
+export async function validateContactValue(token: string, kind: 'phone' | 'email', value: string, extension?: string): Promise<{ preview?: string; displayInput?: string; extension?: string | null } | null> {
+  const response = await fetch(`${apiBaseUrl()}/api/validation/contact-value`, {method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({kind,value,extension})});
+  if (response.status === 400) throw await validationFailure(response);
+  if (!response.ok) throw new ApiError('Validation is temporarily unavailable. Save will validate this field.',response.status);
+  return response.json() as Promise<{ preview?: string; displayInput?: string; extension?: string | null } | null>;
+}
+
+export interface FieldError { field: string; code: string; message: string }
 export class ApiError extends Error {
-  constructor(message: string, public readonly status: number) {
+  constructor(message: string, public readonly status: number, public readonly fieldErrors: FieldError[] = []) {
     super(message);
     this.name = 'ApiError';
   }
@@ -741,7 +769,7 @@ export async function createContact(accessToken: string, request: CreateContactR
   });
 
   if (response.status === 400) {
-    throw new ApiError('Check the contact details and try again.', response.status);
+    throw await validationFailure(response);
   }
 
   if (!response.ok) {
@@ -752,18 +780,18 @@ export async function createContact(accessToken: string, request: CreateContactR
 }
 
 export async function updateContactDetails(accessToken: string, contactId: number, request: UpdateContactDetailsRequest): Promise<ContactDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/contacts/${contactId}`, {
+  const response = await fetch(`${apiBaseUrl()}/api/v2/contacts/${contactId}`, {
     method: 'PATCH',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify(request),
+    body: JSON.stringify({ details: { ...request, phone: undefined, email: undefined }, expectedUpdatedAt: request.expectedUpdatedAt, phone: request.phone, email: request.email }),
   });
 
   if (response.status === 400) {
-    throw new ApiError('Check the contact details and try again.', response.status);
+    throw await validationFailure(response);
   }
 
   if (response.status === 404) {
@@ -810,7 +838,7 @@ export async function createOrganization(accessToken: string, request: CreateOrg
   });
 
   if (response.status === 400) {
-    throw new ApiError('Check the organization details and try again.', response.status);
+    throw await validationFailure(response);
   }
 
   if (!response.ok) {
@@ -837,18 +865,18 @@ export async function searchOrganizations(accessToken: string, query: string): P
 }
 
 export async function updateOrganizationDetails(accessToken: string, organizationId: number, request: UpdateOrganizationDetailsRequest): Promise<OrganizationDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/organizations/${organizationId}`, {
+  const response = await fetch(`${apiBaseUrl()}/api/v2/organizations/${organizationId}`, {
     method: 'PATCH',
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify(request),
+    body: JSON.stringify({ details: { ...request, phone: undefined, fax: undefined, email: undefined }, rowVer: request.rowVer, phone: request.phone, fax: request.fax, email: request.email }),
   });
 
   if (response.status === 400) {
-    throw new ApiError('Check the organization details and try again.', response.status);
+    throw await validationFailure(response);
   }
 
   if (response.status === 404) {

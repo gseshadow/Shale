@@ -52,8 +52,9 @@ public final class SearchService {
 	private final UserDao userDao;
 	private final TaskDao taskDao;
 	private final CalendarEventDao calendarEventDao;
+	private final com.shale.data.dao.SuggestionDao suggestionDao;
 
-	public SearchService(CaseDao caseDao, CaseSummaryDao caseSummaryDao, ContactDao contactDao, OrganizationDao organizationDao, UserDao userDao, TaskDao taskDao, CalendarEventDao calendarEventDao) {
+	public SearchService(CaseDao caseDao, CaseSummaryDao caseSummaryDao, ContactDao contactDao, OrganizationDao organizationDao, UserDao userDao, TaskDao taskDao, CalendarEventDao calendarEventDao, com.shale.data.dao.SuggestionDao suggestionDao) {
 		this.caseDao = Objects.requireNonNull(caseDao, "caseDao");
 		this.caseSummaryDao = Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
 		this.contactDao = Objects.requireNonNull(contactDao, "contactDao");
@@ -61,6 +62,7 @@ public final class SearchService {
 		this.userDao = Objects.requireNonNull(userDao, "userDao");
 		this.taskDao = Objects.requireNonNull(taskDao, "taskDao");
 		this.calendarEventDao = Objects.requireNonNull(calendarEventDao, "calendarEventDao");
+		this.suggestionDao = Objects.requireNonNull(suggestionDao, "suggestionDao");
 	}
 
 	public SearchResults searchAll(int shaleClientId, Integer currentUserId, String query, boolean includeDeletedCases) {
@@ -84,6 +86,65 @@ public final class SearchService {
 		List<CalendarEventDao.GlobalSearchCalendarEventRow> calendarEvents = provider("calendarEvents", failures, () -> sortResults(calendarEventDao.searchCalendarEvents(shaleClientId, searchQuery.rawQuery()), row -> weightedTextScore(searchQuery, row.title(), CASE_NAME_WEIGHT), CalendarEventDao.GlobalSearchCalendarEventRow::title, row -> Integer.toString(row.calendarEventId())));
 		return new SearchResults(searchQuery.rawQuery(), cases, deletedCases, caseCardDates, contacts, organizations, users, tasks, calendarEvents, failures);
 	}
+
+    public enum SuggestionType {
+        CASE("Cases"), CONTACT("Contacts"), ORGANIZATION("Organizations"), USER("Users"),
+        TASK("Tasks"), CALENDAR_EVENT("Calendar Events"), DELETED_CASE("Deleted Cases");
+        private final String label;
+        SuggestionType(String label) { this.label = label; }
+        public String label() { return label; }
+    }
+
+    public record Suggestion(SuggestionType type, long id, String name, String detail, int matchRank) { }
+    public record Suggestions(List<Suggestion> rows, boolean failed) {
+        public Suggestions { rows = List.copyOf(rows); }
+    }
+    public static final int SUGGESTIONS_PER_CATEGORY = 3;
+    public static final int SUGGESTIONS_TOTAL = 18;
+
+    /** Suggestions have their own narrow query path; full search keeps its broader DAO reads. */
+    public Suggestions suggest(int tenant, String query, boolean includeDeleted,
+            java.util.function.BooleanSupplier current) {
+        return suggest(tenant, query, includeDeleted, current, ignored -> { });
+    }
+
+    public Suggestions suggest(int tenant, String query, boolean includeDeleted,
+            java.util.function.BooleanSupplier current, java.util.function.Consumer<Runnable> cancellation) {
+        long started = com.shale.core.util.PerformanceLogging.start();
+        var result = suggestionDao.search(tenant, query, includeDeleted, SUGGESTIONS_PER_CATEGORY, SUGGESTIONS_TOTAL,
+                null, null, current, cancellation);
+        var rows = orderSuggestions(result.rows().stream().map(SearchService::suggestionRow).toList(),
+                SUGGESTIONS_PER_CATEGORY, SUGGESTIONS_TOTAL);
+        com.shale.data.dao.SearchPerformance.log(LOG, "suggestions_total", 0, "all", rows.size(),
+                com.shale.core.util.PerformanceLogging.elapsedMs(started));
+        return new Suggestions(rows, result.failed());
+    }
+
+    /** Recheck the selected ID with exactly the same identifying fields and visibility rules. */
+    public boolean suggestionAvailable(int tenant, String query, Suggestion row, boolean includeDeleted) {
+        if (row.type() == SuggestionType.DELETED_CASE && !includeDeleted) return false;
+        return !suggestionDao.search(tenant, query, includeDeleted, 1, 1,
+                com.shale.data.dao.SuggestionDao.Category.valueOf(row.type().name()), row.id(),
+                () -> true, ignored -> { }).rows().isEmpty();
+    }
+
+    private static Suggestion suggestionRow(com.shale.data.dao.SuggestionDao.Row row) {
+        return new Suggestion(SuggestionType.valueOf(row.category().name()), row.id(), safeText(row.name()),
+                details(row.detail(), "#" + row.id()), row.rank());
+    }
+
+    static List<Suggestion> orderSuggestions(List<Suggestion> rows, int perCategory, int total) {
+        var counts = new java.util.EnumMap<SuggestionType, Integer>(SuggestionType.class);
+        return rows.stream().sorted(Comparator.comparing(Suggestion::type).thenComparingInt(Suggestion::matchRank)
+            .thenComparing(Suggestion::name, String.CASE_INSENSITIVE_ORDER).thenComparingLong(Suggestion::id))
+            .filter(row -> counts.merge(row.type(), 1, Integer::sum) <= perCategory).limit(total).toList();
+    }
+
+    private static String safeText(String text) { return text == null ? "" : text.trim(); }
+    private static String details(String... values) {
+        return java.util.Arrays.stream(values).map(SearchService::safeText).filter(v -> !v.isBlank())
+            .collect(java.util.stream.Collectors.joining(" · "));
+    }
 
 	private static <K,V> Map<K,V> providerMap(String provider, List<ProviderFailure> failures, java.util.function.Supplier<Map<K,V>> loader) {
 		try { return Map.copyOf(loader.get()); }

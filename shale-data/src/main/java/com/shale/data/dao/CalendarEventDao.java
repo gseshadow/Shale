@@ -140,6 +140,10 @@ public final class CalendarEventDao {
 
 
     public List<GlobalSearchCalendarEventRow> searchCalendarEvents(int shaleClientId, String query) {
+        return searchCalendarEvents(shaleClientId, query, null);
+    }
+
+    public List<GlobalSearchCalendarEventRow> searchCalendarEvents(int shaleClientId, String query, SuggestionBounds bounds) {
         if (shaleClientId <= 0) {
             throw new IllegalArgumentException("shaleClientId must be > 0");
         }
@@ -158,11 +162,12 @@ public final class CalendarEventDao {
                   AND (e.Title LIKE ? OR e.Description LIKE ? OR c.Name LIKE ?)
                 ORDER BY e.StartsAt ASC, e.CalendarEventId ASC;
                 """;
-        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+        try (Connection con = db.requireConnection(); PreparedStatement ps = con.prepareStatement(bounds == null ? sql : bounds.sql(sql, "Title", "CalendarEventId", List.of("Title", "Description", "CaseName"), List.of()))) {
             ps.setInt(1, shaleClientId);
             ps.setString(2, like);
             ps.setString(3, like);
             ps.setString(4, like);
+            if (bounds != null) bounds.bind(ps, 5, query, List.of("Title", "Description", "CaseName"), List.of());
             try (ResultSet rs = ps.executeQuery()) {
                 List<GlobalSearchCalendarEventRow> rows = new ArrayList<>();
                 while (rs.next()) {

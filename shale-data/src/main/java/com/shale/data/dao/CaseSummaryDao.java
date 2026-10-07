@@ -438,6 +438,10 @@ public final class CaseSummaryDao {
 	 * case-insensitive literal substring of Case name, with no result cap.
 	 */
 	public List<SearchCaseRow> searchActiveByName(int requestedTenantId, String query) {
+		return searchActiveByName(requestedTenantId, query, null);
+	}
+
+	public List<SearchCaseRow> searchActiveByName(int requestedTenantId, String query, SuggestionBounds bounds) {
 		if (requestedTenantId <= 0) throw new IllegalArgumentException("requestedTenantId must be > 0");
 		String normalized = query == null ? "" : query.strip().toLowerCase(java.util.Locale.ROOT);
 		if (normalized.isBlank()) return List.of();
@@ -477,12 +481,13 @@ public final class CaseSummaryDao {
 				WHERE c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0 AND LOWER(COALESCE(c.Name,'')) LIKE ?
 				ORDER BY c.Name ASC,c.Id ASC
 				""".formatted(statusApplySql());
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
+			try (PreparedStatement ps = con.prepareStatement(bounds == null ? sql : bounds.sql(sql, "Name", "Id", List.of("Name"), List.of()))) {
 				ps.setInt(1, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(2, RoleSemantics.ROLE_LEGAL_ASSISTANT);
 				ps.setInt(3, requestedTenantId);
 				ps.setString(4, "%" + escapeLike(normalized) + "%");
 				List<SearchCaseRow> rows = new ArrayList<>();
+				if (bounds != null) bounds.bind(ps, 5, query, List.of("Name"), List.of());
 				try (ResultSet rs=ps.executeQuery()) { while (rs.next()) rows.add(new SearchCaseRow(
 						mapGridSummary(rs), localDate(rs,"IntakeDate"), localDate(rs,"StatuteDate"),
 						localDate(rs,"TortDate"), rs.getString("PracticeAreaColor"),
@@ -553,6 +558,10 @@ public final class CaseSummaryDao {
 	 * case-name-only literal substring contract while selecting deletion explicitly.
 	 */
 	public List<DeletedCaseRow> searchDeletedByName(int requestedTenantId, String query) {
+		return searchDeletedByName(requestedTenantId, query, null);
+	}
+
+	public List<DeletedCaseRow> searchDeletedByName(int requestedTenantId, String query, SuggestionBounds bounds) {
 		if (requestedTenantId <= 0) throw new IllegalArgumentException("requestedTenantId must be > 0");
 		String normalized = query == null ? "" : query.strip().toLowerCase(java.util.Locale.ROOT);
 		if (normalized.isBlank()) return List.of();
@@ -592,12 +601,13 @@ public final class CaseSummaryDao {
 				WHERE c.ShaleClientId=? AND c.IsDeleted = 1 AND LOWER(COALESCE(c.Name,'')) LIKE ?
 				ORDER BY c.Name ASC,c.Id ASC
 				""".formatted(statusApplySql());
-			try (PreparedStatement ps = con.prepareStatement(sql)) {
+			try (PreparedStatement ps = con.prepareStatement(bounds == null ? sql : bounds.sql(sql, "Name", "Id", List.of("Name"), List.of()))) {
 				ps.setInt(1, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY);
 				ps.setInt(2, RoleSemantics.ROLE_LEGAL_ASSISTANT);
 				ps.setInt(3, requestedTenantId);
 				ps.setString(4, "%" + escapeLike(normalized) + "%");
 				List<DeletedCaseRow> rows = new ArrayList<>();
+				if (bounds != null) bounds.bind(ps, 5, query, List.of("Name"), List.of());
 				try (ResultSet rs=ps.executeQuery()) { while (rs.next()) rows.add(new DeletedCaseRow(
 						mapGridSummary(rs), localDate(rs,"IntakeDate"), localDate(rs,"StatuteDate"),
 						localDate(rs,"TortDate"), rs.getString("PracticeAreaColor"),

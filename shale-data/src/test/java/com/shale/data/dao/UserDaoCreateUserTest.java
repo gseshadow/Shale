@@ -55,7 +55,7 @@ final class UserDaoCreateUserTest {
 		String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/UserDao.java"));
 
 		assertTrue(source.contains("int shaleClientId = requireCurrentShaleClientId(con);"));
-		assertTrue(source.contains("requireCurrentAdmin(con, shaleClientId);"));
+		assertTrue(source.contains("int actor = requireCurrentAdmin(con, shaleClientId);"));
 		assertTrue(source.contains("ps.setInt(idx++, shaleClientId);"),
 				"Inserted ShaleClientId must come from current session context, not the create request/UI.");
 		assertTrue(source.contains("SESSION_CONTEXT(N'PrincipalUserId')"));
@@ -74,7 +74,7 @@ final class UserDaoCreateUserTest {
 	void userManagementActionsAreTenantScopedAndUseSoftDeleteAndBcrypt() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/com/shale/data/dao/UserDao.java"));
 
-		assertTrue(source.contains("findExistingEmail(con, shaleClientId, email)"),
+		assertTrue(source.contains("findExistingEmail(con, shaleClientId, normalizeEmail(email))"),
 				"Create must re-check duplicate normalized email on the server before insert.");
 		assertTrue(source.contains("WHERE ShaleClientId = ?"),
 				"Management queries/actions must be tenant-scoped.");

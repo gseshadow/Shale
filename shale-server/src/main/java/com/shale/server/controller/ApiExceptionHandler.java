@@ -27,6 +27,11 @@ import jakarta.validation.ConstraintViolationException;
 public final class ApiExceptionHandler {
 	private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
+    @ExceptionHandler(com.shale.core.validation.FieldValidationException.class)
+    ResponseEntity<ApiErrorResponse> handleFieldValidation(com.shale.core.validation.FieldValidationException ex,HttpServletRequest request){
+        return ResponseEntity.badRequest().body(new ApiErrorResponse(Instant.now(),400,"validation_failed",ex.getMessage(),request.getRequestURI(),ex.errors()));
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<ApiErrorResponse> handleResponseStatus(ResponseStatusException ex, HttpServletRequest request) {
         HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
@@ -35,20 +40,21 @@ public final class ApiExceptionHandler {
 
     @ExceptionHandler({
             BindException.class,
+            org.springframework.http.converter.HttpMessageNotReadableException.class,
             ConstraintViolationException.class,
             MissingServletRequestParameterException.class,
             MethodArgumentTypeMismatchException.class
     })
     ResponseEntity<ApiErrorResponse> handleInvalidRequest(Exception ex, HttpServletRequest request) {
         log.error("Invalid request exceptionClass={} requestUri={}.",
-                ex.getClass().getName(), request.getRequestURI(), ex);
+                ex.getClass().getName(), request.getRequestURI(), sanitizedThrowable(ex));
         return error(HttpStatus.BAD_REQUEST, "Invalid request.", request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
         log.error("Invalid request exceptionClass={} requestUri={}.",
-                ex.getClass().getName(), request.getRequestURI(), ex);
+                ex.getClass().getName(), request.getRequestURI(), sanitizedThrowable(ex));
         return error(HttpStatus.BAD_REQUEST, "Invalid request.", request);
     }
 
