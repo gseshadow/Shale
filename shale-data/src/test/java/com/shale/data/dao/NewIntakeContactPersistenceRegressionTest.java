@@ -327,6 +327,18 @@ final class NewIntakeContactPersistenceRegressionTest {
         for(var write:writes){assertEquals("UNKNOWN",write.bindings.get(5));assertEquals(7,write.bindings.get(1));assertEquals(101,write.bindings.get(3));assertEquals(9,write.bindings.get(6));}
     }
 
+    @Test void intakeDirectWriterExtractsAndFormatsApprovedUsLengthsAndExtensions() throws Exception {
+        for(String input:List.of("Call: (505) 903 3568 x001","(903) 3568 x001","1-505-903-3568 x001")) {
+            List<Execution> writes=new ArrayList<>();
+            invokeContactPoints(dao(),recordingConnection(writes,null),request(),101,input,null,null);
+            var phone=writes.stream().filter(write->write.sql.startsWith("INSERT dbo.ContactPhoneNumbers")).findFirst().orElseThrow();
+            var expected=com.shale.data.validation.ContactValues.INSTANCE.phone(input,null,true,"phone");
+            assertEquals(expected.displayInput(),phone.bindings.get(4));assertEquals(expected.normalizedNumber(),phone.bindings.get(5));assertEquals("001",phone.bindings.get(6));
+        }
+        assertDoesNotThrow(()->CaseDao.validateIntakeContactValues(withValues(Map.of("clientPhone","Call: 9033568","callerPhone","1-505-903-3568"))));
+        assertThrows(IllegalArgumentException.class,()->CaseDao.validateIntakeContactValues(withValues(Map.of("callerPhone","2-505-903-3568"))));
+    }
+
     private static CaseDao.NewIntakeCreateRequest request() {
         return new CaseDao.NewIntakeCreateRequest(7, "Intake", LocalDate.of(2026, 9, 1), LocalTime.NOON,
                 false, 1, 2, "description", "summary", null, null, null, null, null,

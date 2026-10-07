@@ -581,3 +581,45 @@ and both roles keep all phone controls beneath Phone Number before Email. Safe C
 a full number, and local previews explain the missing area code. No new migration, backfill,
 audit/API redesign or legacy rewrite is part of this follow-up. See the rollout document for the
 new examples, storage/deployment implications and manual acceptance checks.
+
+
+### Phone-entry consistency after PR #1826
+
+This follow-up starts from current `origin/codex/latest` at
+`045074d48b57799efa3d3bc14e2be6cb3bd0d474`. It preserves PR #1825's authoritative
+baselines/tokens/history/audits and PR #1826's local-number results, unavailable reasons,
+intake grouping/error synchronization and safe communication behavior. Historical prose-rejection
+and raw-display recommendations above are superseded by the approved US digit-extraction/formatting
+contract in the [rollout record](phone-email-validation-rollout.md#shared-behavior).
+
+| Reachable location / boundary | Coverage and preserved contracts |
+| --- | --- |
+| Client and independent Caller intake; create and duplicate merge | `NewIntakeController` formats the blurred role (all active roles at Save), extracts inline extensions and preserves unavailable reasons/copying/drafts. `CaseDao` existing shared parser enforces formatted main/separate extension, whole-number duplicate keys, authorization, observation/audit transaction and ordering. |
+| Contact directory create/complete editor and basic writes | `ContactViewController.PhoneEditor` formats changed staged rows and checks canonical whole-number+extension duplicates, keeping locals/full distinct. Nested and outer summaries clear after corrected validation. `ContactDao` basic create/update formats new/changed values and checks active peers under tenant/Contact locks; complete `ContactMutationDao` retains authoritative exact-set/history/token/audit checks. |
+| Embedded basic Contact dialog | `CreateContactDialog` uses shared unrestricted blur formatting, extension handling, first-error focus and selective summary clearing. It remains dormant in current inventory; no new navigation is added. Embedded name-only creators supply no phone. |
+| Organization create/edit; voice and fax; structured/scalar compatibility | Shared `OrganizationAggregateEditor` formats staged rows, compares parsed whole-number+extension+kind keys and clears nested/outer phone errors. Existing aggregate/reconciler handles direct API/DAO/scalar writes, mirror synchronization, tokens and transaction audits. |
+| User administration / User View pencil and whole-profile | Existing `ContactFieldFeedback` bindings now format changed phones and clear their summaries; existing candidates retain original scalar values for unchanged baseline controls. `UserDao.validatedUserPhone` applies the shared parser at admin/basic writes. Add User currently has no phone entry; required email/account lifecycle remains unchanged. |
+| Browser Contact and Organization create/edit, including fax | Extracted `ContactValueInput.tsx` reuses server parser outputs for blur formatting and extension separation, preserves errors/drafts while typing, ignores stale responses and clears only corrected server field errors from summaries. Successful Save returns DAO-formatted values. V1 and v2 request ownership/retain/clear/concurrency contracts remain intact. |
+| Additional producers and communication actions | Service/adapter, intake merge, authoritative DAOs and existing validated Call paths share the parser. Search digit cleanup remains search-only. No reachable general phone importer/bulk editor or extra human-contact settings field was found; technical fields and email/auth grammar are outside this task. |
+
+Pre-edit tests reviewed: `ContactValuesTest`, `ContactBasicPointValidationTest`,
+`ContactLegacyValidationTest`, `OrganizationValueValidationTest`, `OrganizationAggregateRowVersionTest`,
+`NewIntakeContactPersistenceRegressionTest`, `NewIntakeDuplicateMergeContractTest`, aggregate/adapter
+contracts, `UserDaoCreateUserTest`, `ContactValueApiTest`, `ApiReadControllerTest`,
+`ContactExternalActionsTest`, intake phone/layout tests, Organization entry-point tests and neighboring
+Contact/Organization/User presentation contracts. Updated obsolete prose/raw-display assertions;
+added actual shared desktop/staged-editor and browser behavioral tests. See the rollout validation
+record for executed commands/results.
+
+Audit compatibility: this task uses existing Contact/Organization/intake/User mutation audits and
+PHI read seams on their owning transaction connections. The new basic duplicate preflight is a
+non-exporting transaction read, and rejects before point/audit writes. Blur/formatting/error correction
+are non-persisting UI operations and do not add audit events. No new vocabulary/schema, sensitive
+metadata, asynchronous audit insertion or data cleanup is introduced. Existing audit failure rollback,
+tenancy, soft-deleted history, opening tokens and post-commit refresh/live behavior are preserved.
+
+Remaining limits: installed older desktop/external writers require coordinated upgrades; server-only
+deployment cannot enforce their direct JDBC writes. No live SQL Server/RLS/migration/production-data
+verification or Windows/manual browser acceptance is claimed. PR #1825 schema prerequisites still
+apply, but this follow-up has no migration. The known affected-suite Settings FXML baseline failure
+and historical full-suite failures remain outside scope and are not reinvestigated.

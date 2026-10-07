@@ -1019,7 +1019,7 @@ public final class ContactDao {
         String value=normalizeOptional(desired);List<String> values=new ArrayList<>();
         if(table.equals("ContactPhoneNumbers")&&value==null&&ContactValues.trim(suppliedExtension)!=null)ContactValues.INSTANCE.phone(desired,suppliedExtension,false,"phone");
         if(value!=null){
-            if(table.equals("ContactPhoneNumbers")){var v=ContactValues.INSTANCE.phone(desired,suppliedExtension,true,"phone");if(!extensionOwned&&v.extension()==null&&originalExtension!=null)v=ContactValues.INSTANCE.phone(desired,originalExtension,true,"phone");values=java.util.Arrays.asList(v.displayInput(),v.normalizedNumber(),v.extension());}
+            if(table.equals("ContactPhoneNumbers")){var v=ContactValues.INSTANCE.phone(desired,suppliedExtension,true,"phone");if(!extensionOwned&&v.extension()==null&&originalExtension!=null)v=ContactValues.INSTANCE.phone(desired,originalExtension,true,"phone");values=java.util.Arrays.asList(v.displayInput(),v.normalizedNumber(),v.extension());rejectBasicPhoneDuplicate(con,tenantId,contactId,id,v);}
             else if(table.equals("ContactEmailAddresses")){var v=ContactValues.INSTANCE.email(desired,true,"email");values=List.of(v.displayInput(),v.comparisonKey());}
             else values=List.of(value);
         }
@@ -1041,6 +1041,24 @@ public final class ContactDao {
         new EntityActionAuditDao().append(con,EntityActionAuditEvent.now(tenantId,actor,type,id,action,EntityActionAuditEvent.EntityType.CONTACT,(long)contactId,Map.of(EntityActionAuditEvent.MetadataKey.CONTACT_ID,contactId,EntityActionAuditEvent.MetadataKey.KIND,kind,EntityActionAuditEvent.MetadataKey.PRIMARY,value!=null&&primary)));
         if(value==null)compactBasicPointOrder(con,table,contactId,tenantId,actor,type);
     }
+    /** Compare complete parsed main+extension keys under the owning transaction, never suffixes. */
+    private static void rejectBasicPhoneDuplicate(Connection con,int tenant,int contact,Long ownedId,
+            com.shale.core.validation.ContactValueValidator.Phone proposed)throws SQLException {
+        try(var statement=con.prepareStatement("SELECT DisplayNumber,Extension FROM dbo.ContactPhoneNumbers WITH(UPDLOCK,HOLDLOCK) WHERE ShaleClientId=? AND ContactId=? AND IsDeleted=0 AND Id<>?")) {
+            statement.setInt(1,tenant);statement.setInt(2,contact);statement.setLong(3,ownedId==null?0:ownedId);
+            try(var rows=statement.executeQuery()) {
+                while(rows.next()) {
+                    String number=rows.getString(1),extension=rows.getString(2);
+                    if(!ContactValues.INSTANCE.usablePhone(number,extension))continue;
+                    var existing=ContactValues.INSTANCE.phone(number,extension,true,"phone");
+                    if(Objects.equals(proposed.normalizedNumber(),existing.normalizedNumber())
+                            && Objects.equals(proposed.extension(),existing.extension()))
+                        throw new com.shale.core.validation.FieldValidationException("phone","duplicate_phone","Duplicate active phone number and extension.");
+                }
+            }
+        }
+    }
+
     private static void compactBasicPointOrder(Connection con,String table,int contact,int tenant,int actor,EntityActionAuditEvent.EntityType type)throws SQLException{
         record Position(long id,String kind,boolean primary,int order,byte[] rv){}
         List<Position> rows=new ArrayList<>();

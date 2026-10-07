@@ -354,11 +354,11 @@ async function validationFailure(response: Response): Promise<ApiError> {
   const errors = Array.isArray(body.fieldErrors) ? body.fieldErrors.filter(e => typeof e.field === 'string' && typeof e.message === 'string') : [];
   return new ApiError(errors.length ? errors.map(e => e.message).join(' ') : 'Check the details and try again.', response.status, errors);
 }
-export async function validateContactValue(token: string, kind: 'phone' | 'email', value: string, extension?: string): Promise<{ preview?: string } | null> {
+export async function validateContactValue(token: string, kind: 'phone' | 'email', value: string, extension?: string): Promise<{ preview?: string; displayInput?: string; extension?: string | null } | null> {
   const response = await fetch(`${apiBaseUrl()}/api/validation/contact-value`, {method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({kind,value,extension})});
   if (response.status === 400) throw await validationFailure(response);
   if (!response.ok) throw new ApiError('Validation is temporarily unavailable. Save will validate this field.',response.status);
-  return response.json() as Promise<{ preview?: string } | null>;
+  return response.json() as Promise<{ preview?: string; displayInput?: string; extension?: string | null } | null>;
 }
 
 export interface FieldError { field: string; code: string; message: string }

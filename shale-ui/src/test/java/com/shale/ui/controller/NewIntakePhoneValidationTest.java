@@ -91,6 +91,16 @@ class NewIntakePhoneValidationTest {
             assertTrue(((Label)get(controller,"validationLabel")).getText().contains("before adding an extension"));
         });
     }
+    @Test void independentRolesFormatOnlyOnTheirBlurOrSaveAndNeverFoldExtensions() {
+        JavaFxTestSupport.runAndWait(()->{
+            var controller=form();var client=(PhoneField)get(controller,"clientPhoneField");var caller=(PhoneField)get(controller,"callerPhoneField");
+            client.setText("Call: 903 3568 x001");caller.setText("1 505 903 3568");
+            assertEquals("Call: 903 3568 x001",client.getText());client.blur();
+            assertEquals("903-3568",client.getText());assertEquals("001",((TextField)get(controller,"clientPhoneExtensionField")).getText());
+            assertEquals("1 505 903 3568",caller.getText(),"Another role's draft formats at its own boundary");
+            invoke(controller,"validateRequiredFields",new Class<?>[0]);assertEquals("+1 (505) 903-3568",caller.getText());
+        });
+    }
     @Test void productionFxmlLoadsPhoneGroupsInBothThemes() {
         JavaFxTestSupport.runAndWait(()->{
             var loader=new javafx.fxml.FXMLLoader(getClass().getResource("/fxml/new-intake.fxml"));

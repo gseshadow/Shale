@@ -60,7 +60,7 @@ class ContactLegacyValidationTest {
         assertThrows(IllegalArgumentException.class,()->UserDao.validatedUserEmail("changed identifier","legacy identifier"));
         assertThrows(IllegalArgumentException.class,()->UserDao.validatedUserPhone("00","0"));
         assertNull(UserDao.validatedUserPhone(null,"0"));
-        assertEquals("display_too_long",assertThrows(com.shale.core.validation.FieldValidationException.class,()->UserDao.validatedUserPhone("303"+" ".repeat(91)+"5550123",null)).errors().getFirst().code());
+        assertEquals("(303) 555-0123",UserDao.validatedUserPhone("303"+" ".repeat(91)+"5550123",null));
     }
     @Test void localDuplicatesUseWholeSubscriberAndExtensionAndNeverFullNumberSuffix()throws Exception {
         var local=new IntendedPhoneNumber(null,null,"WORK","555-0123","001",true,false,0);

@@ -1,30 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState, useRef } from 'react';
-import type { CSSProperties, KeyboardEvent, ReactNode, InputHTMLAttributes } from 'react';
+import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
-import { ApiError, contactValueUpdate, validateContactValue } from './api';
+import { ApiError, contactValueUpdate } from './api';
+import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
 import './styles.css';
 
-function ContactValueInput({ accessToken, kind, baseline, baselineExtension, extension, onExtensionChange, ...props }: InputHTMLAttributes<HTMLInputElement> & { accessToken: string | null; kind: 'phone' | 'email'; baseline?: string | null; extension?: string; baselineExtension?: string | null; onExtensionChange?: (value: string) => void }) {
-  const [feedback, setFeedback] = useState('');
-  const generation = useRef(0);
-  const retained = baseline !== undefined && props.value === (baseline ?? '') && (extension === undefined || extension === (baselineExtension ?? ''));
-  async function validate() {
-    if (!accessToken) return;
-    const current = ++generation.current;
-    try {
-      const result = await validateContactValue(accessToken, kind, String(props.value ?? ''), extension);
-      if (current === generation.current) setFeedback(result?.preview ?? '');
-    } catch (error) {
-      if (current === generation.current) setFeedback((retained ? 'Saved value needs review; you can retain it. ' : '') + (error instanceof Error ? error.message : 'Check this field.'));
-    }
-  }
-  useEffect(() => { if (baseline !== undefined) void validate(); }, []);
-  const fieldName = props.id?.includes('fax') ? 'fax' : kind;
-  return <><input {...props} data-validation-field={fieldName} type="text" onBlur={() => void validate()} onChange={event => { generation.current++; setFeedback(''); props.onChange?.(event); }} aria-describedby={`${props.id}-feedback`} />
-    {kind === 'phone' && <><small>US full or 7-digit local numbers; use +country code for international numbers.</small><label htmlFor={`${props.id}-extension`}>Extension (optional, 1–12 digits)</label><input id={`${props.id}-extension`} type="text" inputMode="numeric" value={extension ?? ''} onChange={event => { generation.current++; setFeedback(''); onExtensionChange?.(event.target.value); }} onBlur={() => void validate()} disabled={props.disabled} data-validation-field={`${fieldName}.extension`} aria-describedby={`${props.id}-feedback`} /></>}
-    <small id={`${props.id}-feedback`} role="status">{feedback}</small></>;
-}
 function focusContactError(error: unknown, form: HTMLFormElement) {
   if (error instanceof ApiError && error.fieldErrors.length) {
     const field = error.fieldErrors[0].field;
@@ -2484,7 +2465,7 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [condition, setCondition] = useState('');
   const [deceased, setDeceased] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { submitError, setSubmitError, recordContactError, clearContactError, fieldErrors } = useContactFormErrors();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasRequiredName = Boolean(name.trim() || firstName.trim() || lastName.trim());
 
@@ -2518,7 +2499,7 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
       onCreated(created);
     } catch (caught) {
       focusContactError(caught, form);
-      setSubmitError(caught instanceof Error ? caught.message : 'Contact could not be created.');
+      recordContactError(caught, 'Contact could not be created.');
     } finally {
       setIsSubmitting(false);
     }
@@ -2533,9 +2514,9 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
       <label htmlFor="new-contact-last-name">Last name</label>
       <input id="new-contact-last-name" type="text" value={lastName} onChange={(event) => setLastName(event.target.value)} disabled={isSubmitting} autoComplete="family-name" maxLength={255} />
       <label htmlFor="new-contact-email">Email</label>
-      <ContactValueInput id="new-contact-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="new-contact-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" />
       <label htmlFor="new-contact-phone">Phone</label>
-      <ContactValueInput id="new-contact-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" extension={phoneExtension} onExtensionChange={setPhoneExtension} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="new-contact-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { setPhone(number); setPhoneExtension(ext); }} />
       <label htmlFor="new-contact-address-home">Home address</label>
       <textarea id="new-contact-address-home" value={address} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
       <label htmlFor="new-contact-date-of-birth">Date of birth</label>
@@ -2563,7 +2544,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
   const [dateOfBirth, setDateOfBirth] = useState(toDateInputValue(detail.dateOfBirth));
   const [condition, setCondition] = useState(detail.condition || '');
   const [deceased, setDeceased] = useState(detail.deceased);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { submitError, setSubmitError, recordContactError, clearContactError, fieldErrors } = useContactFormErrors();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasRequiredName = Boolean(name.trim() || firstName.trim() || lastName.trim());
 
@@ -2597,7 +2578,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
       onSaved(updated);
     } catch (caught) {
       focusContactError(caught, form);
-      setSubmitError(caught instanceof Error ? caught.message : 'Contact details could not be saved.');
+      recordContactError(caught, 'Contact details could not be saved.');
     } finally {
       setIsSubmitting(false);
     }
@@ -2612,9 +2593,9 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
       <label htmlFor="contact-last-name">Last name</label>
       <input id="contact-last-name" type="text" value={lastName} onChange={(event) => setLastName(event.target.value)} disabled={isSubmitting} autoComplete="family-name" maxLength={255} />
       <label htmlFor="contact-email">Email</label>
-      <ContactValueInput id="contact-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" baseline={detail.email} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="contact-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" baseline={detail.email} />
       <label htmlFor="contact-phone">Phone</label>
-      <ContactValueInput id="contact-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={detail.phone} baselineExtension={detail.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="contact-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={detail.phone} baselineExtension={detail.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { setPhone(number); setPhoneExtension(ext); }} />
       <label htmlFor="contact-address-home">Home address</label>
       <textarea id="contact-address-home" value={address} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
       <label htmlFor="contact-date-of-birth">Date of birth</label>
@@ -2647,7 +2628,7 @@ function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessTo
   const [postalCode, setPostalCode] = useState('');
   const [country, setCountry] = useState('');
   const [notes, setNotes] = useState('');
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { submitError, setSubmitError, recordContactError, clearContactError, fieldErrors } = useContactFormErrors();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasRequiredName = Boolean(name.trim());
 
@@ -2685,7 +2666,7 @@ function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessTo
       onCreated(created);
     } catch (caught) {
       focusContactError(caught, form);
-      setSubmitError(caught instanceof Error ? caught.message : 'Organization could not be created.');
+      recordContactError(caught, 'Organization could not be created.');
     } finally {
       setIsSubmitting(false);
     }
@@ -2696,11 +2677,11 @@ function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessTo
       <label htmlFor="new-organization-name">Organization name</label>
       <input id="new-organization-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="organization" maxLength={255} required />
       <label htmlFor="new-organization-email">Email</label>
-      <ContactValueInput id="new-organization-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="new-organization-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" />
       <label htmlFor="new-organization-phone">Phone</label>
-      <ContactValueInput id="new-organization-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" extension={phoneExtension} onExtensionChange={setPhoneExtension} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="new-organization-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { setPhone(number); setPhoneExtension(ext); }} />
       <label htmlFor="new-organization-fax">Fax</label>
-      <ContactValueInput id="new-organization-fax" value={fax} onChange={(event) => setFax(event.target.value)} disabled={isSubmitting} accessToken={accessToken} kind="phone" extension={faxExtension} onExtensionChange={setFaxExtension} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="new-organization-fax" value={fax} onChange={(event) => setFax(event.target.value)} disabled={isSubmitting} accessToken={accessToken} kind="phone" extension={faxExtension} onExtensionChange={setFaxExtension} onFormatted={(number, ext) => { setFax(number); setFaxExtension(ext); }} />
       <label htmlFor="new-organization-website">Website</label>
       <input id="new-organization-website" type="url" value={website} onChange={(event) => setWebsite(event.target.value)} disabled={isSubmitting} autoComplete="url" maxLength={500} />
       <label htmlFor="new-organization-address1">Address line 1</label>
@@ -2827,7 +2808,7 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
   const [postalCode, setPostalCode] = useState(detail.postalCode || '');
   const [country, setCountry] = useState(detail.country || '');
   const [notes, setNotes] = useState(detail.notes || '');
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { submitError, setSubmitError, recordContactError, clearContactError, fieldErrors } = useContactFormErrors();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasRequiredName = Boolean(name.trim());
 
@@ -2864,7 +2845,7 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
       onSaved(updated);
     } catch (caught) {
       focusContactError(caught, form);
-      setSubmitError(caught instanceof Error ? caught.message : 'Organization details could not be saved.');
+      recordContactError(caught, 'Organization details could not be saved.');
     } finally {
       setIsSubmitting(false);
     }
@@ -2875,11 +2856,11 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
       <label htmlFor="organization-name">Organization name</label>
       <input id="organization-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="organization" maxLength={255} required />
       <label htmlFor="organization-email">Email</label>
-      <ContactValueInput id="organization-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" baseline={detail.email} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" baseline={detail.email} />
       <label htmlFor="organization-phone">Phone</label>
-      <ContactValueInput id="organization-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={detail.phone} baselineExtension={detail.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={detail.phone} baselineExtension={detail.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { setPhone(number); setPhoneExtension(ext); }} />
       <label htmlFor="organization-fax">Fax</label>
-      <ContactValueInput id="organization-fax" value={fax} onChange={(event) => setFax(event.target.value)} disabled={isSubmitting} accessToken={accessToken} kind="phone" baseline={detail.fax} baselineExtension={detail.faxExtension} extension={faxExtension} onExtensionChange={setFaxExtension} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-fax" value={fax} onChange={(event) => setFax(event.target.value)} disabled={isSubmitting} accessToken={accessToken} kind="phone" baseline={detail.fax} baselineExtension={detail.faxExtension} extension={faxExtension} onExtensionChange={setFaxExtension} onFormatted={(number, ext) => { setFax(number); setFaxExtension(ext); }} />
       <label htmlFor="organization-website">Website</label>
       <input id="organization-website" type="url" value={website} onChange={(event) => setWebsite(event.target.value)} disabled={isSubmitting} autoComplete="url" maxLength={500} />
       <label htmlFor="organization-address1">Address line 1</label>

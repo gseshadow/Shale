@@ -13,29 +13,39 @@ that implementation. It performs no network lookups. Review numbering metadata u
 and run parser regressions before changing pins. Validation establishes numbering-plan structure,
 not that a number is assigned, reachable or owned by the person.
 
-The phone default is explicitly **US**, displayed in forms. International input uses a country
-calling code. Familiar punctuation is accepted; input/paste is unrestricted. Full numbers check
-`isValidNumber`, rather than accepting every parseable number. Approved seven-digit US local
-subscribers are also accepted, including familiar spaces/hyphens. Their exchange must start with
-2–9 and must not be an N11 service exchange (211, 311, …, 911). This checks local structure,
-not area-code availability, assignment or reachability. Other incomplete lengths remain invalid. Separate extensions contain 1–12
-ASCII digits; leading zeros are retained. `x`, `ext`, `ext.`, `extension` and `;ext=` suffixes are
-extracted for new/changed input. Matching inline/separate extensions are accepted, conflicts rejected.
-An extension alone is rejected even when the phone is optional/unavailable. New/changed structured
-phones store trimmed main display input, normalized main number, and extension separately. Full
-numbers normalize to E.164; local subscribers normalize to exactly seven ASCII digits. Parser
-results explicitly expose `kind=US_LOCAL`, `localNumber` and a null `canonicalNumber`; global
-results have `kind=GLOBAL` and E.164 `canonicalNumber`. `normalizedNumber()` supplies the whole
-storage/comparison key for either kind. No area code is invented, and comparisons never match
-only the final seven digits of a full number. Local punctuation variants collide for the same
-extension (and Organization kind) under existing domain rules; distinct extensions and local/full counterparts may
-coexist. These keys fit existing `nvarchar(32)` normalized columns; no new migration or backfill. Users' scalar
-phone column stores trimmed display main plus ` ext. digits`; it has no canonical column.
-New/changed User phone display is limited to the documented 100-character scalar capacity; long input
-receives a safe field error, never truncation. Verify optional phone-column capacity at deployment. Local previews say “US local; area code required to call.” Local values satisfy phone validation
-and may be primary, but Call actions remain unavailable until a full number/context is supplied.
-No ambiguous `tel:` URI is constructed; an attempted local action says “Add an area code before
-calling a US local number.” Display previews and `tel:` links are computed independently; unchanged historical storage is not reformatted.
+The phone default is explicitly **US**, displayed in forms. Typing and pasting remain unrestricted.
+On validation, supported inline `x`, `ext`, `ext.`, `extension` and `;ext=` suffixes are parsed
+**before** extracting ASCII main digits. For US input, other nonnumeric characters are ignored;
+letters are never mapped to telephone keypad digits. Seven digits are local (`903-3568`), ten are
+full (`(505) 903-3568`), and eleven require a leading 1 (`+1 (505) 903-3568`). Other US counts,
+all-zero values, and invalid area/exchange prefixes are rejected. Local exchanges start with 2–9
+and exclude N11 service exchanges. Full numbers also pass the pinned numbering-plan validity check.
+Explicit `+country-code` international input retains its own validation and international formatting;
+US digit-count rules do not override it. Validation establishes structure, not assignment or reachability.
+
+Separate and inline extensions contain 1–12 ASCII digits; leading zeros are retained. Matching
+inline/separate extensions are accepted, conflicts and extension-only input rejected. Malformed
+extension tails are rejected before any main-digit extraction. Changed/new structured phones store
+the formatted main and separate extension. Changed User scalar phones store the formatted main plus
+` ext. digits`, within the existing 100-character capacity. Unchanged active/deleted values, including
+legacy formatting and canonical columns, remain byte-for-character through unrelated saves.
+
+Parser results distinguish `US_LOCAL`, `US_FULL` (NANP country code 1), and `INTERNATIONAL`. Local
+results expose seven-digit `localNumber` and null `canonicalNumber`; full/international results expose
+E.164 `canonicalNumber`. `normalizedNumber()` is the complete main key, with extension also used
+for duplicate checks (and kind for Organizations). Basic Contact writes now check other active rows
+under transaction locks using the same interpretation as complete saves and intake merge. Local/full
+counterparts and distinct extensions may coexist; no suffix-only equality, inferred area code,
+automatic cleanup, or data backfill occurs. Keys fit the existing `nvarchar(32)` columns.
+
+Desktop and browser format changed entry fields on blur; successful saves persist/return formatted
+values through the shared validator. Typing does not reformat or dismiss errors. Corrected validation
+clears its field errors and summary messages while retaining other failures. Invalid drafts remain
+available. Browser advisory validation calls the shared server parser and suppresses stale responses;
+Save still validates at the authoritative DAO. No remaining production TextFormatter input filters
+were found in the inspected base. Local previews say “US local; area code required to call”; Call
+remains unavailable for locals, and no ambiguous `tel:` URI is constructed. Explicit full and
+international values use validated E.164 plus a separate URI extension.
 
 Emails accept a single ASCII dot-atom local part, plus tags, apostrophes, subdomains and international
 domain names. ICU performs nontransitional UTS #46 domain conversion, including `ß`, for transport;
@@ -52,9 +62,11 @@ header characters are rejected. Existing account authentication does not apply t
 | Required phone blank | “Enter a usable phone number.” Intake also offers Phone unavailable with a reason. |
 | Optional phone/email blank | Accepted; no blank structured point inserted. |
 | `(303) 555-0123`, `303.555.0123`, `+44 20 7946 0958` | Accepted; canonical main `+13035550123` or `+442079460958`. |
-| `5550123`, `555-0123`, `234 5678 x001` | Accepted as US local; normalized subscriber digits, separate extension, no E.164, area code required to call. |
+| `5550123`, `(555)-0123`, `Call: 234 5678 x001` | Accepted as US local; normalized subscriber digits, separate extension, no E.164, area code required to call. |
 | `0000000`, `1550123`, `211-0123`, `555012`, `55501234` | Rejected: invalid exchange or incomplete length. |
-| `1-800-234-5678` | Accepted if valid numbering-plan structure; business/toll-free/fax are not restricted to mobiles. |
+| `9033568`, `Phone: (505) 903 3568`, `1-505-903-3568` | Formatted as `903-3568`, `(505) 903-3568`, `+1 (505) 903-3568`. |
+| `2-505-903-3568`, 6/8/9/12 digits | Rejected by US length/leading-country-digit rules. |
+| `1-800-234-5678` | Formatted as `+1 (800) 234-5678`; business/toll-free/fax are not restricted to mobiles. |
 | `3035550123 x001`, separate `001` | Accepted, extension `001`. Same main with extension `002` may coexist. |
 | Inline `001`, separate `002` | “The inline and separate extensions must match.” |
 | Extension `abc`, `１２`, or 13 digits | “Enter an extension of 1–12 digits (0–9).” |
@@ -231,6 +243,64 @@ unrelated edits and supported restoration do not force cleanup.
 
 ## Automated validation record
 
+### Phone-entry consistency after PR #1826
+
+Validated on Linux with a complete JDK 21, Maven 3.9.11 and temporary Xvfb (`DISPLAY=:99`).
+Maven settings use a workspace-local dependency cache and the session proxy; the downloaded JDK
+uses the system Java CA trust store. No repository build policy or GitHub workflow was changed.
+
+- **158 distinct focused Java tests passed**, spanning parser, direct basic/complete/Organization/
+  intake/User writes, extensions/duplicates/legacy retention, transaction/audit/concurrency contracts,
+  adapters, actual desktop feedback/stages, communication actions, Organization entry points and APIs.
+  The first broad focused run exposed the superseded Organization changed-phone display expectation;
+  the remaining run exposed the superseded API create display expectation. Both were updated, with
+  unchanged legacy/read fixture assertions retained; their corrected checks pass. Passing tests were
+  repeated only by the required affected/critical suites or after changes to their contracts.
+- **143 affected tests passed**, selected from Contacts, Organizations, settings/team, server/web,
+  UI behavior and shared core dependencies. The current selector does not select the known failing
+  `SettingsFxmlLoadTest`; that baseline issue was neither fixed nor reinvestigated.
+- **116 critical tests passed** across the seven-module reactor.
+- **8 browser behavioral tests passed**, using the server parser response to test unrestricted paste,
+  blur formatting/extensions, corrected phone/fax summary/error clearing, invalid drafts, unchanged
+  legacy spelling, stale responses and retention of authoritative duplicate errors on advisory blur.
+- Browser production build (including TypeScript), static FXML/CSS resource validation, local document
+  links and `git diff --check` passed. Initial JavaFX execution without DISPLAY was stopped and the
+  unverified tests were rerun with Xvfb; no missing-display result is counted as passing.
+- No optional historical all-tests run, baseline-failure investigation, live database/migration,
+  production-data access, Windows acceptance or manual browser acceptance was performed.
+
+Exact Maven commands executed (workspace launcher supplies the environment/settings above):
+
+```sh
+mvn -pl shale-server,shale-ui -am -Dtest=ContactValuesTest,ContactBasicPointValidationTest,ContactLegacyValidationTest,OrganizationValueValidationTest,ContactFieldFeedbackTest,NewIntakePhoneValidationTest,ContactValueApiTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl shale-server,shale-ui -am -Dtest=ContactFieldFeedbackTest,NewIntakePhoneValidationTest,ContactValueApiTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl shale-server,shale-ui -am -Dtest=ContactValuesTest,ContactBasicPointValidationTest,ContactLegacyValidationTest,OrganizationValueValidationTest,NewIntakeContactPersistenceRegressionTest,NewIntakeDuplicateMergeContractTest,ContactFieldFeedbackTest,NewIntakePhoneValidationTest,ContactValueApiTest,ContactExternalActionsTest,ContactAggregateMutationContractTest,ContactCompleteAggregateContractTest,OrganizationAggregateRowVersionTest,ContactServiceAdapterTest,OrganizationServiceAdapterTest,UserDaoCreateUserTest,OrganizationEditEntryPointTest,ApiReadControllerTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl shale-server,shale-ui -am -Dtest=OrganizationAggregateRowVersionTest,ContactPhoneEntryStageTest,ContactFieldFeedbackTest,NewIntakePhoneValidationTest,ContactExternalActionsTest,OrganizationEditEntryPointTest,ContactValueApiTest,ApiReadControllerTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl shale-server -am -Dtest=ApiReadControllerTest#createContactReachesServiceLayerWithDevelopmentHeaders -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base 045074d48b57799efa3d3bc14e2be6cb3bd0d474 --head HEAD --format markdown --output /workspace/work/phone-entry/selection.md --plan-output /workspace/work/phone-entry/selection.json
+python3 build/test-selection/run_selection.py /workspace/work/phone-entry/selection.json --command affected
+mvn test
+npm --prefix shale-web run test
+npm --prefix shale-web run typecheck
+npm --prefix shale-web run build
+python3 build/test-selection/validate_ui_resources.py
+git diff --check 045074d48b57799efa3d3bc14e2be6cb3bd0d474 HEAD
+```
+
+The focused totals count each class once using its final passing result, including corrected assertions
+verified by the affected suite. The final browser-only duplicate-error refinement repeats browser tests
+and build; Java production/test sources are unchanged after the passing affected and critical runs.
+Final selection is rechecked after documentation/commit updates without repeating unaffected Java tests.
+
+Deployment: no migration or automatic data cleanup in this follow-up. Deploy upgraded core/data/UI/
+desktop, server and browser together and upgrade/retire external direct-JDBC writers; PR #1825's
+schema prerequisites still apply. Advisory response `kind` now distinguishes `US_FULL` and
+`INTERNATIONAL` instead of `GLOBAL`; external advisory consumers must accommodate these values.
+Local numbers still cannot be called without area-code context. Audit integration uses existing
+schema/vocabulary and transaction-bound events; UI formatting/feedback does not add audit events.
+
+
+
 The scoped follow-up after PR #1825 passed **56 distinct focused tests**, covering parser results,
 direct local persistence, whole-number/extension duplicate handling, advisory API parity, safe Call
 actions, intake blur/Save error synchronization and FXML grouping/loading. Production Client/Caller
@@ -291,7 +361,7 @@ These links identify the final implementation entry points; names remain durable
 | Contact v2 PATCH: `ContactDetail updateContactV2(` | [ApiReadController.java:581](../shale-server/src/main/java/com/shale/server/controller/ApiReadController.java#L581) |
 | Organization v2 PATCH: `OrganizationDetail updateOrganizationV2(` | [ApiReadController.java:693](../shale-server/src/main/java/com/shale/server/controller/ApiReadController.java#L693) |
 | Structured API errors: `handleFieldValidation(` | [ApiExceptionHandler.java:31](../shale-server/src/main/java/com/shale/server/controller/ApiExceptionHandler.java#L31) |
-| Browser field feedback: `function ContactValueInput(` | [App.tsx:8](../shale-web/src/App.tsx#L8) |
+| Browser field feedback: `function ContactValueInput(` | [ContactValueInput.tsx](../shale-web/src/ContactValueInput.tsx) |
 | Browser PATCH operations: `function contactValueUpdate(` | [api.ts:348](../shale-web/src/api.ts#L348) |
 | Desktop blur feedback: `Label phone(` | [ContactFieldFeedback.java:14](../shale-ui/src/main/java/com/shale/ui/util/ContactFieldFeedback.java#L14) |
 | Safe communication actions: `URI telephone(` | [ContactExternalActions.java:21](../shale-ui/src/main/java/com/shale/ui/util/ContactExternalActions.java#L21) |
