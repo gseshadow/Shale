@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useMemo, useState, useRef } from 'react';
+import { startTransition, FormEvent, useEffect, useMemo, useState, useRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { redirectPathFrom } from './returnPath';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import { ApiError, contactValueUpdate } from './api';
@@ -102,6 +103,8 @@ function displayNameFor(user: AuthenticatedUser): string {
 }
 
 function AppRoutes() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [authState, setAuthState] = useState<AuthState>(() => ({
     accessToken: readAccessToken(),
     user: null,
@@ -142,7 +145,12 @@ function AppRoutes() {
   async function handleLogout() {
     const token = authState.accessToken;
     clearAccessToken();
-    setAuthState({ accessToken: null, user: null, isVerifying: false });
+    // BrowserRouter transitions location updates. Keep teardown in that same update so
+    // ProtectedRoute cannot capture the just-signed-out detail as a new return target.
+    startTransition(() => {
+      navigate('/login', { replace: true, state: null });
+      setAuthState({ accessToken: null, user: null, isVerifying: false });
+    });
     if (token) {
       await logout(token);
     }
@@ -153,7 +161,7 @@ function AppRoutes() {
       <Route path="/" element={authState.user ? <Navigate to="/my-shale" replace /> : <Navigate to="/login" replace />} />
       <Route
         path="/login"
-        element={authState.user ? <Navigate to="/my-shale" replace /> : <LoginPage isVerifying={authState.isVerifying} onLogin={handleLogin} />}
+        element={authState.user ? <Navigate to={redirectPathFrom(location.state)} replace state={null} /> : <LoginPage isVerifying={authState.isVerifying} onLogin={handleLogin} />}
       />
       <Route element={<ProtectedRoute authState={authState} />}>
         <Route element={<AppShell user={authState.user} onLogout={handleLogout} />}>
@@ -423,8 +431,6 @@ function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (v
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
-  const location = useLocation();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -435,7 +441,6 @@ function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (v
       const result = await login(email, password);
       const verifiedUser = await getCurrentUser(result.accessToken);
       onLogin(result.accessToken, verifiedUser);
-      navigate(redirectPathFrom(location.state), { replace: true });
       setPassword('');
     } catch (caught) {
       clearAccessToken();
@@ -470,20 +475,6 @@ function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (v
       </section>
     </main>
   );
-}
-
-function redirectPathFrom(state: unknown): string {
-  if (!state || typeof state !== 'object' || !('from' in state)) {
-    return '/my-shale';
-  }
-
-  const from = (state as { from?: unknown }).from;
-  if (!from || typeof from !== 'object' || !('pathname' in from)) {
-    return '/my-shale';
-  }
-
-  const pathname = (from as { pathname?: unknown }).pathname;
-  return typeof pathname === 'string' ? pathname : '/my-shale';
 }
 
 function AppShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
