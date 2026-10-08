@@ -1,7 +1,8 @@
 # Shale Web V2 architecture and phased implementation roadmap
 
 **Reviewed:** 2026-10-08. **Inventory/documentation:** COMPLETE. **Decision acceptance:** OPEN.
-**Web V2 implementation:** NOT STARTED. Documentation completion is not implementation completion.
+**Web V2 implementation:** Phase 2A foundation IMPLEMENTED FOR REVIEW; ACCEPTANCE OPEN.
+Phase 2 remains IN PROGRESS; phases 3–10 NOT STARTED. Documentation completion is not implementation completion.
 
 **Evidence baseline:** live `origin/codex/latest`, `32e2cfdd25ad475bc03fbb91763c9769ce2ccd6a`.
 [PR #1837](https://github.com/gseshadow/Shale/pull/1837) was merged into that base.
@@ -538,7 +539,7 @@ merely because this document describes it.
 | Phase | Status | Dependencies | Deliverables | Verification | Completion gate / evidence and open decisions |
 | --- | --- | --- | --- | --- | --- |
 | 1 — Inventory and architecture | DOCUMENTATION COMPLETE; ACCEPTANCE OPEN | Live base and required authorities | This inventory, client decisions, parity/audit matrix and next prompt | Source/test review, links/fences/status/diff checks and documentation selector | Documentation only; no V2 features accepted. D1–D10 remain explicit. |
-| 2 — Tokens, components, responsive shell | NOT STARTED | Phase 1 recommendations; D2/D4 for this milestone | Token mapping, shared semantic primitives, responsive shell with complete navigation; temporary preview composition and beta rollback | Existing web tests plus focused semantics/navigation; typecheck/build; screenshots both themes at compact/medium/wide, keyboard/zoom/contrast | Reviewable foundation using synthetic data, all destinations discoverable, no backend/new feature sprawl. Source evidence: beta primitives and desktop A.2/resources. |
+| 2 — Tokens, components, responsive shell | IN PROGRESS — Phase 2A implemented for review; acceptance OPEN | Phase 1 recommendations; D2/D4 for this milestone | Token mapping, shared semantic primitives, responsive shell with complete navigation; temporary preview composition and beta rollback | Existing web tests plus focused semantics/navigation; typecheck/build; screenshots both themes at compact/medium/wide, keyboard/zoom/contrast | Reviewable foundation using synthetic data, all destinations discoverable, no backend/new feature sprawl. Phase 2A: shared primitives/tokens, synthetic isolated preview and compact/medium/wide shell; beta preserved. [Exact scope, checks, captures and limits](../../shale-web/docs/phase-2a-review.md). No all-Phase-2 completion claim; D4 browser UI zoom/device/screen-reader acceptance remains OPEN. |
 | 3 — Routing, session boundary, transport | NOT STARTED | Phase 2; D2/D3 and selected contract review | Canonical routes/aliases, safe return-to, dirty blockers, CredentialStore, coordinated refresh, cancellation/errors, memory query cache | Router/session/transport behavior including refresh race, stale 401, network failure, logout/identity cleanup and dirty forms; legacy endpoint compatibility | No leakage/stale identity installation; unchanged bearer protocol; no replayed uncertain write. Reuse existing durable server APIs. |
 | 4 — First end-to-end read slice | NOT STARTED | Phases 2–3; D1/D5/D6 only for selected reads | Sign in → assigned/basic search → case Overview; genuine bounded reads and required read-audit seam | Current controller/adapter/OpenAPI tests plus targeted SQL paging/actor/two-tenant/audit-failure tests; web loading/empty/error/deep-link/back acceptance | Usable reviewed slice, no broad backend rewrite/all-screen dependency. Basic search may ship before unified suggestions with exclusions explicit. |
 | 5 — Tasks and Case Dates/confirmation | NOT STARTED | Phase 4; D5/D6 per write; reviewed occurrence/confirmation adapters | Task policy/forms/assignment/completion and generic dates/confirmation through authoritative workers; incremental usable slices | Due-policy tests, actor/tenant denial, token conflicts, aggregate rollback/audit tests; mobile editor/draft behavior | Task transaction/audit gaps closed for exposed commands; CaseDates/ValueRevision preserved. Live remains optional until D7 passes. |
@@ -552,9 +553,43 @@ Backend gaps are work packages attached to the first consuming slice, not a new 
 phase. Live browser integration can follow a usable manual-refresh slice after D7 review; it does not force
 MCP/AI activation. Phase 2 is intentionally independent of real-data API decisions so it can be reviewed now.
 
+### 11.3 Phase 2A implementation evidence — 2026-10-08
+
+Implemented on separate task branch `codex/web-v2-phase-2a` from live base
+`eda5045153d6a4dc175884bbb889021e04df83d2` after confirming PR #1838 was merged.
+[Developer review](../../shale-web/docs/phase-2a-review.md) owns exact files, token adaptations,
+preview instructions, audit review, captures and acceptance limits.
+
+* Extracted/adapted beta presentation primitives into `shale-web/src/ui`; native semantic actions,
+  card activation/selection, fields, regions, feedback and validated readable DB-color indicators.
+  A.2 solid surfaces and restricted gradients; no new package/dependency/version.
+* One shared navigation registry and responsive shell in `src/shell`; all ten labels including My Tasks
+  are reachable. Compact uses a native in-flow disclosure, medium a 10rem labelled rail, wide 15rem.
+  This deliberately refines the proposed bottom-bar/drawer, avoiding fixed keyboard-covering surfaces.
+* Temporary `foundation.html`/`src/preview` entry: synthetic data only, both themes, long names,
+  selection and every requested content/validation state. No API or persistence; no fake save/download.
+  Beta remains the default composition with all routes/session/mutation handlers, legacy paint and
+  recoverable base. Only shared primitive semantics are deliberately adopted there.
+* Verification: 52 web tests, typecheck/build, selected AuthControllerTest (10 tests), critical `mvn test`
+  (116 tests), selector and whitespace checks pass. Eight 320/360/768/1280 screenshots cover both themes;
+  no page overflow, visible targets >=44px, native keyboard/compact Escape/return focus, no API requests.
+  Both themes also pass 200% text-size emulation at 320px and measured 22 text/5 boundary pairs each.
+* Audit review: no new sensitive read/domain/admin mutation, no new audit seam/schema; synthetic UI
+  changes intentionally unaudited. Existing beta authoritative API/service/DAO audit paths unchanged.
+* Acceptance OPEN: actual browser UI zoom, physical device keyboard/safe areas, screen readers and
+  other browser engines not verified. Headless text-size emulation is not browser-zoom acceptance.
+  No backend, SQL, authentication/session/transport, deployment or native/PWA changes; no deploy/merge.
+
+Remaining Phase 2: acceptance of tokens/navigation with device/zoom/screen-reader evidence, deliberate
+shell/screen adoption and any needed accessible dialog/menu primitives. Next narrow Phase 2B is
+foundation acceptance and scoped adoption around existing route outlets, preserving domain/session
+behavior. Phase 3 remains separate. Remove the temporary HTML/preview/Vite input only after accepted
+composition replaces beta, as documented; shared primitives/shell and evidence remain.
+
 ## 12. Ready-to-run next Codex implementation prompt
 
-The prompt below is future work and was **not executed** by this documentation task.
+The prompt below is retained as the original Phase 2A specification. It was not executed by the
+documentation task; the implementation evidence and remaining acceptance above now supersede its status.
 
 ```text
 Repository: gseshadow/Shale
