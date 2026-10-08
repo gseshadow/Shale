@@ -1,0 +1,266 @@
+## Shale relevant test selection
+
+### Changed paths
+- `docs/architecture/shale-web-v2-architecture-roadmap.md`
+- `shale-web/docs/phase-2d-evidence/browser-review.cjs`
+- `shale-web/docs/phase-2d-evidence/chromium/accessibility-observations.json`
+- `shale-web/docs/phase-2d-evidence/chromium/browser-observations.json`
+- `shale-web/docs/phase-2d-evidence/chromium/completed-1280-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/completed-1280-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/completed-320-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/completed-320-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/completed-360-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/completed-360-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/completed-768-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/completed-768-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/empty-1280-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/empty-1280-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/empty-320-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/empty-320-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/empty-360-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/empty-360-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/empty-768-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/empty-768-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/errors-1280-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/errors-1280-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/errors-320-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/errors-320-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/errors-360-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/errors-360-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/errors-768-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/errors-768-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/failure-1280-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/failure-1280-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/failure-320-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/failure-320-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/failure-360-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/failure-360-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/failure-768-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/failure-768-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/loading-1280-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/loading-1280-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/loading-320-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/loading-320-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/loading-360-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/loading-360-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/loading-768-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/loading-768-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/normal-1280-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/normal-1280-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/normal-320-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/normal-320-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/normal-360-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/normal-360-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/normal-768-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/normal-768-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/pending-1280-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/pending-1280-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/pending-320-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/pending-320-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/pending-360-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/pending-360-light.png`
+- `shale-web/docs/phase-2d-evidence/chromium/pending-768-dark.png`
+- `shale-web/docs/phase-2d-evidence/chromium/pending-768-light.png`
+- `shale-web/docs/phase-2d-evidence/contrast-observations.json`
+- `shale-web/docs/phase-2d-evidence/contrast-review.cjs`
+- `shale-web/docs/phase-2d-evidence/operator-review.cjs`
+- `shale-web/docs/phase-2d-evidence/screenshots.md`
+- `shale-web/docs/phase-2d-evidence/unavailable-checks.txt`
+- `shale-web/docs/phase-2d-evidence/zoom-200-dark.png`
+- `shale-web/docs/phase-2d-evidence/zoom-200-light.png`
+- `shale-web/docs/phase-2d-evidence/zoom-400-dark.png`
+- `shale-web/docs/phase-2d-evidence/zoom-400-light.png`
+- `shale-web/docs/phase-2d-evidence/zoom-observations.json`
+- `shale-web/docs/phase-2d-evidence/zoom-review.cjs`
+- `shale-web/docs/phase-2d-operator-checklist.md`
+- `shale-web/docs/phase-2d-review.md`
+- `shale-web/src/App.test.tsx`
+- `shale-web/src/App.tsx`
+
+### Selected areas and reasons
+- **server**
+  - shale-web/docs/phase-2d-evidence/browser-review.cjs: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/accessibility-observations.json: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/browser-observations.json: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/completed-1280-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/completed-1280-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/completed-320-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/completed-320-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/completed-360-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/completed-360-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/completed-768-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/completed-768-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/empty-1280-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/empty-1280-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/empty-320-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/empty-320-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/empty-360-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/empty-360-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/empty-768-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/empty-768-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/errors-1280-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/errors-1280-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/errors-320-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/errors-320-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/errors-360-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/errors-360-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/errors-768-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/errors-768-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/failure-1280-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/failure-1280-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/failure-320-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/failure-320-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/failure-360-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/failure-360-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/failure-768-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/failure-768-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/loading-1280-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/loading-1280-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/loading-320-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/loading-320-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/loading-360-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/loading-360-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/loading-768-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/loading-768-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/normal-1280-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/normal-1280-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/normal-320-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/normal-320-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/normal-360-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/normal-360-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/normal-768-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/normal-768-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/pending-1280-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/pending-1280-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/pending-320-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/pending-320-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/pending-360-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/pending-360-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/pending-768-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/chromium/pending-768-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/contrast-observations.json: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/contrast-review.cjs: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/operator-review.cjs: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/screenshots.md: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/unavailable-checks.txt: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/zoom-200-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/zoom-200-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/zoom-400-dark.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/zoom-400-light.png: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/zoom-observations.json: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-evidence/zoom-review.cjs: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-operator-checklist.md: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/docs/phase-2d-review.md: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/src/App.test.tsx: Server, API, authentication endpoint, or web consumer changed.
+  - shale-web/src/App.tsx: Server, API, authentication endpoint, or web consumer changed.
+
+**Full-suite escalation:** no
+**Selected modules:** shale-server
+**Modified test classes:** none
+**Maximum generated command length:** 123 / 7000
+**Complete owned classes (manual/advisory):** 32
+
+### Selected test reasons
+- `com.shale.server.controller.AuthControllerTest`
+  - Classification: blocking_smoke, critical
+  - Mapping: area:server
+  - Changed path: `shale-web/docs/phase-2d-evidence/browser-review.cjs`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/accessibility-observations.json`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/browser-observations.json`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/completed-1280-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/completed-1280-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/completed-320-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/completed-320-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/completed-360-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/completed-360-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/completed-768-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/completed-768-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/empty-1280-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/empty-1280-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/empty-320-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/empty-320-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/empty-360-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/empty-360-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/empty-768-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/empty-768-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/errors-1280-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/errors-1280-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/errors-320-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/errors-320-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/errors-360-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/errors-360-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/errors-768-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/errors-768-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/failure-1280-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/failure-1280-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/failure-320-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/failure-320-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/failure-360-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/failure-360-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/failure-768-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/failure-768-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/loading-1280-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/loading-1280-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/loading-320-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/loading-320-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/loading-360-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/loading-360-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/loading-768-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/loading-768-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/normal-1280-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/normal-1280-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/normal-320-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/normal-320-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/normal-360-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/normal-360-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/normal-768-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/normal-768-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/pending-1280-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/pending-1280-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/pending-320-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/pending-320-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/pending-360-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/pending-360-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/pending-768-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/chromium/pending-768-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/contrast-observations.json`
+  - Changed path: `shale-web/docs/phase-2d-evidence/contrast-review.cjs`
+  - Changed path: `shale-web/docs/phase-2d-evidence/operator-review.cjs`
+  - Changed path: `shale-web/docs/phase-2d-evidence/screenshots.md`
+  - Changed path: `shale-web/docs/phase-2d-evidence/unavailable-checks.txt`
+  - Changed path: `shale-web/docs/phase-2d-evidence/zoom-200-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/zoom-200-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/zoom-400-dark.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/zoom-400-light.png`
+  - Changed path: `shale-web/docs/phase-2d-evidence/zoom-observations.json`
+  - Changed path: `shale-web/docs/phase-2d-evidence/zoom-review.cjs`
+  - Changed path: `shale-web/docs/phase-2d-operator-checklist.md`
+  - Changed path: `shale-web/docs/phase-2d-review.md`
+  - Changed path: `shale-web/src/App.test.tsx`
+  - Changed path: `shale-web/src/App.tsx`
+
+### Commands
+- `mvn -pl shale-server -am -Dtest=com.shale.server.controller.AuthControllerTest -Dsurefire.failIfNoSpecifiedTests=false test`
+- `mvn test`
+
+### Broader ownership coverage
+
+- `python build/test-selection/select_tests.py --area server --run`
+- Complete area ownership is optional local/advisory coverage.
+
+### Skipped areas
+- **build-scripts:** No changed path mapped to this area.
+- **calendar:** No changed path mapped to this area.
+- **cases:** No changed path mapped to this area.
+- **contacts:** No changed path mapped to this area.
+- **notifications:** No changed path mapped to this area.
+- **organizations:** No changed path mapped to this area.
+- **reports:** No changed path mapped to this area.
+- **security-data:** No changed path mapped to this area.
+- **settings-team:** No changed path mapped to this area.
+- **tasks:** No changed path mapped to this area.
+- **ui-behavior:** No changed path mapped to this area.
+- **ui-fxml-structure:** No changed path mapped to this area.
+- **ui-presentation:** No changed path mapped to this area.
+- **ui-visual-advisory:** No changed path mapped to this area.
+- **updater:** No changed path mapped to this area.

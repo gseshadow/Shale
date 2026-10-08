@@ -161,6 +161,7 @@ describe('My Shale shared presentation adoption', () => {
     expect(complete.classList.contains('secondary-button')).toBe(true);
     expect(document.querySelector('.legacy-route-content')).toBeTruthy();
     expect(document.querySelector('.shale-presentation')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
   });
   it('keeps a pending completion disabled, does not complete optimistically, and merges only the returned task', async () => {
     let finish!: (task: api.TaskDetail) => void;
@@ -170,7 +171,12 @@ describe('My Shale shared presentation adoption', () => {
     const card = screen.getByRole('button', { name: 'Open task Synthetic task' }).closest('article')!;
     const complete = within(card).getByRole('button', { name: 'Complete' });
     expect(complete.classList.contains('secondary-button')).toBe(false);
+    const status = within(screen.getByRole('region', { name: 'My Tasks' })).getByRole('status');
+    expect(status.textContent).toBe('');
+    expect(status.getAttribute('aria-live')).toBe('polite');
+    expect(status.getAttribute('aria-atomic')).toBe('true');
     fireEvent.click(complete);
+    expect(status.textContent).toBe('Completing Synthetic task…');
     expect((complete as HTMLButtonElement).disabled).toBe(true);
     expect(complete.getAttribute('aria-busy')).toBe('true');
     expect(complete.textContent).toBe('Completing…');
@@ -180,6 +186,8 @@ describe('My Shale shared presentation adoption', () => {
     finish({ id: 12, completedAt: '2026-10-08T10:00:00' } as api.TaskDetail);
     await waitFor(() => expect(within(card).queryByRole('button', { name: /Complet/ })).toBeNull());
     expect(within(card).getByText('Completed')).toBeTruthy();
+    expect(status.textContent).toBe('Completed Synthetic task.');
+    expect(within(screen.getByRole('region', { name: 'My Tasks' })).getByRole('status')).toBe(status);
     const other = screen.getByRole('button', { name: 'Open task Other task' }).closest('article')!;
     expect(within(other).getByRole('button', { name: 'Complete' })).toBeTruthy();
     expect(api.listAssignedTasks).toHaveBeenCalledTimes(1);
@@ -192,6 +200,7 @@ describe('My Shale shared presentation adoption', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('Synthetic completion rejected');
     const complete = screen.getByRole('button', { name: 'Complete' });
     expect((complete as HTMLButtonElement).disabled).toBe(false);
+    expect(within(screen.getByRole('region', { name: 'My Tasks' })).getByRole('status').textContent).toBe('');
     expect(screen.getByRole('list', { name: 'Assigned tasks' })).toBeTruthy();
     expect(screen.getByText('Open')).toBeTruthy(); expect(screen.queryByText('Completed')).toBeNull();
     expect(api.completeTask).toHaveBeenCalledTimes(1);

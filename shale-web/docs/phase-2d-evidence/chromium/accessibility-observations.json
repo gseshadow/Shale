@@ -1,0 +1,1522 @@
+[
+  {
+    "width": 320,
+    "theme": "light",
+    "state": "normal",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "state": "pending",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "state": "failure",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "state": "completed",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-button-small"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "state": "loading",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "state": "empty",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "state": "errors",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "state": "normal",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "state": "pending",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "state": "failure",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "state": "completed",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-button-small"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "state": "loading",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "state": "empty",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "state": "errors",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "state": "normal",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "state": "pending",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "state": "failure",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "state": "completed",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-button-small"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "state": "loading",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "state": "empty",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "state": "errors",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "state": "normal",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "state": "pending",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "state": "failure",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "state": "completed",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-button-small"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "state": "loading",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "state": "empty",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "state": "errors",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "state": "normal",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "state": "pending",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "state": "failure",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "state": "completed",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              ".shale-button-small"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "state": "loading",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "state": "empty",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "state": "errors",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "state": "normal",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "state": "pending",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "state": "failure",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "state": "completed",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              ".shale-button-small"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "state": "loading",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "state": "empty",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "state": "errors",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "state": "normal",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "state": "pending",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "state": "failure",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "state": "completed",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              ".shale-button-small"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "state": "loading",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "state": "empty",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "state": "errors",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "state": "normal",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "state": "pending",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "state": "failure",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              "article:nth-child(1) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              "article:nth-child(2) > .entity-card-actions > .shale-button-small.shale-button.shale-button-secondary"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "state": "completed",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              ".shale-button-standard"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          },
+          {
+            "target": [
+              ".shale-button-small"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "state": "loading",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "state": "empty",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "state": "errors",
+    "violations": [],
+    "incomplete": [
+      {
+        "id": "color-contrast",
+        "nodes": [
+          {
+            "target": [
+              "button"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a pseudo element"
+          },
+          {
+            "target": [
+              ".shale-destination-active > span"
+            ],
+            "summary": "Fix any of the following:\n  Element's background color could not be determined due to a background gradient"
+          }
+        ]
+      }
+    ]
+  }
+]
