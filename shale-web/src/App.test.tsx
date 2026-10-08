@@ -117,12 +117,10 @@ describe('authenticated responsive shell composition', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'example@example.invalid' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'synthetic-password' } });
     fireEvent.submit(screen.getByRole('button', { name: 'Sign in' }).closest('form')!);
-    // The unchanged login composition currently falls back to My Shale after sign-in.
-    // Baseline reproduction and the return-to acceptance gap are recorded in the review.
-    await screen.findByRole('heading', { name: 'My Shale', level: 1 });
+    await screen.findByRole('heading', { name: 'Contact Detail', level: 1 });
     expect(api.getCurrentUser).toHaveBeenLastCalledWith('new-test-token');
     expect(api.storeAccessToken).toHaveBeenCalledWith('new-test-token');
-    expect(api.listAssignedCases).toHaveBeenCalledWith('new-test-token');
+    expect(api.getContactDetail).toHaveBeenCalledWith('new-test-token', 7);
   });
   it('logs out locally and unmounts protected content before the existing remote call finishes', async () => {
     let finish!: () => void;
@@ -135,6 +133,99 @@ describe('authenticated responsive shell composition', () => {
     expect(screen.queryByText(user.displayName!)).toBeNull(); finish();
   });
 
+});
+
+function submitLogin() {
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'example@example.invalid' } });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'synthetic-password' } });
+  fireEvent.submit(screen.getByRole('button', { name: 'Sign in' }).closest('form')!);
+}
+function loginAt(state: unknown) {
+  window.history.replaceState({ usr: state }, '', '/login'); render(<App />);
+}
+describe('verified login return restoration', () => {
+  beforeEach(() => {
+    vi.mocked(api.readAccessToken).mockReturnValue(null);
+    vi.mocked(api.login).mockResolvedValue({ accessToken: 'new-test-token' } as api.LoginResponse);
+  });
+  it.each([
+    ['/cases/7?page=2#details', 'Case Detail', api.getCaseDetail],
+    ['/contacts/7?sort=name#profile', 'Contact Detail', api.getContactDetail],
+    ['/tasks/7?status=open#activity', 'Task Detail', api.getTaskDetail],
+  ])('restores signed-out detail %s only after login and verification', async (path, heading, detail) => {
+    let verify!: (value: api.AuthenticatedUser) => void;
+    vi.mocked(api.getCurrentUser).mockReturnValue(new Promise(done => { verify = done; }));
+    beta(path); await screen.findByRole('heading', { name: 'Sign in' });
+    expect(window.location.pathname).toBe('/login'); expect(detail).not.toHaveBeenCalled();
+    expect(window.history.state.usr.from.pathname).toBe(path.split('?')[0]);
+    const historyLength = window.history.length;
+    submitLogin(); await waitFor(() => expect(api.getCurrentUser).toHaveBeenCalledWith('new-test-token'));
+    expect(window.location.pathname).toBe('/login'); expect(api.storeAccessToken).not.toHaveBeenCalled();
+    expect(detail).not.toHaveBeenCalled(); verify(user);
+    await screen.findByRole('heading', { name: heading, level: 1 });
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
+    expect(detail).toHaveBeenCalledWith('new-test-token', 7);
+    expect(window.history.length).toBe(historyLength); expect(window.history.state.usr).toBeNull();
+    expect(api.listAssignedCases).not.toHaveBeenCalled();
+  });
+  it.each(['credentials', 'verification'])('preserves return state through failed %s then succeeds', async failure => {
+    if (failure === 'credentials') vi.mocked(api.login).mockRejectedValueOnce(new Error('Synthetic credentials rejected'));
+    else vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new Error('Synthetic verification rejected'));
+    beta('/tasks/7?status=open#activity'); await screen.findByRole('heading', { name: 'Sign in' });
+    const returnState = window.history.state.usr;
+    submitLogin(); await screen.findByRole('alert');
+    expect(window.location.pathname).toBe('/login'); expect(window.history.state.usr).toEqual(returnState);
+    expect(api.getTaskDetail).not.toHaveBeenCalled(); expect(api.storeAccessToken).not.toHaveBeenCalled();
+    submitLogin(); await screen.findByRole('heading', { name: 'Task Detail', level: 1 });
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe('/tasks/7?status=open#activity');
+    expect(api.getTaskDetail).toHaveBeenCalledWith('new-test-token', 7);
+  });
+  it.each([undefined, { from: { pathname: '//evil.invalid' } }, { from: { pathname: '/login' } },
+    { from: { pathname: '/unknown' } }, { from: { pathname: '/cases/7', search: '?bad=%' } }])
+  ('uses default for absent or unsafe login state %#', async state => {
+    loginAt(state); await screen.findByRole('heading', { name: 'Sign in' }); submitLogin();
+    await screen.findByRole('heading', { name: 'My Shale', level: 1 });
+    expect(window.location.pathname).toBe('/my-shale'); expect(window.history.state.usr).toBeNull();
+    expect(api.getCaseDetail).not.toHaveBeenCalled();
+  });
+  it('replaces login so Back/Forward returns to prior authenticated navigation without a redirect loop', async () => {
+    window.history.replaceState({}, '', '/login');
+    window.history.pushState({}, '', '/contacts/7?sort=name#profile'); render(<App />);
+    await screen.findByRole('heading', { name: 'Sign in' }); submitLogin();
+    await screen.findByRole('heading', { name: 'Contact Detail', level: 1 });
+    // Prior explicit login has no return state and uses its existing authenticated default.
+    window.history.back(); await screen.findByRole('heading', { name: 'My Shale', level: 1 });
+    window.history.forward(); await screen.findByRole('heading', { name: 'Contact Detail', level: 1 });
+    expect(window.location.search + window.location.hash).toBe('?sort=name#profile');
+    expect(api.login).toHaveBeenCalledTimes(1);
+  });
+  it('clears consumed return state on detail logout and requires fresh authentication even after Back', async () => {
+    let finishLogout!: () => void;
+    vi.mocked(api.logout).mockReturnValue(new Promise(done => { finishLogout = done; }));
+    beta('/contacts/7?sort=name#profile'); await screen.findByRole('heading', { name: 'Sign in' }); submitLogin();
+    await screen.findByRole('heading', { name: 'Contact Detail', level: 1 });
+    document.querySelector('details')!.open = true;
+    fireEvent.click(screen.getByRole('link', { name: 'My Tasks' }));
+    await screen.findByRole('heading', { name: 'Tasks', level: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    await screen.findByRole('heading', { name: 'Sign in' });
+    expect(window.history.state.usr).toBeNull(); expect(screen.queryByRole('navigation')).toBeNull();
+    submitLogin(); await screen.findByRole('heading', { name: 'My Shale', level: 1 });
+    expect(window.location.pathname).toBe('/my-shale'); finishLogout();
+    // Sign out again and navigate Back to a historical detail entry: still protected.
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    await screen.findByRole('heading', { name: 'Sign in' });
+    const detailCalls = vi.mocked(api.getContactDetail).mock.calls.length;
+    window.history.back(); await waitFor(() => expect(window.history.state.usr?.from?.pathname).toBe('/contacts/7'));
+    expect(window.location.pathname).toBe('/login'); expect(screen.queryByRole('navigation')).toBeNull();
+    expect(api.getContactDetail).toHaveBeenCalledTimes(detailCalls);
+  });
+  it.each([['/unknown', false, 'Sign in'], ['/unknown', true, 'My Shale'], ['/login', true, 'My Shale'], ['/', false, 'Sign in']])
+  ('retains root, unknown and authenticated-login fallback for %s / signed in %s', async (path, authenticated, heading) => {
+    vi.mocked(api.readAccessToken).mockReturnValue(authenticated ? 'test-token' : null);
+    beta(path); await screen.findByRole('heading', { name: heading, level: 1 });
+    expect(window.location.pathname).toBe(authenticated ? '/my-shale' : '/login');
+  });
 });
 
 

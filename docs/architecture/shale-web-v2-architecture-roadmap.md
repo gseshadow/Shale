@@ -2,7 +2,10 @@
 
 **Reviewed:** 2026-10-08. **Inventory/documentation:** COMPLETE. **Decision acceptance:** OPEN.
 **Web V2 implementation:** Phase 2A foundation, Phase 2B authenticated shell and Phase 2C My Shale presentation adoption IMPLEMENTED FOR REVIEW; Phase 2D acceptance review and targeted feedback fix RECORDED; ACCEPTANCE OPEN.
-Phase 2 remains IN PROGRESS; phases 3–10 NOT STARTED. Documentation completion is not implementation completion.
+Phase 2 remains IN PROGRESS; acceptance OPEN. Phase 3 IN PROGRESS — only Phase 3A safe login return-path
+restoration IMPLEMENTED FOR REVIEW. Phases 4–10 NOT STARTED. The user explicitly authorized this bounded
+Phase 3 slice while Phase 2 acceptance remains open; that sequencing does not mark Phase 2 complete.
+Documentation completion is not implementation completion.
 
 **Evidence baseline:** live `origin/codex/latest`, `32e2cfdd25ad475bc03fbb91763c9769ce2ccd6a`.
 [PR #1837](https://github.com/gseshadow/Shale/pull/1837) was merged into that base.
@@ -67,8 +70,11 @@ Paths below are relative to the repository root unless linked. Symbol names make
 There are no current Calendar, Reports, unified Search, or case subsection URL routes in `AppRoutes`.
 These future routes must not be advertised as implemented. Current create/edit forms are local UI state,
 not canonical subsection routes. `ProtectedRoute` passes the current location in navigation state;
-`LoginPage` uses `redirectPathFrom` to return to its pathname after login. That helper accepts any string
-pathname and does not restore search/hash, so V2 must harden return-to validation and safe filter restoration.
+`AppRoutes` now owns the successful-login replacement through `redirectPathFrom`, validating the
+existing protected route allowlist and preserving pathname/search/hash. `LoginPage` verifies login
+through `/me` before installing auth; it no longer issues a competing navigation. Explicit logout
+replaces the current entry with `/login` and clears return state. [Phase 3A review](../../shale-web/docs/phase-3a-review.md)
+records reproduction, safety rules and synthetic evidence. Future route/filter policy remains separate.
 
 ### 2.2 Server, shared services, desktop
 
@@ -540,7 +546,7 @@ merely because this document describes it.
 | --- | --- | --- | --- | --- | --- |
 | 1 — Inventory and architecture | DOCUMENTATION COMPLETE; ACCEPTANCE OPEN | Live base and required authorities | This inventory, client decisions, parity/audit matrix and next prompt | Source/test review, links/fences/status/diff checks and documentation selector | Documentation only; no V2 features accepted. D1–D10 remain explicit. |
 | 2 — Tokens, components, responsive shell | IN PROGRESS — Phase 2A foundation / Phase 2B authenticated shell / Phase 2C My Shale implemented for review; Phase 2D reviewed with feedback fix; acceptance OPEN | Phase 1 recommendations; D2/D4 for this milestone | Token mapping, shared semantic primitives, responsive shell with complete navigation; temporary preview composition and beta rollback | Existing web tests plus focused semantics/navigation; typecheck/build; screenshots both themes at compact/medium/wide, keyboard/zoom/contrast | Reviewable foundation using synthetic data, all destinations discoverable, no backend/new feature sprawl. Phase 2A: shared primitives/tokens and synthetic preview. Phase 2B: shell adopted beneath existing ProtectedRoute around unchanged outlets; beta screen skin retained. [Phase 2A review](../../shale-web/docs/phase-2a-review.md) and [Phase 2B exact scope, checks, captures and gaps](../../shale-web/docs/phase-2b-review.md). [Phase 2C My Shale review](../../shale-web/docs/phase-2c-review.md) adds shared Light/Dark operational presentation and native Chromium 200%/400% zoom evidence. [Phase 2D acceptance review](../../shale-web/docs/phase-2d-review.md) records rerun Chromium shell/state/zoom checks and persistent task completion feedback; [operator checklist](../../shale-web/docs/phase-2d-operator-checklist.md) owns unavailable Firefox/WebKit, screen-reader and physical-device checks. No all-Phase-2 completion claim; D4 device/screen-reader/other-engine acceptance remains OPEN. |
-| 3 — Routing, session boundary, transport | NOT STARTED | Phase 2; D2/D3 and selected contract review | Canonical routes/aliases, safe return-to, dirty blockers, CredentialStore, coordinated refresh, cancellation/errors, memory query cache | Router/session/transport behavior including refresh race, stale 401, network failure, logout/identity cleanup and dirty forms; legacy endpoint compatibility | No leakage/stale identity installation; unchanged bearer protocol; no replayed uncertain write. Reuse existing durable server APIs. |
+| 3 — Routing, session boundary, transport | IN PROGRESS — only Phase 3A safe login return implemented for review | Phase 2 acceptance OPEN; user-authorized bounded sequencing exception for 3A; D2/D3 and selected contract review for remaining work | Canonical routes/aliases, safe return-to, dirty blockers, CredentialStore, coordinated refresh, cancellation/errors, memory query cache | Router/session/transport behavior including refresh race, stale 401, network failure, logout/identity cleanup and dirty forms; legacy endpoint compatibility | Phase 3A: [review and synthetic evidence](../../shale-web/docs/phase-3a-review.md), validated pathname/query/hash, replacement history and logout return-state cleanup. Broader canonical routes, dirty blockers, storage abstraction, startup uncertainty, refresh/transport/cancellation/cache work UNFINISHED. No overall Phase 3 acceptance; unchanged bearer protocol; no replayed uncertain write. |
 | 4 — First end-to-end read slice | NOT STARTED | Phases 2–3; D1/D5/D6 only for selected reads | Sign in → assigned/basic search → case Overview; genuine bounded reads and required read-audit seam | Current controller/adapter/OpenAPI tests plus targeted SQL paging/actor/two-tenant/audit-failure tests; web loading/empty/error/deep-link/back acceptance | Usable reviewed slice, no broad backend rewrite/all-screen dependency. Basic search may ship before unified suggestions with exclusions explicit. |
 | 5 — Tasks and Case Dates/confirmation | NOT STARTED | Phase 4; D5/D6 per write; reviewed occurrence/confirmation adapters | Task policy/forms/assignment/completion and generic dates/confirmation through authoritative workers; incremental usable slices | Due-policy tests, actor/tenant denial, token conflicts, aggregate rollback/audit tests; mobile editor/draft behavior | Task transaction/audit gaps closed for exposed commands; CaseDates/ValueRevision preserved. Live remains optional until D7 passes. |
 | 6 — Remaining case flows, Contacts/Organizations | NOT STARTED | Relevant phase 5 contracts; D1/D5/D6/D8 | Intake, parties/team/links/updates/material metadata/timeline, structured directories; separately gated document export/content | Domain aggregate/delegation tests, conflict/audit rollback, parent-case permissions, responsive long forms/cards and deliberate mutation recovery | Per-feature acceptance; no fake blob/provider entitlement, no scalar/date/overlay authority in React. Unaccepted content scope remains visibly unavailable. |
@@ -693,7 +699,8 @@ expected outcomes and browser/device/outcome/findings fields. No merge/deploymen
 * Firefox 157.0 downloaded but profile launch failed, including one targeted TMPDIR retry. WebKit 27.2
   downloaded but missing host libraries prevent launch. Neither engine's matrix/native zoom accepted.
   No real screen reader/display or physical device available. No real-host/live auth/backend/tenant/audit
-  acceptance performed, and no Phase 2D user-reported results supplied. Required manual checks remain OPEN.
+  acceptance performed at that checkpoint. Later user-reported Windows Firefox/Narrator synthetic
+  results are recorded below and in the operator checklist; required full acceptance remains OPEN.
 * 68 web tests, typecheck/build, selector-selected AuthControllerTest (10), critical Maven reactor (116)
   and git diff checks pass. Existing affected tests extended for stable task status and failure/legacy
   isolation; no geometry test gate or GitHub testing workflow. Review scripts/fixtures isolated from app.
@@ -705,6 +712,42 @@ Next bounded **Phase 2E acceptance closure**: run the outstanding shell/My Shale
 physical-device and other-engine checks and fix only reproduced findings; select any new-screen adoption
 separately. Phase 2 remains **IN PROGRESS**, Phase 3 **NOT STARTED**, including the deferred focused login
 return-path investigation and safe pathname/search/hash restoration. No acceptance closure by inference.
+
+### 11.7 Phase 3A safe login return restoration — 2026-10-08
+
+Based on fetched live `origin/codex/latest` `151d05a9f34af2922dddc94036bc446b22bf465b`, including merged
+Phase 2D PR #1842 and dependency-security PR #1843. Separate task branch
+`codex/web-v2-phase-3a-return-path`; [review](../../shale-web/docs/phase-3a-review.md) owns cause,
+checks, synthetic browser evidence, limits and rollback. Phase 3 IN PROGRESS; only this slice is
+implemented for review. The user explicitly authorized beginning it while Phase 2 acceptance stays OPEN.
+
+* Reproduced protected detail → login → My Shale on untouched production. `LoginPage` return navigation
+  competed with `AppRoutes`' authenticated-login default redirect. One rendered redirect now owns return;
+  auth is installed only after successful login and `/me`. Valid router-relative protected paths retain
+  query/hash exactly; malformed/external/auth-loop/undeclared targets use `/my-shale`. Login history is
+  replaced and return state consumed. Failed attempts retain state; logout clears it with replacement.
+* Focused and complete web tests, typecheck/build, selected server bearer compatibility and critical
+  Maven checks; synthetic Chromium case/contact/task round trips in both shell themes plus history,
+  delayed verification, failed-then-successful login, default/invalid login and logout boundary checks.
+  Fixtures live only under review documentation; no live backend/authentication acceptance claimed.
+* User-reported Windows Firefox synthetic follow-up: completion success/failure, native 200%/400% zoom
+  in both themes, keyboard/skip/disclosure/Escape/independent Complete and loading/empty/read-error/normal
+  states behaved/looked good. Windows Narrator spoke task-named pending completion; readable structure
+  and errors confirmed. Success speech is **assumed by the user, NOT verified**, because releasing the
+  response required switching to Command Prompt. Exact browser version, full AT coverage and full
+  acceptance are not inferred. Physical devices, Safari/WebKit, real-host/live backend checks stay OPEN.
+  [Operator record](../../shale-web/docs/phase-2d-operator-checklist.md) retains remaining gates.
+* Audit: no new mutation or sensitive-read endpoint, audit seam/schema or event. Existing authenticated
+  detail/service/DAO authorization, tenant, validation, concurrency and audit enforcement are retained;
+  navigation mechanics intentionally unaudited. Section 8.2 audit gaps remain deferred. Dependencies and
+  security patches unchanged. No backend/SQL/API/protocol/storage/preview/presentation/deployment change.
+
+Next bounded **Phase 3B**: startup verification uncertainty only — distinguish confirmed authentication
+rejection from transient network/5xx failure, block protected content while unknown, and offer explicit Retry
+with focused tests. No token-storage change, refresh coordination or transport/cache redesign in that slice
+without separate scope. Broader Phase 3 routing/session/transport/cache/dirty-form work remains UNFINISHED.
+Phase 2E acceptance work continues independently. Rollback reverts only Phase 3A to this security-patched
+base; it requires no backend/session/SQL rollback. No merge or deployment.
 
 ## 12. Ready-to-run next Codex implementation prompt
 

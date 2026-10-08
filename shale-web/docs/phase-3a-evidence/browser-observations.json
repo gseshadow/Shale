@@ -1,0 +1,767 @@
+{
+  "browser": "151.0.7922.173",
+  "playwright": "1.64.0",
+  "fixture": "Intercepted synthetic API only. No live authentication/backend/tenant/audit acceptance.",
+  "observations": [
+    {
+      "path": "/cases/7?page=2#details",
+      "theme": "light",
+      "captured": {
+        "pathname": "/cases/7",
+        "search": "?page=2",
+        "hash": "#details",
+        "state": null,
+        "key": "default"
+      },
+      "restoredAfterVerification": true,
+      "failedThenSuccessful": false,
+      "historyReplacement": true,
+      "backToPreviewWithoutLoginLoop": true,
+      "authenticatedNavigationBackForward": true,
+      "logoutBoundaryOnBack": true,
+      "defaultLogin": true,
+      "invalidTargetFallback": true,
+      "calls": [
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "path": "/contacts/7?sort=name#profile",
+      "theme": "light",
+      "captured": {
+        "pathname": "/contacts/7",
+        "search": "?sort=name",
+        "hash": "#profile",
+        "state": null,
+        "key": "default"
+      },
+      "restoredAfterVerification": true,
+      "failedThenSuccessful": false,
+      "historyReplacement": true,
+      "backToPreviewWithoutLoginLoop": true,
+      "authenticatedNavigationBackForward": true,
+      "logoutBoundaryOnBack": true,
+      "defaultLogin": true,
+      "invalidTargetFallback": true,
+      "calls": [
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "path": "/tasks/7?status=open#activity",
+      "theme": "light",
+      "captured": {
+        "pathname": "/tasks/7",
+        "search": "?status=open",
+        "hash": "#activity",
+        "state": null,
+        "key": "default"
+      },
+      "restoredAfterVerification": true,
+      "failedThenSuccessful": true,
+      "historyReplacement": true,
+      "backToPreviewWithoutLoginLoop": true,
+      "authenticatedNavigationBackForward": true,
+      "logoutBoundaryOnBack": true,
+      "defaultLogin": true,
+      "invalidTargetFallback": true,
+      "calls": [
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "path": "/cases/7?page=2#details",
+      "theme": "dark",
+      "captured": {
+        "pathname": "/cases/7",
+        "search": "?page=2",
+        "hash": "#details",
+        "state": null,
+        "key": "default"
+      },
+      "restoredAfterVerification": true,
+      "failedThenSuccessful": false,
+      "historyReplacement": true,
+      "backToPreviewWithoutLoginLoop": true,
+      "authenticatedNavigationBackForward": true,
+      "logoutBoundaryOnBack": true,
+      "defaultLogin": true,
+      "invalidTargetFallback": true,
+      "calls": [
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/tasks",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/7/updates",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "path": "/contacts/7?sort=name#profile",
+      "theme": "dark",
+      "captured": {
+        "pathname": "/contacts/7",
+        "search": "?sort=name",
+        "hash": "#profile",
+        "state": null,
+        "key": "default"
+      },
+      "restoredAfterVerification": true,
+      "failedThenSuccessful": false,
+      "historyReplacement": true,
+      "backToPreviewWithoutLoginLoop": true,
+      "authenticatedNavigationBackForward": true,
+      "logoutBoundaryOnBack": true,
+      "defaultLogin": true,
+      "invalidTargetFallback": true,
+      "calls": [
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "path": "/tasks/7?status=open#activity",
+      "theme": "dark",
+      "captured": {
+        "pathname": "/tasks/7",
+        "search": "?status=open",
+        "hash": "#activity",
+        "state": null,
+        "key": "default"
+      },
+      "restoredAfterVerification": true,
+      "failedThenSuccessful": true,
+      "historyReplacement": true,
+      "backToPreviewWithoutLoginLoop": true,
+      "authenticatedNavigationBackForward": true,
+      "logoutBoundaryOnBack": true,
+      "defaultLogin": true,
+      "invalidTargetFallback": true,
+      "calls": [
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "unexpected": []
+}

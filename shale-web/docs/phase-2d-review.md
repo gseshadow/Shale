@@ -107,7 +107,9 @@ node shale-web/docs/phase-2d-evidence/contrast-review.cjs
   No WebKit matrix/zoom pass; packaged WebKit is not physical Safari/iOS evidence.
 - No real screen reader, desktop display/Xvfb, or physical phone/tablet is available. No device emulation
   is counted as physical acceptance. Real-host routing and live authenticated/security workflows were not run.
-- **User-reported results:** none supplied for Phase 2D. Historical Phase 2C passes are distinct from reruns here.
+- **At this review checkpoint:** no user-reported results had been supplied. The later Windows Firefox/
+  Narrator synthetic reports are recorded in the [operator checklist](phase-2d-operator-checklist.md).
+  Success speech is assumed by the user, NOT verified; full acceptance remains OPEN.
 
 [Short operator checklist with exact launch steps and result fields](phase-2d-operator-checklist.md)
 owns all remaining checks. No repeated unsupported launch/zoom retries are required.
@@ -122,3 +124,7 @@ screen. Phase 2 stays IN PROGRESS until required acceptance is recorded. Wider s
 needs a separate selected consumer. Phase 3 remains NOT STARTED: begin with a focused investigation of the
 existing login return-path defect (protected detail → login → My Shale), safe pathname/search/hash restoration
 and its routing/session tests; it remains deferred here. No merge or deployment.
+
+Phase 3A sequencing follow-up: the user authorized the bounded login-return slice while Phase 2
+acceptance remains OPEN. [Phase 3A review](phase-3a-review.md) supersedes the earlier NOT STARTED
+checkpoint for that slice only; it does not close Phase 2 or the broader Phase 3 backlog.
