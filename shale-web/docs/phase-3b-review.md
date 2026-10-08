@@ -63,7 +63,28 @@ return-path/input tests and server auth tests. The old all-failure-clears expect
 | useStartupSession, getCurrentUser/storage | Real API/storage hook tests: no bearer, success, network, nine non-401 statuses, malformed/empty/false/invalid profiles, duplicate attempts, sign-out/replacement/newer attempt/unmount/StrictMode stale outcomes. |
 | Unchanged shell/My Shale/preview/returnPath/validation | Full existing suites retained and rerun. |
 
-Validation results and selected repository checks are recorded below after execution.
+Executed from repository root; Maven uses `source /workspace/.tools/shale-env.sh` (Java 21).
+
+| Command | Result |
+| --- | --- |
+| `git fetch origin codex/latest` | Passed; live base above. Initial restricted-sandbox proxy failure resolved with the supported network-enabled execution permission. Refetch hydrated the complete base objects. |
+| `npm ci --prefix shale-web --cache /workspace/.cache/npm` | Passed; package/lockfile unchanged. An initial offline-only attempt lacked a cached package and did not count as validation. |
+| `npm test --prefix shale-web -- src/App.test.tsx src/useStartupSession.test.tsx` | 93 passed. |
+| `npm test --prefix shale-web` | 193 passed, seven files. |
+| `npm run typecheck --prefix shale-web`; `npm run build --prefix shale-web` | Passed; operational and isolated foundation entries retained. |
+| `python3 build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format markdown` | [Selection](phase-3b-evidence/test-selection.md): server bearer compatibility/AuthController; no full-suite escalation. |
+| `mvn -pl shale-server -am -Dtest=com.shale.server.controller.AuthControllerTest -Dsurefire.failIfNoSpecifiedTests=false test` | 10 passed; verifies the unchanged server contract consumed by startup/login. |
+| `mvn test` | Critical reactor 116 passed; zero failures/errors/skips. |
+| `PLAYWRIGHT_MODULE=/workspace/work/browser-tools/node_modules/playwright node shale-web/docs/phase-3b-evidence/browser-review.cjs` | Four scenarios passed; eight captures; zero page errors/unexpected requests. Chromium 151.0.7922.173 / Playwright 1.64.0. |
+| `git diff --check`; `git diff origin/codex/latest HEAD --check` | Passed. |
+| `git diff --exit-code origin/codex/latest -- shale-web/package.json shale-web/package-lock.json` | Unchanged; security patches intact (router 7.18.2, PostCSS 8.5.23). |
+| `npm audit --prefix shale-web --json`; `npm audit --prefix shale-web --omit=dev --json` | [All dependencies](phase-3b-evidence/audit.json) / [production](phase-3b-evidence/audit-production.json): zero vulnerabilities at every severity. |
+
+The browser's first run reproduced lost focus on disabled Retry; the status-focus handoff fixed it.
+A focused test run also exposed existing neighboring Phase 3A assertions that treated heading render
+as proof a feature effect had executed. Those request assertions now wait for the actual call, keeping
+the same expected arguments/counts. Focused and full suites passed after correction. Final affected-symbol
+search and production-to-test diff review retained login, shell, returnPath and preview coverage.
 
 [Browser script](phase-3b-evidence/browser-review.cjs) intercepts every API request and aborts unexpected
 remote destinations. External Playwright and system Chromium run against local Vite; fixtures are

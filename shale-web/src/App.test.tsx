@@ -120,7 +120,7 @@ describe('authenticated responsive shell composition', () => {
     await screen.findByRole('heading', { name: 'Contact Detail', level: 1 });
     expect(api.getCurrentUser).toHaveBeenLastCalledWith('new-test-token');
     expect(api.storeAccessToken).toHaveBeenCalledWith('new-test-token');
-    expect(api.getContactDetail).toHaveBeenCalledWith('new-test-token', 7);
+    await waitFor(() => expect(api.getContactDetail).toHaveBeenCalledWith('new-test-token', 7));
   });
   it('logs out locally and unmounts protected content before the existing remote call finishes', async () => {
     let finish!: () => void;
@@ -247,7 +247,7 @@ describe('verified login return restoration', () => {
     expect(detail).not.toHaveBeenCalled(); verify(user);
     await screen.findByRole('heading', { name: heading, level: 1 });
     expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
-    expect(detail).toHaveBeenCalledWith('new-test-token', 7);
+    await waitFor(() => expect(detail).toHaveBeenCalledWith('new-test-token', 7));
     expect(window.history.length).toBe(historyLength); expect(window.history.state.usr).toBeNull();
     expect(api.listAssignedCases).not.toHaveBeenCalled();
   });
@@ -261,7 +261,7 @@ describe('verified login return restoration', () => {
     expect(api.getTaskDetail).not.toHaveBeenCalled(); expect(api.storeAccessToken).not.toHaveBeenCalled();
     submitLogin(); await screen.findByRole('heading', { name: 'Task Detail', level: 1 });
     expect(window.location.pathname + window.location.search + window.location.hash).toBe('/tasks/7?status=open#activity');
-    expect(api.getTaskDetail).toHaveBeenCalledWith('new-test-token', 7);
+    await waitFor(() => expect(api.getTaskDetail).toHaveBeenCalledWith('new-test-token', 7));
   });
   it.each([undefined, { from: { pathname: '//evil.invalid' } }, { from: { pathname: '/login' } },
     { from: { pathname: '/unknown' } }, { from: { pathname: '/cases/7', search: '?bad=%' } }])
