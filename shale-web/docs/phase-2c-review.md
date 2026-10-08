@@ -83,7 +83,8 @@ Executed successfully from repository root:
   operational and foundation HTML entries retained.
 - `python3 build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format markdown`:
   server/AuthController selected; no all-suite escalation. Web consumer ownership maps to bearer/API
-  compatibility; no unrelated domain areas selected. [Selector output](phase-2c-evidence/test-selection.md).
+  compatibility; no unrelated domain areas selected. The same command with `--run` also passed,
+  executing the selected check and critical reactor below. [Selector output](phase-2c-evidence/test-selection.md).
 - `/workspace/.tools/bin/mvn -pl shale-server -am -Dtest=com.shale.server.controller.AuthControllerTest -Dsurefire.failIfNoSpecifiedTests=false test`:
   **10 passed**, after sourcing `/workspace/.tools/shale-env.sh` for Java 21/Maven.
 - `/workspace/.tools/bin/mvn test`: critical reactor **116 passed**, zero failures/errors/skips.
@@ -146,7 +147,7 @@ Only claim live service/security acceptance after separately exercising those wo
 
 ## Rollback and next bounded milestone
 
-Frontend-only rollback: revert this milestone's commit or rebuild base
+Frontend-only rollback: revert this milestone's commits or rebuild base
 `7e7972d6ebb0f1fcc5ae61c1d2eead4854aad39e` with the same API-origin setting. This restores Phase 2B
 shell and beta My Shale presentation. No server/SQL/session/deployment rollback is required. Keep
 foundation.html/preview and prior evidence until accepted composition replaces them in a later task.
