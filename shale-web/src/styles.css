@@ -747,3 +747,10 @@ button:focus-visible,
   font-weight: 800;
   overflow-wrap: anywhere;
 }
+
+/* Extracted EntityCard uses a native activation button; retain beta presentation. */
+.entity-card-activation {
+  background: transparent; border: 0; border-radius: 8px; color: inherit;
+  font: inherit; min-height: 44px; padding: 0; text-align: left; width: 100%;
+}
+.entity-card-activation:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }

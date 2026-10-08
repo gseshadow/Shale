@@ -69,3 +69,10 @@ SHALE_ALLOWED_CORS_ORIGINS=http://localhost:5173
 ```
 
 Restart the Azure App Service after changing CORS or other App Service application settings so the running API process picks up the new values.
+
+## Web V2 Phase 2A synthetic preview
+
+Run `npm run dev` and open <http://localhost:5173/foundation.html> for the isolated responsive shell,
+shared components and Light/Dark examples. It makes no API calls and needs no credentials. `/` and the
+existing business routes retain the beta composition. [Phase 2A review and evidence](docs/phase-2a-review.md)
+documents ownership, local build review, checks, limitations and temporary-entry removal.

@@ -1,0 +1,74 @@
+[
+  {
+    "width": 320,
+    "theme": "light",
+    "overflow": false,
+    "targetsAtLeast44": true,
+    "apiRequests": [],
+    "errors": [],
+    "keyboard": "Enter/Space card; compact Enter/Escape/return focus; validation focus"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "overflow": false,
+    "targetsAtLeast44": true,
+    "apiRequests": [],
+    "errors": [],
+    "keyboard": "Enter/Space card; compact Enter/Escape/return focus; validation focus"
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "overflow": false,
+    "targetsAtLeast44": true,
+    "apiRequests": [],
+    "errors": [],
+    "keyboard": "Enter/Space card; compact Enter/Escape/return focus; validation focus"
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "overflow": false,
+    "targetsAtLeast44": true,
+    "apiRequests": [],
+    "errors": [],
+    "keyboard": "Enter/Space card; compact Enter/Escape/return focus; validation focus"
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "overflow": false,
+    "targetsAtLeast44": true,
+    "apiRequests": [],
+    "errors": [],
+    "keyboard": "Enter/Space card; compact Enter/Escape/return focus; validation focus"
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "overflow": false,
+    "targetsAtLeast44": true,
+    "apiRequests": [],
+    "errors": [],
+    "keyboard": "Enter/Space card; compact Enter/Escape/return focus; validation focus"
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "overflow": false,
+    "targetsAtLeast44": true,
+    "apiRequests": [],
+    "errors": [],
+    "keyboard": "Enter/Space card; compact Enter/Escape/return focus; validation focus"
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "overflow": false,
+    "targetsAtLeast44": true,
+    "apiRequests": [],
+    "errors": [],
+    "keyboard": "Enter/Space card; compact Enter/Escape/return focus; validation focus"
+  }
+]

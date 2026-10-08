@@ -1,0 +1,9 @@
+/* Only the dedicated preview entry imports this stylesheet. */
+body { margin: 0; }
+.shale-foundation .foundation-gallery { max-width: 76rem; margin-inline: auto; display: grid; gap: var(--shale-space-6); }
+.shale-foundation .foundation-columns { display: grid; gap: var(--shale-space-4); grid-template-columns: minmax(0,1fr); align-items: start; }
+.shale-foundation .foundation-stack, .shale-foundation .foundation-form { display: grid; gap: var(--shale-space-3); min-width: 0; }
+.shale-foundation .foundation-indicators { display: flex; flex-wrap: wrap; gap: var(--shale-space-2); }
+@media (min-width: 75rem) {
+  .shale-foundation .foundation-columns { grid-template-columns: minmax(0,1.35fr) minmax(0,1fr); }
+}

@@ -1,9 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState, useRef } from 'react';
-import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import { ApiError, contactValueUpdate } from './api';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
+import { PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
+import { destinations } from './shell/navigation';
 import './styles.css';
 
 function focusContactError(error: unknown, form: HTMLFormElement) {
@@ -19,17 +21,11 @@ interface AuthState {
   isVerifying: boolean;
 }
 
-const navigationItems = [
-  { path: '/my-shale', label: 'My Shale', activePrefixes: ['/my-shale', '/tasks'] },
-  { path: '/cases', label: 'Cases', activePrefixes: ['/cases'] },
-  { path: '/contacts', label: 'Contacts', activePrefixes: ['/contacts'] },
-  { path: '/organizations', label: 'Organizations', activePrefixes: ['/organizations'] },
-  { path: '/team', label: 'Team', activePrefixes: ['/team'] },
-  { path: '/settings', label: 'Settings', activePrefixes: ['/settings'] },
-];
+const navigationItems = destinations.filter(item => item.available && item.path !== '/tasks').map(item => ({
+  ...item, activePrefixes: item.path === '/my-shale' ? ['/my-shale', '/tasks'] : [item.path],
+}));
 
 const MISSING_VALUE = '—';
-
 
 function isMissing(value: string | number | null | undefined): boolean {
   return value === null || value === undefined || String(value).trim() === '';
@@ -76,33 +72,6 @@ function formatDateTime(value: string | null | undefined): string {
     hour: 'numeric',
     minute: '2-digit',
   }).format(date);
-}
-
-function PageHeader({ eyebrow, title, titleId, lede, action }: { eyebrow: string; title: string; titleId?: string; lede?: string; action?: ReactNode }) {
-  return (
-    <header className="page-header">
-      <div className="page-heading-row">
-        <div className="page-title-block">
-          <p className="eyebrow">{eyebrow}</p>
-          <h1 id={titleId}>{title}</h1>
-          {lede && <p className="lede">{lede}</p>}
-        </div>
-        {action && <ToolbarActions>{action}</ToolbarActions>}
-      </div>
-    </header>
-  );
-}
-
-function ToolbarActions({ children }: { children: ReactNode }) {
-  return <div className="toolbar-actions">{children}</div>;
-}
-
-function ActionButton({ children, type = 'button', disabled = false, onClick }: { children: ReactNode; type?: 'button' | 'submit'; disabled?: boolean; onClick?: () => void }) {
-  return <button className="action-button" type={type} disabled={disabled} onClick={onClick}>{children}</button>;
-}
-
-function SecondaryButton({ children, type = 'button', disabled = false, onClick }: { children: ReactNode; type?: 'button' | 'submit'; disabled?: boolean; onClick?: () => void }) {
-  return <button className="secondary-button" type={type} disabled={disabled} onClick={onClick}>{children}</button>;
 }
 
 function SearchBar({ id, label, value, placeholder, isLoading, loadingLabel = 'Searching…', submitLabel = 'Search', onChange, onSubmit }: { id: string; label: string; value: string; placeholder: string; isLoading?: boolean; loadingLabel?: string; submitLabel?: string; onChange: (value: string) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
@@ -244,7 +213,6 @@ function mergeEffectivePracticeAreas(rows: PracticeAreaSetting[], shaleClientId:
     return byName || left.id - right.id;
   });
 }
-
 
 function SettingsPage({ accessToken, user }: { accessToken: string | null; user: AuthenticatedUser | null }) {
   const [caseStatuses, setCaseStatuses] = useState<CaseStatusSetting[]>([]);
@@ -402,68 +370,6 @@ function SettingsTable({ title, emptyText, headers, rows }: { title: string; emp
     </div>
   );
 }
-
-function LoadingState({ message }: { message: string }) {
-  return <p className="status loading-state">{message}</p>;
-}
-
-function EmptyState({ message }: { message: string }) {
-  return <p className="status empty-state">{message}</p>;
-}
-
-function StatusPill({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'success' | 'warning' | 'info' }) {
-  return <span className={`status-pill status-pill-${tone}`}>{children}</span>;
-}
-
-function MetadataRow({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="metadata-row">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
-  );
-}
-
-function MetadataGrid({ children }: { children: ReactNode }) {
-  return <dl className="metadata-grid">{children}</dl>;
-}
-
-function EntityList({ children, ariaLabel }: { children: ReactNode; ariaLabel: string }) {
-  return <div className="entity-list" role="list" aria-label={ariaLabel}>{children}</div>;
-}
-
-function EntityCard({ title, subtitle, eyebrow, badges, metadata, actions, onClick, ariaLabel }: { title: ReactNode; subtitle?: ReactNode; eyebrow?: ReactNode; badges?: ReactNode; metadata?: ReactNode; actions?: ReactNode; onClick?: () => void; ariaLabel?: string }) {
-  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
-    if (!onClick) return;
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onClick();
-    }
-  }
-
-  return (
-    <article
-      className={onClick ? 'entity-card entity-card-clickable' : 'entity-card'}
-      role="listitem"
-      tabIndex={onClick ? 0 : undefined}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      aria-label={ariaLabel}
-    >
-      <div className="entity-card-header">
-        <div className="entity-card-title-block">
-          {eyebrow && <p className="entity-card-eyebrow">{eyebrow}</p>}
-          <h3 className="entity-card-title">{title}</h3>
-          {subtitle && <p className="entity-card-subtitle">{subtitle}</p>}
-        </div>
-        {badges && <div className="entity-card-badges">{badges}</div>}
-      </div>
-      {metadata && <div className="entity-card-metadata">{metadata}</div>}
-      {actions && <div className="entity-card-actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{actions}</div>}
-    </article>
-  );
-}
-
 
 function BackLink({ to, children, ariaLabel }: { to: string; children: ReactNode; ariaLabel?: string }) {
   return <Link className="back-link" to={to} aria-label={ariaLabel}>{children}</Link>;
@@ -628,7 +534,6 @@ function PrimaryNavigation({ locationPathname }: { locationPathname: string }) {
   );
 }
 
-
 function MyShalePage({ accessToken, user }: { accessToken: string | null; user: AuthenticatedUser | null }) {
   return (
     <section className="dashboard-page" aria-labelledby="my-shale-title">
@@ -774,7 +679,6 @@ function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError }: 
     </EntityList>
   );
 }
-
 
 function TasksPage({ accessToken }: { accessToken: string | null }) {
   const [tasks, setTasks] = useState<CaseTaskListItem[]>([]);
@@ -1424,7 +1328,6 @@ function ColorSwatch({ color }: { color: string | null }) {
   return <span className="color-swatch-value"><span className="color-swatch" style={{ backgroundColor: color }} aria-hidden="true" />{color}</span>;
 }
 
-
 function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
   const { taskId } = useParams();
   const numericTaskId = Number(taskId);
@@ -1799,7 +1702,6 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
     </div>
   );
 }
-
 
 function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
   const [practiceAreas, setPracticeAreas] = useState<PracticeAreaSetting[]>([]);
@@ -2453,7 +2355,6 @@ function ContactDetailReadOnly({ accessToken, detail, onDetailChanged }: { acces
   );
 }
 
-
 function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: string | null; onCreated: (detail: ContactDetail) => void; onCancel: () => void }) {
   const [name, setName] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -2611,7 +2512,6 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
     </form>
   );
 }
-
 
 function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessToken: string | null; onCreated: (detail: OrganizationDetail) => void; onCancel: () => void }) {
   const [name, setName] = useState('');

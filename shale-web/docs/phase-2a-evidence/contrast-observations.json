@@ -1,0 +1,438 @@
+{
+  "light": [
+    {
+      "pair": [
+        "text",
+        "card"
+      ],
+      "ratio": 15.5,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "text",
+        "section"
+      ],
+      "ratio": 14.08,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "text",
+        "input"
+      ],
+      "ratio": 15.76,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "text",
+        "selected"
+      ],
+      "ratio": 14.51,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "secondary-text",
+        "card"
+      ],
+      "ratio": 7.2,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "muted",
+        "section"
+      ],
+      "ratio": 5.28,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "muted",
+        "card"
+      ],
+      "ratio": 5.81,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "link",
+        "canvas"
+      ],
+      "ratio": 5.42,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "link",
+        "selected"
+      ],
+      "ratio": 5.42,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "action-text",
+        "secondary"
+      ],
+      "ratio": 9.78,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "danger-text",
+        "danger"
+      ],
+      "ratio": 6.74,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "danger-text",
+        "section"
+      ],
+      "ratio": 6.49,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "success-text",
+        "success"
+      ],
+      "ratio": 5.9,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "info-text",
+        "info"
+      ],
+      "ratio": 6.69,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "neutral-text",
+        "neutral"
+      ],
+      "ratio": 6.68,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-primary",
+        "primary-start"
+      ],
+      "ratio": 5.49,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-primary",
+        "primary-end"
+      ],
+      "ratio": 5.72,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-primary",
+        "primary-hover-start"
+      ],
+      "ratio": 6.66,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-primary",
+        "primary-hover-end"
+      ],
+      "ratio": 7.37,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-primary",
+        "primary-pressed"
+      ],
+      "ratio": 6.77,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-dark",
+        "chrome"
+      ],
+      "ratio": 14.1,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-dark",
+        "navigation"
+      ],
+      "ratio": 14.1,
+      "minimum": 3
+    },
+    {
+      "pair": [
+        "control-border",
+        "input"
+      ],
+      "ratio": 3.48,
+      "minimum": 3
+    },
+    {
+      "pair": [
+        "focus",
+        "selected"
+      ],
+      "ratio": 5.42,
+      "minimum": 3
+    },
+    {
+      "pair": [
+        "focus",
+        "section"
+      ],
+      "ratio": 5.26,
+      "minimum": 3
+    },
+    {
+      "pair": [
+        "focus",
+        "card"
+      ],
+      "ratio": 5.79,
+      "minimum": 3
+    },
+    {
+      "pair": [
+        "on-dark",
+        "navigation"
+      ],
+      "ratio": 14.1,
+      "minimum": 3
+    }
+  ],
+  "dark": [
+    {
+      "pair": [
+        "text",
+        "card"
+      ],
+      "ratio": 11.88,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "text",
+        "section"
+      ],
+      "ratio": 12.91,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "text",
+        "input"
+      ],
+      "ratio": 13.62,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "text",
+        "selected"
+      ],
+      "ratio": 10.14,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "secondary-text",
+        "card"
+      ],
+      "ratio": 8.49,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "muted",
+        "section"
+      ],
+      "ratio": 6.2,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "muted",
+        "card"
+      ],
+      "ratio": 5.71,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "link",
+        "canvas"
+      ],
+      "ratio": 8.9,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "link",
+        "selected"
+      ],
+      "ratio": 5.51,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "action-text",
+        "secondary"
+      ],
+      "ratio": 9.13,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "danger-text",
+        "danger"
+      ],
+      "ratio": 7.47,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "danger-text",
+        "section"
+      ],
+      "ratio": 8.04,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "success-text",
+        "success"
+      ],
+      "ratio": 7.3,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "info-text",
+        "info"
+      ],
+      "ratio": 7.11,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "neutral-text",
+        "neutral"
+      ],
+      "ratio": 7.93,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-primary",
+        "primary-start"
+      ],
+      "ratio": 5.45,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-primary",
+        "primary-end"
+      ],
+      "ratio": 6.35,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-primary",
+        "primary-hover-start"
+      ],
+      "ratio": 5.16,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-primary",
+        "primary-hover-end"
+      ],
+      "ratio": 5.88,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-primary",
+        "primary-pressed"
+      ],
+      "ratio": 5.42,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-dark",
+        "chrome"
+      ],
+      "ratio": 17.09,
+      "minimum": 4.5
+    },
+    {
+      "pair": [
+        "on-dark",
+        "navigation"
+      ],
+      "ratio": 14.1,
+      "minimum": 3
+    },
+    {
+      "pair": [
+        "control-border",
+        "input"
+      ],
+      "ratio": 4.75,
+      "minimum": 3
+    },
+    {
+      "pair": [
+        "focus",
+        "selected"
+      ],
+      "ratio": 4.87,
+      "minimum": 3
+    },
+    {
+      "pair": [
+        "focus",
+        "section"
+      ],
+      "ratio": 6.2,
+      "minimum": 3
+    },
+    {
+      "pair": [
+        "focus",
+        "card"
+      ],
+      "ratio": 5.71,
+      "minimum": 3
+    },
+    {
+      "pair": [
+        "on-dark",
+        "navigation"
+      ],
+      "ratio": 14.1,
+      "minimum": 3
+    }
+  ]
+}
