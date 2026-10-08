@@ -416,7 +416,22 @@ export async function getCurrentUser(accessToken: string): Promise<Authenticated
     throw new ApiError('Shale could not verify the signed-in user.', response.status);
   }
 
-  return response.json() as Promise<AuthenticatedUser>;
+  const user: unknown = await response.json();
+  if (!isAuthenticatedUser(user)) {
+    throw new ApiError('Shale returned an unusable session verification response.', response.status);
+  }
+  return user;
+}
+
+function isAuthenticatedUser(value: unknown): value is AuthenticatedUser {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const user = value as Record<string, unknown>;
+  return user.authenticated === true
+    && Number.isSafeInteger(user.userId) && (user.userId as number) > 0
+    && Number.isSafeInteger(user.shaleClientId) && (user.shaleClientId as number) > 0
+    && typeof user.isAdmin === 'boolean' && typeof user.isAttorney === 'boolean'
+    && ['email', 'displayName', 'nameFirst', 'nameLast', 'initials', 'color']
+      .every(field => user[field] === null || typeof user[field] === 'string');
 }
 
 export async function logout(accessToken: string): Promise<void> {

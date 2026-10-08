@@ -2,8 +2,8 @@
 
 **Reviewed:** 2026-10-08. **Inventory/documentation:** COMPLETE. **Decision acceptance:** OPEN.
 **Web V2 implementation:** Phase 2A foundation, Phase 2B authenticated shell and Phase 2C My Shale presentation adoption IMPLEMENTED FOR REVIEW; Phase 2D acceptance review and targeted feedback fix RECORDED; ACCEPTANCE OPEN.
-Phase 2 remains IN PROGRESS; acceptance OPEN. Phase 3 IN PROGRESS — only Phase 3A safe login return-path
-restoration IMPLEMENTED FOR REVIEW. Phases 4–10 NOT STARTED. The user explicitly authorized this bounded
+Phase 2 remains IN PROGRESS; acceptance OPEN. Phase 3 IN PROGRESS — Phase 3A safe login return-path restoration and Phase 3B startup
+verification uncertainty/recovery IMPLEMENTED FOR REVIEW. Phases 4–10 NOT STARTED. The user explicitly authorized this bounded
 Phase 3 slice while Phase 2 acceptance remains open; that sequencing does not mark Phase 2 complete.
 Documentation completion is not implementation completion.
 
@@ -60,7 +60,7 @@ Paths below are relative to the repository root unless linked. Symbol names make
 | `App.tsx`: `EntityCard`, `EntityList`, `MetadataGrid/Row`, `PageHeader`, `SearchBar`, `FilterBar`, `StatusPill`, `EmptyState`, `ActionButton`, `SecondaryButton` | Reusable vocabulary already exists, but is file-local and tied to beta CSS. | EXTRACT/adapt into shared web primitives; review semantic HTML, keyboard behavior and A.2 tokens rather than starting another card system. |
 | [ContactValueInput.tsx](../../shale-web/src/ContactValueInput.tsx), [its tests](../../shale-web/src/ContactValueInput.test.tsx) | Server-backed phone/email preview on blur, draft preservation, generation guards, field errors and `RETAIN/SET/CLEAR`; unchanged legacy values are preserved. Duplicate errors survive advisory validation until authoritative Save. | RETAIN shared parsing endpoint and semantics; extend accessibility/mobile composition through the same component. |
 | [api.ts](../../shale-web/src/api.ts) | Manually maintained interfaces; repeated `fetch`, bearer headers and JSON casts. `VITE_SHALE_API_BASE_URL` overrides a hard-coded Azure default. `ApiError` includes status and field errors; 404/409 handling varies. No shared cancellation, refresh coordinator or runtime response validation. | REFACTOR transport and typed feature contracts incrementally. Do not claim TypeScript casts validate JSON. |
-| `api.ts`: `storeAccessToken/readAccessToken/clearAccessToken`; `AppRoutes` | Opaque bearer stored per tab in `sessionStorage` under `shale-web.accessToken`; startup calls `/me`. Any startup failure currently clears the token, including network failure. Login TTL is not coordinated into browser refresh; no refresh call exists in this file. Logout clears locally before fetching server logout, whose HTTP status is not checked. | RETAIN bearer protocol, REPLACE lifecycle handling in phase 3; storage tradeoff needs explicit review. |
+| `api.ts`: `storeAccessToken/readAccessToken/clearAccessToken`; `AppRoutes` | Opaque bearer stored per tab in `sessionStorage` under `shale-web.accessToken`; startup calls `/me`. Phase 3B clears startup credentials only on confirmed `/me` 401; uncertain verification retains storage, blocks content/feature requests, and offers explicit Retry or local Return to sign in. Login TTL is not coordinated into browser refresh; no refresh call exists in this file. Logout clears locally before fetching server logout, whose HTTP status is not checked. | RETAIN bearer protocol, REPLACE lifecycle handling in phase 3; storage tradeoff needs explicit review. |
 | `App.tsx` and `api.ts` mutation handlers | Browser already creates cases, tasks, updates, Contacts and Organizations; edits case core/assignment/status, task detail/completion, Contact and Organization details. | RETAIN verified contracts where safe. Historical “read-only beta” descriptions are obsolete for source capabilities; names such as `ApiReadController` and `*ReadOnly` components do not prove read-only behavior. |
 | [styles.css](../../shale-web/src/styles.css) | Beta styling and responsive rules exist; browser uses Inter/system sans stack. | REPLACE incrementally with canonical web tokens and shared component styles; investigate actual visual parity through later screenshots/device review. |
 
@@ -546,7 +546,7 @@ merely because this document describes it.
 | --- | --- | --- | --- | --- | --- |
 | 1 — Inventory and architecture | DOCUMENTATION COMPLETE; ACCEPTANCE OPEN | Live base and required authorities | This inventory, client decisions, parity/audit matrix and next prompt | Source/test review, links/fences/status/diff checks and documentation selector | Documentation only; no V2 features accepted. D1–D10 remain explicit. |
 | 2 — Tokens, components, responsive shell | IN PROGRESS — Phase 2A foundation / Phase 2B authenticated shell / Phase 2C My Shale implemented for review; Phase 2D reviewed with feedback fix; acceptance OPEN | Phase 1 recommendations; D2/D4 for this milestone | Token mapping, shared semantic primitives, responsive shell with complete navigation; temporary preview composition and beta rollback | Existing web tests plus focused semantics/navigation; typecheck/build; screenshots both themes at compact/medium/wide, keyboard/zoom/contrast | Reviewable foundation using synthetic data, all destinations discoverable, no backend/new feature sprawl. Phase 2A: shared primitives/tokens and synthetic preview. Phase 2B: shell adopted beneath existing ProtectedRoute around unchanged outlets; beta screen skin retained. [Phase 2A review](../../shale-web/docs/phase-2a-review.md) and [Phase 2B exact scope, checks, captures and gaps](../../shale-web/docs/phase-2b-review.md). [Phase 2C My Shale review](../../shale-web/docs/phase-2c-review.md) adds shared Light/Dark operational presentation and native Chromium 200%/400% zoom evidence. [Phase 2D acceptance review](../../shale-web/docs/phase-2d-review.md) records rerun Chromium shell/state/zoom checks and persistent task completion feedback; [operator checklist](../../shale-web/docs/phase-2d-operator-checklist.md) owns unavailable Firefox/WebKit, screen-reader and physical-device checks. No all-Phase-2 completion claim; D4 device/screen-reader/other-engine acceptance remains OPEN. |
-| 3 — Routing, session boundary, transport | IN PROGRESS — only Phase 3A safe login return implemented for review | Phase 2 acceptance OPEN; user-authorized bounded sequencing exception for 3A; D2/D3 and selected contract review for remaining work | Canonical routes/aliases, safe return-to, dirty blockers, CredentialStore, coordinated refresh, cancellation/errors, memory query cache | Router/session/transport behavior including refresh race, stale 401, network failure, logout/identity cleanup and dirty forms; legacy endpoint compatibility | Phase 3A: [review and synthetic evidence](../../shale-web/docs/phase-3a-review.md), validated pathname/query/hash, replacement history and logout return-state cleanup. Broader canonical routes, dirty blockers, storage abstraction, startup uncertainty, refresh/transport/cancellation/cache work UNFINISHED. No overall Phase 3 acceptance; unchanged bearer protocol; no replayed uncertain write. |
+| 3 — Routing, session boundary, transport | IN PROGRESS — Phase 3A safe return and Phase 3B startup verification recovery implemented for review | Phase 2 acceptance OPEN; user-authorized bounded sequencing exception for 3A/3B; D2/D3 and selected contract review for remaining work | Canonical routes/aliases, safe return-to, dirty blockers, CredentialStore, coordinated refresh, cancellation/errors, memory query cache | Router/session/transport behavior including refresh race, stale 401, network failure, logout/identity cleanup and dirty forms; legacy endpoint compatibility | Phase 3A: [review and synthetic evidence](../../shale-web/docs/phase-3a-review.md), validated pathname/query/hash, replacement history and logout return-state cleanup. Phase 3B: [review and synthetic evidence](../../shale-web/docs/phase-3b-review.md), confirmed 401 versus uncertain verification, retained bearer with blocked access, explicit read-only Retry/local sign-out and stale-result guards. Broader canonical routes, dirty blockers, storage abstraction, refresh/transport/cancellation/cache work UNFINISHED. No overall Phase 3 acceptance; unchanged bearer protocol; no replayed uncertain write. |
 | 4 — First end-to-end read slice | NOT STARTED | Phases 2–3; D1/D5/D6 only for selected reads | Sign in → assigned/basic search → case Overview; genuine bounded reads and required read-audit seam | Current controller/adapter/OpenAPI tests plus targeted SQL paging/actor/two-tenant/audit-failure tests; web loading/empty/error/deep-link/back acceptance | Usable reviewed slice, no broad backend rewrite/all-screen dependency. Basic search may ship before unified suggestions with exclusions explicit. |
 | 5 — Tasks and Case Dates/confirmation | NOT STARTED | Phase 4; D5/D6 per write; reviewed occurrence/confirmation adapters | Task policy/forms/assignment/completion and generic dates/confirmation through authoritative workers; incremental usable slices | Due-policy tests, actor/tenant denial, token conflicts, aggregate rollback/audit tests; mobile editor/draft behavior | Task transaction/audit gaps closed for exposed commands; CaseDates/ValueRevision preserved. Live remains optional until D7 passes. |
 | 6 — Remaining case flows, Contacts/Organizations | NOT STARTED | Relevant phase 5 contracts; D1/D5/D6/D8 | Intake, parties/team/links/updates/material metadata/timeline, structured directories; separately gated document export/content | Domain aggregate/delegation tests, conflict/audit rollback, parent-case permissions, responsive long forms/cards and deliberate mutation recovery | Per-feature acceptance; no fake blob/provider entitlement, no scalar/date/overlay authority in React. Unaccepted content scope remains visibly unavailable. |
@@ -748,6 +748,40 @@ with focused tests. No token-storage change, refresh coordination or transport/c
 without separate scope. Broader Phase 3 routing/session/transport/cache/dirty-form work remains UNFINISHED.
 Phase 2E acceptance work continues independently. Rollback reverts only Phase 3A to this security-patched
 base; it requires no backend/session/SQL rollback. No merge or deployment.
+
+### 11.8 Phase 3B startup verification uncertainty and explicit Retry — 2026-10-08
+
+Separate branch `codex/web-v2-phase-3b-session-retry` from live `origin/codex/latest`
+`8cba4b85569b6c9afbfe8b447b169e6be3380e7f`, including merged Phase 3A PR #1844 and
+security dependency PR #1843. [Review](../../shale-web/docs/phase-3b-review.md) owns classification,
+test-impact mapping, synthetic browser evidence, exact validation, gaps and rollback.
+
+* Startup `/me` 401 confirms rejection under the inspected resolver/controller contract. Network,
+  other 4xx (including 403), 5xx and unusable successful responses preserve the stored bearer while
+  installing no identity or feature credential. Protected routes/effects stay unmounted while pending
+  or unavailable; public login/default redirects also wait, preserving the original URL.
+* Explicit Retry reads the current bearer and issues only a fresh `/me` GET; synchronous pending guard
+  prevents duplicates. Local Return to sign in invalidates the attempt, clears via existing storage,
+  and replaces with `/login` without the old return target. Confirmed rejection retains Phase 3A's
+  signed-out capture/restoration. Successful Retry retains exact pathname/query/hash and history.
+* Attempt generations, mount cleanup and stored-token comparison discard late success/rejection after
+  local sign-out, replacement, newer attempt or unmount. Accessible status/alert, native buttons,
+  initial/return heading focus and deliberate pending/repeated-failure Retry focus are covered.
+* Focused hook/API and App recovery/history tests plus full web tests/build; intercepted Chromium
+  outage → repeated failure → pending Retry → detail and outage → local sign-in/late-result discard
+  at 320/1280, native Enter/Space/Tab, reflow/targets and preview isolation. Synthetic results do not
+  establish live backend/session acceptance. Exact counts/checks are in the review.
+* Audit: no new sensitive-read endpoint/domain/admin mutation/audit seam or schema; routine `/me`
+  validation and local recovery do not generate browser audit rows. Existing authoritative tenancy,
+  authorization, validation, concurrency and audit enforcement are retained; §8.2 gaps stay deferred.
+  Dependency-security patches and package/lockfile remain unchanged. No merge/deployment.
+
+Phase 2 acceptance stays **OPEN**, Phase 3 **IN PROGRESS**. Next bounded **Phase 3C**: review
+established-session logout transport outcomes, then make local sign-out certain while communicating
+unconfirmed remote revocation with focused tests; do not retain credentials for background replay.
+Refresh coordination, storage redesign/abstraction, broad transport, query cache and dirty-form work
+remain **UNFINISHED** and require separate scope. Rollback only Phase 3B to the security-patched
+Phase 3A base above; no server/session/SQL rollback.
 
 ## 12. Ready-to-run next Codex implementation prompt
 

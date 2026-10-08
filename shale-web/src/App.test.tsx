@@ -107,8 +107,8 @@ describe('authenticated responsive shell composition', () => {
     resolve(user); await screen.findByRole('heading', { name: 'My Shale', level: 1 });
     expect(screen.getByRole('navigation', { name: 'Primary navigation' })).toBeTruthy();
   });
-  it('preserves verification failure and successful login contracts', async () => {
-    vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new Error('Synthetic verification failure'));
+  it('preserves confirmed rejection and successful login contracts', async () => {
+    vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new api.ApiError('Synthetic rejection', 401));
     vi.mocked(api.login).mockResolvedValue({ accessToken: 'new-test-token' } as api.LoginResponse);
     beta('/contacts/7');
     await screen.findByRole('heading', { name: 'Sign in' });
@@ -133,6 +133,89 @@ describe('authenticated responsive shell composition', () => {
     expect(screen.queryByText(user.displayName!)).toBeNull(); finish();
   });
 
+});
+
+describe('startup verification recovery', () => {
+  const protectedCalls = [api.listAssignedCases, api.listAssignedTasks, api.getCaseDetail, api.getContactDetail,
+    api.getOrganizationDetail, api.getTaskDetail, api.getTeamMemberDetail, api.listTeamMembers,
+    api.listCaseTasks, api.listCaseUpdates, api.listCaseStatusSettings, api.listPracticeAreaSettings];
+  function expectBlocked() {
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(screen.queryByText(user.displayName!)).toBeNull();
+    for (const call of protectedCalls) expect(call).not.toHaveBeenCalled();
+    expect(api.login).not.toHaveBeenCalled(); expect(api.completeTask).not.toHaveBeenCalled();
+  }
+  it.each(['/my-shale', '/cases/7?page=2#details', '/login', '/', '/unknown'])
+  ('blocks all route content while pending and unavailable at %s', async path => {
+    let reject!: (error: Error) => void;
+    vi.mocked(api.getCurrentUser).mockReturnValueOnce(new Promise((_done, fail) => { reject = fail; }));
+    beta(path);
+    expect(screen.getByRole('status').textContent).toBe('Checking your Shale session…');
+    expect((screen.getByRole('button', { name: 'Retry' }) as HTMLButtonElement).disabled).toBe(true);
+    expectBlocked(); expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
+    reject(new TypeError('Synthetic offline')); await screen.findByRole('alert');
+    expect(screen.getByRole('alert').textContent).toMatch(/verification is unavailable/);
+    expectBlocked(); expect(api.clearAccessToken).not.toHaveBeenCalled();
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
+  });
+  it('keeps Retry focused through repeated failure, prevents duplicates, then restores the exact detail without login', async () => {
+    let resolve!: (value: api.AuthenticatedUser) => void;
+    vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new TypeError('Synthetic offline'))
+      .mockRejectedValueOnce(new api.ApiError('Synthetic outage', 503))
+      .mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    const path = '/contacts/7?sort=name#profile'; beta(path); await screen.findByRole('alert');
+    const historyLength = window.history.length;
+    const retry = screen.getByRole('button', { name: 'Retry' }); retry.focus(); fireEvent.click(retry);
+    await screen.findByRole('alert'); expect(document.activeElement).toBe(retry); expectBlocked();
+    fireEvent.click(retry); fireEvent.click(retry);
+    expect((retry as HTMLButtonElement).disabled).toBe(true); expect(retry.getAttribute('aria-busy')).toBe('true');
+    expect(api.getCurrentUser).toHaveBeenCalledTimes(3); expectBlocked();
+    resolve(user); await screen.findByRole('heading', { name: 'Contact Detail', level: 1 });
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
+    expect(window.history.length).toBe(historyLength);
+    await waitFor(() => expect(api.getContactDetail).toHaveBeenCalledTimes(1));
+    expect(api.login).not.toHaveBeenCalled(); expect(api.storeAccessToken).not.toHaveBeenCalled();
+    expect(api.clearAccessToken).not.toHaveBeenCalled(); expect(api.listAssignedCases).not.toHaveBeenCalled();
+  });
+  it('Retry rejection uses Phase 3A signed-out restoration with the complete location', async () => {
+    vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new TypeError('Synthetic offline'))
+      .mockRejectedValueOnce(new api.ApiError('Synthetic rejection', 401));
+    beta('/tasks/7?status=open#activity'); await screen.findByRole('alert');
+    const historyLength = window.history.length; fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await screen.findByRole('heading', { name: 'Sign in' });
+    expect(api.clearAccessToken).toHaveBeenCalledTimes(1); expectBlocked();
+    expect(window.history.state.usr.from).toMatchObject({ pathname: '/tasks/7', search: '?status=open', hash: '#activity' });
+    expect(window.history.length).toBe(historyLength);
+  });
+  it.each(['pending', 'unavailable'])('Return to sign in clears locally with replacement from %s and rejects late success', async state => {
+    let resolve!: (value: api.AuthenticatedUser) => void;
+    if (state === 'unavailable') vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new TypeError('Synthetic offline'));
+    vi.mocked(api.getCurrentUser).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    beta('/contacts/7?sort=name#profile');
+    if (state === 'unavailable') {
+      await screen.findByRole('alert'); fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    }
+    const historyLength = window.history.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Return to sign in' }));
+    const heading = await screen.findByRole('heading', { name: 'Sign in' });
+    expect(api.clearAccessToken).toHaveBeenCalledTimes(1); expect(api.logout).not.toHaveBeenCalled();
+    expect(window.history.state.usr).toBeNull(); expect(window.history.length).toBe(historyLength);
+    expect(document.activeElement).toBe(heading);
+    resolve(user); await waitFor(() => expect(screen.getByRole('heading', { name: 'Sign in' })).toBeTruthy());
+    expectBlocked(); expect(api.storeAccessToken).not.toHaveBeenCalled();
+  });
+  it('explicit return drops the old target, while historical Back remains protected', async () => {
+    vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new TypeError('Synthetic offline'));
+    vi.mocked(api.login).mockResolvedValue({ accessToken: 'new-test-token' } as api.LoginResponse);
+    window.history.replaceState({}, '', '/tasks/7?status=open#activity');
+    window.history.pushState({}, '', '/contacts/7?sort=name#profile'); render(<App />);
+    await screen.findByRole('alert'); fireEvent.click(screen.getByRole('button', { name: 'Return to sign in' }));
+    await screen.findByRole('heading', { name: 'Sign in' }); submitLogin();
+    await screen.findByRole('heading', { name: 'My Shale', level: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' })); await screen.findByRole('heading', { name: 'Sign in' });
+    window.history.back(); await waitFor(() => expect(window.history.state.usr?.from?.pathname).toBe('/tasks/7'));
+    expect(screen.queryByRole('navigation')).toBeNull(); expect(api.getTaskDetail).not.toHaveBeenCalled();
+  });
 });
 
 function submitLogin() {

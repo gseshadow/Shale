@@ -1,0 +1,278 @@
+{
+  "synthetic": true,
+  "browser": "151.0.7922.173",
+  "playwright": "1.64.0",
+  "observations": [
+    {
+      "width": 320,
+      "action": "retry",
+      "outageRetainsBearer": true,
+      "blocksContentAndFeatureRequests": true,
+      "repeatedFailureRetainsFocus": true,
+      "duplicateRetryBlocked": true,
+      "exactPathRestored": true,
+      "localClearAndLateResultDiscarded": false,
+      "replacementHistory": true,
+      "nativeKeyboard": true,
+      "noOverflow": true,
+      "targets": [
+        {
+          "name": "Retry",
+          "width": 246,
+          "height": 44
+        },
+        {
+          "name": "Return to sign in",
+          "width": 246,
+          "height": 44
+        }
+      ],
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "action": "sign-in",
+      "outageRetainsBearer": true,
+      "blocksContentAndFeatureRequests": true,
+      "repeatedFailureRetainsFocus": true,
+      "duplicateRetryBlocked": true,
+      "exactPathRestored": false,
+      "localClearAndLateResultDiscarded": true,
+      "replacementHistory": true,
+      "nativeKeyboard": true,
+      "noOverflow": true,
+      "targets": [
+        {
+          "name": "Retry",
+          "width": 246,
+          "height": 44
+        },
+        {
+          "name": "Return to sign in",
+          "width": 246,
+          "height": 44
+        }
+      ],
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "action": "retry",
+      "outageRetainsBearer": true,
+      "blocksContentAndFeatureRequests": true,
+      "repeatedFailureRetainsFocus": true,
+      "duplicateRetryBlocked": true,
+      "exactPathRestored": true,
+      "localClearAndLateResultDiscarded": false,
+      "replacementHistory": true,
+      "nativeKeyboard": true,
+      "noOverflow": true,
+      "targets": [
+        {
+          "name": "Retry",
+          "width": 71.921875,
+          "height": 44
+        },
+        {
+          "name": "Return to sign in",
+          "width": 150.765625,
+          "height": 44
+        }
+      ],
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "action": "sign-in",
+      "outageRetainsBearer": true,
+      "blocksContentAndFeatureRequests": true,
+      "repeatedFailureRetainsFocus": true,
+      "duplicateRetryBlocked": true,
+      "exactPathRestored": false,
+      "localClearAndLateResultDiscarded": true,
+      "replacementHistory": true,
+      "nativeKeyboard": true,
+      "noOverflow": true,
+      "targets": [
+        {
+          "name": "Retry",
+          "width": 71.921875,
+          "height": 44
+        },
+        {
+          "name": "Return to sign in",
+          "width": 150.765625,
+          "height": 44
+        }
+      ],
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        }
+      ]
+    }
+  ],
+  "pageErrors": [],
+  "unexpectedRequests": [],
+  "liveBackendAcceptance": false
+}
