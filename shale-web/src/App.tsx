@@ -610,6 +610,7 @@ function mergeCompletedTask(tasks: CaseTaskListItem[], completedTask: TaskDetail
 function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError, presentation = 'legacy' }: { presentation?: 'legacy' | 'shared'; tasks: CaseTaskListItem[]; allTasks?: CaseTaskListItem[]; accessToken: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onError: (message: string | null) => void }) {
   const navigate = useNavigate();
   const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
+  const [completionStatus, setCompletionStatus] = useState('');
 
   async function handleCompleteTask(task: CaseTaskListItem) {
     if (!accessToken) {
@@ -617,11 +618,15 @@ function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError, pr
       return;
     }
     setCompletingTaskId(task.id);
+    if (presentation === 'shared') setCompletionStatus(`Completing ${displayValue(task.title, `Task ${task.id}`)}…`);
     onError(null);
     try {
       const completedTask = await completeTask(accessToken, task.id);
       onTasksChanged(mergeCompletedTask(allTasks ?? tasks, completedTask));
+      if (presentation === 'shared') setCompletionStatus(completedTask.completedAt
+        ? `Completed ${displayValue(task.title, `Task ${task.id}`)}.` : '');
     } catch (caught) {
+      if (presentation === 'shared') setCompletionStatus('');
       onError(caught instanceof Error ? caught.message : 'Task could not be completed.');
     } finally {
       setCompletingTaskId(null);
@@ -629,6 +634,8 @@ function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError, pr
   }
 
   return (
+    <>
+    {presentation === 'shared' && <p role="status" aria-live="polite" aria-atomic="true">{completionStatus}</p>}
     <EntityList ariaLabel="Assigned tasks">
       {tasks.map((task) => (
         <EntityCard
@@ -644,12 +651,13 @@ function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError, pr
           )}
           actions={!task.completedAt ? (presentation === 'shared'
             ? <Button size="small" purpose="secondary" disabled={completingTaskId === task.id} aria-busy={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</Button>
-            : <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton>) : <span className="completed-state" role={presentation === 'shared' ? 'status' : undefined}>Completed {formatDate(task.completedAt)}</span>}
+            : <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton>) : <span className="completed-state">Completed {formatDate(task.completedAt)}</span>}
           onClick={() => navigate(`/tasks/${task.id}`)}
           ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
         />
       ))}
     </EntityList>
+    </>
   );
 }
 

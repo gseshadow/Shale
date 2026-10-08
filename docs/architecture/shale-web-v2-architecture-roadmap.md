@@ -1,7 +1,7 @@
 # Shale Web V2 architecture and phased implementation roadmap
 
 **Reviewed:** 2026-10-08. **Inventory/documentation:** COMPLETE. **Decision acceptance:** OPEN.
-**Web V2 implementation:** Phase 2A foundation, Phase 2B authenticated shell and Phase 2C My Shale presentation adoption IMPLEMENTED FOR REVIEW; ACCEPTANCE OPEN.
+**Web V2 implementation:** Phase 2A foundation, Phase 2B authenticated shell and Phase 2C My Shale presentation adoption IMPLEMENTED FOR REVIEW; Phase 2D acceptance review and targeted feedback fix RECORDED; ACCEPTANCE OPEN.
 Phase 2 remains IN PROGRESS; phases 3–10 NOT STARTED. Documentation completion is not implementation completion.
 
 **Evidence baseline:** live `origin/codex/latest`, `32e2cfdd25ad475bc03fbb91763c9769ce2ccd6a`.
@@ -539,7 +539,7 @@ merely because this document describes it.
 | Phase | Status | Dependencies | Deliverables | Verification | Completion gate / evidence and open decisions |
 | --- | --- | --- | --- | --- | --- |
 | 1 — Inventory and architecture | DOCUMENTATION COMPLETE; ACCEPTANCE OPEN | Live base and required authorities | This inventory, client decisions, parity/audit matrix and next prompt | Source/test review, links/fences/status/diff checks and documentation selector | Documentation only; no V2 features accepted. D1–D10 remain explicit. |
-| 2 — Tokens, components, responsive shell | IN PROGRESS — Phase 2A foundation / Phase 2B authenticated shell / Phase 2C My Shale implemented for review; acceptance OPEN | Phase 1 recommendations; D2/D4 for this milestone | Token mapping, shared semantic primitives, responsive shell with complete navigation; temporary preview composition and beta rollback | Existing web tests plus focused semantics/navigation; typecheck/build; screenshots both themes at compact/medium/wide, keyboard/zoom/contrast | Reviewable foundation using synthetic data, all destinations discoverable, no backend/new feature sprawl. Phase 2A: shared primitives/tokens and synthetic preview. Phase 2B: shell adopted beneath existing ProtectedRoute around unchanged outlets; beta screen skin retained. [Phase 2A review](../../shale-web/docs/phase-2a-review.md) and [Phase 2B exact scope, checks, captures and gaps](../../shale-web/docs/phase-2b-review.md). [Phase 2C My Shale review](../../shale-web/docs/phase-2c-review.md) adds shared Light/Dark operational presentation and native Chromium 200%/400% zoom evidence. No all-Phase-2 completion claim; D4 device/screen-reader/other-engine acceptance remains OPEN. |
+| 2 — Tokens, components, responsive shell | IN PROGRESS — Phase 2A foundation / Phase 2B authenticated shell / Phase 2C My Shale implemented for review; Phase 2D reviewed with feedback fix; acceptance OPEN | Phase 1 recommendations; D2/D4 for this milestone | Token mapping, shared semantic primitives, responsive shell with complete navigation; temporary preview composition and beta rollback | Existing web tests plus focused semantics/navigation; typecheck/build; screenshots both themes at compact/medium/wide, keyboard/zoom/contrast | Reviewable foundation using synthetic data, all destinations discoverable, no backend/new feature sprawl. Phase 2A: shared primitives/tokens and synthetic preview. Phase 2B: shell adopted beneath existing ProtectedRoute around unchanged outlets; beta screen skin retained. [Phase 2A review](../../shale-web/docs/phase-2a-review.md) and [Phase 2B exact scope, checks, captures and gaps](../../shale-web/docs/phase-2b-review.md). [Phase 2C My Shale review](../../shale-web/docs/phase-2c-review.md) adds shared Light/Dark operational presentation and native Chromium 200%/400% zoom evidence. [Phase 2D acceptance review](../../shale-web/docs/phase-2d-review.md) records rerun Chromium shell/state/zoom checks and persistent task completion feedback; [operator checklist](../../shale-web/docs/phase-2d-operator-checklist.md) owns unavailable Firefox/WebKit, screen-reader and physical-device checks. No all-Phase-2 completion claim; D4 device/screen-reader/other-engine acceptance remains OPEN. |
 | 3 — Routing, session boundary, transport | NOT STARTED | Phase 2; D2/D3 and selected contract review | Canonical routes/aliases, safe return-to, dirty blockers, CredentialStore, coordinated refresh, cancellation/errors, memory query cache | Router/session/transport behavior including refresh race, stale 401, network failure, logout/identity cleanup and dirty forms; legacy endpoint compatibility | No leakage/stale identity installation; unchanged bearer protocol; no replayed uncertain write. Reuse existing durable server APIs. |
 | 4 — First end-to-end read slice | NOT STARTED | Phases 2–3; D1/D5/D6 only for selected reads | Sign in → assigned/basic search → case Overview; genuine bounded reads and required read-audit seam | Current controller/adapter/OpenAPI tests plus targeted SQL paging/actor/two-tenant/audit-failure tests; web loading/empty/error/deep-link/back acceptance | Usable reviewed slice, no broad backend rewrite/all-screen dependency. Basic search may ship before unified suggestions with exclusions explicit. |
 | 5 — Tasks and Case Dates/confirmation | NOT STARTED | Phase 4; D5/D6 per write; reviewed occurrence/confirmation adapters | Task policy/forms/assignment/completion and generic dates/confirmation through authoritative workers; incremental usable slices | Due-policy tests, actor/tenant denial, token conflicts, aggregate rollback/audit tests; mobile editor/draft behavior | Task transaction/audit gaps closed for exposed commands; CaseDates/ValueRevision preserved. Live remains optional until D7 passes. |
@@ -670,6 +670,41 @@ Rollback: revert the frontend milestone or rebuild base `7e7972d6ebb0f1fcc5ae61c
 with the same API-origin setting; no backend/session/SQL rollback. Next bounded **Phase 2D**: obtain
 screen-reader/physical-device acceptance for shell/My Shale and resolve only findings in those adopted
 surfaces; choose any next screen separately. Phase 2 remains **IN PROGRESS**, Phase 3 **NOT STARTED**.
+
+### 11.6 Phase 2D adopted-surface acceptance review — 2026-10-08
+
+Separate branch `codex/web-v2-phase-2d-acceptance` from fetched live `origin/codex/latest`,
+`fc45437e6519be7e905b1ace90e418cbd49276cc`; merged Phase 2C PR #1841 verified by head ancestry.
+[Review](../../shale-web/docs/phase-2d-review.md) records exact checks, evidence and limits;
+[operator checklist](../../shale-web/docs/phase-2d-operator-checklist.md) supplies launch instructions,
+expected outcomes and browser/device/outcome/findings fields. No merge/deployment.
+
+* Review confined to adopted shell/My Shale. Concrete feedback defect: disabled pending label had no
+  live update, and success mounted a populated status. My Shale now uses one initially empty persistent,
+  polite/atomic status with task-named pending and server-confirmed success; failure retains its alert and
+  cards. Initial completed facts are ordinary text. Existing service/data/navigation/completion semantics,
+  single-task pending bookkeeping, other-route presentation and authentication/session handling preserved.
+* Chromium 151.0.7922.173, both themes at 320/360/768/1280: shell disclosure/active/skip/route focus/history,
+  native keyboard/visible focus, independent cards/Complete, long/missing values and all requested states
+  pass. 56 state screenshots, 56 zero-violation axe scans with incomplete contrast checks recorded, 50
+  measured token pairs pass; no horizontal overflow, targets >=44px, zero page errors. Native Settings
+  zoom 200%/400% passes both themes with fixed physical viewport; four captures. Preview retained/API-free.
+  Automated live-region/tree checks are not screen-reader acceptance.
+* Firefox 157.0 downloaded but profile launch failed, including one targeted TMPDIR retry. WebKit 27.2
+  downloaded but missing host libraries prevent launch. Neither engine's matrix/native zoom accepted.
+  No real screen reader/display or physical device available. No real-host/live auth/backend/tenant/audit
+  acceptance performed, and no Phase 2D user-reported results supplied. Required manual checks remain OPEN.
+* 68 web tests, typecheck/build, selector-selected AuthControllerTest (10), critical Maven reactor (116)
+  and git diff checks pass. Existing affected tests extended for stable task status and failure/legacy
+  isolation; no geometry test gate or GitHub testing workflow. Review scripts/fixtures isolated from app.
+* Audit compatibility unchanged: no new sensitive read/domain/admin mutation, audit integration or migration;
+  presentation intentionally unaudited. Section 8.2 gaps remain deferred. No backend/SQL/API/auth/session/
+  transport/deployment/version/application-dependency/native/MCP/AI changes. Frontend rollback to base above.
+
+Next bounded **Phase 2E acceptance closure**: run the outstanding shell/My Shale screen-reader,
+physical-device and other-engine checks and fix only reproduced findings; select any new-screen adoption
+separately. Phase 2 remains **IN PROGRESS**, Phase 3 **NOT STARTED**, including the deferred focused login
+return-path investigation and safe pathname/search/hash restoration. No acceptance closure by inference.
 
 ## 12. Ready-to-run next Codex implementation prompt
 
