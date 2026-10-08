@@ -1,4 +1,4 @@
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button {
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button {
   align-items: center; justify-content: center; display: inline-flex; min-width: 44px;
   min-height: 44px; padding: var(--shale-space-2) var(--shale-space-4); border: 1px solid transparent;
   border-radius: var(--shale-radius-control); cursor: pointer; font-weight: 700;
@@ -6,24 +6,24 @@
   background: transparent; color: var(--shale-action-text);
 }
 /* 40/32px visual planes inside 44px native hit areas, at least 44px if text wraps. */
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button::before {
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button::before {
   content: ""; position: absolute; inset: 2px 0; z-index: -1; border-radius: inherit;
   background: var(--shale-secondary); border: 1px solid var(--shale-control-border);
 }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-small { font-size: var(--shale-type-meta); padding-inline: var(--shale-space-3); }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-small::before { inset-block: 6px; }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-primary { color: var(--shale-on-primary); }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-primary::before { background: linear-gradient(110deg,var(--shale-primary-start),var(--shale-primary-end)); border-color: var(--shale-control-border); }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-primary:hover::before { background: linear-gradient(110deg,var(--shale-primary-hover-start),var(--shale-primary-hover-end)); }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-primary:active::before { background: var(--shale-primary-pressed); }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-secondary:hover::before { background: var(--shale-secondary-hover); }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-ghost::before, :is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-navigation::before { background: transparent; border-color: transparent; }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-ghost:hover::before, :is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-navigation:hover::before { background: var(--shale-secondary-hover); }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-navigation { color: var(--shale-link); text-decoration: underline; text-underline-offset: .2em; }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-danger { color: var(--shale-danger-text); }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-danger::before { background: var(--shale-danger); border-color: var(--shale-danger-text); }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-danger:hover::before { background: var(--shale-danger-hover); }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button:disabled { opacity: .52; cursor: default; }
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button:not(.shale-button-primary):active::before { background: var(--shale-secondary-hover); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-small { font-size: var(--shale-type-meta); padding-inline: var(--shale-space-3); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-small::before { inset-block: 6px; }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-primary { color: var(--shale-on-primary); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-primary::before { background: linear-gradient(110deg,var(--shale-primary-start),var(--shale-primary-end)); border-color: var(--shale-control-border); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-primary:hover::before { background: linear-gradient(110deg,var(--shale-primary-hover-start),var(--shale-primary-hover-end)); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-primary:active::before { background: var(--shale-primary-pressed); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-secondary:hover::before { background: var(--shale-secondary-hover); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-ghost::before, :is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-navigation::before { background: transparent; border-color: transparent; }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-ghost:hover::before, :is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-navigation:hover::before { background: var(--shale-secondary-hover); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-navigation { color: var(--shale-link); text-decoration: underline; text-underline-offset: .2em; }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-danger { color: var(--shale-danger-text); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-danger::before { background: var(--shale-danger); border-color: var(--shale-danger-text); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-danger:hover::before { background: var(--shale-danger-hover); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button:disabled { opacity: .52; cursor: default; }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button:not(.shale-button-primary):active::before { background: var(--shale-secondary-hover); }
 
-:is(.shale-foundation, .shale-authenticated .shale-shell-utilities) .shale-button-danger:active::before { background: var(--shale-danger-hover); }
+:is(.shale-foundation, .shale-presentation, .shale-authenticated .shale-shell-utilities) .shale-button-danger:active::before { background: var(--shale-danger-hover); }

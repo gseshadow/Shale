@@ -5,6 +5,11 @@ Implemented for review from current `origin/codex/latest` at
 `codex/web-v2-phase-2b`. Phase 2 remains **IN PROGRESS; acceptance OPEN**.
 No merge or deployment was performed.
 
+**Phase 2C follow-up:** [My Shale shared presentation review](phase-2c-review.md) records its deliberate
+Light/Dark adoption, isolated other-route styling, native Chromium 200%/400% zoom evidence and remaining
+acceptance gaps. Statements below about retained beta route paint describe the Phase 2B checkpoint;
+My Shale is now the first adopted operational screen. Phase 2 remains IN PROGRESS.
+
 ## Exact scope and composition
 
 `AppShell`, already nested beneath `ProtectedRoute`, now composes `ResponsiveShell` around the unchanged
