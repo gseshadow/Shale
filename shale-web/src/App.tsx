@@ -4,9 +4,13 @@ import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useN
 import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import { ApiError, contactValueUpdate } from './api';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
-import { PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
-import { destinations } from './shell/navigation';
+import { Button, PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
+import { ResponsiveShell } from './shell/ResponsiveShell';
 import './styles.css';
+import './ui/tokens.css';
+import './ui/buttons.css';
+import './shell/shell.css';
+import './shell/authenticated.css';
 
 function focusContactError(error: unknown, form: HTMLFormElement) {
   if (error instanceof ApiError && error.fieldErrors.length) {
@@ -20,10 +24,6 @@ interface AuthState {
   user: AuthenticatedUser | null;
   isVerifying: boolean;
 }
-
-const navigationItems = destinations.filter(item => item.available && item.path !== '/tasks').map(item => ({
-  ...item, activePrefixes: item.path === '/my-shale' ? ['/my-shale', '/tasks'] : [item.path],
-}));
 
 const MISSING_VALUE = '—';
 
@@ -487,51 +487,23 @@ function redirectPathFrom(state: unknown): string {
 
 function AppShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
   const location = useLocation();
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
-  return (
-    <div className="app-layout">
-      <header className="topbar">
-        <div className="brand" aria-label="Shale">
-          <span className="brand-mark" aria-hidden="true">S</span>
-          <span>Shale</span>
-        </div>
-        <span className="beta-badge">BETA</span>
-        <div className="user-summary">
-          <p className="eyebrow">Signed in</p>
-          <p className="user-name">{displayNameFor(user)}</p>
-          <p className="user-meta">{displayValue(user.email, 'Email not provided')}</p>
-        </div>
-        <button type="button" onClick={onLogout}>Logout</button>
-      </header>
-
-      <main className="page-content">
-        <div className="content-container">
-          <Outlet />
-        </div>
-      </main>
-
-      <PrimaryNavigation locationPathname={location.pathname} />
-    </div>
-  );
-}
-
-function PrimaryNavigation({ locationPathname }: { locationPathname: string }) {
-  return (
-    <nav className="bottom-nav-list" aria-label="Primary navigation">
-      {navigationItems.map((item) => {
-        const isActive = item.activePrefixes.some((prefix) => locationPathname === prefix || locationPathname.startsWith(`${prefix}/`));
-        return (
-          <Link key={item.path} to={item.path} className={isActive ? 'nav-link active' : 'nav-link'} aria-current={isActive ? 'page' : undefined}>
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+  return <div className="shale-authenticated" data-theme={theme}>
+    <ResponsiveShell path={location.pathname} navigationKey={location.key} caption="BETA"
+      identity={<><strong>{displayNameFor(user)}</strong><p>{displayValue(user.email, 'Email not provided')}</p></>}
+      utilities={<>
+        <label htmlFor="shell-theme">Theme (this session)</label>
+        <select id="shell-theme" value={theme} onChange={event => setTheme(event.target.value as 'light' | 'dark')}>
+          <option value="light">Light</option><option value="dark">Dark</option>
+        </select>
+        <Button onClick={onLogout}>Logout</Button>
+      </>}>
+      <div className="legacy-route-content"><div className="content-container"><Outlet /></div></div>
+    </ResponsiveShell>
+  </div>;
 }
 
 function MyShalePage({ accessToken, user }: { accessToken: string | null; user: AuthenticatedUser | null }) {

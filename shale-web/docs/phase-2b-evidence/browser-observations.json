@@ -1,0 +1,609 @@
+{
+  "browser": "151.0.7922.173",
+  "fixture": "Intercepted synthetic API only; no live backend/authentication acceptance",
+  "observations": [
+    {
+      "width": 320,
+      "theme": "light",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "SShale",
+          "width": 92.75,
+          "height": 44
+        },
+        {
+          "name": "LightDark",
+          "width": 72,
+          "height": 44
+        },
+        {
+          "name": "Logout",
+          "width": 83.390625,
+          "height": 44
+        },
+        {
+          "name": "Navigation My Shale",
+          "width": 288,
+          "height": 44
+        },
+        {
+          "name": "My Shale",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "My Tasks",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "Cases",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "Contacts",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "Organizations",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "Team",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "Settings",
+          "width": 140,
+          "height": 59
+        }
+      ],
+      "detailWidth": 320,
+      "editFormReflow": true,
+      "history": true,
+      "routeFocus": true
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "SShale",
+          "width": 92.75,
+          "height": 44
+        },
+        {
+          "name": "LightDark",
+          "width": 72,
+          "height": 44
+        },
+        {
+          "name": "Logout",
+          "width": 83.390625,
+          "height": 44
+        },
+        {
+          "name": "Navigation My Shale",
+          "width": 288,
+          "height": 44
+        },
+        {
+          "name": "My Shale",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "My Tasks",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "Cases",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "Contacts",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "Organizations",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "Team",
+          "width": 140,
+          "height": 44
+        },
+        {
+          "name": "Settings",
+          "width": 140,
+          "height": 59
+        }
+      ],
+      "detailWidth": 320,
+      "editFormReflow": true,
+      "history": true,
+      "routeFocus": true
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "SShale",
+          "width": 92.75,
+          "height": 44
+        },
+        {
+          "name": "LightDark",
+          "width": 72,
+          "height": 44
+        },
+        {
+          "name": "Logout",
+          "width": 83.390625,
+          "height": 44
+        },
+        {
+          "name": "Navigation My Shale",
+          "width": 328,
+          "height": 44
+        },
+        {
+          "name": "My Shale",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "My Tasks",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "Cases",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "Contacts",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "Organizations",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "Team",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "Settings",
+          "width": 160,
+          "height": 59
+        }
+      ],
+      "detailWidth": 360,
+      "editFormReflow": true,
+      "history": true,
+      "routeFocus": true
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "SShale",
+          "width": 92.75,
+          "height": 44
+        },
+        {
+          "name": "LightDark",
+          "width": 72,
+          "height": 44
+        },
+        {
+          "name": "Logout",
+          "width": 83.390625,
+          "height": 44
+        },
+        {
+          "name": "Navigation My Shale",
+          "width": 328,
+          "height": 44
+        },
+        {
+          "name": "My Shale",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "My Tasks",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "Cases",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "Contacts",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "Organizations",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "Team",
+          "width": 160,
+          "height": 44
+        },
+        {
+          "name": "Settings",
+          "width": 160,
+          "height": 59
+        }
+      ],
+      "detailWidth": 360,
+      "editFormReflow": true,
+      "history": true,
+      "routeFocus": true
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "SShale",
+          "width": 92.75,
+          "height": 44
+        },
+        {
+          "name": "LightDark",
+          "width": 72,
+          "height": 44
+        },
+        {
+          "name": "Logout",
+          "width": 83.390625,
+          "height": 44
+        },
+        {
+          "name": "My Shale",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "My Tasks",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "Cases",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "Contacts",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "Organizations",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "Team",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "Settings",
+          "width": 136,
+          "height": 44
+        }
+      ],
+      "detailWidth": 768,
+      "editFormReflow": true,
+      "history": true,
+      "routeFocus": true
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "SShale",
+          "width": 92.75,
+          "height": 44
+        },
+        {
+          "name": "LightDark",
+          "width": 72,
+          "height": 44
+        },
+        {
+          "name": "Logout",
+          "width": 83.390625,
+          "height": 44
+        },
+        {
+          "name": "My Shale",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "My Tasks",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "Cases",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "Contacts",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "Organizations",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "Team",
+          "width": 136,
+          "height": 44
+        },
+        {
+          "name": "Settings",
+          "width": 136,
+          "height": 44
+        }
+      ],
+      "detailWidth": 768,
+      "editFormReflow": true,
+      "history": true,
+      "routeFocus": true
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "SShale",
+          "width": 92.75,
+          "height": 44
+        },
+        {
+          "name": "LightDark",
+          "width": 72,
+          "height": 44
+        },
+        {
+          "name": "Logout",
+          "width": 83.390625,
+          "height": 44
+        },
+        {
+          "name": "My Shale",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "My Tasks",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "Cases",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "Contacts",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "Organizations",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "Team",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "Settings",
+          "width": 192,
+          "height": 44
+        }
+      ],
+      "detailWidth": 1280,
+      "editFormReflow": true,
+      "history": true,
+      "routeFocus": true
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "SShale",
+          "width": 92.75,
+          "height": 44
+        },
+        {
+          "name": "LightDark",
+          "width": 72,
+          "height": 44
+        },
+        {
+          "name": "Logout",
+          "width": 83.390625,
+          "height": 44
+        },
+        {
+          "name": "My Shale",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "My Tasks",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "Cases",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "Contacts",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "Organizations",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "Team",
+          "width": 192,
+          "height": 44
+        },
+        {
+          "name": "Settings",
+          "width": 192,
+          "height": 44
+        }
+      ],
+      "detailWidth": 1280,
+      "editFormReflow": true,
+      "history": true,
+      "routeFocus": true
+    }
+  ],
+  "landmarks": [
+    {
+      "role": "banner",
+      "name": ""
+    },
+    {
+      "role": "navigation",
+      "name": "Primary navigation"
+    },
+    {
+      "role": "main",
+      "name": ""
+    }
+  ],
+  "logout": true,
+  "skipLink": true,
+  "nativeCompactKeyboard": true,
+  "directLink": true,
+  "previewApiRequests": 0,
+  "preview": [
+    {
+      "width": 320,
+      "theme": "light",
+      "overflow": false,
+      "apiRequests": 0
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "overflow": false,
+      "apiRequests": 0
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "overflow": false,
+      "apiRequests": 0
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "overflow": false,
+      "apiRequests": 0
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "overflow": false,
+      "apiRequests": 0
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "overflow": false,
+      "apiRequests": 0
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "overflow": false,
+      "apiRequests": 0
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "overflow": false,
+      "apiRequests": 0
+    }
+  ],
+  "errors": [],
+  "expectedSyntheticUnavailableDetails": [
+    "/api/contacts/1",
+    "/api/organizations/1",
+    "/api/users/1"
+  ],
+  "zoom": {
+    "before": {
+      "dpr": 1,
+      "width": 360
+    },
+    "afterShortcut": {
+      "dpr": 1,
+      "width": 360
+    },
+    "settingsError": "page.goto: Target page, context or browser has been closed\nCall log:\n\u001b[2m  - navigating to \"chrome://settings/appearance\", waiting until \"load\"\u001b[22m\n",
+    "acceptance": "Unavailable: shortcuts did not change native browser zoom in headless Chromium"
+  }
+}

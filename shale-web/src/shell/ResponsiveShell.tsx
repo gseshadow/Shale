@@ -3,13 +3,13 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { activeDestination, destinations } from './navigation';
 
-export function ResponsiveShell({ children, path, linkTo = (value: string) => value, utilities, identity, caption }: {
-  children: ReactNode; path: string; linkTo?: (path: string) => string; utilities?: ReactNode; identity: ReactNode; caption?: ReactNode;
+export function ResponsiveShell({ children, path, navigationKey = path, linkTo, utilities, identity, caption }: {
+  children: ReactNode; path: string; navigationKey?: string; linkTo?: (path: string) => string; utilities?: ReactNode; identity: ReactNode; caption?: ReactNode;
 }) {
   const disclosure = useRef<HTMLDetailsElement>(null);
   const summary = useRef<HTMLElement>(null);
   const main = useRef<HTMLElement>(null);
-  const previousPath = useRef(path);
+  const previousNavigation = useRef<string | undefined>(undefined);
   const [isCompact, setCompact] = useState(() => !window.matchMedia('(min-width: 48rem)').matches);
   useEffect(() => {
     const query = window.matchMedia('(min-width: 48rem)');
@@ -18,19 +18,22 @@ export function ResponsiveShell({ children, path, linkTo = (value: string) => va
     return () => query.removeEventListener('change', update);
   }, []);
   useEffect(() => {
-    if (disclosure.current) disclosure.current.open = !isCompact;
+    if (disclosure.current) {
+      if (isCompact && disclosure.current.contains(document.activeElement)) summary.current?.focus();
+      disclosure.current.open = !isCompact;
+    }
   }, [isCompact]);
   useEffect(() => {
-    if (previousPath.current !== path) {
-      previousPath.current = path;
+    if (previousNavigation.current !== navigationKey) {
+      previousNavigation.current = navigationKey;
       if (isCompact && disclosure.current) disclosure.current.open = false;
-      main.current?.focus();
+      main.current?.focus({ preventScroll: true });
     }
-  }, [path, isCompact]);
+  }, [navigationKey, isCompact]);
   const current = activeDestination(path);
   return <div className="shale-shell">
-    <a className="shale-skip" href="#foundation-main">Skip to content</a>
-    <header className="shale-shell-header"><Link className="shale-brand" to={linkTo('/my-shale')} aria-label="Shale home">
+    <a className="shale-skip" href="#foundation-main" onClick={() => main.current?.focus()}>Skip to content</a>
+    <header className="shale-shell-header"><Link className="shale-brand" to={linkTo?.('/my-shale') ?? '/my-shale'} aria-label="Shale home">
       <span className="shale-brand-mark" aria-hidden="true">S</span>Shale</Link>
       {caption && <span className="shale-shell-caption">{caption}</span>}<div className="shale-shell-utilities">{utilities}</div>
     </header>
@@ -41,7 +44,9 @@ export function ResponsiveShell({ children, path, linkTo = (value: string) => va
         }
       }}>
         <summary ref={summary}>Navigation <span>{current?.label ?? 'My Shale'}</span></summary>
-        <div className="shale-destinations">{destinations.map(item => <Link key={item.path} to={linkTo(item.path)}
+        <div className="shale-destinations">{destinations.map(item => !item.available && !linkTo
+          ? <span key={item.path} className="shale-destination shale-destination-unavailable"><span>{item.label}</span><small> Unavailable</small></span>
+          : <Link key={item.path} to={linkTo?.(item.path) ?? item.path}
           className={`shale-destination${current?.path === item.path ? ' shale-destination-active' : ''}`}
           aria-label={item.available ? item.label : `${item.label} Unavailable`}
           aria-current={current?.path === item.path ? 'page' : undefined}>

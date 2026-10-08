@@ -1,50 +1,6 @@
-/* Opt-in web A.2 ownership. No beta/root/global paint selectors. Theme paint once,
-   geometry once. Source mapping and accessible adaptations: README Phase 2A. */
-.shale-foundation {
-  --shale-canvas: #edf4fd; --shale-chrome: #102746; --shale-navigation: #102746;
-  --shale-navigation-hover: #18385f; --shale-plane: #f9fbfe; --shale-section: #e8f1fb;
-  --shale-card: #f9fbfe; --shale-card-hover: #f1f6fd; --shale-input: #fbfdff;
-  --shale-text: #10213d; --shale-secondary-text: #425674; --shale-muted: #52647f;
-  --shale-on-dark: #f5f8ff; --shale-link: #075fca; --shale-border: #9fb5cc;
-  --shale-control-border: #748aa5; --shale-focus: #075fca; --shale-selected: #edf4fd;
-  --shale-primary-start: #0f65d3; --shale-primary-end: #7b3fe4;
-  --shale-primary-hover-start: #0b58be; --shale-primary-hover-end: #692dcc;
-  --shale-primary-pressed: #1158b7; --shale-on-primary: #fff;
-  --shale-secondary: #edf4fd; --shale-secondary-hover: #dceafb; --shale-action-text: #173d70;
-  --shale-danger: #fff1f3; --shale-danger-hover: #ffe1e6; --shale-danger-text: #a51e35;
-  --shale-success: #e8f7ef; --shale-success-text: #176b42;
-  --shale-info: #eaf3ff; --shale-info-text: #185695;
-  --shale-warning: #fff7df; --shale-warning-text: #76500a;
-  --shale-neutral: #eef3f8; --shale-neutral-text: #425674;
-  --shale-shadow: 0 3px 12px rgba(11,35,77,.14);
-  --shale-space-1: .25rem; --shale-space-2: .5rem; --shale-space-3: .75rem;
-  --shale-space-4: 1rem; --shale-space-6: 1.5rem;
-  --shale-radius-card: .875rem; --shale-radius-control: .625rem;
-  --shale-type-page: 1.5rem; --shale-type-section: 1.125rem;
-  --shale-type-body: .875rem; --shale-type-meta: .75rem;
-  --shale-density-padding: var(--shale-space-4); --shale-density-gap: var(--shale-space-3);
-  color: var(--shale-text); background: var(--shale-canvas); color-scheme: light;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: var(--shale-type-body); line-height: 1.5; min-height: 100vh; min-height: 100dvh;
-}
-.shale-foundation[data-theme="dark"] {
-  --shale-canvas: #0d1728; --shale-chrome: #07152e; --shale-navigation: #102746;
-  --shale-plane: #162438; --shale-section: #1b2c42; --shale-card: #203249;
-  --shale-card-hover: #293e58; --shale-input: #17283d;
-  --shale-text: #f0f5fc; --shale-secondary-text: #c5d2e3; --shale-muted: #9fadc0;
-  --shale-link: #82baff; --shale-border: #58718e; --shale-control-border: #7794b5;
-  --shale-focus: #72aeff; --shale-selected: #263d58;
-  --shale-primary-start: #1768c8; --shale-primary-end: #7540c6;
-  --shale-primary-hover-start: #1a6bd1; --shale-primary-hover-end: #7c43d0;
-  --shale-primary-pressed: #1e69c4; --shale-secondary: #2a405a;
-  --shale-secondary-hover: #354f6d; --shale-action-text: #e4effd;
-  --shale-danger: #482631; --shale-danger-hover: #5b2b3b; --shale-danger-text: #ffadba;
-  --shale-success: #1d4035; --shale-success-text: #9addb9;
-  --shale-info: #203d5d; --shale-info-text: #acd2ff;
-  --shale-warning: #493d21; --shale-warning-text: #f0d582;
-  --shale-neutral: #2b3d52; --shale-neutral-text: #d0dbea;
-  --shale-shadow: 0 3px 12px rgba(0,0,0,.32); color-scheme: dark;
-}
+@import "./tokens.css";
+@import "./buttons.css";
+
 .shale-foundation *, .shale-foundation *::before, .shale-foundation *::after { box-sizing: border-box; }
 .shale-foundation :where(h1,h2,h3,p) { margin: 0; overflow-wrap: anywhere; }
 .shale-foundation :where(a,button,input,select,textarea,summary) { font: inherit; overflow-wrap: anywhere; }
@@ -61,33 +17,6 @@
 .shale-foundation .page-title-block { display: grid; gap: var(--shale-space-2); }
 .shale-foundation .page-heading-row { display: flex; flex-wrap: wrap; gap: var(--shale-space-4); justify-content: space-between; }
 .shale-foundation .toolbar-actions, .shale-foundation .entity-card-actions { display: flex; flex-wrap: wrap; gap: var(--shale-space-2); }
-.shale-foundation .shale-button {
-  align-items: center; justify-content: center; display: inline-flex; min-width: 44px;
-  min-height: 44px; padding: var(--shale-space-2) var(--shale-space-4); border: 1px solid transparent;
-  border-radius: var(--shale-radius-control); cursor: pointer; font-weight: 700;
-  text-decoration: none; text-align: center; position: relative; isolation: isolate;
-  background: transparent; color: var(--shale-action-text);
-}
-/* 40/32px visual planes inside 44px native hit areas, at least 44px if text wraps. */
-.shale-foundation .shale-button::before {
-  content: ""; position: absolute; inset: 2px 0; z-index: -1; border-radius: inherit;
-  background: var(--shale-secondary); border: 1px solid var(--shale-control-border);
-}
-.shale-foundation .shale-button-small { font-size: var(--shale-type-meta); padding-inline: var(--shale-space-3); }
-.shale-foundation .shale-button-small::before { inset-block: 6px; }
-.shale-foundation .shale-button-primary { color: var(--shale-on-primary); }
-.shale-foundation .shale-button-primary::before { background: linear-gradient(110deg,var(--shale-primary-start),var(--shale-primary-end)); border-color: var(--shale-control-border); }
-.shale-foundation .shale-button-primary:hover::before { background: linear-gradient(110deg,var(--shale-primary-hover-start),var(--shale-primary-hover-end)); }
-.shale-foundation .shale-button-primary:active::before { background: var(--shale-primary-pressed); }
-.shale-foundation .shale-button-secondary:hover::before { background: var(--shale-secondary-hover); }
-.shale-foundation .shale-button-ghost::before, .shale-foundation .shale-button-navigation::before { background: transparent; border-color: transparent; }
-.shale-foundation .shale-button-ghost:hover::before, .shale-foundation .shale-button-navigation:hover::before { background: var(--shale-secondary-hover); }
-.shale-foundation .shale-button-navigation { color: var(--shale-link); text-decoration: underline; text-underline-offset: .2em; }
-.shale-foundation .shale-button-danger { color: var(--shale-danger-text); }
-.shale-foundation .shale-button-danger::before { background: var(--shale-danger); border-color: var(--shale-danger-text); }
-.shale-foundation .shale-button-danger:hover::before { background: var(--shale-danger-hover); }
-.shale-foundation .shale-button:disabled { opacity: .52; cursor: default; }
-.shale-foundation .shale-button:not(.shale-button-primary):active::before { background: var(--shale-secondary-hover); }
 .shale-foundation .shale-region { padding: var(--shale-density-padding); display: grid; gap: var(--shale-density-gap); border: 1px solid var(--shale-border); background: var(--shale-section); border-radius: var(--shale-radius-card); min-width: 0; }
 .shale-foundation .shale-density-compact { --shale-density-padding: var(--shale-space-3); --shale-density-gap: var(--shale-space-2); }
 .shale-foundation .shale-density-dense { --shale-density-padding: var(--shale-space-2); --shale-density-gap: .375rem; }
@@ -122,5 +51,3 @@
 .shale-foundation .shale-feedback-error { background: var(--shale-danger); color: var(--shale-danger-text); border-color: var(--shale-danger-text); }
 .shale-foundation .shale-feedback-info { background: var(--shale-info); color: var(--shale-info-text); }
 .shale-foundation .shale-feedback-success { background: var(--shale-success); color: var(--shale-success-text); }
-
-.shale-foundation .shale-button-danger:active::before { background: var(--shale-danger-hover); }
