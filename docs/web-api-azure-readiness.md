@@ -1,5 +1,7 @@
 # Shale Server Azure App Service Readiness
 
+For the responsive client replacement, see [Shale Web V2 architecture and roadmap](architecture/shale-web-v2-architecture-roadmap.md). Its verified inventory distinguishes current browser mutations and durable sessions from historical beta descriptions below.
+
 ## Ordinary web-client readiness and separate AI gates — 2026-10-08
 
 The web rebuild uses the existing bearer login/me/refresh/logout contract, SQL-backed bound WEB sessions,

@@ -1,5 +1,7 @@
 # 5P-4 Shale Web Build / Deploy Plan
 
+For the responsive client replacement, see [Shale Web V2 architecture and roadmap](architecture/shale-web-v2-architecture-roadmap.md). Its verified inventory distinguishes current browser mutations and durable sessions from historical beta descriptions below.
+
 This runbook plans the first publication of the read-only `shale-web` beta. It is documentation only: do not deploy the web app or change Azure resources as part of 5P-4.
 
 ## Scope
