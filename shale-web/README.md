@@ -85,3 +85,11 @@ selection is local to the mounted session; route screens retain their Light beta
 services and mutation handlers are unchanged. [Phase 2B review](docs/phase-2b-review.md) records the
 synthetic review script, screenshots, validation, known login return-to issue, acceptance gaps and
 frontend-only rollback. Phase 2 remains in progress; no deployment is part of this milestone.
+
+
+## Web V2 Phase 2C My Shale presentation
+
+My Shale now adopts shared presentation in both shell themes, including assigned cards and existing
+Complete actions. Other routes retain their beta Light skin. [Phase 2C review](docs/phase-2c-review.md)
+records exact scope, synthetic screenshots, native browser zoom, checks, gaps and frontend rollback.
+Phase 2 remains in progress; foundation.html and the isolated preview remain available.

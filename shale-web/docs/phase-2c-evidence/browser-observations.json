@@ -1,0 +1,1752 @@
+{
+  "browser": "151.0.7922.173",
+  "fixture": "Synthetic interception only; no live authentication/backend/device/screen-reader acceptance",
+  "observations": [
+    {
+      "width": 320,
+      "theme": "light",
+      "state": "normal",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 188,
+          "height": 97.5
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 188,
+          "height": 175.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 188,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "light",
+      "state": "pending",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 188,
+          "height": 97.5
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 188,
+          "height": 175.5
+        },
+        {
+          "name": "Completing…",
+          "width": 105.828125,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 188,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "light",
+      "state": "failure",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 188,
+          "height": 97.5
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 188,
+          "height": 175.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 188,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "light",
+      "state": "completed",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 188,
+          "height": 97.5
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 188,
+          "height": 175.5
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 188,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "light",
+      "state": "loading",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "light",
+      "state": "empty",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "light",
+      "state": "errors",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "state": "normal",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 188,
+          "height": 97.5
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 188,
+          "height": 175.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 188,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "state": "pending",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 188,
+          "height": 97.5
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 188,
+          "height": 175.5
+        },
+        {
+          "name": "Completing…",
+          "width": 105.828125,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 188,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "state": "failure",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 188,
+          "height": 97.5
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 188,
+          "height": 175.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 188,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "state": "completed",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 188,
+          "height": 97.5
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 188,
+          "height": 175.5
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 188,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "state": "loading",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "state": "empty",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "state": "errors",
+      "scrollWidth": 320,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "state": "normal",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 228,
+          "height": 78
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 228,
+          "height": 136.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 228,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "state": "pending",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 228,
+          "height": 78
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 228,
+          "height": 136.5
+        },
+        {
+          "name": "Completing…",
+          "width": 105.828125,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 228,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "state": "failure",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 228,
+          "height": 78
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 228,
+          "height": 136.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 228,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "state": "completed",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 228,
+          "height": 78
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 228,
+          "height": 136.5
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 228,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "state": "loading",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "state": "empty",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "state": "errors",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "state": "normal",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 228,
+          "height": 78
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 228,
+          "height": 136.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 228,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "state": "pending",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 228,
+          "height": 78
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 228,
+          "height": 136.5
+        },
+        {
+          "name": "Completing…",
+          "width": 105.828125,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 228,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "state": "failure",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 228,
+          "height": 78
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 228,
+          "height": 136.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 228,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "state": "completed",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 228,
+          "height": 78
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 228,
+          "height": 136.5
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 228,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "state": "loading",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "state": "empty",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "state": "errors",
+      "scrollWidth": 360,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "state": "normal",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 460,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 460,
+          "height": 78
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 460,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "state": "pending",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 460,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 460,
+          "height": 78
+        },
+        {
+          "name": "Completing…",
+          "width": 105.828125,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 460,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "state": "failure",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 460,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 460,
+          "height": 78
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 460,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "state": "completed",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 460,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 460,
+          "height": 78
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 460,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "state": "loading",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "state": "empty",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "state": "errors",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "state": "normal",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 460,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 460,
+          "height": 78
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 460,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "state": "pending",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 460,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 460,
+          "height": 78
+        },
+        {
+          "name": "Completing…",
+          "width": 105.828125,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 460,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "state": "failure",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 460,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 460,
+          "height": 78
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 460,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "state": "completed",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 460,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 460,
+          "height": 78
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 460,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "state": "loading",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "state": "empty",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "state": "errors",
+      "scrollWidth": 768,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "state": "normal",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 423,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 423,
+          "height": 97.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 423,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "state": "pending",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 423,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 423,
+          "height": 97.5
+        },
+        {
+          "name": "Completing…",
+          "width": 105.828125,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 423,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "state": "failure",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 423,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 423,
+          "height": 97.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 423,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "state": "completed",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 423,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 423,
+          "height": 97.5
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 423,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "state": "loading",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "state": "empty",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "state": "errors",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "state": "normal",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 423,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 423,
+          "height": 97.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 423,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "state": "pending",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 423,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 423,
+          "height": 97.5
+        },
+        {
+          "name": "Completing…",
+          "width": 105.828125,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 423,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "state": "failure",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 423,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 423,
+          "height": 97.5
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 423,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "state": "completed",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [
+        {
+          "name": "Synthetic North Meadow Community Association — extended demonstration name for wrapping",
+          "width": 423,
+          "height": 44
+        },
+        {
+          "name": "Case 2",
+          "width": 101.15625,
+          "height": 44
+        },
+        {
+          "name": "Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue",
+          "width": 423,
+          "height": 97.5
+        },
+        {
+          "name": "Task 13",
+          "width": 110.65625,
+          "height": 44
+        },
+        {
+          "name": "Complete",
+          "width": 83.515625,
+          "height": 44
+        },
+        {
+          "name": "Previously completed synthetic task",
+          "width": 423,
+          "height": 44
+        }
+      ],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "state": "loading",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "state": "empty",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "state": "errors",
+      "scrollWidth": 1280,
+      "mainCount": 1,
+      "controls": [],
+      "clipped": []
+    }
+  ],
+  "accessibility": [
+    {
+      "role": "banner",
+      "name": ""
+    },
+    {
+      "role": "navigation",
+      "name": "Primary navigation"
+    },
+    {
+      "role": "main",
+      "name": ""
+    },
+    {
+      "role": "button",
+      "name": "Logout"
+    },
+    {
+      "role": "region",
+      "name": "My Shale"
+    },
+    {
+      "role": "region",
+      "name": "My Cases"
+    },
+    {
+      "role": "region",
+      "name": "My Tasks"
+    },
+    {
+      "role": "button",
+      "name": "Open case Synthetic North Meadow Community Association — extended demonstration name for wrapping"
+    },
+    {
+      "role": "button",
+      "name": "Open case Case 2"
+    },
+    {
+      "role": "button",
+      "name": "Open task Synthetic task — LongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValueLongUnbrokenSyntheticDemonstrationValue"
+    },
+    {
+      "role": "button",
+      "name": "Complete"
+    },
+    {
+      "role": "button",
+      "name": "Open task Task 13"
+    },
+    {
+      "role": "button",
+      "name": "Complete"
+    },
+    {
+      "role": "button",
+      "name": "Open task Previously completed synthetic task"
+    },
+    {
+      "role": "status",
+      "name": ""
+    }
+  ],
+  "isolation": [
+    {
+      "theme": "light",
+      "background": "rgb(255, 255, 255)",
+      "color": "rgb(29, 79, 115)"
+    },
+    {
+      "theme": "dark",
+      "background": "rgb(255, 255, 255)",
+      "color": "rgb(29, 79, 115)"
+    }
+  ],
+  "preview": [
+    {
+      "width": 320,
+      "theme": "light",
+      "apiRequests": 0
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "apiRequests": 0
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "apiRequests": 0
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "apiRequests": 0
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "apiRequests": 0
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "apiRequests": 0
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "apiRequests": 0
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "apiRequests": 0
+    }
+  ],
+  "errors": [],
+  "zoom": {
+    "before": {
+      "dpr": 1,
+      "width": 1280
+    },
+    "afterShortcut": {
+      "dpr": 1,
+      "width": 1280
+    },
+    "settingsError": "page.goto: Cannot navigate to \"chrome://settings/appearance\": this page is not available in an isolated browser context, and opening it crashes the browser. Use browserType.launchPersistentContext() instead.\nCall log:\n\u001b[2m  - navigating to \"chrome://settings/appearance\", waiting until \"load\"\u001b[22m\n",
+    "acceptance": "No browser zoom acceptance unless native zoom changed and 200%/400% reflow was exercised. No viewport/text-size emulation counted as zoom."
+  },
+  "mutationCalls": 16
+}

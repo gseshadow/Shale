@@ -1,0 +1,128 @@
+{
+  "browser": "151.0.7922.173",
+  "mechanism": "Native Chromium Settings > Appearance > Page zoom in disposable persistent profile. Physical viewport remains 1280\u00d7900.",
+  "baseline": {
+    "dpr": 1,
+    "width": 1280,
+    "height": 900
+  },
+  "options": [
+    {
+      "value": "0.25",
+      "text": "25%"
+    },
+    {
+      "value": "0.3333333333333333",
+      "text": "33%"
+    },
+    {
+      "value": "0.5",
+      "text": "50%"
+    },
+    {
+      "value": "0.6666666666666666",
+      "text": "67%"
+    },
+    {
+      "value": "0.75",
+      "text": "75%"
+    },
+    {
+      "value": "0.8",
+      "text": "80%"
+    },
+    {
+      "value": "0.9",
+      "text": "90%"
+    },
+    {
+      "value": "1",
+      "text": "100%"
+    },
+    {
+      "value": "1.1",
+      "text": "110%"
+    },
+    {
+      "value": "1.25",
+      "text": "125%"
+    },
+    {
+      "value": "1.5",
+      "text": "150%"
+    },
+    {
+      "value": "1.75",
+      "text": "175%"
+    },
+    {
+      "value": "2",
+      "text": "200%"
+    },
+    {
+      "value": "2.5",
+      "text": "250%"
+    },
+    {
+      "value": "3",
+      "text": "300%"
+    },
+    {
+      "value": "4",
+      "text": "400%"
+    },
+    {
+      "value": "5",
+      "text": "500%"
+    }
+  ],
+  "records": [
+    {
+      "zoom": 200,
+      "theme": "light",
+      "dpr": 2,
+      "width": 640,
+      "height": 450,
+      "scrollWidth": 640,
+      "visibleFocus": true,
+      "keyboardCompleteFailureRetainsCards": true,
+      "nativeViewportZoom": 2.0
+    },
+    {
+      "zoom": 200,
+      "theme": "dark",
+      "dpr": 2,
+      "width": 640,
+      "height": 450,
+      "scrollWidth": 640,
+      "visibleFocus": true,
+      "keyboardCompleteFailureRetainsCards": true,
+      "nativeViewportZoom": 2.0
+    },
+    {
+      "zoom": 400,
+      "theme": "light",
+      "dpr": 4,
+      "width": 320,
+      "height": 225,
+      "scrollWidth": 320,
+      "visibleFocus": true,
+      "keyboardCompleteFailureRetainsCards": true,
+      "nativeViewportZoom": 4.0
+    },
+    {
+      "zoom": 400,
+      "theme": "dark",
+      "dpr": 4,
+      "width": 320,
+      "height": 225,
+      "scrollWidth": 320,
+      "visibleFocus": true,
+      "keyboardCompleteFailureRetainsCards": true,
+      "nativeViewportZoom": 4.0
+    }
+  ],
+  "errors": [],
+  "limits": "Headless Chromium native page zoom only; physical devices and screen readers not exercised.",
+  "screenshotExport": "CDP contentSize in native device-independent coordinates with scale 100/zoom exports the full zoomed layout at CSS resolution. Export scaling does not alter browser zoom."
+}

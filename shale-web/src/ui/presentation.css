@@ -1,0 +1,72 @@
+/* Shared component presentation. Operational routes adopt explicitly; theme tokens
+   are inherited from the shell, never redefined by a screen. */
+:is(.shale-foundation, .shale-presentation) *, :is(.shale-foundation, .shale-presentation) *::before, :is(.shale-foundation, .shale-presentation) *::after { box-sizing: border-box; }
+:is(.shale-foundation, .shale-presentation) :where(h1,h2,h3,p) { margin: 0; overflow-wrap: anywhere; }
+:is(.shale-foundation, .shale-presentation) :where(a,button,input,select,textarea,summary) { font: inherit; overflow-wrap: anywhere; }
+:is(.shale-foundation, .shale-presentation) :where(a,button,input,select,textarea,summary):focus-visible {
+  outline: 3px solid var(--shale-focus); outline-offset: 3px;
+}
+:is(.shale-foundation, .shale-presentation) h1 { font-size: var(--shale-type-page); font-weight: 800; line-height: 1.25; }
+:is(.shale-foundation, .shale-presentation) h2 { font-size: var(--shale-type-section); font-weight: 800; line-height: 1.3; }
+:is(.shale-foundation, .shale-presentation) h3 { font-size: .9375rem; font-weight: 700; }
+:is(.shale-foundation, .shale-presentation) .eyebrow, :is(.shale-foundation, .shale-presentation) .entity-card-eyebrow {
+  color: var(--shale-muted); font-size: var(--shale-type-meta); font-weight: 700;
+}
+:is(.shale-foundation, .shale-presentation) .lede, :is(.shale-foundation, .shale-presentation) .entity-card-subtitle { color: var(--shale-secondary-text); }
+:is(.shale-foundation, .shale-presentation) .page-title-block { display: grid; gap: var(--shale-space-2); }
+:is(.shale-foundation, .shale-presentation) .page-heading-row { display: flex; flex-wrap: wrap; gap: var(--shale-space-4); justify-content: space-between; }
+:is(.shale-foundation, .shale-presentation) .toolbar-actions, :is(.shale-foundation, .shale-presentation) .entity-card-actions { display: flex; flex-wrap: wrap; gap: var(--shale-space-2); }
+:is(.shale-foundation, .shale-presentation) .shale-region { padding: var(--shale-density-padding); display: grid; gap: var(--shale-density-gap); border: 1px solid var(--shale-border); background: var(--shale-section); border-radius: var(--shale-radius-card); min-width: 0; }
+:is(.shale-foundation, .shale-presentation) .shale-density-compact { --shale-density-padding: var(--shale-space-3); --shale-density-gap: var(--shale-space-2); }
+:is(.shale-foundation, .shale-presentation) .shale-density-dense { --shale-density-padding: var(--shale-space-2); --shale-density-gap: .375rem; }
+:is(.shale-foundation, .shale-presentation) .entity-list { display: grid; gap: var(--shale-space-3); min-width: 0; }
+:is(.shale-foundation, .shale-presentation) .entity-card { background: var(--shale-card); border: 1px solid var(--shale-border); border-radius: var(--shale-radius-card); box-shadow: var(--shale-shadow); padding: var(--shale-space-4); display: grid; gap: var(--shale-space-3); min-width: 0; overflow-wrap: anywhere; }
+:is(.shale-foundation, .shale-presentation) .entity-card-clickable { cursor: pointer; }
+:is(.shale-foundation, .shale-presentation) .entity-card-clickable:hover { background: var(--shale-card-hover); }
+:is(.shale-foundation, .shale-presentation) .shale-card-compact { padding: var(--shale-space-3); gap: var(--shale-space-2); }
+:is(.shale-foundation, .shale-presentation) .shale-card-selected { border: 2px solid var(--shale-focus); background: var(--shale-selected); }
+:is(.shale-foundation, .shale-presentation) .entity-card-header, :is(.shale-foundation, .shale-presentation) .entity-card-title-block { display: grid; gap: var(--shale-space-2); min-width: 0; }
+:is(.shale-foundation, .shale-presentation) .entity-card-activation { display: flex; flex-wrap: wrap; gap: var(--shale-space-2); align-items: center; text-align: left; width: 100%; min-height: 44px; border: 0; padding: 0; border-radius: var(--shale-radius-control); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+:is(.shale-foundation, .shale-presentation) .shale-selected-marker { font-size: var(--shale-type-meta); color: var(--shale-link); }
+:is(.shale-foundation, .shale-presentation) .entity-card-badges { display: flex; flex-wrap: wrap; gap: var(--shale-space-2); }
+:is(.shale-foundation, .shale-presentation) .metadata-grid { display: grid; gap: var(--shale-space-2); margin: 0; }
+:is(.shale-foundation, .shale-presentation) .metadata-row { display: flex; flex-wrap: wrap; gap: var(--shale-space-1) var(--shale-space-3); }
+:is(.shale-foundation, .shale-presentation) .metadata-row dt { color: var(--shale-muted); font-size: var(--shale-type-meta); font-weight: 700; }
+:is(.shale-foundation, .shale-presentation) .metadata-row dd { margin: 0; overflow-wrap: anywhere; }
+:is(.shale-foundation, .shale-presentation) .status-pill { --pill-bg: var(--shale-neutral); --pill-text: var(--shale-neutral-text); display: inline-flex; align-items: center; gap: var(--shale-space-2); max-width: 100%; padding: var(--shale-space-1) var(--shale-space-2); border: 1px solid var(--shale-border); border-radius: 999px; background: var(--shale-indicator-fill,var(--pill-bg)); color: var(--shale-indicator-text,var(--pill-text)); font-size: var(--shale-type-meta); font-weight: 700; overflow-wrap: anywhere; }
+:is(.shale-foundation, .shale-presentation) .status-pill-success { --pill-bg: var(--shale-success); --pill-text: var(--shale-success-text); }
+:is(.shale-foundation, .shale-presentation) .status-pill-warning { --pill-bg: var(--shale-warning); --pill-text: var(--shale-warning-text); }
+:is(.shale-foundation, .shale-presentation) .status-pill-info { --pill-bg: var(--shale-info); --pill-text: var(--shale-info-text); }
+:is(.shale-foundation, .shale-presentation) .shale-indicator-badge { color: var(--shale-text); background: transparent; border: 0; border-radius: 0; padding-inline: 0; }
+:is(.shale-foundation, .shale-presentation) .shale-indicator-dot { background: var(--shale-indicator-fill,var(--shale-neutral-text)); border: 1px solid var(--shale-border); width: .625rem; height: .625rem; border-radius: 50%; flex: 0 0 auto; }
+:is(.shale-foundation, .shale-presentation) .shale-field { display: grid; gap: var(--shale-space-2); }
+:is(.shale-foundation, .shale-presentation) label { font-weight: 700; }
+:is(.shale-foundation, .shale-presentation) :where(input,select,textarea) { color: var(--shale-text); background: var(--shale-input); border: 1px solid var(--shale-control-border); border-radius: var(--shale-radius-control); min-height: 44px; max-width: 100%; min-width: 0; width: 100%; padding: var(--shale-space-2) var(--shale-space-3); font-size: 1rem; scroll-margin-block: var(--shale-space-6); }
+:is(.shale-foundation, .shale-presentation) :where(input,select,textarea):hover { border-color: var(--shale-focus); }
+:is(.shale-foundation, .shale-presentation) :where(input,select,textarea)[aria-invalid="true"] { border-color: var(--shale-danger-text); }
+:is(.shale-foundation, .shale-presentation) :where(input,select,textarea):disabled { opacity: .52; }
+:is(.shale-foundation, .shale-presentation) .shale-field-error { color: var(--shale-danger-text); }
+:is(.shale-foundation, .shale-presentation) .shale-feedback, :is(.shale-foundation, .shale-presentation) .status { background: var(--shale-neutral); color: var(--shale-neutral-text); border: 1px solid var(--shale-border); border-radius: var(--shale-radius-control); padding: var(--shale-space-3); }
+:is(.shale-foundation, .shale-presentation) .shale-feedback-error { background: var(--shale-danger); color: var(--shale-danger-text); border-color: var(--shale-danger-text); }
+:is(.shale-foundation, .shale-presentation) .shale-feedback-info { background: var(--shale-info); color: var(--shale-info-text); }
+:is(.shale-foundation, .shale-presentation) .shale-feedback-success { background: var(--shale-success); color: var(--shale-success-text); }
+
+/* Explicit route adoption also neutralizes beta element defaults. These reusable
+   working-plane/list rules apply only beneath the presentation opt-in. */
+.shale-presentation { color: var(--shale-text); color-scheme: inherit; font-size: var(--shale-type-body); line-height: 1.5; }
+.shale-work-page { background: var(--shale-plane); border-radius: var(--shale-radius-card); padding: var(--shale-space-4); display: grid; gap: var(--shale-space-6); min-width: 0; }
+.shale-presentation .entity-list { grid-template-columns: repeat(auto-fit,minmax(min(20rem,100%),1fr)); }
+.shale-presentation .entity-card { align-content: start; transition: none; word-break: normal; }
+.shale-presentation .entity-card-clickable:hover { border-color: var(--shale-border); box-shadow: var(--shale-shadow); transform: none; }
+.shale-presentation .entity-card-title { color: var(--shale-text); line-height: 1.3; }
+.shale-presentation .entity-card-title-block { flex: initial; }
+.shale-presentation .entity-card-badges { justify-content: flex-start; align-items: center; }
+.shale-presentation .entity-card-actions { justify-content: flex-start; align-items: center; }
+.shale-presentation .metadata-grid { grid-template-columns: minmax(0,1fr); }
+.shale-presentation .metadata-row { background: transparent; border: 0; border-radius: 0; padding: 0; word-break: normal; }
+.shale-presentation .metadata-row dt { letter-spacing: normal; text-transform: none; }
+.shale-presentation .eyebrow { letter-spacing: normal; text-transform: none; }
+.shale-presentation .lede { line-height: inherit; }
+.shale-presentation .status-pill { text-transform: none; line-height: inherit; white-space: normal; }
+.shale-presentation .completed-state { color: var(--shale-success-text); font-size: var(--shale-type-meta); }
+.shale-presentation .entity-card-activation { min-width: 44px; }

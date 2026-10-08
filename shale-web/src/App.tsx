@@ -4,13 +4,14 @@ import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useN
 import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import { ApiError, contactValueUpdate } from './api';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
-import { Button, PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
+import { Button, Feedback, SectionRegion, PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
 import { ResponsiveShell } from './shell/ResponsiveShell';
 import './styles.css';
 import './ui/tokens.css';
 import './ui/buttons.css';
 import './shell/shell.css';
 import './shell/authenticated.css';
+import './ui/presentation.css';
 
 function focusContactError(error: unknown, form: HTMLFormElement) {
   if (error instanceof ApiError && error.fieldErrors.length) {
@@ -501,17 +502,15 @@ function AppShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout
         </select>
         <Button onClick={onLogout}>Logout</Button>
       </>}>
-      <div className="legacy-route-content"><div className="content-container"><Outlet /></div></div>
+      <div className={location.pathname.replace(/\/+$/, '') === '/my-shale' ? 'shale-route-content' : 'legacy-route-content'}><div className="content-container"><Outlet /></div></div>
     </ResponsiveShell>
   </div>;
 }
 
 function MyShalePage({ accessToken, user }: { accessToken: string | null; user: AuthenticatedUser | null }) {
   return (
-    <section className="dashboard-page" aria-labelledby="my-shale-title">
-      <div className="dashboard-header">
-        <PageHeader eyebrow="Dashboard" title="My Shale" titleId="my-shale-title" lede={`Welcome${user ? `, ${displayNameFor(user)}` : ''}. Here is your read-only Shale summary.`} />
-      </div>
+    <section className="shale-presentation shale-work-page" aria-labelledby="my-shale-title">
+      <PageHeader eyebrow="Dashboard" title="My Shale" titleId="my-shale-title" lede={`Welcome${user ? `, ${displayNameFor(user)}` : ''}. Here is your assigned Shale work. Open a case or task, or complete an open task.`} />
       <MyCasesSection accessToken={accessToken} />
       <MyTasksSection accessToken={accessToken} />
     </section>
@@ -539,13 +538,12 @@ function MyCasesSection({ accessToken }: { accessToken: string | null }) {
   }, [accessToken]);
 
   return (
-    <section className="dashboard-section" aria-labelledby="my-cases-title">
-      <h2 id="my-cases-title">My Cases</h2>
-      {isLoading && <LoadingState message="Loading your cases…" />}
-      {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && cases.length === 0 && <EmptyState message="No assigned cases were found." />}
+    <SectionRegion title="My Cases">
+      {isLoading && <Feedback kind="loading">Loading your cases…</Feedback>}
+      {!isLoading && error && <Feedback kind="error">{error}</Feedback>}
+      {!isLoading && !error && cases.length === 0 && <Feedback kind="empty">No assigned cases were found.</Feedback>}
       {!isLoading && !error && cases.length > 0 && <MyCasesList cases={cases} />}
-    </section>
+    </SectionRegion>
   );
 }
 
@@ -577,6 +575,7 @@ function MyTasksSection({ accessToken }: { accessToken: string | null }) {
   const [tasks, setTasks] = useState<CaseTaskListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [completionError, setCompletionError] = useState<string | null>(null);
   useEffect(() => {
     if (!accessToken) {
       setError('Your Shale session is not available. Please sign in again.');
@@ -594,13 +593,13 @@ function MyTasksSection({ accessToken }: { accessToken: string | null }) {
   }, [accessToken]);
 
   return (
-    <section className="dashboard-section" aria-labelledby="my-tasks-title">
-      <h2 id="my-tasks-title">My Tasks</h2>
-      {isLoading && <LoadingState message="Loading your tasks…" />}
-      {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && tasks.length === 0 && <EmptyState message="No assigned tasks were found." />}
-      {!isLoading && !error && tasks.length > 0 && <MyTasksList tasks={tasks} accessToken={accessToken} onTasksChanged={setTasks} onError={setError} />}
-    </section>
+    <SectionRegion title="My Tasks">
+      {isLoading && <Feedback kind="loading">Loading your tasks…</Feedback>}
+      {!isLoading && error && <Feedback kind="error">{error}</Feedback>}
+      {completionError && <Feedback kind="error">{completionError}</Feedback>}
+      {!isLoading && !error && tasks.length === 0 && <Feedback kind="empty">No assigned tasks were found.</Feedback>}
+      {!isLoading && !error && tasks.length > 0 && <MyTasksList tasks={tasks} accessToken={accessToken} onTasksChanged={setTasks} onError={setCompletionError} presentation="shared" />}
+    </SectionRegion>
   );
 }
 
@@ -608,7 +607,7 @@ function mergeCompletedTask(tasks: CaseTaskListItem[], completedTask: TaskDetail
   return tasks.map((task) => task.id === completedTask.id ? { ...task, completedAt: completedTask.completedAt } : task);
 }
 
-function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError }: { tasks: CaseTaskListItem[]; allTasks?: CaseTaskListItem[]; accessToken: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onError: (message: string | null) => void }) {
+function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError, presentation = 'legacy' }: { presentation?: 'legacy' | 'shared'; tasks: CaseTaskListItem[]; allTasks?: CaseTaskListItem[]; accessToken: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onError: (message: string | null) => void }) {
   const navigate = useNavigate();
   const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
 
@@ -643,7 +642,9 @@ function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError }: 
               <MetadataRow label="Priority" value={task.priorityId ? `Priority ${task.priorityId}` : MISSING_VALUE} />
             </MetadataGrid>
           )}
-          actions={!task.completedAt ? <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton> : <span className="completed-state">Completed {formatDate(task.completedAt)}</span>}
+          actions={!task.completedAt ? (presentation === 'shared'
+            ? <Button size="small" purpose="secondary" disabled={completingTaskId === task.id} aria-busy={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</Button>
+            : <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton>) : <span className="completed-state" role={presentation === 'shared' ? 'status' : undefined}>Completed {formatDate(task.completedAt)}</span>}
           onClick={() => navigate(`/tasks/${task.id}`)}
           ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
         />
