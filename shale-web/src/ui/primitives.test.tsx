@@ -1,11 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { Button, EntityCard, EntityList, Field, NavigationButton, SectionRegion } from './primitives';
+import { Button, EntityCard, EntityList, Feedback, Field, NavigationButton, SectionRegion } from './primitives';
 import { indicatorPaint } from './indicatorPaint';
 
 afterEach(cleanup);
 describe('shared presentation contracts', () => {
+  it('keeps a stable polite atomic feedback region across confirmation updates', () => {
+    const { rerender } = render(<Feedback aria-live="polite" aria-atomic="true">Pending</Feedback>);
+    const status = screen.getByRole('status');
+    rerender(<Feedback kind="unavailable" aria-live="polite" aria-atomic="true">Unconfirmed</Feedback>);
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status.getAttribute('aria-live')).toBe('polite'); expect(status.getAttribute('aria-atomic')).toBe('true');
+    rerender(<Feedback kind="error">Failure</Feedback>); expect(screen.getByRole('alert')).toBeTruthy();
+  });
   it('keeps native action types, disabled behavior and navigation links', () => {
     const onClick = vi.fn();
     render(<MemoryRouter><Button purpose="primary">Check</Button><Button type="submit">Submit</Button>

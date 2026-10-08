@@ -2,9 +2,9 @@ import { startTransition, FormEvent, useEffect, useMemo, useState, useRef } from
 import type { CSSProperties, ReactNode } from 'react';
 import { redirectPathFrom } from './returnPath';
 import { useStartupSession } from './useStartupSession';
-import type { AuthState } from './useStartupSession';
+import type { AuthState, LogoutFeedback } from './useStartupSession';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, searchCases, searchContacts, searchOrganizations, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, searchCases, searchContacts, searchOrganizations, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import { ApiError, contactValueUpdate } from './api';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
 import { Button, Feedback, SectionRegion, PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
@@ -101,7 +101,7 @@ function displayNameFor(user: AuthenticatedUser): string {
 function AppRoutes() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { authState, retry, signIn: handleLogin, signOut } = useStartupSession();
+  const { authState, logoutFeedback, retry, signIn: handleLogin, signOut, logoutSession } = useStartupSession();
 
   function returnToSignIn() {
     // Replace and clear return state together, as in Phase 3A local logout.
@@ -111,17 +111,11 @@ function AppRoutes() {
     });
   }
 
-  async function handleLogout() {
-    const token = authState.accessToken;
-    // BrowserRouter transitions location updates. Keep teardown in that same update so
-    // ProtectedRoute cannot capture the just-signed-out detail as a new return target.
+  function handleLogout() {
+    // Match BrowserRouter's transition so a signed-out detail cannot be recaptured.
     startTransition(() => {
-      navigate('/login', { replace: true, state: null });
-      signOut();
+      if (logoutSession()) navigate('/login', { replace: true, state: null });
     });
-    if (token) {
-      await logout(token);
-    }
   }
 
   // Keep the requested pathname/query/hash in place until verification has an outcome.
@@ -135,7 +129,7 @@ function AppRoutes() {
       <Route path="/" element={authState.user ? <Navigate to="/my-shale" replace /> : <Navigate to="/login" replace />} />
       <Route
         path="/login"
-        element={authState.user ? <Navigate to={redirectPathFrom(location.state)} replace state={null} /> : <LoginPage onLogin={handleLogin} />}
+        element={authState.user ? <Navigate to={redirectPathFrom(location.state)} replace state={null} /> : <LoginPage onLogin={handleLogin} logoutFeedback={logoutFeedback} />}
       />
       <Route element={<ProtectedRoute authState={authState} />}>
         <Route element={<AppShell user={authState.user} onLogout={handleLogout} />}>
@@ -431,9 +425,19 @@ function ProtectedRoute({ authState }: { authState: AuthState }) {
   return <Outlet />;
 }
 
-function LoginPage({ onLogin }: { onLogin: (verifiedAccessToken: string, verifiedUser: AuthenticatedUser) => void }) {
+function LoginPage({ onLogin, logoutFeedback }: { logoutFeedback: LogoutFeedback; onLogin: (verifiedAccessToken: string, verifiedUser: AuthenticatedUser) => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, []);
+  const [logoutMessage, setLogoutMessage] = useState('');
+  useEffect(() => {
+    setLogoutMessage(logoutFeedback === 'pending'
+      ? 'You are signed out in this tab. Waiting for the server to confirm session revocation…'
+      : logoutFeedback === 'confirmed'
+        ? 'You are signed out in this tab. The server confirmed revocation of the session used here.'
+        : logoutFeedback === 'unavailable'
+          ? 'You are signed out in this tab. Server session revocation could not be confirmed. The session may still be active on the server. You can sign in again.'
+          : '');
+  }, [logoutFeedback]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -462,6 +466,7 @@ function LoginPage({ onLogin }: { onLogin: (verifiedAccessToken: string, verifie
       <section className="login-panel" aria-labelledby="login-title">
         <p className="eyebrow">Shale Web</p>
         <h1 id="login-title" ref={heading} tabIndex={-1}>Sign in</h1>
+        <Feedback kind={logoutFeedback === 'confirmed' ? 'success' : logoutFeedback === 'unavailable' ? 'unavailable' : 'info'} aria-live="polite" aria-atomic="true">{logoutMessage}</Feedback>
         <p className="lede">Use your Shale account to access the web application shell.</p>
         <form onSubmit={handleSubmit}>
           <label>

@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { indicatorPaint } from './indicatorPaint';
 
@@ -31,8 +31,8 @@ export function SectionRegion({ title, children, density = 'comfortable' }: { ti
   return <section className={`shale-region shale-density-${density}`} aria-labelledby={id}>
     <h2 id={id}>{title}</h2>{children}</section>;
 }
-export function Feedback({ kind = 'info', children }: { kind?: 'info' | 'success' | 'error' | 'loading' | 'empty' | 'unavailable'; children: ReactNode }) {
-  return <p className={`shale-feedback shale-feedback-${kind}`} role={kind === 'error' ? 'alert' : 'status'}>{children}</p>;
+export function Feedback({ kind = 'info', children, ...props }: { kind?: 'info' | 'success' | 'error' | 'loading' | 'empty' | 'unavailable'; children: ReactNode } & Omit<HTMLAttributes<HTMLParagraphElement>, 'role' | 'className'>) {
+  return <p {...props} className={`shale-feedback shale-feedback-${kind}`} role={kind === 'error' ? 'alert' : 'status'}>{children}</p>;
 }
 export function LoadingState({ message }: { message: string }) {
   return <p className="status loading-state" role="status">{message}</p>;

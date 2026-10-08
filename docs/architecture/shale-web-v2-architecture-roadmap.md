@@ -3,7 +3,7 @@
 **Reviewed:** 2026-10-08. **Inventory/documentation:** COMPLETE. **Decision acceptance:** OPEN.
 **Web V2 implementation:** Phase 2A foundation, Phase 2B authenticated shell and Phase 2C My Shale presentation adoption IMPLEMENTED FOR REVIEW; Phase 2D acceptance review and targeted feedback fix RECORDED; ACCEPTANCE OPEN.
 Phase 2 remains IN PROGRESS; acceptance OPEN. Phase 3 IN PROGRESS — Phase 3A safe login return-path restoration and Phase 3B startup
-verification uncertainty/recovery IMPLEMENTED FOR REVIEW. Phases 4–10 NOT STARTED. The user explicitly authorized this bounded
+verification uncertainty/recovery and Phase 3C truthful remote-logout feedback IMPLEMENTED FOR REVIEW. Phases 4–10 NOT STARTED. The user explicitly authorized this bounded
 Phase 3 slice while Phase 2 acceptance remains open; that sequencing does not mark Phase 2 complete.
 Documentation completion is not implementation completion.
 
@@ -60,7 +60,7 @@ Paths below are relative to the repository root unless linked. Symbol names make
 | `App.tsx`: `EntityCard`, `EntityList`, `MetadataGrid/Row`, `PageHeader`, `SearchBar`, `FilterBar`, `StatusPill`, `EmptyState`, `ActionButton`, `SecondaryButton` | Reusable vocabulary already exists, but is file-local and tied to beta CSS. | EXTRACT/adapt into shared web primitives; review semantic HTML, keyboard behavior and A.2 tokens rather than starting another card system. |
 | [ContactValueInput.tsx](../../shale-web/src/ContactValueInput.tsx), [its tests](../../shale-web/src/ContactValueInput.test.tsx) | Server-backed phone/email preview on blur, draft preservation, generation guards, field errors and `RETAIN/SET/CLEAR`; unchanged legacy values are preserved. Duplicate errors survive advisory validation until authoritative Save. | RETAIN shared parsing endpoint and semantics; extend accessibility/mobile composition through the same component. |
 | [api.ts](../../shale-web/src/api.ts) | Manually maintained interfaces; repeated `fetch`, bearer headers and JSON casts. `VITE_SHALE_API_BASE_URL` overrides a hard-coded Azure default. `ApiError` includes status and field errors; 404/409 handling varies. No shared cancellation, refresh coordinator or runtime response validation. | REFACTOR transport and typed feature contracts incrementally. Do not claim TypeScript casts validate JSON. |
-| `api.ts`: `storeAccessToken/readAccessToken/clearAccessToken`; `AppRoutes` | Opaque bearer stored per tab in `sessionStorage` under `shale-web.accessToken`; startup calls `/me`. Phase 3B clears startup credentials only on confirmed `/me` 401; uncertain verification retains storage, blocks content/feature requests, and offers explicit Retry or local Return to sign in. Login TTL is not coordinated into browser refresh; no refresh call exists in this file. Logout clears locally before fetching server logout, whose HTTP status is not checked. | RETAIN bearer protocol, REPLACE lifecycle handling in phase 3; storage tradeoff needs explicit review. |
+| `api.ts`: `storeAccessToken/readAccessToken/clearAccessToken`; `AppRoutes` | Opaque bearer stored per tab in `sessionStorage` under `shale-web.accessToken`; startup calls `/me`. Phase 3B clears startup credentials only on confirmed `/me` 401; uncertain verification retains storage, blocks content/feature requests, and offers explicit Retry or local Return to sign in. Login TTL is not coordinated into browser refresh; no refresh call exists in this file. Phase 3C logout clears locally before one bounded server attempt; only HTTP 200 with `revoked: true` confirms the endpoint outcome, and other outcomes remain explicitly unconfirmed. | RETAIN bearer protocol, REPLACE lifecycle handling in phase 3; storage tradeoff needs explicit review. |
 | `App.tsx` and `api.ts` mutation handlers | Browser already creates cases, tasks, updates, Contacts and Organizations; edits case core/assignment/status, task detail/completion, Contact and Organization details. | RETAIN verified contracts where safe. Historical “read-only beta” descriptions are obsolete for source capabilities; names such as `ApiReadController` and `*ReadOnly` components do not prove read-only behavior. |
 | [styles.css](../../shale-web/src/styles.css) | Beta styling and responsive rules exist; browser uses Inter/system sans stack. | REPLACE incrementally with canonical web tokens and shared component styles; investigate actual visual parity through later screenshots/device review. |
 
@@ -782,6 +782,39 @@ unconfirmed remote revocation with focused tests; do not retain credentials for 
 Refresh coordination, storage redesign/abstraction, broad transport, query cache and dirty-form work
 remain **UNFINISHED** and require separate scope. Rollback only Phase 3B to the security-patched
 Phase 3A base above; no server/session/SQL rollback.
+
+### 11.9 Phase 3C truthful remote-logout feedback — 2026-10-08
+
+Separate task branch `codex/web-v2-phase-3c-logout-feedback` from fetched live `origin/codex/latest`
+`a60297be90fc51e225c715396f909bd50f90a64a`; merged Phase 3A #1844, Phase 3B #1845 and security
+patch #1843 verified by ancestry. [Review](../../shale-web/docs/phase-3c-review.md) owns response
+classification, test impact, exact validation, synthetic evidence, gaps and rollback.
+
+* Immediate local removal/identity teardown, protected unmount and replacement `/login` with null
+  return state remain certain while one captured-bearer POST runs. Only the inspected HTTP 200 plus
+  `LogoutResponse.revoked === true` confirms the endpoint outcome. False/unusable bodies, HTTP errors
+  (including 401), network/redirect failure and an eight-second fetch/body deadline remain unconfirmed;
+  cancellation does not prove the server failed to revoke. No other-device/session claim.
+* A persistent polite/atomic signed-out status communicates pending, confirmed or unavailable. Login
+  stays usable, error payloads stay out of feedback, and late completion never steals input focus.
+  Synchronous duplicate/stale-handler guards, generation invalidation and abort discard results after
+  newer login/local invalidation/unmount. No credential restoration, retry retention or background replay.
+  Startup Return to sign in remains local. Phase 3A return safety and Phase 3B recovery are retained.
+* Focused API/lifecycle/App/feedback tests and full web/build, repository selection/server compatibility,
+  critical Maven, npm full/production audits and diff checks are recorded in the review. Twelve intercepted
+  Chromium scenarios at 320/1280 cover success/negative/HTTP/network/timeout/new-login, keyboard, history,
+  focus/reflow and preview isolation. Synthetic evidence does not establish live server revocation.
+* Audit: existing auth logout/durable lifecycle remains authoritative; local feedback/navigation is
+  intentionally unaudited. No audit integration/schema/migration or new sensitive-read/domain/admin seam.
+  Existing tenancy, authorization, validation, concurrency and audits remain; §8.2 gaps stay deferred.
+  No backend/SQL/protocol/storage redesign/dependency/deployment/version/native/MCP/AI changes.
+
+Phase 2 acceptance **OPEN**, Phase 3 **IN PROGRESS**. Next bounded **Phase 3D**: startup `/me`
+verification deadline while preserving uncertainty/storage and explicit Retry/local return. Broader
+established-session coordination, refresh/storage, transport/cache and dirty forms remain **UNFINISHED**.
+Real-host/live revocation, physical-device/screen-reader/other-engine and Phase 2 acceptance stay OPEN.
+Rollback only Phase 3C to the security-patched 3A/3B base above; no backend/session/SQL rollback.
+No merge or deployment.
 
 ## 12. Ready-to-run next Codex implementation prompt
 
