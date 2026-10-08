@@ -77,12 +77,14 @@ initial restricted-shell proxy/listen failures were resolved without changing pr
 | --- | --- |
 | `git fetch origin codex/latest`; explicit `git fetch origin codex/latest:refs/remotes/origin/codex/latest` | Passed; base and ancestry above. |
 | `npm ci --prefix shale-web --cache /workspace/.cache/npm` | Passed; manifests/locks unchanged. |
-| `npm test --prefix shale-web -- src/App.test.tsx src/logout.test.tsx src/ui/primitives.test.tsx src/useStartupSession.test.tsx` | Focused checks passed; exact final counts below. |
-| `npm test --prefix shale-web` | Final verification recorded below. |
+| `npm test --prefix shale-web -- src/App.test.tsx src/logout.test.tsx src/ui/primitives.test.tsx src/useStartupSession.test.tsx` | 145 passed, four files. |
+| `npm test --prefix shale-web` | 229 passed, eight files. |
 | `npm run typecheck --prefix shale-web`; `npm run build --prefix shale-web` | Passed; operational and foundation build entries retained. |
 | `mvn -pl shale-server -am -Dtest=com.shale.server.controller.AuthControllerTest,com.shale.server.runtime.ServerAuthSessionLogoutTest,com.shale.server.runtime.DurableSessionAuthTest -Dsurefire.failIfNoSpecifiedTests=false test` | 14 passed, zero failures/errors/skips. |
-| Repository selector / selected affected suite / `mvn test` | Final verification recorded below. |
-| `PLAYWRIGHT_MODULE=$PWD/work/browser-tools/node_modules/playwright node shale-web/docs/phase-3c-evidence/browser-review.cjs` | 12 scenarios, eight captures; zero page errors/unexpected requests/unhandled rejections. |
+| `python3 build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format markdown --output shale-web/docs/phase-3c-evidence/test-selection.md` | [Selection](phase-3c-evidence/test-selection.md): server/AuthController compatibility; no full-suite escalation. |
+| `mvn -pl shale-server -am -Dtest=com.shale.server.controller.AuthControllerTest -Dsurefire.failIfNoSpecifiedTests=false test` | 10 passed; unchanged auth endpoint is the browser contract owner. |
+| `mvn test` | Critical reactor 116 passed, zero failures/errors/skips. |
+| `PLAYWRIGHT_MODULE=$PWD/work/browser-tools/node_modules/playwright node shale-web/docs/phase-3c-evidence/browser-review.cjs` | 12 scenarios, eight captures; zero page errors/unexpected requests/unhandled rejections. Chromium 151.0.7922.173 / Playwright 1.64.0. |
 | `npm audit --prefix shale-web --json`; `npm audit --prefix shale-web --omit=dev --json` | [Full](phase-3c-evidence/audit.json) / [production](phase-3c-evidence/audit-production.json): zero vulnerabilities, every severity. |
 | `git diff --check`; package/lockfile diff against base | Passed/unchanged. Router 7.18.2 and PostCSS 8.5.23 security patches retained. |
 
