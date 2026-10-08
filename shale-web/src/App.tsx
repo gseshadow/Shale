@@ -1,8 +1,10 @@
 import { startTransition, FormEvent, useEffect, useMemo, useState, useRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { redirectPathFrom } from './returnPath';
+import { useStartupSession } from './useStartupSession';
+import type { AuthState } from './useStartupSession';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, searchCases, searchContacts, searchOrganizations, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import { ApiError, contactValueUpdate } from './api';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
 import { Button, Feedback, SectionRegion, PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
@@ -19,12 +21,6 @@ function focusContactError(error: unknown, form: HTMLFormElement) {
     const field = error.fieldErrors[0].field;
     (form.querySelector<HTMLInputElement>(`[data-validation-field="${field}"]`) ?? form.querySelector<HTMLInputElement>(`[data-validation-field="${field.split('.')[0]}"]`))?.focus();
   }
-}
-
-interface AuthState {
-  accessToken: string | null;
-  user: AuthenticatedUser | null;
-  isVerifying: boolean;
 }
 
 const MISSING_VALUE = '—';
@@ -105,55 +101,33 @@ function displayNameFor(user: AuthenticatedUser): string {
 function AppRoutes() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [authState, setAuthState] = useState<AuthState>(() => ({
-    accessToken: readAccessToken(),
-    user: null,
-    isVerifying: true,
-  }));
+  const { authState, retry, signIn: handleLogin, signOut } = useStartupSession();
 
-  useEffect(() => {
-    const storedToken = readAccessToken();
-    if (!storedToken) {
-      setAuthState({ accessToken: null, user: null, isVerifying: false });
-      return;
-    }
-
-    let isCurrent = true;
-    getCurrentUser(storedToken)
-      .then((verifiedUser) => {
-        if (isCurrent) {
-          setAuthState({ accessToken: storedToken, user: verifiedUser, isVerifying: false });
-        }
-      })
-      .catch(() => {
-        if (isCurrent) {
-          clearAccessToken();
-          setAuthState({ accessToken: null, user: null, isVerifying: false });
-        }
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, []);
-
-  function handleLogin(verifiedAccessToken: string, user: AuthenticatedUser) {
-    storeAccessToken(verifiedAccessToken);
-    setAuthState({ accessToken: verifiedAccessToken, user, isVerifying: false });
+  function returnToSignIn() {
+    // Replace and clear return state together, as in Phase 3A local logout.
+    startTransition(() => {
+      signOut();
+      navigate('/login', { replace: true, state: null });
+    });
   }
 
   async function handleLogout() {
     const token = authState.accessToken;
-    clearAccessToken();
     // BrowserRouter transitions location updates. Keep teardown in that same update so
     // ProtectedRoute cannot capture the just-signed-out detail as a new return target.
     startTransition(() => {
       navigate('/login', { replace: true, state: null });
-      setAuthState({ accessToken: null, user: null, isVerifying: false });
+      signOut();
     });
     if (token) {
       await logout(token);
     }
+  }
+
+  // Keep the requested pathname/query/hash in place until verification has an outcome.
+  // No route element (including feature effects or credential login) mounts while unknown.
+  if (authState.verification) {
+    return <SessionVerification pending={authState.verification === 'pending'} onRetry={retry} onSignIn={returnToSignIn} />;
   }
 
   return (
@@ -161,7 +135,7 @@ function AppRoutes() {
       <Route path="/" element={authState.user ? <Navigate to="/my-shale" replace /> : <Navigate to="/login" replace />} />
       <Route
         path="/login"
-        element={authState.user ? <Navigate to={redirectPathFrom(location.state)} replace state={null} /> : <LoginPage isVerifying={authState.isVerifying} onLogin={handleLogin} />}
+        element={authState.user ? <Navigate to={redirectPathFrom(location.state)} replace state={null} /> : <LoginPage onLogin={handleLogin} />}
       />
       <Route element={<ProtectedRoute authState={authState} />}>
         <Route element={<AppShell user={authState.user} onLogout={handleLogout} />}>
@@ -412,12 +386,43 @@ function DetailSection({ title, titleId, children, className }: { title: string;
   );
 }
 
+function SessionVerification({ pending, onRetry, onSignIn }: { pending: boolean; onRetry: () => void; onSignIn: () => void }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const status = useRef<HTMLParagraphElement>(null);
+  const retryButton = useRef<HTMLButtonElement>(null);
+  const returnRetryFocus = useRef(false);
+  useEffect(() => { heading.current?.focus(); }, []);
+  useEffect(() => {
+    if (!pending && returnRetryFocus.current) {
+      if (document.activeElement === status.current) retryButton.current?.focus();
+      returnRetryFocus.current = false;
+    }
+  }, [pending]);
+  function retryVerification() {
+    if (pending) return;
+    // Native disabled buttons lose keyboard focus in Chromium. Hold it on the live
+    // status, then return it after failure unless the user has moved to another action.
+    returnRetryFocus.current = document.activeElement === retryButton.current;
+    if (returnRetryFocus.current) status.current?.focus();
+    onRetry();
+  }
+  return <main className="login-page shale-foundation shale-presentation" data-theme="light">
+    <section className="login-panel" aria-labelledby="verification-title">
+      <p className="eyebrow">Shale Web</p>
+      <h1 id="verification-title" ref={heading} tabIndex={-1}>Verify your session</h1>
+      <p ref={status} tabIndex={-1} role="status" aria-live="polite" aria-atomic="true">{pending ? 'Checking your Shale session…' : ''}</p>
+      {!pending && <Feedback kind="error">Session verification is unavailable. Your saved sign-in has been kept, but Shale cannot open your work until it is verified.</Feedback>}
+      <ToolbarActions>
+        <Button purpose="primary" onClick={event => { retryButton.current = event.currentTarget; retryVerification(); }} disabled={pending} aria-busy={pending}>Retry</Button>
+        <Button onClick={onSignIn}>Return to sign in</Button>
+      </ToolbarActions>
+      <p className="lede">Return to sign in clears your saved sign-in in this tab.</p>
+    </section>
+  </main>;
+}
+
 function ProtectedRoute({ authState }: { authState: AuthState }) {
   const location = useLocation();
-
-  if (authState.isVerifying) {
-    return <FullPageStatus message="Checking your Shale session…" />;
-  }
 
   if (!authState.user) {
     return <Navigate to="/login" replace state={{ from: location }} />;
@@ -426,7 +431,9 @@ function ProtectedRoute({ authState }: { authState: AuthState }) {
   return <Outlet />;
 }
 
-function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (verifiedAccessToken: string, verifiedUser: AuthenticatedUser) => void }) {
+function LoginPage({ onLogin }: { onLogin: (verifiedAccessToken: string, verifiedUser: AuthenticatedUser) => void }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { heading.current?.focus(); }, []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -450,15 +457,11 @@ function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (v
     }
   }
 
-  if (isVerifying) {
-    return <FullPageStatus message="Checking your Shale session…" />;
-  }
-
   return (
     <main className="login-page">
       <section className="login-panel" aria-labelledby="login-title">
         <p className="eyebrow">Shale Web</p>
-        <h1 id="login-title">Sign in</h1>
+        <h1 id="login-title" ref={heading} tabIndex={-1}>Sign in</h1>
         <p className="lede">Use your Shale account to access the web application shell.</p>
         <form onSubmit={handleSubmit}>
           <label>
@@ -2799,14 +2802,6 @@ function PlaceholderPage({ title }: { title: string }) {
       <h1 id="page-title">{title}</h1>
       <p>This page is part of the Step 5C navigation framework. Business functionality will be added in a later step.</p>
     </section>
-  );
-}
-
-function FullPageStatus({ message }: { message: string }) {
-  return (
-    <main className="full-page-status">
-      <p className="status">{message}</p>
-    </main>
   );
 }
 
