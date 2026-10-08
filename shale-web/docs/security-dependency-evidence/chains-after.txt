@@ -1,0 +1,10 @@
+shale-web@0.1.0 /workspace/work/shale-web-security/shale-web
+├─┬ jsdom@30.1.2
+│ └─┬ css-tree@3.2.1
+│   └── source-map-js@1.2.2
+├─┬ react-router-dom@7.18.2
+│ └── react-router@7.18.2
+└─┬ vite@8.0.16
+  └─┬ postcss@8.5.23
+    ├── nanoid@3.3.18
+    └── source-map-js@1.2.2 deduped
