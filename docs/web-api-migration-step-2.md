@@ -1,5 +1,22 @@
 # Web/API Migration Step 2: Shared Logic Inventory
 
+## Current shared-service decision alignment — 2026-10-08
+
+This Step 2 inventory records historical migration stages. Current shared API/service decisions follow
+[the AI integration and REST/MCP roadmap](architecture/ai-integration-and-mcp.md), especially section 3.1,
+and the later [API/session readiness contracts](web-api-azure-readiness.md).
+
+Reuse `shale-core` service ports, `shale-data` adapters/authoritative DAO workers and `shale-server` REST
+composition. Extract non-UI policy/orchestration only where the selected operation needs it; a new
+`shale-services` module or whole-application service rewrite is not a prerequisite. Existing request-scoped
+tenant/user runtime connections and durable bearer sessions already provide reusable server foundations.
+
+Ordinary authenticated web delivery depends on its actual operation's authorization, tenant/RLS predicates,
+validation, bounds, concurrency, required audit and REST contract verification. It does not depend on MCP,
+AI OAuth, integration registration, delegation grants or AI-specific audit attribution. Shared operations
+accept verified user/tenant context; integration restrictions are additional only for integration requests.
+Keep AI read-only and controlled-write gates separate from ordinary authorized web mutations.
+
 This note identifies the auth, session, case, task, contact, and notification logic that `shale-server` will likely need to reuse as the browser/mobile API grows. This is documentation only: no code should move in this step, and no runtime behavior should change.
 
 ## Current modules and responsibilities
@@ -139,9 +156,9 @@ Keep the next steps small and compatible with desktop behavior. Prefer extractin
 
 ### Auth/session
 
-1. Introduce a shared application-service layer outside `shale-ui`, likely a new module such as `shale-services` or a clearly non-UI package in an existing shared module.
-2. Move or wrap login orchestration into a shared `AuthApplicationService` that returns `User` or an auth/session DTO using `shale-data` authentication.
-3. Add a server-specific request-scoped `DbSessionProvider` that sets/uses `ShaleClientId` and `PrincipalUserId` from authenticated HTTP context.
+1. Reuse the existing `shale-core` ports and `shale-data` adapters outside `shale-ui`; add narrowly scoped non-UI orchestration only where an operation lacks an authoritative boundary. A new module is not required.
+2. Reuse `AuthServicePort`/`AuthServiceAdapter` and the existing server durable-session orchestration; extract additional shared orchestration only when a verified use case requires it.
+3. Reuse the now-implemented request-scoped `DbSessionProvider` and runtime initialization of `ShaleClientId` and `PrincipalUserId` from authenticated HTTP context; verify the selected operation rather than creating a competing provider.
 4. Keep `DesktopRuntimeSessionProvider` and `RuntimeSessionService.initialize(...)` behavior unchanged for desktop until the server path is proven.
 
 ### Cases

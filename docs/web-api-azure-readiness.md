@@ -1,5 +1,25 @@
 # Shale Server Azure App Service Readiness
 
+## Ordinary web-client readiness and separate AI gates — 2026-10-08
+
+The web rebuild uses the existing bearer login/me/refresh/logout contract, SQL-backed bound WEB sessions,
+server-derived tenant/user context, and shared application operations documented in
+[the REST/MCP architecture roadmap, section 3.1](architecture/ai-integration-and-mcp.md).
+The later session implementation records in
+[the release/session roadmap](architecture/application-release-session-management.md) supersede earlier
+skeleton and in-memory-only descriptions below.
+
+Web readiness requires verification of each delivered operation's user/entity/field authorization,
+tenant isolation and explicit predicates, validation/bounds, mutation concurrency and required Shale audit,
+plus its REST/OpenAPI contract and browser configuration. Reuse existing routes and service/DAO workers;
+address gaps per use case without waiting for unrelated AI decisions.
+
+MCP transport, AI OAuth, tenant AI opt-in, integration registration/scopes, delegation grants and AI-specific
+access audit attribution are separate integration activation requirements. They do not gate ordinary web
+login, authenticated REST reads or authorized REST mutations. Ordinary requests need no fabricated AI
+client/tool identity; integration credentials must never fall back to ordinary user authority to evade
+those additional controls. This distinction does not weaken existing authorization, tenant/RLS or audit.
+
 This document covers Step 4A deployment/configuration readiness for `shale-server`.
 
 ## Profiles
