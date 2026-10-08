@@ -81,7 +81,7 @@ Call log:
 }
 
 WebKit packaged version 27.2 / Playwright build 2370; runtime version unverified.
-browserType.launch: 
+browserType.launch:
 ╔══════════════════════════════════════════════════════╗
 ║ Host system is missing dependencies to run browsers. ║
 ║ Missing libraries:                                   ║
