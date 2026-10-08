@@ -1,5 +1,7 @@
 # Web/API Migration Step 2: Shared Logic Inventory
 
+For the responsive client replacement, see [Shale Web V2 architecture and roadmap](architecture/shale-web-v2-architecture-roadmap.md). Its verified inventory distinguishes current browser mutations and durable sessions from historical beta descriptions below.
+
 ## Current shared-service decision alignment — 2026-10-08
 
 This Step 2 inventory records historical migration stages. Current shared API/service decisions follow

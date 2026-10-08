@@ -21,3 +21,7 @@ Progress (2026-10-05): tenant Task Due Date Policy is complete, including Settin
 External integration architecture and roadmap:
 
 - [AI integration, REST/OpenAPI, and MCP](../docs/architecture/ai-integration-and-mcp.md)
+
+Web client architecture and roadmap:
+
+- [Shale Web V2 architecture and phased implementation](../docs/architecture/shale-web-v2-architecture-roadmap.md)
