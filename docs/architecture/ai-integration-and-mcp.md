@@ -2,7 +2,7 @@
 
 **Status:** Phase 0 assessment COMPLETE; architecture/contract review IN PROGRESS; implementation NOT STARTED.
 
-**Last reviewed:** 2026-10-07
+**Last reviewed:** 2026-10-08
 
 **Repository baseline:** live `origin/codex/latest`, commit `852a9c9d72cf5c62a2963323185eb67b88cf7a20`.
 This is repository inspection, not evidence of deployed SQL, API configuration, or runtime security acceptance.
@@ -18,6 +18,11 @@ A new document is appropriate because the web migration notes inventory shared s
 release/session roadmap owns authentication lifecycle, but neither owns the combined external REST/MCP
 contract, delegated integration authority, or AI access audit model. Reuse those authorities rather than
 copying their roadmaps. Subsequent tasks must update this tracker and the affected owning document.
+
+**Web delivery is independent of AI integration activation.** The web rebuild uses ordinary authenticated
+REST/OpenAPI and shared Shale operations. It does not depend on completing MCP, AI OAuth, integration
+registration, delegation grants, or the AI-specific audit extension. Shared operation security and audit
+requirements still apply; section 3.1 separates these from additional AI gates.
 
 Reviewed evidence and continuing authorities:
 
@@ -168,6 +173,29 @@ keys on every borrow without `@read_only=1`. Preserve and test that actual pooli
 SQL context mutability is separate scoped work requiring pool compatibility evidence, not an MCP prerequisite
 that silently alters existing runtime behavior. Initialization failure must close the connection and fail.
 
+### 3.1 Shared operations and independent client readiness
+
+Shared application services own tenant isolation, current user/entity/field authorization, validation,
+business rules, concurrency, and required audit semantics. Protocol adapters resolve and validate their
+own credentials, supply verified context, and translate contracts. Integration restrictions augment that
+context only for registered integration requests; the shared operation must not require an AI registration
+or delegation grant for an ordinary authenticated web user. Absence of integration context is valid only
+for the ordinary user-session path, never an AI credential fallback that evades integration controls.
+
+| Concern | Ordinary authenticated web/mobile REST | AI integration through MCP or an approved REST integration contract |
+| --- | --- | --- |
+| Identity/session | Existing Shale bearer login/me/refresh/logout and durable WEB-session validation; server-derived tenant/user | Separate approved AI client identity, OAuth/audience validation, live delegation and tenant grant |
+| Shared operation | Current user, tenant, case/field policy, validation, bounds, business rules, concurrency and required audits | The same operation and policies, further restricted by integration scope, tenant opt-in and AI controls |
+| Audit attribution | Actual user/tenant, operation, entity/parent context and required PHI/entity/session audit; no fabricated integration or tool identity | Additional verified integration/tool/grant attribution and approved AI access/failure representation |
+| Reads and writes | Authorized web reads and mutations under existing business and transaction rules | Initially read-only; later AI mutations require separate controlled-write gates |
+| Delivery dependency | Relevant REST/service contract and security verification for each web use case | Selected shared operations plus AI authentication, registration, revocation, audit and operational acceptance |
+
+Phases 1–2 describe reusable service/REST work that can proceed and ship per operation while AI decisions
+remain open. They do not require completion of the entire Phase 0 AI contract review or Phases 3–7. Review
+any unresolved tenant, user, case/field or audit issue affecting the actual web operation before exposing
+that operation; unrelated AI issuer, grant or tool decisions do not block it. Preserve the documented RLS
+coverage review and explicit predicates; this separation does not waive any ordinary web security control.
+
 ## 4. Architectural decisions and security model
 
 ### 4.1 Recommended decisions
@@ -175,16 +203,16 @@ that silently alters existing runtime behavior. Initialization failure must clos
 | Decision | Recommendation |
 | --- | --- |
 | Provider neutrality | Use standard MCP contracts/authentication for compatible clients. No model/vendor SDK in domain operations; Curtis & Co.'s local AI is one ordinary registered consumer. |
-| Independent REST | Retain conventional resource/application-oriented REST and generated OpenAPI for web, mobile, and external integrations. MCP has its own semantic tool catalog, not one tool per route. |
+| Independent REST | Retain conventional resource/application-oriented REST and generated OpenAPI. The authenticated web rebuild can ship without MCP or AI OAuth; MCP has its own semantic tool catalog and activation gates. |
 | Shared services | Strengthen existing ports/adapters only where inspection proves gaps. Tenant, user policy, business validation, and audit must be authoritative below both adapters. |
 | Database boundary | No AI SQL, database credentials, connection strings, table browsers, arbitrary query tool, or privileged data path. Internal schema is not the external contract. |
-| Read-only first | Explicitly allowlist approved query operations. Read-only means no domain writes or side effects; required audit/session bookkeeping remains permissible. HTTP POST used by MCP is not itself a domain mutation. |
+| Read-only first | For AI access, explicitly allowlist approved query operations. Read-only means no domain writes or side effects; required audit/session bookkeeping remains permissible. HTTP POST used by MCP is not itself a domain mutation. |
 | Stable semantics | Return minimized Case/Task/Contact/Organization concepts with stable IDs, typed fields, documented nulls/time semantics, bounds, and errors. Do not expose raw rows, SQL, credentials, or unnecessary RowVer data. |
 | Delegation | Normal AI access is a registered integration acting for an authenticated Shale user in one tenant, under explicit revocable grants. Unattended service-user access is deferred for separate policy review. |
-| Auditing | Sensitive external reads must be identifiable by tenant, actor, integration, operation, correlation, outcome, and entity context through existing audit architecture or a scoped compatible enhancement. |
+| Auditing | AI-originated reads through MCP or approved REST integration contracts must be identifiable by tenant, actor, integration, operation, correlation, outcome, and entity context through existing audit architecture or a scoped compatible enhancement. |
 | Activation gate | Tenant opt-in, registration, revocation, read scopes, quotas, and approved audit persistence are mandatory before any real-data dogfooding. An admin UI can follow. |
 
-### 4.2 Separate identities and intersect authority
+### 4.2 Separate AI identities and intersect authority
 
 | Boundary | Meaning and authority |
 | --- | --- |
@@ -195,10 +223,15 @@ that silently alters existing runtime behavior. Initialization failure must clos
 | User permissions | Current Shale operation, case/matter, sensitive-field, and document permissions, evaluated independently of integration scopes. Consent cannot grant what the user does not possess. |
 
 ```text
-Effective authority = tenant policy AND enabled integration AND live delegation/session
+AI effective authority = tenant policy AND enabled integration AND live delegation/session
                       AND integration scopes/restrictions AND current user permissions
                       AND case/document/field policy AND read-only phase restriction
 ```
+
+For ordinary web requests, effective authority is the live authenticated user session intersected with
+tenant, current user, case/document/field and operation policy. Integration enablement, scopes and AI phase
+restrictions apply only when integration authority is present. Authorized web mutations remain governed by
+their existing command, concurrency and audit contracts rather than the AI read-only rollout.
 
 Any denial wins. A valid token, known case ID, Case Team membership, discovery listing, prompt instruction,
 or caller-supplied role cannot override a boundary. Apply restrictions in searches before pagination/counts
@@ -207,7 +240,7 @@ access for every task, timeline, material, or document operation; a child ID can
 Contact/Organization directory access requires its own policy and must not reveal restricted case relationships.
 Deny by default when the needed policy is unresolved; initially omit deleted-case and administrative surfaces.
 
-### 4.3 Authentication, lifecycle, and controls
+### 4.3 AI authentication, lifecycle, and controls
 
 Recommend HTTPS remote MCP with standards-based delegated OAuth authorization-code flow and PKCE for public
 clients, following the selected MCP specification's authorization/discovery requirements. Shale or a reviewed
@@ -249,14 +282,20 @@ exchange only after the issuer/transport decision; preserve current browser/desk
 
 | Deferred decision | Evidence/owner needed before implementation or activation |
 | --- | --- |
-| Case/matter and sensitive-field read policy | Product/security owners must confirm whether ordinary active cases are tenant-wide visible or restricted, any ethical walls, deleted-case handling, directory relationships, and role/field exceptions. Existing Team roles do not answer this. Required before Phase 1 policy acceptance. |
+| Case/matter and sensitive-field read policy | For each operation being exposed, product/security owners must confirm whether ordinary active cases are tenant-wide visible or restricted, any ethical walls, deleted-case handling, directory relationships, and role/field exceptions. Existing Team roles do not answer this. Required for that operation's policy acceptance; unrelated AI OAuth decisions do not block ordinary REST work. |
 | OAuth issuer and remote MCP transport/library | Inspect current deployment capabilities, selected MCP revision and representative independent clients; decide authorization-server responsibilities, audience/scopes/discovery, consent and client registration, and supported transport. Required before Phase 3. |
 | Grant/session persistence and admin controls | Map integration/delegation lifecycle to existing durable sessions and verified schema constraints; decide minimal compatible extension and rollback/revocation behavior. No table/enum/migration is prescribed in this assessment. |
-| Audit representation | Review SQL and Java allowlists, PHI-read persistence, denied-request attribution and approved retention/review. Decide a scoped compatible extension before sensitive external access. |
+| Audit representation | Review SQL and Java allowlists, PHI-read persistence, denied-request attribution and approved retention/review. Decide the scoped compatible AI attribution extension before AI access; ordinary required read audits are reviewed per web operation. |
 | External document retrieval | Establish real storage ownership, case/document IDs, provider entitlement, supported formats, download audit, and bounded content/extraction path. No Phase 1 document tool until resolved. |
 | Compatibility and budgets | Agree REST/MCP version/deprecation policy, payload/time semantics, performance measurements and numeric quotas with web/mobile/integration consumers before publishing stable contracts. |
 
 ## 5. Audit compatibility review
+
+The integration/tool/grant access-event requirements below gate AI data access. Ordinary web requests
+must satisfy their operation's required Shale audit semantics, but do not need a registered AI identity,
+MCP tool attribution, or the complete AI read/failure audit extension. Implement any required non-UI
+PHI-read seam for a web use case independently; do not fabricate integration fields or silently omit a
+required audit. Reuse that seam for AI once its additional attribution and persistence gates are ready.
 
 Use existing Shale audit ownership, tenant RLS, append-only retention, administrator review, sanitization,
 and transaction patterns. Do not create a parallel AI audit product or use Case/Task Timeline as compliance
@@ -278,7 +317,8 @@ Compatibility matrix:
   through a non-UI application seam, with an approved access-event extension for integration attribution.
 * AI search summaries are automated disclosure. Require one bounded operation-level access event, including
   empty successful results, without keystroke telemetry or query text. This is an external-access policy;
-  it does not retroactively alter the intentionally unaudited desktop suggestions in the universal-search doc.
+  it does not impose AI operation-level search auditing on ordinary web searches or retroactively alter
+  the intentionally unaudited desktop suggestions. Web search audit treatment requires its own scoped review.
 * Tenant integration enable/disable, registration, scope changes, grant revocation, and later domain writes
   are meaningful administrative/security/domain actions. Map administrative/domain changes to reviewed
   entity-action vocabulary and session/grant revocation to compatible session-security semantics.
@@ -293,7 +333,7 @@ with later mutation attribution but do not solve the entire read model. Defer a 
 including any necessary allowlist/schema/viewer change, to implementation; do not squeeze JSON into arbitrary
 PHI value fields or claim today's schema already supports it.
 
-For sensitive reads, perform authorization, bounded read, and required audit persistence at the authoritative
+For AI sensitive reads, perform authorization, bounded read, and required audit persistence at the authoritative
 operation seam and commit audit before releasing data. Follow the existing administrative-read fail-closed
 pattern, not UI best-effort failure handling. Multi-query compositions need a deliberate connection/transaction
 plan because existing ports often borrow independently. Failure returns no sensitive result and no success claim.
@@ -354,6 +394,10 @@ case tasks/updates, Contact/Organization search/detail, lookup, notification cur
 routes. Reuse authoritative Contact/Organization aggregates and Case Date projections rather than raw tables
 or legacy scalar mutation logic. Keep release/policy global control-plane operations separate from tenant data.
 
+Web/API work can implement and verify these shared decisions per use case using existing bearer sessions.
+MCP/AI OAuth, grant storage, tool discovery and AI-specific audit metadata are separate follow-on work.
+The existing required audit/authorization checks for each REST operation remain release criteria.
+
 Phase 2 should standardize:
 
 * Concrete response schemas and operation IDs, replacing ambiguous `Object` descriptions when necessary;
@@ -378,7 +422,7 @@ Phase 2 should standardize:
   OAuth integration credentials are not ordinary web access bearers and cannot unlock unrestricted REST
   writes. Enforce audience/scope at every eligible adapter or reject the credential entirely.
 * A published compatibility/deprecation policy based on actual client consumption, including additive changes,
-  field retirement, versioned breaking changes, and matching independent MCP tool-schema evolution.
+  field retirement, versioned breaking changes, and independently scheduled MCP tool-schema evolution.
 
 Normal REST remains independently useful even if no AI integration is enabled. MCP may compose several shared
 queries into a semantic overview, but each composition must preserve policy, bounds, consistent domain meaning,
@@ -398,8 +442,10 @@ required for this documentation task; the tests below are future phase acceptanc
 * [x] Assess live repository, service boundaries, REST/OpenAPI, sessions, RLS, audit, and documents.
 * [x] Record recommended service/security/audit model, REST improvements, and five-tool proposal.
 * [x] Record existing authority and deferred decisions without implementation or schema changes.
-* [ ] Approve case/directory/field policy, authentication/transport direction, and audit representation.
-* [ ] Finalize initial REST compatibility and MCP input/output/error/pagination contracts.
+* [ ] Confirm policy and required audit treatment per shared/web operation being delivered.
+* [ ] Finalize REST compatibility decisions per web/mobile contract independently of AI review.
+* [ ] Separately approve AI authentication/transport, grants and additional audit representation.
+* [ ] Finalize MCP input/output/error/pagination contracts before AI activation.
 
 **Verification:** Documentation consistency/relative-link review and `git diff --check`; reviewers trace
 selected operations to code and resolve the decision table. **Completion:** Contract/security owners record
@@ -408,12 +454,15 @@ accepted choices and remaining exclusions; no unresolved policy is treated as pe
 ### Phase 1 — Shared application/service boundary (**NOT STARTED**)
 
 **Goal:** Selected operations are authoritative and reusable from either protocol.
-**Dependencies:** Phase 0 policy/contract acceptance; owning domain roadmaps.
+**Dependencies:** Policy/contract and required audit acceptance for the operation being changed, plus
+its owning domain roadmap. AI issuer/transport/grant decisions and full Phase 0 completion are not
+prerequisites for ordinary web/service work.
 
 * [ ] Inventory each selected path's actor, tenant, field policy, audit, connection and bounds.
 * [ ] Reuse core ports/data adapters/DAO workers; extract only necessary non-UI orchestration.
 * [ ] Establish verified immutable execution context and actor-aware shared query operations.
-* [ ] Implement approved read audit attribution/persistence seam; retain strict RLS and explicit predicates.
+* [ ] Implement required ordinary operation read-audit seams; retain strict RLS and explicit predicates.
+* [ ] Separately extend those seams for approved AI integration attribution before AI exposure.
 * [ ] Establish bounded DAO paging and minimized projections; no false-success interface defaults.
 * [ ] Verify live RLS/grants for all selected parent/child tables, explicitly resolving the documented
   Contacts parent-predicate gap with security owners before activation.
@@ -421,18 +470,21 @@ accepted choices and remaining exclusions; no unresolved policy is treated as pe
 **Tests:** Port-to-production-gateway delegation, direct service-call bypass denial, revoked/disabled user,
 restricted case/child and field access, non-dbo two-tenant RLS, pooled concurrent tenant/user reuse, context
 initialization failure, audit failure/no disclosure, and legacy REST parity. Run relevant focused suites and
-repository selector/critical local checks under existing rules. **Completion:** Both adapters can invoke a
-proven operation without recreating business/security logic; selected reads are bounded and correctly audited.
+repository selector/critical local checks under existing rules. **Completion:** Each delivered REST operation
+invokes a proven shared boundary without duplicating business/security logic; reads are bounded and required audits pass. Record AI readiness separately;
+REST acceptance does not require an implemented MCP adapter or AI audit extension.
 
 ### Phase 2 — Stable REST/OpenAPI foundation (**NOT STARTED**)
 
 **Goal:** Web/mobile/integrations consume documented stable application contracts.
-**Dependencies:** Phase 1 operations and Phase 0 compatibility decisions.
+**Dependencies:** Verified shared operations and REST compatibility decisions for the selected web/mobile
+use cases. No dependency on MCP, AI OAuth, registration/grants or completion of AI contract review.
 
 * [ ] Formalize existing selected endpoints/schemas/errors/paging before adding any missing use case.
 * [ ] Align authoritative auth/authorization and audit below REST; retain current compatible routes.
 * [ ] Review generated OpenAPI and typed web/mobile contract consumption and version/deprecation policy.
-* [ ] Document integration audience/scope restrictions independently of browser user authority.
+* [ ] Document the separation of browser user authority and future integration audience/scopes;
+  implementing AI OAuth or grants is not part of ordinary web acceptance.
 
 **Tests:** Existing `OpenApiDocumentationTest` plus selected controller/service integration contracts,
 authentication and authorization failures, safe errors, pagination/query bounds, sensitive field omission,
@@ -529,9 +581,9 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | --- | --- | --- |
 | Repository architecture assessment | COMPLETE | Sections 1–2, pinned live base and concrete source inspection. |
 | Recommended target/security/audit/REST/tool direction | COMPLETE | Sections 3–7 are documented recommendations, not accepted wire contracts. |
-| Phase 0 review and final contract | IN PROGRESS | Owner acceptance and policy/issuer/audit decisions remain. |
-| Phase 1 shared secured operations | NOT STARTED | Phase 0 decisions. |
-| Phase 2 stable REST/OpenAPI foundation | NOT STARTED | Shared operations and compatibility agreement. |
+| Phase 0 review and final contract | IN PROGRESS | Per-operation REST review and separate AI policy/issuer/audit decisions remain; this aggregate status does not gate all web work. |
+| Phase 1 shared secured operations | NOT STARTED | Relevant operation policy/required audit decisions; no dependency on AI issuer/grants. |
+| Phase 2 stable REST/OpenAPI foundation | NOT STARTED | Selected shared operations and REST compatibility; can ship while MCP/AI OAuth remain pending. |
 | Phase 3 MCP and minimum tenant controls | NOT STARTED | Transport/grants, audit and service gates. |
 | Phase 4 ordinary-client dogfooding | NOT STARTED | Phase 3 tested controls, tenant/user grants. |
 | Phase 5 administration experience | NOT STARTED | Minimum controls first, then pilot feedback. |
@@ -542,7 +594,9 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Complete AI read/failure audit representation | BLOCKED | Scoped compatible enhancement decision and verification. |
 | Timeline/document tool expansion | BLOCKED | Bounded timeline service and authorized content/provider boundary. |
 
-**Recommended next task:** Finish Phase 0 decision review and trace the five proposed query paths into an
-operation-by-operation policy/audit/connection/contract inventory. Obtain the missing policy/issuer/audit
-choices before implementation. Subsequent implementation should start with one shared secured read operation,
-not MCP transport or a document-fetch subsystem. Preserve the initial read-only scope throughout.
+**Recommended next tasks:** For the web rebuild, select its next REST use case and verify its existing
+service mapping, bearer session, tenant/user/entity/field policy, required audit and stable contract.
+Implement only the necessary shared boundary/REST improvements and verify that use case independently.
+For AI, continue the five-query policy/audit/connection inventory and obtain issuer, grant, tool and additional
+audit decisions before activation. Keep AI disabled/read-only according to its own gates; ordinary authorized
+web delivery continues without completing MCP or AI OAuth.
