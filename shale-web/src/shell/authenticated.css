@@ -1,0 +1,32 @@
+/* Composition bridge only: retain existing route layouts and their Light beta skin.
+   The shell and its utilities own A.2 paint; screen migration remains separate. */
+.shale-authenticated .legacy-route-content {
+  background: var(--content-bg); color: #172033; color-scheme: light;
+  font-size: 1rem; padding: var(--shale-space-4); border-radius: var(--radius-lg);
+  min-width: 0;
+}
+.shale-authenticated .legacy-route-content .detail-shell {
+  margin: 0; min-height: 0;
+}
+.shale-authenticated .legacy-route-content .detail-header { position: static; }
+.shale-authenticated .legacy-route-content .detail-header-main {
+  display: flex; flex-wrap: wrap;
+}
+.shale-authenticated .legacy-route-content .back-link { min-height: 44px; }
+.shale-authenticated .legacy-route-content .status-pill { white-space: normal; overflow-wrap: anywhere; }
+/* Rail width makes viewport-only beta columns too narrow at medium sizes. */
+@media (48rem <= width < 75rem) {
+  .shale-authenticated .legacy-route-content .entity-list,
+  .shale-authenticated .legacy-route-content .detail-sections { grid-template-columns: minmax(0,1fr); }
+}
+@media (width < 48rem) {
+  .shale-authenticated .legacy-route-content { padding: 0; background: transparent; }
+}
+/* Content now shares width with a rail: cards choose columns from their own space. */
+.shale-authenticated .legacy-route-content .entity-list {
+  grid-template-columns: repeat(auto-fit,minmax(min(20rem,100%),1fr));
+}
+.shale-authenticated .legacy-route-content .entity-card-header { flex-wrap: wrap; }
+.shale-authenticated .legacy-route-content .entity-card-title-block { flex: 1 1 14rem; }
+.shale-authenticated .legacy-route-content .entity-card-badges { max-width: 100%; }
+.shale-authenticated .legacy-route-content .status-pill { flex-shrink: 0; max-width: 100%; }

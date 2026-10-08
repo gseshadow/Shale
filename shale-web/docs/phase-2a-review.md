@@ -4,6 +4,15 @@ Implemented for review; V2 acceptance and the rest of Phase 2 remain open. Base:
 `origin/codex/latest` at `eda5045153d6a4dc175884bbb889021e04df83d2`, including merged PR #1838.
 No deployment was performed.
 
+**Phase 2B follow-up:** the current operational composition now adopts ResponsiveShell around existing
+protected route outlets. [Phase 2B review](phase-2b-review.md) owns that scope, checks, new captures,
+rollback and acceptance gaps. This document retains the historical Phase 2A baseline and evidence;
+its statements that `/` still uses the beta shell describe that earlier checkpoint. Current route
+content retains its beta Light skin, while shell themes are opt-in session presentation. Foundation
+CSS now imports extracted `ui/tokens.css` and `ui/buttons.css`; their canonical values/semantics are
+shared with shell utilities without applying gallery card/field/type styles to operational routes.
+`foundation.html`, preview isolation and Phase 2A captures remain available. Phase 2 is still in progress.
+
 ## Open the isolated preview
 
 ```bash

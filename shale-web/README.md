@@ -74,5 +74,14 @@ Restart the Azure App Service after changing CORS or other App Service applicati
 
 Run `npm run dev` and open <http://localhost:5173/foundation.html> for the isolated responsive shell,
 shared components and Light/Dark examples. It makes no API calls and needs no credentials. `/` and the
-existing business routes retain the beta composition. [Phase 2A review and evidence](docs/phase-2a-review.md)
+existing business routes now use the authenticated ResponsiveShell around their retained beta screen content. [Phase 2A review and evidence](docs/phase-2a-review.md)
 documents ownership, local build review, checks, limitations and temporary-entry removal.
+
+
+## Web V2 Phase 2B authenticated shell
+
+The existing authenticated URLs use one responsive shell and navigation registry. Light/Dark shell
+selection is local to the mounted session; route screens retain their Light beta skin. Authentication,
+services and mutation handlers are unchanged. [Phase 2B review](docs/phase-2b-review.md) records the
+synthetic review script, screenshots, validation, known login return-to issue, acceptance gaps and
+frontend-only rollback. Phase 2 remains in progress; no deployment is part of this milestone.
