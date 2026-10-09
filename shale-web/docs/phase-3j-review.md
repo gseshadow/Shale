@@ -101,7 +101,7 @@ its configured proxy. No proxy, CA, credential or deployment configuration was c
 
 Initial browser assertions assumed one feature mount read (StrictMode makes two) and treated full-document
 Forward as retained fixture state. The corrected fixture compares reads before/after late settlement and
-models startup on Forward. Duplicate events now occur in the same JS turn for immediately failing requests;
+models startup on Forward. Compact/wide timeout captures were visually inspected; feedback and form stay readable without overflow. Duplicate events now occur in the same JS turn for immediately failing requests;
 a submission after an already-settled failure is correctly a new explicit attempt. An existing task test
 needed passive mount effects flushed before synthetic activation; its mutation assertions are unchanged.
 
