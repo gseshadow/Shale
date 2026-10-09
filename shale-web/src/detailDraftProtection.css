@@ -1,4 +1,4 @@
-.contact-discard-dialog {
+.detail-discard-dialog {
   max-width: min(32rem, calc(100vw - 2rem));
   max-height: calc(100dvh - 2rem);
   overflow: auto;
@@ -9,5 +9,5 @@
   border: 1px solid var(--shale-border);
   border-radius: var(--shale-radius-card);
 }
-.contact-discard-dialog::backdrop { background: rgb(0 0 0 / 50%); }
-.contact-discard-dialog .form-actions { flex-wrap: wrap; }
+.detail-discard-dialog::backdrop { background: rgb(0 0 0 / 50%); }
+.detail-discard-dialog .form-actions { flex-wrap: wrap; }

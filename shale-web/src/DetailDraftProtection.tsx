@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
 import { Button } from './ui/primitives';
-import './contactDraftProtection.css';
+import './detailDraftProtection.css';
 
-// Deliberately scoped to Contact Detail's existing information editor, not an all-form service.
-export function useContactDraftProtection({ dirty, pending, isCurrent, onCancel }: {
-  dirty: boolean; pending: boolean; isCurrent: () => boolean; onCancel: () => void;
+// Shared only by the Contact and Organization Detail information editors. Each owns its baseline.
+export function useDetailDraftProtection({ entity, dirty, pending, isCurrent, onCancel }: {
+  entity: 'contact' | 'organization'; dirty: boolean; pending: boolean; isCurrent: () => boolean; onCancel: () => void;
 }) {
   const discarded = useRef(false);
   const [cancelRequested, setCancelRequested] = useState(false);
@@ -54,12 +54,12 @@ export function useContactDraftProtection({ dirty, pending, isCurrent, onCancel 
     isDiscarded: () => discarded.current,
     cancel: () => { if (needed) setCancelRequested(true); else onCancel(); },
     confirmation: (blocker.state === 'blocked' || cancelRequested)
-      ? <ContactDiscardDialog pending={pending} onKeep={keepEditing} onDiscard={discard} /> : null,
+      ? <DetailDiscardDialog entity={entity} pending={pending} onKeep={keepEditing} onDiscard={discard} /> : null,
   };
 }
 
-function ContactDiscardDialog({ pending, onKeep, onDiscard }: {
-  pending: boolean; onKeep: () => void; onDiscard: () => void;
+function DetailDiscardDialog({ entity, pending, onKeep, onDiscard }: {
+  entity: 'contact' | 'organization'; pending: boolean; onKeep: () => void; onDiscard: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -72,8 +72,8 @@ function ContactDiscardDialog({ pending, onKeep, onDiscard }: {
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
   }, []);
-  return <dialog ref={dialog} className="contact-discard-dialog" aria-labelledby="contact-discard-title"
-    aria-describedby="contact-discard-description" onCancel={event => { event.preventDefault(); onKeep(); }}
+  return <dialog ref={dialog} className="detail-discard-dialog" aria-labelledby="detail-discard-title"
+    aria-describedby="detail-discard-description" onCancel={event => { event.preventDefault(); onKeep(); }}
     onKeyDown={event => {
       if (event.key !== 'Tab') return;
       const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('button');
@@ -81,9 +81,9 @@ function ContactDiscardDialog({ pending, onKeep, onDiscard }: {
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }}>
-    <h2 id="contact-discard-title">Discard contact changes?</h2>
-    <p id="contact-discard-description">Your unsaved contact changes will be discarded.
-      {pending && ' A save is still pending and may already have committed. Leaving does not cancel or undo it. Check the contact before submitting again.'}</p>
+    <h2 id="detail-discard-title">Discard {entity} changes?</h2>
+    <p id="detail-discard-description">Your unsaved {entity} changes will be discarded.
+      {pending && ' A save is still pending and may already have committed. Leaving does not cancel or undo it. Check the ' + entity + ' before submitting again.'}</p>
     <div className="form-actions">
       <Button data-keep-editing purpose="secondary" onClick={onKeep}>Keep editing</Button>
       <Button purpose="danger" onClick={onDiscard}>Discard changes</Button>

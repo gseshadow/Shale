@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { redirectPathFrom } from './returnPath';
 import { operationalRouteIds, routePath, routes } from './app/routeRegistry';
 import type { RouteObject } from 'react-router-dom';
-import { useContactDraftProtection } from './ContactDraftProtection';
+import { useDetailDraftProtection } from './DetailDraftProtection';
 import type { OperationalRouteId } from './app/routeRegistry';
 import { CredentialStorageError } from './credentialStore';
 import { useStartupSession } from './useStartupSession';
@@ -164,7 +164,7 @@ function OperationalScreen({ id }: { id: OperationalRouteId }) {
     // A discarded same-screen/query/hash navigation must not retain the old editor or continuation.
     contactDetail: <ContactDetailPage key={location.key} accessToken={authState.accessToken} />,
     organizations: <OrganizationsPage accessToken={authState.accessToken} />,
-    organizationDetail: <OrganizationDetailPage accessToken={authState.accessToken} />,
+    organizationDetail: <OrganizationDetailPage key={location.key} accessToken={authState.accessToken} />,
     team: <TeamPage accessToken={authState.accessToken} />,
     teamMemberDetail: <TeamMemberDetailPage accessToken={authState.accessToken} />,
     settings: <SettingsPage accessToken={authState.accessToken} user={authState.user} />,
@@ -2543,7 +2543,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
     || deceased !== baseline.deceased
     || contactValueUpdate(email, baseline.email).action !== 'RETAIN'
     || contactValueUpdate(phone, baseline.phone, phoneExtension, baseline.phoneExtension).action !== 'RETAIN';
-  const protection = useContactDraftProtection({ dirty, pending: isSubmitting, isCurrent: resultIsCurrent, onCancel });
+  const protection = useDetailDraftProtection({ entity: 'contact', dirty, pending: isSubmitting, isCurrent: resultIsCurrent, onCancel });
   const hasRequiredName = Boolean(name.trim() || firstName.trim() || lastName.trim());
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -2779,13 +2779,14 @@ function OrganizationDetailPage({ accessToken }: { accessToken: string | null })
 
 function OrganizationDetailReadOnly({ accessToken, detail, onDetailChanged }: { accessToken: string | null; detail: OrganizationDetail; onDetailChanged: (detail: OrganizationDetail) => void }) {
   const [isEditingDetails, setIsEditingDetails] = useState(false);
-  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
+  const hasEdited = useRef(false);
+  useEffect(() => { if (hasEdited.current && !isEditingDetails) document.getElementById('organization-edit-button')?.focus(); }, [isEditingDetails]);
   return (
     <div className="detail-sections">
       <section aria-labelledby="organization-info-title">
         <div className="section-heading-row">
           <h2 id="organization-info-title">Organization Information</h2>
-          {!isEditingDetails && <ActionButton onClick={() => setIsEditingDetails(true)}>Edit organization</ActionButton>}
+          {!isEditingDetails && <ActionButton id="organization-edit-button" onClick={() => { hasEdited.current = true; setIsEditingDetails(true); }}>Edit organization</ActionButton>}
         </div>
         {isEditingDetails && <OrganizationDetailsForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingDetails(false); }} onCancel={() => setIsEditingDetails(false)} />}
         <dl className="detail-list">
@@ -2810,6 +2811,27 @@ function OrganizationDetailReadOnly({ accessToken, detail, onDetailChanged }: { 
   );
 }
 
+// This editor needs a complete renderable snapshot and a usable next concurrency witness.
+// The request draft, HTTP status alone, or advisory parsing cannot establish save success.
+function isUsableOrganizationSave(updated: OrganizationDetail, opening: OrganizationDetail): boolean {
+  const fields = ['organizationTypeName', 'phone', 'fax', 'email', 'website', 'address1', 'address2',
+    'city', 'state', 'postalCode', 'country', 'notes'] as const;
+  if (!updated || updated.id !== opening.id || updated.shaleClientId !== opening.shaleClientId
+    || typeof updated.name !== 'string' || !updated.name.trim()
+    || fields.some(field => updated[field] !== null && typeof updated[field] !== 'string')
+    || (updated.organizationTypeId !== null && (!Number.isInteger(updated.organizationTypeId) || updated.organizationTypeId <= 0))
+    || (updated.phoneExtension != null && typeof updated.phoneExtension !== 'string')
+    || (updated.faxExtension != null && typeof updated.faxExtension !== 'string')
+    || typeof updated.rowVer !== 'string' || !updated.rowVer || /\s/.test(updated.rowVer)
+    || !Array.isArray(updated.relatedCases)) return false;
+  try { if (!atob(updated.rowVer).length) return false; } catch { return false; }
+  const relatedFields = ['name', 'intakeDate', 'statuteOfLimitationsDate', 'responsibleAttorneyName',
+    'partyRoleName', 'side', 'notes'] as const;
+  return updated.relatedCases.every(item => item && Number.isInteger(item.id) && item.id > 0
+    && typeof item.primary === 'boolean'
+    && relatedFields.every(field => item[field] === null || typeof item[field] === 'string'));
+}
+
 function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: OrganizationDetail; onSaved: (detail: OrganizationDetail) => void; onCancel: () => void }) {
   const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [name, setName] = useState(detail.name || '');
@@ -2828,11 +2850,27 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
   const [notes, setNotes] = useState(detail.notes || '');
   const { submitError, setSubmitError, recordContactError, clearContactError, fieldErrors } = useContactFormErrors();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitting = useRef(false);
+  // Keep the opening snapshot and concurrency witness until authoritative success closes this editor.
+  const baseline = useRef(detail).current;
+  const dirty = name.trim() !== (baseline.name ?? '').trim()
+    || website.trim() !== (baseline.website ?? '').trim()
+    || address1.trim() !== (baseline.address1 ?? '').trim()
+    || address2.trim() !== (baseline.address2 ?? '').trim()
+    || city.trim() !== (baseline.city ?? '').trim()
+    || state.trim() !== (baseline.state ?? '').trim()
+    || postalCode.trim() !== (baseline.postalCode ?? '').trim()
+    || country.trim() !== (baseline.country ?? '').trim()
+    || notes.trim() !== (baseline.notes ?? '').trim()
+    || contactValueUpdate(email, baseline.email).action !== 'RETAIN'
+    || contactValueUpdate(phone, baseline.phone, phoneExtension, baseline.phoneExtension).action !== 'RETAIN'
+    || contactValueUpdate(fax, baseline.fax, faxExtension, baseline.faxExtension).action !== 'RETAIN';
+  const protection = useDetailDraftProtection({ entity: 'organization', dirty, pending: isSubmitting, isCurrent: resultIsCurrent, onCancel });
   const hasRequiredName = Boolean(name.trim());
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!resultIsCurrent()) return;
+    if (!resultIsCurrent() || protection.isDiscarded() || submitting.current) return;
     const form = event.currentTarget;
     if (!hasRequiredName) {
       setSubmitError('Enter an organization name before saving.');
@@ -2843,15 +2881,16 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
       return;
     }
 
+    submitting.current = true;
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const updated = await updateOrganizationDetails(accessToken, detail.id, {
-        rowVer: detail.rowVer,
+      const updated = await updateOrganizationDetails(accessToken, baseline.id, {
+        rowVer: baseline.rowVer,
         name: name.trim(),
-        phone: contactValueUpdate(phone, detail.phone, phoneExtension, detail.phoneExtension),
-        fax: contactValueUpdate(fax, detail.fax, faxExtension, detail.faxExtension),
-        email: contactValueUpdate(email, detail.email),
+        phone: contactValueUpdate(phone, baseline.phone, phoneExtension, baseline.phoneExtension),
+        fax: contactValueUpdate(fax, baseline.fax, faxExtension, baseline.faxExtension),
+        email: contactValueUpdate(email, baseline.email),
         website: website.trim() || null,
         address1: address1.trim() || null,
         address2: address2.trim() || null,
@@ -2861,26 +2900,33 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
         country: country.trim() || null,
         notes: notes.trim() || null,
       });
-      if (!resultIsCurrent()) return;
+      if (!resultIsCurrent() || protection.isDiscarded()) return;
+      if (!isUsableOrganizationSave(updated, baseline)) {
+        throw new Error('The organization save could not be confirmed. Your changes are kept. Check the organization before submitting again.');
+      }
+      protection.saved();
       onSaved(updated);
     } catch (caught) {
+      if (!resultIsCurrent() || protection.isDiscarded()) return;
       focusContactError(caught, form);
       recordContactError(caught, 'Organization details could not be saved.');
     } finally {
-      setIsSubmitting(false);
+      submitting.current = false;
+      if (resultIsCurrent() && !protection.isDiscarded()) setIsSubmitting(false);
     }
   }
 
   return (
-    <form noValidate className="case-edit-form" onSubmit={handleSubmit}>
+    <>
+    <form noValidate className="case-edit-form" onSubmit={handleSubmit} aria-label="Edit organization">
       <label htmlFor="organization-name">Organization name</label>
       <input id="organization-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="organization" maxLength={255} required />
       <label htmlFor="organization-email">Email</label>
-      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" baseline={detail.email} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" baseline={baseline.email} />
       <label htmlFor="organization-phone">Phone</label>
-      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={detail.phone} baselineExtension={detail.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { setPhone(number); setPhoneExtension(ext); }} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={baseline.phone} baselineExtension={baseline.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { if (!submitting.current && !protection.isDiscarded()) { setPhone(number); setPhoneExtension(ext); } }} />
       <label htmlFor="organization-fax">Fax</label>
-      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-fax" value={fax} onChange={(event) => setFax(event.target.value)} disabled={isSubmitting} accessToken={accessToken} kind="phone" baseline={detail.fax} baselineExtension={detail.faxExtension} extension={faxExtension} onExtensionChange={setFaxExtension} onFormatted={(number, ext) => { setFax(number); setFaxExtension(ext); }} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-fax" value={fax} onChange={(event) => setFax(event.target.value)} disabled={isSubmitting} accessToken={accessToken} kind="phone" baseline={baseline.fax} baselineExtension={baseline.faxExtension} extension={faxExtension} onExtensionChange={setFaxExtension} onFormatted={(number, ext) => { if (!submitting.current && !protection.isDiscarded()) { setFax(number); setFaxExtension(ext); } }} />
       <label htmlFor="organization-website">Website</label>
       <input id="organization-website" type="url" value={website} onChange={(event) => setWebsite(event.target.value)} disabled={isSubmitting} autoComplete="url" maxLength={500} />
       <label htmlFor="organization-address1">Address line 1</label>
@@ -2900,9 +2946,11 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
       {submitError && <p className="status error" role="alert">{submitError}</p>}
       <div className="form-actions">
         <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Save organization'}</ActionButton>
-        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={protection.cancel}>Cancel</SecondaryButton>
       </div>
     </form>
+    {protection.confirmation}
+    </>
   );
 }
 
