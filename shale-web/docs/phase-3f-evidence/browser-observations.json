@@ -1,0 +1,486 @@
+{
+  "synthetic": true,
+  "browser": "151.0.7922.173",
+  "observations": [
+    {
+      "scenario": "expired-read",
+      "width": 320,
+      "passed": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "scenario": "revoked-write",
+      "width": 320,
+      "passed": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/12/complete",
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "scenario": "stale-rejection",
+      "width": 320,
+      "passed": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "scenario": "late-create",
+      "width": 320,
+      "passed": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/validation/contact-value",
+          "method": "POST"
+        },
+        {
+          "path": "/api/validation/contact-value",
+          "method": "POST"
+        },
+        {
+          "path": "/api/contacts",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "scenario": "non-session",
+      "width": 320,
+      "passed": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/12/complete",
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/tasks/12/complete",
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/tasks/12/complete",
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/tasks/12/complete",
+          "method": "PATCH"
+        }
+      ]
+    },
+    {
+      "scenario": "expired-read",
+      "width": 1280,
+      "passed": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "scenario": "revoked-write",
+      "width": 1280,
+      "passed": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/12/complete",
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "scenario": "stale-rejection",
+      "width": 1280,
+      "passed": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "scenario": "late-create",
+      "width": 1280,
+      "passed": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/validation/contact-value",
+          "method": "POST"
+        },
+        {
+          "path": "/api/validation/contact-value",
+          "method": "POST"
+        },
+        {
+          "path": "/api/contacts",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "scenario": "non-session",
+      "width": 1280,
+      "passed": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/12/complete",
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/tasks/12/complete",
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/tasks/12/complete",
+          "method": "PATCH"
+        },
+        {
+          "path": "/api/tasks/12/complete",
+          "method": "PATCH"
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "unexpected": []
+}

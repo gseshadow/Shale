@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { InputHTMLAttributes } from 'react';
 import { ApiError, validateContactValue } from './api';
 import type { FieldError } from './api';
+import { captureSessionRequestGuard } from './sessionRequests';
 
 type Props = InputHTMLAttributes<HTMLInputElement> & {
   accessToken: string | null;
@@ -29,16 +30,17 @@ export function ContactValueInput({ accessToken, kind, baseline, baselineExtensi
   async function validate(format: boolean) {
     if (!accessToken) return;
     const current = ++generation.current;
+    const sessionIsCurrent = captureSessionRequestGuard(accessToken);
     try {
       const result = await validateContactValue(accessToken, kind, String(props.value ?? ''), extension);
-      if (current !== generation.current) return;
+      if (current !== generation.current || !sessionIsCurrent()) return;
       setFeedback(result?.preview ?? '');
       setInvalidField(null);
       onValidated?.(fieldName);
       if (format && !retained && kind === 'phone' && result?.displayInput)
         onFormatted?.(result.displayInput, result.extension ?? '');
     } catch (error) {
-      if (current !== generation.current) return;
+      if (current !== generation.current || !sessionIsCurrent()) return;
       setInvalidField(!retained && error instanceof ApiError && error.fieldErrors.length > 0
         ? error.fieldErrors[0].field.endsWith('.extension') ? 'extension' : 'number' : null);
       setFeedback((retained ? 'Saved value needs review; you can retain it. ' : '')
@@ -48,7 +50,7 @@ export function ContactValueInput({ accessToken, kind, baseline, baselineExtensi
   useEffect(() => {
     if (baseline !== undefined) void validate(false);
     return () => { generation.current++; };
-  }, []);
+  }, [accessToken]);
   return <><input {...props} data-validation-field={fieldName} type="text"
     onBlur={() => void validate(true)} onChange={event => { generation.current++; props.onChange?.(event); }}
     aria-invalid={invalidField === 'number' || errors.some(error => error.field === fieldName)} aria-describedby={`${props.id}-feedback`} />

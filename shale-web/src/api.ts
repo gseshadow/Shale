@@ -1,3 +1,6 @@
+import { sessionFetch } from './sessionRequests';
+import type { FeatureResponse } from './sessionRequests';
+
 const DEFAULT_API_BASE_URL = 'https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net';
 const ACCESS_TOKEN_STORAGE_KEY = 'shale-web.accessToken';
 
@@ -337,7 +340,7 @@ export interface CreateMappedCaseDateInput {
 }
 
 export async function listEffectiveCaseDateTypes(accessToken: string): Promise<string[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/lookups/case-date-types`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/lookups/case-date-types`, {
     method: 'GET', headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new ApiError('Shale could not load Case Date families.', response.status);
@@ -349,13 +352,13 @@ export function contactValueUpdate(value: string, baseline: string | null, exten
   if (value === (baseline ?? '') && (extension === undefined || extension === (baselineExtension ?? ''))) return { action: 'RETAIN' };
   return value.trim() || extension?.trim() ? { action: 'SET', value, extension } : { action: 'CLEAR' };
 }
-async function validationFailure(response: Response): Promise<ApiError> {
+async function validationFailure(response: FeatureResponse): Promise<ApiError> {
   const body = await response.json().catch(() => ({})) as { message?: string; fieldErrors?: FieldError[] };
   const errors = Array.isArray(body.fieldErrors) ? body.fieldErrors.filter(e => typeof e.field === 'string' && typeof e.message === 'string') : [];
   return new ApiError(errors.length ? errors.map(e => e.message).join(' ') : 'Check the details and try again.', response.status, errors);
 }
 export async function validateContactValue(token: string, kind: 'phone' | 'email', value: string, extension?: string): Promise<{ preview?: string; displayInput?: string; extension?: string | null } | null> {
-  const response = await fetch(`${apiBaseUrl()}/api/validation/contact-value`, {method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({kind,value,extension})});
+  const response = await sessionFetch(token, `${apiBaseUrl()}/api/validation/contact-value`, {method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({kind,value,extension})});
   if (response.status === 400) throw await validationFailure(response);
   if (!response.ok) throw new ApiError('Validation is temporarily unavailable. Save will validate this field.',response.status);
   return response.json() as Promise<{ preview?: string; displayInput?: string; extension?: string | null } | null>;
@@ -478,7 +481,7 @@ export async function logout(accessToken: string, signal?: AbortSignal): Promise
   }
 }
 export async function searchCases(accessToken: string, query: string): Promise<CaseSearchResult[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/cases/search?query=${encodeURIComponent(query)}`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/cases/search?query=${encodeURIComponent(query)}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -494,7 +497,7 @@ export async function searchCases(accessToken: string, query: string): Promise<C
 }
 
 export async function createCase(accessToken: string, payload: CreateCasePayload): Promise<CaseDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/cases`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/cases`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -518,7 +521,7 @@ export interface UpdateCaseAssignmentPayload {
 }
 
 export async function updateCaseAssignment(accessToken: string, caseId: number, payload: UpdateCaseAssignmentPayload): Promise<CaseDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/assignment`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/cases/${caseId}/assignment`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -548,7 +551,7 @@ export interface UpdateCaseCoreDetailsPayload {
 }
 
 export async function updateCaseCoreDetails(accessToken: string, caseId: number, payload: UpdateCaseCoreDetailsPayload): Promise<CaseDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/core-details`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/cases/${caseId}/core-details`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -575,7 +578,7 @@ export async function updateCaseCoreDetails(accessToken: string, caseId: number,
 
 
 export async function getCaseDetail(accessToken: string, caseId: number): Promise<CaseDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/cases/${caseId}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -596,7 +599,7 @@ export async function getCaseDetail(accessToken: string, caseId: number): Promis
 
 
 export async function listAssignedCases(accessToken: string): Promise<CaseSearchResult[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/cases/assigned`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/cases/assigned`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -612,7 +615,7 @@ export async function listAssignedCases(accessToken: string): Promise<CaseSearch
 }
 
 export async function listAssignedTasks(accessToken: string): Promise<CaseTaskListItem[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/tasks/assigned`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/tasks/assigned`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -634,7 +637,7 @@ export interface CreateCaseTaskPayload {
 }
 
 export async function listCaseTasks(accessToken: string, caseId: number): Promise<CaseTaskListItem[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/tasks`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/cases/${caseId}/tasks`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -650,7 +653,7 @@ export async function listCaseTasks(accessToken: string, caseId: number): Promis
 }
 
 export async function createCaseTask(accessToken: string, caseId: number, payload: CreateCaseTaskPayload): Promise<CaseTaskListItem[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/tasks`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/cases/${caseId}/tasks`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -668,7 +671,7 @@ export async function createCaseTask(accessToken: string, caseId: number, payloa
 }
 
 export async function addCaseUpdate(accessToken: string, caseId: number, noteText: string): Promise<CaseUpdate[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/updates`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/cases/${caseId}/updates`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -686,7 +689,7 @@ export async function addCaseUpdate(accessToken: string, caseId: number, noteTex
 }
 
 export async function listCaseUpdates(accessToken: string, caseId: number): Promise<CaseUpdate[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/updates`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/cases/${caseId}/updates`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -711,7 +714,7 @@ export interface UpdateTaskPayload {
 
 
 export async function listTaskPriorityLookups(accessToken: string): Promise<TaskPriorityOption[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/lookups/task-priorities`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/lookups/task-priorities`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -727,7 +730,7 @@ export async function listTaskPriorityLookups(accessToken: string): Promise<Task
 }
 
 export async function updateTaskDetail(accessToken: string, taskId: number, payload: UpdateTaskPayload): Promise<TaskDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/tasks/${taskId}`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/tasks/${taskId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -749,7 +752,7 @@ export async function updateTaskDetail(accessToken: string, taskId: number, payl
 }
 
 export async function completeTask(accessToken: string, taskId: number): Promise<TaskDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/tasks/${taskId}/complete`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/tasks/${taskId}/complete`, {
     method: 'PATCH',
     headers: {
       Accept: 'application/json',
@@ -769,7 +772,7 @@ export async function completeTask(accessToken: string, taskId: number): Promise
 }
 
 export async function getTaskDetail(accessToken: string, taskId: number): Promise<TaskDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/tasks/${taskId}`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/tasks/${taskId}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -790,7 +793,7 @@ export async function getTaskDetail(accessToken: string, taskId: number): Promis
 
 
 export async function searchContacts(accessToken: string, query: string): Promise<ContactSearchResult[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/contacts/search?query=${encodeURIComponent(query)}`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/contacts/search?query=${encodeURIComponent(query)}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -807,7 +810,7 @@ export async function searchContacts(accessToken: string, query: string): Promis
 
 
 export async function createContact(accessToken: string, request: CreateContactRequest): Promise<ContactDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/contacts`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/contacts`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -829,7 +832,7 @@ export async function createContact(accessToken: string, request: CreateContactR
 }
 
 export async function updateContactDetails(accessToken: string, contactId: number, request: UpdateContactDetailsRequest): Promise<ContactDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/v2/contacts/${contactId}`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/v2/contacts/${contactId}`, {
     method: 'PATCH',
     headers: {
       Accept: 'application/json',
@@ -855,7 +858,7 @@ export async function updateContactDetails(accessToken: string, contactId: numbe
 }
 
 export async function getContactDetail(accessToken: string, contactId: number): Promise<ContactDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/contacts/${contactId}`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/contacts/${contactId}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -876,7 +879,7 @@ export async function getContactDetail(accessToken: string, contactId: number): 
 
 
 export async function createOrganization(accessToken: string, request: CreateOrganizationRequest): Promise<OrganizationDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/organizations`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/organizations`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -898,7 +901,7 @@ export async function createOrganization(accessToken: string, request: CreateOrg
 }
 
 export async function searchOrganizations(accessToken: string, query: string): Promise<OrganizationSearchResult[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/organizations/search?query=${encodeURIComponent(query)}`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/organizations/search?query=${encodeURIComponent(query)}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -914,7 +917,7 @@ export async function searchOrganizations(accessToken: string, query: string): P
 }
 
 export async function updateOrganizationDetails(accessToken: string, organizationId: number, request: UpdateOrganizationDetailsRequest): Promise<OrganizationDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/v2/organizations/${organizationId}`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/v2/organizations/${organizationId}`, {
     method: 'PATCH',
     headers: {
       Accept: 'application/json',
@@ -940,7 +943,7 @@ export async function updateOrganizationDetails(accessToken: string, organizatio
 }
 
 export async function getOrganizationDetail(accessToken: string, organizationId: number): Promise<OrganizationDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/organizations/${organizationId}`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/organizations/${organizationId}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -961,7 +964,7 @@ export async function getOrganizationDetail(accessToken: string, organizationId:
 
 
 export async function listCaseStatusLookup(accessToken: string): Promise<CaseStatusSetting[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/lookups/case-statuses`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/lookups/case-statuses`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -977,7 +980,7 @@ export async function listCaseStatusLookup(accessToken: string): Promise<CaseSta
 }
 
 export async function updateCaseStatus(accessToken: string, caseId: number, statusId: number): Promise<CaseDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/cases/${caseId}/status`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/cases/${caseId}/status`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -1003,7 +1006,7 @@ export async function updateCaseStatus(accessToken: string, caseId: number, stat
 }
 
 export async function listTeamMembers(accessToken: string): Promise<TeamMemberSummary[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/users`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/users`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -1019,7 +1022,7 @@ export async function listTeamMembers(accessToken: string): Promise<TeamMemberSu
 }
 
 export async function getTeamMemberDetail(accessToken: string, userId: number): Promise<TeamMemberDetail> {
-  const response = await fetch(`${apiBaseUrl()}/api/users/${userId}`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/users/${userId}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -1040,7 +1043,7 @@ export async function getTeamMemberDetail(accessToken: string, userId: number): 
 
 
 export async function listPracticeAreaLookups(accessToken: string): Promise<PracticeAreaSetting[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/lookups/practice-areas`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/lookups/practice-areas`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -1056,7 +1059,7 @@ export async function listPracticeAreaLookups(accessToken: string): Promise<Prac
 }
 
 export async function listCaseStatusSettings(accessToken: string): Promise<CaseStatusSetting[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/settings/case-statuses`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/settings/case-statuses`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -1072,7 +1075,7 @@ export async function listCaseStatusSettings(accessToken: string): Promise<CaseS
 }
 
 export async function listPracticeAreaSettings(accessToken: string): Promise<PracticeAreaSetting[]> {
-  const response = await fetch(`${apiBaseUrl()}/api/settings/practice-areas`, {
+  const response = await sessionFetch(accessToken, `${apiBaseUrl()}/api/settings/practice-areas`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',

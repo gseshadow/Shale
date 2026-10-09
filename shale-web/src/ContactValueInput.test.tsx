@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
 import { ApiError, validateContactValue } from './api';
+import { bindSessionRequests } from './sessionRequests';
 
 vi.mock('./api', async importOriginal => ({ ...await importOriginal<typeof import('./api')>(), validateContactValue: vi.fn() }));
 const validate = vi.mocked(validateContactValue);
@@ -25,10 +26,19 @@ function Form({ baseline, fax = false }: { baseline?: string; fax?: boolean }) {
 }
 function number() { return screen.getByLabelText<HTMLInputElement>('Number'); }
 function extension() { return screen.getByLabelText<HTMLInputElement>('Extension (optional, 1–12 digits)'); }
-beforeEach(() => { validate.mockReset(); });
-afterEach(cleanup);
+let disposeSession: () => void;
+beforeEach(() => { validate.mockReset(); disposeSession = bindSessionRequests('test-token', () => true, () => {}); });
+afterEach(() => { cleanup(); disposeSession(); });
 
 describe('phone entry in browser Contact and Organization forms', () => {
+  it('does not format or invoke parent callbacks after session teardown before unmount', async () => {
+    let resolve!: (value: { displayInput: string }) => void;
+    validate.mockImplementation(() => new Promise(done => { resolve = done; }));
+    render(<Form />); fireEvent.change(number(), { target: { value: '5059033568' } }); fireEvent.blur(number());
+    disposeSession(); await act(async () => { resolve({ displayInput: '(505) 903-3568' }); });
+    expect(number().value).toBe('5059033568');
+    expect(screen.getByRole('status').textContent).toBe('');
+  });
   it('keeps pasted punctuation/text intact until shared validation formats on blur', async () => {
     validate.mockResolvedValue({ displayInput: '(505) 903-3568', extension: '001', preview: '(505) 903-3568 ext. 001' });
     render(<Form />);
