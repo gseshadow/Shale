@@ -5,11 +5,12 @@ import { operationalRouteIds, routePath, routes } from './app/routeRegistry';
 import type { RouteObject } from 'react-router-dom';
 import { useContactDraftProtection } from './ContactDraftProtection';
 import type { OperationalRouteId } from './app/routeRegistry';
+import { CredentialStorageError } from './credentialStore';
 import { useStartupSession } from './useStartupSession';
 import { captureSessionRequestGuard } from './sessionRequests';
 import type { AuthState, LogoutFeedback } from './useStartupSession';
 import { createBrowserRouter, RouterProvider, Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, searchCases, searchContacts, searchOrganizations, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, searchCases, searchContacts, searchOrganizations, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import { ApiError, contactValueUpdate } from './api';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
 import { Button, Feedback, SectionRegion, PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
@@ -143,7 +144,7 @@ function AppRoutes() {
   // Keep the requested pathname/query/hash in place until verification has an outcome.
   // No route element (including feature effects or credential login) mounts while unknown.
   if (authState.verification) {
-    return <SessionVerification pending={authState.verification === 'pending'} onRetry={retry} onSignIn={returnToSignIn} />;
+    return <SessionVerification storageFeedback={session.storageFeedback} pending={authState.verification === 'pending'} onRetry={retry} onSignIn={returnToSignIn} />;
   }
 
   return <SessionContext.Provider value={{ ...session, handleLogout }}><Outlet /></SessionContext.Provider>;
@@ -180,11 +181,11 @@ function SessionShell() {
   return <AppShell user={authState.user} onLogout={handleLogout} />;
 }
 function PublicRoute({ id }: { id: 'root' | 'login' | 'fallback' }) {
-  const { authState, logoutFeedback, sessionEnded, signIn } = useAppSession();
+  const { authState, logoutFeedback, sessionEnded, storageFeedback, signIn, loginFailed } = useAppSession();
   const location = useLocation();
   if (id === 'login') return authState.user
     ? <Navigate to={redirectPathFrom(location.state)} replace state={null} />
-    : <LoginPage onLogin={signIn} logoutFeedback={logoutFeedback} sessionEnded={sessionEnded} />;
+    : <LoginPage onLoginFailed={loginFailed} storageFeedback={storageFeedback} onLogin={signIn} logoutFeedback={logoutFeedback} sessionEnded={sessionEnded} />;
   return <Navigate to={authState.user ? routes.myShale.path : routes.login.path} replace />;
 }
 
@@ -430,7 +431,7 @@ function DetailSection({ title, titleId, children, className }: { title: string;
   );
 }
 
-function SessionVerification({ pending, onRetry, onSignIn }: { pending: boolean; onRetry: () => void; onSignIn: () => void }) {
+function SessionVerification({ pending, onRetry, onSignIn, storageFeedback }: { storageFeedback: string | null; pending: boolean; onRetry: () => void; onSignIn: () => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const status = useRef<HTMLParagraphElement>(null);
   const retryButton = useRef<HTMLButtonElement>(null);
@@ -455,12 +456,12 @@ function SessionVerification({ pending, onRetry, onSignIn }: { pending: boolean;
       <p className="eyebrow">Shale Web</p>
       <h1 id="verification-title" ref={heading} tabIndex={-1}>Verify your session</h1>
       <p ref={status} tabIndex={-1} role="status" aria-live="polite" aria-atomic="true">{pending ? 'Checking your Shale session…' : ''}</p>
-      {!pending && <Feedback kind="error">Session verification is unavailable. Your saved sign-in has been kept, but Shale cannot open your work until it is verified.</Feedback>}
+      {!pending && <Feedback kind="error">{storageFeedback ?? 'Session verification is unavailable. Your saved sign-in has been kept, but Shale cannot open your work until it is verified.'}</Feedback>}
       <ToolbarActions>
         <Button purpose="primary" onClick={event => { retryButton.current = event.currentTarget; retryVerification(); }} disabled={pending} aria-busy={pending}>Retry</Button>
         <Button onClick={onSignIn}>Return to sign in</Button>
       </ToolbarActions>
-      <p className="lede">Return to sign in clears your saved sign-in in this tab.</p>
+      <p className="lede">Return to sign in ends local access and attempts to clear your saved sign-in in this tab.</p>
     </section>
   </main>;
 }
@@ -475,7 +476,7 @@ function ProtectedRoute({ authState }: { authState: AuthState }) {
   return <Outlet />;
 }
 
-function LoginPage({ onLogin, logoutFeedback, sessionEnded }: { sessionEnded: boolean; logoutFeedback: LogoutFeedback; onLogin: (verifiedAccessToken: string, verifiedUser: AuthenticatedUser) => void }) {
+function LoginPage({ onLogin, logoutFeedback, sessionEnded, storageFeedback, onLoginFailed }: { onLoginFailed: () => void; storageFeedback: string | null; sessionEnded: boolean; logoutFeedback: LogoutFeedback; onLogin: (verifiedAccessToken: string, verifiedUser: AuthenticatedUser) => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const mounted = useRef(false);
   const submitting = useRef(false);
@@ -511,7 +512,8 @@ function LoginPage({ onLogin, logoutFeedback, sessionEnded }: { sessionEnded: bo
       setPassword('');
     } catch (caught) {
       if (!mounted.current) return;
-      clearAccessToken();
+      // Persistence failures have already torn down through the session owner.
+      if (!(caught instanceof CredentialStorageError)) onLoginFailed();
       setError(caught instanceof Error ? caught.message : 'Login failed.');
     } finally {
       submitting.current = false;
@@ -524,6 +526,7 @@ function LoginPage({ onLogin, logoutFeedback, sessionEnded }: { sessionEnded: bo
       <section className="login-panel" aria-labelledby="login-title">
         <p className="eyebrow">Shale Web</p>
         <h1 id="login-title" ref={heading} tabIndex={-1}>Sign in</h1>
+        {storageFeedback && <Feedback kind="error">{storageFeedback}</Feedback>}
         {sessionEnded && <Feedback kind="error">Your Shale session ended. Sign in again to continue. Unsaved form changes were discarded. A submitted change may have been saved; check its outcome before submitting again.</Feedback>}
         <Feedback kind={logoutFeedback === 'confirmed' ? 'success' : logoutFeedback === 'unavailable' ? 'unavailable' : 'info'} aria-live="polite" aria-atomic="true">{logoutMessage}</Feedback>
         <p className="lede">Use your Shale account to access the web application shell.</p>

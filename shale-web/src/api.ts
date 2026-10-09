@@ -1,8 +1,8 @@
+import { browserCredentialStore } from './credentialStore';
 import { sessionFetch } from './sessionRequests';
 import type { FeatureResponse } from './sessionRequests';
 
 const DEFAULT_API_BASE_URL = 'https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net';
-const ACCESS_TOKEN_STORAGE_KEY = 'shale-web.accessToken';
 
 export interface AuthenticatedUser {
   authenticated: boolean;
@@ -378,15 +378,15 @@ export function apiBaseUrl(): string {
 }
 
 export function storeAccessToken(accessToken: string): void {
-  sessionStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken);
+  browserCredentialStore.store(accessToken);
 }
 
 export function readAccessToken(): string | null {
-  return sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
+  return browserCredentialStore.read();
 }
 
 export function clearAccessToken(): void {
-  sessionStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+  browserCredentialStore.clear();
 }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {

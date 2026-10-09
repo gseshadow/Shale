@@ -163,3 +163,25 @@ describe('established-session recovery with actual endpoint clients', () => {
     expect(calls.filter(c => c.path.endsWith('/complete'))).toHaveLength(1);
   });
 });
+
+
+describe('real browser credential failure feedback', () => {
+  it.each([false, true])('failed login storage keeps safe return and installs no protected identity (cleanup failure %s)', async failedClear => {
+    fixture(() => response([]));
+    // Clear through the owner: fixture setup remains separate from application logic.
+    api.clearAccessToken(); window.history.replaceState({}, '', '/contacts/7?page=2#details');
+    render(<App router={testRouter()} />); await screen.findByRole('heading', { name: 'Sign in' });
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Synthetic private storage error'); });
+    const remove = failedClear ? vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('Synthetic private storage error'); }) : null;
+    await signIn(); await screen.findByText(/could not store the sign-in credential/);
+    expect(screen.queryByRole('navigation')).toBeNull(); expect(readAccessToken()).toBeNull();
+    expect(calls.every(call => call.path.startsWith('/api/auth/'))).toBe(true);
+    expect(window.history.state.usr.from.pathname).toBe('/contacts/7');
+    expect(screen.queryByText(/private storage error/)).toBeNull();
+    if (failedClear) expect(screen.getByText(/reloading may restore/)).toBeTruthy();
+    write.mockRestore(); remove?.mockRestore(); await signIn();
+    await screen.findByRole('heading', { name: 'Contact Detail' });
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe('/contacts/7?page=2#details');
+    expect(window.history.state.usr).toBeNull();
+  });
+});

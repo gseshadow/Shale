@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LOGOUT_TIMEOUT_MS, logout, readAccessToken } from './api';
+import { LOGOUT_TIMEOUT_MS, logout, readAccessToken, storeAccessToken } from './api';
 import { useStartupSession } from './useStartupSession';
 
 const user = { authenticated: true, userId: 1, shaleClientId: 1, email: null, displayName: 'Synthetic User',
@@ -123,7 +123,7 @@ describe('immediate local teardown and logout generation', () => {
     expect(readAccessToken()).toBeNull(); expect(fetchMock).toHaveBeenCalledTimes(1);
   });
   it('uncertain startup Return to sign in remains purely local', async () => {
-    sessionStorage.setItem('shale-web.accessToken', 'synthetic-startup'); fetchMock.mockResolvedValue(response({}, 503));
+    storeAccessToken('synthetic-startup'); fetchMock.mockResolvedValue(response({}, 503));
     const { result } = renderHook(useStartupSession); await act(async () => {});
     act(() => result.current.signOut());
     expect(readAccessToken()).toBeNull(); expect(result.current.logoutFeedback).toBeNull();

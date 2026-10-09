@@ -16,13 +16,15 @@ describe('isolated synthetic foundation', () => {
   it('does not call APIs or persist anything, even with a stored beta bearer', () => {
     sessionStorage.setItem('shale-web.accessToken', 'synthetic-test-token');
     const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    const reads = vi.spyOn(Storage.prototype, 'getItem');
+    const clears = vi.spyOn(Storage.prototype, 'removeItem');
     const writes = vi.spyOn(Storage.prototype, 'setItem');
     preview(); fireEvent.change(screen.getByLabelText('Preview theme'), { target: { value: 'dark' } });
     fireEvent.click(screen.getByRole('button', { name: 'Select example case' }));
     fireEvent.click(screen.getByRole('button', { name: 'Select example contact' }));
     expect(screen.getByRole('button', { name: 'Select example contact' }).getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: 'Check example' }));
-    expect(fetch).not.toHaveBeenCalled(); expect(writes).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled(); expect(writes).not.toHaveBeenCalled(); expect(reads).not.toHaveBeenCalled(); expect(clears).not.toHaveBeenCalled();
     sessionStorage.clear();
   });
   it.each(destinations)('keeps $label reachable and exposes the active destination without color', async destination => {

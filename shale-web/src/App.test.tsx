@@ -5,14 +5,16 @@ const routers: ReturnType<typeof createAppRouter>[] = [];
 function testRouter() { const router = createAppRouter(); routers.push(router); return router; }
 import { STARTUP_VERIFICATION_TIMEOUT_MS } from './useStartupSession';
 import * as api from './api';
+import { browserCredentialStore } from './credentialStore';
+vi.mock('./credentialStore', async original => ({ ...await original<typeof import('./credentialStore')>(), browserCredentialStore: { read: vi.fn(), store: vi.fn(), clear: vi.fn() } }));
 import { destinations } from './shell/navigation';
 
 vi.mock('./api', async original => ({
   ...await original<typeof import('./api')>(),
-  readAccessToken: vi.fn(), getCurrentUser: vi.fn(), listAssignedCases: vi.fn(), listAssignedTasks: vi.fn(),
+  getCurrentUser: vi.fn(), listAssignedCases: vi.fn(), listAssignedTasks: vi.fn(),
   listTeamMembers: vi.fn(), listCaseStatusSettings: vi.fn(), listPracticeAreaSettings: vi.fn(),
   getCaseDetail: vi.fn(), getContactDetail: vi.fn(), getOrganizationDetail: vi.fn(), getTaskDetail: vi.fn(),
-  login: vi.fn(), logout: vi.fn(), storeAccessToken: vi.fn(), clearAccessToken: vi.fn(),
+  login: vi.fn(), logout: vi.fn(),
   getTeamMemberDetail: vi.fn(), listCaseTasks: vi.fn(), listCaseUpdates: vi.fn(), completeTask: vi.fn(),
 }));
 const user: api.AuthenticatedUser = { authenticated: true, userId: 1, shaleClientId: 1, displayName: 'Example User',
@@ -20,11 +22,11 @@ const user: api.AuthenticatedUser = { authenticated: true, userId: 1, shaleClien
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
-  vi.mocked(api.readAccessToken).mockReturnValue('test-token');
+  vi.mocked(browserCredentialStore.read).mockReturnValue('test-token');
   vi.mocked(api.getCurrentUser).mockResolvedValue(user);
   vi.mocked(api.logout).mockResolvedValue(undefined);
-  vi.mocked(api.clearAccessToken).mockImplementation(() => { vi.mocked(api.readAccessToken).mockReturnValue(null); });
-  vi.mocked(api.storeAccessToken).mockImplementation(token => { vi.mocked(api.readAccessToken).mockReturnValue(token); });
+  vi.mocked(browserCredentialStore.clear).mockImplementation(() => { vi.mocked(browserCredentialStore.read).mockReturnValue(null); });
+  vi.mocked(browserCredentialStore.store).mockImplementation(token => { vi.mocked(browserCredentialStore.read).mockReturnValue(token); });
   for (const method of [api.listAssignedCases, api.listAssignedTasks, api.listTeamMembers, api.listCaseStatusSettings,
     api.listPracticeAreaSettings, api.listCaseTasks, api.listCaseUpdates]) vi.mocked(method).mockResolvedValue([]);
   for (const method of [api.getCaseDetail, api.getContactDetail, api.getOrganizationDetail, api.getTaskDetail,
@@ -49,7 +51,7 @@ describe('authenticated responsive shell composition', () => {
     expect(screen.getAllByRole('link').filter(link => link.getAttribute('aria-current') === 'page')).toHaveLength(1);
   });
   it('retains the login route without a bearer', async () => {
-    vi.mocked(api.readAccessToken).mockReturnValue(null); beta('/login');
+    vi.mocked(browserCredentialStore.read).mockReturnValue(null); beta('/login');
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeTruthy();
     expect(api.getCurrentUser).not.toHaveBeenCalled();
   });
@@ -106,7 +108,7 @@ describe('authenticated responsive shell composition', () => {
     fireEvent.change(screen.getByLabelText('Theme (this session)'), { target: { value: 'dark' } });
     expect(document.querySelector('.shale-authenticated')?.getAttribute('data-theme')).toBe('dark');
     expect(api.listAssignedTasks).toHaveBeenCalledTimes(calls);
-    expect(api.storeAccessToken).not.toHaveBeenCalled();
+    expect(browserCredentialStore.store).not.toHaveBeenCalled();
   });
   it('does not mount shell or load protected data until session verification finishes', async () => {
     let resolve!: (value: api.AuthenticatedUser) => void;
@@ -122,14 +124,14 @@ describe('authenticated responsive shell composition', () => {
     vi.mocked(api.login).mockResolvedValue({ accessToken: 'new-test-token' } as api.LoginResponse);
     beta('/contacts/7');
     await screen.findByRole('heading', { name: 'Sign in' });
-    expect(api.clearAccessToken).toHaveBeenCalledTimes(1); expect(screen.queryByRole('navigation')).toBeNull();
+    expect(browserCredentialStore.clear).toHaveBeenCalledTimes(1); expect(screen.queryByRole('navigation')).toBeNull();
     expect(window.history.state.usr.from.pathname).toBe('/contacts/7');
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'example@example.invalid' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'synthetic-password' } });
     fireEvent.submit(screen.getByRole('button', { name: 'Sign in' }).closest('form')!);
     await screen.findByRole('heading', { name: 'Contact Detail', level: 1 });
     expect(api.getCurrentUser).toHaveBeenLastCalledWith('new-test-token');
-    expect(api.storeAccessToken).toHaveBeenCalledWith('new-test-token');
+    expect(browserCredentialStore.store).toHaveBeenCalledWith('new-test-token');
     await waitFor(() => expect(api.getContactDetail).toHaveBeenCalledWith('new-test-token', 7));
   });
   it('logs out locally and unmounts protected content before the existing remote call finishes', async () => {
@@ -138,7 +140,7 @@ describe('authenticated responsive shell composition', () => {
     beta('/my-shale'); await screen.findByRole('heading', { name: 'My Shale', level: 1 });
     fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
     await screen.findByRole('heading', { name: 'Sign in' });
-    expect(api.clearAccessToken).toHaveBeenCalledTimes(1);
+    expect(browserCredentialStore.clear).toHaveBeenCalledTimes(1);
     expect(api.logout).toHaveBeenCalledWith('test-token', expect.any(AbortSignal)); expect(screen.queryByRole('navigation')).toBeNull();
     expect(screen.queryByText(user.displayName!)).toBeNull(); finish();
   });
@@ -164,8 +166,8 @@ describe('startup verification recovery', () => {
     expectBlocked();
     await act(async () => { await vi.advanceTimersByTimeAsync(STARTUP_VERIFICATION_TIMEOUT_MS); });
     expect(screen.getByRole('alert').textContent).toMatch(/verification is unavailable/);
-    expectBlocked(); expect(api.readAccessToken()).toBe('test-token');
-    expect(api.clearAccessToken).not.toHaveBeenCalled();
+    expectBlocked(); expect(browserCredentialStore.read()).toBe('test-token');
+    expect(browserCredentialStore.clear).not.toHaveBeenCalled();
     expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
     if (action === 'retry') {
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry' })); });
@@ -175,7 +177,7 @@ describe('startup verification recovery', () => {
     } else {
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Return to sign in' })); });
       expect(screen.getByRole('heading', { name: 'Sign in' })).toBeTruthy();
-      expect(api.readAccessToken()).toBeNull(); expect(api.logout).not.toHaveBeenCalled();
+      expect(browserCredentialStore.read()).toBeNull(); expect(api.logout).not.toHaveBeenCalled();
       expect(window.location.pathname).toBe('/login'); expect(window.history.state.usr).toBeNull();
       expectBlocked();
     }
@@ -194,7 +196,7 @@ describe('startup verification recovery', () => {
     expectBlocked(); expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
     reject(new TypeError('Synthetic offline')); await screen.findByRole('alert');
     expect(screen.getByRole('alert').textContent).toMatch(/verification is unavailable/);
-    expectBlocked(); expect(api.clearAccessToken).not.toHaveBeenCalled();
+    expectBlocked(); expect(browserCredentialStore.clear).not.toHaveBeenCalled();
     expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
   });
   it('keeps Retry focused through repeated failure, prevents duplicates, then restores the exact detail without login', async () => {
@@ -213,8 +215,8 @@ describe('startup verification recovery', () => {
     expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
     expect(window.history.length).toBe(historyLength);
     await waitFor(() => expect(api.getContactDetail).toHaveBeenCalledTimes(1));
-    expect(api.login).not.toHaveBeenCalled(); expect(api.storeAccessToken).not.toHaveBeenCalled();
-    expect(api.clearAccessToken).not.toHaveBeenCalled(); expect(api.listAssignedCases).not.toHaveBeenCalled();
+    expect(api.login).not.toHaveBeenCalled(); expect(browserCredentialStore.store).not.toHaveBeenCalled();
+    expect(browserCredentialStore.clear).not.toHaveBeenCalled(); expect(api.listAssignedCases).not.toHaveBeenCalled();
   });
   it('Retry rejection uses Phase 3A signed-out restoration with the complete location', async () => {
     vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new TypeError('Synthetic offline'))
@@ -222,7 +224,7 @@ describe('startup verification recovery', () => {
     beta('/tasks/7?status=open#activity'); await screen.findByRole('alert');
     const historyLength = window.history.length; fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await screen.findByRole('heading', { name: 'Sign in' });
-    expect(api.clearAccessToken).toHaveBeenCalledTimes(1); expectBlocked();
+    expect(browserCredentialStore.clear).toHaveBeenCalledTimes(1); expectBlocked();
     expect(window.history.state.usr.from).toMatchObject({ pathname: '/tasks/7', search: '?status=open', hash: '#activity' });
     expect(window.history.length).toBe(historyLength);
   });
@@ -237,11 +239,11 @@ describe('startup verification recovery', () => {
     const historyLength = window.history.length;
     fireEvent.click(screen.getByRole('button', { name: 'Return to sign in' }));
     const heading = await screen.findByRole('heading', { name: 'Sign in' });
-    expect(api.clearAccessToken).toHaveBeenCalledTimes(1); expect(api.logout).not.toHaveBeenCalled();
+    expect(browserCredentialStore.clear).toHaveBeenCalledTimes(1); expect(api.logout).not.toHaveBeenCalled();
     expect(window.history.state.usr).toBeNull(); expect(window.history.length).toBe(historyLength);
     expect(document.activeElement).toBe(heading);
     resolve(user); await waitFor(() => expect(screen.getByRole('heading', { name: 'Sign in' })).toBeTruthy());
-    expectBlocked(); expect(api.storeAccessToken).not.toHaveBeenCalled();
+    expectBlocked(); expect(browserCredentialStore.store).not.toHaveBeenCalled();
   });
   it('explicit return drops the old target, while historical Back remains protected', async () => {
     vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new TypeError('Synthetic offline'));
@@ -267,7 +269,7 @@ function loginAt(state: unknown) {
 }
 describe('verified login return restoration', () => {
   beforeEach(() => {
-    vi.mocked(api.readAccessToken).mockReturnValue(null);
+    vi.mocked(browserCredentialStore.read).mockReturnValue(null);
     vi.mocked(api.login).mockResolvedValue({ accessToken: 'new-test-token' } as api.LoginResponse);
   });
   it.each([
@@ -282,7 +284,7 @@ describe('verified login return restoration', () => {
     expect(window.history.state.usr.from.pathname).toBe(path.split('?')[0]);
     const historyLength = window.history.length;
     submitLogin(); await waitFor(() => expect(api.getCurrentUser).toHaveBeenCalledWith('new-test-token'));
-    expect(window.location.pathname).toBe('/login'); expect(api.storeAccessToken).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/login'); expect(browserCredentialStore.store).not.toHaveBeenCalled();
     expect(detail).not.toHaveBeenCalled(); verify(user);
     await screen.findByRole('heading', { name: heading, level: 1 });
     expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
@@ -297,7 +299,7 @@ describe('verified login return restoration', () => {
     const returnState = window.history.state.usr;
     submitLogin(); await screen.findByRole('alert');
     expect(window.location.pathname).toBe('/login'); expect(window.history.state.usr).toEqual(returnState);
-    expect(api.getTaskDetail).not.toHaveBeenCalled(); expect(api.storeAccessToken).not.toHaveBeenCalled();
+    expect(api.getTaskDetail).not.toHaveBeenCalled(); expect(browserCredentialStore.store).not.toHaveBeenCalled();
     submitLogin(); await screen.findByRole('heading', { name: 'Task Detail', level: 1 });
     expect(window.location.pathname + window.location.search + window.location.hash).toBe('/tasks/7?status=open#activity');
     await waitFor(() => expect(api.getTaskDetail).toHaveBeenCalledWith('new-test-token', 7));
@@ -345,7 +347,7 @@ describe('verified login return restoration', () => {
   it.each([['/unknown', false, 'Sign in'], ['/unknown', true, 'My Shale'], ['/login', true, 'My Shale'], ['/', false, 'Sign in'], ['/', true, 'My Shale'],
     ...['/calendar', '/reports', '/search', '/cases/7/overview', '/settings/personal'].flatMap(path => [[path, false, 'Sign in'], [path, true, 'My Shale']] as [string, boolean, string][])])
   ('retains root, unknown and authenticated-login fallback for %s / signed in %s', async (path, authenticated, heading) => {
-    vi.mocked(api.readAccessToken).mockReturnValue(authenticated ? 'test-token' : null);
+    vi.mocked(browserCredentialStore.read).mockReturnValue(authenticated ? 'test-token' : null);
     beta(path); await screen.findByRole('heading', { name: heading, level: 1 });
     expect(window.location.pathname).toBe(authenticated ? '/my-shale' : '/login');
   });
@@ -463,7 +465,7 @@ describe('truthful signed-out feedback', () => {
     expect(status.textContent).toContain('You are signed out in this tab. Waiting for the server');
     expect(status.getAttribute('aria-live')).toBe('polite'); expect(status.getAttribute('aria-atomic')).toBe('true');
     expect(window.location.pathname).toBe('/login'); expect(window.history.state.usr).toBeNull();
-    expect(window.history.length).toBe(historyLength); expect(api.storeAccessToken).not.toHaveBeenCalled();
+    expect(window.history.length).toBe(historyLength); expect(browserCredentialStore.store).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Sign in' }).hasAttribute('disabled')).toBe(false);
     screen.getByLabelText('Email').focus(); finish();
     await waitFor(() => expect(status.textContent).toContain('server confirmed revocation of the session used here'));
@@ -479,9 +481,21 @@ describe('truthful signed-out feedback', () => {
     await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Server session revocation could not be confirmed'));
     expect(screen.getByRole('status').textContent).toContain('You are signed out in this tab');
     expect(document.body.textContent).not.toContain('Sensitive'); expect(document.body.textContent).not.toContain('test-token');
-    expect(api.storeAccessToken).not.toHaveBeenCalled(); signInAgain();
+    expect(browserCredentialStore.store).not.toHaveBeenCalled(); signInAgain();
     await screen.findByRole('heading', { name: 'My Shale' });
-    expect(api.logout).toHaveBeenCalledTimes(1); expect(api.storeAccessToken).toHaveBeenCalledWith('synthetic-new-login');
+    expect(api.logout).toHaveBeenCalledTimes(1); expect(browserCredentialStore.store).toHaveBeenCalledWith('synthetic-new-login');
+  });
+  it('retains confirmed logout feedback through failed credential login', async () => {
+    beta('/my-shale'); await screen.findByRole('heading', { name: 'My Shale', level: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    await screen.findByText(/server confirmed revocation/);
+    vi.mocked(api.login).mockRejectedValueOnce(new Error('Synthetic credentials rejected'));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'synthetic@example.invalid' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'synthetic-password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await screen.findByText('Synthetic credentials rejected');
+    expect(screen.getByText(/server confirmed revocation/)).toBeTruthy();
+    expect(screen.queryByRole('navigation')).toBeNull();
   });
   it('allows login while pending and discards the older logout result', async () => {
     let finish!: () => void;
@@ -490,8 +504,8 @@ describe('truthful signed-out feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Logout' })); await screen.findByRole('heading', { name: 'Sign in' });
     const signal = vi.mocked(api.logout).mock.calls[0][1]; signInAgain();
     await screen.findByRole('heading', { name: 'My Shale' }); expect(signal?.aborted).toBe(true);
-    finish(); await waitFor(() => expect(api.storeAccessToken).toHaveBeenCalledWith('synthetic-new-login'));
+    finish(); await waitFor(() => expect(browserCredentialStore.store).toHaveBeenCalledWith('synthetic-new-login'));
     expect(screen.queryByText(/revocation of the session used here/)).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Sign in' })).toBeNull(); expect(api.clearAccessToken).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('heading', { name: 'Sign in' })).toBeNull(); expect(browserCredentialStore.clear).toHaveBeenCalledTimes(1);
   });
 });

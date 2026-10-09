@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { ApiError, clearAccessToken, getCurrentUser, logout, readAccessToken, storeAccessToken } from './api';
+import { ApiError, getCurrentUser, logout } from './api';
+import { browserCredentialStore, CredentialStorageError } from './credentialStore';
+import type { CredentialStore } from './credentialStore';
 import type { AuthenticatedUser } from './api';
 import { bindSessionRequests } from './sessionRequests';
 
@@ -38,7 +40,9 @@ async function verifyStartupSession(token: string, controller: AbortController):
 }
 
 // Startup recovery and the established-session sign-out boundary share invalidation.
-export function useStartupSession() {
+export function useStartupSession(credentialStore: CredentialStore = browserCredentialStore) {
+  const [storageFeedback, setStorageFeedback] = useState<string | null>(null);
+  const locallyEnded = useRef(false);
   const [authState, setAuthState] = useState<AuthState>({ ...signedOut, verification: 'pending' });
   const [logoutFeedback, setLogoutFeedback] = useState<LogoutFeedback>(null);
   const [sessionEnded, setSessionEnded] = useState(false);
@@ -60,14 +64,30 @@ export function useStartupSession() {
     pending.current = null;
   }
 
+  function clearCredential() {
+    locallyEnded.current = true;
+    try { credentialStore.clear(); }
+    catch { setStorageFeedback(new CredentialStorageError('clear').message); }
+  }
+
+  function credentialIsCurrent(token: string) {
+    if (locallyEnded.current) return false;
+    try { return credentialStore.read() === token; }
+    catch {
+      signOut();
+      setStorageFeedback(previous => previous ?? new CredentialStorageError('read').message);
+      return false;
+    }
+  }
+
   function establish(token: string, user: AuthenticatedUser) {
     const attempt = generation.current;
     featureBinding.current = bindSessionRequests(token,
-      () => mounted.current && generation.current === attempt && readAccessToken() === token,
+      () => mounted.current && generation.current === attempt && credentialIsCurrent(token),
       () => {
         // The seam has already consumed this binding. No remote logout or replay.
         invalidate();
-        clearAccessToken();
+        clearCredential();
         setLogoutFeedback(null);
         setSessionEnded(true);
         setAuthState(signedOut);
@@ -78,7 +98,16 @@ export function useStartupSession() {
   }
 
   async function retry() {
-    const token = readAccessToken();
+    if (!mounted.current || locallyEnded.current) return;
+    let token: string | null;
+    try { token = credentialStore.read(); }
+    catch {
+      invalidate();
+      setStorageFeedback(new CredentialStorageError('read').message);
+      setAuthState({ ...signedOut, verification: 'unavailable' });
+      return;
+    }
+    setStorageFeedback(null);
     if (!mounted.current || (pending.current && pending.current.token === token)) return;
     invalidate();
     if (!token) {
@@ -92,10 +121,18 @@ export function useStartupSession() {
 
     function isCurrent() {
       if (!mounted.current || generation.current !== attempt) return false;
-      if (readAccessToken() !== token) {
+      let stored: string | null;
+      try { stored = credentialStore.read(); }
+      catch {
+        invalidate();
+        setStorageFeedback(new CredentialStorageError('read').message);
+        setAuthState({ ...signedOut, verification: 'unavailable' });
+        return false;
+      }
+      if (stored !== token) {
         // A replaced/removed credential cannot inherit this attempt's result (including 401).
         invalidate();
-        setAuthState(readAccessToken() ? { ...signedOut, verification: 'unavailable' } : signedOut);
+        setAuthState(stored ? { ...signedOut, verification: 'unavailable' } : signedOut);
         return false;
       }
       pending.current = null;
@@ -112,7 +149,7 @@ export function useStartupSession() {
       // /me's resolver uses 401 for absent/invalid/expired/revoked/ineligible sessions.
       // Other 4xx, transport, server and unusable-body failures do not reject the bearer.
       if (error instanceof ApiError && error.status === 401) {
-        clearAccessToken();
+        clearCredential();
         setAuthState(signedOut);
       } else {
         setAuthState({ ...signedOut, verification: 'unavailable' });
@@ -131,13 +168,26 @@ export function useStartupSession() {
     invalidate();
     logoutConsumed.current = false;
     setLogoutFeedback(null);
-    storeAccessToken(accessToken);
+    setAuthState(signedOut);
+    setStorageFeedback(null);
+    try { credentialStore.store(accessToken); }
+    catch {
+      clearCredential();
+      throw new CredentialStorageError('store');
+    }
+    locallyEnded.current = false;
     establish(accessToken, user);
+  }
+
+  function loginFailed() {
+    // LoginPage is still signed out: preserve existing logout/session-ended feedback.
+    // A failed persistence installation is already handled by signIn itself.
+    if (mounted.current) clearCredential();
   }
 
   function signOut() {
     invalidate();
-    clearAccessToken();
+    clearCredential();
     setLogoutFeedback(null);
     setSessionEnded(false);
     setAuthState(signedOut);
@@ -153,7 +203,8 @@ export function useStartupSession() {
     const controller = new AbortController();
     remoteLogout.current = controller;
     function isCurrent() {
-      return mounted.current && generation.current === attempt && readAccessToken() === null;
+      if (!mounted.current || generation.current !== attempt || !locallyEnded.current) return false;
+      try { return credentialStore.read() === null; } catch { return false; }
     }
     // The only captured bearer belongs to this bounded attempt; nothing is restored/replayed.
     void logout(token, controller.signal).then(() => {
@@ -166,5 +217,5 @@ export function useStartupSession() {
     return true;
   }
 
-  return { authState, logoutFeedback, sessionEnded, sessionGeneration: generation.current, retry, signIn, signOut, logoutSession };
+  return { authState, storageFeedback, logoutFeedback, sessionEnded, sessionGeneration: generation.current, retry, signIn, loginFailed, signOut, logoutSession };
 }
