@@ -51,6 +51,9 @@ export function ContactValueInput({ accessToken, kind, baseline, baselineExtensi
     if (baseline !== undefined) void validate(false);
     return () => { generation.current++; };
   }, [accessToken]);
+  // A Save disables the editor. An earlier advisory must not repaint its submitted
+  // values, including after a failed save re-enables the same draft.
+  useEffect(() => { if (props.disabled) generation.current++; }, [props.disabled]);
   return <><input {...props} data-validation-field={fieldName} type="text"
     onBlur={() => void validate(true)} onChange={event => { generation.current++; props.onChange?.(event); }}
     aria-invalid={invalidField === 'number' || errors.some(error => error.field === fieldName)} aria-describedby={`${props.id}-feedback`} />

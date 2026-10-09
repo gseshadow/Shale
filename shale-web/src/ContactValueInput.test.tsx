@@ -31,6 +31,17 @@ beforeEach(() => { validate.mockReset(); disposeSession = bindSessionRequests('t
 afterEach(() => { cleanup(); disposeSession(); });
 
 describe('phone entry in browser Contact and Organization forms', () => {
+  it('disabling for Save invalidates earlier advisory callbacks even after re-enabling', async () => {
+    let resolve!: (value: { displayInput: string }) => void;
+    validate.mockImplementation(() => new Promise(done => { resolve = done; }));
+    const formatted = vi.fn();
+    const input = (disabled: boolean) => <ContactValueInput id="pending-phone" aria-label="Number" kind="phone"
+      accessToken="test-token" value="5551234" disabled={disabled} onFormatted={formatted} />;
+    const view = render(input(false)); fireEvent.blur(number());
+    view.rerender(input(true)); view.rerender(input(false));
+    await act(async () => resolve({ displayInput: '555-1234' }));
+    expect(formatted).not.toHaveBeenCalled(); expect(number().value).toBe('5551234');
+  });
   it('does not format or invoke parent callbacks after session teardown before unmount', async () => {
     let resolve!: (value: { displayInput: string }) => void;
     validate.mockImplementation(() => new Promise(done => { resolve = done; }));

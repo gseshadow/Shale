@@ -1,12 +1,14 @@
-import { startTransition, FormEvent, useEffect, useMemo, useState, useRef } from 'react';
+import { startTransition, FormEvent, useEffect, useMemo, useState, useRef, createContext, useContext } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { redirectPathFrom } from './returnPath';
 import { operationalRouteIds, routePath, routes } from './app/routeRegistry';
+import type { RouteObject } from 'react-router-dom';
+import { useContactDraftProtection } from './ContactDraftProtection';
 import type { OperationalRouteId } from './app/routeRegistry';
 import { useStartupSession } from './useStartupSession';
 import { captureSessionRequestGuard } from './sessionRequests';
 import type { AuthState, LogoutFeedback } from './useStartupSession';
-import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, searchCases, searchContacts, searchOrganizations, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import { ApiError, contactValueUpdate } from './api';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
@@ -110,10 +112,18 @@ function displayNameFor(user: AuthenticatedUser): string {
   return user.displayName || [user.nameFirst, user.nameLast].filter(Boolean).join(' ') || user.email || `User ${user.userId}`;
 }
 
+type SessionContextValue = ReturnType<typeof useStartupSession> & { handleLogout: () => void };
+const SessionContext = createContext<SessionContextValue | null>(null);
+function useAppSession() {
+  const session = useContext(SessionContext);
+  if (!session) throw new Error('Session boundary is required.');
+  return session;
+}
+
 function AppRoutes() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { authState, logoutFeedback, sessionEnded, sessionGeneration, retry, signIn: handleLogin, signOut, logoutSession } = useStartupSession();
+  const session = useStartupSession();
+  const { authState, retry, signOut, logoutSession } = session;
 
   function returnToSignIn() {
     // Replace and clear return state together, as in Phase 3A local logout.
@@ -124,7 +134,7 @@ function AppRoutes() {
   }
 
   function handleLogout() {
-    // Match BrowserRouter's transition so a signed-out detail cannot be recaptured.
+    // Group security teardown and replacement; the draft blocker checks current session authority.
     startTransition(() => {
       if (logoutSession()) navigate(routes.login.path, { replace: true, state: null });
     });
@@ -136,7 +146,13 @@ function AppRoutes() {
     return <SessionVerification pending={authState.verification === 'pending'} onRetry={retry} onSignIn={returnToSignIn} />;
   }
 
-  // Composition stays here, beneath the explicit session guard. Metadata is not authorization.
+  return <SessionContext.Provider value={{ ...session, handleLogout }}><Outlet /></SessionContext.Provider>;
+}
+
+function OperationalScreen({ id }: { id: OperationalRouteId }) {
+  const { authState } = useAppSession();
+  const location = useLocation();
+  // Exhaustive screen composition remains separate from URL metadata and router execution.
   const screens: Record<OperationalRouteId, ReactNode> = {
     myShale: <MyShalePage accessToken={authState.accessToken} user={authState.user} />,
     cases: <CasesPage accessToken={authState.accessToken} />,
@@ -144,30 +160,47 @@ function AppRoutes() {
     tasks: <TasksPage accessToken={authState.accessToken} />,
     taskDetail: <TaskDetailPage accessToken={authState.accessToken} />,
     contacts: <ContactsPage accessToken={authState.accessToken} />,
-    contactDetail: <ContactDetailPage accessToken={authState.accessToken} />,
+    // A discarded same-screen/query/hash navigation must not retain the old editor or continuation.
+    contactDetail: <ContactDetailPage key={location.key} accessToken={authState.accessToken} />,
     organizations: <OrganizationsPage accessToken={authState.accessToken} />,
     organizationDetail: <OrganizationDetailPage accessToken={authState.accessToken} />,
     team: <TeamPage accessToken={authState.accessToken} />,
     teamMemberDetail: <TeamMemberDetailPage accessToken={authState.accessToken} />,
     settings: <SettingsPage accessToken={authState.accessToken} user={authState.user} />,
   };
-
-  return (
-    <Routes>
-      <Route path={routes.root.path} element={authState.user ? <Navigate to={routes.myShale.path} replace /> : <Navigate to={routes.login.path} replace />} />
-      <Route
-        path={routes.login.path}
-        element={authState.user ? <Navigate to={redirectPathFrom(location.state)} replace state={null} /> : <LoginPage onLogin={handleLogin} logoutFeedback={logoutFeedback} sessionEnded={sessionEnded} />}
-      />
-      <Route element={<ProtectedRoute key={sessionGeneration} authState={authState} />}>
-        <Route element={<AppShell user={authState.user} onLogout={handleLogout} />}>
-          {operationalRouteIds.map(id => <Route key={id} path={routes[id].path} element={screens[id]} />)}
-        </Route>
-      </Route>
-      <Route path={routes.fallback.path} element={<Navigate to={authState.user ? routes.myShale.path : routes.login.path} replace />} />
-    </Routes>
-  );
+  return screens[id];
 }
+
+function SessionProtectedRoutes() {
+  const { authState, sessionGeneration } = useAppSession();
+  return <ProtectedRoute key={sessionGeneration} authState={authState} />;
+}
+function SessionShell() {
+  const { authState, handleLogout } = useAppSession();
+  return <AppShell user={authState.user} onLogout={handleLogout} />;
+}
+function PublicRoute({ id }: { id: 'root' | 'login' | 'fallback' }) {
+  const { authState, logoutFeedback, sessionEnded, signIn } = useAppSession();
+  const location = useLocation();
+  if (id === 'login') return authState.user
+    ? <Navigate to={redirectPathFrom(location.state)} replace state={null} />
+    : <LoginPage onLogin={signIn} logoutFeedback={logoutFeedback} sessionEnded={sessionEnded} />;
+  return <Navigate to={authState.user ? routes.myShale.path : routes.login.path} replace />;
+}
+
+// The existing registry owns URLs. No loader/action or API/session work runs in the router.
+export const appRouteObjects: RouteObject[] = [{
+  element: <AppRoutes />,
+  children: [
+    { path: routes.root.path, element: <PublicRoute id="root" /> },
+    { path: routes.login.path, element: <PublicRoute id="login" /> },
+    { element: <SessionProtectedRoutes />, children: [{ element: <SessionShell />, children:
+      operationalRouteIds.map(id => ({ path: routes[id].path, element: <OperationalScreen id={id} /> })),
+    }] },
+    { path: routes.fallback.path, element: <PublicRoute id="fallback" /> },
+  ],
+}];
+export function createAppRouter() { return createBrowserRouter(appRouteObjects); }
 
 function normalizeSettingsKey(value: string | null | undefined): string | null {
   const normalized = (value ?? '').trim().toLowerCase();
@@ -2363,20 +2396,21 @@ function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
       {isLoading && <LoadingState message="Loading contact detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !contactDetail && <EmptyState message="No contact detail was found." />}
-      {!isLoading && !error && contactDetail && <ContactDetailReadOnly accessToken={accessToken} detail={contactDetail} onDetailChanged={setContactDetail} />}
+      {!isLoading && !error && contactDetail && <ContactDetailReadOnly key={contactDetail.id} accessToken={accessToken} detail={contactDetail} onDetailChanged={setContactDetail} />}
     </DetailShell>
   );
 }
 
 function ContactDetailReadOnly({ accessToken, detail, onDetailChanged }: { accessToken: string | null; detail: ContactDetail; onDetailChanged: (detail: ContactDetail) => void }) {
   const [isEditingDetails, setIsEditingDetails] = useState(false);
-  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
+  const hasEdited = useRef(false);
+  useEffect(() => { if (hasEdited.current && !isEditingDetails) document.getElementById('contact-edit-button')?.focus(); }, [isEditingDetails]);
   return (
     <div className="detail-sections">
       <section aria-labelledby="contact-info-title">
         <div className="section-heading-row">
           <h2 id="contact-info-title">Contact Information</h2>
-          {!isEditingDetails && <ActionButton onClick={() => setIsEditingDetails(true)}>Edit contact</ActionButton>}
+          {!isEditingDetails && <ActionButton id="contact-edit-button" onClick={() => { hasEdited.current = true; setIsEditingDetails(true); }}>Edit contact</ActionButton>}
         </div>
         {isEditingDetails && <ContactDetailsForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingDetails(false); }} onCancel={() => setIsEditingDetails(false)} />}
         <dl className="detail-list">
@@ -2492,11 +2526,26 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
   const [deceased, setDeceased] = useState(detail.deceased);
   const { submitError, setSubmitError, recordContactError, clearContactError, fieldErrors } = useContactFormErrors();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitting = useRef(false);
+  // Opening values mirror this editor's initial fallback/date and submitted trim semantics.
+  const baseline = useRef({
+    name: (detail.name || detail.displayName || '').trim(), firstName: (detail.firstName || '').trim(),
+    lastName: (detail.lastName || '').trim(), address: (detail.address || '').trim(),
+    dateOfBirth: toDateInputValue(detail.dateOfBirth), condition: (detail.condition || '').trim(),
+    deceased: detail.deceased, email: detail.email, phone: detail.phone, phoneExtension: detail.phoneExtension,
+  }).current;
+  const dirty = name.trim() !== baseline.name || firstName.trim() !== baseline.firstName
+    || lastName.trim() !== baseline.lastName || address.trim() !== baseline.address
+    || dateOfBirth !== baseline.dateOfBirth || condition.trim() !== baseline.condition
+    || deceased !== baseline.deceased
+    || contactValueUpdate(email, baseline.email).action !== 'RETAIN'
+    || contactValueUpdate(phone, baseline.phone, phoneExtension, baseline.phoneExtension).action !== 'RETAIN';
+  const protection = useContactDraftProtection({ dirty, pending: isSubmitting, isCurrent: resultIsCurrent, onCancel });
   const hasRequiredName = Boolean(name.trim() || firstName.trim() || lastName.trim());
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!resultIsCurrent()) return;
+    if (!resultIsCurrent() || protection.isDiscarded() || submitting.current) return;
     const form = event.currentTarget;
     if (!hasRequiredName) {
       setSubmitError('Enter a display name, first name, or last name before saving.');
@@ -2507,6 +2556,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
       return;
     }
 
+    submitting.current = true;
     setIsSubmitting(true);
     setSubmitError(null);
     try {
@@ -2522,18 +2572,30 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
         condition: condition.trim() || null,
         deceased,
       });
-      if (!resultIsCurrent()) return;
+      if (!resultIsCurrent() || protection.isDiscarded()) return;
+      // A usable returned snapshot is the authoritative baseline, never an optimistic request copy.
+      const fields = ['name', 'displayName', 'firstName', 'lastName', 'email', 'phone', 'address', 'dateOfBirth', 'condition', 'updatedAt'] as const;
+      if (!updated || updated.id !== detail.id || updated.shaleClientId !== detail.shaleClientId
+        || fields.some(field => updated[field] !== null && typeof updated[field] !== 'string')
+        || typeof updated.deceased !== 'boolean' || typeof updated.client !== 'boolean'
+        || (updated.phoneExtension != null && typeof updated.phoneExtension !== 'string')) {
+        throw new Error('The contact save could not be confirmed. Your changes are kept. Check the contact before submitting again.');
+      }
+      protection.saved();
       onSaved(updated);
     } catch (caught) {
+      if (!resultIsCurrent() || protection.isDiscarded()) return;
       focusContactError(caught, form);
       recordContactError(caught, 'Contact details could not be saved.');
     } finally {
-      setIsSubmitting(false);
+      submitting.current = false;
+      if (resultIsCurrent() && !protection.isDiscarded()) setIsSubmitting(false);
     }
   }
 
   return (
-    <form noValidate className="case-edit-form" onSubmit={handleSubmit}>
+    <>
+    <form noValidate className="case-edit-form" onSubmit={handleSubmit} aria-label="Edit contact">
       <label htmlFor="contact-display-name">Display name</label>
       <input id="contact-display-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="name" maxLength={255} />
       <label htmlFor="contact-first-name">First name</label>
@@ -2543,7 +2605,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
       <label htmlFor="contact-email">Email</label>
       <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="contact-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" baseline={detail.email} />
       <label htmlFor="contact-phone">Phone</label>
-      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="contact-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={detail.phone} baselineExtension={detail.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { setPhone(number); setPhoneExtension(ext); }} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="contact-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={detail.phone} baselineExtension={detail.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { if (!submitting.current && !protection.isDiscarded()) { setPhone(number); setPhoneExtension(ext); } }} />
       <label htmlFor="contact-address-home">Home address</label>
       <textarea id="contact-address-home" value={address} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
       <label htmlFor="contact-date-of-birth">Date of birth</label>
@@ -2554,9 +2616,11 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
       {submitError && <p className="status error" role="alert">{submitError}</p>}
       <div className="form-actions">
         <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Save contact'}</ActionButton>
-        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={protection.cancel}>Cancel</SecondaryButton>
       </div>
     </form>
+    {protection.confirmation}
+    </>
   );
 }
 
@@ -2883,10 +2947,6 @@ function PlaceholderPage({ title }: { title: string }) {
   );
 }
 
-export default function App() {
-  return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
-  );
+export default function App({ router }: { router: ReturnType<typeof createAppRouter> }) {
+  return <RouterProvider router={router} />;
 }
