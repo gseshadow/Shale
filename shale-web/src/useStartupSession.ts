@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, clearAccessToken, getCurrentUser, logout, readAccessToken, storeAccessToken } from './api';
 import type { AuthenticatedUser } from './api';
+import { bindSessionRequests } from './sessionRequests';
 
 export interface AuthState {
   accessToken: string | null;
@@ -40,6 +41,8 @@ async function verifyStartupSession(token: string, controller: AbortController):
 export function useStartupSession() {
   const [authState, setAuthState] = useState<AuthState>({ ...signedOut, verification: 'pending' });
   const [logoutFeedback, setLogoutFeedback] = useState<LogoutFeedback>(null);
+  const [sessionEnded, setSessionEnded] = useState(false);
+  const featureBinding = useRef<(() => void) | null>(null);
   const remoteLogout = useRef<AbortController | null>(null);
   const logoutConsumed = useRef(false);
   const mounted = useRef(false);
@@ -49,10 +52,29 @@ export function useStartupSession() {
 
   function invalidate() {
     generation.current++;
+    featureBinding.current?.();
+    featureBinding.current = null;
     remoteLogout.current?.abort();
     remoteLogout.current = null;
     pending.current?.controller.abort();
     pending.current = null;
+  }
+
+  function establish(token: string, user: AuthenticatedUser) {
+    const attempt = generation.current;
+    featureBinding.current = bindSessionRequests(token,
+      () => mounted.current && generation.current === attempt && readAccessToken() === token,
+      () => {
+        // The seam has already consumed this binding. No remote logout or replay.
+        invalidate();
+        clearAccessToken();
+        setLogoutFeedback(null);
+        setSessionEnded(true);
+        setAuthState(signedOut);
+      });
+    logoutConsumed.current = false;
+    setSessionEnded(false);
+    setAuthState({ accessToken: token, user, verification: null });
   }
 
   async function retry() {
@@ -83,8 +105,7 @@ export function useStartupSession() {
     try {
       const user = await verifyStartupSession(token, controller);
       if (isCurrent()) {
-        logoutConsumed.current = false;
-        setAuthState({ accessToken: token, user, verification: null });
+        establish(token, user);
       }
     } catch (error) {
       if (!isCurrent()) return;
@@ -106,17 +127,19 @@ export function useStartupSession() {
   }, []);
 
   function signIn(accessToken: string, user: AuthenticatedUser) {
+    if (!mounted.current) return;
     invalidate();
     logoutConsumed.current = false;
     setLogoutFeedback(null);
     storeAccessToken(accessToken);
-    setAuthState({ accessToken, user, verification: null });
+    establish(accessToken, user);
   }
 
   function signOut() {
     invalidate();
     clearAccessToken();
     setLogoutFeedback(null);
+    setSessionEnded(false);
     setAuthState(signedOut);
   }
 
@@ -143,5 +166,5 @@ export function useStartupSession() {
     return true;
   }
 
-  return { authState, logoutFeedback, retry, signIn, signOut, logoutSession };
+  return { authState, logoutFeedback, sessionEnded, sessionGeneration: generation.current, retry, signIn, signOut, logoutSession };
 }

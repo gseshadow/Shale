@@ -4,6 +4,7 @@ import { redirectPathFrom } from './returnPath';
 import { operationalRouteIds, routePath, routes } from './app/routeRegistry';
 import type { OperationalRouteId } from './app/routeRegistry';
 import { useStartupSession } from './useStartupSession';
+import { captureSessionRequestGuard } from './sessionRequests';
 import type { AuthState, LogoutFeedback } from './useStartupSession';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, searchCases, searchContacts, searchOrganizations, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
@@ -26,6 +27,15 @@ function focusContactError(error: unknown, form: HTMLFormElement) {
 }
 
 const MISSING_VALUE = '—';
+
+// Guard the consumer continuation too: an API result can be queued immediately
+// before teardown. Old handlers must not navigate or deliver callbacks afterward.
+function useFeatureResultGuard(accessToken: string | null) {
+  const mounted = useRef(false);
+  const sessionIsCurrent = captureSessionRequestGuard(accessToken);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  return () => mounted.current && sessionIsCurrent();
+}
 
 function isMissing(value: string | number | null | undefined): boolean {
   return value === null || value === undefined || String(value).trim() === '';
@@ -103,7 +113,7 @@ function displayNameFor(user: AuthenticatedUser): string {
 function AppRoutes() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { authState, logoutFeedback, retry, signIn: handleLogin, signOut, logoutSession } = useStartupSession();
+  const { authState, logoutFeedback, sessionEnded, sessionGeneration, retry, signIn: handleLogin, signOut, logoutSession } = useStartupSession();
 
   function returnToSignIn() {
     // Replace and clear return state together, as in Phase 3A local logout.
@@ -147,9 +157,9 @@ function AppRoutes() {
       <Route path={routes.root.path} element={authState.user ? <Navigate to={routes.myShale.path} replace /> : <Navigate to={routes.login.path} replace />} />
       <Route
         path={routes.login.path}
-        element={authState.user ? <Navigate to={redirectPathFrom(location.state)} replace state={null} /> : <LoginPage onLogin={handleLogin} logoutFeedback={logoutFeedback} />}
+        element={authState.user ? <Navigate to={redirectPathFrom(location.state)} replace state={null} /> : <LoginPage onLogin={handleLogin} logoutFeedback={logoutFeedback} sessionEnded={sessionEnded} />}
       />
-      <Route element={<ProtectedRoute authState={authState} />}>
+      <Route element={<ProtectedRoute key={sessionGeneration} authState={authState} />}>
         <Route element={<AppShell user={authState.user} onLogout={handleLogout} />}>
           {operationalRouteIds.map(id => <Route key={id} path={routes[id].path} element={screens[id]} />)}
         </Route>
@@ -432,9 +442,11 @@ function ProtectedRoute({ authState }: { authState: AuthState }) {
   return <Outlet />;
 }
 
-function LoginPage({ onLogin, logoutFeedback }: { logoutFeedback: LogoutFeedback; onLogin: (verifiedAccessToken: string, verifiedUser: AuthenticatedUser) => void }) {
+function LoginPage({ onLogin, logoutFeedback, sessionEnded }: { sessionEnded: boolean; logoutFeedback: LogoutFeedback; onLogin: (verifiedAccessToken: string, verifiedUser: AuthenticatedUser) => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { heading.current?.focus(); }, []);
+  const mounted = useRef(false);
+  const submitting = useRef(false);
+  useEffect(() => { mounted.current = true; heading.current?.focus(); return () => { mounted.current = false; }; }, []);
   const [logoutMessage, setLogoutMessage] = useState('');
   useEffect(() => {
     setLogoutMessage(logoutFeedback === 'pending'
@@ -452,19 +464,25 @@ function LoginPage({ onLogin, logoutFeedback }: { logoutFeedback: LogoutFeedback
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
     setError(null);
     setIsSubmitting(true);
 
     try {
       const result = await login(email, password);
+      if (!mounted.current) return;
       const verifiedUser = await getCurrentUser(result.accessToken);
+      if (!mounted.current) return;
       onLogin(result.accessToken, verifiedUser);
       setPassword('');
     } catch (caught) {
+      if (!mounted.current) return;
       clearAccessToken();
       setError(caught instanceof Error ? caught.message : 'Login failed.');
     } finally {
-      setIsSubmitting(false);
+      submitting.current = false;
+      if (mounted.current) setIsSubmitting(false);
     }
   }
 
@@ -473,6 +491,7 @@ function LoginPage({ onLogin, logoutFeedback }: { logoutFeedback: LogoutFeedback
       <section className="login-panel" aria-labelledby="login-title">
         <p className="eyebrow">Shale Web</p>
         <h1 id="login-title" ref={heading} tabIndex={-1}>Sign in</h1>
+        {sessionEnded && <Feedback kind="error">Your Shale session ended. Sign in again to continue. Unsaved form changes were discarded. A submitted change may have been saved; check its outcome before submitting again.</Feedback>}
         <Feedback kind={logoutFeedback === 'confirmed' ? 'success' : logoutFeedback === 'unavailable' ? 'unavailable' : 'info'} aria-live="polite" aria-atomic="true">{logoutMessage}</Feedback>
         <p className="lede">Use your Shale account to access the web application shell.</p>
         <form onSubmit={handleSubmit}>
@@ -614,11 +633,13 @@ function mergeCompletedTask(tasks: CaseTaskListItem[], completedTask: TaskDetail
 }
 
 function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError, presentation = 'legacy' }: { presentation?: 'legacy' | 'shared'; tasks: CaseTaskListItem[]; allTasks?: CaseTaskListItem[]; accessToken: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onError: (message: string | null) => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const navigate = useNavigate();
   const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
   const [completionStatus, setCompletionStatus] = useState('');
 
   async function handleCompleteTask(task: CaseTaskListItem) {
+    if (!resultIsCurrent()) return;
     if (!accessToken) {
       onError('Your Shale session is not available. Please sign in again.');
       return;
@@ -628,6 +649,7 @@ function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError, pr
     onError(null);
     try {
       const completedTask = await completeTask(accessToken, task.id);
+      if (!resultIsCurrent()) return;
       onTasksChanged(mergeCompletedTask(allTasks ?? tasks, completedTask));
       if (presentation === 'shared') setCompletionStatus(completedTask.completedAt
         ? `Completed ${displayValue(task.title, `Task ${task.id}`)}.` : '');
@@ -734,6 +756,7 @@ function TasksPage({ accessToken }: { accessToken: string | null }) {
 }
 
 function CasesPage({ accessToken }: { accessToken: string | null }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CaseSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -744,6 +767,7 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
 
   async function handleSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    if (!resultIsCurrent()) return;
     const trimmedQuery = query.trim();
 
     if (!trimmedQuery) {
@@ -766,6 +790,7 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
 
     try {
       const searchResults = await searchCases(accessToken, trimmedQuery);
+      if (!resultIsCurrent()) return;
       setResults(searchResults);
     } catch (caught) {
       setResults([]);
@@ -801,6 +826,7 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
 }
 
 function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string | null; onCancel: () => void; onCreated: (created: CaseDetail) => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [practiceAreas, setPracticeAreas] = useState<PracticeAreaSetting[]>([]);
   const [attorneys, setAttorneys] = useState<TeamMemberSummary[]>([]);
   const [caseName, setCaseName] = useState('');
@@ -834,6 +860,7 @@ function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     const selectedPracticeAreaId = Number(practiceAreaId);
     const selectedAttorneyId = Number(responsibleAttorneyUserId);
     if (!caseName.trim()) {
@@ -870,6 +897,7 @@ function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string
         summary: summary.trim() || null,
         description: description.trim() || null,
       });
+      if (!resultIsCurrent()) return;
       onCreated(created);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Case could not be created.');
@@ -931,6 +959,7 @@ function CaseResultsList({ results }: { results: CaseSearchResult[] }) {
 }
 
 function ContactsPage({ accessToken }: { accessToken: string | null }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ContactSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -941,6 +970,7 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
 
   async function handleSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    if (!resultIsCurrent()) return;
     const trimmedQuery = query.trim();
 
     if (!trimmedQuery) {
@@ -963,6 +993,7 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
 
     try {
       const searchResults = await searchContacts(accessToken, trimmedQuery);
+      if (!resultIsCurrent()) return;
       setResults(searchResults);
     } catch (caught) {
       setResults([]);
@@ -1033,6 +1064,7 @@ function ContactResultsList({ results }: { results: ContactSearchResult[] }) {
 }
 
 function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const navigate = useNavigate();
   const [isCreating, setIsCreating] = useState(false);
   const [query, setQuery] = useState('');
@@ -1043,6 +1075,7 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
 
   async function handleSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    if (!resultIsCurrent()) return;
     const trimmedQuery = query.trim();
 
     if (!trimmedQuery) {
@@ -1065,6 +1098,7 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
 
     try {
       const searchResults = await searchOrganizations(accessToken, trimmedQuery);
+      if (!resultIsCurrent()) return;
       setResults(searchResults);
     } catch (caught) {
       setResults([]);
@@ -1417,6 +1451,7 @@ function TaskDetailReadOnly({ accessToken, detail, isEditing, onEdit, onCancel, 
 }
 
 function TaskEditForm({ accessToken, detail, onCancel, onTaskChanged, onError }: { accessToken: string | null; detail: TaskDetail; onCancel: () => void; onTaskChanged: (detail: TaskDetail) => void; onError: (message: string | null) => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [title, setTitle] = useState(detail.title ?? '');
   const [description, setDescription] = useState(detail.description ?? '');
   const [dueDate, setDueDate] = useState(toDateInputValue(detail.dueAt));
@@ -1455,6 +1490,7 @@ function TaskEditForm({ accessToken, detail, onCancel, onTaskChanged, onError }:
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     setSubmitError(null);
     onError(null);
     const safeTitle = title.trim();
@@ -1485,6 +1521,7 @@ function TaskEditForm({ accessToken, detail, onCancel, onTaskChanged, onError }:
         priorityId: selectedPriorityId,
         assignedUserId: selectedAssignedUserId,
       });
+      if (!resultIsCurrent()) return;
       onTaskChanged(updated);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Task detail could not be updated.');
@@ -1691,6 +1728,7 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
 }
 
 function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [practiceAreas, setPracticeAreas] = useState<PracticeAreaSetting[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberSummary[]>([]);
   const [practiceAreaId, setPracticeAreaId] = useState(detail.practiceAreaId ? String(detail.practiceAreaId) : '');
@@ -1726,6 +1764,7 @@ function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { access
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     if (!accessToken) {
       setSubmitError('Your Shale session is not available. Please sign in again.');
       return;
@@ -1748,6 +1787,7 @@ function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { access
         practiceAreaId: selectedPracticeAreaId,
         responsibleAttorneyUserId: selectedAttorneyId,
       });
+      if (!resultIsCurrent()) return;
       onSaved(updated);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Case assignment could not be saved.');
@@ -1780,6 +1820,7 @@ function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { access
 }
 
 function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const solAvailable = mappedCaseDateAvailable(detail, 'statute_of_limitations');
   const tortAvailable = mappedCaseDateAvailable(detail, 'tort_notice_deadline');
   const [caseName, setCaseName] = useState(detail.caseName || '');
@@ -1794,6 +1835,7 @@ function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { acces
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     if (!trimmedCaseName) {
       setSubmitError('Enter a case name before saving.');
       return;
@@ -1822,6 +1864,7 @@ function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { acces
           return edited === undefined ? date : { ...date, startsAt: edited ? `${edited}T00:00:00` : null, endsAt: null, allDay: true };
         }),
       });
+      if (!resultIsCurrent()) return;
       onSaved(updated);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Case details could not be saved.');
@@ -1926,6 +1969,7 @@ function StatusTimelineSection({ accessToken, detail, history, onDetailChanged }
 }
 
 function CaseStatusEditForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const currentStatusId = detail.statusHistory?.find((item) => item.current || !item.endDate)?.statusId ?? null;
   const [statuses, setStatuses] = useState<CaseStatusSetting[]>([]);
   const [selectedStatusId, setSelectedStatusId] = useState(currentStatusId == null ? '' : String(currentStatusId));
@@ -1951,6 +1995,7 @@ function CaseStatusEditForm({ accessToken, detail, onSaved, onCancel }: { access
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     const numericStatusId = Number(selectedStatusId);
     if (!Number.isInteger(numericStatusId) || numericStatusId <= 0) {
       setSubmitError('Choose a status before saving.');
@@ -1964,6 +2009,7 @@ function CaseStatusEditForm({ accessToken, detail, onSaved, onCancel }: { access
     setSubmitError(null);
     try {
       const updated = await updateCaseStatus(accessToken, detail.caseId, numericStatusId);
+      if (!resultIsCurrent()) return;
       onSaved(updated);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Case status could not be saved.');
@@ -2010,6 +2056,7 @@ function normalizeStatusColor(color: string | null | undefined): string {
 }
 
 function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, onTasksError }: { accessToken: string | null; caseId: number; tasks: CaseTaskListItem[]; error: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const navigate = useNavigate();
   const [isAdding, setIsAdding] = useState(false);
   const [title, setTitle] = useState('');
@@ -2030,6 +2077,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
   }
 
   async function handleCompleteTask(task: CaseTaskListItem) {
+    if (!resultIsCurrent()) return;
     if (!accessToken) {
       setSubmitError('Your Shale session is not available. Please sign in again.');
       return;
@@ -2038,6 +2086,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
     setSubmitError(null);
     try {
       const completedTask = await completeTask(accessToken, task.id);
+      if (!resultIsCurrent()) return;
       onTasksChanged(mergeCompletedTask(tasks, completedTask));
       onTasksError(null);
     } catch (caught) {
@@ -2049,6 +2098,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     if (!trimmedTitle) {
       setSubmitError('Enter a task title before saving.');
       return;
@@ -2066,6 +2116,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
         description: trimmedDescription || undefined,
         dueDate: dueDate || undefined,
       });
+      if (!resultIsCurrent()) return;
       onTasksChanged(refreshedTasks);
       onTasksError(null);
       resetForm();
@@ -2149,6 +2200,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
 }
 
 function CaseUpdatesSection({ accessToken, caseId, updates, error, onUpdatesChanged, onUpdatesError }: { accessToken: string | null; caseId: number; updates: CaseUpdate[]; error: string | null; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [isAdding, setIsAdding] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -2163,6 +2215,7 @@ function CaseUpdatesSection({ accessToken, caseId, updates, error, onUpdatesChan
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     if (!trimmedNote) {
       setSubmitError('Enter an update before saving.');
       return;
@@ -2176,6 +2229,7 @@ function CaseUpdatesSection({ accessToken, caseId, updates, error, onUpdatesChan
     setSubmitError(null);
     try {
       const refreshedUpdates = await addCaseUpdate(accessToken, caseId, trimmedNote);
+      if (!resultIsCurrent()) return;
       onUpdatesChanged(refreshedUpdates);
       onUpdatesError(null);
       resetForm();
@@ -2343,6 +2397,7 @@ function ContactDetailReadOnly({ accessToken, detail, onDetailChanged }: { acces
 }
 
 function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: string | null; onCreated: (detail: ContactDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [name, setName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -2359,6 +2414,7 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     const form = event.currentTarget;
     if (!hasRequiredName) {
       setSubmitError('Enter a display name, first name, or last name before saving.');
@@ -2384,6 +2440,7 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
         condition: condition.trim() || null,
         deceased,
       });
+      if (!resultIsCurrent()) return;
       onCreated(created);
     } catch (caught) {
       focusContactError(caught, form);
@@ -2422,6 +2479,7 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
 }
 
 function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: ContactDetail; onSaved: (detail: ContactDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [name, setName] = useState(detail.name || detail.displayName || '');
   const [firstName, setFirstName] = useState(detail.firstName || '');
   const [lastName, setLastName] = useState(detail.lastName || '');
@@ -2438,6 +2496,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     const form = event.currentTarget;
     if (!hasRequiredName) {
       setSubmitError('Enter a display name, first name, or last name before saving.');
@@ -2463,6 +2522,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
         condition: condition.trim() || null,
         deceased,
       });
+      if (!resultIsCurrent()) return;
       onSaved(updated);
     } catch (caught) {
       focusContactError(caught, form);
@@ -2501,6 +2561,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
 }
 
 function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessToken: string | null; onCreated: (detail: OrganizationDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [phoneExtension, setPhoneExtension] = useState('');
@@ -2521,6 +2582,7 @@ function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessTo
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     const form = event.currentTarget;
     if (!hasRequiredName) {
       setSubmitError('Enter an organization name before saving.');
@@ -2550,6 +2612,7 @@ function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessTo
         country: country.trim() || null,
         notes: notes.trim() || null,
       });
+      if (!resultIsCurrent()) return;
       onCreated(created);
     } catch (caught) {
       focusContactError(caught, form);
@@ -2681,6 +2744,7 @@ function OrganizationDetailReadOnly({ accessToken, detail, onDetailChanged }: { 
 }
 
 function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: OrganizationDetail; onSaved: (detail: OrganizationDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [name, setName] = useState(detail.name || '');
   const [phone, setPhone] = useState(detail.phone || '');
   const [phoneExtension, setPhoneExtension] = useState(detail.phoneExtension || '');
@@ -2701,6 +2765,7 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     const form = event.currentTarget;
     if (!hasRequiredName) {
       setSubmitError('Enter an organization name before saving.');
@@ -2729,6 +2794,7 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
         country: country.trim() || null,
         notes: notes.trim() || null,
       });
+      if (!resultIsCurrent()) return;
       onSaved(updated);
     } catch (caught) {
       focusContactError(caught, form);
