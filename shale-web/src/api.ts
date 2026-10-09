@@ -389,9 +389,11 @@ export function clearAccessToken(): void {
   browserCredentialStore.clear();
 }
 
-export async function login(email: string, password: string): Promise<LoginResponse> {
+export async function login(email: string, password: string, signal?: AbortSignal): Promise<LoginResponse> {
   const response = await fetch(`${apiBaseUrl()}/api/auth/login`, {
     method: 'POST',
+    signal,
+    redirect: 'error',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
@@ -400,10 +402,21 @@ export async function login(email: string, password: string): Promise<LoginRespo
   });
 
   if (!response.ok) {
-    throw new ApiError('The email or password was not accepted by Shale.', response.status);
+    // AuthController.login uses 401 for its generic invalid_credentials contract.
+    // Validation, throttling and server failures do not establish bad credentials.
+    throw new ApiError(response.status === 401
+      ? 'The email or password was not accepted by Shale.'
+      : 'Shale could not confirm sign-in.', response.status);
   }
 
-  return response.json() as Promise<LoginResponse>;
+  const body: unknown = await response.json();
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ApiError('Shale returned an unusable sign-in response.', response.status);
+  const result = body as Record<string, unknown>;
+  if (result.authenticated !== true || result.tokenType !== 'Bearer'
+    || typeof result.accessToken !== 'string' || !result.accessToken || /\s|[\u0000-\u001f\u007f]/.test(result.accessToken)
+    || !Number.isSafeInteger(result.expiresInSeconds) || (result.expiresInSeconds as number) <= 0
+    || !isAuthenticatedUser(result.user)) throw new ApiError('Shale returned an unusable sign-in response.', response.status);
+  return body as LoginResponse;
 }
 
 export async function getCurrentUser(accessToken: string, signal?: AbortSignal): Promise<AuthenticatedUser> {

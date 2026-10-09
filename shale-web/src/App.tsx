@@ -5,12 +5,11 @@ import { operationalRouteIds, routePath, routes } from './app/routeRegistry';
 import type { RouteObject } from 'react-router-dom';
 import { useDetailDraftProtection } from './DetailDraftProtection';
 import type { OperationalRouteId } from './app/routeRegistry';
-import { CredentialStorageError } from './credentialStore';
 import { useStartupSession } from './useStartupSession';
 import { captureSessionRequestGuard } from './sessionRequests';
 import type { AuthState, LogoutFeedback } from './useStartupSession';
 import { createBrowserRouter, RouterProvider, Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, searchCases, searchContacts, searchOrganizations, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, getCaseDetail, getContactDetail, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, searchCases, searchContacts, searchOrganizations, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import { ApiError, contactValueUpdate } from './api';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
 import { Button, Feedback, SectionRegion, PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
@@ -181,11 +180,11 @@ function SessionShell() {
   return <AppShell user={authState.user} onLogout={handleLogout} />;
 }
 function PublicRoute({ id }: { id: 'root' | 'login' | 'fallback' }) {
-  const { authState, logoutFeedback, sessionEnded, storageFeedback, signIn, loginFailed } = useAppSession();
+  const { authState, logoutFeedback, sessionEnded, storageFeedback, signInWithCredentials } = useAppSession();
   const location = useLocation();
   if (id === 'login') return authState.user
     ? <Navigate to={redirectPathFrom(location.state)} replace state={null} />
-    : <LoginPage onLoginFailed={loginFailed} storageFeedback={storageFeedback} onLogin={signIn} logoutFeedback={logoutFeedback} sessionEnded={sessionEnded} />;
+    : <LoginPage storageFeedback={storageFeedback} onLogin={signInWithCredentials} logoutFeedback={logoutFeedback} sessionEnded={sessionEnded} />;
   return <Navigate to={authState.user ? routes.myShale.path : routes.login.path} replace />;
 }
 
@@ -476,11 +475,12 @@ function ProtectedRoute({ authState }: { authState: AuthState }) {
   return <Outlet />;
 }
 
-function LoginPage({ onLogin, logoutFeedback, sessionEnded, storageFeedback, onLoginFailed }: { onLoginFailed: () => void; storageFeedback: string | null; sessionEnded: boolean; logoutFeedback: LogoutFeedback; onLogin: (verifiedAccessToken: string, verifiedUser: AuthenticatedUser) => void }) {
+function LoginPage({ onLogin, logoutFeedback, sessionEnded, storageFeedback }: { storageFeedback: string | null; sessionEnded: boolean; logoutFeedback: LogoutFeedback; onLogin: (email: string, password: string, signal: AbortSignal) => Promise<boolean> }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const mounted = useRef(false);
   const submitting = useRef(false);
-  useEffect(() => { mounted.current = true; heading.current?.focus(); return () => { mounted.current = false; }; }, []);
+  const pendingLogin = useRef<AbortController | null>(null);
+  useEffect(() => { mounted.current = true; heading.current?.focus(); return () => { mounted.current = false; pendingLogin.current?.abort(); }; }, []);
   const [logoutMessage, setLogoutMessage] = useState('');
   useEffect(() => {
     setLogoutMessage(logoutFeedback === 'pending'
@@ -500,24 +500,25 @@ function LoginPage({ onLogin, logoutFeedback, sessionEnded, storageFeedback, onL
     event.preventDefault();
     if (submitting.current) return;
     submitting.current = true;
+    const controller = new AbortController();
+    pendingLogin.current = controller;
     setError(null);
     setIsSubmitting(true);
 
     try {
-      const result = await login(email, password);
-      if (!mounted.current) return;
-      const verifiedUser = await getCurrentUser(result.accessToken);
-      if (!mounted.current) return;
-      onLogin(result.accessToken, verifiedUser);
-      setPassword('');
+      const installed = await onLogin(email, password, controller.signal);
+      if (!mounted.current || pendingLogin.current !== controller) return;
+      if (installed) setPassword('');
+      else setError('Sign-in was cancelled because this attempt is no longer active. You are not signed in by this attempt.');
     } catch (caught) {
-      if (!mounted.current) return;
-      // Persistence failures have already torn down through the session owner.
-      if (!(caught instanceof CredentialStorageError)) onLoginFailed();
-      setError(caught instanceof Error ? caught.message : 'Login failed.');
+      if (!mounted.current || pendingLogin.current !== controller) return;
+      setError(caught instanceof Error ? caught.message : 'Shale could not confirm sign-in.');
     } finally {
-      submitting.current = false;
-      if (mounted.current) setIsSubmitting(false);
+      if (pendingLogin.current === controller) {
+        pendingLogin.current = null;
+        submitting.current = false;
+        if (mounted.current) setIsSubmitting(false);
+      }
     }
   }
 

@@ -58,7 +58,9 @@ describe('authenticated responsive shell composition', () => {
   it('keeps task completion authoritative and separate from native card navigation', async () => {
     vi.mocked(api.listAssignedTasks).mockResolvedValue([{ id: 12, caseId: 1, title: 'Synthetic task', caseName: 'Example', priorityId: null, dueAt: null, completedAt: null }]);
     vi.mocked(api.completeTask).mockResolvedValue({ id: 12, completedAt: '2026-10-08T10:00:00' } as api.TaskDetail);
-    beta('/my-shale'); fireEvent.click(await screen.findByRole('button', { name: 'Complete' }));
+    beta('/my-shale'); const complete = await screen.findByRole('button', { name: 'Complete' });
+    await act(async () => {}); // Flush the mounted consumer guard before synthetic activation.
+    fireEvent.click(complete);
     await waitFor(() => expect(api.completeTask).toHaveBeenCalledWith('test-token', 12));
     expect(window.location.pathname).toBe('/my-shale'); expect(api.getTaskDetail).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Open task Synthetic task' }));
@@ -121,7 +123,7 @@ describe('authenticated responsive shell composition', () => {
   });
   it('preserves confirmed rejection and successful login contracts', async () => {
     vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new api.ApiError('Synthetic rejection', 401));
-    vi.mocked(api.login).mockResolvedValue({ accessToken: 'new-test-token' } as api.LoginResponse);
+    vi.mocked(api.login).mockResolvedValue({ authenticated: true, tokenType: 'Bearer', expiresInSeconds: 3600, user, accessToken: 'new-test-token' });
     beta('/contacts/7');
     await screen.findByRole('heading', { name: 'Sign in' });
     expect(browserCredentialStore.clear).toHaveBeenCalledTimes(1); expect(screen.queryByRole('navigation')).toBeNull();
@@ -130,7 +132,7 @@ describe('authenticated responsive shell composition', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'synthetic-password' } });
     fireEvent.submit(screen.getByRole('button', { name: 'Sign in' }).closest('form')!);
     await screen.findByRole('heading', { name: 'Contact Detail', level: 1 });
-    expect(api.getCurrentUser).toHaveBeenLastCalledWith('new-test-token');
+    expect(api.getCurrentUser).toHaveBeenLastCalledWith('new-test-token', expect.any(AbortSignal));
     expect(browserCredentialStore.store).toHaveBeenCalledWith('new-test-token');
     await waitFor(() => expect(api.getContactDetail).toHaveBeenCalledWith('new-test-token', 7));
   });
@@ -247,7 +249,7 @@ describe('startup verification recovery', () => {
   });
   it('explicit return drops the old target, while historical Back remains protected', async () => {
     vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new TypeError('Synthetic offline'));
-    vi.mocked(api.login).mockResolvedValue({ accessToken: 'new-test-token' } as api.LoginResponse);
+    vi.mocked(api.login).mockResolvedValue({ authenticated: true, tokenType: 'Bearer', expiresInSeconds: 3600, user, accessToken: 'new-test-token' });
     window.history.replaceState({}, '', '/tasks/7?status=open#activity');
     window.history.pushState({}, '', '/contacts/7?sort=name#profile'); render(<App router={testRouter()} />);
     await screen.findByRole('alert'); fireEvent.click(screen.getByRole('button', { name: 'Return to sign in' }));
@@ -270,7 +272,7 @@ function loginAt(state: unknown) {
 describe('verified login return restoration', () => {
   beforeEach(() => {
     vi.mocked(browserCredentialStore.read).mockReturnValue(null);
-    vi.mocked(api.login).mockResolvedValue({ accessToken: 'new-test-token' } as api.LoginResponse);
+    vi.mocked(api.login).mockResolvedValue({ authenticated: true, tokenType: 'Bearer', expiresInSeconds: 3600, user, accessToken: 'new-test-token' });
   });
   it.each([
     ['/cases/7?page=2#details', 'Case Detail', api.getCaseDetail],
@@ -283,7 +285,7 @@ describe('verified login return restoration', () => {
     expect(window.location.pathname).toBe('/login'); expect(detail).not.toHaveBeenCalled();
     expect(window.history.state.usr.from.pathname).toBe(path.split('?')[0]);
     const historyLength = window.history.length;
-    submitLogin(); await waitFor(() => expect(api.getCurrentUser).toHaveBeenCalledWith('new-test-token'));
+    submitLogin(); await waitFor(() => expect(api.getCurrentUser).toHaveBeenCalledWith('new-test-token', expect.any(AbortSignal)));
     expect(window.location.pathname).toBe('/login'); expect(browserCredentialStore.store).not.toHaveBeenCalled();
     expect(detail).not.toHaveBeenCalled(); verify(user);
     await screen.findByRole('heading', { name: heading, level: 1 });
@@ -293,8 +295,8 @@ describe('verified login return restoration', () => {
     expect(api.listAssignedCases).not.toHaveBeenCalled();
   });
   it.each(['credentials', 'verification'])('preserves return state through failed %s then succeeds', async failure => {
-    if (failure === 'credentials') vi.mocked(api.login).mockRejectedValueOnce(new Error('Synthetic credentials rejected'));
-    else vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new Error('Synthetic verification rejected'));
+    if (failure === 'credentials') vi.mocked(api.login).mockRejectedValueOnce(new api.ApiError('Synthetic credentials rejected', 401));
+    else vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new api.ApiError('Synthetic verification rejected', 401));
     beta('/tasks/7?status=open#activity'); await screen.findByRole('heading', { name: 'Sign in' });
     const returnState = window.history.state.usr;
     submitLogin(); await screen.findByRole('alert');
@@ -449,7 +451,7 @@ describe('My Shale shared presentation adoption', () => {
 
 describe('truthful signed-out feedback', () => {
   function signInAgain() {
-    vi.mocked(api.login).mockResolvedValue({ accessToken: 'synthetic-new-login' } as api.LoginResponse);
+    vi.mocked(api.login).mockResolvedValue({ authenticated: true, tokenType: 'Bearer', expiresInSeconds: 3600, user, accessToken: 'synthetic-new-login' });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.invalid' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'synthetic-password' } });
     fireEvent.submit(screen.getByRole('button', { name: 'Sign in' }).closest('form')!);
@@ -489,11 +491,11 @@ describe('truthful signed-out feedback', () => {
     beta('/my-shale'); await screen.findByRole('heading', { name: 'My Shale', level: 1 });
     fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
     await screen.findByText(/server confirmed revocation/);
-    vi.mocked(api.login).mockRejectedValueOnce(new Error('Synthetic credentials rejected'));
+    vi.mocked(api.login).mockRejectedValueOnce(new api.ApiError('Synthetic credentials rejected', 401));
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'synthetic@example.invalid' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'synthetic-password' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    await screen.findByText('Synthetic credentials rejected');
+    await screen.findByText('The email or password was not accepted by Shale.');
     expect(screen.getByText(/server confirmed revocation/)).toBeTruthy();
     expect(screen.queryByRole('navigation')).toBeNull();
   });

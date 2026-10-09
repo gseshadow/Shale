@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ApiError, getCurrentUser, logout } from './api';
+import { ApiError, getCurrentUser, login, logout } from './api';
+import { SessionAttemptTimedOut, withSessionDeadline } from './sessionDeadline';
 import { browserCredentialStore, CredentialStorageError } from './credentialStore';
 import type { CredentialStore } from './credentialStore';
 import type { AuthenticatedUser } from './api';
@@ -16,28 +17,10 @@ const signedOut: AuthState = { accessToken: null, user: null, verification: null
 export type LogoutFeedback = 'pending' | 'confirmed' | 'unavailable' | null;
 
 // Match the existing logout deadline: eight seconds for fetch AND body processing.
-// Only startup/explicit Retry opt in; credential login keeps its existing policy.
 export const STARTUP_VERIFICATION_TIMEOUT_MS = 8_000;
-async function verifyStartupSession(token: string, controller: AbortController): Promise<AuthenticatedUser> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let cancel!: () => void;
-  const cancelled = new Promise<never>((_resolve, reject) => {
-    cancel = () => {
-      clearTimeout(timer);
-      reject(new Error('Session verification is unavailable.'));
-    };
-    timer = setTimeout(() => { cancel(); controller.abort(); }, STARTUP_VERIFICATION_TIMEOUT_MS);
-  });
-  controller.signal.addEventListener('abort', cancel, { once: true });
-  try {
-    if (controller.signal.aborted) { cancel(); return await cancelled; }
-    // Racing the entire parsed/validated result also consumes ignored-abort late settlements.
-    return await Promise.race([getCurrentUser(token, controller.signal), cancelled]);
-  } finally {
-    clearTimeout(timer);
-    controller.signal.removeEventListener('abort', cancel);
-  }
-}
+// Login POST and subsequent /me share eight seconds; neither stage resets it.
+export const CREDENTIAL_LOGIN_TIMEOUT_MS = 8_000;
+export const SIGN_IN_UNCONFIRMED = 'Shale could not confirm sign-in. You are not signed in in this tab. A server session may have been created and may still be active. You can try signing in again.';
 
 // Startup recovery and the established-session sign-out boundary share invalidation.
 export function useStartupSession(credentialStore: CredentialStore = browserCredentialStore) {
@@ -52,10 +35,13 @@ export function useStartupSession(credentialStore: CredentialStore = browserCred
   const mounted = useRef(false);
   const generation = useRef(0);
   const pending = useRef<{ token: string; controller: AbortController } | null>(null);
+  const credentialAttempt = useRef<AbortController | null>(null);
   const renderedGeneration = generation.current;
 
   function invalidate() {
     generation.current++;
+    credentialAttempt.current?.abort();
+    credentialAttempt.current = null;
     featureBinding.current?.();
     featureBinding.current = null;
     remoteLogout.current?.abort();
@@ -140,7 +126,8 @@ export function useStartupSession(credentialStore: CredentialStore = browserCred
     }
 
     try {
-      const user = await verifyStartupSession(token, controller);
+      const user = await withSessionDeadline(controller, STARTUP_VERIFICATION_TIMEOUT_MS,
+        () => getCurrentUser(token, controller.signal));
       if (isCurrent()) {
         establish(token, user);
       }
@@ -185,6 +172,68 @@ export function useStartupSession(credentialStore: CredentialStore = browserCred
     if (mounted.current) clearCredential();
   }
 
+  async function signInWithCredentials(email: string, password: string, signal: AbortSignal): Promise<boolean> {
+    if (!mounted.current || featureBinding.current || authState.user || signal.aborted || credentialAttempt.current) return false;
+    let previousCredential: string | null;
+    try { previousCredential = credentialStore.read(); }
+    catch { throw new CredentialStorageError('read'); }
+    invalidate();
+    const attempt = generation.current;
+    const controller = new AbortController();
+    const deadline = performance.now() + CREDENTIAL_LOGIN_TIMEOUT_MS;
+    credentialAttempt.current = controller;
+    const cancel = () => controller.abort();
+    signal.addEventListener('abort', cancel, { once: true });
+    function isCurrent() {
+      if (!mounted.current || generation.current !== attempt || credentialAttempt.current !== controller) return false;
+      try { return credentialStore.read() === previousCredential; }
+      catch {
+        signOut();
+        setStorageFeedback(new CredentialStorageError('read').message);
+        return false;
+      }
+    }
+    let verifying = false;
+    try {
+      const verified = await withSessionDeadline(controller, CREDENTIAL_LOGIN_TIMEOUT_MS, async assertActive => {
+        const result = await login(email, password, controller.signal);
+        assertActive();
+        if (!isCurrent()) { controller.abort(); return null; }
+        verifying = true;
+        const user = await getCurrentUser(result.accessToken, controller.signal);
+        assertActive();
+        if (!isCurrent()) { controller.abort(); return null; }
+        if (user.userId !== result.user.userId || user.shaleClientId !== result.user.shaleClientId) {
+          throw new Error('Unusable identity.');
+        }
+        return { accessToken: result.accessToken, user };
+      });
+      if (!verified || !isCurrent() || signal.aborted) return false;
+      if (performance.now() >= deadline) throw new SessionAttemptTimedOut();
+      // The exchange and timer are finished; install only under current authority.
+      credentialAttempt.current = null;
+      signIn(verified.accessToken, verified.user);
+      return true;
+    } catch (error) {
+      // Storage installation owns its teardown; every other failure needs current authority.
+      if (error instanceof CredentialStorageError) throw error;
+      if (!isCurrent() || signal.aborted) return false;
+      loginFailed();
+      if (!verifying && error instanceof ApiError && error.status === 401) {
+        throw new Error('The email or password was not accepted by Shale.');
+      }
+      if (verifying && error instanceof ApiError && error.status === 401) {
+        throw new Error('Shale rejected the new session during verification. You are not signed in. Sign in again to continue.');
+      }
+      throw new Error(error instanceof SessionAttemptTimedOut
+        ? `Sign-in timed out. ${SIGN_IN_UNCONFIRMED}` : SIGN_IN_UNCONFIRMED);
+    } finally {
+      signal.removeEventListener('abort', cancel);
+      if (credentialAttempt.current === controller) credentialAttempt.current = null;
+      controller.abort();
+    }
+  }
+
   function signOut() {
     invalidate();
     clearCredential();
@@ -195,6 +244,11 @@ export function useStartupSession(credentialStore: CredentialStore = browserCred
 
   function logoutSession(): boolean {
     const token = authState.accessToken;
+    if (mounted.current && !token && credentialAttempt.current) {
+      // Ending an unverified attempt is local only; no captured bearer to revoke.
+      signOut();
+      return true;
+    }
     if (!mounted.current || !token || logoutConsumed.current || generation.current !== renderedGeneration) return false;
     logoutConsumed.current = true; // Synchronous: a stale handler cannot activate twice.
     signOut();
@@ -217,5 +271,5 @@ export function useStartupSession(credentialStore: CredentialStore = browserCred
     return true;
   }
 
-  return { authState, storageFeedback, logoutFeedback, sessionEnded, sessionGeneration: generation.current, retry, signIn, loginFailed, signOut, logoutSession };
+  return { authState, storageFeedback, logoutFeedback, sessionEnded, sessionGeneration: generation.current, retry, signIn, signInWithCredentials, loginFailed, signOut, logoutSession };
 }
