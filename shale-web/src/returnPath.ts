@@ -1,13 +1,7 @@
-import { matchPath } from 'react-router-dom';
+import { isSafeReturnRoute, routes } from './app/routeRegistry';
 
 // Router-relative paths: App uses BrowserRouter without a basename; Vite uses its root base.
-// Keep this allowlist aligned with the protected route declarations in AppRoutes.
-const protectedPaths = [
-  '/my-shale', '/cases', '/cases/:caseId', '/tasks', '/tasks/:taskId',
-  '/contacts', '/contacts/:contactId', '/organizations', '/organizations/:organizationId',
-  '/team', '/team/:userId', '/settings',
-];
-const defaultPath = '/my-shale';
+const defaultPath = routes.myShale.path;
 
 export function redirectPathFrom(state: unknown): string {
   if (!state || typeof state !== 'object' || !('from' in state)) return defaultPath;
@@ -28,7 +22,7 @@ export function redirectPathFrom(state: unknown): string {
     if (decodedPath.split('/').some(segment => segment === '.' || segment === '..')) return defaultPath;
     const url = new URL(pathname + search + hash, 'https://shale.invalid');
     if (url.origin !== 'https://shale.invalid' || url.pathname !== pathname) return defaultPath;
-    if (!protectedPaths.some(path => matchPath({ path, end: true }, pathname))) return defaultPath;
+    if (!isSafeReturnRoute(pathname)) return defaultPath;
     return pathname + search + hash;
   } catch {
     return defaultPath;

@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ResponsiveShell } from '../shell/ResponsiveShell';
-import { activeDestination, foundationUrl } from '../shell/navigation';
+import { foundationUrl, previewNavigation } from './navigation';
+import { routes } from '../app/routeRegistry';
 import { Button, EntityCard, EntityList, Feedback, Field, MetadataGrid, MetadataRow, NavigationButton, PageHeader, SectionRegion, StatusPill, ToolbarActions } from '../ui/primitives';
 import '../ui/foundation.css';
 import '../shell/shell.css';
@@ -9,8 +10,8 @@ import './preview.css';
 
 export function FoundationPreview() {
   const location = useLocation();
-  const path = new URLSearchParams(location.search).get('destination') ?? '/my-shale';
-  const destination = activeDestination(path);
+  const path = new URLSearchParams(location.search).get('destination') ?? routes.myShale.path;
+  const destination = previewNavigation.activeDestination(path);
   const [theme, setTheme] = useState('light');
   const [selected, setSelected] = useState(true);
   const [contactSelected, setContactSelected] = useState(false);
@@ -20,7 +21,7 @@ export function FoundationPreview() {
   const form = useRef<HTMLFormElement>(null);
   const title = destination?.label ?? 'Unavailable destination';
   return <div className="shale-foundation" data-theme={theme}>
-    <ResponsiveShell path={path} linkTo={foundationUrl} caption="Foundation preview" identity={<><strong>Synthetic workspace</strong><p>No account connected</p></>}
+    <ResponsiveShell path={path} navigationAdapter={previewNavigation} caption="Foundation preview" identity={<><strong>Synthetic workspace</strong><p>No account connected</p></>}
       utilities={<><label htmlFor="preview-theme">Preview theme</label><select id="preview-theme" value={theme} onChange={event => setTheme(event.target.value)}><option value="light">Light</option><option value="dark">Dark</option></select></>}>
       <section className="foundation-gallery" aria-labelledby="foundation-title">
         <PageHeader eyebrow="Web V2 · Phase 2A" title={title} titleId="foundation-title"
@@ -70,7 +71,7 @@ export function FoundationPreview() {
               </form>
               <Feedback>{feedback}</Feedback>
               <ToolbarActions><Button purpose="ghost" size="small" onClick={() => setFeedback('Ghost action demonstrated locally.')}>Show feedback</Button>
-                <Button purpose="danger" disabled>Delete unavailable</Button><NavigationButton to={foundationUrl('/tasks')}>View My Tasks example</NavigationButton></ToolbarActions>
+                <Button purpose="danger" disabled>Delete unavailable</Button><NavigationButton to={foundationUrl(routes.tasks.path)}>View My Tasks example</NavigationButton></ToolbarActions>
               <p>Danger is disabled: there is no destructive operation in the preview.</p>
             </SectionRegion>
             <SectionRegion title="Content states" density="compact">

@@ -14,7 +14,7 @@ describe('safe router-relative login return targets', () => {
       'javascript:alert(1)', 'cases/7', '/\\evil.invalid', '/cases\\7', '/cases/7\n',
       '/cases/%', '/cases/%ff', '/cases/%0a', '/cases/%2f%2fevil.invalid', '/cases/%5c7',
       '/cases/../login', '/cases/%2e%2e', '/cases/.', '/login', '/LOGIN/', '/login?next=/cases/7',
-      '/', '/unknown', '/foundation.html', '/cases/7/unknown', '/nested-base/cases/7', '/cases/7?x=1']
+      '/', '/unknown', '/calendar', '/reports', '/search', '/calendar/7', '/settings/personal', '/tasks/7/activity', '/foundation.html', '/cases/7/unknown', '/nested-base/cases/7', '/cases/7?x=1']
       .map(pathname => ({ from: { pathname } })),
     { from: { pathname: 7 } }, { from: { pathname: '/cases/7', search: null } },
     { from: { pathname: '/cases/7', hash: {} } },

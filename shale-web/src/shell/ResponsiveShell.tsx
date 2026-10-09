@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { activeDestination, destinations } from './navigation';
+import type { NavigationAdapter } from './navigation';
+import { routes } from '../app/routeRegistry';
 
-export function ResponsiveShell({ children, path, navigationKey = path, linkTo, utilities, identity, caption }: {
-  children: ReactNode; path: string; navigationKey?: string; linkTo?: (path: string) => string; utilities?: ReactNode; identity: ReactNode; caption?: ReactNode;
+export function ResponsiveShell({ children, path, navigationKey = path, navigationAdapter, utilities, identity, caption }: {
+  children: ReactNode; path: string; navigationKey?: string; navigationAdapter?: NavigationAdapter; utilities?: ReactNode; identity: ReactNode; caption?: ReactNode;
 }) {
   const disclosure = useRef<HTMLDetailsElement>(null);
   const summary = useRef<HTMLElement>(null);
@@ -30,10 +32,11 @@ export function ResponsiveShell({ children, path, navigationKey = path, linkTo, 
       main.current?.focus({ preventScroll: true });
     }
   }, [navigationKey, isCompact]);
-  const current = activeDestination(path);
+  const current = navigationAdapter ? navigationAdapter.activeDestination(path) : activeDestination(path);
+  const linkTo = navigationAdapter?.linkTo;
   return <div className="shale-shell">
     <a className="shale-skip" href="#foundation-main" onClick={() => main.current?.focus()}>Skip to content</a>
-    <header className="shale-shell-header"><Link className="shale-brand" to={linkTo?.('/my-shale') ?? '/my-shale'} aria-label="Shale home">
+    <header className="shale-shell-header"><Link className="shale-brand" to={linkTo?.(routes.myShale.path) ?? routes.myShale.path} aria-label="Shale home">
       <span className="shale-brand-mark" aria-hidden="true">S</span>Shale</Link>
       {caption && <span className="shale-shell-caption">{caption}</span>}<div className="shale-shell-utilities">{utilities}</div>
     </header>
