@@ -192,6 +192,15 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	@Override
+	public List<CaseOverviewDto> searchCasesPage(String query, int shaleClientId, int actorUserId, int offset, int size) {
+		if (offset < 0 || size <= 0) {
+			throw new IllegalArgumentException("Case search offset must be nonnegative and size must be positive.");
+		}
+		return caseGateway.searchActiveForServer(shaleClientId, actorUserId, query, offset, size).stream()
+				.map(CaseServiceAdapter::toOverview).toList();
+	}
+
+	@Override
 	public List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit) {
 		int resolvedLimit = limit <= 0 ? 25 : limit;
 		return caseGateway.listActiveAssignedForServer(shaleClientId, assignedUserId, assignedUserId, resolvedLimit).stream()

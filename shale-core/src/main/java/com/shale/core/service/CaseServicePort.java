@@ -53,6 +53,11 @@ public interface CaseServicePort {
 
 	List<CaseOverviewDto> searchCases(String query, int shaleClientId, int actorUserId, int limit);
 
+	/** Exact SQL page of the existing Case-name search; offset is a row offset, not a page number. */
+	default List<CaseOverviewDto> searchCasesPage(String query, int shaleClientId, int actorUserId, int offset, int size) {
+		throw new UnsupportedOperationException("Exact Case search paging is unavailable. Implement CaseServicePort.searchCasesPage with SQL offset and size delegation.");
+	}
+
 	List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit);
 
 	CaseDetailDto createCase(CreateCaseCommand command);

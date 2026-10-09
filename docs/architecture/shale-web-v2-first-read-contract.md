@@ -1,15 +1,16 @@
 # Web V2 first-read-slice implementation contract readiness
 
 **Inspected:** 2026-10-09. **Readiness documentation: COMPLETE; owner decisions: OPEN.**
-**Phase 2 acceptance: OPEN; Phase 3: IN PROGRESS; Phase 4 implementation: NOT STARTED.**
+**Phase 2 acceptance: OPEN; Phase 3: IN PROGRESS; Phase 4: bounded R1 backend work begun; first read slice INCOMPLETE.**
 Appearance is provisional; visual refinement follows functional delivery. Accessibility remains an
 acceptance gate. Ordinary web delivery is independent of MCP/AI activation.
 
-This is a documentation-only assessment against fetched `origin/codex/latest`
+The original documentation-only assessment below was against fetched `origin/codex/latest`
 `ba3b1acad7710d4afeae099b2a24f9b4c3e77bbf`, on separate branch
 `codex/web-v2-first-read-contract`. Recommendations below are **PROPOSED**, not approved wire,
 permission, audit, storage or deployment contracts. Existing endpoint exposure is not policy approval.
 Implementation readiness is conditional; deployment readiness is not established.
+R1 compatibility work is recorded in §10; it approves no future V2 disclosure or security policy.
 
 ## 1. Evidence baseline and authorities
 
@@ -60,7 +61,7 @@ Paths are repository-relative; links point to authoritative owners, not copies o
 | --- | --- | --- |
 | Sign-in / LoginPage | [useStartupSession](../../shale-web/src/useStartupSession.ts) `signInWithCredentials` → [api](../../shale-web/src/api.ts) `login`, `getCurrentUser` → [AuthController](../../shale-server/src/main/java/com/shale/server/controller/AuthController.java) POST `/api/auth/login`, GET `/api/auth/me` → `AuthServicePort` / `AuthServiceAdapter` / `AuthServiceImpl.login` on auth datasource: parameterized TOP 1 dbo.Users by email/is_deleted=0, `BCryptPasswordVerifier.verify` → BCrypt.checkpw; tenant comes from returned User, not request input. `ServerAuthSessionService.issue` → SqlDurableSessionStore → UserSessionServiceAdapter → UserSessionDao.create verifies same-tenant nonremoved owner and both session keys, persists WEB session, then ShaleAuthTokenService signs bound token. `/me` uses `UserDaoCurrentUserProfileService` → `UserDao.findById`; fallback principal profile has false admin/attorney flags. `LoginResponse` contains authenticated, Bearer, accessToken, expiresInSeconds, user; `AuthenticatedUserResponse` is current profile. | Reuse unchanged 3A–3J installation/return contracts; no new login protocol. |
 | Basic search / CasesPage | [App](../../shale-web/src/App.tsx) `CasesPage.handleSearch` → `api.searchCases` → [ApiReadController](../../shale-server/src/main/java/com/shale/server/controller/ApiReadController.java) GET `/api/cases/search`, validated query, fixed limit 25 → [CaseServicePort](../../shale-core/src/main/java/com/shale/core/service/CaseServicePort.java) `searchCases` → [CaseServiceAdapter](../../shale-data/src/main/java/com/shale/data/service/adapter/CaseServiceAdapter.java) → `DaoCaseGateway.searchActiveForServer` → [CaseSummaryDao](../../shale-data/src/main/java/com/shale/data/dao/CaseSummaryDao.java) `searchActiveForServer` / `listActiveForServer`, offset 0. | Existing implementation searches **case name only**. Browser placeholder incorrectly promises number/client. First slice must say case name; no number/client/narrative search expansion. |
-| Page search / no inspected browser consumer | GET `/api/cases/search-page` → same port with limit `(page+1)*size` → same SQL offset 0 → controller `slice`. [PagedResponse](../../shale-server/src/main/java/com/shale/server/dto/PagedResponse.java): items/page/size/total; total null. | Repair true SQL paging separately, retain legacy shape and semantics. |
+| Page search / no inspected browser consumer | GET `/api/cases/search-page` → `searchCasesPage` port/adapter → existing offset-aware gateway/DAO with checked `page*size` offset and requested size; no Case Java slice (R1, §10). [PagedResponse](../../shale-server/src/main/java/com/shale/server/dto/PagedResponse.java): items/page/size/total; total null. | Repair true SQL paging separately, retain legacy shape and semantics. |
 | My Cases / MyCasesSection | `api.listAssignedCases` → GET `/api/cases/assigned` → port/adapter `listAssignedCases(userId, tenant, 25)` → gateway → `CaseSummaryDao.listActiveAssignedForServer`, actor must equal assigned user. SQL `EXISTS CaseUsers` applies before limit. | Current result is the first 25, not all assigned cases; no next page/count. Minimal new paged projection needs continuation. |
 | Case deep link / CaseDetailPage | `api.getCaseDetail` → GET `/api/cases/{caseId}` (numeric route, positive ID) → `getAuthoritativeCaseDetail` → gateway `getDetail` → [CaseDao](../../shale-data/src/main/java/com/shale/data/dao/CaseDao.java) `getDetail` / `selectCaseDetail`; adapter then calls [CaseDateDao](../../shale-data/src/main/java/com/shale/data/dao/CaseDateDao.java) `listMigratedCompatibilityStateForCase`. | Broad edit/detail DTO is not a minimal Overview. Current browser also starts tasks and updates in `Promise.allSettled`; do not carry these requests into the read slice. |
 
@@ -170,10 +171,11 @@ is explicit work; legacy multi-query deletion races can currently surface generi
 
 ## 4. Genuine bounds and search semantics
 
-Verified chain: controller validates query ≤100 after trim, page 0–100, size 1–100;
-`searchLimitForPage=(page+1)*size`; adapter sends offset **0** and that limit;
+R1 chain: controller validates query ≤100 after trim, page 0–100, size 1–100/default 25;
+`Math.multiplyExact(page,size)` reaches the adapter/gateway/DAO as the row offset, with requested size.
 `CaseSummaryDao.listActiveForServer` binds `OFFSET ? ROWS FETCH NEXT ? ROWS ONLY`.
-Thus maximum prefix is **10,100 rows**, not an unbounded ID/N+1 load, but much more than one page.
+Maximum row offset is **10,000** and maximum fetch is **100 rows**. Before R1, the maximum
+prefix was **10,100 rows**, fetched from zero and sliced in Java. The existing SQL is unchanged.
 Assigned SQL returns at most 25; neither it nor legacy search provides hasMore. SQL limit bounds returned
 rows, not scanned/sorted work or bytes. Description is nvarchar(max), so current row limits are not payload
 limits. No query timeout is set in this selected DAO. Client abort does not prove SQL stopped.
@@ -308,7 +310,8 @@ Existing create/edit functionality outside the selected composition remains sepa
 
 ## 7. Delivery sequence, tests and rollback
 
-All rows are future PRs, not implementation completed by this assessment. Files/symbols named new are proposals.
+R1 is now bounded backend implementation work (§10); R2–R4 remain conditional future PRs.
+Files/symbols named new in those later rows remain proposals.
 
 | PR / dependency | Bounded implementation and files/symbols | Behavioral evidence / rollback |
 | --- | --- | --- |
@@ -442,3 +445,92 @@ sensitive-read audit, D3 re-login acceptance and authorized live/host/accessibil
 Commit and push separate branch, open PR targeting codex/latest. Do not merge or deploy.
 Return PR, compatibility evidence, limits, rollback (revert only R1) and next conditional R2 step.
 ```
+
+
+## 10. R1 exact legacy Case search-page SQL paging — 2026-10-09
+
+Separate task branch `codex/r1-exact-case-search-paging` from explicitly fetched live
+`origin/codex/latest` **`227c36ad73ca114e69c1c0ae1a35f9152d5604c3`**. PR #1854 and all eleven
+3A–3J/security prerequisite merges are ancestors; the five patched Router/DOM, PostCSS, Nano ID
+and source-map-js lock versions are retained. Original checkout preserved through an isolated worktree.
+
+**Scope and compatibility:** `ApiReadController.searchCasesPage` passes checked `page*size` and
+requested size to the new explicit `CaseServicePort.searchCasesPage` operation. Its unsupported default
+throws an actionable error. `CaseServiceAdapter` delegates to the existing production
+`CaseGateway.searchActiveForServer` / `DaoCaseGateway` / `CaseSummaryDao.searchActiveForServer`,
+which already accepts offset/limit. The existing SQL statement, projection and DTO mapper are reused;
+no new DAO, query, SQL columns, predicate or schema change. The controller returns the SQL page directly.
+
+Query trim/max 100, page 0–100, size 1–100/default 25, literal Case-name substring and bracket escaping,
+Name ASC / Id ASC, active-case filtering, tenant/session equality and eligible same-tenant nondeleted actor
+checks remain. `CaseOverviewDto` and exactly `items/page/size/total:null` remain. `/cases/search` and
+assigned still fetch 25 with their established orders; Contact prefix/slicing, detail and mutation
+contracts are unchanged. No hasMore/count/new endpoint/browser adoption or policy change.
+
+**Test impact:** inspected existing controller recording-port/prefix expectation and neighboring search,
+assigned, Contact, detail/mutation and bearer tests; adapter/gateway, projection source contracts and OpenAPI
+coverage before edits. Updated the obsolete prefix assertion; added exact page/default/bounds/query/wire
+checks, explicit unsupported-default/delegation checks, and `CaseSearchPagingJdbcTest` through the public
+production adapter constructor to the real gateway and DAO. The JDBC doubles execute prepared statements
+and capture all six bindings, including `(offset,size)` **(0,25), (25,25), (10000,100)** for pages 0/1/100.
+They also protect final/empty pages, no second slice, SQL-requested tied-name ordering and row-order mapping,
+blank/no-connection behavior, literal `%`, `_`, `[` and Unicode normalization, tenant/actor failure before
+Case query, unchanged legacy search/assigned bindings and orders. Existing projection tests remain relevant.
+OpenAPI verifies query/page/size defaults, bearer security, the four-field page and `CaseOverviewDto` schema.
+The new JDBC test is owned by the existing cases selector area.
+
+**Local validation:** Maven 3.9.11 / JDK 21 were installed in unpublished scratch storage because
+this environment initially had only a JRE. All commands below use `-Dmaven.compiler.parameters=true`
+for existing controller parameter-name reflection, with session proxy/trust and local-repository settings;
+no POM, repository dependency or version changes.
+
+* Focused: `mvn -Dmaven.compiler.parameters=true -pl shale-server -am
+  -Dtest=ApiReadControllerTest,OpenApiDocumentationTest,CaseServiceAdapterTest,CaseSearchPagingJdbcTest,CaseSummaryServerProjectionContractTest
+  -Dsurefire.failIfNoSpecifiedTests=false test` — **79 passed**, zero failures/errors/skips.
+* Change-aware selector: `python3 build/test-selection/select_tests.py --base
+  227c36ad73ca114e69c1c0ae1a35f9152d5604c3 --head HEAD --format markdown` selects cases, contacts,
+  organizations, reports, server and tasks (shared port consumers), nine classes across core/data/server/UI.
+  Its selected Maven command with the compiler metadata flag — **115 passed**, zero failures/errors/skips.
+  `python3 -m unittest discover -s build/test-selection -p test_select_tests.py` — **24 passed**.
+* Required critical: `mvn -Dmaven.compiler.parameters=true test` — **116 passed**, zero failures/errors/skips.
+* Selector-recommended advisory `mvn -Dmaven.compiler.parameters=true -Pall-tests test` — **FAILED**:
+  shale-data ran 804 tests with 12 failures, zero errors/skips; downstream UI/updater/desktop/server were
+  not run. Baseline reproduction is recorded below; this is not a passing full-reactor result.
+* Documentation relative file links, status/scope checks and `git diff --check` passed.
+
+Baseline check: a detached worktree at fetched `227c36ad` ran
+`mvn -Dmaven.compiler.parameters=true -pl shale-data -am -Pall-tests
+-Dtest=AdministrativeReadAuditMigrationContractTest,ApplicationInstanceHeartbeatMigrationContractTest,ApplicationReleaseImportContractTest,CaseDaoCasesGridQueryTest,CaseDateTypeLifecycleCutoverContractTest,CaseDatesFinalRuntimeCleanupContractTest,CaseOverviewConfigurationContractTest,CaseSummaryReportsContractTest,ContactPhase2BAuditMigrationContractTest,FormConfigurationFoundationTest,SessionInvalidationPhase8AContractTest,UserSessionMigrationContractTest
+-Dsurefire.failIfNoSpecifiedTests=false test`. Its 51 tests reproduced **the same 12 failing methods**,
+zero errors/skips. These existing source/migration contract failures are outside R1 and were preserved;
+no full-suite or future security acceptance is inferred. This rerun covers the failing classes, not the
+entire base reactor.
+
+The existing OpenAPI fixture needed a schema-only session service (database access explicitly fails),
+and stale release assertions were aligned to the generated wildcard media key and inline closed enums.
+Production schema annotations, session wiring and release contracts are unchanged. Generated local OpenAPI
+and MockMvc responses are compatibility evidence, not deployed-host acceptance.
+
+**Limits and audit review:** JDBC/source/OpenAPI evidence is synthetic. No live SQL performance, scanned work,
+collation/Unicode acceptance, concurrency/snapshot guarantee, or two-tenant/non-dbo RLS acceptance is claimed.
+No authorized live SQL/application/host/device/audit-failure acceptance was performed. The broad legacy payload
+and unbounded narrative bytes remain; changing row fetch does not minimize fields or bound scanned/sorted work.
+Existing actor validation is retained, not upgraded to a new session-actor/case ACL. Existing server search
+read-audit gaps remain unresolved; no audit event, exemption, representation or failure-policy decision is
+invented, no audit integration/schema/migration is added. Existing exposure is not V2 security approval.
+
+**Status:** Phase 2 acceptance **OPEN**, Phase 3 **IN PROGRESS**. Only bounded Phase 4 R1 backend work
+has begun; the first end-to-end read slice is **INCOMPLETE**. Permission/field/deletion policy, minimized
+payload, required read auditing, first-slice session acceptance and authorized live/host/accessibility gates
+remain **OPEN**. Appearance remains **provisional**. No UI, authentication protocol, dependency, deployment
+configuration or version change; no merge or deployment.
+
+**Rollback:** revert only the R1 commit (controller, paged port/adapter, focused tests/selector ownership and
+these readiness/roadmap updates). The old SQL-prefix/Java-slice cost returns, up to 10,100 rows. No SQL,
+schema, audit-history, session, security-patch or frontend rollback is required.
+
+**Next conditional R2:** obtain exact D1 case/field/deletion policy, D5 minimized bounds/oversized-value,
+endpoint compatibility/query-privacy contract, D6 Overview fail-closed/refetch audit and page/search audit
+representation or explicit exemption, plus D3 first-slice expiry/re-login acceptance. If required page auditing
+needs a safe vocabulary/schema/viewer enhancement, isolate R2a first; only then implement R2b minimized,
+authorized, audited server reads. No new real-data browser consumer is authorized by R1.
