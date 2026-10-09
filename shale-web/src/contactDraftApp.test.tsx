@@ -189,10 +189,15 @@ describe('bounded Contact Detail draft protection with real API clients', () => 
     expect(screen.queryByText('Late saved name')).toBeNull(); expect(screen.queryByDisplayValue('Late formatted phone')).toBeNull();
     expect(unload()).toBe(false); expect(requests.filter(r => r.method === 'PATCH')).toHaveLength(1);
   });
-  it.each(['logout', 'rejection', 'replacement', 'local-return'])('%s bypasses an active blocker and clears the editor and unload handler', async end => {
+  it.each(['logout', 'rejection', 'replacement', 'local-return', 'failed-clear logout', 'failed-clear rejection', 'failed-store replacement'])('%s bypasses an active blocker and clears the editor and unload handler', async end => {
     await open(); const pending = deferred(); save = () => pending.promise; change(); submit(); await navigate(); await prompt();
-    if (end === 'logout') fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
-    if (end === 'rejection') await act(async () => pending.resolve(json({}, 401)));
+    if (end.startsWith('failed-clear')) vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new Error('Synthetic denied'); });
+    if (end === 'failed-store replacement') {
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Synthetic denied'); });
+      act(() => { expect(() => session.signIn('synthetic-replacement', { ...user, userId: 2 })).toThrow('could not store'); });
+    }
+    if (end === 'logout' || end === 'failed-clear logout') fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    if (end === 'rejection' || end === 'failed-clear rejection') await act(async () => pending.resolve(json({}, 401)));
     if (end === 'replacement') await act(async () => session.signIn('synthetic-replacement', { ...user, userId: 2, shaleClientId: 2 }));
     if (end === 'local-return') {
       me = () => new Promise(() => {});
