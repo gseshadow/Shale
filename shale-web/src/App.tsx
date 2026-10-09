@@ -181,11 +181,11 @@ function SessionShell() {
   return <AppShell user={authState.user} onLogout={handleLogout} />;
 }
 function PublicRoute({ id }: { id: 'root' | 'login' | 'fallback' }) {
-  const { authState, logoutFeedback, sessionEnded, storageFeedback, signIn, signOut } = useAppSession();
+  const { authState, logoutFeedback, sessionEnded, storageFeedback, signIn, loginFailed } = useAppSession();
   const location = useLocation();
   if (id === 'login') return authState.user
     ? <Navigate to={redirectPathFrom(location.state)} replace state={null} />
-    : <LoginPage onLoginFailed={signOut} storageFeedback={storageFeedback} onLogin={signIn} logoutFeedback={logoutFeedback} sessionEnded={sessionEnded} />;
+    : <LoginPage onLoginFailed={loginFailed} storageFeedback={storageFeedback} onLogin={signIn} logoutFeedback={logoutFeedback} sessionEnded={sessionEnded} />;
   return <Navigate to={authState.user ? routes.myShale.path : routes.login.path} replace />;
 }
 

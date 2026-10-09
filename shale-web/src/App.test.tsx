@@ -485,6 +485,18 @@ describe('truthful signed-out feedback', () => {
     await screen.findByRole('heading', { name: 'My Shale' });
     expect(api.logout).toHaveBeenCalledTimes(1); expect(browserCredentialStore.store).toHaveBeenCalledWith('synthetic-new-login');
   });
+  it('retains confirmed logout feedback through failed credential login', async () => {
+    beta('/my-shale'); await screen.findByRole('heading', { name: 'My Shale', level: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    await screen.findByText(/server confirmed revocation/);
+    vi.mocked(api.login).mockRejectedValueOnce(new Error('Synthetic credentials rejected'));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'synthetic@example.invalid' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'synthetic-password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await screen.findByText('Synthetic credentials rejected');
+    expect(screen.getByText(/server confirmed revocation/)).toBeTruthy();
+    expect(screen.queryByRole('navigation')).toBeNull();
+  });
   it('allows login while pending and discards the older logout result', async () => {
     let finish!: () => void;
     vi.mocked(api.logout).mockReturnValue(new Promise(done => { finish = done; }));

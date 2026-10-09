@@ -85,16 +85,34 @@ Commands from repository root (Java 21 via `source /workspace/.tools/shale-env.s
 | Command | Result |
 | --- | --- |
 | `npm ci --prefix shale-web --cache /workspace/.cache/npm` | PASS; existing manifest/lock, no dependency changes. |
-| Focused eight web suites, `--maxWorkers=1` | **249 passed**. |
-| `npm test --prefix shale-web -- --maxWorkers=1` | **423 passed**, 14 files. |
+| Focused eight web suites, `--maxWorkers=1` | **250 passed**. |
+| `npm test --prefix shale-web -- --maxWorkers=1` | **424 passed**, 14 files. |
 | `npm run typecheck --prefix shale-web`; `npm run build --prefix shale-web` | PASS; operational and foundation entries built. |
 | `mvn -pl shale-server -am -Dtest=com.shale.server.controller.AuthControllerTest,com.shale.server.runtime.DurableSessionAuthTest,com.shale.server.runtime.ServerAuthSessionLogoutTest -Dsurefire.failIfNoSpecifiedTests=false test` | **14 passed**, no failures/errors/skips. |
 | Repository change-aware selector against pinned base | See [selection](phase-3h-evidence/test-selection.md); selected auth compatibility remains relevant to preserved bearer/me/logout behavior. |
-| Selected AuthController reactor | Pending final recording. |
+| Selected AuthController reactor | **10 passed**, no failures/errors/skips; no full-suite escalation. |
 | `mvn test` | PASS; **116 tests**, no failures/errors/skips. |
 | `npm audit --prefix shale-web --json`; `npm audit --prefix shale-web --omit=dev --json` | **0 vulnerabilities**, both [full](phase-3h-evidence/audit.json) and [production](phase-3h-evidence/audit-production.json). |
-| Chromium synthetic browser review | Pending final recording. |
-| `git diff --check`; base-to-head diff; package/lock comparison | Pending final recording. |
+| Chromium synthetic browser review | **9 scenarios passed**, Chromium 151.0.7922.173 at 320/1280; zero page errors/unexpected destinations. [Observations](phase-3h-evidence/browser-observations.json). |
+| `git diff --check`; base-to-head diff; package/lock comparison | PASS; dependencies unchanged. |
+
+The focused command was `npm test --prefix shale-web -- src/credentialStore.test.ts
+src/credentialFailures.test.tsx src/App.test.tsx src/useStartupSession.test.tsx src/logout.test.tsx
+src/sessionRejectionApp.test.tsx src/contactDraftApp.test.tsx src/preview/FoundationPreview.test.tsx
+--maxWorkers=1` (one command). Selector: `python3 build/test-selection/select_tests.py --base
+origin/codex/latest --head HEAD --format markdown --output
+shale-web/docs/phase-3h-evidence/test-selection.md`. Selected check: `mvn -pl shale-server -am
+-Dtest=com.shale.server.controller.AuthControllerTest -Dsurefire.failIfNoSpecifiedTests=false test`.
+
+[Browser script](phase-3h-evidence/browser-review.cjs) intercepts synthetic endpoints only and aborts
+unexpected destinations. It verifies preview zero API/storage access first in every fresh context, read
+failure/explicit Retry with safe suffix, login store failure/explicit recovery, residual clear after logout
+and rejection, independent revocation feedback and the actual adapter/key/getter denial in Chromium.
+Four feedback captures include [compact failed clear](phase-3h-evidence/clear-320.png). The compact
+feedback was visually inspected; no final aesthetic/device/AT acceptance is inferred. Reproduce with
+local Vite and isolated Playwright tooling under `work/`, then
+`PLAYWRIGHT_MODULE=$PWD/work/browser-tools/node_modules/playwright node
+shale-web/docs/phase-3h-evidence/browser-review.cjs`.
 
 Initial missing installed test dependencies, an empty alert in the new feedback composition and a browser
 fixture expecting a placeholder rather than authoritative Contact heading were corrected. No behavioral

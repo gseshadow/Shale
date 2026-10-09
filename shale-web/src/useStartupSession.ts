@@ -179,6 +179,12 @@ export function useStartupSession(credentialStore: CredentialStore = browserCred
     establish(accessToken, user);
   }
 
+  function loginFailed() {
+    // LoginPage is still signed out: preserve existing logout/session-ended feedback.
+    // A failed persistence installation is already handled by signIn itself.
+    if (mounted.current) clearCredential();
+  }
+
   function signOut() {
     invalidate();
     clearCredential();
@@ -211,5 +217,5 @@ export function useStartupSession(credentialStore: CredentialStore = browserCred
     return true;
   }
 
-  return { authState, storageFeedback, logoutFeedback, sessionEnded, sessionGeneration: generation.current, retry, signIn, signOut, logoutSession };
+  return { authState, storageFeedback, logoutFeedback, sessionEnded, sessionGeneration: generation.current, retry, signIn, loginFailed, signOut, logoutSession };
 }
