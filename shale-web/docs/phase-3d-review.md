@@ -52,7 +52,26 @@ coverage remains. The existing route feature-request assertion now waits for its
 | `useStartupSession` deadline/invalidation | Fake timers: never-resolving fetch, stalled body, success/401 before budget, retained storage, fresh Retry/repeated timeout, duplicate prevention, late success/rejection before/after newer Retry, replacement/sign-in/sign-out/unmount/StrictMode, zero deadline timers after termination. |
 | Existing App route boundary | Fake-timer timeout blocks all protected reads/content, exact detail/query/hash/history restored by Retry, local Return clears without remote logout; full existing login/history/logout suites retained. |
 
-Validation commands and results are recorded below after execution. Network-enabled execution uses the
+Commands from repository root (Maven uses `source /workspace/.tools/shale-env.sh`, Java 21):
+
+| Command | Result |
+| --- | --- |
+| `git fetch origin codex/latest` | Live base above fetched; remote-tracking ref aligned with the fetched commit under the checkout's main-only fetch configuration. |
+| `npm ci --prefix shale-web --cache /workspace/.cache/npm` | Passed; unchanged lockfile installed. |
+| `npm test --prefix shale-web -- src/useStartupSession.test.tsx src/App.test.tsx src/logout.test.tsx` | 148 passed, three files. |
+| `npm test --prefix shale-web` | 249 passed, eight files; zero failures. |
+| `npm run typecheck --prefix shale-web`; `npm run build --prefix shale-web` | Passed; operational and foundation entries retained. |
+| `python3 build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format markdown --output shale-web/docs/phase-3d-evidence/test-selection.md` | [Selection](phase-3d-evidence/test-selection.md): server/AuthController; no full-suite escalation. Relevant because startup consumes the unchanged bearer and `/me` contract. |
+| `mvn -pl shale-server -am -Dtest=com.shale.server.controller.AuthControllerTest -Dsurefire.failIfNoSpecifiedTests=false test` | 10 passed; zero failures/errors/skips. |
+| `mvn test` | 116 passed; zero failures/errors/skips. |
+| `PLAYWRIGHT_MODULE=$PWD/work/browser-tools/node_modules/playwright node shale-web/docs/phase-3d-evidence/browser-review.cjs` | Four scenarios, twelve captures; zero page errors/unexpected requests. Chromium 151.0.7922.173 / Playwright 1.64.0. |
+| `npm audit --prefix shale-web --json`; `npm audit --prefix shale-web --omit=dev --json` | [Full](phase-3d-evidence/audit.json) / [production](phase-3d-evidence/audit-production.json): zero findings at every severity. |
+| `git diff --check`; `git diff origin/codex/latest HEAD --check` | Passed. |
+| `git diff --exit-code origin/codex/latest -- shale-web/package.json shale-web/package-lock.json` | Unchanged; dependency-security patches retained. |
+
+Final changed-file-to-test review and affected-symbol searches retained both getCurrentUser consumers,
+existing login/logout/history, shell/My Shale and preview coverage. No selector escalation justified an
+all-tests run. Network-enabled execution uses the
 supported permission path; the initial sandbox fetch could not reach the configured proxy. No proxy,
 CA or deployment settings were changed. npm manifests/lockfile remain unchanged.
 
