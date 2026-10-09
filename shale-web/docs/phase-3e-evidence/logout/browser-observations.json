@@ -1,0 +1,558 @@
+{
+  "synthetic": true,
+  "liveRevocationAcceptance": false,
+  "browser": "151.0.7922.173",
+  "playwright": "1.64.0",
+  "observations": [
+    {
+      "width": 320,
+      "outcome": "success",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "outcome": "negative",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "outcome": "http",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "outcome": "network",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "outcome": "timeout",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "outcome": "new-login",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "outcome": "success",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "outcome": "negative",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "outcome": "http",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "outcome": "network",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "outcome": "timeout",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "outcome": "new-login",
+      "oneLogoutAttempt": true,
+      "immediateLocalClear": true,
+      "protectedUnmount": true,
+      "noCredentialReplay": true,
+      "loginUsable": true,
+      "keyboard": true,
+      "politeAtomicStatus": true,
+      "safeHistory": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/logout",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/login",
+          "method": "POST"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/cases/assigned",
+          "method": "GET"
+        },
+        {
+          "path": "/api/tasks/assigned",
+          "method": "GET"
+        }
+      ]
+    }
+  ],
+  "pageErrors": [],
+  "unexpectedRequests": []
+}

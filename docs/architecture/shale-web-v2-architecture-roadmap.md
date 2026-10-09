@@ -1,11 +1,16 @@
 # Shale Web V2 architecture and phased implementation roadmap
 
-**Reviewed:** 2026-10-08. **Inventory/documentation:** COMPLETE. **Decision acceptance:** OPEN.
+**Reviewed:** 2026-10-09. **Inventory/documentation:** COMPLETE. **Decision acceptance:** OPEN.
 **Web V2 implementation:** Phase 2A foundation, Phase 2B authenticated shell and Phase 2C My Shale presentation adoption IMPLEMENTED FOR REVIEW; Phase 2D acceptance review and targeted feedback fix RECORDED; ACCEPTANCE OPEN.
 Phase 2 remains IN PROGRESS; acceptance OPEN. Phase 3 IN PROGRESS — Phase 3A safe login return-path restoration and Phase 3B startup
-verification uncertainty/recovery, Phase 3C truthful remote-logout feedback and Phase 3D bounded startup verification IMPLEMENTED FOR REVIEW. Phases 4–10 NOT STARTED. The user explicitly authorized this bounded
+verification uncertainty/recovery, Phase 3C truthful remote-logout feedback and Phase 3D bounded startup verification, plus Phase 3E canonical existing-route registry IMPLEMENTED FOR REVIEW. Phases 4–10 NOT STARTED. The user explicitly authorized this bounded
 Phase 3 slice while Phase 2 acceptance remains open; that sequencing does not mark Phase 2 complete.
 Documentation completion is not implementation completion.
+
+**User delivery preference (2026-10-09):** current appearance is provisional. Prioritize functionality
+and deployment, then perform a dedicated visual refinement pass. Prior visual checks do not constitute
+final aesthetic approval. Accessibility/security acceptance gates remain distinct from aesthetic refinement;
+deferring polish does not waive those gates or authorize deployment in this task.
 
 **Evidence baseline:** live `origin/codex/latest`, `32e2cfdd25ad475bc03fbb91763c9769ce2ccd6a`.
 [PR #1837](https://github.com/gseshadow/Shale/pull/1837) was merged into that base.
@@ -69,7 +74,11 @@ Paths below are relative to the repository root unless linked. Symbol names make
 `/organizations/:organizationId`, `/team`, `/team/:userId`, `/settings`. Unknown URLs redirect.
 There are no current Calendar, Reports, unified Search, or case subsection URL routes in `AppRoutes`.
 These future routes must not be advertised as implemented. Current create/edit forms are local UI state,
-not canonical subsection routes. `ProtectedRoute` passes the current location in navigation state;
+not canonical subsection routes. Phase 3E's [route registry](../../shale-web/src/app/routeRegistry.ts) now owns existing patterns,
+identities, navigation parents/labels/order and safe-return eligibility. AppRoutes owns explicit screen
+composition/session guards; shell and safe-return recognition derive from the same metadata. Unavailable
+Calendar/Reports/Search descriptors never become routes or authorization, and preview uses an explicit adapter.
+`ProtectedRoute` passes the current location in navigation state;
 `AppRoutes` now owns the successful-login replacement through `redirectPathFrom`, validating the
 existing protected route allowlist and preserving pathname/search/hash. `LoginPage` verifies login
 through `/me` before installing auth; it no longer issues a competing navigation. Explicit logout
@@ -103,8 +112,8 @@ client-specific ownership gap without copying those roadmaps.
 
 ## 3. Proposed client organization and explicit technology decisions
 
-Organize inside the existing `shale-web/src`; these directories describe future ownership, not scaffolding
-created by this task:
+Organize inside the existing `shale-web/src`; most directories describe future ownership.
+Phase 3E now implements only `app/routeRegistry.ts`, leaving screen composition in App.tsx:
 
 ```text
 app/                  composition, route registry, providers, error boundaries
@@ -231,6 +240,10 @@ foreign tenant's entity exists. Offline UI explains that writes are unavailable 
 ## 6. Routes and bearer/session lifecycle
 
 ### 6.1 Canonical routes (PROPOSED additions; retain current aliases)
+
+Phase 3E consolidates only existing URLs in `app/routeRegistry.ts`; the additions/aliases below remain
+PROPOSED and unimplemented. Metadata is neither session nor entity authorization. Phase 3A component
+validation still precedes registry recognition and retains existing query/hash restoration rules.
 
 | Area | Canonical model |
 | --- | --- |
@@ -546,7 +559,7 @@ merely because this document describes it.
 | --- | --- | --- | --- | --- | --- |
 | 1 — Inventory and architecture | DOCUMENTATION COMPLETE; ACCEPTANCE OPEN | Live base and required authorities | This inventory, client decisions, parity/audit matrix and next prompt | Source/test review, links/fences/status/diff checks and documentation selector | Documentation only; no V2 features accepted. D1–D10 remain explicit. |
 | 2 — Tokens, components, responsive shell | IN PROGRESS — Phase 2A foundation / Phase 2B authenticated shell / Phase 2C My Shale implemented for review; Phase 2D reviewed with feedback fix; acceptance OPEN | Phase 1 recommendations; D2/D4 for this milestone | Token mapping, shared semantic primitives, responsive shell with complete navigation; temporary preview composition and beta rollback | Existing web tests plus focused semantics/navigation; typecheck/build; screenshots both themes at compact/medium/wide, keyboard/zoom/contrast | Reviewable foundation using synthetic data, all destinations discoverable, no backend/new feature sprawl. Phase 2A: shared primitives/tokens and synthetic preview. Phase 2B: shell adopted beneath existing ProtectedRoute around unchanged outlets; beta screen skin retained. [Phase 2A review](../../shale-web/docs/phase-2a-review.md) and [Phase 2B exact scope, checks, captures and gaps](../../shale-web/docs/phase-2b-review.md). [Phase 2C My Shale review](../../shale-web/docs/phase-2c-review.md) adds shared Light/Dark operational presentation and native Chromium 200%/400% zoom evidence. [Phase 2D acceptance review](../../shale-web/docs/phase-2d-review.md) records rerun Chromium shell/state/zoom checks and persistent task completion feedback; [operator checklist](../../shale-web/docs/phase-2d-operator-checklist.md) owns unavailable Firefox/WebKit, screen-reader and physical-device checks. No all-Phase-2 completion claim; D4 device/screen-reader/other-engine acceptance remains OPEN. |
-| 3 — Routing, session boundary, transport | IN PROGRESS — Phase 3A safe return, Phase 3B startup recovery, Phase 3C truthful logout feedback and Phase 3D bounded startup verification implemented for review | Phase 2 acceptance OPEN; user-authorized bounded sequencing exception for 3A/3B/3C/3D; D2/D3 and selected contract review for remaining work | Canonical routes/aliases, safe return-to, dirty blockers, CredentialStore, coordinated refresh, cancellation/errors, memory query cache | Router/session/transport behavior including refresh race, stale 401, network failure, logout/identity cleanup and dirty forms; legacy endpoint compatibility | Phase 3A: [review and synthetic evidence](../../shale-web/docs/phase-3a-review.md), validated pathname/query/hash, replacement history and logout return-state cleanup. Phase 3B: [review and synthetic evidence](../../shale-web/docs/phase-3b-review.md), confirmed 401 versus uncertain verification, retained bearer with blocked access, explicit read-only Retry/local sign-out and stale-result guards. Phase 3C: [review and synthetic evidence](../../shale-web/docs/phase-3c-review.md), immediate local logout, bounded single remote attempt, truthful pending/confirmed/unconfirmed feedback and generation/cancellation guards. Phase 3D: [review and synthetic evidence](../../shale-web/docs/phase-3d-review.md), eight-second startup/Retry fetch-and-body deadlines, retained uncertain bearer with blocked access, fresh duplicate-guarded Retry and lifecycle cancellation. Broader canonical routes, dirty blockers, storage abstraction, refresh/transport/cancellation/cache work UNFINISHED. No overall Phase 3 acceptance; unchanged bearer protocol; no replayed uncertain write. |
+| 3 — Routing, session boundary, transport | IN PROGRESS — Phase 3A safe return, Phase 3B startup recovery, Phase 3C truthful logout feedback and Phase 3D bounded startup verification and Phase 3E existing-route registry implemented for review | Phase 2 acceptance OPEN; user-authorized bounded sequencing exception for 3A/3B/3C/3D/3E; D2/D3 and selected contract review for remaining work | Canonical routes/aliases, safe return-to, dirty blockers, CredentialStore, coordinated refresh, cancellation/errors, memory query cache | Router/session/transport behavior including refresh race, stale 401, network failure, logout/identity cleanup and dirty forms; legacy endpoint compatibility | Phase 3A: [review and synthetic evidence](../../shale-web/docs/phase-3a-review.md), validated pathname/query/hash, replacement history and logout return-state cleanup. Phase 3B: [review and synthetic evidence](../../shale-web/docs/phase-3b-review.md), confirmed 401 versus uncertain verification, retained bearer with blocked access, explicit read-only Retry/local sign-out and stale-result guards. Phase 3C: [review and synthetic evidence](../../shale-web/docs/phase-3c-review.md), immediate local logout, bounded single remote attempt, truthful pending/confirmed/unconfirmed feedback and generation/cancellation guards. Phase 3D: [review and synthetic evidence](../../shale-web/docs/phase-3d-review.md), eight-second startup/Retry fetch-and-body deadlines, retained uncertain bearer with blocked access, fresh duplicate-guarded Retry and lifecycle cancellation. Phase 3E: [review](../../shale-web/docs/phase-3e-review.md), one existing-route registry drives declarations/navigation/returns and typed links; explicit isolated preview adapter retained. Future route additions/aliases, dirty blockers, storage abstraction, refresh/transport/cancellation/cache and established-session coordination UNFINISHED. No overall Phase 3 acceptance; unchanged bearer protocol; no replayed uncertain write. |
 | 4 — First end-to-end read slice | NOT STARTED | Phases 2–3; D1/D5/D6 only for selected reads | Sign in → assigned/basic search → case Overview; genuine bounded reads and required read-audit seam | Current controller/adapter/OpenAPI tests plus targeted SQL paging/actor/two-tenant/audit-failure tests; web loading/empty/error/deep-link/back acceptance | Usable reviewed slice, no broad backend rewrite/all-screen dependency. Basic search may ship before unified suggestions with exclusions explicit. |
 | 5 — Tasks and Case Dates/confirmation | NOT STARTED | Phase 4; D5/D6 per write; reviewed occurrence/confirmation adapters | Task policy/forms/assignment/completion and generic dates/confirmation through authoritative workers; incremental usable slices | Due-policy tests, actor/tenant denial, token conflicts, aggregate rollback/audit tests; mobile editor/draft behavior | Task transaction/audit gaps closed for exposed commands; CaseDates/ValueRevision preserved. Live remains optional until D7 passes. |
 | 6 — Remaining case flows, Contacts/Organizations | NOT STARTED | Relevant phase 5 contracts; D1/D5/D6/D8 | Intake, parties/team/links/updates/material metadata/timeline, structured directories; separately gated document export/content | Domain aggregate/delegation tests, conflict/audit rollback, parent-case permissions, responsive long forms/cards and deliberate mutation recovery | Per-feature acceptance; no fake blob/provider entitlement, no scalar/date/overlay authority in React. Unaccepted content scope remains visibly unavailable. |
@@ -842,6 +855,43 @@ consumer/test inventory and preview isolation; prepares later data-router/dirty-
 refresh/storage/transport/cache/dirty forms and established-session coordination remain **UNFINISHED**.
 Real-host/live backend/session and remaining device/screen-reader/other-engine acceptance stay OPEN.
 No merge or deployment.
+
+### 11.11 Phase 3E canonical existing-route registry — 2026-10-09
+
+Separate task branch `codex/web-v2-phase-3e-route-registry` from live `origin/codex/latest`
+`1280257ac634e093e4f2f81db24a6b4e661fa820`, including merged Phase 3A–3D and dependency-security patches.
+[Review](../../shale-web/docs/phase-3e-review.md) owns contracts, test impact, exact checks, evidence and rollback.
+
+* `app/routeRegistry.ts` owns every existing route identity/pattern, root/login/fallback metadata,
+  safe-return eligibility and navigation labels/order/parents. AppRoutes keeps exhaustive typed screen
+  composition beneath explicit session enforcement. Shell active matching recognizes existing routes,
+  including case/trailing slash semantics; unavailable destinations never become operational URLs.
+* Safe-return component validation remains intact before registry recognition. Existing parameter,
+  query/hash, authenticated deep-link/history/replacement/focus/unknown behavior is preserved. Typed
+  route builders remove repeated link patterns. Task's existing Back to My Shale remains unchanged.
+* Explicit preview adapter retains synthetic unavailable-destination links/active state and API isolation.
+  Metadata imports neither feature components nor shell/services; no runtime cycle or feature reshuffle.
+  Phase 3B/3D uncertainty/deadline/Retry/stale guards and 3C local logout/truthful feedback are retained.
+* 298 web tests, typecheck/build, repository selection/AuthController (10), critical Maven (116), both
+  zero-finding npm audits and diff checks pass. 22 synthetic Chromium scenarios cover representative
+  case/contact/task round trips, history/active/focus, startup recovery and logout. No live backend or
+  real-host acceptance. Dependency manifests/lockfile remain unchanged.
+* No new sensitive-read/domain/admin/audit seam or schema. Existing service/DAO authority remains;
+  navigation is intentionally unaudited, §8.2 gaps deferred. Rollback only Phase 3E to the base above.
+  No merge/deployment/backend/SQL/API/auth protocol/dependency/version/native/MCP/AI change.
+
+Phase 2 acceptance **OPEN**, Phase 3 **IN PROGRESS**. Current appearance is provisional: functionality
+and deployment take priority before a dedicated visual refinement pass; previous checks are not final
+aesthetic approval. Accessibility/security gates remain separate and required.
+
+Next bounded **Phase 3F: established-session rejection coordination**. A generation-bound request-failure
+boundary should discard stale old-session 401s, distinguish operation 403 and reconcile current authority
+through deliberate bounded `/me` verification without mutation/credential replay. Dependencies: inspect
+feature/API consumers and server rejection contracts, agree D3 unknown-state/write-blocking policy, reuse
+3B–3D cancellation/lifecycle and registry restoration, inventory pending-request/login/logout/replacement
+tests. Refresh/rotation ambiguity, CredentialStore, broad transport/cache and data-router/dirty blockers
+remain separate unfinished Phase 3 work. Real-host/live backend/tenant/audit and remaining device/
+screen-reader/other-engine acceptance stay OPEN. Phase 2 acceptance continues independently.
 
 ## 12. Ready-to-run next Codex implementation prompt
 

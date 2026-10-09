@@ -32,15 +32,19 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 function beta(path: string) { window.history.replaceState({}, '', path); render(<App />); }
 describe('authenticated responsive shell composition', () => {
   it.each([
-    ['/my-shale', 'My Shale'], ['/tasks', 'Tasks'], ['/cases', 'Cases'], ['/contacts', 'Contacts'],
-    ['/organizations', 'Organizations'], ['/team', 'Team'], ['/settings', 'Settings'],
-    ['/cases/1', 'Case Detail'], ['/tasks/1', 'Task Detail'], ['/contacts/1', 'Contact Detail'],
-    ['/organizations/1', 'Organization Detail'], ['/team/1', 'Team Member Detail'],
-  ])('preserves direct route %s', async (path, heading) => {
+    ['/my-shale', 'My Shale', 'My Shale'], ['/tasks', 'Tasks', 'My Tasks'], ['/cases', 'Cases', 'Cases'], ['/contacts', 'Contacts', 'Contacts'],
+    ['/organizations', 'Organizations', 'Organizations'], ['/team', 'Team', 'Team'], ['/settings', 'Settings', 'Settings'],
+    ['/cases/1', 'Case Detail', 'Cases'], ['/tasks/1', 'Task Detail', 'My Tasks'], ['/contacts/1', 'Contact Detail', 'Contacts'],
+    ['/organizations/1', 'Organization Detail', 'Organizations'], ['/team/1', 'Team Member Detail', 'Team'],
+    ['/CASES/001/?page=2#details', 'Case Detail', 'Cases'], ['/TASKS/', 'Tasks', 'My Tasks'],
+  ])('preserves direct route %s', async (path, heading, activeLabel) => {
     beta(path); expect(await screen.findByRole('heading', { name: heading, level: 1 })).toBeTruthy();
     expect(api.getCurrentUser).toHaveBeenCalledWith('test-token', expect.any(AbortSignal));
     expect(screen.getByRole('navigation', { name: 'Primary navigation' })).toBeTruthy();
     expect(document.querySelector('.shale-authenticated')).toBeTruthy();
+    document.querySelector('details')!.open = true;
+    expect(screen.getByRole('link', { name: activeLabel }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getAllByRole('link').filter(link => link.getAttribute('aria-current') === 'page')).toHaveLength(1);
   });
   it('retains the login route without a bearer', async () => {
     vi.mocked(api.readAccessToken).mockReturnValue(null); beta('/login');
@@ -336,7 +340,8 @@ describe('verified login return restoration', () => {
     expect(window.location.pathname).toBe('/login'); expect(screen.queryByRole('navigation')).toBeNull();
     expect(api.getContactDetail).toHaveBeenCalledTimes(detailCalls);
   });
-  it.each([['/unknown', false, 'Sign in'], ['/unknown', true, 'My Shale'], ['/login', true, 'My Shale'], ['/', false, 'Sign in']])
+  it.each([['/unknown', false, 'Sign in'], ['/unknown', true, 'My Shale'], ['/login', true, 'My Shale'], ['/', false, 'Sign in'], ['/', true, 'My Shale'],
+    ...['/calendar', '/reports', '/search', '/cases/7/overview', '/settings/personal'].flatMap(path => [[path, false, 'Sign in'], [path, true, 'My Shale']] as [string, boolean, string][])])
   ('retains root, unknown and authenticated-login fallback for %s / signed in %s', async (path, authenticated, heading) => {
     vi.mocked(api.readAccessToken).mockReturnValue(authenticated ? 'test-token' : null);
     beta(path); await screen.findByRole('heading', { name: heading, level: 1 });

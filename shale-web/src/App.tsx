@@ -1,6 +1,8 @@
 import { startTransition, FormEvent, useEffect, useMemo, useState, useRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { redirectPathFrom } from './returnPath';
+import { operationalRouteIds, routePath, routes } from './app/routeRegistry';
+import type { OperationalRouteId } from './app/routeRegistry';
 import { useStartupSession } from './useStartupSession';
 import type { AuthState, LogoutFeedback } from './useStartupSession';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -107,14 +109,14 @@ function AppRoutes() {
     // Replace and clear return state together, as in Phase 3A local logout.
     startTransition(() => {
       signOut();
-      navigate('/login', { replace: true, state: null });
+      navigate(routes.login.path, { replace: true, state: null });
     });
   }
 
   function handleLogout() {
     // Match BrowserRouter's transition so a signed-out detail cannot be recaptured.
     startTransition(() => {
-      if (logoutSession()) navigate('/login', { replace: true, state: null });
+      if (logoutSession()) navigate(routes.login.path, { replace: true, state: null });
     });
   }
 
@@ -124,30 +126,35 @@ function AppRoutes() {
     return <SessionVerification pending={authState.verification === 'pending'} onRetry={retry} onSignIn={returnToSignIn} />;
   }
 
+  // Composition stays here, beneath the explicit session guard. Metadata is not authorization.
+  const screens: Record<OperationalRouteId, ReactNode> = {
+    myShale: <MyShalePage accessToken={authState.accessToken} user={authState.user} />,
+    cases: <CasesPage accessToken={authState.accessToken} />,
+    caseDetail: <CaseDetailPage accessToken={authState.accessToken} />,
+    tasks: <TasksPage accessToken={authState.accessToken} />,
+    taskDetail: <TaskDetailPage accessToken={authState.accessToken} />,
+    contacts: <ContactsPage accessToken={authState.accessToken} />,
+    contactDetail: <ContactDetailPage accessToken={authState.accessToken} />,
+    organizations: <OrganizationsPage accessToken={authState.accessToken} />,
+    organizationDetail: <OrganizationDetailPage accessToken={authState.accessToken} />,
+    team: <TeamPage accessToken={authState.accessToken} />,
+    teamMemberDetail: <TeamMemberDetailPage accessToken={authState.accessToken} />,
+    settings: <SettingsPage accessToken={authState.accessToken} user={authState.user} />,
+  };
+
   return (
     <Routes>
-      <Route path="/" element={authState.user ? <Navigate to="/my-shale" replace /> : <Navigate to="/login" replace />} />
+      <Route path={routes.root.path} element={authState.user ? <Navigate to={routes.myShale.path} replace /> : <Navigate to={routes.login.path} replace />} />
       <Route
-        path="/login"
+        path={routes.login.path}
         element={authState.user ? <Navigate to={redirectPathFrom(location.state)} replace state={null} /> : <LoginPage onLogin={handleLogin} logoutFeedback={logoutFeedback} />}
       />
       <Route element={<ProtectedRoute authState={authState} />}>
         <Route element={<AppShell user={authState.user} onLogout={handleLogout} />}>
-          <Route path="/my-shale" element={<MyShalePage accessToken={authState.accessToken} user={authState.user} />} />
-          <Route path="/cases" element={<CasesPage accessToken={authState.accessToken} />} />
-          <Route path="/cases/:caseId" element={<CaseDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/tasks" element={<TasksPage accessToken={authState.accessToken} />} />
-          <Route path="/tasks/:taskId" element={<TaskDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/contacts" element={<ContactsPage accessToken={authState.accessToken} />} />
-          <Route path="/contacts/:contactId" element={<ContactDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/organizations" element={<OrganizationsPage accessToken={authState.accessToken} />} />
-          <Route path="/organizations/:organizationId" element={<OrganizationDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/team" element={<TeamPage accessToken={authState.accessToken} />} />
-          <Route path="/team/:userId" element={<TeamMemberDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/settings" element={<SettingsPage accessToken={authState.accessToken} user={authState.user} />} />
+          {operationalRouteIds.map(id => <Route key={id} path={routes[id].path} element={screens[id]} />)}
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to={authState.user ? '/my-shale' : '/login'} replace />} />
+      <Route path={routes.fallback.path} element={<Navigate to={authState.user ? routes.myShale.path : routes.login.path} replace />} />
     </Routes>
   );
 }
@@ -419,7 +426,7 @@ function ProtectedRoute({ authState }: { authState: AuthState }) {
   const location = useLocation();
 
   if (!authState.user) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to={routes.login.path} replace state={{ from: location }} />;
   }
 
   return <Outlet />;
@@ -501,7 +508,7 @@ function AppShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout
         </select>
         <Button onClick={onLogout}>Logout</Button>
       </>}>
-      <div className={location.pathname.replace(/\/+$/, '') === '/my-shale' ? 'shale-route-content' : 'legacy-route-content'}><div className="content-container"><Outlet /></div></div>
+      <div className={location.pathname.replace(/\/+$/, '') === routes.myShale.path ? 'shale-route-content' : 'legacy-route-content'}><div className="content-container"><Outlet /></div></div>
     </ResponsiveShell>
   </div>;
 }
@@ -562,7 +569,7 @@ function MyCasesList({ cases }: { cases: CaseSearchResult[] }) {
               <MetadataRow label="Statute of limitations" value={formatDate(item.solDate)} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/cases/${item.caseId}`)}
+          onClick={() => navigate(routePath('caseDetail', { caseId: item.caseId }))}
           ariaLabel={`Open case ${displayValue(item.caseName, `Case ${item.caseId}`)}`}
         />
       ))}
@@ -651,7 +658,7 @@ function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError, pr
           actions={!task.completedAt ? (presentation === 'shared'
             ? <Button size="small" purpose="secondary" disabled={completingTaskId === task.id} aria-busy={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</Button>
             : <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton>) : <span className="completed-state">Completed {formatDate(task.completedAt)}</span>}
-          onClick={() => navigate(`/tasks/${task.id}`)}
+          onClick={() => navigate(routePath('taskDetail', { taskId: task.id }))}
           ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
         />
       ))}
@@ -772,7 +779,7 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
     <section className="cases-page" aria-labelledby="cases-title">
       <PageHeader eyebrow="Search" title="Cases" titleId="cases-title" lede="Search, open, and create case records."
         action={<button type="button" onClick={() => setIsCreating((value) => !value)}>{isCreating ? 'Cancel new case' : 'New case'}</button>} />
-      {isCreating && <NewCaseForm accessToken={accessToken} onCancel={() => setIsCreating(false)} onCreated={(created) => navigate(`/cases/${created.caseId}`)} />}
+      {isCreating && <NewCaseForm accessToken={accessToken} onCancel={() => setIsCreating(false)} onCreated={(created) => navigate(routePath('caseDetail', { caseId: created.caseId }))} />}
       <SearchBar
         id="case-search"
         label="Search cases"
@@ -915,7 +922,7 @@ function CaseResultsList({ results }: { results: CaseSearchResult[] }) {
               <MetadataRow label="Client" value={displayValue(result.client)} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/cases/${result.caseId}`)}
+          onClick={() => navigate(routePath('caseDetail', { caseId: result.caseId }))}
           ariaLabel={`Open case ${displayValue(result.caseName, `Case ${result.caseId}`)}`}
         />
       ))}
@@ -977,7 +984,7 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
       {isCreating && (
         <ContactCreateForm
           accessToken={accessToken}
-          onCreated={(created) => navigate(`/contacts/${created.id}`)}
+          onCreated={(created) => navigate(routePath('contactDetail', { contactId: created.id }))}
           onCancel={() => setIsCreating(false)}
         />
       )}
@@ -1017,7 +1024,7 @@ function ContactResultsList({ results }: { results: ContactSearchResult[] }) {
               <MetadataRow label="Phone" value={displayValue(result.phone)} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/contacts/${result.id}`)}
+          onClick={() => navigate(routePath('contactDetail', { contactId: result.id }))}
           ariaLabel={`Open contact ${displayValue(result.displayName, `Contact ${result.id}`)}`}
         />
       ))}
@@ -1075,7 +1082,7 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
       {isCreating && (
         <OrganizationCreateForm
           accessToken={accessToken}
-          onCreated={(created) => navigate(`/organizations/${created.id}`)}
+          onCreated={(created) => navigate(routePath('organizationDetail', { organizationId: created.id }))}
           onCancel={() => setIsCreating(false)}
         />
       )}
@@ -1118,7 +1125,7 @@ function OrganizationResultsList({ results }: { results: OrganizationSearchResul
               <MetadataRow label="Location" value={[result.city, result.state].filter(Boolean).join(', ') || MISSING_VALUE} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/organizations/${result.id}`)}
+          onClick={() => navigate(routePath('organizationDetail', { organizationId: result.id }))}
           ariaLabel={`Open organization ${displayValue(result.name, `Organization ${result.id}`)}`}
         />
       ))}
@@ -1215,7 +1222,7 @@ function TeamMembersList({ members }: { members: TeamMemberSummary[] }) {
               <MetadataRow label="Color" value={<ColorSwatch color={member.color} />} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/team/${member.id}`)}
+          onClick={() => navigate(routePath('teamMemberDetail', { userId: member.id }))}
           ariaLabel={`Open team member ${teamMemberName(member)}`}
         />
       ))}
@@ -1265,7 +1272,7 @@ function TeamMemberDetailPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <DetailShell className="team-member-detail-page" titleId="team-member-detail-title">
-      <DetailHeader eyebrow="Team Member Detail" title={title} titleId="team-member-detail-title" backTo="/team" backLabel="Back to Team" />
+      <DetailHeader eyebrow="Team Member Detail" title={title} titleId="team-member-detail-title" backTo={routes.team.path} backLabel="Back to Team" />
       {isLoading && <LoadingState message="Loading team member detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !member && <EmptyState message="No team member detail was found." />}
@@ -1352,7 +1359,7 @@ function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <DetailShell className="task-detail-page" titleId="task-detail-title">
-      <DetailHeader eyebrow="Task Detail" title={title} titleId="task-detail-title" backTo="/my-shale" backLabel="Back to My Shale" />
+      <DetailHeader eyebrow="Task Detail" title={title} titleId="task-detail-title" backTo={routes.myShale.path} backLabel="Back to My Shale" />
 
       {isLoading && <LoadingState message="Loading task detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
@@ -1402,7 +1409,7 @@ function TaskDetailReadOnly({ accessToken, detail, isEditing, onEdit, onCancel, 
           <dl className="detail-list compact">
             <DetailItem label="Related Case Name" value={detail.caseName} />
           </dl>
-          <Link className="button-link inline-action" to={`/cases/${detail.caseId}`}>Open Case</Link>
+          <Link className="button-link inline-action" to={routePath('caseDetail', { caseId: detail.caseId })}>Open Case</Link>
         </section>
       )}
     </div>
@@ -1605,7 +1612,7 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <DetailShell className="case-detail-page" titleId="case-detail-title">
-      <DetailHeader eyebrow="Case Detail" title={title} titleId="case-detail-title" backTo="/cases" backLabel="Back to Cases">
+      <DetailHeader eyebrow="Case Detail" title={title} titleId="case-detail-title" backTo={routes.cases.path} backLabel="Back to Cases">
         {caseDetail?.caseStatus && <StatusPill tone="info">{caseDetail.caseStatus}</StatusPill>}
       </DetailHeader>
 
@@ -2131,7 +2138,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
                 </MetadataGrid>
               )}
               actions={!task.completedAt ? <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton> : <span className="completed-state">Completed {formatDate(task.completedAt)}</span>}
-              onClick={() => navigate(`/tasks/${task.id}`)}
+              onClick={() => navigate(routePath('taskDetail', { taskId: task.id }))}
               ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
             />
           ))}
@@ -2233,7 +2240,7 @@ function RelatedContactsSection({ contacts }: { contacts: CaseRelatedContact[] }
       ) : (
         <div className="related-contact-grid">
           {contacts.map((contact) => (
-            <Link className="related-contact-card" key={contact.id} to={`/contacts/${contact.id}`}>
+            <Link className="related-contact-card" key={contact.id} to={routePath('contactDetail', { contactId: contact.id })}>
               <span className="related-contact-name">{contact.displayName || 'Unnamed contact'}</span>
               <span className="related-contact-meta">
                 {formatRelatedContactMeta(contact)}
@@ -2297,7 +2304,7 @@ function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <DetailShell className="contact-detail-page" titleId="contact-detail-title">
-      <DetailHeader eyebrow="Contact Detail" title={title} titleId="contact-detail-title" backTo="/contacts" backLabel="Back to Contacts" />
+      <DetailHeader eyebrow="Contact Detail" title={title} titleId="contact-detail-title" backTo={routes.contacts.path} backLabel="Back to Contacts" />
 
       {isLoading && <LoadingState message="Loading contact detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
@@ -2631,7 +2638,7 @@ function OrganizationDetailPage({ accessToken }: { accessToken: string | null })
 
   return (
     <DetailShell className="organization-detail-page" titleId="organization-detail-title">
-      <DetailHeader eyebrow="Organization Detail" title={title} titleId="organization-detail-title" backTo="/organizations" backLabel="Back to Organizations" />
+      <DetailHeader eyebrow="Organization Detail" title={title} titleId="organization-detail-title" backTo={routes.organizations.path} backLabel="Back to Organizations" />
       {isLoading && <LoadingState message="Loading organization detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !organizationDetail && <EmptyState message="No organization detail was found." />}
@@ -2782,7 +2789,7 @@ function RelatedOrganizationCasesList({ cases }: { cases: OrganizationDetail['re
               <MetadataRow label="Statute of limitations" value={formatDate(item.statuteOfLimitationsDate)} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/cases/${item.id}`)}
+          onClick={() => navigate(routePath('caseDetail', { caseId: item.id }))}
           ariaLabel={`Open related case ${displayValue(item.name, `Case ${item.id}`)}`}
         />
       ))}
