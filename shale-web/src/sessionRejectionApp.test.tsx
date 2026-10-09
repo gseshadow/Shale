@@ -131,10 +131,17 @@ describe('established-session recovery with actual endpoint clients', () => {
       if (path === '/api/cases/assigned' || path === '/api/tasks/assigned') return response([]);
       throw new Error(`Unexpected fixture endpoint ${path}`);
     });
-    window.history.replaceState({}, '', '/login'); const oldApp = render(<App router={testRouter()} />);
+    window.history.replaceState({}, '', '/login');
+    const oldRouter = testRouter(), oldApp = render(<App router={oldRouter} />);
     await screen.findByRole('heading', { name: 'Sign in' }); await signIn();
-    expect(loginStarted).toBe(true); oldApp.unmount();
+    expect(loginStarted).toBe(true); oldApp.unmount(); oldRouter.dispose();
     open('/my-shale'); await screen.findByRole('heading', { name: 'My Shale', level: 1 });
+    // Heading render does not prove the new screen's normal mount effects ran.
+    // Settle those expected reads before asserting that the old login adds none.
+    await waitFor(() => {
+      expect(calls.filter(c => c.path === '/api/cases/assigned')).toHaveLength(1);
+      expect(calls.filter(c => c.path === '/api/tasks/assigned')).toHaveLength(1);
+    });
     const count = calls.length;
     await act(async () => { old.resolve(response({ accessToken: 'synthetic-old' }, outcome === 'success' ? 200 : 401)); });
     expect(readAccessToken()).toBe('synthetic-established'); expect(calls).toHaveLength(count);
