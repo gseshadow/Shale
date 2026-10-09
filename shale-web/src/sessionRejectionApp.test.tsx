@@ -26,7 +26,7 @@ function fixture(handler: (path: string, method: string) => Response | Promise<R
     const path = new URL(String(input)).pathname, method = init?.method ?? 'GET';
     calls.push({ path, method });
     if (path === '/api/auth/me') return response(user);
-    if (path === '/api/auth/login') return response({ accessToken: 'synthetic-new', user });
+    if (path === '/api/auth/login') return response({ authenticated: true, tokenType: 'Bearer', expiresInSeconds: 3600, accessToken: 'synthetic-new', user });
     if (path === '/api/auth/logout') return response({ revoked: true });
     return handler(path, method);
   });
@@ -121,6 +121,28 @@ describe('established-session recovery with actual endpoint clients', () => {
     expect(window.location.pathname).toBe('/contacts'); expect(readAccessToken()).toBe('synthetic-new');
     expect(screen.queryByText('Old')).toBeNull(); expect(calls.some(c => c.path === '/api/contacts/99')).toBe(false);
   });
+  it('leaving LoginPage cancels its attempt even while the session owner stays mounted', async () => {
+    const old = deferred(); let oldSignal: AbortSignal | null | undefined;
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      calls.push({ path, method: init?.method ?? 'GET' });
+      if (path === '/api/auth/login') { oldSignal = init?.signal; return old.promise; }
+      throw new Error('Unexpected synthetic request');
+    });
+    window.history.replaceState({}, '', '/login');
+    const router = testRouter(); render(<App router={router} />);
+    await screen.findByRole('heading', { name: 'Sign in' }); await signIn();
+    expect(oldSignal?.aborted).toBe(false);
+    await act(async () => { await router.navigate('/unknown'); });
+    await screen.findByRole('heading', { name: 'Sign in' });
+    expect(oldSignal?.aborted).toBe(true);
+    fixture(() => response([])); await signIn();
+    await screen.findByRole('heading', { name: 'My Shale', level: 1 });
+    await act(async () => { old.resolve(response({ authenticated: true, tokenType: 'Bearer', expiresInSeconds: 3600, accessToken: 'synthetic-old', user })); });
+    expect(readAccessToken()).toBe('synthetic-new');
+    expect(calls.filter(call => call.path === '/api/auth/login')).toHaveLength(2);
+    expect(calls.filter(call => call.path === '/api/auth/me')).toHaveLength(1);
+  });
   it.each(['success', 'failure'])('an unmounted login cannot overwrite or clear a replacement on late %s', async outcome => {
     const old = deferred(); let loginStarted = false;
     fetchMock.mockImplementation(async (input, init) => {
@@ -143,7 +165,7 @@ describe('established-session recovery with actual endpoint clients', () => {
       expect(calls.filter(c => c.path === '/api/tasks/assigned')).toHaveLength(1);
     });
     const count = calls.length;
-    await act(async () => { old.resolve(response({ accessToken: 'synthetic-old' }, outcome === 'success' ? 200 : 401)); });
+    await act(async () => { old.resolve(response({ authenticated: true, tokenType: 'Bearer', expiresInSeconds: 3600, accessToken: 'synthetic-old', user }, outcome === 'success' ? 200 : 401)); });
     expect(readAccessToken()).toBe('synthetic-established'); expect(calls).toHaveLength(count);
     expect(screen.getByRole('heading', { name: 'My Shale', level: 1 })).toBeTruthy();
   });

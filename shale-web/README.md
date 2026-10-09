@@ -33,13 +33,13 @@ By default, `shale-web` posts credentials to:
 https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net/api/auth/login
 ```
 
-After login succeeds, the app stores the returned access token in `sessionStorage` and calls:
+After a usable login response, the app calls:
 
 ```text
 https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net/api/auth/me
 ```
 
-with `Authorization: Bearer <token>`. The authenticated user information displayed in the UI comes from `/api/auth/me`.
+with `Authorization: Bearer <token>`. Only a usable `/me` response matching the login identity permits credential storage and protected access. The authenticated user information displayed in the UI comes from `/api/auth/me`. Login and verification share one eight-second deadline; timeout does not prove that the server failed to create a session. See [Phase 3J review](docs/phase-3j-review.md).
 
 ## `.env.local` override
 
