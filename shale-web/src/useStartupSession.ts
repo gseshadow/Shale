@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ApiError, clearAccessToken, getCurrentUser, readAccessToken, storeAccessToken } from './api';
+import { ApiError, clearAccessToken, getCurrentUser, logout, readAccessToken, storeAccessToken } from './api';
 import type { AuthenticatedUser } from './api';
 
 export interface AuthState {
@@ -10,15 +10,23 @@ export interface AuthState {
 
 const signedOut: AuthState = { accessToken: null, user: null, verification: null };
 
-// Startup/recovery only. Established sessions retain their existing login/logout behavior.
+export type LogoutFeedback = 'pending' | 'confirmed' | 'unavailable' | null;
+
+// Startup recovery and the established-session sign-out boundary share invalidation.
 export function useStartupSession() {
   const [authState, setAuthState] = useState<AuthState>({ ...signedOut, verification: 'pending' });
+  const [logoutFeedback, setLogoutFeedback] = useState<LogoutFeedback>(null);
+  const remoteLogout = useRef<AbortController | null>(null);
+  const logoutConsumed = useRef(false);
   const mounted = useRef(false);
   const generation = useRef(0);
   const pending = useRef<{ token: string } | null>(null);
+  const renderedGeneration = generation.current;
 
   function invalidate() {
     generation.current++;
+    remoteLogout.current?.abort();
+    remoteLogout.current = null;
     pending.current = null;
   }
 
@@ -48,7 +56,10 @@ export function useStartupSession() {
 
     try {
       const user = await getCurrentUser(token);
-      if (isCurrent()) setAuthState({ accessToken: token, user, verification: null });
+      if (isCurrent()) {
+        logoutConsumed.current = false;
+        setAuthState({ accessToken: token, user, verification: null });
+      }
     } catch (error) {
       if (!isCurrent()) return;
       // /me's resolver uses 401 for absent/invalid/expired/revoked/ineligible sessions.
@@ -70,6 +81,8 @@ export function useStartupSession() {
 
   function signIn(accessToken: string, user: AuthenticatedUser) {
     invalidate();
+    logoutConsumed.current = false;
+    setLogoutFeedback(null);
     storeAccessToken(accessToken);
     setAuthState({ accessToken, user, verification: null });
   }
@@ -77,8 +90,32 @@ export function useStartupSession() {
   function signOut() {
     invalidate();
     clearAccessToken();
+    setLogoutFeedback(null);
     setAuthState(signedOut);
   }
 
-  return { authState, retry, signIn, signOut };
+  function logoutSession(): boolean {
+    const token = authState.accessToken;
+    if (!mounted.current || !token || logoutConsumed.current || generation.current !== renderedGeneration) return false;
+    logoutConsumed.current = true; // Synchronous: a stale handler cannot activate twice.
+    signOut();
+    setLogoutFeedback('pending');
+    const attempt = generation.current;
+    const controller = new AbortController();
+    remoteLogout.current = controller;
+    function isCurrent() {
+      return mounted.current && generation.current === attempt && readAccessToken() === null;
+    }
+    // The only captured bearer belongs to this bounded attempt; nothing is restored/replayed.
+    void logout(token, controller.signal).then(() => {
+      if (isCurrent()) setLogoutFeedback('confirmed');
+    }, () => {
+      if (isCurrent()) setLogoutFeedback('unavailable');
+    }).finally(() => {
+      if (remoteLogout.current === controller) remoteLogout.current = null;
+    });
+    return true;
+  }
+
+  return { authState, logoutFeedback, retry, signIn, signOut, logoutSession };
 }

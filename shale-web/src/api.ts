@@ -434,14 +434,47 @@ function isAuthenticatedUser(value: unknown): value is AuthenticatedUser {
       .every(field => user[field] === null || typeof user[field] === 'string');
 }
 
-export async function logout(accessToken: string): Promise<void> {
-  await fetch(`${apiBaseUrl()}/api/auth/logout`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
+// Bound the whole exchange, including response-body reading. Abort is uncertainty,
+// never proof that the server did not commit revocation. No retry or credential queue.
+export const LOGOUT_TIMEOUT_MS = 8_000;
+export async function logout(accessToken: string, signal?: AbortSignal): Promise<void> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancel!: () => void;
+  const cancelled = new Promise<never>((_resolve, reject) => {
+    cancel = () => {
+      reject(new Error('Server session revocation could not be confirmed.'));
+      controller.abort();
+    };
+    timer = setTimeout(cancel, LOGOUT_TIMEOUT_MS);
   });
+  signal?.addEventListener('abort', cancel, { once: true });
+  try {
+    if (signal?.aborted) cancel();
+    else {
+      const exchange = (async () => {
+        const response = await fetch(`${apiBaseUrl()}/api/auth/logout`, {
+          method: 'POST',
+          redirect: 'error',
+          headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` },
+          signal: controller.signal,
+        });
+        if (response.status !== 200) throw new ApiError('Server session revocation could not be confirmed.', response.status);
+        const body: unknown = await response.json();
+        // LogoutResponse.revoked is false for absent/invalid/ineligible tokens.
+        // Neither a resolved fetch nor 401 establishes durable revocation.
+        if (!body || typeof body !== 'object' || !('revoked' in body) || body.revoked !== true) {
+          throw new Error('Server session revocation could not be confirmed.');
+        }
+      })();
+      await Promise.race([exchange, cancelled]);
+      return;
+    }
+    await cancelled;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', cancel);
+  }
 }
 export async function searchCases(accessToken: string, query: string): Promise<CaseSearchResult[]> {
   const response = await fetch(`${apiBaseUrl()}/api/cases/search?query=${encodeURIComponent(query)}`, {
