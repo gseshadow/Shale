@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App from './App';
+import { STARTUP_VERIFICATION_TIMEOUT_MS } from './useStartupSession';
 import * as api from './api';
 import { destinations } from './shell/navigation';
 
@@ -27,7 +28,7 @@ beforeEach(() => {
   for (const method of [api.getCaseDetail, api.getContactDetail, api.getOrganizationDetail, api.getTaskDetail,
     api.getTeamMemberDetail]) vi.mocked(method).mockRejectedValue(new Error('Synthetic detail failure'));
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 function beta(path: string) { window.history.replaceState({}, '', path); render(<App />); }
 describe('authenticated responsive shell composition', () => {
   it.each([
@@ -37,7 +38,7 @@ describe('authenticated responsive shell composition', () => {
     ['/organizations/1', 'Organization Detail'], ['/team/1', 'Team Member Detail'],
   ])('preserves direct route %s', async (path, heading) => {
     beta(path); expect(await screen.findByRole('heading', { name: heading, level: 1 })).toBeTruthy();
-    expect(api.getCurrentUser).toHaveBeenCalledWith('test-token');
+    expect(api.getCurrentUser).toHaveBeenCalledWith('test-token', expect.any(AbortSignal));
     expect(screen.getByRole('navigation', { name: 'Primary navigation' })).toBeTruthy();
     expect(document.querySelector('.shale-authenticated')).toBeTruthy();
   });
@@ -68,7 +69,7 @@ describe('authenticated responsive shell composition', () => {
       }
     }
     expect(window.location.pathname + window.location.search + window.location.hash).toBe('/cases/42?review=1#detail');
-    expect(api.getCaseDetail).toHaveBeenCalledWith('test-token', 42);
+    await waitFor(() => expect(api.getCaseDetail).toHaveBeenCalledWith('test-token', 42));
   });
   it('preserves browser back/forward, active navigation and route focus', async () => {
     beta('/cases'); await screen.findByRole('heading', { name: 'Cases', level: 1 });
@@ -148,6 +149,35 @@ describe('startup verification recovery', () => {
     for (const call of protectedCalls) expect(call).not.toHaveBeenCalled();
     expect(api.login).not.toHaveBeenCalled(); expect(api.completeTask).not.toHaveBeenCalled();
   }
+  it.each(['retry', 'return'])('deadline blocks features, preserves location/history, and supports %s', async action => {
+    vi.useFakeTimers();
+    let late!: (value: api.AuthenticatedUser) => void;
+    vi.mocked(api.getCurrentUser).mockReturnValueOnce(new Promise(done => { late = done; }));
+    const path = '/contacts/7?sort=name#profile'; beta(path);
+    const historyLength = window.history.length;
+    expectBlocked();
+    await act(async () => { await vi.advanceTimersByTimeAsync(STARTUP_VERIFICATION_TIMEOUT_MS); });
+    expect(screen.getByRole('alert').textContent).toMatch(/verification is unavailable/);
+    expectBlocked(); expect(api.readAccessToken()).toBe('test-token');
+    expect(api.clearAccessToken).not.toHaveBeenCalled();
+    expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
+    if (action === 'retry') {
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry' })); });
+      expect(screen.getByRole('heading', { name: 'Contact Detail' })).toBeTruthy();
+      expect(api.getContactDetail).toHaveBeenCalledWith('test-token', 7);
+      expect(window.location.pathname + window.location.search + window.location.hash).toBe(path);
+    } else {
+      await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Return to sign in' })); });
+      expect(screen.getByRole('heading', { name: 'Sign in' })).toBeTruthy();
+      expect(api.readAccessToken()).toBeNull(); expect(api.logout).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe('/login'); expect(window.history.state.usr).toBeNull();
+      expectBlocked();
+    }
+    await act(async () => { late(user); });
+    expect(window.history.length).toBe(historyLength);
+    expect(api.getCurrentUser).toHaveBeenCalledTimes(action === 'retry' ? 2 : 1);
+    if (action === 'return') expectBlocked();
+  });
   it.each(['/my-shale', '/cases/7?page=2#details', '/login', '/', '/unknown'])
   ('blocks all route content while pending and unavailable at %s', async path => {
     let reject!: (error: Error) => void;
