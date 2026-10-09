@@ -12,6 +12,30 @@ const signedOut: AuthState = { accessToken: null, user: null, verification: null
 
 export type LogoutFeedback = 'pending' | 'confirmed' | 'unavailable' | null;
 
+// Match the existing logout deadline: eight seconds for fetch AND body processing.
+// Only startup/explicit Retry opt in; credential login keeps its existing policy.
+export const STARTUP_VERIFICATION_TIMEOUT_MS = 8_000;
+async function verifyStartupSession(token: string, controller: AbortController): Promise<AuthenticatedUser> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancel!: () => void;
+  const cancelled = new Promise<never>((_resolve, reject) => {
+    cancel = () => {
+      clearTimeout(timer);
+      reject(new Error('Session verification is unavailable.'));
+    };
+    timer = setTimeout(() => { cancel(); controller.abort(); }, STARTUP_VERIFICATION_TIMEOUT_MS);
+  });
+  controller.signal.addEventListener('abort', cancel, { once: true });
+  try {
+    if (controller.signal.aborted) { cancel(); return await cancelled; }
+    // Racing the entire parsed/validated result also consumes ignored-abort late settlements.
+    return await Promise.race([getCurrentUser(token, controller.signal), cancelled]);
+  } finally {
+    clearTimeout(timer);
+    controller.signal.removeEventListener('abort', cancel);
+  }
+}
+
 // Startup recovery and the established-session sign-out boundary share invalidation.
 export function useStartupSession() {
   const [authState, setAuthState] = useState<AuthState>({ ...signedOut, verification: 'pending' });
@@ -20,13 +44,14 @@ export function useStartupSession() {
   const logoutConsumed = useRef(false);
   const mounted = useRef(false);
   const generation = useRef(0);
-  const pending = useRef<{ token: string } | null>(null);
+  const pending = useRef<{ token: string; controller: AbortController } | null>(null);
   const renderedGeneration = generation.current;
 
   function invalidate() {
     generation.current++;
     remoteLogout.current?.abort();
     remoteLogout.current = null;
+    pending.current?.controller.abort();
     pending.current = null;
   }
 
@@ -39,14 +64,15 @@ export function useStartupSession() {
       return;
     }
     const attempt = generation.current;
-    pending.current = { token };
+    const controller = new AbortController();
+    pending.current = { token, controller };
     setAuthState({ ...signedOut, verification: 'pending' });
 
     function isCurrent() {
       if (!mounted.current || generation.current !== attempt) return false;
       if (readAccessToken() !== token) {
         // A replaced/removed credential cannot inherit this attempt's result (including 401).
-        pending.current = null;
+        invalidate();
         setAuthState(readAccessToken() ? { ...signedOut, verification: 'unavailable' } : signedOut);
         return false;
       }
@@ -55,7 +81,7 @@ export function useStartupSession() {
     }
 
     try {
-      const user = await getCurrentUser(token);
+      const user = await verifyStartupSession(token, controller);
       if (isCurrent()) {
         logoutConsumed.current = false;
         setAuthState({ accessToken: token, user, verification: null });

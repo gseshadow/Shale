@@ -403,9 +403,10 @@ export async function login(email: string, password: string): Promise<LoginRespo
   return response.json() as Promise<LoginResponse>;
 }
 
-export async function getCurrentUser(accessToken: string): Promise<AuthenticatedUser> {
+export async function getCurrentUser(accessToken: string, signal?: AbortSignal): Promise<AuthenticatedUser> {
   const response = await fetch(`${apiBaseUrl()}/api/auth/me`, {
     method: 'GET',
+    signal,
     headers: {
       Accept: 'application/json',
       Authorization: `Bearer ${accessToken}`,
