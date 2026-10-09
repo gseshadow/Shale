@@ -1,0 +1,13 @@
+.contact-discard-dialog {
+  max-width: min(32rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: var(--shale-space-4, 1rem);
+  background: var(--shale-card);
+  color: var(--shale-text);
+  border: 1px solid var(--shale-border);
+  border-radius: var(--shale-radius-card);
+}
+.contact-discard-dialog::backdrop { background: rgb(0 0 0 / 50%); }
+.contact-discard-dialog .form-actions { flex-wrap: wrap; }

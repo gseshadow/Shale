@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import App from './App';
+import App, { createAppRouter } from './App';
+const routers: ReturnType<typeof createAppRouter>[] = [];
+function testRouter() { const router = createAppRouter(); routers.push(router); return router; }
 import * as api from './api';
 import { readAccessToken, storeAccessToken } from './api';
 
@@ -18,7 +20,7 @@ beforeEach(() => {
   sessionStorage.clear(); calls = []; fetchMock.mockReset(); vi.stubGlobal('fetch', fetchMock);
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
 });
-afterEach(() => { cleanup(); sessionStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); routers.splice(0).forEach(router => router.dispose()); sessionStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 function fixture(handler: (path: string, method: string) => Response | Promise<Response>) {
   fetchMock.mockImplementation(async (input, init) => {
     const path = new URL(String(input)).pathname, method = init?.method ?? 'GET';
@@ -29,7 +31,7 @@ function fixture(handler: (path: string, method: string) => Response | Promise<R
     return handler(path, method);
   });
 }
-function open(path: string) { storeAccessToken('synthetic-established'); window.history.replaceState({}, '', path); render(<App />); }
+function open(path: string) { storeAccessToken('synthetic-established'); window.history.replaceState({}, '', path); render(<App router={testRouter()} />); }
 async function signIn() {
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'synthetic@example.invalid' } });
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'synthetic-password' } });
@@ -129,10 +131,17 @@ describe('established-session recovery with actual endpoint clients', () => {
       if (path === '/api/cases/assigned' || path === '/api/tasks/assigned') return response([]);
       throw new Error(`Unexpected fixture endpoint ${path}`);
     });
-    window.history.replaceState({}, '', '/login'); const oldApp = render(<App />);
+    window.history.replaceState({}, '', '/login');
+    const oldRouter = testRouter(), oldApp = render(<App router={oldRouter} />);
     await screen.findByRole('heading', { name: 'Sign in' }); await signIn();
-    expect(loginStarted).toBe(true); oldApp.unmount();
+    expect(loginStarted).toBe(true); oldApp.unmount(); oldRouter.dispose();
     open('/my-shale'); await screen.findByRole('heading', { name: 'My Shale', level: 1 });
+    // Heading render does not prove the new screen's normal mount effects ran.
+    // Settle those expected reads before asserting that the old login adds none.
+    await waitFor(() => {
+      expect(calls.filter(c => c.path === '/api/cases/assigned')).toHaveLength(1);
+      expect(calls.filter(c => c.path === '/api/tasks/assigned')).toHaveLength(1);
+    });
     const count = calls.length;
     await act(async () => { old.resolve(response({ accessToken: 'synthetic-old' }, outcome === 'success' ? 200 : 401)); });
     expect(readAccessToken()).toBe('synthetic-established'); expect(calls).toHaveLength(count);

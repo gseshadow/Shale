@@ -1,6 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import App from './App';
+import App, { createAppRouter } from './App';
+const routers: ReturnType<typeof createAppRouter>[] = [];
+function testRouter() { const router = createAppRouter(); routers.push(router); return router; }
 import { STARTUP_VERIFICATION_TIMEOUT_MS } from './useStartupSession';
 import * as api from './api';
 import { destinations } from './shell/navigation';
@@ -28,8 +30,8 @@ beforeEach(() => {
   for (const method of [api.getCaseDetail, api.getContactDetail, api.getOrganizationDetail, api.getTaskDetail,
     api.getTeamMemberDetail]) vi.mocked(method).mockRejectedValue(new Error('Synthetic detail failure'));
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
-function beta(path: string) { window.history.replaceState({}, '', path); render(<App />); }
+afterEach(() => { cleanup(); routers.splice(0).forEach(router => router.dispose()); vi.useRealTimers(); vi.unstubAllGlobals(); });
+function beta(path: string) { window.history.replaceState({}, '', path); render(<App router={testRouter()} />); }
 describe('authenticated responsive shell composition', () => {
   it.each([
     ['/my-shale', 'My Shale', 'My Shale'], ['/tasks', 'Tasks', 'My Tasks'], ['/cases', 'Cases', 'Cases'], ['/contacts', 'Contacts', 'Contacts'],
@@ -245,7 +247,7 @@ describe('startup verification recovery', () => {
     vi.mocked(api.getCurrentUser).mockRejectedValueOnce(new TypeError('Synthetic offline'));
     vi.mocked(api.login).mockResolvedValue({ accessToken: 'new-test-token' } as api.LoginResponse);
     window.history.replaceState({}, '', '/tasks/7?status=open#activity');
-    window.history.pushState({}, '', '/contacts/7?sort=name#profile'); render(<App />);
+    window.history.pushState({}, '', '/contacts/7?sort=name#profile'); render(<App router={testRouter()} />);
     await screen.findByRole('alert'); fireEvent.click(screen.getByRole('button', { name: 'Return to sign in' }));
     await screen.findByRole('heading', { name: 'Sign in' }); submitLogin();
     await screen.findByRole('heading', { name: 'My Shale', level: 1 });
@@ -261,7 +263,7 @@ function submitLogin() {
   fireEvent.submit(screen.getByRole('button', { name: 'Sign in' }).closest('form')!);
 }
 function loginAt(state: unknown) {
-  window.history.replaceState({ usr: state }, '', '/login'); render(<App />);
+  window.history.replaceState({ usr: state }, '', '/login'); render(<App router={testRouter()} />);
 }
 describe('verified login return restoration', () => {
   beforeEach(() => {
@@ -310,7 +312,7 @@ describe('verified login return restoration', () => {
   });
   it('replaces login so Back/Forward returns to prior authenticated navigation without a redirect loop', async () => {
     window.history.replaceState({}, '', '/login');
-    window.history.pushState({}, '', '/contacts/7?sort=name#profile'); render(<App />);
+    window.history.pushState({}, '', '/contacts/7?sort=name#profile'); render(<App router={testRouter()} />);
     await screen.findByRole('heading', { name: 'Sign in' }); submitLogin();
     await screen.findByRole('heading', { name: 'Contact Detail', level: 1 });
     // Prior explicit login has no return state and uses its existing authenticated default.
