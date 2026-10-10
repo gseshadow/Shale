@@ -38,6 +38,29 @@ import com.shale.data.dao.CaseDao;
 class CaseServiceAdapterTest {
 
 	@Test
+	void exactSearchPageDelegatesUnchangedQueryTenantActorOffsetAndSize() {
+		FakeCaseGateway gateway = new FakeCaseGateway(List.of());
+		CaseServiceAdapter adapter = new CaseServiceAdapter(gateway);
+		assertEquals(List.of(), adapter.searchCasesPage(" Élan_%[ ", 41, 31, 10000, 100));
+		assertEquals(List.of(41, 31, " Élan_%[ ", 10000, 100), gateway.lastSearch);
+		assertThrows(IllegalArgumentException.class, () -> adapter.searchCasesPage("x", 41, 31, -1, 25));
+		assertThrows(IllegalArgumentException.class, () -> adapter.searchCasesPage("x", 41, 31, 0, 0));
+		assertEquals(List.of(41, 31, " Élan_%[ ", 10000, 100), gateway.lastSearch,
+				"Invalid boundaries must not delegate or replace the requested size with a default");
+	}
+
+	@Test
+	void unsupportedPagedPortDefaultTellsImplementerToDelegateSqlPaging() {
+		CaseServicePort port = (CaseServicePort) java.lang.reflect.Proxy.newProxyInstance(
+				CaseServicePort.class.getClassLoader(), new Class<?>[] {CaseServicePort.class},
+				(proxy, method, args) -> java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args));
+		var failure = assertThrows(UnsupportedOperationException.class,
+				() -> port.searchCasesPage("x", 41, 31, 25, 25));
+		assertTrue(failure.getMessage().contains("Implement CaseServicePort.searchCasesPage"));
+		assertTrue(failure.getMessage().contains("SQL offset and size"));
+	}
+
+	@Test
 	void listCaseUpdatesDelegatesToGateway() {
 		CaseUpdateDto update = new CaseUpdateDto(11, 99, "note", LocalDateTime.now(), null, 5, "Author");
 		FakeCaseGateway gateway = new FakeCaseGateway(List.of(update));
@@ -253,6 +276,7 @@ class CaseServiceAdapterTest {
 
 	static class FakeCaseGateway implements CaseServiceAdapter.CaseGateway {
 		private final List<CaseUpdateDto> caseUpdates;
+		private List<Object> lastSearch;
 		private long lastCaseUpdatesCaseId;
 		private long lastNoteCaseId;
 		private int lastNoteShaleClientId;
@@ -283,6 +307,13 @@ class CaseServiceAdapterTest {
 
 		FakeCaseGateway(List<CaseUpdateDto> caseUpdates) {
 			this.caseUpdates = caseUpdates;
+		}
+
+		@Override
+		public List<com.shale.data.dao.CaseSummaryDao.ServerCaseRow> searchActiveForServer(
+				int tenant, int actor, String query, int offset, int limit) {
+			lastSearch = List.of(tenant, actor, query, offset, limit);
+			return List.of();
 		}
 
 		@Override

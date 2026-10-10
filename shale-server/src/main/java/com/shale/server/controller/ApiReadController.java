@@ -236,12 +236,13 @@ public final class ApiReadController {
         int safePage = ApiValidation.page(page);
         int safeSize = ApiValidation.size(size);
         int shaleClientId = runtimeSessionState.requireShaleClientId();
-        List<CaseOverviewDto> fetched = caseServicePort.searchCases(
+        List<CaseOverviewDto> items = caseServicePort.searchCasesPage(
                 safeQuery,
                 shaleClientId,
                 runtimeSessionState.requireUserId(),
-                ApiValidation.searchLimitForPage(safePage, safeSize));
-        return new PagedResponse<>(slice(fetched, safePage, safeSize), safePage, safeSize, null);
+                Math.multiplyExact(safePage, safeSize),
+                safeSize);
+        return new PagedResponse<>(items, safePage, safeSize, null);
     }
 
     @Operation(summary = "List my cases", description = "Returns cases assigned to the current authenticated user.")

@@ -839,6 +839,7 @@ class ApiReadControllerTest {
     @Test
     void caseSearchPageReturnsPageContractWithDevelopmentHeaders() throws Exception {
         RecordingCaseServicePort caseServicePort = new RecordingCaseServicePort();
+        caseServicePort.pageItems = List.of(RecordingCaseServicePort.secondCaseOverview());
         MockMvc devMockMvc = developmentMockMvc(
                 caseServicePort,
                 unusedPort(TaskServicePort.class),
@@ -860,7 +861,85 @@ class ApiReadControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals("smith", caseServicePort.searchQuery);
         org.junit.jupiter.api.Assertions.assertEquals(41, caseServicePort.searchShaleClientId);
         org.junit.jupiter.api.Assertions.assertEquals(31, caseServicePort.searchActorUserId);
-        org.junit.jupiter.api.Assertions.assertEquals(2, caseServicePort.searchLimit);
+        org.junit.jupiter.api.Assertions.assertEquals(1, caseServicePort.searchLimit);
+        assertEquals(1, caseServicePort.searchOffset);
+    }
+
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"0,25,0", "1,25,25", "100,100,10000"})
+    void caseSearchPageDelegatesExactOffsetAndSize(int page, int size, int offset) throws Exception {
+        RecordingCaseServicePort port = new RecordingCaseServicePort();
+        port.pageItems = List.of(RecordingCaseServicePort.caseOverview());
+        MockMvc mvc = developmentMockMvc(port, unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class));
+        mvc.perform(get("/api/cases/search-page").param("query", "  Élan_%[  ")
+                .param("page", Integer.toString(page)).param("size", Integer.toString(size))
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].caseId").value(501))
+                .andExpect(jsonPath("$.page").value(page))
+                .andExpect(jsonPath("$.size").value(size))
+                .andExpect(content().string(containsString("\"total\":null")))
+                .andExpect(jsonPath("$.hasMore").doesNotExist());
+        assertEquals("Élan_%[", port.searchQuery, "Controller must trim without changing literal search semantics");
+        assertEquals(41, port.searchShaleClientId);
+        assertEquals(31, port.searchActorUserId);
+        assertEquals(offset, port.searchOffset, "Pass row offset, never a prefix fetch size");
+        assertEquals(size, port.searchLimit);
+    }
+
+    @Test
+    void caseSearchPageDefaultsAndEmptyFinalPageKeepLegacyShape() throws Exception {
+        RecordingCaseServicePort port = new RecordingCaseServicePort();
+        MockMvc mvc = developmentMockMvc(port, unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class));
+        mvc.perform(get("/api/cases/search-page")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(25));
+        assertEquals(0, port.searchOffset);
+        assertEquals(25, port.searchLimit);
+        assertEquals("", port.searchQuery);
+        port.pageItems = List.of();
+        mvc.perform(get("/api/cases/search-page").param("query", "x").param("page", "100")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk()).andExpect(content().json(
+                        "{\"items\":[],\"page\":100,\"size\":25,\"total\":null}", true));
+        assertEquals(2500, port.searchOffset);
+        assertEquals(25, port.searchLimit);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"-1,25", "101,25", "2147483647,100", "0,0", "0,101", "0,-1"})
+    void invalidCasePageBoundsFailBeforeService(int page, int size) throws Exception {
+        MockMvc mvc = developmentMockMvc(unusedPort(CaseServicePort.class), unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class));
+        mvc.perform(get("/api/cases/search-page").param("page", Integer.toString(page))
+                .param("size", Integer.toString(size))
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void casePageQueryLengthAndAuthenticationGuardsRemain() throws Exception {
+        mockMvc.perform(get("/api/cases/search-page").param("query", "x".repeat(101)))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/cases/search-page").param("query", "x"))
+                .andExpect(status().isUnauthorized());
+        RecordingCaseServicePort port = new RecordingCaseServicePort();
+        MockMvc mvc = developmentMockMvc(port, unusedPort(TaskServicePort.class),
+                unusedPort(ContactServicePort.class), unusedPort(NotificationServicePort.class));
+        mvc.perform(get("/api/cases/search-page").param("query", "  " + "x".repeat(100) + "  ")
+                .header(DevelopmentHeaderServerSessionResolver.USER_ID_HEADER, "31")
+                .header(DevelopmentHeaderServerSessionResolver.TENANT_ID_HEADER, "41"))
+                .andExpect(status().isOk());
+        assertEquals("x".repeat(100), port.searchQuery);
     }
 
     @Test
@@ -945,6 +1024,8 @@ class ApiReadControllerTest {
         private int searchShaleClientId;
         private int searchActorUserId;
         private int searchLimit;
+        private int searchOffset;
+        private List<CaseOverviewDto> pageItems = List.of(caseOverview(), secondCaseOverview());
         private long detailCaseId;
         private int detailShaleClientId;
         private int assignedUserId;
@@ -1008,6 +1089,16 @@ class ApiReadControllerTest {
             this.searchActorUserId = actorUserId;
             this.searchLimit = limit;
             return List.of(caseOverview(), secondCaseOverview());
+        }
+
+        @Override
+        public List<CaseOverviewDto> searchCasesPage(String query, int shaleClientId, int actorUserId, int offset, int size) {
+            this.searchQuery = query;
+            this.searchShaleClientId = shaleClientId;
+            this.searchActorUserId = actorUserId;
+            this.searchOffset = offset;
+            this.searchLimit = size;
+            return pageItems;
         }
 
         @Override
