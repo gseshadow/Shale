@@ -1,5 +1,8 @@
 package com.shale.core.service;
 
+import com.shale.core.dto.MinimizedCaseOverview;
+import com.shale.core.dto.MinimizedCasePage;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -43,6 +46,17 @@ import java.util.Collection;
  * implementations or exposing JavaFX types.</p>
  */
 public interface CaseServicePort {
+
+    default MinimizedCasePage searchMinimizedCases(String query, int tenant, int actor, int page, int size) {
+        throw new UnsupportedOperationException("Implement CaseServicePort.searchMinimizedCases with authorized SQL paging.");
+    }
+    default MinimizedCasePage listMinimizedAssignedCases(int tenant, int actor, int page, int size) {
+        throw new UnsupportedOperationException("Implement CaseServicePort.listMinimizedAssignedCases with authorized SQL paging.");
+    }
+    default Optional<MinimizedCaseOverview> readMinimizedCaseOverview(long caseId, int tenant, int actor) {
+        throw new UnsupportedOperationException("Implement CaseServicePort.readMinimizedCaseOverview with required committed read audit.");
+    }
+
 
 	Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId);
 	default Optional<CaseDetailDto> getAuthoritativeCaseDetail(long caseId, int shaleClientId, int actorUserId) {
