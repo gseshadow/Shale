@@ -32,6 +32,36 @@ class OpenApiDocumentationTest {
 
 
     @Test
+    void minimizedReadSchemasAreConcreteBoundedNullableSecuredAndAdditive() throws Exception {
+        var root=new com.fasterxml.jackson.databind.ObjectMapper().readTree(mockMvc.perform(get("/v3/api-docs"))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        var schemas=root.path("components").path("schemas");
+        for(String path:java.util.List.of("/api/v2/cases/search-page","/api/v2/cases/assigned-page","/api/v2/cases/{caseId}/overview")) {
+            String verb=path.endsWith("search-page")?"post":"get";
+            var operation=root.path("paths").path(path).path(verb);
+            org.junit.jupiter.api.Assertions.assertTrue(operation.path("security").get(0).has("bearerAuth"));
+            for(String code:java.util.List.of("200","400","401","403","503"))
+                org.junit.jupiter.api.Assertions.assertTrue(operation.path("responses").has(code),path+" requires "+code);
+            org.junit.jupiter.api.Assertions.assertTrue(operation.path("responses").path("200").path("content").path("application/json").path("schema").path("$ref").asText().contains("MinimizedCase"));
+        }
+        var search=root.path("paths").path("/api/v2/cases/search-page");
+        org.junit.jupiter.api.Assertions.assertFalse(search.has("get"),"Search text must only occur in the request body");
+        org.junit.jupiter.api.Assertions.assertTrue(search.path("post").path("requestBody").path("content").has("application/json"));
+        org.junit.jupiter.api.Assertions.assertTrue(root.path("paths").path("/api/v2/cases/{caseId}/overview").path("get").path("responses").has("404"));
+        var overview=schemas.path("MinimizedCaseOverview");
+        java.util.Set<String> keys=new java.util.HashSet<>();overview.path("properties").fieldNames().forEachRemaining(keys::add);
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.Set.of("caseId","caseNumber","caseName","status","practiceArea","responsibleAttorney","primaryLegalAssistant","updatedAt"),keys);
+        org.junit.jupiter.api.Assertions.assertEquals(8,overview.path("required").size());
+        org.junit.jupiter.api.Assertions.assertEquals(255,overview.path("properties").path("caseName").path("maxLength").asInt());
+        for(String field:java.util.List.of("caseNumber","status","practiceArea","responsibleAttorney","primaryLegalAssistant","updatedAt"))
+            org.junit.jupiter.api.Assertions.assertTrue(overview.path("properties").path(field).path("nullable").asBoolean(),field+" must be explicitly nullable");
+        org.junit.jupiter.api.Assertions.assertEquals(25,schemas.path("MinimizedCasePage").path("properties").path("items").path("maxItems").asInt());
+        org.junit.jupiter.api.Assertions.assertEquals(100,schemas.path("MinimizedCasePage").path("properties").path("page").path("maximum").asInt());
+        org.junit.jupiter.api.Assertions.assertFalse(schemas.path("MinimizedCasePage").path("properties").has("total"));
+        org.junit.jupiter.api.Assertions.assertTrue(schemas.path("CaseOverviewDto").path("properties").has("description"),"Legacy schema remains broad");
+    }
+
+    @Test
     void legacyCaseSearchPageKeepsParametersDtoAndFourFieldPageSchema() throws Exception {
         String json = mockMvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();

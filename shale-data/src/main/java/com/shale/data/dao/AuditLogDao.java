@@ -163,6 +163,12 @@ public final class AuditLogDao {
             Integer fieldCode,
             String stringValue,
             LocalDate dateValue) {
+        appendPhiWriteAudit(con, userId, objectTypeId, objectId, fieldName, fieldCode, stringValue, dateValue, 0);
+    }
+
+    /** Selected required reads supply a timeout while legacy callers retain their existing behavior. */
+    public void appendPhiWriteAudit(Connection con, Integer userId, Integer objectTypeId, Long objectId,
+            String fieldName, Integer fieldCode, String stringValue, LocalDate dateValue, int timeoutSeconds) {
         String sql = """
                 INSERT INTO dbo.AuditLog (
                   ShaleClientId, UserId, ObjectTypeId, ObjectId, FieldName, FieldCode, StringValue, DateValue, BooleanValue, IntValue, EntryDate
@@ -170,8 +176,9 @@ public final class AuditLogDao {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?);
                 """;
         try (PreparedStatement ps = con.prepareStatement(sql)) {
+            if (timeoutSeconds > 0) ps.setQueryTimeout(timeoutSeconds);
             FieldCodeBindingMode bindingMode = resolveFieldCodeBindingMode(con);
-            ps.setInt(1, requireCurrentShaleClientId(con));
+            ps.setInt(1, requireCurrentShaleClientId(con, timeoutSeconds));
             if (userId == null || userId <= 0) ps.setNull(2, java.sql.Types.INTEGER); else ps.setInt(2, userId);
             if (objectTypeId == null || objectTypeId <= 0) ps.setNull(3, java.sql.Types.INTEGER); else ps.setInt(3, objectTypeId);
             if (objectId == null || objectId <= 0) ps.setNull(4, java.sql.Types.BIGINT); else ps.setLong(4, objectId);
@@ -180,7 +187,7 @@ public final class AuditLogDao {
             ps.setString(7, stringValue);
             if (dateValue == null) ps.setNull(8, java.sql.Types.DATE); else ps.setDate(8, Date.valueOf(dateValue));
             ps.setTimestamp(9, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
-            ps.executeUpdate();
+            if (ps.executeUpdate() != 1 && timeoutSeconds > 0) throw new SQLException("Required read audit was not appended.");
         } catch (SQLException e) {
             throw new RuntimeException("Failed to append PHI write audit entry", e);
         }
@@ -269,17 +276,23 @@ public final class AuditLogDao {
     }
 
     private static int requireCurrentShaleClientId(Connection con) throws SQLException {
+        return requireCurrentShaleClientId(con, 0);
+    }
+
+    private static int requireCurrentShaleClientId(Connection con, int timeoutSeconds) throws SQLException {
         String sql = "SELECT CAST(SESSION_CONTEXT(N'ShaleClientId') AS INT);";
-        try (PreparedStatement ps = con.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            if (!rs.next()) {
-                throw new IllegalStateException("ShaleClientId session context is missing.");
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            if (timeoutSeconds > 0) ps.setQueryTimeout(timeoutSeconds);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new IllegalStateException("ShaleClientId session context is missing.");
+                }
+                int shaleClientId = rs.getInt(1);
+                if (rs.wasNull()) {
+                    throw new IllegalStateException("ShaleClientId session context is missing.");
+                }
+                return shaleClientId;
             }
-            int shaleClientId = rs.getInt(1);
-            if (rs.wasNull()) {
-                throw new IllegalStateException("ShaleClientId session context is missing.");
-            }
-            return shaleClientId;
         }
     }
 
@@ -305,7 +318,7 @@ public final class AuditLogDao {
                 }
             }
         } catch (SQLException ex) {
-            System.err.println("[PHI_AUDIT] failed to inspect AuditLog.FieldCode type, defaulting to text. " + ex.getMessage());
+            org.slf4j.LoggerFactory.getLogger(AuditLogDao.class).warn("Audit field-code type inspection unavailable; exceptionClass={}", ex.getClass().getName());
         }
         fieldCodeBindingModeRef.compareAndSet(null, resolved);
         return fieldCodeBindingModeRef.get();

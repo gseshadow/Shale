@@ -1,16 +1,16 @@
 # Shale Web V2 architecture and phased implementation roadmap
 
-**Reviewed:** 2026-10-09. **Inventory/documentation:** COMPLETE. **Decision acceptance:** OPEN.
+**Reviewed:** 2026-10-10. **Inventory/documentation:** COMPLETE. **R2 selected-read decisions:** ACCEPTED; broader/live/deployment acceptance OPEN.
 **Web V2 implementation:** Phase 2A foundation, Phase 2B authenticated shell and Phase 2C My Shale presentation adoption IMPLEMENTED FOR REVIEW; Phase 2D acceptance review and targeted feedback fix RECORDED; ACCEPTANCE OPEN.
 Phase 2 remains IN PROGRESS; acceptance OPEN. Phase 3 IN PROGRESS — Phase 3A safe login return-path restoration and Phase 3B startup
-verification uncertainty/recovery, Phase 3C truthful remote-logout feedback and Phase 3D bounded startup verification, plus Phase 3E canonical existing-route registry and Phase 3F established-session rejection coordination, plus Phase 3G existing-route data-router migration and bounded Contact editor protection and Phase 3H CredentialStore extraction and Phase 3I Organization Detail editor protection and Phase 3J credential-login deadlines/cancellation IMPLEMENTED FOR REVIEW. Phase 4 bounded R1 backend work BEGUN; first read slice INCOMPLETE. Phases 5–10 NOT STARTED. The user explicitly authorized this bounded
+verification uncertainty/recovery, Phase 3C truthful remote-logout feedback and Phase 3D bounded startup verification, plus Phase 3E canonical existing-route registry and Phase 3F established-session rejection coordination, plus Phase 3G existing-route data-router migration and bounded Contact editor protection and Phase 3H CredentialStore extraction and Phase 3I Organization Detail editor protection and Phase 3J credential-login deadlines/cancellation IMPLEMENTED FOR REVIEW. Phase 4 bounded R1/R2 server reads IMPLEMENTED FOR REVIEW; first read slice INCOMPLETE. Phases 5–10 NOT STARTED. The user explicitly authorized this bounded
 Phase 3 slice while Phase 2 acceptance remains open; that sequencing does not mark Phase 2 complete.
 Documentation completion is not implementation completion.
 
 **First-read readiness (2026-10-09):** [focused implementation contract](shale-web-v2-first-read-contract.md)
-records live-base traces, proposed minimal fields/bounds, missing permission/audit policy, conditional
-expiry/re-login recommendation, small PR sequence and live gates. Readiness documentation COMPLETE;
-owner decisions OPEN. Bounded R1 compatibility backend work is recorded in §11.18; the first read slice remains INCOMPLETE.
+records live-base traces and R2 accepted tenant-wide minimal fields/bounds, required Overview audit and
+summary exemption, explicit re-login limitation, implementation evidence and live gates. Readiness documentation
+COMPLETE; selected R2 owner decisions ACCEPTED (§11.19), live/deployment acceptance OPEN. R1 is in §11.18; the first read slice remains INCOMPLETE.
 
 **User delivery preference (2026-10-09):** current appearance is provisional. Prioritize functionality
 and deployment, then perform a dedicated visual refinement pass. Prior visual checks do not constitute
@@ -546,12 +546,12 @@ host. Preview deployment is later authorized operator work; no resources/configu
 
 | ID | OPEN decision / evidence needed | Owner and first affected gate |
 | --- | --- | --- |
-| D1 | Approve per-operation case/directory/field policy, deleted-case access and sensitive-read failure/audit treatment. | Product/security/domain owners; phase 4 real-data reads. |
+| D1 | R2 active tenant-wide minimized Case policy, fields and safe deleted/unavailable 404 ACCEPTED (§11.19); other directory/field policies remain OPEN. | Product/security/domain owners; phase 4 real-data reads. |
 | D2 | Wider cache/forms/schema/primitive choices remain OPEN; first read slice can use current tools with narrow validators/cancellation and identity-scoped memory state, no new dependency or broad cache rewrite required. Router migration already implemented in 3G. | Web maintainer; per consuming slice. |
-| D3 | Browser storage/reload/current-JTI/lost-response/replacement-failure and identity cleanup decisions. First-read recommendation is explicit expiry/re-login with unchanged CredentialStore, conditional on owner acceptance; coordinated refresh remains deferred and unapproved. | Security/API/web owners; phase 3 and first-read exposure. |
+| D3 | Browser storage/reload/current-JTI/lost-response/replacement-failure and identity cleanup decisions. R2 explicitly ACCEPTS first-slice expiry/re-login with unchanged CredentialStore/startup uncertainty and no automatic refresh (§11.19); wider storage/reload/rotation coordination remains deferred and unapproved. | Security/API/web owners; phase 3 and first-read exposure. |
 | D4 | Validate content breakpoints, compact destinations, fonts/density and real-device input/zoom/contrast. | Product/design/accessibility; phase 2 onward. |
-| D5 | Numeric SQL paging/range/payload budgets, timezone/date contracts, missing concurrency witnesses and command outcome reconciliation. | API/domain owners; each slice before exposure. |
-| D6 | Non-UI PHI reads; task/note atomic audit seams; export/download/admin-read representations and any allowlist/schema/viewer changes. | Audit/security/domain owners; phases 4–7 per operation. |
+| D5 | R2 Case page/query/SQL/browser/UTF-8 budgets and body-search privacy ACCEPTED (§11.19); other range/date/concurrency/command contracts and live performance acceptance remain OPEN. | API/domain owners; each slice before exposure. |
+| D6 | R2 required committed Overview audit and explicit summary exemption ACCEPTED and implemented for review (§11.19); live audit acceptance and other task/note/export/admin audit seams remain OPEN. | Audit/security/domain owners; phases 4–7 per operation. |
 | D7 | Actual Function bearer negotiation/grants/routing and safe post-commit REST domain publication. | Security/deployment/API owners; live-enabled slices. |
 | D8 | Document storage/provider authority and generated-summary export scope; approved report/export access. | Product/security/domain owners; phases 6–7. |
 | D9 | Preview/pilot origin/hosting/cache settings, acceptance devices, rollout/soak/rollback-retention window and API compatibility window. | Deployment/product owners; preview through phase 8. |
@@ -568,7 +568,7 @@ merely because this document describes it.
 | 1 — Inventory and architecture | DOCUMENTATION COMPLETE; ACCEPTANCE OPEN | Live base and required authorities | This inventory, client decisions, parity/audit matrix and next prompt | Source/test review, links/fences/status/diff checks and documentation selector | Documentation only; no V2 features accepted. D1–D10 remain explicit. |
 | 2 — Tokens, components, responsive shell | IN PROGRESS — Phase 2A foundation / Phase 2B authenticated shell / Phase 2C My Shale implemented for review; Phase 2D reviewed with feedback fix; acceptance OPEN | Phase 1 recommendations; D2/D4 for this milestone | Token mapping, shared semantic primitives, responsive shell with complete navigation; temporary preview composition and beta rollback | Existing web tests plus focused semantics/navigation; typecheck/build; screenshots both themes at compact/medium/wide, keyboard/zoom/contrast | Reviewable foundation using synthetic data, all destinations discoverable, no backend/new feature sprawl. Phase 2A: shared primitives/tokens and synthetic preview. Phase 2B: shell adopted beneath existing ProtectedRoute around unchanged outlets; beta screen skin retained. [Phase 2A review](../../shale-web/docs/phase-2a-review.md) and [Phase 2B exact scope, checks, captures and gaps](../../shale-web/docs/phase-2b-review.md). [Phase 2C My Shale review](../../shale-web/docs/phase-2c-review.md) adds shared Light/Dark operational presentation and native Chromium 200%/400% zoom evidence. [Phase 2D acceptance review](../../shale-web/docs/phase-2d-review.md) records rerun Chromium shell/state/zoom checks and persistent task completion feedback; [operator checklist](../../shale-web/docs/phase-2d-operator-checklist.md) owns unavailable Firefox/WebKit, screen-reader and physical-device checks. No all-Phase-2 completion claim; D4 device/screen-reader/other-engine acceptance remains OPEN. |
 | 3 — Routing, session boundary, transport | IN PROGRESS — Phase 3A safe return, Phase 3B startup recovery, Phase 3C truthful logout feedback and Phase 3D bounded startup verification and Phase 3E existing-route registry plus Phase 3F established-session rejection coordination and Phase 3G data-router/Contact editor protection and Phase 3H CredentialStore extraction and Phase 3I Organization Detail editor protection and Phase 3J credential-login deadlines/cancellation implemented for review | Phase 2 acceptance OPEN; user-authorized bounded sequencing exception for 3A/3B/3C/3D/3E/3F/3G/3H/3I/3J; D2/D3 and selected contract review for remaining work | Canonical routes/aliases, safe return-to, dirty blockers, CredentialStore, coordinated refresh, cancellation/errors, memory query cache | Router/session/transport behavior including refresh race, stale 401, network failure, logout/identity cleanup and dirty forms; legacy endpoint compatibility | Phase 3A: [review and synthetic evidence](../../shale-web/docs/phase-3a-review.md), validated pathname/query/hash, replacement history and logout return-state cleanup. Phase 3B: [review and synthetic evidence](../../shale-web/docs/phase-3b-review.md), confirmed 401 versus uncertain verification, retained bearer with blocked access, explicit read-only Retry/local sign-out and stale-result guards. Phase 3C: [review and synthetic evidence](../../shale-web/docs/phase-3c-review.md), immediate local logout, bounded single remote attempt, truthful pending/confirmed/unconfirmed feedback and generation/cancellation guards. Phase 3D: [review and synthetic evidence](../../shale-web/docs/phase-3d-review.md), eight-second startup/Retry fetch-and-body deadlines, retained uncertain bearer with blocked access, fresh duplicate-guarded Retry and lifecycle cancellation. Phase 3E: [review](../../shale-web/docs/phase-3e-review.md), one existing-route registry drives declarations/navigation/returns and typed links; explicit isolated preview adapter retained. Phase 3F: [review](../../shale-web/docs/phase-3f-review.md), current 401 teardown once, generation/credential/body/consumer guards, exact safe return and no request replay. Phase 3G: [review](../../shale-web/docs/phase-3g-review.md), existing operational route objects/data router, one Contact Detail information editor with discard/Keep editing, conditional unload guard and security bypass. Phase 3H: [review](../../shale-web/docs/phase-3h-review.md), one credential port/browser owner with compatibility adapters, isolated memory tests and bounded storage failures; unchanged sessionStorage policy, explicit residual limitations and XSS exposure. Phase 3I: [review](../../shale-web/docs/phase-3i-review.md), Organization Detail information editor reuses the renamed shared Contact guard; opening RowVer/contact-value semantics, authoritative success, pending uncertainty, stale-result and immediate security/storage-failure teardown preserved. Phase 3J: [review](../../shale-web/docs/phase-3j-review.md), one shared eight-second login/verification budget, cancellation/generation/credential guards, usable-response installation and truthful unconfirmed-session feedback. Future route additions/aliases, other dirty forms, refresh, broader transport/cancellation/cache UNFINISHED. No overall Phase 3 acceptance; unchanged bearer protocol; no replayed uncertain write. |
-| 4 — First end-to-end read slice | BOUNDED R1 BACKEND WORK BEGUN; first read slice INCOMPLETE; readiness documentation COMPLETE, decisions OPEN | Selected Phase 2/3 acceptance and D1/D3/D5/D6; D9 for deployment, independent of MCP/AI | Sign in → bounded assigned/case-name search → minimized read-only Overview; [focused contract](shale-web-v2-first-read-contract.md) defines R1 exact legacy SQL paging, conditional R2 policy/audit/minimized API, R3 browser, R4 acceptance | SQL execution/delegation/bytes, concrete OpenAPI, policy before paging, required audit failure, identity/cancel/re-login/deep-link/back tests; authorized live session/two-tenant/non-dbo/host/AT gates | First approve case/field/deletion policy, page/search audit representation or explicit exemption, fail-closed Overview/refetch audit, session limitation and numeric/privacy contracts. R1 legacy Case search-page fetches ≤100 rows at offset ≤10,000, with synthetic delegation/JDBC evidence (§11.18); assigned caps 25; broad detail is excluded. Permissions/minimized payload/required read audit/session/live acceptance remain OPEN. No all-form/cache/refresh rewrite prerequisite. Deployment readiness remains separate. |
+| 4 — First end-to-end read slice | BOUNDED R1/R2 SERVER READS IMPLEMENTED FOR REVIEW; first read slice INCOMPLETE; readiness COMPLETE, selected R2 decisions ACCEPTED | Selected Phase 2/3 acceptance and D1/D3/D5/D6; D9 for deployment, independent of MCP/AI | Sign in → bounded assigned/case-name search → minimized read-only Overview; [focused contract](shale-web-v2-first-read-contract.md) defines R1 exact legacy SQL paging, conditional R2 policy/audit/minimized API, R3 browser, R4 acceptance | SQL execution/delegation/bytes, concrete OpenAPI, policy before paging, required audit failure, identity/cancel/re-login/deep-link/back tests; authorized live session/two-tenant/non-dbo/host/AT gates | R2 accepts tenant-wide minimized Case/field/deletion policy, summary exemption, fail-closed Overview audit, re-login limitation and numeric/body-search privacy contracts (§11.19). R1 legacy Case search-page fetches ≤100 rows at offset ≤10,000, with synthetic delegation/JDBC evidence (§11.18); assigned caps 25; broad detail is excluded. R2 selected policy/minimal payload/audit are implemented for review; browser/session/live/host acceptance remains OPEN. No all-form/cache/refresh rewrite prerequisite. Deployment readiness remains separate. |
 | 5 — Tasks and Case Dates/confirmation | NOT STARTED | Phase 4; D5/D6 per write; reviewed occurrence/confirmation adapters | Task policy/forms/assignment/completion and generic dates/confirmation through authoritative workers; incremental usable slices | Due-policy tests, actor/tenant denial, token conflicts, aggregate rollback/audit tests; mobile editor/draft behavior | Task transaction/audit gaps closed for exposed commands; CaseDates/ValueRevision preserved. Live remains optional until D7 passes. |
 | 6 — Remaining case flows, Contacts/Organizations | NOT STARTED | Relevant phase 5 contracts; D1/D5/D6/D8 | Intake, parties/team/links/updates/material metadata/timeline, structured directories; separately gated document export/content | Domain aggregate/delegation tests, conflict/audit rollback, parent-case permissions, responsive long forms/cards and deliberate mutation recovery | Per-feature acceptance; no fake blob/provider entitlement, no scalar/date/overlay authority in React. Unaccepted content scope remains visibly unavailable. |
 | 7 — Calendar, Team, Reports, Settings/admin | NOT STARTED | Relevant earlier slices; D1/D5/D6/D8; personal/session APIs reviewed | Calendar projection/event flow, directory/user/role admin, reports, preferences, tenant configuration/audit/session UI | Date/range/DST tests, report/export limits, live admin-role rechecks, session-security tests, keyboard/touch acceptance | All agreed parity rows accepted or explicit owner exclusions; administrative reads/mutations use approved audits. |
@@ -1133,6 +1133,69 @@ live/host/accessibility gates remain **OPEN**; appearance **provisional**. No me
 Rollback reverts only R1; old prefix cost returns, with no database/session/frontend/security rollback.
 Next conditional R2 requires D1/D3/D5/D6 owner decisions; isolate audit enhancement first if required,
 then minimized authorized/audited server reads before any browser consumer.
+
+### 11.19 R2 minimized tenant-wide Case read API — 2026-10-10
+
+Separate branch `codex/r2-minimized-case-reads`, freshly fetched `origin/codex/latest`
+`fe029cb2d157a3e4f1f86130f3872d731dd2a991`; merged R1/#1855, 3A–3J and security #1843 ancestry
+verified. [R2 contract/evidence/prerequisites/rollback and bounded R3 prompt](shale-web-v2-first-read-contract.md#11-r2-minimized-tenant-wide-case-reads--2026-10-10)
+own exact operation traces, test impact, commands and synthetic/live distinctions.
+
+**Explicit owner decisions accepted for this first slice:**
+
+* Authenticated eligible users can read active Cases throughout their own tenant; assignment is only an
+  assigned-list filter. No cross-tenant access, invented assignment-only permission or role/admin bypass.
+* Eight fields only: caseId, caseNumber, caseName, nullable status `{id,name,color}`, nullable practiceArea
+  `{id,name}`, nullable responsibleAttorney/primaryLegalAssistant `{userId,displayName}`, nullable updatedAt.
+  Positive safe integer ID, nullable number, string name, existing semantic relationship resolution/local
+  timestamp text. No narratives, contacts, dates, tasks/history/documents or edit witnesses.
+* Deleted excluded; missing/foreign/deleted/unavailable detail uses the same safe 404. Operation denial
+  is 403 retaining session. Each successful Overview server read requires the established authoritative
+  audit to commit before delivery; failure returns no Case data. Summary search/assigned pages are
+  explicitly audit-exempt for this first slice; opening Overview triggers the required read audit.
+* No sensitive fields/query text in logs or audit metadata; preserve existing representations/sanitization.
+  Search is JSON-body POST, no search text in URLs. Default/max size25, query max100, five-second selected
+  SQL timeout, eight-second browser fetch/body deadline, 128KiB/page and 8KiB/Overview exact UTF-8 limits.
+  Oversized values/responses fail clearly with no partial disclosure or silent value truncation.
+* First-slice automatic refresh disabled; confirmed rejection requires explicit re-login with safe returns.
+  CredentialStore/startup uncertainty and 3A–3J contracts remain. Appearance provisional.
+
+**Implemented for review:** additive typed POST `/api/v2/cases/search-page`, GET assigned-page and single
+Overview routes through existing port/adapter/gateway/CaseSummaryDao workers. SQL applies tenant/active/name
+search and assigned selection **before** deterministic ordering/paging. It fetches ≤26 authorized rows,
+returns ≤25 and reports items/page/size/hasMore without a count. Pages0–100, offset≤2500; at size25 page100
+returns rows2501–2525 and probes2526. `hasMore` at ceiling remains truthful: R3 must stop Next and label the
+window limit rather than claim no results remain. Smaller fixed sizes cover101*size; concurrent offset drift
+is explicit. Blank search is no browse. Source name/display255/number200 bounds and exact UTF-8 serialization
+limits reject oversized data without truncation. Row bounds do not bound scanned work; abort is not SQL cancellation.
+
+One verified principal and same-connection tenant/actor/active User check precede disclosure. Explicit root/
+join tenant predicates complement RLS; no broad detail/child hydration. Overview uses one transaction and
+existing AuditLog Case type1 / FieldCode4 / `Case.Overview.Read` / `action=READ;screen=Case.Overview` with Case ID,
+verified actor and connection-stamped tenant. Read/required append/commit precede return; failures roll back.
+Existing viewer READ classification is protected; no required R2a schema/allowlist/viewer enhancement was
+identified. Deployment must verify existing schema/grants/RLS/event support; no live deployment evidence is
+inferred from the source. Checked bytes and selected errors are no-store; safe error handling omits bodies/values.
+A committed server-access audit may outlive a failed/oversized/lost HTTP delivery; it never proves human viewing.
+
+Synthetic production-adapter/JDBC tests include35 unfiltered nonmatches before Cases36–90 matching, later/tied/
+final/empty pages, exact probes/escaping, assigned versus tenant-wide access, authority/removed actor/isolation,
+minimal hydration, timeout/source oversize and audit connection/commit/failure. HTTP/OpenAPI tests protect
+minimal fields, nullability/bounds/security/errors, bytes/privacy and legacy compatibility. Final focused97, selected110, critical116 and selector-unit24 passed; exact commands and the inherited
+advisory813-data/12-failure result plus fetched-base reproduction are recorded in the focused contract. Known base advisory failures remain unfixed and are not passing
+full-suite evidence. Live SQL/RLS/audit/host acceptance requires separately authorized access and stays OPEN.
+
+Phase2 acceptance **OPEN**, Phase3 **IN PROGRESS**, Phase4 first end-to-end slice **INCOMPLETE**; only bounded
+R1/R2 server work is implemented for review. Browser adoption, live/host/session/device/accessibility acceptance
+remain open. No dependencies, mutations, refresh, transport/cache rewrite, native/MCP/AI, deployment or version
+change. Next **R3** consumes only these accepted reads using existing shell/session owners, narrow runtime
+validators, cancellation/eight-second fetch+body budget, identity-scoped memory and explicit re-login. The
+focused contract owns the ready-to-run prompt; no browser adoption was performed here.
+
+Deploy only after the existing durable-session/runtime schema, tenant/overlay/RLS/active actor, authoritative
+AuditLog event/grants/viewer, two-tenant/non-dbo audit-failure and host/logging/no-store gates in that contract
+are separately verified. Rollback removes only new R2 consumers/routes/worker, keeps R1/security/session
+contracts and all audit history. Never disable required audit or delete its history as rollback. No merge/deployment.
 
 ## 12. Ready-to-run next Codex implementation prompt
 

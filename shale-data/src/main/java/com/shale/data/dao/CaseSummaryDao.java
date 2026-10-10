@@ -1,5 +1,9 @@
 package com.shale.data.dao;
 
+import com.shale.core.dto.MinimizedCaseOverview;
+import com.shale.core.dto.MinimizedCasePage;
+import com.shale.core.service.CaseReadException;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -497,6 +501,160 @@ public final class CaseSummaryDao {
 		} catch (SQLException e) { throw new RuntimeException("Failed to search authoritative Case summaries", e); }
 	}
 
+    // R2 reuses the established status and semantic compatibility assignment workers.
+    public MinimizedCasePage searchMinimizedCases(String query, int tenant, int actor, int page, int size) {
+        String normalized = query == null ? "" : query.strip().toLowerCase(java.util.Locale.ROOT);
+        validateMinimizedPage(page, size);
+        if ((query == null ? "" : query.strip()).length() > 100) throw new IllegalArgumentException("Query exceeds 100 characters.");
+        return minimizedPage(tenant, actor, normalized, false, page, size);
+    }
+
+    public MinimizedCasePage listMinimizedAssignedCases(int tenant, int actor, int page, int size) {
+        validateMinimizedPage(page, size);
+        return minimizedPage(tenant, actor, null, true, page, size);
+    }
+
+    private MinimizedCasePage minimizedPage(int tenant, int actor, String query, boolean assigned, int page, int size) {
+        try (Connection con = db.requireConnection()) {
+            verifyMinimizedActor(con, tenant, actor);
+            if (query != null && query.isBlank()) return new MinimizedCasePage(List.of(), page, size, false);
+            List<MinimizedCaseOverview> rows = selectMinimized(con, tenant, actor, query, assigned, null,
+                    Math.multiplyExact(page, size), size + 1);
+            return new MinimizedCasePage(rows.subList(0, Math.min(size, rows.size())), page, size, rows.size() > size);
+        } catch (SQLException e) { throw minimizedSqlFailure(e); }
+    }
+
+    /** The connection owns read, required existing PHI READ append, and commit before returning anything. */
+    public java.util.Optional<MinimizedCaseOverview> readMinimizedCaseOverview(long id, int tenant, int actor) {
+        if (id <= 0 || id > Integer.MAX_VALUE) throw new IllegalArgumentException("Invalid Case ID.");
+        try (Connection con = db.requireConnection()) {
+            con.setAutoCommit(false);
+            try {
+                verifyMinimizedActor(con, tenant, actor);
+                var rows = selectMinimized(con, tenant, actor, null, false, id, 0, 1);
+                if (rows.isEmpty()) { con.rollback(); return java.util.Optional.empty(); }
+                try {
+                    new AuditLogDao(db).appendPhiWriteAudit(con, actor, 1, id, "Case.Overview.Read", 4,
+                            "action=READ;screen=Case.Overview", null, 5);
+                    con.commit();
+                } catch (RuntimeException | SQLException failure) {
+                    throw new CaseReadException(
+                            CaseReadException.Kind.AUDIT_UNAVAILABLE, failure);
+                }
+                return java.util.Optional.of(rows.getFirst());
+            } catch (RuntimeException | SQLException failure) {
+                try { con.rollback(); } catch (SQLException rollbackFailure) { failure.addSuppressed(rollbackFailure); }
+                throw failure;
+            }
+        } catch (SQLException e) { throw minimizedSqlFailure(e); }
+    }
+
+    private static void validateMinimizedPage(int page, int size) {
+        if (page < 0 || page > 100 || size < 1 || size > 25) throw new IllegalArgumentException("Invalid Case page.");
+    }
+
+    private static void verifyMinimizedActor(Connection con, int tenant, int actor) throws SQLException {
+        if (tenant <= 0 || actor <= 0) throw new CaseReadException(CaseReadException.Kind.DENIED);
+        String sql = "SELECT 1 FROM dbo.Users u WHERE u.Id=? AND u.ShaleClientId=? AND COALESCE(u.is_deleted,0)=0 AND COALESCE(u.IsRemoved,0)=0 "
+                + "AND TRY_CONVERT(int,SESSION_CONTEXT(N'ShaleClientId'))=? AND TRY_CONVERT(int,SESSION_CONTEXT(N'PrincipalUserId'))=?";
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setQueryTimeout(5);
+            ps.setInt(1, actor); ps.setInt(2, tenant); ps.setInt(3, tenant); ps.setInt(4, actor);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) throw new CaseReadException(CaseReadException.Kind.DENIED);
+            }
+        }
+    }
+
+    private static CaseReadException minimizedSqlFailure(SQLException e) {
+        return new CaseReadException(e instanceof java.sql.SQLTimeoutException
+                ? CaseReadException.Kind.TIMEOUT
+                : CaseReadException.Kind.READ_UNAVAILABLE, e);
+    }
+
+    private List<MinimizedCaseOverview> selectMinimized(Connection con, int tenant, int actor,
+            String query, boolean assigned, Long id, int offset, int limit) throws SQLException {
+        String search = query == null ? "" : "AND LOWER(COALESCE(c.Name,'')) LIKE ?";
+        String scope = assigned ? "AND EXISTS (SELECT 1 FROM dbo.CaseUsers scope WHERE scope.CaseId=c.Id AND scope.ShaleClientId=c.ShaleClientId AND scope.UserId=?)" : "";
+        String identity = id == null ? "" : "AND c.Id=?";
+        String order = assigned ? "status_row.StatusSortOrder ASC,dates.IntakeDate DESC,c.Id DESC" : "c.Name ASC,c.Id ASC";
+        // CASE guards bound transfer of legacy nvarchar(max) names, preserving values or failing; never LEFT/SUBSTRING.
+        String sql = "SELECT c.Id," + boundedReadText("c.CaseNumber", 200, "CaseNumber") + ","
+                + boundedReadText("COALESCE(c.Name,'')", 255, "Name") + ",status_row.StatusId,"
+                + boundedReadText("status_row.StatusName", 255, "StatusName") + ","
+                + boundedReadText("status_row.StatusColor", 20, "StatusColor") + ",pa.Id PracticeAreaId,"
+                + boundedReadText("pa.Name", 255, "PracticeAreaName") + ",attorney_user.id ResponsibleAttorneyId,"
+                + boundedReadText("attorney_user.DisplayName", 255, "ResponsibleAttorneyName") + ",assistant_user.id PrimaryLegalAssistantId,"
+                + boundedReadText("assistant_user.DisplayName", 255, "PrimaryLegalAssistantName") + ",c.UpdatedAt FROM dbo.Cases c\n"
+                + statusApplySql() + "\nLEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId AND (pa.ShaleClientId=c.ShaleClientId OR pa.ShaleClientId IS NULL)\n"
+                + assignmentApplySql(true) + (assigned ? intakeOrderingApplySql() : "")
+                + "\nWHERE c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0 " + search + " " + scope + " " + identity
+                + "\nORDER BY " + order + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setQueryTimeout(5);
+            int i = 1;
+            ps.setInt(i++, RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY); ps.setInt(i++, RoleSemantics.ROLE_LEGAL_ASSISTANT);
+            ps.setInt(i++, tenant);
+            if (query != null) ps.setString(i++, "%" + escapeLike(query) + "%");
+            if (assigned) ps.setInt(i++, actor);
+            if (id != null) ps.setLong(i++, id);
+            ps.setInt(i++, offset); ps.setInt(i, limit);
+            List<MinimizedCaseOverview> rows = new ArrayList<>();
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    if (rows.size() >= limit) throw new IllegalStateException("Case projection exceeded its row bound.");
+                    rows.add(mapMinimized(rs));
+                }
+            }
+            return List.copyOf(rows);
+        }
+    }
+
+    private static String boundedReadText(String expression, int max, String alias) {
+        return "CASE WHEN DATALENGTH(" + expression + ")<=" + (max * 2) + " THEN " + expression + " END " + alias
+                + ",CASE WHEN DATALENGTH(" + expression + ")>" + (max * 2) + " THEN 1 ELSE 0 END " + alias + "Oversized";
+    }
+
+    private static MinimizedCaseOverview mapMinimized(ResultSet rs) throws SQLException {
+        for (String column : List.of("CaseNumber", "Name", "StatusName", "StatusColor", "PracticeAreaName", "ResponsibleAttorneyName", "PrimaryLegalAssistantName")) {
+            if (rs.getBoolean(column + "Oversized")) throw new CaseReadException(CaseReadException.Kind.OVERSIZED);
+        }
+        Integer status = nullableInt(rs, "StatusId"), area = nullableInt(rs, "PracticeAreaId"), attorney = nullableInt(rs, "ResponsibleAttorneyId"), assistant = nullableInt(rs, "PrimaryLegalAssistantId");
+        String color = rs.getString("StatusColor");
+        // Canonical CSS hex or neutral null; source names and identities are never truncated.
+        if (color != null && !color.matches("#[0-9a-fA-F]{6}")) color = null;
+        Timestamp updated = rs.getTimestamp("UpdatedAt");
+        return new MinimizedCaseOverview(rs.getLong("Id"), rs.getString("CaseNumber"), rs.getString("Name"),
+                status == null ? null : new MinimizedCaseOverview.CaseReadStatus(status, rs.getString("StatusName"), color),
+                area == null ? null : new MinimizedCaseOverview.CaseReadPracticeArea(area, rs.getString("PracticeAreaName")),
+                attorney == null ? null : new MinimizedCaseOverview.CaseReadUser(attorney, rs.getString("ResponsibleAttorneyName")),
+                assistant == null ? null : new MinimizedCaseOverview.CaseReadUser(assistant, rs.getString("PrimaryLegalAssistantName")),
+                updated == null ? null : updated.toLocalDateTime().toString());
+    }
+
+    private static String assignmentApplySql(boolean tenantQualified) {
+        String tenant = tenantQualified ? "AND cu.ShaleClientId=c.ShaleClientId " : "";
+        return """
+            OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id %sAND cu.RoleId=? ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) attorney
+            OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color FROM dbo.Users u WHERE u.id=attorney.UserId AND u.ShaleClientId=c.ShaleClientId) attorney_user
+            OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id %sAND cu.RoleId=? ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) assistant
+            OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
+            """.formatted(tenant, tenant);
+    }
+
+    /** Internal ordering witness only, never disclosed or hydrated per Case. */
+    private static String intakeOrderingApplySql() {
+        return """
+            OUTER APPLY (SELECT MAX(CAST(cd.StartsAt AS date)) IntakeDate
+             FROM dbo.CaseDates cd JOIN dbo.CaseDateTypes t ON t.Id=cd.CaseDateTypeId AND (t.ShaleClientId=c.ShaleClientId OR t.ShaleClientId IS NULL)
+             OUTER APPLY (SELECT TOP(1) m.SemanticRoleKey FROM dbo.CaseDateTypeSemanticRoleMappings m
+              WHERE m.CaseDateTypeId=t.Id AND m.SemanticRoleKey='INTAKE' AND m.IsActive=1 AND m.IsDeleted=0
+               AND (m.ShaleClientId=c.ShaleClientId OR m.ShaleClientId IS NULL)
+              ORDER BY CASE WHEN m.ShaleClientId=c.ShaleClientId THEN 0 ELSE 1 END,m.Id DESC) effective
+             WHERE cd.CaseId=c.Id AND cd.ShaleClientId=c.ShaleClientId AND cd.IsDeleted=0 AND effective.SemanticRoleKey='INTAKE') dates
+            """;
+    }
+
 	/** Bounded server search; one SQL statement replaces the former ID query plus N overview reads. */
 	public List<ServerCaseRow> searchActiveForServer(int tenant, int actor, String query, int offset, int limit) {
 		String normalized=query==null?"":query.strip().toLowerCase(java.util.Locale.ROOT);
@@ -530,10 +688,7 @@ public final class CaseSummaryDao {
 				FROM dbo.Cases c
 				%s
 				LEFT JOIN dbo.PracticeAreas pa ON pa.Id=c.PracticeAreaId AND (pa.ShaleClientId=c.ShaleClientId OR pa.ShaleClientId IS NULL)
-				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=? ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) attorney
-				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color FROM dbo.Users u WHERE u.id=attorney.UserId AND u.ShaleClientId=c.ShaleClientId) attorney_user
-				OUTER APPLY (SELECT TOP(1) cu.UserId FROM dbo.CaseUsers cu WHERE cu.CaseId=c.Id AND cu.RoleId=? ORDER BY cu.IsPrimary DESC,cu.UpdatedAt DESC,cu.CreatedAt DESC,cu.Id DESC) assistant
-				OUTER APPLY (SELECT u.id,LTRIM(RTRIM(CONCAT(u.name_first,' ',u.name_last))) DisplayName,u.color Color FROM dbo.Users u WHERE u.id=assistant.UserId AND u.ShaleClientId=c.ShaleClientId) assistant_user
+				%s
 				OUTER APPLY (SELECT
 				 MAX(CASE WHEN effective.SemanticRoleKey='INTAKE' THEN CAST(cd.StartsAt AS date) END) IntakeDate,
 				 MAX(CASE WHEN t.SystemKey='date_of_injury' THEN CAST(cd.StartsAt AS date) END) InjuryDate,
@@ -547,7 +702,7 @@ public final class CaseSummaryDao {
 				OUTER APPLY (SELECT TOP(1) ct.Id ContactId,COALESCE(NULLIF(LTRIM(RTRIM(CONCAT(ct.FirstName,' ',ct.LastName))),''),ct.Name) DisplayName FROM dbo.CaseParties cp JOIN dbo.PartyRoles pr ON pr.Id=cp.PartyRoleId AND (pr.ShaleClientId=c.ShaleClientId OR pr.ShaleClientId IS NULL) JOIN dbo.Contacts ct ON ct.Id=cp.ContactId AND ct.ShaleClientId=c.ShaleClientId WHERE cp.CaseId=c.Id AND ISNULL(ct.IsDeleted,0)=0 AND LOWER(COALESCE(pr.SystemKey,pr.Name))='counsel' AND LOWER(LTRIM(RTRIM(cp.Side)))='opposing' ORDER BY cp.IsPrimary DESC,cp.Id DESC) counsel
 				WHERE c.ShaleClientId=? AND ISNULL(c.IsDeleted,0)=0 %s %s
 				ORDER BY %s OFFSET ? ROWS FETCH NEXT ? ROWS ONLY
-				""".formatted(statusApplySql(),search,scope,order);
+				""".formatted(statusApplySql(),assignmentApplySql(false),search,scope,order);
 			try(PreparedStatement ps=con.prepareStatement(sql)) { int i=1; ps.setInt(i++,RoleSemantics.ROLE_RESPONSIBLE_ATTORNEY); ps.setInt(i++,RoleSemantics.ROLE_LEGAL_ASSISTANT); ps.setInt(i++,tenant); if(query!=null)ps.setString(i++,"%"+escapeLike(query)+"%"); if(assignedUserId!=null)ps.setInt(i++,assignedUserId); ps.setInt(i++,offset); ps.setInt(i,limit);
 				List<ServerCaseRow> out=new ArrayList<>(); try(ResultSet rs=ps.executeQuery()){while(rs.next())out.add(new ServerCaseRow(mapGridSummary(rs),localDate(rs,"IntakeDate"),localDate(rs,"InjuryDate"),localDate(rs,"StatuteDate"),localDate(rs,"TortDate"),rs.getString("PracticeAreaColor"),rs.getString("Description"),nullableInt(rs,"CallerContactId"),rs.getString("CallerName"),nullableInt(rs,"ClientContactId"),rs.getString("ClientName"),nullableInt(rs,"OpposingCounselContactId"),rs.getString("OpposingCounselName")));} return List.copyOf(out); }
 		} catch(SQLException e){throw new RuntimeException("Failed to load server Case summaries",e);}

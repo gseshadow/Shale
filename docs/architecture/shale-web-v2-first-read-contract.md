@@ -1,16 +1,18 @@
 # Web V2 first-read-slice implementation contract readiness
 
-**Inspected:** 2026-10-09. **Readiness documentation: COMPLETE; owner decisions: OPEN.**
-**Phase 2 acceptance: OPEN; Phase 3: IN PROGRESS; Phase 4: bounded R1 backend work begun; first read slice INCOMPLETE.**
+**Inspected:** 2026-10-10. **Readiness documentation: COMPLETE; R2 first-slice owner decisions: ACCEPTED; live/deployment acceptance: OPEN.**
+**Phase 2 acceptance: OPEN; Phase 3: IN PROGRESS; Phase 4: bounded R1/R2 server reads implemented for review; first read slice INCOMPLETE.**
 Appearance is provisional; visual refinement follows functional delivery. Accessibility remains an
 acceptance gate. Ordinary web delivery is independent of MCP/AI activation.
 
 The original documentation-only assessment below was against fetched `origin/codex/latest`
 `ba3b1acad7710d4afeae099b2a24f9b4c3e77bbf`, on separate branch
-`codex/web-v2-first-read-contract`. Recommendations below are **PROPOSED**, not approved wire,
+`codex/web-v2-first-read-contract`. The original recommendations below were **PROPOSED**, not approved wire,
 permission, audit, storage or deployment contracts. Existing endpoint exposure is not policy approval.
-Implementation readiness is conditional; deployment readiness is not established.
-R1 compatibility work is recorded in §10; it approves no future V2 disclosure or security policy.
+That original implementation readiness was conditional; the selected R2 server contract is now implemented
+for review (§11). Deployment readiness is not established.
+R1 compatibility work is recorded in §10; accepted R2 decisions and server evidence in §11 supersede
+the earlier selected-slice proposals. Broader and live/deployment acceptance remain OPEN.
 
 ## 1. Evidence baseline and authorities
 
@@ -154,7 +156,7 @@ is established here. The historical [RLS audit](../tenant-rls-audit-2026-06-29.m
 have coverage/Contacts-parent discrepancies; source joins explicitly qualify Contacts, but deployed
 predicates must be inspected. Do not extrapolate broad documentation table lists into live enforcement.
 
-**Recommended policy for owner review:** initially restrict selected search and Overview to the same
+**Historical recommendation (superseded by the tenant-wide R2 owner decision in §11):** initially restrict selected search and Overview to the same
 active assigned-case set, with the minimal fields above and no admin exception; lower disclosure but
 excludes unassigned cases and is not existing policy. Alternatively approve tenant-wide minimal reads
 with explicit exceptions/ethical walls. Owner must identify any narrower field restrictions. Once chosen,
@@ -237,7 +239,7 @@ bounded dedupe key scoped to tenant/actor/case/intent and concurrency semantics;
 label or key as permission to skip audit. Failed delivery after committed audit remains an auditable server
 read, not proof that the human saw it. No automatic replay after timeout.
 
-**List/search policy is unresolved.** Desktop summary/search does not establish web exemption. Recommend
+**Historical list/search policy gap (closed for this first slice by the explicit R2 summary exemption in §11).** Desktop summary/search does not establish web exemption. Recommend
 required server auditing of successful minimized page disclosure, using existing approved vocabulary only
 where its meaning fits. No established page/search event was found; do not call a page Case.Overview.Read
 or invent Case.Search.Read. Until audit owner either approves an explicit summary exemption with rationale,
@@ -379,7 +381,7 @@ new executed Java/browser result. No test assertion or inventory file needed mai
 No live security/session/SQL/host/accessibility readiness is claimed. Documentation rollback reverts these
 two files only; retained dependencies/security patches and 3A–3J source remain untouched.
 
-## 8. Decision table and owner questions
+## 8. Original decision table and owner questions (selected R2 answers accepted in §11)
 
 | Question | Verified evidence | Recommended choice and tradeoff | Owner approval needed | Implementation blocked by decision |
 | --- | --- | --- | --- | --- |
@@ -393,7 +395,8 @@ two files only; retained dependencies/security patches and 3A–3J source remain
 | D5/D9: endpoint compatibility and sensitive GET logs? | Broad legacy DTOs used by App; existing GET query and host/CORS plan. | Add minimized versioned projections sharing workers; preserve legacy shapes; body search or explicit log/referrer suppression before live search. Additional API surface preserves clients. | API/security choose version/extension and query privacy; deployment operator verifies target. | R2b route choice; live search/host gate. |
 | D9: deployment readiness? | Source SPA fallback and historical Azure session reports; no selected live proof here. | Independent authorized pilot after contract/implementation tests and live tenant/audit/session/host/AT gates. Appearance polish follows functionality. | Deployment/product select target, pilot, asset/rollback window and acceptance. | Deployment only; no MCP/AI activation dependency. |
 
-Only these owner answers are needed before real-data delivery:
+The selected R2 answers to questions 1–4 are accepted in §11. Question 5 and broader/live acceptance
+remain OPEN. Original questions:
 
 1. Approve the exact case set, minimal fields, exceptions and deleted/forbidden 404 behavior.
 2. Approve Overview fail-closed server audit/refetch semantics; decide summary/page audit exemption or
@@ -534,3 +537,233 @@ endpoint compatibility/query-privacy contract, D6 Overview fail-closed/refetch a
 representation or explicit exemption, plus D3 first-slice expiry/re-login acceptance. If required page auditing
 needs a safe vocabulary/schema/viewer enhancement, isolate R2a first; only then implement R2b minimized,
 authorized, audited server reads. No new real-data browser consumer is authorized by R1.
+
+## 11. R2 minimized tenant-wide Case reads — 2026-10-10
+
+Separate branch `codex/r2-minimized-case-reads` from freshly fetched live
+`origin/codex/latest` **`fe029cb2d157a3e4f1f86130f3872d731dd2a991`** (merged R1/#1855).
+The original checkout is preserved. Ancestry includes #1843 dependency-security and 3A–3J/#1844–1853;
+retained source/lock versions were inspected. This is server implementation, not browser or deployment acceptance.
+The owner's R2 instruction explicitly supersedes the earlier proposed assignment-only policy and unresolved
+selected-slice decisions above; broader feature and live/deployment decisions remain open.
+
+### Accepted owner decisions and wire contract
+
+* Authenticated eligible users may read **all active Cases in their own tenant**. Assignment is a list
+  filter only. No cross-tenant access, new ACL, numeric-role permission, or administrator bypass.
+* Exactly `caseId`, `caseNumber`, `caseName`, `status`, `practiceArea`, `responsibleAttorney`,
+  `primaryLegalAssistant`, `updatedAt`. ID is a positive SQL int (safe JavaScript integer); number nullable,
+  name string (legacy null Case name resolves to empty, as the existing name-search normalization does).
+  Status nullable `{id,name,color}`, Practice Area nullable `{id,name}`, assignment nullable
+  `{userId,displayName}`. Optional unresolved relationships remain null without losing/multiplying Cases;
+  present relationship names are required. Updated timestamp is nullable stored local date-time text,
+  with no timezone or appended Z. No narratives, contacts, dates, tasks, history, documents or edit witnesses.
+* Deleted Cases excluded. Missing/foreign/deleted/unavailable IDs share `404 Case unavailable.`.
+  Invalid ID/page/query is 400; operation-wide authority denial is 403 and retains the session;
+  confirmed authentication rejection is 401 with the existing explicit re-login/safe-return contract.
+* Each successful Overview server read requires a committed authoritative audit before any data delivery.
+  Audit append/commit failure returns safe 503 with no Case data. Each deliberate server reopen/refetch
+  creates an event; no desktop two-second dedupe, browser callback, queue, fabricated entity READ or replay.
+* Search and assigned **summary pages are explicitly exempt** from Case-read audit entries for this first
+  slice. Opening Overview is the required audited read. This owner-selected exemption scopes summary
+  discovery separately from authoritative Overview; it does not establish exemptions for other features.
+* No sensitive field values or search text in operational logs/audit metadata. Preserve established audit
+  representations/sanitization. Search text lives only in JSON request bodies, never request URLs.
+* First-slice automatic refresh stays disabled. Confirmed session rejection requires explicit re-login;
+  existing CredentialStore, startup uncertainty, generation guards and safe-return behavior remain.
+  The accepted browser fetch **and body** budget is eight seconds; enforcement belongs to R3, no browser
+  is changed here. Idle data is not continuously revalidated; no new storage/cache/refresh authority.
+* Default/max page size 25; query at most 100 trimmed UTF-16 code units; selected JDBC statements have a
+  five-second timeout. Exact UTF-8 JSON at most **128 KiB/page** and **8 KiB/Overview**. Oversized source
+  fields or serialized responses fail clearly, with no partial disclosure or silent value truncation.
+* Appearance remains provisional. Phase 2 acceptance **OPEN**, Phase 3 **IN PROGRESS**, Phase 4 incomplete.
+
+| Additive operation | Concrete contract / authoritative path |
+| --- | --- |
+| `POST /api/v2/cases/search-page` | JSON `{query,page?,size?}`; defaults 0/25; literal Case-name substring only; blank returns empty without a Case browse. No GET/query-text parameter. |
+| `GET /api/v2/cases/assigned-page?page=0&size=25` | Authenticated actor's any-role `CaseUsers` membership is SQL selection, before paging; no actor/tenant request selector. |
+| `GET /api/v2/cases/{caseId}/overview` | Same tenant-wide active set; minimized one-Case read and required committed existing Overview audit. |
+| Page wire | Exactly `{items,page,size,hasMore}`; no count/total. Items use the same eight-field allowlist as Overview. |
+
+**Exact continuation:** pages are zero-based **0–100**, size **1–25**, with checked `offset=page*size`.
+SQL fetches at most `size+1` (maximum **26**) already authorized/filtered rows, returns at most `size`,
+and derives hasMore from that probe. At size 25 the maximum offset is **2,500**; page 100 can return
+rows 2,501–2,525 and probe row 2,526. `hasMore=true` at page 100 truthfully signals more matching data,
+not permission for page 101: R3 must disable Next and label the result-window ceiling, inviting a narrower
+search. At smaller size the ceiling covers `101*size` rows. Keep size fixed during continuation; reset
+page on new selection/search. Offset drift under concurrent insert/delete/rename/assignment/status changes
+is explicit; no snapshot or count guarantee.
+
+### Implementation and audit compatibility evidence (SOURCE / synthetic TEST)
+
+`MinimizedCaseReadController` captures one verified principal and delegates additive CaseServicePort
+operations through explicit CaseServiceAdapter/CaseGateway/DaoCaseGateway delegation to CaseSummaryDao.
+Unsupported defaults throw actionable errors. Legacy routes, DTOs, limits, consumers and broad detail
+remain unchanged; the new worker never invokes CaseDetailDto or child hydration.
+
+On each borrowed connection, authority requires matching tenant **and PrincipalUserId** SQL context and
+same-tenant Users with `is_deleted=0` and `IsRemoved=0`, matching durable-session eligibility. SQL explicitly
+predicates the active Case root, tenant/global status/Practice Area joins and tenant-owned assignment/User
+joins alongside RLS. Status uses the existing deterministic current-status worker. The existing semantic
+compatibility assignment worker was extracted for reuse without changing legacy bindings or predicates;
+new reads additionally predicate CaseUsers tenant and use the resolved same-tenant User ID. Responsible
+Attorney / Legal Assistant keep RoleSemantics and primary/recent/ID tie ordering, not new permission rules.
+Search applies tenant/active/name **before** Name ASC/ID ASC and OFFSET/FETCH. Assigned applies membership
+**before** the established status-sort/authoritative-Intake DESC/Case ID DESC ordering. Only assigned
+ordering computes Intake set-wise internally; no dates are exposed or separately fetched.
+
+SQL CASE/DATALENGTH guards cap transfer of historical nvarchar(max) names without LEFT/SUBSTRING truncation:
+name/display at most 255 UTF-16 units, number 200, status color source 20. Oversized sentinel rejects the
+whole operation, including an oversized probe row. DTO construction validates required names/identities
+and string bounds. Colors are canonical six-digit CSS hex or neutral null. The server serializes once,
+checks the resulting UTF-8 byte array and delivers those **exact bytes**; escaped characters and multibyte
+text count toward the cap. Success and selected safe errors use `Cache-Control: no-store`.
+
+Overview owns one connection/transaction: authority → narrow read → existing
+`AuditLogDao.appendPhiWriteAudit(Connection, …, timeout=5)` → commit → return DTO → checked HTTP bytes.
+Representation remains **Case type 1**, **FieldCode 4**, **FieldName `Case.Overview.Read`**,
+**StringValue `action=READ;screen=Case.Overview`**, null date/other values; ObjectId is the Case ID,
+actor the verified user, tenant stamped from the authoritative connection. No new metadata or schema.
+Append must affect exactly one row; append/commit failure attempts rollback and throws audit-unavailable
+before returning a result. A failed commit acknowledgement can leave persistence uncertain; no data or
+automatic replay is returned, and rollback attempts do not prove an already-committed row was undone. Read/not-found/authority/oversized-source failures emit no success event. A later
+serialization limit, disconnect or lost HTTP response can follow a committed server read audit; that row
+records server access, not proof the human viewed it. Never delete it or replay automatically.
+
+Existing generic viewer recognizes `action=READ`; a focused viewer regression protects that classification.
+The existing schema/vocabulary/connection overload can represent this event; inspection found no necessary
+R2a allowlist/schema/viewer enhancement. The timeout overload is additive; legacy overload behavior is
+preserved. Audit metadata inspection warning now emits only the exception class, preserving privacy.
+SearchRequest formatting is redacted so Spring body-conversion DEBUG/TRACE cannot print the query;
+selected error handling never logs/echoes source values, query bodies or exception text, including malformed JSON.
+Generated OpenAPI has concrete closed read/page/relationship schemas, required/nullable fields, numeric and
+string/page bounds, bearer security, body search and safe 400/401/403/404/503 contracts. It does not rewrite
+legacy schemas.
+
+Five seconds applies to selected authority, Case SELECT, audit tenant witness and INSERT statements.
+Connection acquisition, JDBC metadata inspection and commit are additional server work; this is not a
+five-second end-to-end server deadline. Row bounds do **not** bound scanned/sorted work. Browser abort
+and its eight-second deadline do **not** prove SQL cancellation or audit rollback. Live collation,
+representative query plans/timeouts, concurrency and failure behavior remain acceptance work.
+
+### Test impact and local validation
+
+Pre-edit inventory inspected CaseServiceAdapterTest, executing CaseSearchPagingJdbcTest,
+CaseSummaryServerProjectionContractTest and neighboring shared projection contracts; ApiReadControllerTest,
+OpenApiDocumentationTest, ApiExceptionHandlerTest; established PHI read/write helpers and viewer classification.
+New synthetic JDBC coverage reaches the public production adapter, gateway and DAO. Its fixture has **35
+unfiltered nonmatches before matching Cases 36–90**, then foreign/deleted matches; it proves the SQL filter
+precedes ordering/paging, first/later/tied/final/empty pages, exact 26-row probe bindings, ceiling/escaping,
+assignment versus tenant-wide search/direct read, mismatched/null authority, removed actor, isolation and
+safe unavailable IDs. Transaction tests protect same-connection audit identity/metadata/timeout/commit and
+failure rollback. HTTP tests protect minimal fields, authority/defaults/bounds, 403 versus 401, 404,
+audit/timeout failures, exact byte limits (including JSON escaping), no partial payload and query/error privacy.
+Defaults and legacy SQL/DTO/OpenAPI remain covered. Viewer READ classification and selector ownership updated.
+
+Final local checks used the existing scratch Maven 3.9.11/JDK21 wrapper (`/workspace/.tools/bin/mvn`),
+with `-Dmaven.compiler.parameters=true` for controller parameter reflection. Network-enabled shell execution
+was needed for the existing dependencies; no repository toolchain, dependency or version change.
+
+* Focused command below — **97 passed**, zero failures/errors/skips. Includes an actual Spring body-converter
+  TRACE test proving search-request formatting is redacted, not merely a toString unit assertion.
+* Change-aware selector against `fe029cb2...` and final HEAD — cases/contacts/organizations/reports/security-data/
+  server/tasks, 19 classes across core/data/server/UI. Shared port consumers plus authoritative audit/RLS and
+  directly modified/new tests explain these selected areas. Exact emitted affected command below — **110
+  passed**, zero failures/errors/skips. Final selector command/class plan unchanged after documentation update.
+* Required `mvn -Dmaven.compiler.parameters=true test` — **116 passed**, zero failures/errors/skips.
+* `python3 -m unittest discover -s build/test-selection -p test_select_tests.py` — **24 passed**.
+* Selector-recommended advisory `mvn -Dmaven.compiler.parameters=true -Pall-tests test` — **FAILED**:
+  core111 passed; data813 tests/**12 failures**/zero errors/skips; UI/updater/desktop/server unexecuted.
+  All12 failure **methods match R1 §10** and reproduced again on unchanged fetched `fe029cb2` in the
+  51-test command below (12 failures, zero errors/skips). This is not a passing full suite. No unrelated fix.
+* Additional diagnostic compatibility inspection ran `mvn -Dmaven.compiler.parameters=true -pl shale-server
+  -am -Dtest=ApiExceptionHandlerTest -Dsurefire.failIfNoSpecifiedTests=false test` on the unchanged fetched
+  base: four tests/**three failures**. Identical failures had appeared in an exploratory R2 focused run:
+  `invalidRequestLogsDiagnosticAndKeepsClientResponseSanitized`,
+  `illegalArgumentLogsDiagnosticAndKeepsClientResponseSanitized`,
+  `sqlServerFailureLogsSafeMetadataAndCompletesWithoutReplacingOriginalFailure`. The first two expect the
+  original throwable instead of current sanitization; the third sees no mocked SQL cause metadata under this
+  toolchain. Existing handler/test code is untouched; this additional advisory result is not relabelled passing.
+* Changed-production-to-test review, old-symbol/legacy-field search, both changed documents' relative links/
+  balanced fences/whitespace, R1/3A–3J/security ancestry and retained lock versions, `git diff --check` and
+  `git diff fe029cb2 HEAD --check` — PASS. Original checkout remains clean on `work`.
+
+```bash
+mvn -Dmaven.compiler.parameters=true -pl shale-server,shale-ui -am \
+  -Dtest=MinimizedCaseReadJdbcTest,MinimizedCaseReadControllerTest,CaseServiceAdapterTest,CaseSearchPagingJdbcTest,CaseSummaryServerProjectionContractTest,ApiReadControllerTest,OpenApiDocumentationTest,AuditLogViewerEntityTypeTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base fe029cb2d157a3e4f1f86130f3872d731dd2a991 --head HEAD --format markdown
+mvn -Dmaven.compiler.parameters=true -pl shale-core,shale-data,shale-server,shale-ui -am -Dtest=com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.data.service.adapter.CaseServiceAdapterTest,com.shale.data.service.adapter.MinimizedCaseReadJdbcTest,com.shale.data.service.adapter.OrganizationServiceAdapterTest,com.shale.data.service.adapter.TaskServiceAdapterTest,com.shale.server.controller.AuthControllerTest,com.shale.server.controller.MinimizedCaseReadControllerTest,com.shale.server.controller.OpenApiDocumentationTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest,com.shale.ui.controller.AuditLogViewerEntityTypeTest,com.shale.ui.controller.ReportsControllerLifecycleTest -Dsurefire.failIfNoSpecifiedTests=false test
+# Unchanged fetched-base reproduction of the inherited advisory failures:
+mvn -Dmaven.compiler.parameters=true -pl shale-data -am -Pall-tests \
+  -Dtest=AdministrativeReadAuditMigrationContractTest,ApplicationInstanceHeartbeatMigrationContractTest,ApplicationReleaseImportContractTest,CaseDaoCasesGridQueryTest,CaseDateTypeLifecycleCutoverContractTest,CaseDatesFinalRuntimeCleanupContractTest,CaseOverviewConfigurationContractTest,CaseSummaryReportsContractTest,ContactPhase2BAuditMigrationContractTest,FormConfigurationFoundationTest,SessionInvalidationPhase8AContractTest,UserSessionMigrationContractTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+All JDBC/MockMvc/source/viewer/OpenAPI results are **synthetic**. No authorized live application/SQL/RLS/
+audit-failure/host/device/AT acceptance was performed. Known base advisory failures remain unfixed and are
+not a reason to weaken auditing or claim live acceptance.
+
+### Deployment prerequisites and rollback (no deployment performed)
+
+1. Deploy only after separately authorized acceptance. Retain the security-patched 3A–3J/R1 base, durable
+   WEB sessions/cutoff configuration and production/azure verified-bearer request-scoped runtime connection
+   initialization. Development identity headers must remain disabled on the target.
+2. Verify deployed existing schema and runtime grants: Cases/CaseStatuses/Statuses/PracticeAreas/Users,
+   semantic RoleSemantics compatibility rows, tenant-owned CaseUsers (`2026-09-03_case_team_member_roles_phase2.sql`),
+   Users.IsRemoved (`2026-08-03_users_management_completion.sql`), assigned ordering's CaseDates/types/semantic
+   mappings, and AuditLog.ShaleClientId (`2026-04-15_auditlog_shaleclientid_tenant_scope_phase1.sql`). These are
+   existing prerequisites, not new R2 migrations. Verify FieldName/FieldCode storage supports the exact
+   existing event, ObjectTypes Case=1, INSERT grant and tenant-scoped audit visibility/viewer. The tenant-column
+   migration alone does not prove deployed RLS or grants. If a deployed audit/schema protection gap is found,
+   resolve it through a separately scoped prerequisite before enabling these reads; never weaken the audit.
+3. With separately approved two-tenant fixtures and a **non-dbo runtime identity**, verify enabled RLS and
+   explicit root/join isolation, active/removed actors, assigned/unassigned/closed/deleted Cases, pooled
+   tenant/actor switching and missing/mismatched context. Inspect exact live predicates for Cases, Users,
+   CaseUsers, selected strict/overlay lookups, ordering dates and audit visibility; dbo catalog output is
+   not enforcement evidence. Exercise search beyond the unfiltered first page and representative scan/plans.
+4. Prove persisted Overview event identity/representation and no data when authorized isolated INSERT/commit
+   fault injection fails; verify timeout and byte-limit outcomes. No production grant alteration or fixture
+   work is authorized by this PR. Do not infer success from synthetic JDBC doubles.
+5. Verify actual HTTPS API/host, exact CORS, no-store end to end, current concrete OpenAPI and safe JSON errors;
+   keep request bodies/search text out of tracing, access/error/APM logs and referrers. Do not enable payload
+   logging to diagnose failures. R3/browser and live session/host/accessibility acceptance remain open.
+
+Rollback removes/reverts only the additive R2 read routes/contracts/worker, associated tests/schema customizer
+and documentation, restoring the retained R1/security base. Stop new consumers first. Retain legacy consumers,
+durable-session/security patches and **all audit history**. No migration rollback is needed. Never disable
+required audit, switch to the suppressed convenience overload, bypass authority/RLS, or delete audit rows as
+rollback. Rollback to pre-durable-session server code still has the independent token-drain/secret-rotation
+requirements in the deployment runbook.
+
+### Next bounded R3 browser-consumer prompt
+
+```text
+Repository: gseshadow/Shale; PR base: codex/latest.
+Task: R3 — consume the accepted minimized Case read contracts only.
+Fetch live base and verify merged R2 and 3A–3J/security prerequisites. Read AGENTS, complete prompt rules,
+Web V2 roadmap and first-read contract (R2 §11), follow routing; create a separate branch, preserve work.
+Inspect neighboring browser/session/route tests before edits. Implement only an assigned/case-name-search
+workspace and read-only Overview using POST /api/v2/cases/search-page, GET assigned-page and audited Overview.
+Use narrow unknown-JSON validators for the exact schema, nullability, safe IDs, fields and UTF-8/page bounds.
+Do not fetch broad detail, tasks, updates, history, contacts, dates, lookups or mutation witnesses for this path.
+Keep query in bounded identity-scoped memory, never URLs/logs/persistent storage. Blank search gives instructions;
+search is explicit submit and filters the entire tenant dataset server-side. Reset page on selection/search,
+continue size-stably through page 100; if hasMore at that ceiling, disable Next and explain the result-window
+limit. Preserve deterministic IDs, existing legacy route/consumer compatibility and deliberate Back/reopen.
+Reuse shell/primitives, route registry and sessionRequests generation/rejection owners; compose narrow route/
+query cancellation with an eight-second total fetch AND body deadline. Reject stale success and failure;
+clear old entity before new ID, clear/abort memory on logout/rejection/identity replacement. No automatic
+retry/refetch/focus refresh/replay. Opening/refetching Overview invokes the server's required audit; never
+append audit from browser callbacks. Summary pages are explicitly audit-exempt. Distinguish accepted empty,
+400, operation 403 retaining session, safe 404, audit/read unavailable, oversized/malformed and deadline outcomes.
+Confirmed session rejection uses explicit re-login and existing safe returns; automatic refresh remains off.
+Preserve CredentialStore/startup uncertainty/login/storage/logout contracts. Appearance provisional; reuse
+semantic/accessibility controls, responsive layouts/focus/announcements. No new dependencies, broad transport/
+cache rewrite, native/MCP/AI, mutations, refresh implementation, deployment or version changes.
+Maintain affected tests, run focused/full web tests/typecheck/build and synthetic browser checks plus selector/
+relevant/critical checks under prompt rules and diff checks. Carry forward known base failures honestly.
+Update evidence/prerequisites/rollback; Phase 2 OPEN, Phase 3 IN PROGRESS, Phase 4 incomplete until separately
+accepted. Commit/push/open PR targeting codex/latest; do not merge/deploy. Live SQL/session/host/device/AT
+acceptance requires separate authorization; report gaps, never infer it from mocks.
+```
