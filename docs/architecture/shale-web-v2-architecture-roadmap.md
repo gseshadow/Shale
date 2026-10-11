@@ -1,9 +1,9 @@
 # Shale Web V2 architecture and phased implementation roadmap
 
-**Reviewed:** 2026-10-10. **Inventory/documentation:** COMPLETE. **R2 selected-read decisions:** ACCEPTED; broader/live/deployment acceptance OPEN.
+**Reviewed:** 2026-10-11. **Inventory/documentation:** COMPLETE. **R2 selected-read decisions:** ACCEPTED; broader/live/deployment acceptance OPEN.
 **Web V2 implementation:** Phase 2A foundation, Phase 2B authenticated shell and Phase 2C My Shale presentation adoption IMPLEMENTED FOR REVIEW; Phase 2D acceptance review and targeted feedback fix RECORDED; ACCEPTANCE OPEN.
 Phase 2 remains IN PROGRESS; acceptance OPEN. Phase 3 IN PROGRESS — Phase 3A safe login return-path restoration and Phase 3B startup
-verification uncertainty/recovery, Phase 3C truthful remote-logout feedback and Phase 3D bounded startup verification, plus Phase 3E canonical existing-route registry and Phase 3F established-session rejection coordination, plus Phase 3G existing-route data-router migration and bounded Contact editor protection and Phase 3H CredentialStore extraction and Phase 3I Organization Detail editor protection and Phase 3J credential-login deadlines/cancellation IMPLEMENTED FOR REVIEW. Phase 4 bounded R1/R2 server reads IMPLEMENTED FOR REVIEW; first read slice INCOMPLETE. Phases 5–10 NOT STARTED. The user explicitly authorized this bounded
+verification uncertainty/recovery, Phase 3C truthful remote-logout feedback and Phase 3D bounded startup verification, plus Phase 3E canonical existing-route registry and Phase 3F established-session rejection coordination, plus Phase 3G existing-route data-router migration and bounded Contact editor protection and Phase 3H CredentialStore extraction and Phase 3I Organization Detail editor protection and Phase 3J credential-login deadlines/cancellation IMPLEMENTED FOR REVIEW. Phase 4 bounded R1/R2 server reads and R3 browser workspace/limited Overview IMPLEMENTED FOR REVIEW; first read slice INCOMPLETE. Phases 5–10 NOT STARTED. The user explicitly authorized this bounded
 Phase 3 slice while Phase 2 acceptance remains open; that sequencing does not mark Phase 2 complete.
 Documentation completion is not implementation completion.
 
@@ -1196,6 +1196,38 @@ Deploy only after the existing durable-session/runtime schema, tenant/overlay/RL
 AuditLog event/grants/viewer, two-tenant/non-dbo audit-failure and host/logging/no-store gates in that contract
 are separately verified. Rollback removes only new R2 consumers/routes/worker, keeps R1/security/session
 contracts and all audit history. Never disable required audit or delete its history as rollback. No merge/deployment.
+
+### 11.20 R3 — bounded Case browser path (implemented for review, 2026-10-11)
+
+Fetched base `862b8671da698da5469e8d28220bca04bad98944` includes merged #1856/R2, R1, 3A–3J
+and security prerequisites. Separate `codex/r3-case-workspace` preserves the original checkout.
+[Review and exact launch/check/rollback instructions](../../shale-web/docs/r3-review.md) and
+[synthetic browser evidence](../../shale-web/docs/r3-evidence/) accompany this bounded slice.
+
+The existing registry/shell/Light/Dark primitives compose explicit `/case-workspace` and
+`/case-workspace/:caseId` routes. Existing `/cases` editors and broad write contracts remain reachable.
+Assigned is assignment-filtered; explicit POST case-name search and direct Overview are tenant-wide.
+The server filters the entire active tenant dataset before pagination; no UI-loaded-card search.
+Search query/page/back state is bounded identity-scoped memory, never a URL/log/persistent cache.
+Size25/page0–100 and hasMore govern accessible paging; the ceiling explains narrowing the result window.
+Overview displays exactly the eight approved fields and invokes the required server-audited read each
+open/reread; summary reads remain audit-exempt, with no browser audit rows or cancellation reversal claim.
+
+Unknown JSON exact-schema/local-timestamp validation and streamed UTF-8 limits (128 KiB/page, 8 KiB/detail)
+precede rendering. A narrow caller-aware sessionRequests extension retains generation/rejection ownership
+and composes route/query cancellation with one eight-second fetch/body budget and late-result guards.
+Logout/rejection/replacement/storage-security teardown clears memory. No automatic refresh/retry/refetch/replay,
+excluded read endpoints, mutations, dependency/schema/version/host changes. 401 uses existing explicit re-login;
+403 retains the session. Empty, safe404, validation, service/audit failure, invalid/oversized and uncertain
+network/timeout feedback remain distinct, with no list-row detail fallback.
+
+The review records focused/full web, build/typecheck/audits, selected/critical local checks and Chromium
+synthetic width/theme/keyboard/announcements/native-zoom evidence, retaining known base Maven advisories.
+Appearance provisional. Phase 2 acceptance OPEN, Phase 3 IN PROGRESS, Phase 4 INCOMPLETE until separately
+accepted. Next bounded **R4 acceptance** requires an approved isolated target and live two-tenant/non-dbo
+SQL/RLS, audit/session, host, device and real assistive-technology witnesses; none is inferred from mocks.
+Rollback only R3 consumers/routes (and unused narrow extension), keeping R1/R2/security/session contracts and
+all audit history. Exact deployment prerequisites remain in the review and R2 §11; no merge/deployment here.
 
 ## 12. Ready-to-run next Codex implementation prompt
 

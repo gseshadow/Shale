@@ -6,7 +6,7 @@ import { foundationUrl, previewNavigation } from '../preview/navigation';
 
 // Independent compatibility inventory: adding/changing a route requires a URL decision.
 const expectedRoutes = {
-  root: '/', login: '/login', myShale: '/my-shale', cases: '/cases', caseDetail: '/cases/:caseId',
+  root: '/', login: '/login', caseWorkspace: '/case-workspace', caseOverview: '/case-workspace/:caseId', myShale: '/my-shale', cases: '/cases', caseDetail: '/cases/:caseId',
   tasks: '/tasks', taskDetail: '/tasks/:taskId', contacts: '/contacts', contactDetail: '/contacts/:contactId',
   organizations: '/organizations', organizationDetail: '/organizations/:organizationId', team: '/team',
   teamMemberDetail: '/team/:userId', settings: '/settings', fallback: '*',
@@ -14,15 +14,16 @@ const expectedRoutes = {
 describe('canonical existing application route ownership', () => {
   it('contains exactly the existing URLs, identities and public/fallback exclusions', () => {
     expect(Object.fromEntries(Object.entries(routes).map(([id, route]) => [id, route.path]))).toEqual(expectedRoutes);
-    expect(operationalRouteIds).toHaveLength(12);
+    expect(operationalRouteIds).toHaveLength(14);
     for (const id of ['root', 'login', 'fallback'] as const) {
       expect(routes[id].navigation).toBeNull(); expect(routes[id].safeReturn).toBe(false);
       expect(operationalRouteIds).not.toContain(id);
     }
     for (const id of operationalRouteIds) expect(routes[id].safeReturn).toBe(true);
-    expect(new Set(Object.values(routes).map(route => route.path)).size).toBe(15);
+    expect(new Set(Object.values(routes).map(route => route.path)).size).toBe(17);
   });
   it.each([
+    ['/case-workspace', 'caseWorkspace', 'Case workspace'], ['/case-workspace/7', 'caseOverview', 'Case workspace'],
     ['/my-shale', 'myShale', 'My Shale'], ['/cases', 'cases', 'Cases'], ['/cases/7', 'caseDetail', 'Cases'],
     ['/tasks', 'tasks', 'My Tasks'], ['/tasks/007', 'taskDetail', 'My Tasks'],
     ['/contacts', 'contacts', 'Contacts'], ['/contacts/name', 'contactDetail', 'Contacts'],
@@ -44,7 +45,7 @@ describe('canonical existing application route ownership', () => {
     expect(destinations).toBe(routeDestinations);
     expect(destinations.map(item => [item.path, item.label, item.available])).toEqual([
       ['/my-shale', 'My Shale', true], ['/tasks', 'My Tasks', true], ['/cases', 'Cases', true],
-      ['/contacts', 'Contacts', true], ['/organizations', 'Organizations', true], ['/team', 'Team', true],
+      ['/case-workspace', 'Case workspace', true], ['/contacts', 'Contacts', true], ['/organizations', 'Organizations', true], ['/team', 'Team', true],
       ['/calendar', 'Calendar', false], ['/reports', 'Reports', false], ['/search', 'Search', false], ['/settings', 'Settings', true],
     ]);
     for (const item of destinations.filter(item => !item.available)) {
@@ -55,6 +56,7 @@ describe('canonical existing application route ownership', () => {
     expect(previewNavigation.activeDestination('/calendar/unknown')).toBeUndefined();
   });
   it('builds every static URL from the same registry', () => {
+    expect(routePath('caseWorkspace')).toBe('/case-workspace'); expect(routePath('caseOverview', { caseId: 7 })).toBe('/case-workspace/7');
     expect(routePath('root')).toBe('/'); expect(routePath('login')).toBe('/login');
     expect(routePath('myShale')).toBe('/my-shale'); expect(routePath('cases')).toBe('/cases');
     expect(routePath('tasks')).toBe('/tasks'); expect(routePath('contacts')).toBe('/contacts');

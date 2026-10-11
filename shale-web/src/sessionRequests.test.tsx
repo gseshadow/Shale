@@ -1,5 +1,6 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readCasePage, readCaseOverview } from './features/cases/client';
 import * as api from './api';
 import { bindSessionRequests, SessionRequestDiscarded } from './sessionRequests';
 import { useStartupSession } from './useStartupSession';
@@ -24,6 +25,9 @@ async function established() {
 
 // Independent consumer inventory. Every real endpoint client must notify through the seam.
 const consumers: [string, (token: string) => Promise<unknown>][] = [
+  ['bounded case search', t => readCasePage(t, { mode: 'search', query: 'synthetic', page: 0 }, new AbortController())],
+  ['bounded assigned', t => readCasePage(t, { mode: 'assigned', query: '', page: 0 }, new AbortController())],
+  ['bounded overview', t => readCaseOverview(t, 7, new AbortController())],
   ['date families', t => api.listEffectiveCaseDateTypes(t)],
   ['advisory validation', t => api.validateContactValue(t, 'phone', '3035550123')],
   ['case search', t => api.searchCases(t, 'synthetic')],

@@ -13,6 +13,7 @@ import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryIte
 import { ApiError, contactValueUpdate } from './api';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
 import { Button, Feedback, SectionRegion, PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
+import { CaseWorkspace, CaseWorkspaceMemory, ReadOnlyCaseOverview } from './features/cases/CaseWorkspace';
 import { ResponsiveShell } from './shell/ResponsiveShell';
 import './styles.css';
 import './ui/tokens.css';
@@ -155,6 +156,8 @@ function OperationalScreen({ id }: { id: OperationalRouteId }) {
   // Exhaustive screen composition remains separate from URL metadata and router execution.
   const screens: Record<OperationalRouteId, ReactNode> = {
     myShale: <MyShalePage accessToken={authState.accessToken} user={authState.user} />,
+    caseWorkspace: <CaseWorkspace key={location.key} token={authState.accessToken ?? ''} />,
+    caseOverview: <ReadOnlyCaseOverview key={location.key} token={authState.accessToken ?? ''} />,
     cases: <CasesPage accessToken={authState.accessToken} />,
     caseDetail: <CaseDetailPage accessToken={authState.accessToken} />,
     tasks: <TasksPage accessToken={authState.accessToken} />,
@@ -177,7 +180,7 @@ function SessionProtectedRoutes() {
 }
 function SessionShell() {
   const { authState, handleLogout } = useAppSession();
-  return <AppShell user={authState.user} onLogout={handleLogout} />;
+  return <CaseWorkspaceMemory token={authState.accessToken ?? ''}><AppShell user={authState.user} onLogout={handleLogout} /></CaseWorkspaceMemory>;
 }
 function PublicRoute({ id }: { id: 'root' | 'login' | 'fallback' }) {
   const { authState, logoutFeedback, sessionEnded, storageFeedback, signInWithCredentials } = useAppSession();

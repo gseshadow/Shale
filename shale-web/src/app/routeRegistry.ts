@@ -1,6 +1,6 @@
 import { generatePath, matchPath } from 'react-router-dom';
 
-type Navigation = { label: string; order: number } | { parent: 'cases' | 'tasks' | 'contacts' | 'organizations' | 'team' } | null;
+type Navigation = { label: string; order: number } | { parent: 'caseWorkspace' | 'cases' | 'tasks' | 'contacts' | 'organizations' | 'team' } | null;
 type RouteDefinition = {
   kind: 'operational' | 'public' | 'fallback';
   path: string;
@@ -14,6 +14,8 @@ export const routes = {
   root: { kind: 'public', path: '/', navigation: null, safeReturn: false },
   login: { kind: 'public', path: '/login', navigation: null, safeReturn: false },
   myShale: { kind: 'operational', path: '/my-shale', navigation: { label: 'My Shale', order: 0 }, safeReturn: true },
+  caseWorkspace: { kind: 'operational', path: '/case-workspace', navigation: { label: 'Case workspace', order: 2.5 }, safeReturn: true },
+  caseOverview: { kind: 'operational', path: '/case-workspace/:caseId', navigation: { parent: 'caseWorkspace' }, safeReturn: true },
   cases: { kind: 'operational', path: '/cases', navigation: { label: 'Cases', order: 2 }, safeReturn: true },
   caseDetail: { kind: 'operational', path: '/cases/:caseId', navigation: { parent: 'cases' }, safeReturn: true },
   tasks: { kind: 'operational', path: '/tasks', navigation: { label: 'My Tasks', order: 1 }, safeReturn: true },
