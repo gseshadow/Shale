@@ -1,7 +1,7 @@
 # Web V2 first-read-slice implementation contract readiness
 
-**Inspected:** 2026-10-10. **Readiness documentation: COMPLETE; R2 first-slice owner decisions: ACCEPTED; live/deployment acceptance: OPEN.**
-**Phase 2 acceptance: OPEN; Phase 3: IN PROGRESS; Phase 4: bounded R1/R2 server reads implemented for review; first read slice INCOMPLETE.**
+**Inspected:** 2026-10-11. **Readiness documentation: COMPLETE; R2 first-slice owner decisions: ACCEPTED; live/deployment acceptance: OPEN.**
+**Phase 2 acceptance: OPEN; Phase 3: IN PROGRESS; Phase 4: bounded R1/R2 server reads and R3 browser consumer implemented for review; first read slice INCOMPLETE.**
 Appearance is provisional; visual refinement follows functional delivery. Accessibility remains an
 acceptance gate. Ordinary web delivery is independent of MCP/AI activation.
 
@@ -736,7 +736,7 @@ required audit, switch to the suppressed convenience overload, bypass authority/
 rollback. Rollback to pre-durable-session server code still has the independent token-drain/secret-rotation
 requirements in the deployment runbook.
 
-### Next bounded R3 browser-consumer prompt
+### R3 browser-consumer prompt (implemented for review; see §12)
 
 ```text
 Repository: gseshadow/Shale; PR base: codex/latest.
@@ -767,3 +767,25 @@ Update evidence/prerequisites/rollback; Phase 2 OPEN, Phase 3 IN PROGRESS, Phase
 accepted. Commit/push/open PR targeting codex/latest; do not merge/deploy. Live SQL/session/host/device/AT
 acceptance requires separate authorization; report gaps, never infer it from mocks.
 ```
+
+## 12. R3 browser consumer implementation record (2026-10-11)
+
+R3 implements the previously ready-to-run browser prompt on fetched #1856 base
+`862b8671da698da5469e8d28220bca04bad98944`, verifying R1/R2, 3A–3J and retained security ancestry.
+The accepted R2 §11 schema/tenant/audit/bounds contract remains authoritative and unchanged.
+[Launch/review, exact validation, synthetic evidence, rollback and deployment prerequisites](../../shale-web/docs/r3-review.md)
+record the implementation. [Roadmap §11.20](shale-web-v2-architecture-roadmap.md#1120-r3--bounded-case-browser-path-implemented-for-review-2026-10-11)
+records phase status and the next bounded R4 acceptance.
+
+The explicit Case workspace routes preserve legacy editors, use only the three R2 reads and keep server-side
+tenant-wide submitted search independent of Assigned. Validated eight-field Overview is always obtained through
+its required audited endpoint. Body-byte limits, exact unknown-JSON schemas, SQL IDs/local calendar timestamps,
+page0–100/size25/hasMore checks, identity-scoped bounded query/page memory, one eight-second fetch/body budget,
+caller plus session cancellation and stale success/failure guards precede rendering. No excluded reads, browser
+audit rows, detail fallback, automatic refresh/refetch/retry/replay or new persistence/dependency/schema changes.
+Confirmed401 reuses explicit login/safe returns;403 preserves session; failure feedback is sanitized and distinct.
+
+Executed tests/browser evidence are synthetic, with inherited advisory failures attributed to R2 rather than
+claimed fixed or passing. Phase 2 acceptance OPEN, Phase 3 IN PROGRESS, Phase 4 first read slice INCOMPLETE
+until separate acceptance. Appearance provisional. Live SQL/RLS/performance, persisted audit/session, host,
+physical devices and real assistive-technology speech remain unverified. No merge or deployment authorized here.

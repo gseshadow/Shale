@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { redirectPathFrom } from './returnPath';
 
 describe('safe router-relative login return targets', () => {
-  it.each(['/my-shale', '/cases', '/cases/7', '/tasks', '/tasks/12', '/contacts', '/contacts/7',
+  it.each(['/case-workspace', '/case-workspace/7', '/my-shale', '/cases', '/cases/7', '/tasks', '/tasks/12', '/contacts', '/contacts/7',
     '/organizations', '/organizations/7', '/team', '/team/7', '/settings', '/cases/7/', '/CASES/7'])
   ('preserves existing protected route %s with query and hash', pathname => {
     expect(redirectPathFrom({ from: { pathname, search: '?page=2&sort=due%20date', hash: '#details' } }))

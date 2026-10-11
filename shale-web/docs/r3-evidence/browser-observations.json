@@ -1,0 +1,170 @@
+{
+  "browser": "151.0.7922.173",
+  "observations": [
+    {
+      "width": 320,
+      "theme": "light",
+      "synthetic": true,
+      "noOverflow": true,
+      "targetMinimum44": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryPageFocus": true,
+      "loadingResultLiveRegionAndAXTree": true,
+      "auditFailureClearsEntity": true,
+      "noExcludedRequestsOrAutomaticRefetch": true
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "synthetic": true,
+      "noOverflow": true,
+      "targetMinimum44": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryPageFocus": true,
+      "loadingResultLiveRegionAndAXTree": true,
+      "auditFailureClearsEntity": true,
+      "noExcludedRequestsOrAutomaticRefetch": true
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "synthetic": true,
+      "noOverflow": true,
+      "targetMinimum44": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryPageFocus": true,
+      "loadingResultLiveRegionAndAXTree": true,
+      "auditFailureClearsEntity": true,
+      "noExcludedRequestsOrAutomaticRefetch": true
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "synthetic": true,
+      "noOverflow": true,
+      "targetMinimum44": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryPageFocus": true,
+      "loadingResultLiveRegionAndAXTree": true,
+      "auditFailureClearsEntity": true,
+      "noExcludedRequestsOrAutomaticRefetch": true
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "synthetic": true,
+      "noOverflow": true,
+      "targetMinimum44": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryPageFocus": true,
+      "loadingResultLiveRegionAndAXTree": true,
+      "auditFailureClearsEntity": true,
+      "noExcludedRequestsOrAutomaticRefetch": true
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "synthetic": true,
+      "noOverflow": true,
+      "targetMinimum44": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryPageFocus": true,
+      "loadingResultLiveRegionAndAXTree": true,
+      "auditFailureClearsEntity": true,
+      "noExcludedRequestsOrAutomaticRefetch": true
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "synthetic": true,
+      "noOverflow": true,
+      "targetMinimum44": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryPageFocus": true,
+      "loadingResultLiveRegionAndAXTree": true,
+      "auditFailureClearsEntity": true,
+      "noExcludedRequestsOrAutomaticRefetch": true
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "synthetic": true,
+      "noOverflow": true,
+      "targetMinimum44": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryPageFocus": true,
+      "loadingResultLiveRegionAndAXTree": true,
+      "auditFailureClearsEntity": true,
+      "noExcludedRequestsOrAutomaticRefetch": true
+    },
+    {
+      "mode": "forbidden",
+      "synthetic": true,
+      "safeFeedback": true,
+      "noStaleDetail": true,
+      "noReplay": true,
+      "explicitLoginReturn": false
+    },
+    {
+      "mode": "unavailable",
+      "synthetic": true,
+      "safeFeedback": true,
+      "noStaleDetail": true,
+      "noReplay": true,
+      "explicitLoginReturn": false
+    },
+    {
+      "mode": "oversized",
+      "synthetic": true,
+      "safeFeedback": true,
+      "noStaleDetail": true,
+      "noReplay": true,
+      "explicitLoginReturn": false
+    },
+    {
+      "mode": "malformed",
+      "synthetic": true,
+      "safeFeedback": true,
+      "noStaleDetail": true,
+      "noReplay": true,
+      "explicitLoginReturn": false
+    },
+    {
+      "mode": "timeout",
+      "synthetic": true,
+      "safeFeedback": true,
+      "noStaleDetail": true,
+      "noReplay": true,
+      "explicitLoginReturn": false
+    },
+    {
+      "mode": "body-timeout",
+      "synthetic": true,
+      "safeFeedback": true,
+      "noStaleDetail": true,
+      "noReplay": true,
+      "explicitLoginReturn": false
+    },
+    {
+      "mode": "rejected",
+      "synthetic": true,
+      "safeFeedback": true,
+      "noStaleDetail": true,
+      "noReplay": true,
+      "explicitLoginReturn": true
+    }
+  ],
+  "pageErrors": [],
+  "unexpectedRequests": [],
+  "liveAcceptance": false,
+  "screenReaderSpeech": "unverified",
+  "physicalDevices": "unverified"
+}
