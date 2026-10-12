@@ -58,11 +58,17 @@ Do not include `/api/auth/login` or any other path in `VITE_SHALE_API_BASE_URL`;
 
 ## Deployment plan
 
-The 5P-4 read-only beta build/deploy runbook is documented in [docs/shale-web-deployment.md](../docs/shale-web-deployment.md). It recommends Azure Static Web Apps for the first beta, documents the required `VITE_SHALE_API_BASE_URL` build setting, and lists the Azure API CORS update needed for the deployed frontend origin.
+The [hosted web operator handoff](../docs/shale-web-deployment.md) reconciles the existing Static Web Apps
+workflow (targets `main`) with current source, reproducible artifact preparation, build-time
+`VITE_SHALE_API_BASE_URL`, exact CORS, routing/privacy/cache prerequisites and rollback. Actual host and
+deployed build identity remain UNKNOWN. The bundle includes legacy writes alongside the reviewed Case
+workspace; it is not a read-only pilot. Publication needs separate authorization and remaining R4 evidence.
 
 ## Required Azure CORS setting
 
-Local browser login requires the Azure App Service to allow the Vite development origin:
+Local browser login requires the Azure App Service's effective allowed-origin list to include the Vite
+development origin below. Preserve existing authorized consumers when adding it or an approved hosted
+origin; this value is not a replacement for the deployed list:
 
 ```text
 SHALE_ALLOWED_CORS_ORIGINS=http://localhost:5173
