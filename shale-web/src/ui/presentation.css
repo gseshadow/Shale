@@ -41,10 +41,10 @@
 :is(.shale-foundation, .shale-presentation) .shale-indicator-dot { background: var(--shale-indicator-fill,var(--shale-neutral-text)); border: 1px solid var(--shale-border); width: .625rem; height: .625rem; border-radius: 50%; flex: 0 0 auto; }
 :is(.shale-foundation, .shale-presentation) .shale-field { display: grid; gap: var(--shale-space-2); }
 :is(.shale-foundation, .shale-presentation) label { font-weight: 700; }
-:is(.shale-foundation, .shale-presentation) :where(input,select,textarea) { color: var(--shale-text); background: var(--shale-input); border: 1px solid var(--shale-control-border); border-radius: var(--shale-radius-control); min-height: 44px; max-width: 100%; min-width: 0; width: 100%; padding: var(--shale-space-2) var(--shale-space-3); font-size: 1rem; scroll-margin-block: var(--shale-space-6); }
-:is(.shale-foundation, .shale-presentation) :where(input,select,textarea):hover { border-color: var(--shale-focus); }
-:is(.shale-foundation, .shale-presentation) :where(input,select,textarea)[aria-invalid="true"] { border-color: var(--shale-danger-text); }
-:is(.shale-foundation, .shale-presentation) :where(input,select,textarea):disabled { opacity: .52; }
+:is(.shale-foundation, .shale-presentation) :is(input,select,textarea) { color: var(--shale-text); background: var(--shale-input); border: 1px solid var(--shale-control-border); border-radius: var(--shale-radius-control); min-height: 44px; max-width: 100%; min-width: 0; width: 100%; padding: var(--shale-space-2) var(--shale-space-3); font-size: 1rem; scroll-margin-block: var(--shale-space-6); }
+:is(.shale-foundation, .shale-presentation) :is(input,select,textarea):hover { border-color: var(--shale-focus); }
+:is(.shale-foundation, .shale-presentation) :is(input,select,textarea)[aria-invalid="true"] { border-color: var(--shale-danger-text); }
+:is(.shale-foundation, .shale-presentation) :is(input,select,textarea):disabled { opacity: .52; }
 :is(.shale-foundation, .shale-presentation) .shale-field-error { color: var(--shale-danger-text); }
 :is(.shale-foundation, .shale-presentation) .shale-feedback, :is(.shale-foundation, .shale-presentation) .status { background: var(--shale-neutral); color: var(--shale-neutral-text); border: 1px solid var(--shale-border); border-radius: var(--shale-radius-control); padding: var(--shale-space-3); }
 :is(.shale-foundation, .shale-presentation) .shale-feedback-error { background: var(--shale-danger); color: var(--shale-danger-text); border-color: var(--shale-danger-text); }
@@ -70,3 +70,22 @@
 .shale-presentation .status-pill { text-transform: none; line-height: inherit; white-space: normal; }
 .shale-presentation .completed-state { color: var(--shale-success-text); font-size: var(--shale-type-meta); }
 .shale-presentation .entity-card-activation { min-width: 44px; }
+
+/* Beta feedback and native editors use the same semantic states as shared fields. */
+:is(.shale-foundation, .shale-presentation) .status.error {
+  background: var(--shale-danger); color: var(--shale-danger-text); border-color: var(--shale-danger-text);
+}
+:is(.shale-foundation, .shale-presentation) :is(input,textarea)::placeholder {
+  color: var(--shale-muted); opacity: 1;
+}
+:is(.shale-foundation, .shale-presentation) :is(input,select,textarea):disabled,
+:is(.shale-foundation, .shale-presentation) fieldset:disabled { cursor: default; }
+:is(.shale-foundation, .shale-presentation) :is(input[type="radio"],input[type="checkbox"]) {
+  width: 1.2rem; min-width: 1.2rem; height: 1.2rem; min-height: 1.2rem;
+  padding: 0; accent-color: var(--shale-focus); flex: 0 0 auto;
+}
+:is(.shale-foundation, .shale-presentation) option {
+  background: var(--shale-input); color: var(--shale-text);
+}
+.shale-presentation .shale-button { font: inherit; font-weight: 700; }
+.shale-presentation :is(.status-pill-success,.status-pill-warning,.status-pill-info) { border-color: var(--shale-border); }

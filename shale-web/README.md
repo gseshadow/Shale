@@ -81,7 +81,7 @@ documents ownership, local build review, checks, limitations and temporary-entry
 ## Web V2 Phase 2B authenticated shell
 
 The existing authenticated URLs use one responsive shell and navigation registry. Light/Dark shell
-selection is local to the mounted session; route screens retain their Light beta skin. Authentication,
+selection is local to the mounted session; at this checkpoint, route screens retained their Light beta skin. Authentication,
 services and mutation handlers are unchanged. [Phase 2B review](docs/phase-2b-review.md) records the
 synthetic review script, screenshots, validation, known login return-to issue, acceptance gaps and
 frontend-only rollback. Phase 2 remains in progress; no deployment is part of this milestone.
@@ -90,6 +90,15 @@ frontend-only rollback. Phase 2 remains in progress; no deployment is part of th
 ## Web V2 Phase 2C My Shale presentation
 
 My Shale now adopts shared presentation in both shell themes, including assigned cards and existing
-Complete actions. Other routes retain their beta Light skin. [Phase 2C review](docs/phase-2c-review.md)
+Complete actions. At this checkpoint, other routes retained their beta Light skin. [Phase 2C review](docs/phase-2c-review.md)
 records exact scope, synthetic screenshots, native browser zoom, checks, gaps and frontend rollback.
 Phase 2 remains in progress; foundation.html and the isolated preview remain available.
+
+
+## Authenticated Light/Dark presentation
+
+All existing authenticated routes and their existing details/editors now inherit the selected session
+theme. No preference persistence is implied. [Theme review and synthetic local retest](docs/theme-review.md)
+records the cascade correction, complete route/editor coverage, full-page evidence, native zoom,
+validation and remaining acceptance. My Shale retains its established shared presentation. Appearance
+is provisional; Phase 2/3/4 acceptance remains open. No deployment is included.

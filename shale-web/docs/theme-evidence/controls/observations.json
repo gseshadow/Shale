@@ -1,0 +1,54 @@
+{
+  "browser": "151.0.7922.173",
+  "records": [
+    {
+      "name": "my-shale",
+      "theme": "light",
+      "pending": true,
+      "error": true,
+      "noLiveMutation": true
+    },
+    {
+      "name": "tasks",
+      "theme": "light",
+      "pending": true,
+      "error": true,
+      "noLiveMutation": true
+    },
+    {
+      "name": "native-select-and-nonadmin",
+      "theme": "light",
+      "scheme": "light",
+      "background": "rgb(251, 253, 255)",
+      "color": "rgb(16, 33, 61)",
+      "optionBackground": "rgb(251, 253, 255)",
+      "optionColor": "rgb(16, 33, 61)",
+      "noAdministrativeReads": true
+    },
+    {
+      "name": "my-shale",
+      "theme": "dark",
+      "pending": true,
+      "error": true,
+      "noLiveMutation": true
+    },
+    {
+      "name": "tasks",
+      "theme": "dark",
+      "pending": true,
+      "error": true,
+      "noLiveMutation": true
+    },
+    {
+      "name": "native-select-and-nonadmin",
+      "theme": "dark",
+      "scheme": "dark",
+      "background": "rgb(23, 40, 61)",
+      "color": "rgb(240, 245, 252)",
+      "optionBackground": "rgb(23, 40, 61)",
+      "optionColor": "rgb(240, 245, 252)",
+      "noAdministrativeReads": true
+    }
+  ],
+  "limits": "Native Chromium keyboard/select plus inherited option paint; other OS popup implementations not verified."
+}

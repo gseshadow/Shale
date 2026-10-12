@@ -1,0 +1,38 @@
+{
+  "base": "d0d43655765b74e0c1e83ecefe59451307e7b749",
+  "syntheticOnly": true,
+  "records": [
+    {
+      "name": "tasks",
+      "url": "/tasks",
+      "theme": "dark",
+      "frame": "rgb(238, 243, 248)",
+      "scheme": "light",
+      "card": "linear-gradient(rgb(255, 255, 255), rgb(248, 251, 254))"
+    },
+    {
+      "name": "workspace",
+      "url": "/case-workspace",
+      "theme": "dark",
+      "frame": "rgb(238, 243, 248)",
+      "scheme": "light",
+      "card": "none"
+    },
+    {
+      "name": "overview",
+      "url": "/case-workspace/1",
+      "theme": "dark",
+      "frame": "rgb(238, 243, 248)",
+      "scheme": "light",
+      "card": "none"
+    },
+    {
+      "name": "case-detail",
+      "url": "/cases/1",
+      "theme": "dark",
+      "frame": "rgb(238, 243, 248)",
+      "scheme": "light",
+      "card": "linear-gradient(rgb(255, 255, 255), rgb(248, 251, 254))"
+    }
+  ]
+}

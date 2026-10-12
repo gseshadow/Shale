@@ -1,7 +1,7 @@
 import { startTransition, FormEvent, useEffect, useMemo, useState, useRef, createContext, useContext } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { redirectPathFrom } from './returnPath';
-import { operationalRouteIds, routePath, routes } from './app/routeRegistry';
+import { matchExistingRoute, operationalRouteIds, routePath, routes } from './app/routeRegistry';
 import type { RouteObject } from 'react-router-dom';
 import { useDetailDraftProtection } from './DetailDraftProtection';
 import type { OperationalRouteId } from './app/routeRegistry';
@@ -14,6 +14,7 @@ import { ApiError, contactValueUpdate } from './api';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
 import { Button, Feedback, SectionRegion, PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
 import { CaseWorkspace, CaseWorkspaceMemory, ReadOnlyCaseOverview } from './features/cases/CaseWorkspace';
+import { indicatorPaint } from './ui/indicatorPaint';
 import { ResponsiveShell } from './shell/ResponsiveShell';
 import './styles.css';
 import './ui/tokens.css';
@@ -567,7 +568,7 @@ function AppShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout
         </select>
         <Button onClick={onLogout}>Logout</Button>
       </>}>
-      <div className={location.pathname.replace(/\/+$/, '') === routes.myShale.path ? 'shale-route-content' : 'legacy-route-content'}><div className="content-container"><Outlet /></div></div>
+      <div className="shale-route-content shale-presentation" data-route={matchExistingRoute(location.pathname)}><div className="content-container"><Outlet /></div></div>
     </ResponsiveShell>
   </div>;
 }
@@ -843,7 +844,7 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="cases-page" aria-labelledby="cases-title">
       <PageHeader eyebrow="Search" title="Cases" titleId="cases-title" lede="Search, open, and create case records."
-        action={<button type="button" onClick={() => setIsCreating((value) => !value)}>{isCreating ? 'Cancel new case' : 'New case'}</button>} />
+        action={<Button onClick={() => setIsCreating((value) => !value)}>{isCreating ? 'Cancel new case' : 'New case'}</Button>} />
       {isCreating && <NewCaseForm accessToken={accessToken} onCancel={() => setIsCreating(false)} onCreated={(created) => navigate(routePath('caseDetail', { caseId: created.caseId }))} />}
       <SearchBar
         id="case-search"
@@ -962,8 +963,8 @@ function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string
         <label htmlFor="new-case-description">Description<textarea id="new-case-description" value={description} onChange={(event) => setDescription(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} /></label>
         {submitError && <p className="status error" role="alert">{submitError}</p>}
         <div className="form-actions">
-          <button type="submit" disabled={isSubmitting || isLoadingLookups}>{isSubmitting ? 'Creating…' : isLoadingLookups ? 'Loading lookups…' : 'Create case'}</button>
-          <button type="button" className="secondary-button" onClick={onCancel} disabled={isSubmitting}>Cancel</button>
+          <ActionButton type="submit" disabled={isSubmitting || isLoadingLookups}>{isSubmitting ? 'Creating…' : isLoadingLookups ? 'Loading lookups…' : 'Create case'}</ActionButton>
+          <SecondaryButton onClick={onCancel} disabled={isSubmitting}>Cancel</SecondaryButton>
         </div>
       </form>
     </section>
@@ -1386,7 +1387,7 @@ function yesNo(value: boolean): string {
 
 function ColorSwatch({ color }: { color: string | null }) {
   if (!color) return <>—</>;
-  return <span className="color-swatch-value"><span className="color-swatch" style={{ backgroundColor: color }} aria-hidden="true" />{color}</span>;
+  return <span className="color-swatch-value"><span className="color-swatch" style={indicatorPaint(color)} aria-hidden="true" />{color}</span>;
 }
 
 function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
@@ -2092,7 +2093,8 @@ function CaseStatusEditForm({ accessToken, detail, onSaved, onCancel }: { access
 
 function normalizeStatusColor(color: string | null | undefined): string {
   const trimmed = color?.trim();
-  return trimmed && /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(trimmed) ? trimmed : '#2f80b7';
+  const expanded = trimmed?.replace(/^#([a-f\d])([a-f\d])([a-f\d])$/i, '#$1$1$2$2$3$3');
+  return String(indicatorPaint(expanded)?.['--shale-indicator-fill' as keyof CSSProperties] ?? 'var(--shale-neutral-text)');
 }
 
 function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, onTasksError }: { accessToken: string | null; caseId: number; tasks: CaseTaskListItem[]; error: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void }) {

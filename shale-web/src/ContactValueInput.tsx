@@ -64,7 +64,7 @@ export function ContactValueInput({ accessToken, kind, baseline, baselineExtensi
         onBlur={() => void validate(true)} disabled={props.disabled} data-validation-field={`${fieldName}.extension`}
         aria-invalid={invalidField === 'extension' || errors.some(error => error.field.endsWith('.extension'))}
         aria-describedby={`${props.id}-feedback`} /></>}
-    <small id={`${props.id}-feedback`} role="status">{errors.length ? errors.map(error => error.message).join(' ') : feedback}</small></>;
+    <small id={`${props.id}-feedback`} className={invalidField !== null || errors.length > 0 ? 'shale-field-error' : undefined} role="status">{errors.length ? errors.map(error => error.message).join(' ') : feedback}</small></>;
 }
 
 /** A corrected field clears only its own server errors; unrelated failures stay visible. */
