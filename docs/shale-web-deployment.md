@@ -169,15 +169,16 @@ No build or actual artifact inventory/hash was established by this documentation
    A narrower pilot needs actual reviewed composition/access enforcement, including direct links and
    server authority. Hidden navigation or host login alone cannot restrict domain writes; no config
    switch is invented here.
-2. **Routing boundary:** [SWA config](../shale-web/public/staticwebapp.config.json) contains only
-   `navigationFallback.rewrite: /index.html`, without exclusions/routes/cache/security headers.
+2. **Routing boundary:** merged [#1862](https://github.com/gseshadow/Shale/pull/1862) adds exclusions
+   to [SWA config](../shale-web/public/staticwebapp.config.json) while retaining the `/index.html`
+   rewrite. Build/artifact and SWA runtime acceptance remain open; see the validation follow-up below.
    Require HTTPS and reload/direct entry for workspace/Overview and legacy `/cases/:caseId`,
    `/tasks/:taskId`, `/contacts/:contactId`, `/organizations/:organizationId`, `/team/:userId`,
    plus login/safe return/history. Real JS/CSS must retain MIME types; missing `/assets/...` must fail,
    not return 200 HTML. Exclude `/api` and `/api/**` from SPA fallback: absent frontend API paths fail;
    any actual API proxy must preserve JSON/error status. Source fetches the separate absolute API,
-   with blank api_location; do not invent a proxy. Unrestricted fallback needs separate implementation
-   before this boundary is accepted.
+   with blank api_location; do not invent a proxy. The merged exclusions still need emitted-artifact
+   inspection and actual response/MIME verification before this boundary is accepted.
    Selected browser parsing/byte/schema checks reject HTML, malformed/oversized data and safe service/audit
    failures; no successful empty state, stale Overview or list-row detail fallback may mask failure.
 3. **Cache:** recommend revalidated entry HTML/config and immutable content-hashed public assets only
@@ -313,3 +314,74 @@ The separate `codex/hosted-swa-routing-boundary` change narrows only `shale-web/
 **Verification boundary:** repository/config checks and a deterministic synthetic URL matrix cannot prove SWA runtime responses or MIME types. No local SWA runtime or Azure host was exercised in this task. Before separately authorized publication, build with the reviewed lockfile and verify `dist/index.html`, `dist/foundation.html`, `dist/assets/*` and `dist/staticwebapp.config.json`. After that separate publication, record host, source, build and asset hashes. For `/`, `/login`, `/case-workspace`, `/case-workspace/6502`, `/cases/6502`, `/tasks/1`, `/contacts/1`, `/organizations/1`, `/team/1`, and `/settings`, request a direct reload: expected 200 HTML index (then appropriate application behavior with authorized credentials). Request actual emitted JS/CSS/assets: expect 200 and correct JavaScript/CSS/image MIME, never HTML; request nonexistent `/assets/missing.js`, `/assets/nested/missing.css`, `/missing.js`, `/nested/missing.png`, `/api`, `/api/`, and `/api/health`: expect not-found, never 200 index HTML. Inspect `/foundation.html` as a separate existing file; this is not authorization to publish it. Confirm browser requests still target the approved compiled absolute API origin and never the SWA-relative `/api`. Repeat against the exact published host/environment, not just Vite preview.
 
 **Rollback:** retain the previous exact static archive and hashes, source/lock/tooling/API-origin and deployment identity; restore the last known-good assets and SWA config using only the separately authorized existing-host publication channel. Validate old/new JS chunk compatibility and direct navigation after rollback. Rolling back this routing boundary does not roll back API/SQL or change session/audit history. Prior rollback retention and all R4 isolation, required-audit failure/uncertain commit, live session, CORS, no-store/privacy and device/AT gates remain open. Foundation composition and full-bundle legacy writes remain separate decisions.
+
+## Routing validation follow-up — October 12, 2026
+
+**PARTIALLY VERIFIED; build/artifact and actual SWA runtime verification OPEN.** Live connector access
+confirmed `codex/latest` at #1862's merge commit `0a0bffc49ff7c8694ea0b3f85e4cd2ae3805ce00`,
+tree `c864aad09cf2dc52c368e18df5b4eb58953be1d6`. `git fetch origin codex/latest` failed because
+the inherited managed proxy on port 8080 was unreachable. Supported GitHub connector reads supplied
+the exact source blobs; each imported blob, complete tracked tree and reconstructed signed merge
+commit matched its Git SHA. A separate `codex/validate-static-routing-1862` worktree preserves the
+original checkout. Its 427 historical PNG/JPG evidence files were not materialized (67 MB including
+missing sources); their original tree entries remain intact. This is a source-complete sparse checkout,
+not a new screenshot review or proof of historical uploaded binaries. No network settings were changed.
+
+Reviewed the committed routing test/config, two Vite HTML inputs, route registry and its existing tests,
+deployment/roadmap/first-read/R4 authorities and repository test-selection rules. No routing/test defect
+was established by available checks, so this follow-up changes evidence only. All declared root/login,
+workspace/Overview and legacy extensionless route patterns remain outside the exclusions by source
+inspection. `/assets/*` covers Vite's configured asset directory in the documented directory-filter
+model; **actual emitted paths and copied config cannot be confirmed without the production build**.
+No dist files existed after the failed build; no artifact inventory/hash or compiled API origin is claimed.
+
+| Executed command/check | Result |
+| --- | --- |
+| `node --test shale-web/tests/static-routing.test.mjs` | PASS, exit 0; default runner reported one passing file. |
+| `node --test --test-isolation=none --test-reporter=tap shale-web/tests/static-routing.test.mjs` | PASS, all four committed subtests visible; no standalone equivalent used. |
+| `node --version`; `npm --version` | `v24.19.0`; `11.9.0`. |
+| `sha256sum shale-web/package-lock.json` | `6017c5dec9bc9c5b8f1e39d609d6ae255cd5bd898926aa969cb8d142d255dd9d`; lockfile unchanged. |
+| `npm ci --prefix shale-web --fetch-retries=0 --fetch-timeout=15000` | BLOCKED, exit 1: `EPERM` connecting to inherited proxy `172.31.0.29:8080` while fetching locked `xmlchars-2.2.0.tgz` from registry.npmjs.org. |
+| `npm run typecheck --prefix shale-web` | BLOCKED, missing `tsc`; installation did not complete. |
+| `npm run build --prefix shale-web` | BLOCKED at typecheck, missing `tsc`; Vite did not emit dist. |
+| `npm test --prefix shale-web -- src/app/routeRegistry.test.ts` | BLOCKED, missing `vitest`; protects the supported deep-link inventory and recognition. |
+| `python -m unittest build/test-selection/test_select_tests.py` | PASS, 24 selector tests. |
+| Selector with `--path` for #1862's four connector-verified changed files | PASS; selects server `AuthControllerTest` plus critical `mvn test`, no full-suite escalation. Broad web-consumer mapping is compatibility coverage, not SWA runtime proof. |
+| `mvn -pl shale-server -am -Dtest=com.shale.server.controller.AuthControllerTest -Dsurefire.failIfNoSpecifiedTests=false test`; `mvn test` | BLOCKED, `mvn: command not found`; no new Maven pass or advisory disposition. |
+| `command -v swa`; `npm ls -g --depth=0`; installed-tool search under `/workspace` and `/opt/codex` | No supported existing SWA runtime found; global npm listing also failed on absent `/home/agent/.local/lib`. No emulator dependency installed. |
+| `python /workspace/work/check_routing_docs.py` | PASS: two edited Markdown files, 134 relative links/anchors, balanced fences, retained phase/gate markers, whitespace and evidence-only scope. Scratch checker uses tracked tree entries for sparse historical evidence paths. |
+| `python build/test-selection/select_tests.py --base 0a0bffc49ff7c8694ea0b3f85e4cd2ae3805ce00 --head HEAD --format markdown` | Final evidence-only change selects no affected area or full-suite escalation; generic critical command remains blocked by missing Maven. |
+| `git diff --check`; `git diff 0a0bffc49ff7c8694ea0b3f85e4cd2ae3805ce00 HEAD --check` | PASS for the evidence-only diff. |
+
+The merged-change selector command was:
+
+```bash
+python build/test-selection/select_tests.py \
+  --path docs/shale-web-deployment.md \
+  --path docs/architecture/shale-web-v2-architecture-roadmap.md \
+  --path shale-web/public/staticwebapp.config.json \
+  --path shale-web/tests/static-routing.test.mjs --format markdown \
+  --plan-output /workspace/work/routing-1862-selection.json
+```
+
+[Microsoft configuration documentation](https://learn.microsoft.com/en-us/azure/static-web-apps/configuration#fallback-routes)
+was checked directly: it documents fallback exclusions, directory filters and brace-delimited extension
+filters, with existing files served and excluded missing files returning 404 in its examples. Its wildcard
+section distinguishes `/calendar/*` from `/calendar`, supporting the separate exact `/api` exclusion.
+This supports the chosen syntax/intended boundary; it does **not** execute our root extension filter,
+nested wildcard paths, API namespace handling or actual content types. The custom matcher assumes suffix
+matching across nested paths. Actual HTTP status, nested wildcard semantics and MIME handling remain
+**OPEN**, including both existing HTML entries, real JS/CSS/assets, missing root/nested assets and
+`/api`, `/api/`, `/api/health`. Vite preview cannot substitute for SWA acceptance. Microsoft also describes
+the supported [local SWA CLI](https://learn.microsoft.com/en-us/azure/static-web-apps/local-development).
+
+**Next concrete prerequisite:** restore the managed proxy's supported registry access, then repeat
+lockfile installation, typecheck, route-registry tests and production build on this exact source with
+recorded tools/API origin; inspect every emitted path and compare copied config byte-for-byte. Run the
+selector's selected/critical checks in an existing Maven-capable environment. For HTTP verification,
+use an already available supported SWA runtime against that dist without live API calls; if unavailable,
+retain OPEN and use the response/MIME matrix above only after separately authorized publication to the
+verified existing host. This task authorizes neither runtime installation nor Azure changes/deployment.
+All R4 accepted desktop observations, inherited Maven advisories and unresolved isolation/audit/commit
+uncertainty/session/host/privacy/device/AT gates remain retained. Phase 2 acceptance OPEN; Phase 3 IN
+PROGRESS; Phase 4 INCOMPLETE. No cache/API proxy/foundation/workflow/dependency/version changes.

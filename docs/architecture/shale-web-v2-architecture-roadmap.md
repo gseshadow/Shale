@@ -1292,15 +1292,25 @@ job outcomes, while marking actual host/build/API settings UNKNOWN. This does no
 publication. Phase 2 acceptance OPEN; Phase 3 IN PROGRESS; Phase 4 INCOMPLETE. Appearance provisional;
 web independent of AI/MCP. Accepted desktop observations remain in R4 without repetition.
 
-The next concrete implementation prerequisite is the unrestricted SWA navigation fallback: missing
-API/assets must not become successful SPA HTML while workspace/Overview and legacy deep links still
-reload. Use the handoff's [ready-to-run routing prompt](../shale-web-deployment.md#ready-to-run-next-prompt--static-routing-boundary-prerequisite).
+The routing boundary is now merged in #1862; its remaining concrete prerequisite is lockfile/build/
+artifact validation and actual SWA response/MIME evidence. See the handoff's
+[routing validation follow-up](../shale-web-deployment.md#routing-validation-follow-up--october-12-2026)
+for the committed-test pass, exact installation/tool blockers and next executable checks.
 Foundation publication composition, any genuinely narrower pilot/access change, sensitive-response
 no-store gaps and unknown operator settings remain separately scoped prerequisites. The current bundle
 retains legacy writes and unclosed broader authorization/audit gaps. No resource creation, configuration
 change, deployment, live fault testing or phase completion occurred during preparation.
 
 
-### Hosted static routing boundary (implementation proposed for review; not published)
+### Hosted static routing boundary (merged #1862; runtime acceptance OPEN; not published)
 
 The independent `codex/hosted-swa-routing-boundary` change limits `navigationFallback.exclude` to the exact absent frontend API namespace, Vite's emitted `/assets/*` directory and recognized static-file extensions. Valid extensionless current and legacy router paths retain the `index.html` fallback; `foundation.html` remains a separate emitted entry. This is a routing-only change: no proxy, API-origin change, cache/header rule, workflow, public scope restriction or deployment. See the operator handoff's routing implementation and post-publication response/MIME matrix. Synthetic checks do not establish Azure behavior; host acceptance remains open. All R4 accepted desktop observations and two-tenant/non-dbo, required audit and commit uncertainty, live session, actual hosted privacy/no-store/CORS, and device/AT gates are unchanged. Phase 2 acceptance OPEN; Phase 3 IN PROGRESS; Phase 4 first slice INCOMPLETE.
+
+Validation follow-up on exact merge source `0a0bffc4`: committed Node routing test PASS (four subtests
+visible with test isolation disabled), selector-unit 24 PASS and Microsoft syntax/documentation reviewed.
+Registry installation is BLOCKED by the managed proxy; typecheck/build/route-registry suite cannot run,
+so emitted dist and copied config remain unverified. Selected/critical Maven checks are BLOCKED by absent
+Maven. No existing supported SWA runtime was found; actual HTTP statuses, nested wildcard semantics and
+MIME handling remain OPEN. No routing/test correction is justified by available evidence; this follow-up
+updates evidence only and does not close any R4 or phase gate. Restore supported registry access and
+complete the exact-source build/artifact checks before runtime acceptance; see the linked handoff.
