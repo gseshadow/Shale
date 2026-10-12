@@ -96,9 +96,18 @@ describe('bounded Organization Detail draft protection with real API clients', (
     expect(screen.queryByRole('dialog')).toBeNull(); expect(unload()).toBe(false);
     expect(router.state.location.pathname).toBe('/organizations/7'); await navigate(); await screen.findByRole('heading', { name: 'Tasks' });
   });
-  it('shell links block, Keep editing preserves values/focus, and Discard proceeds once', async () => {
-    await open(); change(); const link = screen.getByRole('link', { name: 'My Tasks' }); link.focus(); fireEvent.click(link);
-    await prompt(); expect(router.state.location.pathname).toBe('/organizations/7');
+  it.each(['light', 'dark'])('theme %s shares editor/dialog ownership while Keep/Discard preserve values and focus', async theme => {
+    await open();
+    fireEvent.change(screen.getByLabelText('Theme (this session)'), { target: { value: theme } });
+    const form = screen.getByRole('form', { name: 'Edit organization' });
+    expect(form.closest('.shale-route-content.shale-presentation')).toBeTruthy();
+    const owner = form.closest('[data-theme]');
+    expect(owner?.getAttribute('data-theme')).toBe(theme);
+    change(); const link = screen.getByRole('link', { name: 'My Tasks' }); link.focus(); fireEvent.click(link);
+    const confirmation = await prompt();
+    expect(confirmation.closest('[data-theme]')).toBe(owner);
+    expect(form.isConnected).toBe(true);
+    expect(router.state.location.pathname).toBe('/organizations/7');
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Keep editing' }));
     keep(); expect(screen.queryByRole('dialog')).toBeNull(); expect(document.activeElement).toBe(link);
     expect((screen.getByLabelText('Notes') as HTMLTextAreaElement).value).toBe('Changed notes');

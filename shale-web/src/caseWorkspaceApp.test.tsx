@@ -144,8 +144,14 @@ describe('bounded read workspace through actual routes/session/client', () => {
   });
   it('does not refetch on focus/reconnect/theme or rerender and preserves legacy editor routes', async () => {
     const { router } = open('/case-workspace/36'); await screen.findByText('Case summary'); const count = calls.length;
+    const summary = screen.getByText('Case summary');
+    const content = summary.closest('.shale-route-content.shale-presentation');
+    expect(content).toBeTruthy();
+    expect(content?.getAttribute('data-route')).toBe('caseOverview');
     fireEvent(window, new Event('focus')); fireEvent(window, new Event('online')); fireEvent.change(screen.getByLabelText('Theme (this session)'), { target: { value: 'dark' } });
     await act(async () => {}); expect(calls).toHaveLength(count);
+    expect(screen.getByText('Case summary')).toBe(summary);
+    expect(content?.closest('[data-theme]')?.getAttribute('data-theme')).toBe('dark');
     await act(async () => { await router.navigate('/cases/7'); }); await screen.findByRole('heading', { name: 'Legacy editable Case' });
     expect(screen.getByRole('button', { name: 'Edit details' })).toBeTruthy();
     expect(calls.filter(call => call.path.startsWith('/api/cases/7'))).toHaveLength(3);

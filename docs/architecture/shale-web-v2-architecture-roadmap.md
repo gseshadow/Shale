@@ -1229,6 +1229,36 @@ SQL/RLS, audit/session, host, device and real assistive-technology witnesses; no
 Rollback only R3 consumers/routes (and unused narrow extension), keeping R1/R2/security/session contracts and
 all audit history. Exact deployment prerequisites remain in the review and R2 §11; no merge/deployment here.
 
+### 11.21 Authenticated Light/Dark presentation migration — 2026-10-12
+
+Separate branch `codex/authenticated-theme-consistency`, live fetched base
+`d0d43655765b74e0c1e83ecefe59451307e7b749` (merged R3 and ordinary-build Overview fix #1858).
+[Review, synthetic evidence and local retest](../../shale-web/docs/theme-review.md) owns the route/editor
+matrix, theme/cascade trace, validation, limits and frontend rollback. This supersedes the earlier
+Case-workspace-only theme-fix scope. No earlier Case-only branch/worktree or open matching PR was found.
+
+All existing authenticated route content now inherits the shell's semantic Light/Dark presentation.
+My Shale retains its working shared composition. Tasks, Cases, Contacts, Organizations, Team, Settings,
+their reachable details/editors and the bounded Case workspace/limited Overview share semantic paint.
+The beta Light-only wrapper and native `color-scheme: light` override are retired; shared components and
+scoped compatibility aliases own surfaces/text/fields/actions/feedback. No new palette, route, feature,
+endpoint, dependency, backend, auth/audit/SQL/schema/version or deployment change.
+Appearance remains **provisional**, not final aesthetic approval. Audit compatibility uses the existing
+schema and authoritative owners unchanged; presentation is intentionally unaudited and adds no new
+sensitive read or domain/admin mutation. The broader §8.2 gaps remain deferred.
+
+**Previously reported live R4 evidence (user report, not rerun by this task):** search; limited Overview;
+Back restoration; Assigned; paging; search beyond page 1; logout/direct-link/sign-in return; persisted
+Overview audit; explicit reread audit; unavailable-case handling passed. Theme acceptance has the reported
+Light-content/Dark-shell and pale-workspace-frame defect addressed for synthetic review here. **Keyboard
+acceptance is not yet reported.** These reports do not establish complete R4 or broaden acceptance to
+unreported live two-tenant/non-dbo/audit-failure/device/AT/other-engine checks.
+
+Phase 2 acceptance **OPEN**, Phase 3 **IN PROGRESS**, Phase 4 first slice **INCOMPLETE**. No phase closure,
+merge or deployment. Next acceptance should retest the reported theme defect with approved nonsensitive
+fixtures and obtain the missing keyboard/device/AT/other-engine witnesses. Rollback only this frontend
+presentation migration; preserve R1/R2/R3, security/session contracts and all audit history.
+
 ## 12. Ready-to-run next Codex implementation prompt
 
 The prompt below is retained as the original Phase 2A specification. It was not executed by the
