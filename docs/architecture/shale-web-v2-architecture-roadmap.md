@@ -1299,3 +1299,8 @@ Foundation publication composition, any genuinely narrower pilot/access change, 
 no-store gaps and unknown operator settings remain separately scoped prerequisites. The current bundle
 retains legacy writes and unclosed broader authorization/audit gaps. No resource creation, configuration
 change, deployment, live fault testing or phase completion occurred during preparation.
+
+
+### Hosted static routing boundary (implementation proposed for review; not published)
+
+The independent `codex/hosted-swa-routing-boundary` change limits `navigationFallback.exclude` to the exact absent frontend API namespace, Vite's emitted `/assets/*` directory and recognized static-file extensions. Valid extensionless current and legacy router paths retain the `index.html` fallback; `foundation.html` remains a separate emitted entry. This is a routing-only change: no proxy, API-origin change, cache/header rule, workflow, public scope restriction or deployment. See the operator handoff's routing implementation and post-publication response/MIME matrix. Synthetic checks do not establish Azure behavior; host acceptance remains open. All R4 accepted desktop observations and two-tenant/non-dbo, required audit and commit uncertainty, live session, actual hosted privacy/no-store/CORS, and device/AT gates are unchanged. Phase 2 acceptance OPEN; Phase 3 IN PROGRESS; Phase 4 first slice INCOMPLETE.
