@@ -55,6 +55,77 @@ class MinimizedCaseReadControllerTest {
         result=Optional.empty();
         mvc(true).perform(get("/api/v2/cases/999/overview")).andExpect(status().isNotFound()).andExpect(jsonPath("$.message").value("Case unavailable."));
     }
+    @Test void ordinaryBuildBindsOverviewIdBeforeCallingTheService() throws Exception {
+        result=Optional.of(new MinimizedCaseOverview(6502,null,"Synthetic",null,null,null,null,null));
+        var outcome=mvc(true).perform(get("/api/v2/cases/6502/overview")).andReturn();
+        assertNull(outcome.getResolvedException(),
+            "Overview binding must work with the ordinary build; failure class: "
+                + (outcome.getResolvedException()==null ? "none" : outcome.getResolvedException().getClass().getName()));
+        assertEquals(200,outcome.getResponse().getStatus());
+        assertEquals(List.of("readMinimizedCaseOverview",List.of(6502L,41,31)),calls.getFirst());
+    }
+
+    @Test void assignedDefaultsAndExplicitBindingsDoNotRequireCompilerParameterNames() throws Exception {
+        mvc(true).perform(get("/api/v2/cases/assigned-page")).andExpect(status().isOk());
+        assertEquals(List.of("listMinimizedAssignedCases",List.of(41,31,0,25)),calls.getFirst());
+        var overview=MinimizedCaseReadController.class.getMethod("overview",long.class).getParameters()[0];
+        assertEquals("caseId",overview.getAnnotation(org.springframework.web.bind.annotation.PathVariable.class).value(),
+            "Overview needs an explicit binding even when a developer opts into -parameters");
+        var assigned=MinimizedCaseReadController.class.getMethod("assigned",int.class,int.class).getParameters();
+        for(int i=0;i<assigned.length;i++)
+            assertEquals(i==0?"page":"size",assigned[i].getAnnotation(org.springframework.web.bind.annotation.RequestParam.class).name());
+    }
+
+    @Test void malformedBindingsAndOutOfRangeInputsRemainClientErrorsWithoutServiceCalls() throws Exception {
+        for(String id:List.of("not-a-number","0","-1","2147483648","9223372036854775808"))
+            mvc(true).perform(get("/api/v2/cases/"+id+"/overview")).andExpect(status().isBadRequest());
+        for(String[] params:List.of(new String[]{"no","25"},new String[]{"0","no"},
+                new String[]{"-1","25"},new String[]{"101","25"},new String[]{"0","0"},new String[]{"0","26"}))
+            mvc(true).perform(get("/api/v2/cases/assigned-page").param("page",params[0]).param("size",params[1]))
+                .andExpect(status().isBadRequest());
+        mvc(true).perform(post("/api/v2/cases/search-page").contentType(MediaType.APPLICATION_JSON).content("{broken"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("invalid_case_request"));
+        assertTrue(calls.isEmpty(),"Request validation must run before any Case service read");
+    }
+
+    @Test void internalIllegalArgumentsNeverBecomeInvalidClientRequests() throws Exception {
+        failure=new IllegalArgumentException("PrivateFailureWitness");
+        var response=mvc(true).perform(get("/api/v2/cases/6502/overview"))
+            .andExpect(status().isServiceUnavailable()).andExpect(header().string("Cache-Control","no-store"))
+            .andExpect(jsonPath("$.error").value("case_read_unavailable"))
+            .andExpect(jsonPath("$.caseName").doesNotExist()).andReturn().getResponse().getContentAsString();
+        assertFalse(response.contains("PrivateFailureWitness"));
+        mvc(true).perform(post("/api/v2/cases/search-page").contentType(MediaType.APPLICATION_JSON).content("{\"query\":\"Synthetic\"}"))
+            .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.error").value("case_read_unavailable"));
+    }
+
+    @Test void scopedDiagnosticsContainOnlyFixedOperationCategoryAndExceptionClass() {
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(MinimizedCaseReadErrors.class);
+        var events=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        events.start();logger.addAppender(events);
+        try {
+            var request=new org.springframework.mock.web.MockHttpServletRequest("GET","/api/v2/cases/PrivateIdWitness/overview");
+            request.setQueryString("token=PrivateTokenWitness");
+            request.setContent("PrivateBodyWitness".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            request.setAttribute(org.springframework.web.servlet.HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE,
+                "/api/v2/cases/{caseId}/overview");
+            var errors=new MinimizedCaseReadErrors();
+            errors.failure(new IllegalArgumentException("PrivateMessageWitness",new RuntimeException("PrivateCauseWitness")),request);
+            errors.failure(new CaseReadException(CaseReadException.Kind.AUDIT_UNAVAILABLE,new RuntimeException("PrivateAuditWitness")),request);
+            errors.failure(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,"PrivateValidationWitness"),request);
+            request.setAttribute(org.springframework.web.servlet.HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE,"PrivatePatternWitness");
+            errors.failure(new IllegalStateException("PrivateInternalWitness"),request);
+            assertEquals(List.of(
+                "Minimized Case read operation=overview category=internal_failure exceptionClass=java.lang.IllegalArgumentException",
+                "Minimized Case read operation=overview category=AUDIT_UNAVAILABLE exceptionClass=com.shale.core.service.CaseReadException",
+                "Minimized Case read operation=overview category=request_rejected exceptionClass=org.springframework.web.server.ResponseStatusException",
+                "Minimized Case read operation=unknown category=internal_failure exceptionClass=java.lang.IllegalStateException"),
+                events.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage).toList());
+            assertTrue(events.list.stream().allMatch(event->event.getThrowableProxy()==null),
+                "Scoped diagnostics must never carry a throwable dump, even a sanitized one");
+        } finally {logger.detachAppender(events);events.stop();}
+    }
+
     @Test void invalidInputsNeverReachPortAndSessionRejectionIsDistinct() throws Exception {
         for(String body:List.of("{\"page\":101}","{\"size\":26}","{\"size\":0}","{\"query\":\""+"x".repeat(101)+"\"}","{\"query\":{\"private\":\"secret\"}}"))
             mvc(true).perform(post("/api/v2/cases/search-page").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
@@ -96,7 +167,7 @@ class MinimizedCaseReadControllerTest {
         var request=new org.springframework.mock.web.MockHttpServletRequest("POST","/api/v2/cases/search-page");
         request.setContent("{\"query\":\"Private search\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         var response=new MinimizedCaseReadErrors().failure(new IllegalArgumentException("Private search"),request);
-        assertEquals(400,response.getStatusCode().value());assertFalse(response.getBody().toString().contains("Private search"));
+        assertEquals(503,response.getStatusCode().value());assertFalse(response.getBody().toString().contains("Private search"));
     }
     private static MinimizedCaseOverview escapedItem() {
         String value="\u0001".repeat(255);
