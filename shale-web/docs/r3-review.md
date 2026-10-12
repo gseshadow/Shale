@@ -7,6 +7,11 @@ checkout and unrelated work are preserved. No backend/schema/dependency/version 
 Appearance remains provisional. Phase 2 acceptance OPEN; Phase 3 IN PROGRESS; Phase 4 first read slice
 implemented for review but INCOMPLETE until separate acceptance.
 
+**Current acceptance update (2026-10-12):** [R4 desktop record](r4-desktop-acceptance.md) reconciles
+the user's later Windows Firefox/localhost → Azure API deployment, functional/audit and desktop
+presentation/accessibility passes. Historical R3 validation below remains synthetic and was not rerun.
+Phase 2 acceptance OPEN, Phase 3 IN PROGRESS, Phase 4 INCOMPLETE with desktop acceptance recorded.
+
 ## Launch and review
 
 From the repository root:
@@ -17,7 +22,9 @@ npm run dev --prefix shale-web -- --host 127.0.0.1
 ```
 
 Open `http://127.0.0.1:5173/case-workspace`. The existing default API origin is described in
-[README](../README.md); it is **not verified to have R2 deployed**. For authorized live review, set only
+[README](../README.md); R3 itself did **not verify R2 deployment**. The later user report in R4 records
+Swagger's three minimized endpoints and successful Overview after #1858; no deployed artifact hash
+was supplied. For authorized live review, set only
 an approved API origin in `shale-web/.env.local` as `VITE_SHALE_API_BASE_URL=https://<approved-api-host>`
 before starting Vite. R2 deployment, bearer, CORS and runtime prerequisites below must be verified first.
 Use approved synthetic fixtures; do not paste credentials, case names, tokens or raw responses into evidence.
@@ -166,9 +173,14 @@ no-store throughout API/proxies, request-body logging exclusion for search, bear
 SPA deep-link fallback and rollback asset/API compatibility. Use the existing deployment runbooks; this task
 performs no host or deployment changes.
 
-The next bounded step is a separately authorized **R4 acceptance** against an isolated approved live target:
-execute the preceding tenant/RLS/audit/session/host checklist using nonsensitive fixtures, then physical
-phone/tablet/desktop keyboard/safe-area/virtual-keyboard checks and real screen-reader speech/zoom in both
-themes. Record witnesses, gaps and explicit acceptance before completing Phase 4. Live SQL/performance/RLS,
-persisted audit/session, deployed host, real devices and assistive technology remain **UNVERIFIED** here.
-Phase 2 acceptance remains OPEN and Phase 3 IN PROGRESS; synthetic evidence does not close those gates.
+The [R4 desktop record](r4-desktop-acceptance.md) now owns the user-reported functional/persisted-audit,
+Dark, keyboard, actual Firefox zoom and limited Narrator passes and their limits. The preceding checklist
+is a verification procedure, not a claim that every item was tested. Authorized two-tenant/non-dbo/
+pooled-context isolation, isolated required-audit failure/commit uncertainty, remaining live session
+expiry/revocation/uncertainty, actual hosted HTTPS/CORS/fallback/no-store/logging privacy, physical-device
+keyboard/safe-area and remaining browser/AT checks remain open, as do live SQL performance/collation.
+Only the current API/database exists; R4 recommends disposable local fault-test preparation without
+production changes or requiring a second Azure environment. Phase 2 acceptance OPEN; Phase 3 IN PROGRESS;
+Phase 4 INCOMPLETE. Next bounded work is
+[hosted delivery preparation](../../docs/architecture/shale-web-v2-architecture-roadmap.md#12-next-bounded-prompt--hosted-web-delivery-preparation),
+with no deployment authorization. Synthetic evidence remains separate; appearance provisional.
