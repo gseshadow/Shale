@@ -789,3 +789,157 @@ Executed tests/browser evidence are synthetic, with inherited advisory failures 
 claimed fixed or passing. Phase 2 acceptance OPEN, Phase 3 IN PROGRESS, Phase 4 first read slice INCOMPLETE
 until separate acceptance. Appearance provisional. Live SQL/RLS/performance, persisted audit/session, host,
 physical devices and real assistive-technology speech remain unverified. No merge or deployment authorized here.
+
+
+## 13. Minimized Overview ordinary-build 400 correction — 2026-10-12
+
+Fetched live `origin/codex/latest` / `FETCH_HEAD` at
+`e7b5135c99e6f326b077cfbae550f5cc93bf5636`; separate branch
+`codex/fix-minimized-overview-400`. Read the bootstrap/prompt rules and routed system,
+tenancy, schema/projection, API migration/readiness, App Service/web deployment and
+local selection documents, plus this accepted first-read contract and roadmap §11.19–20.
+
+### Evidence and limits
+
+User-reported live evidence: login and tenant-wide search succeed; deployed search returned Case 6502,
+but its minimized Overview returned HTTP 400 / `invalid_case_request` / `Invalid Case request.`
+The deployment used the documented normal Maven build. A suggested compiler-parameters rebuild has
+no confirmed deployment/result in this task and does not establish the deployed root cause.
+
+On the unchanged fetched production sources, executed the documented ordinary build:
+
+```bash
+mvn -pl shale-server -am clean package -DskipTests
+javap -v shale-server/target/classes/com/shale/server/controller/MinimizedCaseReadController.class
+mvn -pl shale-server -am -Dtest=MinimizedCaseReadControllerTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+The build passed. Bytecode has local-variable debug names but **no `MethodParameters` attribute**;
+Overview's `@PathVariable` has no explicit name and Assigned's two `@RequestParam` annotations have
+only defaults. Spring 6 reflection cannot use those debug names for these bindings.
+The existing six HTTP tests produced three failures: expected Assigned 200, Overview audit-failure 503,
+and unauthenticated Overview 401 all instead received 400 before the controller/service ran.
+A synthetic HTTP regression using `/api/v2/cases/6502/overview` separately reproduced the resolved
+`java.lang.IllegalArgumentException` from missing argument-name metadata, with no service invocation.
+This is a proven ordinary-build binding defect that reproduces the reported envelope. **The actual
+live exception/deployed artifact was not inspected; live cause and post-redeployment success remain
+unconfirmed.** No production credentials, data, requests or fault injection were used.
+
+### Correction and exception trace
+
+Explicit bindings are now `caseId`, `page`, `size`; compiler metadata is not required. POM/compiler/test
+flags are unchanged. Existing defaults, bounds, tenant-wide search/Overview and assigned selection remain.
+The scoped handler no longer treats arbitrary `IllegalArgumentException` as client validation. Typed
+malformed JSON, numeric conversion/missing query parameters and explicit `ResponseStatusException`
+request rejection retain sanitized client outcomes. Other internal failures return sanitized 503
+`case_read_unavailable`, never raw messages or partial Case data. Existing typed denial, timeout,
+oversize and audit-unavailable classifications remain.
+
+Trace reviewed: `MinimizedCaseReadController` -> `CaseServicePort` -> `CaseServiceAdapter` ->
+production `DaoCaseGateway` -> `CaseSummaryDao`. `CaseDao` only supplies the shared connection provider;
+Overview does not call its broad detail composition. Controller ID/page/size/query validation occurs
+before delegation. DAO ID/page/query guards also throw `IllegalArgumentException`, but a throw there
+after successful HTTP validation indicates an internal boundary mismatch, not proven bad HTTP input.
+Connection-provider/framework/adapter exceptions are likewise not client validation.
+`MinimizedCaseOverview`/nested DTOs and `MinimizedCasePage` fail with typed read-unavailable/oversize
+for invalid source identity/required text/bounds; mapping preserves those classifications. Selected SQL
+failures become typed read-unavailable/timeout. Authority mismatch becomes typed denial. Required
+`AuditLogDao.appendPhiWriteAudit` (including tenant witness/type binding/insert) and commit runtime/SQL
+failures, including any illegal argument, are wrapped as audit-unavailable and roll back before return.
+No SQL, DTO, DAO, schema, grants, event vocabulary, legacy handler or session/security changes.
+
+Audit compatibility uses the existing schema: one authoritative `Case.Overview.Read` / Case type1 /
+FieldCode4 / `action=READ;screen=Case.Overview`, same tenant/actor/read connection and committed before
+return. Summary exemption remains. No bypass/dedupe/asynchronous append or browser audit. Exact checked
+8 KiB Overview / 128 KiB page UTF-8 bytes and no-store remain. A successful binding may expose a
+separate required-audit failure; that must stay fail-closed.
+
+Diagnostics emit one line with **fixed operation, fixed category, exception class only**. Operations
+are `overview`, `assigned`, `search`, `unknown`, selected from allowlisted Spring handler patterns;
+no request URI/ID/query is logged. Categories are `internal_failure`, `request_validation`,
+`request_rejected`, or the fixed `CaseReadException.Kind` name. No messages, cause traversal, bodies,
+tokens, SQL, identities, response values, or throwable dumps. Log-capture tests enforce the exact format
+and null throwable proxy; unknown/untrusted handler patterns collapse to `unknown`.
+
+### Operator redeployment and sanitized confirmation (not executed here)
+
+1. After review/merge approval in the separate delivery workflow, build the approved commit with the
+   ordinary command above; do not add `-Dmaven.compiler.parameters=true`. Inspect `javap -v` for explicit
+   `caseId`, `page`, `size` annotation values. `MethodParameters` need not exist. Record only commit and
+   artifact SHA-256, and verify the executable Boot jar, not `.jar.original`, is the artifact uploaded.
+2. Follow [App Service deployment](../azure-app-service-deployment.md) with existing Azure profile,
+   bearer/runtime/CORS settings. Restart and confirm the active artifact matches. No frontend rebuild,
+   schema/grant change or security-setting change is required by this correction.
+3. Using an authorized existing session, deliberately load Assigned (default and explicit page/size),
+   search, then open one returned Case (6502 if still eligible). Record only operation, HTTP status and
+   safe error code; do not export search text, bearer/headers, URL IDs or Case payloads into diagnostics.
+4. For any failure, collect only the new `Minimized Case read operation=... category=... exceptionClass=...`
+   line from the scoped logger. An `overview/internal_failure/java.lang.IllegalArgumentException` line
+   is internal evidence, not proof of a binding origin. Recheck approved deployed bytecode/commit first;
+   if explicit bindings are present, reproduce in an isolated synthetic environment at the reviewed
+   service/mapper seam. Do not infer the throw site from the class alone or enable body/TRACE dumps.
+5. `AUDIT_UNAVAILABLE` identifies the required append/commit boundary. An authorized operator must verify
+   existing AuditLog schema, tenant session/RLS, runtime INSERT authority, numeric/text FieldCode support
+   and established event mapping through the existing prerequisite runbook. Record pass/fail only; no
+   raw SQL exceptions, sensitive audit values, grant edits or bypass to obtain 200.
+6. Confirm one committed required Overview audit per successful server read through approved audit tools
+   (tenant/actor/Case context and established event), without copying sensitive audit rows into logs/chat.
+   Preserve the remaining two-tenant/non-dbo, session, host, device and assistive-technology acceptance gates.
+
+**Phase 4 acceptance remains OPEN / first read slice INCOMPLETE.** Existing Phase 2/3 and broader
+acceptance statuses remain unchanged. No merge, deployment, version bump or production fault injection.
+Known fetched-base advisories remain: R1/R2 all-tests data's 12 failure methods, and the three historical
+`ApiExceptionHandlerTest` failures listed in §11. They are not claimed fixed or passing by this correction.
+
+
+### Local validation and changed-file review
+
+All commands below used Maven 3.9.11 / JDK21 via the existing `/workspace/.tools/bin/mvn` wrapper,
+with **no compiler-parameters flag** and no POM/test-only compiler change. Tests are synthetic, not
+live SQL/session/audit acceptance. Each changed production file maps to the maintained
+`MinimizedCaseReadControllerTest`: binding/validation/no-store/authority/bounds and scoped internal-error/
+privacy/logging contracts. Preserved downstream contracts additionally map to the adapter, JDBC and
+OpenAPI tests listed below. Repository-wide old binding/exception/symbol search and complete production/
+test diff review found no stale 400 expectation except the deliberately updated generic-argument test.
+
+```bash
+# Focused HTTP, adapter/JDBC audit and minimized/legacy OpenAPI checks:
+mvn -pl shale-server -am \
+  -Dtest=MinimizedCaseReadControllerTest,MinimizedCaseReadJdbcTest,CaseServiceAdapterTest,CaseSearchPagingJdbcTest,OpenApiDocumentationTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+# Selection against the live fetched base and committed task HEAD:
+python3 build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format markdown
+# Exact emitted affected-suite command:
+mvn -pl shale-server -am \
+  -Dtest=com.shale.server.controller.AuthControllerTest,com.shale.server.controller.MinimizedCaseReadControllerTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+# Critical reactor and selector checks:
+mvn test
+python3 -m unittest discover -s build/test-selection -p test_select_tests.py
+git diff origin/codex/latest --check
+```
+
+* Focused run: **44 tests, 43 passed / 1 inherited unrelated OpenAPI failure**, zero errors/skips.
+  All11 maintained minimized HTTP regressions, all29 adapter/JDBC tests, and the3 minimized/legacy
+  Case/core-path OpenAPI tests passed. The failure is
+  `OpenApiDocumentationTest.openApiDocumentsAuthenticatedApplicationReleaseContractsAndClosedVocabularies`:
+  `/api/application-releases` lacks the reflected `channel` parameter under an ordinary build.
+  That legacy controller still uses unnamed parameters and was not modified in this scoped fix.
+  The exact failing method reproduced on the unchanged fetched `e7b5135c` in a detached worktree:
+  `mvn -pl shale-server -am clean test
+  -Dtest=OpenApiDocumentationTest#openApiDocumentsAuthenticatedApplicationReleaseContractsAndClosedVocabularies
+  -Dsurefire.failIfNoSpecifiedTests=false` — **1 test / 1 failure**, zero errors/skips. Neither run is
+  relabelled wholly passing; broader legacy metadata cleanup is separate work.
+* Selector: cases/server, directly modified HTTP tests plus authentication smoke, **no full-suite
+  escalation**. The affected suite passed **21 tests**, zero failures/errors/skips. Case mapping protects
+  selected reads; server mapping protects the unchanged authentication boundary.
+* Critical reactor: **116 passed**, zero failures/errors/skips. Selector unit checks: **24 passed**.
+* Optional `python3 build/test-selection/inventory.py --check` reports a stale generated inventory;
+  the identical check is stale on unchanged `e7b5135c` (the recorded330-class inventory predates its
+  actual564 classes). No broad inventory regeneration or unrelated test changes were made.
+* Final `mvn -pl shale-server -am clean package -DskipTests`: **BUILD SUCCESS**. Final `javap -v`
+  again confirms no `MethodParameters` attribute and explicit `caseId`/`page`/`size` bindings.
+* Git diff whitespace checks passed. Final selector recheck matched the same affected plan.
+* Historical12 all-tests data failures and3 legacy-handler advisories remain as attributed in §11;
+  no new all-tests/visual run is required by this selector and none is claimed passing.

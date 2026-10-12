@@ -65,8 +65,8 @@ public final class MinimizedCaseReadController {
     @Operation(summary = "Assigned selection before paging", description = "Assignment filters this list only; search and Overview are tenant-wide. Summary reads are audit-exempt. At page 100 hasMore still reflects the probe; Next must stop at the ceiling. UTF-8 JSON at most 128 KiB.")
     @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = MinimizedCasePage.class)))
     public ResponseEntity<byte[]> assigned(
-            @Schema(minimum = "0", maximum = "100") @RequestParam(defaultValue = "0") int page,
-            @Schema(minimum = "1", maximum = "25") @RequestParam(defaultValue = "25") int size) {
+            @Schema(minimum = "0", maximum = "100") @RequestParam(name = "page", defaultValue = "0") int page,
+            @Schema(minimum = "1", maximum = "25") @RequestParam(name = "size", defaultValue = "25") int size) {
         var principal = sessions.requirePrincipal();
         return bounded(cases.listMinimizedAssignedCases(principal.shaleClientId(), principal.userId(), page(page), size(size)), 128 * 1024);
     }
@@ -75,7 +75,7 @@ public final class MinimizedCaseReadController {
     @Operation(summary = "Read one minimized active tenant Case with required committed Overview audit", description = "One authoritative Case.Overview.Read per successful server read. UTF-8 JSON at most 8 KiB. No broad detail/child hydration.")
     @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = MinimizedCaseOverview.class)))
     @ApiResponse(responseCode = "404", description = "Case unavailable; missing, foreign and deleted are indistinguishable", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
-    public ResponseEntity<byte[]> overview(@PathVariable long caseId) {
+    public ResponseEntity<byte[]> overview(@PathVariable("caseId") long caseId) {
         var principal = sessions.requirePrincipal();
         if (caseId <= 0 || caseId > Integer.MAX_VALUE) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Case ID.");
         var result = cases.readMinimizedCaseOverview(caseId, principal.shaleClientId(), principal.userId())
