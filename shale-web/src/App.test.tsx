@@ -45,7 +45,16 @@ describe('authenticated responsive shell composition', () => {
     beta(path); expect(await screen.findByRole('heading', { name: heading, level: 1 })).toBeTruthy();
     expect(api.getCurrentUser).toHaveBeenCalledWith('test-token', expect.any(AbortSignal));
     expect(screen.getByRole('navigation', { name: 'Primary navigation' })).toBeTruthy();
-    expect(document.querySelector('.shale-authenticated')).toBeTruthy();
+    const owner = document.querySelector('.shale-authenticated')!;
+    const content = screen.getByRole('heading', { name: heading, level: 1 }).closest('.shale-route-content.shale-presentation')!;
+    expect(content).toBeTruthy();
+    expect(content.getAttribute('data-route')).toBeTruthy();
+    expect(content.closest('[data-theme]')).toBe(owner);
+    for (const theme of ['dark', 'light']) {
+      fireEvent.change(screen.getByLabelText('Theme (this session)'), { target: { value: theme } });
+      expect(owner.getAttribute('data-theme')).toBe(theme);
+      expect(screen.getByRole('heading', { name: heading, level: 1 }).closest('.shale-route-content')).toBe(content);
+    }
     document.querySelector('details')!.open = true;
     expect(screen.getByRole('link', { name: activeLabel }).getAttribute('aria-current')).toBe('page');
     expect(screen.getAllByRole('link').filter(link => link.getAttribute('aria-current') === 'page')).toHaveLength(1);
@@ -358,7 +367,7 @@ describe('verified login return restoration', () => {
 
 const assignedTask: api.CaseTaskListItem = { id: 12, caseId: 1, title: 'Synthetic task', caseName: 'Example', priorityId: null, dueAt: null, completedAt: null };
 describe('My Shale shared presentation adoption', () => {
-  it.each(['/my-shale', '/my-shale/'])('names sections and limits adoption to My Shale at %s while theme changes preserve loaded work', async path => {
+  it.each(['/my-shale', '/my-shale/'])('retains My Shale sections at %s while theme changes preserve loaded work', async path => {
     vi.mocked(api.listAssignedTasks).mockResolvedValue([assignedTask]);
     beta(path);
     await screen.findByRole('button', { name: 'Complete' });
@@ -373,12 +382,12 @@ describe('My Shale shared presentation adoption', () => {
     expect(api.listAssignedTasks).toHaveBeenCalledTimes(calls);
     expect(api.completeTask).not.toHaveBeenCalled();
   });
-  it('retains the shared task-list legacy action on the separate Tasks route', async () => {
+  it('retains the shared task-list action and feedback behavior on the themed Tasks route', async () => {
     vi.mocked(api.listAssignedTasks).mockResolvedValue([assignedTask]); beta('/tasks');
     const complete = await screen.findByRole('button', { name: 'Complete' });
     expect(complete.classList.contains('secondary-button')).toBe(true);
-    expect(document.querySelector('.legacy-route-content')).toBeTruthy();
-    expect(document.querySelector('.shale-presentation')).toBeNull();
+    expect(document.querySelector('.legacy-route-content')).toBeNull();
+    expect(complete.closest('.shale-route-content.shale-presentation')).toBeTruthy();
     expect(screen.queryByRole('status')).toBeNull();
   });
   it('keeps a pending completion disabled, does not complete optimistically, and merges only the returned task', async () => {
