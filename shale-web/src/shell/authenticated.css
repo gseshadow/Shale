@@ -1,0 +1,73 @@
+/* Existing route geometry stays here. Paint aliases bridge retained beta classes to
+   the shell's one semantic vocabulary; no route owns a theme or a second palette. */
+.shale-authenticated {
+  --content-bg: var(--shale-plane);
+  --surface: var(--shale-card);
+  --section-surface: var(--shale-section);
+  --border: var(--shale-border);
+  --border-strong: var(--shale-control-border);
+  --text-muted: var(--shale-muted);
+  --primary: var(--shale-link);
+  --primary-soft: var(--shale-secondary-hover);
+  --focus: var(--shale-focus);
+}
+.shale-authenticated .shale-route-content {
+  color: var(--shale-text); color-scheme: inherit;
+  min-width: 0;
+}
+.shale-authenticated .shale-route-content .detail-shell {
+  margin: 0; min-height: 0;
+}
+.shale-authenticated .shale-route-content .detail-header { position: static; }
+.shale-authenticated .shale-route-content .detail-header-main {
+  display: flex; flex-wrap: wrap;
+}
+.shale-authenticated .shale-route-content .back-link { min-height: 44px; }
+.shale-authenticated .shale-route-content .status-pill { white-space: normal; overflow-wrap: anywhere; }
+/* Rail width makes viewport-only beta columns too narrow at medium sizes. */
+@media (48rem <= width < 75rem) {
+  .shale-authenticated .shale-route-content .entity-list,
+  .shale-authenticated .shale-route-content .detail-sections { grid-template-columns: minmax(0,1fr); }
+}
+/* Content now shares width with a rail: cards choose columns from their own space. */
+.shale-authenticated .shale-route-content .entity-list {
+  grid-template-columns: repeat(auto-fit,minmax(min(20rem,100%),1fr));
+}
+.shale-authenticated .shale-route-content .entity-card-header { flex-wrap: wrap; }
+.shale-authenticated .shale-route-content .entity-card-title-block { flex: 1 1 14rem; }
+.shale-authenticated .shale-route-content .entity-card-badges { max-width: 100%; }
+.shale-authenticated .shale-route-content .status-pill { flex-shrink: 0; max-width: 100%; }
+
+/* Remaining page/section/editor primitives. Shared presentation owns cards, fields,
+   indicators and semantic actions, including dialogs in the native top layer. */
+.shale-route-content :is(.tasks-page,.cases-page,.contacts-page,.organizations-page,
+  .team-page,.detail-shell,.settings-card) { background: var(--shale-plane); }
+.shale-route-content :is(.settings-subcard,.detail-sections > section,.filter-bar,.case-edit-form) {
+  background: var(--shale-section); border-color: var(--shale-border);
+}
+.shale-route-content :is(.detail-header,.related-contact-card,.case-update-card,.status-timeline-card,.status-choice-card) {
+  background: var(--shale-card);
+}
+.shale-route-content .detail-list div { border-color: var(--shale-border); }
+.shale-route-content :is(.breadcrumb a,.button-link,.back-link,.related-contact-name,.status-timeline-name,.status-choice-name) {
+  color: var(--shale-link);
+}
+.shale-route-content a:not(.shale-button) { color: var(--shale-link); }
+.shale-route-content :is(.related-contact-card,.button-link,.back-link):hover {
+  background: var(--shale-card-hover);
+}
+.shale-route-content :is(.inline-beta-badge,.status-current-pill) {
+  background: var(--shale-info); color: var(--shale-info-text); border-color: var(--shale-border);
+}
+.shale-route-content .color-swatch {
+  background: var(--shale-indicator-fill,var(--shale-neutral-text));
+  border-color: var(--shale-border); box-shadow: none;
+}
+.shale-route-content .status-choice-card:has(input:checked) {
+  background: var(--shale-selected); border-color: var(--shale-focus);
+  border-left-color: var(--status-accent); box-shadow: none;
+}
+.shale-route-content .status-choice-card:focus-within {
+  outline: 3px solid var(--shale-focus); outline-offset: 3px;
+}
+.shale-route-content .status-choice-card:has(input:disabled) { opacity: .52; cursor: default; }

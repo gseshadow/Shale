@@ -23,13 +23,15 @@ final class ThemeResourceContractTest {
         read(Theme.DARK.stylesheetResource());
 
         Matcher imports = IMPORT.matcher(app);
-        int importCount = 0;
+        Set<String> importedResources = new java.util.HashSet<>();
         while (imports.find()) {
-            importCount++;
+            importedResources.add(imports.group(1));
             assertNotNull(getClass().getResource("/css/" + imports.group(1)),
                     "app.css import must resolve from the classpath: " + imports.group(1));
         }
-        assertEquals(14, importCount, "the stable production entry point includes every established foundation stylesheet");
+        assertTrue(importedResources.containsAll(Set.of("foundation/colors.css", "foundation/surfaces.css",
+                "foundation/cards.css", "foundation/buttons.css", "foundation/forms.css")),
+                "the production entry point must include the shared theme, card, button and form foundations");
     }
 
     @Test

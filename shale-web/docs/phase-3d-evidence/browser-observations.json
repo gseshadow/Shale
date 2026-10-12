@@ -1,0 +1,158 @@
+{
+  "browser": "151.0.7922.173",
+  "playwright": "1.64.0",
+  "deterministicBrowserClock": true,
+  "observations": [
+    {
+      "width": 320,
+      "action": "retry",
+      "synthetic": true,
+      "deadlineMs": 8000,
+      "storedBearerRetainedOnTimeout": true,
+      "protectedAccessBlocked": true,
+      "freshRetryDeadline": true,
+      "duplicateRetryPrevented": true,
+      "restoredExactDetail": true,
+      "localReturn": false,
+      "historyPreserved": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "action": "return",
+      "synthetic": true,
+      "deadlineMs": 8000,
+      "storedBearerRetainedOnTimeout": true,
+      "protectedAccessBlocked": true,
+      "freshRetryDeadline": false,
+      "duplicateRetryPrevented": false,
+      "restoredExactDetail": false,
+      "localReturn": true,
+      "historyPreserved": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "action": "retry",
+      "synthetic": true,
+      "deadlineMs": 8000,
+      "storedBearerRetainedOnTimeout": true,
+      "protectedAccessBlocked": true,
+      "freshRetryDeadline": true,
+      "duplicateRetryPrevented": true,
+      "restoredExactDetail": true,
+      "localReturn": false,
+      "historyPreserved": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        },
+        {
+          "path": "/api/contacts/7",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "action": "return",
+      "synthetic": true,
+      "deadlineMs": 8000,
+      "storedBearerRetainedOnTimeout": true,
+      "protectedAccessBlocked": true,
+      "freshRetryDeadline": false,
+      "duplicateRetryPrevented": false,
+      "restoredExactDetail": false,
+      "localReturn": true,
+      "historyPreserved": true,
+      "noOverflow": true,
+      "calls": [
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        },
+        {
+          "path": "/api/auth/me",
+          "method": "GET"
+        }
+      ]
+    }
+  ],
+  "pageErrors": [],
+  "unexpectedRequests": [],
+  "liveBackendAcceptance": false
+}

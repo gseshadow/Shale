@@ -211,10 +211,7 @@
 									<Label text="Practice area"
 										styleClass="shale-property-row-label" GridPane.rowIndex="2"
 										GridPane.columnIndex="0" />
-									<VBox spacing="6" GridPane.rowIndex="2" GridPane.columnIndex="1">
-										<StackPane alignment="CENTER_LEFT" fx:id="ovPracticeAreaHost" styleClass="shale-property-row-value" />
-										<Button fx:id="managePracticeAreasButton" text="Manage Practice Areas" />
-									</VBox>
+									<StackPane alignment="CENTER_LEFT" fx:id="ovPracticeAreaHost" styleClass="shale-property-row-value" GridPane.rowIndex="2" GridPane.columnIndex="1" />
 									<Button fx:id="changePracticeAreaButton" text="✎"
 										GridPane.rowIndex="2"
 										GridPane.columnIndex="2" />
@@ -222,10 +219,7 @@
 									<Label text="Case status"
 										styleClass="shale-property-row-label" GridPane.rowIndex="3"
 										GridPane.columnIndex="0" />
-									<VBox spacing="6" GridPane.rowIndex="3" GridPane.columnIndex="1">
-										<StackPane alignment="CENTER_LEFT" fx:id="ovCaseStatusHost" styleClass="shale-property-row-value" />
-										<Button fx:id="manageCaseStatusesButton" text="Manage Case Statuses" />
-									</VBox>
+									<StackPane alignment="CENTER_LEFT" fx:id="ovCaseStatusHost" styleClass="shale-property-row-value" GridPane.rowIndex="3" GridPane.columnIndex="1" />
 									<Button fx:id="changeStatusButton" text="✎"
 										GridPane.rowIndex="3"
 										GridPane.columnIndex="2" />

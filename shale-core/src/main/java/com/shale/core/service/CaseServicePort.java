@@ -1,5 +1,8 @@
 package com.shale.core.service;
 
+import com.shale.core.dto.MinimizedCaseOverview;
+import com.shale.core.dto.MinimizedCasePage;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -44,6 +47,17 @@ import java.util.Collection;
  */
 public interface CaseServicePort {
 
+    default MinimizedCasePage searchMinimizedCases(String query, int tenant, int actor, int page, int size) {
+        throw new UnsupportedOperationException("Implement CaseServicePort.searchMinimizedCases with authorized SQL paging.");
+    }
+    default MinimizedCasePage listMinimizedAssignedCases(int tenant, int actor, int page, int size) {
+        throw new UnsupportedOperationException("Implement CaseServicePort.listMinimizedAssignedCases with authorized SQL paging.");
+    }
+    default Optional<MinimizedCaseOverview> readMinimizedCaseOverview(long caseId, int tenant, int actor) {
+        throw new UnsupportedOperationException("Implement CaseServicePort.readMinimizedCaseOverview with required committed read audit.");
+    }
+
+
 	Optional<CaseDetailDto> getCaseDetail(long caseId, int shaleClientId);
 	default Optional<CaseDetailDto> getAuthoritativeCaseDetail(long caseId, int shaleClientId, int actorUserId) {
 		throw new UnsupportedOperationException("Authoritative existing-case detail is unavailable.");
@@ -52,6 +66,11 @@ public interface CaseServicePort {
 	Optional<CaseOverviewDto> getCaseOverview(long caseId, int shaleClientId);
 
 	List<CaseOverviewDto> searchCases(String query, int shaleClientId, int actorUserId, int limit);
+
+	/** Exact SQL page of the existing Case-name search; offset is a row offset, not a page number. */
+	default List<CaseOverviewDto> searchCasesPage(String query, int shaleClientId, int actorUserId, int offset, int size) {
+		throw new UnsupportedOperationException("Exact Case search paging is unavailable. Implement CaseServicePort.searchCasesPage with SQL offset and size delegation.");
+	}
 
 	List<CaseOverviewDto> listAssignedCases(int assignedUserId, int shaleClientId, int limit);
 

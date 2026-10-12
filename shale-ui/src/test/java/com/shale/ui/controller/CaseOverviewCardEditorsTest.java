@@ -18,7 +18,14 @@ class CaseOverviewCardEditorsTest {
         assertTrue(editors.contains("UserSelectionField<T> selector"));
         assertFalse(editors.contains("ChoiceBox<String>"));
         assertTrue(editors.contains("PracticeAreaCardFactory.Variant.MINI"));
+        assertTrue(editors.contains("PracticeAreaSelector.showPicker"),
+                "Practice Area changes must reuse the same typed card picker as New Intake");
+        assertTrue(editors.contains("savePracticeAreaField(v.id())"),
+                "Practice Area persistence remains owned by the existing save workflow");
         assertTrue(editors.contains("StatusCardFactory.Variant.MINI"));
+        assertTrue(editors.contains("CaseStatusSelector.showPicker"),
+                "Case Status changes must reuse the typed card picker used by New Intake");
+        assertTrue(editors.contains("saveStatusField(v.id())"));
         assertTrue(editors.contains("Variant.MINI"));
         assertTrue(editors.contains("CaseDao.StatusRow::id"));
         assertTrue(editors.contains("CaseDao.PracticeAreaRow::id"));

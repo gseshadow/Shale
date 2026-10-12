@@ -3,6 +3,8 @@
 **/*.class
 **/*.jar
 /build/staging/
+/build/tmp/
+/dist-macos/
 
 # Eclipse metadata
 .classpath

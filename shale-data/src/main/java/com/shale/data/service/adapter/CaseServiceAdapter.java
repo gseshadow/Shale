@@ -1,5 +1,8 @@
 package com.shale.data.service.adapter;
 
+import com.shale.core.dto.MinimizedCaseOverview;
+import com.shale.core.dto.MinimizedCasePage;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -184,10 +187,33 @@ public final class CaseServiceAdapter implements CaseServicePort {
 		return Optional.ofNullable(caseGateway.getOverview(caseId));
 	}
 
+
+    @Override
+    public MinimizedCasePage searchMinimizedCases(String query, int tenant, int actor, int page, int size) {
+        return caseGateway.searchMinimizedCases(query, tenant, actor, page, size);
+    }
+    @Override
+    public MinimizedCasePage listMinimizedAssignedCases(int tenant, int actor, int page, int size) {
+        return caseGateway.listMinimizedAssignedCases(tenant, actor, page, size);
+    }
+    @Override
+    public Optional<MinimizedCaseOverview> readMinimizedCaseOverview(long caseId, int tenant, int actor) {
+        return caseGateway.readMinimizedCaseOverview(caseId, tenant, actor);
+    }
+
 	@Override
 	public List<CaseOverviewDto> searchCases(String query, int shaleClientId, int actorUserId, int limit) {
 		int resolvedLimit = limit <= 0 ? 25 : limit;
 		return caseGateway.searchActiveForServer(shaleClientId, actorUserId, query, 0, resolvedLimit).stream()
+				.map(CaseServiceAdapter::toOverview).toList();
+	}
+
+	@Override
+	public List<CaseOverviewDto> searchCasesPage(String query, int shaleClientId, int actorUserId, int offset, int size) {
+		if (offset < 0 || size <= 0) {
+			throw new IllegalArgumentException("Case search offset must be nonnegative and size must be positive.");
+		}
+		return caseGateway.searchActiveForServer(shaleClientId, actorUserId, query, offset, size).stream()
 				.map(CaseServiceAdapter::toOverview).toList();
 	}
 
@@ -942,6 +968,16 @@ public final class CaseServiceAdapter implements CaseServicePort {
 	}
 
 	interface CaseGateway {
+        default MinimizedCasePage searchMinimizedCases(String q, int t, int a, int p, int s) {
+            throw unsupportedCaseLinkGatewayOperation("searchMinimizedCases");
+        }
+        default MinimizedCasePage listMinimizedAssignedCases(int t, int a, int p, int s) {
+            throw unsupportedCaseLinkGatewayOperation("listMinimizedAssignedCases");
+        }
+        default Optional<MinimizedCaseOverview> readMinimizedCaseOverview(long id, int t, int a) {
+            throw unsupportedCaseLinkGatewayOperation("readMinimizedCaseOverview");
+        }
+
 		CaseDetailDto getDetail(long caseId);
 
 		CaseOverviewDto getOverview(long caseId);
@@ -1177,6 +1213,19 @@ public final class CaseServiceAdapter implements CaseServicePort {
 			Objects.requireNonNull(caseSummaryDao, "caseSummaryDao");
 		}
 
+
+        @Override
+        public MinimizedCasePage searchMinimizedCases(String q, int t, int a, int p, int s) {
+            return caseSummaryDao.searchMinimizedCases(q, t, a, p, s);
+        }
+        @Override
+        public MinimizedCasePage listMinimizedAssignedCases(int t, int a, int p, int s) {
+            return caseSummaryDao.listMinimizedAssignedCases(t, a, p, s);
+        }
+        @Override
+        public Optional<MinimizedCaseOverview> readMinimizedCaseOverview(long id, int t, int a) {
+            return caseSummaryDao.readMinimizedCaseOverview(id, t, a);
+        }
 		@Override
 		public CaseDetailDto getDetail(long caseId) {
 			return caseDao.getDetail(caseId);

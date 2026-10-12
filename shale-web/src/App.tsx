@@ -1,10 +1,27 @@
-import { FormEvent, useEffect, useMemo, useState, useRef } from 'react';
-import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
-import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, clearAccessToken, getCaseDetail, getContactDetail, getCurrentUser, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, login, logout, readAccessToken, searchCases, searchContacts, searchOrganizations, storeAccessToken, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
+import { startTransition, FormEvent, useEffect, useMemo, useState, useRef, createContext, useContext } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { redirectPathFrom } from './returnPath';
+import { matchExistingRoute, operationalRouteIds, routePath, routes } from './app/routeRegistry';
+import type { RouteObject } from 'react-router-dom';
+import { useDetailDraftProtection } from './DetailDraftProtection';
+import type { OperationalRouteId } from './app/routeRegistry';
+import { useStartupSession } from './useStartupSession';
+import { captureSessionRequestGuard } from './sessionRequests';
+import type { AuthState, LogoutFeedback } from './useStartupSession';
+import { createBrowserRouter, RouterProvider, Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { AuthenticatedUser, CaseDetail, CaseRelatedContact, CaseStatusHistoryItem, CaseSearchResult, CaseUpdate, CaseStatusSetting, CaseTaskListItem, ContactDetail, ContactSearchResult, OrganizationDetail, OrganizationSearchResult, PracticeAreaSetting, TaskDetail, TaskPriorityOption, TeamMemberDetail, TeamMemberSummary, addCaseUpdate, apiBaseUrl, createCase, createCaseTask, createContact, createOrganization, completeTask, getCaseDetail, getContactDetail, getOrganizationDetail, getTaskDetail, getTeamMemberDetail, listAssignedCases, listAssignedTasks, listCaseTasks, listCaseUpdates, listCaseStatusSettings, listCaseStatusLookup, listEffectiveCaseDateTypes, listPracticeAreaLookups, listPracticeAreaSettings, listTaskPriorityLookups, listTeamMembers, searchCases, searchContacts, searchOrganizations, updateCaseAssignment, updateCaseCoreDetails, updateCaseStatus, updateContactDetails, updateOrganizationDetails, updateTaskDetail } from './api';
 import { ApiError, contactValueUpdate } from './api';
 import { ContactValueInput, useContactFormErrors } from './ContactValueInput';
+import { Button, Feedback, SectionRegion, PageHeader, ToolbarActions, ActionButton, SecondaryButton, LoadingState, EmptyState, StatusPill, MetadataRow, MetadataGrid, EntityList, EntityCard } from './ui/primitives';
+import { CaseWorkspace, CaseWorkspaceMemory, ReadOnlyCaseOverview } from './features/cases/CaseWorkspace';
+import { indicatorPaint } from './ui/indicatorPaint';
+import { ResponsiveShell } from './shell/ResponsiveShell';
 import './styles.css';
+import './ui/tokens.css';
+import './ui/buttons.css';
+import './shell/shell.css';
+import './shell/authenticated.css';
+import './ui/presentation.css';
 
 function focusContactError(error: unknown, form: HTMLFormElement) {
   if (error instanceof ApiError && error.fieldErrors.length) {
@@ -13,23 +30,16 @@ function focusContactError(error: unknown, form: HTMLFormElement) {
   }
 }
 
-interface AuthState {
-  accessToken: string | null;
-  user: AuthenticatedUser | null;
-  isVerifying: boolean;
-}
-
-const navigationItems = [
-  { path: '/my-shale', label: 'My Shale', activePrefixes: ['/my-shale', '/tasks'] },
-  { path: '/cases', label: 'Cases', activePrefixes: ['/cases'] },
-  { path: '/contacts', label: 'Contacts', activePrefixes: ['/contacts'] },
-  { path: '/organizations', label: 'Organizations', activePrefixes: ['/organizations'] },
-  { path: '/team', label: 'Team', activePrefixes: ['/team'] },
-  { path: '/settings', label: 'Settings', activePrefixes: ['/settings'] },
-];
-
 const MISSING_VALUE = '—';
 
+// Guard the consumer continuation too: an API result can be queued immediately
+// before teardown. Old handlers must not navigate or deliver callbacks afterward.
+function useFeatureResultGuard(accessToken: string | null) {
+  const mounted = useRef(false);
+  const sessionIsCurrent = captureSessionRequestGuard(accessToken);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  return () => mounted.current && sessionIsCurrent();
+}
 
 function isMissing(value: string | number | null | undefined): boolean {
   return value === null || value === undefined || String(value).trim() === '';
@@ -78,33 +88,6 @@ function formatDateTime(value: string | null | undefined): string {
   }).format(date);
 }
 
-function PageHeader({ eyebrow, title, titleId, lede, action }: { eyebrow: string; title: string; titleId?: string; lede?: string; action?: ReactNode }) {
-  return (
-    <header className="page-header">
-      <div className="page-heading-row">
-        <div className="page-title-block">
-          <p className="eyebrow">{eyebrow}</p>
-          <h1 id={titleId}>{title}</h1>
-          {lede && <p className="lede">{lede}</p>}
-        </div>
-        {action && <ToolbarActions>{action}</ToolbarActions>}
-      </div>
-    </header>
-  );
-}
-
-function ToolbarActions({ children }: { children: ReactNode }) {
-  return <div className="toolbar-actions">{children}</div>;
-}
-
-function ActionButton({ children, type = 'button', disabled = false, onClick }: { children: ReactNode; type?: 'button' | 'submit'; disabled?: boolean; onClick?: () => void }) {
-  return <button className="action-button" type={type} disabled={disabled} onClick={onClick}>{children}</button>;
-}
-
-function SecondaryButton({ children, type = 'button', disabled = false, onClick }: { children: ReactNode; type?: 'button' | 'submit'; disabled?: boolean; onClick?: () => void }) {
-  return <button className="secondary-button" type={type} disabled={disabled} onClick={onClick}>{children}</button>;
-}
-
 function SearchBar({ id, label, value, placeholder, isLoading, loadingLabel = 'Searching…', submitLabel = 'Search', onChange, onSubmit }: { id: string; label: string; value: string; placeholder: string; isLoading?: boolean; loadingLabel?: string; submitLabel?: string; onChange: (value: string) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   return (
     <form className="search-form filter-bar" onSubmit={onSubmit} role="search">
@@ -131,80 +114,97 @@ function displayNameFor(user: AuthenticatedUser): string {
   return user.displayName || [user.nameFirst, user.nameLast].filter(Boolean).join(' ') || user.email || `User ${user.userId}`;
 }
 
-function AppRoutes() {
-  const [authState, setAuthState] = useState<AuthState>(() => ({
-    accessToken: readAccessToken(),
-    user: null,
-    isVerifying: true,
-  }));
-
-  useEffect(() => {
-    const storedToken = readAccessToken();
-    if (!storedToken) {
-      setAuthState({ accessToken: null, user: null, isVerifying: false });
-      return;
-    }
-
-    let isCurrent = true;
-    getCurrentUser(storedToken)
-      .then((verifiedUser) => {
-        if (isCurrent) {
-          setAuthState({ accessToken: storedToken, user: verifiedUser, isVerifying: false });
-        }
-      })
-      .catch(() => {
-        if (isCurrent) {
-          clearAccessToken();
-          setAuthState({ accessToken: null, user: null, isVerifying: false });
-        }
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, []);
-
-  function handleLogin(verifiedAccessToken: string, user: AuthenticatedUser) {
-    storeAccessToken(verifiedAccessToken);
-    setAuthState({ accessToken: verifiedAccessToken, user, isVerifying: false });
-  }
-
-  async function handleLogout() {
-    const token = authState.accessToken;
-    clearAccessToken();
-    setAuthState({ accessToken: null, user: null, isVerifying: false });
-    if (token) {
-      await logout(token);
-    }
-  }
-
-  return (
-    <Routes>
-      <Route path="/" element={authState.user ? <Navigate to="/my-shale" replace /> : <Navigate to="/login" replace />} />
-      <Route
-        path="/login"
-        element={authState.user ? <Navigate to="/my-shale" replace /> : <LoginPage isVerifying={authState.isVerifying} onLogin={handleLogin} />}
-      />
-      <Route element={<ProtectedRoute authState={authState} />}>
-        <Route element={<AppShell user={authState.user} onLogout={handleLogout} />}>
-          <Route path="/my-shale" element={<MyShalePage accessToken={authState.accessToken} user={authState.user} />} />
-          <Route path="/cases" element={<CasesPage accessToken={authState.accessToken} />} />
-          <Route path="/cases/:caseId" element={<CaseDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/tasks" element={<TasksPage accessToken={authState.accessToken} />} />
-          <Route path="/tasks/:taskId" element={<TaskDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/contacts" element={<ContactsPage accessToken={authState.accessToken} />} />
-          <Route path="/contacts/:contactId" element={<ContactDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/organizations" element={<OrganizationsPage accessToken={authState.accessToken} />} />
-          <Route path="/organizations/:organizationId" element={<OrganizationDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/team" element={<TeamPage accessToken={authState.accessToken} />} />
-          <Route path="/team/:userId" element={<TeamMemberDetailPage accessToken={authState.accessToken} />} />
-          <Route path="/settings" element={<SettingsPage accessToken={authState.accessToken} user={authState.user} />} />
-        </Route>
-      </Route>
-      <Route path="*" element={<Navigate to={authState.user ? '/my-shale' : '/login'} replace />} />
-    </Routes>
-  );
+type SessionContextValue = ReturnType<typeof useStartupSession> & { handleLogout: () => void };
+const SessionContext = createContext<SessionContextValue | null>(null);
+function useAppSession() {
+  const session = useContext(SessionContext);
+  if (!session) throw new Error('Session boundary is required.');
+  return session;
 }
+
+function AppRoutes() {
+  const navigate = useNavigate();
+  const session = useStartupSession();
+  const { authState, retry, signOut, logoutSession } = session;
+
+  function returnToSignIn() {
+    // Replace and clear return state together, as in Phase 3A local logout.
+    startTransition(() => {
+      signOut();
+      navigate(routes.login.path, { replace: true, state: null });
+    });
+  }
+
+  function handleLogout() {
+    // Group security teardown and replacement; the draft blocker checks current session authority.
+    startTransition(() => {
+      if (logoutSession()) navigate(routes.login.path, { replace: true, state: null });
+    });
+  }
+
+  // Keep the requested pathname/query/hash in place until verification has an outcome.
+  // No route element (including feature effects or credential login) mounts while unknown.
+  if (authState.verification) {
+    return <SessionVerification storageFeedback={session.storageFeedback} pending={authState.verification === 'pending'} onRetry={retry} onSignIn={returnToSignIn} />;
+  }
+
+  return <SessionContext.Provider value={{ ...session, handleLogout }}><Outlet /></SessionContext.Provider>;
+}
+
+function OperationalScreen({ id }: { id: OperationalRouteId }) {
+  const { authState } = useAppSession();
+  const location = useLocation();
+  // Exhaustive screen composition remains separate from URL metadata and router execution.
+  const screens: Record<OperationalRouteId, ReactNode> = {
+    myShale: <MyShalePage accessToken={authState.accessToken} user={authState.user} />,
+    caseWorkspace: <CaseWorkspace key={location.key} token={authState.accessToken ?? ''} />,
+    caseOverview: <ReadOnlyCaseOverview key={location.key} token={authState.accessToken ?? ''} />,
+    cases: <CasesPage accessToken={authState.accessToken} />,
+    caseDetail: <CaseDetailPage accessToken={authState.accessToken} />,
+    tasks: <TasksPage accessToken={authState.accessToken} />,
+    taskDetail: <TaskDetailPage accessToken={authState.accessToken} />,
+    contacts: <ContactsPage accessToken={authState.accessToken} />,
+    // A discarded same-screen/query/hash navigation must not retain the old editor or continuation.
+    contactDetail: <ContactDetailPage key={location.key} accessToken={authState.accessToken} />,
+    organizations: <OrganizationsPage accessToken={authState.accessToken} />,
+    organizationDetail: <OrganizationDetailPage key={location.key} accessToken={authState.accessToken} />,
+    team: <TeamPage accessToken={authState.accessToken} />,
+    teamMemberDetail: <TeamMemberDetailPage accessToken={authState.accessToken} />,
+    settings: <SettingsPage accessToken={authState.accessToken} user={authState.user} />,
+  };
+  return screens[id];
+}
+
+function SessionProtectedRoutes() {
+  const { authState, sessionGeneration } = useAppSession();
+  return <ProtectedRoute key={sessionGeneration} authState={authState} />;
+}
+function SessionShell() {
+  const { authState, handleLogout } = useAppSession();
+  return <CaseWorkspaceMemory token={authState.accessToken ?? ''}><AppShell user={authState.user} onLogout={handleLogout} /></CaseWorkspaceMemory>;
+}
+function PublicRoute({ id }: { id: 'root' | 'login' | 'fallback' }) {
+  const { authState, logoutFeedback, sessionEnded, storageFeedback, signInWithCredentials } = useAppSession();
+  const location = useLocation();
+  if (id === 'login') return authState.user
+    ? <Navigate to={redirectPathFrom(location.state)} replace state={null} />
+    : <LoginPage storageFeedback={storageFeedback} onLogin={signInWithCredentials} logoutFeedback={logoutFeedback} sessionEnded={sessionEnded} />;
+  return <Navigate to={authState.user ? routes.myShale.path : routes.login.path} replace />;
+}
+
+// The existing registry owns URLs. No loader/action or API/session work runs in the router.
+export const appRouteObjects: RouteObject[] = [{
+  element: <AppRoutes />,
+  children: [
+    { path: routes.root.path, element: <PublicRoute id="root" /> },
+    { path: routes.login.path, element: <PublicRoute id="login" /> },
+    { element: <SessionProtectedRoutes />, children: [{ element: <SessionShell />, children:
+      operationalRouteIds.map(id => ({ path: routes[id].path, element: <OperationalScreen id={id} /> })),
+    }] },
+    { path: routes.fallback.path, element: <PublicRoute id="fallback" /> },
+  ],
+}];
+export function createAppRouter() { return createBrowserRouter(appRouteObjects); }
 
 function normalizeSettingsKey(value: string | null | undefined): string | null {
   const normalized = (value ?? '').trim().toLowerCase();
@@ -244,7 +244,6 @@ function mergeEffectivePracticeAreas(rows: PracticeAreaSetting[], shaleClientId:
     return byName || left.id - right.id;
   });
 }
-
 
 function SettingsPage({ accessToken, user }: { accessToken: string | null; user: AuthenticatedUser | null }) {
   const [caseStatuses, setCaseStatuses] = useState<CaseStatusSetting[]>([]);
@@ -403,68 +402,6 @@ function SettingsTable({ title, emptyText, headers, rows }: { title: string; emp
   );
 }
 
-function LoadingState({ message }: { message: string }) {
-  return <p className="status loading-state">{message}</p>;
-}
-
-function EmptyState({ message }: { message: string }) {
-  return <p className="status empty-state">{message}</p>;
-}
-
-function StatusPill({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'success' | 'warning' | 'info' }) {
-  return <span className={`status-pill status-pill-${tone}`}>{children}</span>;
-}
-
-function MetadataRow({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="metadata-row">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
-  );
-}
-
-function MetadataGrid({ children }: { children: ReactNode }) {
-  return <dl className="metadata-grid">{children}</dl>;
-}
-
-function EntityList({ children, ariaLabel }: { children: ReactNode; ariaLabel: string }) {
-  return <div className="entity-list" role="list" aria-label={ariaLabel}>{children}</div>;
-}
-
-function EntityCard({ title, subtitle, eyebrow, badges, metadata, actions, onClick, ariaLabel }: { title: ReactNode; subtitle?: ReactNode; eyebrow?: ReactNode; badges?: ReactNode; metadata?: ReactNode; actions?: ReactNode; onClick?: () => void; ariaLabel?: string }) {
-  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
-    if (!onClick) return;
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onClick();
-    }
-  }
-
-  return (
-    <article
-      className={onClick ? 'entity-card entity-card-clickable' : 'entity-card'}
-      role="listitem"
-      tabIndex={onClick ? 0 : undefined}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      aria-label={ariaLabel}
-    >
-      <div className="entity-card-header">
-        <div className="entity-card-title-block">
-          {eyebrow && <p className="entity-card-eyebrow">{eyebrow}</p>}
-          <h3 className="entity-card-title">{title}</h3>
-          {subtitle && <p className="entity-card-subtitle">{subtitle}</p>}
-        </div>
-        {badges && <div className="entity-card-badges">{badges}</div>}
-      </div>
-      {metadata && <div className="entity-card-metadata">{metadata}</div>}
-      {actions && <div className="entity-card-actions" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>{actions}</div>}
-    </article>
-  );
-}
-
-
 function BackLink({ to, children, ariaLabel }: { to: string; children: ReactNode; ariaLabel?: string }) {
   return <Link className="back-link" to={to} aria-label={ariaLabel}>{children}</Link>;
 }
@@ -497,56 +434,106 @@ function DetailSection({ title, titleId, children, className }: { title: string;
   );
 }
 
+function SessionVerification({ pending, onRetry, onSignIn, storageFeedback }: { storageFeedback: string | null; pending: boolean; onRetry: () => void; onSignIn: () => void }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const status = useRef<HTMLParagraphElement>(null);
+  const retryButton = useRef<HTMLButtonElement>(null);
+  const returnRetryFocus = useRef(false);
+  useEffect(() => { heading.current?.focus(); }, []);
+  useEffect(() => {
+    if (!pending && returnRetryFocus.current) {
+      if (document.activeElement === status.current) retryButton.current?.focus();
+      returnRetryFocus.current = false;
+    }
+  }, [pending]);
+  function retryVerification() {
+    if (pending) return;
+    // Native disabled buttons lose keyboard focus in Chromium. Hold it on the live
+    // status, then return it after failure unless the user has moved to another action.
+    returnRetryFocus.current = document.activeElement === retryButton.current;
+    if (returnRetryFocus.current) status.current?.focus();
+    onRetry();
+  }
+  return <main className="login-page shale-foundation shale-presentation" data-theme="light">
+    <section className="login-panel" aria-labelledby="verification-title">
+      <p className="eyebrow">Shale Web</p>
+      <h1 id="verification-title" ref={heading} tabIndex={-1}>Verify your session</h1>
+      <p ref={status} tabIndex={-1} role="status" aria-live="polite" aria-atomic="true">{pending ? 'Checking your Shale session…' : ''}</p>
+      {!pending && <Feedback kind="error">{storageFeedback ?? 'Session verification is unavailable. Your saved sign-in has been kept, but Shale cannot open your work until it is verified.'}</Feedback>}
+      <ToolbarActions>
+        <Button purpose="primary" onClick={event => { retryButton.current = event.currentTarget; retryVerification(); }} disabled={pending} aria-busy={pending}>Retry</Button>
+        <Button onClick={onSignIn}>Return to sign in</Button>
+      </ToolbarActions>
+      <p className="lede">Return to sign in ends local access and attempts to clear your saved sign-in in this tab.</p>
+    </section>
+  </main>;
+}
+
 function ProtectedRoute({ authState }: { authState: AuthState }) {
   const location = useLocation();
 
-  if (authState.isVerifying) {
-    return <FullPageStatus message="Checking your Shale session…" />;
-  }
-
   if (!authState.user) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to={routes.login.path} replace state={{ from: location }} />;
   }
 
   return <Outlet />;
 }
 
-function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (verifiedAccessToken: string, verifiedUser: AuthenticatedUser) => void }) {
+function LoginPage({ onLogin, logoutFeedback, sessionEnded, storageFeedback }: { storageFeedback: string | null; sessionEnded: boolean; logoutFeedback: LogoutFeedback; onLogin: (email: string, password: string, signal: AbortSignal) => Promise<boolean> }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const mounted = useRef(false);
+  const submitting = useRef(false);
+  const pendingLogin = useRef<AbortController | null>(null);
+  useEffect(() => { mounted.current = true; heading.current?.focus(); return () => { mounted.current = false; pendingLogin.current?.abort(); }; }, []);
+  const [logoutMessage, setLogoutMessage] = useState('');
+  useEffect(() => {
+    setLogoutMessage(logoutFeedback === 'pending'
+      ? 'You are signed out in this tab. Waiting for the server to confirm session revocation…'
+      : logoutFeedback === 'confirmed'
+        ? 'You are signed out in this tab. The server confirmed revocation of the session used here.'
+        : logoutFeedback === 'unavailable'
+          ? 'You are signed out in this tab. Server session revocation could not be confirmed. The session may still be active on the server. You can sign in again.'
+          : '');
+  }, [logoutFeedback]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
-  const location = useLocation();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
+    const controller = new AbortController();
+    pendingLogin.current = controller;
     setError(null);
     setIsSubmitting(true);
 
     try {
-      const result = await login(email, password);
-      const verifiedUser = await getCurrentUser(result.accessToken);
-      onLogin(result.accessToken, verifiedUser);
-      navigate(redirectPathFrom(location.state), { replace: true });
-      setPassword('');
+      const installed = await onLogin(email, password, controller.signal);
+      if (!mounted.current || pendingLogin.current !== controller) return;
+      if (installed) setPassword('');
+      else setError('Sign-in was cancelled because this attempt is no longer active. You are not signed in by this attempt.');
     } catch (caught) {
-      clearAccessToken();
-      setError(caught instanceof Error ? caught.message : 'Login failed.');
+      if (!mounted.current || pendingLogin.current !== controller) return;
+      setError(caught instanceof Error ? caught.message : 'Shale could not confirm sign-in.');
     } finally {
-      setIsSubmitting(false);
+      if (pendingLogin.current === controller) {
+        pendingLogin.current = null;
+        submitting.current = false;
+        if (mounted.current) setIsSubmitting(false);
+      }
     }
-  }
-
-  if (isVerifying) {
-    return <FullPageStatus message="Checking your Shale session…" />;
   }
 
   return (
     <main className="login-page">
       <section className="login-panel" aria-labelledby="login-title">
         <p className="eyebrow">Shale Web</p>
-        <h1 id="login-title">Sign in</h1>
+        <h1 id="login-title" ref={heading} tabIndex={-1}>Sign in</h1>
+        {storageFeedback && <Feedback kind="error">{storageFeedback}</Feedback>}
+        {sessionEnded && <Feedback kind="error">Your Shale session ended. Sign in again to continue. Unsaved form changes were discarded. A submitted change may have been saved; check its outcome before submitting again.</Feedback>}
+        <Feedback kind={logoutFeedback === 'confirmed' ? 'success' : logoutFeedback === 'unavailable' ? 'unavailable' : 'info'} aria-live="polite" aria-atomic="true">{logoutMessage}</Feedback>
         <p className="lede">Use your Shale account to access the web application shell.</p>
         <form onSubmit={handleSubmit}>
           <label>
@@ -565,76 +552,31 @@ function LoginPage({ isVerifying, onLogin }: { isVerifying: boolean; onLogin: (v
   );
 }
 
-function redirectPathFrom(state: unknown): string {
-  if (!state || typeof state !== 'object' || !('from' in state)) {
-    return '/my-shale';
-  }
-
-  const from = (state as { from?: unknown }).from;
-  if (!from || typeof from !== 'object' || !('pathname' in from)) {
-    return '/my-shale';
-  }
-
-  const pathname = (from as { pathname?: unknown }).pathname;
-  return typeof pathname === 'string' ? pathname : '/my-shale';
-}
-
 function AppShell({ user, onLogout }: { user: AuthenticatedUser | null; onLogout: () => void }) {
   const location = useLocation();
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
-  return (
-    <div className="app-layout">
-      <header className="topbar">
-        <div className="brand" aria-label="Shale">
-          <span className="brand-mark" aria-hidden="true">S</span>
-          <span>Shale</span>
-        </div>
-        <span className="beta-badge">BETA</span>
-        <div className="user-summary">
-          <p className="eyebrow">Signed in</p>
-          <p className="user-name">{displayNameFor(user)}</p>
-          <p className="user-meta">{displayValue(user.email, 'Email not provided')}</p>
-        </div>
-        <button type="button" onClick={onLogout}>Logout</button>
-      </header>
-
-      <main className="page-content">
-        <div className="content-container">
-          <Outlet />
-        </div>
-      </main>
-
-      <PrimaryNavigation locationPathname={location.pathname} />
-    </div>
-  );
+  return <div className="shale-authenticated" data-theme={theme}>
+    <ResponsiveShell path={location.pathname} navigationKey={location.key} caption="BETA"
+      identity={<><strong>{displayNameFor(user)}</strong><p>{displayValue(user.email, 'Email not provided')}</p></>}
+      utilities={<>
+        <label htmlFor="shell-theme">Theme (this session)</label>
+        <select id="shell-theme" value={theme} onChange={event => setTheme(event.target.value as 'light' | 'dark')}>
+          <option value="light">Light</option><option value="dark">Dark</option>
+        </select>
+        <Button onClick={onLogout}>Logout</Button>
+      </>}>
+      <div className="shale-route-content shale-presentation" data-route={matchExistingRoute(location.pathname)}><div className="content-container"><Outlet /></div></div>
+    </ResponsiveShell>
+  </div>;
 }
-
-function PrimaryNavigation({ locationPathname }: { locationPathname: string }) {
-  return (
-    <nav className="bottom-nav-list" aria-label="Primary navigation">
-      {navigationItems.map((item) => {
-        const isActive = item.activePrefixes.some((prefix) => locationPathname === prefix || locationPathname.startsWith(`${prefix}/`));
-        return (
-          <Link key={item.path} to={item.path} className={isActive ? 'nav-link active' : 'nav-link'} aria-current={isActive ? 'page' : undefined}>
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
-
 
 function MyShalePage({ accessToken, user }: { accessToken: string | null; user: AuthenticatedUser | null }) {
   return (
-    <section className="dashboard-page" aria-labelledby="my-shale-title">
-      <div className="dashboard-header">
-        <PageHeader eyebrow="Dashboard" title="My Shale" titleId="my-shale-title" lede={`Welcome${user ? `, ${displayNameFor(user)}` : ''}. Here is your read-only Shale summary.`} />
-      </div>
+    <section className="shale-presentation shale-work-page" aria-labelledby="my-shale-title">
+      <PageHeader eyebrow="Dashboard" title="My Shale" titleId="my-shale-title" lede={`Welcome${user ? `, ${displayNameFor(user)}` : ''}. Here is your assigned Shale work. Open a case or task, or complete an open task.`} />
       <MyCasesSection accessToken={accessToken} />
       <MyTasksSection accessToken={accessToken} />
     </section>
@@ -662,13 +604,12 @@ function MyCasesSection({ accessToken }: { accessToken: string | null }) {
   }, [accessToken]);
 
   return (
-    <section className="dashboard-section" aria-labelledby="my-cases-title">
-      <h2 id="my-cases-title">My Cases</h2>
-      {isLoading && <LoadingState message="Loading your cases…" />}
-      {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && cases.length === 0 && <EmptyState message="No assigned cases were found." />}
+    <SectionRegion title="My Cases">
+      {isLoading && <Feedback kind="loading">Loading your cases…</Feedback>}
+      {!isLoading && error && <Feedback kind="error">{error}</Feedback>}
+      {!isLoading && !error && cases.length === 0 && <Feedback kind="empty">No assigned cases were found.</Feedback>}
       {!isLoading && !error && cases.length > 0 && <MyCasesList cases={cases} />}
-    </section>
+    </SectionRegion>
   );
 }
 
@@ -688,7 +629,7 @@ function MyCasesList({ cases }: { cases: CaseSearchResult[] }) {
               <MetadataRow label="Statute of limitations" value={formatDate(item.solDate)} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/cases/${item.caseId}`)}
+          onClick={() => navigate(routePath('caseDetail', { caseId: item.caseId }))}
           ariaLabel={`Open case ${displayValue(item.caseName, `Case ${item.caseId}`)}`}
         />
       ))}
@@ -700,6 +641,7 @@ function MyTasksSection({ accessToken }: { accessToken: string | null }) {
   const [tasks, setTasks] = useState<CaseTaskListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [completionError, setCompletionError] = useState<string | null>(null);
   useEffect(() => {
     if (!accessToken) {
       setError('Your Shale session is not available. Please sign in again.');
@@ -717,13 +659,13 @@ function MyTasksSection({ accessToken }: { accessToken: string | null }) {
   }, [accessToken]);
 
   return (
-    <section className="dashboard-section" aria-labelledby="my-tasks-title">
-      <h2 id="my-tasks-title">My Tasks</h2>
-      {isLoading && <LoadingState message="Loading your tasks…" />}
-      {!isLoading && error && <p className="status error" role="alert">{error}</p>}
-      {!isLoading && !error && tasks.length === 0 && <EmptyState message="No assigned tasks were found." />}
-      {!isLoading && !error && tasks.length > 0 && <MyTasksList tasks={tasks} accessToken={accessToken} onTasksChanged={setTasks} onError={setError} />}
-    </section>
+    <SectionRegion title="My Tasks">
+      {isLoading && <Feedback kind="loading">Loading your tasks…</Feedback>}
+      {!isLoading && error && <Feedback kind="error">{error}</Feedback>}
+      {completionError && <Feedback kind="error">{completionError}</Feedback>}
+      {!isLoading && !error && tasks.length === 0 && <Feedback kind="empty">No assigned tasks were found.</Feedback>}
+      {!isLoading && !error && tasks.length > 0 && <MyTasksList tasks={tasks} accessToken={accessToken} onTasksChanged={setTasks} onError={setCompletionError} presentation="shared" />}
+    </SectionRegion>
   );
 }
 
@@ -731,21 +673,29 @@ function mergeCompletedTask(tasks: CaseTaskListItem[], completedTask: TaskDetail
   return tasks.map((task) => task.id === completedTask.id ? { ...task, completedAt: completedTask.completedAt } : task);
 }
 
-function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError }: { tasks: CaseTaskListItem[]; allTasks?: CaseTaskListItem[]; accessToken: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onError: (message: string | null) => void }) {
+function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError, presentation = 'legacy' }: { presentation?: 'legacy' | 'shared'; tasks: CaseTaskListItem[]; allTasks?: CaseTaskListItem[]; accessToken: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onError: (message: string | null) => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const navigate = useNavigate();
   const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
+  const [completionStatus, setCompletionStatus] = useState('');
 
   async function handleCompleteTask(task: CaseTaskListItem) {
+    if (!resultIsCurrent()) return;
     if (!accessToken) {
       onError('Your Shale session is not available. Please sign in again.');
       return;
     }
     setCompletingTaskId(task.id);
+    if (presentation === 'shared') setCompletionStatus(`Completing ${displayValue(task.title, `Task ${task.id}`)}…`);
     onError(null);
     try {
       const completedTask = await completeTask(accessToken, task.id);
+      if (!resultIsCurrent()) return;
       onTasksChanged(mergeCompletedTask(allTasks ?? tasks, completedTask));
+      if (presentation === 'shared') setCompletionStatus(completedTask.completedAt
+        ? `Completed ${displayValue(task.title, `Task ${task.id}`)}.` : '');
     } catch (caught) {
+      if (presentation === 'shared') setCompletionStatus('');
       onError(caught instanceof Error ? caught.message : 'Task could not be completed.');
     } finally {
       setCompletingTaskId(null);
@@ -753,6 +703,8 @@ function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError }: 
   }
 
   return (
+    <>
+    {presentation === 'shared' && <p role="status" aria-live="polite" aria-atomic="true">{completionStatus}</p>}
     <EntityList ariaLabel="Assigned tasks">
       {tasks.map((task) => (
         <EntityCard
@@ -766,15 +718,17 @@ function MyTasksList({ tasks, allTasks, accessToken, onTasksChanged, onError }: 
               <MetadataRow label="Priority" value={task.priorityId ? `Priority ${task.priorityId}` : MISSING_VALUE} />
             </MetadataGrid>
           )}
-          actions={!task.completedAt ? <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton> : <span className="completed-state">Completed {formatDate(task.completedAt)}</span>}
-          onClick={() => navigate(`/tasks/${task.id}`)}
+          actions={!task.completedAt ? (presentation === 'shared'
+            ? <Button size="small" purpose="secondary" disabled={completingTaskId === task.id} aria-busy={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</Button>
+            : <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton>) : <span className="completed-state">Completed {formatDate(task.completedAt)}</span>}
+          onClick={() => navigate(routePath('taskDetail', { taskId: task.id }))}
           ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
         />
       ))}
     </EntityList>
+    </>
   );
 }
-
 
 function TasksPage({ accessToken }: { accessToken: string | null }) {
   const [tasks, setTasks] = useState<CaseTaskListItem[]>([]);
@@ -843,6 +797,7 @@ function TasksPage({ accessToken }: { accessToken: string | null }) {
 }
 
 function CasesPage({ accessToken }: { accessToken: string | null }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CaseSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -853,6 +808,7 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
 
   async function handleSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    if (!resultIsCurrent()) return;
     const trimmedQuery = query.trim();
 
     if (!trimmedQuery) {
@@ -875,6 +831,7 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
 
     try {
       const searchResults = await searchCases(accessToken, trimmedQuery);
+      if (!resultIsCurrent()) return;
       setResults(searchResults);
     } catch (caught) {
       setResults([]);
@@ -887,8 +844,8 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
   return (
     <section className="cases-page" aria-labelledby="cases-title">
       <PageHeader eyebrow="Search" title="Cases" titleId="cases-title" lede="Search, open, and create case records."
-        action={<button type="button" onClick={() => setIsCreating((value) => !value)}>{isCreating ? 'Cancel new case' : 'New case'}</button>} />
-      {isCreating && <NewCaseForm accessToken={accessToken} onCancel={() => setIsCreating(false)} onCreated={(created) => navigate(`/cases/${created.caseId}`)} />}
+        action={<Button onClick={() => setIsCreating((value) => !value)}>{isCreating ? 'Cancel new case' : 'New case'}</Button>} />
+      {isCreating && <NewCaseForm accessToken={accessToken} onCancel={() => setIsCreating(false)} onCreated={(created) => navigate(routePath('caseDetail', { caseId: created.caseId }))} />}
       <SearchBar
         id="case-search"
         label="Search cases"
@@ -910,6 +867,7 @@ function CasesPage({ accessToken }: { accessToken: string | null }) {
 }
 
 function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string | null; onCancel: () => void; onCreated: (created: CaseDetail) => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [practiceAreas, setPracticeAreas] = useState<PracticeAreaSetting[]>([]);
   const [attorneys, setAttorneys] = useState<TeamMemberSummary[]>([]);
   const [caseName, setCaseName] = useState('');
@@ -943,6 +901,7 @@ function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     const selectedPracticeAreaId = Number(practiceAreaId);
     const selectedAttorneyId = Number(responsibleAttorneyUserId);
     if (!caseName.trim()) {
@@ -979,6 +938,7 @@ function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string
         summary: summary.trim() || null,
         description: description.trim() || null,
       });
+      if (!resultIsCurrent()) return;
       onCreated(created);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Case could not be created.');
@@ -1003,8 +963,8 @@ function NewCaseForm({ accessToken, onCancel, onCreated }: { accessToken: string
         <label htmlFor="new-case-description">Description<textarea id="new-case-description" value={description} onChange={(event) => setDescription(event.target.value)} disabled={isSubmitting} rows={5} maxLength={10000} /></label>
         {submitError && <p className="status error" role="alert">{submitError}</p>}
         <div className="form-actions">
-          <button type="submit" disabled={isSubmitting || isLoadingLookups}>{isSubmitting ? 'Creating…' : isLoadingLookups ? 'Loading lookups…' : 'Create case'}</button>
-          <button type="button" className="secondary-button" onClick={onCancel} disabled={isSubmitting}>Cancel</button>
+          <ActionButton type="submit" disabled={isSubmitting || isLoadingLookups}>{isSubmitting ? 'Creating…' : isLoadingLookups ? 'Loading lookups…' : 'Create case'}</ActionButton>
+          <SecondaryButton onClick={onCancel} disabled={isSubmitting}>Cancel</SecondaryButton>
         </div>
       </form>
     </section>
@@ -1031,7 +991,7 @@ function CaseResultsList({ results }: { results: CaseSearchResult[] }) {
               <MetadataRow label="Client" value={displayValue(result.client)} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/cases/${result.caseId}`)}
+          onClick={() => navigate(routePath('caseDetail', { caseId: result.caseId }))}
           ariaLabel={`Open case ${displayValue(result.caseName, `Case ${result.caseId}`)}`}
         />
       ))}
@@ -1040,6 +1000,7 @@ function CaseResultsList({ results }: { results: CaseSearchResult[] }) {
 }
 
 function ContactsPage({ accessToken }: { accessToken: string | null }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ContactSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -1050,6 +1011,7 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
 
   async function handleSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    if (!resultIsCurrent()) return;
     const trimmedQuery = query.trim();
 
     if (!trimmedQuery) {
@@ -1072,6 +1034,7 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
 
     try {
       const searchResults = await searchContacts(accessToken, trimmedQuery);
+      if (!resultIsCurrent()) return;
       setResults(searchResults);
     } catch (caught) {
       setResults([]);
@@ -1093,7 +1056,7 @@ function ContactsPage({ accessToken }: { accessToken: string | null }) {
       {isCreating && (
         <ContactCreateForm
           accessToken={accessToken}
-          onCreated={(created) => navigate(`/contacts/${created.id}`)}
+          onCreated={(created) => navigate(routePath('contactDetail', { contactId: created.id }))}
           onCancel={() => setIsCreating(false)}
         />
       )}
@@ -1133,7 +1096,7 @@ function ContactResultsList({ results }: { results: ContactSearchResult[] }) {
               <MetadataRow label="Phone" value={displayValue(result.phone)} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/contacts/${result.id}`)}
+          onClick={() => navigate(routePath('contactDetail', { contactId: result.id }))}
           ariaLabel={`Open contact ${displayValue(result.displayName, `Contact ${result.id}`)}`}
         />
       ))}
@@ -1142,6 +1105,7 @@ function ContactResultsList({ results }: { results: ContactSearchResult[] }) {
 }
 
 function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const navigate = useNavigate();
   const [isCreating, setIsCreating] = useState(false);
   const [query, setQuery] = useState('');
@@ -1152,6 +1116,7 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
 
   async function handleSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    if (!resultIsCurrent()) return;
     const trimmedQuery = query.trim();
 
     if (!trimmedQuery) {
@@ -1174,6 +1139,7 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
 
     try {
       const searchResults = await searchOrganizations(accessToken, trimmedQuery);
+      if (!resultIsCurrent()) return;
       setResults(searchResults);
     } catch (caught) {
       setResults([]);
@@ -1191,7 +1157,7 @@ function OrganizationsPage({ accessToken }: { accessToken: string | null }) {
       {isCreating && (
         <OrganizationCreateForm
           accessToken={accessToken}
-          onCreated={(created) => navigate(`/organizations/${created.id}`)}
+          onCreated={(created) => navigate(routePath('organizationDetail', { organizationId: created.id }))}
           onCancel={() => setIsCreating(false)}
         />
       )}
@@ -1234,7 +1200,7 @@ function OrganizationResultsList({ results }: { results: OrganizationSearchResul
               <MetadataRow label="Location" value={[result.city, result.state].filter(Boolean).join(', ') || MISSING_VALUE} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/organizations/${result.id}`)}
+          onClick={() => navigate(routePath('organizationDetail', { organizationId: result.id }))}
           ariaLabel={`Open organization ${displayValue(result.name, `Organization ${result.id}`)}`}
         />
       ))}
@@ -1331,7 +1297,7 @@ function TeamMembersList({ members }: { members: TeamMemberSummary[] }) {
               <MetadataRow label="Color" value={<ColorSwatch color={member.color} />} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/team/${member.id}`)}
+          onClick={() => navigate(routePath('teamMemberDetail', { userId: member.id }))}
           ariaLabel={`Open team member ${teamMemberName(member)}`}
         />
       ))}
@@ -1381,7 +1347,7 @@ function TeamMemberDetailPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <DetailShell className="team-member-detail-page" titleId="team-member-detail-title">
-      <DetailHeader eyebrow="Team Member Detail" title={title} titleId="team-member-detail-title" backTo="/team" backLabel="Back to Team" />
+      <DetailHeader eyebrow="Team Member Detail" title={title} titleId="team-member-detail-title" backTo={routes.team.path} backLabel="Back to Team" />
       {isLoading && <LoadingState message="Loading team member detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !member && <EmptyState message="No team member detail was found." />}
@@ -1421,9 +1387,8 @@ function yesNo(value: boolean): string {
 
 function ColorSwatch({ color }: { color: string | null }) {
   if (!color) return <>—</>;
-  return <span className="color-swatch-value"><span className="color-swatch" style={{ backgroundColor: color }} aria-hidden="true" />{color}</span>;
+  return <span className="color-swatch-value"><span className="color-swatch" style={indicatorPaint(color)} aria-hidden="true" />{color}</span>;
 }
-
 
 function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
   const { taskId } = useParams();
@@ -1469,7 +1434,7 @@ function TaskDetailPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <DetailShell className="task-detail-page" titleId="task-detail-title">
-      <DetailHeader eyebrow="Task Detail" title={title} titleId="task-detail-title" backTo="/my-shale" backLabel="Back to My Shale" />
+      <DetailHeader eyebrow="Task Detail" title={title} titleId="task-detail-title" backTo={routes.myShale.path} backLabel="Back to My Shale" />
 
       {isLoading && <LoadingState message="Loading task detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
@@ -1519,7 +1484,7 @@ function TaskDetailReadOnly({ accessToken, detail, isEditing, onEdit, onCancel, 
           <dl className="detail-list compact">
             <DetailItem label="Related Case Name" value={detail.caseName} />
           </dl>
-          <Link className="button-link inline-action" to={`/cases/${detail.caseId}`}>Open Case</Link>
+          <Link className="button-link inline-action" to={routePath('caseDetail', { caseId: detail.caseId })}>Open Case</Link>
         </section>
       )}
     </div>
@@ -1527,6 +1492,7 @@ function TaskDetailReadOnly({ accessToken, detail, isEditing, onEdit, onCancel, 
 }
 
 function TaskEditForm({ accessToken, detail, onCancel, onTaskChanged, onError }: { accessToken: string | null; detail: TaskDetail; onCancel: () => void; onTaskChanged: (detail: TaskDetail) => void; onError: (message: string | null) => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [title, setTitle] = useState(detail.title ?? '');
   const [description, setDescription] = useState(detail.description ?? '');
   const [dueDate, setDueDate] = useState(toDateInputValue(detail.dueAt));
@@ -1565,6 +1531,7 @@ function TaskEditForm({ accessToken, detail, onCancel, onTaskChanged, onError }:
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     setSubmitError(null);
     onError(null);
     const safeTitle = title.trim();
@@ -1595,6 +1562,7 @@ function TaskEditForm({ accessToken, detail, onCancel, onTaskChanged, onError }:
         priorityId: selectedPriorityId,
         assignedUserId: selectedAssignedUserId,
       });
+      if (!resultIsCurrent()) return;
       onTaskChanged(updated);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Task detail could not be updated.');
@@ -1722,7 +1690,7 @@ function CaseDetailPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <DetailShell className="case-detail-page" titleId="case-detail-title">
-      <DetailHeader eyebrow="Case Detail" title={title} titleId="case-detail-title" backTo="/cases" backLabel="Back to Cases">
+      <DetailHeader eyebrow="Case Detail" title={title} titleId="case-detail-title" backTo={routes.cases.path} backLabel="Back to Cases">
         {caseDetail?.caseStatus && <StatusPill tone="info">{caseDetail.caseStatus}</StatusPill>}
       </DetailHeader>
 
@@ -1800,8 +1768,8 @@ function CaseDetailReadOnly({ accessToken, detail, tasks, tasksError, updates, u
   );
 }
 
-
 function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [practiceAreas, setPracticeAreas] = useState<PracticeAreaSetting[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberSummary[]>([]);
   const [practiceAreaId, setPracticeAreaId] = useState(detail.practiceAreaId ? String(detail.practiceAreaId) : '');
@@ -1837,6 +1805,7 @@ function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { access
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     if (!accessToken) {
       setSubmitError('Your Shale session is not available. Please sign in again.');
       return;
@@ -1859,6 +1828,7 @@ function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { access
         practiceAreaId: selectedPracticeAreaId,
         responsibleAttorneyUserId: selectedAttorneyId,
       });
+      if (!resultIsCurrent()) return;
       onSaved(updated);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Case assignment could not be saved.');
@@ -1891,6 +1861,7 @@ function CaseAssignmentForm({ accessToken, detail, onSaved, onCancel }: { access
 }
 
 function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const solAvailable = mappedCaseDateAvailable(detail, 'statute_of_limitations');
   const tortAvailable = mappedCaseDateAvailable(detail, 'tort_notice_deadline');
   const [caseName, setCaseName] = useState(detail.caseName || '');
@@ -1905,6 +1876,7 @@ function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { acces
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     if (!trimmedCaseName) {
       setSubmitError('Enter a case name before saving.');
       return;
@@ -1933,6 +1905,7 @@ function CaseCoreDetailsForm({ accessToken, detail, onSaved, onCancel }: { acces
           return edited === undefined ? date : { ...date, startsAt: edited ? `${edited}T00:00:00` : null, endsAt: null, allDay: true };
         }),
       });
+      if (!resultIsCurrent()) return;
       onSaved(updated);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Case details could not be saved.');
@@ -2037,6 +2010,7 @@ function StatusTimelineSection({ accessToken, detail, history, onDetailChanged }
 }
 
 function CaseStatusEditForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: CaseDetail; onSaved: (detail: CaseDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const currentStatusId = detail.statusHistory?.find((item) => item.current || !item.endDate)?.statusId ?? null;
   const [statuses, setStatuses] = useState<CaseStatusSetting[]>([]);
   const [selectedStatusId, setSelectedStatusId] = useState(currentStatusId == null ? '' : String(currentStatusId));
@@ -2062,6 +2036,7 @@ function CaseStatusEditForm({ accessToken, detail, onSaved, onCancel }: { access
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     const numericStatusId = Number(selectedStatusId);
     if (!Number.isInteger(numericStatusId) || numericStatusId <= 0) {
       setSubmitError('Choose a status before saving.');
@@ -2075,6 +2050,7 @@ function CaseStatusEditForm({ accessToken, detail, onSaved, onCancel }: { access
     setSubmitError(null);
     try {
       const updated = await updateCaseStatus(accessToken, detail.caseId, numericStatusId);
+      if (!resultIsCurrent()) return;
       onSaved(updated);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : 'Case status could not be saved.');
@@ -2117,10 +2093,12 @@ function CaseStatusEditForm({ accessToken, detail, onSaved, onCancel }: { access
 
 function normalizeStatusColor(color: string | null | undefined): string {
   const trimmed = color?.trim();
-  return trimmed && /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(trimmed) ? trimmed : '#2f80b7';
+  const expanded = trimmed?.replace(/^#([a-f\d])([a-f\d])([a-f\d])$/i, '#$1$1$2$2$3$3');
+  return String(indicatorPaint(expanded)?.['--shale-indicator-fill' as keyof CSSProperties] ?? 'var(--shale-neutral-text)');
 }
 
 function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, onTasksError }: { accessToken: string | null; caseId: number; tasks: CaseTaskListItem[]; error: string | null; onTasksChanged: (tasks: CaseTaskListItem[]) => void; onTasksError: (message: string | null) => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const navigate = useNavigate();
   const [isAdding, setIsAdding] = useState(false);
   const [title, setTitle] = useState('');
@@ -2141,6 +2119,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
   }
 
   async function handleCompleteTask(task: CaseTaskListItem) {
+    if (!resultIsCurrent()) return;
     if (!accessToken) {
       setSubmitError('Your Shale session is not available. Please sign in again.');
       return;
@@ -2149,6 +2128,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
     setSubmitError(null);
     try {
       const completedTask = await completeTask(accessToken, task.id);
+      if (!resultIsCurrent()) return;
       onTasksChanged(mergeCompletedTask(tasks, completedTask));
       onTasksError(null);
     } catch (caught) {
@@ -2160,6 +2140,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     if (!trimmedTitle) {
       setSubmitError('Enter a task title before saving.');
       return;
@@ -2177,6 +2158,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
         description: trimmedDescription || undefined,
         dueDate: dueDate || undefined,
       });
+      if (!resultIsCurrent()) return;
       onTasksChanged(refreshedTasks);
       onTasksError(null);
       resetForm();
@@ -2249,7 +2231,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
                 </MetadataGrid>
               )}
               actions={!task.completedAt ? <SecondaryButton disabled={completingTaskId === task.id} onClick={() => handleCompleteTask(task)}>{completingTaskId === task.id ? 'Completing…' : 'Complete'}</SecondaryButton> : <span className="completed-state">Completed {formatDate(task.completedAt)}</span>}
-              onClick={() => navigate(`/tasks/${task.id}`)}
+              onClick={() => navigate(routePath('taskDetail', { taskId: task.id }))}
               ariaLabel={`Open task ${displayValue(task.title, `Task ${task.id}`)}`}
             />
           ))}
@@ -2260,6 +2242,7 @@ function CaseTasksSection({ accessToken, caseId, tasks, error, onTasksChanged, o
 }
 
 function CaseUpdatesSection({ accessToken, caseId, updates, error, onUpdatesChanged, onUpdatesError }: { accessToken: string | null; caseId: number; updates: CaseUpdate[]; error: string | null; onUpdatesChanged: (updates: CaseUpdate[]) => void; onUpdatesError: (message: string | null) => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [isAdding, setIsAdding] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -2274,6 +2257,7 @@ function CaseUpdatesSection({ accessToken, caseId, updates, error, onUpdatesChan
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     if (!trimmedNote) {
       setSubmitError('Enter an update before saving.');
       return;
@@ -2287,6 +2271,7 @@ function CaseUpdatesSection({ accessToken, caseId, updates, error, onUpdatesChan
     setSubmitError(null);
     try {
       const refreshedUpdates = await addCaseUpdate(accessToken, caseId, trimmedNote);
+      if (!resultIsCurrent()) return;
       onUpdatesChanged(refreshedUpdates);
       onUpdatesError(null);
       resetForm();
@@ -2351,7 +2336,7 @@ function RelatedContactsSection({ contacts }: { contacts: CaseRelatedContact[] }
       ) : (
         <div className="related-contact-grid">
           {contacts.map((contact) => (
-            <Link className="related-contact-card" key={contact.id} to={`/contacts/${contact.id}`}>
+            <Link className="related-contact-card" key={contact.id} to={routePath('contactDetail', { contactId: contact.id })}>
               <span className="related-contact-name">{contact.displayName || 'Unnamed contact'}</span>
               <span className="related-contact-meta">
                 {formatRelatedContactMeta(contact)}
@@ -2415,25 +2400,26 @@ function ContactDetailPage({ accessToken }: { accessToken: string | null }) {
 
   return (
     <DetailShell className="contact-detail-page" titleId="contact-detail-title">
-      <DetailHeader eyebrow="Contact Detail" title={title} titleId="contact-detail-title" backTo="/contacts" backLabel="Back to Contacts" />
+      <DetailHeader eyebrow="Contact Detail" title={title} titleId="contact-detail-title" backTo={routes.contacts.path} backLabel="Back to Contacts" />
 
       {isLoading && <LoadingState message="Loading contact detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !contactDetail && <EmptyState message="No contact detail was found." />}
-      {!isLoading && !error && contactDetail && <ContactDetailReadOnly accessToken={accessToken} detail={contactDetail} onDetailChanged={setContactDetail} />}
+      {!isLoading && !error && contactDetail && <ContactDetailReadOnly key={contactDetail.id} accessToken={accessToken} detail={contactDetail} onDetailChanged={setContactDetail} />}
     </DetailShell>
   );
 }
 
 function ContactDetailReadOnly({ accessToken, detail, onDetailChanged }: { accessToken: string | null; detail: ContactDetail; onDetailChanged: (detail: ContactDetail) => void }) {
   const [isEditingDetails, setIsEditingDetails] = useState(false);
-  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
+  const hasEdited = useRef(false);
+  useEffect(() => { if (hasEdited.current && !isEditingDetails) document.getElementById('contact-edit-button')?.focus(); }, [isEditingDetails]);
   return (
     <div className="detail-sections">
       <section aria-labelledby="contact-info-title">
         <div className="section-heading-row">
           <h2 id="contact-info-title">Contact Information</h2>
-          {!isEditingDetails && <ActionButton onClick={() => setIsEditingDetails(true)}>Edit contact</ActionButton>}
+          {!isEditingDetails && <ActionButton id="contact-edit-button" onClick={() => { hasEdited.current = true; setIsEditingDetails(true); }}>Edit contact</ActionButton>}
         </div>
         {isEditingDetails && <ContactDetailsForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingDetails(false); }} onCancel={() => setIsEditingDetails(false)} />}
         <dl className="detail-list">
@@ -2453,8 +2439,8 @@ function ContactDetailReadOnly({ accessToken, detail, onDetailChanged }: { acces
   );
 }
 
-
 function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: string | null; onCreated: (detail: ContactDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [name, setName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -2471,6 +2457,7 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     const form = event.currentTarget;
     if (!hasRequiredName) {
       setSubmitError('Enter a display name, first name, or last name before saving.');
@@ -2496,6 +2483,7 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
         condition: condition.trim() || null,
         deceased,
       });
+      if (!resultIsCurrent()) return;
       onCreated(created);
     } catch (caught) {
       focusContactError(caught, form);
@@ -2534,6 +2522,7 @@ function ContactCreateForm({ accessToken, onCreated, onCancel }: { accessToken: 
 }
 
 function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: ContactDetail; onSaved: (detail: ContactDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [name, setName] = useState(detail.name || detail.displayName || '');
   const [firstName, setFirstName] = useState(detail.firstName || '');
   const [lastName, setLastName] = useState(detail.lastName || '');
@@ -2546,10 +2535,26 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
   const [deceased, setDeceased] = useState(detail.deceased);
   const { submitError, setSubmitError, recordContactError, clearContactError, fieldErrors } = useContactFormErrors();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitting = useRef(false);
+  // Opening values mirror this editor's initial fallback/date and submitted trim semantics.
+  const baseline = useRef({
+    name: (detail.name || detail.displayName || '').trim(), firstName: (detail.firstName || '').trim(),
+    lastName: (detail.lastName || '').trim(), address: (detail.address || '').trim(),
+    dateOfBirth: toDateInputValue(detail.dateOfBirth), condition: (detail.condition || '').trim(),
+    deceased: detail.deceased, email: detail.email, phone: detail.phone, phoneExtension: detail.phoneExtension,
+  }).current;
+  const dirty = name.trim() !== baseline.name || firstName.trim() !== baseline.firstName
+    || lastName.trim() !== baseline.lastName || address.trim() !== baseline.address
+    || dateOfBirth !== baseline.dateOfBirth || condition.trim() !== baseline.condition
+    || deceased !== baseline.deceased
+    || contactValueUpdate(email, baseline.email).action !== 'RETAIN'
+    || contactValueUpdate(phone, baseline.phone, phoneExtension, baseline.phoneExtension).action !== 'RETAIN';
+  const protection = useDetailDraftProtection({ entity: 'contact', dirty, pending: isSubmitting, isCurrent: resultIsCurrent, onCancel });
   const hasRequiredName = Boolean(name.trim() || firstName.trim() || lastName.trim());
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent() || protection.isDiscarded() || submitting.current) return;
     const form = event.currentTarget;
     if (!hasRequiredName) {
       setSubmitError('Enter a display name, first name, or last name before saving.');
@@ -2560,6 +2565,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
       return;
     }
 
+    submitting.current = true;
     setIsSubmitting(true);
     setSubmitError(null);
     try {
@@ -2575,17 +2581,30 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
         condition: condition.trim() || null,
         deceased,
       });
+      if (!resultIsCurrent() || protection.isDiscarded()) return;
+      // A usable returned snapshot is the authoritative baseline, never an optimistic request copy.
+      const fields = ['name', 'displayName', 'firstName', 'lastName', 'email', 'phone', 'address', 'dateOfBirth', 'condition', 'updatedAt'] as const;
+      if (!updated || updated.id !== detail.id || updated.shaleClientId !== detail.shaleClientId
+        || fields.some(field => updated[field] !== null && typeof updated[field] !== 'string')
+        || typeof updated.deceased !== 'boolean' || typeof updated.client !== 'boolean'
+        || (updated.phoneExtension != null && typeof updated.phoneExtension !== 'string')) {
+        throw new Error('The contact save could not be confirmed. Your changes are kept. Check the contact before submitting again.');
+      }
+      protection.saved();
       onSaved(updated);
     } catch (caught) {
+      if (!resultIsCurrent() || protection.isDiscarded()) return;
       focusContactError(caught, form);
       recordContactError(caught, 'Contact details could not be saved.');
     } finally {
-      setIsSubmitting(false);
+      submitting.current = false;
+      if (resultIsCurrent() && !protection.isDiscarded()) setIsSubmitting(false);
     }
   }
 
   return (
-    <form noValidate className="case-edit-form" onSubmit={handleSubmit}>
+    <>
+    <form noValidate className="case-edit-form" onSubmit={handleSubmit} aria-label="Edit contact">
       <label htmlFor="contact-display-name">Display name</label>
       <input id="contact-display-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="name" maxLength={255} />
       <label htmlFor="contact-first-name">First name</label>
@@ -2595,7 +2614,7 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
       <label htmlFor="contact-email">Email</label>
       <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="contact-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" baseline={detail.email} />
       <label htmlFor="contact-phone">Phone</label>
-      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="contact-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={detail.phone} baselineExtension={detail.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { setPhone(number); setPhoneExtension(ext); }} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="contact-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={detail.phone} baselineExtension={detail.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { if (!submitting.current && !protection.isDiscarded()) { setPhone(number); setPhoneExtension(ext); } }} />
       <label htmlFor="contact-address-home">Home address</label>
       <textarea id="contact-address-home" value={address} onChange={(event) => setAddressHome(event.target.value)} disabled={isSubmitting} autoComplete="street-address" rows={3} maxLength={2000} />
       <label htmlFor="contact-date-of-birth">Date of birth</label>
@@ -2606,14 +2625,16 @@ function ContactDetailsForm({ accessToken, detail, onSaved, onCancel }: { access
       {submitError && <p className="status error" role="alert">{submitError}</p>}
       <div className="form-actions">
         <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Save contact'}</ActionButton>
-        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={protection.cancel}>Cancel</SecondaryButton>
       </div>
     </form>
+    {protection.confirmation}
+    </>
   );
 }
 
-
 function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessToken: string | null; onCreated: (detail: OrganizationDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [phoneExtension, setPhoneExtension] = useState('');
@@ -2634,6 +2655,7 @@ function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessTo
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent()) return;
     const form = event.currentTarget;
     if (!hasRequiredName) {
       setSubmitError('Enter an organization name before saving.');
@@ -2663,6 +2685,7 @@ function OrganizationCreateForm({ accessToken, onCreated, onCancel }: { accessTo
         country: country.trim() || null,
         notes: notes.trim() || null,
       });
+      if (!resultIsCurrent()) return;
       onCreated(created);
     } catch (caught) {
       focusContactError(caught, form);
@@ -2751,7 +2774,7 @@ function OrganizationDetailPage({ accessToken }: { accessToken: string | null })
 
   return (
     <DetailShell className="organization-detail-page" titleId="organization-detail-title">
-      <DetailHeader eyebrow="Organization Detail" title={title} titleId="organization-detail-title" backTo="/organizations" backLabel="Back to Organizations" />
+      <DetailHeader eyebrow="Organization Detail" title={title} titleId="organization-detail-title" backTo={routes.organizations.path} backLabel="Back to Organizations" />
       {isLoading && <LoadingState message="Loading organization detail…" />}
       {!isLoading && error && <p className="status error" role="alert">{error}</p>}
       {!isLoading && !error && !organizationDetail && <EmptyState message="No organization detail was found." />}
@@ -2762,13 +2785,14 @@ function OrganizationDetailPage({ accessToken }: { accessToken: string | null })
 
 function OrganizationDetailReadOnly({ accessToken, detail, onDetailChanged }: { accessToken: string | null; detail: OrganizationDetail; onDetailChanged: (detail: OrganizationDetail) => void }) {
   const [isEditingDetails, setIsEditingDetails] = useState(false);
-  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
+  const hasEdited = useRef(false);
+  useEffect(() => { if (hasEdited.current && !isEditingDetails) document.getElementById('organization-edit-button')?.focus(); }, [isEditingDetails]);
   return (
     <div className="detail-sections">
       <section aria-labelledby="organization-info-title">
         <div className="section-heading-row">
           <h2 id="organization-info-title">Organization Information</h2>
-          {!isEditingDetails && <ActionButton onClick={() => setIsEditingDetails(true)}>Edit organization</ActionButton>}
+          {!isEditingDetails && <ActionButton id="organization-edit-button" onClick={() => { hasEdited.current = true; setIsEditingDetails(true); }}>Edit organization</ActionButton>}
         </div>
         {isEditingDetails && <OrganizationDetailsForm accessToken={accessToken} detail={detail} onSaved={(updated) => { onDetailChanged(updated); setIsEditingDetails(false); }} onCancel={() => setIsEditingDetails(false)} />}
         <dl className="detail-list">
@@ -2793,7 +2817,29 @@ function OrganizationDetailReadOnly({ accessToken, detail, onDetailChanged }: { 
   );
 }
 
+// This editor needs a complete renderable snapshot and a usable next concurrency witness.
+// The request draft, HTTP status alone, or advisory parsing cannot establish save success.
+function isUsableOrganizationSave(updated: OrganizationDetail, opening: OrganizationDetail): boolean {
+  const fields = ['organizationTypeName', 'phone', 'fax', 'email', 'website', 'address1', 'address2',
+    'city', 'state', 'postalCode', 'country', 'notes'] as const;
+  if (!updated || updated.id !== opening.id || updated.shaleClientId !== opening.shaleClientId
+    || typeof updated.name !== 'string' || !updated.name.trim()
+    || fields.some(field => updated[field] !== null && typeof updated[field] !== 'string')
+    || (updated.organizationTypeId !== null && (!Number.isInteger(updated.organizationTypeId) || updated.organizationTypeId <= 0))
+    || (updated.phoneExtension != null && typeof updated.phoneExtension !== 'string')
+    || (updated.faxExtension != null && typeof updated.faxExtension !== 'string')
+    || typeof updated.rowVer !== 'string' || !updated.rowVer || /\s/.test(updated.rowVer)
+    || !Array.isArray(updated.relatedCases)) return false;
+  try { if (!atob(updated.rowVer).length) return false; } catch { return false; }
+  const relatedFields = ['name', 'intakeDate', 'statuteOfLimitationsDate', 'responsibleAttorneyName',
+    'partyRoleName', 'side', 'notes'] as const;
+  return updated.relatedCases.every(item => item && Number.isInteger(item.id) && item.id > 0
+    && typeof item.primary === 'boolean'
+    && relatedFields.every(field => item[field] === null || typeof item[field] === 'string'));
+}
+
 function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { accessToken: string | null; detail: OrganizationDetail; onSaved: (detail: OrganizationDetail) => void; onCancel: () => void }) {
+  const resultIsCurrent = useFeatureResultGuard(accessToken);
   const [name, setName] = useState(detail.name || '');
   const [phone, setPhone] = useState(detail.phone || '');
   const [phoneExtension, setPhoneExtension] = useState(detail.phoneExtension || '');
@@ -2810,10 +2856,27 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
   const [notes, setNotes] = useState(detail.notes || '');
   const { submitError, setSubmitError, recordContactError, clearContactError, fieldErrors } = useContactFormErrors();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitting = useRef(false);
+  // Keep the opening snapshot and concurrency witness until authoritative success closes this editor.
+  const baseline = useRef(detail).current;
+  const dirty = name.trim() !== (baseline.name ?? '').trim()
+    || website.trim() !== (baseline.website ?? '').trim()
+    || address1.trim() !== (baseline.address1 ?? '').trim()
+    || address2.trim() !== (baseline.address2 ?? '').trim()
+    || city.trim() !== (baseline.city ?? '').trim()
+    || state.trim() !== (baseline.state ?? '').trim()
+    || postalCode.trim() !== (baseline.postalCode ?? '').trim()
+    || country.trim() !== (baseline.country ?? '').trim()
+    || notes.trim() !== (baseline.notes ?? '').trim()
+    || contactValueUpdate(email, baseline.email).action !== 'RETAIN'
+    || contactValueUpdate(phone, baseline.phone, phoneExtension, baseline.phoneExtension).action !== 'RETAIN'
+    || contactValueUpdate(fax, baseline.fax, faxExtension, baseline.faxExtension).action !== 'RETAIN';
+  const protection = useDetailDraftProtection({ entity: 'organization', dirty, pending: isSubmitting, isCurrent: resultIsCurrent, onCancel });
   const hasRequiredName = Boolean(name.trim());
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!resultIsCurrent() || protection.isDiscarded() || submitting.current) return;
     const form = event.currentTarget;
     if (!hasRequiredName) {
       setSubmitError('Enter an organization name before saving.');
@@ -2824,15 +2887,16 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
       return;
     }
 
+    submitting.current = true;
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const updated = await updateOrganizationDetails(accessToken, detail.id, {
-        rowVer: detail.rowVer,
+      const updated = await updateOrganizationDetails(accessToken, baseline.id, {
+        rowVer: baseline.rowVer,
         name: name.trim(),
-        phone: contactValueUpdate(phone, detail.phone, phoneExtension, detail.phoneExtension),
-        fax: contactValueUpdate(fax, detail.fax, faxExtension, detail.faxExtension),
-        email: contactValueUpdate(email, detail.email),
+        phone: contactValueUpdate(phone, baseline.phone, phoneExtension, baseline.phoneExtension),
+        fax: contactValueUpdate(fax, baseline.fax, faxExtension, baseline.faxExtension),
+        email: contactValueUpdate(email, baseline.email),
         website: website.trim() || null,
         address1: address1.trim() || null,
         address2: address2.trim() || null,
@@ -2842,25 +2906,33 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
         country: country.trim() || null,
         notes: notes.trim() || null,
       });
+      if (!resultIsCurrent() || protection.isDiscarded()) return;
+      if (!isUsableOrganizationSave(updated, baseline)) {
+        throw new Error('The organization save could not be confirmed. Your changes are kept. Check the organization before submitting again.');
+      }
+      protection.saved();
       onSaved(updated);
     } catch (caught) {
+      if (!resultIsCurrent() || protection.isDiscarded()) return;
       focusContactError(caught, form);
       recordContactError(caught, 'Organization details could not be saved.');
     } finally {
-      setIsSubmitting(false);
+      submitting.current = false;
+      if (resultIsCurrent() && !protection.isDiscarded()) setIsSubmitting(false);
     }
   }
 
   return (
-    <form noValidate className="case-edit-form" onSubmit={handleSubmit}>
+    <>
+    <form noValidate className="case-edit-form" onSubmit={handleSubmit} aria-label="Edit organization">
       <label htmlFor="organization-name">Organization name</label>
       <input id="organization-name" type="text" value={name} onChange={(event) => setName(event.target.value)} disabled={isSubmitting} autoComplete="organization" maxLength={255} required />
       <label htmlFor="organization-email">Email</label>
-      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" baseline={detail.email} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={isSubmitting} autoComplete="email" accessToken={accessToken} kind="email" baseline={baseline.email} />
       <label htmlFor="organization-phone">Phone</label>
-      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={detail.phone} baselineExtension={detail.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { setPhone(number); setPhoneExtension(ext); }} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-phone" value={phone} onChange={(event) => setPhone(event.target.value)} disabled={isSubmitting} autoComplete="tel" accessToken={accessToken} kind="phone" baseline={baseline.phone} baselineExtension={baseline.phoneExtension} extension={phoneExtension} onExtensionChange={setPhoneExtension} onFormatted={(number, ext) => { if (!submitting.current && !protection.isDiscarded()) { setPhone(number); setPhoneExtension(ext); } }} />
       <label htmlFor="organization-fax">Fax</label>
-      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-fax" value={fax} onChange={(event) => setFax(event.target.value)} disabled={isSubmitting} accessToken={accessToken} kind="phone" baseline={detail.fax} baselineExtension={detail.faxExtension} extension={faxExtension} onExtensionChange={setFaxExtension} onFormatted={(number, ext) => { setFax(number); setFaxExtension(ext); }} />
+      <ContactValueInput serverErrors={fieldErrors} onValidated={clearContactError} id="organization-fax" value={fax} onChange={(event) => setFax(event.target.value)} disabled={isSubmitting} accessToken={accessToken} kind="phone" baseline={baseline.fax} baselineExtension={baseline.faxExtension} extension={faxExtension} onExtensionChange={setFaxExtension} onFormatted={(number, ext) => { if (!submitting.current && !protection.isDiscarded()) { setFax(number); setFaxExtension(ext); } }} />
       <label htmlFor="organization-website">Website</label>
       <input id="organization-website" type="url" value={website} onChange={(event) => setWebsite(event.target.value)} disabled={isSubmitting} autoComplete="url" maxLength={500} />
       <label htmlFor="organization-address1">Address line 1</label>
@@ -2880,9 +2952,11 @@ function OrganizationDetailsForm({ accessToken, detail, onSaved, onCancel }: { a
       {submitError && <p className="status error" role="alert">{submitError}</p>}
       <div className="form-actions">
         <ActionButton type="submit" disabled={isSubmitting || !hasRequiredName}>{isSubmitting ? 'Saving…' : 'Save organization'}</ActionButton>
-        <SecondaryButton disabled={isSubmitting} onClick={onCancel}>Cancel</SecondaryButton>
+        <SecondaryButton onClick={protection.cancel}>Cancel</SecondaryButton>
       </div>
     </form>
+    {protection.confirmation}
+    </>
   );
 }
 
@@ -2902,7 +2976,7 @@ function RelatedOrganizationCasesList({ cases }: { cases: OrganizationDetail['re
               <MetadataRow label="Statute of limitations" value={formatDate(item.statuteOfLimitationsDate)} />
             </MetadataGrid>
           )}
-          onClick={() => navigate(`/cases/${item.id}`)}
+          onClick={() => navigate(routePath('caseDetail', { caseId: item.id }))}
           ariaLabel={`Open related case ${displayValue(item.name, `Case ${item.id}`)}`}
         />
       ))}
@@ -2930,18 +3004,6 @@ function PlaceholderPage({ title }: { title: string }) {
   );
 }
 
-function FullPageStatus({ message }: { message: string }) {
-  return (
-    <main className="full-page-status">
-      <p className="status">{message}</p>
-    </main>
-  );
-}
-
-export default function App() {
-  return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
-  );
+export default function App({ router }: { router: ReturnType<typeof createAppRouter> }) {
+  return <RouterProvider router={router} />;
 }

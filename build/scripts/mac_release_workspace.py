@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +19,8 @@ GENERATED_POMS = (
     "shale-ui/pom.xml",
     "shale-updater/pom.xml",
 )
+
+GENERATED_OUTPUTS = ("build/tmp", "dist-macos")
 
 
 class WorkspaceError(RuntimeError):
@@ -62,7 +65,7 @@ def reject_unrelated_changes(root: Path) -> list[str]:
         details = "\n".join(f"  {status} {path}" for status, path in unrelated)
         raise WorkspaceError(
             "Mac release workspace contains changes outside the known generated POM files:\n"
-            f"{details}\nResolve these changes before retrying; nothing was discarded."
+            f"{details}\nResolve these changes before retrying; no unrelated changes were discarded."
         )
     return [path for _, path in changes]
 
@@ -77,6 +80,36 @@ def restore_generated_poms(root: Path) -> None:
         raise WorkspaceError(f"Mac release workspace was not clean after POM restoration:\n{details}")
 
 
+def cleanup_generated_outputs(root: Path) -> None:
+    """Remove only disposable outputs; never follow parent symlinks or delete tracked paths."""
+    root = root.resolve()
+    if Path(git(root, "rev-parse", "--show-toplevel").stdout.strip()).resolve() != root:
+        raise WorkspaceError("Mac release root must be the Git workspace root")
+    # Check both HEAD and the index so staged deletions cannot hide tracked files.
+    tracked = (
+        git(root, "ls-files", "--cached", "-z", "--", *GENERATED_OUTPUTS).stdout
+        + git(root, "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", *GENERATED_OUTPUTS).stdout
+    )
+    if tracked:
+        raise WorkspaceError("Refusing to clean generated output containing tracked paths: "
+                             + ", ".join(sorted(set(tracked.rstrip("\0").split("\0")))))
+    # Validate every destination before deleting anything. Do not resolve output
+    # symlinks: unlink them, and let rmtree leave nested symlink targets alone.
+    for relative in GENERATED_OUTPUTS:
+        path = root / relative
+        if any(parent.is_symlink() for parent in path.parents if parent != root and root in parent.parents):
+            raise WorkspaceError(f"Refusing to clean generated output through a symlinked parent: {relative}")
+    for relative in GENERATED_OUTPUTS:
+        path = root / relative
+        try:
+            if path.is_symlink() or path.is_file():
+                path.unlink()
+            elif path.exists():
+                shutil.rmtree(path)
+        except OSError as error:
+            raise WorkspaceError(f"Unable to clean generated output {relative}: {error}") from error
+
+
 def cleanup_generated_poms(root: Path) -> None:
     """Restore only tracked generated POMs, without touching any other late changes."""
     changed_poms = [path for status, path in workspace_changes(root) if path in GENERATED_POMS and status != "??"]
@@ -85,6 +118,7 @@ def cleanup_generated_poms(root: Path) -> None:
 
 
 def prepare(root: Path, remote: str, revision: str) -> None:
+    cleanup_generated_outputs(root)
     restore_generated_poms(root)
     git(root, "fetch", remote)
     if git(root, "cat-file", "-e", f"{revision}^{{commit}}", check=False).returncode:

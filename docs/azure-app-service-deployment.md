@@ -2,6 +2,16 @@
 
 This guide is the repeatable deployment checklist for deploying `shale-server` to Azure App Service. It assumes the Step 4A-4D API migration work is present: Azure/local profiles, bearer auth, health endpoints, Swagger/OpenAPI, standardized errors, and paged read endpoints.
 
+**Hosted-web preparation update (2026-10-12):** use the existing API and the
+[hosted operator handoff](shale-web-deployment.md). Static browser assets in `shale-web/dist` are separate
+from this executable Java JAR. [R4](../shale-web/docs/r4-desktop-acceptance.md) records user-reported
+API redeployment after #1858 and successful Overview; exact current JAR/source/hash/settings remain
+UNKNOWN. Historical deployment notes below do not identify today's binary. No resource creation,
+configuration change, deployment or production fault testing is authorized by this handoff.
+Phase 2 acceptance OPEN; Phase 3 IN PROGRESS; Phase 4 INCOMPLETE. Appearance remains provisional;
+web delivery is independent of AI/MCP. Hosted routing/cache/privacy, two-tenant/non-dbo isolation,
+isolated audit failure/commit uncertainty, remaining live sessions and device/AT gates remain open.
+
 ## Deployment readiness review
 
 - `shale-server` listens on `server.port=${PORT:8080}`, allowing Azure App Service to provide the runtime port.
@@ -52,33 +62,15 @@ The `.original` file is not executable.
 
 ---
 
-## Create Azure App Service
+## Existing Azure App Service identity
 
-Recommended settings:
-
-1. Linux App Service Plan
-2. Java 21 Runtime
-3. HTTPS Only enabled
-4. Region as close to Azure SQL as practical
-5. Deploy a Spring Boot executable jar
-
-Example:
-
-```bash
-az group create --name rg-shale-web --location eastus
-
-az appservice plan create \
-  --resource-group rg-shale-web \
-  --name plan-shale-web \
-  --is-linux \
-  --sku B1
-
-az webapp create \
-  --resource-group rg-shale-web \
-  --plan plan-shale-web \
-  --name shale-api \
-  --runtime "JAVA:21-java21"
-```
+Only the current API/database exists. Confirm the existing subscription/resource group/App Service,
+runtime/profile/HTTPS settings, active executable JAR hash and source commit through authorized
+operator evidence before a separately authorized deployment. Resource identifiers and current effective
+settings are UNKNOWN here; the documented API URL is not proof of those settings. The historical
+resource-creation examples have been removed to avoid deploying guessed resources. No second Azure
+environment is required merely to prepare isolated fault tests; R4 recommends disposable local SQL/API
+feasibility work with synthetic fixtures and no production connections or credentials.
 
 ---
 
@@ -112,7 +104,7 @@ Optional:
 | Setting | Notes |
 |----------|----------|
 | SHALE_AUTH_TOKEN_TTL_SECONDS | Defaults to 28800 (8 hours) |
-| SHALE_ALLOWED_CORS_ORIGINS | Required for browser clients. For local `shale-web` login, set `SHALE_ALLOWED_CORS_ORIGINS=http://localhost:5173` and restart the App Service. |
+| SHALE_ALLOWED_CORS_ORIGINS | Browser clients require the exact origin in the existing effective list. Preserve all authorized consumers; append localhost/approved HTTPS frontend origins as needed, never replace the list or use a wildcard. Restart after a separately authorized change. See the hosted handoff for primary/alias precedence and platform CORS evidence. |
 | DB_MAX_POOL_SIZE | Pool tuning |
 | DB_CONNECTION_TIMEOUT_MS | Pool tuning |
 
@@ -292,7 +284,9 @@ The current deployed Azure API origin for the Step 5 `shale-web` browser-login m
 https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net
 ```
 
-Local browser login from Vite requires this App Service setting followed by an App Service restart:
+Local browser login from Vite requires the effective CORS list to include the following origin;
+preserve every existing authorized origin. This historical single-origin example is not an instruction
+to overwrite the current list. A separately authorized setting change requires an App Service restart:
 
 ```text
 SHALE_ALLOWED_CORS_ORIGINS=http://localhost:5173
@@ -385,19 +379,16 @@ Returns authenticated user information.
 
 ### Protected Data Endpoint
 
-Example:
+For the reviewed Case workspace use `POST /api/v2/cases/search-page` with an approved synthetic
+case-name query in its JSON body, `GET /api/v2/cases/assigned-page`, and a deliberately authorized
+`GET /api/v2/cases/{caseId}/overview`. Expected eligible success is 200 JSON with `Cache-Control: no-store`;
+Overview requires committed server-owned audit. Use first-read §11 and the hosted handoff for bounds,
+safe failures and sanitized evidence. Never put real search text in diagnostic URLs/logs or export
+bearers, request bodies, sensitive responses or raw HAR. The legacy GET search remains available and
+needs query-log/referrer privacy review when exposed; the body-only minimized path does not prove
+upstream request/error/APM capture is disabled.
 
-```text
-GET /api/cases/search?query=smith
-```
-
-Expected:
-
-```text
-200 OK
-```
-
-This validates:
+An authorized successful request provides bounded evidence for:
 
 - JWT generation
 - JWT validation

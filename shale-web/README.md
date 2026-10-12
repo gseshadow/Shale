@@ -33,13 +33,13 @@ By default, `shale-web` posts credentials to:
 https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net/api/auth/login
 ```
 
-After login succeeds, the app stores the returned access token in `sessionStorage` and calls:
+After a usable login response, the app calls:
 
 ```text
 https://shale-api-hsd6hrcya0g4amhv.southcentralus-01.azurewebsites.net/api/auth/me
 ```
 
-with `Authorization: Bearer <token>`. The authenticated user information displayed in the UI comes from `/api/auth/me`.
+with `Authorization: Bearer <token>`. Only a usable `/me` response matching the login identity permits credential storage and protected access. The authenticated user information displayed in the UI comes from `/api/auth/me`. Login and verification share one eight-second deadline; timeout does not prove that the server failed to create a session. See [Phase 3J review](docs/phase-3j-review.md).
 
 ## `.env.local` override
 
@@ -58,14 +58,53 @@ Do not include `/api/auth/login` or any other path in `VITE_SHALE_API_BASE_URL`;
 
 ## Deployment plan
 
-The 5P-4 read-only beta build/deploy runbook is documented in [docs/shale-web-deployment.md](../docs/shale-web-deployment.md). It recommends Azure Static Web Apps for the first beta, documents the required `VITE_SHALE_API_BASE_URL` build setting, and lists the Azure API CORS update needed for the deployed frontend origin.
+The [hosted web operator handoff](../docs/shale-web-deployment.md) reconciles the existing Static Web Apps
+workflow (targets `main`) with current source, reproducible artifact preparation, build-time
+`VITE_SHALE_API_BASE_URL`, exact CORS, routing/privacy/cache prerequisites and rollback. Actual host and
+deployed build identity remain UNKNOWN. The bundle includes legacy writes alongside the reviewed Case
+workspace; it is not a read-only pilot. Publication needs separate authorization and remaining R4 evidence.
 
 ## Required Azure CORS setting
 
-Local browser login requires the Azure App Service to allow the Vite development origin:
+Local browser login requires the Azure App Service's effective allowed-origin list to include the Vite
+development origin below. Preserve existing authorized consumers when adding it or an approved hosted
+origin; this value is not a replacement for the deployed list:
 
 ```text
 SHALE_ALLOWED_CORS_ORIGINS=http://localhost:5173
 ```
 
 Restart the Azure App Service after changing CORS or other App Service application settings so the running API process picks up the new values.
+
+## Web V2 Phase 2A synthetic preview
+
+Run `npm run dev` and open <http://localhost:5173/foundation.html> for the isolated responsive shell,
+shared components and Light/Dark examples. It makes no API calls and needs no credentials. `/` and the
+existing business routes now use the authenticated ResponsiveShell around their retained beta screen content. [Phase 2A review and evidence](docs/phase-2a-review.md)
+documents ownership, local build review, checks, limitations and temporary-entry removal.
+
+
+## Web V2 Phase 2B authenticated shell
+
+The existing authenticated URLs use one responsive shell and navigation registry. Light/Dark shell
+selection is local to the mounted session; at this checkpoint, route screens retained their Light beta skin. Authentication,
+services and mutation handlers are unchanged. [Phase 2B review](docs/phase-2b-review.md) records the
+synthetic review script, screenshots, validation, known login return-to issue, acceptance gaps and
+frontend-only rollback. Phase 2 remains in progress; no deployment is part of this milestone.
+
+
+## Web V2 Phase 2C My Shale presentation
+
+My Shale now adopts shared presentation in both shell themes, including assigned cards and existing
+Complete actions. At this checkpoint, other routes retained their beta Light skin. [Phase 2C review](docs/phase-2c-review.md)
+records exact scope, synthetic screenshots, native browser zoom, checks, gaps and frontend rollback.
+Phase 2 remains in progress; foundation.html and the isolated preview remain available.
+
+
+## Authenticated Light/Dark presentation
+
+All existing authenticated routes and their existing details/editors now inherit the selected session
+theme. No preference persistence is implied. [Theme review and synthetic local retest](docs/theme-review.md)
+records the cascade correction, complete route/editor coverage, full-page evidence, native zoom,
+validation and remaining acceptance. My Shale retains its established shared presentation. Appearance
+is provisional; Phase 2/3/4 acceptance remains open. No deployment is included.

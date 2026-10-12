@@ -1,0 +1,64 @@
+{
+  "browser": "151.0.7922.173",
+  "mechanism": "Native Chromium Settings > Appearance > Page zoom, disposable profile, physical viewport 1280x900.",
+  "screenshotExport": "CDP contentSize with scale 100/zoom exports CSS resolution without changing native browser zoom.",
+  "baseline": {
+    "dpr": 1,
+    "width": 1280,
+    "height": 900
+  },
+  "records": [
+    {
+      "zoom": 200,
+      "theme": "light",
+      "dpr": 2,
+      "width": 640,
+      "height": 450,
+      "scrollWidth": 640,
+      "noOverflow": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryFocus": true
+    },
+    {
+      "zoom": 200,
+      "theme": "dark",
+      "dpr": 2,
+      "width": 640,
+      "height": 450,
+      "scrollWidth": 640,
+      "noOverflow": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryFocus": true
+    },
+    {
+      "zoom": 400,
+      "theme": "light",
+      "dpr": 4,
+      "width": 320,
+      "height": 225,
+      "scrollWidth": 320,
+      "noOverflow": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryFocus": true
+    },
+    {
+      "zoom": 400,
+      "theme": "dark",
+      "dpr": 4,
+      "width": 320,
+      "height": 225,
+      "scrollWidth": 320,
+      "noOverflow": true,
+      "nativeKeyboard": true,
+      "visibleFocus": true,
+      "backQueryFocus": true
+    }
+  ],
+  "errors": [],
+  "allowedRequestsOnly": true,
+  "liveAcceptance": false,
+  "limits": "Headless Chromium only; physical devices and assistive-technology speech unverified."
+}

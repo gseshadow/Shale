@@ -31,6 +31,13 @@ final class SemanticControlCssContractTest {
         assertTrue(base.contains("-fx-border-radius: 10px"));
     }
 
+    @Test void smallSecondaryDialogActionsRetainTheSharedPadding() throws Exception {
+        String css = Files.readString(BUTTONS);
+        String override = rule(css, ".dialog-pane.secondary-window-shell .button.shale-control-button.shale-control-small");
+        assertTrue(override.contains("-fx-padding: 0px 16px 0px 16px"),
+                "Legacy secondary-dialog padding must not clip Small semantic action labels");
+    }
+
     private static String rule(String css, String selector) {
         int start = css.indexOf(selector);
         assertTrue(start >= 0, "Missing selector " + selector);

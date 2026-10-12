@@ -1,0 +1,128 @@
+{
+  "browser": "151.0.7922.173",
+  "synthetic": true,
+  "observations": [
+    {
+      "width": 320,
+      "scenario": "navigation",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "pending-discard",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "pending-failure",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "success",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "validation",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "conflict",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "network",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "unusable",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "rejection",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "failed-clear rejection",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "logout",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "scenario": "failed-clear logout",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "navigation",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "pending-discard",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "pending-failure",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "success",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "validation",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "conflict",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "network",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "unusable",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "rejection",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "failed-clear rejection",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "logout",
+      "passed": true
+    },
+    {
+      "width": 1280,
+      "scenario": "failed-clear logout",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "unexpected": []
+}
