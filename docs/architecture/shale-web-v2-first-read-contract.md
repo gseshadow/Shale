@@ -1,9 +1,15 @@
 # Web V2 first-read-slice implementation contract readiness
 
-**Inspected:** 2026-10-11. **Readiness documentation: COMPLETE; R2 first-slice owner decisions: ACCEPTED; live/deployment acceptance: OPEN.**
+**Inspected:** 2026-10-12. **Readiness documentation: COMPLETE; R2 first-slice owner decisions: ACCEPTED; live/deployment acceptance: OPEN.**
 **Phase 2 acceptance: OPEN; Phase 3: IN PROGRESS; Phase 4: bounded R1/R2 server reads and R3 browser consumer implemented for review; first read slice INCOMPLETE.**
 Appearance is provisional; visual refinement follows functional delivery. Accessibility remains an
 acceptance gate. Ordinary web delivery is independent of MCP/AI activation.
+
+**Current acceptance:** [R4 desktop record](../../shale-web/docs/r4-desktop-acceptance.md)
+records October 12 user-reported Windows Firefox/localhost → Azure API passes after #1858/#1859,
+including successful Overview, persisted audit/reread, Dark, keyboard, actual zoom and limited Narrator.
+These are not Codex reruns. Section 14 reconciles the historical unverified statements below;
+overall first-slice acceptance and remaining release/deployment gates stay open.
 
 The original documentation-only assessment below was against fetched `origin/codex/latest`
 `ba3b1acad7710d4afeae099b2a24f9b4c3e77bbf`, on separate branch
@@ -788,7 +794,8 @@ Confirmed401 reuses explicit login/safe returns;403 preserves session; failure f
 Executed tests/browser evidence are synthetic, with inherited advisory failures attributed to R2 rather than
 claimed fixed or passing. Phase 2 acceptance OPEN, Phase 3 IN PROGRESS, Phase 4 first read slice INCOMPLETE
 until separate acceptance. Appearance provisional. Live SQL/RLS/performance, persisted audit/session, host,
-physical devices and real assistive-technology speech remain unverified. No merge or deployment authorized here.
+physical devices and real assistive-technology speech were unverified by R3. The later user-reported
+desktop evidence and remaining limits are in §14. No merge or deployment was authorized by R3.
 
 
 ## 13. Minimized Overview ordinary-build 400 correction — 2026-10-12
@@ -799,7 +806,7 @@ Fetched live `origin/codex/latest` / `FETCH_HEAD` at
 tenancy, schema/projection, API migration/readiness, App Service/web deployment and
 local selection documents, plus this accepted first-read contract and roadmap §11.19–20.
 
-### Evidence and limits
+### Evidence and limits (at the correction task)
 
 User-reported live evidence: login and tenant-wide search succeed; deployed search returned Case 6502,
 but its minimized Overview returned HTTP 400 / `invalid_case_request` / `Invalid Case request.`
@@ -824,7 +831,9 @@ A synthetic HTTP regression using `/api/v2/cases/6502/overview` separately repro
 `java.lang.IllegalArgumentException` from missing argument-name metadata, with no service invocation.
 This is a proven ordinary-build binding defect that reproduces the reported envelope. **The actual
 live exception/deployed artifact was not inspected; live cause and post-redeployment success remain
-unconfirmed.** No production credentials, data, requests or fault injection were used.
+unconfirmed by that task.** R4 later records the user-reported successful Overview after deployment
+of #1858's corrected JAR; it supplies no artifact hash or inspected live exception. No production
+credentials, data, requests or fault injection were used by the correction task.
 
 ### Correction and exception trace
 
@@ -862,7 +871,7 @@ no request URI/ID/query is logged. Categories are `internal_failure`, `request_v
 tokens, SQL, identities, response values, or throwable dumps. Log-capture tests enforce the exact format
 and null throwable proxy; unknown/untrusted handler patterns collapse to `unknown`.
 
-### Operator redeployment and sanitized confirmation (not executed here)
+### Operator redeployment and sanitized confirmation (procedure; not executed by the correction task)
 
 1. After review/merge approval in the separate delivery workflow, build the approved commit with the
    ordinary command above; do not add `-Dmaven.compiler.parameters=true`. Inspect `javap -v` for explicit
@@ -943,3 +952,32 @@ git diff origin/codex/latest --check
 * Git diff whitespace checks passed. Final selector recheck matched the same affected plan.
 * Historical12 all-tests data failures and3 legacy-handler advisories remain as attributed in §11;
   no new all-tests/visual run is required by this selector and none is claimed passing.
+
+## 14. R4 desktop acceptance reconciliation — 2026-10-12
+
+The [R4 record](../../shale-web/docs/r4-desktop-acceptance.md) owns the current acceptance ledger,
+including merged R1–R3/#1855–1857, #1858 binding fix and #1859 theme migration verified on live base
+`0572ea7c42c414edc5c9992fdfa1edf1cdf63ac8`. Earlier evidence/no-deployment statements describe their
+original tasks, not a denial of the user's later deployment report. R2 §11 remains the wire/policy/
+audit authority; no endpoint, exemption, schema or timestamp contract changes.
+
+User-reported Windows desktop Firefox, localhost frontend → deployed Azure API passes include
+search/limited Overview, Back/Assigned/paging/search beyond the first page, logout/direct-link/sign-in
+return, unavailable-case clearing with sign-in retained, AuditLog persistence for Case 6502 and explicit
+reread, corrected Dark after #1859, workspace keyboard/focus, actual 200%/400% zoom and limited Narrator
+speech. Overview succeeded after #1858 redeployment. The reported 15:25 audit / Denver 09:25 correspondence
+is an observation, not a reviewed system-wide timestamp contract. Exact scope and evidence limits stay
+in the ledger; no live Codex reruns or audit actor verification are claimed.
+
+Authorized two-tenant/non-dbo/pooled-context isolation, isolated required-audit failure/commit uncertainty,
+remaining live expiry/revocation/uncertainty, actual static-host HTTPS/CORS/deep links/no-store/search-body
+logging privacy, physical-device keyboard/safe areas and remaining browser/AT coverage remain gates.
+A valid-ID 404, successful persisted audit and logout/re-login do not close those independent gates.
+Only the current API/database exists. The ledger recommends a disposable local SQL/API fault-test target,
+not production grant/audit/fixture/TTL changes or a mandatory second Azure environment.
+
+Phase 2 acceptance **OPEN**; Phase 3 **IN PROGRESS**; Phase 4 **INCOMPLETE** with desktop acceptance
+recorded. Historical synthetic evidence and inherited Maven failures remain separately attributed;
+no full-suite pass, merge or deployment is claimed. Appearance provisional; aesthetic refinement follows
+functional delivery; web delivery independent of AI/MCP. Next bounded work is the
+[hosted delivery preparation prompt](shale-web-v2-architecture-roadmap.md#12-next-bounded-prompt--hosted-web-delivery-preparation).

@@ -6,6 +6,11 @@ preserved in place; implementation is in a separate worktree. The earlier Case-o
 No earlier Case-only local branch/worktree or open matching theme PR was found during status inspection.
 No merge or deployment. Appearance is provisional, not final aesthetic approval.
 
+**Current acceptance update (2026-10-12):** [R4 desktop record](r4-desktop-acceptance.md) records
+the user's report that pulling merged #1859 and restarting the local frontend corrected Dark on all
+pages, plus the reported workspace keyboard, actual Firefox zoom and limited Narrator passes.
+These are user-reported localhost → Azure API observations; the matrix below remains synthetic.
+
 ## Ownership and scope
 
 Styles load in App.tsx as beta styles → shared tokens/buttons → shell/authenticated bridge → shared
@@ -156,16 +161,17 @@ CORS/audit prerequisites, never a guessed default API readiness or real-data scr
 [state observations](theme-evidence/captures/observations.json), [native zoom](theme-evidence/zoom/observations.json),
 [computed contrast](theme-evidence/paint-observations.json), [token contrast](theme-evidence/contrast-observations.json),
 [native controls](theme-evidence/controls/observations.json) and [untouched-base evidence](theme-evidence/before/observations.json)
-are review artifacts. The [full **448-image** synthetic bundle](theme-evidence/full-evidence.zip) is included with this PR; the repository
+are review artifacts. The original theme review reported a full **448-image** synthetic bundle; that
+archive is absent from the R4 live base, so no repository download link is claimed. The repository
 retains a smaller full-page set to avoid storing every repeated state/zoom image. Scripts regenerate the
 complete matrix and observation filenames locally. A full run produces 332 capture records; a state-only
 resume produces 132, with the separate 200-record matrix unchanged.
 
-**Unavailable / not performed:** physical phone/tablet virtual keyboard and safe-area acceptance;
-real screen-reader speech; Firefox/WebKit/other-engine rendering; real-host and new live R4 acceptance.
-Native browser zoom, automated keyboard/focus and computed contrast are narrower evidence. Live keyboard
-acceptance remains unreported. Overall theme acceptance still needs approved live nonsensitive retest;
-appearance remains provisional. No phase is closed by these synthetic checks.
+**Not performed by the theme implementation task:** physical phone/tablet virtual keyboard/safe-area
+acceptance, real screen-reader speech, Firefox/WebKit/other-engine rendering and hosted acceptance.
+Later user-reported Windows Firefox/Narrator and keyboard passes are scoped in R4; they do not expand
+this synthetic matrix or accept every theme/editor/device/AT state. Remaining coverage stays open;
+appearance remains provisional. No phase is closed by these synthetic checks or the bounded reports.
 
 ## Audit, R4 reports and rollback
 
@@ -174,11 +180,12 @@ add no audits, new sensitive reads or domain/admin mutations. Required server Ov
 reread ownership remain; cancellation is not claimed to undo a committed audit. Existing mutation owners
 and broader roadmap §8.2 audit gaps remain untouched; no migration or audit enhancement is claimed.
 
-Previously reported live R4 passes, recorded as user evidence rather than rerun here: search; Overview;
-Back restoration; Assigned; paging; search beyond page 1; logout/direct-link/sign-in return; persisted
-Overview audit; explicit reread audit; unavailable-case handling. Theme acceptance had the reported defect.
-Keyboard acceptance is **not yet reported**. Synthetic keyboard evidence in this task does not substitute
-for that missing live acceptance report. Phase 2 acceptance OPEN, Phase 3 IN PROGRESS, Phase 4 INCOMPLETE.
+The [R4 record](r4-desktop-acceptance.md) consolidates the earlier functional/audit reports with the
+later corrected Dark and workspace keyboard/focus, actual Firefox zoom and limited Narrator report.
+The earlier theme defect and unreported-keyboard status are superseded for that tested desktop flow.
+Remaining release/deployment gates are retained there. Phase 2 acceptance OPEN, Phase 3 IN PROGRESS,
+Phase 4 INCOMPLETE with desktop acceptance recorded. Next work prepares hosted delivery, not a repeat
+of completed desktop checks or an implicit deployment.
 
 Rollback reverts this PR's frontend presentation/tests/documentation only, or rebuilds base `d0d43655`
 with the same API-origin setting to recover the previous assets (including the known theme defect).

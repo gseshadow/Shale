@@ -1,11 +1,17 @@
 # Shale Web V2 architecture and phased implementation roadmap
 
-**Reviewed:** 2026-10-11. **Inventory/documentation:** COMPLETE. **R2 selected-read decisions:** ACCEPTED; broader/live/deployment acceptance OPEN.
+**Reviewed:** 2026-10-12. **Inventory/documentation:** COMPLETE. **R2 selected-read decisions:** ACCEPTED; broader/live/deployment acceptance OPEN.
 **Web V2 implementation:** Phase 2A foundation, Phase 2B authenticated shell and Phase 2C My Shale presentation adoption IMPLEMENTED FOR REVIEW; Phase 2D acceptance review and targeted feedback fix RECORDED; ACCEPTANCE OPEN.
 Phase 2 remains IN PROGRESS; acceptance OPEN. Phase 3 IN PROGRESS — Phase 3A safe login return-path restoration and Phase 3B startup
 verification uncertainty/recovery, Phase 3C truthful remote-logout feedback and Phase 3D bounded startup verification, plus Phase 3E canonical existing-route registry and Phase 3F established-session rejection coordination, plus Phase 3G existing-route data-router migration and bounded Contact editor protection and Phase 3H CredentialStore extraction and Phase 3I Organization Detail editor protection and Phase 3J credential-login deadlines/cancellation IMPLEMENTED FOR REVIEW. Phase 4 bounded R1/R2 server reads and R3 browser workspace/limited Overview IMPLEMENTED FOR REVIEW; first read slice INCOMPLETE. Phases 5–10 NOT STARTED. The user explicitly authorized this bounded
 Phase 3 slice while Phase 2 acceptance remains open; that sequencing does not mark Phase 2 complete.
 Documentation completion is not implementation completion.
+
+**Current R4 acceptance:** [October 12 desktop record](../../shale-web/docs/r4-desktop-acceptance.md)
+records user-reported Windows Firefox/localhost → Azure API functional, persisted-audit, Dark,
+keyboard, actual zoom and limited Narrator passes after #1858/#1859. These are not Codex reruns.
+Phase 2 acceptance OPEN; Phase 3 IN PROGRESS; Phase 4 INCOMPLETE. Remaining release/deployment
+gates and isolated fault-test preparation are owned there; hosted delivery preparation is in §12.
 
 **First-read readiness (2026-10-09):** [focused implementation contract](shale-web-v2-first-read-contract.md)
 records live-base traces and R2 accepted tenant-wide minimal fields/bounds, required Overview audit and
@@ -568,7 +574,7 @@ merely because this document describes it.
 | 1 — Inventory and architecture | DOCUMENTATION COMPLETE; ACCEPTANCE OPEN | Live base and required authorities | This inventory, client decisions, parity/audit matrix and next prompt | Source/test review, links/fences/status/diff checks and documentation selector | Documentation only; no V2 features accepted. D1–D10 remain explicit. |
 | 2 — Tokens, components, responsive shell | IN PROGRESS — Phase 2A foundation / Phase 2B authenticated shell / Phase 2C My Shale implemented for review; Phase 2D reviewed with feedback fix; acceptance OPEN | Phase 1 recommendations; D2/D4 for this milestone | Token mapping, shared semantic primitives, responsive shell with complete navigation; temporary preview composition and beta rollback | Existing web tests plus focused semantics/navigation; typecheck/build; screenshots both themes at compact/medium/wide, keyboard/zoom/contrast | Reviewable foundation using synthetic data, all destinations discoverable, no backend/new feature sprawl. Phase 2A: shared primitives/tokens and synthetic preview. Phase 2B: shell adopted beneath existing ProtectedRoute around unchanged outlets; beta screen skin retained. [Phase 2A review](../../shale-web/docs/phase-2a-review.md) and [Phase 2B exact scope, checks, captures and gaps](../../shale-web/docs/phase-2b-review.md). [Phase 2C My Shale review](../../shale-web/docs/phase-2c-review.md) adds shared Light/Dark operational presentation and native Chromium 200%/400% zoom evidence. [Phase 2D acceptance review](../../shale-web/docs/phase-2d-review.md) records rerun Chromium shell/state/zoom checks and persistent task completion feedback; [operator checklist](../../shale-web/docs/phase-2d-operator-checklist.md) owns unavailable Firefox/WebKit, screen-reader and physical-device checks. No all-Phase-2 completion claim; D4 device/screen-reader/other-engine acceptance remains OPEN. |
 | 3 — Routing, session boundary, transport | IN PROGRESS — Phase 3A safe return, Phase 3B startup recovery, Phase 3C truthful logout feedback and Phase 3D bounded startup verification and Phase 3E existing-route registry plus Phase 3F established-session rejection coordination and Phase 3G data-router/Contact editor protection and Phase 3H CredentialStore extraction and Phase 3I Organization Detail editor protection and Phase 3J credential-login deadlines/cancellation implemented for review | Phase 2 acceptance OPEN; user-authorized bounded sequencing exception for 3A/3B/3C/3D/3E/3F/3G/3H/3I/3J; D2/D3 and selected contract review for remaining work | Canonical routes/aliases, safe return-to, dirty blockers, CredentialStore, coordinated refresh, cancellation/errors, memory query cache | Router/session/transport behavior including refresh race, stale 401, network failure, logout/identity cleanup and dirty forms; legacy endpoint compatibility | Phase 3A: [review and synthetic evidence](../../shale-web/docs/phase-3a-review.md), validated pathname/query/hash, replacement history and logout return-state cleanup. Phase 3B: [review and synthetic evidence](../../shale-web/docs/phase-3b-review.md), confirmed 401 versus uncertain verification, retained bearer with blocked access, explicit read-only Retry/local sign-out and stale-result guards. Phase 3C: [review and synthetic evidence](../../shale-web/docs/phase-3c-review.md), immediate local logout, bounded single remote attempt, truthful pending/confirmed/unconfirmed feedback and generation/cancellation guards. Phase 3D: [review and synthetic evidence](../../shale-web/docs/phase-3d-review.md), eight-second startup/Retry fetch-and-body deadlines, retained uncertain bearer with blocked access, fresh duplicate-guarded Retry and lifecycle cancellation. Phase 3E: [review](../../shale-web/docs/phase-3e-review.md), one existing-route registry drives declarations/navigation/returns and typed links; explicit isolated preview adapter retained. Phase 3F: [review](../../shale-web/docs/phase-3f-review.md), current 401 teardown once, generation/credential/body/consumer guards, exact safe return and no request replay. Phase 3G: [review](../../shale-web/docs/phase-3g-review.md), existing operational route objects/data router, one Contact Detail information editor with discard/Keep editing, conditional unload guard and security bypass. Phase 3H: [review](../../shale-web/docs/phase-3h-review.md), one credential port/browser owner with compatibility adapters, isolated memory tests and bounded storage failures; unchanged sessionStorage policy, explicit residual limitations and XSS exposure. Phase 3I: [review](../../shale-web/docs/phase-3i-review.md), Organization Detail information editor reuses the renamed shared Contact guard; opening RowVer/contact-value semantics, authoritative success, pending uncertainty, stale-result and immediate security/storage-failure teardown preserved. Phase 3J: [review](../../shale-web/docs/phase-3j-review.md), one shared eight-second login/verification budget, cancellation/generation/credential guards, usable-response installation and truthful unconfirmed-session feedback. Future route additions/aliases, other dirty forms, refresh, broader transport/cancellation/cache UNFINISHED. No overall Phase 3 acceptance; unchanged bearer protocol; no replayed uncertain write. |
-| 4 — First end-to-end read slice | BOUNDED R1/R2 SERVER READS IMPLEMENTED FOR REVIEW; first read slice INCOMPLETE; readiness COMPLETE, selected R2 decisions ACCEPTED | Selected Phase 2/3 acceptance and D1/D3/D5/D6; D9 for deployment, independent of MCP/AI | Sign in → bounded assigned/case-name search → minimized read-only Overview; [focused contract](shale-web-v2-first-read-contract.md) defines R1 exact legacy SQL paging, conditional R2 policy/audit/minimized API, R3 browser, R4 acceptance | SQL execution/delegation/bytes, concrete OpenAPI, policy before paging, required audit failure, identity/cancel/re-login/deep-link/back tests; authorized live session/two-tenant/non-dbo/host/AT gates | R2 accepts tenant-wide minimized Case/field/deletion policy, summary exemption, fail-closed Overview audit, re-login limitation and numeric/body-search privacy contracts (§11.19). R1 legacy Case search-page fetches ≤100 rows at offset ≤10,000, with synthetic delegation/JDBC evidence (§11.18); assigned caps 25; broad detail is excluded. R2 selected policy/minimal payload/audit are implemented for review; browser/session/live/host acceptance remains OPEN. No all-form/cache/refresh rewrite prerequisite. Deployment readiness remains separate. |
+| 4 — First end-to-end read slice | R1/R2 SERVER READS AND R3 BROWSER IMPLEMENTED; USER-REPORTED DESKTOP ACCEPTANCE RECORDED; first read slice INCOMPLETE | Selected Phase 2/3 acceptance and D1/D3/D5/D6; D9 for deployment, independent of MCP/AI | Sign in → bounded assigned/case-name search → minimized read-only Overview; [focused contract](shale-web-v2-first-read-contract.md) owns the accepted R2 wire/policy/audit; [R4 record](../../shale-web/docs/r4-desktop-acceptance.md) owns current acceptance | Historical synthetic execution/delegation/bytes/OpenAPI/transaction/browser evidence remains separate; remaining authorized two-tenant/non-dbo/pooled-context, audit-fault, live session, hosted privacy and device/browser/AT gates | R2 decisions ACCEPTED (§11.19); R1/R2/R3 and #1858/#1859 merged. Desktop passes do not close overall acceptance or authorize deployment. No all-form/cache/refresh rewrite prerequisite; inherited Maven advisories remain. |
 | 5 — Tasks and Case Dates/confirmation | NOT STARTED | Phase 4; D5/D6 per write; reviewed occurrence/confirmation adapters | Task policy/forms/assignment/completion and generic dates/confirmation through authoritative workers; incremental usable slices | Due-policy tests, actor/tenant denial, token conflicts, aggregate rollback/audit tests; mobile editor/draft behavior | Task transaction/audit gaps closed for exposed commands; CaseDates/ValueRevision preserved. Live remains optional until D7 passes. |
 | 6 — Remaining case flows, Contacts/Organizations | NOT STARTED | Relevant phase 5 contracts; D1/D5/D6/D8 | Intake, parties/team/links/updates/material metadata/timeline, structured directories; separately gated document export/content | Domain aggregate/delegation tests, conflict/audit rollback, parent-case permissions, responsive long forms/cards and deliberate mutation recovery | Per-feature acceptance; no fake blob/provider entitlement, no scalar/date/overlay authority in React. Unaccepted content scope remains visibly unavailable. |
 | 7 — Calendar, Team, Reports, Settings/admin | NOT STARTED | Relevant earlier slices; D1/D5/D6/D8; personal/session APIs reviewed | Calendar projection/event flow, directory/user/role admin, reports, preferences, tenant configuration/audit/session UI | Date/range/DST tests, report/export limits, live admin-role rechecks, session-security tests, keyboard/touch acceptance | All agreed parity rows accepted or explicit owner exclusions; administrative reads/mutations use approved audits. |
@@ -1224,8 +1230,10 @@ network/timeout feedback remain distinct, with no list-row detail fallback.
 The review records focused/full web, build/typecheck/audits, selected/critical local checks and Chromium
 synthetic width/theme/keyboard/announcements/native-zoom evidence, retaining known base Maven advisories.
 Appearance provisional. Phase 2 acceptance OPEN, Phase 3 IN PROGRESS, Phase 4 INCOMPLETE until separately
-accepted. Next bounded **R4 acceptance** requires an approved isolated target and live two-tenant/non-dbo
-SQL/RLS, audit/session, host, device and real assistive-technology witnesses; none is inferred from mocks.
+accepted. [R4 desktop acceptance](../../shale-web/docs/r4-desktop-acceptance.md) now records the reported
+passes and remaining two-tenant/non-dbo, audit-fault, session, hosted delivery and broader device/AT gates.
+Only the current API/database exists; isolated fault-test preparation does not require a second Azure
+environment. No remaining gate is inferred from mocks or the desktop passes.
 Rollback only R3 consumers/routes (and unused narrow extension), keeping R1/R2/security/session contracts and
 all audit history. Exact deployment prerequisites remain in the review and R2 §11; no merge/deployment here.
 
@@ -1247,72 +1255,70 @@ Appearance remains **provisional**, not final aesthetic approval. Audit compatib
 schema and authoritative owners unchanged; presentation is intentionally unaudited and adds no new
 sensitive read or domain/admin mutation. The broader §8.2 gaps remain deferred.
 
-**Previously reported live R4 evidence (user report, not rerun by this task):** search; limited Overview;
-Back restoration; Assigned; paging; search beyond page 1; logout/direct-link/sign-in return; persisted
-Overview audit; explicit reread audit; unavailable-case handling passed. Theme acceptance has the reported
-Light-content/Dark-shell and pale-workspace-frame defect addressed for synthetic review here. **Keyboard
-acceptance is not yet reported.** These reports do not establish complete R4 or broaden acceptance to
-unreported live two-tenant/non-dbo/audit-failure/device/AT/other-engine checks.
+**Current user-reported acceptance:** [R4 desktop record](../../shale-web/docs/r4-desktop-acceptance.md)
+reconciles the prior functional/audit reports with the October 12 report that pulling merged #1859 and
+restarting the local frontend corrected Dark presentation. Workspace keyboard/focus, actual Firefox
+200%/400% zoom and limited Narrator speech now have reported passes. Earlier synthetic theme evidence
+remains separately labelled; overall/browser/device/AT acceptance is not inferred.
 
 Phase 2 acceptance **OPEN**, Phase 3 **IN PROGRESS**, Phase 4 first slice **INCOMPLETE**. No phase closure,
-merge or deployment. Next acceptance should retest the reported theme defect with approved nonsensitive
-fixtures and obtain the missing keyboard/device/AT/other-engine witnesses. Rollback only this frontend
+merge or deployment by that implementation task. Remaining acceptance follows R4's precise gate list;
+the next bounded task prepares hosted delivery (§12). Rollback only this frontend
 presentation migration; preserve R1/R2/R3, security/session contracts and all audit history.
 
-## 12. Ready-to-run next Codex implementation prompt
+### 11.22 R4 — user-reported desktop acceptance recorded (2026-10-12)
 
-The prompt below is retained as the original Phase 2A specification. It was not executed by the
-documentation task; the implementation evidence and remaining acceptance above now supersede its status.
+Live base `0572ea7c42c414edc5c9992fdfa1edf1cdf63ac8` contains merged R1–R3/#1855–1857,
+binding fix #1858 and theme migration #1859; GitHub metadata/compare checks verify ancestry.
+The [R4 record](../../shale-web/docs/r4-desktop-acceptance.md) is the single current evidence ledger:
+implemented source, user-reported passes, historical synthetic evidence, remaining verification,
+release/deployment blockers and later improvements. No Codex live rerun or fault injection occurred.
+
+Phase 2 acceptance **OPEN**, Phase 3 **IN PROGRESS**, Phase 4 **INCOMPLETE** with desktop acceptance
+recorded. Two-tenant/non-dbo/pooled-context isolation, required-audit failure/commit uncertainty,
+remaining live session checks, actual hosted HTTPS/CORS/fallback/no-store/logging privacy and physical
+device/remaining browser/AT evidence still gate acceptance. Inherited Maven advisory failures are not
+full-suite passes. Appearance provisional; aesthetic refinement follows functional delivery.
+Only the current API/database exists; a minimal disposable local SQL/API target is recommended for
+fault-test preparation, without production grant/audit/fixture/TTL changes or requiring another Azure
+environment. Web delivery is independent of AI/MCP. No merge or deployment is authorized by R4.
+
+## 12. Next bounded prompt — hosted web delivery preparation
+
+Prepare the remaining host evidence and operator handoff before any separately authorized deployment.
+The original Phase 2A prompt is superseded by its implementation records above.
 
 ```text
 Repository: gseshadow/Shale
 PR base: codex/latest
-Task: Web V2 phase 2A — reviewable responsive foundation and shared shell only.
+Task: hosted web delivery readiness handoff — documentation and read-only inspection only.
 
 Fetch live origin/codex/latest. Read AGENTS.md and architecture/codex-prompt-rules.md completely;
-follow documentation routing, including the Web V2 roadmap, canonical design-system A.2 and current
-Light/Dark resources. Create a separate task branch from the current remote base; preserve unrelated work.
-Inspect App.tsx, styles.css, ContactValueInput, routes and related existing tests before editing.
+follow routing. Read the Web V2 roadmap, first-read contract, R4 desktop record, R3/theme reviews,
+and web/App Service/session deployment runbooks. Create a separate task branch from the fetched base.
 
-Implement only inside the existing shale-web project:
-- Extract/adapt shared semantic Button (Primary/Secondary/Ghost/Danger/Navigation), EntityCard,
-  section/heading/field/feedback primitives and Light/Dark CSS tokens from the existing vocabulary.
-- Compose a responsive shell for the proposed compact/medium/wide ranges, validating against content.
-  Keep My Shale/My Tasks, Cases, Contacts, Organizations, Team, Calendar, Reports, Search and Settings
-  discoverable through labelled navigation. Future unavailable routes must say unavailable and never
-  simulate working features. Preserve every existing functional beta route and mutation handler.
-- Provide a temporary isolated foundation preview composition with synthetic nonsensitive examples:
-  long entity names, selected cards, status/practice-area DB-color examples, form errors and states.
-  Reuse shared primitives; do not create three independent device-specific feature implementations.
-- Keep the beta build/composition recoverable until acceptance and describe temporary preview entry
-  and removal plan. Update this roadmap's phase 2 evidence and status accurately.
+Reconcile docs/shale-web-deployment.md with the existing Static Web Apps workflow, build/API-origin
+selection and public/staticwebapp.config.json. The existing workflow targets main; source workflow
+and fallback files do not prove an active host or a deployed codex/latest build. Inspect available
+host metadata/settings read-only only when authorized access exists; do not read/export secrets.
+Record the actual host/resource/origin and deployed source/build/API identity if evidenced, otherwise
+name the exact owner input still needed. Do not create a replacement host merely because evidence
+is missing. Current source includes legacy writes; historical read-only-beta wording is not an
+access control. State the intended pilot routes and compatibility scope without inventing restrictions.
 
-Do not rebuild all feature screens, change API/auth protocol or session behavior, introduce real-data
-queries to the preview, change backend/SQL/deployment/version, install native/PWA tooling or start mobile
-projects. React Router is already installed. Prefer native semantic controls for this bounded milestone;
-add no dependencies unless an explicitly justified accessible control requires one within this scope.
-Do not perform phase 3 or execute a production deployment.
+Produce one operator handoff: approved HTTPS/API origin and exact CORS prerequisites; workspace/
+Overview and legacy deep-link reload/fallback; API JSON failures; authenticated no-store through
+proxies; search-body/bearer exclusion from access/error/tracing/APM logs; asset/API compatibility,
+rollback and sanitized future smoke-test checklist. Mark each item evidenced or unverified. Carry
+forward R4's isolation/audit-fault/session/device/browser/AT gates and inherited Maven advisories.
+Do not repeat accepted Windows desktop checks or claim source configuration is hosted acceptance.
 
-Acceptance criteria:
-1. Shared token/primitive ownership replaces extracted duplication; current beta behavior/routes work.
-2. Both themes render legibly, including dynamic colors with neutral fallback/readable foreground.
-   A.2 geometry/action roles/gradient restrictions and one Primary per local action area are preserved.
-3. At 360/768/1280 CSS px plus 320px reflow/zoom, no unintended page overflow; navigation and primary
-   content remain reachable. Long text wraps; touch targets >=44px; safe areas and virtual keyboard
-   do not cover focused fields or footer actions. Actual breakpoints are recorded as validated/proposed.
-4. Keyboard and screen-reader landmarks/link names/focus/selected state work; active destination is
-   identifiable without color. Escape/return-focus works for any introduced navigation drawer/dialog.
-5. Preview contains synthetic data only, no persisted sensitive cache and no fake save/download success.
-6. Audit compatibility review records that this foundation adds no domain/admin mutation or new sensitive
-   read; existing beta authoritative audit paths remain unchanged.
-
-Verification: inspect and maintain related existing tests. Add focused behavior tests only for new shared
-semantics, destination reachability and keyboard interactions; avoid rendered pixel/framework-internal
-contracts. Run npm test --prefix shale-web, npm run typecheck --prefix shale-web and npm run build
---prefix shale-web; inspect both themes/layouts with available browser tooling and report real-device
-keyboard/safe-area checks not actually performed. Run the repository change-aware selector and its
-relevant local verification under prompt rules, plus git diff --check. No new GitHub test workflows/gates.
-Do not claim completion if required checks are blocked; identify exact commands/evidence still needed.
-Commit, push the separate branch and open a PR targeting codex/latest. Return files, validation, screenshots
-or preview evidence, limits and the next narrowly scoped phase; do not deploy.
+Documentation only: no production code, tests, dependencies, SQL, configuration/workflow, versions,
+resource creation, grant/audit/fixture/TTL changes, destructive tests, merge or deployment. Only the
+current API/database exists; isolated fault-test preparation is separate. Keep Phase 2 acceptance
+OPEN, Phase 3 IN PROGRESS, Phase 4 INCOMPLETE; appearance provisional; web independent of AI/MCP.
+Validate relative links, fences, statuses, change-aware selector and documentation-appropriate
+checks plus git diff --check; no unrelated runtime suites for documentation evidence. Commit,
+push and open a PR targeting codex/latest. Return the reviewable handoff and explicit remaining
+inputs/blockers. Deployment requires separate authorization after prerequisites are resolved.
 ```

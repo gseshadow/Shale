@@ -2,6 +2,18 @@
 
 For the responsive client replacement, see [Shale Web V2 architecture and roadmap](architecture/shale-web-v2-architecture-roadmap.md). Its verified inventory distinguishes current browser mutations and durable sessions from historical beta descriptions below.
 
+**Current acceptance (2026-10-12):** [R4 desktop record](../shale-web/docs/r4-desktop-acceptance.md)
+records user-reported Windows Firefox/localhost → deployed Azure API passes, including #1858/#1859
+corrections. This does not verify a hosted frontend. Actual static-host HTTPS/origin/build/API identity,
+exact CORS, deep-link fallback, no-store through proxies and search-body logging privacy remain gates,
+alongside R4's isolation/audit-fault/session/device/browser/AT checks. The source Static Web Apps workflow
+targets `main`; source fallback configuration is not deployed-host evidence. Current source includes
+legacy writes, so the historical read-only-beta label below is not access control or a V2 scope decision.
+The [next bounded prompt](architecture/shale-web-v2-architecture-roadmap.md#12-next-bounded-prompt--hosted-web-delivery-preparation)
+prepares a read-only/documentation handoff and reconciles these historical steps before any separately
+authorized deployment. Phase 2 acceptance OPEN, Phase 3 IN PROGRESS, Phase 4 INCOMPLETE. No deployment
+or configuration change is authorized by this acceptance update.
+
 This runbook plans the first publication of the read-only `shale-web` beta. It is documentation only: do not deploy the web app or change Azure resources as part of 5P-4.
 
 ## Scope
