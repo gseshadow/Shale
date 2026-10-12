@@ -1285,40 +1285,17 @@ environment. Web delivery is independent of AI/MCP. No merge or deployment is au
 
 ## 12. Next bounded prompt — hosted web delivery preparation
 
-Prepare the remaining host evidence and operator handoff before any separately authorized deployment.
-The original Phase 2A prompt is superseded by its implementation records above.
+Hosted delivery preparation is now recorded in the
+[concrete operator handoff](../shale-web-deployment.md). It verifies merged #1860/R1–R3/#1858/#1859
+on live source `33ddd228c789c81b7d7c05cd1d77c232b1d47ff6`, source workflow paths and historical GitHub
+job outcomes, while marking actual host/build/API settings UNKNOWN. This does not close R4 or authorize
+publication. Phase 2 acceptance OPEN; Phase 3 IN PROGRESS; Phase 4 INCOMPLETE. Appearance provisional;
+web independent of AI/MCP. Accepted desktop observations remain in R4 without repetition.
 
-```text
-Repository: gseshadow/Shale
-PR base: codex/latest
-Task: hosted web delivery readiness handoff — documentation and read-only inspection only.
-
-Fetch live origin/codex/latest. Read AGENTS.md and architecture/codex-prompt-rules.md completely;
-follow routing. Read the Web V2 roadmap, first-read contract, R4 desktop record, R3/theme reviews,
-and web/App Service/session deployment runbooks. Create a separate task branch from the fetched base.
-
-Reconcile docs/shale-web-deployment.md with the existing Static Web Apps workflow, build/API-origin
-selection and public/staticwebapp.config.json. The existing workflow targets main; source workflow
-and fallback files do not prove an active host or a deployed codex/latest build. Inspect available
-host metadata/settings read-only only when authorized access exists; do not read/export secrets.
-Record the actual host/resource/origin and deployed source/build/API identity if evidenced, otherwise
-name the exact owner input still needed. Do not create a replacement host merely because evidence
-is missing. Current source includes legacy writes; historical read-only-beta wording is not an
-access control. State the intended pilot routes and compatibility scope without inventing restrictions.
-
-Produce one operator handoff: approved HTTPS/API origin and exact CORS prerequisites; workspace/
-Overview and legacy deep-link reload/fallback; API JSON failures; authenticated no-store through
-proxies; search-body/bearer exclusion from access/error/tracing/APM logs; asset/API compatibility,
-rollback and sanitized future smoke-test checklist. Mark each item evidenced or unverified. Carry
-forward R4's isolation/audit-fault/session/device/browser/AT gates and inherited Maven advisories.
-Do not repeat accepted Windows desktop checks or claim source configuration is hosted acceptance.
-
-Documentation only: no production code, tests, dependencies, SQL, configuration/workflow, versions,
-resource creation, grant/audit/fixture/TTL changes, destructive tests, merge or deployment. Only the
-current API/database exists; isolated fault-test preparation is separate. Keep Phase 2 acceptance
-OPEN, Phase 3 IN PROGRESS, Phase 4 INCOMPLETE; appearance provisional; web independent of AI/MCP.
-Validate relative links, fences, statuses, change-aware selector and documentation-appropriate
-checks plus git diff --check; no unrelated runtime suites for documentation evidence. Commit,
-push and open a PR targeting codex/latest. Return the reviewable handoff and explicit remaining
-inputs/blockers. Deployment requires separate authorization after prerequisites are resolved.
-```
+The next concrete implementation prerequisite is the unrestricted SWA navigation fallback: missing
+API/assets must not become successful SPA HTML while workspace/Overview and legacy deep links still
+reload. Use the handoff's [ready-to-run routing prompt](../shale-web-deployment.md#ready-to-run-next-prompt--static-routing-boundary-prerequisite).
+Foundation publication composition, any genuinely narrower pilot/access change, sensitive-response
+no-store gaps and unknown operator settings remain separately scoped prerequisites. The current bundle
+retains legacy writes and unclosed broader authorization/audit gaps. No resource creation, configuration
+change, deployment, live fault testing or phase completion occurred during preparation.
