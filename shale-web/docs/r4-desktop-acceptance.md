@@ -1,9 +1,42 @@
 # R4 desktop acceptance record — 2026-10-12
 
 **Phase 2 acceptance OPEN; Phase 3 IN PROGRESS; Phase 4 first read slice INCOMPLETE.**
-Desktop acceptance below is recorded; overall release/deployment acceptance remains open.
+Desktop, hosted and bounded physical-device acceptance below are recorded; overall acceptance remains open.
 Appearance remains provisional; dedicated aesthetic refinement follows functional delivery.
 Ordinary web delivery remains independent of AI/MCP.
+
+## October 12 hosted/mobile and Windows validation reconciliation
+
+**USER-REPORTED; not Codex reruns.** These later reports supplement the earlier desktop/audit/Firefox
+zoom/Narrator observations and historical synthetic evidence below. They do not identify exact source,
+deployed commit/artifact, Node/npm versions, phone model, iOS or Firefox versions.
+
+| Report | Recorded pass and attribution |
+| --- | --- |
+| Windows local | User ran the committed static-routing test: all four subtests passed. `npm ci` succeeded and reported zero vulnerabilities; web typecheck and production build passed. Output included index.html, foundation.html and hashed assets. Binary public-versus-dist staticwebapp.config.json comparison found no differences. No route-registry suite, Maven or every #1863 check is inferred. |
+| Hosted publication | User identified **Shale-web-beta**, **https://app.myshale.com**, main tracking with existing workflow deployment on main pushes, and reported merging codex/latest into main and successful publication. Published interface looked as tested, including Case workspace. This task did not merge or publish. |
+| Hosted routing | Overview direct reload worked. `/assets/missing.js` and frontend `/api/health` were unavailable rather than successful SPA application fallback. Exact statuses/MIME and the rest of the root/nested/legacy/asset matrix were not supplied. |
+| Selected hosted successes | User inspected `Cache-Control: no-store` on successful Overview, POST search-page and GET assigned-page responses. This covers those inspected responses, not every response/error/auth/legacy/proxy path or universal no-store. |
+| Physical iPhone / Firefox | Hosted sign-in, search, Overview and Back worked. Requested portrait/landscape and on-screen-keyboard checks looked good; Dark-mode navigation/readability/tap flow worked as intended. Exact device/software versions unspecified. No VoiceOver, all-editor, all-device or comprehensive browser acceptance claimed. |
+
+Live inspection found [#1863](https://github.com/gseshadow/Shale/pull/1863) **merged/closed** on October 12;
+current task base is `70599324cf843b2dd4f51dfb44e6094502354e25`. Its historical Codex Node/selector passes
+and proxy/missing-tool blockers remain attributed to that task. The later Windows build/artifact reports
+add acceptance without rewriting those executed outcomes, closing unreported checks, changing PR/review
+status, or creating a conflicting open-PR ledger. No issue/PR closure or review mutation occurred here.
+
+Remaining host gates: exact source/build/API identities and compiled destination; complete routing/MIME,
+CORS/preflight/error policy; selected failures/auth/legacy end-to-end cache handling; entry/asset cache and
+compatibility/rollback retention; search-body/bearer/query/referrer logging privacy at each actual layer.
+Remaining device/AT gates include VoiceOver, tablet/other devices/engines and untested editors/errors/keyboard/
+safe-area/announcement flows. Reports establish none of tenant isolation, session expiry/revocation,
+required audit failure/commit uncertainty or logging privacy. Appearance stays provisional.
+
+The [local SQL harness/runbook](../../docs/testing/case-read-local-security-verification.md) now implements
+the isolated verification preparation recommended below. It requires authoritative schema-only definitions,
+synthetic fixtures and a marked local disposable database; fault controls are test tooling only. SQL
+execution is **NOT RUN** without that approved offline baseline, and local passes cannot accept deployed Azure.
+The remaining security gates below persist; Phases 2/3/4 are not complete.
 
 ## Evidence and implemented baseline
 
@@ -66,8 +99,8 @@ Advisory failures need tracked disposition, not an unrelated repair or a new all
 | Tenant isolation | Authorized two-tenant **non-dbo** RLS enforcement and explicit root/join/strict-versus-overlay predicates; active/removed actors and assigned/unassigned/closed/deleted cases; search/page/hasMore/direct lookup and audit visibility. Alternate tenant/actor on pooled connections and test null/mismatched context. One missing-case result and dbo catalog inspection cannot close this gate. |
 | Required audit / commit uncertainty | Verify successful rows' server-owned tenant/actor/Case/event/sanitized metadata and viewer meaning. In isolation, required INSERT failure, commit failure and lost commit acknowledgement must withhold all Case data, return safe failure and permit only deliberate Retry. A rollback attempt cannot prove an uncertain commit was undone; retain committed history and reconcile uncertainty without automatic replay. |
 | Live web session | Timed expiry and explicit re-login on the next request; authorized remote revocation and rejection of the old bearer after confirmed logout; reload/startup verification uncertainty, login/late-response/issuance uncertainty, storage failure and truthful remote-logout outcomes. Retain current TTLs, no refresh and no replay; historical JavaFX session closeouts do not accept these browser paths. |
-| Hosted frontend / search-body logging privacy | Actual static host and source/build/API identity remain unverified. Establish approved HTTPS origin, compiled API origin, exact CORS, deep-link reload/fallback for workspace/Overview and legacy routes, correct API JSON failures, no-store through API/proxies, and exclusion/redaction of search bodies/bearers from access/error/tracing/APM logs. Confirm compatible assets and rollback procedure. Localhost navigation is not hosted acceptance. |
-| Devices / browser / AT | Physical phone/tablet keyboard traversal, virtual-keyboard and safe-area checks, remaining browser engines and screen-reader combinations, and untested keyboard/announcement/error/editor states in both themes. Windows Firefox/Narrator passes above cover only the reported flow. |
+| Hosted frontend / search-body logging privacy | HTTPS origin/resource, successful publication, Overview reload, two fallback exclusions and three successful no-store responses now have user-reported evidence above. Exact source/build/API identity/compiled origin, complete CORS/routing/MIME/safe JSON/error/auth/legacy cache matrix, privacy layers, compatible assets and rollback evidence remain open. |
+| Devices / browser / AT | Bounded iPhone Firefox orientation/keyboard/Dark tap flow now has user-reported acceptance above. Physical tablet/other devices, remaining browser engines and screen-reader combinations, explicit safe-area coverage, and untested keyboard/announcement/error/editor states in both themes remain open. Earlier Windows Firefox/Narrator passes cover their reported flow only. |
 
 These evidence gaps block overall acceptance and release/deployment readiness; they do not erase the
 recorded desktop passes. Representative live SQL plans/scanned-work, collation and concurrent-paging
@@ -76,7 +109,7 @@ for disposition, without treating the optional full suite as a newly imposed dep
 No deployment is authorized by this record. Use the [web deployment](../../docs/shale-web-deployment.md)
 and [App Service/session rollout](../../docs/azure-app-service-deployment.md) runbooks.
 
-**Minimal isolated fault-test preparation:** there is only the current Shale API/database; no separate
+**Historical minimal isolated fault-test recommendation (superseded by the runnable local harness above):** there is only the current Shale API/database; no separate
 test target exists. Plan a disposable local SQL Server database and loopback-only API using the relevant
 existing schema/RLS/audit/session dependencies, synthetic two-tenant fixtures and non-dbo runtime identity,
 with no production connections or credentials. First establish schema/fixture feasibility and an approved
@@ -91,7 +124,7 @@ perform destructive fault tests.
 automatic refresh coordination, generic cache/forms work and optional native/PWA/AI/MCP remain separately
 scoped roadmap work. Required accessibility, privacy, isolation and audit evidence are not deferred polish.
 
-## Documentation validation
+## Historical R4 documentation validation
 
 Changed-file review contains six Markdown files only and changes no production/test contract.
 
@@ -111,8 +144,9 @@ link was reconciled: the claimed archive is absent from this base, so its invali
 
 ## Next bounded prompt
 
-Use [roadmap §12](../../docs/architecture/shale-web-v2-architecture-roadmap.md#12-next-bounded-prompt--hosted-web-delivery-preparation)
-to prepare a documentation-only hosted-web readiness handoff: reconcile the existing Static Web Apps
-workflow/fallback with the actual host, API origin, CORS, no-store and logging-privacy prerequisites.
-Inspect only authorized read-only configuration; record unknowns and an operator verification/rollback
-checklist. Do not create resources, change configuration, merge or deploy.
+Use the [local SQL runbook](../../docs/testing/case-read-local-security-verification.md) and
+[roadmap §12](../../docs/architecture/shale-web-v2-architecture-roadmap.md#12-next-bounded-prompt--local-sql-execution-and-remaining-acceptance)
+to execute the opt-in harness after reviewing an approved offline schema-only input. Record local
+production-path isolation/audit outcomes and exact schema/tool identities; separate real SQL from
+injected commit-acknowledgement behavior. Preserve deployed RLS/performance/session/host/privacy/device/
+AT gates and isolate defects for follow-up. No merge or deployment.

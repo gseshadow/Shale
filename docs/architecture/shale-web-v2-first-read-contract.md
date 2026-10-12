@@ -5,11 +5,22 @@
 Appearance is provisional; visual refinement follows functional delivery. Accessibility remains an
 acceptance gate. Ordinary web delivery is independent of MCP/AI activation.
 
-**Current acceptance:** [R4 desktop record](../../shale-web/docs/r4-desktop-acceptance.md)
+**Current acceptance:** [R4 acceptance record](../../shale-web/docs/r4-desktop-acceptance.md)
 records October 12 user-reported Windows Firefox/localhost → Azure API passes after #1858/#1859,
 including successful Overview, persisted audit/reread, Dark, keyboard, actual zoom and limited Narrator.
 These are not Codex reruns. Section 14 reconciles the historical unverified statements below;
 overall first-slice acceptance and remaining release/deployment gates stay open.
+
+Later October 12 user reports add Windows routing/install/build/copied-config passes, publication to
+Shale-web-beta / https://app.myshale.com, Overview reload/two fallback exclusions, three successful
+selected no-store responses and bounded physical iPhone Firefox/Dark orientation/keyboard/tap flow.
+Exact source/tool/device versions were not supplied; no Codex reruns or universal security acceptance.
+The R4 ledger and [deployment reconciliation](../shale-web-deployment.md#later-operator-reports--october-12-2026)
+supersede the historical unknown-host/device statements only for those reported checks. #1863 is
+merged/closed; its prior tool blockers stay historical. The
+[runnable local security harness](../testing/case-read-local-security-verification.md) verifies selected
+production read/runtime/audit paths only after an authoritative offline schema is supplied. SQL execution
+is NOT RUN here. This changes no accepted R2 policy, audit exemption, production schema/grant or protocol.
 
 The original documentation-only assessment below was against fetched `origin/codex/latest`
 `ba3b1acad7710d4afeae099b2a24f9b4c3e77bbf`, on separate branch
@@ -980,4 +991,4 @@ Phase 2 acceptance **OPEN**; Phase 3 **IN PROGRESS**; Phase 4 **INCOMPLETE** wit
 recorded. Historical synthetic evidence and inherited Maven failures remain separately attributed;
 no full-suite pass, merge or deployment is claimed. Appearance provisional; aesthetic refinement follows
 functional delivery; web delivery independent of AI/MCP. Next bounded work is the
-[hosted delivery preparation prompt](shale-web-v2-architecture-roadmap.md#12-next-bounded-prompt--hosted-web-delivery-preparation).
+[local SQL execution and remaining acceptance step](shale-web-v2-architecture-roadmap.md#12-next-bounded-prompt--local-sql-execution-and-remaining-acceptance).
