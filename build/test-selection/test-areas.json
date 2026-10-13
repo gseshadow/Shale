@@ -187,6 +187,8 @@
         "com.shale.data.service.adapter.CaseServiceAdapterTest",
         "com.shale.data.service.adapter.CaseSearchPagingJdbcTest",
         "com.shale.data.service.adapter.MinimizedCaseReadJdbcTest",
+        "com.shale.data.verification.CaseReadLocalSqlServerTest",
+        "com.shale.data.verification.CaseReadVerificationSafetyTest",
         "com.shale.ui.component.CaseCardActivationTest",
         "com.shale.ui.component.PracticeAreaSelectorTest",
         "com.shale.ui.component.CaseStatusSelectorTest",
@@ -492,7 +494,9 @@
         "**/*Session*.java",
         "docs/sql/**/*rls*.sql",
         "docs/sql/**/*audit*.sql",
-        "architecture/tenancy-and-rls.md"
+        "architecture/tenancy-and-rls.md",
+        "build/case-read-verification/**",
+        "**/verification/CaseRead*.java"
       ],
       "reason": "Security, RLS, tenant session, or audit infrastructure changed; critical and affected data/security contracts are blocking.",
       "ownership_patterns": [

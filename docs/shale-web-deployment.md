@@ -1,9 +1,36 @@
 # Hosted web operator handoff — 2026-10-12
 
-**Preparation only; publication BLOCKED pending prerequisites and separate authorization.**
+**Current reconciliation:** user-reported publication to Shale-web-beta / https://app.myshale.com is
+recorded below. Earlier preparation/publication-blocked statements describe their original tasks;
+this task performs no deployment. Overall security/operational acceptance remains OPEN.
 Phase 2 acceptance OPEN; Phase 3 IN PROGRESS; Phase 4 first read slice INCOMPLETE.
 Appearance remains provisional; ordinary web delivery is independent of AI/MCP.
 This replaces obsolete 5P-4 instructions to create a new host and publish a “read-only beta.”
+
+## Later operator reports — October 12, 2026
+
+The [R4 acceptance ledger](../shale-web/docs/r4-desktop-acceptance.md#october-12-hostedmobile-and-windows-validation-reconciliation)
+owns precise attribution and exclusions. User reported Windows committed-routing test (four subtests),
+`npm ci` with zero vulnerabilities, typecheck/build, index.html/foundation.html/hashed assets and identical
+copied staticwebapp.config.json. Source/tool versions were not supplied; Codex did not rerun these checks.
+[#1863](https://github.com/gseshadow/Shale/pull/1863) is now merged/closed; its original blocked checks
+remain historical, not retroactively passed. No current PR/review status was changed.
+
+User identified resource **Shale-web-beta**, origin **https://app.myshale.com**, main tracking and existing
+workflow deployment on main pushes, and reported merging codex/latest to main and successful publication.
+The published interface/Case workspace looked as tested; direct Overview reload worked. Missing
+`/assets/missing.js` and frontend `/api/health` were unavailable without successful SPA application fallback.
+Successful Overview, POST search-page and GET assigned-page had inspected `Cache-Control: no-store`.
+Bounded physical iPhone/Firefox sign-in/search/Overview/Back, portrait/landscape/on-screen keyboard and
+Dark navigation/readability/tap acceptance is recorded separately in R4; versions unspecified, no VoiceOver.
+
+These reports supersede the earlier *unknown resource/origin/linked branch/publication* entries for those
+facts only. Subscription/resource group/environment ID, exact deployment/source/build/API artifact,
+compiled API origin, tool versions, complete CORS, response/MIME/cache/error matrix, logging privacy and
+rollback/asset-retention window remain unknown. No universal no-store, tenant/session/audit-fault acceptance,
+read-only pilot restriction or phase completion follows. Existing legacy writes/foundation output remain.
+Next security work is the [runnable disposable local harness](testing/case-read-local-security-verification.md);
+the remaining hosted checks below still apply to their unreported scope. Do not repeat already reported passes.
 
 ## Evidence and retained acceptance
 
@@ -37,8 +64,8 @@ Authorities: [roadmap](architecture/shale-web-v2-architecture-roadmap.md),
 
 | Item | Verified source / authorized read-only GitHub evidence | Actual deployed setting |
 | --- | --- | --- |
-| Resource/hostname/environment | Existing [SWA workflow](../.github/workflows/azure-static-web-apps-proud-water-049dc3010.yml); `proud-water-049dc3010` is a workflow/secret identifier, not verified resource/hostname | **UNKNOWN**: subscription, resource group, resource, environment, generated/custom hostname |
-| Branch/triggers | Push to `main`; PR opened/synchronize/reopened/closed targeting `main`. Upload on push/nonclosed PR; close on closed PR. No workflow_dispatch | Effective resource-linked branch and active deployment **UNKNOWN** |
+| Resource/hostname/environment | Existing [SWA workflow](../.github/workflows/azure-static-web-apps-proud-water-049dc3010.yml); `proud-water-049dc3010` is a workflow/secret identifier | **USER-REPORTED** Shale-web-beta / https://app.myshale.com. Subscription/resource group/environment ID remain UNKNOWN. |
+| Branch/triggers | Push to `main`; PR opened/synchronize/reopened/closed targeting `main`. Upload on push/nonclosed PR; close on closed PR. No workflow_dispatch | **USER-REPORTED** resource tracks main, codex/latest merged to main and successful publication; exact deployed source/artifact UNKNOWN. |
 | Locations | `app_location: ./shale-web`; `output_location: dist`; blank `api_location` | Effective host/build settings **UNKNOWN** |
 | Builder | `Azure/static-web-apps-deploy@v1`; no explicit install command, Node pin, app_build_command or API-origin environment in YAML. [package](../shale-web/package.json) build is `npm run typecheck && vite build` | Actual install/Oryx/build/tool versions and compiled API origin **UNKNOWN** |
 | Historical upload | [main run 37659978509](https://github.com/gseshadow/Shale/actions/runs/37659978509), October 7, SHA `6aef93a0b0f9940911af3a7b3f635570a224cc76`: Build and Deploy Job succeeded | Historical job success does not identify current served bytes |
@@ -192,7 +219,8 @@ No build or actual artifact inventory/hash was established by this documentation
    establish universal no-store in source: login/me/logout, rejection/error and legacy sensitive
    responses require explicit end-to-end evidence and scoped remediation where absent. Static public/
    immutable caching must never apply to authenticated data.
-4. **Exact CORS:** frontend origin to add = **UNKNOWN**, pending verified scheme/hostname/port.
+4. **Exact CORS:** reported frontend origin = **https://app.myshale.com**. Effective full CORS list,
+   preflight and platform/error behavior remain unverified; successful sign-in/read is bounded evidence.
    Add that exact approved HTTPS origin to the existing effective list, preserving localhost and other
    authorized consumers. No wildcard/guessed hostname. [CORS owner](../shale-server/src/main/java/com/shale/server/config/ShaleServerWebConfiguration.java)
    chooses first nonblank primary env, primary Java property, alias env, alias Java property:
@@ -213,7 +241,7 @@ No build or actual artifact inventory/hash was established by this documentation
    category/times/build IDs only. Never export secrets, tokens, connection strings, names/search text,
    raw HAR or sensitive response bodies.
 
-## Ordered operator procedure
+## Historical ordered preparation procedure (before the later reported publication)
 
 1. **Prepare now:** resolve host facts below, decide full-bundle versus separately implemented narrower
    scope, prepare the reviewed local artifact/manifest unuploaded, and arrange rollback retention.
@@ -272,8 +300,9 @@ attributed to R4 and are not relabelled passing.
 
 ## Exact host/operator facts still needed
 
-- Existing SWA subscription/resource group/resource/environment and approved HTTPS/custom/preview origins;
-  effective linked branch, authorized upload channel/operator (no secrets).
+- Existing SWA subscription/resource group/environment ID and any additional approved preview origins;
+  authorized upload channel/operator (no secrets). Resource/origin/main tracking/publication now have
+  user-reported evidence above; exact deployment identity remains unknown.
 - Active deployment/source/artifact hashes, exact Node/npm/install/build inputs and compiled API origin;
   API executable JAR source/hash and compatible endpoint/session/schema evidence.
 - Effective CORS list/precedence/platform CORS; applicable proxies/CDNs, fallback/MIME/cache settings,
@@ -281,7 +310,7 @@ attributed to R4 and are not relabelled passing.
 - Sanitized access/error/WAF/APM/body/header/query/referrer settings/evidence; full-bundle versus narrower
   scope decision and owners/dispositions for all remaining R4 gates.
 
-## Ready-to-run next prompt — static routing boundary prerequisite
+## Historical next prompt — static routing boundary prerequisite (now merged)
 
 ```text
 Repository: gseshadow/Shale
@@ -307,7 +336,7 @@ tests, run selector and relevant checks, validate docs/diff, commit/push and ope
 Return routing diff, validation limits and concrete operator checks; no generic reassessment.
 ```
 
-## Routing boundary implementation (unpublished, October 12, 2026)
+## Routing boundary implementation (historical unpublished checkpoint, October 12, 2026)
 
 The separate `codex/hosted-swa-routing-boundary` change narrows only `shale-web/public/staticwebapp.config.json` navigation fallback. The Vite output has two HTML entries (`index.html`, `foundation.html`), hashed `assets/` chunks, and a copied SWA config. The configured exclusions are exact `/api`, prefix `/api/*`, emitted `/assets/*`, and a bounded extension set for HTML, scripts, styles, source maps, manifests, images, fonts and other conventional static files. An extensionless browser route (including the supported workspace, Overview, login and legacy deep links) remains eligible for `/index.html`. Real files are served normally with the platform's content type; a missing excluded file must be 404 rather than successful HTML. This does not add host authentication, proxying, API URL rewriting, headers, caching or a publication policy. API calls continue to use the independently compiled absolute HTTPS API origin. Microsoft documents SWA navigationFallback.exclude directory and multi-extension glob semantics: https://learn.microsoft.com/en-us/azure/static-web-apps/configuration#fallback-routes .
 
@@ -317,7 +346,9 @@ The separate `codex/hosted-swa-routing-boundary` change narrows only `shale-web/
 
 ## Routing validation follow-up — October 12, 2026
 
-**PARTIALLY VERIFIED; build/artifact and actual SWA runtime verification OPEN.** Live connector access
+**Historical #1863 checkpoint: PARTIALLY VERIFIED.** Later user-reported Windows build/artifact and
+bounded hosted passes are recorded above; unreported route tests/statuses/MIME/identity remain OPEN.
+Live connector access
 confirmed `codex/latest` at #1862's merge commit `0a0bffc49ff7c8694ea0b3f85e4cd2ae3805ce00`,
 tree `c864aad09cf2dc52c368e18df5b4eb58953be1d6`. `git fetch origin codex/latest` failed because
 the inherited managed proxy on port 8080 was unreachable. Supported GitHub connector reads supplied
@@ -375,7 +406,7 @@ matching across nested paths. Actual HTTP status, nested wildcard semantics and 
 `/api`, `/api/`, `/api/health`. Vite preview cannot substitute for SWA acceptance. Microsoft also describes
 the supported [local SWA CLI](https://learn.microsoft.com/en-us/azure/static-web-apps/local-development).
 
-**Next concrete prerequisite:** restore the managed proxy's supported registry access, then repeat
+**Historical next prerequisite at #1863 (later Windows/host reports reconciled above):** restore the managed proxy's supported registry access, then repeat
 lockfile installation, typecheck, route-registry tests and production build on this exact source with
 recorded tools/API origin; inspect every emitted path and compare copied config byte-for-byte. Run the
 selector's selected/critical checks in an existing Maven-capable environment. For HTTP verification,

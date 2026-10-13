@@ -1,0 +1,4 @@
+<configuration>
+  <!-- Harness runner only. No production logging configuration is changed. -->
+  <root level="OFF"/>
+</configuration>
