@@ -1103,4 +1103,77 @@ requires all three existing PASS scenario lines and exit code 0 after exact-reso
 only those fixed outcomes, tool versions, JVM timezone and exit code. Native Windows execution remains
 an operator retest; Linux SQL results do not establish Windows/installed-client acceptance. Case SQL
 remains NOT RUN; original schema/provenance commands and independent R4/security/deployment gates remain
-in force. No Azure/live application connection, production change, deployment or merge is authorized.
+in force. No Azure/live application connection, production database/configuration change, deployment or merge was performed.
+
+
+### Executed verification and final impact review
+
+Executed on Linux/Python 3.12.14, Maven 3.9.11, Temurin JDK 21.0.12.1 and SQL Server
+16.0.4305.5 (2022 container image digest
+`sha256:cf8f0ab2ebe61feec2eed2629061a07d247f791c2a8ddda74a4ac9f06a291718`).
+The operator's Windows/JDK versions remain a separate retest. `mvn` below denotes the existing
+`/workspace/.tools/bin/mvn` toolchain wrapper/settings, with the inherited proxy and CA trust.
+No repository dependency/build configuration changed. SQL runs captured/discarded unrestricted output;
+only fixed outcomes were recorded. The new task-owned container was removed only after verifying its
+captured exact container ID and task label; its private credential file was erased. The operator
+container and any resources from the operator's earlier failed cleanup were not accessed or removed.
+
+Pre-edit impact review covered the existing store binding/identity tests, complete migration contract,
+module/auth/lifecycle tests, opt-in fixture, both launcher safety suites and downstream auth/session
+contracts. The existing migration contract's default-calendar source expectation was obsolete under the
+established UTC contract and now requires the UTC timestamp overload; schema/hash/ownership assertions
+remain intact. New executing JDBC-double coverage verifies all nine UTC writes, the UTC expiry read,
+returned identity/deadline and the joint commit under Denver and Kolkata defaults. Test-only diagnostic
+coverage verifies primary plus cleanup attribution, cleanup-only failure, message/cause exclusion,
+closed categories, canonical UUID cardinality and exact original login SID matching. Python coverage
+checks unknown/injected tokens, duplicate/missing PASS lines, cleanup after PASS and fallback behavior.
+
+Changed-file mapping: production store → SqlRememberCredentialStoreTest, migration contract and real
+opt-in SQL; Java fixture/support → AuthVerificationSupportTest and real SQL; Python runner → existing
+cross-launcher tests and extended test_runner; runbook → fixed vocabulary, commands and evidence checks.
+The committed base-to-head selector maps changes to security-data/server plus directly modified tests:
+auth eligibility/module authority, tenant/audit transactions, request context and auth controller are
+relevant dependencies. It recommends **no full-suite escalation**; no unrelated historical tests or
+CI workflows were enabled. Final searches found no default-calendar calls in the changed store, stale
+string UUID guards, or old timestamp-binding expectations in the affected tests.
+
+Exact successful local check commands (SQL credentials were supplied only in a private child environment):
+
+```bash
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py'
+python3 -m unittest discover -s build/case-read-verification -p 'test_*.py'
+python3 -m unittest discover -s build/test-selection -p 'test_select_tests.py'
+mvn -o -pl shale-data,shale-server -am -Dtest=AuthVerificationSupportTest,SqlRememberCredentialStoreTest,PreTenantAuthenticationLocalSqlServerTest,AuthCredentialLookupTest,AuthUserLifecycleSecurityTest,PreTenantAuthenticationModuleContractTest,DesktopRememberCredentialMigrationContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base 30ca63c9d0b9ceefceb4ae3dd057b16376b42080 --head HEAD --format markdown --plan-output /workspace/work/auth-diagnosis/selection.json
+mvn -o -pl shale-data,shale-server -am -Dtest=com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.DesktopRememberCredentialMigrationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.server.controller.AuthControllerTest,com.shale.server.runtime.AuthVerificationSupport,com.shale.server.runtime.AuthVerificationSupportTest,com.shale.server.runtime.PreTenantAuthenticationLocalSqlServerTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest,com.shale.server.runtime.SqlRememberCredentialStoreTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -B test
+# Private task helpers invoked only our opt-in harness / real quiet launcher:
+python /workspace/work/auth-diagnosis/run_harness.py semantic-uuid
+python /workspace/work/auth-diagnosis/run_harness.py utc-store-denver denver
+python /workspace/work/auth-diagnosis/run_launcher.py
+git diff --check 30ca63c9d0b9ceefceb4ae3dd057b16376b42080 HEAD
+```
+
+The private helpers created no arbitrary URL/schema/resource inputs; they used the existing harness's
+LOCAL_DISPOSABLE_AUTH, loopback port and dedicated local credentials. Native Windows reproduction uses
+the exact public launcher commands above, not these private helpers. Initial default-calendar Denver
+SQL failures and the pre-fix UUID/cleanup failures were diagnostic evidence, not passing verification.
+An initial offline dependency miss was resolved through the configured proxy; an overlapping Maven
+attempt returned no scenario evidence and was repeated sequentially. Only sequential runs are counted.
+
+| Check | Result and limits |
+| --- | --- |
+| Auth/cross-launcher Python | 17 PASS, 1 explicit native-Windows skip; actual POSIX invocation, simulated Windows boundaries. |
+| Existing Case launcher / selector units | 4 PASS / 24 PASS. No Case SQL. |
+| Focused Java | 23 PASS, 1 explicit opt-in SQL skip; auth/modules, store, diagnostics, migration bindings. |
+| Committed selector affected suite | 77 PASS, 1 explicit opt-in SQL skip; security-data/server and dependencies. |
+| Critical reactor | 116 PASS, 0 failures/errors/skips; BUILD SUCCESS. |
+| Disposable SQL, semantic UUID / UTC JVM | All three scenarios PASS; exact-resource cleanup and exit 0. |
+| Disposable SQL, complete fix / America/Denver JVM | All three scenarios PASS; UTC readback, original guards, SID cleanup and exit 0. |
+| Real quiet launcher / disposable SQL | Exactly the three allowed PASS lines, cleanup successful, exit 0. |
+| Diff/scope/docs | PASS; Case harness/launcher, SQL modules/migrations, accepted R4 reports unchanged; original export absent/unmodified. |
+
+**SYNTHETIC AUTH SQL PASS on Linux in UTC and America/Denver; native Windows retest pending; CASE SQL NOT
+RUN; installed-client and production authority UNVERIFIED; deployment BLOCKED; security acceptance OPEN.**
+The passing disposable fixture does not authorize targeted RLS attachment, production grants or cleanup
+of unknown retained resources.
