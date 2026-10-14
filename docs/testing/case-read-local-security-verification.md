@@ -614,3 +614,239 @@ command do not verify documentation-only assessment; Maven/npm/browser/SQL suite
 Historical focused/critical passes, skipped local SQL and inherited full-suite advisories stay attributed
 to their original tasks. This task establishes documentation/source review only. SQL integration and
 security acceptance remain OPEN/NOT RUN.
+
+## Pre-tenant authentication prerequisite implementation — 2026-10-14
+
+**REVIEW CANDIDATE; SQL EXECUTION UNVERIFIED; DEPLOYMENT BLOCKED.** Fetched live
+`origin/codex/latest` `59d8374858764788c621f6f8d986773b58ab79c4`, confirmed merged #1867 by
+GitHub metadata and Git ancestry. Separate task worktree/branch `codex/pretenant-auth-prerequisite`
+preserves the original checkout. This implements only the authentication prerequisite, not the
+three-table FILTER migration. No live connection, production credential, fault, configuration change,
+deployment or merge occurred. The original export is not present in this task's mounted files; its
+previously accepted evidence/hash above remains attributed to #1867. No replacement export was made.
+`CaseReadLocalSqlServerTest` and all accepted R4 reports remain unchanged. Security acceptance OPEN;
+Phase 2 OPEN, Phase 3 IN PROGRESS, Phase 4 INCOMPLETE, appearance provisional.
+
+### Bounded modules and execution-authority review
+
+[Candidate SQL](../sql/2026-10-14_pretenant_authentication_modules.sql) creates two **new versioned**
+dbo procedures. It leaves the historical `ResolveDesktopRememberCredential` and its grants intact:
+
+| Module / consumer | Exact capability and failure policy |
+| --- | --- |
+| `dbo.LookupAuthenticationCredentialV1` / shared `AuthServiceImpl` | One exact email parameter, at most 255 UTF-16 units; static SQL captures at most two matching identities once. It returns the existing internal User/auth projection plus `IsRemoved` only when exactly one matching row exists, positive user/tenant with an existing ShaleClients identity, `is_deleted=0`, not removed and a populated hash. Java still verifies BCrypt and defensively rejects duplicate/null/nonpositive/lifecycle-invalid results before returning the unchanged User. Password and tenant selector are never SQL parameters. |
+| `dbo.ResolveDesktopRememberCredentialV2` / `SqlRememberCredentialStore.lookup` | Exactly 32-byte opaque hash, installation UUID and existing time parameter; static, same-tenant Users/session joins. At most two raw credential candidates captured before joins (invalid ownership cannot hide ambiguity); only one positive owner with an existing ShaleClients identity and eligible user, unconsumed credential, unrevoked session and both deadlines later than supplied **and database** time can return tenant/user/session/email. No hash is returned. Java checks result cardinality/identity/session syntax. It remains only a candidate: authoritative serializable runtime rotation/JTI/revocation and explicit owner predicates are retained. |
+
+The proposed authority is `WITH EXECUTE AS OWNER` **only with effective owner dbo**. Deployment preflight
+requires dbo schema ownership, and both module bodies fail if `USER_NAME()` is not dbo. SQL Server's module
+scope restores the caller automatically on success/error; neither caller executes impersonation, REVERT
+or session-context mutation. No dynamic SQL, arbitrary tenant lookup, broad enumeration, general domain
+read or mutation is exposed. Existing sec functions/policies are untouched. Ordinary permission chaining
+or permission-only signing would not alone supply the existing predicate's dbo exception.
+
+This is a source-reviewed proposal, **not independent security-owner approval or production evidence**.
+The SQL installs no roles, memberships, GRANT/DENY/REVOKE, or base-table permission changes. The old
+remembered resolver remains available for staged old/new server rollback. The versioned installer fails
+on any preexisting target object; compare/review definitions rather than overwriting unknown authority.
+Run batches on one connection with stop-on-first-error and rollback; continuing after a failed GO batch
+is forbidden. Both modules must install/commit together before switching shared callers.
+
+Password identity policy deliberately rejects **all duplicate email matches under the existing database
+comparison/collation**, including an inactive/removed/NULL-tenant duplicate. No normalization, new email
+index, backfill, reassignment, or silent TOP1 selection is introduced. The existing email_norm nonunique
+index does not establish uniqueness or bounded scanned work. Returned rows are bounded; caller statement
+timeouts are five seconds. Catalog/representative-plan review remains required. Password login retains
+its prior `is_deleted=0` semantics; remembered lookup retains its nullable-deleted COALESCE semantics.
+NULL/nonpositive tenants never become trusted runtime identities. Clients never supply a trusted tenant.
+Driver messages/causes are removed at the pre-tenant lookup error seams; no credentials/hash/email/SQL
+or sensitive values are logged there. Other preexisting logging findings remain separately open.
+
+Audit compatibility uses the existing schema and lifecycle: lookup and routine credential rotation are
+security plumbing, not new PHI/business views or domain/admin mutations. No ad-hoc PHI, Timeline, entity
+or per-login audit is appropriate. Existing durable issuance/logout/revocation security records and
+transaction-bound audits remain authoritative and unchanged; no audit migration is needed.
+
+### Explicit deployment blockers and compatibility sequence
+
+1. Authorized operator evidence is still **UNKNOWN**: actual auth/runtime databases/principals, dbo
+   database/schema/table/module ownership, nested/public/fixed/server roles, effective permissions,
+   signing/impersonation/ALTER/CONTROL authority and identifier/email collation. Run the bounded operator
+   catalog handoff above separately as actual auth/runtime identities and metadata-capable operator;
+   do not substitute dbo output for caller permissions. Inventory the new modules with
+   `sys.sql_modules.execute_as_principal_id=-2` and effective object/schema owner dbo, both before/after
+   deployment. Include new modules in dependency/permission inspection and retain exact definitions/hashes.
+2. Security owner must explicitly accept the bounded dbo capability and **internal password-hash projection**,
+   ambiguity rejection policy and caller-restoration evidence. Possession of shared desktop auth SQL
+   credentials permits repeated exact-email hash lookup through this module; row bounds do not make that
+   a password-verified DB boundary or defeat offline hash attacks. No new HTTP hash endpoint exists.
+   Resolve duplicate email/NULL-owner impacts using authorized minimized evidence, not row exports.
+3. Local SQL execution below and server/desktop runtime compatibility must pass before activation.
+   Review production schema/types/defaults/FKs and plans separately: the synthetic fixture is not parity.
+   Auth and runtime identities must be non-dbo/non-ShaleAdmins/non-elevated. Proposed local role names
+   `ShalePreTenantAuthentication` and `ShaleTenantRuntime` describe a test permission profile, not deployed
+   principals or a grant instruction. Map reviewed actual identities explicitly before any grant change.
+4. Additive modules first, then approved **object EXECUTE only on both new modules** for the reviewed auth
+   role. Capture every prior permission state/grantor/membership. Runtime must not execute these modules,
+   ALTER/CONTROL them/the dbo schema, impersonate dbo or change RLS. Auth must have no general Users/hash
+   or remembered-table SELECT after its compatible-client cutover. The migration makes no grants because
+   inheritance/column grants/denials/public/fixed roles and existing caller needs are unknown. Do not blindly
+   DENY/revoke SELECT: review each old client/control-plane dependency and permitted runtime projection.
+5. Rebuild/deploy compatible server **and desktop** consumers after modules/EXECUTE are verified. Preserve
+   password login, second server credential exchange, instance enrollment, checked/unchecked remembered
+   sign-in, rotation/retry, ordinary-close preservation, explicit logout, revocation, refresh and /me.
+   No token DTO/port/signing/cutoff/DPAPI contract changes. Missing module/EXECUTE fails safely; there is no
+   direct-SELECT fallback. Existing Windows acceptance is historical and does not certify this build.
+6. Inventory and drain **all** older installed direct-SELECT desktops, running processes, jobs and other
+   pre-context callers before reducing their grants or attaching strict Users FILTER. Record exact minimum
+   compatible artifact/version/source hashes and fleet completion; this PR does not invent a release number.
+   Existing minimum-version safe drain does not itself upgrade old JDBC authentication. If coexistence is
+   mandatory, obtain a separate compatibility decision; no shared RLS exception or SQL-admin bypass.
+7. Only then prepare separately reviewed targeted FILTER/candidate work. Write BLOCKs, admin-only audit
+   access, global Status immutability, direct-JDBC credential/context trust and deployed acceptance remain
+   independently open. Do not interpret this prerequisite as closing those gates.
+
+### Local verification and exact rollback
+
+[Quiet auth launcher](../../build/auth-verification/run.py) and
+[opt-in SQL test](../../shale-server/src/test/java/com/shale/server/runtime/PreTenantAuthenticationLocalSqlServerTest.java)
+use an explicitly labelled **synthetic auth compatibility fixture**, never an authoritative/candidate Case
+schema. Dedicated loopback SQL Server, fresh generated database/logins and exact nonce ownership marker;
+no arbitrary JDBC URL/database/schema input, app connection variables, implicit Maven arguments or Azure
+engine. Only the proposed role profile receives object grants inside that fresh DB. Auth has module EXECUTE
+and no direct Users/credential-table SELECT; runtime has tenant reads/rotation permissions, no hash read,
+module EXECUTE or dbo impersonation. A one-connection Hikari pool tests caller/NULL context restoration,
+valid A/B password login, absent/ambiguous/disabled/removed/NULL-owner/wrong-password rejection, owner-guard
+error restoration, remembered rotation/JTI/replay/installation/revocation/disabled/removed/NULL-owner/expiry,
+and runtime A1→A2→B1→A1/NULL isolation. Test-only ownership alteration is confined to the disposable fixture;
+it is not an observed production fault. This is not full-schema/HTTP/installed-Windows acceptance.
+
+After setting up the dedicated local SQL instance using the existing safe setup guidance above, use an
+installed JDK 21/Maven terminal with no application connection variables:
+
+```bash
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py'
+python3 build/auth-verification/run.py --opt-in LOCAL_DISPOSABLE_AUTH --port 14333
+```
+
+The launcher privately prompts for dedicated **local** admin credentials and discards unrestricted Maven/
+driver output; fixed scenario names only. Cleanup closes pools and checks the exact generated DB nonce
+before dropping that DB and its two generated logins. If marking/ownership or cleanup fails, report the
+fixed failure and require exact-resource operator review; never scan/drop by prefix. This fixture does not
+modify the original export, Case harness or any shared instance data. No local SQL instance/credentials
+were supplied here, so **AUTH SQL NOT RUN** and **CASE SQL NOT RUN**. SQL/production authority and installed
+compatibility remain unverified regardless of synthetic test success.
+
+Prepare rollback evidence before any later authorization. No database rollback was executed here:
+
+1. Record unchanged old resolver definition/permissions, absence of both new modules, dbo ownership,
+   exact installer hash, all proposed permission/member deltas, and previous compatible server/MSI hashes.
+   If a new module name already existed, stop installation; this script cannot safely restore unknown code.
+2. Before any FILTER change (none in this PR), roll server and desktop consumers back to the recorded
+   previous durable-session-aware artifacts, finish/drain running new callers, and verify old password/
+   remembered login under their recorded original permissions. Keep new modules while any client depends
+   on them. Do not revert to pre-7B revocation-ignorant code or alter signing/cutoff; retain the App Service
+   guide's maximum-TTL/emergency-secret rules if a separately authorized older rollback ever requires it.
+3. For each **new** EXECUTE grant whose captured previous state was absent, revoke precisely that grant
+   from its recorded actual role. Example template (replace grantee only from approved evidence):
+
+   ```sql
+   REVOKE EXECUTE ON OBJECT::dbo.LookupAuthenticationCredentialV1 FROM [reviewed_auth_role];
+   REVOKE EXECUTE ON OBJECT::dbo.ResolveDesktopRememberCredentialV2 FROM [reviewed_auth_role];
+   ```
+
+   If previous state was GRANT/DENY/WITH GRANT OPTION or permissions/memberships changed separately,
+   restore the exact recorded state/grantor/member delta instead; do not run these templates blindly.
+   This installer creates no production role or membership to drop. Do not revoke unrelated inherited
+   grants or reset all auth/runtime permissions.
+4. Once dependency drain and identity/definition hashes prove these are exactly this change's new objects:
+
+   ```sql
+   DROP PROCEDURE dbo.ResolveDesktopRememberCredentialV2;
+   DROP PROCEDURE dbo.LookupAuthenticationCredentialV1;
+   ```
+
+   Leave `dbo.ResolveDesktopRememberCredential`, Users, sessions, remembered credentials, audit history,
+   every existing predicate/function/policy and original schema export untouched. Prefer retaining harmless
+   additive modules over stranding clients. If a later Users FILTER exists, **stop this old-client rollback**;
+   coordinate its separate exact-predicate disposition first, never disable the whole policy.
+
+The next targeted RLS migration/candidate-verification implementation prompt is deliberately **DEFERRED**
+until auth SQL and compatible installed callers are sufficiently demonstrated. The current prerequisite
+prompt above remains historical/source authority. Required next evidence: passing local auth authority/
+restoration/rotation, approved actual catalog/grant/identity decisions, compatible fleet/drain matrix.
+Then the separately reviewed task may add only the three accepted FILTERs and prepare labelled derived/
+candidate hashes/manifests for the unchanged Case harness; it must retain all existing security/host/R4 gates.
+
+### Prerequisite test impact and executed checks
+
+Pre-edit reference inventory covered AuthServiceImpl/password projection/lifecycle, AuthServiceAdapter,
+remembered procedure/migrations/store/bindings, server auth/desktop exchange/durable lifecycle/controllers,
+runtime initialization, desktop enrollment/restore/logout/revocation and UI lifecycle tests. Existing
+AuthUserLifecycleSecurityTest's direct-SELECT assumption now points to the module's lifecycle contract;
+SqlRememberCredentialStoreTest uses V2 and rejects malformed/ambiguous identities before runtime borrow.
+AuthCredentialLookupTest executes the shared implementation through JDBC doubles with real Java BCrypt;
+PreTenantAuthenticationModuleContractTest protects static/bounded/owner/ambiguity/no-grant scope. New tests
+are owned by security-data/server; no opt-in SQL execution was added to critical defaults. Selector smoke
+covers these changed contracts plus existing tenant/audit/request-context and auth HTTP dependencies.
+Additional desktop/server compatibility checks protect unchanged enrollment, remembered and durable flows.
+No user-visible/domain/admin mutation or new audit event is introduced; established audit integration is
+retained without a migration.
+
+Successful commands use scratch Maven 3.9.9/JDK 21.0.2, existing Microsoft JDBC 12.6.1.jre11. Initial missing
+Maven/compiler, local-repository access and scratch-JDK CA trust errors were resolved without changing
+repository POM/dependency/runtime configuration. The successful command prefix was:
+
+```bash
+JAVA_HOME=/workspace/work/pretenant-review/jdk-21.0.2 \
+MAVEN_OPTS=-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts \
+/workspace/work/pretenant-review/apache-maven-3.9.9/bin/mvn \
+-s /workspace/work/pretenant-review/settings.xml
+```
+
+The scratch settings point to the inherited session proxy and a scratch local repository; no credentials
+or application configuration are copied. Below, `mvn` means that exact prefix for this execution record,
+or installed JDK 21/Maven in an operator terminal. No SQL opt-in/admin credentials were set.
+
+```bash
+mvn -pl shale-data,shale-server -am \
+  -Dtest=AuthCredentialLookupTest,PreTenantAuthenticationModuleContractTest,AuthUserLifecycleSecurityTest,AuthServiceAdapterTest,SqlRememberCredentialStoreTest,DesktopRememberCredentialMigrationContractTest,PreTenantAuthenticationLocalSqlServerTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+mvn \
+  -Dtest=AuthCredentialLookupTest,PreTenantAuthenticationModuleContractTest,AuthUserLifecycleSecurityTest,AuthServiceAdapterTest,SqlRememberCredentialStoreTest,DesktopRememberCredentialMigrationContractTest,PreTenantAuthenticationLocalSqlServerTest,AuthControllerTest,DesktopSessionControllerTest,DurableSessionAuthTest,RememberedDesktopSessionTest,SessionControllerTest,ServerAuthSessionLogoutTest,RequestScopedDbSessionProviderTest,DesktopSessionEnrollmentLifecycleTest,DesktopSessionEnrollmentClientTest,DesktopRuntimeSessionLifecycleTest,LoginRememberedSignInContractTest,AuthenticatedSessionLifecycleContractTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base origin/codex/latest --head HEAD --format markdown
+mvn -pl shale-data,shale-server -am \
+  -Dtest=com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.server.controller.AuthControllerTest,com.shale.server.runtime.PreTenantAuthenticationLocalSqlServerTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest,com.shale.server.runtime.SqlRememberCredentialStoreTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+mvn test
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py'
+python3 -m unittest discover -s build/test-selection -p 'test_select_tests.py'
+# Selector recommends this informationally because test-areas.json changed:
+mvn -Pall-tests test
+# Reproduced the advisory failures in a separate untouched 59d83748 worktree:
+mvn -pl shale-data -am \
+  -Dtest=AdministrativeReadAuditMigrationContractTest,ApplicationInstanceHeartbeatMigrationContractTest,ApplicationReleaseImportContractTest,CaseDaoCasesGridQueryTest,CaseDateTypeLifecycleCutoverContractTest,CaseDatesFinalRuntimeCleanupContractTest,CaseOverviewConfigurationContractTest,CaseSummaryReportsContractTest,ContactPhase2BAuditMigrationContractTest,FormConfigurationFoundationTest,SessionInvalidationPhase8AContractTest,UserSessionMigrationContractTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+# Preserve existing CRLF source rather than rewriting it for whitespace checking:
+git -c core.whitespace=cr-at-eol diff --check origin/codex/latest HEAD
+```
+
+| Executed check | Result and limits |
+| --- | --- |
+| Final focused modules/callers | 19 PASS; 1 explicit local auth SQL skip. All test sources compile; no SQL evidence. |
+| Additional server/desktop/UI compatibility | 69 PASS; 1 explicit local auth SQL skip. Synthetic controllers/lifecycles, not installed Windows or live login. |
+| Committed base-to-head selector / affected suite | 68 PASS; 1 local auth SQL skip. security-data/server/dependencies; no new-area or unrelated historical test activation. |
+| Critical `mvn test` | 116 PASS. Does not execute opt-in SQL. |
+| Auth launcher safety / selector units | 3 PASS / 24 PASS. No connections. |
+| Informational all-tests | Core 111 PASS; data 827 tests, 12 failures, 0 errors, 1 Case SQL skip. UI/desktop/updater/server not executed after data failure. No full-suite pass. |
+| Untouched live-base advisory reproduction | 51 tests, exactly the same 12 failing methods, 0 errors. The existing R1/R2/#1865 advisories remain inherited and unresolved; no unrelated fixes. |
+| Optional generated inventory check | Stale on both task and untouched live base. Regeneration exposed repository-wide historical drift; generated broad changes were discarded. Narrow test-area ownership is updated; no unrelated inventory rewrite. |
+
+Final changed-file review maps both production callers to the executing auth/store tests and unchanged
+server/desktop/session regressions; SQL to module contracts and compiled opt-in harness; runner to safety
+units; ownership map to selector units. Search finds no stale direct-SELECT auth or old resolver call in
+current production/tests (historical migration remains intentionally unchanged). Added documentation links,
+fences, scope/whitespace and exact unchanged Case harness/R4 ledger are checked separately. The original
+export remains unmodified/uncommitted and absent from this mount; its historical hash is not recomputed here.
+**AUTH SQL NOT RUN; CASE SQL NOT RUN; installed/production compatibility UNVERIFIED; deployment BLOCKED.**
+No targeted RLS migration prompt or security acceptance is issued without the missing compatibility evidence.

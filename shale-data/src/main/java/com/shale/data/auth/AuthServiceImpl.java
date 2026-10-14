@@ -1,7 +1,7 @@
 package com.shale.data.auth;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
+import java.sql.CallableStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
@@ -13,7 +13,7 @@ import com.shale.data.errors.AuthException;
 
 /**
  * JDBC implementation of AuthService. Looks up the user by email and verifies the bcrypt
- * hash. Adjust the column names/table name if your schema differs.
+ * hash in Java. The bounded database module is the only pre-tenant identity seam.
  */
 public final class AuthServiceImpl implements AuthService {
 
@@ -21,8 +21,12 @@ public final class AuthServiceImpl implements AuthService {
 	private final PasswordVerifier passwordVerifier;
 
 	public AuthServiceImpl(DataSources dataSources, PasswordVerifier passwordVerifier) {
-		this.appDs = dataSources.auth(); // "shale-app" datasource (Users table readable)
-		this.passwordVerifier = passwordVerifier;
+		this(dataSources.auth(), passwordVerifier);
+	}
+
+	public AuthServiceImpl(DataSource authSource, PasswordVerifier passwordVerifier) {
+		this.appDs = java.util.Objects.requireNonNull(authSource);
+		this.passwordVerifier = java.util.Objects.requireNonNull(passwordVerifier);
 	}
 
 	@Override
@@ -31,35 +35,35 @@ public final class AuthServiceImpl implements AuthService {
 			throw new AuthException("Email and password are required.");
 		}
 
-		final String sql = "SELECT TOP 1 " +
-				"  Id, " +
-				"  name_first, name_last, email, " +
-				"  password_hash AS pw_hash, " + // <- only this, no COALESCE
-				"  color, is_attorney, is_admin, is_deleted, " +
-				"  default_organization, organization_id, initials, " +
-				"  ShaleClientId " +
-				"FROM dbo.Users " +
-				"WHERE email = ? AND is_deleted = 0";
+		if (email.length() > 255) throw new AuthException("Invalid credentials.");
+		final String sql = "{call dbo.LookupAuthenticationCredentialV1(?)}";
 		int attempts = 0;
 		while (true) {
 			attempts++;
 			try (Connection c = appDs.getConnection();
-					PreparedStatement ps = c.prepareStatement(sql)) {
+					CallableStatement ps = c.prepareCall(sql)) {
 
 				ps.setString(1, email);
+				ps.setQueryTimeout(5);
 				try (ResultSet rs = ps.executeQuery()) {
 					if (!rs.next()) {
 						throw new AuthException("Invalid credentials.");
 					}
 
-					final String storedHash = rs.getString("pw_hash");
-					if (storedHash == null || !passwordVerifier.verify(password, storedHash)) {
+					Integer id = getNullableInt(rs, "Id");
+					Integer tenant = getNullableInt(rs, "ShaleClientId");
+					boolean deleted = rs.getBoolean("is_deleted");
+					boolean unknownDeleted = rs.wasNull();
+					if (id == null || id <= 0 || tenant == null || tenant <= 0
+							|| deleted || unknownDeleted || rs.getBoolean("IsRemoved")) {
 						throw new AuthException("Invalid credentials.");
 					}
 
+					final String storedHash = rs.getString("pw_hash");
+
 					// Build the shared core User
-					return User.builder()
-							.id(rs.getInt("Id"))
+					User user = User.builder()
+							.id(id)
 							.nameFirst(rs.getString("name_first"))
 							.nameLast(rs.getString("name_last"))
 							.email(rs.getString("email"))
@@ -70,16 +74,20 @@ public final class AuthServiceImpl implements AuthService {
 							.defaultOrganization(getNullableInt(rs, "default_organization"))
 							.organizationId(getNullableInt(rs, "organization_id"))
 							.initials(rs.getString("initials"))
-							.shaleClientId(rs.getInt("ShaleClientId"))
+							.shaleClientId(tenant)
 							.build();
+					if (rs.next() || storedHash == null || !passwordVerifier.verify(password, storedHash)) {
+						throw new AuthException("Invalid credentials.");
+					}
+					return user;
 				}
 			} catch (SQLException e) {
 				if (attempts < 3 && isTransient(e)) {
 					sleepQuiet(250L * attempts); // 250ms, 500ms
 					continue;
 				}
-				e.printStackTrace();
-				throw new AuthException("DB error: " + e.getMessage(), e);
+				// Driver messages/causes can contain SQL, identity or credential values.
+				throw new AuthException("Authentication is temporarily unavailable.");
 			}
 		}
 

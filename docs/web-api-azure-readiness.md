@@ -1,5 +1,15 @@
 # Shale Server Azure App Service Readiness
 
+## Pre-tenant auth candidate — 2026-10-14
+
+Shared password and remembered callers now target the bounded versioned modules described in the
+[owning prerequisite implementation](testing/case-read-local-security-verification.md#pre-tenant-authentication-prerequisite-implementation--2026-10-14).
+Deployment is BLOCKED: actual identities/owners/grants, security-owner approval of the internal hash
+projection/ambiguity policy, opt-in auth SQL and compatible installed desktop/fleet drain remain required.
+SQL must precede rebuilt server and desktop; there is no direct-SELECT fallback. No three-table FILTER
+is attached here. Follow the exact module/permission/client rollback there; preserve durable sessions,
+accepted R4 reports and every open security/deployment gate. Synthetic checks do not establish Azure parity.
+
 ## Case-read RLS prerequisite — 2026-10-14
 
 Security acceptance remains **OPEN**. The authoritative offline SSMS export and user-run Shale catalog

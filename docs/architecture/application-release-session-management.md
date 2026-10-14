@@ -5,6 +5,20 @@ closed; the wider release/session initiative remains in progress and logged-out 
 
 **Last reviewed:** 2026-10-06
 
+## Pre-tenant authentication compatibility candidate — 2026-10-14
+
+The shared JDBC password verifier and server remembered lookup now consume new bounded modules while
+retaining BCrypt, User/auth ports, desktop enrollment, DPAPI, durable issuance/validation/refresh/logout
+and authoritative runtime rotation. See the [owning prerequisite](../testing/case-read-local-security-verification.md#pre-tenant-authentication-prerequisite-implementation--2026-10-14)
+for capabilities, proposed non-bypass role profile, catalog/deployment blockers, tests and exact rollback.
+Modules and approved EXECUTE must precede compatible server **and desktop** releases; all older direct-SELECT
+clients/jobs must be inventoried/drained before grants/strict Users FILTER change. Existing Stay logged in
+acceptance remains attributed to its original Windows build, not this new candidate. Local auth SQL,
+installed compatibility and production grants/owners remain UNVERIFIED; security acceptance OPEN.
+Historical auth SELECT/ownership-chain descriptions below are superseded for this candidate only.
+No new audit schema/event, token/session/DPAPI contract or FILTER is introduced. Logged-out updates remain
+UNSUPPORTED and unrelated accepted reports/open gates retain their status.
+
 ## Stay logged in acceptance closeout — 2026-10-06
 
 **Status: COMPLETE — user-reported Windows acceptance.** This documentation-only closeout records the user's

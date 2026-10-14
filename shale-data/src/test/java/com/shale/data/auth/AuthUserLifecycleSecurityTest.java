@@ -14,10 +14,12 @@ import com.shale.data.dao.UserDao;
 
 final class AuthUserLifecycleSecurityTest {
 	@Test
-	void inactiveUsersCannotAuthenticateBecauseLoginFiltersDeletedUsers() throws Exception {
+	void loginUsesReviewedBoundedModuleWithLifecycleChecks() throws Exception {
 		String source = Files.readString(Path.of("src/main/java/com/shale/data/auth/AuthServiceImpl.java"));
 
-		assertTrue(source.contains("WHERE email = ? AND is_deleted = 0"));
+		assertTrue(source.contains("{call dbo.LookupAuthenticationCredentialV1(?)}"));
+        String module = Files.readString(Path.of("..", "docs", "sql", "2026-10-14_pretenant_authentication_modules.sql"));
+        assertTrue(module.contains("is_deleted=0 AND COALESCE(IsRemoved,0)=0"), "password login must reject disabled and removed identities");
 	}
 
 	@Test
