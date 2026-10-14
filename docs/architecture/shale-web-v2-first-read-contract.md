@@ -557,6 +557,16 @@ authorized, audited server reads. No new real-data browser consumer is authorize
 
 ## 11. R2 minimized tenant-wide Case reads — 2026-10-10
 
+**October 14 RLS evidence:** the authoritative supplied SSMS export and user-run catalog result confirm
+missing predicates on Users/auditLog/Statuses. Explicit minimized root/join/actor/context and required
+Overview audit contracts below remain; absence of RLS is not evidence of an API leak. SQL integration
+is still NOT RUN. The [owning runbook assessment](../testing/case-read-local-security-verification.md#rls-blocker-assessment--2026-10-14)
+sets the compatible auth/remembered-bootstrap prerequisite, targeted FILTER proposal, unknown grants,
+verification and rollback. Do not fabricate predicates in the snapshot or weaken the harness. This
+supersedes the immediate-run recommendation once an input is supplied: coverage/auth compatibility
+must be repaired and separately labelled candidate verification prepared first. Security acceptance
+OPEN; all R4 user reports and remaining deployment gates retained.
+
 Separate branch `codex/r2-minimized-case-reads` from freshly fetched live
 `origin/codex/latest` **`fe029cb2d157a3e4f1f86130f3872d731dd2a991`** (merged R1/#1855).
 The original checkout is preserved. Ancestry includes #1843 dependency-security and 3A–3J/#1844–1853;

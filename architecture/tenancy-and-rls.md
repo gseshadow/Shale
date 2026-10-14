@@ -6,7 +6,8 @@ Primary tenant key:
 - ShaleClientId
 
 Database access:
-- Runtime connections use shale_runtime.
+- Runtime connections are intended to use a non-bypass tenant identity, conventionally shale_runtime.
+  Actual configured principals, effective grants/roles and module execution authority require catalog evidence.
 - SESSION_CONTEXT('ShaleClientId') must be set before querying tenant protected tables.
 
 Pattern:
@@ -16,7 +17,7 @@ EXEC sys.sp_set_session_context
     @value=@TenantId,
     @read_only=1
 
-RLS protected tables:
+Intended RLS coverage (not a verified deployed inventory):
 - Cases
 - Contacts
 - Organizations
@@ -27,6 +28,30 @@ RLS protected tables:
 - Categories
 - Priorities
 - UserReleaseState
+
+### Confirmed Case-read coverage gap — 2026-10-14
+
+The authoritative user-supplied schema-only export and user-run Shale catalog result confirm **no
+security predicates** on `dbo.Users`, `dbo.auditLog` or `dbo.Statuses`. The enabled `sec.TenantFilter`
+and its functions exist, but unattached functions do not protect these tables. Users/audit history
+must be strict tenant reads; Statuses must allow global NULL ownership plus current-tenant rows.
+Absent RLS is a coverage gap, not proof of an API leak: minimized Case reads have explicit root/join
+predicates and same-connection actor/context checks. No local SQL integration run has occurred.
+
+The owning [Case-read runbook assessment](../docs/testing/case-read-local-security-verification.md#rls-blocker-assessment--2026-10-14)
+records actual exported shapes, application/auth/desktop/audit paths, unknown effective grants,
+bounded read-only catalog queries and prerequisite/verification/rollout/rollback decisions.
+Reuse the existing sec FILTER functions; keep the harness and original export unchanged. First
+establish bounded pre-tenant password/remembered identity resolution and compatible installed clients.
+Attaching strict Users RLS directly can break current login and remembered bootstrap. Ownership
+chaining alone does not bypass RLS; do not solve this by adding shared identities to ShaleAdmins or
+changing the shared function. Tenant-admin UI authority is distinct from SQL ShaleAdmins bypass.
+FILTER coverage does not establish write blocking, column protection or admin-only audit reads.
+
+RuntimeSessionService actually stamps both ShaleClientId and PrincipalUserId on every borrow without
+read_only=1; pooled context switching needs independent non-dbo verification. The example above is
+not the runtime initializer. Pre-tenant authentication and approved global control-plane operations
+are distinct bounded paths; tenant domain access must remain initialized. Security acceptance OPEN.
 
 ### User release announcement state
 

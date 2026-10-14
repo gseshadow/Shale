@@ -32,6 +32,14 @@ read-only pilot restriction or phase completion follows. Existing legacy writes/
 Next security work is the [runnable disposable local harness](testing/case-read-local-security-verification.md);
 the remaining hosted checks below still apply to their unreported scope. Do not repeat already reported passes.
 
+**October 14 prerequisite update:** the supplied authoritative offline schema and user-run catalog result
+confirm missing Users/auditLog/Statuses RLS; local SQL integration remains NOT RUN. Follow the
+[remediation assessment](testing/case-read-local-security-verification.md#rls-blocker-assessment--2026-10-14)
+for pre-tenant auth/remembered-bootstrap compatibility, targeted coverage and separately labelled candidate
+verification before invoking that harness. Keep the original export/harness unchanged. Missing predicates
+are a confirmed coverage gap, not proof of an API leak. All accepted reports and remaining host/security
+gates above remain; this assessment authorizes no configuration, live connection, fault or deployment.
+
 ## Evidence and retained acceptance
 
 Live `codex/latest`: **`33ddd228c789c81b7d7c05cd1d77c232b1d47ff6`**, retrieved through the

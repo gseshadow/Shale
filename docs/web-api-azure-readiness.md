@@ -1,5 +1,22 @@
 # Shale Server Azure App Service Readiness
 
+## Case-read RLS prerequisite — 2026-10-14
+
+Security acceptance remains **OPEN**. The authoritative offline SSMS export and user-run Shale catalog
+query confirm no predicates on Users/auditLog/Statuses; local SQL integration is **NOT RUN**. This is
+a confirmed RLS coverage gap, not proof of an API leak. Minimized Case queries retain explicit tenant/
+join/context checks and required committed Overview audit. Current auth and remembered-sign-in lookup
+run before tenant initialization, so strict Users coverage needs a compatible bounded auth-module
+prerequisite and installed desktop drain first. Ownership chaining alone does not bypass RLS.
+Do not weaken #1865's harness, fabricate snapshot predicates or grant shared identities SQL admin bypass.
+
+The [owning remediation assessment and next implementation prompt](testing/case-read-local-security-verification.md#rls-blocker-assessment--2026-10-14)
+define schema/source evidence, desktop/session/audit impact, unknown grants with read-only catalog queries,
+targeted three-FILTER repair, separate write/admin controls, verification, rollout and scoped rollback.
+No production code/migration/configuration/live fault/deployment change is part of this assessment.
+All [R4 accepted reports](../shale-web/docs/r4-desktop-acceptance.md) remain attributed and accepted;
+two-tenant/non-dbo, audit failure/commit uncertainty, session/host/privacy/device/AT gates remain open.
+
 For the responsive client replacement, see [Shale Web V2 architecture and roadmap](architecture/shale-web-v2-architecture-roadmap.md). Its verified inventory distinguishes current browser mutations and durable sessions from historical beta descriptions below.
 
 ## Ordinary web-client readiness and separate AI gates — 2026-10-08

@@ -15,6 +15,19 @@ Source of truth for this version: live schema output from the Shale database.
 
 **Important:** Before adding or changing SQL, verify column names against the live database or existing DAO/query code. Do not introduce new column names based on memory or naming guesses.
 
+**October 14, 2026 scoped evidence correction:** the authoritative attached schema-only SSMS export
+has nullable Users.ShaleClientId, non-null `dbo.auditLog.ShaleClientId` and nullable Statuses.ShaleClientId.
+Users email/password_hash are nvarchar(255), first/last names nvarchar(50), and email_norm is a persisted
+lower(email) expression with a nonunique exported index. Statuses Name/Color/LifecycleKey/SystemKey are
+nvarchar(50)/(10)/(32)/(64). Audit entryDate is varchar(50), stringValue varchar(max), fieldCode int.
+These scoped actual definitions supersede differing legacy table notes below for this assessment;
+do not infer missing migrations were applied. The supplied enabled sec policy has no predicates on
+these three tables, corroborated by the user-run catalog result. See the
+[owning assessment](../docs/testing/case-read-local-security-verification.md#rls-blocker-assessment--2026-10-14)
+for evidence hash, runtime/auth compatibility, catalog handoff and planned repair. The export contains
+no rows/grants/principal or auth-procedure inventory and stays uncommitted. No live connection or local
+SQL integration run occurred; security acceptance remains OPEN.
+
 ---
 
 ## Development Tenant
