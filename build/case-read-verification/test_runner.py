@@ -33,7 +33,7 @@ class RunnerSafetyTest(unittest.TestCase):
 
     def test_application_credentials_and_implicit_arguments_fail_closed(self):
         for key in ("SHALE_APP_DB_URL", "SHALE_RT_PASS", "SHALE_AUTH_TOKEN_SECRET", "SHALE_SUGGESTION_TEST_JDBC_URL",
-                    "SPRING_DATASOURCE_URL", "SQLAZURECONNSTR_DB", "JAVA_TOOL_OPTIONS", "MAVEN_ARGS"):
+                    "SPRING_DATASOURCE_URL", "SQLAZURECONNSTR_DB", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS", "MAVEN_ARGS", "MAVEN_OPTS"):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 self.check(env={key: "not-a-credential"})
         self.check(env={"SHALE_CASE_VERIFY_ADMIN_PASSWORD": "synthetic", "HTTPS_PROXY": "inherited"})
