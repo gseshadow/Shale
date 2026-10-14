@@ -1352,12 +1352,28 @@ R4's accepted Windows/desktop/audit/hosted/iPhone evidence remains unchanged and
 NOT RUN; security acceptance OPEN; Phase 2 OPEN, Phase 3 IN PROGRESS, Phase 4 INCOMPLETE; appearance
 provisional. Deployed RLS/grants/performance/audit/session/host/privacy/device/AT gates remain open.
 
+### 11.25 Pre-tenant authentication prerequisite candidate — 2026-10-14
+
+Based on fetched `59d8374858764788c621f6f8d986773b58ab79c4` (merged #1867), separate
+`codex/pretenant-auth-prerequisite`. Bounded exact password identity and versioned remembered resolver
+modules propose dbo-confined owner execution; shared callers preserve BCrypt/User/auth/session contracts
+and reject invalid/ambiguous identities safely. No tenant predicate or three-table FILTER changes.
+The [owning implementation record](../testing/case-read-local-security-verification.md#pre-tenant-authentication-prerequisite-implementation--2026-10-14)
+owns module capabilities, test evidence, catalog/security-owner/hash/identity/grant blockers, server and
+older desktop compatibility/drain, and exact additive module/permission/client rollback. No actual
+production grants are assumed or issued. Local auth and Case SQL remain NOT RUN; deployment BLOCKED.
+No live connection, production credential/fault/configuration, deployment or merge. Original export and
+Case harness unchanged; R4 accepted reports and all open gates retained. Phase 2 OPEN, Phase 3 IN PROGRESS,
+Phase 4 INCOMPLETE; appearance provisional. Next targeted migration/candidate prompt is deferred pending
+sufficient auth SQL and installed-client compatibility evidence; no security acceptance inferred.
+
 <a id="12-next-bounded-prompt--hosted-web-delivery-preparation"></a>
 
 ## 12. Next bounded prompt — local SQL execution and remaining acceptance
 
-Implement the [bounded pre-tenant auth prerequisite](../testing/case-read-local-security-verification.md#next-implementation-prompt)
-before the separately reviewed targeted RLS migration and local candidate verification. The authoritative
+Review and verify the [pre-tenant auth candidate](../testing/case-read-local-security-verification.md#pre-tenant-authentication-prerequisite-implementation--2026-10-14)
+before proposing the separately reviewed targeted RLS migration and local candidate verification prompt.
+Auth SQL and installed-client compatibility remain unverified; that next implementation prompt is deferred. The authoritative
 offline snapshot is now supplied and confirms missing Users/auditLog/Statuses coverage; it must remain
 unchanged/uncommitted. Resolve actual identity/grant/module ownership and email/NULL-user prerequisites
 through approved operator evidence. Preserve shared BCrypt/auth/session contracts and compatible desktop

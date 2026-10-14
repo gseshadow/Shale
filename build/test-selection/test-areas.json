@@ -496,11 +496,14 @@
         "docs/sql/**/*audit*.sql",
         "architecture/tenancy-and-rls.md",
         "build/case-read-verification/**",
+        "build/auth-verification/**",
         "**/verification/CaseRead*.java"
       ],
       "reason": "Security, RLS, tenant session, or audit infrastructure changed; critical and affected data/security contracts are blocking.",
       "ownership_patterns": [
         "com.shale.data.auth.AuthUserLifecycleSecurityTest",
+        "com.shale.data.auth.AuthCredentialLookupTest",
+        "com.shale.data.auth.PreTenantAuthenticationModuleContractTest",
         "com.shale.data.dao.CaseAggregateTransactionTest",
         "com.shale.data.dao.CaseLifecycleAuditContractTest",
         "com.shale.data.dao.ContactAggregateMutationContractTest",
@@ -513,6 +516,8 @@
       ],
       "blocking_smoke_patterns": [
         "com.shale.data.auth.AuthUserLifecycleSecurityTest",
+        "com.shale.data.auth.AuthCredentialLookupTest",
+        "com.shale.data.auth.PreTenantAuthenticationModuleContractTest",
         "com.shale.data.dao.CaseAggregateTransactionTest",
         "com.shale.data.dao.CaseLifecycleAuditContractTest",
         "com.shale.data.dao.ContactAggregateMutationContractTest",

@@ -67,15 +67,22 @@ public final class SqlRememberCredentialStore implements RememberCredentialStore
     }
 
     private Optional<Lookup> lookup(byte[] hash,UUID installation,Instant now){
+        if(hash==null || hash.length!=32 || installation==null || now==null)return Optional.empty();
         try(Connection c=identityLookup.getConnection();CallableStatement q=c.prepareCall(
-                "{call dbo.ResolveDesktopRememberCredential(?,?,?)}")){
+                "{call dbo.ResolveDesktopRememberCredentialV2(?,?,?)}")){
+            q.setQueryTimeout(5);
             q.setBytes(1,hash);q.setObject(2,installation);q.setTimestamp(3,Timestamp.from(now));
             try(ResultSet rs=q.executeQuery()){
                 if(!rs.next())return Optional.empty();
-                var principal=new ServerPrincipal(rs.getInt(2),rs.getInt(1),rs.getString(4));
-                return Optional.of(new Lookup(principal,UUID.fromString(rs.getString(3))));
+                int tenant=rs.getInt(1);boolean nullTenant=rs.wasNull();
+                int user=rs.getInt(2);boolean nullUser=rs.wasNull();
+                String session=rs.getString(3),email=rs.getString(4);
+                if(nullTenant || tenant<=0 || nullUser || user<=0 || session==null || rs.next())return Optional.empty();
+                UUID sid;
+                try{sid=UUID.fromString(session);}catch(IllegalArgumentException invalid){return Optional.empty();}
+                return Optional.of(new Lookup(new ServerPrincipal(user,tenant,email),sid));
             }
-        }catch(SQLException e){throw new IllegalStateException("Failed to locate remembered sign-in",e);}
+        }catch(SQLException e){throw new IllegalStateException("Failed to locate remembered sign-in");}
     }
 
     private Connection openRuntime(ServerPrincipal principal)throws SQLException{

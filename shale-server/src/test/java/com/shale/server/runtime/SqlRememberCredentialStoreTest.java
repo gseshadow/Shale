@@ -74,9 +74,49 @@ class SqlRememberCredentialStoreTest {
         var failure=assertThrows(IllegalStateException.class,()->store.rotate(new byte[32],installation,new byte[32],UUID.randomUUID(),Instant.now()));
 
         assertEquals("Failed to rotate remembered sign-in",failure.getMessage());
-        assertEquals("{call dbo.ResolveDesktopRememberCredential(?,?,?)}",calledSql.get(),"shale_app must execute only the narrow resolver module");
+        assertEquals("{call dbo.ResolveDesktopRememberCredentialV2(?,?,?)}",calledSql.get(),"shale_app must execute only the narrow resolver module");
         assertEquals(7,runtimePrincipal.get().shaleClientId());assertEquals(9,runtimePrincipal.get().userId());
         assertEquals("owner@test",runtimePrincipal.get().email());
+    }
+
+    @Test void invalidOrAmbiguousResolverRowsNeverInitializeRuntimeAuthority() {
+        UUID installation=UUID.randomUUID();
+        for(Object[] row:List.of(new Object[]{null,9,UUID.randomUUID().toString()},
+                new Object[]{0,9,UUID.randomUUID().toString()},new Object[]{7,null,UUID.randomUUID().toString()},
+                new Object[]{7,-1,UUID.randomUUID().toString()},new Object[]{7,9,null},new Object[]{7,9,"invalid"})) {
+            var store=new SqlRememberCredentialStore(lookupRows(List.<Object[]>of(row)),p->{throw new AssertionError("invalid candidate must not open runtime");});
+            assertTrue(store.rotate(new byte[32],installation,new byte[32],UUID.randomUUID(),Instant.now()).isEmpty());
+        }
+        Object[] valid={7,9,UUID.randomUUID().toString()};
+        var store=new SqlRememberCredentialStore(lookupRows(List.of(valid,valid)),p->{throw new AssertionError("ambiguous candidate must not open runtime");});
+        assertTrue(store.rotate(new byte[32],installation,new byte[32],UUID.randomUUID(),Instant.now()).isEmpty());
+    }
+
+    @Test void malformedLookupInputsNeverBorrowAuthOrRuntime() {
+        DataSource denied=(DataSource)Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{DataSource.class},
+                (p,m,a)->{throw new AssertionError("invalid hash must not borrow auth");});
+        var store=new SqlRememberCredentialStore(denied,p->{throw new AssertionError("invalid hash must not borrow runtime");});
+        for(byte[] hash:Arrays.asList(null,new byte[31],new byte[33]))
+            assertTrue(store.rotate(hash,UUID.randomUUID(),new byte[32],UUID.randomUUID(),Instant.now()).isEmpty());
+    }
+
+    private DataSource lookupRows(List<Object[]> values) {
+        int[] index={-1};boolean[] wasNull={false};
+        ResultSet rows=(ResultSet)Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{ResultSet.class},(p,m,a)->{
+            if(m.getName().equals("next"))return ++index[0]<values.size();
+            if(m.getName().equals("wasNull"))return wasNull[0];
+            if(m.getName().equals("getInt")||m.getName().equals("getString")) {
+                Object value=((Integer)a[0])==4?"owner@test":values.get(index[0])[(Integer)a[0]-1];wasNull[0]=value==null;
+                return m.getName().equals("getInt")&&value==null?0:value;
+            }
+            return defaultValue(m.getReturnType());
+        });
+        CallableStatement call=(CallableStatement)Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{CallableStatement.class},
+                (p,m,a)->m.getName().equals("executeQuery")?rows:defaultValue(m.getReturnType()));
+        Connection connection=(Connection)Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{Connection.class},
+                (p,m,a)->m.getName().equals("prepareCall")?call:defaultValue(m.getReturnType()));
+        return (DataSource)Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{DataSource.class},
+                (p,m,a)->m.getName().equals("getConnection")?connection:defaultValue(m.getReturnType()));
     }
 
     private static Object defaultValue(Class<?> type){
