@@ -1,10 +1,10 @@
 # AI Integration, REST/OpenAPI, and MCP Architecture and Roadmap
 
-**Status:** Phase 0 assessment COMPLETE; architecture/contract review IN PROGRESS; implementation NOT STARTED.
+**Status:** Phase 0 assessment COMPLETE; architecture/contract review IN PROGRESS; shared Case/REST foundation IN PROGRESS; MCP implementation NOT STARTED.
 
-**Last reviewed:** 2026-10-08
+**Last reviewed:** 2026-10-14
 
-**Repository baseline:** live `origin/codex/latest`, commit `852a9c9d72cf5c62a2963323185eb67b88cf7a20`.
+**Repository baseline:** live `origin/codex/latest`, commit `b4023ff33036d108aec0feb941bc365c5e529aca`.
 This is repository inspection, not evidence of deployed SQL, API configuration, or runtime security acceptance.
 
 ## 1. Purpose, scope, and document ownership
@@ -14,10 +14,10 @@ application operations used by REST/OpenAPI and future MCP. It records recommend
 not authorize deployment or claim that proposed contracts or controls exist. This task changes documentation
 only: no MCP implementation, endpoints, database migrations, production code, or runtime configuration.
 
-A new document is appropriate because the web migration notes inventory shared services, and the
-release/session roadmap owns authentication lifecycle, but neither owns the combined external REST/MCP
-contract, delegated integration authority, or AI access audit model. Reuse those authorities rather than
-copying their roadmaps. Subsequent tasks must update this tracker and the affected owning document.
+This existing document already owns the combined external REST/MCP contract, delegated integration
+authority, and AI access audit model. Update it rather than creating another roadmap. The web roadmap
+owns client delivery and the release/session roadmap owns authentication lifecycle; reuse those authorities
+rather than copying their roadmaps. Subsequent tasks must update this tracker and the affected owning document.
 
 **Web delivery is independent of AI integration activation.** The web rebuild uses ordinary authenticated
 REST/OpenAPI and shared Shale operations. It does not depend on completing MCP, AI OAuth, integration
@@ -32,6 +32,10 @@ Reviewed evidence and continuing authorities:
   [API readiness and OpenAPI contracts](../web-api-azure-readiness.md), [local smoke tests](../web-api-local-smoke-test.md),
   [App Service deployment](../azure-app-service-deployment.md), [web deployment](../shale-web-deployment.md),
   and [web client README](../../shale-web/README.md).
+* [Web V2 roadmap](shale-web-v2-architecture-roadmap.md), especially R1–R4 and its remaining acceptance
+  gates; [first-read contract](shale-web-v2-first-read-contract.md), especially the accepted R2 decisions
+  in section 11; [R4 acceptance ledger](../../shale-web/docs/r4-desktop-acceptance.md); and
+  [isolated SQL verification runbook](../testing/case-read-local-security-verification.md).
 * [Release/session roadmap](application-release-session-management.md), especially the later Phase 7B/7C,
   Phase 8A/8B implementation records and remembered-sign-in closeout. Earlier inventory sections describe
   historical states and must not be interpreted as today's exclusively in-memory revocation design.
@@ -50,8 +54,8 @@ Reviewed evidence and continuing authorities:
 | Shared contracts | `shale-core`, `com.shale.core.service`: `CaseServicePort`, `TaskServicePort`, `ContactServicePort`, `OrganizationServicePort`, `AuthServicePort`, `UserServicePort`; shared DTOs and `DbSessionProvider` | Existing JavaFX-free application entry points; no new service module is justified merely to add MCP. A port interface alone does not prove complete policy enforcement. |
 | Implementations | `shale-data`, `com.shale.data.service.adapter.*`, backed by `CaseDao`, `CaseSummaryDao`, `TaskDao`, `ContactDao`, Organization aggregate DAOs | Many adapters are thin delegates. Important validation, lifecycle, concurrency, relationship, and transaction rules live in DAOs/aggregate workers. Keep these authoritative workers. |
 | Server composition | `shale-server`, `ShaleServerServiceConfiguration` | Spring Boot composes core/data services without `shale-ui` or `shale-desktop`. This is the natural initial host for both external adapters. Separate deployment is not currently required. |
-| REST | `ApiReadController` plus auth, session, release, instance, admin, and contact-value-validation controllers | Existing case/contact/organization/task reads and several writes. Despite its name, `ApiReadController` is not read-only. Reuse routes and operations; do not expose the controller wholesale to MCP. |
-| OpenAPI | `OpenApiConfiguration`, Springdoc dependency in `shale-server/pom.xml`, `OpenApiDocumentationTest` | Generated `/v3/api-docs`, `/swagger-ui/index.html`, and `bearerAuth` already exist. The advertised `v1` is not yet a complete external compatibility policy. |
+| REST | `MinimizedCaseReadController`, `ApiReadController` plus auth, session, release, instance, admin, and contact-value-validation controllers | Minimized actor-aware Case search/assigned/Overview reads now exist alongside broad legacy reads and writes. Despite its name, `ApiReadController` is not read-only. Reuse operations; do not expose a controller wholesale to MCP. |
+| OpenAPI | `OpenApiConfiguration`, `MinimizedCaseOpenApiConfiguration`, Springdoc dependency in `shale-server/pom.xml`, `OpenApiDocumentationTest` | Generated `/v3/api-docs`, `/swagger-ui/index.html`, and `bearerAuth` exist. Minimized Case schemas have concrete required/nullable fields and bounds. The advertised `v1` is not yet a complete external compatibility policy. |
 | Tenant context | `ServerSessionResolver`, `ServerRuntimeSessionState`, `RequestScopedDbSessionProvider`, `RuntimeSessionServiceConnectionProvider`, data `RuntimeSessionService` | Authenticated principal is resolved before business access; connections set `ShaleClientId` and `PrincipalUserId`. DAOs also use tenant equality and lifecycle predicates. |
 | Sessions | `ShaleAuthTokenService`, `ServerAuthSessionService`, `DurableSessionTokenValidator`, `SqlDurableSessionStore`, `UserSessionServicePort`/adapter/DAO | Bound JWT `sid`/`jti` is checked against SQL expiry, current JTI, ownership, and revocation; refresh rotates conditionally. Reuse durable lifecycle patterns, not an in-memory-only replacement. |
 | Audit | `PhiFieldRegistry`, data `PhiAuditService`/`AuditLogDao`, `EntityActionAuditEvent`/DAO, `AdministrativeReadAuditEvent`/DAO, server `SessionManagementService` | Existing tenant-owned PHI, mutation, bounded administrative-read, and session-security mechanisms. Their vocabularies are constrained and not interchangeable. |
@@ -78,6 +82,24 @@ transaction gap, retaining DAO transaction owners and post-commit invalidations.
 
 ### 2.3 Security and audit gaps
 
+The accepted R2 web contract is an important scoped exception to the older gaps below. Eligible users may
+search/read all active Cases in their own tenant through the eight-field minimized projection; assignment
+filters only the Assigned list. `CaseServicePort.searchMinimizedCases`, `listMinimizedAssignedCases`, and
+`readMinimizedCaseOverview` delegate through `CaseServiceAdapter`/`DaoCaseGateway` to `CaseSummaryDao`.
+That worker checks tenant/actor against SQL session context and the current non-deleted/non-removed user,
+applies tenant/deletion predicates before paging, and uses tenant-qualified relationship joins. No new
+Case ACL or administrator bypass is part of this slice. Broader field/child/document access and AI grant
+policy still need their own review; do not reopen the accepted ordinary web policy as an AI prerequisite.
+
+Overview uses one connection/transaction for authority, narrow read, existing `Case.Overview.Read` PHI
+audit, and commit before returning the DTO. Audit append/commit failure withholds data. Web search/assigned
+summary pages have an explicit owner-approved audit exemption for this slice only. These are reusable
+boundaries, not proof of complete AI attribution or permission for wider payloads. Source and recorded
+synthetic tests establish implementation; the R4 ledger records bounded user-reported desktop/hosted/iPhone
+acceptance. Two-tenant/non-dbo/pooled-context, audit-failure/commit uncertainty, deployed protection and
+performance gates remain open. The isolated SQL harness has not run because approved authoritative
+schema-only definitions are missing; this assessment runs no SQL or runtime tests.
+
 * RLS coverage is not uniformly established. The Contacts roadmap explicitly records that the parent
   `dbo.Contacts` has no TenantFilter predicate, while newer Contact child tables use strict RLS; the
   generic tenancy list must not override this specific finding. The historical RLS audit also identifies
@@ -98,8 +120,8 @@ transaction gap, retaining DAO transaction owners and post-commit invalidations.
   desktop remembered credentials and `DESKTOP` sessions are not an integration registration mechanism.
 * `shale-ui.services.PhiReadAuditService` derives actor from `AppState`, deduplicates briefly, and catches
   audit failures. `CaseController` and task detail callers invoke it on view intent. HTTP and future MCP
-  calls cannot rely on that UI seam. Selected server reads need an authoritative audit-before-release
-  boundary with a deliberate failure policy.
+  calls cannot rely on that UI seam. The minimized Overview now has an authoritative fail-closed seam;
+  other selected reads still need operation-specific audit review and any necessary shared boundary.
 * `EntityActionAuditEvent` already has source/correlation/parent context, but no general READ/FAILED
   action or integration/tool metadata keys. `AdministrativeReadAuditEvent.ReadType` currently models
   only application-instance list/distribution reads. `SessionSecurityAuditLog` models session events,
@@ -122,13 +144,17 @@ composition and workstation file handling remain UI-specific. No inspected serve
 case-document content search/download, provider authorization, or a stable secured document identifier contract.
 Do not reinterpret generated summaries, Material Items, or arbitrary URLs as authorized document bytes.
 
-`shale-web/src/api.ts` is an existing React/TypeScript consumer of bearer APIs, with per-tab `sessionStorage`
-and manually maintained types. The server has safe errors via `ApiExceptionHandler`/`ApiErrorResponse`,
-validation via `ApiValidation`, and configured origin CORS. Case and Contact search-page endpoints currently
-fetch a prefix and slice it in memory with `total=null`; Contact search also applies its adapter limit after
-DAO retrieval. A bounded response alone is not bounded database work. Some responses expose UI-oriented
-fields or concurrency bytes, and `getCase` returns Java `Object`. These are contract-hardening issues, not
-reasons to replace Spring Boot or the existing domain architecture.
+`shale-web/src/api.ts` remains a compatibility consumer of bearer APIs; the newer
+`shale-web/src/features/cases` client/workspace uses the minimized Case contract with runtime response
+validation. `CredentialStore` owns the existing per-tab `sessionStorage` boundary; first-slice refresh is
+disabled and confirmed rejection requires explicit re-login. These are client choices, not AI credentials.
+The server has safe errors via `ApiExceptionHandler`/`ApiErrorResponse`, validation via `ApiValidation`,
+and configured origin CORS. R1 removed prefix slicing from legacy Case search-page through exact SQL
+offset/size delegation (`total=null` remains); Contact search-page still slices a fetched prefix and its
+adapter can limit after DAO retrieval. R2 adds SQL size+1 paging, page/size limits, statement timeouts and
+checked serialized byte budgets. Row limits/timeouts do not establish bounded scanned work or an
+end-to-end deadline. Broad legacy responses still expose UI-oriented fields or concurrency bytes, and
+`getCase` returns Java `Object`. Harden those contracts per use case; retain the newer proven source seams.
 
 ## 3. Target architecture
 
@@ -247,7 +273,8 @@ clients, following the selected MCP specification's authorization/discovery requ
 authorization server authenticates the user and issues audience-bound, short-lived, integration/grant-bound
 credentials; clients do not receive Shale passwords or desktop remembered credentials. Validate issuer,
 audience/resource, signature, expiry, and live grant/session state. Do not pass tokens to a storage provider or
-accept a token issued for another resource. Confidential-client keys authenticate the integration only and
+accept a token issued for another resource. Never accept development identity headers or legacy unbound
+Shale tokens as AI authentication. Confidential-client keys authenticate the integration only and
 never substitute for user delegation. Local AI can use the same remote connection; localhost/stdio, if later
 needed, must not create a trusted local SQL or identity-assertion exception.
 
@@ -282,7 +309,7 @@ exchange only after the issuer/transport decision; preserve current browser/desk
 
 | Deferred decision | Evidence/owner needed before implementation or activation |
 | --- | --- |
-| Case/matter and sensitive-field read policy | For each operation being exposed, product/security owners must confirm whether ordinary active cases are tenant-wide visible or restricted, any ethical walls, deleted-case handling, directory relationships, and role/field exceptions. Existing Team roles do not answer this. Required for that operation's policy acceptance; unrelated AI OAuth decisions do not block ordinary REST work. |
+| Case/matter and sensitive-field read policy | R2 already accepts tenant-wide active Case reads for eligible web users and its exact minimized fields. Preserve that decision. Product/security owners must decide AI grant/case restrictions and policies for wider fields, child operations, directories, documents and deleted cases. Existing Team roles do not answer this; do not introduce assignment-only policy or an admin bypass by assumption. Unrelated AI decisions do not block the accepted web slice. |
 | OAuth issuer and remote MCP transport/library | Inspect current deployment capabilities, selected MCP revision and representative independent clients; decide authorization-server responsibilities, audience/scopes/discovery, consent and client registration, and supported transport. Required before Phase 3. |
 | Grant/session persistence and admin controls | Map integration/delegation lifecycle to existing durable sessions and verified schema constraints; decide minimal compatible extension and rollback/revocation behavior. No table/enum/migration is prescribed in this assessment. |
 | Audit representation | Review SQL and Java allowlists, PHI-read persistence, denied-request attribution and approved retention/review. Decide the scoped compatible AI attribution extension before AI access; ordinary required read audits are reviewed per web operation. |
@@ -296,6 +323,16 @@ must satisfy their operation's required Shale audit semantics, but do not need a
 MCP tool attribution, or the complete AI read/failure audit extension. Implement any required non-UI
 PHI-read seam for a web use case independently; do not fabricate integration fields or silently omit a
 required audit. Reuse that seam for AI once its additional attribution and persistence gates are ready.
+
+The minimized Overview is now a concrete reuse example: `CaseSummaryDao.readMinimizedCaseOverview`
+appends the existing event through `AuditLogDao.appendPhiWriteAudit(Connection, ...)` before commit.
+Its row preserves tenant/user/Case/time and `action=READ;screen=Case.Overview`, but has no structured
+integration, tool, grant, correlation or outcome attribution. Preserve this PHI event and its failure
+semantics; add approved AI attribution at the same authoritative boundary rather than duplicating the
+Overview query/audit in MCP. Decide whether a compatible extension or linked access event is appropriate;
+do not require another success PHI row merely to attach AI provenance. Later serialization or transport
+failure after commit must be distinguishable from successful server access; an audit row does not prove
+delivery to a human or model.
 
 Use existing Shale audit ownership, tenant RLS, append-only retention, administrator review, sanitization,
 and transaction patterns. Do not create a parallel AI audit product or use Case/Task Timeline as compliance
@@ -317,8 +354,10 @@ Compatibility matrix:
   through a non-UI application seam, with an approved access-event extension for integration attribution.
 * AI search summaries are automated disclosure. Require one bounded operation-level access event, including
   empty successful results, without keystroke telemetry or query text. This is an external-access policy;
-  it does not impose AI operation-level search auditing on ordinary web searches or retroactively alter
-  the intentionally unaudited desktop suggestions. Web search audit treatment requires its own scoped review.
+  it does not alter the accepted R2 web summary exemption or the intentionally unaudited desktop
+  suggestions. Other web search audit treatment requires its own scoped review. Because the reused R2
+  page worker intentionally appends no PHI read row, the shared AI context/access-event seam must enforce
+  approved integration auditing before MCP disclosure; the MCP adapter cannot silently inherit that exemption.
 * Tenant integration enable/disable, registration, scope changes, grant revocation, and later domain writes
   are meaningful administrative/security/domain actions. Map administrative/domain changes to reviewed
   entity-action vocabulary and session/grant revocation to compatible session-security semantics.
@@ -334,8 +373,9 @@ including any necessary allowlist/schema/viewer change, to implementation; do no
 PHI value fields or claim today's schema already supports it.
 
 For AI sensitive reads, perform authorization, bounded read, and required audit persistence at the authoritative
-operation seam and commit audit before releasing data. Follow the existing administrative-read fail-closed
-pattern, not UI best-effort failure handling. Multi-query compositions need a deliberate connection/transaction
+operation seam and commit audit before releasing data. Follow the existing minimized Overview and
+administrative-read fail-closed patterns, not UI best-effort failure handling. Multi-query compositions need
+a deliberate connection/transaction
 plan because existing ports often borrow independently. Failure returns no sensitive result and no success claim.
 A denied/failed attempt needs separately approved durable security-event semantics outside a rolled-back
 business transaction; no invented success event or untrusted tenant attribution. If required failure audit is
@@ -352,17 +392,27 @@ audit failure rollback/no disclosure, and absence of sensitive values. This task
 ## 6. Proposed initial MCP surface
 
 These five tools are a small proposed **Phase 1 read-only contract**, delivered in roadmap Phase 3 after
-shared-service and security gates. They are not implemented or approved wire schemas. All inputs exclude tenant,
-user, integration identity, SQL, arbitrary field expressions, and permission claims. Proposed search pages
-start with a maximum of 25 items (policy may lower it); response byte/time budgets are also required. Cursors
-are opaque, bound to authorized scope/filter/version, and never allow tenant selection. Pagination support
-below the port must be proven before promising a cursor. Search output is minimized; narrative, DOB/condition,
-private notes, external URLs, audit internals, and row versions are excluded by default.
+shared-service and security gates. Start implementation planning with `search_cases` and
+`get_case_overview`, whose minimized operations already exist; add the other three only after their
+actor policy, bounds and audit gaps close. All remain proposed, not implemented MCP schemas. Inputs
+exclude tenant, user, integration identity, SQL, arbitrary field expressions, and permission claims.
+
+For the two Case tools, begin with existing R2 page/size semantics (0–100 / 1–25), literal Case-name
+search, `hasMore` and result-window ceiling; blank search does not browse. Reuse the eight-field DTO
+allowlist and stored local `updatedAt` text without appending Z. MCP may omit presentation-only color.
+Do not add dates, narratives or broad detail hydration to make an Overview seem more useful. REST's
+128 KiB page / 8 KiB Overview caps are evidence for initial budgets; MCP encoding/envelopes need their
+own checked byte budget. Its additional grant restrictions must filter SQL before paging and the probe.
+Existing tenant-wide queries alone cannot enforce a narrower integration case restriction.
+
+Other tools need proven bounded pagination before choosing page or opaque scope/filter/version-bound
+cursors. Search output is minimized; narrative, DOB/condition, private notes, external URLs, audit
+internals and row versions are excluded by default. No cursor is promised by an unpaged legacy port.
 
 | Tool | Purpose; conceptual inputs | Conceptual outputs | Authorization considerations | Underlying Shale operation and existing REST equivalent |
 | --- | --- | --- | --- | --- |
-| `search_cases` | Find relevant active accessible matters; literal query, bounded page limit/cursor | Case ID/number/name, current semantic status and practice area, continuation/truncation indicator; no narrative by default | Case-search grant AND current user read policy, before paging; exclude deleted/restricted matters and hidden counts | Reuse `CaseServicePort.searchCases` -> `CaseServiceAdapter` -> `CaseSummaryDao.searchActiveForServer`; strengthen policy/true paging as needed. REST exists: `GET /api/cases/search` and `/search-page`. |
-| `get_case_overview` | Understand one accessible matter; Case ID | Minimized typed overview: case identity, status, practice area, authorized team and authoritative selected dates; allowed summary fields only after field-policy review | Case-read grant, active user, same tenant, case/field visibility; one auditable access, no deleted-case admin capability | Compose/narrow existing `getAuthoritativeCaseDetail`, summary and authoritative date operations behind a shared query boundary; avoid automatic full detail/narrative loading. REST `GET /api/cases/{caseId}` exists but returns fuller detail, not this exact minimized contract. |
+| `search_cases` | Find active accessible matters; literal Case-name query, page, size | Minimized Case summaries and page/size/hasMore with explicit window ceiling | Case-search scope AND current eligible user AND tenant/AI grant restrictions, applied before paging/probe; deleted Cases excluded | Reuse `CaseServicePort.searchMinimizedCases` -> `CaseServiceAdapter`/`DaoCaseGateway` -> `CaseSummaryDao.searchMinimizedCases`; extend only for approved integration restrictions/audit. Exact REST exists: `POST /api/v2/cases/search-page`. Legacy GET search routes remain compatible alternatives, not the preferred MCP mapping. |
+| `get_case_overview` | Understand one active accessible matter; Case ID | Existing minimized identity, status, practice area, responsible attorney, primary legal assistant and stored local updatedAt; no dates/narratives/children | Case-read scope, eligible user, same tenant, case/field/grant visibility; required committed Overview audit plus approved AI attribution | Reuse `CaseServicePort.readMinimizedCaseOverview` -> adapter/gateway -> `CaseSummaryDao.readMinimizedCaseOverview`; preserve its transaction/audit. Exact REST exists: `GET /api/v2/cases/{caseId}/overview`. Do not compose broad `getAuthoritativeCaseDetail` for this tool. |
 | `get_case_tasks` | Identify case work and deadlines; Case ID, bounded page/filter for completion | Task IDs, title, due date/time, status/completion and permitted assignee summary; continuation indicator | Case and task read permission plus grant; authorize parent independently, exclude private narrative, bound child query | Reuse `TaskServicePort.listCaseTasks` -> `TaskServiceAdapter` -> `TaskDao.listActiveTasksForCase`; add authoritative actor policy/bounds where needed. REST exists: `GET /api/cases/{caseId}/tasks`, currently list-shaped. |
 | `search_contacts` | Find people in the permitted directory; literal query, limit/cursor | Contact ID, display name, permitted classification/primary contact summary; no DOB, condition, or notes | Directory-read grant AND user directory/field policy; no restricted case relationship expansion | Reuse `ContactServicePort.searchContacts` or actor-aware `getContactDirectoryPage` where its filtering/paging fits; shared projection and policy must avoid unbounded legacy retrieval. REST exists: `GET /api/contacts/search` and `/search-page`. |
 | `search_organizations` | Find permitted organizations; literal query, limit/cursor | Organization ID, name and permitted type/primary contact summary | Organization-directory grant AND user/field policy; no private notes or hidden related cases | Reuse `OrganizationServicePort.searchOrganizations`; `OrganizationDao.findDirectoryPage(OrganizationSearchCriteria)` is a structured paged query to assess behind an actor-aware shared port extension, not an existing directory port. REST exists: `GET /api/organizations/search`; current scalar summary is a compatibility projection. |
@@ -389,9 +439,11 @@ Deferred tools:
 ## 7. REST/OpenAPI implications
 
 The present Spring Boot/core/data split is suitable for redesigned web and future mobile clients. Continue it
-and strengthen selected contracts instead of starting a second web/mobile backend. Reuse case search/detail,
-case tasks/updates, Contact/Organization search/detail, lookup, notification cursor, auth, and durable-session
-routes. Reuse authoritative Contact/Organization aggregates and Case Date projections rather than raw tables
+and strengthen selected contracts instead of starting a second web/mobile backend. Prefer the existing
+minimized `/api/v2/cases` search/assigned/Overview routes and their concrete OpenAPI schemas for the
+selected read workflow. Retain broad legacy case search/detail, case tasks/updates, Contact/Organization
+search/detail, lookup, notification cursor, auth, and durable-session routes for their existing consumers.
+Reuse authoritative Contact/Organization aggregates and Case Date projections rather than raw tables
 or legacy scalar mutation logic. Keep release/policy global control-plane operations separate from tenant data.
 
 Web/API work can implement and verify these shared decisions per use case using existing bearer sessions.
@@ -404,8 +456,9 @@ Phase 2 should standardize:
   safe request DTOs/projections rather than persistence rows. Document nullable fields, enum/custom lookup
   identity, UTC instants versus existing local Case Date/task times, ID encoding for mobile/JavaScript,
   relationship visibility, soft deletion, and empty/unavailable results.
-* Bounded database paging/sorting and response budgets, including case/Contact prefix slicing and Organization
-  directory/search behavior. Keep existing list/page contracts compatible until an explicit deprecation;
+* Bounded database paging/sorting and response budgets, including remaining Contact prefix slicing
+  and Organization directory/search behavior. Preserve the completed R1 Case SQL paging and R2
+  size+1/window semantics. Keep existing list/page contracts compatible until an explicit deprecation;
   do not add full counts where unavailable/expensive. Notifications already offer a cursor pattern to assess.
 * Common safe error envelope with documented 400/401/403/404/409/429/503 behavior, sanitized correlation,
   and no forbidden-resource existence leakage. REST error codes and MCP protocol errors are translated by
@@ -451,14 +504,16 @@ required for this documentation task; the tests below are future phase acceptanc
 selected operations to code and resolve the decision table. **Completion:** Contract/security owners record
 accepted choices and remaining exclusions; no unresolved policy is treated as permission to expose data.
 
-### Phase 1 — Shared application/service boundary (**NOT STARTED**)
+### Phase 1 — Shared application/service boundary (**IN PROGRESS**)
 
 **Goal:** Selected operations are authoritative and reusable from either protocol.
 **Dependencies:** Policy/contract and required audit acceptance for the operation being changed, plus
 its owning domain roadmap. AI issuer/transport/grant decisions and full Phase 0 completion are not
 prerequisites for ordinary web/service work.
 
-* [ ] Inventory each selected path's actor, tenant, field policy, audit, connection and bounds.
+* [x] Identify existing minimized Case ports/adapters/workers with actor/context checks, SQL paging
+  and committed Overview audit; source evidence is in the first-read R2 record.
+* [ ] Complete each additional selected path's actor, tenant, field policy, audit, connection and bounds.
 * [ ] Reuse core ports/data adapters/DAO workers; extract only necessary non-UI orchestration.
 * [ ] Establish verified immutable execution context and actor-aware shared query operations.
 * [ ] Implement required ordinary operation read-audit seams; retain strict RLS and explicit predicates.
@@ -471,16 +526,21 @@ prerequisites for ordinary web/service work.
 restricted case/child and field access, non-dbo two-tenant RLS, pooled concurrent tenant/user reuse, context
 initialization failure, audit failure/no disclosure, and legacy REST parity. Run relevant focused suites and
 repository selector/critical local checks under existing rules. **Completion:** Each delivered REST operation
-invokes a proven shared boundary without duplicating business/security logic; reads are bounded and required audits pass. Record AI readiness separately;
-REST acceptance does not require an implemented MCP adapter or AI audit extension.
+invokes a proven shared boundary without duplicating business/security logic; reads are bounded and
+required audits pass. Record AI readiness separately; REST acceptance does not require an implemented
+MCP adapter or AI audit extension.
 
-### Phase 2 — Stable REST/OpenAPI foundation (**NOT STARTED**)
+### Phase 2 — Stable REST/OpenAPI foundation (**IN PROGRESS**)
 
 **Goal:** Web/mobile/integrations consume documented stable application contracts.
 **Dependencies:** Verified shared operations and REST compatibility decisions for the selected web/mobile
 use cases. No dependency on MCP, AI OAuth, registration/grants or completion of AI contract review.
 
-* [ ] Formalize existing selected endpoints/schemas/errors/paging before adding any missing use case.
+* [x] Reconcile the implemented R1 exact legacy Case paging and R2 minimized endpoints/OpenAPI with
+  this roadmap; the R3 browser consumer and R4 acceptance ledger remain owned by the web roadmap.
+* [ ] Formalize remaining selected endpoints/schemas/errors/paging before adding any missing use case.
+* [ ] Close outstanding Case-read runtime security/deployment/performance gates using the existing
+  runbook/ledger; approved schema-only definitions block execution of the local SQL harness.
 * [ ] Align authoritative auth/authorization and audit below REST; retain current compatible routes.
 * [ ] Review generated OpenAPI and typed web/mobile contract consumption and version/deprecation policy.
 * [ ] Document the separation of browser user authority and future integration audience/scopes;
@@ -494,10 +554,13 @@ OpenAPI describes actual behavior and selected web/mobile contracts remain compa
 ### Phase 3 — Read-only MCP foundation and minimum tenant controls (**NOT STARTED**)
 
 **Goal:** A disabled-by-default, securely delegated read-only pilot interface.
-**Dependencies:** Phases 0–2; approved OAuth/transport/grant model and audit enhancement. New schema work, if
-needed, belongs in separately scoped implementation with live catalog/RLS verification, never this task.
+**Dependencies:** Accepted AI decisions from Phase 0 and verified selected operations/contracts from
+Phases 1–2; approved OAuth/transport/grant model and audit enhancement. No whole-web rewrite is required.
+New schema work, if needed, belongs in separately scoped implementation with live catalog/RLS verification,
+never this task.
 
-* [ ] Select protocol revision/library and transport; implement discovery and five approved tool schemas.
+* [ ] Select protocol revision/library and transport; implement discovery and approved tool schemas,
+  starting with the two Case tools; other proposed tools remain absent until their gates close.
 * [ ] Bind authentication to integration, tenant, acting user and live grant/session; validate audience.
 * [ ] Add minimum admin-controlled tenant opt-in, registration, read scopes, expiry/rotation and revocation.
 * [ ] Invoke shared operations only; enforce read allowlist, quotas, time/bytes/concurrency budgets.
@@ -582,21 +645,24 @@ live deployment. Individual blockers are distinct from the phase's implementatio
 | Repository architecture assessment | COMPLETE | Sections 1–2, pinned live base and concrete source inspection. |
 | Recommended target/security/audit/REST/tool direction | COMPLETE | Sections 3–7 are documented recommendations, not accepted wire contracts. |
 | Phase 0 review and final contract | IN PROGRESS | Per-operation REST review and separate AI policy/issuer/audit decisions remain; this aggregate status does not gate all web work. |
-| Phase 1 shared secured operations | NOT STARTED | Relevant operation policy/required audit decisions; no dependency on AI issuer/grants. |
-| Phase 2 stable REST/OpenAPI foundation | NOT STARTED | Selected shared operations and REST compatibility; can ship while MCP/AI OAuth remain pending. |
+| Phase 1 shared secured operations | IN PROGRESS | R2 minimized Case operations implemented; wider operations, AI restrictions/attribution and runtime acceptance remain. No dependency on AI issuer/grants for ordinary web work. |
+| Phase 2 stable REST/OpenAPI foundation | IN PROGRESS | R1/R2 Case paging, minimized routes/schemas and R3 consumer exist; remaining contract/runtime gates follow the web ledger. Independent of MCP/AI OAuth. |
 | Phase 3 MCP and minimum tenant controls | NOT STARTED | Transport/grants, audit and service gates. |
 | Phase 4 ordinary-client dogfooding | NOT STARTED | Phase 3 tested controls, tenant/user grants. |
 | Phase 5 administration experience | NOT STARTED | Minimum controls first, then pilot feedback. |
 | Phase 6 optional controlled writes | NOT STARTED | Read-only maturity and per-command approval. |
 | Phase 7 customer readiness | NOT STARTED | Read-only acceptance; write maturity only if offered. |
 | Live RLS coverage acceptance | BLOCKED | Non-dbo deployment evidence, including documented Contacts parent-predicate gap. |
-| Case/field policy acceptance | BLOCKED | Product/security decision; Team membership is not an access policy. |
+| Wider Case/field and AI grant policy acceptance | BLOCKED | R2 web minimized tenant-wide policy is accepted; additional fields/children/directories and AI restrictions need scoped decisions. Team membership is not a general access policy. |
 | Complete AI read/failure audit representation | BLOCKED | Scoped compatible enhancement decision and verification. |
+| Local Case-read SQL security execution | BLOCKED | Existing harness needs approved authoritative schema-only definitions; no SQL run claimed. |
 | Timeline/document tool expansion | BLOCKED | Bounded timeline service and authorized content/provider boundary. |
 
-**Recommended next tasks:** For the web rebuild, select its next REST use case and verify its existing
-service mapping, bearer session, tenant/user/entity/field policy, required audit and stable contract.
-Implement only the necessary shared boundary/REST improvements and verify that use case independently.
-For AI, continue the five-query policy/audit/connection inventory and obtain issuer, grant, tool and additional
-audit decisions before activation. Keep AI disabled/read-only according to its own gates; ordinary authorized
+**Recommended next tasks:** Close the web Case slice's remaining acceptance gates through its existing
+ledger/runbook; obtain approved schema-only definitions before running the isolated SQL harness. For the
+next web REST use case, verify its existing service mapping, bearer session, tenant/user/entity/field
+policy, required audit and stable contract, then implement only necessary shared-boundary improvements.
+For AI, prioritize the two reusable Case queries, decide integration restrictions and compatible read/failure
+attribution, and obtain issuer/grant/tool decisions before activation. Inventory task/directory gaps before
+expanding the catalog. Keep AI disabled/read-only according to its own gates; ordinary authorized
 web delivery continues without completing MCP or AI OAuth.
