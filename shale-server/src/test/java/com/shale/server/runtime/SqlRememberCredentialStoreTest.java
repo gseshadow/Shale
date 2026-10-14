@@ -10,6 +10,77 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 
 class SqlRememberCredentialStoreTest {
+    @Test void createAndFullRotationUseUtcForEveryDatetime2BindingAndRead() {
+        // Prevent expiry corruption on Windows/non-UTC JVMs while SQL uses SYSUTCDATETIME().
+        TimeZone original=TimeZone.getDefault();
+        try {
+            for(String zone:List.of("America/Denver","Asia/Kolkata")) {
+                TimeZone.setDefault(TimeZone.getTimeZone(zone));
+                var jdbc=new UtcRotationJdbc();
+                var store=new SqlRememberCredentialStore(jdbc.auth(),p->jdbc.runtime());
+                UUID installation=UUID.randomUUID();byte[] replacement=new byte[32];replacement[0]=1;
+                store.create(new ServerPrincipal(9,7,"owner@test"),jdbc.session,installation,new byte[32],jdbc.expiry);
+                var result=store.rotate(new byte[32],installation,replacement,UUID.randomUUID(),jdbc.now).orElseThrow();
+                assertEquals(jdbc.expiry,result.absoluteExpiresAt(),"UTC deadline must survive rotation exactly");
+                assertEquals(jdbc.session,result.sessionId());
+                assertEquals(9,jdbc.timestampWrites,"create, resolver, revalidation and both updates must use UTC");
+                assertEquals(1,jdbc.timestampReads,"rotation must read datetime2 with UTC");
+                assertEquals(1,jdbc.commits,"successful session and credential writes must commit together");
+                assertEquals(0,jdbc.rollbacks);
+            }
+        } finally { TimeZone.setDefault(original); }
+    }
+
+    private final class UtcRotationJdbc {
+        final UUID session=UUID.randomUUID();
+        final Instant now=Instant.parse("2026-10-14T18:00:00.123456700Z"),expiry=now.plusSeconds(3600);
+        int timestampWrites,timestampReads,commits,rollbacks;
+        private <T> T stub(Class<T> type,java.lang.reflect.InvocationHandler handler) {
+            return type.cast(Proxy.newProxyInstance(getClass().getClassLoader(),new Class<?>[]{type},handler));
+        }
+        private void requireUtc(Object[] args,int calendarIndex) {
+            assertEquals(calendarIndex+1,args.length,"datetime2 must use the Calendar JDBC overload");
+            assertEquals("UTC",((Calendar)args[calendarIndex]).getTimeZone().getID(),"datetime2 must use UTC even on a non-UTC JVM");
+        }
+        DataSource auth() { return stub(DataSource.class,(p,m,a)->m.getName().equals("getConnection")?connection(true):defaultValue(m.getReturnType())); }
+        Connection runtime() { return connection(false); }
+        private Connection connection(boolean auth) {
+            return stub(Connection.class,(p,m,a)->switch(m.getName()) {
+                case "prepareCall" -> statement(true,true);
+                case "prepareStatement" -> {
+                    assertFalse(auth,"only the bounded resolver may use auth authority");
+                    yield statement(false,((String)a[0]).startsWith("SELECT"));
+                }
+                case "commit" -> { commits++;yield null; }
+                case "rollback" -> { rollbacks++;yield null; }
+                default -> defaultValue(m.getReturnType());
+            });
+        }
+        private CallableStatement statement(boolean lookup,boolean select) {
+            return stub(CallableStatement.class,(p,m,a)->switch(m.getName()) {
+                case "setTimestamp" -> {
+                    requireUtc(a,2);timestampWrites++;
+                    assertEquals(select?now:timestampWrites==1?expiry:now,((Timestamp)a[1]).toInstant());
+                    yield null;
+                }
+                case "executeUpdate" -> 1;
+                case "executeQuery" -> rows(lookup);
+                default -> defaultValue(m.getReturnType());
+            });
+        }
+        private ResultSet rows(boolean lookup) {
+            boolean[] next={true};
+            return stub(ResultSet.class,(p,m,a)->switch(m.getName()) {
+                case "next" -> {boolean value=next[0];next[0]=false;yield value;}
+                case "getInt" -> (Integer)a[0]==1?7:9;
+                case "getString" -> lookup?((Integer)a[0]==3?session.toString().toUpperCase(Locale.ROOT):"owner@test")
+                        :((Integer)a[0]==5?UUID.randomUUID().toString().toUpperCase(Locale.ROOT):"owner@test");
+                case "getTimestamp" -> {requireUtc(a,1);timestampReads++;yield Timestamp.from(expiry);}
+                default -> defaultValue(m.getReturnType());
+            });
+        }
+    }
+
     @Test void createUsesPrincipalScopedRuntimeConnectionAndBindsTheMigrationShape() {
         var openedFor=new AtomicReference<ServerPrincipal>();
         var bindings=new HashMap<Integer,Object>();

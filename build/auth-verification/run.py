@@ -60,6 +60,48 @@ def check_maven(maven, root, env):
 OPT_IN = "LOCAL_DISPOSABLE_AUTH"
 PRODUCTION = re.compile(r"^(SHALE_(APP|RT|AUTH(?!_VERIFY)|SERVER|SUGGESTION).*|SPRING_DATASOURCE.*|SQLCONNSTR_.*|SQLAZURECONNSTR_.*)$", re.I)
 
+# Exact protocol vocabulary, never arbitrary lowercase words from child output.
+STEPS = {
+    "prerequisites": {"configuration"},
+    "setup": {"resources", "pools"},
+    "credential_identity": {"credentials"},
+    "remembered_rotation": {
+        "session_seed", "create", "created_deadline", "wrong_installation", "rotate", "principal", "deadline", "replay",
+        "jti_identity", "revoke", "revoked", "disabled_seed", "disabled_reject", "removed_seed",
+        "removed_reject", "null_tenant_seed", "null_tenant_reject", "expired_seed", "expired_reject",
+        "caller_restoration",
+    },
+    "runtime_isolation": {"isolation"},
+    "cleanup": {"pool_close", "marker_identity", "database_drop", "auth_login_identity",
+                "auth_login_drop", "runtime_login_identity", "runtime_login_drop"},
+}
+CATEGORIES = {"assertion", "guard", "sql_permission", "sql_constraint", "sql_timeout",
+              "sql_connection", "sql_other", "unexpected"}
+SCENARIOS = {"credential_identity", "remembered_rotation", "runtime_isolation"}
+
+
+def report_result(result):
+    """Emit at most one event per kind/phase, using only closed protocol tokens."""
+    seen = set()
+    for line in result.stdout.splitlines():
+        tokens = line.split(" ")
+        if len(tokens) == 3 and tokens[0] == "AUTH_VERIFY":
+            _, kind, phase = tokens
+            allowed = (kind == "PASS" and phase in SCENARIOS) or (kind == "FAIL" and phase in STEPS)
+        elif len(tokens) == 5 and tokens[:2] == ["AUTH_VERIFY", "DETAIL"]:
+            _, kind, phase, step, category = tokens
+            allowed = step in STEPS.get(phase, set()) and category in CATEGORIES
+        else:
+            continue
+        if allowed and (kind, phase) not in seen:
+            seen.add((kind, phase))
+            print(line)
+    failures = any(kind == "FAIL" for kind, _ in seen)
+    success = not result.returncode and not failures and all(("PASS", phase) in seen for phase in SCENARIOS)
+    if not success and not failures:
+        print("AUTH_VERIFY FAIL build_or_prerequisite")
+    return 0 if success else 1
+
 def validate(env, port, opt_in):
     if opt_in != OPT_IN or not 1024 <= port <= 65535:
         raise ValueError("Explicit disposable local auth opt-in and valid port required")
@@ -89,13 +131,7 @@ def launch():
         command = ["-pl", "shale-server", "-am", "-Dtest=PreTenantAuthenticationLocalSqlServerTest",
                    "-Dsurefire.failIfNoSpecifiedTests=false", f"-Dlogback.configurationFile={quiet}", "test"]
         result = run_maven(maven, command, root, env)
-        lines = [line for line in result.stdout.splitlines() if re.fullmatch(r"AUTH_VERIFY (PASS|FAIL) [a-z_]+", line)]
-        for line in lines:
-            print(line)
-        if result.returncode or len([x for x in lines if x.startswith("AUTH_VERIFY PASS")]) != 3:
-            print("AUTH_VERIFY FAIL build_or_prerequisite")
-            return 1
-    return 0
+        return report_result(result)
 
 def main():
     try:

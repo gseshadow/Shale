@@ -975,3 +975,132 @@ The subprocess boundary receives an explicit environment snapshot. These checks 
 establish actual Windows Maven invocation, SQL scenario success, installed-client compatibility or
 production authority. **Windows retest pending; AUTH SQL NOT RUN; CASE SQL NOT RUN; deployment BLOCKED;
 security acceptance OPEN.** No live connection, deployment or merge occurred.
+
+## First SQL auth failures after #1869 — 2026-10-14
+
+Live base `30ca63c9d0b9ceefceb4ae3dd057b16376b42080` is merged #1869. The task branch
+`codex/windows-auth-verification-diagnostics` starts at that exact base. Reviewed AGENTS, prompt rules,
+database schema, tenancy/RLS architecture, this runbook, versioned auth modules, production store,
+RuntimeSessionService, launcher and related tests. The original schema export is absent from this mount;
+it has not been recreated or changed. Case harness/launcher, SQL modules, RLS gates and accepted reports
+are unchanged. This section supplements historical NOT RUN records; it does not reattribute them.
+
+### Reproduction and established scope
+
+The operator's native Windows output was `remembered_rotation`, `cleanup`, then
+`build_or_prerequisite`. A new task-owned loopback SQL Server 2022 Docker container reproduced the first
+two failures with diagnostic-only instrumentation before changing identity assertions:
+
+```text
+AUTH_VERIFY FAIL remembered_rotation
+AUTH_VERIFY DETAIL remembered_rotation jti_identity assertion
+AUTH_VERIFY FAIL cleanup
+AUTH_VERIFY DETAIL cleanup marker_identity guard
+```
+
+Rotation itself returned successfully; principal, expiry and replay checks passed before the JTI
+assertion. Microsoft JDBC returns uppercase canonical UUID text whereas Java UUID.toString is lowercase.
+The JTI assertion and independent cleanup nonce guard compared strings. They now parse canonical UUIDs
+and compare the full UUID identity. Missing, malformed, different and duplicate marker rows still refuse
+cleanup. The successful retest exercised every original authority/lifecycle/rotation/isolation assertion.
+Cleanup still requires the creation flags, exact generated database and exactly one matching nonce;
+login drops additionally verify each exact generated SQL login's SID captured immediately after creation.
+No resource discovery or prefix deletion is added. Failure to mark/capture/verify retains resources.
+
+Two independent reporting defects are fixed. Cleanup used to overwrite the original failure phase in
+the final assertion; primary and cleanup failures now have separate immutable phase/step/category
+records. The launcher used to append build_or_prerequisite to every SQL failure; it now reserves that
+fallback for missing scenario evidence or a failing build without a known scenario failure. Cleanup-only
+failure remains nonzero even after all three scenarios pass. Exact allowlisted events are deduplicated
+and bounded; arbitrary lowercase child strings no longer qualify as safe output.
+
+A separate non-UTC run established a production timestamp defect. Under America/Denver, rotation first
+failed at `rotate`. After fixture seeds were explicitly bound as UTC, a UTC readback of the production
+create result failed at `created_deadline`: default-calendar JDBC bindings stored a shifted datetime2
+expiry. The resolver compares expiry to SYSUTCDATETIME, so local-wall-time values are incompatible.
+SqlRememberCredentialStore now uses fresh UTC Calendars for **all nine timestamp writes and its expiry
+read**, including resolver time, runtime revalidation, JTI/session update and credential update. This
+scope changes no authority, SQL predicates, transaction boundaries, schema, grants or token contract.
+It does not rewrite previously stored timestamps. Existing shifted rows cannot safely be inferred or
+backfilled from this evidence; any repair requires separate evidence and scope. Fresh remembered
+credentials must be checked through the normal login/enrollment path in later installed-client acceptance.
+
+The fixture uses an exactly representable millisecond deadline and asserts exact Instant equality after
+rotation, replacing the weaker millisecond projection comparison and avoiding datetime2(7) rounding of
+arbitrary nanoseconds. Fixture session/negative-case timestamps are explicitly UTC. The fixture remains
+synthetic: its table shapes support these actual production queries, but do not establish deployed
+constraints, defaults, grants or complete-schema parity. No module or production identity defect was
+established by the UUID failures. The UTC binding defect above is the sole production change.
+
+Audit compatibility retains the existing schema and durable-session/security audit flows. This scoped
+UTC correction and synthetic diagnostic tooling introduce no new domain/admin mutation or PHI view;
+no ad-hoc audit event, audit migration or sensitive diagnostic payload is added.
+
+### Closed diagnostics and operator action
+
+`AUTH_VERIFY FAIL <phase>` is followed by `AUTH_VERIFY DETAIL <phase> <step> <category>`.
+The primary event precedes any independent cleanup event. Details contain only enum/allowlist tokens;
+no exception messages/classes, SQL states/codes, credentials, hashes, emails, connection strings, SQL,
+payloads or unrestricted Maven/driver text are emitted. Do not enable debug/driver logging or share raw
+Surefire/Maven output to diagnose a scenario. The final Surefire assertion contains only the same fixed
+primary/cleanup summary, without original causes or suppressed exceptions.
+
+| Phase / steps | Meaning |
+| --- | --- |
+| remembered_rotation: session_seed, create, created_deadline | Fixture session insertion, production credential creation, exact UTC expiry readback. |
+| remembered_rotation: wrong_installation, rotate, principal, deadline, replay, jti_identity | Device rejection, eligible rotation, returned identity/deadline, old-hash replay rejection, exact session JTI verification. |
+| remembered_rotation: revoke, revoked | Fixture revocation and revoked-session rejection. |
+| remembered_rotation: disabled_seed/reject, removed_seed/reject, null_tenant_seed/reject, expired_seed/reject | Distinguishes each negative fixture insertion from its independent rejection assertion. |
+| remembered_rotation: caller_restoration | Narrow auth caller remains non-bypass and context-free after resolver operations. |
+| cleanup: pool_close, marker_identity, database_drop | Pools close; exact singleton database nonce must match before any database drop. |
+| cleanup: auth_login_identity/drop, runtime_login_identity/drop | Exact original SID must match before dropping the respective generated login. |
+| prerequisites: configuration; setup: resources/pools; credential_identity: credentials; runtime_isolation: isolation | Bounds failures outside remembered rotation. |
+
+Categories are assertion, guard, sql_permission, sql_constraint, sql_timeout, sql_connection, sql_other
+and unexpected. Wrapped SQL exceptions are inspected through at most eight causes; only fixed categories
+are rendered. A category identifies a class of failure, not proof of its root cause. Keep both primary
+and cleanup lines when reporting a failure. A build_or_prerequisite without known scenario failure is
+build/prerequisite evidence only, not a SQL result.
+
+### Retained resources from earlier failed cleanup
+
+Leave the existing operator container running and intact. A new retest creates fresh random resources;
+it neither adopts nor cleans resources from the failed run. Do not enumerate/drop databases by prefix,
+prune containers, recreate the operator container, or treat a matching-looking name as ownership proof.
+Earlier versions did not persist their expected nonce or login SIDs. If those independent original
+creation identities are unavailable, leave the resources retained pending exact-resource operator review.
+Reading a nonce from an unknown retained database and then accepting that same value is not verification.
+
+Only an independently recorded exact prior database name plus expected nonce permits that database's
+ownership check, requiring exactly one canonical UUID identity match. Missing/different/malformed/multiple
+markers mean stop. Review only individually known resources; establish original SQL login identity from
+trusted creation evidence/SID before any exact login removal, and check that it has no unrelated use.
+Do not weaken guards or substitute names/prefixes for identity. This task provides no bulk cleanup or
+automatic recovery of the previous operator run. Keep resource names/ownership evidence private; report
+only the fixed outcome categories.
+
+### Exact native Windows retest
+
+From the PR branch repository root, use the existing dedicated SQL container on 127.0.0.1:14333 and a
+fresh PowerShell terminal with installed Python/JDK 21/Maven. These commands do not remove any container.
+Only the operator-confirmed inherited process secret is cleared; do not bypass other environment guards.
+
+```powershell
+Remove-Item Env:SHALE_AUTH_TOKEN_SECRET -ErrorAction SilentlyContinue
+python --version
+java -version
+& 'C:\Program Files\Apache\Maven\apache-maven-3.9.11\bin\mvn.CMD' -version
+python -m unittest discover -s build/auth-verification -p 'test_*.py'
+if ($LASTEXITCODE -ne 0) { throw 'Auth launcher regression tests failed' }
+& 'C:\Program Files\Apache\Maven\apache-maven-3.9.11\bin\mvn.CMD' -pl shale-data,shale-server -am '-Dtest=AuthVerificationSupportTest,SqlRememberCredentialStoreTest,DesktopRememberCredentialMigrationContractTest,PreTenantAuthenticationModuleContractTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
+if ($LASTEXITCODE -ne 0) { throw 'Focused auth regressions failed' }
+python build/auth-verification/run.py --opt-in LOCAL_DISPOSABLE_AUTH --port 14333 --maven 'C:\Program Files\Apache\Maven\apache-maven-3.9.11\bin\mvn.CMD'
+if ($LASTEXITCODE -ne 0) { throw 'Auth SQL failed; retain both fixed failure/detail pairs' }
+```
+
+Enter only the dedicated local administrator credentials privately at the prompts. Successful completion
+requires all three existing PASS scenario lines and exit code 0 after exact-resource cleanup. Record
+only those fixed outcomes, tool versions, JVM timezone and exit code. Native Windows execution remains
+an operator retest; Linux SQL results do not establish Windows/installed-client acceptance. Case SQL
+remains NOT RUN; original schema/provenance commands and independent R4/security/deployment gates remain
+in force. No Azure/live application connection, production change, deployment or merge is authorized.

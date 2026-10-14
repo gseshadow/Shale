@@ -2,6 +2,8 @@ package com.shale.server.runtime;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static com.shale.server.runtime.AuthVerificationSupport.Phase.*;
+import static com.shale.server.runtime.AuthVerificationSupport.Step.*;
 import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
 import com.shale.data.auth.AuthServiceImpl;
 import com.shale.data.auth.BCryptPasswordVerifier;
@@ -22,29 +24,28 @@ class PreTenantAuthenticationLocalSqlServerTest {
     private final String authSecret="A!9"+UUID.randomUUID(),runtimeSecret="R!9"+UUID.randomUUID();
     private final String marker=UUID.randomUUID().toString();
     private boolean created,marked,authCreated,runtimeCreated;
+    private byte[] authSid,runtimeSid;
     private int port;
     private HikariDataSource authPool,runtimePool;
+    private final AuthVerificationSupport diagnostics=new AuthVerificationSupport(System.out);
 
     @Test void boundedAuthAndRememberedRotationUnderNonBypassRoles() {
         assumeTrue(System.getenv("SHALE_AUTH_VERIFY_OPT_IN")!=null,
                 "NOT RUN: use build/auth-verification/run.py on dedicated disposable loopback SQL");
-        Throwable failure=null;String phase="prerequisites";
-        try {
+        diagnostics.verify(()->{
             validateConfiguration();
-            phase="setup";setup();
+            diagnostics.at(SETUP,RESOURCES);setup();
+            diagnostics.step(POOLS);
             authPool=pool(authLogin,authSecret);runtimePool=pool(runtimeLogin,runtimeSecret);
-            phase="credential_identity";credentials();
-            phase="remembered_rotation";remembered();
-            phase="runtime_isolation";runtimeIsolation();
+            diagnostics.at(CREDENTIAL_IDENTITY,CREDENTIALS);credentials();
+            diagnostics.at(REMEMBERED_ROTATION,SESSION_SEED);remembered();
+            diagnostics.at(RUNTIME_ISOLATION,ISOLATION);runtimeIsolation();
             System.out.println("AUTH_VERIFY PASS credential_identity");
             System.out.println("AUTH_VERIFY PASS remembered_rotation");
             System.out.println("AUTH_VERIFY PASS runtime_isolation");
-        }catch(Throwable caught){failure=caught;System.out.println("AUTH_VERIFY FAIL "+phase);}
-        finally {
-            try {cleanup();}catch(Throwable caught){if(failure==null)failure=caught;phase="cleanup";System.out.println("AUTH_VERIFY FAIL cleanup");}
-        }
-        if(failure!=null)throw new AssertionError("Auth SQL verification failed in "+phase+"; exceptionClass="+failure.getClass().getName());
+        },this::cleanup);
     }
+
     private void validateConfiguration() {
         require("LOCAL_DISPOSABLE_AUTH".equals(env("OPT_IN")));
         var values=new HashMap<String,String>(System.getenv());
@@ -72,8 +73,8 @@ class PreTenantAuthenticationLocalSqlServerTest {
             try(var q=c.createStatement();var r=q.executeQuery("SELECT CONVERT(int,SERVERPROPERTY('EngineEdition'))")){require(r.next());require(r.getInt(1)!=5&&r.getInt(1)!=8);}
             try(var q=c.prepareStatement("SELECT DB_ID(?),SUSER_ID(?),SUSER_ID(?)")){q.setString(1,db);q.setString(2,authLogin);q.setString(3,runtimeLogin);try(var r=q.executeQuery()){require(r.next());require(r.getObject(1)==null&&r.getObject(2)==null&&r.getObject(3)==null);}}
             execute(c,"CREATE DATABASE ["+db+"]");created=true;
-            execute(c,"CREATE LOGIN ["+authLogin+"] WITH PASSWORD='"+authSecret+"', CHECK_POLICY=OFF");authCreated=true;
-            execute(c,"CREATE LOGIN ["+runtimeLogin+"] WITH PASSWORD='"+runtimeSecret+"', CHECK_POLICY=OFF");runtimeCreated=true;
+            execute(c,"CREATE LOGIN ["+authLogin+"] WITH PASSWORD='"+authSecret+"', CHECK_POLICY=OFF");authCreated=true;authSid=loginSid(c,authLogin);
+            execute(c,"CREATE LOGIN ["+runtimeLogin+"] WITH PASSWORD='"+runtimeSecret+"', CHECK_POLICY=OFF");runtimeCreated=true;runtimeSid=loginSid(c,runtimeLogin);
         }
         try(var c=admin(db)) {
             execute(c,"CREATE TABLE dbo.AuthVerifierOwner(Marker uniqueidentifier NOT NULL)");
@@ -124,36 +125,54 @@ class PreTenantAuthenticationLocalSqlServerTest {
         try {assertThrows(AuthException.class,()->auth.login("owner1@test","synthetic-password"));try(var c=authPool.getConnection()){caller(c,authLogin);}}
         finally{try(var c=admin(db)){execute(c,"ALTER AUTHORIZATION ON OBJECT::dbo.LookupAuthenticationCredentialV1 TO dbo");execute(c,"GRANT EXECUTE ON dbo.LookupAuthenticationCredentialV1 TO ShalePreTenantAuthentication");}}
     }
+    private static Calendar utc(){return Calendar.getInstance(TimeZone.getTimeZone("UTC"));}
     private void remembered()throws Exception {
         UUID sid=UUID.randomUUID(),installation=UUID.randomUUID(),jti=UUID.randomUUID();byte[] hash=new byte[32],replacement=new byte[32];replacement[0]=1;
-        Instant deadline=Instant.now().plusSeconds(3600);
+        Instant deadline=Instant.now().plusSeconds(3600).truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
         try(var c=admin(db)){
-            try(var q=c.prepareStatement("INSERT dbo.UserSessions(SessionId,ShaleClientId,UserId,CurrentAccessJti,ExpiresAt) VALUES(?,11,1,?,?)")){q.setObject(1,sid);q.setObject(2,jti);q.setTimestamp(3,Timestamp.from(deadline));q.executeUpdate();}
+            try(var q=c.prepareStatement("INSERT dbo.UserSessions(SessionId,ShaleClientId,UserId,CurrentAccessJti,ExpiresAt) VALUES(?,11,1,?,?)")){q.setObject(1,sid);q.setObject(2,jti);q.setTimestamp(3,Timestamp.from(deadline),utc());q.executeUpdate();}
         }
         var runtime=new RuntimeSessionService(runtimePool);
         var store=new SqlRememberCredentialStore(authPool,p->{runtime.initialize(p.shaleClientId(),p.userId());return runtime.getConnection();});
+        diagnostics.step(CREATE);
         store.create(new ServerPrincipal(1,11,"owner1@test"),sid,installation,hash,deadline);
+        diagnostics.step(CREATED_DEADLINE);
+        try(var c=admin(db);var q=c.prepareStatement("SELECT AbsoluteExpiresAt FROM dbo.DesktopRememberCredentials WHERE SessionId=?")) {
+            q.setObject(1,sid);
+            try(var r=q.executeQuery()){require(r.next());assertEquals(deadline,r.getTimestamp(1,utc()).toInstant(),"created deadline must be stored as UTC");require(!r.next());}
+        }
+        diagnostics.step(WRONG_INSTALLATION);
         assertTrue(store.rotate(hash,UUID.randomUUID(),replacement,UUID.randomUUID(),Instant.now()).isEmpty());
-        UUID next=UUID.randomUUID();var result=store.rotate(hash,installation,replacement,next,Instant.now()).orElseThrow();
-        assertEquals(11,result.principal().shaleClientId());assertEquals(deadline.toEpochMilli(),result.absoluteExpiresAt().toEpochMilli());
+        diagnostics.step(ROTATE);
+        UUID next=UUID.randomUUID();var rotated=store.rotate(hash,installation,replacement,next,Instant.now());
+        assertTrue(rotated.isPresent(),"eligible remembered credential must rotate");var result=rotated.orElseThrow();
+        diagnostics.step(PRINCIPAL);assertEquals(11,result.principal().shaleClientId());
+        diagnostics.step(DEADLINE);assertEquals(deadline,result.absoluteExpiresAt(),"rotation must preserve the exactly representable fixture deadline");
+        diagnostics.step(REPLAY);
         assertTrue(store.rotate(hash,installation,new byte[32],UUID.randomUUID(),Instant.now()).isEmpty());
-        try(var c=admin(db);var q=c.prepareStatement("SELECT CurrentAccessJti FROM dbo.UserSessions WHERE SessionId=?")){q.setObject(1,sid);try(var r=q.executeQuery()){require(r.next());assertEquals(next.toString(),r.getString(1));}}
+        diagnostics.step(JTI_IDENTITY);
+        try(var c=admin(db);var q=c.prepareStatement("SELECT CurrentAccessJti FROM dbo.UserSessions WHERE SessionId=?")){q.setObject(1,sid);try(var r=q.executeQuery()){assertTrue(AuthVerificationSupport.exactlyOneUuid(r,next),"rotated session JTI identity must match exactly one row");}}
+        diagnostics.step(REVOKE);
         try(var c=admin(db)){execute(c,"UPDATE dbo.UserSessions SET RevokedAt=SYSUTCDATETIME()");}
+        diagnostics.step(REVOKED);
         assertTrue(store.rotate(replacement,installation,hash,UUID.randomUUID(),Instant.now()).isEmpty());
         for(int owner:List.of(3,4,5,6)) {
+            diagnostics.step(switch(owner){case 3->DISABLED_SEED;case 4->REMOVED_SEED;case 5->NULL_TENANT_SEED;default->EXPIRED_SEED;});
             byte[] rejected=new byte[32];rejected[0]=(byte)(owner+10);
             UUID rejectedSession=UUID.randomUUID(),device=UUID.randomUUID();
             try(var c=admin(db)) {
                 try(var q=c.prepareStatement("INSERT dbo.UserSessions(SessionId,ShaleClientId,UserId,CurrentAccessJti,ExpiresAt) VALUES(?,11,?,?,?)")) {
                     q.setObject(1,rejectedSession);q.setInt(2,owner);q.setObject(3,UUID.randomUUID());
-                    q.setTimestamp(4,Timestamp.from(owner==6?Instant.now().minusSeconds(60):deadline));q.executeUpdate();
+                    q.setTimestamp(4,Timestamp.from(owner==6?Instant.now().minusSeconds(60):deadline),utc());q.executeUpdate();
                 }
                 try(var q=c.prepareStatement("INSERT dbo.DesktopRememberCredentials(ShaleClientId,UserId,SessionId,InstallationId,CredentialHash,AbsoluteExpiresAt) VALUES(11,?,?,?,?,?)")) {
-                    q.setInt(1,owner);q.setObject(2,rejectedSession);q.setObject(3,device);q.setBytes(4,rejected);q.setTimestamp(5,Timestamp.from(deadline));q.executeUpdate();
+                    q.setInt(1,owner);q.setObject(2,rejectedSession);q.setObject(3,device);q.setBytes(4,rejected);q.setTimestamp(5,Timestamp.from(deadline),utc());q.executeUpdate();
                 }
             }
+            diagnostics.step(switch(owner){case 3->DISABLED_REJECT;case 4->REMOVED_REJECT;case 5->NULL_TENANT_REJECT;default->EXPIRED_REJECT;});
             assertTrue(store.rotate(rejected,device,new byte[32],UUID.randomUUID(),Instant.now()).isEmpty(),"disabled/removed/NULL-tenant/expired identity must not rotate");
         }
+        diagnostics.step(CALLER_RESTORATION);
         try(var c=authPool.getConnection()){caller(c,authLogin);}
     }
     private void runtimeIsolation()throws Exception {
@@ -173,12 +192,30 @@ class PreTenantAuthenticationLocalSqlServerTest {
             try(var q=c.createStatement();var r=q.executeQuery("SELECT Id FROM dbo.Users")){assertFalse(r.next());}}
         runtime.clear();assertThrows(IllegalStateException.class,runtime::getConnection);
     }
+    private byte[] loginSid(Connection c,String login)throws SQLException {
+        require(login.equals(authLogin)||login.equals(runtimeLogin));
+        try(var q=c.prepareStatement("SELECT sid FROM sys.server_principals WHERE name=? AND type='S'")) {
+            q.setString(1,login);
+            try(var r=q.executeQuery()){require(r.next());byte[] sid=r.getBytes(1);require(sid!=null&&sid.length>0&&!r.next());return sid;}
+        }
+    }
     private void cleanup()throws Exception {
         if(authPool!=null)authPool.close();if(runtimePool!=null)runtimePool.close();
         if(created){
-            require(marked);try(var c=admin(db);var q=c.createStatement();var r=q.executeQuery("SELECT Marker FROM dbo.AuthVerifierOwner")){require(r.next()&&marker.equals(r.getString(1))&&!r.next());}
+            diagnostics.step(MARKER_IDENTITY);
+            require(marked);try(var c=admin(db);var q=c.createStatement();var r=q.executeQuery("SELECT Marker FROM dbo.AuthVerifierOwner")){require(AuthVerificationSupport.exactlyOneUuid(r,UUID.fromString(marker)));}
+            diagnostics.step(DATABASE_DROP);
             try(var c=admin("master")){execute(c,"ALTER DATABASE ["+db+"] SET SINGLE_USER WITH ROLLBACK IMMEDIATE");execute(c,"DROP DATABASE ["+db+"]");}
         }
-        if(authCreated||runtimeCreated)try(var c=admin("master")){if(authCreated)execute(c,"DROP LOGIN ["+authLogin+"]");if(runtimeCreated)execute(c,"DROP LOGIN ["+runtimeLogin+"]");}
+        if(authCreated||runtimeCreated)try(var c=admin("master")){
+            if(authCreated){
+                diagnostics.step(AUTH_LOGIN_IDENTITY);require(AuthVerificationSupport.sameSid(authSid,loginSid(c,authLogin)));
+                diagnostics.step(AUTH_LOGIN_DROP);execute(c,"DROP LOGIN ["+authLogin+"]");
+            }
+            if(runtimeCreated){
+                diagnostics.step(RUNTIME_LOGIN_IDENTITY);require(AuthVerificationSupport.sameSid(runtimeSid,loginSid(c,runtimeLogin)));
+                diagnostics.step(RUNTIME_LOGIN_DROP);execute(c,"DROP LOGIN ["+runtimeLogin+"]");
+            }
+        }
     }
 }
