@@ -40,6 +40,19 @@ The remaining security gates below persist; Phases 2/3/4 are not complete.
 
 ## Evidence and implemented baseline
 
+### October 14 Case-read RLS blocker assessment
+
+The user-supplied authoritative schema-only SSMS export and user-run Shale catalog result confirm
+no security predicates for Users/auditLog/Statuses. This is a confirmed coverage gap, not an observed
+API leak. The [owning runbook assessment](../../docs/testing/case-read-local-security-verification.md#rls-blocker-assessment--2026-10-14)
+reviews explicit application predicates, auth/session/bootstrap/desktop/audit paths and unknown grants;
+it recommends bounded pre-tenant auth compatibility before targeted strict/overlay FILTER attachment.
+The original snapshot and #1865 harness stay unchanged. **No local SQL integration run occurred.**
+All user-reported desktop/audit/Windows/hosted/iPhone passes above remain accepted within their stated
+scope. No new security/SQL/fault/deployment acceptance follows from this documentation assessment.
+Phase 2 OPEN; Phase 3 IN PROGRESS; Phase 4 INCOMPLETE; appearance provisional. Follow the prerequisite
+implementation prompt in the runbook before candidate-schema execution; deployed and other gates remain.
+
 **USER-REPORTED LIVE OBSERVATIONS**, October 12, 2026: Windows desktop, Firefox,
 localhost browser frontend calling the deployed Azure API. Codex did not rerun these checks.
 Browser version, exact test times, artifact hashes and screenshots were not supplied. No audit
@@ -146,7 +159,8 @@ link was reconciled: the claimed archive is absent from this base, so its invali
 
 Use the [local SQL runbook](../../docs/testing/case-read-local-security-verification.md) and
 [roadmap §12](../../docs/architecture/shale-web-v2-architecture-roadmap.md#12-next-bounded-prompt--local-sql-execution-and-remaining-acceptance)
-to execute the opt-in harness after reviewing an approved offline schema-only input. Record local
-production-path isolation/audit outcomes and exact schema/tool identities; separate real SQL from
-injected commit-acknowledgement behavior. Preserve deployed RLS/performance/session/host/privacy/device/
-AT gates and isolate defects for follow-up. No merge or deployment.
+for the [pre-tenant auth prerequisite prompt](../../docs/testing/case-read-local-security-verification.md#next-implementation-prompt)
+before the targeted RLS migration and candidate-schema harness execution. The supplied authoritative
+export confirms the gap and must stay unchanged; no local SQL result is inferred. Record source/schema/
+tool identities and distinguish real SQL from injected commit acknowledgement in later verification.
+Preserve deployed RLS/performance/session/host/privacy/device/AT gates. No merge or deployment.

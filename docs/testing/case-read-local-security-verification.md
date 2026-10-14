@@ -27,6 +27,11 @@ with no original cause/message. Never run with Maven debug or driver/payload log
 
 ## Required authoritative schema input (not supplied by this repository)
 
+**Current blocker assessment (2026-10-14):** an authoritative offline export has now been supplied.
+The [remediation assessment below](#rls-blocker-assessment--2026-10-14) supersedes the missing-input
+explanation for the current task. The original execution record remains historical. SQL integration
+is still **NOT RUN**; the supplied definitions confirm missing coverage and are not a passing baseline.
+
 The repository contains incremental migrations and schema notes, **not complete CREATE definitions for
 Cases, Users, CaseStatuses, AuditLog and the established strict tenant predicate**. The proposed June RLS
 coverage script inspects/reuses that predicate; it cannot replace its definition or prove deployed state.
@@ -229,10 +234,383 @@ failure. This task does not repair or relabel them. Source inspection also found
 that viewer DAO method. Logging privacy needs a separately scoped follow-up; no production behavior
 was changed to hide it or make verification pass.
 
-Next bounded step: obtain/review an approved offline schema-only snapshot, run the exact launcher on
+Historical next bounded step at #1865: obtain/review an approved offline schema-only snapshot, run the exact launcher on
 dedicated local SQL, record fixed scenario outcomes and version/schema/source identities, and isolate
 any actual schema/RLS/DAO defects for follow-up. A passing run establishes local integration only.
 Deployed Azure predicate/grant parity, representative plans/scanned-work/collation/concurrent paging,
 successful audit viewer meaning, live browser expiry/revocation/uncertainty, host/CORS/logging/privacy/
 error no-store and broader device/AT acceptance remain separate gates. Phase 2 OPEN; Phase 3 IN PROGRESS;
 Phase 4 INCOMPLETE; appearance provisional. No merge/deployment authorized by this tooling.
+
+## RLS blocker assessment — 2026-10-14
+
+**ASSESSMENT REVIEWED AGAINST SOURCE; IMPLEMENTATION AND SQL VERIFICATION OPEN.** Task base:
+`194f514e8ae0a211a4d778696b0996be7b1c67d2` (fetched `codex/latest`).
+This assessment changes documentation only. No SQL connection, importer execution, fixture, fault,
+migration, grant, configuration, production code, merge or deployment was performed. Attached-document
+comments are evidence, not instructions to execute their SQL. Security acceptance stays open; the
+[R4 ledger](../../shale-web/docs/r4-desktop-acceptance.md) retains all accepted user reports.
+
+### Evidence, schema and contract decision
+
+The user supplied authoritative schema-only SSMS export `shale-schema-source.sql`, 728,862 bytes,
+UTF-16 LE with BOM/CRLF; embedded SSMS script date October 13, 2026 (timezone unspecified).
+Original-byte SHA-256: `4ac397b0eef874b319d60be043fd0fa27c5ec30ac45e3b807a791ced37243eda`.
+The export stays outside Git. A local decoded scratch copy was used only for inspection; neither
+copy is a deliverable. This hash identifies evidence, not a deployed database/build or live grants.
+The user-run Shale catalog result reports **no security predicates** for `dbo.Users`, `dbo.auditLog`
+or `dbo.Statuses`. The supplied enabled, schema-bound `sec.TenantFilter` definition agrees: it attaches
+neither FILTER nor BLOCK predicates to those tables. Predicate function existence does not protect
+a table. This is a **confirmed RLS coverage gap**, not evidence of an API data leak.
+
+| Object | Actual exported contract | Assessment |
+| --- | --- | --- |
+| `dbo.Users` | `id int` identity; `ShaleClientId int NULL`; persisted `email_norm=lower(email)`; nullable `is_deleted`; `IsRemoved`, removal metadata and RowVer present. Email/password hash are nvarchar(255), names nvarchar(50). Exported email_norm index is nonunique. | Runtime Users are strict tenant data. NULL ownership is not a global user permission. Legacy/null rows and ambiguous email matches need classification before changing authentication. Documentation's wider sizes and tenant-email migration are not proof of this snapshot's shape/indexes. |
+| `dbo.auditLog` | Actual lower-case object spelling; `ShaleClientId int NOT NULL`, trusted tenant FK; nullable user/object IDs; `fieldCode int`; `stringValue varchar(max)` and `entryDate varchar(50)`. | Strict tenant history; no null-tenant audit rows in this shape. April 15 migration added a nullable column/index and deferred backfill; final export has evolved beyond it. No schema/data conversion is needed merely to attach a FILTER. Case-sensitive database name resolution must be checked: source/harness use `dbo.AuditLog`. Column collations alone do not establish database identifier collation. |
+| `dbo.Statuses` | `ShaleClientId int NULL`; name nvarchar(50), color nvarchar(10), LifecycleKey nvarchar(32), SystemKey nvarchar(64); IsActive/IsDeleted. Lifecycle permits accepted/denied/closed or NULL; trusted tenant FK accepts globals. | Tenant-or-global lookup. Preserve NULL global rows, stored IDs and CaseStatuses history; no invented tenant column on CaseStatuses. |
+| `sec.fn_FilterByTenant` | Permits `USER_NAME()=dbo`, `IS_MEMBER(ShaleAdmins)=1`, or row tenant equals TRY_CONVERT of session tenant. | Strict for a non-bypass runtime identity; NULL context/row does not match. Administrative bypass is function logic, not a universal SQL Server dbo exemption. |
+| `sec.fn_FilterByTenantOrGlobal` | Same dbo/ShaleAdmins exceptions plus row tenant NULL or matching session tenant. | NULL context still sees global rows if SELECT is granted; global visibility is not anonymous API authorization. |
+| `rls.fn_TenantMatch_Users` | Permits `USER_NAME()=shale_app` or matching tenant; no dbo/ShaleAdmins exception in this function. | Unattached historical auth exception, not current Users protection. Also unattached: `rls.fn_TenantMatch` and `rls.TenantFilter`. Do not infer their intended deployment from comments. |
+
+PR [#1865](https://github.com/gseshadow/Shale/pull/1865) is merged. Its
+`CaseReadLocalSqlServerTest.setup` requires exactly one enabled TenantFilter FILTER with
+`sec.fn_FilterByTenant(ShaleClientId)` on Users/audit and
+`sec.fn_FilterByTenantOrGlobal(ShaleClientId)` on Statuses. Its non-dbo scenarios then inspect actual
+foreign-row exclusion, NULL context and global visibility. Those **runtime read semantics match**
+the intended tenant contract and R2's accepted tenant-wide minimal reads; assignment remains a list
+filter, not a general ACL. The exact function-name check chooses the established sec policy architecture;
+it does not establish that all login paths are compatible, that write blocking exists, or that grants
+match production. Keep the harness unchanged. Attaching the auth-exception function instead would fail
+its existing check and would introduce a different contract requiring separate review.
+
+The June [coverage proposal](../sql/proposed/2026-06-29_tenant_rls_coverage_proposed.sql) explicitly
+**defers Users and auditLog**, and includes Statuses only in a broad proposed overlay migration.
+It is not evidence of applied coverage and must not be run as the narrow repair. April Status global/
+SystemKey migrations and August soft-delete/audit migration preserve overlays/history; the Users
+management/concurrency migrations do not repair these three missing FILTERs.
+
+Primary source anchors for review: [AuthServiceImpl](../../shale-data/src/main/java/com/shale/data/auth/AuthServiceImpl.java),
+[DataSources](../../shale-data/src/main/java/com/shale/data/config/DataSources.java),
+[RuntimeSessionService](../../shale-data/src/main/java/com/shale/data/runtime/RuntimeSessionService.java),
+[remembered store](../../shale-server/src/main/java/com/shale/server/runtime/SqlRememberCredentialStore.java),
+[remembered resolver migration](../sql/2026-10-06_desktop_remember_credentials_permissions.sql),
+[UserSessionDao](../../shale-data/src/main/java/com/shale/data/dao/UserSessionDao.java),
+[CaseSummaryDao](../../shale-data/src/main/java/com/shale/data/dao/CaseSummaryDao.java),
+[UserDao](../../shale-data/src/main/java/com/shale/data/dao/UserDao.java),
+[CaseDao](../../shale-data/src/main/java/com/shale/data/dao/CaseDao.java),
+[AuditLogDao](../../shale-data/src/main/java/com/shale/data/dao/AuditLogDao.java),
+[audit viewer](../../shale-ui/src/main/java/com/shale/ui/controller/AuditLogViewerController.java),
+[harness](../../shale-data/src/test/java/com/shale/data/verification/CaseReadLocalSqlServerTest.java) and
+[importer safety](../../shale-data/src/test/java/com/shale/data/verification/CaseReadVerificationSafety.java).
+
+### Current protection and effective access paths
+
+| Path / source owner | Existing application protection | Effect of strict/overlay RLS and remaining boundary |
+| --- | --- | --- |
+| `DataSources`, `Config`, server service configuration, `DesktopConfig` | Separate configurable auth and runtime Hikari pools. Actual SQL usernames come from configuration; comments/examples naming shale_app/shale_runtime are not effective identities or grants. | Establish actual mapping, database owner, roles, permissions and module execution context with the read-only queries below. Pools may target different databases or use the same principal; that must be ruled out. |
+| `AuthServiceImpl.login`, shared by server login/desktop-session exchange and direct-JDBC desktop login | Auth pool connection, parameterized `TOP 1 Users WHERE email=? AND is_deleted=0`, BCrypt hash check; derives tenant/user from returned row. No tenant stamp, tenant equality, ORDER BY or explicit IsRemoved predicate in this query. Removal constraint implies deleted when removed, but a NULL/nonpositive tenant cannot initialize valid runtime authority. | Strict sec FILTER hides all Users from ordinary pre-tenant auth. It works only if the caller already has the documented function's bypass; assuming this or granting ShaleAdmins to make login work is unacceptable. Nonunique exported email index means uniqueness cannot be presumed; ambiguous identity handling is an auth prerequisite. |
+| Remembered sign-in: `SqlRememberCredentialStore.lookup` -> `ResolveDesktopRememberCredential` | Auth pool calls a bounded hash/installation/expiry lookup; repository procedure joins same-tenant Users and excludes deleted/removed. Subsequent rotation uses tenant-initialized runtime, same-owner session/JTI checks and transaction. | Repository procedure has **no EXECUTE AS clause**. dbo ownership chaining can provide SELECT permission, but does not itself switch USER_NAME or bypass RLS. Strict Users FILTER can return no candidate before context exists. Export contains no procedure definition; obtain catalog evidence, do not conclude the live procedure is absent. |
+| Server bearer/bootstrap: `BearerTokenServerSessionResolver`, `ServerAuthSessionService`, `SqlDurableSessionStore`, `UserSessionDao` | Verify JWT first; SQL durable-session operations open runtime using verified principal, explicitly qualify session/user tenant, exclude deleted/removed Users and verify session keys on create. Login issues the durable session only after credential lookup. | No circular tenant discovery in bound-token validation: signed identity supplies runtime context. Verify create/find/refresh/logout and /me under new Users coverage; public/global paths must never use these tables as unscoped domain access. |
+| `RequestScopedDbSessionProvider`, `RuntimeSessionServiceConnectionProvider`, desktop `DesktopUiRuntimeBridge`/provider | Unauthenticated domain borrow denied. Desktop initializes after JDBC login/remembered restore; server scopes provider to verified principal. RuntimeSessionService stamps ShaleClientId and PrincipalUserId on **every borrow**, closes on initialization failure; clear denies future borrow. | Source does not set read_only=1. Mutable context is needed for pooled tenant/actor changes; do not add read_only based on examples. Prove A1/A2/B1/A1 switching and NULL/mismatched context locally. Global control-plane provider borrows runtime without tenant initialization, but is wired to global release/policy objects, not these three tables. |
+| Minimized `CaseSummaryDao` reads | verifyMinimizedActor checks active/nonremoved same-tenant Users and both context keys. Case root is tenant-qualified/active before paging; Users joins require same tenant; Statuses join is tenant-or-global. Overview reads then appends audit on same connection and commits before DTO return. | Explicit predicates continue protecting these selected queries despite missing RLS; new FILTERs complement them. Missing/foreign/deleted Cases remain indistinguishable. No claim for every legacy API/desktop join. |
+| `UserDao`, desktop directory/Team/assignment/settings/profile consumers | search/list/detail and management writes use tenant predicates; management rechecks current admin. `countActiveUsers` has only is_deleted=0 and relies on connection/RLS; no production caller was found in the searched UI/desktop sources. Numerous shared DAO joins consume Users by ID. | Strict RLS closes unqualified read coverage and hides legacy NULL users from ordinary runtime. Audit historical user displays, selectors, task/case assignments, sessions and user-management flows. RLS does not implement active state, admin authorization or protect password columns separately. |
+| `CaseDao` Status selectors/settings and shared `CaseSummaryDao` desktop grids/search/Calendar/Documents/Reports | Effective selectors read global/current rows, resolve SystemKey tenant precedence **before** excluding inactive/deleted winners. History joins keep stored IDs even if inactive. Global Settings edit creates a tenant override; tenant updates qualify owner. Lifecycle remove/restore validates admin and commits entity-action audit on the same connection. | Overlay FILTER retains global defaults/history and masks foreign definitions, including legacy unqualified ID joins. FILTER allows targeting visible global rows if UPDATE/DELETE is granted: global read access must not be treated as global write permission. |
+| `AuditLogDao` writers, `PhiAuditService`, desktop `PhiReadAuditService` | Both append overloads obtain tenant from SQL context. Connection-bound append throws; R2 requires one exact Case.Overview.Read/type1/code4/READ metadata event, commit before return, safe failure without DTO. Aggregate PHI writes on a supplied connection roll back on audit failure. Desktop screen reads dedupe/catch failure; non-connection PHI convenience paths can suppress failure. | Strict FILTER changes read visibility, **does not reject wrong-tenant INSERTs**. Preserve INSERT permission and existing failure contracts; do not claim desktop best-effort paths become fail-closed through RLS. AFTER INSERT/UPDATE blocks are a separate write decision below. No change to event fields, timestamps, sanitization or required audit policy. |
+| Audit review: `AuditLogViewerController`, `AuditLogDao.listAuditLogEntries` | Viewer normally gates on AppState admin; DAO requires requested tenant equal connection context, explicit tenant predicate, cap500. DAO has no authoritative active-admin check. It logs SQL and bound values to stderr, as already reported by #1865. | Tenant FILTER preserves same-tenant administrator visibility but does not restrict ordinary SQL users within that tenant. Shared runtime SELECT grants and desktop-held credentials could allow non-UI reads. Actual grants unknown; future admin-read boundary/least-privilege work is required before claiming DB-enforced admin-only audit access. Logging privacy is a separate unresolved source finding. |
+
+**Effective access cannot be inferred from this source inventory.** If an identity has direct SELECT
+through object/schema/database grants, public/nested/fixed roles, ownership, or an elevated module,
+these unprotected tables currently have no RLS tenant restriction on that path. Application WHERE clauses
+protect only the queries that include them. db_owner/control/impersonation and dbo/ShaleAdmins bypass
+also require review; app `Users.is_admin` is unrelated to SQL role ShaleAdmins. A tenant admin on ordinary
+runtime remains tenant-bound. Do not put shared runtime/auth identities in that bypass role.
+
+RLS here trusts SESSION_CONTEXT, not a signed end-user credential. Anyone able to use a shared JDBC
+identity and stamp arbitrary context may choose a different tenant if grants permit. Desktop direct
+JDBC/configuration and module/context-setting privileges are therefore part of the trust boundary;
+even a passing non-dbo harness is not proof against hostile possession of shared SQL credentials.
+No live credential exposure or direct SQL misuse was tested or established by this assessment.
+
+### Bounded catalog handoff for unknowns (not executed)
+
+An authorized operator should run these SELECT-only statements in Shale with existing approved access;
+this task does not authorize a connection. Use an existing metadata-capable administrator for catalog
+inventory, then separately the actual auth and runtime connections for current-identity/effective checks.
+Never export connection configuration, passwords, token/credential hashes, User/audit rows or raw logs.
+Record safe identities/permission names, counts and reviewed predicate semantics. TOP limits bound
+returned catalog metadata, not an execution deadline. If a limit is reached, visibility is insufficient,
+an object is hidden or a definition is NULL, report incomplete evidence; do not interpret that as absence.
+
+```sql
+-- Run on each approved auth/runtime connection, without EXECUTE AS or context mutation.
+SELECT DB_NAME() AS DatabaseName, USER_NAME() AS DatabasePrincipal,
+       ORIGINAL_LOGIN() AS OriginalLogin, SUSER_SNAME() AS EffectiveLogin,
+       CONVERT(nvarchar(128), DATABASEPROPERTYEX(DB_NAME(), 'Collation')) AS DatabaseCollation,
+       IS_MEMBER(N'ShaleAdmins') AS ShaleAdminsMember,
+       IS_MEMBER(N'db_owner') AS DbOwnerMember,
+       HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'VIEW DEFINITION') AS CanViewDefinitions;
+SELECT TOP (100) name, type, usage FROM sys.user_token ORDER BY name;
+-- Login token may be limited/unavailable under some Azure identities; retain UNKNOWN then.
+SELECT TOP (100) name, type, usage FROM sys.login_token ORDER BY name;
+SELECT TOP (100) permission_name FROM sys.fn_my_permissions(NULL, 'DATABASE')
+ORDER BY permission_name;
+SELECT TOP (100) permission_name FROM sys.fn_my_permissions(N'dbo.Users', 'OBJECT')
+ORDER BY permission_name;
+SELECT TOP (100) permission_name FROM sys.fn_my_permissions(N'dbo.auditLog', 'OBJECT')
+ORDER BY permission_name;
+SELECT TOP (100) permission_name FROM sys.fn_my_permissions(N'dbo.Statuses', 'OBJECT')
+ORDER BY permission_name;
+SELECT TOP (100) permission_name
+FROM sys.fn_my_permissions(N'dbo.ResolveDesktopRememberCredential', 'OBJECT')
+ORDER BY permission_name;
+```
+
+```sql
+-- Metadata-capable catalog connection. LEFT JOIN preserves tables with zero predicates.
+SELECT TOP (50) s.name AS TableSchema, t.name AS TableName, c.is_nullable,
+       ps.name AS PolicySchema, sp.name AS PolicyName, sp.is_enabled,
+       p.predicate_type_desc, p.operation_desc, p.predicate_definition
+FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id
+JOIN sys.columns c ON c.object_id=t.object_id AND c.name=N'ShaleClientId'
+LEFT JOIN sys.security_predicates p ON p.target_object_id=t.object_id
+LEFT JOIN sys.security_policies sp ON sp.object_id=p.object_id
+LEFT JOIN sys.schemas ps ON ps.schema_id=sp.schema_id
+WHERE s.name=N'dbo' AND t.name IN (N'Users',N'auditLog',N'Statuses')
+ORDER BY t.name, sp.name, p.security_predicate_id;
+SELECT TOP (10) s.name AS FunctionSchema, o.name, m.is_schema_bound, m.definition
+FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id
+LEFT JOIN sys.sql_modules m ON m.object_id=o.object_id
+WHERE (s.name=N'sec' AND o.name IN (N'fn_FilterByTenant',N'fn_FilterByTenantOrGlobal'))
+   OR (s.name=N'rls' AND o.name IN (N'fn_TenantMatch',N'fn_TenantMatch_Users',N'TenantFilter'))
+ORDER BY s.name,o.name;
+-- Static dependencies are discovery aids; dynamic SQL/external jobs are not fully represented.
+SELECT TOP (200) OBJECT_SCHEMA_NAME(d.referencing_id) AS ModuleSchema,
+       OBJECT_NAME(d.referencing_id) AS ModuleName, o.type_desc,
+       m.execute_as_principal_id, USER_NAME(m.execute_as_principal_id) AS ExplicitExecutionPrincipal,
+       COALESCE(o.principal_id,s.principal_id) AS EffectiveOwnerPrincipalId,
+       d.referenced_entity_name
+FROM sys.sql_expression_dependencies d JOIN sys.objects o ON o.object_id=d.referencing_id
+JOIN sys.schemas s ON s.schema_id=o.schema_id
+LEFT JOIN sys.sql_modules m ON m.object_id=o.object_id
+WHERE d.referenced_id IN (OBJECT_ID(N'dbo.Users'),OBJECT_ID(N'dbo.auditLog'),OBJECT_ID(N'dbo.Statuses'))
+ORDER BY ModuleSchema,ModuleName,d.referenced_entity_name;
+-- execute_as=-2 means OWNER; NULL means caller, not dbo. Inspect owner separately.
+SELECT TOP (10) o.name,m.execute_as_principal_id,
+       USER_NAME(COALESCE(o.principal_id,s.principal_id)) AS ModuleOwner,
+       m.is_schema_bound
+FROM sys.objects o JOIN sys.schemas s ON s.schema_id=o.schema_id
+LEFT JOIN sys.sql_modules m ON m.object_id=o.object_id
+WHERE s.name=N'dbo' AND o.name=N'ResolveDesktopRememberCredential';
+SELECT TOP (1) name AS DatabaseName,SUSER_SNAME(owner_sid) AS DatabaseOwner
+FROM sys.databases WHERE database_id=DB_ID();
+SELECT TOP (100) i.name AS IndexName,i.is_unique,i.is_disabled,i.filter_definition,
+       c.name AS ColumnName,ic.key_ordinal,ic.is_included_column
+FROM sys.indexes i JOIN sys.index_columns ic
+ ON ic.object_id=i.object_id AND ic.index_id=i.index_id
+JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id
+WHERE i.object_id=OBJECT_ID(N'dbo.Users') AND i.is_hypothetical=0
+ORDER BY i.name,ic.key_ordinal,ic.index_column_id;
+SELECT TOP (100) OBJECT_SCHEMA_NAME(cp.major_id) AS ModuleSchema,
+       OBJECT_NAME(cp.major_id) AS ModuleName, cp.crypt_type_desc
+FROM sys.crypt_properties cp
+WHERE cp.major_id IN (SELECT d.referencing_id FROM sys.sql_expression_dependencies d
+ WHERE d.referenced_id IN (OBJECT_ID(N'dbo.Users'),OBJECT_ID(N'dbo.auditLog'),OBJECT_ID(N'dbo.Statuses')))
+ORDER BY ModuleSchema,ModuleName;
+```
+
+```sql
+-- Run per actual auth/runtime connection: token includes applicable roles/public.
+-- Explicit permissions are supplementary; fixed roles/owners need effective checks above.
+SELECT TOP (500) gr.name AS Grantee, grantor.name AS Grantor,
+       p.class_desc,p.major_id,p.minor_id,p.permission_name,p.state_desc,
+       CASE WHEN p.class=1 THEN OBJECT_SCHEMA_NAME(p.major_id)+N'.'+OBJECT_NAME(p.major_id)
+            WHEN p.class=3 THEN SCHEMA_NAME(p.major_id) ELSE DB_NAME() END AS SecurableName
+FROM sys.database_permissions p
+JOIN sys.database_principals gr ON gr.principal_id=p.grantee_principal_id
+LEFT JOIN sys.database_principals grantor ON grantor.principal_id=p.grantor_principal_id
+WHERE p.grantee_principal_id IN (SELECT principal_id FROM sys.user_token)
+ AND (p.class=0 OR (p.class=3 AND p.major_id IN (SCHEMA_ID(N'dbo'),SCHEMA_ID(N'sec'),SCHEMA_ID(N'rls')))
+ OR (p.class=1 AND p.major_id IN (OBJECT_ID(N'dbo.Users'),OBJECT_ID(N'dbo.auditLog'),
+     OBJECT_ID(N'dbo.Statuses'),OBJECT_ID(N'dbo.ResolveDesktopRememberCredential'))))
+ORDER BY gr.name,p.class,p.major_id,p.minor_id,p.permission_name;
+-- Catalog principal/role closure: replace/add names only from approved actual-identity evidence.
+WITH RolePaths AS (
+ SELECT principal_id AS RootId,principal_id AS MemberId,0 AS Depth
+ FROM sys.database_principals
+ WHERE name IN (USER_NAME(),N'shale_app',N'shale_runtime',N'ShaleAdmins',N'public')
+ UNION ALL
+ SELECT r.RootId,rm.role_principal_id,r.Depth+1
+ FROM RolePaths r JOIN sys.database_role_members rm ON rm.member_principal_id=r.MemberId
+ WHERE r.Depth<16
+)
+SELECT TOP (200) USER_NAME(RootId) AS RootPrincipal,USER_NAME(MemberId) AS InheritedPrincipal,Depth
+FROM RolePaths ORDER BY RootPrincipal,Depth,InheritedPrincipal OPTION (MAXRECURSION 16);
+```
+
+These checks establish only the examined connection/database. An administrator must additionally
+inventory server-role/CONTROL SERVER/IMPERSONATE authority, database ownership, alternate schemas/modules,
+module signing and external jobs with existing approved metadata access where applicable. A dbo
+fn_my_permissions result cannot stand in for runtime. No GRANT/DENY, EXECUTE AS, sp_set_session_context,
+business data SELECT, hash lookup or connection-secret retrieval belongs in this catalog handoff.
+
+### Smallest compatible remediation and prerequisite order
+
+**Recommended target:** reuse existing enabled `sec.TenantFilter`, add precisely the three missing
+read FILTERs: Users/auditLog -> `sec.fn_FilterByTenant`; Statuses -> `sec.fn_FilterByTenantOrGlobal`.
+Do not edit shared predicate functions, attach the unused rls shim, create a competing policy, make
+Users global, or relax the harness/snapshot. Three FILTERs are the smallest **read-coverage** repair;
+they are insufficient for authentication compatibility or database-enforced write/admin authorization.
+
+1. **Close catalog/ownership prerequisites.** Confirm actual auth/runtime principals, databases,
+   no runtime dbo/ShaleAdmins bypass or elevated role/alter-policy/impersonation authority, effective
+   SELECT/INSERT/module access and database collation. Review nullable Users ownership, actual email
+   uniqueness and all pre-context callers (including older installed desktops/jobs); no guessed backfill,
+   identity reassignment or silent TOP1 ambiguity. The snapshot proves shape, not row distribution.
+2. **Implement a bounded pre-tenant authentication seam first, in a separate reviewed change.** Prefer
+   static parameterized database modules for exact credential identity lookup and remembered-credential
+   resolution, with narrowly scoped, explicitly reviewed module execution authority. With this existing
+   predicate, `EXECUTE AS OWNER` can provide the necessary dbo exception only when effective ownership
+   resolves to dbo; test caller restoration and restrict EXECUTE/ALTER/IMPERSONATE. Ordinary ownership
+   chaining and permission-only certificate signing do not automatically satisfy USER_NAME/IS_MEMBER.
+   Reuse `AuthServicePort`/AuthServiceImpl/BCrypt and DTOs, never accept a client tenant claim as verified
+   authority. Return only the existing authentication projection internally; no general enumeration,
+   arbitrary SQL or password hash API/logging. Reject unavailable/invalid-tenant/ambiguous identities
+   safely; retain active/removal checks. Review hash access because the current Java verifier consumes
+   hashes. This is a proposed auth-module design, not an assertion that such a login module exists.
+   Security owner review must accept this scoped pre-tenant capability, hash projection and ambiguous
+   identity policy before activation; it is not permission for a general tenant-runtime RLS bypass.
+3. **Stage compatible clients before Users FILTER.** Add modules and switch shared server/desktop
+   auth callers; preserve current password login, desktop enrollment and remembered restore/rotation,
+   session issuance/validation/refresh/logout, /me and post-login context initialization. Inventory/drain
+   every older direct-SELECT desktop first. There is no secure transparent strict-filter rollout to an
+   unknown ordinary pre-context caller. Do not temporarily grant broad bypass or modify the shared
+   sec function to preserve old clients. If older-client coexistence is mandatory, stop and obtain a
+   separate compatibility decision; do not silently adopt the unused shale_app-exception function.
+4. **Prepare a narrow, fail-fast, idempotent migration later.** Require exact target objects/columns,
+   reviewed predicate bodies and enabled schema-qualified policy. No-op only for matching predicates;
+   reject unexpected/disabled/conflicting policies. Add the three missing FILTERs without data rewrite,
+   index/nullability/ID/lookup-history changes. Record exact before/after definitions for scoped rollback.
+   AuditLog INSERT remains needed even if SELECT is reduced. Do not run the broad June proposal.
+5. **Decide write/admin controls explicitly before rollout.** FILTER does not prevent INSERT of foreign
+   ownership or UPDATE changing ownership. Recommend strict AFTER INSERT/UPDATE blocks for Users/audit
+   after writer review, retaining append-only audit grants (no runtime UPDATE/DELETE). Statuses needs
+   distinct strict write semantics: AFTER INSERT/UPDATE and BEFORE UPDATE/DELETE protection if database
+   enforcement of global immutability is required; overlay BLOCK would permit global changes, and only
+   AFTER UPDATE would permit converting a visible global row into a tenant row. Keep approved dbo/admin
+   maintenance separate. These blocks exceed the harness's read requirement and need scoped tests;
+   they are not implied to exist or be verified. Tenant-admin audit review also needs an authoritative
+   active-admin service/DAO/module seam and compatible grants: a shared desktop runtime SELECT plus a
+   UI check does not prove admin-only DB access. Preserve the viewer while planning any grant reduction;
+   do not revoke SELECT blindly or give every app admin SQL ShaleAdmins membership.
+
+**Audit compatibility review:** no new user-visible read/mutation/event is created by this assessment.
+The repair reuses existing audit schema/representation. Required R2 Overview delivery remains read +
+connection-bound append + commit; success/reread produces one event, search/assigned retain accepted
+summary exemption. Failures withhold all Case data; uncertain commit retains durable audit with no
+automatic replay/delete. Review aggregate PHI/entity-action writers, nullable actor/system rows and
+approved administrative tools before BLOCK/grant work. Desktop best-effort reads and legacy suppressed
+writes remain separately scoped limitations. Authentication modules must not add ad-hoc PHI/Timeline
+events or log credentials. Catalog/migration operator evidence is change-control evidence, not fabricated
+application audit. Existing audit-list logging privacy and missing DAO admin recheck remain open.
+
+### Verification, rollout and rollback gates
+
+Before running SQL, prepare a dependency-complete **derived UTF-8 schema-only input**, hash and manifest
+from the unchanged authoritative export. Record source and derived hashes separately. Full raw export
+is not importer-ready: UTF-16 differs from the Java UTF-8 reader; scalar dbo.ToBitNV is unsupported;
+`CREATE   FUNCTION` whitespace and SSMS SET ANSI_PADDING ON are outside the literal allowlist.
+Retained computed expressions/defaults and all FK/type/function dependencies must be resolved, not
+deleted to pass. Transcoding/format normalization or a narrow safety-reviewed importer enhancement must
+preserve definitions. Record the source database identifier collation and the disposable database's
+collation separately: the harness creates a database with the local server default, not an exported
+CREATE DATABASE definition. Resolve a case-sensitive AuditLog name mismatch through a reviewed source/
+tool compatibility change, never rename the authoritative table to conceal it. The current snapshot
+must continue to report the three missing FILTERs. A later
+candidate migration in an approved disposable clone produces a **separately labelled candidate final
+schema**, never a falsified authoritative export. #1865's importer does not run migrations: plan separate
+local candidate preparation/export or a narrowly reviewed test-tool workflow for it. No candidate DDL,
+derived input or integration execution was produced here.
+
+| Gate | Evidence required before rollout / closure |
+| --- | --- |
+| Auth prerequisite tests | Inspect/update existing AuthUserLifecycleSecurityTest's source-string assumption, auth adapter/controller and desktop lifecycle tests; add real local auth-principal tests for initial NULL context, valid/invalid/removed/NULL-tenant/ambiguous identities and pooled isolation. Prove module execution authority is confined and restored; no broad direct hash/table access after final grant cutover. |
+| Remember/session/bootstrap | Local auth-principal remembered resolver plus runtime rotation/JTI/revocation tests; server login/desktop exchange/session issuance, bound validation/refresh/logout and /me; no circular tenant lookup, client tenant assertion or caller authority retained from modules. |
+| Unchanged Case-read harness | Run original fixed scenarios on the labelled candidate schema using generated non-dbo identity with no bypass: A/B/NULL context, globals, pooling, paging/hasMore, joins/actor/deletion, exact audit and real denied INSERT. Commit wrappers remain injected transport evidence; inspect durable outcome independently. It does not cover auth modules, actual production grants or all desktop flows. |
+| Writes/admin compatibility | If adding blocks, reject foreign/null ownership writes and global Status mutations; permit valid tenant transactions and approved global maintenance. Verify ordinary versus tenant-admin audit reads through the approved boundary; retained historical audit/Status/User displays, settings/Team/assignment/Calendar/Documents/Reports. No success claim from an empty RLS-filtered reader. |
+| Runtime/build regression | Future implementation follows focused tests, selector affected modules/dependencies and critical Maven. Keep inherited full-suite advisories attributed and unresolved; inspect relevant migration-contract tests and runner safety tests without weakening assertions. |
+| Deployment evidence | Separately authorized operator confirms reviewed migration/candidate/source parity, actual grants/roles/context, database identifier collation, compatible installed clients and representative query plans/latency. Local success does not accept deployed Azure. R4 sessions/host/no-store/CORS/privacy/device/AT gates remain separate. |
+
+Future rollout order: catalog decisions -> additive auth modules -> shared auth implementation/server and
+compatible desktop release -> old-client drain -> isolated candidate verification -> authorized targeted
+policy change and any separately accepted blocks/grants -> sanitized operational smoke checks. Statuses/
+audit FILTERs can be independently staged after their consumers pass, but Users/auth blocker stays open
+until the full prerequisite chain closes. Do not deploy a partially verified set and call security accepted.
+Stop on login/remembered-restore denial, missing global/history presentation, audit append failure,
+context contamination or unexpected authority; withhold sensitive results, investigate safely.
+
+Prepare/rehearse rollback before authorization: restore only this change's recorded added predicates,
+module definitions and specific permission deltas; never disable the whole TenantFilter, alter shared
+functions, remove preexisting protection or delete committed audit history. Removing only newly added
+FILTERs reopens the confirmed coverage gap and requires explicit security disposition; it is not a green
+acceptance state. Prefer rolling back a faulty caller while retaining compatible auth modules/policies.
+Reverting to old direct-SELECT auth clients under strict Users FILTER will break login; coordinate database
+and client rollback using the recorded compatibility matrix. Keep additive modules while dependent
+clients remain. Durable-session cutoff/secret/legacy-token rollback constraints in the
+[App Service guide](../azure-app-service-deployment.md#phase-7b-durable-api-sessions) still apply.
+
+### Next implementation prompt
+
+Repository `gseshadow/Shale`, PR base `codex/latest`: implement **only the pre-tenant authentication
+prerequisite** for the reviewed three-table RLS plan. Read AGENTS.md, codex-prompt-rules and their routing,
+this assessment, tenancy/schema and release/session owners completely as applicable. Use approved
+operator catalog evidence to settle actual identities/owners/grants and email/NULL-tenant ambiguity;
+if unavailable, prepare reviewable modules/callers with explicit deployment blockers, never assume grants.
+Create a separate branch. Add bounded static credential lookup and remembered-credential identity
+modules with reviewed execution authority; switch shared AuthServiceImpl and remembered resolver while
+retaining Java BCrypt, auth ports/DTOs, server/desktop login/enrollment and durable session contracts.
+Restrict module capability, sanitize output/logging, fail safely on invalid/ambiguous identities and prove
+caller restoration. Do not set tenant from unverified client input or broaden shared sec predicates.
+Inspect/update existing auth/source-contract, remembered migration/store, controller and desktop lifecycle
+tests; add synthetic and opt-in local SQL coverage under actual proposed non-bypass auth/runtime roles.
+Do not attach the three FILTERs yet; document older desktop drain and exact rollback/permission evidence
+needed before that next migration. Keep CaseReadLocalSqlServerTest unchanged and the original export
+unmodified/uncommitted. Do not label candidate schema as production. No live connection, production
+credential, fault, configuration change, deployment or merge. Run focused/selected/critical relevant
+checks, update owning readiness/runbook/roadmap, commit/push and open a PR to codex/latest. Record any
+unrun SQL and preserve all R4 reports/security gates. Then propose the separately reviewed targeted RLS
+migration and candidate-verification task once auth compatibility is demonstrated.
+
+### Assessment review and documentation checks
+
+Changed-file/source review covers eight Markdown owners only; no production or test contracts changed.
+Reviewed the exported policy/functions/table shapes, Users/auth/session/remembered resolver, runtime
+initializer, minimized/shared desktop Case/Status readers, PHI/required/entity-action audit and viewer
+seams, June proposal and relevant incremental migrations against the plan. The review retained the
+auth-before-context dependency, unused versus attached functions, FILTER versus BLOCK distinction,
+global Status write limitation, dbo/ShaleAdmins exceptions, ambiguous email/nullable Users, module
+ownership-chain limitation, unknown production grants and original-versus-candidate evidence boundary.
+No independent human approval or SQL/security acceptance is claimed.
+
+Executed documentation checks on this assessment:
+
+```bash
+python3 /workspace/work/check_rls_docs.py
+python3 build/test-selection/select_tests.py --path architecture/database-schema.md \
+  --path architecture/tenancy-and-rls.md \
+  --path docs/testing/case-read-local-security-verification.md \
+  --path docs/web-api-azure-readiness.md \
+  --path docs/architecture/shale-web-v2-first-read-contract.md \
+  --path docs/architecture/shale-web-v2-architecture-roadmap.md \
+  --path docs/shale-web-deployment.md --path shale-web/docs/r4-desktop-acceptance.md \
+  --format markdown --plan-output /workspace/work/rls-doc-selection.json
+git diff --check
+```
+
+PASS: relative links/anchors, fences/whitespace, original export byte hash/encoding/size and offline
+absence of the three policy attachments; accepted R4 report tables unchanged; Java/SQL/tooling/build/
+configuration scope unchanged. Selector PASS: broad tenancy-document/web paths map to security-data
+and server, no modified tests or full-suite escalation. Their runtime tests and generic critical Maven
+command do not verify documentation-only assessment; Maven/npm/browser/SQL suites were not run.
+Historical focused/critical passes, skipped local SQL and inherited full-suite advisories stay attributed
+to their original tasks. This task establishes documentation/source review only. SQL integration and
+security acceptance remain OPEN/NOT RUN.

@@ -1320,18 +1320,57 @@ No new app dependency/version/workflow, product/API/auth feature, Azure setting/
 merge/close/review change, native/PWA or MCP/AI work. Inherited Maven advisories remain for disposition.
 Phase 2 acceptance **OPEN**, Phase 3 **IN PROGRESS**, Phase 4 **INCOMPLETE**.
 
+### 11.24 Case-read RLS coverage blocker and compatible remediation — 2026-10-14
+
+Documentation-only assessment from fetched `codex/latest` `194f514e8ae0a211a4d778696b0996be7b1c67d2`,
+separate `codex/case-read-rls-remediation-plan`. The
+[owning local security runbook](../testing/case-read-local-security-verification.md#rls-blocker-assessment--2026-10-14)
+records the authoritative attached SSMS export's original hash/actual shapes and the user-run Shale
+catalog result: **no security predicates on Users/auditLog/Statuses**. Existing sec functions/enabled
+policy do not establish attachment. This is a confirmed RLS coverage gap, not proof of an API leak.
+No local SQL integration, live connection, fixture/fault, production code, migration, configuration,
+merge or deployment occurred. The export/credentials stay outside Git; harness unchanged.
+
+Reviewed contract: ordinary runtime Users/audit reads are strict tenant; Statuses reads are tenant-or-global.
+R2 source has explicit actor/context/root/join predicates and connection-bound required Overview audit,
+so existing read behavior is not replaced with a guessed policy. AuthServiceImpl uses the auth pool before
+tenant context; remembered lookup's dbo ownership chain does not itself bypass RLS. Direct strict Users
+attachment can break server/desktop login and remembered bootstrap. Actual principal/grant/role/module
+execution context is UNKNOWN; bounded read-only catalog queries in the runbook precede those decisions.
+Database ShaleAdmins bypass is distinct from a tenant application's is_admin flag; shared SQL credentials
+and mutable SESSION_CONTEXT remain an explicit direct-JDBC trust boundary.
+
+Smallest target is three FILTER attachments to the existing sec policy after bounded pre-tenant auth
+modules/callers and installed-client drain. No shared function edit, unused auth-exception predicate,
+mock snapshot or broad June proposal. FILTERs do not enforce INSERT ownership, immutable global Statuses,
+password-column access or admin-only audit visibility; write blocks/grants/admin review need explicit
+compatible decisions. The runbook owns prerequisites, test inventory, candidate-schema preparation,
+rollout/rollback and the concrete next auth implementation prompt. Do not run the unchanged original
+snapshot expecting a pass or imply a derived candidate represents deployed production.
+
+R4's accepted Windows/desktop/audit/hosted/iPhone evidence remains unchanged and attributed. SQL execution
+NOT RUN; security acceptance OPEN; Phase 2 OPEN, Phase 3 IN PROGRESS, Phase 4 INCOMPLETE; appearance
+provisional. Deployed RLS/grants/performance/audit/session/host/privacy/device/AT gates remain open.
+
 <a id="12-next-bounded-prompt--hosted-web-delivery-preparation"></a>
 
 ## 12. Next bounded prompt — local SQL execution and remaining acceptance
 
-Run the [local security harness](../testing/case-read-local-security-verification.md) against a dedicated
-loopback SQL Server using a reviewed approved offline schema-only snapshot. Record source/schema hash,
-selected dependency inventory, SQL/JDBC/JDK/Maven versions and fixed scenario outcomes, distinguishing
-real SQL execution from injected acknowledgement behavior and response withholding from durable outcome.
-Do not retrieve production data/credentials, alter production protection or relax schema to pass. If a
-real defect emerges, report/isolate it for a bounded follow-up. Preserve all committed audit history;
-cleanup only the marker-verified resources created by that harness. SQL checks remain unexecuted until
-that prerequisite is supplied. No Azure/deployment or phase-completion authorization follows.
+Implement the [bounded pre-tenant auth prerequisite](../testing/case-read-local-security-verification.md#next-implementation-prompt)
+before the separately reviewed targeted RLS migration and local candidate verification. The authoritative
+offline snapshot is now supplied and confirms missing Users/auditLog/Statuses coverage; it must remain
+unchanged/uncommitted. Resolve actual identity/grant/module ownership and email/NULL-user prerequisites
+through approved operator evidence. Preserve shared BCrypt/auth/session contracts and compatible desktop
+login/remembered bootstrap; do not broaden shared sec predicates or grant runtime SQL admin bypass.
+
+After compatible callers/old-client drain and reviewed targeted policy preparation, the unchanged
+[local harness](../testing/case-read-local-security-verification.md) can verify a **labelled candidate**
+schema on dedicated disposable loopback SQL. Record original/derived/candidate hashes and manifest,
+SQL/JDBC/JDK/Maven/source identities and exact scenario outcomes; distinguish real SQL from injected
+acknowledgement behavior and withheld response from durable outcome. Never fabricate predicates into
+the authoritative export, weaken harness checks, delete committed audit or infer Azure parity from a
+local pass. SQL execution remains NOT RUN. No live/production changes, merge/deployment or phase closure
+are authorized by this assessment.
 
 Remaining gates after that local run: deployed schema/RLS/grant parity and representative SQL scanned-work/
 plans/collation/concurrent paging; authoritative audit context/viewer and deployed failure handling;
