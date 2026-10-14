@@ -850,3 +850,128 @@ fences, scope/whitespace and exact unchanged Case harness/R4 ledger are checked 
 export remains unmodified/uncommitted and absent from this mount; its historical hash is not recomputed here.
 **AUTH SQL NOT RUN; CASE SQL NOT RUN; installed/production compatibility UNVERIFIED; deployment BLOCKED.**
 No targeted RLS migration prompt or security acceptance is issued without the missing compatibility evidence.
+
+## Windows local-launcher Maven retest — 2026-10-14
+
+Operator evidence on Windows 11 / Python 3.12.10 / JDK 21.0.8 / Maven 3.9.11:
+three existing auth launcher safety tests passed; the dedicated SQL container listens at
+`127.0.0.1:14333`. After clearing the process-only `SHALE_AUTH_TOKEN_SECRET`, credentials were
+prompted but the launcher reported `launcher_prerequisite`. `shutil.which("mvn")` found
+`C:\Program Files\Apache\Maven\apache-maven-3.9.11\bin\mvn.CMD`, while
+`subprocess.run(["mvn", "-version"])` raised FileNotFoundError / winerror 2.
+**AUTH SQL NOT RUN**; reaching credential prompts was not SQL verification.
+
+Both Python launchers now resolve an absolute installed Maven path (Windows prefers `mvn.cmd`)
+and quietly execute `-version` before credential prompts. Inspection confirmed the Case runner also
+invoked a batch wrapper directly; it receives the equivalent fix. Native executables and POSIX Maven
+use direct argument arrays with `shell=False`. Windows `.cmd`/`.bat` wrappers use the explicit system
+`cmd.exe /d /s /v:off /c`, with every token quoted and the required outer command quotes.
+AutoRun and delayed expansion are disabled. Credentials are passed only in the private child environment;
+no credential is formatted into a command, logged, or copied into the parent process environment.
+Command tokens containing quotes, `%`, `!`, `^`, `&`, `|`, `<`, `>`, NUL or line breaks are refused
+instead of being interpreted; ordinary spaces and parentheses are supported. If an installed Maven or
+quiet-config path contains those refused characters, use a dedicated path without them. `--maven`
+on either launcher accepts one installed executable path, never command arguments.
+
+Fixed tooling/environment outcomes are `AUTH_VERIFY FAIL <category>` or
+`CASE_READ_VERIFY FAIL <category>`:
+
+| Category | Meaning / operator action |
+| --- | --- |
+| `maven_missing` | Maven cannot be resolved. Install/add Maven to PATH or provide `--maven` with its exact path. No credentials prompted. |
+| `maven_invocation` | Resolved Maven could not start, the quiet version probe failed (including unusable JDK), or Windows command tokens were unsafe. Check local tooling/path prerequisites; no raw diagnostic or value is exposed. Probe failures precede prompts; a later child-start failure uses the same category. |
+| `prohibited_environment` | An application/auth/connection source or implicit Java/Maven argument variable is populated. Use a clean verification terminal; values and variable names are not printed. Both launchers reject `MAVEN_OPTS` as well as the other documented implicit sources. |
+
+Other invalid local inputs keep their existing generic refusal; a Maven build/harness failure after
+successful startup keeps the existing fixed build/scenario output. Local-only validation, explicit
+opt-in, schema hash/provenance (Case), quiet diagnostics and exact nonce/resource cleanup are retained.
+The schema export, Case SQL harness, production authentication/modules/RLS, dependencies and accepted
+R4 evidence are unchanged. Audit compatibility retains the existing schema and audit flows; this launcher
+change introduces no domain/admin mutation, sensitive application read, or new audit event.
+
+From the repository root of the task branch in a fresh **PowerShell** terminal with the dedicated
+local container already running and installed JDK 21/Maven available:
+
+```powershell
+# Process-only removal of the operator-confirmed inherited auth secret; no persistent configuration edit.
+Remove-Item Env:SHALE_AUTH_TOKEN_SECRET -ErrorAction SilentlyContinue
+python --version
+java -version
+mvn -version
+python -m unittest discover -s build/auth-verification -p 'test_*.py'
+if ($LASTEXITCODE -ne 0) { throw 'Launcher regression tests failed' }
+python -m unittest discover -s build/case-read-verification -p 'test_*.py'
+if ($LASTEXITCODE -ne 0) { throw 'Case launcher safety tests failed' }
+python build/auth-verification/run.py --opt-in LOCAL_DISPOSABLE_AUTH --port 14333
+if ($LASTEXITCODE -ne 0) { throw 'Auth SQL remains unverified; review fixed category/scenario and prerequisites' }
+```
+
+For an explicit-path retest of the operator's Maven installation, use this **instead of** the final
+launcher command above (a second invocation creates another fresh synthetic fixture):
+
+```powershell
+python build/auth-verification/run.py --opt-in LOCAL_DISPOSABLE_AUTH --port 14333 --maven 'C:\Program Files\Apache\Maven\apache-maven-3.9.11\bin\mvn.CMD'
+if ($LASTEXITCODE -ne 0) { throw 'Auth SQL remains unverified; review fixed category/scenario and prerequisites' }
+```
+
+Enter only dedicated **local** admin credentials privately at the prompts (`sa` for the previously
+created disposable container). Do not populate application connection variables or implicit Java/Maven
+arguments to make the launcher pass. Expected auth results are exactly `AUTH_VERIFY PASS credential_identity`,
+`AUTH_VERIFY PASS remembered_rotation` and `AUTH_VERIFY PASS runtime_isolation`, with exit code 0 after
+successful exact-resource cleanup. Record only fixed outcomes, exit code and tool versions. Any cleanup
+failure still requires exact-resource operator review; never scan/drop by prefix or prune containers.
+The Case SQL retest still uses the existing reviewed-schema/hash/provenance commands above; this fix does
+not supply, derive or modify its schema input and does not authorize SQL execution in this task.
+
+The new cross-launcher regression suite lives in
+[`test_maven.py`](../../build/auth-verification/test_maven.py). On Linux its Windows resolution/command
+checks are **simulated**, and its native `cmd.exe` fake-wrapper test is explicitly skipped. On Windows
+that test executes an actual temporary `.CMD` path with spaces and a synthetic private environment,
+without Maven, Java or SQL; its POSIX child-process test is skipped instead. Passing that test proves
+batch invocation only. Actual Maven-on-Windows and SQL scenario evidence require the operator commands
+above. **Actual Windows execution UNVERIFIED; AUTH SQL NOT RUN; CASE SQL NOT RUN; security acceptance OPEN.**
+
+### Launcher-fix local verification record
+
+Base fetched live: `eefe3e8cc91dc471fec304e3cbdc4a24e5b268d2`; #1868 is merged by GitHub
+metadata and Git ancestry. Separate branch/worktree `codex/windows-local-verification-maven` preserves
+the original checkout. Pre-edit impact inventory reviewed both `test_runner.py` suites, the selector's
+Windows Maven resolution/argv tests, CaseReadVerificationSafetyTest and the opt-in auth harness.
+Changed-file review maps both Python launchers to the new cross-launcher process tests, existing guard
+suites and owning operator instructions. Searches confirm no remaining bare-Maven invocation in these
+launchers and no `shell=True`. The Case guard test additionally covers all implicit Java/Maven sources.
+
+Executed on **Linux / Python 3.12.14 / Maven 3.9.11 / Eclipse Adoptium JDK 21.0.12.1** (Codex toolchain,
+not the operator's Windows versions). `mvn` below means the preinstalled
+`/workspace/.tools/bin/mvn` wrapper with its existing local settings/JDK; no repository dependencies or
+build settings changed. No SQL opt-in or SQL admin credentials were set.
+
+```bash
+python3 -m unittest discover -s build/auth-verification -p 'test_*.py'
+python3 -m unittest discover -s build/case-read-verification -p 'test_*.py'
+python3 -m unittest discover -s build/test-selection -p 'test_select_tests.py'
+mvn -pl shale-data,shale-server -am \
+  -Dtest=CaseReadVerificationSafetyTest,PreTenantAuthenticationLocalSqlServerTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+python3 build/test-selection/select_tests.py --base eefe3e8cc91dc471fec304e3cbdc4a24e5b268d2 --head HEAD --format markdown --plan-output work/selection.json
+mvn -pl shale-data,shale-server -am \
+  -Dtest=com.shale.data.auth.AuthCredentialLookupTest,com.shale.data.auth.AuthUserLifecycleSecurityTest,com.shale.data.auth.PreTenantAuthenticationModuleContractTest,com.shale.data.dao.CaseAggregateTransactionTest,com.shale.data.dao.CaseLifecycleAuditContractTest,com.shale.data.dao.ContactAggregateMutationContractTest,com.shale.data.dao.ContactMutationContractTest,com.shale.data.dao.EntityActionAuditEventTest,com.shale.data.dao.EntityActionAuditMigrationContractTest,com.shale.data.dao.RequestLookupRlsPhase2MigrationTest,com.shale.server.runtime.RequestScopedDbSessionProviderTest,com.shale.server.runtime.ServerSessionSkeletonTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -B test
+git diff --check eefe3e8cc91dc471fec304e3cbdc4a24e5b268d2 HEAD
+```
+
+| Check | Result and limits |
+| --- | --- |
+| Auth/cross-launcher Python discovery | 13 PASS, 1 explicit native-Windows skip. Simulated Windows resolution/quoting/injection checks for both launchers; actual POSIX child process; private credentials, quiet output, pre-prompt failure order and temp cleanup. |
+| Existing Case Python safety | 4 PASS. Opt-in, local port, schema/hash/provenance, environment and fixed-output boundary. |
+| Selector unit suite | 24 PASS. Existing Windows resolution and structured argv contracts retained. |
+| Focused Java harness safety | 5 PASS; 1 explicit local auth SQL skip. Harness compiles; no SQL execution. |
+| Selector affected suite | 54 PASS. Security-data auth, tenant/audit and request-context contracts plus module dependencies are selected because local security tooling changed. No full-suite escalation. |
+| Critical reactor | 116 PASS; build success. Compilation and synthetic critical regressions across modules. |
+| Scope / Markdown / Git checks | PASS: added relative links/fences, diff whitespace, unchanged Case SQL harness/SQL migrations/R4 ledger, original checkout clean. Original schema export is absent from this mount and was not read, regenerated or committed. |
+
+The subprocess boundary receives an explicit environment snapshot. These checks do not
+establish actual Windows Maven invocation, SQL scenario success, installed-client compatibility or
+production authority. **Windows retest pending; AUTH SQL NOT RUN; CASE SQL NOT RUN; deployment BLOCKED;
+security acceptance OPEN.** No live connection, deployment or merge occurred.
