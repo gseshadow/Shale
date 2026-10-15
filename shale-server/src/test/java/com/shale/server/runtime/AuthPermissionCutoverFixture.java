@@ -21,8 +21,21 @@ final class AuthPermissionCutoverFixture {
         variables.put("RollbackCompatibilityReviewed","CONFIRMED");
         variables.put("NewModuleConsumersDrained","CONFIRMED");
     }
+    private record AuthorityCheck(String condition,String securable,String permission,Integer value,String outcome) {}
+    private final List<AuthorityCheck> authorityChecks=new ArrayList<>();
     private void execute(String sql)throws SQLException {
-        try(var q=connection.createStatement()){q.setQueryTimeout(15);q.execute(sql);}
+        try(var q=connection.createStatement()) {
+            q.setQueryTimeout(15);
+            boolean results=q.execute(sql);
+            while(results || q.getUpdateCount()!=-1) {
+                if(results)try(var r=q.getResultSet()) {
+                    if(r.getMetaData().getColumnCount()==5 && r.getMetaData().getColumnLabel(1).equals("ConditionName"))while(r.next())
+                        authorityChecks.add(new AuthorityCheck(r.getString("ConditionName"),r.getString("Securable"),
+                                r.getString("PermissionName"),(Integer)r.getObject("EffectiveValue"),r.getString("Outcome")));
+                }
+                results=q.getMoreResults();
+            }
+        }
     }
     private String expand(Path path)throws Exception {
         var result=new StringBuilder();
@@ -33,6 +46,7 @@ final class AuthPermissionCutoverFixture {
         return result.toString();
     }
     private void script(String name)throws Exception {
+        authorityChecks.clear();
         // Only compile-time fixed repo script paths/known safe fixture substitutions; no user SQL inputs.
         String sql=expand(root.resolve("docs/sql/auth/permission-cutover/"+name+".sql"));
         for(var e:variables.entrySet()) sql=sql.replace("$("+e.getKey()+")",e.getValue());
@@ -41,7 +55,7 @@ final class AuthPermissionCutoverFixture {
         catch(Exception failure){execute("IF @@TRANCOUNT>0 ROLLBACK");throw failure;}
         finally {
             // SQLCMD exits its connection on the first error. Reused JDBC test connections need temp cleanup.
-            for(String table:List.of("PriorPermissions","PriorModules","PriorOwners","PriorMemberships","PriorPredicates","CutoverPrincipals","CutoverObjects","CutoverColumns","ElevatedModules","AuthColumns","CutoverDelta"))
+            for(String table:List.of("PriorPermissions","PriorModules","PriorOwners","PriorMemberships","PriorPredicates","AuthAuthorityChecks","CutoverOwnership","CutoverGrantOptions","CutoverVisibility","CutoverPrincipals","CutoverObjects","CutoverColumns","ElevatedModules","AuthColumns","CutoverDelta"))
                 execute("DROP TABLE IF EXISTS #"+table);
         }
     }
@@ -69,7 +83,63 @@ final class AuthPermissionCutoverFixture {
         assertEquals("dbo",scalar("SELECT USER_NAME()"),"failed preflight/postcheck must restore operator");
         assertEquals("0",scalar("SELECT @@TRANCOUNT"),"failed stage must not leave an open transaction");
     }
+    private void authFinding(String injection,String cleanup,String condition,String permission)throws Exception {
+        execute(injection);
+        try {
+            rejected("preflight",58307);
+            assertTrue(authorityChecks.stream().anyMatch(c->c.condition().equals(condition)
+                    && c.permission().equals(permission) && Integer.valueOf(1).equals(c.value())
+                    && c.outcome().equals("GRANTED")),"must name the actual granted authority: "+condition+"/"+permission);
+        } finally { execute(cleanup); }
+    }
+    private void authAuthorityDiagnostics()throws Exception {
+        var originalPermissions=catalog("database_permissions");
+        var originalMemberships=catalog("database_role_members");
+        authFinding("GRANT EXECUTE TO shale_app", "REVOKE EXECUTE FROM shale_app", "database", "EXECUTE");
+        authFinding("GRANT EXECUTE ON SCHEMA::dbo TO shale_app", "REVOKE EXECUTE ON SCHEMA::dbo FROM shale_app", "dbo-schema", "EXECUTE");
+        authFinding("ALTER ROLE db_datareader ADD MEMBER shale_app", "ALTER ROLE db_datareader DROP MEMBER shale_app", "fixed-role", "MEMBER");
+        authFinding("CREATE ROLE ShaleAdmins; ALTER ROLE ShaleAdmins ADD MEMBER shale_app",
+                "ALTER ROLE ShaleAdmins DROP MEMBER shale_app; DROP ROLE ShaleAdmins", "role", "MEMBER");
+        authFinding("GRANT UPDATE ON dbo.Users(email) TO shale_app AS dbo",
+                "REVOKE UPDATE ON dbo.Users FROM shale_app AS dbo","column","UPDATE");
+        authFinding("GRANT SELECT ON dbo.Statuses(Id) TO shale_app AS dbo",
+                "REVOKE SELECT ON dbo.Statuses FROM shale_app AS dbo","column","SELECT");
+        authFinding("CREATE ROLE AuthProbeInner; CREATE ROLE AuthProbeOuter; ALTER ROLE AuthProbeInner ADD MEMBER shale_app; "
+                        +"ALTER ROLE AuthProbeOuter ADD MEMBER AuthProbeInner; GRANT UPDATE ON dbo.Users(email) TO AuthProbeOuter",
+                "ALTER ROLE AuthProbeOuter DROP MEMBER AuthProbeInner; ALTER ROLE AuthProbeInner DROP MEMBER shale_app; "
+                        +"DROP ROLE AuthProbeInner; DROP ROLE AuthProbeOuter","column","UPDATE");
+        authFinding("GRANT UPDATE ON dbo.Users(email) TO public",
+                "REVOKE UPDATE ON dbo.Users FROM public AS dbo","column","UPDATE");
+        authFinding("GRANT SELECT ON dbo.Users TO shale_app WITH GRANT OPTION AS dbo",
+                "REVOKE SELECT ON dbo.Users FROM shale_app CASCADE AS dbo","grant-option","SELECT");
+        authFinding("CREATE SCHEMA AuthProbeOwned AUTHORIZATION shale_app",
+                "DROP SCHEMA AuthProbeOwned","ownership","OWNER");
+        authFinding("GRANT IMPERSONATE ON USER::PriorGrantor TO shale_app",
+                "REVOKE IMPERSONATE ON USER::PriorGrantor FROM shale_app","impersonate-user","IMPERSONATE");
+        execute("CREATE PROCEDURE dbo.AuthProbeModule WITH EXECUTE AS OWNER AS SELECT 1 AS FixtureOnly");
+        try { authFinding("GRANT EXECUTE ON dbo.AuthProbeModule TO shale_app",
+                "REVOKE EXECUTE ON dbo.AuthProbeModule FROM shale_app","object","EXECUTE"); }
+        finally { execute("DROP PROCEDURE dbo.AuthProbeModule"); }
+        // A deliberately unsupported permission probe returns SQL NULL: preserve it and stop.
+        String snapshot=expand(root.resolve("docs/sql/auth/permission-cutover/auth-authority-snapshot.sql"));
+        for(String batch:snapshot.split("(?im)^GO\\s*$"))if(!batch.isBlank())execute(batch);
+        String diagnostics=expand(root.resolve("docs/sql/auth/permission-cutover/auth-authority-diagnostics.sql"))
+                .replace("v.PermissionName,c.ColumnName", "N'NOT_A_PERMISSION',c.ColumnName");
+        for(String batch:diagnostics.split("(?im)^GO\\s*$"))if(!batch.isBlank())execute(batch);
+        assertTrue(authorityChecks.stream().anyMatch(c->c.value()==null && c.outcome().equals("UNKNOWN")
+                && c.condition().equals("column")),"unknown column permission must not be called GRANTED or safe");
+        rejected("auth-authority-check",58307);
+        assertEquals(originalPermissions,catalog("database_permissions"),"diagnostic probes must preserve the original ACL states and grantors");
+        assertEquals(originalMemberships,catalog("database_role_members"),"diagnostic probes must preserve original memberships");
+    }
     void verifyAndInstall()throws Exception {
+        // Reproduce the operator's complete auth ACL profile, including denied metadata.
+        as("shale_app","IF COALESCE(HAS_PERMS_BY_NAME(DB_NAME(),'DATABASE','VIEW DEFINITION'),-1)<>0 THROW 58400,N'Fixture must reproduce metadata DENY',1");
+        script("diagnose-auth");
+        script("preflight");
+        assertTrue(authorityChecks.stream().noneMatch(c->c.value()==null || c.value()==1),
+                "reported grants plus VIEW DEFINITION DENY alone must pass without unknown authority");
+        authAuthorityDiagnostics();
         // Establish the dangerous baseline with the same broad database/schema grants reported by operator.
         execute("BEGIN TRANSACTION");
         String installer=Files.readString(root.resolve("docs/sql/2026-10-14_pretenant_authentication_modules.sql"));
